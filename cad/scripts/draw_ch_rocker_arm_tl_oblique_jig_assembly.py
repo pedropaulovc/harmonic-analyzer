@@ -379,11 +379,8 @@ BOM_DESCRIPTION_MAX_CHARS = int(
     (BOM_COLUMN_WIDTHS["description"] - BOM_CELL_PADDING_M) / BOM_CHAR_M
 )
 BOM_ROW_HEIGHT = 0.0055
-BOM_SHEET_CLEARANCE = 0.003  # the paper the BOM keeps off the title block
-BOM_ANCHOR = (
-    SHEET_INNER_BORDER[0],
-    SHEET_INNER_BORDER[3] - BOM_SHEET_CLEARANCE,
-)
+BOM_SHEET_CLEARANCE = 0.003  # visible air at the border and title block
+BOM_ANCHOR = (0.018, 0.260)
 REGION_GAP = 0.006  # between a view's room and the text beside it
 # The BOM's reference owns its whole right column.
 REFERENCE_REGION = (
@@ -774,29 +771,63 @@ def pin_tip_inspection_lines() -> tuple[
         # Block material either side of the open pin bore; mount faces at Z=0.
         ((x + 0.024, datum), (x + 0.024, upper),
          (x + 0.042, upper), (x + 0.042, datum)),
-        ((x + 0.064, datum), (x + 0.064, upper),
-         (x + 0.082, upper), (x + 0.082, datum)),
+        # Open room beside the pin for the inspection bracket and its value.
+        ((x + 0.104, datum), (x + 0.104, upper),
+         (x + 0.122, upper), (x + 0.122, datum)),
         # The lowest pin tip stays on the +Z side, not in the carriage.
         ((x + 0.049, upper), (x + 0.049, tip),
          (x + 0.057, tip), (x + 0.057, upper)),
         # Ground bridge below the mount faces; its upper face is the datum line.
         ((x + 0.024, datum), (x + 0.024, datum - 0.003),
-         (x + 0.082, datum - 0.003), (x + 0.082, datum)),
+         (x + 0.122, datum - 0.003), (x + 0.122, datum)),
         # Feeler in the open recess; its paper thickness is not a model size.
         ((x + 0.048, datum + 0.002), (x + 0.060, datum + 0.002),
          (x + 0.060, datum + 0.004), (x + 0.048, datum + 0.004),
          (x + 0.048, datum + 0.002)),
     )
+    pointers = []
+    for _text, start, end in pin_tip_inspection_leaders():
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        length = math.hypot(dx, dy)
+        ux, uy = dx / length, dy / length
+        # Native sheet-sketch arrowheads share the schematic's exact paper proof.
+        back = (end[0] - 0.0015 * ux, end[1] - 0.0015 * uy)
+        pointers.extend((
+            (start, end),
+            ((back[0] - 0.0006 * uy, back[1] + 0.0006 * ux), end),
+            ((back[0] + 0.0006 * uy, back[1] - 0.0006 * ux), end),
+        ))
     return (
         *((a, b) for profile in profiles for a, b in zip(profile, profile[1:])),
-        ((x + 0.020, datum), (x + 0.090, datum)),
+        ((x + 0.020, datum), (x + 0.124, datum)),
         ((x + 0.006, datum), (x + 0.006, upper)),
         ((x + 0.003, upper - 0.004), (x + 0.006, upper)),
         ((x + 0.009, upper - 0.004), (x + 0.006, upper)),
         # A drawn inspection bracket, not an imported/manufacturing dimension.
-        ((x + 0.061, datum), (x + 0.061, tip)),
-        ((x + 0.0595, datum), (x + 0.0625, datum)),
-        ((x + 0.0595, tip), (x + 0.0625, tip)),
+        ((x + 0.057, tip), (x + 0.072, tip)),
+        ((x + 0.070, datum), (x + 0.070, tip)),
+        ((x + 0.0685, datum), (x + 0.0715, datum)),
+        ((x + 0.0685, tip), (x + 0.0715, tip)),
+        ((x + 0.070, (datum + tip) / 2.0),
+         (x + 0.073, (datum + tip) / 2.0)),
+        *pointers,
+    )
+
+
+def pin_tip_inspection_leaders() -> tuple[
+    tuple[str, tuple[float, float], tuple[float, float]], ...
+]:
+    """Each feature caption's pointer starts outside its text and ends on the ink."""
+    x, _bottom, _right, top = PIN_TIP_INSPECTION_REGION
+    datum = PIN_TIP_SECTION_DATUM_Y
+    return (
+        ("PIN", (x + 0.059, top - 0.0245), (x + 0.057, top - 0.032)),
+        ("BLOCK", (x + 0.111, top - 0.0245), (x + 0.111, top - 0.027)),
+        ("FEELER", (x + 0.0425, top - 0.0245), (x + 0.048, datum + 0.003)),
+        ("Z=0 MOUNTING PLANE", (x + 0.012, top - 0.070), (x + 0.020, datum)),
+        ("GROUND BRIDGE", (x + 0.093, top - 0.070), (x + 0.093, datum - 0.003)),
+        ("NO PROUD CARRIAGE FEATURE", (x + 0.074, top - 0.087),
+         (x + 0.066, datum - 0.007)),
     )
 
 
@@ -807,13 +838,14 @@ def pin_tip_inspection_labels() -> tuple[tuple[str, tuple[float, float]], ...]:
         ("C2A FUNCTIONAL SECTION", (x, top)),
         ("SCHEMATIC - NOT TO SCALE", (x, top - 0.006)),
         ("+Z INTO BLOCK", (x, top - 0.014)),
-        ("PIN", (x + 0.047, top - 0.020)),
-        ("Z=0 MOUNTING PLANE", (x, top - 0.070)),
-        (spec.PIN_TIP_MIN_RECESS_CALLOUT,
-         (x + 0.069, top - 0.070)),
-        ("GROUND BRIDGE + FEELER", (x, top - 0.078)),
-        ("NO PROUD CARRIAGE FEATURE", (x, top - 0.086)),
-        ("BEARINGS ABSENT; SEE C2A", (x, top - 0.092)),
+        ("FEELER", (x + 0.025, top - 0.020)),
+        ("PIN", (x + 0.056, top - 0.020)),
+        ("BLOCK", (x + 0.104, top - 0.020)),
+        (spec.PIN_TIP_MIN_RECESS_CALLOUT, (x + 0.076, top - 0.0525)),
+        ("Z=0 MOUNTING PLANE", (x, top - 0.073)),
+        ("GROUND BRIDGE", (x + 0.076, top - 0.073)),
+        ("NO PROUD CARRIAGE FEATURE", (x, top - 0.087)),
+        ("BEARINGS ABSENT; SEE C2A", (x, top - 0.095)),
     )
 
 
@@ -1018,9 +1050,9 @@ def bom_extent_violations(
     ):
         findings.append("enters the reference column")
     if (
-        left < border_left - tolerance
-        or right > border_right + tolerance
-        or top > border_top + tolerance
+        left < border_left + BOM_SHEET_CLEARANCE - tolerance
+        or right > border_right - BOM_SHEET_CLEARANCE + tolerance
+        or top > border_top - BOM_SHEET_CLEARANCE + tolerance
     ):
         findings.append("crosses the inner border")
     if bottom < border_bottom + BOM_SHEET_CLEARANCE - tolerance:

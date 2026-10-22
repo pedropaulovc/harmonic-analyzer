@@ -320,6 +320,48 @@ def test_clusters_partition_the_bom() -> None:
     assert all(set(cluster.context) <= inventory for cluster in drawing.CLUSTERS)
 
 
+def test_exploded_wire_stays_near_its_heads_and_apart_from_the_cotter() -> None:
+    right, up, _sight = spec.VIEW_AXES[spec.ISOMETRIC_VIEW]
+    ratio = 1.0 / 4000.0  # the reviewed capture sheet's 1:4 paper projection
+
+    def project(stem, point, index=0):
+        origin, rows = spec.PLACEMENTS[stem][index]
+        world = tuple(
+            origin[axis] + spec.explode_shift(stem, "xyz"[axis])
+            + sum(point[k] * rows[k][axis] for k in range(3))
+            for axis in range(3)
+        )
+        return tuple(sum(p * a for p, a in zip(world, axis)) * ratio
+                     for axis in (right, up))
+
+    wire = spec.pivot_wire
+    wire_points = [
+        project(spec.PIVOT_LOCK_WIRE, point)
+        for segment in wire.installed_wire_segments() for point in segment
+    ]
+    cotter = spec.pivot_cotter
+    cotter_points = [
+        project(spec.PIVOT_COTTER, (x, y, z))
+        for x in (cotter.INSTALLED_X_MIN, cotter.INSTALLED_X_MAX)
+        for y in (-cotter.INSTALLED_Y_HALF_WIDTH, cotter.INSTALLED_Y_HALF_WIDTH)
+        for z in (cotter.INSTALLED_Z_MIN, cotter.INSTALLED_Z_MAX)
+    ]
+    # Cf3's two bodies met at their leader tips. Their projected envelopes now
+    # have daylight, including the formed wire's whole tube radius.
+    assert max(p[0] for p in wire_points) + wire.WIRE_DIA / 2.0 * ratio < min(
+        p[0] for p in cotter_points
+    )
+    wire_center = project(spec.PIVOT_LOCK_WIRE, (0.0, 0.0, wire.WIRE_AXIS_Z))
+    heads = [
+        project(spec.PIVOT_CAP_SCREW, (0.0, 0.0, wire.WIRE_AXIS_Z), index)
+        for index in (0, 2)
+    ]
+    head_center = tuple(sum(p[axis] for p in heads) / 2.0 for axis in (0, 1))
+    assert wire_center[1] > head_center[1]
+    assert math.dist(wire_center, head_center) < drawing.BALLOON_RADIUS
+
+
+
 def test_exploded_captions_fit_their_text_region() -> None:
     for cluster in drawing.CLUSTERS:
         scale = drawing.cluster_ring_scale(
@@ -484,12 +526,21 @@ def test_bom_sheet_regions_fit_apart() -> None:
     region = drawing.REFERENCE_REGION
     assert _inside(reference, region) and _inside_sheet(region)
     assert region[0] >= bom[2] + drawing.REGION_GAP
+    assert bom[0] - drawing.SHEET_INNER_BORDER[0] >= drawing.BOM_SHEET_CLEARANCE
+    assert drawing.SHEET_INNER_BORDER[3] - bom[3] >= drawing.BOM_SHEET_CLEARANCE
 
 
 def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> None:
     left, bottom, right, top = drawing.SHEET_INNER_BORDER
     clearance = drawing.BOM_SHEET_CLEARANCE
     assert not drawing.bom_extent_violations(drawing.BOM_ANCHOR, BOM_WIDTH, BOM_HEIGHT)
+    # Touching either border failed the printed cf3 sheet even without a spill.
+    assert drawing.bom_extent_violations(
+        (left, drawing.BOM_ANCHOR[1]), BOM_WIDTH, BOM_HEIGHT,
+    )
+    assert drawing.bom_extent_violations(
+        (drawing.BOM_ANCHOR[0], top), BOM_WIDTH, BOM_HEIGHT,
+    )
     table_top = drawing.TITLE_BLOCK[3]
     table_height = (table_top - bottom - clearance) / 2.0
     assert drawing.bom_extent_violations(
@@ -712,10 +763,9 @@ def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
         (line for line in lines if line[0][1] == line[1][1] == datum_y),
         key=lambda line: line[1][0] - line[0][0],
     )
-    pin_tip = max(
-        (line for line in lines if line[0][1] == line[1][1] == tip_y),
-        key=lambda line: line[1][0] - line[0][0],
-    )
+    x = region[0]
+    pin_tip = ((x + 0.049, tip_y), (x + 0.057, tip_y))
+    assert pin_tip in lines
     assert datum[0][0] < pin_tip[0][0] < pin_tip[1][0] < datum[1][0]
     positive_z = min(
         (line for line in lines if line[0][0] == line[1][0]),
@@ -724,7 +774,7 @@ def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
     assert positive_z[0][1] == datum_y and positive_z[1][1] > tip_y
     labels = dict(drawing.pin_tip_inspection_labels())
     assert {"SCHEMATIC - NOT TO SCALE", "+Z INTO BLOCK", "Z=0 MOUNTING PLANE"} <= labels.keys()
-    assert f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN RECESS" in labels
+    assert f"{spec.retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN" in labels
     note_boxes = [_note_box(text, xy) for text, xy in labels.items()]
     instruction_boxes = _steps_sheet_boxes(drawing.TOP_CAPTURE_LAYOUT)
     for index, box in enumerate(note_boxes):
@@ -739,6 +789,36 @@ def test_c2a_schematic_signed_tip_and_paper_regions_are_unambiguous() -> None:
         )
         assert _inside(box, region) and _inside_sheet(box)
         assert all(not _overlap(box, note) for note in note_boxes + instruction_boxes)
+
+
+def test_c2a_feature_labels_point_at_features_and_value_sits_on_the_bracket() -> None:
+    labels = dict(drawing.pin_tip_inspection_labels())
+    lines = drawing.pin_tip_inspection_lines()
+    pointers = {text: (start, end)
+                for text, start, end in drawing.pin_tip_inspection_leaders()}
+    assert pointers.keys() == {
+        "PIN", "BLOCK", "FEELER", "Z=0 MOUNTING PLANE",
+        "GROUND BRIDGE", "NO PROUD CARRIAGE FEATURE",
+    }
+    x, _bottom, _right, top = drawing.PIN_TIP_INSPECTION_REGION
+    datum, tip = drawing.PIN_TIP_SECTION_DATUM_Y, drawing.PIN_TIP_SECTION_TIP_Y
+    assert pointers["PIN"][1] == (x + 0.057, top - 0.032)
+    assert pointers["BLOCK"][1] == (x + 0.111, top - 0.027)
+    assert pointers["FEELER"][1] == (x + 0.048, datum + 0.003)
+    assert pointers["Z=0 MOUNTING PLANE"][1] == (x + 0.020, datum)
+    assert pointers["GROUND BRIDGE"][1] == (x + 0.093, datum - 0.003)
+    for text, segment in pointers.items():
+        assert text in labels and segment in lines
+    assert ((x + 0.070, datum), (x + 0.070, tip)) in lines
+    value = _note_box(spec.PIN_TIP_MIN_RECESS_CALLOUT,
+                      labels[spec.PIN_TIP_MIN_RECESS_CALLOUT])
+    assert value[0] > x + 0.0715
+    assert value[1] < (datum + tip) / 2.0 < value[3]
+    assert ((x + 0.057, tip), (x + 0.072, tip)) in lines
+    assert not find_leader_leader_crossings([
+        LeaderSegment(text, "note", *start, *end)
+        for text, (start, end) in pointers.items()
+    ])
 
 
 def test_capture_operation_notes_and_finished_view_fit_their_sheet() -> None:

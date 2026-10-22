@@ -147,9 +147,10 @@ including when the reference needs 1:25 or 1:30 rather than 1:20.
 The recipe now requires every segment to belong to that sheet sketch and
 remain non-construction geometry. Both native endpoints inverse-map to their
 individual intended paper points within 0.1 µm, with their full bounds inside
-the reserved schematic region. Independently match all 23 lines against the
-sheet view's native `GetLines4` display ink, using `GetXform` for its paper
-origin and scale; model `GetPolylines` data excludes these user-drawn segments.
+the reserved schematic region. Independently match every authored line,
+including feature-label arrows, against the sheet view's native `GetLines4`
+display ink, using `GetXform` for its paper origin and scale. Model
+`GetPolylines` data excludes these user-drawn segments.
 Repeat the proofs after the finalizer re-pins the sheet scales and rebuilds,
 also requiring the authored native scale to remain unchanged. The subsequent
 `e9aa2521665e` native run proved all 23 lines at placement but correctly refused
@@ -164,6 +165,16 @@ regressions exercise nonidentity scale, rotation and origin; scaled, displaced
 and missing display ink; an inserted-view sheet-scale drift; and finalization
 at each fitted scale. Fresh native export and all-ten-sheet visual inspection
 remain required.
+
+The cf3 assembly review found that C2A's loose caption list did not identify
+its ink. Keep separate pointers to the pin, block, feeler, mounting plane and
+ground bridge, and put the spec-owned `0.50 MIN` beside the recess bracket
+between the pin-tip witness and Z=0. These native sheet-sketch arrows use the
+same exact endpoint/display proof as the section. The BOM's explicit native
+top-left anchor must leave visible air on both border sides; retain the native
+row/column bounds and reference/title-block keep-outs. The exploded lock wire
+stays near its drilled screw heads, separately from the withdrawn cotter, with
+the existing real-edge balloon ownership and settled-landing guards unchanged.
 
 For the assembly's imported CL-tip reference, curate the native dimension at
 a near-tip **dimension-line anchor**, reset inherited `OffsetText`, then use
