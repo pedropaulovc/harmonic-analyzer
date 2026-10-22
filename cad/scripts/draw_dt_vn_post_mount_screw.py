@@ -263,7 +263,7 @@ STOCK_HEAD_RADIUS_MM = 8.5
 STOCK_HEAD_KEEP = {
     "SupplierHeadOD": (0.035, 0.200),
     "SupplierHeadHeight": (0.100, 0.257),
-    "SupplierStraightSkirt": (0.108, 0.147),
+    "SupplierStraightSkirt": (0.108, 0.149),  # Keep lower limit ink above the caption cell.
     "SupplierSlotWidth": (0.170, 0.200),
     "SupplierSlotDepth": (0.095, 0.237),
 }
