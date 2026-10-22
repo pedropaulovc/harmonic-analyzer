@@ -148,11 +148,15 @@ git submodule update --init --recursive
 
 During the rolling-main trial, authors prove their own changes before merge.
 Except for the narrowly generated-only post-release PR defined below, each PR
-must satisfy the applicable requirements here. An individual PR or stack does
-not need a successful full `build` before merging.
+must satisfy all requirements here within the CAD scope stated above. An
+individual PR or stack does not need a successful full `build` before merging.
 
 1. **Focused proof** — run the source checks appropriate to the change and the
    affected native leaves when SolidWorks behavior or saved artifacts change.
+   Include affected assembly/mating checks when the changed behavior reaches
+   them. Identify downstream drawing inputs from the dependency graph or
+   cache-miss scope, regenerate affected sheets and record that scope in the PR.
+   Review those sheets under the direct/indirect policy below.
    Record the checked commit, commands, results and native artifacts in the PR.
    Focused proof must exercise the changed behavior; compilation or a cache hit
    alone does not establish a new native side-effect.
@@ -184,23 +188,24 @@ not need a successful full `build` before merging.
    (`cad/docs/drawing-simplicity-policy.md`, "The gate").
    Changed drawing sheets require automated machinist review under
    [the direct/indirect sheet policy](cad/docs/drawing-simplicity-policy.md#the-gate).
-   Automated review is the default; human review is exceptional and requires
-   explicit owner authorization.
+   Automated machinist review is the default; substituting human machinist
+   review requires explicit owner authorization.
 
 **Stacked PRs may share focused native proof and render inspection** when the
 tested top commit contains every covered change and the evidence identifies the
 covered commits and artifacts. A stack does not require a full build to merge.
 Each PR still needs its own clean Codex or CodeRabbit review of its latest push;
 code review is not shared. Drawing reviews retain the direct/indirect sheet
-requirements linked above. Order the stack so the riskiest change sits on top;
+requirements linked above and count only for the exact sheet version merged.
+Order the stack so the riskiest change sits on top;
 if its focused proof fails, drop it and prove the remainder.
 Merge bottom-up and do NOT pass `--delete-branch`:
 deleting a parent branch auto-closes the children still targeting it.
 
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
-before starting new work on it, and always before kicking off a full `build`
-— a stale branch risks a green build that
+before starting new work on it, and always before focused native proof and
+rendering: a stale branch risks green proof that
 still conflicts or drifts (config/digest/cache-key changes on `main` invalidate
 what you just built). Rebase (`git pull --rebase origin main`) as soon as you
 find `main` has moved, rather than waiting for a merge conflict or a failed
@@ -217,7 +222,7 @@ When rolling-main validation fails, the release manager attributes the failure.
 If the repair is simple and bounded, delegate it immediately for a prompt
 roll-forward; otherwise roll back the attributable PR. Keep releases blocked
 until main is green. Publish the daily release only from a main commit whose
-full build and applicable release checks passed, using artifacts from that
+full build and all release checks passed, using artifacts from that
 commit. This trial changes PR merge policy, not the build graph, executors,
 cache contracts or release qualification.
 
@@ -471,7 +476,7 @@ travelers](cad/docs/pipeline/features-travelers.md).
   `cad/process/<stem>/plan.toml` files, and generated README image files. It may
   merge immediately. Other plan
   or shop changes, code, prose, docs, README markup/layout or any other change
-  stays in an ordinary PR and MUST pass every gate.
+  stays in an ordinary PR and MUST satisfy the ordinary PR requirements.
 - For a supervised farm release, launch only
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded

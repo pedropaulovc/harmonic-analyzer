@@ -869,13 +869,13 @@ During the rolling-main trial, the release manager continuously full-builds
 source checks, appropriate native proof and the applicable code/render reviews;
 they do not need a full build of their own. Changed sheets still require
 automated machinist review under the existing direct/indirect sheet policy.
-Human review is exceptional and requires explicit owner authorization. See
+Substituting human machinist review requires explicit owner authorization. See
 [the merge requirements](AGENTS.md#minimum-merge-gate-every-pr).
 
 The release manager attributes rolling-main failures and immediately delegates
 a simple, bounded repair for roll-forward; otherwise the attributable PR is
 rolled back. The daily release may publish only from green main, with a
-successful full build and applicable release checks for the exact source commit
+successful full build and all release checks for the exact source commit
 and artifacts being released. The trial does not change the task graph,
 executors, cache contracts or release checks.
 
