@@ -23,7 +23,6 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
-from _drawing_attachment import _is_same_attachment
 from _drawing_layout_check import DEFAULT_BOUNDARY_ALLOWANCE_M
 from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import (
@@ -44,6 +43,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 import _stock_trim_drawing as trim_drawing
 import _telemetry
+from stock_anchor_geom import ANCHOR_9490T1 as _SUPPLIER_ANCHOR
 from sm_vn_boss_hook_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
@@ -76,6 +76,8 @@ from sm_vn_boss_hook_spec import (
 SPEC = DRAWINGS_BY_NAME["sm_vn_boss_hook"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
+# diag_build_9490T1 names the merged circular-profile eye sweep "Wire".
+_SUPPLIER_EYE_FEATURE = "Wire"
 SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
 STOCK_SCALE = (2.0, 1.0)
@@ -126,26 +128,71 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
+def _supplier_eye_circle(adapter: Any, view: Any, raw: Any) -> tuple[float, ...] | None:
+    """Read an exact model-XY circle on the authoritative physical eye torus."""
+    if raw is None:
+        return None
+    silhouette = _early_bound(raw, "ISilhouetteEdge")
+    raw_curve = silhouette.GetCurve()
+    if raw_curve is None:
+        return None
+    curve = _early_bound(raw_curve, "ICurve")
+    if not curve.IsCircle():
+        return None
+    circle = tuple(float(value) for value in curve.CircleParams)
+    if not (
+        len(circle) == 7
+        and all(math.isfinite(value) for value in circle)
+        and all(abs(value) < 1e-8 for value in circle[:3])
+        and abs(abs(circle[5]) - 1.0) < 1e-8
+    ):
+        return None
+    native_view = silhouette.GetView()
+    if native_view is None or view_name(adapter, native_view) != view_name(adapter, view):
+        return None
+    raw_document = view.ReferencedDocument
+    if raw_document is None:
+        return None
+    document = _early_bound(raw_document, "IModelDoc2")
+    if str(document.GetPathName()).replace("\\", "/").casefold() != SOURCE.resolve().as_posix().casefold():
+        return None
+    expected_feature = _early_bound(raw_document, "IPartDoc").FeatureByName(_SUPPLIER_EYE_FEATURE)
+    raw_face = silhouette.GetFace()
+    if expected_feature is None or raw_face is None:
+        return None
+    face = _early_bound(raw_face, "IFace2")
+    owner = face.GetFeature()
+    if owner is None or int(adapter.swApp.IsSame(owner, expected_feature)) != 1:
+        return None
+    raw_surface = face.GetSurface()
+    if raw_surface is None:
+        return None
+    surface = _early_bound(raw_surface, "ISurface")
+    if not surface.IsTorus():
+        return None
+    torus = tuple(float(value) for value in surface.TorusParams)
+    if not (
+        len(torus) == 8
+        and all(math.isfinite(value) for value in torus)
+        and all(abs(value) < 1e-8 for value in torus[:3])
+        and abs(abs(torus[5]) - 1.0) < 1e-8
+        and abs(torus[6] * 2000.0 - 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm) < 1e-5
+        and abs(torus[7] * 2000.0 - _SUPPLIER_ANCHOR.wire_dia_mm) < 1e-5
+    ):
+        return None
+    return circle
+
+
+def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
     """Use the physical matching eye ID and an explicit nominal thread carrier."""
-    # HLR/configuration changes precede this query. Materialize their geometry
-    # now: native repaint is deferred while the recipe retains COM control.
+    # Imported controls can leave the edge set unregenerated. The existing
+    # HLV-to-HLR transition regenerates it; Update alone only refreshes display.
+    set_hidden_lines_removed(adapter, front)
     front.UpdateViewDisplayGeometry()
     eye = None
     for raw in visible_view_entities(front, 4, label="counter anchor supplier contours"):
-        silhouette = _early_bound(raw, "ISilhouetteEdge")
-        raw_curve = silhouette.GetCurve()
-        if raw_curve is None:
-            continue
-        curve = _early_bound(raw_curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        circle = tuple(float(value) for value in curve.CircleParams)
-        if (
-            all(abs(value) < 1e-8 for value in circle[:3])
-            and abs(abs(circle[5]) - 1.0) < 1e-8
-            and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
-        ):
+        circle = _supplier_eye_circle(adapter, front, raw)
+        if circle is not None and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5:
             eye = raw
             break
     if eye is None:
@@ -165,7 +212,7 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         fraction_denominator=SUPPLIER_FRACTION_DENOMINATOR,
     )
     display = supplier_reference_dimension(adapter, display, **contract)
-    refs = [(str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, eye)]
+    refs = [(str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract)]
     annotations = curate_stock_dimensions(
         adapter, front, keep={"SupplierThreadMajor": (0.166, 0.170)},
         view_label="supplier thread nominal major, not helical geometry",
@@ -181,7 +228,7 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     return refs
 
 
@@ -272,7 +319,7 @@ def _supplier_stock_diagram(adapter: Any):
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
@@ -328,7 +375,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
         expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
         if len(displays) != expected_count:
             raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
-        for key, contract, expected_entity in refs:
+        for key, contract in refs:
             if key not in displays:
                 raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
             display = displays[key]
@@ -336,7 +383,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
             native = _early_bound(display.GetDimension2(0), "IDimension")
             if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
                 raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
-            if expected_entity is None:
+            if contract["label"] != "EyeID":
                 feature = (
                     SUPPLIER_THREAD_FEATURE
                     if contract["label"] == "SupplierThreadMajor" else SUPPLIER_STOCK_FEATURE
@@ -360,42 +407,10 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                         "supplier eye ID must retain one live physical silhouette; "
                         f"entities={len(entities)}, kinds={kinds}"
                     )
-
-                def exact_eye_id(raw):
-                    raw_curve = _early_bound(raw, "ISilhouetteEdge").GetCurve()
-                    if raw_curve is None:
-                        return False
-                    curve = _early_bound(raw_curve, "ICurve")
-                    if not curve.IsCircle():
-                        return False
-                    circle = tuple(float(value) for value in curve.CircleParams)
-                    return (
-                        len(circle) == 7
-                        and all(math.isfinite(value) for value in circle)
-                        and all(abs(value) < 1e-8 for value in circle[:3])
-                        and abs(abs(circle[5]) - 1.0) < 1e-8
-                        and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
-                    )
-
-                attached = _early_bound(entities[0], "ISilhouetteEdge")
-                if not exact_eye_id(attached):
-                    raise RuntimeError("supplier eye ID changed its exact physical circle")
-                attached_view = attached.GetView()
-                if attached_view is None or view_name(adapter, attached_view) != names[0]:
-                    raise RuntimeError("supplier eye ID changed its native drawing view")
-                # Compare current native owners, not a pre-rebuild silhouette.
-                matching = [
-                    raw for raw in visible_view_entities(view, 4, label="settled counter physical eye ID")
-                    if exact_eye_id(raw)
-                ]
-                if not any(
-                    _is_same_attachment(adapter, attached, raw, "SILHOUETTE")
-                    for raw in matching
-                ):
+                circle = _supplier_eye_circle(adapter, view, entities[0])
+                if circle is None or abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) >= 1e-5:
                     raise RuntimeError(
-                        "supplier eye ID lost its current physical contour owner; "
-                        f"matching_visible_contours={len(matching)}, "
-                        f"attached_face_present={attached.GetFace() is not None}"
+                        f"supplier eye ID lost its exact physical source contour; circle={circle!r}"
                     )
 
 

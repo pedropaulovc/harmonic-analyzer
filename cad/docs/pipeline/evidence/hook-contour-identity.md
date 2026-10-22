@@ -13,11 +13,14 @@ The physical eye OD is 12.7 mm and ID is 6.35 mm. The settled verifier requires:
 - the expected finished configuration on both finished views;
 - exactly one non-null, non-dangling native attachment, with selection type 46
   (`SILHOUETTE`), and agreement between the native count, entity and type arrays;
-- a native analytic circle at the model origin (centre coordinates within
+- a finite native analytic circle at the model origin (centre coordinates within
   1e-8 m), normal Z within 1e-8 of ±1, and diameter within 1e-5 mm of the
   corresponding physical eye size;
-- the expected native drawing view and a matching **current physical owning
-  face**, reacquired from that configuration-bound view.
+- the expected native drawing view and exact referenced source-part path;
+- the native face's owning feature being the source part's authoritative `Wire`
+  feature, compared with `ISldWorks.IsSame`, not a matching feature-name string;
+- a finite native torus at the same origin and Z axis, with the catalogue eye
+  mean radius and wire radius, using the unchanged 1e-5 mm diameter tolerance.
 
 Do not compare a post-rebuild annotation with a silhouette handle retained from
 before the settling rebuild. The 2026-10-22 native diagnostic at source
@@ -32,14 +35,26 @@ its captured and attached CircleParams were identical:
 The failing clause was the old physical-owner comparison, not attachment count,
 type or measured circle. That diagnostic did not separately record a missing
 face versus a not-same native face; identical circle parameters alone are not
-owner-identity proof. The repair therefore retains the native face comparison
-but reacquires its reference from the current view instead of accepting radius
-alone.
+owner-identity proof. The repair retains only dimension keys and contracts, not
+pre-rebuild COM handles. It reads the annotation's current attached silhouette,
+then obtains its face's native feature and torus. The expected feature comes
+from `IPartDoc.FeatureByName("Wire")` on the current view's referenced source
+part. Both native source builders explicitly name their circular-profile sweep
+`Wire` (`diag_build_9489T111._sweep_wire` and
+`diag_build_9490T1._sweep_wire`); the finished-stock trim keeps that feature.
+`Wire` also owns the bend, so the centre, axis and catalogue torus radii are
+required independently. No fresh visible-entity scan or self-membership test is
+used during verification.
 
 The same native enumeration returned two ID entries with identical circle
 parameters. Enumerator entries are not annotation attachments: multiple visible
 entries must not disable the exactly-one-attachment guard. Wrong diameter,
 foreign owner, missing contour and additional annotation attachments are refused.
+
+The SM diagnostic records `Wire` as the eye's actual native owner. The retained
+CH diagnostic does not contain a feature/torus readback; its source builder is
+the authoritative feature-name evidence. Final native qualification must prove
+the strict source-feature identity check on both drawings.
 
 The existing pre-save layout check refreshes every view before the attachment
 readback. The attachment verifier itself performs no geometry refresh, rebuild,
@@ -74,19 +89,24 @@ diameter is `7.937499289699116 mm`; the model-to-view transform had identity
 rotation and scale 4. This is the expected model frame, not permission to
 dimension a nominal replacement or change selection type.
 
-The recipe changes the view configuration and HLR mode before discovery.
-`IView.UpdateViewDisplayGeometry` explicitly makes such changes available before
-Windows repaints; without it the native API need not expose the changed view
-geometry while the recipe retains COM control. Materialize the finished front
-view once **before** enumerating supplier contours, then apply the unchanged
-strict physical-ID predicate. Do not retry against a different type, diameter,
-view or configuration if that query still finds no ID.
+The initial HLR setup precedes the imported control annotations. The existing
+`_drawing_view_display.set_hidden_lines_removed` contract documents that these
+annotations can leave the edge set unregenerated, and that
+`IView.UpdateViewDisplayGeometry` alone does not rebuild it. Immediately before
+discovery, the recipe therefore uses the existing real HLV-to-HLR transition
+with both native display-mode readbacks, then materializes that regenerated
+geometry with `UpdateViewDisplayGeometry`. Existing imported machining controls
+must still pass the settled checks. The native output must confirm recovery of
+the missing physical ID; the source-order correction is not itself that proof.
+Do not retry against a different type, diameter, view or configuration if the
+strict query still finds no ID.
 
 The final and still-open post-native-save checks retain type 46 and exactly one
-live attachment, and compare its exact ID circle and current native owning face
-against fresh geometry from the configuration-bound view. As for CH, refreshes
-belong to the existing pre-save layout check, not the post-save observer, and
-successful save/leaf evidence is required before claiming post-save proof.
+live attachment, and reuse the same strict circle, source-view, native feature
+and torus predicate as discovery. The label's physical ID remains mandatory:
+the outer eye is not an alternative. As for CH, refreshes belong to the existing
+pre-save layout check, not the post-save observer, and successful save/leaf
+evidence is required before claiming post-save proof.
 
 ## Evidence boundary
 
