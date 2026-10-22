@@ -28,10 +28,9 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
-from _sketch_circle import define_circle
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
-from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NECK_THICKNESS_TOL, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC, THREAD_ROOT_ENVELOPE
-from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, ROOT_R, SINGLE_LIMITS
+from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NECK_THICKNESS_TOL, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
+from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, ISOMETRIC_VIEW_NOTE, ROOT_R
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"
@@ -44,15 +43,6 @@ def _construction(adapter, entity: str) -> None:
         raise RuntimeError(f"{entity}: construction flag did not persist")
 
 
-def _single_limits(adapter) -> None:
-    for (feature, name), (limit, kind) in SINGLE_LIMITS.items():
-        _, dimension = _named_dimension(adapter, feature, name)
-        if not math.isclose(float(dimension.SystemValue) * 1000.0, limit, abs_tol=1e-6):
-            raise RuntimeError(f"{name}@{feature}: single-limit nominal changed")
-        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-        tolerance.Type = kind
-        if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != kind:
-            raise RuntimeError(f"{name}@{feature}: single limit did not persist")
 
 
 def _assert_placement_sketches_fully_defined(adapter) -> None:
@@ -125,15 +115,6 @@ async def _coordinates(adapter, jobs) -> None:
     for name in ("TapFromTip", "TapFromSide"):
         set_dimension_symmetric_tolerance(adapter, "TapCoordinates", name, HOLE_LOCATION_TOL)
 
-    # A thread-root cap is a separate requirement, not a tap-drill tolerance.
-    dims = SketchDims()
-    check("thread root envelope sketch", await adapter.create_sketch("Right"))
-    circle = await define_circle(adapter, 0.0, 0.0, THREAD_ROOT_ENVELOPE / 2.0, "internal thread root envelope", dims=dims, names=(None, None, "ThreadRootEnvelope"))
-    _construction(adapter, circle)
-    await ensure_fully_defined(adapter, "thread root envelope")
-    check("exit thread root envelope", await adapter.exit_sketch())
-    name_last_feature(adapter, "ThreadEnvelope")
-    jobs.extend(dims.apply(adapter, "ThreadEnvelope"))
 
 
 async def build(adapter) -> dict[str, str]:
@@ -183,9 +164,12 @@ async def build(adapter) -> dict[str, str]:
     if FLANGE_X[1] != NECK_HALF_X:
         raise AssertionError("foot and neck must share the right face without a ledge")
 
-    check("inside root rounds", await adapter.add_fillet(ROOT_R, [[-NECK_HALF_X, 0.0, FLANGE_Z[0]], [0.0, -NOSE_R, FLANGE_Z[0]], [0.0, NOSE_R, FLANGE_Z[0]]], propagate=False))
-    name_last_feature(adapter, "RootRounds")
-    name_dimensions(adapter, "RootRounds", ["RootR"])
+    check("foot inside X root", await adapter.add_fillet(FOOT_CORNER_R, [[-NECK_HALF_X, 0.0, FLANGE_Z[0]]], propagate=False))
+    name_last_feature(adapter, "InsideRoot")
+    check("smooth axial roots", await adapter.add_fillet(ROOT_R, [[0.0, y, FLANGE_Z[0]] for y in (-NOSE_R, NOSE_R)], propagate=False))
+    name_last_feature(adapter, "AxialRoots")
+    check("tangent outside foot edges", await adapter.add_fillet(FOOT_CORNER_R, [[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y], propagate=False))
+    name_last_feature(adapter, "FootTopEdges")
     check("rounded parallel foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[x, y, sum(FLANGE_Z) / 2.0] for x in FLANGE_X for y in FLANGE_Y], propagate=False))
     name_last_feature(adapter, "FootCorners")
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
@@ -222,12 +206,11 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "threaded lever axis")
     set_dimension_symmetric_tolerance(adapter, "NeckProfile", "NoseR", NOSE_R_TOL)
     set_dimension_symmetric_tolerance(adapter, "Neck", "NeckThickness", NECK_THICKNESS_TOL)
-    _single_limits(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)
-    blank_reference_sketches(adapter, ("MountingCoordinates", "TapCoordinates", "ThreadEnvelope"))
+    blank_reference_sketches(adapter, ("MountingCoordinates", "TapCoordinates"))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, (0.12, 0.12, 0.13))  # blued 1018, not bare steel
     apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE})

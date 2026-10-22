@@ -1514,14 +1514,16 @@ readbacks are the positive control; do not fabricate a successful fallback.
 
 The through tap's ordinary locations are 5.50 ±0.05 from the physical nose tip
 and neck side. These are not zero datum dimensions and not a GD&T frame.
-Combine the R5.50 ±0.05 radius with each locating band: the relative radial
-axis error is `hypot(0.10, 0.10)`, not the conditional sketch's 0.05. A
-separate native **Ø6.45 MAX internal thread-root envelope** bounds the
-thread mouth; a nominal 2B tap and its tap drill do not establish that maximum.
-Include start wander 0.10 plus 0.3° run-off over the maximum 12.6 hole depth,
-an additional 0.165974. The 2026-10-21 approved joint cutover retains the
-modeled 0.20 chamfers but replaces their unsupported 0.15 minimum with hidden
-native primary-distance limits 0..0.25. The one ceiling comes from structured
+The R5.50 nose and location bands do not establish a maximum finished thread
+root. ASME B1.1-2003 §§5.5 and8.3.2 explicitly leave the internal maximum
+major diameter unspecified. The user chose a normal standard through tap, so
+remove the former custom Ø6.45 inspection sketch, callout and false guaranteed
+wall calculation rather than pretending 2B supplies the missing upper bound.
+Nominal standard-major wall is2.325 and nominal mouth wall2.125; those are not
+manufactured worst-case certificates. Actual finished walls remain subject to
+drawing-policy rule17 (2.0 target/1.5 floor). The retained modeled0.20 chamfers
+use hidden native primary-distance limits0..0.25, not an unsupported0.15 minimum.
+The one ceiling comes from structured
 `title_block.edge_break.chamfer_max_mm`; the existing bilateral setter owns
 the deviations, and each builder checks the nominal plus its native lower and
 upper deviations against 0 and 0.25. Do not substitute an unbanded printed
@@ -1530,11 +1532,10 @@ indication takes `angular_band_deg()` (±1°), giving the conservative projected
 leg envelope `q = 0.25 tan46° = 0.258882578`. `_part_save` already invokes
 `apply_block_tolerances`, which verifies the template-owned native angular
 preference 126 against the configured value and fails on drift.
-The revised conservative wall bound is **1.658722017**, printed **1.658 MIN**:
-above the 1.5 floor, below the 2.0 target. This explicitly supersedes the
-former 1.667605/1.667 MIN claim, and the approved RV-01 declaration records
-the change. Round a printed MIN down. No FCF, tighter radius or tighter angle
-was authorized to recover the superseded sketch's 1.925 figure.
+The removed1.658 MIN/RV-01 declaration depended on a custom root acceptance
+the user explicitly rejected. It is not a standard-thread guarantee and must
+not survive hidden in metadata, tests or review context. Do not replace it
+with another unasked thread-major limit or local inspection note.
 
 The lever no longer imports or prints its local numeric `TipChamfer` size,
 band or `LIMIT RETAINS FULL ENGAGEMENT` text. The existing thread-feature
@@ -1585,17 +1586,20 @@ apply the pre-equation DrivenState check after equations take ownership.
 The dependent MHA-MG-02 clamp uses **1/2 in hex** brass, keeps its bore at
 **19.95** from the bottom seat and its overall height at **29.50**. The hook
 stays at **919.7**; neither `.XX` ±0.51 band tightens. The native TOP
-**HexAf = 12.70 ±0.13**, at **two places and not REF**, owns receiving size
-12.57–12.83. Its attached below-text is `1/2 HEX STOCK; FLATS AS SUPPLIED`.
-Use the existing symmetric-tolerance authoring path and read back native
-value, tolerance type/min/max, both precisions and non-reference presentation.
+**HexAf = 12.70**, at **two places and not REF**, uses the ordinary
+title-block `.XX` ±0.51 receiving size12.19–13.21, with no explicit band.
+Its attached below-text is `1/2 HEX STOCK; FLATS AS SUPPLIED`. The fresh
+source dimension uses tolerance TypeNONE=0; native min/max getters remain
+inactive observations, not the ordinary accepted limits. Read back value,
+both precisions, non-reference property and actual prefix/suffix text.
 Prove its actual source HexProfile endpoints, imported source dimension and
 requested TOP-view ownership again after the final drawing rebuild.
 
-The independent global receiving-form note reads:
+The independent receiving-form callout is attached to the actual section edge:
 
-- `AS-SUPPLIED STOCK FORM ACCEPTANCE`
-- `TRANSVERSE ENVELOPE 15.00 MAX OVER FULL HEIGHT`
+- `TRANSVERSE ENVELOPE 15.00 MAX`
+- `OVER FULL HEIGHT; FOR MHA-MG-03`
+- `PLAIN-BODY CLAMP TRAVEL`
 
 That envelope includes nonideal as-supplied stock over its complete height;
 do not derive it from nominal regular-hex AF/cos(30°), exact 60° normals or
@@ -1603,21 +1607,26 @@ Rule #1. No supplier, alloy/temper or stock-form certification is implied.
 The actual bore diameter owns the separate finished acceptance:
 
 - `2.0 MIN FINISHED NET WALL`
-- `BORE/TAPS/OUTER FACES, FULL DEPTH`
+- `AND BLIND FLOOR; EXCEPT ONLY`
+- `SHOWN HOLE ENTRIES/EXITS AND`
+- `TOP-TAP/BORE INTERSECTION`
 
-This concerns actual remaining ligaments, including outer-face drift and hole
-wander through depth, not the intentional thumb-tap/bore opening. It is not
-a certificate computed from nominal AF. The three finished-wall entries in
-`FINISHED_NET_WALL_MINIMUMS` are acceptance thresholds; only the blind rod-tap
-drill-point floor remains in `DERIVED_WALL_BOUNDS` (2.092143505152 mm worst).
+Only those designed apertures are excluded: actual remaining sidewalls and
+blind floors still require2 MIN throughout depth, including stock-face drift
+and hole wander. This is conjunctive acceptance, not an all-independent-corners
+certificate: the ordinary AF12.19/B6.86/bore radius3.30/full15tan(0.3°) corner
+has1.951459 mm wall and must be rejected. Ideal AF13.21 has15.253594 across
+corners and is likewise rejected by15 MAX; neither is an admitted shortfall.
+The three `FINISHED_NET_WALL_MINIMUMS` entries remain acceptance thresholds;
+only the blind rod-tap floor is in `DERIVED_WALL_BOUNDS` (2.092143505152 worst).
 Retain the actual seat's `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`;
-`AT TAP` does not constrain unrelated edges. Neither 15 nor 2 is represented
-by a fabricated native measurement. The isometric is illustrative only:
-the former stock-definition face leader and its correspondence machinery
-are removed, not retained as a second acceptance route.
-The unchanged 29.50 height and its .XX band control **TOP-TAP WALL**; do not
-label the height FULL THREAD ENGAGEMENT. Identify MHA-MG-VN-50 at its actual
-top-tap callout.
+`AT TAP` does not constrain unrelated edges. Neither15 nor2 is a fabricated
+native measurement. The isometric remains illustrative: retain no old iso
+stock-definition leader or alternative acceptance route. The new section
+leader owns the actual full-height form requirement, not a perfect-hex claim.
+Remove only the ambiguous height below-text; **29.50 and .XX±0.51 remain**.
+Height alone is not full thread engagement; its native precision is functional
+in the male/female overlap. Identify MHA-MG-VN-50 at its actual top-tap callout.
 
 Spend 15.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
 an unowned nominal half-depth. Intersect actual male/female full-profile
@@ -1831,20 +1840,28 @@ face/edge/vertex route. Null, ambiguous or wrong-view results, unknown native
 self/owner identity and malformed keys remain refusals. Reacquire all source
 and drawing proof after rebuilds; never cache correspondence across them.
 
-The attached TOP AF stock callout names the supplied form; its **native
-12.70 ±0.13 dimension**, not a REF value or text-only AF limits, owns size.
-The unleadered property-linked global note owns only full-height stock form,
-with resolved native text/position and zero-leader readback after rebuilding.
-Activate the current sheet through `GetCurrentSheet` → `ISheet.GetName` →
-`IDrawingDoc.ActivateSheet`; `ActivateView` does not activate drawing sheets.
-Attach height precision's functional reason to the height dimension itself,
-and remove only the native hole-callout thread-class variable where the title
-block already owns 2B. Keep live thread/drill/depth variables and reject
-resolved text that still repeats 2B.
+The attached TOP AF stock callout names supplied form; its **native12.70
+dimension with ordinary .XX acceptance**, not REF/text-only limits, owns size.
+The property-linked15 MAX note now has one real section-stock-edge leader:
+retain its resolved full-height/plain-body-travel text, native view owner,
+exact edge attachment and position through the final rebuild.
+Retain the selected stock edge **before** insertion with `_select_view_entity`,
+then use `add_attached_note(entity=E, attached_to=E)` with the property-link text.
+Its post-rebuild identity guard must reject an initial wrong edge; never adopt
+the note's observed attachment as a new expected baseline. Verify both unresolved
+`INote.PropertyLinkedText` and resolved `GetText()` after insertion/final rebuild,
+so a frozen literal cannot silently replace the source-property link. The shared
+leader helpers need no API or behavior change for this local authoritative path.
+Do not retain the obsolete unleadered sheet-note acceptance path. `ActivateView` selects the
+callout's actual view; it does not stand in for drawing-sheet activation.
+Clear height's obsolete below-text explicitly while retaining its numeric
+source/precision. Remove only the native hole-callout thread-class variable
+where the title block already owns 2B. Keep live thread/drill/depth variables
+and reject resolved text that still repeats 2B.
 
-R17/R18's former stock-face leader exposed crossing and clipping failures;
-the current acceptance cutover removes that leader rather than preserving
-obsolete face-binding tests. Wrap and place complete native text blocks, not
+R17/R18's former isometric stock-face leader exposed crossing/clipping;
+it remains removed. Attach the new acceptance flag to the actual section edge
+below the bore instead, and wrap/place the complete native text blocks, not
 just their numeric values, clear of borders, section markers and neighbours.
 Source-coordinate predictions are not native layout proof: inspect the final
 whole PNG and require the unchanged native annotation/ink audit.
@@ -1867,10 +1884,10 @@ its complete three-row qualifier collided with the section label and height
 extension. Keep the cleared vertical witness station; move the common-flat
 text station from `(50, 175.5)` to `(150, 175.5)` mm instead of lifting it back
 through the A stroke. R28 proved this station and the seat note at
-`(260, 116)` mm with no gating native layout errors. The clarity cutover places
-the unleadered global form note in the same cleared `(285, 140)` mm lane,
-the two-place AF plus supplied-stock below-text at `(85, 255)` mm, and the
-expanded bore net-wall callout at `(165, 145)` mm. The actual TOP hex reaches
+`(260, 116)` mm with no gating native layout errors. The clarity cutover keeps
+the attached form callout in `(285, 140)` mm, the two-place AF plus supplied-stock
+below-text at `(152, 255)` mm and the expanded bore wall/floor callout at
+`(165, 145)` mm. The actual TOP hex reaches
 about 239.5 mm; the inner border is 266.7 mm. The front right edge is 104.05 mm
 and the section begins at 222.415 mm. These are placement constraints, not a
 claim of newly measured text clearance. Preserve all five actual flat controls,
@@ -1891,120 +1908,38 @@ not permission to collapse spaces, blank lines or changed thread/mate text.
 Read every independent post-state field before refusal, with per-reader errors
 and precise indexed identity-call labels. Keep owner/attachment/dangling checks.
 
-Cut-only section display can retain a whole-model native view outline, not just
-the visible mouth slice. Place the complete measured outline after rotation,
-preserving3:1 and the real cut; verify it again after annotation rebuilds.
-Use actual text runs and the linked caption's six-value extent for layout,
-and retain unproved automatic centre marks as measured line obstacles. Wrap
-qualifiers without changing words, dimensions or bands. Native export/audit
-success alone does not prove border/title-block clearance or readable ink:
-inspect the exact final PNG/PDF before calling the sheet SHIP.
-Check dimension-line/centre-mark crossings as actual segments: horizontal and
-vertical marks have zero-area bounding boxes, which area-overlap helpers can
-correctly ignore even when the native ink crosses.
+The user clarified that this bracket is a straightforward tapped through hole.
+Keep the ordinary end view and real native1/4-20 UNC THRU ALL callout; no A-A,
+cutting arrows, orphan section marks or section-thread display/ink machinery
+belongs in the production recipe. Its12.50 neck and3.175 foot dimensions remain
+native, without redundant FULL THREAD ENGAGEMENT or SCREW GRIP qualifiers.
+Inside corners follow the actual title-blockR1.0 MAX default, not a bespoke
+R0.25 inside restriction. The nominal root uses tangentR0.60 inside andR0.25
+outside arcs across the0.85 offset, with no flat ledge; verify the actual native
+root at enlarged scale. The user-approved5mm free-end extension changes only
+machineX−3 to−8 (local−43 to−48), foot49.25 to54.25 and setbacks4/17.70 to
+9/22.70; both mounting axes, seat, width, thickness and lever pose stay fixed.
+The earlier+10 option intersected the existing hex knife stub and was rejected.
+The knife mount's pre-existing0.6835 nominal axial air gap is not a2mm wall
+policy violation or permission to claim a full articulation clearance proof.
+Validate the isometric caption against actual nativeIView.ScaleRatio and
+inspect the final whole PDF/PNG, including the enlarged root, for clarity.
 
-A cosmetic-thread display can expose straight native polylines as well as line
-items. Read `ICThread.GetDisplayData` independently of the same annotation's
-diagnostic `IAnnotation.GetDisplayData`, recording availability, view mode,
-quality and each available primitive family even if another reader fails.
-Use only the unique thread's actual primary display ink for acceptance:
-require continuous longitudinal flanks on both sides of the real section
-profile. Join touching collinear straight segments, never bridge a gap or
-replace an arc/circle by its endpoint chord. Annotation display data, a
-callout or a visible plain bore cannot rescue absent or unreadable thread ink.
-For numerical collinearity, bound each Y band's total spread rather than
-chaining successive tolerances, then sort its X intervals before union and
-check overlap on both sides. Raw Y sorting can reverse X order under native
-floating-point roundoff. This is ink processing, not a manufacturing tolerance.
-Log primitive coordinates and per-reader errors before refusal; an unmeasured
-display is not evidence that the native thread contains zero geometry.
+The LEVER TIP DETAIL retains its model-owned1.25 projection, attached native
+dimension import, actual lever/bracket component and source-configuration
+checks, source immutability, 4:1 view, and persisted native crop readback.
+Use native projected source stations only to place the dimension and crop;
+they do not prove the solids are visible. Inspect the actual exported PNG/PDF
+to confirm both the flat lever tip and far bracket face are clearly visible,
+then require formal machinist review. The user explicitly removed the added
+G7 parser/count-priming/canonical-edge diagnostic subsystem: no substitute
+polyline acceptance contract, retry, copied outline or suppressed warning.
 
-An enlarged assembly crop can show a valid imported construction dimension
-while showing none of the intended solid interface. A nearer flange may cover
-the rod and receiver in that viewing direction. Prove the actual component
-transforms and model-edge correspondence before and after cropping, choose the
-unoccluded standard view and label its real direction. Sketch points and a
-dimension's witnesses alone are not a solid-visibility positive control.
-`IView.GetPolylines7` excludes user sketch segments; use its edge correspondence
-for this distinction, not a hand-mapped PDF-coordinate approximation.
-
-Decode `GetPolylines7` by native edge-slot order, including null silhouette
-slots. Its linked official VBA example consumes but ignores the size field for
-a type-0 polyline; only type-1 arcs consume the documented 12 geometry doubles.
-Require complete finite records and valid integral sizes/counts, with at least
-two points per polyline. After one record per returned edge slot, only finite
-exact-zero residual values may remain; their native cause is unknown. Neither
-an ignored size field nor residual zeros prove geometry. Do not special-case a
-record index, the observed size 17 or the observed residual length 34. A null
-return channel is unavailable, not an observed empty array; decoder success
-still does not replace actual model-edge identity or final render inspection.
-
-If a cropped return has more complete records than edge slots, retain the
-refusal: R29 had twelve numerical records but eleven returned slots. Capture
-the single raw return, including IEEE-754 values and null slots, **before**
-optional descriptions or native readers can fail. Independently inventory
-well-formed numerical records for diagnostics only; do not prefix-pair slots,
-skip a crop-congruent contour or treat a numeric count as native authority.
-`RAW_SLOT_OBSERVATION` records typed native capabilities, source/component
-correspondence and isolated reader failures without claiming rendered ink.
-Read `GetPolyLineCount5(1)` and `GetXform()` independently; unavailable counts,
-OUT channels or transforms stay unavailable. Retain an actual authored crop
-handle only in its scoped view context, never reconstruct its identity from
-radius or coordinates. All failure-only formatting/capture readers must leave
-the original decoder exception and traceback intact. These diagnostics do
-not change the acceptance decoder, its cardinality guard or physical proof.
-
-R30b returned `((), None)` for the uncropped MG detail even though the later
-failure-only `GetPolyLineCount5(1)` observed `(36, 1201)` and both components
-were visible. A single count-first preparation is an **empirical experiment**,
-not a documented `GetPolylines7` precondition: the official VBA example calls
-G7 directly, while Count5's explicit sequencing remark names `IGetPolylines6`.
-Freeze both typed nonnegative count outputs before the single G7 call, then
-freeze its exact return before any component reader or decoder. Keep a later
-failure-only count distinct. A positive count cannot rescue an unavailable G7
-channel, prove buffer initialization or relax the edge/record identity guard;
-do not retry, sleep, change the camera or claim the experiment fixed anything
-until fresh native output establishes the actual result.
-
-Raw visible-edge and rendered-polyline handles do not establish a shared
-identity namespace merely because both bind as `IEdge`. The MG interface
-proof uses one documented route: owned drawing seed, owning source Extension
-`GetCorrespondingEntity2`, exact full component `GetCorrespondingEntity`,
-then native `IsSame == 1` against a supported nonempty G7 edge. Before mapping,
-require the seed's actual native component owner to match that full component
-and its source's actual active configuration to match the referenced one.
-Map the component entity back through the same drawing view; require native
-equality with the original seed, its real owner, and its source-back entity.
-Null owners are unavailable, never positive ownership. Circle/body geometry
-corroborates this route; coordinates, paths, PID bytes and route-OR fallbacks
-cannot replace identity. R28's real target/control matches proved that direct
-cross-context zeros were not evidence of absent ink or occlusion.
-
-Calibrate the independent known-visible positive and distinct native negatives
-on the uncropped exact view. The opposite bracket control lies outside the
-20mm final crop: do not demand or claim its postcrop ink. The detail caller
-owns this private calibration, not a global or view-name cache. Every settled
-pass requires native exact view/component/source-document continuity and fresh
-active/referenced configuration agreement. Re-enumerate and re-prove each
-target's owner, source/component/view roundtrip, geometry and actual G7 ink.
-Re-read retained control capabilities/body/geometry and distinct negatives;
-unknown or stale proof refuses. Calibration never rescues a missing target
-or supplies a cached target correspondence after rebuilding.
-
-On a physical-identity refusal, preserve the single original polyline return,
-including null slots and numeric bytes, actual transforms and independent
-reader errors. Capture the native drawing, image and whole evidence packet
-without labeling successful decoding unavailable. Preserve the original
-refusal and traceback at the local collector/caller boundary even if its
-formatting, logging or capture fails; that local isolation is not a guarantee
-about the unchanged outer shared telemetry.
-
-Suppress sketch inference while creating the crop boundary, restore the prior
-`AddToDB` state, and read the persisted native circle with
-`IView.GetDetailCircleInfo2`. Requested centre/radius are not measured bounds.
-Keep neighbouring captions outside the complete actual `IView.GetOutline`,
-even when the printed circle itself leaves glyph clearance. Final native
-model-edge readback, audit and whole-sheet render remain separate requirements.
+Suppress inference while creating the native crop boundary, restore AddToDB,
+and check IView.GetDetailCircleInfo2 against the requested centre/radius.
+Keep captions outside the complete actual IView.GetOutline and retain ordinary
+whole-dimension text, witness/arrow and sheet/title-block clearance checks.
+Native export success alone is not physical-visibility or layout acceptance.
 
 The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel.
 R22 wrapping of only that CHECK cleared the actual glyphs but left a gating
@@ -2047,9 +1982,9 @@ uses the existing adjuster classification and joint-specific
 part packages. The user's exact2026-10-20 direction was “no further thread
 locking needed because mg-magnifying-lever does not experience rotational
 forces”. The approved implementation has no added lock; that is not native
-test proof of immunity to vibration, projection drift or backout. The bracket's
-approved1.658MIN mouth wall is separately declared RV-01, kind minor, for its
-sub-2.0 target while retaining the1.5 floor and original location/radius bands.
+test proof of immunity to vibration, projection drift or backout. The former
+custom-root wall declaration is removed; normal standard tapping does not
+establish an upper root limit or an all-standard-variation wall guarantee.
 
 The retention and wall checks are not a brass strength certification. Wire
 force below the lever produces bending even though there is no torque about

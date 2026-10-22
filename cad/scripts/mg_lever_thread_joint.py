@@ -26,7 +26,6 @@ NECK_HALF_X = NECK_THICKNESS / 2.0
 NOSE_R = 5.50
 NOSE_R_TOL = 0.05
 HOLE_LOCATION_TOL = 0.05  # locations from a real neck side and nose tip
-THREAD_ROOT_ENVELOPE = 6.45  # native MAX requirement; NOT the tap-drill diameter
 MOUTH_CHAMFER = 0.20
 # The title-block ceiling owns the native primary distance, not both legs.
 # Keep the modeled 0.20; remove only the unsupported positive lower limit.
@@ -102,12 +101,8 @@ def installation_full_overlap(
     return max(0.0, earliest_end - latest_start)
 
 
-# Both the nose radius and each hole location have independent native bands.
-# A toleranced radius is not an exact centre-to-edge distance.
-DRILL_WANDER_START = 0.10
-DRILL_WANDER_DEG = 0.3
-THREAD_BORE_WANDER = DRILL_WANDER_START + (NECK_THICKNESS + NECK_THICKNESS_TOL) * math.tan(math.radians(DRILL_WANDER_DEG))
-AXIS_OFFSET_MAX = math.hypot(NOSE_R_TOL + HOLE_LOCATION_TOL, NOSE_R_TOL + HOLE_LOCATION_TOL)
-WALL_MIN = NOSE_R - NOSE_R_TOL - AXIS_OFFSET_MAX - THREAD_BORE_WANDER - THREAD_ROOT_ENVELOPE / 2.0 - CHAMFER_LEG_MAX
-if WALL_MIN < 1.5:
-    raise AssertionError("MG threaded nose loses the worst-case 1.5 mm wall")
+# ASME B1.1 specifies no internal maximum major diameter. These are nominal
+# standard-thread geometry checks, NOT a guaranteed manufactured wall bound.
+# Actual finished walls remain subject to drawing-guidelines rule17.
+NOMINAL_THREAD_WALL = NOSE_R - THREAD_MAJOR / 2.0
+NOMINAL_MOUTH_WALL = NOMINAL_THREAD_WALL - MOUTH_CHAMFER

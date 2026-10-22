@@ -45,7 +45,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
-from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
@@ -68,7 +67,6 @@ from mg_magnifying_clamp_geom import (
     BLOCK_HEIGHT,
     HEX_AC,
     HEX_AF,
-    HEX_AF_BAND,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     ROD_TAP_DRILL_DIA,
@@ -1049,7 +1047,7 @@ def _assert_ordinary_location(display: Any, dimension: Any, name: str) -> None:
 
 
 def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
-    """The actual AF dimension, not a stock note or title-block default, owns size."""
+    """The native non-REF .XX AF uses ordinary title-block size acceptance."""
     import _telemetry
 
     display = _early_bound(display, "IDisplayDimension")
@@ -1064,8 +1062,9 @@ def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
         "places": display.GetPrimaryPrecision2(),
         "tolerance_places": display.GetPrimaryTolPrecision2(),
         "tolerance_type": tolerance.Type,
-        "minimum_m": tolerance.GetMinValue(),
-        "maximum_m": tolerance.GetMaxValue(),
+        # Inactive native fields are observations, not the .XX accepted limits.
+        "inactive_minimum_m": tolerance.GetMinValue(),
+        "inactive_maximum_m": tolerance.GetMaxValue(),
     }
     _telemetry.info("clamp native stock AF acceptance", operation_stage=stage, native_measurement=repr(actual))
     if type(actual["full_name"]) is not str or actual["full_name"].split("@")[:2] != ["HexAf", "HexProfile"]:
@@ -1074,11 +1073,10 @@ def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
     # ShowParenthesis; either stale half must fail every source/import readback.
     if any("(" in actual[field] or ")" in actual[field] for field in ("prefix", "suffix")):
         raise RuntimeError(f"HexAf: native reference affix remained at {stage}: {actual!r}")
-    if actual["reference"] is not False or any(type(actual[field]) is not int or actual[field] != value for field, value in (("places", 2), ("tolerance_places", 2), ("tolerance_type", 4))):
-        raise RuntimeError(f"HexAf: native non-reference precision/tolerance changed at {stage}: {actual!r}")
-    for field, wanted in (("value_m", HEX_AF / 1000.0), ("minimum_m", -HEX_AF_BAND / 1000.0), ("maximum_m", HEX_AF_BAND / 1000.0)):
-        if type(actual[field]) not in (int, float) or not math.isclose(actual[field], wanted, rel_tol=0.0, abs_tol=1e-9):
-            raise RuntimeError(f"HexAf: native receiving limits changed at {stage}: {actual!r}")
+    if actual["reference"] is not False or any(type(actual[field]) is not int or actual[field] != value for field, value in (("places", 2), ("tolerance_places", 2), ("tolerance_type", 0))):
+        raise RuntimeError(f"HexAf: native non-reference ordinary precision/tolerance changed at {stage}: {actual!r}")
+    if type(actual["value_m"]) not in (int, float) or not math.isclose(actual["value_m"], HEX_AF / 1000.0, rel_tol=0.0, abs_tol=1e-9):
+        raise RuntimeError(f"HexAf: native receiving size changed at {stage}: {actual!r}")
 
 
 def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
@@ -1106,9 +1104,15 @@ def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
 
 
 def _author_stock_af(adapter: Any) -> None:
-    set_dimension_symmetric_tolerance(adapter, "HexProfile", "HexAf", HEX_AF_BAND)
-    display, _dimension = _named_dimension(adapter, "HexProfile", "HexAf")
-    _early_bound(display, "IDisplayDimension").ShowParenthesis = False
+    # This is a fresh HexProfile, not migration of an old toleranced part.
+    # NONE owns the ordinary band; inactive min/max getters do not define it.
+    display, dimension = _named_dimension(adapter, "HexProfile", "HexAf")
+    display = _early_bound(display, "IDisplayDimension")
+    _early_bound(dimension.Tolerance, "IDimensionTolerance").Type = 0
+    display.ShowParenthesis = False
+    precision_status = display.SetPrecision3(2, -1, 2, -1)
+    if type(precision_status) is not int or precision_status != 0:
+        raise RuntimeError(f"HexAf: ordinary precision authoring refused: {precision_status!r}")
     _assert_stock_af_source(adapter, stage="HexAf.source-authored")
 
 

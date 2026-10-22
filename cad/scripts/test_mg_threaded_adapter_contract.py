@@ -360,16 +360,9 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IEdge", "GetClosestPointOn", 3, 12),
     ("IComponent2", "GetPathName", 0, 8),
     ("IComponent2", "GetModelDoc2", 0, 9),
-    ("IComponent2", "GetCorrespondingEntity", 1, 9),
-    ("IView", "GetCorrespondingEntity", 1, 9),
-    ("IEntity", "GetComponent", 0, 9),
-    ("IEdge", "GetBody", 0, 9),
-    ("IBody2", "IsTemporaryBody", 0, 11),
-    ("IModelDocExtension", "GetObjectByPersistReference3", 2, 9),
     ("IView", "GetVisibleDrawingComponents", 0, 12),
     ("IView", "GetVisibleComponents", 0, 12),
     ("IView", "GetVisibleEntities2", 2, 12),
-    ("IView", "GetPolylines7", 2, 12),
     ("IView", "GetDetailCircleInfo2", 0, 12),
     ("IView", "IsCropped", 0, 11),
     ("IView", "UpdateViewDisplayGeometry", 0, 24),
@@ -379,9 +372,7 @@ def test_repaired_drawing_native_calls_bind_including_inline_interfaces(recipe) 
     ("IMathPoint", "MultiplyTransform", 1, 9),
     ("IView", "GetCThreads", 0, 12),
     ("IView", "GetDisplayMode2", 0, 3),
-    ("IView", "GetCThreadQuality", 0, 11),
     ("ICThread", "GetAnnotation", 0, 9),
-    ("ICThread", "GetDisplayData", 0, 9),
     ("IDisplayData", "GetLineCount", 0, 3),
     ("IDisplayData", "GetLineAtIndex2", 1, 12),
     ("IDisplayData", "GetPolyLineCount", 0, 3),
@@ -425,6 +416,7 @@ def test_witness_and_bracket_native_method_contracts(interface, member, arity, r
 @pytest.mark.parametrize("interface, member", (
     ("IView", "Angle"),
     ("IView", "Position"),
+    ("IView", "ScaleRatio"),
     ("IDisplayDimension", "CenterText"),
     ("IDisplayDimension", "OffsetText"),
     ("IDisplayDimension", "ShowParenthesis"),
@@ -484,60 +476,6 @@ def test_definition_capability_uses_pinned_interface_iids_not_coclass_ids(interf
     methods, _maps = _native_declaration(interface)
     assert _native_return_type(methods["GetID"]) == (12, 0)
     assert _native_return_type(methods["GetSketch"]) == (9, 0)
-
-
-def test_native_polyline_census_retains_optional_variant_out_parameter() -> None:
-    method = _native_declaration("IView")[0]["GetPolylines7"]
-    invocation = next(
-        node for node in ast.walk(method)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        and node.func.attr in ("InvokeTypes", "_ApplyTypes_")
-    )
-    argument_index = 4 if invocation.func.attr == "InvokeTypes" else 3
-    assert ast.literal_eval(invocation.args[argument_index]) == ((2, 1), (16396, 2))
-    # Native SHORT input, optional BYREF VARIANT output. The one-argument
-    # recipe call is valid; the full two-argument signature is checked above.
-    call = ast.parse("native.GetPolylines7(1)").body[0].value
-    assert _can_bind(call, method)
-
-
-def test_persistent_reference_resolution_retains_optional_integer_out_parameter() -> None:
-    method = _native_declaration("IModelDocExtension")[0]["GetObjectByPersistReference3"]
-    invocation = next(
-        node for node in ast.walk(method)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "_ApplyTypes_"
-    )
-    assert ast.literal_eval(invocation.args[3]) == ((12, 1), (16387, 2))
-    assert _can_bind(ast.parse("native.GetObjectByPersistReference3(reference)").body[0].value, method)
-
-
-@pytest.mark.parametrize(("interface", "iid"), (
-    ("IEdge", "{83A33D42-27C5-11CE-BFD4-00400513BB57}"),
-    ("IEntity", "{83A33D65-27C5-11CE-BFD4-00400513BB57}"),
-))
-def test_projection_diagnostic_qi_uses_pinned_interface_not_coclass(interface, iid) -> None:
-    # Import-free ABI evidence only; actual QI/ownership remains a native gate.
-    wrapper = SCRIPTS.parent.parent / "SolidworksMCP-python" / "src" / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
-    declaration = next(node for node in _tree(wrapper).body if isinstance(node, ast.ClassDef) and node.name == interface)
-    identifiers = {
-        target.id: ast.literal_eval(node.value.args[0])
-        for node in declaration.body
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)
-        and isinstance(node.value.func, ast.Name) and node.value.func.id == "IID"
-        for target in node.targets if isinstance(target, ast.Name)
-    }
-    assert identifiers["CLSID"] == iid
-    assert identifiers["coclass_clsid"] != iid
-    collector = next(
-        node for node in _tree(SCRIPTS / "draw_mg_magnifier_assembly.py").body
-        if isinstance(node, ast.FunctionDef) and node.name == "_capture_projection_identity_failure"
-    )
-    assert interface in {
-        alias.name for node in ast.walk(collector)
-        if isinstance(node, ast.ImportFrom) and node.module == "solidworks_mcp.adapters._generated.sldworks_2026"
-        for alias in node.names
-    }
 
 
 @pytest.mark.parametrize("interface, member, retval, writable", (

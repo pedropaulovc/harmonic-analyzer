@@ -7,10 +7,12 @@ mg-magnifying-clamp:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: >-
-    Cut 29.50 long from 1/2 hex brass. Native top-view AF 12.70 ±0.13
-    (two places, not REF) owns receiving size 12.57–12.83; the separate
-    as-supplied stock-form acceptance is transverse envelope 15.00 MAX
-    over the full height. Flats as supplied.
+    Cut 29.50 long from 1/2 hex brass. Native top-view AF 12.70 at two places,
+    not REF and without an explicit tolerance, uses the ordinary .XX ±0.51
+    receiving size 12.19–13.21. Retain the independent full-height transverse
+    envelope 15.00 MAX for complete-clamp travel on MHA-MG-03's plain body.
+    Flats as supplied; this is conjunctive acceptance, not a guarantee that
+    every independent dimensional corner meets the finished-wall/form limits.
     Face both ends square to the nominal hex axis; the bottom is the MHA-MG-04 shoulder seat.
     Drill Ø6.50 +0.10/0 through the corners at 19.95 from the bottom, sliding
     on the MHA-MG-03 quarter-inch body. Locate the bore axis and both #4-40
@@ -19,10 +21,12 @@ mg-magnifying-clamp:
     diagonal stock flat. Do not assume a perfect common stock axis.
     Tap the top into the bore (6.30 REF thread, 9.55 drill); retain the blind
     bottom rod tap at 8.55 full thread and 12.75 drill at the .XX band.
-    Inspect 2.0 MIN finished net wall at bore/taps/outer faces throughout
-    depth, including hole wander; AF alone does not certify stock form
-    or those finished walls. This is remaining material, not the intentional
-    top-tap/bore opening.
+    Inspect 2.0 MIN finished net wall and blind floor, including hole wander
+    and nonideal outer-face drift. Exclude only the shown hole entries/exits
+    and designed top-tap/bore intersection, not remaining sidewalls, the blind
+    floor or a new unintended breakthrough. AF alone certifies neither stock
+    form nor finished walls: reject stock/parts failing 15 MAX or 2 MIN even
+    when AF and the ordinary locating dimensions are individually in band.
     Full-depth 15.00 tan(0.3 degree) angular run-off and actual relative-axis
     limits feed the finite-tip male/female FULL overlap and drill-cone checks.
     Seat the actual stock thumb screw on the lever before inspecting overlap

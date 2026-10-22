@@ -43,6 +43,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -59,11 +60,12 @@ from _drawing_dimensions import (
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
@@ -89,7 +91,6 @@ from mg_magnifying_clamp_spec import (
     GROUPED_HIDDEN_DIMENSIONS,
     Z_FLAT_DIMENSIONS,
     VISIBLE_DIMENSIONS,
-    HEIGHT_CALLOUT,
     HEX_AC,
     HEX_AF,
     LEVER_BORE_CALLOUT,
@@ -137,7 +138,7 @@ BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
 # (x > ~0.216, y < ~0.066); the isometric right of it, inside the border.
 SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
-# R28's cleared blank lane: global stock-form acceptance has no iso leader.
+# The supplied-stock envelope is flagged on section A-A's real outside edge.
 STOCK_FORM_NOTE_XY = (0.285, 0.140)
 # The iso remains illustrative; keep its scale caption above it.
 ISO_NOTE_XY = (0.335, 0.245)
@@ -178,12 +179,9 @@ RIGHT_LOCATION_KEEP = {
 TOP_LOCATION_KEEP = {"ThumbTapFromDiagonalFlat": (0.043, 0.186)}
 BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 
-# Preserve the honest height function while wrapping its native below-text.
-HEIGHT_DRAWING_CALLOUT = HEIGHT_CALLOUT.replace("TOP-TAP WALL", "TOP-TAP\nWALL")
-
 DIMENSION_CALLOUTS = {
     "HexAf": STOCK_AF_CALLOUT,
-    "Height": HEIGHT_DRAWING_CALLOUT,
+    "Height": "",
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
     "LeverBoreFromZFlat": "BORE AND BOTH\nTAP ENTRY AXES",
 }
@@ -434,30 +432,48 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: resolved native callout repeats title-block 2B")
 
 
-def _assert_stock_form_note(note: Any, *, stage: str) -> None:
+def _assert_stock_form_note(
+    adapter: Any, view: Any, note: Any, edge: Any, *, stage: str,
+) -> None:
     native = _early_bound(note, "INote")
     annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
     text = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    raw_link = native.PropertyLinkedText
     leaders = annotation.GetLeaderCount()
     position = tuple(annotation.GetPosition() or ())
-    _telemetry.info("clamp global stock-form acceptance", operation_stage=stage, resolved_text=text, leader_count=leaders, position=repr(position))
-    if text != DRAWING_NOTES or type(leaders) is not int or leaders != 0 or len(position) != 3 or any(type(value) not in (int, float) or not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position, (*STOCK_FORM_NOTE_XY, 0.0), strict=True)):
-        raise RuntimeError(f"clamp stock form: global unleadered acceptance changed at {stage}")
+    _assert_attached_to(
+        adapter, annotation, edge, entity_type="EDGE",
+        what="clamp stock-form callout", label=stage,
+    )
+    owner, owner_type = annotation.Owner, annotation.OwnerType
+    if owner is None:
+        raise RuntimeError(f"clamp stock form: attached note has no view owner at {stage}")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    codes = (app.IsSame(view, view), app.IsSame(owner, view), app.IsSame(edge, edge))
+    _telemetry.info(
+        "clamp attached stock-form acceptance", operation_stage=stage,
+        resolved_text=text, raw_property_link=raw_link, leader_count=leaders, position=repr(position),
+        owner_type=owner_type, identity_codes=repr(codes),
+    )
+    if text != DRAWING_NOTES or type(raw_link) is not str or raw_link != property_link("Manufacturing Notes") or type(leaders) is not int or leaders != 1 or type(owner_type) is not int or owner_type != 0 or any(type(code) is not int or code != 1 for code in codes) or len(position) != 3 or any(type(value) not in (int, float) or not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position, (*STOCK_FORM_NOTE_XY, 0.0), strict=True)):
+        raise RuntimeError(f"clamp stock form: attached envelope/function changed at {stage}")
 
 
-def _add_stock_form_note(adapter: Any) -> Any:
-    # InsertNote inherits the active context; explicitly activate the sheet,
-    # then use the existing property-link helper (which clears selection).
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
-    if sheet is None:
-        raise RuntimeError("clamp stock form: current drawing sheet is unavailable")
-    name = sheet.GetName()
-    if type(name) is not str or not name or drawing.ActivateSheet(name) is not True:
-        raise RuntimeError("clamp stock form: failed to activate the drawing sheet")
-    note = add_property_linked_note(adapter, "Manufacturing Notes", *STOCK_FORM_NOTE_XY)
-    _assert_stock_form_note(note, stage="stock-form.inserted")
-    return note
+def _add_stock_form_note(adapter: Any, view: Any) -> tuple[Any, Any]:
+    # Retain the selected stock edge BEFORE note insertion: a wrong attachment
+    # must never become its own accepted baseline after insertion/rebuild.
+    edge = _select_view_entity(
+        adapter, view, "EDGE",
+        (SECTION_CENTER[0] + _HALF_AC, _elev_y(SECTION_CENTER, LEVER_BORE_Y / 2.0)),
+        label="clamp full-height stock envelope",
+    )
+    note = add_attached_note(
+        adapter, view, text=property_link("Manufacturing Notes"),
+        entity=edge, attached_to=edge, note_xy=STOCK_FORM_NOTE_XY,
+        label="MHA-MG-03 plain-body clamp travel",
+    )
+    _assert_stock_form_note(adapter, view, note, edge, stage="stock-form.inserted")
+    return note, edge
 
 
 def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, stage: str) -> None:
@@ -865,8 +881,8 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("LeverBoreDiaDim: native process/mate/finished-wall callout did not persist")
     height_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "Height")
     height_display = _early_bound(_early_bound(height_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
-    if str(height_display.GetText(4) or "") != HEIGHT_DRAWING_CALLOUT:
-        raise RuntimeError("Height: truthful top-tap wall function did not remain attached")
+    if str(height_display.GetText(4) or ""):
+        raise RuntimeError("Height: removed top-tap-wall qualifier remained")
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
     _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.imported")
 
@@ -921,13 +937,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-MG-04 shoulder seat",
     )
 
-    stock_form_note = _add_stock_form_note(adapter)
+    stock_form_note, stock_form_edge = _add_stock_form_note(adapter, section)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     def settled_dimensions() -> None:
         _assert_grouped_flat_locations(adapter, right, right_annotations)
         _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
-        _assert_stock_form_note(stock_form_note, stage="stock-form.after-final-rebuild")
+        _assert_stock_form_note(adapter, section, stock_form_note, stock_form_edge, stage="stock-form.after-final-rebuild")
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):
             annotation = _early_bound(raw, "IAnnotation")
@@ -939,8 +955,8 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"clamp native dimension census changed: {visibility!r}")
         if {name for name, state in visibility.items() if state == 1} != VISIBLE_DIMENSIONS:
             raise RuntimeError(f"clamp visible native dimension census changed: {visibility!r}")
-        if height_display.GetText(4) != HEIGHT_DRAWING_CALLOUT or bore_display.GetText(4) != LEVER_BORE_CALLOUT or int(_early_bound(bore_dimension.Tolerance, "IDimensionTolerance").Type) != 0:
-            raise RuntimeError("clamp settled height function, bore wall callout or title-block acceptance changed")
+        if str(height_display.GetText(4) or "") or bore_display.GetText(4) != LEVER_BORE_CALLOUT or int(_early_bound(bore_dimension.Tolerance, "IDimensionTolerance").Type) != 0:
+            raise RuntimeError("clamp settled height qualifier, bore wall callout or title-block acceptance changed")
         _telemetry.info("clamp native dimension census after final rebuild", source_dimension_count=len(visibility), visible_dimension_count=sum(value == 1 for value in visibility.values()), native_visibility=repr(visibility))
 
     return await finalize_drawing(

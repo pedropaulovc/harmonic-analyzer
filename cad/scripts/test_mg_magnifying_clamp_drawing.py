@@ -170,10 +170,11 @@ def test_feature_owned_acceptance_retains_stock_envelope_wall_and_seat_requireme
     notes = spec.DRAWING_NOTES
     assert float(Fraction(spec.STOCK_AF_CALLOUT.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
     assert spec.STOCK_AF_CALLOUT == "1/2 HEX STOCK; FLATS AS SUPPLIED"
-    assert (spec.HEX_AF - spec.HEX_AF_BAND, spec.HEX_AF + spec.HEX_AF_BAND) == pytest.approx((12.57, 12.83))
+    from _printed_tolerance import printed_band_mm
+    band = printed_band_mm(spec.HEX_AF_PLACES)
+    assert (spec.HEX_AF - band, spec.HEX_AF + band) == pytest.approx((12.19, 13.21))
     for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "SEAT", "THREAD ENDS"):
         assert gone not in notes
-    assert spec.WALL_NOTE.splitlines() == ["2.0 MIN FINISHED NET WALL", "BORE/TAPS/OUTER FACES, FULL DEPTH"]
     assert f"TRANSVERSE ENVELOPE {spec.STOCK_WIDTH_MAX:.2f} MAX" in notes
     assert "OVER FULL HEIGHT" in notes
     assert not hasattr(spec, "TAP_TOOL_NOTE")
@@ -186,8 +187,7 @@ def test_feature_owned_acceptance_retains_stock_envelope_wall_and_seat_requireme
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
     assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE; MHA-MG-VN-50"
     assert "AT TAP" in spec.SEAT_NOTE
-    assert notes.startswith("AS-SUPPLIED STOCK FORM ACCEPTANCE\n")
-    assert spec.HEIGHT_CALLOUT == "CONTROLS TOP-TAP WALL"
+    assert "MHA-MG-03" in notes and "CLAMP TRAVEL" in notes
     for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):
         assert stale not in notes
     assert "BRASS" not in notes and "C36000" not in notes
@@ -214,7 +214,7 @@ def _front_drawing_layout(monkeypatch):
                     Type=0, minimum=0.0, maximum=0.0,
                 ),
             )
-            self.text = {4: spec.HEIGHT_CALLOUT if name == "Height" else ""}
+            self.text = {4: "CONTROLS TOP-TAP WALL" if name == "Height" else ""}
             self.display = SimpleNamespace(
                 GetDimension=lambda: self.dimension,
                 GetDimension2=lambda _index: self.dimension,
@@ -276,7 +276,7 @@ def _front_drawing_layout(monkeypatch):
     return SimpleNamespace(annotations=annotations, curated=curated, before=before)
 
 
-def test_front_layout_moves_native_dimensions_and_wraps_only_height_below_text(monkeypatch) -> None:
+def test_front_layout_moves_native_dimensions_and_clears_height_qualifier_only(monkeypatch) -> None:
     state = _front_drawing_layout(monkeypatch)
     assert len(state.curated) == len(state.annotations)
     for name, item in state.annotations.items():
@@ -289,10 +289,14 @@ def test_front_layout_moves_native_dimensions_and_wraps_only_height_below_text(m
             item.owner, item.entities,
         )
         assert set(item.text) == {4}
-    height = state.annotations["Height"].display.GetText(4)
-    assert height.splitlines() == ["CONTROLS TOP-TAP", "WALL"]
-    assert height.split() == spec.HEIGHT_CALLOUT.split()
+    assert state.annotations["Height"].display.GetText(4) == ""
     assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == spec.LEVER_BORE_CALLOUT
+    wall_authority, marker, openings = state.annotations["LeverBoreDiaDim"].display.GetText(4).partition("EXCEPT ONLY")
+    assert "2.0 MIN FINISHED NET WALL" in " ".join(wall_authority.split())
+    assert "AND BLIND FLOOR" in " ".join(wall_authority.split())
+    assert marker and openings.split() == [
+        "SHOWN", "HOLE", "ENTRIES/EXITS", "AND", "TOP-TAP/BORE", "INTERSECTION",
+    ]
     assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
     for name in spec.GROUPED_HIDDEN_DIMENSIONS:
         assert state.annotations[name].display.GetText(4) == ""
@@ -532,16 +536,17 @@ def test_native_tap_class_omission_rejects_refused_or_stale_callouts(options) ->
 
 class _AfTolerance:
     def __init__(self):
-        self.Type, self.minimum, self.maximum = 4, -0.00013, 0.00013
-        self.calls, self.refuse, self.stale = [], False, False
+        self._type, self.minimum, self.maximum = 0, -0.00013, 0.00013
+        self.refuse_type = False
 
-    def SetValues(self, minimum, maximum):
-        self.calls.append((minimum, maximum))
-        if self.refuse:
-            return False
-        if not self.stale:
-            self.minimum, self.maximum = minimum, maximum
-        return True
+    @property
+    def Type(self):
+        return self._type
+
+    @Type.setter
+    def Type(self, value):
+        if not self.refuse_type:
+            self._type = value
 
     def GetMinValue(self):
         return self.minimum
@@ -555,6 +560,7 @@ class _AfDisplay:
         self.dimension, self.annotation = dimension, annotation
         self.ShowParenthesis, self.places, self.tolerance_places = False, 2, 2
         self.text, self.precision_calls, self.stale_precision = "", [], False
+        self.precision_status = 0
         self.prefix, self.suffix = "", ""
 
     def GetDimension2(self, configuration):
@@ -573,8 +579,11 @@ class _AfDisplay:
     def SetPrecision3(self, primary, dual, tolerance, dual_tolerance):
         self.precision_calls.append((primary, dual, tolerance, dual_tolerance))
         if not self.stale_precision:
-            self.tolerance_places = tolerance
-        return 0
+            if primary >= 0:
+                self.places = primary
+            if tolerance >= 0:
+                self.tolerance_places = tolerance
+        return self.precision_status
 
     def GetText(self, part):
         assert part in (1, 2, 4)
@@ -583,11 +592,10 @@ class _AfDisplay:
     def SetText(self, part, text):
         assert part in (1, 2, 4)
         setattr(self, {1: "prefix", 2: "suffix", 4: "text"}[part], text)
-        return True
+        return None
 
 
 def _af_fixture(monkeypatch):
-    import _drawing_tolerances as tolerances
 
     _install_witness_interfaces(monkeypatch)
     owner = _NativeSketch("actual hex", "HexProfile")
@@ -628,10 +636,9 @@ def _af_fixture(monkeypatch):
         assert (feature, dimension) == ("HexProfile", "HexAf")
         return source_display, source_dimension
 
-    for module in (part, drawing, tolerances):
+    for module in (part, drawing):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(part, "_named_dimension", named)
-    monkeypatch.setattr(tolerances, "_named_dimension", named)
     monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
     return SimpleNamespace(
         adapter=adapter, model=model, view=view, points=points,
@@ -642,40 +649,43 @@ def _af_fixture(monkeypatch):
     )
 
 
-def test_native_af_authoring_owns_real_limits_precision_and_nonreference_source(monkeypatch):
+def test_native_af_authoring_uses_ordinary_default_not_inactive_native_limits(monkeypatch):
     state = _af_fixture(monkeypatch)
-    state.tolerance.Type = 0
-    state.tolerance.minimum = state.tolerance.maximum = 0.0
+    state.tolerance.Type = 4
+    inactive = (state.tolerance.minimum, state.tolerance.maximum)
     state.source_display.ShowParenthesis = True
-    state.source_display.tolerance_places = -2
+    state.source_display.places = state.source_display.tolerance_places = -2
     part._author_stock_af(state.adapter)
-    assert len(state.tolerance.calls) == 1
-    assert state.tolerance.calls[0] == pytest.approx((-0.00013, 0.00013), rel=0.0, abs=1e-12)
-    assert state.tolerance.Type == 4
-    assert state.source_display.precision_calls == [(-1, -1, 2, -1)]
+    assert state.tolerance.Type == 0
+    assert state.source_display.precision_calls == [(2, -1, 2, -1)]
+    assert state.source_display.places == state.source_display.tolerance_places == 2
     assert state.source_display.ShowParenthesis is False
-    assert ((state.source_dimension.SystemValue + state.tolerance.GetMinValue()) * 1000,
-            (state.source_dimension.SystemValue + state.tolerance.GetMaxValue()) * 1000) == pytest.approx((12.57, 12.83))
+    assert (state.tolerance.minimum, state.tolerance.maximum) == inactive
+    # NONE makes these stored getters inactive; their nonzero values cannot
+    # masquerade as the title-block's ordinary receiving limits.
+    from _printed_tolerance import printed_band_mm
+    band = printed_band_mm(state.source_display.GetPrimaryPrecision2())
+    nominal = state.source_dimension.SystemValue * 1000.0
+    assert (nominal - band, nominal + band) == pytest.approx((12.19, 13.21))
     assert all(point._oleobj_.calls for point in state.points)
 
 
-@pytest.mark.parametrize("fault", ("refused", "stale-values", "stale-precision"))
+@pytest.mark.parametrize("fault", ("stale-type", "stale-precision", "precision-status"))
 def test_native_af_authoring_refuses_failed_or_nonpersistent_native_writes(monkeypatch, fault):
     state = _af_fixture(monkeypatch)
-    state.tolerance.minimum = state.tolerance.maximum = 0.0
-    state.tolerance.refuse = fault == "refused"
-    state.tolerance.stale = fault == "stale-values"
+    state.tolerance.Type = 4
+    state.tolerance.refuse_type = fault == "stale-type"
     state.source_display.stale_precision = fault == "stale-precision"
-    state.source_display.tolerance_places = 3
+    state.source_display.precision_status = 1 if fault == "precision-status" else 0
+    state.source_display.places = state.source_display.tolerance_places = 3
     with pytest.raises(RuntimeError):
         part._author_stock_af(state.adapter)
-    assert len(state.tolerance.calls) == 1
 
 
 @pytest.mark.parametrize("field,value", (
     ("places", 3), ("tolerance_places", -2), ("ShowParenthesis", True),
-    ("SystemValue", 0.0128), ("Type", 0), ("minimum", -0.00051),
-    ("maximum", 0.00051), ("FullName", "Wrong@HexProfile@actual-clamp.Part"),
+    ("SystemValue", 0.0128), ("Type", 4),
+    ("FullName", "Wrong@HexProfile@actual-clamp.Part"),
 ))
 def test_native_af_readback_refuses_changed_acceptance(monkeypatch, field, value):
     state = _af_fixture(monkeypatch)
@@ -857,16 +867,6 @@ def test_native_top_af_placement_and_attached_stock_text_preserve_source_accepta
     assert moved[1].ymin - neighbors[1].ymax > 0.0179
 
 
-def test_unchanged_envelope_row_keeps_r28_blank_lane_clearance():
-    # R28 native text: this exact surviving row was 118.9611 mm wide.
-    # This proves only its placement budget, not the new heading/AF/bore ink.
-    assert spec.DRAWING_NOTES.splitlines()[1] == "TRANSVERSE ENVELOPE 15.00 MAX OVER FULL HEIGHT"
-    x, y = drawing.STOCK_FORM_NOTE_XY
-    row = Box(x, y - 0.0090514, x + 0.1189611, y - 0.0090514 + 0.0035)
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    assert template.width_m - 0.0127 - row.xmax > 0.015
-    assert row.gap(Box(0.222415, 0.120162, 0.277585, 0.219838)) > 0.007
-    assert row.gap(Box(0.2602567, 0.1124082, 0.4062721, 0.1159736)) > 0.014
 
 
 @pytest.mark.parametrize("fault", ("dimension", "view", "owner-type", "dangling", "text", "unknown-self", "source-span"))
@@ -891,44 +891,132 @@ def test_native_af_import_refuses_wrong_source_context_or_postrebuild_drift(monk
         drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
 
 
-@pytest.mark.parametrize("fault", (None, "activation", "stale-property", "leader", "position"))
-def test_global_stock_form_acceptance_is_linked_unleadered_and_sheet_placed(monkeypatch, fault):
-    state = SimpleNamespace(active=False, inserted=[], text=spec.DRAWING_NOTES, leaders=0, position=(*drawing.STOCK_FORM_NOTE_XY, 0.0))
+@pytest.mark.parametrize("fault", (
+    None, "activation", "wrong-initial-edge", "first-rebuild-switch",
+    "stale-property", "raw-link", "leader", "position", "wrong-edge",
+    "dangling", "owner", "owner-type", "lost-height", "unknown-self",
+))
+def test_stock_form_acceptance_keeps_actual_section_edge_and_function_after_rebuild(monkeypatch, fault):
+    import _drawing_leader_notes as leader_notes
+
+    view = SimpleNamespace(GetName2=lambda: "Section A-A")
+    edge = SimpleNamespace(
+        x=drawing.SECTION_CENTER[0] + drawing._HALF_AC,
+        low=drawing._elev_y(drawing.SECTION_CENTER, 0.0),
+        high=drawing._elev_y(drawing.SECTION_CENTER, spec.LEVER_BORE_Y - spec.LEVER_BORE_DIA / 2.0),
+    )
+    properties = {"Manufacturing Notes": spec.DRAWING_NOTES}
+    state = SimpleNamespace(active=None, entities=(), leaders=0, position=None, dangling=False)
+    annotation = SimpleNamespace(Owner=view, OwnerType=0)
+    annotation.GetAttachedEntities3 = lambda: state.entities
+    annotation.GetAttachedEntityCount3 = lambda: len(state.entities)
+    annotation.GetAttachedEntityTypes = lambda: (1,) * len(state.entities)
+    annotation.GetLeaderCount = lambda: state.leaders
+    annotation.GetPosition = lambda: state.position
+    annotation.IsDangling = lambda: state.dangling
+
+    def attach(entities):
+        state.entities = tuple(entities)
+        return True
+
+    def leader(*_arguments):
+        state.leaders = 1
+        return 0
+
+    def position(x, y, z):
+        state.position = x, y, z
+        return True
+
+    annotation.SetAttachedEntities = attach
+    annotation.SetLeader3 = leader
+    annotation.SetPosition2 = position
+    note = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        PropertyLinkedText=drawing_notes.property_link("Manufacturing Notes"),
+        GetText=lambda: properties["Manufacturing Notes"],
+    )
 
     def activate(name):
-        assert name == "ActualSheet"
-        state.active = fault != "activation"
-        return state.active
+        assert name == view.GetName2()
+        if fault == "activation":
+            return False
+        state.active = view
+        return True
 
-    def insert(adapter, text, x, y):
-        assert state.active and text == drawing_notes.property_link("Manufacturing Notes")
-        assert (x, y) == drawing.STOCK_FORM_NOTE_XY
-        annotation = SimpleNamespace(GetLeaderCount=lambda: state.leaders, GetPosition=lambda: state.position)
-        note = SimpleNamespace(GetAnnotation=lambda: annotation, GetText=lambda: state.text)
-        state.inserted.append(note)
+    def select(_adapter, target, entity_type, xy, *, label, entity=None):
+        assert target is view and entity_type == "EDGE"
+        if not activate(target.GetName2()):
+            raise RuntimeError("failed to activate the native stock-note view")
+        if entity is None:
+            x, y = xy
+            assert x == pytest.approx(edge.x) and edge.low < y < edge.high
+        else:
+            assert entity is edge and xy is None
+        return edge
+
+    def insert(text):
+        assert state.active is view
+        assert text == drawing_notes.property_link("Manufacturing Notes")
+        if fault == "wrong-initial-edge":
+            state.entities = (SimpleNamespace(**vars(edge)),)
         return note
 
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(
-        ActivateSheet=activate, GetCurrentSheet=lambda: SimpleNamespace(GetName=lambda: "ActualSheet"),
-    ))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            ActivateView=activate, ClearSelection2=lambda _all: None, InsertNote=insert,
+        ),
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing_notes, "add_note", insert)
+    monkeypatch.setattr(leader_notes, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(leader_notes._sw_type_info, "early_bound_or_flag", lambda value, _interface, *_members: value)
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(leader_notes, "_select_view_entity", select)
+    monkeypatch.setattr(leader_notes, "dispatch_array", tuple)
+
+    def rebuild(*_args, **_kwargs):
+        if fault == "first-rebuild-switch":
+            state.entities = (SimpleNamespace(**vars(edge)),)
+
+    monkeypatch.setattr(leader_notes, "rebuild_drawing", rebuild)
+    if fault in ("activation", "wrong-initial-edge", "first-rebuild-switch"):
+        message = "activate" if fault == "activation" else "lost its edge attachment"
+        with pytest.raises(RuntimeError, match=message):
+            drawing._add_stock_form_note(adapter, view)
+        if fault == "activation":
+            assert state.entities == () and state.position is None
+        return
+    result, retained_edge = drawing._add_stock_form_note(adapter, view)
+    assert result is note and retained_edge is edge
+    assert state.entities == (edge,) and state.leaders == 1
+    assert state.position == (*drawing.STOCK_FORM_NOTE_XY, 0.0)
+    assert properties == {"Manufacturing Notes": spec.DRAWING_NOTES}
     if fault == "stale-property":
-        state.text = "OLD STOCK"
+        properties["Manufacturing Notes"] = "OLD STOCK"
+    elif fault == "raw-link":
+        # A frozen literal can look identical but no longer follows the part.
+        note.PropertyLinkedText = spec.DRAWING_NOTES
     elif fault == "leader":
-        state.leaders = 1
+        state.leaders = 0
     elif fault == "position":
         state.position = (0.305, 0.140, 0.0)
-    if fault is not None:
-        with pytest.raises(RuntimeError):
-            drawing._add_stock_form_note(adapter)
-        assert len(state.inserted) == (0 if fault == "activation" else 1)
+    elif fault == "wrong-edge":
+        state.entities = (SimpleNamespace(**vars(edge)),)
+    elif fault == "dangling":
+        state.dangling = True
+    elif fault == "owner":
+        annotation.Owner = SimpleNamespace(GetName2=view.GetName2)
+    elif fault == "owner-type":
+        annotation.OwnerType = 1
+    elif fault == "lost-height":
+        properties["Manufacturing Notes"] = spec.DRAWING_NOTES.replace("OVER FULL HEIGHT", "")
+    elif fault == "unknown-self":
+        adapter.swApp.IsSame = lambda left, right: 2 if left is right is view else int(left is right)
+    if fault is None:
+        drawing._assert_stock_form_note(adapter, view, note, retained_edge, stage="after-final-rebuild")
     else:
-        note = drawing._add_stock_form_note(adapter)
-        drawing._assert_stock_form_note(note, stage="after-final-rebuild")
-        state.text = "TRANSVERSE ENVELOPE 15.00 MAX"  # Lost full-height authority.
         with pytest.raises(RuntimeError):
-            drawing._assert_stock_form_note(note, stage="after-final-rebuild")
+            drawing._assert_stock_form_note(adapter, view, note, retained_edge, stage="after-final-rebuild")
 
 
 @pytest.mark.parametrize("interface", ("IEntity", "ISketchPoint", "ISketchSegment"))

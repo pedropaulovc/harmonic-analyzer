@@ -1,22 +1,17 @@
 r"""Native manufacturing sheet for the simple threaded L bracket.
 
-Model sizes import from the saved SLDPRT; the foot-to-neck location measures
-its two physical edges using the native drawing-edge dimensional contract.
-The true-profile section exposes the thread mouths; their edge-break limit
-is title-block-owned and their 45-degree shape rides the native tap callout.
-The associative tap callout owns its thread description and extent; its class
-is owned by the title block. The duplicate Wizard name leaves the wall's lane.
-No press-fit, collar, finish-land or GD&T-frame convention remains.
+Model sizes import from the saved SLDPRT. The ordinary end view and associative
+1/4-20 UNC THRU callout define the simple tapped hole; no section is needed.
+Its fit class, inside corners and ordinary edge breaks follow the title block.
+The native 12.50 neck and 3.175 foot thicknesses remain controlling dimensions.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
 import math
 import re
 import sys
-from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -26,31 +21,26 @@ from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import CalloutInk, move_annotation, require_clear, require_inside, sheet_region
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
-from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimension_import import curate_view_dimensions
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_audit import annotation_display
-from _drawing_layout_check import DrawableRegion, LeaderSegment
-from _drawing_leader_notes import add_leader_note
+from _drawing_layout_check import LeaderSegment
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _drawing_view_display import set_hidden_lines_removed
-from _drawing_sections import create_section_view
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _layout_audit import _display_segments
 from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
 from _paths import CAD_ROOT
 from _session import run_build
-from _section_axis import position_section_caption
-import _seat_forensics
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, FLANGE_DEPTH_CALLOUT, MOUNTING_HOLE_PROCESS, NECK_THICKNESS_CALLOUT, ROOT_CALLOUT, TAP_PROCESS, THREAD_ENVELOPE_CALLOUT, WALL_CALLOUT
+from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -63,18 +53,11 @@ BOTTOM_CENTER = (0.079, 0.080)
 SIDE_CENTER = (0.228, 0.165)
 ISO_CENTER = (0.350, 0.130)
 ISO_SCALE = (1, 2)
-# Creation seed only: cut-only sections retain the whole-model outline on R8.
-# The final location is measured after rotation, not inferred from this point.
-MOUTH_SECTION_SEED = (0.228, 0.080)
-MOUTH_SECTION_SCALE = (3, 1)
-FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.140, 0.123), "RootR": (0.045, 0.145)}
+FRONT_KEEP = {"NeckThickness": (0.118, 0.185), "FlangeWidth": (0.079, 0.098), "FlangeDepth": (0.140, 0.123)}
 BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
-TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240), "ThreadRootEnvelope": (0.292, 0.214)}
-WALL_TEXT_XY = (0.140, 0.250)
-# Whitespace only; keep the native radius/MAX and all controlled corners.
-ROOT_PRINT_CALLOUT = ROOT_CALLOUT.replace(" INSIDE ", "\nINSIDE ")
+TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240)}
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:
@@ -110,87 +93,6 @@ def _project_side_view(adapter: Any, front: Any, side: Any) -> None:
         raise RuntimeError("threaded bracket end view axis is not aligned")
 
 
-def _mouth_section(adapter: Any, side: Any, iso: Any) -> Any:
-    """Cut Z=0 through the X-axis tap; an end view collapses its chamfer leg."""
-    ends = [
-        model_point_in_view(adapter, side, (0.0, sign * (NOSE_R + 3.0) / 1000.0, 0.0), label="mouth section cutting line")
-        for sign in (1.0, -1.0)
-    ]
-    section = _early_bound(create_section_view(
-        adapter, side, line_start=ends[0], line_end=ends[1],
-        view_xy=MOUTH_SECTION_SEED, section_label="A", scale=MOUTH_SECTION_SCALE,
-        label="thread-mouth true-profile section",
-    ), "IView")
-    cut = _early_bound(section.GetSection(), "IDrSection")
-    cut.SetDisplayOnlySurfaceCut(True)
-    set_hidden_lines_removed(adapter, section)
-    rebuild_drawing(adapter, label="thread-mouth section cut faces only")
-    if cut.GetDisplayOnlySurfaceCut() is not True:
-        raise RuntimeError("thread-mouth section retained geometry beyond the cutting plane")
-    # R8's 3:1 outline was 49.276 x 158.926 mm, even in cut-only mode.
-    # Its mouth was near the bottom of that outline, not at Position. Turn
-    # the measured outline-to-mouth vector right, leaving the cut itself and
-    # its scale intact. This fits the complete native outline above the iso.
-    outline = tuple(float(value) for value in section.GetOutline())
-    if len(outline) != 4 or not all(math.isfinite(value) for value in outline):
-        raise RuntimeError("thread-mouth section has invalid native outline")
-    origin = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label="mouth before rotation")
-    offset = tuple(origin[i] - (outline[i] + outline[i + 2]) / 2.0 for i in range(2))
-    if math.hypot(*offset) < 0.001:
-        raise RuntimeError("thread-mouth section lost its measured whole-model/profile offset")
-    section.Angle = float(section.Angle) - math.atan2(offset[1], offset[0])
-    rebuild_drawing(adapter, label="orient thread-mouth profile into free sheet lane")
-    outline = tuple(float(value) for value in section.GetOutline())
-    position = tuple(float(value) for value in section.Position)
-    region = sheet_region(adapter)
-    iso_outline = tuple(float(value) for value in _early_bound(iso, "IView").GetOutline())
-    # R8: iso top 154.0135; root-envelope text starts above 209 mm.
-    # Reserve 3 mm above the ACTUAL iso and at least 2 mm below that text.
-    if len(outline) != 4 or len(position) != 2 or len(iso_outline) != 4 or not all(math.isfinite(value) for value in (*outline, *position, *iso_outline)):
-        raise RuntimeError("thread-mouth section has invalid placement readback")
-    lane = DrawableRegion(0.250, iso_outline[3] + 0.003, region.xmax - 0.004, 0.207)
-    width, height = outline[2] - outline[0], outline[3] - outline[1]
-    if not (0.0 < width <= lane.xmax - lane.xmin - 0.0004 and 0.0 < height <= lane.ymax - lane.ymin - 0.0004):
-        raise RuntimeError(f"thread-mouth native outline does not fit above isometric: {outline}, lane={lane}")
-    delta = (lane.xmax - 0.0002 - outline[2], lane.ymin + 0.0002 - outline[1])
-    if section.SetViewPosition(double_array([position[i] + delta[i] for i in range(2)]), False) is not True:
-        raise RuntimeError("thread-mouth section refused its measured placement")
-    rebuild_drawing(adapter, label="place complete thread-mouth native extent")
-    placed = tuple(float(value) for value in section.GetOutline())
-    expected_outline = tuple(outline[i] + delta[i % 2] for i in range(4))
-    if len(placed) != 4 or any(not math.isfinite(value) for value in placed) or max(abs(a - b) for a, b in zip(placed, expected_outline)) > 0.00005:
-        raise RuntimeError(f"thread-mouth section placement/alignment did not persist: {placed}, expected={expected_outline}")
-    require_inside("complete thread-mouth outline", placed, lane)
-    require_inside("complete thread-mouth outline", placed, region)
-    require_clear("complete thread-mouth outline", placed, {"isometric": iso_outline})
-    origin = model_point_in_view(adapter, section, (0.0, 0.0, 0.0), label="mouth section origin")
-    axes = [
-        model_point_in_view(adapter, section, point, label="mouth section profile axis")
-        for point in ((0.01, 0.0, 0.0), (0.0, 0.01, 0.0))
-    ]
-    vectors = [tuple(point[i] - origin[i] for i in range(2)) for point in axes]
-    expected = 0.01 * MOUTH_SECTION_SCALE[0] / MOUTH_SECTION_SCALE[1]
-    if any(abs(math.hypot(*vector) - expected) > 1e-7 for vector in vectors) or abs(sum(a * b for a, b in zip(*vectors))) > 1e-9:
-        raise RuntimeError("thread-mouth section does not show both chamfer legs in true profile")
-    if abs(vectors[0][1]) > 1e-7 or abs(vectors[1][0]) > 1e-7:
-        raise RuntimeError("thread-mouth section axial/radial directions are not horizontal/vertical")
-    if cut.GetDisplayOnlySurfaceCut() is not True:
-        raise RuntimeError("thread-mouth section lost cut-only display after placement")
-    _telemetry.info(f"thread-mouth layout: before={outline}, after={placed}, lane={lane}, origin={origin}, profile_axes={vectors}")
-    return section
-
-
-def _mouth_profile_box(adapter: Any, section: Any) -> tuple[float, float, float, float]:
-    """Project the complete Z=0 neck envelope, not the uncut foot's outline."""
-    points = [
-        model_point_in_view(adapter, section, (x / 1000.0, y / 1000.0, 0.0), label="mouth cut-profile envelope")
-        for x in (-NECK_HALF_X, NECK_HALF_X) for y in (-NOSE_R, NOSE_R)
-    ]
-    if any(len(point) != 2 or not all(math.isfinite(value) for value in point) for point in points):
-        raise RuntimeError("thread-mouth cut profile has invalid native projection")
-    return (min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points))
-
-
 def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> CalloutInk:
     """Use native text runs, not the longest line (a horizontal size is not a leader)."""
     display, errors = annotation_display(adapter, annotation)
@@ -220,76 +122,6 @@ def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> Callo
     # These are native layout envelopes, not exported PDF glyph proof.
     lines = tuple(LeaderSegment(label, "dim", line.x0, line.y0, line.x1, line.y1) for line in _display_segments(display))
     return CalloutInk(label, (box.xmin, box.ymin, box.xmax, box.ymax), lines)
-
-
-def _layout_mouth_caption(adapter: Any, section: Any, iso: Any) -> None:
-    """Seat the linked ROTATED caption beside the true-profile native section."""
-    region = sheet_region(adapter)
-    iso_outline = tuple(float(value) for value in _early_bound(iso, "IView").GetOutline())
-    if len(iso_outline) != 4 or not all(math.isfinite(value) for value in iso_outline):
-        raise RuntimeError("thread-mouth layout has invalid isometric outline")
-    lane = DrawableRegion(0.250, iso_outline[3] + 0.003, region.xmax - 0.004, 0.207)
-    profile = _mouth_profile_box(adapter, section)
-    notes = [
-        note for note in (_early_bound(raw, "INote") for raw in (_early_bound(section, "IView").GetNotes() or ()))
-        if "<VLLABEL>" in str(note.PropertyLinkedText or "")
-    ]
-    if len(notes) != 1:
-        raise RuntimeError("thread-mouth layout requires one native linked section caption")
-    note = notes[0]
-    linked = str(note.PropertyLinkedText or "")
-    rotated = linked.replace("<VLLABEL>", "<VLLABEL> (ROTATED)", 1)
-    if "(ROTATED)" not in linked:
-        note.PropertyLinkedText = rotated
-        rebuild_drawing(adapter, label="identify rotated native thread-mouth section")
-        if str(note.PropertyLinkedText or "") != rotated:
-            raise RuntimeError("thread-mouth rotated caption lost its native linked fields")
-    extent = tuple(float(value) for value in note.GetExtent())
-    if len(extent) != 6 or not all(math.isfinite(value) for value in extent) or extent[0] >= extent[3] or extent[1] >= extent[4]:
-        raise RuntimeError("thread-mouth caption has invalid native extent")
-    position = tuple(float(value) for value in _early_bound(note.GetAnnotation(), "IAnnotation").GetPosition())
-    target = (
-        position[0] + profile[0] - 0.004 - extent[3],
-        position[1] + profile[3] - extent[4],
-    )
-    position_section_caption(adapter, section, target, label="thread mouth A-A")
-    extent = tuple(float(value) for value in note.GetExtent())
-    if len(extent) != 6 or not all(math.isfinite(value) for value in extent) or extent[0] >= extent[3] or extent[1] >= extent[4]:
-        raise RuntimeError("thread-mouth caption lost its native extent")
-    caption = (extent[0], extent[1], extent[3], extent[4])
-    outline = tuple(float(value) for value in _early_bound(section, "IView").GetOutline())
-    if len(outline) != 4 or not all(math.isfinite(value) for value in outline) or outline[0] >= outline[2] or outline[1] >= outline[3]:
-        raise RuntimeError("thread-mouth layout lost its final native outline")
-    require_inside("final complete thread-mouth outline", outline, lane)
-    require_inside("final complete thread-mouth outline", outline, region)
-    require_clear("final complete thread-mouth outline", outline, {"isometric": iso_outline})
-    for label, box in (("mouth profile", profile), ("mouth caption", caption)):
-        require_inside(label, box, lane)
-        require_inside(label, box, region)
-        require_clear(label, box, {"isometric": iso_outline})
-    require_clear("mouth caption", caption, {"profile": profile})
-    if _early_bound(section, "IView").GetAnnotationsByType(13):
-        raise RuntimeError("out-of-cut centre marks returned after native section layout")
-    _telemetry.info(f"thread-mouth caption layout: profile={profile}, caption={caption}")
-
-
-def _require_root_callout_inside(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """The wrapped native radius stays inside the border and left of the neck."""
-    roots = [annotation for annotation in annotations if dimension_name(adapter, annotation) == "RootR"]
-    if len(roots) != 1:
-        raise RuntimeError("inside-corner layout requires one native RootR")
-    rebuild_drawing(adapter, label="measure wrapped inside-corner callout")
-    ink = _dimension_layout_ink(adapter, roots[0], label="all neck/foot inside corners")
-    region = sheet_region(adapter)
-    require_inside("inside-corner callout", ink.text, region)
-    neck_left = min(
-        model_point_in_view(adapter, front, (x / 1000.0, 0.0, 0.0), label="inside-corner neck clearance")[0]
-        for x in (-NECK_HALF_X, NECK_HALF_X)
-    )
-    if ink.text[2] + 0.003 > neck_left:
-        raise RuntimeError("inside-corner callout text crosses the neck")
-    for line in ink.leader:
-        require_inside("inside-corner leader", (min(line.x0, line.x1), min(line.y0, line.y1), max(line.x0, line.x1), max(line.y0, line.y1)), region)
 
 
 def _curate_tap_callout(adapter: Any, view: Any, callout: Any) -> int:
@@ -385,7 +217,7 @@ def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
 
 
 def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
-    """Ordinary .XX location between physical sides; radius/parallelism owns width."""
+    """Locate the straight sides; the tangent root is not a flat step."""
     selected = []
     for level, neck in ((-NOSE_R, True), (SIDE_PLATE_Y[0], False)):
         candidates = []
@@ -399,8 +231,6 @@ def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
             elif min(a[2], b[2]) < SIDE_PLATE_Z[0] - 1e-6 or max(a[2], b[2]) > SIDE_PLATE_Z[1] + 1e-6:
                 continue
             candidates.append(item)
-        # The visible +X foot-side edge is tangent to its actual corner
-        # round, not at X=NECK_HALF_X. No screen hit-test or proxy IsSame.
         if not candidates:
             raise RuntimeError("neck-to-foot location has no physical side edge")
         front_x = max(item.midpoint_mm[0] for item in candidates)
@@ -425,368 +255,6 @@ def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
     if str(native.Name) != "NeckToFootSide" or int(display.GetPrimaryPrecision2()) != DRAWING_EDGE_PRECISION["NeckToFootSide"] or display.ShowParenthesis is not False or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
         raise RuntimeError("neck-to-foot location is not an ordinary title-band dimension")
     return display.GetAnnotation()
-
-
-def _remove_out_of_cut_mounting_marks(adapter: Any, section: Any) -> None:
-    """Prove source/view correspondence and MountingHoles ownership before deletion."""
-    view = _early_bound(section, "IView")
-    if _early_bound(view.GetSection(), "IDrSection").GetDisplayOnlySurfaceCut() is not True:
-        raise RuntimeError("mounting-mark removal requires the proven Z=0 cut-only section")
-    # A section has no ReferencedDocument (SDK); its base view owns it.
-    base = _early_bound(view.GetBaseView(), "IView")
-    reference = base.ReferencedDocument if base is not None else None
-    if reference is None or reference == "":
-        raise RuntimeError("section mounting-mark proof has no base-view source")
-    source = _early_bound(reference, "IModelDoc2")
-    source_path = str(source.GetPathName() or "")
-    if int(source.GetType()) != 1 or not source_path or Path(source_path).resolve() != SOURCE.resolve():
-        raise RuntimeError(f"section mounting-mark proof references wrong source: {source_path!r}")
-    feature = _early_bound(source, "IPartDoc").FeatureByName("MountingHoles")
-    if feature is None:
-        raise RuntimeError(f"section mounting-mark source {source_path!r} has no MountingHoles")
-    extension = _early_bound(source.Extension, "IModelDocExtension")
-
-    def persistent(entity: Any, label: str) -> Any:
-        if entity is None:
-            raise RuntimeError(f"{label}: missing source correspondence in {source_path!r}")
-        reference_id = extension.GetPersistReference3(entity)
-        if reference_id is None or len(reference_id) == 0 or int(extension.IsSamePersistentID(reference_id, reference_id)) != 1:
-            raise RuntimeError(f"{label}: unresolved source persistent identity in {source_path!r}")
-        return reference_id
-
-    # Inventory real edges of the named physical source feature. Shared face
-    # boundaries repeat an edge; deduplicate native IDs, not circle geometry.
-    inventory = []
-    for face in _early_bound(feature, "IFeature").GetFaces() or ():
-        for edge in _early_bound(face, "IFace2").GetEdges() or ():
-            identity = persistent(edge, "MountingHoles inventory edge")
-            comparisons = [int(extension.IsSamePersistentID(identity, known)) for known in inventory]
-            if any(value not in (0, 1) for value in comparisons):
-                raise RuntimeError("MountingHoles inventory has unresolved native identity comparisons")
-            if 1 not in comparisons:
-                inventory.append(identity)
-    if not inventory:
-        raise RuntimeError(f"MountingHoles has no native source-edge inventory in {source_path!r}")
-    removable = []
-    for index, raw in enumerate(view.GetAnnotationsByType(13) or ()):
-        mark = _early_bound(raw, "IAnnotation")
-        entities = tuple(mark.GetAttachedEntities3() or ())
-        types = tuple(mark.GetAttachedEntityTypes() or ())
-        if len(entities) != 1 or types != (1,) or entities[0] is None or mark.IsDangling():
-            raise RuntimeError(f"section mark {index}: unresolved attachment count={len(entities)}, types={types!r}, source={source_path!r}")
-        canonical = extension.GetCorrespondingEntity2(entities[0])
-        identity = persistent(canonical, f"section mark {index} attached edge")
-        comparisons = [int(extension.IsSamePersistentID(identity, known)) for known in inventory]
-        if any(value not in (0, 1) for value in comparisons) or comparisons.count(1) != 1:
-            raise RuntimeError(f"section mark {index}: attached edge is not uniquely owned by source MountingHoles; matches={comparisons}, source={source_path!r}")
-        roundtrip = view.GetCorrespondingEntity(canonical)
-        if roundtrip is None:
-            raise RuntimeError(f"section mark {index}: MountingHoles edge has no correspondence in this section")
-        back = persistent(extension.GetCorrespondingEntity2(roundtrip), f"section mark {index} view roundtrip")
-        if int(extension.IsSamePersistentID(identity, back)) != 1:
-            raise RuntimeError(f"section mark {index}: source/view persistent identity roundtrip changed")
-        # Only now do centre/axis/radius establish which mounting rim this
-        # owned edge is and that it lies beyond the actual Z=0 cut.
-        curve = _early_bound(_early_bound(canonical, "IEdge").GetCurve(), "ICurve")
-        if curve.IsCircle() is not True:
-            raise RuntimeError("section centre mark source is not a circle")
-        values = tuple(float(v) for v in curve.CircleParams)
-        if len(values) != 7 or not all(math.isfinite(v) for v in values):
-            raise RuntimeError("section centre mark has unreadable native circle geometry")
-        x, y, z, nx, ny, nz, radius = values
-        mounting = any(math.dist((x, y), tuple(v / 1000.0 for v in p[:2])) < 1e-7 for p in BRACKET_HOLE_POINTS)
-        mounting = mounting and min(abs(z - v / 1000.0) for v in SIDE_PLATE_Z) < 1e-7 and abs(z) > CLEARANCE_DIA / 1000.0
-        mounting = mounting and max(abs(nx), abs(ny), abs(abs(nz) - 1.0), abs(radius - CLEARANCE_DIA / 2000.0)) < 1e-7
-        if not mounting:
-            raise RuntimeError("section centre mark is not an out-of-cut mounting-hole rim")
-        removable.append(mark)
-    draw = _early_bound(adapter.currentModel, "IModelDoc2")
-    for mark in removable:
-        draw.ClearSelection2(True)
-        if not mark.Select2(False, 0):
-            raise RuntimeError("could not select out-of-cut mounting centre mark")
-        draw.EditDelete()  # Void; view-scoped native re-read is the proof.
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="remove proven out-of-cut mounting marks")
-    if view.GetAnnotationsByType(13):
-        raise RuntimeError("out-of-cut mounting centre mark survived deletion")
-
-
-def _mouth_thread_diagnostic(adapter: Any, section: Any, *, feature_name: str = "LeverTap") -> dict[str, Any]:
-    """Observe a failed section or staged native control; never authorize ink."""
-    evidence: dict[str, Any] = {"feature": feature_name, "reads": {}, "errors": {}}
-
-    def observe(name: str, reader: Any, *, opaque: bool = False) -> Any:
-        try:
-            value = reader()
-            evidence["reads"][name] = {"present": value is not None} if opaque else value
-            return value
-        except Exception as error:
-            try:
-                detail = f"{type(error).__name__}: {error}"
-            except Exception:
-                detail = f"{type(error).__name__}: <unprintable diagnostic exception>"
-            evidence["errors"][name] = detail
-            return None
-
-    view = _early_bound(section, "IView")
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    layer_manager = observe("layer_manager", lambda: _early_bound(model.GetLayerManager(), "ILayerMgr"), opaque=True)
-    base = observe("base_view", lambda: _early_bound(view.GetBaseView(), "IView"), opaque=True)
-    source = observe("source", lambda: _early_bound(base.ReferencedDocument, "IModelDoc2"), opaque=True) if base is not None else None
-    source_extension = None
-    if source is not None:
-        observe("source.path", lambda: source.GetPathName())
-        source_extension = observe("source.extension", lambda: _early_bound(source.Extension, "IModelDocExtension"), opaque=True)
-        feature = observe("source.feature", lambda: _early_bound(_early_bound(source, "IPartDoc").FeatureByName(feature_name), "IFeature"), opaque=True)
-        if feature is not None:
-            definition = observe("source.definition", lambda: _early_bound(feature.GetDefinition(), "IWizardHoleFeatureData2"), opaque=True)
-            if definition is not None:
-                observe("source.CosmeticThreadType", lambda: definition.CosmeticThreadType)
-                observe("source.ThreadEndCondition", lambda: definition.ThreadEndCondition)
-                observe("source.ThreadClass", lambda: definition.ThreadClass)
-                observe("source.Type", lambda: definition.Type)
-                observe("source.FastenerSize", lambda: definition.FastenerSize)
-                observe("source.EndCondition", lambda: definition.EndCondition)
-                observe("source.HoleDepth", lambda: definition.HoleDepth)
-                observe("source.ThreadDepth", lambda: definition.ThreadDepth)
-                observe("source.TapDrillDepth", lambda: definition.TapDrillDepth)
-                observe("source.ThruTapDrillDepth", lambda: definition.ThruTapDrillDepth)
-                observe("source.ThreadDiameter", lambda: definition.ThreadDiameter)
-                observe("source.TapDrillDiameter", lambda: definition.TapDrillDiameter)
-                observe("source.ThruTapDrillDiameter", lambda: definition.ThruTapDrillDiameter)
-    # Official DP_Detailing mapping; numeric enum values read from swconst PE
-    # metadata, not guessed. Read only: no document/global display toggles.
-    for label, document in (("drawing", model), ("source", source)):
-        if document is None:
-            continue
-        extension = source_extension if label == "source" else observe("drawing.extension", lambda: _early_bound(document.Extension, "IModelDocExtension"), opaque=True)
-        if extension is not None:
-            for name, value in (("swDisplayAnnotations", 31), ("swDisplayCosmeticThreads", 41), ("swDetailingCThreadDisplayHighQuality", 257)):
-                observe(f"{label}.{name}", lambda: extension.GetUserPreferenceToggle(value, 0))
-    for label, current in (("section", view), ("base", base)):
-        if current is None:
-            continue
-        for name, reader in (
-            ("mode", lambda: current.GetDisplayMode2()),
-            ("thread_quality", lambda: current.GetCThreadQuality()),
-            ("use_parent_mode", lambda: current.GetUseParentDisplayMode()),
-            ("faceted", lambda: current.GetFacettedHlrDisplay()),
-            ("angle", lambda: current.Angle), ("scale", lambda: current.ScaleDecimal),
-            ("outline", lambda: tuple(current.GetOutline())),
-        ):
-            observe(f"{label}.{name}", reader)
-    cut = observe("section.cut", lambda: _early_bound(view.GetSection(), "IDrSection"), opaque=True)
-    if cut is not None:
-        observe("section.cut_only", lambda: cut.GetDisplayOnlySurfaceCut())
-
-    def source_identity(name: str, entity: Any) -> None:
-        if source_extension is None or entity is None:
-            return
-        canonical = observe(f"{name}.canonical", lambda: source_extension.GetCorrespondingEntity2(entity), opaque=True)
-        if canonical is not None:
-            observe(f"{name}.source_id", lambda: tuple(source_extension.GetPersistReference3(canonical)))
-
-    def thread_readers(stage: str) -> None:
-        observe(f"{stage}.mode", lambda: view.GetDisplayMode2())
-        observe(f"{stage}.thread_quality", lambda: view.GetCThreadQuality())
-        threads = observe(f"{stage}.threads", lambda: tuple(view.GetCThreads() or ()), opaque=True)
-        if threads is None:
-            return
-        evidence["reads"][f"{stage}.thread_count"] = len(threads)
-        for index, raw_thread in enumerate(threads):
-            prefix = f"{stage}.thread[{index}]"
-            thread = observe(prefix, lambda: _early_bound(raw_thread, "ICThread"), opaque=True)
-            if thread is None:
-                continue
-            annotation = observe(f"{prefix}.annotation", lambda: _early_bound(thread.GetAnnotation(), "IAnnotation"), opaque=True)
-            if annotation is not None:
-                observe(f"{prefix}.visible", lambda: annotation.Visible)
-                observe(f"{prefix}.dangling", lambda: annotation.IsDangling())
-                layer_name = observe(f"{prefix}.layer", lambda: annotation.Layer)
-                if layer_name and layer_manager is not None:
-                    layer = observe(f"{prefix}.layer_object", lambda: _early_bound(layer_manager.GetLayer(layer_name), "ILayer"), opaque=True)
-                    if layer is not None:
-                        observe(f"{prefix}.layer_visible", lambda: layer.Visible)
-                        observe(f"{prefix}.layer_printable", lambda: layer.Printable)
-                observe(f"{prefix}.attachment_types", lambda: tuple(annotation.GetAttachedEntityTypes() or ()))
-                attached = observe(f"{prefix}.attachments", lambda: tuple(annotation.GetAttachedEntities3() or ()), opaque=True)
-                if attached is not None:
-                    evidence["reads"][f"{prefix}.attachment_count"] = len(attached)
-                    for attachment_index, entity in enumerate(attached):
-                        source_identity(f"{prefix}.attachment[{attachment_index}]", entity)
-            for family, owner in (("ICThread", thread), ("IAnnotation", annotation)):
-                if owner is None:
-                    continue
-                data = observe(f"{prefix}.{family}.display", lambda: _early_bound(owner.GetDisplayData(), "IDisplayData"), opaque=True)
-                if data is None:
-                    continue
-                for kind, count_reader, row_reader in (
-                    ("lines", lambda: data.GetLineCount(), lambda i: data.GetLineAtIndex2(i)),
-                    ("polylines", lambda: data.GetPolyLineCount(), lambda i: data.GetPolylineAtIndex2(i)),
-                    ("arcs", lambda: data.GetArcCount(), lambda i: data.GetArcAtIndex2(i)),
-                ):
-                    key = f"{prefix}.{family}.{kind}"
-                    count = observe(f"{key}.count", lambda: int(count_reader()))
-                    if count is not None:
-                        for row_index in range(max(0, count)):
-                            observe(f"{key}[{row_index}]", lambda: tuple(row_reader(row_index)))
-
-    thread_readers("before_generation")
-    # One documented GetPolylines7 generation boundary, not a setting sweep or
-    # retry. Immediate geometry access after HLR/HLV needs UpdateViewDisplayGeometry.
-    observe("generation.zoom_to_fit", lambda: model.ViewZoomtofit2())
-    observe("generation.update", lambda: view.UpdateViewDisplayGeometry())
-    thread_readers("after_generation")
-    polylines = observe("model_polylines", lambda: view.GetPolylines7(1), opaque=True)
-    evidence["model_polylines_role"] = "Solid-model/silhouette evidence only; null edge is NOT cosmetic-thread ownership."
-    if isinstance(polylines, (tuple, list)) and len(polylines) == 2:
-        edges, data = polylines
-        observe("model_polylines.records", lambda: tuple(data or ()))
-        if edges is not None:
-            evidence["reads"]["model_polylines.edge_count"] = len(edges)
-            for index, edge in enumerate(edges):
-                evidence["reads"][f"model_polylines.edge[{index}].present"] = edge is not None
-                source_identity(f"model_polylines.edge[{index}]", edge)
-    elif polylines is not None:
-        evidence["errors"]["model_polylines"] = "GetPolylines7 did not return its edge/OUT-polyline pair"
-    return evidence
-
-
-def _show_mouth_thread(adapter: Any, section: Any) -> None:
-    """Import the model's native thread; refuse an empty/plain-bore representation."""
-    if import_cosmetic_threads(adapter, section) != (1, 1):
-        raise RuntimeError("thread-mouth section requires its one native through thread")
-    set_hidden_lines_removed(adapter, section)
-    rebuild_drawing(adapter, label="regenerate native thread-mouth cosmetic thread")
-    view = _early_bound(section, "IView")
-    threads = tuple(view.GetCThreads() or ())
-    if len(threads) != 1:
-        raise RuntimeError("thread-mouth section has no unique native cosmetic thread")
-    thread = _early_bound(threads[0], "ICThread")
-    unavailable = object()
-    errors = []
-
-    def collect(scope: str, member: str, read: Any, *, required: bool) -> Any:
-        try:
-            value = read()
-        except Exception as error:
-            try:
-                detail = f"{scope}: {member}: {error!r}"
-            except Exception:
-                detail = f"{scope}: {member}: {type(error).__name__}: <unprintable diagnostic exception>"
-            if required:
-                errors.append(detail)
-            with contextlib.suppress(Exception):
-                _telemetry.info(f"thread-mouth {detail}")
-            return unavailable
-        with contextlib.suppress(Exception):
-            shown = f"present={value is not None}" if member in ("ICThread.GetAnnotation", "ICThread.GetDisplayData", "IAnnotation.GetDisplayData") else repr(value)
-            _telemetry.info(f"thread-mouth {scope}: {member.removeprefix('IDisplayData.')}={shown}")
-        return value
-
-    def collect_display(data: Any, scope: str, *, required: bool) -> dict[str, list[Any]]:
-        rows = {"line": [], "polyline": [], "arc": []}
-        for family, count_member, count_read, item_member, item_read in (
-            ("line", "GetLineCount", lambda: data.GetLineCount(), "GetLineAtIndex2", lambda i: data.GetLineAtIndex2(i)),
-            ("polyline", "GetPolyLineCount", lambda: data.GetPolyLineCount(), "GetPolylineAtIndex2", lambda i: data.GetPolylineAtIndex2(i)),
-            ("arc", "GetArcCount", lambda: data.GetArcCount(), "GetArcAtIndex2", lambda i: data.GetArcAtIndex2(i)),
-        ):
-            count = collect(scope, f"IDisplayData.{count_member}", lambda: int(count_read()), required=required)
-            if count is unavailable:
-                continue  # Only this count's dependent index reads are unavailable.
-            if count < 0:
-                detail = f"{scope}: {count_member}: invalid negative count {count}"
-                with contextlib.suppress(Exception):
-                    _telemetry.info(f"thread-mouth {detail}")
-                if required:
-                    errors.append(detail)
-                continue
-            for index in range(count):
-                raw = collect(scope, f"IDisplayData.{item_member}({index})", lambda: item_read(index), required=required)
-                if raw is not unavailable:
-                    rows[family].append(raw)
-        return rows
-
-    # Finish every independent reader before deciding acceptance. In particular
-    # a failed view getter, count or primitive must not hide other families.
-    collect("view diagnostic", "IView.GetDisplayMode2", lambda: view.GetDisplayMode2(), required=True)
-    collect("view diagnostic", "IView.GetCThreadQuality", lambda: view.GetCThreadQuality(), required=True)
-    annotation = collect("native ink", "ICThread.GetAnnotation", lambda: _early_bound(thread.GetAnnotation(), "IAnnotation"), required=True)
-    visible = dangling = unavailable
-    if annotation is not unavailable and annotation is not None:
-        visible = collect("native ink", "IAnnotation.Visible", lambda: int(annotation.Visible), required=True)
-        dangling = collect("native ink", "IAnnotation.IsDangling", lambda: annotation.IsDangling(), required=True)
-
-    # Import activates this view; HLR requests (but must not imply) precision.
-    # Neither display-data API documents another activation prerequisite.
-    data = collect("native ink", "ICThread.GetDisplayData", lambda: _early_bound(thread.GetDisplayData(), "IDisplayData"), required=True)
-    primary = {"line": [], "polyline": [], "arc": []}
-    if data is not unavailable:
-        with contextlib.suppress(Exception):
-            _telemetry.info(f"thread-mouth native ink: dataPresent={data is not None}")
-        if data is not None:
-            primary = collect_display(data, "native ink", required=True)
-    # This same-thread counterpart is independent diagnostic evidence only;
-    # neither its ink nor a successful read can rescue primary errors/absence.
-    if annotation is not unavailable and annotation is not None:
-        other = collect("annotation diagnostic", "IAnnotation.GetDisplayData", lambda: _early_bound(annotation.GetDisplayData(), "IDisplayData"), required=False)
-        if other is not unavailable:
-            with contextlib.suppress(Exception):
-                _telemetry.info(f"thread-mouth annotation diagnostic: dataPresent={other is not None}")
-            if other is not None:
-                collect_display(other, "annotation diagnostic", required=False)
-    if errors:
-        raise RuntimeError(f"thread-mouth native ink read failed: {'; '.join(errors)}")
-    if visible != 1 or dangling is not False:
-        raise RuntimeError("thread-mouth native cosmetic thread is hidden, dangling or unreadable")
-    if data is None:
-        raise RuntimeError("native through-thread has no display-data object")
-    profile = _mouth_profile_box(adapter, section)
-    segments = []
-    for raw in primary["line"]:
-        row = tuple(float(v) for v in raw or ())
-        if len(row) != 10 or not all(math.isfinite(v) for v in row):
-            raise RuntimeError("native through-thread has unreadable section line")
-        segments.append((row[4], row[5], row[7], row[8]))
-    for raw in primary["polyline"]:
-        row = tuple(float(v) for v in raw or ())
-        if len(row) < 7 or not all(math.isfinite(v) for v in row) or row[0] not in (0.0, 1.0):
-            raise RuntimeError("native through-thread has unreadable section polyline")
-        if row[0] == 1.0:
-            continue  # SDK arc/circle type: never turn its chord into a flank.
-        count = int(row[6])
-        if row[1] != 0.0 or row[6] != count or count < 2 or len(row) != 7 + 3 * count:
-            raise RuntimeError("native through-thread has malformed straight-polyline points")
-        points = [row[offset:offset + 3] for offset in range(7, len(row), 3)]
-        segments.extend((a[0], a[1], b[0], b[1]) for a, b in zip(points, points[1:]))
-    # Bin by a fixed Y anchor before sorting intervals by X. Sorting by raw Y
-    # alone reverses touching intervals when native roundoff slopes down in X.
-    # Each band's total Y spread is bounded; adjacent tolerances cannot chain.
-    horizontal = sorted(((y0 + y1) / 2.0, min(x0, x1), max(x0, x1))
-                        for x0, y0, x1, y1 in segments if abs(y0 - y1) < 1e-7)
-    bands = []
-    for y, xmin, xmax in horizontal:
-        if not bands or y - bands[-1][0] >= 1e-7:
-            bands.append((y, []))
-        bands[-1][1].append((xmin, xmax))
-    runs = []
-    for y, intervals in bands:
-        merged = []
-        for xmin, xmax in sorted(intervals):
-            if merged and xmin <= merged[-1][1] + 1e-7 and xmax >= merged[-1][0] - 1e-7:
-                merged[-1] = (min(merged[-1][0], xmin), max(merged[-1][1], xmax))
-            else:
-                merged.append((xmin, xmax))
-        runs.extend((y, xmin, xmax) for xmin, xmax in merged)
-    longitudinal = [run for run in runs if run[2] - run[1] > (profile[2] - profile[0]) / 2.0]
-    with contextlib.suppress(Exception):
-        _telemetry.info(f"thread-mouth native ink: profile={profile}, longitudinal_runs={longitudinal}")
-    centre_y = (profile[1] + profile[3]) / 2.0
-    if not any(y < centre_y - 1e-7 for y, _, _ in longitudinal) or not any(y > centre_y + 1e-7 for y, _, _ in longitudinal):
-        raise RuntimeError("native thread does not show both longitudinal flanks")
-    for y, xmin, xmax in longitudinal:
-        require_inside("native section thread", (xmin, y, xmax, y), DrawableRegion(*profile))
 
 
 def _layout_linear_annotations(adapter: Any, front: Any, bottom: Any, annotations: list[Any]) -> None:
@@ -898,7 +366,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(SOURCE)
     check("open threaded bracket source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Isometric View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"))
+    properties = read_required_properties(adapter.currentModel, ("Number", "Revision", "Title", "Material Specification", "Finish", "Quantity", "Isometric View Note"), required=("Number", "Material Specification", "Finish", "Quantity", "Isometric View Note"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout)
     stamp_drawing_summary(adapter, drawing, {0: "Magnifying Bracket Manufacturing Drawing", 1: "Harmonic Analyzer hobby-machinist book drawing", 2: "Harmonic Analyzer Project", 3: "blued 1018 simple L bracket; quarter-inch through thread", 4: "Generated from the project-owned ASME B drawing standard"})
     front = place_view(adapter, str(SOURCE), "*Top", *FRONT_CENTER, scale=SHEET_SCALE)
@@ -908,70 +376,54 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, bottom, side, iso):
         set_hidden_lines_removed(adapter, view)
     _project_side_view(adapter, front, side)
-    mouth = _mouth_section(adapter, side, iso)
     imported = {}
-    for view, keep, label, callouts in (
-        (front, FRONT_KEEP, "front", {"NeckThickness": NECK_THICKNESS_CALLOUT, "FlangeDepth": FLANGE_DEPTH_CALLOUT, "RootR": ROOT_PRINT_CALLOUT}),
-        (bottom, BOTTOM_KEEP, "mounting face", {}),
-        (side, SIDE_KEEP, "thread-axis end", {}),
+    for view, keep, label in (
+        (front, FRONT_KEEP, "front"),
+        (bottom, BOTTOM_KEEP, "mounting face"),
+        (side, SIDE_KEEP, "thread-axis end"),
     ):
         annotations = curate_view_dimensions(adapter, view, keep=keep, view_label=label, dimensions_by_feature=DRAWING_DIMENSIONS)
-        set_dimension_callouts(adapter, annotations, callouts)
         imported[label] = annotations
     mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="unchanged mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
-    annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations and root limit", dimensions_by_feature={feature: DRAWING_DIMENSIONS[feature] for feature in ("TapCoordinates", "ThreadEnvelope")})
-    set_dimension_callouts(adapter, annotations, {"ThreadRootEnvelope": THREAD_ENVELOPE_CALLOUT})
+    annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations", dimensions_by_feature={"TapCoordinates": DRAWING_DIMENSIONS["TapCoordinates"]})
     rim = _mounting_rims(bottom)[1]
     mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)
     edges = scan_view_edges(side, label="bracket through thread")
+    lateral_location = _neck_to_foot_side(adapter, side, edges)
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")
     tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap")
     _curate_tap_callout(adapter, side, tap)
     _set_hole_process(tap, mate=TAP_PROCESS, tapped=True)
-    neck_location = _neck_to_foot_side(adapter, side, edges)
-    try:
-        _show_mouth_thread(adapter, mouth)
-    except Exception as error:
-        original_traceback = error.__traceback__
-        try:
-            try:
-                thread_evidence = _mouth_thread_diagnostic(adapter, mouth)
-            except Exception as diagnostic_error:
-                try:
-                    detail = f"{type(diagnostic_error).__name__}: {diagnostic_error}"
-                except Exception:
-                    detail = f"{type(diagnostic_error).__name__}: <unprintable diagnostic exception>"
-                thread_evidence = {"errors": {"diagnostic": detail}}
-            try:
-                message = str(error)
-            except Exception:
-                message = f"{type(error).__name__}: <unprintable original exception>"
-            try:
-                _seat_forensics.capture_com_failure(
-                    adapter, f"{PART_STEM}-native-thread", message,
-                    api="bracket native section thread guard", exception=error,
-                    sheet_png=True, section_label="A-A", thread_evidence=thread_evidence,
-                )
-            except Exception as capture_error:
-                if capture_error is not error:
-                    with contextlib.suppress(Exception):
-                        _telemetry.warn(f"native thread secondary capture failure: {capture_error!r}")
-        finally:
-            # Forensics normally raises this same object, mutating its traceback.
-            # Optional observers, formatters and loggers must never own the refusal.
-            raise error.with_traceback(original_traceback)
-    _remove_out_of_cut_mounting_marks(adapter, mouth)
-    landing = model_point_in_view(adapter, side, (NECK_HALF_X / 1000.0, 0.0, -4.5e-3), label="minimum thread-mouth wall")
-    add_leader_note(adapter, WALL_CALLOUT, text_xy=WALL_TEXT_XY, attach_xy=landing, view=side, label="honest manufactured minimum wall")
-    add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.092)
+    ratio = tuple(float(value) for value in _early_bound(iso, "IView").ScaleRatio)
+    if len(ratio) != 2 or any(not math.isfinite(value) or value <= 0.0 for value in ratio):
+        raise RuntimeError("isometric view has no valid native scale ratio")
+    caption = f"ISOMETRIC VIEW SCALE {ratio[0]:g}:{ratio[1]:g}"
+    if caption != properties["Isometric View Note"]:
+        raise RuntimeError("isometric scale caption does not match the native view")
+    iso_outline = tuple(float(value) for value in _early_bound(iso, "IView").GetOutline())
+    if len(iso_outline) != 4 or not all(math.isfinite(value) for value in iso_outline):
+        raise RuntimeError("isometric view has no finite native outline")
+    note = _early_bound(add_property_linked_note(adapter, "Isometric View Note", 0.320, iso_outline[1] - 0.004), "INote")
+    rebuild_drawing(adapter, label="settle native isometric scale caption")
+    if str(note.GetText()) != caption:
+        raise RuntimeError("isometric scale caption did not resolve to the actual view ratio")
+    extent = tuple(float(value) for value in note.GetExtent())
+    if len(extent) != 6 or not all(math.isfinite(value) for value in extent) or extent[0] >= extent[3] or extent[1] >= extent[4]:
+        raise RuntimeError("isometric scale caption has no finite native extent")
+    box = (extent[0], extent[1], extent[3], extent[4])
+    require_inside("isometric scale caption", box, sheet_region(adapter))
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    require_clear("isometric scale caption", box, {
+        "isometric view": iso_outline,
+        "title block": (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m),
+    })
     _layout_linear_annotations(adapter, front, bottom, [
         *imported["front"], *imported["mounting face"], *imported["thread-axis end"],
-        *mounting_dimensions, *annotations, neck_location,
+        *mounting_dimensions, *annotations,
         _early_bound(mounting_callout, "IDisplayDimension").GetAnnotation(),
         _early_bound(tap, "IDisplayDimension").GetAnnotation(),
+        lateral_location,
     ])
-    _require_root_callout_inside(adapter, front, imported["front"])
-    _layout_mouth_caption(adapter, mouth, iso)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 
