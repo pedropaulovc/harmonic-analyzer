@@ -359,8 +359,13 @@ def _fiducial_note_clear(
         box,
         {"arm silhouette": ARM_SILHOUETTE, **{ink.label: ink.text for ink in neighbours}},
     )
+    # Include 2 mm of air around the measured five-line note,
+    # rather than merely proving that adjacent leaders miss its ink.
+    leader_keep_out = (
+        box[0] - 0.002, box[1] - 0.002, box[2] + 0.002, box[3] + 0.002
+    )
     for ink in neighbours:
-        require_leader_clear(ink, {"punched fiducial callout": box})
+        require_leader_clear(ink, {"punched fiducial callout": leader_keep_out})
     leader = _leader_segments_of(
         adapter, annotation, label="punched fiducial callout", kind="note", owner="front"
     )
