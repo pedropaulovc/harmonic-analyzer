@@ -702,11 +702,17 @@ root-level workflow request inventory.
 Readiness declares one **900-second operation deadline** and a **10-second
 supervision margin**. The original absolute deadline starts before receipt-lock
 waiting and uv/Popen setup; later phases cannot acquire another 900 seconds.
-Process and receipt-lock waits use responsive slices of at most one second.
+Process and receipt-lock waits use slices of at most one second and observe
+pending `asyncio.Runner` task cancellation, including the first SIGINT.
 The margin is only for terminal-receipt observation and cleanup, not new
 publication work. Owned-tree cleanup gets one deadline
 `min(now + 5, operation_deadline + 10)` shared by termination and reaping.
 These bounds do not change native-leaf budgets, FIFO grace or build lifetime.
+Every publication deadline, remaining-time calculation, elapsed metric and
+cleanup subtraction uses the selected pool's `publication_clock()` authority
+(`perf_counter`). Do not mix it with `monotonic()` across Windows Python 3.12
+and 3.14 processes. The cross-interpreter clock proof covers CPython 3.12–3.14;
+reverify it when upgrading the toolchain. Native/FIFO duration clocks are unchanged.
 
 HA loads the selected pool's pure private-body argv/receipt helpers and invokes
 that body through its existing, sole `ProcessTree`; it does not invoke the
@@ -723,13 +729,20 @@ storage, and leaves the shared receipt nonterminal.
 
 The launcher's requests root remains launcher-owned. An attended direct build
 without an inherited requests root owns a temporary root for its producer/action
-worker lifetime and removes only that root afterward. If owned-tree termination
-is unconfirmed, the root and receipts are retained. Other cleanup failures report
-the owned residue without replacing an existing build failure; an otherwise
-successful build still fails if its cleanup cannot be confirmed. Preserve these
-diagnostics and do not edit/delete a receipt or lock to retry inside the same
-build. Establish that the owned publisher stopped before recovery through a
-fresh build identity.
+worker lifetime. Any primary exception or interrupt retains that owned requests
+root without scanning or deleting it: doit may still have unjoined processes or
+threads that have not reached their preparation lock yet. A missing receipt is
+not cleanup evidence on this path. The original failure receives a note and a
+warning naming the retained root; it is not replaced by a secondary cleanup fault.
+
+After ordinary joined completion, cleanup requires canonical, matching-build
+terminal preparation receipts and nonblocking free locks. Nonterminal, corrupt,
+unreadable, mismatched, unknown or aliased preparation entries retain the root.
+An otherwise successful build still fails loudly when retention is required or
+directory cleanup fails. Inherited launcher-owned roots are never deleted here.
+Preserve diagnostics and do not edit/delete a receipt or lock to retry inside
+the same build. Establish that all owned publishers stopped before recovery
+through a fresh build identity.
 
 ### Interpreting selective execution measurements
 

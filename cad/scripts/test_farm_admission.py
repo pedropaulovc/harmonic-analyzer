@@ -6,9 +6,11 @@ intercepted before they can contact a service or write a production request.
 """
 
 import ast
+import asyncio
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -1058,7 +1060,7 @@ def test_optional_readiness_probe_does_not_sanitize_keyboard_interrupt(admission
 
 @pytest.fixture
 def bounded_pool_bridge(tmp_path, monkeypatch):
-    """Own only inert handles; simulated timed waits advance a monotonic clock."""
+    """Own only inert handles; simulated waits advance the chosen clock domain."""
     state = SimpleNamespace(
         pool=tmp_path / "pool", events=[], returncode=0, clock=0.0,
         popen_error=None, adopt_error=None, wait_error=None, kill_error=None,
@@ -1067,7 +1069,8 @@ def bounded_pool_bridge(tmp_path, monkeypatch):
         kill_elapsed=0.0, termination_elapsed=0.0,
         work_timeouts=0, termination=True, termination_error=None,
         close_error=None, cleaning=False, closed=False, after_popen=None,
-        after_adopt=None, during_termination=None, on_popen=None,
+        after_adopt=None, during_wait=None, during_termination=None,
+        during_close=None, on_popen=None, work_wait_elapsed=0.0,
         argv=["inert-owned-publisher", "--private-body"],
         env={"OWNERSHIP_FIXTURE": "inert"},
     )
@@ -1085,6 +1088,9 @@ def bounded_pool_bridge(tmp_path, monkeypatch):
                 if state.cleanup_wait_error is not None:
                     raise state.cleanup_wait_error
             else:
+                state.clock += state.work_wait_elapsed
+                if state.during_wait is not None:
+                    state.during_wait()
                 if state.wait_error is not None:
                     if isinstance(state.wait_error, subprocess.TimeoutExpired):
                         state.clock += timeout
@@ -1135,6 +1141,8 @@ def bounded_pool_bridge(tmp_path, monkeypatch):
         def close(self):
             state.closed = True
             state.events.append(("close-tree",))
+            if state.during_close is not None:
+                state.during_close()
             if state.close_error is not None:
                 raise state.close_error
 
@@ -1166,11 +1174,12 @@ def bounded_pool_bridge(tmp_path, monkeypatch):
         state.clock += state.setup_elapsed
         return tree
 
-    def run(*, operation_deadline=900.0, process_margin_s=10.0):
+    def run(*, operation_deadline=900.0, process_margin_s=10.0, clock=None):
         return build._bounded_pool_farm(
             state.pool, state.argv, state.env,
             operation_deadline=operation_deadline,
             process_margin_s=process_margin_s,
+            clock=clock,
         )
 
     monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "unrelated-outer-venv"))
@@ -1181,6 +1190,7 @@ def bounded_pool_bridge(tmp_path, monkeypatch):
     state.process = process
     state.tree = tree
     state.run = run
+    state.publication_clock = lambda: state.clock
     return state
 
 
@@ -1358,6 +1368,36 @@ def test_failed_popen_closes_tree_without_claiming_a_created_process(bounded_poo
     assert [event[0] for event in state.events] == ["tree", "popen", "close-tree"]
 
 
+@pytest.mark.parametrize("helper", ["bounded", "close"])
+def test_generic_duration_helpers_default_to_monotonic_not_publication_counter(
+    bounded_pool_bridge, monkeypatch, helper,
+):
+    state = bounded_pool_bridge
+    monkeypatch.setattr(build, "time", SimpleNamespace(
+        monotonic=lambda: state.clock, perf_counter=lambda: 9_000_000.0,
+    ))
+    if helper == "bounded":
+        state.setup_elapsed = 2.25
+        state.work_timeouts = None
+        with pytest.raises(build.FarmPreflightError, match="deadline"):
+            state.run(operation_deadline=3.5)
+        assert [event[1] for event in state.events if event[0] == "wait"] == [1.0, 0.25]
+        assert state.clock == 3.5
+    else:
+        state.clock = 10.0
+        state.kill_elapsed = 1.25
+        state.termination_elapsed = 2.5
+        state.cleanup_wait_elapsed = 1.25
+        assert build._close_owned_pool_process(
+            state.tree, state.process, adopted=False, cleanup_deadline=15.0,
+        ) is True
+        assert ("terminate", 3.75) in state.events
+        assert ("wait", 1.25, "cleanup") in state.events
+        assert state.clock == 15.0
+        state.tree.close()
+    assert state.closed
+
+
 def test_default_pool_bridge_keeps_existing_unbounded_run_contract(tmp_path, monkeypatch):
     expected = subprocess.CompletedProcess(["fixture"], 0, "existing stdout")
     calls = []
@@ -1402,6 +1442,68 @@ def test_process_tree_loads_exact_selected_file_without_cached_agent(tmp_path, m
         tree = build._pool_process_tree(pool)
         assert tree.marker == label
         assert tree.log is build._pool_process_log
+    assert {name for name in sys.modules if name.startswith("_harmonic_selected_")} == baseline
+
+
+def test_publication_clock_loads_exact_selected_callable_without_cached_agent(
+    tmp_path, monkeypatch,
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("publication clock used a foreign protocol or local fallback")
+
+    monkeypatch.setitem(sys.modules, "agent", SimpleNamespace(__path__=["foreign-pool"]))
+    monkeypatch.setitem(
+        sys.modules, "agent.protocol", SimpleNamespace(publication_clock=forbidden),
+    )
+    monkeypatch.setattr(build, "time", SimpleNamespace(
+        monotonic=forbidden, perf_counter=forbidden,
+    ))
+    baseline = {name for name in sys.modules if name.startswith("_harmonic_selected_")}
+    for label, epoch in (("first-pool", 50_000.0), ("second-pool", 17.0)):
+        pool = tmp_path / label
+        package = pool / "agent"
+        package.mkdir(parents=True)
+        (package / "protocol.py").write_text(
+            "PUBLICATION_EPOCH = " + repr(epoch) + "\n"
+            "def publication_clock():\n"
+            "    return PUBLICATION_EPOCH\n",
+            encoding="utf-8",
+        )
+        clock = build._pool_publication_clock(pool)
+        assert clock is clock.__globals__["publication_clock"]
+        assert clock.__module__.startswith("_harmonic_selected_protocol_")
+        assert clock() == epoch
+    assert {name for name in sys.modules if name.startswith("_harmonic_selected_")} == baseline
+
+
+@pytest.mark.parametrize("missing", ["file", "helper", "callable"])
+def test_missing_selected_publication_clock_fails_closed_without_any_publication(
+    tmp_path, monkeypatch, missing,
+):
+    if missing != "file":
+        package = tmp_path / "agent"
+        package.mkdir()
+        (package / "protocol.py").write_text(
+            "UNRELATED_API = True\n" if missing == "helper" else "publication_clock = None\n",
+            encoding="utf-8",
+        )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("missing selected clock fell back or started publication work")
+
+    monkeypatch.setitem(
+        sys.modules, "agent.protocol", SimpleNamespace(publication_clock=forbidden),
+    )
+    monkeypatch.setattr(build, "time", SimpleNamespace(
+        monotonic=forbidden, perf_counter=forbidden,
+    ))
+    monkeypatch.setattr(build, "_pool_process_tree", forbidden)
+    monkeypatch.setattr(build.subprocess, "Popen", forbidden)
+    monkeypatch.setattr(build.subprocess, "run", forbidden)
+    monkeypatch.setattr(build.tempfile, "TemporaryDirectory", forbidden)
+    baseline = {name for name in sys.modules if name.startswith("_harmonic_selected_")}
+    with pytest.raises(build.FarmPreflightError):
+        build._pool_publication_clock(tmp_path)
     assert {name for name in sys.modules if name.startswith("_harmonic_selected_")} == baseline
 
 
@@ -1522,6 +1624,114 @@ def test_non_main_thread_cancellation_uses_finally_without_signal_registration(
     assert state.events[-2:] == [("terminate", 5.0), ("close-tree",)]
 
 
+def test_publication_cancellation_poll_without_running_loop_is_inert():
+    assert build._raise_if_pool_publication_cancelled() is None
+
+
+def test_already_cancelling_runner_task_cannot_create_publication_tree(bounded_pool_bridge):
+    state = bounded_pool_bridge
+
+    async def main():
+        task = asyncio.current_task()
+        task.cancel()
+        assert task.cancelling() == 1
+        try:
+            state.run(clock=state.publication_clock)
+        except asyncio.CancelledError:
+            assert state.events == []
+            raise
+        pytest.fail("synchronous publication accepted an already-cancelling Runner task")
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(main())
+    assert state.events == []
+
+
+@pytest.mark.parametrize("cancel_point", [
+    "before-wait", "timed-wait", "normal-wait", "terminate", "close",
+])
+def test_runner_first_task_cancellation_finishes_owned_cleanup_before_propagating(
+    bounded_pool_bridge, cancel_point,
+):
+    state = bounded_pool_bridge
+    observed = []
+
+    async def main():
+        task = asyncio.current_task()
+
+        def cancel():
+            assert task.cancelling() == 0
+            task.cancel()
+            assert task.cancelling() == 1
+
+        if cancel_point == "before-wait":
+            state.after_adopt = cancel
+        elif cancel_point in ("timed-wait", "normal-wait"):
+            state.during_wait = cancel
+            state.work_timeouts = 1 if cancel_point == "timed-wait" else 0
+        elif cancel_point == "terminate":
+            state.during_termination = cancel
+        else:
+            state.during_close = cancel
+        try:
+            state.run(clock=state.publication_clock)
+        except asyncio.CancelledError:
+            observed.append(task.cancelling())
+            assert state.cleaning and state.closed
+            assert state.events[-2:] == [("terminate", 5.0), ("close-tree",)]
+            raise
+        pytest.fail("synchronous publication returned normally with cancellation pending")
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(main())
+    assert observed == [1]
+    assert [event[0] for event in state.events].count("terminate") == 1
+    assert [event[0] for event in state.events].count("close-tree") == 1
+    waits = [event for event in state.events if event[0] == "wait"]
+    assert len(waits) == (0 if cancel_point == "before-wait" else 1)
+
+
+@pytest.mark.parametrize("critical_point", ["after_popen", "after_adopt"])
+def test_deferred_first_sigint_replays_runner_task_cancel_before_publication_wait(
+    bounded_pool_bridge, publisher_signals, critical_point,
+):
+    state = bounded_pool_bridge
+    signals = publisher_signals
+    observed = []
+
+    async def main():
+        task = asyncio.current_task()
+        runner_handler = signal.getsignal(signal.SIGINT)
+        assert callable(runner_handler)
+
+        def first_press(signum, frame):
+            signals.delivered.append((signum, frame))
+            assert task.cancelling() == 0
+            runner_handler(signum, frame)
+            assert task.cancelling() == 1
+
+        signals.original = signals.handler = first_press
+        setattr(state, critical_point, signals.fire)
+        try:
+            state.run(clock=state.publication_clock)
+        except asyncio.CancelledError:
+            observed.append(task.cancelling())
+            assert state.cleaning and state.closed
+            raise
+        pytest.fail("first SIGINT cancelled Runner's task but publication kept running")
+
+    # asyncio.Runner translates the propagated first-press task cancellation to
+    # KeyboardInterrupt only after the synchronous owned cleanup has completed.
+    with pytest.raises(KeyboardInterrupt):
+        asyncio.run(main())
+    assert observed == [1]
+    assert signals.delivered == [(signal.SIGINT, None)]
+    assert signals.handler is signals.original
+    assert [event[0] for event in state.events] == [
+        "tree", "popen", "adopt", "terminate", "close-tree",
+    ]
+
+
 @pytest.fixture
 def preparation_bridge(bounded_pool_bridge, tmp_path, monkeypatch):
     """Use the real bridge/supervisor with one scripted selected-protocol authority."""
@@ -1594,6 +1804,7 @@ def preparation_bridge(bounded_pool_bridge, tmp_path, monkeypatch):
         PREPARATION_PROCESS_MARGIN_S=10.0,
         PREPARATION_RECEIPT_MAX_BYTES=64 * 1024,
         publication_body_arguments=arguments,
+        publication_clock=state.publication_clock,
         decode_publication_receipt=decode,
     )
 
@@ -1625,6 +1836,7 @@ def preparation_bridge(bounded_pool_bridge, tmp_path, monkeypatch):
             state.pool, state.workspace, commit=state.commit,
             operation_deadline=operation_deadline,
             process_margin_s=process_margin_s,
+            clock=state.publication_clock,
         )
 
     def forbidden(*args, **kwargs):
@@ -1641,6 +1853,201 @@ def preparation_bridge(bounded_pool_bridge, tmp_path, monkeypatch):
     # the fixture still removes its own deliberate residue after each test.
     for _owned, original_cleanup in state.storages:
         original_cleanup()
+
+
+@pytest.mark.parametrize("wait_times_out", [False, True])
+def test_preparation_task_cancellation_cleans_owned_tree_and_receipt_before_propagating(
+    preparation_bridge, wait_times_out,
+):
+    state = preparation_bridge
+    observed = []
+
+    async def main():
+        task = asyncio.current_task()
+
+        def cancel():
+            assert task.cancelling() == 0
+            task.cancel()
+
+        state.during_wait = cancel
+        state.work_timeouts = 1 if wait_times_out else 0
+        try:
+            state.publish()
+        except asyncio.CancelledError:
+            observed.append(task.cancelling())
+            assert state.cleaning and state.closed
+            assert state.decode_calls == []
+            assert state.events[-3:] == [
+                ("terminate", 5.0), ("close-tree",), ("receipt-cleanup",),
+            ]
+            assert not state.result_file.parent.exists()
+            raise
+        pytest.fail("preparation accepted a receipt after its Runner task was cancelled")
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(main())
+    assert observed == [1]
+    assert len([event for event in state.events if event[0] == "wait"]) == 1
+
+
+@pytest.fixture(params=[
+    (50_000.0, 17.0, 9_000_000.0),
+    (17.0, 50_000.0, 0.0),
+], ids=["selected-ahead-of-monotonic", "selected-behind-monotonic"])
+def selected_publication_bridge(preparation_bridge, monkeypatch, request):
+    """The selected authority, local monotonic and local counter have distinct epochs."""
+    state = preparation_bridge
+    epoch, monotonic_epoch, counter_epoch = request.param
+    state.clock = state.selected_epoch = epoch
+    monkeypatch.setattr(build, "time", SimpleNamespace(
+        monotonic=lambda: state.clock + (monotonic_epoch - epoch),
+        perf_counter=lambda: state.clock + (counter_epoch - epoch),
+    ))
+    assert state.protocol.publication_clock is state.publication_clock
+    return state
+
+
+def test_preparation_forwards_exact_selected_clock_to_supervision_and_owned_cleanup(
+    selected_publication_bridge, monkeypatch,
+):
+    state = selected_publication_bridge
+    clock = build._pool_publication_clock(state.pool)
+    assert clock is state.protocol.publication_clock is state.publication_clock
+    real_bounded = build._bounded_pool_farm
+    real_close = build._close_owned_pool_process
+    seen = []
+
+    def bounded(*args, clock, **kwargs):
+        assert clock is state.publication_clock
+        seen.append("bounded")
+        return real_bounded(*args, clock=clock, **kwargs)
+
+    def close(*args, clock, **kwargs):
+        assert clock is state.publication_clock
+        seen.append("close")
+        return real_close(*args, clock=clock, **kwargs)
+
+    monkeypatch.setattr(build, "_bounded_pool_farm", bounded)
+    monkeypatch.setattr(build, "_close_owned_pool_process", close)
+    assert state.publish(operation_deadline=state.selected_epoch + 2.0) is state.decode_result["result"]
+    assert seen == ["bounded", "close"]
+    assert state.decode_calls == [(state.receipt_payload, 0)]
+    assert not state.result_file.parent.exists()
+
+
+@pytest.mark.parametrize(("cap", "caller_budget", "deadline_delta", "waits"), [
+    (900.0, 3.5, 3.5, [1.0, 0.5]),
+    (2.5, 100.0, 3.75, [1.0, 0.75]),
+], ids=["original-caller-deadline", "selected-protocol-cap"])
+def test_selected_epoch_caps_and_setup_subtract_from_one_original_deadline(
+    selected_publication_bridge, cap, caller_budget, deadline_delta, waits,
+):
+    state = selected_publication_bridge
+    state.protocol.PREPARATION_OPERATION_TIMEOUT_S = cap
+    state.protocol_load_elapsed = 1.25
+    state.arguments_elapsed = 0.75
+    state.work_timeouts = None
+    deadline = state.selected_epoch + deadline_delta
+    with pytest.raises(build.FarmPreflightError, match="deadline"):
+        state.publish(operation_deadline=state.selected_epoch + caller_budget)
+    assert state.argument_calls == [(deadline, state.result_file, state.commit)]
+    assert [event[1] for event in state.events if event[0] == "wait"] == waits
+    assert state.clock == deadline
+    assert state.events[-3:] == [
+        ("terminate", 5.0), ("close-tree",), ("receipt-cleanup",),
+    ]
+    assert state.decode_calls == []
+    assert not state.result_file.parent.exists()
+
+
+def test_selected_epoch_expired_argument_setup_cannot_spawn_late(
+    selected_publication_bridge,
+):
+    state = selected_publication_bridge
+    state.arguments_elapsed = 3.0
+    deadline = state.selected_epoch + 2.0
+    with pytest.raises(build.FarmPreflightError, match="deadline"):
+        state.publish(operation_deadline=deadline)
+    assert state.argument_calls == [(deadline, state.result_file, state.commit)]
+    assert state.clock == state.selected_epoch + 3.0
+    assert not any(event[0] in ("tree", "popen") for event in state.events)
+    assert state.decode_calls == []
+    assert not state.result_file.parent.exists()
+
+
+def test_selected_epoch_successful_wait_cannot_accept_after_original_deadline(
+    selected_publication_bridge,
+):
+    state = selected_publication_bridge
+    state.work_wait_elapsed = 2.25
+    with pytest.raises(build.FarmPreflightError, match="deadline"):
+        state.publish(operation_deadline=state.selected_epoch + 2.0)
+    assert state.clock == state.selected_epoch + 2.25
+    assert ("wait", 1.0, "work") in state.events
+    assert state.closed and state.cleaning
+    assert state.decode_calls == []
+    assert not state.result_file.parent.exists()
+
+
+def test_selected_epoch_cleanup_c_and_each_remaining_subtraction_share_the_same_clock(
+    selected_publication_bridge,
+):
+    state = selected_publication_bridge
+    state.adopt_elapsed = 10.5
+    state.adopt_error = OSError("late fixture adoption failure")
+    state.kill_elapsed = 0.25
+    state.termination_elapsed = 0.75
+    state.cleanup_wait_elapsed = 0.5
+    with pytest.raises(build.FarmPreflightError, match="create or adopt") as failure:
+        state.publish(operation_deadline=state.selected_epoch + 2.0)
+    assert failure.value.__cause__ is state.adopt_error
+    # C=min(epoch+10.5+5, epoch+2+10)=epoch+12. Killing, tree
+    # termination and root reaping must subtract from that same C in order.
+    assert ("terminate", 1.25) in state.events
+    assert ("wait", 0.5, "cleanup") in state.events
+    assert state.clock == state.selected_epoch + 12.0
+    assert [event[0] for event in state.events].count("terminate") == 1
+    assert state.events[-2:] == [("close-tree",), ("receipt-cleanup",)]
+    assert state.decode_calls == []
+    assert not state.result_file.parent.exists()
+
+
+@pytest.mark.parametrize("phase", ["before-read", "decode", "storage-cleanup"])
+def test_selected_epoch_receipt_window_never_uses_local_monotonic_or_counter(
+    selected_publication_bridge, phase,
+):
+    state = selected_publication_bridge
+    if phase == "before-read":
+        state.termination_elapsed = 12.0
+    elif phase == "decode":
+        state.decode_elapsed = 12.0
+    else:
+        state.storage_cleanup_elapsed = 12.0
+    with pytest.raises(build.FarmPreflightError, match="margin"):
+        state.publish(operation_deadline=state.selected_epoch + 2.0)
+    assert state.clock == state.selected_epoch + 12.0
+    assert state.decode_calls == (
+        [] if phase == "before-read" else [(state.receipt_payload, 0)]
+    )
+    assert state.closed and state.cleaning
+    assert not state.result_file.parent.exists()
+
+
+def test_selected_epoch_receipt_can_finish_inside_original_margin_without_renewal(
+    selected_publication_bridge,
+):
+    state = selected_publication_bridge
+    state.work_wait_elapsed = 1.5
+    state.termination_elapsed = 1.0
+    state.decode_elapsed = 9.25
+    state.storage_cleanup_elapsed = 0.125
+    assert state.publish(operation_deadline=state.selected_epoch + 2.0) is state.decode_result["result"]
+    assert state.clock == state.selected_epoch + 11.875
+    assert state.decode_calls == [(state.receipt_payload, 0)]
+    assert state.events[-3:] == [
+        ("close-tree",), ("decode-receipt", 0), ("receipt-cleanup",),
+    ]
+    assert not state.result_file.parent.exists()
 
 
 def test_preparation_uses_original_deadline_private_uv_body_and_sole_owned_tree(preparation_bridge):
@@ -1811,6 +2218,7 @@ def test_preparation_loads_exact_selected_protocol_not_foreign_cached_agent(
     monkeypatch.setitem(sys.modules, "agent", SimpleNamespace(__path__=["foreign-pool"]))
     monkeypatch.setitem(sys.modules, "agent.protocol", SimpleNamespace(
         publication_body_arguments=forbidden,
+        publication_clock=forbidden,
         decode_publication_receipt=forbidden,
     ))
     monkeypatch.setattr(build, "_load_pool_helper", state.selected_helper_loader)
@@ -1837,6 +2245,8 @@ def test_preparation_loads_exact_selected_protocol_not_foreign_cached_agent(
             "PREPARATION_OPERATION_TIMEOUT_S = 900.0\n"
             "PREPARATION_PROCESS_MARGIN_S = 10.0\n"
             "PREPARATION_RECEIPT_MAX_BYTES = 65536\n"
+            "def publication_clock():\n"
+            "    return 0.0\n"
             "def publication_body_arguments(workspace, *, operation_deadline, result_file, commit=None):\n"
             "    return ['-I', '-c', 'INERT_SELECTED_FILE_BODY', str(Path(__file__).resolve().parents[1]),\n"
             "            '--workspace', str(workspace), '--operation-deadline', str(operation_deadline),\n"
@@ -1846,6 +2256,7 @@ def test_preparation_loads_exact_selected_protocol_not_foreign_cached_agent(
             "    return {'ok': True, 'result': {'selected': " + repr(label) + "}}\n",
             encoding="utf-8",
         )
+        state.publication_clock = build._pool_publication_clock(state.pool)
         assert state.publish() == {"selected": label}
         assert not state.result_file.parent.exists()
     assert {name for name in sys.modules if name.startswith("_harmonic_selected_")} == baseline
@@ -1853,7 +2264,7 @@ def test_preparation_loads_exact_selected_protocol_not_foreign_cached_agent(
 
 @pytest.mark.parametrize("missing", [
     "publication_body_arguments", "decode_publication_receipt",
-    "PREPARATION_RECEIPT_MAX_BYTES",
+    "PREPARATION_RECEIPT_MAX_BYTES", "publication_clock",
 ])
 def test_preparation_refuses_missing_selected_protocol_capability_before_spawn(
     preparation_bridge, missing,

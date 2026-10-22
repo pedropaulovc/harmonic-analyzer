@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import textwrap
+import time
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1307,6 +1308,8 @@ def leaf_control(_guarded_process, monkeypatch):
     fake.pool.mkdir()
     monkeypatch.setattr(_farm, "REPO_ROOT", fake.workspace)
     monkeypatch.setattr(build, "_pool_home", lambda: fake.pool)
+    publication_clock = time.perf_counter
+    monkeypatch.setattr(build, "_pool_publication_clock", lambda pool: publication_clock)
     monkeypatch.setenv("HARMONIC_FARM_COMMIT", fake.request.commit)
     monkeypatch.setenv("HARMONIC_FARM_AGENT_IDENTITY", PUBLISHER_AGENT_IDENTITY)
     monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps({
@@ -1315,11 +1318,12 @@ def leaf_control(_guarded_process, monkeypatch):
         "operation_timeout_s": 900.0, "process_margin_s": 10.0,
     }))
 
-    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s):
+    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s, clock):
+        assert clock is publication_clock
         assert pool == fake.pool
         assert workspace == fake.workspace
         assert commit == fake.request.commit
-        assert 0 < operation_deadline - time.monotonic() <= 900.0
+        assert 0 < operation_deadline - clock() <= 900.0
         assert process_margin_s == 10.0
         fake.publications.append((pool, workspace, commit, operation_deadline, process_margin_s))
         return fake.publisher_result.copy()

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 import textwrap
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
@@ -72,6 +73,13 @@ def boundary(tmp_path, monkeypatch):
         publication_options=[], spans={},
         result=_farm.LeafResult("succeeded", 0, "fake-worker", 1, True, None, None, None),
     )
+    state.publication_clock = time.perf_counter
+
+    def selected_publication_clock(selected_pool):
+        assert selected_pool == build._pool_home().resolve()
+        return state.publication_clock
+
+    monkeypatch.setattr(build, "_pool_publication_clock", selected_publication_clock)
 
     def span(name, **_options):
         attributes = {}
@@ -90,13 +98,14 @@ def boundary(tmp_path, monkeypatch):
     monkeypatch.setattr(_farm._thread, "interrupt_main", lambda: state.interrupts.append(True))
 
     def pool_preparation(
-        selected_pool, workspace, *, commit, operation_deadline, process_margin_s,
+        selected_pool, workspace, *, commit, operation_deadline, process_margin_s, clock,
     ):
+        assert clock is state.publication_clock
         state.events.append("publish")
         state.publication_calls.append((selected_pool, workspace))
         state.publication_options.append({
             "commit": commit, "operation_deadline": operation_deadline,
-            "process_margin_s": process_margin_s,
+            "process_margin_s": process_margin_s, "clock": clock,
         })
         if state.publication_hook is not None:
             state.publication_hook()
@@ -245,8 +254,9 @@ def test_first_cache_miss_publishes_admitted_source_after_parent_registration(
     assert options["commit"] == COMMIT
     assert options["process_margin_s"] == 10.0
     assert options["operation_deadline"] == (
-        boundary.spans["farm.preparation"][0]["operation_deadline_monotonic"]
+        boundary.spans["farm.preparation"][0]["operation_deadline_counter"]
     )
+    assert options["clock"] is boundary.publication_clock
     timing = boundary.spans["farm.preparation"][0]
     assert timing["operation_timeout_s"] == 900.0
     assert timing["process_margin_s"] == 10.0
@@ -591,7 +601,7 @@ def test_attended_build_cleans_only_its_owned_requests_directory(
     assert boundary.requests_directory.is_dir(), "cleanup removed a caller-owned directory"
 
 
-def test_attended_registration_failure_also_cleans_owned_requests(
+def test_attended_registration_failure_retains_owned_requests_before_any_marker(
     boundary, monkeypatch, tmp_path
 ):
     temporary_directory = _farm.tempfile.TemporaryDirectory
@@ -605,10 +615,12 @@ def test_attended_registration_failure_also_cleans_owned_requests(
     monkeypatch.setattr(_farm.tempfile, "TemporaryDirectory", own_directory)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS")
     boundary.coordinator_error = RuntimeError("coordinator unavailable")
-    with pytest.raises(_farm.BuildOwnershipError, match="coordinator unavailable"):
+    with pytest.raises(_farm.BuildOwnershipError, match="coordinator unavailable") as caught:
         with _farm.producer_build("Failed attended preparation cleanup"):
             pytest.fail("producer entered after registration failed")
-    assert created and all(not path.exists() for path in created)
+    assert created and all(path.is_dir() for path in created)
+    assert all(not (path / "preparation").exists() for path in created)
+    assert any(str(created[0]) in note for note in caught.value.__notes__)
     assert "HARMONIC_FARM_REQUESTS" not in _farm.os.environ
     assert boundary.requests_directory.is_dir()
 
@@ -671,27 +683,38 @@ def _assert_requests_cleanup_report(
         assert "PermissionError" in message
         assert "possible residue" in message
     else:
-        assert "publisher cleanup is unconfirmed" in message
+        assert "primary build exception or interrupt" in message
     if primary is not None:
         assert primary.__notes__ == [message]
         assert "synthetic cleanup detail" not in str(primary)
 
 
-def test_body_primary_survives_owned_requests_cleanup_failure(
-    boundary, requests_cleanup_failure,
+@pytest.mark.parametrize("primary_type", [RuntimeError, KeyboardInterrupt, asyncio.CancelledError])
+def test_body_primary_retains_owned_requests_without_probe_or_cleanup(
+    boundary, requests_cleanup_failure, monkeypatch, primary_type,
 ):
-    ownership = _farm.producer_build("Body primary cleanup regression")
-    primary = RuntimeError("original build failure")
-    with pytest.raises(RuntimeError) as caught:
+    ownership = _farm.producer_build("Body primary retention regression")
+    primary = primary_type("original build failure")
+
+    def forbidden_probe(*_args):
+        raise AssertionError("primary-error teardown inspected a possibly active publisher")
+
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden_probe)
+    with pytest.raises(primary_type) as caught:
         with ownership:
             requests_cleanup_failure.arm(ownership)
+            assert not (requests_cleanup_failure.root / "preparation").exists()
             raise primary
     assert caught.value is primary
-    assert boundary.close_reasons == ["failed"]
-    _assert_requests_cleanup_report(ownership, requests_cleanup_failure, primary=primary)
+    assert boundary.close_reasons == [
+        "cancelled" if isinstance(primary, KeyboardInterrupt) else "failed",
+    ]
+    _assert_requests_cleanup_report(
+        ownership, requests_cleanup_failure, primary=primary, cleanup_attempted=False,
+    )
 
 
-def test_registration_primary_survives_owned_requests_cleanup_failure(
+def test_registration_primary_retains_owned_requests_without_cleanup(
     boundary, requests_cleanup_failure,
 ):
     ownership = _farm.producer_build("Registration primary cleanup regression")
@@ -702,7 +725,7 @@ def test_registration_primary_survives_owned_requests_cleanup_failure(
             pytest.fail("producer entered after registration failure")
     assert caught.value.__cause__ is boundary.coordinator_error
     _assert_requests_cleanup_report(
-        ownership, requests_cleanup_failure, primary=caught.value,
+        ownership, requests_cleanup_failure, primary=caught.value, cleanup_attempted=False,
     )
 
 
@@ -808,10 +831,13 @@ def publication_request():
 
 
 @pytest.fixture
-def publication_clock(monkeypatch):
+def publication_clock(boundary, monkeypatch):
     clock = SimpleNamespace(now=1000.0)
-    # Do not replace the process-wide time module used by pytest or FileLock.
-    monkeypatch.setattr(_farm, "time", SimpleNamespace(monotonic=lambda: clock.now))
+    clock.read = lambda: clock.now
+    boundary.publication_clock = clock.read
+    # Publication uses the selected pool's counter, not this divergent epoch.
+    # Keep the process-wide time module used by pytest and FileLock unchanged.
+    monkeypatch.setattr(_farm, "time", SimpleNamespace(monotonic=lambda: -1_000_000.0))
     return clock
 
 
@@ -837,11 +863,14 @@ def test_lock_wait_consumes_the_original_declared_publication_budget(
     assert boundary.publication_calls == [(boundary.pool, boundary.workspace)]
     assert boundary.publication_options == [{
         "commit": COMMIT, "operation_deadline": 1007.5, "process_margin_s": 1.25,
+        "clock": publication_clock.read,
     }]
     timing = boundary.spans["farm.preparation"][0]
     assert timing["operation_timeout_s"] == 7.5
     assert timing["process_margin_s"] == 1.25
     assert timing["lock_wait_ms"] == 2000
+    assert timing["operation_deadline_counter"] == 1007.5
+    assert timing["publication_ms"] == 0
 
 
 @pytest.mark.parametrize("shared_state", ["succeeded", "failed", "publishing", "missing"])
@@ -949,6 +978,7 @@ _SHARED_PUBLICATION_CHILD = textwrap.dedent(
 
     _farm.REPO_ROOT = Path(sys.argv[2])
     build._pool_home = lambda: Path(sys.argv[3])
+    build._pool_publication_clock = lambda pool: _farm.time.perf_counter
     mode = sys.argv[4]
     calls = Path(sys.argv[5])
     _farm._telemetry.span = lambda *a, **k: nullcontext(
@@ -964,7 +994,8 @@ _SHARED_PUBLICATION_CHILD = textwrap.dedent(
     _farm._connect_client = forbidden
     _farm._thread.interrupt_main = forbidden
 
-    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s):
+    def publish(pool, workspace, *, commit, operation_deadline, process_margin_s, clock):
+        assert clock is _farm.time.perf_counter
         with calls.open("a", encoding="utf-8") as stream:
             stream.write(str(os.getpid()) + "\\n")
         print("publishing", flush=True)
@@ -1125,3 +1156,544 @@ def test_unconfirmed_publisher_cleanup_keeps_the_nonterminal_fail_closed_marker(
     assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
     assert len(boundary.publication_calls) == 1
     assert boundary.requests == []
+
+
+@pytest.fixture
+def owned_requests(boundary, monkeypatch, tmp_path):
+    """Capture real owned roots and cleanup calls without leaking retained roots."""
+    monkeypatch.delenv("HARMONIC_FARM_REQUESTS")
+    temporary_directory = _farm.tempfile.TemporaryDirectory
+    state = SimpleNamespace(root=None, owned=None, cleanup_calls=[], warnings=[])
+    cleanups = []
+
+    def create(**kwargs):
+        owned = temporary_directory(dir=tmp_path, **kwargs)
+        state.owned, state.root = owned, Path(owned.name)
+        real_cleanup = owned.cleanup
+        cleanups.append(real_cleanup)
+
+        def cleanup():
+            state.cleanup_calls.append(state.root)
+            real_cleanup()
+
+        monkeypatch.setattr(owned, "cleanup", cleanup)
+        return owned
+
+    monkeypatch.setattr(_farm.tempfile, "TemporaryDirectory", create)
+    monkeypatch.setattr(
+        _farm._telemetry, "warn",
+        lambda message, **attributes: state.warnings.append((message, attributes)),
+    )
+    try:
+        yield state
+    finally:
+        for cleanup in cleanups:
+            cleanup()
+
+
+@pytest.mark.parametrize("evidence", [
+    "succeeded", "failed", "empty", "free-lock", "receipt-staging", "lock-staging",
+])
+def test_normal_return_cleans_terminal_receipts_and_free_lock_evidence(
+    boundary, owned_requests, evidence,
+):
+    ownership = _farm.producer_build("Normal receipt cleanup")
+    with ownership:
+        root = owned_requests.root
+        if evidence != "empty":
+            if evidence == "failed":
+                boundary.publication_error = build.FarmPreflightError("synthetic rejection")
+                with pytest.raises(RuntimeError, match="synthetic rejection"):
+                    _farm.run_leaf(TASK, KEY)
+            else:
+                _farm.run_leaf(TASK, KEY)
+            path = next((root / "preparation").glob("*.json"))
+            lock_path = path.with_suffix(".lock")
+            if evidence in {"free-lock", "lock-staging"}:
+                path.unlink()
+                # FileLock may remove the file on Windows release. Supply a real,
+                # currently free lock entry, without assuming it persists.
+                lock_path.touch()
+            if evidence in {"receipt-staging", "lock-staging"}:
+                path.with_name(f"{path.name}.123.{'b' * 32}.tmp").write_text(
+                    "{partial", encoding="utf-8",
+                )
+        ownership.finish(evidence != "failed")
+    assert owned_requests.cleanup_calls == [root]
+    assert ownership._owned_requests is None
+    assert not root.exists()
+    assert owned_requests.warnings == []
+    assert boundary.requests_directory.is_dir()
+
+
+@pytest.mark.parametrize("damage", [
+    "publishing", "busy", "busy-lock-only", "staging-busy", "corrupt",
+    "foreign-build", "bad-digest", "extra-identity-key", "missing-identity-key",
+    "non-string-identity", "failed-without-error", "unknown-state", "unknown-entry",
+    "subdirectory", "unreadable", "scan-error", "staging-only", "preparation-file",
+])
+def test_successful_return_retains_unsafe_preparation_and_fails_loud(
+    boundary, owned_requests, monkeypatch, damage,
+):
+    from filelock import FileLock
+
+    ownership = _farm.producer_build("Unsafe receipt cleanup")
+    holder = None
+    try:
+        with pytest.raises(_farm.BuildOwnershipError, match="Farm requests retained") as caught:
+            with ownership:
+                _farm.run_leaf(TASK, KEY)
+                root = owned_requests.root
+                preparation = root / "preparation"
+                path = next(preparation.glob("*.json"))
+                receipt = json.loads(path.read_text(encoding="utf-8"))
+                if damage in {"busy", "busy-lock-only", "staging-busy"}:
+                    holder = FileLock(str(path.with_suffix(".lock")))
+                    holder.acquire(timeout=0)
+                    if damage != "busy":
+                        path.unlink()
+                    if damage == "staging-busy":
+                        path.with_name(f"{path.name}.123.{'b' * 32}.tmp").write_text(
+                            "{partial", encoding="utf-8",
+                        )
+                elif damage == "corrupt":
+                    path.write_text("{broken", encoding="utf-8")
+                elif damage == "bad-digest":
+                    path.rename(preparation / f"{'f' * 64}.json")
+                elif damage == "unknown-entry":
+                    (preparation / "unexpected.txt").write_text("unknown", encoding="utf-8")
+                elif damage == "subdirectory":
+                    (preparation / "unexpected").mkdir()
+                elif damage == "unreadable":
+                    real_read = Path.read_text
+
+                    def unreadable(candidate, *args, **kwargs):
+                        if candidate == path:
+                            raise PermissionError("synthetic unreadable receipt")
+                        return real_read(candidate, *args, **kwargs)
+
+                    monkeypatch.setattr(Path, "read_text", unreadable)
+                elif damage == "scan-error":
+                    real_iterdir = Path.iterdir
+
+                    def unreadable_directory(candidate):
+                        if candidate == preparation:
+                            raise OSError("synthetic listing failure")
+                        return real_iterdir(candidate)
+
+                    monkeypatch.setattr(Path, "iterdir", unreadable_directory)
+                elif damage in {"staging-only", "preparation-file"}:
+                    path.unlink()
+                    path.with_suffix(".lock").unlink(missing_ok=True)
+                    if damage == "staging-only":
+                        path.with_name(f"{path.name}.123.{'b' * 32}.tmp").write_text(
+                            "{partial", encoding="utf-8",
+                        )
+                    else:
+                        preparation.rmdir()
+                        preparation.write_text("not a directory", encoding="utf-8")
+                else:
+                    if damage == "publishing":
+                        receipt["state"] = "publishing"
+                    elif damage == "foreign-build":
+                        receipt["identity"]["build_id"] = "foreign-build"
+                    elif damage == "extra-identity-key":
+                        receipt["identity"]["extra"] = "not part of the identity"
+                    elif damage == "missing-identity-key":
+                        del receipt["identity"]["workspace"]
+                    elif damage == "non-string-identity":
+                        receipt["identity"]["workspace"] = 17
+                    elif damage == "failed-without-error":
+                        receipt.update(state="failed", error="")
+                    else:
+                        receipt["state"] = "unknown"
+                    path.write_text(json.dumps(receipt), encoding="utf-8")
+                ownership.finish(True)
+        assert caught.value.__cause__ is None
+        assert ownership._owned_requests is owned_requests.owned
+        assert root.is_dir()
+        assert owned_requests.cleanup_calls == []
+        assert len(owned_requests.warnings) == 1
+        assert str(root) in owned_requests.warnings[0][0]
+        assert "HARMONIC_FARM_REQUESTS" not in _farm.os.environ
+    finally:
+        if holder is not None:
+            holder.release()
+
+
+def test_failed_finish_retains_publishing_receipt_without_changing_nonzero_result(
+    boundary, owned_requests,
+):
+    boundary.publication_error = build.PoolProcessCleanupError("synthetic unconfirmed child")
+    ownership = _farm.producer_build("Generic failed action outcome")
+
+    def failed_build():
+        with ownership:
+            with pytest.raises(build.PoolProcessCleanupError):
+                _farm.run_leaf(TASK, KEY)
+            ownership.finish(False)
+            return 7
+
+    assert failed_build() == 7
+    assert owned_requests.cleanup_calls == []
+    assert owned_requests.root.is_dir()
+    path = next((owned_requests.root / "preparation").glob("*.json"))
+    assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
+    assert len(owned_requests.warnings) == 1
+    assert boundary.close_reasons == ["failed"]
+
+
+@pytest.mark.parametrize("location", ["root", "preparation", "receipt"])
+@pytest.mark.parametrize("alias_kind", ["symlink", "junction"])
+def test_normal_return_retains_aliases_without_following_other_roots(
+    boundary, owned_requests, monkeypatch, tmp_path, location, alias_kind,
+):
+    if alias_kind == "junction" and _farm.os.name != "nt":
+        pytest.skip("Windows junctions only")
+    if alias_kind == "junction" and location == "receipt":
+        pytest.skip("junctions alias directories, not receipt files")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    sentinel = outside / "untouched.txt"
+    sentinel.write_text("not owned", encoding="utf-8")
+    ownership = _farm.producer_build("Aliased receipt cleanup")
+    alias = None
+    try:
+        with pytest.raises(_farm.BuildOwnershipError, match="Farm requests retained"):
+            with ownership:
+                root = owned_requests.root
+                if location == "root":
+                    alias = tmp_path / "requests-alias"
+                    target = root
+                elif location == "preparation":
+                    alias, target = root / "preparation", outside
+                else:
+                    preparation = root / "preparation"
+                    preparation.mkdir()
+                    alias, target = preparation / f"{'a' * 64}.json", sentinel
+                try:
+                    if alias_kind == "junction":
+                        import _winapi
+                        _winapi.CreateJunction(str(target), str(alias))
+                    else:
+                        alias.symlink_to(target, target_is_directory=target.is_dir())
+                except OSError as exc:
+                    pytest.skip(f"local alias creation unavailable: {type(exc).__name__}")
+                if location == "root":
+                    # Change only the captured owned object's path; its original
+                    # root remains available for fixture-owned cleanup.
+                    monkeypatch.setattr(owned_requests.owned, "name", str(alias))
+                ownership.finish(True)
+        assert owned_requests.cleanup_calls == []
+        assert root.is_dir()
+        assert sentinel.read_text(encoding="utf-8") == "not owned"
+        assert len(owned_requests.warnings) == 1
+    finally:
+        if alias is not None:
+            if alias.is_symlink():
+                alias.unlink()
+            elif alias.is_junction():
+                alias.rmdir()
+        if owned_requests.owned is not None:
+            monkeypatch.setattr(owned_requests.owned, "name", str(owned_requests.root))
+
+
+def test_teardown_acquires_each_digest_lock_before_shared_receipt_validation(
+    boundary, owned_requests, monkeypatch,
+):
+    from filelock import FileLock, Timeout
+
+    validated = []
+    real_read = _farm._read_preparation_receipt
+    ownership = _farm.producer_build("Locked teardown validation")
+    with ownership:
+        _farm.run_leaf(TASK, KEY)
+        path = next((owned_requests.root / "preparation").glob("*.json"))
+
+        def read_locked(candidate, **kwargs):
+            assert candidate == path
+            with pytest.raises(Timeout):
+                FileLock(str(candidate.with_suffix(".lock"))).acquire(timeout=0)
+            validated.append(candidate)
+            return real_read(candidate, **kwargs)
+
+        monkeypatch.setattr(_farm, "_read_preparation_receipt", read_locked)
+        ownership.finish(True)
+    assert validated == [path]
+    assert owned_requests.cleanup_calls == [owned_requests.root]
+
+
+@pytest.mark.parametrize("terminal", ["succeeded", "failed"])
+def test_producer_writes_under_lock_before_launch_and_never_rewrites_terminal_receipts(
+    boundary, monkeypatch, publication_request, terminal,
+):
+    from filelock import FileLock, Timeout
+
+    real_atomic = _farm._atomic_json
+    writes = []
+
+    def write_locked(path, receipt):
+        with pytest.raises(Timeout):
+            FileLock(str(path.with_suffix(".lock"))).acquire(timeout=0)
+        writes.append(receipt["state"])
+        real_atomic(path, receipt)
+
+    def publish_after_marker():
+        path = next((boundary.requests_directory / "preparation").glob("*.json"))
+        assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
+        with pytest.raises(Timeout):
+            FileLock(str(path.with_suffix(".lock"))).acquire(timeout=0)
+        if terminal == "failed":
+            raise build.FarmPreflightError("absorbing rejection")
+
+    monkeypatch.setattr(_farm, "_atomic_json", write_locked)
+    boundary.publication_hook = publish_after_marker
+    for _ in range(2):
+        if terminal == "failed":
+            with pytest.raises(RuntimeError, match="absorbing rejection"):
+                _farm._ensure_preparation_published(publication_request)
+        else:
+            _farm._ensure_preparation_published(publication_request)
+    assert writes == ["publishing", terminal]
+    assert len(boundary.publication_calls) == 1
+
+
+@pytest.mark.parametrize("phase", ["before-acquire", "after-acquire", "before-launch"])
+def test_runner_cancellation_stops_publication_and_releases_any_acquired_lock(
+    boundary, monkeypatch, publication_request, phase,
+):
+    from filelock import FileLock
+
+    real_acquire, real_atomic = FileLock.acquire, _farm._atomic_json
+    acquired = []
+
+    def acquire(lock, *, timeout):
+        result = real_acquire(lock, timeout=timeout)
+        acquired.append(lock.lock_file)
+        if phase == "after-acquire":
+            asyncio.current_task().cancel()
+        return result
+
+    def marker(path, receipt):
+        real_atomic(path, receipt)
+        if phase == "before-launch" and receipt["state"] == "publishing":
+            asyncio.current_task().cancel()
+
+    monkeypatch.setattr(FileLock, "acquire", acquire)
+    monkeypatch.setattr(_farm, "_atomic_json", marker)
+
+    async def publication():
+        if phase == "before-acquire":
+            asyncio.current_task().cancel()
+        _farm._ensure_preparation_published(publication_request)
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(publication())
+    assert boundary.publication_calls == []
+    assert boundary.requests == []
+    preparation = boundary.requests_directory / "preparation"
+    receipts = list(preparation.glob("*.json"))
+    if phase == "before-launch":
+        assert len(receipts) == 1
+        assert json.loads(receipts[0].read_text(encoding="utf-8"))["state"] == "publishing"
+    else:
+        assert receipts == []
+    for path in acquired:
+        # Use the real acquire, outside the cancelled Runner task.
+        probe = FileLock(path)
+        with real_acquire(probe, timeout=0):
+            pass
+
+
+def test_selected_clock_load_finishes_before_the_single_prelock_deadline_starts(
+    boundary, monkeypatch, publication_request, publication_clock,
+):
+    from filelock import FileLock
+
+    readiness = json.loads(_farm.os.environ["HARMONIC_FARM_PREPARATION_READINESS"])
+    readiness.update(operation_timeout_s=7.5, process_margin_s=1.25)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", json.dumps(readiness))
+    selected = []
+    started = []
+    real_acquire = FileLock.acquire
+
+    def load_clock(pool):
+        assert pool == boundary.pool
+        selected.append(pool)
+        # Loading the selected pure helper is not an operation-budget reset.
+        # It must complete before the initial counter read that starts the work.
+        publication_clock.now += 5000
+        started.append(publication_clock.now)
+        return publication_clock.read
+
+    def acquire(lock, *, timeout):
+        publication_clock.now += 2
+        return real_acquire(lock, timeout=0)
+
+    def publish():
+        publication_clock.now += 0.125
+
+    monkeypatch.setattr(build, "_pool_publication_clock", load_clock)
+    monkeypatch.setattr(FileLock, "acquire", acquire)
+    boundary.publication_hook = publish
+    _farm._ensure_preparation_published(publication_request)
+    assert selected == [boundary.pool]
+    options = boundary.publication_options[0]
+    timing = boundary.spans["farm.preparation"][0]
+    assert options["clock"] is publication_clock.read
+    assert options["operation_deadline"] - started[0] == 7.5
+    assert timing["operation_deadline_counter"] == options["operation_deadline"]
+    assert timing["publication_clock_domain"] == "perf_counter"
+    assert timing["lock_wait_ms"] == 2000
+    assert timing["publication_ms"] == 125
+
+
+def test_missing_selected_clock_capability_fails_before_timer_or_lock_setup(
+    boundary, monkeypatch, publication_request,
+):
+    from filelock import FileLock
+
+    loads = []
+
+    def missing_clock(pool):
+        loads.append(pool)
+        raise build.FarmPreflightError("selected PoolHome lacks publication_clock")
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("missing clock reached a fallback timer or lock")
+
+    monkeypatch.setattr(build, "_pool_publication_clock", missing_clock)
+    monkeypatch.setattr(_farm, "time", SimpleNamespace(monotonic=forbidden, perf_counter=forbidden))
+    monkeypatch.setattr(FileLock, "acquire", forbidden)
+    with pytest.raises(build.FarmPreflightError, match="lacks publication_clock"):
+        _farm._ensure_preparation_published(publication_request)
+    assert loads == [boundary.pool]
+    assert boundary.publication_calls == []
+    assert boundary.spans == {}
+    assert not (boundary.requests_directory / "preparation").exists()
+
+
+@pytest.mark.parametrize("parent_outcome", ["generic-error", "nonzero-return"])
+def test_interrupted_action_process_evidence_survives_parent_without_typed_child_error(
+    boundary, owned_requests, tmp_path, parent_outcome,
+):
+    """A real action interpreter dies; only a generic doit outcome reaches parent."""
+    calls = tmp_path / "interrupted-publisher-calls.txt"
+    messages = queue.Queue()
+    child = reader = None
+    ownership = _farm.producer_build("Interrupted action teardown")
+    primary = RuntimeError("doit action process failed")
+
+    def failed_build():
+        nonlocal child, reader
+        with ownership:
+            child = subprocess.Popen(
+                [sys.executable, "-I", "-c", _SHARED_PUBLICATION_CHILD,
+                 str(REPO_ROOT), str(boundary.workspace), str(boundary.pool),
+                 "crash", str(calls)],
+                cwd=tmp_path, env=dict(_farm.os.environ, OTEL_SDK_DISABLED="true"),
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            def read_output():
+                for line in child.stdout:
+                    messages.put(line.rstrip("\n"))
+
+            reader = threading.Thread(target=read_output, daemon=True)
+            reader.start()
+            assert messages.get(timeout=60) == "ready"
+            child.stdin.write("start\n")
+            child.stdin.flush()
+            assert messages.get(timeout=WAIT_S) == "attempt"
+            assert messages.get(timeout=WAIT_S) == "publishing"
+            path = next((owned_requests.root / "preparation").glob("*.json"))
+            assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
+            child.stdin.write("release\n")
+            child.stdin.flush()
+            assert child.wait(timeout=WAIT_S) == 23
+            if parent_outcome == "generic-error":
+                raise primary
+            ownership.finish(False)
+            return 7
+
+    try:
+        if parent_outcome == "generic-error":
+            with pytest.raises(RuntimeError) as caught:
+                failed_build()
+            assert caught.value is primary
+            assert str(owned_requests.root) in primary.__notes__[0]
+        else:
+            assert failed_build() == 7
+        path = next((owned_requests.root / "preparation").glob("*.json"))
+        assert json.loads(path.read_text(encoding="utf-8"))["state"] == "publishing"
+        assert owned_requests.cleanup_calls == []
+        assert len(owned_requests.warnings) == 1
+        assert boundary.close_reasons == ["failed"]
+        assert len(calls.read_text(encoding="utf-8").splitlines()) == 1
+    finally:
+        if child is not None:
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=WAIT_S)
+        if reader is not None:
+            reader.join(timeout=WAIT_S)
+            assert not reader.is_alive()
+        if child is not None:
+            child.stdin.close()
+            child.stdout.close()
+            child.stderr.close()
+
+
+def test_inherited_requests_root_and_pending_evidence_are_never_inspected_or_cleaned(
+    boundary, monkeypatch,
+):
+    _farm.run_leaf(TASK, KEY)
+    path = next((boundary.requests_directory / "preparation").glob("*.json"))
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    receipt["state"] = "publishing"
+    original = json.dumps(receipt)
+    path.write_text(original, encoding="utf-8")
+
+    def forbidden(*_args):
+        raise AssertionError("producer inspected a caller-owned requests root")
+
+    monkeypatch.setattr(_farm, "_require_quiescent_requests", forbidden)
+    with _farm.producer_build("Inherited root ownership") as ownership:
+        assert ownership._owned_requests is None
+        ownership.finish(True)
+    assert path.read_text(encoding="utf-8") == original
+    assert _farm.os.environ["HARMONIC_FARM_REQUESTS"] == str(boundary.requests_directory)
+
+
+def test_normal_cleanup_does_not_invent_a_schema_for_root_request_records(
+    boundary, owned_requests,
+):
+    with _farm.producer_build("Existing request inventory") as ownership:
+        root = owned_requests.root
+        (root / "existing-request-record.custom").write_text("opaque", encoding="utf-8")
+        ownership.finish(True)
+    assert owned_requests.cleanup_calls == [root]
+    assert not root.exists()
+
+
+def test_lock_probe_oserror_retains_real_receipt_and_fails_success_loud(
+    boundary, owned_requests, monkeypatch,
+):
+    from filelock import FileLock
+
+    ownership = _farm.producer_build("Unconfirmed lock probe")
+    with pytest.raises(_farm.BuildOwnershipError, match="Farm requests retained"):
+        with ownership:
+            _farm.run_leaf(TASK, KEY)
+            path = next((owned_requests.root / "preparation").glob("*.json"))
+
+            def refuse_probe(_lock, *, timeout):
+                assert timeout == 0
+                raise OSError("synthetic lock probe failure")
+
+            monkeypatch.setattr(FileLock, "acquire", refuse_probe)
+            ownership.finish(True)
+    assert path.is_file()
+    assert owned_requests.cleanup_calls == []
+    assert len(owned_requests.warnings) == 1

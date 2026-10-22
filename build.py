@@ -53,7 +53,7 @@ import tempfile
 import threading
 import time
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
@@ -831,6 +831,16 @@ def _pool_process_tree(pool: Path):
     return tree_class(log=_pool_process_log)
 
 
+def _pool_publication_clock(pool: Path) -> Callable[[], float]:
+    """Use the selected pool's cross-interpreter publication clock authority."""
+    clock = getattr(_load_pool_helper(pool, "protocol"), "publication_clock", None)
+    if not callable(clock):
+        raise FarmPreflightError(
+            f"PoolHome {pool} lacks the publication clock API; update the selected pool revision"
+        )
+    return clock
+
+
 @contextmanager
 def _defer_pool_interrupts():
     """Keep an owned handle registered and cleanup confirmed before SIGINT."""
@@ -862,8 +872,10 @@ def _defer_pool_interrupts():
 
 def _close_owned_pool_process(
     tree, process, *, adopted: bool, cleanup_deadline: float,
+    clock: Callable[[], float] | None = None,
 ) -> bool:
     """Kill, terminate and reap using only the caller's one cleanup reserve."""
+    clock = time.monotonic if clock is None else clock
     if not adopted:
         # Assignment can fail while the root is suspended and outside the job.
         # Kill only our stored handle before spending any reserve waiting.
@@ -873,31 +885,46 @@ def _close_owned_pool_process(
             pass
     try:
         confirmed = tree.terminate(
-            process, timeout_s=max(0.0, cleanup_deadline - time.monotonic()),
+            process, timeout_s=max(0.0, cleanup_deadline - clock()),
         )
     except BaseException:
         confirmed = False
     if not adopted:
         try:
-            process.wait(timeout=max(0.0, cleanup_deadline - time.monotonic()))
+            process.wait(timeout=max(0.0, cleanup_deadline - clock()))
         except BaseException:
             return False
     return confirmed
 
 
+def _raise_if_pool_publication_cancelled() -> None:
+    """Observe Runner's first SIGINT cancellation without awaiting in sync work."""
+    import asyncio
+
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        return
+    if task is not None and task.cancelling():
+        raise asyncio.CancelledError
+
+
 def _bounded_pool_farm(
     pool: Path, argv: list[str], env: dict[str, str], *,
     operation_deadline: float, process_margin_s: float,
+    clock: Callable[[], float] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Supervise the private publisher body, never another supervisor."""
+    clock = time.monotonic if clock is None else clock
     if any(
         isinstance(value, bool) or not isinstance(value, (int, float))
         or not math.isfinite(value) or value <= 0
         for value in (operation_deadline, process_margin_s)
     ):
         raise FarmPreflightError("pool publisher requires a finite positive operation deadline and margin")
-    if time.monotonic() >= operation_deadline:
+    if clock() >= operation_deadline:
         raise FarmPreflightError("pool publisher operation deadline expired before launch")
+    _raise_if_pool_publication_cancelled()
     tree = _pool_process_tree(pool)
     process = None
     adopted = False
@@ -907,7 +934,7 @@ def _bounded_pool_farm(
             # its handle is stored and the mandatory cleanup path can see it.
             with _defer_pool_interrupts():
                 popen_options = tree.popen_options
-                if time.monotonic() >= operation_deadline:
+                if clock() >= operation_deadline:
                     raise subprocess.TimeoutExpired(argv, 0)
                 process = subprocess.Popen(
                     argv, cwd=REPO_ROOT, env=env, stdout=None, text=True,
@@ -916,21 +943,24 @@ def _bounded_pool_farm(
                 tree.adopt(process)
                 adopted = True
             while True:
-                remaining = operation_deadline - time.monotonic()
+                _raise_if_pool_publication_cancelled()
+                remaining = operation_deadline - clock()
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired(argv, 0)
                 try:
                     returncode = process.wait(timeout=min(1.0, remaining))
                 except subprocess.TimeoutExpired:
                     continue
-                if time.monotonic() > operation_deadline:
+                _raise_if_pool_publication_cancelled()
+                if clock() > operation_deadline:
                     raise subprocess.TimeoutExpired(argv, 0)
                 break
         except BaseException as error:
-            cleanup_deadline = min(time.monotonic() + 5.0, operation_deadline + process_margin_s)
+            cleanup_deadline = min(clock() + 5.0, operation_deadline + process_margin_s)
             with _defer_pool_interrupts():
                 if process is not None and not _close_owned_pool_process(
                     tree, process, adopted=adopted, cleanup_deadline=cleanup_deadline,
+                    clock=clock,
                 ):
                     raise PoolProcessCleanupError(
                         "pool publisher cleanup could not confirm the owned process tree stopped"
@@ -945,15 +975,15 @@ def _bounded_pool_farm(
                 ) from error
             raise
         else:
-            cleanup_deadline = min(time.monotonic() + 5.0, operation_deadline + process_margin_s)
+            cleanup_deadline = min(clock() + 5.0, operation_deadline + process_margin_s)
             with _defer_pool_interrupts():
                 if not _close_owned_pool_process(
                     tree, process, adopted=adopted, cleanup_deadline=cleanup_deadline,
+                    clock=clock,
                 ):
                     raise PoolProcessCleanupError(
                         "pool publisher exited but its owned process tree did not stop"
                     )
-            return subprocess.CompletedProcess(argv, returncode, None)
     finally:
         with _defer_pool_interrupts():
             try:
@@ -962,11 +992,16 @@ def _bounded_pool_farm(
                 raise PoolProcessCleanupError(
                     "pool publisher ownership handle could not be closed safely"
                 ) from error
+    # A first SIGINT during cleanup/close cancels the Runner task but does not
+    # raise. Honor it only after confirmed cleanup, before accepting a result.
+    _raise_if_pool_publication_cancelled()
+    return subprocess.CompletedProcess(argv, returncode, None)
 
 
 def _pool_preparation(
     pool: Path, workspace: Path, *, commit: str,
     operation_deadline: float, process_margin_s: float,
+    clock: Callable[[], float],
 ) -> dict:
     """Publish through this pool's private body under HA's sole ProcessTree."""
     protocol = _load_pool_helper(pool, "protocol")
@@ -977,6 +1012,7 @@ def _pool_preparation(
     receipt_limit = getattr(protocol, "PREPARATION_RECEIPT_MAX_BYTES", None)
     if (
         not callable(arguments) or not callable(decode)
+        or not callable(getattr(protocol, "publication_clock", None)) or not callable(clock)
         or any(
             isinstance(value, bool) or not isinstance(value, (int, float))
             or not math.isfinite(value) or value <= 0
@@ -990,8 +1026,8 @@ def _pool_preparation(
         )
     # Keep the original caller deadline, including its prior lock wait. A
     # selected protocol cap can shorten that deadline, never restart it.
-    deadline = min(operation_deadline, time.monotonic() + timeout)
-    if time.monotonic() >= deadline:
+    deadline = min(operation_deadline, clock() + timeout)
+    if clock() >= deadline:
         raise FarmPreflightError("pool publisher operation deadline expired before launch")
     owned = tempfile.TemporaryDirectory(prefix="harmonic-preparation-result-", delete=False)
     primary_error = None
@@ -1007,8 +1043,9 @@ def _pool_preparation(
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
         result = _bounded_pool_farm(
             pool, argv, env, operation_deadline=deadline, process_margin_s=margin,
+            clock=clock,
         )
-        if time.monotonic() >= deadline + margin:
+        if clock() >= deadline + margin:
             raise FarmPreflightError("pool publisher supervision margin expired before receipt validation")
         try:
             with result_file.open("rb") as stream:
@@ -1043,7 +1080,7 @@ def _pool_preparation(
                     logging.getLogger(__name__).warning("%s", message)
                 except Exception:
                     pass
-            if primary_error is None and time.monotonic() >= deadline + margin:
+            if primary_error is None and clock() >= deadline + margin:
                 raise FarmPreflightError("pool publisher supervision margin expired during receipt handling")
 
 

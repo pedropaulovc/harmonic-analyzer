@@ -24,13 +24,15 @@ import hashlib
 import json
 import math
 import os
+import re
 import socket
+import stat
 import subprocess
 import tempfile
 import threading
 import time
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -628,22 +630,34 @@ class _ProducerBuild:
             os.environ.pop("HARMONIC_FARM_REQUESTS", None)
         else:
             os.environ["HARMONIC_FARM_REQUESTS"] = self._previous_requests
-        if primary_error is not None and getattr(primary_error, "cleanup_confirmed", True) is False:
+        if primary_error is not None:
+            # Doit terminates process workers without joining on exceptions,
+            # and thread workers may continue. Even an empty/free receipt scan
+            # cannot close the race before a worker's first publishing marker.
             message = (
-                "Farm requests retained because publisher cleanup is unconfirmed; "
-                f"owned directory: {owned.name}"
+                "Farm requests retained after a primary build exception or interrupt; "
+                f"publisher cleanup cannot be inferred; owned directory: {owned.name}"
             )
         else:
             try:
-                owned.cleanup()
-            except Exception as cleanup_error:
+                _require_quiescent_requests(Path(owned.name), self.build_id)
+            except Exception as evidence_error:
                 message = (
-                    "Farm requests cleanup could not be confirmed; possible residue "
-                    f"at {owned.name} ({type(cleanup_error).__name__})"
+                    "Farm requests retained because owned preparation evidence "
+                    f"is not quiescent ({type(evidence_error).__name__}); "
+                    f"owned directory: {owned.name}"
                 )
             else:
-                self._owned_requests = None
-                return
+                try:
+                    owned.cleanup()
+                except Exception as cleanup_error:
+                    message = (
+                        "Farm requests cleanup could not be confirmed; possible residue "
+                        f"at {owned.name} ({type(cleanup_error).__name__})"
+                    )
+                else:
+                    self._owned_requests = None
+                    return
         if primary_error is not None:
             primary_error.add_note(message)
         try:
@@ -954,6 +968,108 @@ def _display_name(label: str | None = None) -> str:
 _PREPARATION_CAPABILITY = "preparation-publish-v1"
 
 
+def _preparation_identity_digest(identity: dict[str, str]) -> str:
+    return hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _read_preparation_receipt(
+    path: Path, *, build_id: str, identity: dict[str, str] | None = None,
+) -> dict:
+    """Use the same receipt schema and filename identity for owner and teardown."""
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, RecursionError) as exc:
+        raise RuntimeError(
+            f"farm preparation publication receipt is corrupt: {path}"
+        ) from exc
+    recorded_identity = receipt.get("identity") if isinstance(receipt, dict) else None
+    if (
+        not isinstance(recorded_identity, dict)
+        or set(recorded_identity) != {
+            "build_id", "workspace", "pool_home", "commit", "agent_identity_sha256",
+        }
+        or not all(isinstance(value, str) for value in recorded_identity.values())
+        or recorded_identity["build_id"] != build_id
+        or (identity is not None and recorded_identity != identity)
+        or path.stem != _preparation_identity_digest(recorded_identity)
+        or receipt.get("state") not in ("publishing", "succeeded", "failed")
+        or (
+            receipt["state"] == "failed"
+            and (not isinstance(receipt.get("error"), str) or not receipt["error"])
+        )
+    ):
+        raise RuntimeError(f"farm preparation publication receipt is invalid: {path}")
+    return receipt
+
+
+def _requests_entry_mode(path: Path) -> int:
+    entry = path.lstat()
+    if (
+        stat.S_ISLNK(entry.st_mode)
+        or getattr(entry, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    ):
+        raise RuntimeError(f"farm requests evidence is an alias: {path}")
+    return entry.st_mode
+
+
+def _require_quiescent_requests(root: Path, build_id: str) -> None:
+    """Inspect only our root after normal worker completion, never on an error.
+
+    I1: every preparation receipt/staging write holds its digest lock.
+    I2: publishing is atomic before any launch, so a free lock without JSON is safe.
+    I3: succeeded/failed are absorbing; a free terminal receipt cannot relaunch.
+    These prove normal-return cleanup only, not exception-time worker quiescence.
+    """
+    from filelock import FileLock
+
+    if not stat.S_ISDIR(_requests_entry_mode(root)):
+        raise RuntimeError(f"farm requests root is not a directory: {root}")
+    preparation = root / "preparation"
+    try:
+        mode = _requests_entry_mode(preparation)
+    except FileNotFoundError:
+        return
+    if not stat.S_ISDIR(mode):
+        raise RuntimeError(f"farm preparation root is not a directory: {preparation}")
+    digests, receipts, staging = set(), set(), set()
+    for entry in preparation.iterdir():
+        if not stat.S_ISREG(_requests_entry_mode(entry)):
+            raise RuntimeError(f"farm preparation contains non-file evidence: {entry}")
+        match = re.fullmatch(r"([0-9a-f]{64})\.(json|lock)", entry.name)
+        if match is not None:
+            digest, kind = match.groups()
+            digests.add(digest)
+            if kind == "json":
+                receipts.add(digest)
+        else:
+            match = re.fullmatch(
+                r"([0-9a-f]{64})\.json\.[0-9]+\.[0-9a-f]{32}\.tmp", entry.name,
+            )
+            if match is None:
+                raise RuntimeError(f"farm preparation contains unknown evidence: {entry}")
+            staging.add(match.group(1))
+    if staging - digests:
+        raise RuntimeError("farm preparation contains staging without a receipt or lock")
+    for digest in sorted(digests):
+        # Probe before reading. Windows filelock may unlink its file on release;
+        # only snapshot JSON/lock digests are probed, never staging-only digests.
+        lock = FileLock(str(preparation / f"{digest}.lock"))
+        with lock.acquire(timeout=0):
+            path = preparation / f"{digest}.json"
+            try:
+                if not stat.S_ISREG(_requests_entry_mode(path)):
+                    raise RuntimeError(f"farm preparation receipt is not a file: {path}")
+                receipt = _read_preparation_receipt(path, build_id=build_id)
+            except FileNotFoundError:
+                if digest in receipts:
+                    raise
+                continue
+            if receipt["state"] == "publishing":
+                raise RuntimeError(f"farm preparation publication is still publishing: {path}")
+
+
 def _require_preparation_readiness() -> tuple[float, float]:
     """Refuse an unavailable publisher only when a real remote leaf is needed."""
     from build import _pool_home
@@ -1015,7 +1131,7 @@ def _require_preparation_readiness() -> tuple[float, float]:
 
 def _publish_preparation(
     pool: Path, workspace: Path, commit: str, agent_identity: str, *,
-    operation_deadline: float, process_margin_s: float,
+    operation_deadline: float, process_margin_s: float, clock: Callable[[], float],
 ) -> None:
     # The existing owned ProcessTree is the sole supervisor. Its selected-pool
     # private body shares this operation's original deadline, not a fresh budget.
@@ -1023,7 +1139,7 @@ def _publish_preparation(
 
     published = _pool_preparation(
         pool, workspace, commit=commit, operation_deadline=operation_deadline,
-        process_margin_s=process_margin_s,
+        process_margin_s=process_margin_s, clock=clock,
     )
     if (
         not isinstance(published, dict)
@@ -1044,10 +1160,18 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
     locks. A holder interrupted after starting publication leaves a marker that
     fails closed; a later process must not launch a second publisher.
     """
-    from build import PoolProcessCleanupError, _pool_home
+    from build import (
+        PoolProcessCleanupError, _pool_home, _pool_publication_clock,
+        _raise_if_pool_publication_cancelled,
+    )
 
     operation_timeout_s, process_margin_s = _require_preparation_readiness()
-    started = time.monotonic()
+    pool = _pool_home().resolve()
+    # This exact selected protocol counter is shared with the private child.
+    # Its perf_counter domain (raw QPC on supported Windows CPython) is not the
+    # unrelated duration-only monotonic domain used by FIFO/lease operations.
+    clock = _pool_publication_clock(pool)
+    started = clock()
     operation_deadline = started + operation_timeout_s
     observation_deadline = operation_deadline + process_margin_s
 
@@ -1067,7 +1191,6 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
             "farm preparation publication source does not match the admitted commit"
         )
     workspace = REPO_ROOT.resolve()
-    pool = _pool_home().resolve()
     directory = os.environ.get("HARMONIC_FARM_REQUESTS")
     if not directory or not Path(directory).is_dir():
         raise BuildOwnershipError(
@@ -1080,9 +1203,7 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
         "commit": commit,
         "agent_identity_sha256": agent_identity,
     }
-    digest = hashlib.sha256(
-        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
+    digest = _preparation_identity_digest(identity)
     receipts = Path(directory) / "preparation"
     receipts.mkdir(exist_ok=True)
     path = receipts / f"{digest}.json"
@@ -1094,10 +1215,12 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
     ) as sp:
         sp.set_attribute("operation_timeout_s", operation_timeout_s)
         sp.set_attribute("process_margin_s", process_margin_s)
-        sp.set_attribute("operation_deadline_monotonic", operation_deadline)
+        sp.set_attribute("operation_deadline_counter", operation_deadline)
+        sp.set_attribute("publication_clock_domain", "perf_counter")
         lock = FileLock(str(path.with_suffix(".lock")))
         while True:
-            remaining = observation_deadline - time.monotonic()
+            _raise_if_pool_publication_cancelled()
+            remaining = observation_deadline - clock()
             if remaining <= 0:
                 raise RuntimeError(
                     f"farm preparation publication lock timed out after "
@@ -1112,33 +1235,15 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
                 continue
             break
         try:
-            sp.set_attribute("lock_wait_ms", int((time.monotonic() - started) * 1000))
+            _raise_if_pool_publication_cancelled()
+            sp.set_attribute("lock_wait_ms", int((clock() - started) * 1000))
             try:
-                text = path.read_text(encoding="utf-8")
+                receipt = _read_preparation_receipt(
+                    path, build_id=request.build_id, identity=identity,
+                )
             except FileNotFoundError:
                 receipt = None
-            else:
-                try:
-                    receipt = json.loads(text)
-                except (ValueError, RecursionError) as exc:
-                    raise RuntimeError(
-                        f"farm preparation publication receipt is corrupt: {path}"
-                    ) from exc
-                if (
-                    not isinstance(receipt, dict)
-                    or receipt.get("identity") != identity
-                    or receipt.get("state") not in {"publishing", "succeeded", "failed"}
-                    or (
-                        receipt["state"] == "failed"
-                        and (
-                            not isinstance(receipt.get("error"), str)
-                            or not receipt["error"]
-                        )
-                    )
-                ):
-                    raise RuntimeError(
-                        f"farm preparation publication receipt is invalid: {path}"
-                    )
+            # I3: terminal receipts are absorbing: no rewrite or second launch.
             if receipt is not None:
                 sp.set_attribute("publication_state", receipt["state"])
                 if receipt["state"] == "succeeded":
@@ -1152,17 +1257,20 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
                 else:
                     error = receipt["error"]
                 raise RuntimeError(error)
-            publication_started = time.monotonic()
+            publication_started = clock()
             try:
                 if publication_started >= operation_deadline:
                     raise RuntimeError(
                         "preparation publication operation deadline exhausted "
                         "before publisher launch"
                     )
+                # I1: every receipt/staging write is under this digest lock.
+                # I2: atomically record publishing before any publisher launch.
                 _atomic_json(path, {
                     "identity": identity, "state": "publishing", "error": None,
                 })
-                if time.monotonic() >= operation_deadline:
+                _raise_if_pool_publication_cancelled()
+                if clock() >= operation_deadline:
                     raise RuntimeError(
                         "preparation publication operation deadline exhausted "
                         "before publisher launch"
@@ -1170,7 +1278,7 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
                 _publish_preparation(
                     pool, workspace, commit, agent_identity,
                     operation_deadline=operation_deadline,
-                    process_margin_s=process_margin_s,
+                    process_margin_s=process_margin_s, clock=clock,
                 )
             except PoolProcessCleanupError:
                 # The owned publisher may still be writing. Keep the
@@ -1190,7 +1298,7 @@ def _ensure_preparation_published(request: LeafRequest) -> None:
             finally:
                 sp.set_attribute(
                     "publication_ms",
-                    int((time.monotonic() - publication_started) * 1000),
+                    int((clock() - publication_started) * 1000),
                 )
             _atomic_json(path, {
                 "identity": identity, "state": "succeeded", "error": None,
