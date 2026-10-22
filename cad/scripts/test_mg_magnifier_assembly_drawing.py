@@ -5,6 +5,7 @@ import json
 import math
 from dataclasses import replace
 from fractions import Fraction
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
