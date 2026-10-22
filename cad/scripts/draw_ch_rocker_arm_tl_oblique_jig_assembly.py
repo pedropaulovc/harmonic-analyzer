@@ -2975,7 +2975,7 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
     scales = [scale, locator_scale]
     crop_profiles = [locator_profile]
     for index, letter in enumerate(("A", "B"), start=2):
-        section_scale = (1, 2) if letter == "A" else (1, 1)
+        section_scale = (1, 2)
         points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
         view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
                             view_xy=_region_center(CAPTURE_VIEW_REGIONS[index]), section_label=letter,

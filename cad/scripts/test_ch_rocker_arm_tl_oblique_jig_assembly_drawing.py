@@ -2917,7 +2917,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
     assert tuple(main.ScaleRatio) == (1, 2)
-    assert tuple(bolt.ScaleRatio) == (1, 1)
+    assert tuple(bolt.ScaleRatio) == (1, 2)
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
     installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
     for index, view in enumerate(sheet.views):
@@ -2976,46 +2976,55 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     settled[-1]()
 
 
-def test_capture_section_a_half_scale_precedes_crop_without_shrinking_model_fence(
-    native_property_package,
+@pytest.mark.parametrize("view_index,model_radius,paper_radius,region", (
+    (2, 0.039, 0.0195, (0.278, 0.119, 0.364, 0.211)),
+    (3, 0.014, 0.007, (0.360, 0.226, 0.403, 0.261)),
+))
+def test_capture_sections_half_scale_precedes_crop_without_shrinking_model_fence(
+    native_property_package, view_index, model_radius, paper_radius, region,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
-    _exploded, _locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
-    profile = package.doc.crop_circles[1]
-    assert tuple(main.ScaleRatio) == main.crop_scale == (1, 2)
-    assert main.post_crop_scale_writes == []
-    assert profile.GetRadius() == pytest.approx(0.039)
-    assert main.crop[1] == pytest.approx(0.039)
+    section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    profile = package.doc.crop_circles[view_index - 1]
+    assert tuple(section.ScaleRatio) == section.crop_scale == (1, 2)
+    assert section.post_crop_scale_writes == []
+    assert profile.GetRadius() == pytest.approx(model_radius)
+    assert section.crop[1] == pytest.approx(model_radius)
     inverse = profile.GetSketch().ModelToSketchTransform.Inverse()
     centre = inverse.apply(profile.centre)
     rim = inverse.apply((profile.centre[0] + profile.GetRadius(), *profile.centre[1:]))
-    assert math.dist(centre, rim) == pytest.approx(0.0195)
-    assert drawing.CAPTURE_VIEW_REGIONS[2] == (0.278, 0.119, 0.364, 0.211)
-    assert tuple(bolt.ScaleRatio) == bolt.crop_scale == (1, 1)
-    assert bolt.crop[1] == pytest.approx(0.014)
-    drawing._assert_capture_crop(package.adapter, main, 2, profile)
+    assert math.dist(centre, rim) == pytest.approx(paper_radius)
+    assert drawing.CAPTURE_VIEW_REGIONS[view_index] == region
+    drawing._assert_capture_crop(package.adapter, section, view_index, profile)
 
 
-def test_capture_section_a_still_refuses_the_observed_oversized_native_extent(
-    native_property_package,
+@pytest.mark.parametrize("view_index,native_outline,refusal", (
+    (2, (
+        0.27083100196371956, 0.24606200349283217,
+        0.3737219227586998, 0.3340379981999397,
+    ), "width 102[.]9 mm > 86[.]0 mm"),
+    (3, (
+        0.34833699958956615, 0.3351120025212765,
+        0.3904130000444241, 0.3798879901473522,
+    ), "height 44[.]8 mm > 35[.]0 mm"),
+))
+def test_capture_sections_still_refuse_the_observed_oversized_native_extents(
+    native_property_package, view_index, native_outline, refusal,
 ) -> None:
     package = native_property_package
     drawing._place_package(package.adapter)
-    main = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[2]
-    # 4e7's real 1:1 extent must still be refused if native returns it at 1:2;
-    # changing the authored scale never licenses an inferred or relaxed box.
-    main.GetOutline = lambda: (
-        0.27083100196371956, 0.24606200349283217,
-        0.3737219227586998, 0.3340379981999397,
-    )
-    with pytest.raises(RuntimeError, match="width 102[.]9 mm > 86[.]0 mm"):
+    section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    # The actual 4e7 A-A and 49385 B-B 1:1 extents remain refusals if native
+    # returns them at 1:2; the new scale never licenses a relaxed native box.
+    section.GetOutline = lambda: native_outline
+    with pytest.raises(RuntimeError, match=refusal):
         drawing._fit_capture_view(
-            package.adapter, main, drawing.CAPTURE_VIEW_REGIONS[2], ((1, 2),),
-            crop_profile=package.doc.crop_circles[1], label="jig capture section A",
+            package.adapter, section, drawing.CAPTURE_VIEW_REGIONS[view_index], ((1, 2),),
+            crop_profile=package.doc.crop_circles[view_index - 1], label="jig capture section",
         )
-    assert tuple(main.ScaleRatio) == (1, 2)
-    assert main.post_crop_scale_writes == []
+    assert tuple(section.ScaleRatio) == (1, 2)
+    assert section.post_crop_scale_writes == []
 
 
 def test_capture_sections_use_actual_distinct_longitudinal_and_bolt_planes() -> None:
@@ -3056,11 +3065,10 @@ def test_capture_exploded_fit_does_not_shrink_assembled_reading_scales(native_pr
     package = native_property_package
     package.doc.capture_fit_denominator = 8.0
     scales, settled = drawing._place_package(package.adapter)
-    exploded, locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    exploded, locator, main, _bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
     assert tuple(exploded.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET] == (1.0, 8.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
     assert tuple(main.ScaleRatio) == (1, 2)
-    assert tuple(bolt.ScaleRatio) == (1, 1)
     settled[-1]()
 
 
@@ -3691,6 +3699,7 @@ def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale
     (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
     (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
     (2, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
+    (3, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
     (1, ((1, 4),), False, "cropped view lost its selected native profile"),
 ))
 def test_capture_cropped_fit_refuses_rescaling_or_a_lost_selected_profile(
