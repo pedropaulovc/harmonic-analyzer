@@ -650,7 +650,7 @@ def test_channel_creation_uses_source_proof_and_returns_only_data(monkeypatch, f
         if fault == "missing-id":
             assert packet["raw_origin_xy_od_circle_count"] == 1
             assert packet["raw_origin_xy_id_circle_count"] == 0
-            assert packet["kind4"][0]["od_diameter_matches_observation_only"] is True
+            assert packet["kind4"][0]["od_diameter_matches"] is True
             assert packet["kind4"][0]["id_diameter_matches"] is False
 
 
@@ -704,7 +704,7 @@ def test_channel_census_distinguishes_raw_inventory_and_strict_rejection(monkeyp
     if visible:
         expected = {
             "foreign-owner": "owner_same_as_expected",
-            "source-path": "source_lexical_path_matches",
+            "source-path": "lexical_path_matches",
             "torus-major": "torus_major_matches",
         }[fault]
         assert {row["first_rejection"] for row in packet["predicate_time"]} == {expected}
