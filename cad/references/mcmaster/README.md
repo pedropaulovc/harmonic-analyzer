@@ -1600,6 +1600,11 @@ not measured empty inventories, and optional diagnostics cannot replace that
 guard's original exception. This instrumentation is not a native pin fix or
 proof that an edge-on rim supports a center arc condition.
 
+Read-only supplier presentation refusals identify the first mismatched field
+and its actual/expected values, preserving native getter order and stopping
+before later readers can mask that failure. Imports are not reformatted or
+repaired by this assertion; an error label alone is not its native root cause.
+
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
 solid/sheet-body counts and face counts and compares all twelve mass-property
