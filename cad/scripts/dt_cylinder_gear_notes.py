@@ -54,8 +54,3 @@ GEAR_DATA = "\n".join(
         f"TOOTH CUTTING SETUP, ACCEPT AT SETUP:  {TOOTH_RUNOUT_TIR_MM:.2f} TIR MAX TO FINISHED BORE",
     )
 )
-# The mesh mate (MHA-DT-03) is named at the OD callout and the eccentricity
-# carries its per-gear band only, so one note remains (rule 7).
-DRAWING_NOTES = (
-    "ALIGNMENT NOTCH IS FIRST TOOTH ROOT CCW FROM CAM LOBE AS VIEWED FROM CAM FACE."
-)

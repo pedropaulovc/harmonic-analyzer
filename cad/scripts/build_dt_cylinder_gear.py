@@ -103,7 +103,7 @@ from _simplified_part import save_simplified_part
 from _fit_deviations import deviations
 from _gear import build_stock_form_gear, volume_check
 from _part_pmi import author_part_pmi
-from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
+from dt_cylinder_gear_notes import GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     CAM_DIA as CAM_DIAMETER,
@@ -740,7 +740,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {"Gear Data": GEAR_DATA},
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
