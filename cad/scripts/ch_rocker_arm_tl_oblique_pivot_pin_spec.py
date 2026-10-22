@@ -13,11 +13,12 @@ nominal); model Z is block Z minus the nominal bearing recess.
 
 The narrow Ø12.7 boss alone contacts that inner race. Its nominal height
 1.15 puts the broad flange underside at block-local Z24.15; fit its height
-from the actual assembled upper-race face and block floor to obtain
-0.10-0.15 rim/floor gap, with the entire relieved underside clear of seal
-and outer race. This is a fitted acceptance, not a tolerance-stack promise
-or a bearing-preload adjustment. The cap pocket is separately fitted to the
-actual flange thickness and local floor/ceiling variation.
+from the actual assembled upper-race face and the block's machined top face
+around the upper bearing seat to obtain 0.10-0.15 flange-rim/top-face gap,
+with the entire relieved underside clear of seal and outer race. This is a
+fitted acceptance, not a tolerance-stack promise or a bearing-preload
+adjustment. The cap pocket is separately fitted to the actual flange
+thickness and local floor/ceiling variation.
 
 The Ø36 flange is 3 thick; the upper Ø12.7 boss is nominally 12.35 from
 flange top to carrier seat, reaching block-local Z39.5.
@@ -206,30 +207,37 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # drawing-guidelines rule 4: each tight band is a matched-fit callout naming
 # its mate. Callouts ride the below lane, one short line each (SolidWorks
 # does not wrap callout text).
+# 9bbd's native below-callout starts on BearingDia's vertical leader.
+# Three native Century Gothic spaces (1.2931 paper mm each) keep the first
+# printed zero clear; other rows retain native centred multiline layout.
 BEARING_CALLOUT = (
-    f"{BEARING_INTERFERENCE_MIN:.3f}-{BEARING_INTERFERENCE_MAX:.3f} DIAMETRAL\n"
+    f"   {BEARING_INTERFERENCE_MIN:.3f}-{BEARING_INTERFERENCE_MAX:.3f} DIAMETRAL\n"
     "INTERFERENCE ON\n6200-2RS INNER RACE"
 )
 CARRIER_CALLOUT = (
     f"{CARRIER_CLEARANCE_MIN:.3f}-{CARRIER_CLEARANCE_MAX:.3f} DIAMETRAL\n"
     "CLEARANCE ON\nMHA-CH-06-TL-21 PIN HOLES"
 )
-BEARING_NOTE = " ".join(BEARING_CALLOUT.splitlines())
+BEARING_NOTE = " ".join(BEARING_CALLOUT.split())
 CARRIER_NOTE = " ".join(CARRIER_CALLOUT.splitlines())
 LEAD_CHAMFER_CALLOUT = "X 45° LEAD CHAMFER"
 # The flange's ±0.10 band runs in the positive-capture cap's pocket.
 CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
+BLOCK_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-block")["number"]
 DIMENSION_CALLOUTS = {
     "BearingDia": BEARING_CALLOUT,
     "CarrierDia": CARRIER_CALLOUT,
     "BottomChamfer": LEAD_CHAMFER_CALLOUT,
     "TopChamfer": LEAD_CHAMFER_CALLOUT,
     "FlangeDia": f"RUNNING FIT IN {CAP_NUMBER}",
-    # Three rows of at most 22 characters stay inside the 1.15's witness bay
-    # (X213.5-279.5 less 3.5 each side, about 2.5 mm a character).
+    # Name the actual block top surrounding the upper bearing seat, not an
+    # unspecified floor or a nonexistent recess. Five native rows fit the
+    # witness bay; the drawing reserves their complete measured ink height.
     "LowerBossHeight": (
-        "FIT MHA-CH-06-TL-22\n"
-        f"FLOOR GAP {retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f};\n"
+        "FIT PIVOT BLOCK\n"
+        f"{BLOCK_NUMBER} TOP\n"
+        "FACE AT UPPER BEARING\n"
+        f"SEAT; GAP {retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f};\n"
         "NO PRELOAD, CLEAR SEAL"
     ),
     "CrossHoleDia": "DRILL THRU\nHEADED CLEVIS PIN",

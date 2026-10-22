@@ -78,6 +78,21 @@ def test_fit_limits_match_the_printed_callouts() -> None:
     assert printed == [round(k5_low, 12), round(k5_high, 12)]
 
 
+def test_fitted_lower_gap_names_the_actual_block_top_at_the_upper_bearing_seat() -> None:
+    caption = " ".join(spec.DIMENSION_CALLOUTS["LowerBossHeight"].split())
+    assert caption == (
+        f"FIT PIVOT BLOCK {spec.BLOCK_NUMBER} TOP FACE AT UPPER BEARING "
+        "SEAT; GAP 0.10-0.15; NO PRELOAD, CLEAR SEAL"
+    )
+    assert spec.BLOCK_NUMBER == _config.parts("ch-rocker-arm-tl-oblique-pivot-block")["number"]
+    lower_stop = next(row for row in spec.GEOMETRIC_CONTROLS if row.key == "flange_lower_stop")
+    # Existing machined block top, not a bearing shoulder or recess floor.
+    pin_plane = lower_stop.face.offset_mm / lower_stop.face.normal[2]
+    assert pin_plane + trammel.BEARING_RECESS - block.BLOCK_HEIGHT == pytest.approx(
+        retention.PIN_LOWER_GAP[1]
+    )
+
+
 def _mounted_clearance(shaft_interference: float, seat_interference: float) -> float:
     """C3 minimum less NTN's conservative take-up: 70 % of the shaft's
     interference after 7 µm smoothing, 60 % of the seat's."""
@@ -612,6 +627,54 @@ def _d349_box_at(name, bounds) -> Box:
     )
 
 
+# 9bbd's actual PDF/native font: the new rows' embedded Century Gothic
+# advances are 36.464, 48.687, 55.276 and 45.363 mm. Reserve another
+# 0.2+ mm per row; the longest, unchanged row and reference value retain
+# their measured complete glyph boxes. Native row pitch is 5.55625 mm.
+_LOWER_BOSS_ROW_ADVANCE_BUDGET = {
+    "FIT PIVOT BLOCK": 0.0367,
+    "MHA-CH-06-TL-22 TOP": 0.0489,
+    "FACE AT UPPER BEARING": 0.0555,
+    "SEAT; GAP 0.10-0.15;": 0.0456,
+}
+_NATIVE_CALLOUT_ROW_PITCH = 0.00555625
+
+
+def _lower_boss_caption_glyphs(keep=None):
+    x, y = drawing.PROFILE_KEEP["LowerBossHeight"] if keep is None else keep
+    rows = spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()
+    glyphs = [
+        Box(x - 0.0057898, y + 0.0054535, x + 0.0057898, y + 0.0102709),
+    ]
+    for index, row in enumerate(rows):
+        baseline = y - index * _NATIVE_CALLOUT_ROW_PITCH
+        if row == "NO PRELOAD, CLEAR SEAL":
+            glyphs.append(Box(
+                x - 0.0291255, baseline + 0.0006259,
+                x + 0.0294149, baseline + 0.0044992,
+            ))
+        else:
+            width = _LOWER_BOSS_ROW_ADVANCE_BUDGET[row]
+            glyphs.append(Box(
+                x - width / 2.0, baseline + 0.0005,
+                x + width / 2.0, baseline + 0.0047,
+            ))
+    return glyphs
+
+
+def _lower_boss_caption_box():
+    glyphs = _lower_boss_caption_glyphs()
+    return Box(
+        min(row.xmin for row in glyphs), min(row.ymin for row in glyphs),
+        max(row.xmax for row in glyphs), max(row.ymax for row in glyphs),
+    )
+
+
+def _lower_boss_line_y():
+    rows = spec.DIMENSION_CALLOUTS["LowerBossHeight"].splitlines()
+    return drawing.PROFILE_KEEP["LowerBossHeight"][1] - (len(rows) - 1) * _NATIVE_CALLOUT_ROW_PITCH
+
+
 def _cross_hole_leader_at(keep) -> Segment:
     """Retain the native elbow-to-text offset and the actual Ø5 circle.
 
@@ -656,8 +719,8 @@ def test_d349_text_strikes_clear_the_actual_rows_and_lines(name, row, line) -> N
     if line == _D349_CROSS_LEADER:
         current_line = _cross_hole_leader_at(drawing.PROFILE_KEEP["CrossHoleDia"])
     elif line == _D349_LOWER_LINE:
-        x, y = drawing.PROFILE_KEEP["LowerBossHeight"]
-        current_line = Segment(0.2135, y - 0.0111125, x + 0.0261333, y - 0.0111125)
+        x, _y = drawing.PROFILE_KEEP["LowerBossHeight"]
+        current_line = Segment(0.2135, _lower_boss_line_y(), x + 0.0295361, _lower_boss_line_y())
     assert segment_box_distance(current_line, _d349_box_at(name, bounds)) >= 0.0035
 
 
@@ -668,7 +731,7 @@ def test_d349_two_text_overlaps_have_separate_complete_blocks() -> None:
     top = Box(*_D349_ROWS["top_lead"])
     station = Box(*_D349_ROWS["cross_station"])
     assert top.overlaps(station, tol=0.0003)
-    assert _d349_box_at("LowerBossHeight", _D349_BLOCKS["LowerBossHeight"]).gap(
+    assert _lower_boss_caption_box().gap(
         _d349_box_at("BearingDia", _D349_BLOCKS["BearingDia"])
     ) >= 0.0035
     assert _d349_box_at("TopChamfer", _D349_BLOCKS["TopChamfer"]).gap(
@@ -678,7 +741,7 @@ def test_d349_two_text_overlaps_have_separate_complete_blocks() -> None:
 
 def test_upper_blocks_fit_between_witnesses_with_room_for_their_whole_rows() -> None:
     upper = _d349_box_at("UpperBossHeight", _D349_BLOCKS["UpperBossHeight"])
-    lower = _d349_box_at("LowerBossHeight", _D349_BLOCKS["LowerBossHeight"])
+    lower = _lower_boss_caption_box()
     for box, left, right in (
         (upper, 0.0905, 0.164),
         (lower, 0.2135, 0.2795),
@@ -701,7 +764,7 @@ def test_lower_boss_witnesses_stop_above_both_native_radius_leader_runs() -> Non
     assert drawing.PROFILE_KEEP["SeatFilletR"] == (
         drawing._x(spec.COLLAR_STATION) + 0.012, 0.137
     )
-    line_y = drawing.PROFILE_KEEP["LowerBossHeight"][1] - 0.0111125
+    line_y = _lower_boss_line_y()
     assert line_y > 0.18205
     # Include the old starts conservatively; an upward witness's 1 mm overrun
     # goes above the new dimension line, not below it as in the failed sheet.
@@ -789,10 +852,11 @@ def test_normal_datum_footprint_clears_complete_known_native_dimension_ink() -> 
     assert box_allowance.ymax < landing[1]  # box below body; only triangle touches flank
     assert 0.0127 < footprint.xmin < footprint.xmax < 0.4191
     assert 0.0127 < footprint.ymin < footprint.ymax < 0.2667
-    for name in ("BearingDia", "BottomChamfer", "LowerBossHeight"):
+    for name in ("BearingDia", "BottomChamfer"):
         assert footprint.gap(_d349_box_at(name, _D349_BLOCKS[name])) >= 0.0035
-    for line in _PIN_NATIVE_NEIGHBOUR_LINES:
-        assert segment_box_distance(Segment(*line), footprint) >= 0.0035
+    assert footprint.gap(_lower_boss_caption_box()) >= 0.0035
+    for line in _pin_native_neighbour_lines():
+        assert segment_box_distance(line, footprint) >= 0.0035
     # A square of radius equal to the larger native arrow extent covers
     # either size/direction reading (the FCF regression also checks wings).
     for x, y, _dx, _dy in _PIN_NATIVE_NEIGHBOUR_ARROWS:
@@ -822,7 +886,7 @@ _ESTIMATED_TRUN_005_WIDTH = _NATIVE_TRUN_0050_WIDTH - 0.0116375 + 0.0090514
 # about 28.65 +/- 0.05 mm; the native-font estimate is 28.6903 mm. Budget both
 # with margin. This is derived, never a measured current pin rectangle.
 _PIN_STOP_FRAME_WIDTH_BUDGET = (0.02855, 0.0288)
-_PIN_NATIVE_BEARING_GLYPHS = (
+_PIN_9BBD_BEARING_GLYPHS = (
     Box(0.2545, 0.1087, 0.2599, 0.1124),  # native stroked diameter glyph
     Box(0.2604673, 0.1087961, 0.2729638, 0.1123614),
     Box(0.2755826, 0.1138796, 0.2778889, 0.1162083),
@@ -832,6 +896,77 @@ _PIN_NATIVE_BEARING_GLYPHS = (
     Box(0.252277, 0.0976301, 0.2919855, 0.1011954),
     Box(0.2484193, 0.0920739, 0.2960393, 0.0956392),
 )
+
+
+# Native IDisplayData.GetTextInBoxWidthAtIndex records 1.2931 mm/space.
+# Padding the longest row increases its glyph X by the whole padding and
+# centres every other native row by half that amount. These are projected
+# native-font envelopes, not an assertion that the next rebuild was seen.
+_PIN_NATIVE_SPACE_ADVANCE = 0.0012931
+
+
+def _bearing_callout_padding():
+    first = spec.BEARING_CALLOUT.splitlines()[0]
+    return (len(first) - len(first.lstrip(" "))) * _PIN_NATIVE_SPACE_ADVANCE
+
+
+def _bearing_callout_glyphs():
+    padding = _bearing_callout_padding()
+    return [
+        Box(
+            row.xmin + (padding if index == 5 else padding / 2.0), row.ymin,
+            row.xmax + (padding if index == 5 else padding / 2.0), row.ymax,
+        )
+        for index, row in enumerate(_PIN_9BBD_BEARING_GLYPHS)
+    ]
+
+
+def _pin_native_neighbour_lines():
+    return [
+        Segment(
+            x0 + (_bearing_callout_padding() if index == 2 else 0.0), y0, x1, y1,
+        )
+        for index, (x0, y0, x1, y1) in enumerate(_PIN_NATIVE_NEIGHBOUR_LINES)
+    ]
+
+
+def test_9bbd_leading_zero_lacks_clearance_from_its_actual_native_vertical_line() -> None:
+    line = Segment(0.2465, 0.0911399, 0.2465, 0.1489985)
+    assert segment_box_distance(line, _PIN_9BBD_BEARING_GLYPHS[5]) == pytest.approx(0.0001494)
+    assert segment_box_distance(line, _PIN_9BBD_BEARING_GLYPHS[5]) < 0.0002
+
+
+def test_native_bearing_callout_padding_clears_all_glyphs_not_only_the_first_zero() -> None:
+    line = Segment(0.2465, 0.0911399, 0.2465, 0.1790015)
+    for glyph in _bearing_callout_glyphs():
+        assert segment_box_distance(line, glyph) >= 0.0035
+        assert glyph.xmax <= 0.4191 - 0.0035
+        for foreign in _pin_native_neighbour_lines()[5:]:
+            assert segment_box_distance(foreign, glyph) >= 0.002
+    # Paper padding must not change the exported fit acceptance or native value.
+    assert spec.BEARING_NOTE == (
+        "0.001-0.015 DIAMETRAL INTERFERENCE ON 6200-2RS INNER RACE"
+    )
+
+
+def test_full_five_row_block_top_caption_clears_body_witnesses_and_flange_thickness() -> None:
+    witnesses = (
+        Segment(0.2135, 0.1800015, 0.2135, 0.2402219),
+        Segment(0.2795, 0.165, 0.2795, 0.2402219),
+    )
+    flange_line = Segment(0.20105, 0.2212219, 0.2535257, 0.2212219)
+    flange_value = Box(0.2459308, 0.2221558, 0.2520833, 0.2257211)
+    for glyph in _lower_boss_caption_glyphs():
+        for body in _projected_pin_body().values():
+            assert glyph.gap(body) >= 0.0035
+        for witness in witnesses:
+            assert segment_box_distance(witness, glyph) >= 0.0035
+        assert segment_box_distance(flange_line, glyph) >= 0.002
+        assert glyph.gap(flange_value) >= 0.0035
+    # Five rows at the old anchor would crowd both body and left witness.
+    old_ink = _lower_boss_caption_glyphs((0.245, 0.202))
+    assert min(glyph.gap(body) for glyph in old_ink for body in _projected_pin_body().values()) < 0.0035
+    assert min(segment_box_distance(witnesses[0], glyph) for glyph in old_ink) < 0.0035
 
 
 def _projected_pin_body():
@@ -976,8 +1111,9 @@ def test_full_native_sized_stop_frames_and_bent_leaders_fit_separate_corridors(w
     frames, leaders, heads = _native_stop_frame_corridors(width)
     assert find_leader_leader_crossings(leaders) == []
     glyphs = [
-        *_PIN_NATIVE_NEIGHBOUR_GLYPHS, *_PIN_NATIVE_BEARING_GLYPHS,
-        *(_d349_box_at(name, bounds) for name, bounds in _D349_BLOCKS.items() if name != "BearingDia"),
+        *_PIN_NATIVE_NEIGHBOUR_GLYPHS, *_bearing_callout_glyphs(), *_lower_boss_caption_glyphs(),
+        *(_d349_box_at(name, bounds) for name, bounds in _D349_BLOCKS.items()
+          if name not in {"BearingDia", "LowerBossHeight"}),
     ]
     datum_axis = (drawing._x(drawing.BEARING_DATUM_STATION_MM), drawing.PROFILE_CENTER[1])
     datum_landing = (datum_axis[0], datum_axis[1] - spec.BEARING_DIA * drawing._S / 2.0)
@@ -986,7 +1122,7 @@ def test_full_native_sized_stop_frames_and_bent_leaders_fit_separate_corridors(w
         datum_symbol[0] - 0.006, datum_symbol[1] - 0.009,
         datum_symbol[0] + 0.006, datum_landing[1] + 0.0005,
     ))
-    lines = [Segment(*line) for line in _PIN_NATIVE_NEIGHBOUR_LINES]
+    lines = _pin_native_neighbour_lines()
     callout = _cross_hole_leader_at(drawing.PROFILE_KEEP["CrossHoleDia"])
     cx, cy = drawing._x(spec.CROSS_HOLE_STATION), drawing.PROFILE_CENTER[1]
     shelf_direction = 1.0 if drawing.PROFILE_KEEP["CrossHoleDia"][0] > cx else -1.0

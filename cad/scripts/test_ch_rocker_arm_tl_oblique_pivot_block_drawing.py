@@ -985,6 +985,7 @@ def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(transl
     assert original[2] == pytest.approx(((outline[0] + outline[2]) / 2.0, outline[1]))
 
 
+@pytest.mark.parametrize("qualifier_gap_m", [0.019446875900030136, 0.0075, 0.028])
 @pytest.mark.parametrize(
     "failure,arrow_count,reason",
     [
@@ -992,7 +993,8 @@ def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(transl
         ("arrow-count", 1, "arrow_count_mismatch"),
         ("arrow-count", 3, "arrow_count_mismatch"),
         ("off-witness", 2, "arrow_witness_mismatch"),
-        ("line-refuses-lane", 2, "dimension_line_missed_lane"),
+        ("line-refuses-lane", 2, "line_origin_missed_lane"),
+        ("line-origin-clamped", 2, "line_origin_missed_lane"),
         ("text-moves-line", 2, "text_move_changed_dimension_line"),
         ("offset-enable-refused", 2, "offset_text_not_enabled"),
         ("offset-resets", 2, "offset_text_not_enabled"),
@@ -1007,30 +1009,39 @@ def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(transl
         ("serialization-fails", 2, "line_position_setter_failed"),
         ("telemetry-fails", 2, "line_position_setter_failed"),
         ("serialization-and-telemetry-fail", 2, "line_position_setter_failed"),
+        ("offset-keeps-old-line", 2, "text_move_changed_dimension_line"),
+        ("offset-shifts-origin-line", 2, "text_move_changed_dimension_line"),
+        ("offset-enable-throws", 2, "offset_text_helper_failed"),
+        ("offset-enable-and-getter-fail", 2, "offset_text_helper_failed"),
     ],
 )
 def test_register_depth_placement_refuses_bad_native_readbacks(
-    monkeypatch, failure, arrow_count, reason
+    monkeypatch, failure, arrow_count, reason, qualifier_gap_m
 ) -> None:
     import _drawing_dimensions as dimensions
 
-    # SDK contracts: OffsetText=False translates the line with the annotation;
-    # True moves text alone. Arrowhead records expose their actual tip XYZ.
-    # These doubles exercise refusal logic, not SOLIDWORKS rendering semantics.
-    tips = [[0.349, 0.080], [0.345, 0.080]]
+    # 9bb native before/after: FALSE-mode arrows are below their origin; the
+    # combined offset/text handoff leaves the line at the pre-text origin.
+    # The first gap is the observed 19.4468759 mm; other gaps reject calibration
+    # or hardcoded compensation. This does not claim an isolated toggle probe.
+    position = [0.347, 0.090, 0.0371]
+    tips = [
+        [0.349, position[1] - qualifier_gap_m, position[2]],
+        [0.345, position[1] - qualifier_gap_m, position[2]],
+    ]
     if arrow_count == 1:
         tips.pop()
     elif arrow_count == 3:
-        tips.append([0.347, 0.080])
+        tips.append([0.347, position[1] - qualifier_gap_m, position[2]])
     if failure == "off-witness":
         tips[0][0] += 0.000002  # Two micrometres must fail the unchanged 1 µm guard.
-    position = [0.347, 0.090, 0.0]
     moves = []
     events = []
     logs = []
     setter_error = RuntimeError("native SetPosition2 rejected text placement")
     getter_error = RuntimeError("native GetPosition became unavailable")
     reset_error = RuntimeError("native OffsetText reset failed")
+    enable_error = RuntimeError("native OffsetText enable failed")
     line_error = RuntimeError("native SetPosition2 rejected line placement")
     serialization_error = ValueError("diagnostic serialization failed")
     event_error = OSError("diagnostic event failed")
@@ -1042,12 +1053,14 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         "line-setter-and-unprintable-getter-fail",
         "serialization-fails", "telemetry-fails", "serialization-and-telemetry-fail",
     )
+    enable_setter_fails = failure in ("offset-enable-throws", "offset-enable-and-getter-fail")
     serialization_fails = failure in ("serialization-fails", "serialization-and-telemetry-fail")
     telemetry_fails = failure in ("telemetry-fails", "serialization-and-telemetry-fail")
     unavailable_origin = failure in (
         "post-text-getter-fails", "text-setter-and-getter-fail",
         "reset-setter-and-getter-fail", "line-setter-and-getter-fail",
         "line-setter-and-unprintable-getter-fail",
+        "offset-enable-and-getter-fail",
     )
 
     class UnprintableReadbackError(RuntimeError):
@@ -1063,12 +1076,12 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
 
         def GetArrowHeadAtIndex2(self, index):
             return (
-                *tips[index], 0.0, 1.0, 0.0, 0.0,
+                *tips[index], 1.0, 0.0, 0.0,
                 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0,
             )
 
     class DisplayDimension:
-        _offset_text = True
+        _offset_text = False
 
         @property
         def OffsetText(self):
@@ -1079,6 +1092,17 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
             if not value and reset_setter_fails:
                 native_failures.append("reset")
                 raise reset_error
+            if value and enable_setter_fails:
+                native_failures.append("enable")
+                raise enable_error
+            if value and failure != "offset-enable-refused":
+                # Model the observed combined handoff here; the native trace
+                # did not isolate whether the toggle or ensuing move did it.
+                if failure == "offset-shifts-origin-line":
+                    position[1] += 0.000002
+                if failure != "offset-keeps-old-line":
+                    for tip in tips:
+                        tip[1] = position[1]
             self._offset_text = bool(value) and failure != "offset-enable-refused"
 
         def GetDisplayData(self):
@@ -1111,8 +1135,10 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
                     tip[1] += 0.000002
             if display.OffsetText and failure == "text-origin-clamped":
                 position[:] = (x - 0.004, y + 0.003, z)
+            elif not display.OffsetText and failure == "line-origin-clamped":
+                position[:] = (x + 0.000002, y, position[2])
             else:
-                position[:] = (x, y, z)
+                position[:] = (x, y, z if display.OffsetText else position[2])
             return True
 
     data, display, annotation = DisplayData(), DisplayDimension(), Annotation()
@@ -1175,7 +1201,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
     if reason is None:
         place()
         for tip, expected in zip(
-            sorted(tips), ((0.345, 0.105), (0.349, 0.105)), strict=True
+            sorted(tips), ((0.345, 0.105, 0.0371), (0.349, 0.105, 0.0371)), strict=True
         ):
             assert tip == pytest.approx(expected)
         assert position == pytest.approx((*text_xy, 0.0))
@@ -1192,9 +1218,9 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
             assert reason in str(raised.value)
             assert "serialization_error" in str(raised.value)
             assert [offset for offset, _position in moves] == [False]
-            assert moves[0][1] == pytest.approx((0.347, 0.115, 0.0))
-            assert position == pytest.approx((0.347, 0.090, 0.0))
-            assert all(tip[1] == 0.080 for tip in tips)
+            assert moves[0][1] == pytest.approx((*line_xy, 0.0))
+            assert position == pytest.approx((0.347, 0.090, 0.0371))
+            assert all(tip[1] == pytest.approx(0.090 - qualifier_gap_m) for tip in tips)
             assert native_failures == ["line"]
             assert events and logs
             return
@@ -1203,7 +1229,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         assert payload["stage"] == {
             "arrow_count_mismatch": "line_move",
             "arrow_witness_mismatch": "line_move",
-            "dimension_line_missed_lane": "post_line",
+            "line_origin_missed_lane": "post_line",
             "text_move_changed_dimension_line": "post_text",
             "offset_text_not_enabled": "post_text",
             "text_origin_missed_shelf": "post_text",
@@ -1221,7 +1247,7 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         for actual, expected in zip(
             payload["actual_arrow_tips_m"], sorted(tips), strict=True
         ):
-            assert actual == pytest.approx((*expected, 0.0))
+            assert actual == pytest.approx(expected)
         assert payload["arrow_count"] == len(tips)
         assert payload["offset_text"] is display.OffsetText
         assert payload["tolerance_m"] == 1e-6
@@ -1233,6 +1259,8 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
             assert payload["actual_annotation_xyz_m"] is None
             assert payload["text_xy_miss_m"] is None
             assert payload["text_distance_m"] is None
+            assert payload["line_origin_xy_miss_m"] is None
+            assert payload["line_origin_distance_m"] is None
             assert len(payload["read_errors"]) == 1
             read_error = payload["read_errors"][0]
             assert read_error["getter"] == "IAnnotation.GetPosition"
@@ -1249,9 +1277,16 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
             assert payload["text_distance_m"] == pytest.approx(
                 math.dist(position[:2], text_xy)
             )
+            assert payload["line_origin_xy_miss_m"] == pytest.approx(
+                (position[0] - line_xy[0], position[1] - line_xy[1])
+            )
+            assert payload["line_origin_distance_m"] == pytest.approx(
+                math.dist(position[:2], line_xy)
+            )
         original = (
             reset_error if reset_setter_fails
             else line_error if line_setter_fails
+            else enable_error if enable_setter_fails
             else setter_error if failure == "text-setter-and-getter-fail"
             else getter_error if failure == "post-text-getter-fails"
             else None
@@ -1269,19 +1304,27 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
         elif reset_setter_fails:
             assert phases == []
             assert native_failures == ["reset"]
-            assert payload["offset_text"] is True
+            assert payload["offset_text"] is False
         elif line_setter_fails:
             assert phases == [False]
             assert native_failures == ["line"]
-            assert moves[0][1] == pytest.approx((0.347, 0.115, 0.0))
-            assert position == pytest.approx((0.347, 0.090, 0.0))
-            assert all(tip[1] == 0.080 for tip in tips)
+            assert moves[0][1] == pytest.approx((*line_xy, 0.0))
+            assert position == pytest.approx((0.347, 0.090, 0.0371))
+            assert all(tip[1] == pytest.approx(0.090 - qualifier_gap_m) for tip in tips)
+        elif enable_setter_fails:
+            assert phases == [False]
+            assert native_failures == ["enable"]
         elif failure == "line-refuses-lane":
-            assert phases == [False, False, False]
-            assert all(tip[1] == 0.080 for tip in tips)
+            assert phases == [False]
+            assert all(tip[1] == pytest.approx(0.090 - qualifier_gap_m) for tip in tips)
+            assert payload["line_origin_distance_m"] == pytest.approx(0.015)
+        elif failure == "line-origin-clamped":
+            assert phases == [False]
+            assert payload["line_origin_xy_miss_m"] == pytest.approx((0.000002, 0.0))
+            assert payload["line_y_misses_m"] == pytest.approx((-qualifier_gap_m,) * 2)
         elif failure == "offset-enable-refused":
             assert phases == [False, False]
-            assert payload["line_y_misses_m"] == pytest.approx((0.022, 0.022))
+            assert payload["line_y_misses_m"] == pytest.approx((0.032 - qualifier_gap_m,) * 2)
         else:
             assert phases == [False, True]
             if failure == "text-moves-line":
@@ -1295,15 +1338,30 @@ def test_register_depth_placement_refuses_bad_native_readbacks(
             elif failure == "offset-resets":
                 assert position == pytest.approx((*text_xy, 0.0))
                 assert payload["line_y_misses_m"] == pytest.approx((0.0, 0.0))
+            elif failure == "offset-keeps-old-line":
+                assert position == pytest.approx((*text_xy, 0.0))
+                assert payload["line_y_misses_m"] == pytest.approx((-qualifier_gap_m,) * 2)
+            elif failure == "offset-shifts-origin-line":
+                assert position == pytest.approx((*text_xy, 0.0))
+                assert payload["line_y_misses_m"] == pytest.approx((0.000002,) * 2)
 
     observations = [json.loads(attributes["diagnostics_json"]) for _, attributes in events]
     assert observations[0]["stage"] == "pre_line"
     if reason is None:
         stages = [observation["stage"] for observation in observations]
         assert stages.index("pre_line") < stages.index("post_line") < stages.index("post_text")
+        before_handoff = next(
+            observation for observation in observations if observation["stage"] == "post_line"
+        )
+        assert before_handoff["offset_text"] is False
+        assert before_handoff["actual_annotation_xyz_m"] == pytest.approx((*line_xy, 0.0371))
+        assert before_handoff["line_origin_distance_m"] == pytest.approx(0.0)
+        assert before_handoff["line_y_misses_m"] == pytest.approx((-qualifier_gap_m,) * 2)
         assert observations[-1]["actual_annotation_xyz_m"] == pytest.approx((*text_xy, 0.0))
         assert observations[-1]["line_y_misses_m"] == pytest.approx((0.0, 0.0))
         assert observations[-1]["text_distance_m"] == pytest.approx(0.0)
+        assert all(tip[2] == 0.0371 for tip in observations[-1]["actual_arrow_tips_m"])
+        assert moves == [(False, (*line_xy, 0.0)), (True, (*text_xy, 0.0))]
     else:
         assert observations[-1] == payload
         assert json.dumps(payload, sort_keys=True) in logs[-1]

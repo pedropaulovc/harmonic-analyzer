@@ -1101,7 +1101,7 @@ def _position_register_depth(
     text_positions: dict[str, tuple[float, float]],
     witnesses: tuple[tuple[float, float], tuple[float, float]],
 ) -> None:
-    """Place the real depth line near its witnesses, then move only its text."""
+    """Prime the native origin for the shared offset/text handoff."""
     matches = [
         annotation for annotation in annotations
         if dimension_name(adapter, annotation) == "CapRegisterDepth"
@@ -1147,7 +1147,7 @@ def _position_register_depth(
             return serialized
 
     def observe(
-        stage: str, *, attempt: int | None = None, tolerate_read_errors: bool = False
+        stage: str, *, tolerate_read_errors: bool = False
     ) -> dict[str, Any]:
         read_errors = []
         exceptions = []
@@ -1190,11 +1190,15 @@ def _position_register_depth(
             (position[0] - text_xy[0], position[1] - text_xy[1])
             if position is not None else None
         )
+        line_origin_miss = (
+            (position[0] - line_xy[0], position[1] - line_xy[1])
+            if position is not None else None
+        )
         state = {
             "operation": "position_register_depth",
             "stage": stage,
             "reason": "observed",
-            "attempt": attempt,
+            "attempt": None,
             "requested_line_xy_m": line_xy,
             "requested_text_xyz_m": (*text_xy, 0.0),
             "actual_annotation_xyz_m": position,
@@ -1216,6 +1220,10 @@ def _position_register_depth(
             "section_witness_y_spread_m": abs(witnesses[0][1] - witnesses[1][1]),
             "text_xy_miss_m": text_miss,
             "text_distance_m": math.dist(position[:2], text_xy) if position is not None else None,
+            "line_origin_xy_miss_m": line_origin_miss,
+            "line_origin_distance_m": (
+                math.dist(position[:2], line_xy) if position is not None else None
+            ),
             "read_errors": read_errors,
         }
         emit(state)
@@ -1253,30 +1261,29 @@ def _position_register_depth(
     if state["offset_text"]:
         refuse(state, "offset_text_disable_refused")
     rebuild_drawing(adapter, label="register-depth dimension line")
-    for attempt in range(3):
-        state = observe("line_move", attempt=attempt)
-        require_arrows(state)
-        miss = -state["line_y_misses_m"][0]
-        if abs(miss) <= tolerance_m:
-            break
-        position = state["actual_annotation_xyz_m"]
-        try:
-            moved = annotation.SetPosition2(position[0], position[1] + miss, 0.0)
-        except Exception as exc:
-            refuse(
-                observe("line_move_exception", attempt=attempt, tolerate_read_errors=True),
-                "line_position_setter_failed", cause=exc,
-            )
-        if not moved:
-            refuse(
-                observe("line_move_setter", attempt=attempt, tolerate_read_errors=True),
-                "line_position_setter_rejected",
-            )
-        rebuild_drawing(adapter, label="register-depth dimension line placed")
+    state = observe("line_move")
+    require_arrows(state)
+    # 9bb native before/after shows FALSE-mode arrows below GetPosition and
+    # the combined offset/text handoff leaving the line at that prior origin.
+    # Prime the origin; never calibrate FALSE-mode arrows or compensate for
+    # the qualifier-dependent gap. The toggle alone was not measured.
+    try:
+        moved = annotation.SetPosition2(line_xy[0], line_xy[1], 0.0)
+    except Exception as exc:
+        refuse(
+            observe("line_move_exception", tolerate_read_errors=True),
+            "line_position_setter_failed", cause=exc,
+        )
+    if not moved:
+        refuse(
+            observe("line_move_setter", tolerate_read_errors=True),
+            "line_position_setter_rejected",
+        )
+    rebuild_drawing(adapter, label="register-depth dimension line placed")
     state = observe("post_line")
     require_arrows(state)
-    if any(abs(miss) > tolerance_m for miss in state["line_y_misses_m"]):
-        refuse(state, "dimension_line_missed_lane")
+    if state["line_origin_distance_m"] > tolerance_m:
+        refuse(state, "line_origin_missed_lane")
     try:
         offset_dimension_text(adapter, annotations, text_positions)
     except Exception as exc:

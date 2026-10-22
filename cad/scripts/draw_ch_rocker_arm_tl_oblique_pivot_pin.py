@@ -150,7 +150,9 @@ PROFILE_KEEP = {
     "CollarDia": (_x(CARRIER_STATION - 5.0), 0.127),
     "FlangeDia": (_x(part_spec.FLANGE_BOTTOM_STATION + part_spec.FLANGE_THICK / 2.0), 0.079),
     "FlangeThick": (0.249, 0.224),
-    "LowerBossHeight": (0.245, 0.202),
+    # Five native rows name the actual mating block top; centre their full
+    # glyphs in the bearing-length witness bay, below the 3.0 flange label.
+    "LowerBossHeight": (_x(BEARING_LENGTH / 2.0), 0.208),
     "CarrierFilletR": (_x(CARRIER_STATION) - 0.012, 0.137),
     "SeatFilletR": (_x(COLLAR_STATION) + 0.012, 0.137),
     "CrossHoleDia": (0.1468, 0.111),

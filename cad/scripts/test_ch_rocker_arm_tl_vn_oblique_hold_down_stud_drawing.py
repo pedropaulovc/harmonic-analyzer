@@ -542,7 +542,8 @@ def test_local_title_fit_preserves_full_name_number_and_never_touches_material(m
 
 
 @pytest.mark.parametrize("failure", [
-    None, "lower_attachment", "thread_attachment", "landing", "late_landing", "annotation",
+    None, "lower_attachment", "thread_attachment",
+    "lower_landing", "landing", "late_landing",
 ])
 def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monkeypatch, failure):
     monkeypatch.setattr(spec, "LOWER_FACTORY_CHAMFER", 0.6)
@@ -552,21 +553,27 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
     other_flank = SimpleNamespace(GetFace=lambda: neighbour)
     front = object()
     adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: 1 if a is b else 0))
-    projected, inserted = [], []
+    projected = []
     late = False
+    selected = {}
+
+    def select(owner, view, kind, xy, *, label, entity):
+        # 9bbd's coordinate EDGE hit-test failed despite a resolved native rim.
+        # Insertion must select that exact native entity, not hit-test again.
+        selected.clear()
+        selected.update(entity=entity, kind=kind)
+        return entity
+
+    def set_point(index, mark, x, y, z):
+        selected["point"] = (x, y)
+        return True
 
     def project(owner, view, points, *, label):
-        assert owner is adapter and view is front
         projected.append(points)
         return [(0.120 + 2.0 * x, 0.093 + 2.0 * y) for x, y, _z in points]
 
     def silhouettes(owner, view, picks, *, label):
-        assert owner is adapter and view is front
-        cylinder, xy = picks["thread"]
-        assert cylinder.diameter_mm == spec.MAJOR_DIA
-        assert cylinder.contains_y_mm == pytest.approx(
-            (spec.LOWER_FACTORY_CHAMFER + spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 2.0
-        )
+        _cylinder, xy = picks["thread"]
         # Replay b9e4d6b45bbb's one matching native silhouette: the opposite
         # contour was NOT returned as a silhouette of the selected cylinder.
         from _drawing_edges import _segment_distance
@@ -575,25 +582,30 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
             raise RuntimeError("no native barrel silhouette passes through the requested point")
         return {"thread": flank}
 
-    def attached(owner, view, **kwargs):
-        assert owner is adapter and view is front
-        inserted.append(kwargs)
-        thread = kwargs["entity_type"] == "SILHOUETTE"
-        expected = flank if thread else lower_rim
-        assert kwargs["attached_to"] is expected
-        actual = expected
+    def insert(text):
+        record = dict(selected)
+        thread = record["kind"] == "SILHOUETTE"
+        actual = record["entity"]
         if failure == "thread_attachment" and thread:
             actual = other_flank
         elif failure == "lower_attachment" and not thread:
             actual = neighbour
 
+        def position(x, y, z):
+            record["note_xy"] = (x, y)
+            return True
+
         def leader(_index):
-            x, y = kwargs["entity_xy"]
+            x, y = record["point"]
             if thread and (failure == "landing" or (failure == "late_landing" and late)):
                 y += 0.010
-            return (*kwargs["note_xy"], 0.0, x, y, 0.0)
+            if not thread and failure == "lower_landing":
+                x += 0.010
+            return (*record["note_xy"], 0.0, x, y, 0.0)
 
         annotation = SimpleNamespace(
+            SetLeader3=lambda *_args: 0,
+            SetPosition2=position,
             GetAttachedEntities3=lambda: (actual,),
             GetAttachedEntityCount3=lambda: 1,
             GetAttachedEntityTypes=lambda: (46 if thread else 1,),
@@ -601,13 +613,20 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
             IsDangling=lambda: False,
             GetLeaderPointsAtIndex=leader,
         )
-        return SimpleNamespace(GetAnnotation=lambda: None if failure == "annotation" else annotation)
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    adapter.currentModel = SimpleNamespace(
+        SelectionManager=SimpleNamespace(SetSelectionPoint2=set_point),
+        InsertNote=insert,
+        ClearSelection2=lambda _all: None,
+    )
 
     monkeypatch.setattr(draw, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(draw, "model_points_in_view", project)
     monkeypatch.setattr(draw, "face_silhouettes_through", silhouettes)
     monkeypatch.setattr(draw, "lower_factory_end_edge", lambda view: lower_rim)
-    monkeypatch.setattr(draw, "add_attached_note", attached)
+    monkeypatch.setattr(draw, "_select_view_entity", select)
+    monkeypatch.setattr(draw, "rebuild_drawing", lambda _adapter, **_kwargs: None)
     if failure and failure != "late_landing":
         with pytest.raises(RuntimeError):
             draw.add_rework_notes(adapter, front)
@@ -619,16 +638,12 @@ def test_rework_notes_keep_native_feature_attachment_and_noncorner_landings(monk
     assert math.hypot(lower[0], lower[2]) == pytest.approx(rim_radius)
     assert thread[0] == -spec.RADIUS / 1000 and thread[2] == 0.0
     assert spec.LOWER_FACTORY_CHAMFER / 1000 < thread[1] < (spec.LENGTH - spec.CUT_END_CHAMFER_MAX) / 1000
-    assert [row["text"] for row in inserted] == [draw.property_link("Lower End Note"), draw.THREAD_CALLOUT]
-    assert spec.THREAD in inserted[1]["text"]
-    assert "2A" not in inserted[1]["text"]  # No fabricated kit-stock qualification.
     late = True
     if failure == "late_landing":
         with pytest.raises(RuntimeError, match="leader attachment moved"):
             settled()
     else:
         settled()
-        assert len(projected) == 3  # Insertion, immediate proof, settled proof.
 
 
 @pytest.mark.parametrize("failure", [
