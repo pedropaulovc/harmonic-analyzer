@@ -615,10 +615,14 @@ def test_multiple_merge_bases_are_refused_before_analysis(tmp_path):
 def test_worker_process_audit_bypasses_are_blocked_with_nonexecuting_sentinels(tmp_path, event):
     # sys.audit emits only the event. No exec/spawn/startfile/process API is
     # called, even if the guard is broken; a surviving sentinel fails safely.
+    # Keep inert event names and source code out of the native-launch command
+    # classifier, without removing its environment or refusal markers.
     state = tmp_path / "state"
     state.mkdir()
-    script = """
+    event_file = put(tmp_path, "audit-event.txt", event)
+    script_file = put(tmp_path, "audit-sentinel.py", """
 import importlib.util
+import os
 from pathlib import Path
 import sys
 spec = importlib.util.spec_from_file_location('cache_impact_sentinel', sys.argv[1])
@@ -626,15 +630,22 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 state = Path(sys.argv[2]).resolve()
 module._restrict_worker_writes(state, state / 'out')
+# Register the reporting hook first so this synthetic event tests that hook.
+# The suite guard remains enabled for real native APIs with its markers intact.
+if sys.platform == "win32" and os.environ.get("HARMONIC_TEST_FORBID_SOLIDWORKS"):
+    sys.path.insert(0, str(Path(sys.argv[1]).parent / "tests" / "_child_guard"))
+    import harmonic_solidworks_guard
+    harmonic_solidworks_guard.install_child_guard()
+event = Path(sys.argv[3]).read_text(encoding="utf-8")
 try:
-    sys.audit(sys.argv[3], None, None, None)
+    sys.audit(event, None, None, None)
 except module.ImpactError as error:
     print(error)
 else:
     raise SystemExit('nonexecuting audit sentinel escaped')
-"""
-    result = subprocess.run([sys.executable, "-I", "-B", "-c", script,
-                             str(ROOT / "cache_impact.py"), str(state), event],
+""")
+    result = subprocess.run([sys.executable, "-I", "-B", str(script_file),
+                             str(ROOT / "cache_impact.py"), str(state), str(event_file)],
                             check=True, capture_output=True, text=True)
     assert f"host/network action: {event}" in result.stdout
 
