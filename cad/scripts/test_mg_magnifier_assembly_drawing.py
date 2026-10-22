@@ -1722,12 +1722,16 @@ def test_physical_reader_failure_still_collects_independent_visibility_and_ink(
     native.view.GetVisibleDrawingComponents = drawing_components
     native.view.GetVisibleComponents = visible_components
     native.view.GetPolylines7 = polylines
-    with pytest.raises(RuntimeError, match="physical model proof failed"):
+    with pytest.raises(RuntimeError, match="drawing component reader refused") as caught:
         drawing._projection_model_ink(native.adapter, native.view, stage="independent reader regression")
-    assert calls == ["drawing", "visible", "polylines"]
-    assert "drawing component reader refused" in messages[-1]
-    assert "'rendered_model_edges': 4" in messages[-1]
-    assert "mg-magnifying-lever-1" in messages[-1] and "mg-magnifying-bracket-1" in messages[-1]
+    assert calls == ["polylines", "drawing", "visible"]
+    packet = native.failure_captures[0][2]
+    assert packet["exception"] is caught.value
+    probe = packet["native_polyline_probe"]
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    assert probe["component_readback"]["visible_component_count"] == 2
+    assert probe["original_return"]["items"][0]["length"] == 4
+    assert probe["numeric_records"]["numeric_record_count"] == 4
 
 
 def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_native):
@@ -2251,6 +2255,438 @@ def test_model_polyline_reader_refuses_unproven_ink(lever_tip_native, failure):
         result = (native.rendered_edges, data)
     with pytest.raises(RuntimeError, match="GetPolylines7"):
         drawing._projection_rendered_edges(result)
+
+
+def test_failure_only_polyline_readers_match_generated_view_abi():
+    """Read wrapper source as data: never import a generated COM interface."""
+    import ast
+    import re
+
+    wrapper = (
+        Path(__file__).resolve().parents[2] / "SolidworksMCP-python" / "src"
+        / "solidworks_mcp" / "adapters" / "_generated" / "sldworks_2026.py"
+    ).read_text(encoding="utf-8")
+    start = re.search(r"^class IView\(", wrapper, re.M)
+    assert start is not None
+    following = re.compile(r"^class ", re.M).search(wrapper, start.end())
+    (view,) = ast.parse(wrapper[start.start():following.start() if following else None]).body
+    methods = {node.name: node for node in view.body if isinstance(node, ast.FunctionDef)}
+    expected = {
+        "GetPolylines7": (329, 1, (12, 0), ((2, 1), (16396, 2))),
+        "GetPolyLineCount5": (228, 1, (3, 0), ((2, 1), (16387, 2))),
+        "GetXform": (4, 1, (12, 0), ()),
+    }
+    for name, header in expected.items():
+        method = methods[name]
+        calls = [
+            node for node in ast.walk(method)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "_ApplyTypes_"
+        ]
+        assert len(calls) == 1
+        assert tuple(ast.literal_eval(node) for node in calls[0].args[:4]) == header
+        if name == "GetXform":
+            assert [arg.arg for arg in method.args.args] == ["self"]
+        else:
+            assert [arg.arg for arg in method.args.args] == [
+                "self", "CrossHatchOption", "Polylines" if name == "GetPolylines7" else "PointCount",
+            ]
+            assert ast.unparse(method.args.defaults[-1]) == "pythoncom.Missing"
+
+
+@pytest.fixture
+def r29_polyline_capture():
+    """Actual bytes/NULL placement only; cropped native identities were NOT read."""
+    import json
+    import struct
+
+    actual = json.loads(
+        (Path(__file__).parent / "fixtures" / "mg_r29_projection_polylines.json").read_text(encoding="utf-8")
+    )
+    probe = actual["native_polyline_probe"]
+    slots, values = probe["original_return"]["items"]
+    data = tuple(struct.unpack("<d", bytes.fromhex(row["ieee754_le"]))[0] for row in values["items"])
+    return SimpleNamespace(actual=actual, probe=probe, slots=slots["items"], values=values["items"], data=data)
+
+
+def test_r29_full_buffer_diagnostic_does_not_authorize_twelve_records_for_eleven_slots(r29_polyline_capture):
+    import struct
+
+    native = r29_polyline_capture
+    assert len(native.data) == 2370 and len(native.slots) == 11
+    assert [i for i, row in enumerate(native.slots) if row["type"] == "builtins.NoneType"] == [0, 1, 2, 3]
+    assert all(struct.pack("<d", v).hex() == row["ieee754_le"] for v, row in zip(native.data, native.values, strict=True))
+    assert native.probe["component_readback"]["rendered_model_edges"] is None
+    assert native.probe["stage"] == "settled drawing"
+    records = drawing._projection_diagnostic_records(native.data)
+    assert records["association"] == "UNAVAILABLE"
+    assert records["numeric_record_count"] == 12
+    assert records["consumed_values"] == 2370 and records["zero_residual_values"] == 0
+    assert [row["offset"] for row in records["records"]] == [
+        0, 15, 30, 45, 60, 2190, 2232, 2259, 2286, 2313, 2340, 2355,
+    ]
+    assert [row["point_count"] for row in records["records"]] == [2, 2, 2, 2, 707, 11, 6, 6, 6, 6, 2, 2]
+    assert all(row["type"] == 0 and row["geom_data_size"] == 0 for row in records["records"])
+    # These sentinels test array cardinality, not actual native model identity.
+    slots = tuple(None if row["type"] == "builtins.NoneType" else object() for row in native.slots)
+    with pytest.raises(RuntimeError, match="nonzero residual data / unmatched primitive at primitive 11, offset 2355"):
+        drawing._projection_rendered_edges((slots, native.data))
+
+
+def test_full_buffer_diagnostic_preserves_r28_semantics(r28_identity_native):
+    native = r28_identity_native
+    records = drawing._projection_diagnostic_records(native.raw_data)
+    assert records["numeric_record_count"] == 36
+    assert records["consumed_values"] == 1167 and records["zero_residual_values"] == 34
+    assert sum(row["type"] == 0 for row in records["records"]) == 19
+    assert sum(row["type"] == 1 for row in records["records"]) == 17
+    assert drawing._projection_rendered_edges((native.raw_slots, native.raw_data)) == tuple(native.raw_slots)
+
+
+@pytest.mark.parametrize("cut", [1, 8, 14, 61, 2189, 2231, 2354, 2369])
+def test_r29_diagnostic_rejects_truncated_records(r29_polyline_capture, cut):
+    with pytest.raises(RuntimeError, match="diagnostic truncated"):
+        drawing._projection_diagnostic_records(r29_polyline_capture.data[:cut])
+
+
+@pytest.mark.parametrize("offset,value", [
+    (0, 2.0), (1, -1.0), (1, float("inf")), (8, 1.0), (8, 2.5),
+    (68, float("nan")), (69, float("inf")), (2368, float("nan")),
+    (2368, "not-a-double"),
+])
+def test_r29_diagnostic_rejects_malformed_and_nonfinite_records(r29_polyline_capture, offset, value):
+    data = list(r29_polyline_capture.data)
+    data[offset] = value
+    with pytest.raises(RuntimeError, match="diagnostic"):
+        drawing._projection_diagnostic_records(data)
+
+
+def test_r29_extra_record_is_observed_but_never_accepted(r29_polyline_capture):
+    data = (*r29_polyline_capture.data, *r29_polyline_capture.data[-15:])
+    records = drawing._projection_diagnostic_records(data)
+    assert records["numeric_record_count"] == 13 and records["consumed_values"] == 2385
+    with pytest.raises(RuntimeError, match="primitive 11, offset 2355"):
+        drawing._projection_rendered_edges(((None,) * 11, data))
+
+
+@pytest.fixture
+def r29_refusal_native(lever_tip_native, r29_polyline_capture):
+    """R29 numbers with explicitly SYNTHETIC capabilities, counts and mappings.
+
+    The actual packet has no Count5/GetXform or cropped slot identity evidence.
+    Values below exercise reader isolation, not an R29 native success claim.
+    """
+    native = lever_tip_native
+    native.actual_r29 = r29_polyline_capture
+    native.raw_slots = tuple(
+        None if row["type"] == "builtins.NoneType" else native.rendered_edges[(index - 4) % 4]
+        for index, row in enumerate(r29_polyline_capture.slots)
+    )
+    native.raw_data = list(r29_polyline_capture.data)
+    native.g7_calls, native.count_calls = [], []
+    native.cropped = True
+
+    def polylines(option):
+        native.g7_calls.append(option)
+        return native.raw_slots, native.raw_data
+
+    def count(option):
+        native.count_calls.append(option)
+        return 23, 4567  # Deliberately unlike the observed numeric record count.
+
+    native.view.GetPolylines7 = polylines
+    native.view.GetPolyLineCount5 = count
+    native.view.GetXform = lambda: (0.25, -0.5, 2.0)
+    return native
+
+
+def test_r29_refusal_collects_all_raw_slots_without_prefix_association(r29_refusal_native):
+    native = r29_refusal_native
+    with pytest.raises(RuntimeError, match="primitive 11, offset 2355") as caught:
+        drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
+    assert native.g7_calls == [1] and native.count_calls == [1]
+    assert len(native.failure_captures) == 1
+    packet = native.failure_captures[0][2]
+    assert packet["exception"] is caught.value
+    probe = packet["native_polyline_probe"]
+    assert probe["slot_observation_scope"] == "RAW_SLOT_OBSERVATION"
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    assert probe["numeric_records"]["numeric_record_count"] == 12
+    assert probe["numeric_records"]["association"] == "UNAVAILABLE"
+    assert probe["crop_contour_handle"]["status"] == "UNAVAILABLE"
+    readers = probe["readers"]
+    assert readers["native_polyline_count5.return"]["value"]["value"] == 23
+    assert readers["native_polyline_count5.point_count"]["value"]["value"] == 4567
+    assert readers["view.xform"]["value"]["length"] == 3
+    for index in range(11):
+        prefix = f"slot[{index}]"
+        assert readers[f"{prefix}.raw"]["status"] == ("RETURNED_NULL" if index < 4 else "OBSERVED")
+        assert readers[f"{prefix}.qi.IEdge"]["status"] == ("UNAVAILABLE" if index < 4 else "OBSERVED")
+        assert readers[f"{prefix}.owner"]["status"] == ("UNAVAILABLE" if index < 4 else "OBSERVED")
+        assert f"{prefix}.same.slot[10]" in readers
+    for component in native.drawing_components:
+        prefix = f"component[{component.Component.Name2}]"
+        assert readers[f"{prefix}.slot[0].source"]["status"] == "UNAVAILABLE"
+        assert readers[f"{prefix}.slot[10].instance"]["status"] == "OBSERVED"
+        assert readers[f"{prefix}.visible_edge[0].instance_raw.same.slot[10]"]["status"] == "OBSERVED"
+    assert native.imports == []
+    assert native.source.SystemValue == pytest.approx(0.00125)
+
+
+@pytest.mark.parametrize("failure", [
+    "count", "xform", "qi", "curve", "body", "owner", "source", "mapping",
+    "snapshot", "formatter", "collector", "capture",
+])
+def test_r29_refusal_preserves_raw_first_and_original_traceback(
+    r29_refusal_native, monkeypatch, failure,
+):
+    native = r29_refusal_native
+    originals, traces = [], []
+    decode = drawing._projection_rendered_edges
+    attempts = []
+    raw_frozen = []
+    freeze = drawing._projection_raw_snapshot
+
+    class ReaderFailure(BaseException):
+        def __str__(self):
+            raise ValueError("unprintable diagnostic")
+
+    def fail(*_args, **_kwargs):
+        assert raw_frozen  # Raw bytes precede every optional failure.
+        raise ReaderFailure()
+
+    def frozen(value):
+        result = freeze(value)
+        raw_frozen.append(result)
+        return result
+
+    def refuse(result):
+        assert raw_frozen  # The real strict decoder must run AFTER preservation.
+        try:
+            return decode(result)
+        except RuntimeError as original:
+            originals.append(original)
+            traces.append(original.__traceback__)
+            raise
+
+    def capture(_adapter, _label, _message, **kwargs):
+        attempts.append(kwargs)
+        if failure == "capture":
+            fail()
+
+    monkeypatch.setattr(drawing, "_projection_raw_snapshot", frozen)
+    monkeypatch.setattr(drawing, "_projection_rendered_edges", refuse)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    failed_key = None
+    if failure == "count":
+        native.view.GetPolyLineCount5 = fail
+        failed_key = "native_polyline_count5"
+    elif failure == "xform":
+        native.view.GetXform = fail
+        failed_key = "view.xform"
+    elif failure in ("qi", "curve", "body", "owner"):
+        edge = native.raw_slots[4]
+        if failure == "qi":
+            edge._oleobj_.QueryInterface = fail
+            failed_key = "slot[4].qi.IEdge"
+        else:
+            setattr(edge, {"curve": "GetCurve", "body": "GetBody", "owner": "GetComponent"}[failure], fail)
+            failed_key = f"slot[4].{failure}_return"
+    elif failure in ("source", "mapping"):
+        component = native.drawing_components[0].Component
+        setattr(component, "GetModelDoc2" if failure == "source" else "GetCorrespondingEntity", fail)
+        failed_key = f"component[{component.Name2}]." + ("source_return" if failure == "source" else "slot[4].instance")
+    elif failure == "snapshot":
+        monkeypatch.setattr(drawing, "_projection_polyline_snapshot", fail)
+    elif failure == "formatter":
+        monkeypatch.setattr(drawing, "_projection_error_text", fail)
+    elif failure == "collector":
+        monkeypatch.setattr(drawing, "_projection_refused_slot_observations", fail)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
+    original = originals[0]
+    assert str(original) == "GetPolylines7 nonzero residual data / unmatched primitive at primitive 11, offset 2355"
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not traces[0]:
+        trace = trace.tb_next
+    assert trace is traces[0]
+    assert len(attempts) == 1 and attempts[0]["exception"] is original
+    probe = attempts[0]["native_polyline_probe"]
+    slots, values = probe["original_return"]["items"]
+    assert slots["length"] == 11 and values["length"] == 2370
+    assert [row["value"] for row in slots["items"][:4]] == [None] * 4
+    assert [row["ieee754_le"] for row in values["items"]] == [
+        row["ieee754_le"] for row in native.actual_r29.values
+    ]
+    if failed_key is not None:
+        assert probe["readers"][failed_key]["status"] == "ERROR"
+        assert probe["readers"]["slot[10].raw"]["status"] == "OBSERVED"
+    assert native.g7_calls == [1] and native.imports == []
+
+
+@pytest.mark.parametrize("error_type", [RuntimeError, KeyboardInterrupt, SystemExit])
+@pytest.mark.parametrize("site", [
+    "drawing-getter", "visible-getter", "component-binding", "component-member", "decoder",
+])
+def test_r29_raw_return_precedes_component_and_decoder_interrupts(
+    r29_refusal_native, monkeypatch, site, error_type,
+):
+    native = r29_refusal_native
+    native.raw_slots = list(native.raw_slots)
+    original = error_type(f"first native failure at {site}")
+    traces, attempts = [], []
+
+    def fail(*_args, **_kwargs):
+        # Mutate the actual returned containers at the failing reader. A snapshot
+        # taken on collector entry would lose the original NULL and IEEE bytes.
+        native.raw_slots[0] = object()
+        native.raw_data[0] = 99.0
+        try:
+            raise original
+        except BaseException:
+            if not traces:
+                traces.append(original.__traceback__)
+            raise
+
+    if site == "drawing-getter":
+        native.view.GetVisibleDrawingComponents = fail
+    elif site == "visible-getter":
+        native.view.GetVisibleComponents = fail
+    elif site == "component-binding":
+        bind = drawing._early_bound
+
+        def binding(value, interface):
+            if interface == "IDrawingComponent":
+                return fail()
+            return bind(value, interface)
+
+        monkeypatch.setattr(drawing, "_early_bound", binding)
+    elif site == "component-member":
+        class InterruptedComponent:
+            @property
+            def Component(self):
+                return fail()
+
+        native.drawing_components[0] = InterruptedComponent()
+    else:
+        monkeypatch.setattr(drawing, "_projection_rendered_edges", fail)
+
+    def formatter(_error):
+        raise KeyboardInterrupt("secondary diagnostic formatter")
+
+    def capture(_adapter, _label, _message, **kwargs):
+        attempts.append(kwargs)
+        raise SystemExit("secondary forensic observer")
+
+    monkeypatch.setattr(drawing, "_projection_error_text", formatter)
+    monkeypatch.setattr(drawing._seat_forensics, "capture_com_failure", capture)
+    with pytest.raises(error_type) as caught:
+        drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not traces[0]:
+        trace = trace.tb_next
+    assert trace is traces[0]
+    assert len(attempts) == 1 and attempts[0]["exception"] is original
+    probe = attempts[0]["native_polyline_probe"]
+    slots, values = probe["original_return"]["items"]
+    assert slots["length"] == 11 and values["length"] == 2370
+    assert [row["value"] for row in slots["items"][:4]] == [None] * 4
+    assert [row["ieee754_le"] for row in values["items"]] == [
+        row["ieee754_le"] for row in native.actual_r29.values
+    ]
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["component_readback"]["rendered_model_edges"] is None
+    assert native.g7_calls == [1] and native.imports == []
+
+
+@pytest.mark.parametrize("count", [None, 12, (), (12,), (12, 2370, 11)])
+def test_r29_count_readback_never_infers_missing_out_parameter(r29_refusal_native, count):
+    native = r29_refusal_native
+    native.view.GetPolyLineCount5 = lambda _option: count
+    with pytest.raises(RuntimeError, match="primitive 11, offset 2355"):
+        drawing._projection_model_ink(native.adapter, native.view, stage="settled drawing")
+    readers = native.failure_captures[0][2]["native_polyline_probe"]["readers"]
+    assert readers["native_polyline_count5"]["status"] == ("RETURNED_NULL" if count is None else "OBSERVED")
+    assert readers["native_polyline_count5.return"]["status"] == "UNAVAILABLE"
+    assert readers["native_polyline_count5.point_count"]["status"] == "UNAVAILABLE"
+
+
+@pytest.mark.parametrize("failure", [
+    None, "wrong-view", "wrong-sketch", "stale-circle", "sketch-reader", "bool-identity",
+])
+def test_retained_crop_handle_is_diagnostic_only_and_requires_current_native_context(
+    r29_refusal_native, failure,
+):
+    native = r29_refusal_native
+    sketch = object()
+    # Synthetic native equality is deliberate: the actual R29 capture has no
+    # retained authored circle. Even a positive observation cannot accept G7.
+    circle = native.raw_slots[4]
+    context = (native.view, sketch, circle, circle)
+    native.view.GetSketch = lambda: sketch
+    if failure == "wrong-view":
+        context = (object(), sketch, circle, circle)
+    elif failure == "wrong-sketch":
+        native.view.GetSketch = lambda: object()
+    elif failure == "sketch-reader":
+        def unavailable_sketch():
+            raise RuntimeError("current sketch reader refused")
+        native.view.GetSketch = unavailable_sketch
+    elif failure in ("stale-circle", "bool-identity"):
+        same = native.adapter.swApp.IsSame
+
+        def identity(left, right):
+            if left is circle or right is circle:
+                if failure == "stale-circle":
+                    raise RuntimeError("authored circle invalidated by Crop2")
+                return True
+            return same(left, right)
+
+        native.adapter.swApp.IsSame = identity
+    with pytest.raises(RuntimeError, match="primitive 11, offset 2355"):
+        drawing._projection_model_ink(
+            native.adapter, native.view, stage="settled drawing", crop_context=context,
+        )
+    probe = native.failure_captures[0][2]["native_polyline_probe"]
+    assert probe["rendered_status"] == "UNAVAILABLE"
+    assert probe["numeric_records"]["numeric_record_count"] == 12
+    assert probe["crop_contour_handle"]["acceptance"] == "NOT_USED"
+    assert probe["crop_contour_handle"]["record_association"] == "UNAVAILABLE"
+    assert probe["crop_contour_handle"]["status"] == ("OBSERVED" if failure is None else "UNAVAILABLE")
+    readers = probe["readers"]
+    assert readers["crop.segment.same.slot[0]"]["status"] == "UNAVAILABLE"
+    if failure is None:
+        assert readers["crop.segment.same.slot[4]"]["value"]["value"] == 1
+    else:
+        assert readers["crop.segment.same.slot[4]"]["status"] == "UNAVAILABLE"
+    assert readers["slot[10].raw"]["status"] == "OBSERVED"
+    assert native.g7_calls == [1] and native.imports == []
+
+
+def test_tip_settled_closure_retains_only_its_authored_crop_context(lever_tip_native, monkeypatch):
+    native = lever_tip_native
+    context = (native.view, object(), object(), object())
+    crop = drawing._crop
+    layout = drawing._projection_layout
+    seen = []
+
+    def retain(*args):
+        crop(*args)
+        return context
+
+    def observe(*args, crop_context=None):
+        seen.append(crop_context)
+        return layout(*args, crop_context=crop_context)
+
+    monkeypatch.setattr(drawing, "_crop", retain)
+    monkeypatch.setattr(drawing, "_projection_layout", observe)
+    settled = drawing._thread_projection_detail(native.adapter, (), ())
+    settled()
+    assert len(seen) == 2 and all(value is context for value in seen)
+    assert not native.failure_captures
 
 
 def test_bad_polyline_header_preserves_full_original_payload_and_terminal_failure(lever_tip_native):
@@ -2882,6 +3318,7 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
 
     manager = SimpleNamespace(AddToDB=previous_direct)
     fence = []
+    authored = []
 
     def circle(*points):
         events.append(("circle", points, manager.AddToDB))
@@ -2889,13 +3326,16 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
         if not manager.AddToDB:
             cx -= 0.0025  # R24's witness inference, not a native layout acceptance.
         fence[:] = _native_crop_fence((cx, cy), math.hypot(rx - cx, ry - cy))
-        return SimpleNamespace(
+        segment = SimpleNamespace(
             Select4=lambda append, data: events.append(("select", append, data)) or True
         )
+        authored.append(segment)
+        return segment
 
     manager.CreateCircle = circle
+    sketch = SimpleNamespace(ModelToSketchTransform=transform)
     view = SimpleNamespace(
-        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=transform),
+        GetSketch=lambda: sketch,
         Crop2=lambda *args: events.append(("Crop2", args)) or status,
         IsCropped=lambda: cropped,
         UpdateViewDisplayGeometry=lambda: events.append(("refresh",)),
@@ -2914,7 +3354,9 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
     monkeypatch.setattr(drawing, "null_callout", lambda: None)
     monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
     if cropped:
-        drawing._crop(adapter, view, drawing.LEVER_TIP)
+        context = drawing._crop(adapter, view, drawing.LEVER_TIP)
+        assert context[0] is view and context[1] is sketch
+        assert context[2] is authored[0] and context[3] is authored[0]
     else:
         with pytest.raises(RuntimeError, match="not cropped"):
             drawing._crop(adapter, view, drawing.LEVER_TIP)

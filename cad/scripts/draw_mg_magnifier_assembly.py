@@ -755,9 +755,14 @@ def _placed_detail(adapter: Any, detail: StackDetail | LeverTipDetail) -> Any:
     return view
 
 
-def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None:
-    """Crop ``view`` to the circle round ``detail.centre``: sketch the circle
-    in the active view's own sketch and Crop2 while it is still selected."""
+def _crop(
+    adapter: Any, view: Any, detail: StackDetail | LeverTipDetail,
+) -> tuple[Any, Any, Any, Any] | None:
+    """Crop in the active view's sketch; retain the tip's exact authored handles.
+
+    The returned view/sketch/circle/segment are scoped diagnostic references,
+    not permission to identify or discard any GetPolylines7 numeric record.
+    """
     view = _early_bound(view, "IView")
     _activate(adapter, view, label=detail.title)
     sketch = _early_bound(view.GetSketch(), "ISketch")
@@ -804,6 +809,8 @@ def _crop(adapter: Any, view: Any, detail: StackDetail | LeverTipDetail) -> None
         )
     if isinstance(detail, LeverTipDetail):
         _projection_crop_box(view)
+        return view, sketch, circle, segment
+    return None
 
 
 def _projection_crop_box(view: Any) -> tuple[float, float, float, float]:
@@ -1277,12 +1284,319 @@ def _projection_polyline_snapshot(value: Any) -> dict[str, Any]:
     return record
 
 
+def _projection_raw_snapshot(value: Any) -> dict[str, Any]:
+    """Freeze scalar bytes and NULL slots before any diagnostic object reader.
+
+    Unlike the optional descriptive snapshot, this never invokes opaque repr,
+    attributes, QI, or an exception formatter. Opaque slots retain Python identity
+    only; their native capabilities are separate observations, never inferred.
+    """
+    kind = type(value)
+    record: dict[str, Any] = {"type": f"{kind.__module__}.{kind.__qualname__}"}
+    if value is None or kind in (bool, int, str):
+        record["value"] = value
+    elif kind is float:
+        record["repr"] = repr(value)
+        record["ieee754_le"] = struct.pack("<d", value).hex()
+    elif kind in (tuple, list):
+        record["length"] = len(value)
+        record["items"] = [_projection_raw_snapshot(item) for item in value]
+    else:
+        record["python_id"] = id(value)
+    return record
+
+
+def _projection_diagnostic_records(data: Any) -> dict[str, Any]:
+    """Describe the entire G7 buffer WITHOUT assigning records to edge slots.
+
+    SDK GetPolylines7 / Get Polyline Data from Drawing View: type 0 consumes
+    no geometry doubles, type 1 consumes twelve, then six attributes, a point
+    count and XYZ triples. R29 has twelve records but eleven slots; this reader
+    must never supply accepted edges, discard a contour, or prefix-pair them.
+    R28's finite zero residual remains explicitly reported, not another record.
+    """
+    if not isinstance(data, (tuple, list)):
+        raise RuntimeError("diagnostic polyline buffer unavailable")
+    records = []
+    offset = 0
+    while offset < len(data):
+        location = f"at primitive {len(records)}, offset {offset}"
+        if all(type(v) in (int, float) and math.isfinite(v) and v == 0 for v in data[offset:]):
+            break
+        if offset + 9 > len(data):
+            raise RuntimeError(f"diagnostic truncated primitive {location}")
+        kind, size = data[offset:offset + 2]
+        if (
+            type(kind) not in (int, float) or kind not in (0, 1)
+            or type(size) not in (int, float) or not math.isfinite(size)
+            or size < 0 or size != int(size) or (kind == 1 and size != 12)
+        ):
+            raise RuntimeError(f"diagnostic invalid geometry header {location}")
+        geometry_size = 12 if kind == 1 else 0
+        count_index = offset + 8 + geometry_size
+        if count_index >= len(data):
+            raise RuntimeError(f"diagnostic truncated geometry {location}")
+        count = data[count_index]
+        if (
+            type(count) not in (int, float) or not math.isfinite(count)
+            or count != int(count) or count < (2 if kind == 0 else 0)
+        ):
+            raise RuntimeError(f"diagnostic invalid point count {location}")
+        end = count_index + 1 + 3 * int(count)
+        if end > len(data):
+            raise RuntimeError(f"diagnostic truncated points {location}")
+        if not all(type(v) in (int, float) and math.isfinite(v) for v in data[offset:end]):
+            raise RuntimeError(f"diagnostic non-finite or nonnumeric primitive {location}")
+        records.append({
+            "index": len(records), "offset": offset, "end": end,
+            "type": kind, "geom_data_size": size, "point_count": int(count),
+            "geometry": list(data[offset + 2:offset + 2 + geometry_size]),
+            "attributes": list(data[offset + 2 + geometry_size:count_index]),
+            "points": [list(data[i:i + 3]) for i in range(count_index + 1, end, 3)],
+        })
+        offset = end
+    return {
+        "association": "UNAVAILABLE", "numeric_record_count": len(records),
+        "consumed_values": offset, "zero_residual_values": len(data) - offset,
+        "records": records,
+    }
+
+
+def _projection_refused_slot_observations(
+    adapter: Any, view: Any, result: Any, probe: dict[str, Any],
+    components: dict[str, Any], visible_components: Any,
+    crop_context: tuple[Any, Any, Any, Any] | None = None,
+) -> None:
+    """Failure-only RAW_SLOT_OBSERVATION; no value here can license model ink."""
+    readers = probe["readers"] = {}
+    probe["slot_observation_scope"] = "RAW_SLOT_OBSERVATION"
+    probe["crop_contour_handle"] = {
+        "status": "UNAVAILABLE", "reason": "no retained native crop-contour handle",
+    }
+
+    def error_text(error: BaseException) -> str:
+        try:
+            return _projection_error_text(error)
+        except BaseException:
+            return type(error).__name__
+
+    def observe(key: str, reader: Callable[[], Any], *dependencies: Any) -> Any:
+        if any(value is None for value in dependencies):
+            readers[key] = {"status": "UNAVAILABLE", "reason": "dependency unavailable"}
+            return None
+        try:
+            value = reader()
+        except BaseException as error:
+            readers[key] = {"status": "ERROR", "error": error_text(error)}
+            return None
+        row = {"status": "RETURNED_NULL" if value is None else "OBSERVED"}
+        try:
+            row["value"] = _projection_polyline_snapshot(value)
+        except BaseException as error:
+            row["snapshot_error"] = error_text(error)
+        readers[key] = row
+        return value
+
+    # Generated IView ABI: I2 input, I4 retval + optional OUT I4; GetXform
+    # has no arguments and a VARIANT retval. Preserve the actual return shapes.
+    count = observe("native_polyline_count5", lambda: view.GetPolyLineCount5(1))
+    pair = count if isinstance(count, (tuple, list)) and len(count) == 2 else None
+    observe("native_polyline_count5.return", lambda: pair[0], pair)
+    observe("native_polyline_count5.point_count", lambda: pair[1], pair)
+    observe("view.xform", lambda: view.GetXform())
+    try:
+        probe["numeric_records"] = {
+            "status": "OBSERVED", **_projection_diagnostic_records(result[1]),
+        }
+    except BaseException as error:
+        probe["numeric_records"] = {"status": "ERROR", "error": error_text(error)}
+    app = observe("application", lambda: _early_bound(adapter.swApp, "ISldWorks"))
+
+    def declarations() -> tuple[Any, Any, Any]:
+        import pythoncom
+        from solidworks_mcp.adapters._generated.sldworks_2026 import IEdge, IEntity
+
+        return pythoncom.IID_IUnknown, IEdge.CLSID, IEntity.CLSID
+
+    interfaces = observe("qi.declarations", declarations)
+
+    def edge_readers(key: str, raw: Any) -> tuple[Any, Any, Any]:
+        observe(f"{key}.raw", lambda: raw)
+        dispatch = observe(f"{key}.dispatch", lambda: raw._oleobj_, raw)
+        capabilities = {}
+        for index, name in ((1, "IEdge"), (2, "IEntity")):
+            capabilities[name] = observe(
+                f"{key}.qi.{name}",
+                lambda: dispatch.QueryInterface(interfaces[index], interfaces[0]),
+                dispatch, interfaces,
+            )
+        edge = observe(
+            f"{key}.edge", lambda: _early_bound(raw, "IEdge"), raw, capabilities["IEdge"],
+        )
+        entity = observe(
+            f"{key}.entity", lambda: _early_bound(raw, "IEntity"), raw, capabilities["IEntity"],
+        )
+        observe(f"{key}.self", lambda: app.IsSame(edge, edge), app, edge)
+        curve_raw = observe(f"{key}.curve_return", lambda: edge.GetCurve(), edge)
+        curve = observe(f"{key}.curve", lambda: _early_bound(curve_raw, "ICurve"), curve_raw)
+        circular = observe(f"{key}.is_circle", lambda: curve.IsCircle(), curve)
+        params = observe(
+            f"{key}.circle", lambda: tuple(curve.CircleParams),
+            curve, curve if circular is True else None,
+        )
+        body_raw = observe(f"{key}.body_return", lambda: edge.GetBody(), edge)
+        body = observe(f"{key}.body", lambda: _early_bound(body_raw, "IBody2"), body_raw)
+        observe(f"{key}.temporary", lambda: body.IsTemporaryBody(), body)
+        owner_raw = observe(f"{key}.owner_return", lambda: entity.GetComponent(), entity)
+        owner = observe(f"{key}.owner", lambda: _early_bound(owner_raw, "IComponent2"), owner_raw)
+        observe(f"{key}.owner.name", lambda: owner.Name2, owner)
+        observe(f"{key}.owner.path", lambda: owner.GetPathName(), owner)
+        return edge, owner, params
+
+    slots = observe("original_slots", lambda: tuple(result[0]))
+    observe("original_slot_count", lambda: len(slots), slots)
+    raw_edges = [
+        edge_readers(f"slot[{index}]", raw)
+        for index, raw in enumerate(slots if slots is not None else ())
+    ]
+    if crop_context is not None:
+        crop_view, crop_sketch, circle, segment = crop_context
+        for name, value in (
+            ("view", crop_view), ("sketch", crop_sketch), ("circle", circle), ("segment", segment),
+        ):
+            observe(f"crop.{name}.retained", lambda: value)
+        current_raw = observe("crop.current_sketch_return", lambda: view.GetSketch())
+        current_sketch = observe(
+            "crop.current_sketch", lambda: _early_bound(current_raw, "ISketch"), current_raw,
+        )
+        view_same = observe("crop.view.same", lambda: app.IsSame(crop_view, view), app, crop_view)
+        sketch_same = observe(
+            "crop.sketch.same", lambda: app.IsSame(crop_sketch, current_sketch),
+            app, crop_sketch, current_sketch,
+        )
+        circle_self = observe("crop.circle.self", lambda: app.IsSame(circle, circle), app, circle)
+        segment_same = observe(
+            "crop.segment.same_circle", lambda: app.IsSame(segment, circle), app, segment, circle,
+        )
+        same_context = all(
+            type(code) is int and code == 1
+            for code in (view_same, sketch_same, circle_self, segment_same)
+        )
+        probe["crop_contour_handle"] = {
+            "status": "OBSERVED" if same_context else "UNAVAILABLE",
+            "reason": "retained authored handle in current view/sketch" if same_context else
+                      "retained handle lifetime or current native context not established",
+            "acceptance": "NOT_USED", "record_association": "UNAVAILABLE",
+        }
+        for index, raw in enumerate(slots if slots is not None else ()):
+            observe(
+                f"crop.segment.same.slot[{index}]", lambda: app.IsSame(segment, raw),
+                app, segment, raw, segment if same_context else None,
+            )
+    for i, (left, _, _) in enumerate(raw_edges):
+        for j, (right, _, _) in enumerate(raw_edges):
+            observe(f"slot[{i}].same.slot[{j}]", lambda: app.IsSame(left, right), app, left, right)
+
+    for name, (stem, component, _shown) in components.items():
+        prefix = f"component[{name}]"
+        source_raw = observe(f"{prefix}.source_return", lambda: component.GetModelDoc2())
+        source = observe(f"{prefix}.source", lambda: _early_bound(source_raw, "IModelDoc2"), source_raw)
+        observe(f"{prefix}.path", lambda: component.GetPathName())
+        observe(f"{prefix}.source.path", lambda: source.GetPathName(), source)
+        observe(f"{prefix}.configuration", lambda: component.ReferencedConfiguration)
+        manager = observe(
+            f"{prefix}.configuration_manager",
+            lambda: _early_bound(source.ConfigurationManager, "IConfigurationManager"), source,
+        )
+        active = observe(
+            f"{prefix}.active_configuration",
+            lambda: _early_bound(manager.ActiveConfiguration, "IConfiguration"), manager,
+        )
+        observe(f"{prefix}.active_configuration.name", lambda: active.Name, active)
+        extension_raw = observe(f"{prefix}.extension_return", lambda: source.Extension, source)
+        extension = observe(
+            f"{prefix}.extension", lambda: _early_bound(extension_raw, "IModelDocExtension"), extension_raw,
+        )
+
+        def route(key: str, edge: Any) -> tuple[Any, Any]:
+            part_raw = observe(f"{key}.source", lambda: extension.GetCorrespondingEntity2(edge), extension, edge)
+            part = observe(f"{key}.source.edge", lambda: _early_bound(part_raw, "IEdge"), part_raw)
+            instance_raw = observe(f"{key}.instance", lambda: component.GetCorrespondingEntity(part), part)
+            instance = observe(f"{key}.instance.edge", lambda: _early_bound(instance_raw, "IEdge"), instance_raw)
+            view_raw = observe(f"{key}.view", lambda: view.GetCorrespondingEntity(instance), instance)
+            view_edge = observe(f"{key}.view.edge", lambda: _early_bound(view_raw, "IEdge"), view_raw)
+            observe(f"{key}.view.same", lambda: app.IsSame(edge, view_edge), app, edge, view_edge)
+            return part, instance
+
+        routes = []
+        for index, (edge, owner, _) in enumerate(raw_edges):
+            key = f"{prefix}.slot[{index}]"
+            observe(f"{key}.owner_same", lambda: app.IsSame(owner, component), app, owner)
+            routes.append(route(key, edge))
+        # Observe the actual visible namespace separately; selection by geometry
+        # labels diagnostic candidates only, never establishes edge identity.
+        visible = None
+        for index, raw in enumerate(visible_components or ()):
+            candidate = observe(f"{prefix}.visible[{index}]", lambda: _early_bound(raw, "IComponent2"))
+            candidate_name = observe(f"{prefix}.visible[{index}].name", lambda: str(candidate.Name2).rsplit("/", 1)[-1], candidate)
+            if candidate_name == name:
+                visible = candidate
+        seeds = observe(
+            f"{prefix}.visible_edges", lambda: visible_component_entities(view, visible, 1), visible,
+        )
+        target_x, target_r, control_x, control_r = (
+            (-NECK_HALF_X / 1000, NOSE_R / 1000, NECK_HALF_X / 1000, NOSE_R / 1000)
+            if stem == "mg-magnifying-bracket" else
+            (ROD_LENGTH / 1000, (LEVER_ROD_DIA / 2 - TIP_CHAMFER) / 1000,
+             (ROD_LENGTH - TIP_CHAMFER) / 1000, LEVER_ROD_DIA / 2000)
+        )
+        for index, raw in enumerate(seeds if seeds is not None else ()):
+            key = f"{prefix}.visible_edge[{index}]"
+            edge, owner, params = edge_readers(key, raw)
+            observe(f"{key}.owner_same", lambda: app.IsSame(owner, component), app, owner)
+            roles = observe(f"{key}.candidate_roles", lambda: [
+                role for role, x, radius in (
+                    ("target", target_x, target_r), ("control", control_x, control_r),
+                )
+                if len(params) == 7 and all(math.isfinite(v) for v in params)
+                and math.dist(params[:3], (x, 0.0, 0.0)) <= DETAIL_POSITION_TOL_M
+                and abs(params[6] - radius) <= DETAIL_POSITION_TOL_M
+            ], params)
+            if not roles:
+                continue
+            part, instance = route(key, edge)
+            for slot, ((other, _, _), (other_part, other_instance)) in enumerate(zip(raw_edges, routes, strict=True)):
+                for context, left, right in (
+                    ("visible_raw", edge, other), ("source", part, other_part),
+                    ("instance", instance, other_instance), ("instance_raw", instance, other),
+                ):
+                    observe(
+                        f"{key}.{context}.same.slot[{slot}]",
+                        lambda: app.IsSame(left, right), app, left, right,
+                    )
+
+
 def _capture_projection_polyline_failure(
     adapter: Any, view: Any, *, stage: str, result: Any, observed: bool,
-    exception: Exception, evidence: dict[str, Any],
+    exception: BaseException, evidence: dict[str, Any],
+    components: dict[str, Any] | None = None, visible_components: Any = None,
+    crop_context: tuple[Any, Any, Any, Any] | None = None,
+    raw_snapshot: dict[str, Any] | None = None,
 ) -> NoReturn:
-    """Preserve a refused G7 decode, its native frame and partial drawing."""
+    """Reuse getter-time bytes; later observations never replace or accept them.
+
+    Direct collector callers without a supplied snapshot freeze on entry. The
+    production path always supplies its snapshot from the single G7 retrieval,
+    before any component getter, binding, decoder, or formatter can interrupt.
+    """
     original_traceback = exception.__traceback__
+
+    def error_text(error: BaseException) -> str:
+        try:
+            return _projection_error_text(error)
+        except BaseException:
+            return type(error).__name__
+
     try:
         probe: dict[str, Any] = {
             "stage": stage,
@@ -1292,12 +1606,15 @@ def _capture_projection_polyline_failure(
             "component_readback": evidence,
             "view_state": {},
             "reader_errors": {},
+            "original_return": raw_snapshot if raw_snapshot is not None else _projection_raw_snapshot(result),
         }
         try:
-            # The unchanged original return, not a second getter or interpretation.
-            probe["original_return"] = _projection_polyline_snapshot(result)
-        except Exception as exc:
-            probe["reader_errors"]["original_return"] = _projection_error_text(exc)
+            # Optional opaque descriptions cannot replace or erase the already
+            # frozen numeric bytes/NULL slots, even if repr/formatting fails.
+            probe["descriptive_return"] = _projection_polyline_snapshot(result)
+        except BaseException as exc:
+            probe["reader_errors"]["original_return"] = error_text(exc)
+        evidence["errors"] = [*evidence.get("errors", ()), f"native observation: {error_text(exception)}"]
         # The caller already owns an IView. Optional application binding belongs
         # to its own reader; a refused bind must not skip available view readers.
         for name, reader in (
@@ -1317,11 +1634,18 @@ def _capture_projection_polyline_failure(
         ):
             try:
                 probe["view_state"][name] = _projection_polyline_snapshot(reader())
-            except Exception as exc:
-                probe["reader_errors"][name] = _projection_error_text(exc)
+            except BaseException as exc:
+                probe["reader_errors"][name] = error_text(exc)
+        try:
+            _projection_refused_slot_observations(
+                adapter, view, result, probe, components or {}, visible_components,
+                crop_context=crop_context,
+            )
+        except BaseException as exc:
+            probe["collector_error"] = error_text(exc)
         try:
             message = str(exception)
-        except Exception:
+        except BaseException:
             message = f"{type(exception).__name__}: <original message unavailable>"
         _seat_forensics.capture_com_failure(
             adapter, "mg-magnifier-thread-projection-polylines", message,
@@ -1329,7 +1653,7 @@ def _capture_projection_polyline_failure(
             native_polyline_probe=probe,
         )
     finally:
-        raise exception.with_traceback(original_traceback)
+        raise BaseException.with_traceback(exception, original_traceback)
 
 
 def _capture_projection_identity_failure(
@@ -1791,6 +2115,7 @@ def _projection_component_identity(
 def _projection_model_ink(
     adapter: Any, view: Any, *, stage: str,
     calibration: dict[str, Any] | None = None,
+    crop_context: tuple[Any, Any, Any, Any] | None = None,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
     """Prove the actual flat tip and outer far-face arc, not the assembly sketch.
 
@@ -1805,48 +2130,59 @@ def _projection_model_ink(
     view = _early_bound(view, "IView")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     values, errors, evidence = {}, [], {"stage": stage}
-    reader_exceptions: dict[str, Exception] = {}
-    # Independent readers leave a discriminating trace even if one is refused.
-    # Zoom is the documented GetPolylines7 generation prerequisite, not a retry.
+    raw_snapshot = None
+    first_failure: BaseException | None = None
+    first_traceback = None
+    # Generate once, then freeze the actual return BEFORE component getters,
+    # binding/QI, decoding, or diagnostic formatting can fail or mutate it.
     for name, reader in (
         ("zoom", lambda: model.ViewZoomtofit2()),
         ("refresh", lambda: view.UpdateViewDisplayGeometry()),
+        ("polylines", lambda: view.GetPolylines7(1)),  # exclude crosshatch
         ("drawing_components", lambda: view.GetVisibleDrawingComponents()),
         ("visible_components", lambda: view.GetVisibleComponents()),
-        ("polylines", lambda: view.GetPolylines7(1)),  # exclude crosshatch
     ):
         try:
             values[name] = reader()
-        except Exception as exc:
-            errors.append(f"{name}: {_projection_error_text(exc)}")
-            reader_exceptions[name] = exc
+            if name == "polylines":
+                raw_snapshot = _projection_raw_snapshot(values[name])
+        except BaseException as exc:
+            if first_failure is None:
+                first_failure, first_traceback = exc, exc.__traceback__
+            # Do not format exceptions before the raw return is frozen. Other
+            # independent readers still get their one observation.
+            errors.append(f"{name}: native reader failed")
     full = {}
     evidence["drawing_components"] = []
-    for raw in values.get("drawing_components") or ():
-        try:
-            drawing_component = _early_bound(raw, "IDrawingComponent")
-            component = _early_bound(drawing_component.Component, "IComponent2")
-            name = str(component.Name2).rsplit("/", 1)[-1]
-            stem = _component_stem(component)
-            shown = bool(drawing_component.Visible)
-            evidence["drawing_components"].append((name, stem, shown))
-            if stem in LEVER_TIP.stems:
-                if name in full:
-                    raise RuntimeError(f"duplicate drawing component {name}")
-                full[name] = (stem, component, shown)
-        except Exception as exc:
-            errors.append(f"drawing component: {_projection_error_text(exc)}")
     rendered = ()
     try:
+        for raw in values.get("drawing_components") or ():
+            try:
+                drawing_component = _early_bound(raw, "IDrawingComponent")
+                component = _early_bound(drawing_component.Component, "IComponent2")
+                name = str(component.Name2).rsplit("/", 1)[-1]
+                stem = _component_stem(component)
+                shown = bool(drawing_component.Visible)
+                evidence["drawing_components"].append((name, stem, shown))
+                if stem in LEVER_TIP.stems:
+                    if name in full:
+                        raise RuntimeError(f"duplicate drawing component {name}")
+                    full[name] = (stem, component, shown)
+            except BaseException as exc:
+                if first_failure is None:
+                    first_failure, first_traceback = exc, exc.__traceback__
+                errors.append("drawing component: native reader failed")
+        if first_failure is not None:
+            raise BaseException.with_traceback(first_failure, first_traceback)
         rendered = tuple(
             _early_bound(edge, "IEdge")
             for edge in _projection_rendered_edges(values.get("polylines"))
         )
-    except Exception as exc:
-        original = reader_exceptions.get("polylines", exc)
-        original_traceback = original.__traceback__
+    except BaseException as exc:
+        original = first_failure if first_failure is not None else exc
+        original_traceback = first_traceback if first_failure is not None else exc.__traceback__
         try:
-            evidence["errors"] = [*errors, f"model polylines: {_projection_error_text(original)}"]
+            evidence["errors"] = list(errors)
             evidence["rendered_model_edges"] = None
             components = values.get("visible_components")
             evidence["visible_components_observed"] = "visible_components" in values
@@ -1856,9 +2192,11 @@ def _projection_model_ink(
             _capture_projection_polyline_failure(
                 adapter, view, stage=stage, result=values.get("polylines"),
                 observed="polylines" in values, exception=original, evidence=evidence,
+                components=full, visible_components=components,
+                crop_context=crop_context, raw_snapshot=raw_snapshot,
             )
         finally:
-            raise original.with_traceback(original_traceback)
+            raise BaseException.with_traceback(original, original_traceback)
     evidence["rendered_model_edges"] = len(rendered)
     evidence["visible_components"] = []
     targets = {
@@ -2058,6 +2396,7 @@ def _projection_layout(
     adapter: Any, view: Any, annotation: Any, caption: Any,
     neighbour_views: tuple[Any, ...], neighbour_notes: tuple[Any, ...],
     calibration: dict[str, Any],
+    crop_context: tuple[Any, Any, Any, Any] | None = None,
 ) -> None:
     """Full dimension ink, actual note extents and the physical crop fence."""
     label = LEVER_TIP.title
@@ -2065,7 +2404,10 @@ def _projection_layout(
     view.UpdateViewDisplayGeometry()
     if not view.IsCropped() or tuple(view.ScaleRatio) != LEVER_TIP.scale:
         raise RuntimeError(f"{label}: crop or 4:1 scale changed")
-    _projection_model_ink(adapter, view, stage="settled drawing", calibration=calibration)
+    _projection_model_ink(
+        adapter, view, stage="settled drawing", calibration=calibration,
+        crop_context=crop_context,
+    )
     crop_box = _projection_crop_box(view)
     outline = _view_outline(view, label=label)
     if not all(math.isfinite(value) for value in outline):
@@ -2155,7 +2497,7 @@ def _thread_projection_detail(
     if len(annotations) != 1 or dimension_name(adapter, annotations[0]) != name:
         raise RuntimeError(f"{detail.title}: targeted import did not return one {name}")
     original = _projection_source(adapter, view, annotations[0], stage="uncropped import")
-    _crop(adapter, view, detail)
+    crop_context = _crop(adapter, view, detail)
     annotation = _unique_projection(adapter, view, stage="after crop")
     _projection_source(adapter, view, annotation, stage="after crop", original=original)
     set_dimension_callouts(
@@ -2180,6 +2522,7 @@ def _thread_projection_detail(
         _assert_lever_callouts([(name, display)], _printable_lever_callouts())
         _projection_layout(
             adapter, view, current, caption, neighbour_views, neighbour_notes, calibration,
+            crop_context=crop_context,
         )
 
     settled()
