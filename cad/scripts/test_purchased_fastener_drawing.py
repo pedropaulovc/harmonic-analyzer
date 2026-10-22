@@ -6029,6 +6029,118 @@ def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(
     assert case.native.SystemValue == native_value
 
 
+def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
+    import _supplier_pin_drawing as pins
+
+    # Isolate native authoring, not the production station calculation. The
+    # returned station drives the real audit consumer against recorded R43 ink.
+    monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
+    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (None, None))
+    monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: (None, None))
+    monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
+    placements = {}
+
+    def import_references(_adapter, _view, _source, keep):
+        placements.update(keep)
+        return {name: (None, None) for name in keep}
+
+    monkeypatch.setattr(pins, "_import_model_references", import_references)
+    view = SimpleNamespace(GetOutline=lambda: outline, Position=(0.2875, 0.143))
+    source = SimpleNamespace(
+        sku="R43 layout", length_mm=12.7, wall_mm=0.3048,
+        wall_precision=3, application_hole_limits=(1.5748, 1.651),
+        application_hole_precision=3,
+    )
+    if family == "dowel":
+        pins.add_supplier_dowel_dimensions(None, {"*Front": view, "*Top": view}, source)
+        return placements[pins.DIAMETER_DIMENSION]
+    pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
+    return placements[pins.MATING_HOLE_DIMENSION]
+
+
+@pytest.mark.parametrize(
+    "family,outline,old_position,text_box,line",
+    [
+        pytest.param(
+            "dowel", (0.065412, 0.219412, 0.092588, 0.246588),
+            (0.110588, 0.233), (0.0881, 0.2286, 0.1331, 0.2331),
+            (0.079, 0.233, 0.099, 0.233), id="locating-pin",
+        ),
+        pytest.param(
+            "dowel", (0.070237, 0.224237, 0.087763, 0.241763),
+            (0.105763, 0.233), (0.0832, 0.2286, 0.1283, 0.2331),
+            (0.079, 0.233, 0.084, 0.233), id="latch-pin-container",
+        ),
+        pytest.param(
+            "dowel", (0.070237, 0.224237, 0.087763, 0.241763),
+            (0.105763, 0.233), (0.0832, 0.2286, 0.1283, 0.2331),
+            (0.079, 0.233, 0.084, 0.233), id="knife-dowel-container",
+        ),
+        pytest.param(
+            "spring", (0.2779432, 0.1334433, 0.2970568, 0.1525568),
+            (0.3165, 0.112), (0.2842854, 0.1029181, 0.3487146, 0.1064181),
+            (0.3090623, 0.1397694, 0.2826979, 0.1019181), id="strap-spring-pin",
+        ),
+        pytest.param(
+            "spring", (0.2779432, 0.1334433, 0.2970568, 0.1525568),
+            (0.3165, 0.112), (0.2842854, 0.1029181, 0.3487146, 0.1064181),
+            (0.3090623, 0.1397694, 0.2826979, 0.1019181), id="cup-spring-pin",
+        ),
+    ],
+)
+def test_supplier_pin_replays_r43_collision_clearance_without_moving_witnesses(
+    monkeypatch, family, outline, old_position, text_box, line,
+):
+    """5049b24 R43 native audit records, in sheet metres.
+
+    Locating-pin ink and both spring qualifiers are genuinely struck. Latch
+    and knife records are conservative container findings, not glyph strikes.
+    This replay retains those containers rather than weakening the audit.
+    """
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import (
+        AnnotationGeometry, Box, Segment, SheetGeometry, find_text_on_line,
+    )
+    import _supplier_pin_drawing as pins
+
+    position = _supplier_pin_layout_placement(monkeypatch, family=family, outline=outline)
+
+    def replay(station):
+        dx, dy = station[0] - old_position[0], station[1] - old_position[1]
+        box = Box(text_box[0] + dx, text_box[1] + dy, text_box[2] + dx, text_box[3] + dy)
+        if family == "dowel":
+            annotations = (
+                AnnotationGeometry("R43 diameter", "dim", "Top", (box,)),
+                AnnotationGeometry("R43 center mark", "center-mark", "Top", (),
+                                   (Segment(*line),)),
+            )
+            finder = find_text_on_line
+        else:
+            # Keep the actual circle-end witness fixed. Only the text end of
+            # its leader follows the moved block; translating both ends would
+            # falsely move the model witness and hide this failure.
+            leader = Segment(line[0], line[1], line[2] + dx, line[3] + dy, "dim-line")
+            annotations = (AnnotationGeometry(
+                "R43 application qualifier", "dim", "Right", (box,), (leader,),
+            ),)
+            finder = find_lines_through_own_text
+        sheet = SheetGeometry("R43", 0.4318, 0.2794, None, annotations=annotations)
+        return finder(sheet), box
+
+    old_findings, _ = replay(old_position)
+    assert len(old_findings) == 1  # The actual old placement is a negative control.
+    findings, box = replay(position)
+    assert not findings
+    if family == "dowel":
+        assert box.xmax < outline[2] + pins.DOWEL_SUPPLIER_MARGINS["*Top"][2]
+    else:
+        right_cell = next(cell for name, _center, cell in purchased.fastener_view_cells(0.018)
+                          if name == "*Right")
+        assert right_cell[0] < box.xmin < box.xmax < right_cell[2]
+        assert right_cell[1] < box.ymin < box.ymax < right_cell[3]
+
+
 
 @pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
 def test_supplier_fraction_requires_an_exact_integer_power_of_two(

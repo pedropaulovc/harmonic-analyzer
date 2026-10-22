@@ -323,7 +323,7 @@ def add_supplier_dowel_dimensions(
     outline = tuple(float(value) for value in top.GetOutline())
     imported = _import_model_references(
         adapter, top, source,
-        {DIAMETER_DIMENSION: (outline[2] + 0.018, (outline[1] + outline[3]) / 2.0)},
+        {DIAMETER_DIMENSION: (outline[2] + 0.033, (outline[1] + outline[3]) / 2.0)},
     )
     diameter, diameter_check = imported[DIAMETER_DIMENSION]
     return _settled_pin_check(
@@ -363,7 +363,7 @@ def add_supplier_spring_pin_dimensions(
         adapter, right, source,
         {
             WALL_DIMENSION: (center[0] - 0.022, center[1] + 0.018),
-            MATING_HOLE_DIMENSION: (center[0] + 0.029, center[1] - 0.031),
+            MATING_HOLE_DIMENSION: (center[0] + 0.064, center[1] - 0.031),
         },
     )
     wall, wall_check = imported[WALL_DIMENSION]
