@@ -28,7 +28,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from typing import Any
@@ -43,7 +42,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _assert_attached_to
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -56,21 +54,17 @@ from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
-    set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
 from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_leader_notes import add_attached_note
-from _drawing_notes import add_property_linked_note, property_link
+from _drawing_notes import add_property_linked_note
 from _drawing_precision import _named_dimension
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
-from _gtol_face_read import face_geometry
-from _gtol_face_resolve import resolve_faces
-from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
@@ -78,6 +72,8 @@ import _telemetry
 from build_mg_magnifying_clamp import (
     _assert_location_profiles,
     _assert_ordinary_location,
+    _assert_stock_af,
+    _assert_stock_af_source,
     _point_flat_attachment,
     _point_identity,
     _segment_identity,
@@ -86,6 +82,7 @@ from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
     BLOCK_HEIGHT,
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION_BY_NAME,
     DIMENSION_GROUPS,
     GROUPED_HIDDEN_DIMENSIONS,
@@ -100,12 +97,11 @@ from mg_magnifying_clamp_spec import (
     PREF_MATERIAL_HATCH_PATTERN,
     PREF_MATERIAL_HATCH_STYLE,
     PREF_NO_OPTION,
-    REFERENCE_DIMENSIONS,
     ROD_TAP_DRILL_DIA,
     ROD_TAP_PROCESS,
     SEAT_NOTE,
     SECTION_HATCH_PATTERN,
-    STOCK_NOTE,
+    STOCK_AF_CALLOUT,
     TAP_CALLOUT_PRECISION,
     TAP_DRILL_DEPTH_VARIABLE,
     TAP_THREAD_DEPTH_VARIABLE,
@@ -140,10 +136,9 @@ BOTTOM_CENTER = (RIGHT_CENTER[0], 0.045)
 # (x > ~0.216, y < ~0.066); the isometric right of it, inside the border.
 SECTION_CENTER = (0.250, 0.170)
 ISO_CENTER = (0.365, 0.190)
-# R27's complete native stock text reached x423.9 mm (border x419.1).
-# These remain top-left text anchors, not leader-tip coordinates.
-STOCK_NOTE_XY = (0.285, 0.140)
-# Above the iso: R17's real stock-flat leader crosses the lower caption lane.
+# R28's cleared blank lane: global stock-form acceptance has no iso leader.
+STOCK_FORM_NOTE_XY = (0.285, 0.140)
+# The iso remains illustrative; keep its scale caption above it.
 ISO_NOTE_XY = (0.335, 0.245)
 # R27's 146.5 mm seat row needs the full right-hand text lane inside the border.
 SEAT_NOTE_XY = (0.260, 0.116)
@@ -165,11 +160,11 @@ _RIGHT_LEFT_X = RIGHT_CENTER[0] - _HALF_AF
 RIGHT_KEEP = {
     "Height": (0.036, 0.1555),
     "LeverBoreYDim": (_RIGHT_LEFT_X - 0.012, _elev_y(RIGHT_CENTER, LEVER_BORE_Y / 2.0)),
-    "LeverBoreDiaDim": (0.150, 0.145),
+    "LeverBoreDiaDim": (0.165, 0.145),
 }
-# The top view: the flats (Z, sheet horizontal) above it, between its upper
-# vertices.
-TOP_KEEP = {"HexAf": (TOP_CENTER[0], TOP_CENTER[1] + _HALF_AC + 0.010)}
+# Keep the native AF tolerance and its supplied-stock below-text above the hex
+# (top extent 239.5 mm), inside the actual 266.7 mm inner border.
+TOP_KEEP = {"HexAf": (TOP_CENTER[0], 0.255)}
 RIGHT_LOCATION_KEEP = {
     # Move R27's whole three-row label right, away from A and the height witness.
     # Keep its vertical station: raising the flat witness crosses A (R21).
@@ -183,6 +178,7 @@ BOTTOM_KEEP = {"RodTapFromDiagonalFlat": (0.043, 0.074)}
 HEIGHT_DRAWING_CALLOUT = HEIGHT_CALLOUT.replace("TOP-TAP WALL", "TOP-TAP\nWALL")
 
 DIMENSION_CALLOUTS = {
+    "HexAf": STOCK_AF_CALLOUT,
     "Height": HEIGHT_DRAWING_CALLOUT,
     "LeverBoreDiaDim": LEVER_BORE_CALLOUT,
     "LeverBoreFromZFlat": "BORE AND BOTH\nTAP ENTRY AXES",
@@ -434,179 +430,59 @@ def _omit_tap_thread_class(display: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: resolved native callout repeats title-block 2B")
 
 
-def _add_stock_note(adapter: Any, view: Any) -> None:
-    """Use the supplied flat's drawing-context face, with exact source proof."""
-    native = _early_bound(view, "IView")
+def _assert_stock_form_note(note: Any, *, stage: str) -> None:
+    native = _early_bound(note, "INote")
+    annotation = _early_bound(native.GetAnnotation(), "IAnnotation")
+    text = str(native.GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    leaders = annotation.GetLeaderCount()
+    position = tuple(annotation.GetPosition() or ())
+    _telemetry.info("clamp global stock-form acceptance", operation_stage=stage, resolved_text=text, leader_count=leaders, position=repr(position))
+    if text != DRAWING_NOTES or type(leaders) is not int or leaders != 0 or len(position) != 3 or any(type(value) not in (int, float) or not math.isclose(value, target, rel_tol=0.0, abs_tol=1e-9) for value, target in zip(position, (*STOCK_FORM_NOTE_XY, 0.0), strict=True)):
+        raise RuntimeError(f"clamp stock form: global unleadered acceptance changed at {stage}")
+
+
+def _add_stock_form_note(adapter: Any) -> Any:
+    # InsertNote inherits the active context; explicitly activate the sheet,
+    # then use the existing property-link helper (which clears selection).
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    if sheet is None:
+        raise RuntimeError("clamp stock form: current drawing sheet is unavailable")
+    name = sheet.GetName()
+    if type(name) is not str or not name or drawing.ActivateSheet(name) is not True:
+        raise RuntimeError("clamp stock form: failed to activate the drawing sheet")
+    note = add_property_linked_note(adapter, "Manufacturing Notes", *STOCK_FORM_NOTE_XY)
+    _assert_stock_form_note(note, stage="stock-form.inserted")
+    return note
+
+
+def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, stage: str) -> None:
+    view = _early_bound(view, "IView")
+    model = view.ReferencedDocument
+    if model is None:
+        raise RuntimeError("HexAf: top view has no source part")
+    source = SimpleNamespace(currentModel=model, swApp=adapter.swApp)
+    _source_display, source_dimension = _assert_stock_af_source(source, stage=f"{stage}.source")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    _assert_stock_af(display, dimension, stage=stage)
+    owner, owner_type = annotation.Owner, annotation.OwnerType
+    if owner is None:
+        raise RuntimeError(f"HexAf: imported annotation has no native owner at {stage}")
     app = _early_bound(adapter.swApp, "ISldWorks")
-    audit = {
-        "stage": "stock.source_face", "source_context": "referenced part",
-        "selection_context": "target drawing view", "diagnostic_errors": [],
-    }
-    missing = object()
-    source_face = face = extension = None
-    notes_before = missing
+    codes = (
+        app.IsSame(view, view), app.IsSame(owner, owner), app.IsSame(owner, view),
+        app.IsSame(source_dimension, source_dimension), app.IsSame(dimension, dimension),
+        app.IsSame(dimension, source_dimension),
+    )
+    dangling, text = annotation.IsDangling(), display.GetText(4)
+    names = (source_dimension.FullName, dimension.FullName)
+    _telemetry.info("clamp native stock AF import", operation_stage=stage, identity_codes=repr(codes), owner_type=owner_type, full_names=repr(names), dangling=dangling, stock_callout=text)
+    if any(type(code) is not int or code != 1 for code in codes) or type(owner_type) is not int or owner_type != 0 or names[0] != names[1] or dangling is not False or text != STOCK_AF_CALLOUT:
+        raise RuntimeError(f"HexAf: actual source dimension/top-view ownership or supplied-stock callout changed at {stage}")
 
-    def diagnostic(row: dict[str, Any], field: str, member: str, reader: Any, *, record: bool = True) -> Any:
-        try:
-            value = reader()
-        except Exception as exc:
-            audit["diagnostic_errors"].append({
-                "field": field, "member": member, "type": type(exc).__name__, "message": str(exc),
-            })
-            return missing
-        if record:
-            row[field] = value
-        return value
 
-    def emit() -> None:
-        evidence = json.dumps(audit, sort_keys=True, default=repr)
-        _telemetry.info(
-            f"clamp stock face audit: {evidence}",
-            operation_stage=audit["stage"], auditJSON=evidence,
-        )
-
-    try:
-        model = native.ReferencedDocument
-        if model is None:
-            raise RuntimeError("supplied hex stock flat: view has no referenced part")
-        selector = PlanarFace((0.0, 0.0, 1.0), HEX_AF / 2.0)
-        source_face = resolve_faces(model, {"supplied_hex_flat": selector})["supplied_hex_flat"]
-        audit["stage"] = "stock.source_self"
-        audit["source_self"] = app.IsSame(source_face, source_face)
-        if audit["source_self"] != 1:
-            raise RuntimeError("supplied hex stock flat: source face identity is unavailable")
-        # Select4 requires an entity from the active document. Follow the
-        # output-fixture's feature -> view face -> source correspondence, not
-        # a part-body face selected into a drawing or a geometry/FaceID alias.
-        audit["stage"] = "stock.view_feature"
-        feature = _early_bound(model, "IPartDoc").FeatureByName("Block")
-        if feature is None:
-            raise RuntimeError("supplied hex stock flat: source has no Block feature")
-        view_feature = _early_bound(native.GetCorresponding(feature), "IFeature")
-        if view_feature is None:
-            raise RuntimeError("supplied hex stock flat: Block has no drawing-view correspondence")
-        audit["stage"] = "stock.view_flat"
-        feature_faces = tuple(view_feature.GetFaces() or ())
-        matches = []
-        for candidate in feature_faces:
-            geometry = face_geometry(candidate)
-            if geometry is not None and selector.matches(geometry):
-                matches.append(candidate)
-        audit["view_feature_faces"] = len(feature_faces)
-        audit["view_flat_candidates"] = len(matches)
-        if len(matches) != 1:
-            raise RuntimeError(f"supplied hex stock flat: expected one drawing-view flat, found {len(matches)}")
-        face = matches[0]
-        audit["stage"] = "stock.view_self"
-        audit["view_self"] = app.IsSame(face, face)
-        if audit["view_self"] != 1:
-            raise RuntimeError("supplied hex stock flat: drawing face identity is unavailable")
-        audit["stage"] = "stock.source_correspondence"
-        extension = _early_bound(_early_bound(model, "IModelDoc2").Extension, "IModelDocExtension")
-        canonical = extension.GetCorrespondingEntity2(face)
-        audit["canonical_present"] = canonical is not None
-        if canonical is None:
-            raise RuntimeError("supplied hex stock flat: drawing face has no source correspondence")
-        audit["stage"] = "stock.canonical_self"
-        audit["canonical_self"] = app.IsSame(canonical, canonical)
-        audit["stage"] = "stock.source_same"
-        audit["source_same"] = app.IsSame(canonical, source_face)
-        if audit["canonical_self"] != 1 or audit["source_same"] != 1:
-            raise RuntimeError("supplied hex stock flat: drawing face does not prove exact source identity")
-        diagnostic(audit, "raw_source_vs_view", "ISldWorks.IsSame", lambda: app.IsSame(source_face, face))
-        notes_before = diagnostic(audit, "notes_before", "IView.GetNotes", lambda: tuple(native.GetNotes() or ()), record=False)
-        if notes_before is not missing:
-            audit["view_note_count_before"] = len(notes_before)
-        audit["stage"] = "stock.attach"
-        emit()
-        note = add_attached_note(adapter, view, text=property_link("Manufacturing Notes"), entity_type="FACE", entity=face, attached_to=face, note_xy=STOCK_NOTE_XY, label="supplied hex stock flat")
-        # R27's straight leader crossed the first stock glyph. Use the existing
-        # native bent/right note style; never move or replace its actual face tip.
-        audit["stage"] = "stock.leader_style"
-        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
-        status = annotation.SetLeader3(2, 2, True, False, False, False)  # swBENT, swLS_RIGHT
-        audit["leader_status"] = status
-        if type(status) is not int or status != 0:
-            raise RuntimeError(f"supplied hex stock flat: bent/right leader refused: {status!r}")
-        rebuild_drawing(adapter, label="bend supplied hex stock flat leader")
-        _assert_attached_to(
-            adapter, annotation, face, entity_type="FACE",
-            what="stock note", label="supplied hex stock flat",
-        )
-        audit["stage"] = "stock.resolved_property"
-        resolved = str(_early_bound(note, "INote").GetText() or "").replace("\r\n", "\n").replace("\r", "\n").strip()
-        if resolved != STOCK_NOTE:
-            raise RuntimeError(f"supplied hex stock flat: model property did not resolve: {resolved!r}")
-        audit["stage"] = "stock.complete"
-        emit()
-    except Exception as original:
-        audit["failure"] = {"type": type(original).__name__, "message": str(original)}
-        # A strict helper failure can precede its INote return. Inspect the
-        # documented view-note inventory, without guessing which note is new
-        # or replacing the original failure with an optional diagnostic error.
-        try:
-            notes = diagnostic(audit, "view_notes", "IView.GetNotes", lambda: tuple(native.GetNotes() or ()), record=False)
-            if notes is not missing:
-                audit["view_notes"] = []
-                for index, raw_note in enumerate(notes):
-                    row: dict[str, Any] = {"index": index}
-                    audit["view_notes"].append(row)
-                    note = _early_bound(raw_note, "INote")
-                    row["note_present"] = note is not None
-                    if note is None:
-                        continue
-                    diagnostic(row, "text", "INote.GetText", lambda: note.GetText())
-                    diagnostic(row, "self", f"ISldWorks.IsSame(note[{index}],note[{index}])", lambda: app.IsSame(note, note))
-                    if notes_before is not missing:
-                        row["same_to_before"] = []
-                        for previous_index, previous in enumerate(notes_before):
-                            if previous is None:
-                                row["same_to_before"].append({"index": previous_index, "unavailable": True, "reason": "prior note handle is None"})
-                                continue
-                            code = diagnostic(row, f"before[{previous_index}]", "ISldWorks.IsSame", lambda: app.IsSame(note, previous), record=False)
-                            row["same_to_before"].append({"index": previous_index, "unavailable": True} if code is missing else {"index": previous_index, "code": code})
-                    annotation = diagnostic(row, "annotation", "INote.GetAnnotation", lambda: _early_bound(note.GetAnnotation(), "IAnnotation"), record=False)
-                    if annotation is missing or annotation is None:
-                        row["annotation_present"] = False if annotation is None else None
-                        continue
-                    row["annotation_present"] = True
-                    diagnostic(row, "count", "IAnnotation.GetAttachedEntityCount3", lambda: annotation.GetAttachedEntityCount3())
-                    types = diagnostic(row, "types", "IAnnotation.GetAttachedEntityTypes", lambda: tuple(annotation.GetAttachedEntityTypes() or ()))
-                    diagnostic(row, "dangling", "IAnnotation.IsDangling", lambda: annotation.IsDangling())
-                    diagnostic(row, "leaders", "IAnnotation.GetLeaderCount", lambda: annotation.GetLeaderCount())
-                    diagnostic(row, "owner_type", "IAnnotation.OwnerType", lambda: annotation.OwnerType)
-                    owner = diagnostic(row, "owner", "IAnnotation.Owner", lambda: annotation.Owner, record=False)
-                    row["owner_present"] = None if owner is missing else owner is not None
-                    if owner is not missing and owner is not None:
-                        diagnostic(row, "owner_self", f"ISldWorks.IsSame(note_owner[{index}],note_owner[{index}])", lambda: app.IsSame(owner, owner))
-                        if row.get("owner_type") == 0:
-                            diagnostic(row, "owner_to_view", f"ISldWorks.IsSame(note_owner[{index}],target_view)", lambda: app.IsSame(owner, native))
-                    attached = diagnostic(row, "entities", "IAnnotation.GetAttachedEntities3", lambda: tuple(annotation.GetAttachedEntities3() or ()), record=False)
-                    if attached is missing:
-                        continue
-                    row["entities_reported"], row["attachments"] = len(attached), []
-                    for entity_index, entity in enumerate(attached):
-                        item = {"index": entity_index, "present": entity is not None}
-                        row["attachments"].append(item)
-                        if entity is None:
-                            continue
-                        diagnostic(item, "self", f"ISldWorks.IsSame(attached[{entity_index}],attached[{entity_index}])", lambda: app.IsSame(entity, entity))
-                        if face is not None:
-                            diagnostic(item, "view_same", f"ISldWorks.IsSame(attached[{entity_index}],view_face)", lambda: app.IsSame(entity, face))
-                        if extension is not None and types is not missing and entity_index < len(types) and types[entity_index] == 2:
-                            canonical = diagnostic(item, "source", "IModelDocExtension.GetCorrespondingEntity2", lambda: extension.GetCorrespondingEntity2(entity), record=False)
-                            item["source_present"] = None if canonical is missing else canonical is not None
-                            if canonical is not missing and canonical is not None and source_face is not None:
-                                diagnostic(item, "source_same", f"ISldWorks.IsSame(attached_source[{entity_index}],source_face)", lambda: app.IsSame(canonical, source_face))
-        except Exception as diagnostic_error:
-            audit["diagnostic_errors"].append({
-                "field": "failure_inventory", "type": type(diagnostic_error).__name__, "message": str(diagnostic_error),
-            })
-        try:
-            emit()
-        except Exception:
-            pass  # Optional logging must never replace the actual native failure.
-        raise
 
 
 def _require_flat_import(adapter, requested_view, source_display, display, source_entities, source_types, source_point, *, stage):
@@ -974,7 +850,7 @@ async def build(adapter: Any) -> dict[str, str]:
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         _assert_ordinary_location(display, dimension, name)
-    set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, [*right_annotations, *top_annotations], DIMENSION_CALLOUTS)
     _group_flat_locations(adapter, right, right_annotations)
     bore_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "LeverBoreDiaDim")
     bore_display = _early_bound(_early_bound(bore_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
@@ -987,12 +863,8 @@ async def build(adapter: Any) -> dict[str, str]:
     height_display = _early_bound(_early_bound(height_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
     if str(height_display.GetText(4) or "") != HEIGHT_DRAWING_CALLOUT:
         raise RuntimeError("Height: truthful top-tap wall function did not remain attached")
-    # The flats are the bar's as supplied: a stock reference.
     top_by_name = {dimension_name(adapter, a): a for a in top_annotations}
-    for name in sorted(REFERENCE_DIMENSIONS):
-        set_reference_dimension(
-            adapter, top_by_name[name], label=f"MHA-MG-02 {name} stock reference"
-        )
+    _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.imported")
 
     # The template marks each end view's tap; a second, scripted mark doubled
     # it (the r1 audit's duplicate-annotation), so the sheet only proves the one.
@@ -1045,11 +917,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="MHA-MG-04 shoulder seat",
     )
 
-    _add_stock_note(adapter, iso)
+    stock_form_note = _add_stock_form_note(adapter)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     def settled_dimensions() -> None:
         _assert_grouped_flat_locations(adapter, right, right_annotations)
+        _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
+        _assert_stock_form_note(stock_form_note, stage="stock-form.after-final-rebuild")
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):
             annotation = _early_bound(raw, "IAnnotation")

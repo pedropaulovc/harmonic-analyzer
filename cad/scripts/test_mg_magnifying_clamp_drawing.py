@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import itertools
-import json
 import math
 from fractions import Fraction
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,24 +14,18 @@ import build_mg_magnifying_clamp as part
 import draw_mg_magnifying_clamp as drawing
 import mg_magnifying_clamp_spec as spec
 import mg_rod_clamp_joint as joint
-import _gtol_face_resolve
 import _drawing_dimension_import as dimension_import
 import _drawing_dimensions as drawing_dimensions
-import _drawing_leader_notes as leader_notes
 import _drawing_notes as drawing_notes
-from _drawing_layout_check import DrawableRegion
-from _layout_audit import arrowhead_segments, find_leader_through_text
+from _layout_audit import arrowhead_segments
 from _layout_geometry import (
     ARROW_TEXT_CLEARANCE_M,
     AnnotationGeometry,
     Box,
     Segment,
-    SheetGeometry,
-    find_border_breaches,
     segment_box_distance,
     segment_box_overlap_length,
 )
-from _gtol_face import FaceGeometry, SURFACE_PLANE
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 
 
@@ -63,7 +55,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     kept = set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP) | set(drawing.RIGHT_LOCATION_KEEP) | set(drawing.TOP_LOCATION_KEEP) | set(drawing.BOTTOM_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
-    assert spec.REFERENCE_DIMENSIONS <= set(drawing.TOP_KEEP)
+    assert spec.DRAWING_PRECISION["HexProfile"]["HexAf"] == 2
 
 
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
@@ -84,10 +76,10 @@ def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
 
 
 def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
-    for name, (nominal, worst) in spec.WALLS.items():
+    for name, (nominal, worst) in spec.DERIVED_WALL_BOUNDS.items():
         assert worst >= spec.WALL_TARGET, name
         assert nominal >= worst, name
-    assert spec.WALLS["rod-tap drill point to the lever bore"][1] == pytest.approx(
+    assert spec.DERIVED_WALL_BOUNDS["rod-tap drill point to the lever bore"][1] == pytest.approx(
         spec.ROD_TAP_FLOOR_WALL_WORST
     )
     # Finished stock form is separately accepted. Bore and tap axes each
@@ -100,8 +92,13 @@ def test_worst_case_walls_and_engagement_hold_the_contract() -> None:
     ]
     assert geom.TAP_TO_BORE_ENTRY_Z_MAX == pytest.approx(max(entry_errors))
     assert geom.BORE_FULL_ANGULAR == pytest.approx(15.0 * math.tan(math.radians(0.3)))
-    for name in ("lever bore to a flat", "rod-tap thread to a flat", "thumb-screw tap thread to a flat"):
-        assert spec.WALLS[name][1] == spec.WALL_TARGET
+    assert spec.FINISHED_NET_WALL_MINIMUMS == {
+        "lever bore to outer faces": 2.0,
+        "rod-tap thread to outer faces": 2.0,
+        "thumb-screw tap thread to outer faces": 2.0,
+    }
+    assert set(spec.FINISHED_NET_WALL_MINIMUMS).isdisjoint(spec.DERIVED_WALL_BOUNDS)
+    assert spec.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(2.092143505152)
     assert spec.THUMB_ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert joint.ENGAGEMENT_WORST >= joint.ENGAGEMENT_MIN
     assert spec.TAP_REACH_NEEDED <= spec.PLUG_TAP_USABLE_LENGTH
@@ -172,23 +169,25 @@ def test_installed_thumb_full_overlap_includes_actual_male_tip_and_seating() -> 
 
 def test_feature_owned_acceptance_retains_stock_envelope_wall_and_seat_requirements() -> None:
     notes = spec.DRAWING_NOTES
-    assert float(Fraction(notes.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
+    assert float(Fraction(spec.STOCK_AF_CALLOUT.split()[0])) * 25.4 == pytest.approx(spec.HEX_AF)
+    assert spec.STOCK_AF_CALLOUT == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+    assert (spec.HEX_AF - spec.HEX_AF_BAND, spec.HEX_AF + spec.HEX_AF_BAND) == pytest.approx((12.57, 12.83))
     for gone in ("CENTRED", "PLUG TAP", "CHAMFER", "SEAT", "THREAD ENDS"):
         assert gone not in notes
-    assert spec.WALL_NOTE == f"{spec.WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS"
+    assert spec.WALL_NOTE.splitlines() == ["2.0 MIN FINISHED NET WALL", "BORE/TAPS/OUTER FACES, FULL DEPTH"]
     assert f"TRANSVERSE ENVELOPE {spec.STOCK_WIDTH_MAX:.2f} MAX" in notes
     assert "OVER FULL HEIGHT" in notes
     assert not hasattr(spec, "TAP_TOOL_NOTE")
     assert not hasattr(spec, "BORE_WALL_NOTE")
     # This is finished acceptance, not an AF/Rule#1 form guarantee.
     assert "WALL" not in notes
-    assert spec.LEVER_BORE_CALLOUT.splitlines() == ["DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", spec.WALL_NOTE]
+    assert spec.LEVER_BORE_CALLOUT.splitlines() == ["DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", *spec.WALL_NOTE.splitlines()]
     assert "MHA-MG-03" in spec.LEVER_BORE_CALLOUT
     assert spec.SEAT_NOTE.startswith("MHA-MG-04 SHOULDER SEAT")
     assert "NO CHAMFER OR SPOTFACE" in spec.SEAT_NOTE
     assert spec.THUMB_TAP_PROCESS == "TAP INTO BORE; MHA-MG-VN-50"
     assert "AT TAP" in spec.SEAT_NOTE
-    assert len(spec.STOCK_NOTE.splitlines()) + len(spec.WALL_NOTE.splitlines()) + len(spec.SEAT_NOTE.splitlines()) == 4
+    assert notes.startswith("AS-SUPPLIED STOCK FORM ACCEPTANCE\n")
     assert spec.HEIGHT_CALLOUT == "CONTROLS TOP-TAP WALL"
     for stale in ("SKEW", "5.2", "Ø5 VERTICAL ROD"):
         assert stale not in notes
@@ -274,7 +273,7 @@ def _front_drawing_layout(monkeypatch):
             adapter, view, keep=keep, view_label="front",
             dimensions_by_feature=spec.DRAWING_DIMENSIONS,
         ))
-    drawing.set_dimension_callouts(adapter, curated, drawing.DIMENSION_CALLOUTS)
+    drawing.set_dimension_callouts(adapter, curated, {name: text for name, text in drawing.DIMENSION_CALLOUTS.items() if name in annotations})
     return SimpleNamespace(annotations=annotations, curated=curated, before=before)
 
 
@@ -347,7 +346,7 @@ def test_r27_group_text_moves_clear_of_actual_neighbor_ink_without_raising_witne
     neighbors = (
         section_a, diagonal_value,
         Box(0.060362, 0.077362, 0.109638, 0.177038),  # actual front outline
-        Box(0.1083, 0.1338, 0.1917, 0.1541),  # complete four-row bore callout
+        Box(0.1083, 0.1338, 0.1917, 0.1541),  # R27's former four-row callout, not the new five-row extent
         Box(0.0137, 0.1471, 0.0583, 0.1619),  # height value and both function rows
     )
     assert min(box.gap(neighbor) for box in moved for neighbor in neighbors) > 0.004
@@ -532,403 +531,341 @@ def test_native_tap_class_omission_rejects_refused_or_stale_callouts(options) ->
         drawing._omit_tap_thread_class(_TapCallout(**options), label="native tap")
 
 
-class _StockFace:
-    def __init__(self, context, key, normal, origin):
-        self.context, self.native_key = context, (context, key)
-        self.face_id = 7  # Deliberately collides across faces/documents; never an identity.
-        self.geometry = FaceGeometry(self, SURFACE_PLANE, (*normal, *origin), normal, (0.0,) * 6)
-        self.document = None
-        self.selection_count = 0
+class _AfTolerance:
+    def __init__(self):
+        self.Type, self.minimum, self.maximum = 4, -0.00013, 0.00013
+        self.calls, self.refuse, self.stale = [], False, False
 
-    def Select4(self, append, data):
-        assert self.context == "view", "Select4 must not select an underlying-part face into the active drawing"
-        assert append is False and data.View is self.document.view
-        self.selection_count += 1
-        if self.document.fault == "selection_rejected":
+    def SetValues(self, minimum, maximum):
+        self.calls.append((minimum, maximum))
+        if self.refuse:
             return False
-        self.document.selected = self.document.wrong if self.document.fault == "wrong_pick" else self.document.selected_alias
+        if not self.stale:
+            self.minimum, self.maximum = minimum, maximum
         return True
 
+    def GetMinValue(self):
+        return self.minimum
 
-class _StockNoteAnnotation:
-    def __init__(self, document):
-        self.document = document
-        self.entity = document.wrong if document.fault in ("wrong_attachment", "inventory_unavailable") else document.selected
-        self.leaders, self.position = 0, None
-        self.leader_calls = []
-        self.OwnerType = 0
-        self.Owner = document.view
+    def GetMaxValue(self):
+        return self.maximum
 
-    def GetAttachedEntities3(self):
-        return (self.entity,)
 
-    def GetAttachedEntityCount3(self):
-        return 1
+class _AfDisplay:
+    def __init__(self, dimension, annotation):
+        self.dimension, self.annotation = dimension, annotation
+        self.ShowParenthesis, self.places, self.tolerance_places = False, 2, 2
+        self.text, self.precision_calls, self.stale_precision = "", [], False
+        self.prefix, self.suffix = "", ""
 
-    def GetAttachedEntityTypes(self):
-        return (2,)
+    def GetDimension2(self, configuration):
+        assert configuration == 0
+        return self.dimension
 
-    def GetLeaderCount(self):
-        return self.leaders
+    def GetAnnotation(self):
+        return self.annotation
 
-    def IsDangling(self):
-        return self.document.fault == "dangling"
+    def GetPrimaryPrecision2(self):
+        return self.places
 
-    def SetLeader3(self, *args):
-        self.leader_calls.append(args)
-        if args[:2] == (2, 2):
-            if self.document.fault == "bent_leader_refused":
-                return -1
-            if self.document.fault == "bent_leader_boolean":
-                return False
-        self.leaders = 1
+    def GetPrimaryTolPrecision2(self):
+        return self.tolerance_places
+
+    def SetPrecision3(self, primary, dual, tolerance, dual_tolerance):
+        self.precision_calls.append((primary, dual, tolerance, dual_tolerance))
+        if not self.stale_precision:
+            self.tolerance_places = tolerance
         return 0
 
-    def SetPosition2(self, x, y, z):
-        self.position = (x, y, z)
+    def GetText(self, part):
+        assert part in (1, 2, 4)
+        return {1: self.prefix, 2: self.suffix, 4: self.text}[part]
+
+    def SetText(self, part, text):
+        assert part in (1, 2, 4)
+        setattr(self, {1: "prefix", 2: "suffix", 4: "text"}[part], text)
         return True
 
 
-class _StockNoteDocument:
-    def __init__(self, fault):
-        self.fault, self.selected, self.active, self.notes = fault, None, None, []
-        self.rebuilds = 0
-        self.SelectionManager = SimpleNamespace(
-            CreateSelectData=lambda: SimpleNamespace(View=None),
-            GetSelectedObjectCount2=lambda _mark: int(self.selected is not None),
-            GetSelectedObject6=lambda _index, _mark: self.selected,
-        )
-        self.Extension = SimpleNamespace(SelectByID2=self._reject_coordinate_pick)
+def _af_fixture(monkeypatch):
+    import _drawing_tolerances as tolerances
 
-    def _reject_coordinate_pick(self, *_args):
-        raise AssertionError("stock note must select the exact view flat, not a guessed coordinate")
-
-    def ActivateView(self, name):
-        assert name == "stock iso"
-        self.active = self.view
-        return True
-
-    def ClearSelection2(self, _all):
-        self.selected = None
-
-    def EditRebuild3(self):
-        self.rebuilds += 1
-        if self.fault == "bent_leader_wrong_attachment":
-            self.notes[-1].GetAnnotation().entity = self.wrong
-        return True
-
-    def InsertNote(self, text):
-        assert text == drawing.property_link("Manufacturing Notes")
-        assert self.active is self.view and self.selected is not None
-        annotation = _StockNoteAnnotation(self)
-        note = SimpleNamespace(
-            GetAnnotation=lambda: annotation,
-            GetText=lambda: self.model.properties["Manufacturing Notes"],
-        )
-        self.notes.append(note)
-        return note
-
-
-def _stock_context_fixture(monkeypatch, *, fault=None, stale_property=False, has_supplied_flat=True, cross_context_code=0):
-    origin = (0.0, 0.0, spec.HEX_AF / 2000.0)
-    normal = (0.0, 0.0, 1.0)
-    supplied = _StockFace("source", "stock", normal, origin)
-    cap = _StockFace("source", "cap", (0.0, 1.0, 0.0), (0.0, spec.BLOCK_HEIGHT / 1000.0, 0.0))
-    opposite = _StockFace("source", "opposite", (0.0, 0.0, -1.0), (0.0, 0.0, -origin[2]))
-    source_faces = [cap, opposite, *([supplied] if has_supplied_flat else [])]
-    for face, following in zip(source_faces, [*source_faces[1:], None], strict=True):
-        face.GetNextFace = lambda following=following: following
-    view_face = _StockFace("view", "stock", normal, origin)
-    selected_alias = _StockFace("view", "stock", normal, origin)
-    wrong = _StockFace("view", "wrong", normal, origin)
-    wrong_source = _StockFace("other part", "stock", normal, origin)
-    canonical_alias = _StockFace("source", "stock", normal, origin)
-    feature, view_feature = SimpleNamespace(), SimpleNamespace()
-    candidates = [view_face]
-    if fault == "no_view_flat":
-        candidates = []
-    elif fault == "duplicate_view_flat":
-        candidates.append(wrong)
-    view_feature.GetFaces = lambda: tuple(candidates)
-    bindings, records, correspondences = [], [], []
-
-    def feature_by_name(name):
-        assert name == "Block"
-        return None if fault == "no_block" else feature
-
-    def corresponding_feature(source):
-        assert source is feature  # Never retry the fixture's known-null direct face API.
-        return None if fault == "no_view_feature" else view_feature
-
-    def corresponding_source(entity):
-        correspondences.append(entity)
-        assert entity.context == "view"
-        if fault == "no_source_correspondence":
-            return None
-        return wrong_source if fault == "wrong_source" or entity.native_key[1] == "wrong" else canonical_alias
-
-    model = SimpleNamespace(
-        GetBodies2=lambda _kind, _visible: (SimpleNamespace(GetFirstFace=lambda: source_faces[0]),),
-        FeatureByName=feature_by_name,
-        Extension=SimpleNamespace(GetCorrespondingEntity2=corresponding_source),
-        properties={"Manufacturing Notes": "OLD STOCK" if stale_property else spec.STOCK_NOTE},
+    _install_witness_interfaces(monkeypatch)
+    owner = _NativeSketch("actual hex", "HexProfile")
+    points = [_WitnessPoint(owner, -0.003666, 0.00635), _WitnessPoint(owner, -0.003666, -0.00635)]
+    source_annotation = SimpleNamespace(
+        entities=points, types=(11, 11), count=2, dangling=False,
     )
-    document = _StockNoteDocument(fault)
-
-    def notes():
-        if fault == "inventory_unavailable":
-            raise RuntimeError("native view note inventory unavailable")
-        return tuple(document.notes)
-
-    view = SimpleNamespace(
-        ReferencedDocument=model, GetCorresponding=corresponding_feature,
-        GetName2=lambda: "stock iso", GetNotes=notes,
+    source_annotation.GetAttachedEntities3 = lambda: source_annotation.entities
+    source_annotation.GetAttachedEntityTypes = lambda: source_annotation.types
+    source_annotation.GetAttachedEntityCount3 = lambda: source_annotation.count
+    source_annotation.IsDangling = lambda: source_annotation.dangling
+    tolerance = _AfTolerance()
+    source_dimension = SimpleNamespace(
+        Tolerance=tolerance, SystemValue=0.0127,
+        FullName="HexAf@HexProfile@actual-clamp.Part", native_token="actual AF",
     )
-    document.view, document.model, document.wrong, document.selected_alias = view, model, wrong, selected_alias
-    for face in (view_face, selected_alias, wrong):
-        face.document = document
+    source_display = _AfDisplay(source_dimension, source_annotation)
+    model = SimpleNamespace(FeatureManager=_native_inventory(*points))
+    view = SimpleNamespace(ReferencedDocument=model)
+    imported_dimension = SimpleNamespace(**vars(source_dimension))
+    imported_annotation = SimpleNamespace(Owner=view, OwnerType=0, dangling=False)
+    imported_annotation.IsDangling = lambda: imported_annotation.dangling
+    imported_display = _AfDisplay(imported_dimension, imported_annotation)
+    imported_display.text = spec.STOCK_AF_CALLOUT
+    imported_annotation.GetSpecificAnnotation = lambda: imported_display
+    records, same_calls = [], []
 
-    def same(first, second):
-        if first is second:
-            if fault == "source_self_unknown" and first is supplied:
-                return 2
-            if fault == "view_self_unknown" and first is view_face:
-                return 2
-            if fault == "canonical_self_unknown" and first is canonical_alias:
-                return 2
-            return 1
-        if first is canonical_alias and second is supplied and fault == "source_same_unknown":
-            return 2
-        if getattr(first, "context", None) == "source" and getattr(second, "context", None) == "view":
-            return cross_context_code
-        return int(getattr(first, "native_key", object()) == getattr(second, "native_key", object()))
+    def same(left, right):
+        same_calls.append((left, right))
+        if hasattr(left, "native_token") and hasattr(right, "native_token"):
+            return int(left.native_token == right.native_token)
+        return _native_same(left, right)
 
-    def bind(value, interface):
-        bindings.append((value, interface))
-        if value is model and interface == "IModelDoc2":
-            return SimpleNamespace(Extension=model.Extension)  # No FeatureByName on this interface.
-        return value
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=same), _attempt=lambda reader, default=None: reader())
 
-    def read_member(value, member):
-        value = getattr(value, member)
-        return value() if callable(value) else value
+    def named(context, feature, dimension):
+        assert context.currentModel is model
+        assert (feature, dimension) == ("HexProfile", "HexAf")
+        return source_display, source_dimension
 
-    adapter = SimpleNamespace(
-        currentModel=document, swApp=SimpleNamespace(IsSame=same),
-        _attempt=lambda fn, default=None: fn(), _get_attr_or_call=read_member,
-    )
-    monkeypatch.setattr(drawing, "_early_bound", bind)
-    monkeypatch.setattr(_gtol_face_resolve, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(_gtol_face_resolve, "_bind", lambda value, _interface: value)
-    monkeypatch.setattr(_gtol_face_resolve, "_com_invoke", lambda value, _interface, member: getattr(value, member)())
-    monkeypatch.setattr(_gtol_face_resolve, "face_geometry", lambda value, *, identities: value.geometry)
-    monkeypatch.setattr(drawing, "face_geometry", lambda value: value.geometry)
-    monkeypatch.setattr(leader_notes, "rebuild_drawing", lambda *_a, **_kw: None)
+    for module in (part, drawing, tolerances):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(tolerances, "_named_dimension", named)
     monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: records.append((message, fields)))
     return SimpleNamespace(
-        adapter=adapter, view=view, model=model, source=supplied, face=view_face,
-        alias=selected_alias, wrong_source=wrong_source, document=document,
-        bindings=bindings, records=records, correspondences=correspondences,
+        adapter=adapter, model=model, view=view, points=points,
+        source_annotation=source_annotation, source_dimension=source_dimension,
+        source_display=source_display, tolerance=tolerance,
+        annotation=imported_annotation, dimension=imported_dimension, display=imported_display,
+        records=records, same_calls=same_calls,
     )
 
 
-@pytest.mark.parametrize("cross_context_code", (0, 2))
-def test_stock_note_uses_the_exact_view_face_and_native_source_correspondence(monkeypatch, cross_context_code) -> None:
-    state = _stock_context_fixture(monkeypatch, cross_context_code=cross_context_code)
-    drawing._add_stock_note(state.adapter, state.view)
-    assert state.face.selection_count == 1 and state.source.selection_count == 0
-    assert len(state.document.notes) == 1 and state.document.selected is None
-    annotation = state.document.notes[0].GetAnnotation()
-    assert annotation.GetAttachedEntities3() == (state.alias,) and state.alias is not state.face
-    assert state.adapter.swApp.IsSame(state.alias, state.face) == 1
-    assert state.adapter.swApp.IsSame(state.source, state.face) == cross_context_code
-    assert annotation.GetAttachedEntityTypes() == (2,) and annotation.GetLeaderCount() == 1
-    assert not annotation.IsDangling() and annotation.position == (*drawing.STOCK_NOTE_XY, 0.0)
-    assert state.document.notes[0].GetText() == spec.STOCK_NOTE
-    assert (state.model, "IPartDoc") in state.bindings
-    audit = json.loads(state.records[-1][1]["auditJSON"])
-    assert audit["source_self"] == audit["view_self"] == audit["canonical_self"] == audit["source_same"] == 1
-    assert audit["raw_source_vs_view"] == cross_context_code and audit["stage"] == "stock.complete"
-    assert annotation.leader_calls == [
-        (1, 0, True, False, False, False),
-        (2, 2, True, False, False, False),
-    ]
-    assert state.document.rebuilds == 1 and audit["leader_status"] == 0
+def test_native_af_authoring_owns_real_limits_precision_and_nonreference_source(monkeypatch):
+    state = _af_fixture(monkeypatch)
+    state.tolerance.Type = 0
+    state.tolerance.minimum = state.tolerance.maximum = 0.0
+    state.source_display.ShowParenthesis = True
+    state.source_display.tolerance_places = -2
+    part._author_stock_af(state.adapter)
+    assert state.tolerance.calls == [(-0.00013, 0.00013)]
+    assert state.tolerance.Type == 4
+    assert state.source_display.precision_calls == [(-1, -1, 2, -1)]
+    assert state.source_display.ShowParenthesis is False
+    assert ((state.source_dimension.SystemValue + state.tolerance.GetMinValue()) * 1000,
+            (state.source_dimension.SystemValue + state.tolerance.GetMaxValue()) * 1000) == pytest.approx((12.57, 12.83))
+    assert all(point._oleobj_.calls for point in state.points)
 
 
-@pytest.mark.parametrize("fault, message", (
-    ("bent_leader_refused", "bent/right leader refused"),
-    ("bent_leader_boolean", "bent/right leader refused"),
-    ("bent_leader_wrong_attachment", "lost its face attachment"),
+@pytest.mark.parametrize("fault", ("refused", "stale-values", "stale-precision"))
+def test_native_af_authoring_refuses_failed_or_nonpersistent_native_writes(monkeypatch, fault):
+    state = _af_fixture(monkeypatch)
+    state.tolerance.minimum = state.tolerance.maximum = 0.0
+    state.tolerance.refuse = fault == "refused"
+    state.tolerance.stale = fault == "stale-values"
+    state.source_display.stale_precision = fault == "stale-precision"
+    state.source_display.tolerance_places = 3
+    with pytest.raises(RuntimeError):
+        part._author_stock_af(state.adapter)
+    assert len(state.tolerance.calls) == 1
+
+
+@pytest.mark.parametrize("field,value", (
+    ("places", 3), ("tolerance_places", -2), ("ShowParenthesis", True),
+    ("SystemValue", 0.0128), ("Type", 0), ("minimum", -0.00051),
+    ("maximum", 0.00051), ("FullName", "Wrong@HexProfile@actual-clamp.Part"),
 ))
-def test_stock_note_bent_leader_must_succeed_and_keep_the_actual_face_after_rebuild(monkeypatch, fault, message) -> None:
-    state = _stock_context_fixture(monkeypatch, fault=fault)
-    with pytest.raises(RuntimeError, match=message):
-        drawing._add_stock_note(state.adapter, state.view)
-    assert state.document.notes[0].GetText() == spec.STOCK_NOTE
-    audit = json.loads(state.records[-1][1]["auditJSON"])
-    assert audit["stage"] == "stock.leader_style"
-    assert audit["failure"]["type"] == "RuntimeError"
+def test_native_af_readback_refuses_changed_acceptance(monkeypatch, field, value):
+    state = _af_fixture(monkeypatch)
+    target = state.display if hasattr(state.display, field) else state.dimension if hasattr(state.dimension, field) else state.tolerance
+    setattr(target, field, value)
+    with pytest.raises(RuntimeError, match="HexAf"):
+        part._assert_stock_af(state.display, state.dimension, stage="after-rebuild")
+    assert state.records[-1][1]["operation_stage"] == "after-rebuild"
 
 
-def test_r27_complete_stock_and_seat_rows_fit_the_native_inner_border(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch)
-    drawing._add_stock_note(state.adapter, state.view)
-    stock = state.document.notes[0].GetAnnotation()
-    # R27 native text-only extents; do not translate attached leader tips or
-    # claim synthetic bent segments prove the next native layout audit.
-    stock_before = Box(0.3057, 0.1319, 0.4239, 0.1400)
-    seat_before = Box(0.2870, 0.1124, 0.4333, 0.1160)
-    inner_right, paper_right = 0.4191, 0.4318
-    assert stock_before.xmax > inner_right and seat_before.xmax > paper_right
-    original_leader = Segment(0.3040418, 0.1384266, 0.3508350, 0.1637209, "leader")
-    assert segment_box_overlap_length(
-        original_leader, Box(0.3057, 0.1360, 0.4105, 0.1400)
-    ) > 0.0005
-    moved = []
-    for box, old, actual in (
-        (stock_before, (0.305, 0.140), stock.position[:2]),
-        (seat_before, (0.287, 0.116), drawing.SEAT_NOTE_XY),
-    ):
-        dx, dy = actual[0] - old[0], actual[1] - old[1]
-        translated = Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
-        assert translated.xmax < inner_right - 0.012
-        moved.append(translated)
-    section_outline = Box(0.222415, 0.120162, 0.277585, 0.219838)
-    section_caption = Box(0.225, 0.099, 0.275, 0.108)
-    assert moved[0].gap(section_outline) > 0.008
-    assert moved[1].gap(section_caption) > 0.004
-    assert moved[0].gap(moved[1]) > 0.015
-    assert stock.leader_calls[-1] == (2, 2, True, False, False, False)
-    assert stock.GetAttachedEntities3() == (state.alias,)
+@pytest.mark.parametrize("prefix,suffix", (("(", ")"), ("(", ""), ("", ")")))
+@pytest.mark.parametrize("target,stage", (
+    ("source", "HexAf.source-authored"),
+    ("source", "HexAf.imported"),
+    ("import", "HexAf.imported"),
+    ("source", "HexAf.after-final-rebuild"),
+    ("import", "HexAf.after-final-rebuild"),
+))
+def test_native_af_rejects_stale_reference_affixes_with_parenthesis_property_false(monkeypatch, prefix, suffix, target, stage):
+    state = _af_fixture(monkeypatch)
+
+    def accept():
+        if stage == "HexAf.source-authored":
+            part._assert_stock_af_source(state.adapter, stage=stage)
+        else:
+            drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage=stage)
+
+    accept()  # The ordinary AF and its existing stock qualifier are allowed.
+    display = state.source_display if target == "source" else state.display
+    # Exercise the same independent native text parts as set_reference_dimension.
+    display.SetText(1, prefix)
+    display.SetText(2, suffix)
+    assert display.ShowParenthesis is False
+    with pytest.raises(RuntimeError, match="native reference affix remained"):
+        accept()
+    expected_stage = f"{stage}.source" if target == "source" and stage != "HexAf.source-authored" else stage
+    assert state.records[-1][1]["operation_stage"] == expected_stage
+    assert f"'prefix': {prefix!r}" in state.records[-1][1]["native_measurement"]
+    assert f"'suffix': {suffix!r}" in state.records[-1][1]["native_measurement"]
 
 
-def test_stock_flat_leader_clears_linked_scale_caption_with_r17_actual_ink(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch)
-    drawing._add_stock_note(state.adapter, state.view)
-    stock = state.document.notes[0]
-    assert stock.GetText() == spec.STOCK_NOTE
-    assert stock.GetAnnotation().GetAttachedEntities3() == (state.alias,)
+@pytest.mark.parametrize("fault", ("count", "null", "type", "dangling", "alias", "owner", "span", "normal-offset", "capability"))
+def test_native_af_source_requires_actual_distinct_opposite_flat_endpoints(monkeypatch, fault):
+    state = _af_fixture(monkeypatch)
+    if fault == "count":
+        state.source_annotation.count = 1
+    elif fault == "null":
+        state.source_annotation.entities = (None, state.points[1])
+    elif fault == "type":
+        state.source_annotation.types = (10, 11)
+    elif fault == "dangling":
+        state.source_annotation.dangling = True
+    elif fault == "alias":
+        state.points[1].identifiers = state.points[0].identifiers
+    elif fault == "owner":
+        state.points[0].owner.feature_name = "WrongProfile"
+        state.model.FeatureManager = _native_inventory(*state.points)
+    elif fault == "span":
+        state.points[1].Y -= 0.001
+    elif fault == "normal-offset":
+        state.points[1].X += 0.001
+    else:
+        state.points[0]._oleobj_.capabilities[_WitnessDispatch.segment_iid] = True
+    with pytest.raises(RuntimeError):
+        part._assert_stock_af_source(state.adapter, stage="source-rebuilt")
 
-    def insert_linked(adapter, text, x, y):
-        assert adapter is state.adapter
-        assert text == drawing.property_link("Isometric View Note")
-        return SimpleNamespace(position=(x, y), GetText=lambda: spec.ISOMETRIC_VIEW_NOTE)
 
-    monkeypatch.setattr(drawing_notes, "add_note", insert_linked)
-    caption = drawing.add_property_linked_note(
-        state.adapter, "Isometric View Note", *drawing.ISO_NOTE_XY
+def test_native_af_import_keeps_supplied_stock_callout_on_actual_source_dimension_and_top_view(monkeypatch):
+    state = _af_fixture(monkeypatch)
+    monkeypatch.setattr(drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda value, _interface, *_members: value)
+    monkeypatch.setattr(drawing_dimensions, "dimension_name", lambda _adapter, annotation: "HexAf")
+    drawing.set_dimension_callouts(state.adapter, [state.annotation], {"HexAf": spec.STOCK_AF_CALLOUT})
+    drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
+    assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+    assert any(left is state.dimension and right is state.source_dimension for left, right in state.same_calls)
+    assert any(left is state.annotation.Owner and right is state.view for left, right in state.same_calls)
+
+
+def test_native_top_af_placement_and_attached_stock_text_preserve_source_acceptance(monkeypatch):
+    state = _af_fixture(monkeypatch)
+    state.dimension.Name = "HexAf"
+    state.display.GetDimension = lambda: state.dimension
+    state.view.GetName2 = lambda: "actual top"
+    state.annotation.position = None
+
+    def position(x, y, z):
+        state.annotation.position = (x, y, z)
+        return True
+
+    def read_member(value, member):
+        result = getattr(value, member)
+        return result() if callable(result) else result
+
+    def imported(adapter, view, features):
+        assert adapter is state.adapter and view is state.view
+        assert set(features) == {"HexProfile"}
+        return [("HexAf", state.annotation)]
+
+    state.annotation.SetPosition = position
+    state.adapter._get_attr_or_call = read_member
+    before = (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
+              state.annotation.Owner, tuple(state.points))
+    monkeypatch.setattr(dimension_import, "insert_feature_dimensions", imported)
+    monkeypatch.setattr(drawing_dimensions._sw_type_info, "early_bound_or_flag", lambda value, _interface, *_members: value)
+    curated = drawing.curate_view_dimensions(
+        state.adapter, state.view, keep=drawing.TOP_KEEP, view_label="top",
+        dimensions_by_feature=spec.DRAWING_DIMENSIONS,
     )
-    assert caption.GetText() == spec.ISOMETRIC_VIEW_NOTE
+    drawing.set_dimension_callouts(state.adapter, curated, {"HexAf": spec.STOCK_AF_CALLOUT})
+    assert curated == [state.annotation]
+    assert state.annotation.position == (0.085, 0.255, 0.0)
+    assert state.display.GetText(4) == "1/2 HEX STOCK; FLATS AS SUPPLIED"
+    assert before == (state.dimension.SystemValue, state.tolerance.minimum, state.tolerance.maximum,
+                      state.annotation.Owner, tuple(state.points))
+    assert state.display.GetPrimaryPrecision2() == state.display.GetPrimaryTolPrecision2() == 2
+    assert state.display.ShowParenthesis is False
 
-    # Replay R17's frozen segment and caption ink (0.1 mm audit rounding).
-    # The new two-line stock note can move its leader root: this regression is
-    # historic crossing evidence, NOT a current-note extent/attachment proof.
-    original_anchor = (0.335, 0.150)
-    original_box = Box(0.3354, 0.1464, 0.3937, 0.1500)
-    stock_ink = AnnotationGeometry(
-        label=stock.GetText(), kind="note", owner="stock iso",
-        segments=(Segment(0.3891, 0.1384, 0.3508, 0.1637, "leader"),),
-    )
-    caption_ink = AnnotationGeometry(
-        label=caption.GetText(), kind="note", owner="sheet",
-        text_boxes=(original_box,), position=original_anchor, exact=True,
-    )
+
+def test_unchanged_envelope_row_keeps_r28_blank_lane_clearance():
+    # R28 native text: this exact surviving row was 118.9611 mm wide.
+    # This proves only its placement budget, not the new heading/AF/bore ink.
+    assert spec.DRAWING_NOTES.splitlines()[1] == "TRANSVERSE ENVELOPE 15.00 MAX OVER FULL HEIGHT"
+    x, y = drawing.STOCK_FORM_NOTE_XY
+    row = Box(x, y - 0.0090514, x + 0.1189611, y - 0.0090514 + 0.0035)
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    sheet = SheetGeometry(
-        name="Sheet1", width=template.width_m, height=template.height_m,
-        region=DrawableRegion.whole_sheet(template.width_m, template.height_m),
-        keep_outs=(("title block", Box(
-            template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m
-        )),),
-        annotations=(stock_ink, caption_ink),
-    )
-    before = find_leader_through_text(sheet)
-    assert len(before) == 1 and before[0].kind == "leader-through-text"
-    assert before[0].extra["overlap_mm"] == pytest.approx(6.47, abs=0.15)
-
-    dx, dy = (value - old for value, old in zip(caption.position, original_anchor, strict=True))
-    moved_box = Box(
-        original_box.xmin + dx, original_box.ymin + dy,
-        original_box.xmax + dx, original_box.ymax + dy,
-    )
-    after = replace(sheet, annotations=(stock_ink, replace(
-        caption_ink, text_boxes=(moved_box,), position=caption.position
-    )))
-    assert find_leader_through_text(after) == []
-    # These are the registry's paper/title bounds, not invented native view
-    # or zone extents: the unchanged final live audit must still prove those.
-    assert find_border_breaches(after) == []
+    assert template.width_m - 0.0127 - row.xmax > 0.015
+    assert row.gap(Box(0.222415, 0.120162, 0.277585, 0.219838)) > 0.007
+    assert row.gap(Box(0.2602567, 0.1124082, 0.4062721, 0.1159736)) > 0.014
 
 
-@pytest.mark.parametrize("fault, message", (
-    ("no_block", "source has no Block"),
-    ("no_view_feature", "Block has no drawing-view correspondence"),
-    ("no_view_flat", "expected one drawing-view flat, found 0"),
-    ("duplicate_view_flat", "expected one drawing-view flat, found 2"),
-    ("no_source_correspondence", "drawing face has no source correspondence"),
-    ("wrong_source", "does not prove exact source identity"),
-    ("source_same_unknown", "does not prove exact source identity"),
-    ("source_self_unknown", "source face identity is unavailable"),
-    ("view_self_unknown", "drawing face identity is unavailable"),
-    ("canonical_self_unknown", "does not prove exact source identity"),
-))
-def test_stock_note_rejects_unproved_native_face_correspondence_before_insertion(monkeypatch, fault, message) -> None:
-    state = _stock_context_fixture(monkeypatch, fault=fault)
-    if fault == "wrong_source":
-        assert state.source.geometry.parameters == state.wrong_source.geometry.parameters
-        assert state.source.face_id == state.wrong_source.face_id  # Geometry/ID collision must still fail.
-    with pytest.raises(RuntimeError, match=message):
-        drawing._add_stock_note(state.adapter, state.view)
-    assert state.document.notes == [] and state.face.selection_count == 0
+@pytest.mark.parametrize("fault", ("dimension", "view", "owner-type", "dangling", "text", "unknown-self", "source-span"))
+def test_native_af_import_refuses_wrong_source_context_or_postrebuild_drift(monkeypatch, fault):
+    state = _af_fixture(monkeypatch)
+    if fault == "dimension":
+        state.dimension.native_token = "wrong AF with same name and size"
+    elif fault == "view":
+        state.annotation.Owner = SimpleNamespace(ReferencedDocument=state.model)
+    elif fault == "owner-type":
+        state.annotation.OwnerType = 1
+    elif fault == "dangling":
+        state.annotation.dangling = True
+    elif fault == "text":
+        state.display.text = "FLATS AS SUPPLIED"
+    elif fault == "unknown-self":
+        same = state.adapter.swApp.IsSame
+        state.adapter.swApp.IsSame = lambda left, right: 2 if left is right is state.view else same(left, right)
+    else:
+        state.points[1].Y -= 0.001
+    with pytest.raises(RuntimeError):
+        drawing._assert_stock_af_import(state.adapter, state.view, state.annotation, stage="after-final-rebuild")
 
 
-def test_stock_note_still_requires_the_independently_resolved_supplied_flat(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch, has_supplied_flat=False)
-    with pytest.raises(RuntimeError, match="matched 0 faces"):
-        drawing._add_stock_note(state.adapter, state.view)
-    assert state.document.notes == [] and state.face.selection_count == 0
+@pytest.mark.parametrize("fault", (None, "activation", "stale-property", "leader", "position"))
+def test_global_stock_form_acceptance_is_linked_unleadered_and_sheet_placed(monkeypatch, fault):
+    state = SimpleNamespace(active=False, inserted=[], text=spec.DRAWING_NOTES, leaders=0, position=(*drawing.STOCK_FORM_NOTE_XY, 0.0))
 
+    def activate(name):
+        assert name == "ActualSheet"
+        state.active = fault != "activation"
+        return state.active
 
-@pytest.mark.parametrize("fault", ("wrong_pick", "wrong_attachment", "dangling"))
-def test_stock_note_keeps_the_actual_shared_face_attachment_guard(monkeypatch, fault) -> None:
-    state = _stock_context_fixture(monkeypatch, fault=fault)
-    with pytest.raises(RuntimeError, match="lost its face attachment"):
-        drawing._add_stock_note(state.adapter, state.view)
-    audit = json.loads(state.records[-1][1]["auditJSON"])
-    row = audit["view_notes"][0]
-    assert row["count"] == row["entities_reported"] == row["leaders"] == 1 and row["types"] == [2]
-    assert row["dangling"] is (fault == "dangling")
-    assert row["owner_present"] is True and row["owner_self"] == row["owner_to_view"] == 1
-    assert row["attachments"][0]["self"] == 1
-    assert row["attachments"][0]["view_same"] == row["attachments"][0]["source_same"] == int(fault == "dangling")
-    assert audit["view_note_count_before"] == 0 and row["same_to_before"] == []
-    assert audit["source_same"] == 1  # A valid mapping never excuses a later wrong attachment.
+    def insert(adapter, text, x, y):
+        assert state.active and text == drawing_notes.property_link("Manufacturing Notes")
+        assert (x, y) == drawing.STOCK_FORM_NOTE_XY
+        annotation = SimpleNamespace(GetLeaderCount=lambda: state.leaders, GetPosition=lambda: state.position)
+        note = SimpleNamespace(GetAnnotation=lambda: annotation, GetText=lambda: state.text)
+        state.inserted.append(note)
+        return note
 
-
-def test_stock_note_optional_failure_inventory_never_masks_the_strict_attachment_error(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch, fault="inventory_unavailable")
-    with pytest.raises(RuntimeError, match="lost its face attachment"):
-        drawing._add_stock_note(state.adapter, state.view)
-    audit = json.loads(state.records[-1][1]["auditJSON"])
-    assert "lost its face attachment" in audit["failure"]["message"]
-    assert any(error["member"] == "IView.GetNotes" for error in audit["diagnostic_errors"])
-    assert "view_notes" not in audit
-
-
-def test_stock_note_requires_successful_selection_of_the_verified_view_face(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch, fault="selection_rejected")
-    with pytest.raises(RuntimeError, match="failed to select supplied hex stock flat face by entity"):
-        drawing._add_stock_note(state.adapter, state.view)
-    assert state.face.selection_count == 1 and state.source.selection_count == 0
-    assert state.document.notes == []
-
-
-def test_stock_note_preserves_native_property_resolution_as_a_required_guard(monkeypatch) -> None:
-    state = _stock_context_fixture(monkeypatch, stale_property=True)
-    with pytest.raises(RuntimeError, match="model property did not resolve"):
-        drawing._add_stock_note(state.adapter, state.view)
-    assert state.document.notes[0].GetText() == "OLD STOCK"
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        ActivateSheet=activate, GetCurrentSheet=lambda: SimpleNamespace(GetName=lambda: "ActualSheet"),
+    ))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing_notes, "add_note", insert)
+    if fault == "stale-property":
+        state.text = "OLD STOCK"
+    elif fault == "leader":
+        state.leaders = 1
+    elif fault == "position":
+        state.position = (0.305, 0.140, 0.0)
+    if fault is not None:
+        with pytest.raises(RuntimeError):
+            drawing._add_stock_form_note(adapter)
+        assert len(state.inserted) == (0 if fault == "activation" else 1)
+    else:
+        note = drawing._add_stock_form_note(adapter)
+        drawing._assert_stock_form_note(note, stage="after-final-rebuild")
+        state.text = "TRANSVERSE ENVELOPE 15.00 MAX"  # Lost full-height authority.
+        with pytest.raises(RuntimeError):
+            drawing._assert_stock_form_note(note, stage="after-final-rebuild")
 
 
 @pytest.mark.parametrize("interface", ("IEntity", "ISketchPoint", "ISketchSegment"))

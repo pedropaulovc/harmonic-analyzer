@@ -45,6 +45,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _feature_tree import name_last_feature
 from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
@@ -67,6 +68,7 @@ from mg_magnifying_clamp_geom import (
     BLOCK_HEIGHT,
     HEX_AC,
     HEX_AF,
+    HEX_AF_BAND,
     LEVER_BORE_DIA,
     LEVER_BORE_Y,
     ROD_TAP_DRILL_DIA,
@@ -1046,6 +1048,70 @@ def _assert_ordinary_location(display: Any, dimension: Any, name: str) -> None:
         raise RuntimeError(f"{name}: ordinary .XX default location acceptance changed: {actual!r}")
 
 
+def _assert_stock_af(display: Any, dimension: Any, *, stage: str) -> None:
+    """The actual AF dimension, not a stock note or title-block default, owns size."""
+    import _telemetry
+
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(dimension, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    actual = {
+        "full_name": dimension.FullName,
+        "value_m": dimension.SystemValue,
+        "reference": display.ShowParenthesis,
+        "prefix": str(display.GetText(1) or ""),  # swDimensionTextPrefix
+        "suffix": str(display.GetText(2) or ""),  # swDimensionTextSuffix
+        "places": display.GetPrimaryPrecision2(),
+        "tolerance_places": display.GetPrimaryTolPrecision2(),
+        "tolerance_type": tolerance.Type,
+        "minimum_m": tolerance.GetMinValue(),
+        "maximum_m": tolerance.GetMaxValue(),
+    }
+    _telemetry.info("clamp native stock AF acceptance", operation_stage=stage, native_measurement=repr(actual))
+    if type(actual["full_name"]) is not str or actual["full_name"].split("@")[:2] != ["HexAf", "HexProfile"]:
+        raise RuntimeError(f"HexAf: wrong native source dimension at {stage}: {actual!r}")
+    # set_reference_dimension authors these affixes independently of
+    # ShowParenthesis; either stale half must fail every source/import readback.
+    if any("(" in actual[field] or ")" in actual[field] for field in ("prefix", "suffix")):
+        raise RuntimeError(f"HexAf: native reference affix remained at {stage}: {actual!r}")
+    if actual["reference"] is not False or any(type(actual[field]) is not int or actual[field] != value for field, value in (("places", 2), ("tolerance_places", 2), ("tolerance_type", 4))):
+        raise RuntimeError(f"HexAf: native non-reference precision/tolerance changed at {stage}: {actual!r}")
+    for field, wanted in (("value_m", HEX_AF / 1000.0), ("minimum_m", -HEX_AF_BAND / 1000.0), ("maximum_m", HEX_AF_BAND / 1000.0)):
+        if type(actual[field]) not in (int, float) or not math.isclose(actual[field], wanted, rel_tol=0.0, abs_tol=1e-9):
+            raise RuntimeError(f"HexAf: native receiving limits changed at {stage}: {actual!r}")
+
+
+def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
+    """Prove the named native AF still measures two actual HexProfile endpoints."""
+    import _telemetry
+
+    display, dimension = _named_dimension(adapter, "HexProfile", "HexAf")
+    _assert_stock_af(display, dimension, stage=stage)
+    annotation = _early_bound(_early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
+    entities = tuple(annotation.GetAttachedEntities3() or ())
+    types = tuple(annotation.GetAttachedEntityTypes() or ())
+    count, dangling = annotation.GetAttachedEntityCount3(), annotation.IsDangling()
+    _telemetry.info("clamp native stock AF source attachments", operation_stage=stage, attachment_count=count, attachment_types=repr(types), returned_count=len(entities), dangling=dangling)
+    if type(count) is not int or count != 2 or len(entities) != 2 or len(types) != 2 or any(type(kind) is not int or kind != 11 for kind in types) or any(entity is None for entity in entities) or dangling is not False:
+        raise RuntimeError(f"HexAf: actual two-point source attachment changed at {stage}")
+    keys = tuple(_point_identity(adapter, entity, stage=stage, role=f"af-endpoint-{index}") for index, entity in enumerate(entities))
+    if keys[0] == keys[1] or any(key[:2] != ("HexProfile", "ISketchPoint") for key in keys):
+        raise RuntimeError(f"HexAf: source endpoints are not distinct actual HexProfile points: {keys!r}")
+    points = tuple(_early_bound(entity, "ISketchPoint") for entity in entities)
+    coordinates = tuple((point.X, point.Y) for point in points)
+    _telemetry.info("clamp native stock AF source span", operation_stage=stage, point_keys=repr(keys), coordinates=repr(coordinates))
+    if any(type(value) not in (int, float) or not math.isfinite(value) for point in coordinates for value in point) or not math.isclose(coordinates[0][0], coordinates[1][0], rel_tol=0.0, abs_tol=1e-9) or not math.isclose(abs(coordinates[0][1] - coordinates[1][1]), HEX_AF / 1000.0, rel_tol=0.0, abs_tol=1e-9):
+        raise RuntimeError(f"HexAf: actual source points no longer span the opposite flats: {coordinates!r}")
+    return display, dimension
+
+
+def _author_stock_af(adapter: Any) -> None:
+    set_dimension_symmetric_tolerance(adapter, "HexProfile", "HexAf", HEX_AF_BAND)
+    display, _dimension = _named_dimension(adapter, "HexProfile", "HexAf")
+    _early_bound(display, "IDisplayDimension").ShowParenthesis = False
+    _assert_stock_af_source(adapter, stage="HexAf.source-authored")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -1175,6 +1241,7 @@ async def build(adapter) -> dict[str, str]:
     if int(bore_tolerance.Type) != 0:
         raise RuntimeError("LeverBoreDiaDim: duplicate explicit drilled-hole tolerance remained")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _author_stock_af(adapter)
     _assert_location_profiles(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -63,11 +63,10 @@ from mg_rod_clamp_joint import (  # noqa: F401 (re-export)
 
 
 # --- Places each printed dimension carries ----------------------------------
-# Nominal 1/2 in AF is REF; the attached property owns receiving limits.
-HEX_AF_PLACES = 3
+# The native, non-reference AF dimension owns the selected receiving band.
+HEX_AF_PLACES = 2
 # The drilled lever bore uses .XX and the DRILLED HOLES +0.10/0 row.
 LEVER_BORE_DIA_PLACES = 2
-REFERENCE_DIMENSIONS = frozenset({"HexAf"})
 
 # --- Printed limits ----------------------------------------------------------
 _HEIGHT_BAND = printed_band_mm(HEIGHT_PLACES)  # 0.51 on the height and the bore's
@@ -86,12 +85,16 @@ _THREAD_R_MAX = THREAD_MAJOR / 2.0 + _TAP_OVERSIZE_R
 _DRILL_SLOPE = math.tan(math.radians(DRILL_WANDER_DEG))
 
 
-# --- Walls at the printed worst case (drawing-guidelines.md rule 17) --------
-WALLS: dict[str, tuple[float, float]] = {
-    "lever bore to a flat": (
-        (HEX_AF - LEVER_BORE_DIA) / 2.0,
-        WALL_TARGET,
-    ),
+# --- Independent finished acceptance versus derived dimensional bounds -------
+# These are inspection thresholds for actual remaining material, including
+# outer-face drift and hole wander; they are NOT calculated stock certificates.
+FINISHED_NET_WALL_MINIMUMS = {
+    "lever bore to outer faces": WALL_TARGET,
+    "rod-tap thread to outer faces": WALL_TARGET,
+    "thumb-screw tap thread to outer faces": WALL_TARGET,
+}
+# Only the blind drill-point floor has a dimensional worst-bound here.
+DERIVED_WALL_BOUNDS: dict[str, tuple[float, float]] = {
     "rod-tap drill point to the lever bore": (
         LEVER_BORE_Y
         - LEVER_BORE_DIA / 2.0
@@ -99,16 +102,8 @@ WALLS: dict[str, tuple[float, float]] = {
         - ROD_TAP_DRILL_DIA / 2.0 / math.tan(math.radians(59.0)),
         ROD_TAP_FLOOR_WALL_WORST,
     ),
-    "rod-tap thread to a flat": (
-        (HEX_AF - THREAD_MAJOR) / 2.0,
-        WALL_TARGET,
-    ),
-    "thumb-screw tap thread to a flat": (
-        (HEX_AF - THREAD_MAJOR) / 2.0,
-        WALL_TARGET,
-    ),
 }
-for _name, (_nominal, _worst) in WALLS.items():
+for _name, (_nominal, _worst) in DERIVED_WALL_BOUNDS.items():
     if _worst < WALL_TARGET - 1e-9:
         raise AssertionError(
             f"MHA-MG-02 {_name} wall {_worst:.3f} at the printed worst case is "
@@ -189,8 +184,8 @@ if not ROD_TAP_DRILL_DEPTH_MAX < LEVER_BORE_Y - _HEIGHT_BAND - _LEVER_BORE_R_MAX
 # --- Marked model dimensions and the places the model authors on them --------
 # Five ordinary native location measurements remain authoritative even when
 # the three common-flat values print as one explicitly grouped dimension.
-# The attached stock property owns full-height receiving acceptance; the
-# actual bore's callout owns finished-wall acceptance, not nominal stock form.
+# The native AF dimension owns receiving size; a global note owns supplied
+# stock form. The actual bore's callout owns finished net-wall acceptance.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HexProfile": {"HexAf": HEX_AF_PLACES},
     "Block": {"Height": HEIGHT_PLACES},
@@ -219,12 +214,10 @@ Z_FLAT_DIMENSIONS = ("LeverBoreFromZFlat", "ThumbTapFromZFlat", "RodTapFromZFlat
 DIMENSION_GROUPS = {"LeverBoreFromZFlat": Z_FLAT_DIMENSIONS}
 GROUPED_HIDDEN_DIMENSIONS = frozenset(Z_FLAT_DIMENSIONS[1:])
 VISIBLE_DIMENSIONS = frozenset(DRAWING_PRECISION_BY_NAME) - GROUPED_HIDDEN_DIMENSIONS
-if not REFERENCE_DIMENSIONS <= set(DRAWING_PRECISION_BY_NAME):
-    raise AssertionError("MHA-MG-02 reference dimension is unprinted")
 
 # --- Sheet text ----------------------------------------------------------------
 # Process, mate and finished-wall acceptance belong to the actual bore diameter.
-WALL_NOTE = f"{WALL_TARGET:.1f} MIN FINISHED WALL AT BORE/TAPS"
+WALL_NOTE = f"{WALL_TARGET:.1f} MIN FINISHED NET WALL\nBORE/TAPS/OUTER FACES, FULL DEPTH"
 LEVER_BORE_CALLOUT = "\n".join(("DRILL THRU CORNERS", "SLIP ON 1/4 IN LEVER MHA-MG-03", WALL_NOTE))
 HEIGHT_CALLOUT = "CONTROLS TOP-TAP WALL"
 # Ahead of each native thread row.
@@ -238,11 +231,11 @@ TAP_CALLOUT_PRECISION = {
     TAP_DRILL_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
     TAP_THREAD_DEPTH_VARIABLE: HOLE_DEPTH_PLACES,
 }
-STOCK_NOTE = f"1/2 HEX BAR; AF {HEX_AF - HEX_AF_BAND:.2f}–{HEX_AF + HEX_AF_BAND:.2f}; FLATS AS SUPPLIED\nTRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX OVER FULL HEIGHT"
+STOCK_AF_CALLOUT = "1/2 HEX STOCK; FLATS AS SUPPLIED"
 # The MHA-MG-04 shoulder's face, flagged on Section A-A's bottom line.
 SEAT_NOTE = "MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP"
-# drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the stock.
-DRAWING_NOTES = STOCK_NOTE
+# Independent receiving-form acceptance, not a nominal regular-hex deduction.
+DRAWING_NOTES = f"AS-SUPPLIED STOCK FORM ACCEPTANCE\nTRANSVERSE ENVELOPE {STOCK_WIDTH_MAX:.2f} MAX OVER FULL HEIGHT"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 # --- Section hatch ----------------------------------------------------------------
