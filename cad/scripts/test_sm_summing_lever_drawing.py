@@ -1409,252 +1409,6 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
         bracket_depth_callout.dress()
 
 
-def _native_thread_cutting_envelope(monkeypatch):
-    """Exercise source property + native MAX/MIN identity, not renderer wiring."""
-    import magnifying_bracket_joint_layout as joint
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    properties = {"Bracket Thread-Cutting Requirement": notes.BRACKET_THREAD_CUTTING_REQUIREMENT}
-    dimensions = {}
-    displays = []
-    for name, value_mm, kind, precision in (
-        ("BracketThreadCuttingEnvelopeDiameter", joint.THREAD_CUTTING_ENVELOPE_DIA_MAX, 6, 2),
-        ("BracketThreadCuttingEnvelopeDepth", joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX, 6, 2),
-        ("BracketReceiverWallMinimum", joint.RECEIVER_WALL_MIN, 5, 1),
-    ):
-        tolerance = SimpleNamespace(
-            Type=kind, lower=-value_mm / 1000.0 if kind == 6 else 0.0, upper=0.0,
-        )
-        tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.lower
-        tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.upper
-        dimension = SimpleNamespace(
-            FullName=f"{name}@BracketThreadCuttingEnvelope@sm-summing-lever.SLDPRT",
-            SystemValue=value_mm / 1000.0, Tolerance=tolerance,
-        )
-        display = SimpleNamespace(precision=precision, dimension=dimension)
-        display.GetDimension2 = lambda _index, display=display: display.dimension
-        display.GetPrimaryPrecision2 = lambda display=display: display.precision
-        dimensions[name] = display
-        displays.append(display)
-    feature = SimpleNamespace(displays=displays)
-    source = SimpleNamespace(
-        GetCustomInfoValue=lambda _config, name: properties.get(name, ""),
-        FeatureByName=lambda name: feature if name == "BracketThreadCuttingEnvelope" else None,
-    )
-    monkeypatch.setattr(drawing, "_feature_display_dimensions", lambda owner: iter(owner.displays))
-    return SimpleNamespace(
-        read=lambda: drawing._bracket_thread_cutting_requirement(source),
-        properties=properties, dimensions=dimensions, displays=displays, source=source,
-    )
-
-
-def test_cutting_requirement_reads_saved_model_and_all_three_native_limits(monkeypatch) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
-    # SolidWorks may serialize the property with Windows line endings; it is
-    # still the same complete requirement, not a reason to drop a cavity limit.
-    value = notes.BRACKET_THREAD_CUTTING_REQUIREMENT.replace("\n", "\r\n")
-    case.properties["Bracket Thread-Cutting Requirement"] = value
-    assert case.read() == value
-
-
-@pytest.mark.parametrize("damaged_limit", [None, 1, 2], ids=["valid", "lost-max", "lost-min"])
-def test_cutting_requirement_binds_raw_enumerated_dispatches(
-    monkeypatch, damaged_limit,
-) -> None:
-    """Keep the real raw walker and binding contract at this consumer boundary."""
-    import _com as actual_com
-    import _dimensions
-    from solidworks_mcp.adapters import sw_type_info
-
-    case = _native_thread_cutting_envelope(monkeypatch)
-    wrappers = {}
-    bindings = []
-
-    class PyIDispatchLike:
-        # Like a raw PyIDispatch: no _oleobj_ and no named API members.
-        def InvokeTypes(self, *_args):
-            raise AssertionError("the consumer must bind before calling named members")
-
-    def wrapped(interface, members):
-        raw = PyIDispatchLike()
-        members._oleobj_ = raw
-        wrappers[raw, interface] = members
-        return members
-
-    raw_displays = []
-    for display in case.displays:
-        dimension = display.dimension
-        # Generated GetDimension2 and IDimension.Tolerance return Dispatch
-        # wrappers, unlike _com_invoke's raw feature-walk results.
-        wrapped("IDimensionTolerance", dimension.Tolerance)
-        wrapped("IDimension", dimension)
-        wrapped("IDisplayDimension", display)
-        raw_displays.append(display._oleobj_)
-    if damaged_limit is not None:
-        case.displays[damaged_limit].dimension.Tolerance.Type = 2
-
-    walked = []
-
-    def next_display(raw):
-        walked.append(raw)
-        index = raw_displays.index(raw) + 1
-        return raw_displays[index] if index < len(raw_displays) else None
-
-    feature = SimpleNamespace(
-        GetFirstDisplayDimension=lambda: raw_displays[0],
-        GetNextDisplayDimension=next_display,
-    )
-    case.source.FeatureByName = lambda name: (
-        feature if name == "BracketThreadCuttingEnvelope" else None
-    )
-
-    def early_bound(value, interface):
-        # Stand in only for makepy construction, not _com's passthrough rules.
-        raw = value._oleobj_
-        bindings.append((raw, interface))
-        return wrappers[raw, interface]
-
-    monkeypatch.setattr(sw_type_info, "early_bound", early_bound)
-    monkeypatch.setattr(
-        sw_type_info, "is_early_bound",
-        lambda value, interface: wrappers.get((value._oleobj_, interface)) is value,
-    )
-    monkeypatch.setattr(drawing, "_early_bound", actual_com._early_bound)
-    monkeypatch.setattr(drawing, "_feature_display_dimensions", _dimensions._feature_display_dimensions)
-    if damaged_limit is not None:
-        with pytest.raises(RuntimeError):
-            case.read()
-    else:
-        assert case.read() == notes.BRACKET_THREAD_CUTTING_REQUIREMENT
-        assert walked == raw_displays
-    visited = case.displays if damaged_limit is None else case.displays[:damaged_limit + 1]
-    assert bindings == [
-        (owner._oleobj_, interface)
-        for display in visited
-        for owner, interface in (
-            (display, "IDisplayDimension"),
-            (display.dimension, "IDimension"),
-            (display.dimension.Tolerance, "IDimensionTolerance"),
-        )
-    ]
-
-
-def test_cutting_requirement_rejects_stale_property_even_with_matching_native_sizes(
-    monkeypatch,
-) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    case.properties["Bracket Thread-Cutting Requirement"] = "stale saved requirement\n"
-    with pytest.raises(RuntimeError, match="requirement differs"):
-        case.read()
-
-
-@pytest.mark.parametrize("index", [0, 1], ids=["diameter", "reach"])
-@pytest.mark.parametrize(
-    "damage",
-    ["owner", "name", "value", "nonfinite", "missing_tolerance", "bilateral",
-     "minimum", "lower_limit", "upper_limit", "precision", "duplicate", "missing"],
-)
-def test_cutting_requirement_rejects_wrong_native_association_or_limits(
-    monkeypatch, index, damage,
-) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    display = case.displays[index]
-    dimension = display.dimension
-    if damage == "owner":
-        dimension.FullName = dimension.FullName.replace(
-            "@BracketThreadCuttingEnvelope@", "@UnrelatedReference@",
-        )
-    elif damage == "name":
-        dimension.FullName = "SameSizeButWrongMeaning@BracketThreadCuttingEnvelope@lever"
-    elif damage == "value":
-        dimension.SystemValue += 0.00001
-    elif damage == "nonfinite":
-        dimension.SystemValue = math.nan
-    elif damage == "missing_tolerance":
-        dimension.Tolerance = None
-    elif damage == "bilateral":
-        dimension.Tolerance.Type = 2
-    elif damage == "minimum":
-        dimension.Tolerance.Type = 5
-    elif damage == "lower_limit":
-        dimension.Tolerance.lower = 0.0
-    elif damage == "upper_limit":
-        dimension.Tolerance.upper = 0.00001
-    elif damage == "precision":
-        display.precision = 1
-    elif damage == "duplicate":
-        case.displays.append(display)
-    else:
-        case.displays.remove(display)
-    with pytest.raises(RuntimeError):
-        case.read()
-
-
-@pytest.mark.parametrize(
-    "damage",
-    ["owner", "name", "value", "nonfinite", "missing_tolerance", "maximum",
-     "bilateral", "lower_limit", "upper_limit", "precision", "duplicate", "missing"],
-)
-def test_cutting_requirement_rejects_wrong_native_wall_minimum(monkeypatch, damage) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    display = case.dimensions["BracketReceiverWallMinimum"]
-    dimension = display.dimension
-    if damage == "owner":
-        dimension.FullName = dimension.FullName.replace(
-            "@BracketThreadCuttingEnvelope@", "@UnrelatedReference@",
-        )
-    elif damage == "name":
-        dimension.FullName = "SameSizeButWrongMeaning@BracketThreadCuttingEnvelope@lever"
-    elif damage == "value":
-        dimension.SystemValue += 0.00001
-    elif damage == "nonfinite":
-        dimension.SystemValue = math.nan
-    elif damage == "missing_tolerance":
-        dimension.Tolerance = None
-    elif damage == "maximum":
-        dimension.Tolerance.Type = 6
-    elif damage == "bilateral":
-        dimension.Tolerance.Type = 2
-    elif damage == "lower_limit":
-        dimension.Tolerance.lower = -0.00001
-    elif damage == "upper_limit":
-        dimension.Tolerance.upper = 0.00001
-    elif damage == "precision":
-        display.precision = 2
-    elif damage == "duplicate":
-        case.displays.append(display)
-    else:
-        case.displays.remove(display)
-    with pytest.raises(RuntimeError):
-        case.read()
-
-
-def test_cutting_requirement_rechecks_native_wall_minimum_after_admission(monkeypatch) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    case.read()
-    case.dimensions["BracketReceiverWallMinimum"].dimension.Tolerance.Type = 6
-    with pytest.raises(RuntimeError):
-        case.read()
-
-
-def test_cutting_requirement_rejects_an_unbacked_source_property(monkeypatch) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    case.source.FeatureByName = lambda _name: None
-    with pytest.raises(RuntimeError, match="no native envelope owner"):
-        case.read()
-
-
-def test_cutting_requirement_rechecks_source_limits_after_initial_admission(monkeypatch) -> None:
-    case = _native_thread_cutting_envelope(monkeypatch)
-    case.read()
-    case.displays[1].dimension.Tolerance.upper = 0.00005
-    with pytest.raises(RuntimeError):
-        case.read()
-
-
-
-
 @pytest.mark.parametrize(
     "damage",
     (
@@ -1715,18 +1469,20 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
             lever_build._assert_edge_rib_end_planes(adapter)
 
 
-def test_receiver_row_retains_its_profile_wall_margin() -> None:
-    """The blind receivers stay in the unchanged footprint, inside the G1 rib."""
+def test_receiver_pilots_retain_their_profile_wall_margin() -> None:
+    """The blind pilot cylinders stay inside the unchanged G1 rib footprint."""
     import magnifying_bracket_joint_layout as joint
     from sm_summing_lever_profile import receiver_wall_margin
 
-    drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
+    pilot_radius_max = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
     for x, y, _z in joint.LEVER_HOLE_POINTS:
         assert receiver_wall_margin(
             x + joint.POSITION_BAND,
             y + joint.POSITION_BAND,
-            drill_radius_max,
-        ) - joint.LINEAR_BAND - joint.DRILL_WANDER_MAX >= 2.0
+            pilot_radius_max,
+        ) - joint.LINEAR_BAND - joint.DRILL_WANDER_MAX >= joint.RECEIVER_PILOT_WALL_MIN
 
 
 def _thread_annotation_drawing(monkeypatch, note_count: int = 7):

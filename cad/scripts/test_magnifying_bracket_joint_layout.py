@@ -210,12 +210,12 @@ def test_drill_limits_discriminate_tap_lead_and_point_wander_boundaries() -> Non
             depths[side] = limit - joint.DRILL_DEPTH + direction * epsilon * (1 if safe else -1)
             if safe:
                 _joint_with_values(
-                    DRILL_DEPTH_DEVIATIONS=tuple(depths), RECEIVER_WALL_MIN=0.0,
+                    DRILL_DEPTH_DEVIATIONS=tuple(depths), RECEIVER_PILOT_WALL_MIN=0.0,
                 )
             else:
                 with pytest.raises(AssertionError, match=failure):
                     _joint_with_values(
-                        DRILL_DEPTH_DEVIATIONS=tuple(depths), RECEIVER_WALL_MIN=0.0,
+                        DRILL_DEPTH_DEVIATIONS=tuple(depths), RECEIVER_PILOT_WALL_MIN=0.0,
                     )
 
     feasible_band = min(joint.DRILL_DEPTH - shallow_limit, deep_limit - joint.DRILL_DEPTH)
@@ -226,7 +226,7 @@ def test_drill_limits_discriminate_tap_lead_and_point_wander_boundaries() -> Non
     wider = feasible_band + epsilon
     with pytest.raises(AssertionError, match="bottoming-tap lead|breaks out of the front rib"):
         _joint_with_values(
-            DRILL_DEPTH_DEVIATIONS=(-wider, wider), RECEIVER_WALL_MIN=0.0,
+            DRILL_DEPTH_DEVIATIONS=(-wider, wider), RECEIVER_PILOT_WALL_MIN=0.0,
         )
 
 
@@ -241,9 +241,9 @@ def test_rib_depth_and_band_discriminate_point_containment_boundary() -> None:
     ):
         # Isolate the pre-existing axial containment gate from the stricter,
         # independent 2 mm step-wall gate proved separately below.
-        _joint_with_values(RECEIVER_WALL_MIN=0.0, **{name: boundary + direction * epsilon})
+        _joint_with_values(RECEIVER_PILOT_WALL_MIN=0.0, **{name: boundary + direction * epsilon})
         with pytest.raises(AssertionError, match="breaks out of the front rib"):
-            _joint_with_values(RECEIVER_WALL_MIN=0.0, **{name: boundary - direction * epsilon})
+            _joint_with_values(RECEIVER_PILOT_WALL_MIN=0.0, **{name: boundary - direction * epsilon})
 
 
 def _finite_step_wall_oracle(
@@ -276,9 +276,9 @@ def _finite_step_wall_oracle(
         (5.0, 3.0, 4.0, 1.0, 0.0, math.hypot(1.0, 2.0)),
         (5.0, 2.0, 4.0, 0.0, 0.5, math.hypot(1.0, 2.0)),
     ],
-    ids=["shoulder", "interior-cone", "finite-tip", "full-thread-cylinder", "zero-radius"],
+    ids=["shoulder", "interior-cone", "finite-tip", "flat-point", "zero-radius"],
 )
-def test_step_wall_minimizes_the_exact_finite_envelope(
+def test_step_wall_minimizes_the_exact_finite_pilot(
     rib: float, floor: float, cylinder: float, radius: float, point_ratio: float, expected: float,
 ) -> None:
     wander = 0.125
@@ -320,7 +320,7 @@ def test_step_wall_refuses_every_nonfinite_geometry_input(index: int, nonfinite:
     (6.0, 1.5, 4.0, 1.0, -0.1, 0.0),
     (6.0, 1.5, 4.0, 1.0, 1.0, -0.1),
 ])
-def test_step_wall_refuses_violated_finite_envelope_premises(arguments: tuple[float, ...]) -> None:
+def test_step_wall_refuses_violated_finite_pilot_premises(arguments: tuple[float, ...]) -> None:
     with pytest.raises(ValueError):
         joint.receiver_step_wall_margin(*arguments)
 
@@ -365,23 +365,6 @@ def _printed_pilot_step_budget_oracle() -> float:
     )
 
 
-def _thread_cutting_step_budget_oracle() -> float:
-    return min(
-        _finite_step_wall_oracle(
-            joint.RIB_DEPTH - joint.RIB_DEPTH_BAND, floor,
-            joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
-            joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0,
-            0.0, joint.THREAD_CUTTING_PROOF_RESERVE,
-        )
-        for _, y, _ in joint.LEVER_HOLE_POINTS
-        for floor in (
-            lever.COEFFICIENT_TOP_Y - y - joint.POSITION_BAND,
-            lever.COEFFICIENT_T - joint.LINEAR_BAND
-            - (lever.COEFFICIENT_TOP_Y - y) - joint.POSITION_BAND,
-        )
-    )
-
-
 @pytest.mark.parametrize("pilot", [1.778, 1.784])
 def test_pilot_step_budget_uses_printed_pilot_plus_allowance_and_one_whole_wander(
     monkeypatch, pilot: float,
@@ -400,12 +383,12 @@ def test_pilot_step_budget_uses_printed_pilot_plus_allowance_and_one_whole_wande
     wander = math.tan(math.radians(0.3)) * (7.01 + radius * joint.DRILL_POINT_H)
     assert actual == pytest.approx(_printed_pilot_step_budget_oracle(), abs=1e-12)
     assert len(calls) == len(joint.LEVER_HOLE_POINTS)
-    for rib, floor, depth, envelope_radius, point_ratio, drift in calls:
+    for rib, floor, depth, pilot_radius, point_ratio, drift in calls:
         assert rib == pytest.approx(8.49)
         assert floor == pytest.approx(2.49)  # actual-top row, no extra top-position band
         assert drift == pytest.approx(wander, abs=1e-12)
         assert point_ratio == joint.DRILL_POINT_H
-        assert envelope_radius == pytest.approx(radius)
+        assert pilot_radius == pytest.approx(radius)
         assert depth == pytest.approx(7.01)
     if pilot == 1.778:
         assert radius == pytest.approx((1.78 + 0.10) / 2.0)
@@ -432,7 +415,7 @@ def test_pilot_step_budget_cancels_top_translation_but_checks_thin_plate_lower_f
     assert lower_floor == pytest.approx(1.80)
     assert lower_floor < top - joint.POSITION_BAND
     assert joint.receiver_pilot_step_wall_budget() == pytest.approx(_printed_pilot_step_budget_oracle(), abs=1e-12)
-    assert joint.receiver_pilot_step_wall_budget() < joint.RECEIVER_WALL_MIN
+    assert joint.receiver_pilot_step_wall_budget() < joint.RECEIVER_PILOT_WALL_MIN
     with pytest.raises(AssertionError, match="receiver pilot step wall"):
         _joint_with_values()
 
@@ -449,99 +432,26 @@ def test_pilot_step_budget_rederives_changed_geometry(monkeypatch, name: str, va
     assert actual == pytest.approx(_printed_pilot_step_budget_oracle(), abs=1e-12)
 
 
-def test_pilot_step_proof_is_independent_of_actual_thread_cutting_envelope(monkeypatch) -> None:
+def test_pilot_step_proof_is_independent_of_native_thread_metadata(monkeypatch) -> None:
     pilot = joint.receiver_pilot_step_wall_budget()
-    baseline = joint.receiver_thread_cutting_step_wall_budget()
-    assert baseline == pytest.approx(2.764318, abs=1e-6)
-    assert baseline == pytest.approx(_thread_cutting_step_budget_oracle(), abs=1e-12)
-    monkeypatch.setattr(joint, "THREAD_CUTTING_ENVELOPE_DIA_MAX", 2.60)
-    assert joint.receiver_thread_cutting_step_wall_budget() < baseline
-    assert joint.receiver_thread_cutting_step_wall_budget() == pytest.approx(
-        _thread_cutting_step_budget_oracle(), abs=1e-12,
-    )
-    assert joint.receiver_pilot_step_wall_budget() == pilot
-    monkeypatch.setattr(joint, "THREAD_CUTTING_ENVELOPE_DEPTH_MAX", 7.0)
-    assert joint.receiver_thread_cutting_step_wall_budget() < joint.RECEIVER_WALL_MIN
-    assert joint.receiver_thread_cutting_step_wall_budget() == pytest.approx(
-        _thread_cutting_step_budget_oracle(), abs=1e-12,
-    )
-    assert joint.receiver_pilot_step_wall_budget() == pilot
-    # Native full-thread metadata/basic screw diameter are not pilot inputs.
     monkeypatch.setattr(joint, "THREAD_DEPTH", 8.0)
     monkeypatch.setattr(joint, "THREAD_DEPTH_BAND", 0.5)
     monkeypatch.setattr(joint, "SCREW_MAJOR_DIA", 4.0)
     assert joint.receiver_pilot_step_wall_budget() == pilot
-    with pytest.raises(AssertionError, match="receiver thread-cutting step wall"):
-        _joint_with_values(THREAD_CUTTING_ENVELOPE_DIA_MAX=2.60,
-                           THREAD_CUTTING_ENVELOPE_DEPTH_MAX=7.0)
-
-
-def test_cutting_envelope_axial_budget_has_real_lead_boundary() -> None:
-    assert joint.THREAD_CUTTING_ENVELOPE_DIA_MAX == 2.40
-    assert joint.THREAD_CUTTING_ENVELOPE_DEPTH_MAX == 6.00
-    assert joint.THREAD_CUTTING_PROOF_RESERVE == 0.04
-    assert joint.THREAD_CUTTING_AUXILIARY_DEPTH_MAX == pytest.approx(1.05)
-    assert joint.THREAD_CUTTING_LEAD_MARGIN_MIN == pytest.approx(0.092857142857)
-    boundary = joint.THREAD_DEPTH + joint.THREAD_DEPTH_BAND + 2 * joint.SCREW_PITCH
-    safe = _joint_with_values(THREAD_CUTTING_ENVELOPE_DEPTH_MAX=boundary + 1e-6)
-    assert safe["THREAD_CUTTING_LEAD_MARGIN_MIN"] == pytest.approx(1e-6)
-    with pytest.raises(AssertionError, match="thread-cutting.*lead|lead.*thread-cutting"):
-        _joint_with_values(THREAD_CUTTING_ENVELOPE_DEPTH_MAX=boundary - 1e-6)
-
-
-@pytest.mark.parametrize("name", [
-    "THREAD_CUTTING_ENVELOPE_DEPTH_MAX", "THREAD_CUTTING_ENVELOPE_DIA_MAX",
-])
-def test_thread_cutting_step_guard_discriminates_depth_and_diameter_boundaries(name: str) -> None:
-    rib, floor, reserve = 8.49, 2.49, 0.04
-    target = joint.RECEIVER_WALL_MIN + reserve
-    if name.endswith("DEPTH_MAX"):
-        boundary = rib - math.sqrt(target**2 - (floor - 1.20)**2)
-    else:
-        # At the approved depth even a zero floor ligament is >2 mm;
-        # deepen within the rib first so diameter can independently lose wall.
-        boundary = 2 * (floor - math.sqrt(target**2 - (rib - 7.0)**2))
-    values = {} if name.endswith("DEPTH_MAX") else {"THREAD_CUTTING_ENVELOPE_DEPTH_MAX": 7.0}
-    safe = _joint_with_values(**values, **{name: boundary - 1e-6})
-    assert safe["RECEIVER_THREAD_CUTTING_STEP_WALL_MIN"] > 2.0
-    assert safe["RECEIVER_PILOT_STEP_WALL_MIN"] == joint.RECEIVER_PILOT_STEP_WALL_MIN
-    with pytest.raises(AssertionError, match="receiver thread-cutting step wall"):
-        _joint_with_values(**values, **{name: boundary + 1e-6})
-
-
-def test_thread_cutting_step_uses_actual_axis_bands_and_reserve_once_not_pilot_wander(monkeypatch) -> None:
-    calls = []
-    original = joint.receiver_step_wall_margin
-
-    def record(*arguments):
-        calls.append(arguments)
-        return original(*arguments)
-
-    monkeypatch.setattr(joint, "receiver_step_wall_margin", record)
-    baseline = joint.receiver_thread_cutting_step_wall_budget()
-    assert len(calls) == len(joint.LEVER_HOLE_POINTS)
-    for arguments in calls:
-        assert arguments == pytest.approx((8.49, 2.49, 6.0, 1.2, 0.0, 0.04))
-    assert baseline == pytest.approx(math.hypot(8.49 - 6.0, 2.49 - 1.2) - 0.04)
-    monkeypatch.setattr(joint, "DRILL_WANDER_DEG", 3.0)
-    monkeypatch.setattr(joint, "DRILL_WANDER_MAX", 1.0)
-    assert joint.receiver_thread_cutting_step_wall_budget() == baseline
-    monkeypatch.setattr(joint, "THREAD_CUTTING_PROOF_RESERVE", 0.08)
-    assert joint.receiver_thread_cutting_step_wall_budget() == pytest.approx(baseline - 0.04)
 
 
 def test_real_pilot_step_guard_rejects_old_receiver_even_though_the_point_stays_contained() -> None:
-    old = _joint_with_values(RIB_DEPTH=8.20, RECEIVER_WALL_MIN=0.0)
+    old = _joint_with_values(RIB_DEPTH=8.20, RECEIVER_PILOT_WALL_MIN=0.0)
     assert old["DRILL_POINT_RIB_MARGIN_MIN"] > 0.0
     assert old["RECEIVER_PILOT_STEP_WALL_MIN"] == pytest.approx(1.653, abs=0.001)
     assert old["RECEIVER_PILOT_STEP_WALL_MIN"] < 2.0
     with pytest.raises(AssertionError, match="receiver pilot step wall"):
         _joint_with_values(RIB_DEPTH=8.20)
     approved = _joint_with_values(RIB_DEPTH=9.00)
-    assert approved["RECEIVER_WALL_MIN"] == 2.0
-    assert approved["RECEIVER_PILOT_STEP_WALL_MIN"] == pytest.approx(2.103, abs=0.001)
+    assert approved["RECEIVER_PILOT_WALL_MIN"] == 2.0
+    assert approved["RECEIVER_PILOT_STEP_WALL_MIN"] == pytest.approx(2.103443, abs=1e-6)
     assert approved["RECEIVER_PILOT_STEP_WALL_MIN"] == pytest.approx(_printed_pilot_step_budget_oracle(), abs=1e-12)
-    assert approved["RECEIVER_PILOT_STEP_WALL_MIN"] >= approved["RECEIVER_WALL_MIN"]
+    assert approved["RECEIVER_PILOT_STEP_WALL_MIN"] >= approved["RECEIVER_PILOT_WALL_MIN"]
 
 
 def test_real_pilot_step_guard_uses_maximum_positive_drill_deviation_not_the_low_limit() -> None:
@@ -556,7 +466,7 @@ def test_real_pilot_step_guard_uses_maximum_positive_drill_deviation_not_the_low
     with pytest.raises(AssertionError, match="bottoming-tap lead"):
         _joint_with_values(DRILL_DEPTH_DEVIATIONS=(-0.80, 0.80))
     axial_only = _joint_with_values(
-        DRILL_DEPTH_DEVIATIONS=(-0.51, 0.80), RECEIVER_WALL_MIN=0.0,
+        DRILL_DEPTH_DEVIATIONS=(-0.51, 0.80), RECEIVER_PILOT_WALL_MIN=0.0,
     )
     assert axial_only["DRILL_POINT_RIB_MARGIN_MIN"] > 0.0
     assert axial_only["RECEIVER_PILOT_STEP_WALL_MIN"] < 2.0
@@ -564,21 +474,20 @@ def test_real_pilot_step_guard_uses_maximum_positive_drill_deviation_not_the_low
         _joint_with_values(DRILL_DEPTH_DEVIATIONS=(-0.51, 0.80))
 
 
-def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry() -> None:
-    thread_radius = (
-        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE
+def test_printed_pilot_clears_pivot_and_native_spring_tap_geometry() -> None:
+    pilot_radius = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
+        + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    pilot_radius += math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
+        joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
     )
     assert min(
         point[0] for point in joint.LEVER_HOLE_POINTS
-    ) - thread_radius - lever.CYL_R == pytest.approx(2.06)
-    assert (
-        min(point[0] for point in joint.LEVER_HOLE_POINTS) - thread_radius > lever.CYL_R
-    )
-    # The bracket removal requirement is bounded; spring taps retain their
-    # native basic-major geometry here, not an unqualified physical-tool claim.
-    # Their perpendicular Y axes remain outside the bracket cutting envelope.
-    # On the cam plane (#1292) the j=0 station lies alongside the drill's depth,
-    # so that web is the X gap alone.
+    ) - pilot_radius - lever.CYL_R >= joint.RECEIVER_PILOT_WALL_MIN
+    # Spring taps retain their native basic-major geometry for this independent
+    # pilot clearance check. The j=0 station lies alongside the drill's depth,
+    # so its conservative web is the X gap alone.
     spring_radius = THREAD_MAJOR_MM[lever.HOLE_SPEC.size] / 2.0
     spring_stations = tuple(
         lever.CHANNEL_Z0 + lever.HOLE_Z_OFFSET + j * lever.CHANNEL_PITCH
@@ -589,12 +498,15 @@ def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry()
         math.hypot(
             lever.HOLE_X - x, max(joint.LEVER_FRONT_LOCAL_Z - z, 0.0, z - bottom)
         )
-        - thread_radius
+        - pilot_radius
         - spring_radius
         for x, _y, _z in joint.LEVER_HOLE_POINTS
         for z in spring_stations
     )
-    assert spring_web == pytest.approx(7.1575, abs=1e-4)
+    assert spring_web == pytest.approx(
+        lever.HOLE_X - max(point[0] for point in joint.LEVER_HOLE_POINTS)
+        - pilot_radius - spring_radius
+    )
     assert spring_web >= 2.0
     # Both coefficient faces are fixed by the new asymmetric section. Test
     # the actual circle/line/R1 union, not the obsolete symmetric half-height.
@@ -603,7 +515,7 @@ def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry()
         assert lower < lever.COEFFICIENT_BOTTOM_Y < y
         assert y < lever.COEFFICIENT_TOP_Y < upper
         assert upper != pytest.approx(-lower)
-        assert x + thread_radius + joint.POSITION_BAND < (
+        assert x + pilot_radius + joint.POSITION_BAND < (
             lever_profile.PROFILE.reach - joint.LINEAR_BAND
         )
         # At these two stations the closest nominal boundary lies on a flank,
@@ -613,14 +525,13 @@ def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry()
             assert branch.wrap_xy[0] < x < branch.flank_xy[0]
             nx, ny = branch.normal_xy
             flank_margins.append(
-                lever_profile.PROFILE.wrap_radius - nx * x - ny * y - thread_radius
+                lever_profile.PROFILE.wrap_radius - nx * x - ny * y - pilot_radius
             )
-        nominal_wall = lever_profile.receiver_wall_margin(x, y, thread_radius)
+        nominal_wall = lever_profile.receiver_wall_margin(x, y, pilot_radius)
         assert nominal_wall == pytest.approx(min(flank_margins))
         assert nominal_wall >= 2.0
     # Ordinary shape/plate bands retain real top/free-edge correlations.
-    # This bounds conforming removal, not a claim that a stock tap is qualified.
-    walls = lever_profile.receiver_wall_budget()
+    walls = lever_profile.receiver_pilot_wall_budget()
     assert tuple(wall.x_mm for wall in walls) == tuple(
         point[0] for point in joint.LEVER_HOLE_POINTS
     )
@@ -630,7 +541,7 @@ def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry()
         assert wall.minimum_mm >= 2.0
         assert wall.minimum_mm == pytest.approx(min(wall.upper_mm, wall.lower_mm))
     # The native spring frame is Ø0.15 RFS (code review C06), not MMC.
-    # Separate X/Z extremes conservatively bound the same requirement radius.
+    # Separate X/Z extremes conservatively bound the pilot and its wander.
     spring_position = float(lever.GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"]) / 2.0
     spring_dx_min = (
         lever.HOLE_X - max(point[0] for point in joint.LEVER_HOLE_POINTS)
@@ -644,9 +555,9 @@ def test_required_cutting_envelope_clears_pivot_and_native_spring_tap_geometry()
     assert spring_dz_min < 0.0  # the j=0 station overlaps the drill's depth
     spring_web_min = (
         math.hypot(spring_dx_min, max(spring_dz_min, 0.0))
-        - thread_radius - spring_radius
+        - pilot_radius - spring_radius
     )
-    assert spring_web_min == pytest.approx(spring_dx_min - thread_radius - spring_radius)
+    assert spring_web_min == pytest.approx(spring_dx_min - pilot_radius - spring_radius)
     assert spring_web_min >= 2.0
 
 

@@ -539,46 +539,25 @@ are the concrete realizations of the classes above, being lifted into `tolerance
 
 ## Open items the budget exposed
 
-- **Summing-lever receiver process qualification.** The owner-approved **9.00 mm**
-  receiver on the uniform **7.00 mm** slab retains ordinary bands and pilot
-  dimensions. The model-owned **Ø2.40 MAX × 6.00 MAX** finished-hole cavity
-  acceptance retains the rib walls. It bounds **all thread-cutting removal**,
-  including partial threads, lead, chamfer, tip, runout and deflection, about
-  each **actual finished-hole axis** and from its **actual entry**. Only the
-  separately dimensioned pilot bore and cone are excluded; this is not a
-  full-thread-only limit or a prescribed machining method.
+- **Summing-lever conventional blind receivers: proof limits.** By explicit
+  owner decision, the two **2-56 UNC 2B** taps fasten **MHA-MG-01**, with
+  native **2X Ø1.78 DRILL 6.50** and **4.95 MIN** full thread. The drill
+  retains **+0.10/0 mm** diameter and ordinary **±0.51 mm** depth bands.
+  The **9.00 mm** receiver and fixed-top **7.00 mm** slab are unchanged.
+  There is no additional finished-cavity envelope or printed wall acceptance.
   `receiver_pilot_step_wall_budget` / `RECEIVER_PILOT_STEP_WALL_MIN` retain
-  the **≥2 mm pilot-only** sharp-step wall (about **2.103 mm**, with printed
-  pilot limits and one 0.3° wander charge).
-  `receiver_thread_cutting_step_wall_budget` /
-  `RECEIVER_THREAD_CUTTING_STEP_WALL_MIN` now use the full required removal
-  envelope, shortest rib, actual-top/thickness floors and printed position
-  bands: **hypot(8.49−6.00,2.49−1.20)−0.04 ≈ 2.764318 mm**. The extra
-  **0.04 mm** is a conservative proof reserve, not another runout charge or
-  tighter hole tolerance. `receiver_wall_budget` recomputes both longitudinal
-  walls with the larger of cutting-envelope radius plus reserve or printed
-  pilot radius plus drill wander. The native trimmed-face comparison uses
-  the **1.20 mm** required radius. These bounds guarantee walls for a
-  **conforming process**, rather than assuming a maximum internal root from
-  external screw size or treating native full-thread metadata as cutting reach.
-  Hidden construction dimensions own the two native MAX limits and the
-  **2.0 MIN** `BracketReceiverWallMinimum` requirement (global
-  `ReceiverWallMinimum` from `RECEIVER_WALL_MIN`),
-  with native `swTolMIN=5`, zero stored deviations and one-place precision.
-  The **Bracket Thread-Cutting Requirement** property ties the cavity bound
-  to this wall function; drawing admission reads all three owned native
-  limits, not just the property text. This does not qualify a physical tap.
-  Printed **4.95 MIN** usable full thread leaves **1.05 mm** within the
-  envelope for all remaining axial removal; a two-pitch design allowance
-  consumes **0.907143 mm**, leaving **0.142857 mm**, or **0.092857 mm** after
-  the retained native metadata's extra 0.05. This necessary budget does not
-  qualify an available tool. Before machining, process choice and inspection
-  must demonstrate actual crest/oversize, lead/chamfer/tip, reach/stop error
-  and runout/deflection fit the envelope while meeting usable thread.
-  ASME B1.1 §§5.5/8.3.2 and class 2B fit do not bound maximum internal root;
-  OSG 1011100 nominal data do not establish maximum crest/tip reach.
-  Native Hole Wizard pilot/cosmetic threads or more COM are not physical-tool
-  evidence; engagement, tip-gap, drill-lead and native-pilot guards remain.
+  the independent **≥2 mm pilot-only** sharp-step design floor (about
+  **2.103443 mm**, with printed pilot limits and one 0.3° wander charge).
+  `sm_summing_lever_profile.receiver_pilot_wall_budget` /
+  `ReceiverPilotWallBudget` bound longitudinal walls against
+  `RECEIVER_PILOT_WALL_MIN` using only the printed pilot radius and drill
+  wander, with the full ordinary top/thickness bands and correlated
+  actual-top-referenced receiver position. Native trimmed-face clearance
+  separately uses **TAP_DRILL_DIA/2**. Pilot volume, end-plane, band and point
+  containment checks, drill-lead reserve, usable engagement and screw-tip-gap
+  guards remain. Native **4.95 ±0.05 mm** full-thread metadata serves the
+  screw stack, not a maximum cutting reach. Pilot/cosmetic-thread geometry
+  does not prove all finished-hole wall thicknesses.
 
 - **Stock spring selection and static balance** (#747). The custom springs have
   been replaced by catalog force curves: twenty hook-ended **9432K31** channel

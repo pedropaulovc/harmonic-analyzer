@@ -306,50 +306,28 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 ### Summing lever & knife edge (T1 — least forgiving interface)
 
-MHA-SM-03's two MHA-MG-01 bracket receivers use a **6.50 ±0.51 mm**
-cylindrical tap-drill depth, explicitly symmetric in the native dimension.
-The native hole callout prints **6.50** at two places, inheriting the same
-ordinary title-block **.XX ±0.51 mm** band without restating it; this is not an
-accepted tolerance exception. The owner-approved **−Z receiver rib** is now
-**9.00 mm**, extending **0.80 mm** farther inward than the prior 8.20 design:
-its entry remains **−76.20 mm**, its inner boundary is **−67.20 mm**, and the
-opposite end rib remains **5.08 mm**. The axes and 13.7 mm pitch,
-MHA-MG-VN-53 screws, and 3.175 mm flange are unchanged. `RibDepth` retains
-**two decimal places**, hence the ordinary **±0.51 mm** band; printing 9.0
-would widen that band to ±0.8 mm and fail the step-wall requirement below.
-Native usable full-thread metadata remains **4.95 ±0.05 mm**; the printed
-callout remains **4.95 MIN**. That minimum is not a cutting-depth maximum.
-The owner-approved **Ø2.40 MAX × 6.00 MAX** bound occupies four feature-limit rows:
-**CAVITY WITHIN Ø2.40 MAX X 6.00 MAX DEEP** /
-**(EXCEPT TAP-DRILL BORE/POINT)** /
-**ABOUT ACTUAL AXIS, FROM ACTUAL ENTRY** /
-**RIB-STEP & RIB/PLATE PROFILE WALLS 2.0 MIN**.
-The native hole callout identifies the individual actual finished hole:
-its actual axis and entry are the cylinder's references, not the nominal
-receiver coordinates or hidden requirement sketch. Only the separately
-dimensioned tap-drill bore and point are excluded from that envelope, not
-from the independent wall minimum.
-This is a flat-ended bounding cylinder, not an ordinary full-diameter
-blind-hole depth: no other smaller-diameter tip or lead cavity may continue
-beyond its **6.00 MAX** end.
-Every other part of the finished hole cavity must lie inside the cylinder:
-full and partial threads, lead/chamfer/tip recesses, reliefs, and any extra
-void left by runout or deflection. This is geometrically equivalent to bounding
-all thread-cutting material removal, not merely the full-thread profile; it
-neither selects a cutting method nor qualifies a tool. The two printed ±0.05
-axis-position bands are unchanged; this is not a new, tighter location
-tolerance. The native model still contains only the Hole Wizard pilot and
-cosmetic threads, not an exact physical thread cut.
+By explicit owner decision, MHA-SM-03's two bracket receivers are conventional
+blind **2-56 UNC 2B** taps fastening **MHA-MG-01**. The native callout prints
+**2X Ø1.78 DRILL 6.50** and **4.95 MIN** full thread, with the concise
+**FASTENS MHA-MG-01** caption. The drill diameter inherits **+0.10/0 mm**
+and the two-place depth inherits the ordinary **±0.51 mm** title-block band;
+the native cylindrical depth is explicitly symmetric. Native usable
+full-thread metadata remains **4.95 ±0.05 mm** for the screw stack.
+The printed minimum is not a cutting-depth maximum. There is no additional
+finished-cavity envelope or printed wall-acceptance requirement.
 
-The **6.00−4.95 = 1.05 mm** axial budget must accommodate every non-usable
-thread-cutting portion. A two-pitch lead design allowance is **0.907143 mm**,
-leaving **0.142857 mm** for any additional tip/runout/stop allowance; reserving
-the native full-thread metadata's extra 0.05 leaves **0.092857 mm**.
-These positive necessary budgets do **not** qualify a stock tap or prove an
-available process. The independent drill lead reserve remains **0.082857 mm**,
-and the entire 118° pilot point plus conservative 0.3° wander stays inside
-the shortest rib by **0.876133 mm**. Point containment is not a bottom-wall
-thickness or a reduced rule-17 floor; engagement and screw-tip-gap guards stay.
+The owner-approved **−Z receiver rib** remains **9.00 mm**, extending
+**0.80 mm** farther inward than the prior 8.20 design: its entry remains
+**−76.20 mm**, its inner boundary is **−67.20 mm**, and the opposite end rib
+remains **5.08 mm**. The axes and 13.7 mm pitch, MHA-MG-VN-53 screws, and
+3.175 mm flange are unchanged. `RibDepth` retains two decimal places and
+the ordinary **±0.51 mm** band; printing 9.0 would widen it to ±0.8 mm and
+fail the independent pilot-step design margin below.
+
+The independent drill lead reserve remains **0.082857 mm**, and the entire
+118° pilot point plus conservative 0.3° wander stays inside the shortest
+rib by **0.876133 mm**. Point containment is not a bottom-wall thickness.
+Usable engagement and screw-tip-gap guards remain.
 
 The independent **worst printed pilot-only sharp-step wall** must remain **≥2.0 mm**.
 The actual-top-referenced receiver row cancels the top-face position shift:
@@ -364,79 +342,32 @@ For the finite 118° cone, with **k=cot(59°)** and radial contraction
 **u=clamp((ka−b)/(1+k²),0,0.94)**. The shoulder controls these dimensions,
 but the calculation re-solves the finite minimum when inputs change.
 Charge the entire deepest **0.03966 mm** wander once, giving approximately
-**2.103 mm**. The old 8.20 design gives only **1.653 mm**, despite positive
+**2.103443 mm**. The old 8.20 design gives only **1.653 mm**, despite positive
 point containment; 9.0±0.8 would give only **1.914 mm**.
 
 `magnifying_bracket_joint_layout.receiver_pilot_step_wall_budget` and
-`RECEIVER_PILOT_STEP_WALL_MIN` enforce that pilot-only ≥2 mm floor independently
-of the thread-cutting requirement. Extending the step's excluded quadrant
-infinitely in X and ignoring the material-adding concave root fillet gives a
-conservative bound; it does not credit a helpful blend.
+`RECEIVER_PILOT_STEP_WALL_MIN` enforce that pilot-only ≥2 mm design floor.
+Extending the step's excluded quadrant infinitely in X and ignoring the
+material-adding concave root fillet gives a conservative bound; it does not
+credit a helpful blend.
 
-`THREAD_CUTTING_ENVELOPE_DIA_MAX` and `THREAD_CUTTING_ENVELOPE_DEPTH_MAX` own the
-new manufacturing limits. `receiver_thread_cutting_step_wall_budget` /
-`RECEIVER_THREAD_CUTTING_STEP_WALL_MIN` bound the **entire** removal cylinder,
-not merely full threads: **a=8.49−6.00=2.49**, **b=2.49−1.20=1.29**, hence
-**hypot(2.49,1.29)−0.04 ≈ 2.764318 mm**. Axis bands are already in the floors.
-The **0.04 mm** is an additional conservative proof reserve, not a second
-runout charge or a tighter position tolerance: runout/deflection are already
-inside Ø2.40. `receiver_wall_budget` recomputes both longitudinal sidewalls
-using the actual tangent profile, ordinary shape/plate bands, correlated
-actual-top/free-edge positions, and the larger of the complete cutting radius
-plus proof reserve or the printed pilot radius plus its own drill wander.
+`sm_summing_lever_profile.receiver_pilot_wall_budget` /
+`ReceiverPilotWallBudget` independently bound both longitudinal pilot walls
+against `RECEIVER_PILOT_WALL_MIN`, using the actual tangent profile, ordinary
+shape/plate bands, correlated actual-top/free-edge positions, and the printed
+pilot radius plus drill wander. The independent native **PlateTopY** dimension
+takes the full ordinary `.XX` **±0.51 mm** allowance, conservatively covering
+native **0.02 in = 0.508 mm** and printed-nominal rounding. **ReceiverY0**
+remains **±0.05 mm from the actual top**, so top/axis motion stays correlated;
+the independent thickness still takes **±0.51 mm**. The boundary test constructs
+the permitted common-tangent wall independently and rejects the obsolete
+half-band budget. The native trimmed-face comparison separately uses the
+actual pilot radius, **TAP_DRILL_DIA/2**.
 
-The independent native **PlateTopY** dimension takes the full ordinary `.XX`
-**±0.51 mm** allowance, conservatively covering native **0.02 in = 0.508 mm**
-and printed-nominal rounding. It is not half the former centred slab's depth
-band. **ReceiverY0** remains **±0.05 mm from the actual top**, so top/axis
-motion stays correlated; the independent thickness still takes **±0.51 mm**.
-The boundary test constructs the permitted common-tangent wall independently
-and rejects the obsolete half-band budget. No wall minimum is relaxed.
-
-The native trimmed-face comparison now subtracts the **1.20 mm required
-envelope radius**, not a basic external screw radius. Together these bounds
-guarantee ≥2 mm walls for **conforming** removal; the separate **2.103 mm pilot
-step wall** remains controlling at the approved geometry.
-
-The callout names the protected **rib-step and rib/plate profile walls**, with
-an independent **2.0 MIN** requirement. The longitudinal receiver profile's
-upper/lower boundaries include the plate, R1 blend, tangent rib flank and
-R15.24 wrap. The governing **2.7286 mm** longitudinal wall is to the tangent
-rib flank, not the continuous plate underside. Naming only the rib step or
-coefficient plate would omit part of the protected wall family.
-The **1.29 mm** radial separation to the extended top-face plane
-is not the finite sharp-step distance above, nor is it a claim that every
-surrounding wall is **2.764318 mm**. The pilot-step and longitudinal-wall
-proofs remain independent; the finished-cavity acceptance preserves their
-required thread-cutting bound.
-
-The hidden `BracketThreadCuttingEnvelope` construction sketch owns the two
-MAX-only native dimensions `BracketThreadCuttingEnvelopeDiameter` and
-`BracketThreadCuttingEnvelopeDepth`, with two-place display, and the one-place
-`BracketReceiverWallMinimum` **2.0 MIN** requirement driven by the
-`ReceiverWallMinimum` global from `RECEIVER_WALL_MIN`. The MAX dimensions
-retain `swTolMAX=6` and deviations −nominal/0; the MIN dimension uses
-`swTolMIN=5` with zero stored deviations.
-All three share joint authority with the model-owned **Bracket Thread-Cutting
-Requirement** drawing property; the drawing validates native ownership,
-values, limits and precision before consuming it. This is a wall-function
-requirement, not a measured physical tap qualification.
-Feature enumeration yields raw COM dispatches, so each display dimension is
-bound through `_bind` before reading its dimension and tolerance interfaces.
-The sketch is not cut into the solid and stays hidden in part images.
-
-**Process choice and inspection remain required before machining.** ASME B1.1
-§§5.5/8.3.2 leaves the internal maximum major/root diameter unspecified,
-defined by the unworn tool crest; neither basic external screw major nor
-class 2B fit supplies a maximum. Qualify a tool/process against the stated
-envelope and usable-thread minimum using actual cutting-crest OD and
-tolerance/oversize, full lead/chamfer/tip geometry, bounded insertion/programmed
-reach and stop error, runout/deflection, and supporting evidence/inspection.
-OSG 1011100's nominal Ø2.1844 and 1.5-pitch lead do not establish maximum crest
-or tip reach, so no stock-tap qualification is claimed. Native pilot/cosmetic
-threads, additional COM measurements and passing geometry gates cannot prove
-physical-tool compliance; the manufacturing envelope is now a requirement,
-not the former unsupported 2.2844/5.00 assumption.
+These proofs cover pilot drilling and the retained engagement stack, not
+unknown physical thread-cutting geometry. The native model contains a Hole
+Wizard pilot and cosmetic threads; it does not establish all finished-hole
+wall thicknesses.
 
 The approved option A keeps the coefficient plate's **top at local Y=+2.54 mm**
 and makes the entire **X=0..44.45, Z=±76.20 mm** slab **7.00 mm** thick,

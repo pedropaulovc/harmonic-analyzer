@@ -524,18 +524,11 @@ Live catalog verification on October 16, 2026:
   stainless on main. `diagnostics.diag_build_91794A078` reuses the native
   fillister family recipe; its derived slot, dome, thread/runout and
   vendor-frame mapping are family assumptions, not verified vendor geometry.
-  The receiver now requires **all thread-cutting removal** within a model-owned
-  **Ø2.40 MAX × 6.00 MAX** cylinder, about each **actual finished-hole axis**
-  from its **actual entry**; partial threads, lead, chamfer, tip, runout and
-  deflection are included, while separate pilot drilling is excluded.
-  Conforming removal guarantees the receiver wall bounds; process choice and
-  inspection before machining must still establish actual cutting-crest OD
-  and tolerance/oversize, full lead/chamfer/tip, reach/stop error and
-  runout/deflection. ASME B1.1 §§5.5/8.3.2 leaves maximum internal root diameter
-  unspecified; neither basic external screw diameter nor class 2B fit bounds
-  it. Two pitches of lead remain a design allowance. OSG 1011100 nominal OD
-  and 1.5-pitch lead do not qualify its maximum crest/tip reach. No stock tap
-  or physical tool is qualified by native pilot/cosmetic-thread model passes.
+  By explicit owner decision, the receiver uses conventional blind **2-56
+  UNC 2B** taps fastening **MHA-MG-01**, with native **2X Ø1.78 DRILL 6.50**
+  and **4.95 MIN** full thread. There is no additional finished-cavity
+  envelope or printed wall-acceptance requirement. The pilot and engagement
+  proofs below do not establish all physical thread-cut wall thicknesses.
 
 Live catalog verification on October 8, 2026:
 
@@ -559,11 +552,7 @@ Live catalog verification on October 8, 2026:
   by 91794A078 above, October 16, 2026.)
   Current native **4.95 ±0.05 mm** cosmetic-thread metadata is retained for
   the screw stack, not used as a manufacturing maximum. Printed **4.95 MIN**
-  usable full thread is paired with the separate **6.00 MAX** entire
-  thread-cutting reach requirement. Its **1.05 mm** remaining axial budget
-  covers all non-usable portions: a two-pitch design lead consumes
-  **0.907143 mm**, leaving **0.142857 mm**, or **0.092857 mm** after the
-  metadata's extra 0.05. This is necessary room, not qualified tool evidence.
+  specifies usable full thread without an additional maximum cutting reach.
   Only the -Z entry rib, `EdgeRibBack`, extends inward to the owner-approved
   **9.00 mm** depth (inner cap -67.20, unchanged entry -76.20);
   `EdgeRibFront` remains 5.08. `RibDepth` keeps two decimals and the ordinary
@@ -572,24 +561,15 @@ Live catalog verification on October 8, 2026:
   wander charge remain inside the rib with 0.876133 mm minimum axial
   containment, not a bottom-wall thickness. The separate worst printed
   **pilot-only** sharp-step budget uses Ø1.78 +0.10/0 and charges the whole
-  deepest wander: about 2.103 mm at 9.00, versus only 1.653 mm at the
+  deepest wander: about **2.103443 mm** at 9.00, versus only 1.653 mm at the
   superseded 8.20 depth. `receiver_pilot_step_wall_budget` /
-  `RECEIVER_PILOT_STEP_WALL_MIN` enforce ≥2 mm independently of thread cutting.
-  `receiver_thread_cutting_step_wall_budget` /
-  `RECEIVER_THREAD_CUTTING_STEP_WALL_MIN` use the entire required **Ø2.40 MAX
-  × 6.00 MAX** removal envelope: the sharp-step bound is
-  **hypot(8.49−6.00,2.49−1.20)−0.04 ≈ 2.764318 mm**. Printed axis bands
-  are already charged; the extra **0.04 mm** is conservative proof reserve,
-  not another runout allowance or tighter position requirement.
-  `receiver_wall_budget` recalculates longitudinal walls from the larger of
-  the full cutting radius plus reserve or printed pilot radius plus drill
-  wander. Native trimmed-face comparison subtracts the **1.20 mm** required
-  radius. Conforming removal guarantees the walls; actual process choice and
-  inspection remain required before machining. The native model contains
-  pilot and cosmetic threads, not exact physical thread-cutting geometry.
-  Hidden `BracketThreadCuttingEnvelope` construction dimensions own both MAX
-  limits and the model-owned drawing requirement; the sketch does not cut
-  the solid. The minimum 0.122 mm
+  `RECEIVER_PILOT_STEP_WALL_MIN` enforce the independent ≥2 mm pilot design
+  floor. `sm_summing_lever_profile.receiver_pilot_wall_budget` /
+  `ReceiverPilotWallBudget` bound longitudinal pilot walls against
+  `RECEIVER_PILOT_WALL_MIN` using the printed pilot radius plus drill wander.
+  Native trimmed-face comparison separately subtracts **TAP_DRILL_DIA/2**.
+  The native model contains pilot and cosmetic threads, not exact physical
+  thread-cutting geometry. The minimum 0.122 mm
   head-to-counterbore radial float exceeds the 0.10 mm maximum station
   pitch mismatch at the printed ±0.05 position bands. The minimum end wall
   is 2.00 mm from the real end-face station datum, without double-counting

@@ -85,11 +85,11 @@ def test_receiver_deepens_only_inward_without_moving_installed_interfaces() -> N
     assert joint.LEVER_FRONT_LOCAL_Z + joint.RIB_DEPTH == pytest.approx(-67.20)
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)
     assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
-    assert spec.HOLE_X - (joint.SCREW_MAJOR_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
+    assert spec.HOLE_X - (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0 > spec.RIB_REACH
 
 
 def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -> None:
-    radius = joint.SCREW_MAJOR_DIA / 2.0
+    radius = joint.TAP_DRILL_DIA / 2.0
     x, y = 29.7, 0.0
     branch = profile.UPPER
     line_distance = spec.RIB_WRAP_R - _dot(branch.normal_xy, (x, y))
@@ -114,7 +114,7 @@ def test_nearest_distance_is_not_a_vertical_height_or_infinite_line_shortcut() -
     assert profile.receiver_wall_margin(spec.RIB_REACH - 0.01, 0.0, 0.0) > 2.5
 
 
-def _receiver_envelope_radius() -> float:
+def _receiver_pilot_radius() -> float:
     pilot_radius = (
         max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
         + joint.DRILLED_DIAMETER_PLUS
@@ -122,10 +122,7 @@ def _receiver_envelope_radius() -> float:
     pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
     )
-    return max(
-        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE,
-        pilot_radius + pilot_wander,
-    )
+    return pilot_radius + pilot_wander
 
 
 def _witness_clearance(
@@ -138,7 +135,7 @@ def _witness_clearance(
     )
     x = width - (spec.PLATE_W - nominal_x) + ex
     y = top - spec.COEFFICIENT_TOP_Y + ey
-    radius = _receiver_envelope_radius()
+    radius = _receiver_pilot_radius()
     if side == "minimum":
         return section.receiver_wall_margin(x, y, radius)
     boundary = section.upper_boundary if side == "upper" else section.lower_boundary
@@ -157,8 +154,8 @@ def _plate_top_y_limits() -> tuple[float, float]:
     )
 
 
-def test_required_envelope_ordinary_bands_have_replayable_correlated_wall_witnesses() -> None:
-    budgets = profile.receiver_wall_budget()
+def test_pilot_ordinary_bands_have_replayable_correlated_wall_witnesses() -> None:
+    budgets = profile.receiver_pilot_wall_budget()
     top_limits = _plate_top_y_limits()
     assert len(budgets) == len(joint.LEVER_HOLE_POINTS) == 2
     for budget, point in zip(budgets, joint.LEVER_HOLE_POINTS):
@@ -210,10 +207,10 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
     distance = wrap - nx * x - ny * y
     foot_x = x + distance * nx
     assert wrap * nx < foot_x < reach - blend * nx
-    permitted_wall = distance - _receiver_envelope_radius()
-    assert permitted_wall > joint.RECEIVER_WALL_MIN == 2.0
+    permitted_wall = distance - _receiver_pilot_radius()
+    assert permitted_wall > joint.RECEIVER_PILOT_WALL_MIN == 2.0
 
-    budget = profile.receiver_wall_budget()[-1]
+    budget = profile.receiver_pilot_wall_budget()[-1]
     assert budget.upper_mm == pytest.approx(permitted_wall, abs=1e-12)
     assert budget.minimum_mm == pytest.approx(permitted_wall, abs=1e-12)
     assert budget.upper_witness == pytest.approx(witness, abs=1e-12)
@@ -228,7 +225,7 @@ def test_independent_plate_top_boundary_catches_obsolete_half_band(monkeypatch) 
     for too_small in (0.0, printed_band / 2.0):
         with monkeypatch.context() as patch:
             patch.setattr(profile, "PLATE_TOP_Y_ALLOWANCE", too_small)
-            incomplete = profile.receiver_wall_budget()[-1]
+            incomplete = profile.receiver_pilot_wall_budget()[-1]
         assert incomplete.upper_mm > permitted_wall + 1e-6
         assert incomplete.minimum_mm > permitted_wall + 1e-6
 
@@ -245,60 +242,63 @@ def _axial_margins(rib_depth: float, thread_depth: float, drill_depth: float) ->
     )
 
 
-def test_native_thread_stack_and_pilot_fit_separately_from_required_envelope_walls() -> None:
+def test_native_thread_stack_and_pilot_walls_have_independent_margins() -> None:
     margins = _axial_margins(joint.RIB_DEPTH, joint.THREAD_DEPTH, joint.DRILL_DEPTH)
     assert margins == pytest.approx((
         joint.THREAD_RIB_MARGIN_MIN, joint.SCREW_TIP_GAP_MIN,
         joint.TAP_LEAD_MARGIN_MIN, joint.DRILL_POINT_RIB_MARGIN_MIN,
     ))
     assert min(margins) > 0.0
-    # Conforming cutting removal is bounded independently of the longer pilot.
-    # Native cosmetic/full-thread metadata does not qualify an actual tool.
     assert joint.SCREW_MAJOR_DIA >= joint.TAP_DRILL_DIA
-    assert all(wall.minimum_mm > 2.0 for wall in profile.receiver_wall_budget())
-    assert joint.receiver_thread_cutting_step_wall_budget() >= joint.RECEIVER_WALL_MIN
-    assert joint.receiver_pilot_step_wall_budget() >= joint.RECEIVER_WALL_MIN == 2.0
+    assert all(wall.minimum_mm > 2.0 for wall in profile.receiver_pilot_wall_budget())
+    assert joint.receiver_pilot_step_wall_budget() >= joint.RECEIVER_PILOT_WALL_MIN == 2.0
     assert min(_axial_margins(7.0, joint.THREAD_DEPTH, joint.DRILL_DEPTH)) < 0.0
     assert _axial_margins(joint.RIB_DEPTH, 4.0, joint.DRILL_DEPTH)[1] < 0.0
     assert _axial_margins(joint.RIB_DEPTH, joint.THREAD_DEPTH, 5.5)[2] < 0.0
     # Positive axial room cannot excuse a lateral breakout in a changed profile.
     narrowed = replace(profile.PROFILE, reach=18.0)
-    assert narrowed.receiver_wall_margin(29.7, 0.0, joint.SCREW_MAJOR_DIA / 2.0) < 1.5
-
-
-def test_larger_cutting_envelope_reduces_required_walls_without_changing_pilot_proof(monkeypatch) -> None:
-    pilot = joint.receiver_pilot_step_wall_budget()
-    before = profile.receiver_wall_budget()
-    monkeypatch.setattr(joint, "THREAD_CUTTING_ENVELOPE_DIA_MAX", 4.0)
-    after = profile.receiver_wall_budget()
-    for old, new in zip(before, after, strict=True):
-        assert new.minimum_mm == pytest.approx(old.minimum_mm - (4.0 - 2.4) / 2.0)
-    assert min(wall.minimum_mm for wall in after) < joint.RECEIVER_WALL_MIN
-    assert joint.receiver_pilot_step_wall_budget() == pilot
-
-
-def test_envelope_longitudinal_reserve_is_charged_once_without_duplicate_runout(monkeypatch) -> None:
-    before = profile.receiver_wall_budget()
-    monkeypatch.setattr(joint, "THREAD_CUTTING_PROOF_RESERVE", 0.08)
-    after = profile.receiver_wall_budget()
-    for old, new in zip(before, after, strict=True):
-        assert new.minimum_mm == pytest.approx(old.minimum_mm - 0.04, abs=1e-12)
-    # Runout/deflection already lie inside the actual-axis cutting envelope.
-    # Pilot wander is a separate max branch, not added to that envelope.
-    monkeypatch.setattr(joint, "DRILL_WANDER_DEG", 0.0)
-    assert profile.receiver_wall_budget() == after
+    assert narrowed.receiver_wall_margin(29.7, 0.0, joint.TAP_DRILL_DIA / 2.0) < joint.RECEIVER_PILOT_WALL_MIN
 
 
 @pytest.mark.parametrize("pilot", [1.778, 1.784])
-def test_longitudinal_pilot_branch_uses_printed_diameter_and_its_own_wander(monkeypatch, pilot) -> None:
-    monkeypatch.setattr(joint, "THREAD_CUTTING_ENVELOPE_DIA_MAX", 1.0)
+def test_longitudinal_pilot_uses_printed_diameter_and_deepest_wander(monkeypatch, pilot) -> None:
     monkeypatch.setattr(joint, "TAP_DRILL_DIA", pilot)
-    for budget in profile.receiver_wall_budget():
+    for budget in profile.receiver_pilot_wall_budget():
         for side in ("minimum", "upper", "lower"):
             assert getattr(budget, side + "_mm") == pytest.approx(
                 _witness_clearance(budget.x_mm, getattr(budget, side + "_witness"), side),
                 abs=1e-12,
             )
+
+
+@pytest.mark.parametrize("name,value", [
+    ("DRILLED_DIAMETER_PLUS", 0.20),
+    ("DRILL_WANDER_DEG", 0.6),
+    ("DRILL_DEPTH_MAX", 7.4),
+    ("DRILL_POINT_H", 1.0),
+])
+def test_longitudinal_pilot_rederives_allowance_and_deepest_wander(
+    monkeypatch, name: str, value: float,
+) -> None:
+    before = profile.receiver_pilot_wall_budget()
+    original_radius = _receiver_pilot_radius()
+    monkeypatch.setattr(joint, name, value)
+    radius_increase = _receiver_pilot_radius() - original_radius
+    assert radius_increase > 0.0
+    after = profile.receiver_pilot_wall_budget()
+    for old, new in zip(before, after, strict=True):
+        for side in ("minimum", "upper", "lower"):
+            assert getattr(new, side + "_mm") == pytest.approx(
+                getattr(old, side + "_mm") - radius_increase, abs=1e-12,
+            )
+
+
+def test_longitudinal_pilot_does_not_assume_a_thread_major_radius(monkeypatch) -> None:
+    before = profile.receiver_pilot_wall_budget()
+    monkeypatch.setattr(joint, "SCREW_MAJOR_DIA", 4.0)
+    monkeypatch.setattr(joint, "THREAD_DEPTH", 8.0)
+    monkeypatch.setattr(joint, "THREAD_DEPTH_BAND", 0.5)
+    assert profile.receiver_pilot_wall_budget() == before
 
 
 # Fixed four-point Gauss-Legendre quadrature, only an independent test oracle.

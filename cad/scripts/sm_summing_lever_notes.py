@@ -14,10 +14,7 @@ from __future__ import annotations
 
 from magnifying_bracket_joint_layout import (
     LINEAR_BAND,
-    RECEIVER_WALL_MIN,
     SCREW_THREAD,
-    THREAD_CUTTING_ENVELOPE_DEPTH_MAX,
-    THREAD_CUTTING_ENVELOPE_DIA_MAX,
 )
 from sm_summing_lever_spec import COEFFICIENT_T, HOLE_SPEC
 
@@ -118,7 +115,7 @@ BRACKET_NUMBER = "MHA-MG-01"  # mg-magnifying-bracket
 RIDGE_CALLOUT_MAX_CHARS = 30
 DIMENSION_CALLOUTS_ABOVE: dict[str, str] = {
     "RibReach": "ALL POSITIVE RIBS",
-    "ReceiverY0": f"LOCATES {BRACKET_NUMBER}",
+    "ReceiverY0": f"FASTENS {BRACKET_NUMBER}",
 }
 DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "RidgeFromLeft": f"{KNIFE_MOUNT_NUMBER} SEAT;\nSYMMETRIC TO SIDES",
@@ -130,8 +127,8 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     # Both locations start on real faces, not the asymmetric plate's midplane:
     # View G measures boss top from coefficient top; the web shares that top.
     "WebThickness": "TOP FACE FLUSH WITH\nCOEFFICIENT TOP",
-    "ReceiverX0": f"LOCATES {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
-    "ReceiverX1": f"LOCATES {BRACKET_NUMBER}",
+    "ReceiverX0": f"FASTENS {BRACKET_NUMBER}\n{SCREW_THREAD} SCREW PATTERN",
+    "ReceiverX1": f"FASTENS {BRACKET_NUMBER}",
     # The plan's 152.4 is the body's end-face span, not the part's overall:
     # the stubs stand 2X 21.72 past it (machinist review 20261018 read it
     # as the overall; drawing-guidelines: nothing reads like an overall that
@@ -139,20 +136,9 @@ DIMENSION_CALLOUTS_BELOW: dict[str, str] = {
     "PlateLength": "BODY\nEND FACES",
 }
 
-# The finished cavity includes full and partial threads, lead, relief,
-# chamfer, tip, runout and deflection voids. Only the separately dimensioned
-# tap-drill bore and point are excluded; keep that parenthetical exception
-# with the cavity envelope, not the independent rib-step/profile wall minimum.
-# The cylinder is about each actual finished-hole axis, from its actual
-# entry. The builder saves this requirement on the SLDPRT; the drawing checks
-# its two native MAX dimensions and wall MIN requirement before printing it.
-BRACKET_THREAD_CUTTING_REQUIREMENT = (
-    f"CAVITY WITHIN Ø{THREAD_CUTTING_ENVELOPE_DIA_MAX:.2f} MAX X "
-    f"{THREAD_CUTTING_ENVELOPE_DEPTH_MAX:.2f} MAX DEEP\n"
-    "(EXCEPT TAP-DRILL BORE/POINT)\n"
-    "ABOUT ACTUAL AXIS, FROM ACTUAL ENTRY\n"
-    f"RIB-STEP & RIB/PLATE PROFILE WALLS {RECEIVER_WALL_MIN:.1f} MIN\n"
-)
+# The two blind taps fasten the magnifying bracket. Their native callout owns
+# the pilot and full-thread depths; no additional cavity or wall limit prints.
+BRACKET_TAP_CALLOUT_PROCESS = f"FASTENS {BRACKET_NUMBER}\n"
 # Under the plan's boss Z location (datum B to the boss axis): the mid rib
 # is centred on the same station.
 BOSS_Z_CALLOUT = "BOSS AXIS AND\nMID RIB CENTRE"

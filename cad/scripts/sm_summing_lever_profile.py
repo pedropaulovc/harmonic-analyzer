@@ -309,8 +309,8 @@ def receiver_wall_margin(x: float, y: float, radius: float) -> float:
 
 
 @dataclass(frozen=True)
-class ReceiverWallBudget:
-    """Longitudinal wall bound for the required cutting envelope and pilot."""
+class ReceiverPilotWallBudget:
+    """Longitudinal pilot wall bound, including diameter allowance and wander."""
     x_mm: float
     upper_mm: float
     lower_mm: float
@@ -321,20 +321,16 @@ class ReceiverWallBudget:
     minimum_witness: tuple[float, ...]
 
 
-def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
-    """Bounded manufacturing walls with ordinary bands and datum correlations.
+def receiver_pilot_wall_budget() -> tuple[ReceiverPilotWallBudget, ...]:
+    """Pilot walls with ordinary shape bands and correlated receiver locations.
 
     Width, wrap and reach each take +/-0.51. The R1 MAX runout independently
     spans 0..1. The independent PlateTopY takes PLATE_TOP_Y_ALLOWANCE and
     thickness independently +/-0.51. ReceiverY0 is +/-0.05 from the ACTUAL
     top, just as each X station is from the ACTUAL free edge: their shifts
-    are shared, not charged again as independent axis motion. The radius contains
-    both the entire required thread-cutting cylinder (runout/deflection already
-    included, plus a separate conservative proof reserve) and the printed
-    pilot plus deepest drill wander. Never add pilot wander to the cutting
-    envelope again. Finite corner enumeration is dimensional budgeting, not
-    integration or physical-tool qualification. Native pilot/cosmetic threads
-    do not establish that an unqualified process meets the requirement.
+    are shared, not charged again as independent axis motion. The radius is
+    the larger native/printed pilot plus its diameter allowance and deepest
+    drill wander. This budget describes the pilot, not finished thread walls.
     """
     pilot_radius = (
         max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
@@ -343,10 +339,7 @@ def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
     pilot_wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
         joint.DRILL_DEPTH_MAX + pilot_radius * joint.DRILL_POINT_H
     )
-    radius = max(
-        joint.THREAD_CUTTING_ENVELOPE_DIA_MAX / 2.0 + joint.THREAD_CUTTING_PROOF_RESERVE,
-        pilot_radius + pilot_wander,
-    )
+    radius = pilot_radius + pilot_wander
     points = joint.LEVER_HOLE_POINTS
     values = [[math.inf, math.inf, math.inf] for _ in points]
     witnesses = [[(), (), ()] for _ in points]
@@ -378,6 +371,6 @@ def receiver_wall_budget() -> tuple[ReceiverWallBudget, ...]:
                         values[index][side] = clearance
                         witnesses[index][side] = witness
     return tuple(
-        ReceiverWallBudget(point[0], *value, *witness)
+        ReceiverPilotWallBudget(point[0], *value, *witness)
         for point, value, witness in zip(points, values, witnesses)
     )
