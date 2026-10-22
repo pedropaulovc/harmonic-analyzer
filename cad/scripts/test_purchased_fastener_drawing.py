@@ -5715,13 +5715,7 @@ def test_supplier_fraction_cannot_round_a_nonrepresentable_native_size(monkeypat
         "view-owner",
         "feature-membership",
         "model-dimension",
-        "dimension-map-null",
-        "dimension-map-error",
-        "dimension-map-foreign",
-        "dimension-map-unsupported",
-        "mapped-dimension-null",
-        "mapped-dimension-foreign",
-        "mapped-dimension-unsupported",
+        "qualified-model-name",
         "source-dimension-unsupported",
         "attachment-owner",
         "null-attachment",
@@ -5780,10 +5774,9 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
     )
     raw_source_display = object()
     source_dimension = SimpleNamespace(**vars(case.native))
-    source_annotation = object()
     source_display = SimpleNamespace(
         GetDimension2=lambda _index: source_dimension,
-        GetAnnotation=lambda: source_annotation,
+        GetAnnotation=lambda: pytest.fail("source annotation mapping is not required"),
     )
     source_feature = SimpleNamespace(
         Name="SupplierReference",
@@ -5817,10 +5810,10 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         id(source): mapped
         for source, mapped in zip(source_points, drawing_points, strict=True)
     }
-    forward_map[id(source_annotation)] = case.annotation
     case.view.GetCorresponding = lambda obj: forward_map.get(id(obj))
     annotations = [case.annotation]
     case.view.GetAnnotations = lambda: annotations
+
     def same(left, right):
         # MSC returns swObjectUnsupported across source/drawing dimensions.
         if (left is case.native and right is source_dimension) or (
@@ -5865,39 +5858,11 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         source_display.GetDimension2 = lambda _index: different_dimension
     elif drift == "model-dimension":
         model.Parameter = lambda _name: object()
-    elif drift == "dimension-map-null":
-        forward_map[id(source_annotation)] = None
-    elif drift == "dimension-map-error":
-        def unreadable_annotation_mapping(obj):
-            if obj is source_annotation:
-                raise RuntimeError("source annotation mapping unreadable")
-            return forward_map.get(id(obj))
-
-        case.view.GetCorresponding = unreadable_annotation_mapping
-    elif drift == "dimension-map-foreign":
-        forward_map[id(source_annotation)] = SimpleNamespace(
-            GetSpecificAnnotation=lambda: case.display,
-        )
-    elif drift in ("mapped-dimension-null", "mapped-dimension-foreign"):
-        mapped_native = None if drift == "mapped-dimension-null" else object()
-        mapped_annotation = SimpleNamespace(
-            native_identity=case.annotation,
-            GetSpecificAnnotation=lambda: SimpleNamespace(
-                GetDimension2=lambda _index: mapped_native,
-            ),
-        )
-        forward_map[id(source_annotation)] = mapped_annotation
-    elif drift in (
-        "dimension-map-unsupported", "mapped-dimension-unsupported",
-        "source-dimension-unsupported",
-    ):
-        target = (
-            case.annotation if drift == "dimension-map-unsupported"
-            else source_dimension if drift == "source-dimension-unsupported"
-            else case.native
-        )
+    elif drift == "qualified-model-name":
+        case.native.FullName = "Length@SupplierReference@unrelated.SLDPRT"
+    elif drift == "source-dimension-unsupported":
         adapter.swApp.IsSame = lambda left, right: (
-            2 if left is right is target else same(left, right)
+            2 if left is right is source_dimension else same(left, right)
         )
     elif drift in {"attachment-owner", "capture-error"}:
         case.annotation.entities = (
@@ -5997,13 +5962,7 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         "view-owner",
         "feature-membership",
         "model-dimension",
-        "dimension-map-null",
-        "dimension-map-error",
-        "dimension-map-foreign",
-        "dimension-map-unsupported",
-        "mapped-dimension-null",
-        "mapped-dimension-foreign",
-        "mapped-dimension-unsupported",
+        "qualified-model-name",
         "source-dimension-unsupported",
         "configuration",
         "orientation",

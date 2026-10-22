@@ -1585,10 +1585,14 @@ unchanged. That is presentation persistence, not evidence of a geometry change.
 Installed pictorials retain their native-outline guards. Standard scales,
 reserved cells and final native dimension/note-ink containment are unchanged.
 
-Supplier source ownership is proved across model and drawing contexts, not by
-equality of COM feature or sketch wrappers. The displayed `IDimension` must
-compare `IsSame == 1` both with the referenced model's named `Parameter` and
-with a dimension enumerated from the intended source feature. Enumerate the
+Supplier source ownership uses documented `IDisplayDimension.GetDimension2`
+and the fully qualified model-dimension identity, not cross-context COM wrapper
+equality. That identity must match the referenced model's named `Parameter` and
+a dimension enumerated from the intended source feature. Within the source
+context, the named parameter and enumerated feature member must compare
+`IsSame == 1`. Cross-context `IsSame == 2` is diagnostic only; source-annotation
+mapping into the view is not required. Actual drawing/view annotation ownership
+remains checked. Enumerate the
 actual source sketch's same-kind `GetSketchPoints2()` or `GetSketchSegments()`
 members and map each individually through the view's `GetCorresponding()`.
 Source and mapped counts must match; each member must compare equal to itself

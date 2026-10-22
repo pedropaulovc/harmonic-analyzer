@@ -75,11 +75,8 @@ def _source_feature_dimensions(
     adapter: Any,
     source_feature: Any,
     source_dimension: Any,
-    view: Any,
-    annotation: Any,
-    native: Any,
 ) -> list[dict[str, Any]]:
-    """Prove source membership, then compare imported annotations in this view."""
+    """Prove the named parameter belongs to the actual source feature."""
     inventory = []
     for raw_display in _feature_display_dimensions(source_feature):
         display = _bind(raw_display, "IDisplayDimension")
@@ -91,45 +88,6 @@ def _source_feature_dimensions(
             "full_name": str(dimension.FullName),
             "dimension_is_same": int(adapter.swApp.IsSame(source_dimension, dimension)),
         }
-        if row["dimension_is_same"] == 1:
-            # GetCorresponding explicitly supports previously imported IAnnotation.
-            # Compare mapped view objects, never source/drawing IDimension wrappers.
-            source_annotation = _early_bound(
-                _bind(display.GetAnnotation(), "IAnnotation"), "IAnnotation"
-            )
-            mapped = (
-                None
-                if source_annotation is None
-                else _early_bound(
-                    _bind(view.GetCorresponding(source_annotation), "IAnnotation"),
-                    "IAnnotation",
-                )
-            )
-            row["mapped_annotation_is_same"] = (
-                None
-                if mapped is None
-                else int(adapter.swApp.IsSame(annotation, mapped))
-            )
-            mapped_display = (
-                None
-                if mapped is None
-                else _early_bound(
-                    _bind(mapped.GetSpecificAnnotation(), "IDisplayDimension"),
-                    "IDisplayDimension",
-                )
-            )
-            mapped_dimension = (
-                None
-                if mapped_display is None
-                else _early_bound(
-                    _bind(mapped_display.GetDimension2(0), "IDimension"), "IDimension"
-                )
-            )
-            row["mapped_dimension_is_same"] = (
-                None
-                if mapped_dimension is None
-                else int(adapter.swApp.IsSame(native, mapped_dimension))
-            )
         inventory.append(row)
     return inventory
 
@@ -404,20 +362,25 @@ def _assert_source(
     if source_feature is not None:
         try:
             feature_dimensions = _source_feature_dimensions(
-                adapter, source_feature, source_dimension, view, annotation, native
+                adapter, source_feature, source_dimension
             )
         except Exception as exc:
             feature_dimensions_error = {
                 "error_type": type(exc).__name__,
                 "message": str(exc),
             }
+    # GetDimension2 returns the model dimension used to create the display.
+    # Native drawing/source wrappers need not support cross-context IsSame, and
+    # GetCorresponding(source annotation) can be absent for these imports.
+    # Retain qualified identity plus actual source membership here; the native
+    # drawing-view owner and mapped geometry attachments are checked separately.
     feature_members = [
         row
         for row in feature_dimensions
         if row["full_name"].split("@")[:2] == [name, feature]
         and row["dimension_is_same"] == 1
-        and row.get("mapped_annotation_is_same") == 1
-        and row.get("mapped_dimension_is_same") == 1
+        and row["full_name"] == str(native.FullName)
+        and row["full_name"] == str(source_dimension.FullName)
     ]
     if (
         source_dimension is None
