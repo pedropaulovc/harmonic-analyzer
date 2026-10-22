@@ -77,6 +77,12 @@ cannot ask for what the authors were told to leave out.
   station/extent proof is not exact glyph or foreign-line clearance proof;
   retain every line, including fraction bars, and inspect the actual PDF ink,
   whole sheet and automated machinist result after regeneration.
+  The five nut stems additionally enforce `text-clearance`, `text-on-line`,
+  `dim-line-through-own-text`, `text-on-view` and `arrow-near-text`.
+  `extension-through-own-text` remains reported rather than newly enforced:
+  its merged-row bounds can cross a legitimate fraction bar while individual
+  PDF glyphs clear it. Retain the raw finding and inspect those glyphs; this
+  does not waive genuine witness or tail collisions or machinist review.
   After native export closes each purchased-nut drawing, its normal drawing
   leaf reopens that exact SLDDRW read-only, reacquires Front and its nominal
   dimension, and repeats the native owner, value and distinct mapped-endpoint
