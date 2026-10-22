@@ -143,11 +143,10 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         35.0,
         ("north",),
     ),
-    ExplodeStep("south thrust washer", ("dt-cylinder-end-disc",), "z", -15.0, ("south",)),
-    # MHA-DT-VN-68 (#948 ruling R) sits between the front strap and the front
-    # washer: it stops between their exploded stations.
-    ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", -25.0),
-    ExplodeStep("north thrust washer", ("dt-cylinder-end-disc",), "z", 15.0, ("north",)),
+    ExplodeStep("south end disc", ("dt-cylinder-end-disc",), "z", -15.0),
+    # R11 sheet 3: 15 left the spring over the arbor dome, so balloons 1 and 4
+    # read as one ring. Separate their ink without reaching the north pedestal.
+    ExplodeStep("bank spring", ("dt-vn-cylinder-bank-spring",), "z", 22.0),
     ExplodeStep("pedestal screws lift", ("dt-vn-pedestal-hold-down-screw",), "y", 30.0),
     ExplodeStep("apex set screws lift", ("dt-vn-arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,

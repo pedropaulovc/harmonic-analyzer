@@ -8,9 +8,9 @@ dt-vn-cylinder-bank-spring:
   material_specification: "Steel wave disc spring, 0.385 ID x 0.5 OD; McMaster-Carr 9714K392"
   finish: plain; no coating
   installation_notes: |-
-    INSTALLATION - ON THE MHA-DT-13 ARBOR, BETWEEN THE FRONT MHA-DT-26
-    WASHER AND THE FRONT MHA-DT-02 STRAP, SQUEEZED TO A 0.95 GAP: A 0.95
-    BLADE BESIDE IT, STRAP TO WASHER, IS LIGHTLY PINCHED (MHA-DT-00 9C).
+    INSTALLATION - ON THE MHA-DT-13 ARBOR, DIRECTLY BETWEEN GEAR 19'S
+    NORTH FACE AND THE NORTH MHA-DT-02 STRAP. SET THE GAP BESIDE THE
+    SPRING TO THE NATIVE SETTING ON MHA-DT-00 SHEET 13, DETAIL A (9C).
   quantity: 1
   tolerance_class: machined_block
   process: purchased

@@ -1,12 +1,11 @@
 r"""MHA-DT-VN-68 cylinder-bank-spring: McMaster 9714K392 stock wave disc spring.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  One wave disc spring sits on the MHA-DT-13 arbor between the front
-MHA-DT-26 thrust washer and the front MHA-DT-02 strap's inner face, where
-the 0.45 end-play leaf used to be (#948 ruling R, PR #1292).  Squeezed to
-INSTALLED_HEIGHT there, it holds the 20-gear stack north on the back washer
-and the DRO-set back strap, so the bank has no end play
-(``cylinder_bank_layout``).
+closure. One wave disc spring sits on the MHA-DT-13 arbor directly between
+gear 19's north planar face and the north MHA-DT-02 strap's inner face
+(user ruling 2026-10-20). Squeezed to INSTALLED_HEIGHT there, it holds the
+20-gear stack south on the brass MHA-DT-26 disc and the DRO-set south strap,
+so the bank has no end play (``cylinder_bank_layout``).
 
 Catalogue (mcmaster.com/9714K392, read live 2026-10-09): Wave Disc Spring,
 steel, stackable; ID 0.385 in -0.01/+0.01, OD 0.5 in -0.01/+0.01, thickness
@@ -16,9 +15,9 @@ rate and no wave count.  A 3-D SolidWorks model is offered but none was
 fetched, so the part is catalogue-only.
 
 Part frame: spring axis local +Z.  The model is the spring's installed
-envelope: the ID x OD annulus from its south bearing face (on the front
-strap) at z = 0 to its north bearing face (on the front washer) at
-z = MODEL_HEIGHT, the nominal set gap.  [INFERENCE: the waves are not
+envelope: the ID x OD annulus from its south bearing face (on gear 19)
+at z = 0 to its north bearing face (on the north strap) at
+z = MODEL_HEIGHT, the nominal set gap. [INFERENCE: the waves are not
 modelled; the envelope is what the bank layout and the interference gate
 see.]
 """
@@ -44,8 +43,8 @@ WORKING_DEFLECTION = 0.026 * MM_PER_IN  # 0.6604
 WORKING_LOAD_N = 1.5 * N_PER_LBF  # 6.672
 # [INFERENCE: linear] The page gives one load point, no rate.
 RATE_N_PER_MM = WORKING_LOAD_N / WORKING_DEFLECTION  # 10.10
-# The set gap between the front washer and the front strap: one 0.95 blade
-# (cylinder_bank_layout.BANK_SPRING_SET).  Load there 3.2 N,
+# The set gap between gear 19's north face and the north strap: one 0.95 blade
+# (cylinder_bank_layout.BANK_SPRING_SET). Load there 3.2 N,
 # (FREE_HEIGHT - INSTALLED_HEIGHT) x RATE [INFERENCE: linear].
 INSTALLED_HEIGHT = 0.95
 # The model shows the installed state.

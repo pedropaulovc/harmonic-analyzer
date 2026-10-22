@@ -43,6 +43,11 @@ cannot ask for what the authors were told to leave out.
   (`DRAWING_REFERENCE_PRECISION`), never a literal. Migrated packages are
   gated by `test_drawing_specification_purity.py`; the rest of the fleet
   migrates incrementally.
+  The cylinder-bank assembly settings also author their native dimension
+  callout text in the builder; the drawing reads it back instead of calling
+  `SetText` on imported dimensions. That call can write through to the source
+  model, as the [rack source-save controls](pipeline/evidence/vm2-datum-placement/source-hash-cause.md)
+  demonstrated. Source-clean guards remain fail-closed before drawing export.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

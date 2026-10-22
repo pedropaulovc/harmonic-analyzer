@@ -40,8 +40,8 @@ ARBOR_BEARING_PROBE_Y_MM = 10.0
 
 # The arbor is one plain cylinder extruded +Y from the origin (y 0..ARBOR_LENGTH,
 # NOT mid-plane), domed past both ends, so the bearing face resolves by
-# diameter alone.  The 20 cylinder gears and both thrust washers run on that
-# single O.D., which also
+# diameter alone. The 20 cylinder gears, south disc and north spring run on
+# that single O.D., which also
 # journals in the two arbor pedestals -- one running surface, one roughness
 # control (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).  No datums and no feature control
 # frames: drawing-guidelines.md rule 5 (avoid excessive GD&T) keeps GD&T for the cast frame members and the gear blanks, and

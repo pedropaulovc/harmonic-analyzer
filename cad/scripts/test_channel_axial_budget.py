@@ -61,17 +61,17 @@ def _clear_window() -> tuple[float, float]:
 
 
 def _station_delta(j: int) -> tuple[float, float]:
-    """(min, max) Delta at station j: both datums DRO-set with the mic
-    compensation (back washer, north thrust washer), both banks held north on them
-    by their springs (no end play)."""
+    """(min, max) Delta at j: cam bank accumulated from the south disc;
+    rocker bank accumulated from its unchanged north thrust washer."""
     cam_datum = sum(bank.DATUM_CHAIN_STACK.values())
     arm_datum = sum(rocker.NORTH_DATUM_STACK.values())
     north = bank.COUNT - 1 - j
-    cam_upper, cam_lower = bank.partial_stack_band(north)
+    # Cam-slot centre = south cam datum + sum(T0..Tj-1) + (Tj-FWj)/2.
+    cam_upper, cam_lower = bank.partial_stack_band(j)
     half_slot = (gear.FACE_WIDTH_TOLERANCE_MM + gear.OVERALL_THICKNESS_BAND[0]) / 2.0
     cam = (
-        -(cam_datum + cam_upper + half_slot),
-        cam_datum - cam_lower + half_slot,
+        -cam_datum + cam_lower - half_slot,
+        cam_datum + cam_upper + half_slot,
     )
     hub_upper, hub_lower = _rocker_partial_band(north)
     gap = (
@@ -93,7 +93,7 @@ def test_the_clear_window_is_the_flat_rods() -> None:
 
 def test_the_worst_station_keeps_a_spare() -> None:
     worst = max(range(bank.COUNT), key=lambda j: _station_delta(j)[1] - _station_delta(j)[0])
-    assert worst == 7
+    assert worst == 12
     assert _station_delta(worst) == pytest.approx((-0.5635, 0.6885), abs=1e-4)
 
 

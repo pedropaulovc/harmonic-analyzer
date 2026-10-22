@@ -52,7 +52,7 @@ def test_preload_rule_is_the_cylinder_bank_rule() -> None:
     assert bank.ROCKER_SPRING_SET_BAND == drum_bank.BANK_SPRING_SET_BAND
     assert bank.PRELOAD_LIMITS == drum_bank.PRELOAD_LIMITS
     assert bank.MIC_RESIDUAL == drum_bank.MIC_RESIDUAL
-    assert bank.NORTH_EAR_LOCATE_BAND == drum_bank.BACK_STRAP_LOCATE_BAND
+    assert bank.NORTH_EAR_LOCATE_BAND == drum_bank.FRONT_STRAP_LOCATE_BAND
 
 
 def test_the_bank_is_preloaded_by_its_spring() -> None:

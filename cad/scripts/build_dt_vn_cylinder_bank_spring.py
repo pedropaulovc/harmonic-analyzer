@@ -1,8 +1,8 @@
 r"""Purchased MHA-DT-VN-68 cylinder bank spring: McMaster 9714K392.
 
 A wave disc spring (``dt_vn_cylinder_bank_spring_spec``); on the MHA-DT-13
-arbor between the front MHA-DT-26 washer and the front MHA-DT-02 strap, it
-holds the 20-gear stack north on its datum (#948 ruling R).  The stock recipe
+arbor directly between gear 19's north face and the north MHA-DT-02 strap,
+it holds the 20-gear stack south on its datum (user ruling 2026-10-20).
 ``diagnostics/diag_build_9714K392.py`` models the installed envelope; no
 vendor model was fetched, so its standalone run is catalog-only.
 

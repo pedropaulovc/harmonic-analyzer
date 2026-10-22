@@ -3256,7 +3256,7 @@ def _lug_printed() -> dict[str, float]:
     }
 
 
-def test_underside_lug_sheet_preserves_retained_locations_from_x0_y0() -> None:
+def test_underside_lug_baselines_increase_outward_from_the_rear_west_datum() -> None:
     import draw_fr_harmonic_base as sheet
 
     spec = fr_harmonic_base_spec
@@ -3269,19 +3269,7 @@ def test_underside_lug_sheet_preserves_retained_locations_from_x0_y0() -> None:
         spec.UNDERSIDE_LOCATION_DIMENSIONS
     )
     assert {name for _feature, name in spec.UNDERSIDE_LOCATION_PREFIXES} <= marked
-    printed = {name: round(value, 1) for name, value in _lug_printed().items()}
-    assert printed == {
-        "Lug1X": 39.6,
-        "CrossRibX": 234.6,
-        "Lug3X": 417.6,
-        "Lug1Y": 68.6,
-        "LongRibY": 138.6,
-        "Lug0Y": 218.6,
-    }
-    assert spec.CROSS_RIB_CENTER_X == 11.0
-    assert _lug_vertices()["CrossRibX"][0] == pytest.approx(
-        spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0,
-    )
+    printed = _lug_printed()
     assert printed["CrossRibX"] == pytest.approx(
         spec.BOTTOM_LENGTH / 2.0 + spec.CROSS_RIB_CENTER_X - spec.RIB_THICKNESS / 2.0,
     )

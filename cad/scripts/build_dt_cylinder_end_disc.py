@@ -1,18 +1,13 @@
-r"""Reproduction script: cylinder-bank end thrust washer (#743; 2 used).
+r"""Reproduction script: south cylinder-bank end disc (MHA-DT-26; one used).
 
-The turned steel washer at each end of the solid cylinder-gear stack, between
-the end gear and its arbor-pedestal strap. The back-side photographs (ch13
-page002_img01, ch25 page002_img03) show a grey annulus of about 2.6x the ~O10
-arbor dome between the strap and gear 19 (inferred, photo-scaled); the front
-side shows gear 0's cam and rod directly behind the strap with no large disc,
-so the former O55 brass "end disc" is retired (user ruling on #743, Q2). The
-back washer's thickness sits in the bank's axial datum chain
-(cylinder_bank_layout), so it carries a held band. The dimensions live in
-dt_cylinder_end_disc_spec.
+The C36000 brass disc has a reduced OD to clear the unchanged drive.
+Its drilled bore clears the arbor; the ordinary thickness band meets the web target.
+The south face seats directly on the south arbor-pedestal strap; the north
+face closes gear 0's cam slot. The north spring holds the bank south onto
+this datum. Dimensions live in dt_cylinder_end_disc_spec.
 
 Layout: Front-plane annulus at the origin (OD WASHER_OD, bore WASHER_BORE)
-extruded +Z by WASHER_THICK. The drive-train assembly seats one against each
-end gear and locks it to the arbor.
+extruded +Z by WASHER_THICK, stationary on the arbor.
 
 Run (SolidWorks already open)::
 
@@ -36,20 +31,16 @@ from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
-from _fit_deviations import deviations
 from dt_cylinder_end_disc_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     WASHER_BORE,
-    WASHER_BORE_BAND,
     WASHER_OD,
     WASHER_THICK,
-    WASHER_THICK_TOLERANCE_MM,
 )
 
 PART_NAME = "dt-cylinder-end-disc"
-MATERIAL = "Plain Carbon Steel"  # the photographed annulus reads grey steel
+MATERIAL = "Brass"
 
 DISC_DIA = WASHER_OD
 DISC_THICK = WASHER_THICK
@@ -118,12 +109,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(WASHER_BORE_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "Disc", "DiscThick", WASHER_THICK_TOLERANCE_MM
-    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

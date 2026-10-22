@@ -24,10 +24,9 @@ screw's largest listed circle by entity, whose leader SolidWorks ended on
 the pedestal's top face (run
 20260928T194845954Z-44f5de00de924735961d14f4aad40337, item 32).
 
-The thrust washer is pinned to the north one, cylinder-end-disc-2 (placed
-after the south): it stands alone at the sheet's west end, while the south
-one sits among the front strap, MHA-DT-VN-68 and the apex set screw (#1051;
-the machinist review of 9ebf51696 found the visible washer unballooned).
+The single south end disc uses a walked edge on cylinder-end-disc-1.
+There is no north disc: MHA-DT-VN-68 bears directly between gear 19 and
+the north strap (user ruling 2026-10-20).
 
 The MHA-DT-VN-57 block screw is pinned to the front (south) block's west
 screw, slotted-screw-3 (x -4.65, z -85.59 in the assembly), which stands
@@ -50,7 +49,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
     "cylinder-bank": {
         "dt-cylinder-gear-shaft": BalloonAnchor(),
         "dt-arbor-pedestal": BalloonAnchor(),
-        "dt-cylinder-end-disc": BalloonAnchor(instance="dt-cylinder-end-disc-2"),
+        "dt-cylinder-end-disc": BalloonAnchor(),
         "dt-vn-cylinder-bank-spring": BalloonAnchor(),
         "dt-vn-arbor-set-screw": BalloonAnchor(),
         "dt-cylinder-gear": BalloonAnchor(),

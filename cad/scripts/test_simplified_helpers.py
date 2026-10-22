@@ -867,16 +867,23 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         return reference(2, "*Isometric", (1.0, 8.0))
 
     exploded_at_bom: list[int] = []
+    views_at_bom: list[FakeView] = []
 
     def insert_bom(_adapter, _view, _facts) -> tuple[str, dict[str, str]]:
         fake = adapter.currentModel
         exploded_at_bom.append(sum(view.IsExploded() for view in fake.views))
+        views_at_bom.extend(fake.views)
         fake.bom_inserted = True
         return "BOM", {}
 
     def full_detail(_adapter) -> tuple[float, float]:
         reference(drawing.FULL_DETAIL_SHEET, "*Right", (1.0, 1.0), ViewRole.FULL_DETAIL)
         return (1.0, 1.0)
+
+    def bank_settings(_adapter, _facts, _trace):
+        for scale in (drawing.BANK_SETTING_SCALE, drawing.BANK_SPRING_DETAIL_SCALE):
+            reference(drawing.BANK_SETTINGS_SHEET, "*Right", scale)
+        return idle
 
     idle = lambda *_args, **_kwargs: None  # noqa: E731
     for name, stub in {
@@ -886,6 +893,7 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         "_insert_bom": insert_bom,
         "_place_sequence_sheet": sheet(drawing.SEQUENCE_SHEET),
         "_place_bank_sheet": sheet(drawing.BANK_SHEET),
+        "_place_bank_setting_sheet": bank_settings,
         "_place_fit_sheet": sheet(drawing.FIT_SHEET),
         "_place_checks_sheet": sheet(drawing.CHECKS_SHEET),
         "_place_continuation_sheet": sheet(drawing.CONTINUATION_SHEET),
@@ -901,6 +909,7 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
 
     fake = adapter.currentModel
     assert fake.dirtied_source == []
+    assert views_at_bom == fake.views
     assert exploded_at_bom == [len(drawing.CLUSTER_SHEETS)]
     exploded = [view for view in fake.views if view.IsExploded()]
     assert len(exploded) == len(drawing.CLUSTER_SHEETS)

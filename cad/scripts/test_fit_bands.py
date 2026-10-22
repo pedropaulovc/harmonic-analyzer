@@ -222,6 +222,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
+    ("dt_cylinder_end_disc_spec", "WASHER_BORE_BAND"): (
+        "title-block drilled-hole deviations; upper limit indexed by "
+        "installed_clearance_budget for free-bore tilt and drive clearance"
+    ),
     ("dt_vn_cone_pivot_screw_spec", "SHOULDER_DIA_BAND"): (
         "McMaster 91829A560 supplied shoulder diameter +0/-0.0254 mm; "
         "upper/lower deviations used by the platform's stock pivot fit"

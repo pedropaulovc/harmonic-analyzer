@@ -105,6 +105,7 @@ from _assembly_postbuild import (
 from _chain_mounts import mounted_wheels
 from _interference_contracts import allowed_interference_pairs
 from _native_spring_contact import assert_assembly_spring_contacts
+from _native_bank_retention import measure as measure_bank_retention
 # component iteration helpers (read-only)
 from _com import _early_bound, _read_member
 
@@ -921,6 +922,14 @@ def _run_soundness_battery(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
         )
+    if name in ("dt-drive-train", "ha-harmonic-analyzer"):
+        report.gate(
+            f"{name}:bank-retention-native",
+            lambda: measure_bank_retention(
+                adapter,
+                assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
+            ),
+        )
     if name == CHANNEL_OWNER:
         report.gate(
             f"{name}:channel-independence",
@@ -1058,6 +1067,14 @@ async def _verify_static_one(
         report.gate(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
+        )
+    if name in ("dt-drive-train", "ha-harmonic-analyzer"):
+        report.gate(
+            f"{name}:bank-retention-native",
+            lambda: measure_bank_retention(
+                adapter,
+                assembly_kind="top_assembly" if name == "ha-harmonic-analyzer" else "drive_train",
+            ),
         )
     # component-count REMOVED: every historical failure of that gate was a stale band
     # or a gate bug (never a real regression), so it cost more in false alarms than it

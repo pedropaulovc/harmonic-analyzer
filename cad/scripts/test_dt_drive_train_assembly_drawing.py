@@ -74,11 +74,8 @@ def _instances(**overrides) -> list[spec.Instance]:
                 bank_layout.BACK_PEDESTAL_ORIGIN_Z,
             )
         ],
-        "dt-cylinder-end-disc": [
-            (drum_x, drum_y, interval[0])
-            for interval in (bank_layout.FRONT_WASHER_Z, bank_layout.BACK_WASHER_Z)
-        ],
-        "dt-vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.FRONT_STRAP_INNER_Z)],
+        "dt-cylinder-end-disc": [(drum_x, drum_y, bank_layout.SOUTH_DISC_Z[0])],
+        "dt-vn-cylinder-bank-spring": [(drum_x, drum_y, bank_layout.BANK_SPRING_Z[0])],
         "dt-vn-arbor-set-screw": [
             (drum_x, drum_y, z)
             for z in (bank_layout.FRONT_SET_SCREW_Z, bank_layout.BACK_SET_SCREW_Z)
@@ -413,40 +410,6 @@ def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
     assert "RETURN IT TO THE MHA-DT-VN-53" not in check
 
 
-def test_cone_swing_shims_hold_the_step_9_bands_and_check_7_resets_the_rig() -> None:
-    """#1691 review r4: the shims move the pedestals after step 9 set them
-    and after the north bracket and the rig were set from them.  Check 4
-    bounds that move to the step 9 bands, read against the recorded X and
-    back inner-face Y, names the steps that stand, and check 7 re-sets the rig."""
-    import dt_drive_train_steps as steps
-
-    check = " ".join(drawing.CHECKS.split("4. CONE SWING")[1].split("\n5.")[0].split())
-    order = [
-        check.index("ZERO AN INDICATOR ON EACH MHA-DT-02 IN X"),
-        check.index("(MHA-DT-VN-62) TO SNUG-LOOSE"),
-        check.index("TIGHTEN MHA-DT-VN-62"),
-        check.index(
-            f"RECORDED X (9A, 9C) PLUS ITS X READING IS {drawing.BANK_X_LIMITS}"
-        ),
-        check.index("BACK INNER-FACE Y RECORDED IN 9A PLUS ITS Y READING"),
-        check.index("THE 9A Y LIMITS, USING THE SAME W"),
-        check.index("RESET WITHIN THOSE LIMITS ON ITS INDICATORS AND TIGHTEN"),
-        check.index("SWING OUT AND REMOVE THE SHIMS"),
-    ]
-    assert order == sorted(order), check
-    assert (
-        f"STEPS {steps.step_number(drawing.NORTH_BRACKET_SET_KEY)} AND "
-        f"{steps.step_number('rig-located')}-{steps.step_number('rig-seats-transferred')}"
-        " STAND; CHECK 7 RE-PROVES THE RIG"
-    ) in check
-    assert "BACK THE SWING OFF" not in check
-    bank = _flat(drawing.BANK_STEPS)
-    assert bank.count("RECHECK AND RECORD X") == 2
-    assert "RECHECK AND RECORD X AND Y" in bank
-    assert "THE Y READING IS ZERO" not in check
-    assert "MHA-DT-13 BAR" not in bank
-    check5 = _flat(drawing.CHECKS.split("\n5. ")[1].split("\n6. ")[0])
-    assert check5.endswith("TIGHTEN MHA-DT-VN-51: THE CHECK 4 SETTING.")
 
 
 def test_cone_swing_check_requires_installed_stop_inspection_and_seating() -> None:
@@ -685,16 +648,41 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
         "dt-vn-pedestal-hold-down-screw-1",
         "dt-vn-pedestal-hold-down-screw-2",
     )
-    # The bank sheet's thrust-washer balloon is pinned to the north washer.
-    assert moved["north thrust washer"] == ("dt-cylinder-end-disc-2",)
-    bank_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["cylinder-bank"]
-    assert bank_anchors["dt-cylinder-end-disc"].instance == "dt-cylinder-end-disc-2"
+    assert moved["south end disc"] == ("dt-cylinder-end-disc-1",)
+    assert moved["bank spring"] == ("dt-vn-cylinder-bank-spring-1",)
+    assert not any(i.name == "dt-cylinder-end-disc-2" for i in _instances())
     assert moved["spring foot screw lifts"] == ("dt-vn-foot-screw-1",)
     assert moved["spring steps east"] == ("dt-pinion-spring-1", "dt-vn-foot-screw-1")
     assert moved["block screws lift"] == tuple(f"dt-vn-slotted-screw-{i}" for i in range(1, 5))
     # The rig sheet's MHA-DT-VN-57 balloon is pinned to the front block's west screw.
     rig_anchors = drawing.DRIVE_TRAIN_BALLOON_ANCHORS["pinion-rig"]
     assert rig_anchors["dt-vn-slotted-screw"].instance == "dt-vn-slotted-screw-3"
+
+
+def test_bank_spring_explode_clears_arbor_and_pedestal_in_isometric() -> None:
+    import dt_arbor_pedestal_spec as pedestal
+    import dt_cylinder_gear_shaft_spec as shaft
+    import dt_vn_cylinder_bank_spring_spec as spring
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    spring_step, pedestal_step = steps["bank spring"], steps["north pedestal"]
+    assert spring_step.axis == pedestal_step.axis == "z"
+    # Conservative ink envelopes along projected +Z in the standard isometric:
+    # an axial millimetre projects sqrt(2/3), a radial one at most 1/sqrt(3).
+    # R11's 15 mm spring step overlaps the arbor's envelope.
+    axial, radial = math.sqrt(2.0 / 3.0), 1.0 / math.sqrt(3.0)
+    spring_south = bank_layout.BANK_SPRING_Z[0] + spring_step.distance_mm
+    spring_north = bank_layout.BANK_SPRING_Z[1] + spring_step.distance_mm
+    arbor_tip = (
+        bank_layout.BACK_STRAP_INNER_Z + pedestal.STRAP_T + bank_layout.ARBOR_DOME_HEIGHT
+    )
+    pedestal_inner = bank_layout.BACK_STRAP_INNER_Z + pedestal_step.distance_mm
+    assert (spring_south - arbor_tip) * axial > (
+        spring.OD / 2.0 + shaft.SHAFT_RADIUS
+    ) * radial
+    assert (pedestal_inner - spring_north) * axial > (
+        spring.OD / 2.0 + pedestal.TOP_RADIUS
+    ) * radial
 
 
 def test_explode_plan_refuses_unknown_retired_and_missing_families() -> None:
@@ -811,6 +799,75 @@ def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
         drawing.BOM_COLUMN_WIDTH,
         drawing.BOM_ANCHOR[1] - drawing.BOM_REFERENCE_FIELD[1] + 0.001,
     )
+
+
+def test_bank_setting_caption_accepts_native_r4_extent_not_exact_anchor_target() -> None:
+    # Native R4, source 957dc7b2fc79, 20261020T223233Z failure capture:
+    # Its rendered readback differed harmlessly from the requested corner.
+    # That point is not _anchor_note's postcondition; actual air is 4.1845 mm.
+    target = (0.25288663532950506, 0.1265405874866539)
+    extent = (
+        0.25307234782608695, 0.12206696321070235,
+        0.31073714381270906, 0.12635608026755854,
+    )
+    outline = (0.099, target[1] + 0.004, 0.311, 0.2336)
+    assert abs(extent[0] - target[0]) > drawing.NOTE_ANCHOR_SETTLE
+    assert abs(extent[3] - target[1]) > drawing.NOTE_ANCHOR_SETTLE
+    assert drawing.bank_setting_caption_violations(extent, outline) == []
+    # Position stability alone cannot accept a caption that actually moves
+    # onto the view, or one whose measured air drops below the unchanged 4 mm.
+    for top in (outline[1] + 0.001, outline[1] - 0.00399):
+        assert drawing.bank_setting_caption_violations((*extent[:3], top), outline)
+
+
+def test_bank_setting_caption_margin_clears_native_r6_failure_and_printed_border() -> None:
+    # Native R6 actual extent (source 881d1eddc90d, 20261020T225444Z).
+    # The unchanged view's R3 outline bottom was reported as 31.1 mm;
+    # its 0.05 mm reporting precision cannot change either result below.
+    extent = (
+        0.06864031438127086, 0.022464133779264206,
+        0.14107873578595315, 0.027229819397993293,
+    )
+    outline = (0.061, 0.0311, 0.149, 0.1189)
+    assert drawing.bank_setting_caption_violations(extent, outline)
+    # Moving the placement target from 4 to 8 mm drops the whole caption
+    # another 4 mm; this is an offline placement envelope, not native proof.
+    drop = drawing.VIEW_CAPTION_GAP
+    moved = (extent[0], extent[1] - drop, extent[2], extent[3] - drop)
+    assert drawing.bank_setting_caption_violations(moved, outline) == []
+    # Actual R4 sheet-13 PDF frame: centre y35.90001 pt, stroke1.41733 pt.
+    # Check its INNER ink edge, more conservative than 12.7 mm zone metadata.
+    border_inner = (35.90001 + 1.41733 / 2.0) * 25.4 / 72.0 / 1000.0
+    assert moved[1] - border_inner > 0.0055
+    field = (0.0127, 0.2667, 0.4191, border_inner)
+    assert drawing.note_field_violations(moved, field) == []
+    # A further drop through the frame is still refused by containment.
+    through_frame = (moved[0], border_inner - 0.001, moved[2], moved[3])
+    assert drawing.note_field_violations(through_frame, field)
+
+
+@pytest.mark.parametrize(
+    ("extent", "outline"),
+    (
+        # Actual R3 native caption/view boxes, the two original real overlaps.
+        ((0.1649, 0.1407, 0.2226, 0.1454), (0.099, 0.1305, 0.311, 0.2336)),
+        ((0.0596, 0.0306, 0.1325, 0.0353), (0.061, 0.0311, 0.149, 0.1189)),
+    ),
+)
+def test_bank_setting_caption_refuses_recorded_native_r3_collisions(extent, outline) -> None:
+    assert drawing.bank_setting_caption_violations(extent, outline)
+
+
+def test_bank_setting_letter_requires_whole_box_clear_of_circle() -> None:
+    centre, radius = (0.13275, 0.195), 0.008
+    clear = (0.113, 0.211, 0.117, 0.216)
+    assert drawing.bank_setting_letter_violations(clear, centre, radius) == []
+    # Each independent edge must retain 4 mm; readable/stable position alone
+    # does not prove the identifier is outside its view-owned sketch circle.
+    right_close = (*clear[:2], centre[0] - radius - 0.00399, clear[3])
+    below = (clear[0], centre[1] + radius + 0.00399, *clear[2:])
+    assert drawing.bank_setting_letter_violations(right_close, centre, radius)
+    assert drawing.bank_setting_letter_violations(below, centre, radius)
 
 
 def test_balloon_attachment_gate_names_every_mismatch() -> None:
@@ -1268,102 +1325,6 @@ def test_the_cone_gears_slide_off_the_64t_gear_and_stay_on_the_stub() -> None:
     assert collar_end < block_face
 
 
-def test_bank_fitup_limits_are_the_layout_bands() -> None:
-    """#743 steps 8-9 print cylinder_bank_layout's bands as limits, each
-    rounded inward so a part inside the print is inside the model band."""
-    import math
-
-    import ch_vn_rocker_thrust_washer_spec as rocker_washer
-    import cylinder_bank_layout as bank
-    import fr_harmonic_base_spec as base
-    import rocker_bank_layout as rockers
-
-    def limits(low: float, high: float, places: int) -> str:
-        scale = 10**places
-        return (
-            f"{math.ceil(low * scale - 1e-9) / scale:.{places}f}-"
-            f"{math.floor(high * scale + 1e-9) / scale:.{places}f}"
-        )
-
-    steps = _flat(drawing.BANK_STEPS)
-    thickness = bank.OVERALL_THICKNESS
-    upper, lower = bank.OVERALL_THICKNESS_BAND
-    # The gear's own thickness band is the MHA-DT-12 print's (rules 2 and 24).
-    assert limits(thickness + lower, thickness + upper, 4) not in steps
-    assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
-    short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
-    assert short in " ".join(steps.split())
-    back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
-    band = bank.BACK_STRAP_LOCATE_BAND
-    # #948 ruling R (PR #1292): the target moves north -- LESS Y, a rear-face
-    # distance -- by the miced back washer's excess over nominal.
-    washer = f"{bank.WASHER_THICK:.3f}"
-    bank_x = cone_line.X_DRUM + base.BOTTOM_LENGTH / 2.0
-    assert (
-        f"TO X {limits(bank_x - band, bank_x + band, drawing.FIT_LIMIT_PLACES)}" in steps
-    )
-    assert (
-        f"X {limits(bank_x - band, bank_x + band, drawing.FIT_LIMIT_PLACES)} AND SPOT" in steps
-    )
-    assert (
-        f"Y {limits(back_y - band, back_y + band, drawing.FIT_LIMIT_PLACES)} "
-        f"LESS (W - {washer})" in steps
-    )
-    assert steps.index("MIC ONE MHA-DT-26, W") < steps.index("FACE TO Y")
-    # Step 10: the north MHA-CH-08 ear inner face on the same DRO zero, its
-    # target offset north by the miced north MHA-CH-VN-56 washer's excess; the
-    # plain shaft threads through the set ear, so the bracket stays down.
-    ear_y = base.BOTTOM_REAR_Z - rockers.NORTH_EAR_INNER_Z
-    ear_band = rockers.NORTH_EAR_LOCATE_BAND
-    rocker_washer_thick = f"{rocker_washer.THICKNESS:.3f}"
-    assert (
-        f"EAR INNER FACE TO Y {limits(ear_y - ear_band, ear_y + ear_band, 2)} "
-        f"LESS (W - {rocker_washer_thick})" in steps
-    )
-    assert steps.index("MIC THE MHA-CH-VN-56, W") < steps.index("EAR INNER FACE")
-    assert "LIFT IT OFF" not in steps
-    assert "SHOULDER" not in steps
-    # The front MHA-DT-02 is set one spring-set blade off the front washer,
-    # the MHA-DT-VN-68 beside it; the bank then has no end play to read.
-    assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN IT AND THE FRONT MHA-DT-26" in steps
-    assert "BESIDE MHA-DT-VN-68" in steps
-    assert "REMOVE THE BLADE" in steps
-    for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
-        assert gone not in steps, gone
-    assert "MHA-DT-VN-64" in steps
-    dome = f"{bank.ARBOR_DOME_HEIGHT:.1f}"
-    assert f"PLUS A {dome} DOME EACH END" in steps
-    assert f"EACH DOME STANDS {dome} PROUD" in steps
-
-
-def test_bank_drills_the_front_foot_with_the_loaded_mandrel_off_the_base() -> None:
-    """dtrefactor F1/F2 on #937: the loaded mandrel hangs from the back strap
-    until the front strap goes on, and its front end covers the front foot
-    hole, so it is propped, then lifted off for the drill and tap."""
-    steps = " ".join(drawing.BANK_STEPS.split())
-    prop = steps.index("PROP THE MANDREL FRONT END")
-    front_on = steps.index("9C. SLIDE THE FRONT MHA-DT-02 ON")
-    spot = steps.index("SPOT AS 9A", front_on)
-    mandrel_off = steps.index("DRAW THE LOADED MANDREL OUT OF THE BACK MHA-DT-02")
-    drill = steps.index("DRILL AND TAP AS 9A", mandrel_off)
-    back_in = steps.index("PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-02")
-    refit = steps.index("REFIT THE FRONT MHA-DT-02; RE-SET THE BLADE AND X")
-    assert prop < front_on < spot < mandrel_off < drill < back_in < refit
-    assert "LIFT OFF, DRILL AND TAP" not in steps
-
-
-def test_bank_preload_check_replaces_the_ring_overhang_bound() -> None:
-    """#948 ruling R (PR #1292): MHA-DT-VN-68 preloads the bank back, so no ring
-    overhangs its cam; check 3 proves the spring holds instead, and neither
-    check 3 nor the MHA-DT-12 callout states an overhang bound."""
-    import dt_cylinder_gear_notes
-
-    checks = " ".join(drawing.CHECKS.split())
-    check3 = checks.split("3. ")[1].split(" 4. ")[0]
-    assert "PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE" in check3
-    assert "SPRINGS BACK ONTO THE BACK MHA-DT-26" in check3
-    assert "OVERHANG" not in checks
-    assert "OVERHANG" not in dt_cylinder_gear_notes.STACK_FIT_CALLOUT
 
 
 def test_the_collar_pin_explodes_with_the_arbor_and_the_strap_pins_stay() -> None:

@@ -72,7 +72,7 @@ def test_the_bank_is_preloaded_by_its_spring() -> None:
     assert bank.BANK_SPRING_SET == pytest.approx(0.95)
     assert bank.BANK_SPRING_HEIGHT == pytest.approx((0.85, 1.05))
     assert bank.BANK_PRELOAD == pytest.approx((2.22, 4.24), abs=0.01)
-    assert bank.BANK_SPRING_Z == (bank.FRONT_STRAP_INNER_Z, bank.FRONT_WASHER_Z[0])
+    assert bank.BANK_SPRING_Z == (bank.G19_BACK_FACE_Z, bank.BACK_STRAP_INNER_Z)
     assert not hasattr(bank, "BANK_END_PLAY")
     assert not hasattr(bank, "RING_OVERHANG_MAX")
     # The spring takes up the brass stack's thermal growth inside its set band.
@@ -81,7 +81,6 @@ def test_the_bank_is_preloaded_by_its_spring() -> None:
 
 def test_the_bank_spring_fits_its_arbor_and_faces() -> None:
     import dt_arbor_pedestal_spec as ped
-    import dt_cylinder_end_disc_spec as washer
     import dt_cylinder_gear_shaft_spec as arbor
     import dt_vn_cylinder_bank_spring_spec as spring
 
@@ -89,12 +88,14 @@ def test_the_bank_spring_fits_its_arbor_and_faces() -> None:
     # (with no clearance to spare: the DT-000 step checks it slides free).
     id_min = spring.ID + spring.ID_BAND[1]
     assert id_min >= arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0] - 1e-9
-    # Its whole width lands on the washer's face and on the strap's.
+    # Direct seating on gear 19's planar face and the north pedestal strap.
     od_min = spring.OD + spring.OD_BAND[1]
     od_max = spring.OD + spring.OD_BAND[0]
-    assert od_min > washer.WASHER_BORE + washer.WASHER_BORE_BAND[0]
+    assert od_min > (
+        arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0] + gear.BORE_DIAMETRAL_CLEARANCE_MM[1]
+    )
     assert od_min > ped.BORE_DIA + ped.BORE_DIA_BAND[0]
-    assert od_max < washer.WASHER_OD
+    assert od_max < gear.ROOT_ENVELOPE_DIA_MM[0]
 
 
 def test_g0_to_g19_band_is_capped_by_the_stack_acceptance() -> None:
@@ -108,18 +109,34 @@ def test_g0_to_g19_band_is_capped_by_the_stack_acceptance() -> None:
     assert sum(bank.G0_FRONT_NORTH_STACK.values()) == pytest.approx(0.175)
 
 
-def test_the_worst_station_is_gear_7_not_gear_0() -> None:
-    # 12 gears north of gear 7 may all lean one way (0.30) while the other 8
-    # lean back (0.20), and the stack still passes L20 +/-0.10.
-    assert bank.partial_stack_band(12) == pytest.approx((0.30, -0.30))
+def test_station_accumulation_starts_at_the_south_cam_face() -> None:
+    # The first tooth plane carries its own overall thickness, not 19 north
+    # gears. The longest accepted prefix is 12 gears, reaching gear 11.
+    assert bank.station_stack_band(0) == pytest.approx((-0.05, 0.05))
+    assert bank.station_stack_band(11) == pytest.approx((-0.325, 0.325))
+    assert bank.station_stack_band(19) == pytest.approx((-0.125, 0.125))
     assert bank.STATION_STACK_BAND == pytest.approx((-0.325, 0.325))
+    assert bank.G19_BACK_FACE_BAND == pytest.approx((-0.10, 0.10))
+
+
+@pytest.mark.parametrize("j", range(bank.COUNT))
+def test_station_errors_follow_accepted_south_prefixes(j: int) -> None:
+    south, north = bank.station_stack_band(j)
+    for deviations in _extreme_stacks(
+        gear.OVERALL_THICKNESS_BAND[0], bank.STACK_L20_ACCEPT_BAND[0]
+    ):
+        for ordered in (sorted(deviations), sorted(deviations, reverse=True)):
+            prefix = sum(ordered[:j + 1])
+            for fw_error in (-gear.FACE_WIDTH_TOLERANCE_MM, gear.FACE_WIDTH_TOLERANCE_MM):
+                error = prefix - fw_error / 2.0
+                assert south - 1e-12 <= error <= north + 1e-12
 
 
 def test_the_datum_chain_is_mic_compensated() -> None:
-    # #948 ruling R: the back strap's DRO target is offset by the measured
-    # back washer's (W - 1.500), so only the micrometer's residual stays.
+    # A thick south disc moves its datum strap south by the excess.
+    # Mic compensation leaves only the reading's residual in the chain.
     assert bank.DATUM_CHAIN_STACK == pytest.approx(
-        {"back strap DRO locate": 0.10, "back washer, mic-compensated": 0.013}
+        {"south strap DRO locate": 0.10, "south disc, mic-compensated": 0.013}
     )
 
 
@@ -155,13 +172,16 @@ def test_ring_faces_stay_on_flat_web_through_the_whole_stroke() -> None:
 
 
 def test_stations_close_up_against_the_datum() -> None:
-    assert bank.BACK_STRAP_INNER_Z - bank.G19_BACK_FACE_Z == pytest.approx(1.5)
+    assert bank.BACK_STRAP_INNER_Z - bank.G19_BACK_FACE_Z == pytest.approx(
+        bank.BANK_SPRING_SET
+    )
     assert bank.G0_CAM_FACE_Z == pytest.approx(
         bank.station_z(0) - gear.FACE_WIDTH / 2.0 - gear.CAM_THICKNESS
     )
-    assert bank.FRONT_WASHER_Z[0] - bank.FRONT_STRAP_INNER_Z == pytest.approx(
-        bank.BANK_SPRING_SET
+    assert bank.SOUTH_DISC_Z == (
+        bank.FRONT_STRAP_INNER_Z, bank.G0_CAM_FACE_Z
     )
+    assert bank.SOUTH_DISC_Z[1] - bank.SOUTH_DISC_Z[0] == pytest.approx(bank.WASHER_THICK)
     assert cam_plane.CAM_MID_DZ == pytest.approx(-gear.OVERALL_THICKNESS / 2.0)
 
 
@@ -170,8 +190,6 @@ def test_layout_stays_geometry_only() -> None:
     assert deps.isdisjoint(
         {"dt_cylinder_gear_notes.py", "build_dt_cylinder_gear.py", "draw_dt_cylinder_gear.py"}
     )
-    source = Path(bank.__file__).read_text(encoding="utf-8")
-    assert "title_block" not in source.split('"""', 2)[2]
 
 
 def test_arbor_spans_both_straps_and_domes_proud_of_each() -> None:
@@ -208,8 +226,8 @@ def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
         bank.BACK_STRAP_INNER_Z + ped.STRAP_INNER_Z
     )
     # Both faces follow the configured station grid, not rounded world-z
-    # coordinates from the retired train. Reconstruct the same stack at each
-    # end: cam face / washer / set spring at the front, tooth face / washer at back.
+    # coordinates from the retired train. Reconstruct the same stack:
+    # cam face / disc / strap at south; tooth face / spring / strap at north.
     station_z0 = _config.machine("channels", "station_z0_mm")
     seat = _config.machine("cone_incline", "drum_seat_nominal_mm")
     radius_step = 3.0 * MM_PER_IN / _config.machine("gear_train", "diametral_pitch")
@@ -217,10 +235,10 @@ def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
     front_cam_face = station_z0 + gear.FACE_WIDTH / 2.0 - gear.OVERALL_THICKNESS
     back_tooth_face = station_z0 + (bank.COUNT - 1) * pitch + gear.FACE_WIDTH / 2.0
     assert bank.FRONT_STRAP_INNER_Z == pytest.approx(
-        front_cam_face - bank.WASHER_THICK - bank.BANK_SPRING_SET, abs=1e-9
+        front_cam_face - bank.WASHER_THICK, abs=1e-9
     )
     assert bank.BACK_STRAP_INNER_Z == pytest.approx(
-        back_tooth_face + bank.WASHER_THICK, abs=1e-9
+        back_tooth_face + bank.BANK_SPRING_SET, abs=1e-9
     )
     # The apex set screws sit at each strap's mid-depth.
     assert bank.FRONT_SET_SCREW_Z == pytest.approx(

@@ -8,27 +8,24 @@ print-wording edit can never re-key the drive train.
 
 The bank is a SOLID STACK. Each MHA-DT-12 gear's overall thickness, cam face to
 back face, is the station pitch, so neighbouring gears bear cam face on back
-face, as the rocker hubs do (``ch_rocker_arm_spec.HUB_LENGTH``). A turned thrust
-washer (MHA-DT-26) sits at each end between the end gear and its arbor-pedestal
-strap.
+face, as the rocker hubs do (``ch_rocker_arm_spec.HUB_LENGTH``). One retaining
+brass end disc (MHA-DT-26) closes gear 0's cam slot at the south end.
 
-* The BACK (north) strap is the bank's axial datum. Its inner face is
-  DRO-located at fit-up, offset by the measured back washer's deviation from
-  nominal (MIC_RESIDUAL is what is left of that washer's band), and the bank
-  is held back against it: g19's back face bears on the back washer, which
-  bears on the back strap.
-* The arbor fills both strap bores and domes proud of each strap; a set
-  screw in each pedestal's crown apex bears on it (MHA-DT-VN-64): the back one
-  fixes the arbor, the front one is tightened once the front strap is set.
-* The FRONT (south) strap is set off the front washer by one BANK_SPRING_SET
-  blade, and the MHA-DT-VN-68 wave spring (``dt_vn_cylinder_bank_spring_spec``)
-  squeezed in that gap preloads the whole stack north onto the datum.
-* Every gear's overall thickness is +/-0.025 on its print (user ruling L20
-  d'). A fit-up acceptance on the measured 20-gear stack (STACK_L20_ACCEPT,
-  +/-0.10, #948 ruling R) caps the cumulative deviation, so g0's position
-  relative to g19 never carries 19 per-gear bands. A part of the stack is
-  not capped by the acceptance alone: its gears may all lean one way while
-  the rest lean the other (partial_stack_band).
+* The FRONT (south) strap is the bank's axial datum. Its inner face is
+  DRO-located at fit-up, offset south by the measured disc's excess over
+  nominal (MIC_RESIDUAL is the reading's remaining error). The disc seats
+  directly on that strap; gear 0's cam face seats on the disc.
+* The arbor fills both strap bores and domes proud of each strap. Its two
+  crown-apex set screws (MHA-DT-VN-64) bear midway through the straps:
+  tighten the datum-side south screw before the north one.
+* The BACK (north) strap is set one BANK_SPRING_SET blade off gear 19's
+  north planar face. The MHA-DT-VN-68 wave spring squeezed directly between
+  them preloads the whole stack south onto the datum. There is no north disc
+  (user ruling 2026-10-20).
+* Every gear's overall thickness is +/-0.025 on its print. The measured
+  20-gear stack acceptance (STACK_L20_ACCEPT, +/-0.10) caps the end-to-end
+  deviation; partial stacks may still lean opposite ways (partial_stack_band).
+  Accumulation now starts at gear 0's south cam face, not gear 19.
 
 The bank is PRELOADED (#948 ruling R, PR #1292, reversing the #743 Q1 ruling
 "the bank is not preloaded"): no gear interface opens in service, so the
@@ -50,6 +47,7 @@ import ch_connecting_rod_spec as _rod
 import dt_vn_cylinder_bank_spring_spec as _spring
 import dt_cylinder_gear_shaft_spec as _shaft
 from dt_cylinder_end_disc_spec import (
+    installed_clearance_budget,
     WASHER_THICK,
     WASHER_THICK_TOLERANCE_MM,
 )
@@ -88,15 +86,13 @@ def station_z(j: int) -> float:
 
 
 # --- preload (#948 ruling R) ----------------------------------------------------
-# The front strap is set off the front washer by one blade of the metric gauge
-# set; the MHA-DT-VN-68 wave spring in that gap holds the stack north, so the
-# bank has no end play. The blade is the spring's installed height; the strap's
-# set error (re-set on its hold-downs) moves only the spring's height, and with
-# it the preload, never a gear.
+# The north strap is set off gear 19's north face by one gauge blade. The
+# spring in that gap holds the stack south, with no end play. Re-setting the
+# north strap changes only spring height and preload, never the datum.
 MARGIN_SPARE = 0.25  # novice spare over every floor (pinion_rig_layout rule)
 FEELER_STEP = 0.05  # blades of the metric gauge set (pinion_rig_fitup)
 BANK_SPRING_SET = _spring.INSTALLED_HEIGHT  # the set blade, 0.95
-BANK_SPRING_SET_BAND = 0.10  # set error: front strap re-set on its hold-downs
+BANK_SPRING_SET_BAND = 0.10  # set error: north strap re-set on its hold-downs
 BANK_SPRING_HEIGHT = (
     BANK_SPRING_SET - BANK_SPRING_SET_BAND,
     BANK_SPRING_SET + BANK_SPRING_SET_BAND,
@@ -107,7 +103,7 @@ BANK_PRELOAD = (
     _spring.spring_load(BANK_SPRING_HEIGHT[0]),
 )
 # The ruling's "light force": single-digit newtons, enough to hold the stack
-# north against its axial drag on the arbor (#948 analysis: ~0.3 N of turning
+# south against its axial drag on the arbor (#948 analysis: ~0.3 N of turning
 # drag per gear at 3 N, mu 0.15) [INFERENCE: the 1 N floor].
 PRELOAD_LIMITS = (1.0, 10.0)
 if abs(BANK_SPRING_SET / FEELER_STEP - round(BANK_SPRING_SET / FEELER_STEP)) > 1e-9:
@@ -171,19 +167,18 @@ def partial_stack_band(n: int) -> tuple[float, float]:
         max(n * lower, accept_lower - rest * upper),
     )
 
-# --- nominal stations (bank held back against the datum) ---------------------
+# --- nominal stations (bank held south against the datum) -------------------
 G19_BACK_FACE_Z = station_z(COUNT - 1) + FACE_WIDTH / 2.0
-BACK_WASHER_Z = (G19_BACK_FACE_Z, G19_BACK_FACE_Z + WASHER_THICK)
-BACK_STRAP_INNER_Z = BACK_WASHER_Z[1]
 G0_TOOTH_FRONT_Z = station_z(0) - FACE_WIDTH / 2.0
 G0_CAM_FACE_Z = station_z(0) + FACE_WIDTH / 2.0 - OVERALL_THICKNESS
-FRONT_WASHER_Z = (G0_CAM_FACE_Z - WASHER_THICK, G0_CAM_FACE_Z)
-FRONT_STRAP_INNER_Z = FRONT_WASHER_Z[0] - BANK_SPRING_SET
-# The spring's installed envelope, front strap to front washer.
-BANK_SPRING_Z = (FRONT_STRAP_INNER_Z, FRONT_WASHER_Z[0])
+SOUTH_DISC_Z = (G0_CAM_FACE_Z - WASHER_THICK, G0_CAM_FACE_Z)
+FRONT_STRAP_INNER_Z = SOUTH_DISC_Z[0]
+# The spring bears directly on the final gear and the north strap.
+BANK_SPRING_Z = (G19_BACK_FACE_Z, G19_BACK_FACE_Z + BANK_SPRING_SET)
+BACK_STRAP_INNER_Z = BANK_SPRING_Z[1]
 STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
 
-# --- pedestals, arbor and set screws (nominal, bank pushed back) ------------
+# --- pedestals, arbor and set screws (nominal, bank pushed south) ------------
 # Each MHA-DT-02 stands on its strap INNER face (U34 row 5): the front one as
 # built (local +z = machine +z), the back one turned 180 about y (local +z =
 # machine -z). Their origins follow from those faces.
@@ -243,15 +238,23 @@ G0_G19_BAND = (
     -(_G1_G19_BAND[0] + FACE_WIDTH_TOLERANCE_MM),
     -_G1_G19_BAND[1] + FACE_WIDTH_TOLERANCE_MM,
 )
-# Any gear's tooth-face mid-plane against its nominal, bank held back: the
-# gears north of it, capped by partial_stack_band, not by the acceptance. With
-# centred bands the worst station is the one with 12 gears north (the
-# acceptance's reach, 0.10 / 0.025 = 4 gears, from the middle of the stack).
-_NORTH_OF_STATION = [partial_stack_band(COUNT - 1 - j) for j in range(COUNT)]
+# Absolute tooth-face mid-plane deviation from the south cam-face datum:
+# sum(T0..Tj) - FWj/2. The worst accepted prefix has 12 gears (gear 11).
+def station_stack_band(j: int) -> tuple[float, float]:
+    """(south, north) tooth-mid-plane error, excluding the datum chain."""
+    upper, lower = partial_stack_band(j + 1)
+    return (
+        lower - FACE_WIDTH_TOLERANCE_MM / 2.0,
+        upper + FACE_WIDTH_TOLERANCE_MM / 2.0,
+    )
+
+
 STATION_STACK_BAND = (
-    -(max(upper for upper, _ in _NORTH_OF_STATION) + FACE_WIDTH_TOLERANCE_MM / 2.0),
-    -min(lower for _, lower in _NORTH_OF_STATION) + FACE_WIDTH_TOLERANCE_MM / 2.0,
+    min(station_stack_band(j)[0] for j in range(COUNT)),
+    max(station_stack_band(j)[1] for j in range(COUNT)),
 )
+# Gear 19's north planar face is the whole accepted stack from the datum.
+G19_BACK_FACE_BAND = (STACK_L20_ACCEPT_BAND[1], STACK_L20_ACCEPT_BAND[0])
 
 # --- ring support -----------------------------------------------------------
 # A closed slot IS the cam: gear j's web to gear j-1's back face. Its smallest
@@ -272,17 +275,20 @@ if RING_SLOT_MARGIN < MARGIN_SPARE:
     )
 
 # --- datum chain for the cone-mesh and channel axial budgets ----------------
-BACK_STRAP_LOCATE_BAND = 0.10  # DRO edge-find on the strap inner face
-# Fit-up compensation (#948 ruling R): the fitter mics the back MHA-DT-26 and
-# offsets the back strap's DRO target by (measured - nominal), so the washer's
-# band leaves the chain and only the micrometer reading's residual stays.
+FRONT_STRAP_LOCATE_BAND = 0.10  # DRO edge-find on the datum strap inner face
+# A thick south disc requires its strap farther south: target machine z minus
+# (measured - nominal), or rear-face drawing Y PLUS that excess.
 MIC_RESIDUAL = 0.013  # half a thou: one micrometer reading
 DATUM_CHAIN_STACK = {
-    "back strap DRO locate": BACK_STRAP_LOCATE_BAND,
-    "back washer, mic-compensated": MIC_RESIDUAL,
+    "south strap DRO locate": FRONT_STRAP_LOCATE_BAND,
+    "south disc, mic-compensated": MIC_RESIDUAL,
 }
 if MIC_RESIDUAL >= WASHER_THICK_TOLERANCE_MM:
-    raise AssertionError("the washer's compensation must beat its own band")
+    raise AssertionError("the disc's compensation must beat its own band")
+
+# Pure owning-spec guards include the engaged alignment-pinion sweep, not just
+# the rig's parked native pose, and the enlarged disc's 64T separating plane.
+SOUTH_DISC_CLEARANCE = installed_clearance_budget(sum(DATUM_CHAIN_STACK.values()))
 
 __all__ = [
     "ARBOR_DOME_HEIGHT",
@@ -298,7 +304,8 @@ __all__ = [
     "SET_SCREW_SOCKET_PROUD",
     "STRAP_OUTER_SPAN",
     "BACK_STRAP_INNER_Z",
-    "BACK_WASHER_Z",
+    "SOUTH_DISC_Z",
+    "SOUTH_DISC_CLEARANCE",
     "BANK_PRELOAD",
     "BANK_SPRING_HEIGHT",
     "BANK_SPRING_SET",
@@ -309,7 +316,7 @@ __all__ = [
     "COUNT",
     "DATUM_CHAIN_STACK",
     "FRONT_STRAP_INNER_Z",
-    "FRONT_WASHER_Z",
+    "FRONT_STRAP_LOCATE_BAND",
     "G0_CAM_FACE_Z",
     "G0_FRONT_FROM_G19_BACK",
     "G0_FRONT_NORTH_STACK",
@@ -317,6 +324,7 @@ __all__ = [
     "G0_G19_BAND",
     "G0_TOOTH_FRONT_Z",
     "G19_BACK_FACE_Z",
+    "G19_BACK_FACE_BAND",
     "MARGIN_SPARE",
     "MIC_RESIDUAL",
     "PRELOAD_LIMITS",
@@ -333,4 +341,5 @@ __all__ = [
     "THERMAL_STACK_DRIFT",
     "partial_stack_band",
     "station_z",
+    "station_stack_band",
 ]

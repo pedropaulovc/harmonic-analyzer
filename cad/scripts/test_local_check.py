@@ -35,14 +35,25 @@ def _start(cmd, cwd, env):
         stderr=subprocess.PIPE, text=True, encoding="utf-8",
     )
     lines = queue.Queue()
+    errors = queue.Queue()
 
     def drain():
         for line in proc.stdout:
             lines.put(line.strip())
         lines.put("<exited>")
 
-    threading.Thread(target=drain, daemon=True).start()
-    return proc, lines
+    def drain_errors():
+        # wait() cannot complete if the child fills an unread stderr pipe.
+        # Keep diagnostics separate from stdout's readiness protocol.
+        errors.put(proc.stderr.read())
+
+    proc._capture_readers = (
+        threading.Thread(target=drain, name="local-check-stdout", daemon=True),
+        threading.Thread(target=drain_errors, name="local-check-stderr", daemon=True),
+    )
+    for reader in proc._capture_readers:
+        reader.start()
+    return proc, lines, errors
 
 
 def _stop(proc):
@@ -52,8 +63,42 @@ def _stop(proc):
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=30)
+    # A process exit does not mean its readers have consumed EOF yet.
+    # Join before closing either stream, including when a reader started late.
+    deadline = time.monotonic() + 30
+    for reader in proc._capture_readers:
+        reader.join(timeout=max(0, deadline - time.monotonic()))
+    assert not any(reader.is_alive() for reader in proc._capture_readers), (
+        "local-check capture readers did not stop after process exit"
+    )
     for stream in (proc.stdin, proc.stdout, proc.stderr):
         stream.close()
+
+
+def test_released_check_completes_with_stderr_larger_than_pipe_capacity(tmp_path, check_env):
+    """Completion must drain stderr without mixing it into readiness lines."""
+    script = tmp_path / "noisy_check.py"
+    script.write_text(
+        "import os, sys\n"
+        "print(os.getpid(), flush=True)\n"
+        "sys.stdin.read(1)\n"
+        "sys.stderr.write('teardown stderr\\n' * 131072)\n"
+        "sys.stderr.flush()\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, lines, errors = _start(
+        _local_check.command([sys.executable, str(script)], "check:noisy"),
+        tmp_path, check_env,
+    )
+    try:
+        int(lines.get(timeout=30))
+        proc.stdin.write("x")
+        proc.stdin.flush()
+        assert proc.wait(timeout=30) == 7, errors.get(timeout=30)
+        assert errors.get(timeout=30).endswith("teardown stderr\n" * 131072)
+    finally:
+        _stop(proc)
 
 
 def test_separate_checkouts_share_admission_until_running_check_exits(tmp_path, check_env):
@@ -73,21 +118,21 @@ def test_separate_checkouts_share_admission_until_running_check_exits(tmp_path, 
     check_env["PYTHONPATH"] = os.pathsep.join(
         [str(Path(_local_check.__file__).parent), check_env.get("PYTHONPATH", "")]
     )
-    first, first_lines = _start(*commands[0], check_env)
+    first, first_lines, first_errors = _start(*commands[0], check_env)
     second = None
     try:
         # Windows venv executables may redirect to a different interpreter PID.
         first_pid = int(first_lines.get(timeout=30))
-        second, second_lines = _start(*commands[1], check_env)
+        second, second_lines, second_errors = _start(*commands[1], check_env)
         with pytest.raises(queue.Empty):
             second_lines.get(timeout=0.5)
         first.stdin.write("x")
         first.stdin.flush()
-        assert first.wait(timeout=30) == 0, first.stderr.read()
+        assert first.wait(timeout=30) == 0, first_errors.get(timeout=30)
         assert int(second_lines.get(timeout=30)) != first_pid
         second.stdin.write("x")
         second.stdin.flush()
-        assert second.wait(timeout=30) == 0, second.stderr.read()
+        assert second.wait(timeout=30) == 0, second_errors.get(timeout=30)
     finally:
         _stop(first)
         if second is not None:
@@ -98,7 +143,7 @@ def test_killed_check_releases_admission(tmp_path, check_env):
     script = tmp_path / "hold.py"
     script.write_text("import os, sys\nprint(os.getpid(), flush=True)\nsys.stdin.read(1)\n", encoding="utf-8")
     cmd = _local_check.command([sys.executable, str(script)], "check:fixture")
-    proc, lines = _start(cmd, tmp_path, check_env)
+    proc, lines, _ = _start(cmd, tmp_path, check_env)
     try:
         owner_pid = int(lines.get(timeout=30))
         os.kill(owner_pid, signal.SIGTERM)
@@ -225,15 +270,15 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
         encoding="utf-8",
     )
     cmd = _local_check.command([sys.executable, str(hold)], "check:small")
-    small, small_lines = _start(cmd, tmp_path, check_env)
+    small, small_lines, small_errors = _start(cmd, tmp_path, check_env)
     parallel = None
     waiting = None
     blocker = None
     try:
         int(small_lines.get(timeout=30))
-        blocker, blocker_lines = _start(cmd, tmp_path, check_env)
+        blocker, blocker_lines, blocker_errors = _start(cmd, tmp_path, check_env)
         int(blocker_lines.get(timeout=30))
-        parallel, _ = _start(
+        parallel, _, parallel_errors = _start(
             _local_check.command(
                 [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
                  *worker_args, str(worker_test)],
@@ -247,24 +292,24 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
         assert not list(tmp_path.glob("gw*"))
         blocker.stdin.write("x")
         blocker.stdin.flush()
-        assert blocker.wait(timeout=30) == 0, blocker.stderr.read()
+        assert blocker.wait(timeout=30) == 0, blocker_errors.get(timeout=30)
         deadline = time.monotonic() + 30
         while len(list(tmp_path.glob("gw*"))) < 2:
-            assert parallel.poll() is None, parallel.stderr.read()
+            assert parallel.poll() is None, parallel_errors.get(timeout=30)
             assert time.monotonic() < deadline, "two admitted workers did not start"
             time.sleep(0.05)
         assert {p.name: p.read_text() for p in tmp_path.glob("gw*")} == {"gw0": "2", "gw1": "2"}
-        waiting, waiting_lines = _start(cmd, tmp_path, check_env)
+        waiting, waiting_lines, _ = _start(cmd, tmp_path, check_env)
         with pytest.raises(queue.Empty):
             waiting_lines.get(timeout=0.5)
         small.stdin.write("x")
         small.stdin.flush()
-        assert small.wait(timeout=30) == 0, small.stderr.read()
+        assert small.wait(timeout=30) == 0, small_errors.get(timeout=30)
         int(waiting_lines.get(timeout=30))
         # The small successor starts while the two xdist workers remain alive.
         assert parallel.poll() is None
         (tmp_path / "release").touch()
-        assert parallel.wait(timeout=30) == 0, parallel.stderr.read()
+        assert parallel.wait(timeout=30) == 0, parallel_errors.get(timeout=30)
     finally:
         (tmp_path / "release").touch()
         for proc in (small, parallel, waiting, blocker):

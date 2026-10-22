@@ -1582,9 +1582,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_dt_drive_train_assembly.py", "build_dt_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"
     ),
-    ("build_dt_drive_train_assembly.py", "build_dt_cylinder_end_disc"): (
-        "dtrefactor: reads DISC_DIA, DISC_THICK"
-    ),
     ("build_dt_drive_train_assembly.py", "build_fr_harmonic_base"): (
         "dtrefactor: reads BLOCK_SCREW_XZ, BLOCK_SEAT_SPEC, FOOT_SCREW_XZ, FOOT_SEAT_SPEC, LOCK_KNOB_XZ, LOCK_SEAT_SPEC, LOCK_STUD_ENGAGEMENT, PEDESTAL_SCREW_XZ, PEDESTAL_SEAT_SPEC, PIVOT_SCREW_XZ, PIVOT_SEAT_SPEC, STOP_SCREW_XZ, STOP_SEAT_SPEC, SWING_HARDWARE_GEOMETRY; finite through-seat material and engagement from fr_harmonic_base_fasteners"
     ),
