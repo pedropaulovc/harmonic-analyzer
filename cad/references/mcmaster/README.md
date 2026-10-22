@@ -1658,7 +1658,23 @@ three part-dimension identities while `GetFeatureOwner` versus `FeatureByName`
 returned zero for equally named `ProfileFeature` handles. The reason for that
 feature-identity discrepancy remains unproven; it is not a part-dimension
 authority check. Drawing owner mappings and independent geometry/attachment
-checks remain strict. The corrected contract still needs native qualification.
+checks remain strict. Native R48 qualified the back washer's banded thickness
+dimension at the part, imported drawing and final original-part checkpoints.
+Its unbanded OD and bore references passed the physical-rim guards; they were
+not three banded part-dimension qualifications. All 18 source-preservation
+checkpoints retained the original native-file hash and clean, read-only state.
+
+R48 also exposed actual thickness-text/witness and bore-qualifier/outline
+crossings. The shared washer drawing author now settles the full formatted
+thickness limits stack in native linear `OffsetText` mode, then measures its
+text and physical witnesses before placing the text on a right-hand shelf.
+The entire bore value/qualifier block moves to the right of the face outline,
+without applying the unsupported diameter `OffsetText` mode. Both use the
+existing 2 mm text clearance plus 0.2 mm placement allowance and retain the
+physical dimension stations, exact native/source identities and supplier bands.
+This drawing-only placement affects all seven washer-sheet consumers. Its
+final native export and whole-sheet layout still require qualification for
+those seven sheets; R48 does not establish the new placements.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical

@@ -488,6 +488,125 @@ def test_washer_import_refuses_uninherited_tolerance_precision_without_repairing
     ) == before
 
 
+def _r48_washer_layout(monkeypatch, *, axis="z", banded="thickness"):
+    from test_purchased_fastener_drawing import _washer_import_native
+    import _supplier_washer_drawing as washer
+
+    case = _washer_import_native(monkeypatch, axis=axis, values={
+        washer.OUTER_DIAMETER: 11.1252, washer.BORE_DIAMETER: 5.08, washer.THICKNESS: .91,
+    })
+    # The captured limits stack, not a nominal-value-only surrogate.
+    case.bands[washer.THICKNESS] = (.7366, 1.0922, "limits")
+    for collection in (case.sources, case.imports):
+        native = collection[washer.THICKNESS].native
+        native.Tolerance.Type = 3
+        native.Tolerance.GetMinValue = lambda: (.7366 - .91) / 1000
+        native.Tolerance.GetMaxValue = lambda: (1.0922 - .91) / 1000
+    if banded == "thickness":
+        case.kwargs["bands"] = {washer.THICKNESS: case.bands[washer.THICKNESS]}
+    qualifier = "FOR No. 10 SCREW SIZE"
+    case.sources[washer.BORE_DIAMETER].text[4] = qualifier
+    case.kwargs["bore_callout"] = qualifier
+    return case
+
+
+def _washer_source_state(case):
+    return {
+        label: (item.native.SystemValue, item.native.Tolerance.Type,
+                item.native.Tolerance.GetMinValue(), item.native.Tolerance.GetMaxValue(),
+                dict(vars(item.state)), dict(item.text), tuple(item.annotation.entities))
+        for label, item in case.sources.items()
+    }
+
+
+@pytest.mark.parametrize("axis", ("y", "z"))
+@pytest.mark.parametrize("banded", ("thickness", "all"))
+def test_washer_complete_consumer_replay_clears_limits_and_bore_qualifier_without_moving_witnesses(
+    monkeypatch, axis, banded,
+):
+    import copy
+    from _layout_audit import display_box
+    from _supplier_screw_layout import supplier_top_text_geometry
+
+    case = _r48_washer_layout(monkeypatch, axis=axis, banded=banded)
+    thick, bore = case.helper.THICKNESS, case.helper.BORE_DIAMETER
+    before = _washer_source_state(case)
+    before_records = copy.deepcopy({label: paint.record for label, paint in case.paint.items()})
+    before_stations = supplier_top_text_geometry(before_records[thick], horizontal=False)
+    face = case.views["*Top" if axis == "y" else "*Front"]
+    assert before_stations["text"].xmin < before_stations["right"]
+    assert display_box({"texts": before_records[bore]["display"]["texts"]}).xmin < face.GetOutline()[2]
+    # Offset mode changes the full native block only on rebuild. Measuring the
+    # pre-mode box would leave 6 mm of this real-width stack in the witness lane.
+    case.paint[thick].offset_shift = -.006
+    bore_y = case.paint[bore].record["pos"][1]
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    after = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    for field in ("tips", "witnesses", "physical_lines"):
+        assert after[field] == before_stations[field]
+    assert after["text"].xmin - after["right"] >= .002
+    assert display_box({"texts": case.paint[bore].record["display"]["texts"]}).xmin - face.GetOutline()[2] >= .002
+    assert case.paint[bore].record["pos"][1] == bore_y
+    assert case.imports[bore].display.OffsetText is False
+    assert _washer_source_state(case) == before
+    # A subsequent native layout regression must be caught at the real final
+    # consumer guard, even when every value, band and source identity is sound.
+    case.paint[bore].record = before_records[bore]
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+@pytest.mark.parametrize("label", ("thickness", "bore"))
+def test_washer_final_guard_refuses_r48_old_crossing_even_with_offset_flag_true(monkeypatch, label):
+    import copy
+
+    case = _r48_washer_layout(monkeypatch)
+    key = case.helper.THICKNESS if label == "thickness" else case.helper.BORE_DIAMETER
+    old = copy.deepcopy(case.paint[key].record)
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    case.paint[key].record = old
+    assert case.imports[case.helper.THICKNESS].display.OffsetText is True
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+@pytest.mark.parametrize("defect", ("reject", "clamp", "refuse_mode"))
+def test_washer_refuses_unrealized_native_thickness_shelf_without_altering_source(monkeypatch, defect):
+    case = _r48_washer_layout(monkeypatch)
+    before = _washer_source_state(case)
+    setattr(case.paint[case.helper.THICKNESS], defect, True)
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    assert _washer_source_state(case) == before
+
+
+@pytest.mark.parametrize("drift", ("witness", "bore_y"))
+def test_washer_final_guard_refuses_physical_station_drift_with_clear_text(monkeypatch, drift):
+    case = _r48_washer_layout(monkeypatch)
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    if drift == "witness":
+        case.paint[case.helper.THICKNESS].record["display"]["lines"][0][4] += .003
+    else:
+        case.paint[case.helper.BORE_DIAMETER].record["pos"][1] += .003
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+@pytest.mark.parametrize("defect", ("position", "width"))
+def test_washer_refuses_unavailable_measured_paint_instead_of_estimated_text(monkeypatch, defect):
+    case = _r48_washer_layout(monkeypatch)
+    record = case.paint[case.helper.THICKNESS].record
+    if defect == "position":
+        record["pos"][0] = float("nan")
+    else:
+        record["display"]["texts"][0]["w"] = 0.0
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+
+
 @pytest.mark.parametrize(
     "family,head_half,head_one,front_half,front_one",
     (
