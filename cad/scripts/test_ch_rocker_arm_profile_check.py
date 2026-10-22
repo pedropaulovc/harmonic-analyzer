@@ -215,7 +215,9 @@ def test_template_outline_corners_lie_on_their_arcs() -> None:
     assert check.BOT_END_X < check.TIP_X and check.BOT_END_Y < check.TIP_Y
 
 
-def test_pivot_pin_registration_and_acceptance_fit_a_quarter_of_the_rocker_zone() -> None:
+def test_pivot_pin_registration_and_acceptance_fit_a_quarter_of_the_rocker_zone() -> (
+    None
+):
     """The pin's worst-case play in BOTH bores (template and rocker, each at
     its largest, the pin at its smallest) moves the template off the arm's
     pivot; with the template's own DTI acceptance it stays inside the

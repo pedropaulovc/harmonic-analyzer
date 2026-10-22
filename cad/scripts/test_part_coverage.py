@@ -109,16 +109,14 @@ def test_part_and_assembly_coverage():
 
 
 @pytest.mark.parametrize("assembled", [False, True])
-def test_shop_fixture_coverage_requires_any_registered_assembly(
-    monkeypatch, assembled
-):
+def test_shop_fixture_coverage_requires_any_registered_assembly(monkeypatch, assembled):
     fixture = "coverage_tl_fixture"
     fixture_assembly = next(
         stem for stem in bg.ASSEMBLY_ORDER if bg.is_shop_fixture(stem)
     )
     original_parts = bg.part_stems()
     original_references = bg.references_of
-    monkeypatch.setattr(bg, "part_stems", lambda: (*original_parts, fixture))
+    monkeypatch.setattr(bg, "part_stems", lambda: [*original_parts, fixture])
     monkeypatch.setattr(
         registry,
         "DRAWINGS_BY_NAME",
@@ -140,7 +138,6 @@ def test_shop_fixture_coverage_requires_any_registered_assembly(
     else:
         with pytest.raises(
             AssertionError,
-            match="shop fixtures without registered assembly membership: "
-            + fixture,
+            match="shop fixtures without registered assembly membership: " + fixture,
         ):
             test_part_and_assembly_coverage()
