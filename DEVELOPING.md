@@ -1709,6 +1709,59 @@ Account, container, and salt are committed constants in `_artifact_cache.py`
 its matching `HARMONIC_CACHE_*` env var (CI, tests, an unlanded salt bump). None
 is a secret — the account is RBAC-gated with public blob access off.
 
+### Local archive reuse and file-backed transfers
+
+Workers and producers use the same `_artifact_cache.py` transfer path. Packing
+writes a private temporary file; downloads use the Azure SDK's `readinto` on a
+seekable file, then verify its complete SHA-256 and length before unpacking.
+Large uploads read bounded blocks instead of slicing a whole in-memory archive.
+Transfer concurrency remains **8**: `readall` was already parallel, so using
+`readinto` is a memory/copy optimization, not itself a network-speed improvement.
+
+Every restore starts with a GET bounded to **8 MiB**. Small archives complete in
+that one request, without a preceding HEAD. The response's epoch, archive
+SHA-256, total length and ETag establish the current canonical identity. For
+archives larger than 8 MiB and no larger than the local store cap, a matching
+`objects/<sha256>` file can supply the remaining bytes. A warm local hit still
+pays for that first network prefix; it is not a zero-network restore.
+`cache.archive` reports `probe_bytes` and `reused_bytes` to distinguish that cost
+from the remaining body avoided.
+
+Local objects are leaf-writable, so every reuse copies and hashes the complete
+object into a **private handle**. Unpacking reads that same handle, not a
+reopened shared path. Corrupted objects are not served. On a local miss, the SDK
+continues the original response with ETag-pinned parallel ranges; the completed
+private file must pass the same integrity checks. There is no recipe-to-ETag
+mapping: a same-key refresh is resolved from the current response metadata,
+not from previously cached recipe bytes.
+
+`HARMONIC_ARCHIVE_CACHE_ROOT` selects only these allowlisted locations:
+
+- **Producer default:** `%LOCALAPPDATA%/harmonic-analyzer/archive-cache/v1`.
+- **Worker:** `C:/ProgramData/solidworks-pool/archive-cache/v1`, explicitly
+  supplied by the worker/job runner.
+
+An override must be exactly one of those roots, outside `REPO_ROOT`, with no
+workspace overlap. Relative paths, aliases and UNC paths are refused. Without
+either `LOCALAPPDATA` or an explicit approved root, local reuse is disabled;
+file-backed remote transfers still work. Filesystem I/O failures in the optional
+local store skip local reuse or persistence rather than discarding a verified
+remote download. This does not bypass root-validation guards, hide Azure/auth
+errors, or weaken archive integrity and forced-refresh publication requirements.
+
+The new local store has a **16 GiB archive capacity**, separate from Azure
+retention. It reserves room before writing a publication temp and uses explicit
+mtime updates for LRU order. A host-local lock coordinates capacity admission
+and eviction; cross-process object leases prevent eviction of active readers.
+If unleased objects cannot make enough room, persistence is skipped. Archives
+larger than the cap are transferred without being retained locally.
+
+Eviction removes only hash-named objects and recognized interrupted-publication
+temps inside this new store. Lease files are retained to avoid split locks.
+Concurrent writers use unique temps and publish verified objects atomically.
+No source, native output, other cache directory or remote blob is deleted by
+this local capacity policy.
+
 ### Busting the cache (salt / epoch)
 
 The toolchain (SolidWorks major version, COM adapter) is **not** in any
