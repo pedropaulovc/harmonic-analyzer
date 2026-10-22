@@ -176,6 +176,13 @@ row/column bounds and reference/title-block keep-outs. The exploded lock wire
 stays near its drilled screw heads, separately from the withdrawn cotter, with
 the existing real-edge balloon ownership and settled-landing guards unchanged.
 
+Keep pointer starts clear of the labels' complete line boxes, not just their
+text anchors. The C2A PIN/BLOCK/FEELER checks exposed a 0.025 mm overlap;
+moving the PIN/BLOCK labels up and the FEELER pointer start down by 2.5 mm
+leaves 2.475 mm vertical air under the conservative text model. Keep the
+feature endpoints fixed and retain both the offline overlap checks and native
+endpoint/display proofs.
+
 The e12 assembly review requires the two exploded capture supports to use
 the sheet's left and right fields, not stay bunched at the left of one large
 source view. Insert two native assembly views with the existing occurrence
