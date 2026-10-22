@@ -340,4 +340,7 @@ recovery for the remaining revisions. All temporary files are discarded.
 `--no-publish` and failed publication leave the tracked images and revisions
 byte-identical. The generated-only follow-up exemption covers only generated
 README images, `next_revision`, and matching migrated/enrolled-plan revision lines;
-other plan edits require the ordinary merge gates.
+other plan edits require the [ordinary PR requirements](../../../AGENTS.md#minimum-merge-gate-every-pr),
+including focused source checks, appropriate native proof and applicable reviews.
+An individual PR or stack does not require a full build before merge; the
+release manager runs the full build on main and releases only green main.

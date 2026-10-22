@@ -156,14 +156,20 @@ git submodule update --init --recursive
 
 ## Minimum merge gate (every PR)
 
-Except for the narrowly generated-only post-release PR defined below, a PR is
-not mergeable until ALL THREE hold — no partial credit:
+During the rolling-main trial, authors prove their own changes before merge.
+Except for the narrowly generated-only post-release PR defined below, each PR
+must satisfy all requirements here within the CAD scope stated above. An
+individual PR or stack does not need a successful full `build` before merging.
 
-1. **Build green** — the full `build` pipeline (every part, assembly and gate)
-   passes on the PR's head. On the farm, run it through the supervised launcher
-   with **no `-n`**: `build.py --executor farm` keeps 8 leaves in flight, while a
-   hand-passed `-n 4` leaves the fifth worker idle. **One** successful build
-   is the bar.
+1. **Focused proof** — run the source checks appropriate to the change and the
+   affected native leaves when SolidWorks behavior or saved artifacts change.
+   Include affected assembly/mating checks when the changed behavior reaches
+   them. Identify downstream drawing inputs from the dependency graph or
+   cache-miss scope, regenerate affected sheets and record that scope in the PR.
+   Review those sheets under the direct/indirect policy below.
+   Record the checked commit, commands, results and native artifacts in the PR.
+   Focused proof must exercise the changed behavior; compilation or a cache hit
+   alone does not establish a new native side-effect.
 2. **Remote reviewer approved** — Codex or CodeRabbit approved the latest push
    (no findings, or its findings were addressed and re-reviewed clean).
 3. **Visual inspection of renders** — an eye pass over the rendered PNGs of
@@ -190,25 +196,45 @@ not mergeable until ALL THREE hold — no partial credit:
    replacement. Reviewer/judge defaults and their prompts are hashed review inputs.
    The review remains exempt from code review's cross-family rule
    (`cad/docs/drawing-simplicity-policy.md`, "The gate").
+   Changed drawing sheets require automated machinist review under
+   [the direct/indirect sheet policy](cad/docs/drawing-simplicity-policy.md#the-gate).
+   Automated machinist review is the default; substituting human machinist
+   review requires explicit owner authorization.
 
-**Stacked PRs share gates 1 and 3.** A successful build at the TOP of a stack
-covers every PR in that stack, and so does the visual inspection of the renders
-it produces — the top commit contains all of them, so building or eyeballing
-each branch separately re-proves the same artefacts on one COM seat. Gate 2 is
-NOT shared: each PR needs its own clean Codex or CodeRabbit review of its latest
-push. Order the stack so the riskiest change sits on top —
-if it fails, drop it off and gate the remainder, rather than having it block
-everything beneath it. Merge bottom-up and do NOT pass `--delete-branch`:
+**Stacked PRs may share focused native proof and render inspection** when the
+tested top commit contains every covered change and the evidence identifies the
+covered commits and artifacts. A stack does not require a full build to merge.
+Each PR still needs its own clean Codex or CodeRabbit review of its latest push;
+code review is not shared. Drawing reviews retain the direct/indirect sheet
+requirements linked above and count only for the exact sheet version merged.
+Order the stack so the riskiest change sits on top;
+if its focused proof fails, drop it and prove the remainder.
+Merge bottom-up and do NOT pass `--delete-branch`:
 deleting a parent branch auto-closes the children still targeting it.
 
 **Rebase on `main` proactively, not reactively.** Check the branch against
 `origin/main` (`git fetch origin main && git status`/`git log HEAD..origin/main`)
-before starting new work on it, and always before kicking off a full `build`
-— a stale branch risks a green build that
+before starting new work on it, and always before focused native proof and
+rendering: a stale branch risks green proof that
 still conflicts or drifts (config/digest/cache-key changes on `main` invalidate
 what you just built). Rebase (`git pull --rebase origin main`) as soon as you
 find `main` has moved, rather than waiting for a merge conflict or a failed
 gate to force it.
+
+### Rolling main and daily releases
+
+The release manager continuously runs the full `build` pipeline on `main`,
+including every part, assembly and check. On the farm, use the supervised
+launcher with no `-n`: `build.py --executor farm` keeps 8 leaves in flight,
+while a hand-passed `-n 4` leaves the fifth worker idle.
+
+When rolling-main validation fails, the release manager attributes the failure.
+If the repair is simple and bounded, delegate it immediately for a prompt
+roll-forward; otherwise roll back the attributable PR. Keep releases blocked
+until main is green. Publish the daily release only from a main commit whose
+full build and all release checks passed, using artifacts from that
+commit. This trial changes PR merge policy, not the build graph, executors,
+cache contracts or release qualification.
 
 ## Initialize the project (uv)
 
@@ -359,8 +385,8 @@ such build:
   `verify_soundness:ha_harmonic_analyzer`, the slowest leaves on the farm, so
   every iteration pays for them. While iterating, launch only the leaves the
   change touches (`-Targets "drawing:dt_cone_gear,drawing:pd_transgear_arm"`;
-  doit pulls in their real dependencies). Run the full `build` once, as the
-  merge gate, after the loop has converged.
+  doit pulls in their real dependencies). The release manager runs the full
+  `build` continuously on main; it is not an individual PR merge gate.
 - Hand off the run id and `-LogDirectory` — plus the hub name, worktree,
   pushed HEAD, pool, exact targets and leaf budget — rather than letting a
   successor recreate the command. The successor tracks the run with the same
@@ -454,13 +480,13 @@ travelers](cad/docs/pipeline/features-travelers.md).
   publisher run on the submitter, precompute README images before the tag, and
   install them with the `next_revision` and migrated/enrolled plan revision bumps only
   after publication succeeds.
-- The release follow-up PR is exempt from the three merge gates ONLY if its
+- The release follow-up PR is exempt from the ordinary PR requirements ONLY if its
   entire diff is the `cad/config/release.yaml` `next_revision` bump, the matching
   `[drawing].revision` literal lines in migrated or enrolled
   `cad/process/<stem>/plan.toml` files, and generated README image files. It may
   merge immediately. Other plan
   or shop changes, code, prose, docs, README markup/layout or any other change
-  stays in an ordinary PR and MUST pass every gate.
+  stays in an ordinary PR and MUST satisfy the ordinary PR requirements.
 - For a supervised farm release, launch only
   `-Targets "build,export,package:release,preflight"` through
   `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
