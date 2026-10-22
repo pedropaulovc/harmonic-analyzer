@@ -694,6 +694,7 @@ class NativeShelfInk:
     GetPolyLineCount = GetArcCount
     GetPolygonCount = GetArcCount
     GetTriangleCount = GetArcCount
+    GetEllipseCount = GetArcCount
 
 
 class ShelfDisplay:
