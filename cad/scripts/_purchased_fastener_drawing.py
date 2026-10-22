@@ -1433,6 +1433,7 @@ async def build_purchased_fastener_drawing(
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    saved_check: Callable[[Any, Path], None] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1448,7 +1449,11 @@ async def build_purchased_fastener_drawing(
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``saved_check`` optionally reads the saved native drawing after the finalizer
+    closes it, while the supplier-source byte-preservation guard still owns it.
     """
+    if saved_check is not None and not callable(saved_check):
+        raise TypeError("purchased saved drawing check must be callable")
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -1489,7 +1494,7 @@ async def build_purchased_fastener_drawing(
                         f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                     )
 
-        return await _build_reference_sheet(
+        artifacts = await _build_reference_sheet(
             adapter,
             spec,
             properties=properties,
@@ -1515,6 +1520,9 @@ async def build_purchased_fastener_drawing(
                 configuration=configuration,
             ),
         )
+        if saved_check is not None:
+            saved_check(adapter, Path(artifacts["drawing"]))
+        return artifacts
     except BaseException as error:
         primary = error
         raise
