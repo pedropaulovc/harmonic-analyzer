@@ -2008,14 +2008,21 @@ def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration)
     with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
         drawing._validate_source(source)
 
-@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
-def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("active configuration", "Default configuration"),
+        ("displaced", "displaced"),
+        ("families", "families"),
+    ],
+)
+def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure, message):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     if failure == "active configuration":
         source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
     elif failure == "families":
-        source.components.pop()
+        source.components.pop(0)
     else:
         base = source.components[0].GetTotalTransform(False).ArrayData
         displaced = list(base)
@@ -2023,7 +2030,7 @@ def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure
         source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
             ArrayData=displaced if presentation else base
         )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match=message):
         drawing._validate_source(source)
 
 
