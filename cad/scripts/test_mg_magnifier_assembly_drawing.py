@@ -400,6 +400,24 @@ def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last()
     assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
 
 
+def test_the_drawing_key_reads_only_the_package_parts_config() -> None:
+    # The builder's COM explode (_mg_magnifier_explode -> _assembly_patterns ->
+    # _assembly) reads every parts/* and assemblies/* YAML, so importing it
+    # re-keyed this sheet on any part edit. The drawing reads the pure spec.
+    from pathlib import Path
+
+    import _buildgraph
+
+    script = Path(drawing.__file__)
+    names = {Path(dep).name for dep in _buildgraph.module_deps_of(script)}
+    assert not names & {
+        "_assembly.py",
+        "_assembly_patterns.py",
+        "_mg_magnifier_explode.py",
+    }
+    assert not [token for token in _buildgraph.config_files_of(script) if "*" in token]
+
+
 def test_the_wire_balloon_lands_on_the_mid_run_ring_facing_the_viewer() -> None:
     import math
 
