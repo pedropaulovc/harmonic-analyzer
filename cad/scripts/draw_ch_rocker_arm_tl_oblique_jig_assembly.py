@@ -3143,7 +3143,59 @@ def _assert_capture_sheet(
         notes.append((captions[0], _capture_note_bounds(captions[0]), "section caption"))
     for i, (_note, box, owner_label) in enumerate(notes):
         if not _capture_inside(box, CAPTURE_READING_REGION) or any(_capture_overlap(box, other[1]) for other in notes[i + 1:]):
-            raise RuntimeError("jig capture: native captions/reading labels overlap or leave field")
+            rectangles = [
+                {
+                    "index": j, "label": label, "bbox_m": bounds,
+                    "field_gaps_m": (
+                        bounds[0] - CAPTURE_READING_REGION[0], bounds[1] - CAPTURE_READING_REGION[1],
+                        CAPTURE_READING_REGION[2] - bounds[2], CAPTURE_READING_REGION[3] - bounds[3],
+                    ),
+                }
+                for j, (_native_note, bounds, label) in enumerate(notes)
+            ]
+            view_outlines = []
+            for view_index, reading_view in enumerate(views[1:], 1):
+                try:
+                    view_outlines.append({"view_index": view_index, "bbox_m": _view_outline(reading_view, label="jig capture")})
+                except Exception as exc:
+                    view_outlines.append({"view_index": view_index, "error": f"{type(exc).__name__}: {exc}"})
+            layout = {
+                "field_m": CAPTURE_READING_REGION,
+                "rectangles": rectangles,
+                "outside": [j for j, (_native_note, bounds, _label) in enumerate(notes) if not _capture_inside(bounds, CAPTURE_READING_REGION)],
+                "overlaps": [
+                    {
+                        "a": j, "b": k,
+                        "gaps_m": (
+                            max(bounds[0], other[1][0]) - min(bounds[2], other[1][2]),
+                            max(bounds[1], other[1][1]) - min(bounds[3], other[1][3]),
+                        ),
+                    }
+                    for j, (_native_note, bounds, _label) in enumerate(notes)
+                    for k, other in enumerate(notes[j + 1:], j + 1)
+                    if _capture_overlap(bounds, other[1])
+                ],
+                "view_outlines": view_outlines,
+                "model_overlaps": [
+                    (rectangle["index"], outline["view_index"])
+                    for rectangle in rectangles for outline in view_outlines
+                    if "bbox_m" in outline and _capture_overlap(rectangle["bbox_m"], outline["bbox_m"])
+                ],
+                "leaders": [
+                    (segment.label, segment.kind, segment.x0, segment.y0, segment.x1, segment.y1)
+                    for segment in leaders
+                ],
+                "leader_label_crossings": [
+                    (j, rectangle["index"])
+                    for j, segment in enumerate(leaders) for rectangle in rectangles
+                    if segment.label != rectangle["label"] and _segment_crosses_box(segment, rectangle["bbox_m"], inset=0.0)
+                ],
+                "leader_crossings": [
+                    (crossing.a.label, crossing.b.label, crossing.x, crossing.y)
+                    for crossing in find_leader_leader_crossings(leaders)
+                ],
+            }
+            raise RuntimeError(f"jig capture: native captions/reading labels overlap or leave field; layout={layout!r}")
         if any(_capture_overlap(box, _view_outline(view, label="jig capture")) for view in views[1:]):
             raise RuntimeError("jig capture: native caption/reading label covers model geometry")
         if any(segment.label != owner_label and _segment_crosses_box(segment, box, inset=0.0) for segment in leaders):

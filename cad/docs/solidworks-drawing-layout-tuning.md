@@ -275,6 +275,13 @@ comparison remain unchanged. Do not guess root names or reapply hiding.
 Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText`;
 raw dispatch can materialize that zero-argument member as a string. Keep the
 exact caption text and uniqueness checks rather than guessing callable forms.
+On a native caption/reading-label layout refusal, report all indexed note
+rectangles, outside-field entries and overlapping pairs, not only the first
+conflict. Field gaps are left/bottom/right/top; pair gaps are horizontal/vertical,
+in metres, with negative values denoting overlap or field overrun. Include
+the existing leader segments/crossings and the three reading-view outlines
+(or their read errors), without masking the original refusal. Move labels only
+from measured bounds and neighboring clearances; do not relax layout guards.
 
 The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
 the bench procedure to sheet 8; feed checks, cap seating and carrier capture

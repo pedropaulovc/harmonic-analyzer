@@ -4875,6 +4875,129 @@ def test_capture_settled_isolation_refusal_reports_all_native_view_censuses(
     )
 
 
+@pytest.mark.parametrize("defect", ("caption-overlaps", "captions-outside"))
+def test_capture_layout_refusal_reports_all_native_caption_conflicts(
+    native_property_package, monkeypatch, defect,
+) -> None:
+    import ast
+
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    _exploded, locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    captions = (
+        next(note for note in locator.notes if note.GetText().startswith("ASSEMBLED PLAN ")),
+        next(note for note in main.notes if "<VLLABEL>" in note.PropertyLinkedText),
+        next(note for note in bolt.notes if "<VLLABEL>" in note.PropertyLinkedText),
+    )
+    field = drawing.CAPTURE_READING_REGION
+    if defect == "caption-overlaps":
+        first, second = (note.GetExtent() for note in package.doc.attached_notes[:2])
+        first_box = (first[0], first[1], first[3], first[4])
+        second_box = (second[0], second[1], second[3], second[4])
+        caption_boxes = (first_box, second_box, first_box)
+    else:
+        left, bottom, right, top = field
+        caption_boxes = (
+            (left - 0.003, bottom + 0.005, left - 0.001, bottom + 0.007),
+            (right + 0.001, bottom + 0.005, right + 0.004, bottom + 0.007),
+            (left + 0.005, top + 0.001, left + 0.009, top + 0.004),
+        )
+    for note, box in zip(captions, caption_boxes, strict=True):
+        # Independent native-shaped GetExtent evidence, not moved label
+        # positions or a patched production geometry/acceptance helper.
+        monkeypatch.setattr(
+            note, "GetExtent", lambda box=box: (*box[:2], 0.0, *box[2:], 0.0),
+        )
+    native_notes = [
+        ("locator caption", captions[0]),
+        *(
+            (f"jig capture {reading.text.splitlines()[0]} {reading.local_mm}", note)
+            for reading, note in zip(
+                drawing.capture_readings(), package.doc.attached_notes, strict=True,
+            )
+        ),
+        ("section caption", captions[1]),
+        ("section caption", captions[2]),
+    ]
+    observed = []
+    for index, (label, note) in enumerate(native_notes):
+        raw = note.GetExtent()
+        box = (raw[0], raw[1], raw[3], raw[4])
+        observed.append({
+            "index": index, "label": label, "bbox_m": box,
+            "field_gaps_m": (
+                box[0] - field[0], box[1] - field[1],
+                field[2] - box[2], field[3] - box[3],
+            ),
+        })
+    assert len(observed) == 17
+    overlaps = []
+    for a, first in enumerate(observed):
+        for b, second in enumerate(observed[a + 1:], a + 1):
+            x, y = first["bbox_m"], second["bbox_m"]
+            if _overlap(x, y):
+                overlaps.append({
+                    "a": a, "b": b,
+                    "gaps_m": (
+                        max(x[0], y[0]) - min(x[2], y[2]),
+                        max(x[1], y[1]) - min(x[3], y[3]),
+                    ),
+                })
+    segments = []
+    for label, note in native_notes[1:-2]:
+        raw = note.GetAnnotation().GetLeaderPointsAtIndex(0)
+        segments.extend(
+            LeaderSegment(
+                label=label, kind="note", x0=raw[i], y0=raw[i + 1],
+                x1=raw[i + 3], y1=raw[i + 4],
+            )
+            for i in range(0, len(raw) - 3, 3)
+        )
+    with pytest.raises(
+        RuntimeError, match="jig capture: native captions/reading labels overlap or leave field",
+    ) as refusal:
+        settled[-1]()
+    layout = ast.literal_eval(str(refusal.value).split("; layout=", 1)[1])
+    assert layout["field_m"] == field
+    assert layout["rectangles"] == observed
+    assert layout["outside"] == [
+        rectangle["index"] for rectangle in observed
+        if any(gap < 0.0 for gap in rectangle["field_gaps_m"])
+    ]
+    assert layout["overlaps"] == overlaps
+    if defect == "caption-overlaps":
+        assert {(0, 1), (0, 16), (1, 16), (2, 15)} <= {
+            (pair["a"], pair["b"]) for pair in layout["overlaps"]
+        }
+        assert all(gap < 0.0 for pair in overlaps for gap in pair["gaps_m"])
+        assert layout["outside"] == []
+    else:
+        assert layout["outside"] == [0, 15, 16]
+    assert layout["view_outlines"] == [
+        {"view_index": index, "bbox_m": tuple(view.GetOutline())}
+        for index, view in enumerate((locator, main, bolt), 1)
+    ]
+    assert layout["model_overlaps"] == [
+        (rectangle["index"], outline["view_index"])
+        for rectangle in observed for outline in layout["view_outlines"]
+        if _overlap(rectangle["bbox_m"], outline["bbox_m"])
+    ]
+    assert layout["leaders"] == [
+        (segment.label, segment.kind, segment.x0, segment.y0, segment.x1, segment.y1)
+        for segment in segments
+    ]
+    assert layout["leader_label_crossings"] == [
+        (index, rectangle["index"])
+        for index, segment in enumerate(segments) for rectangle in observed
+        if segment.label != rectangle["label"]
+        and drawing._segment_crosses_box(segment, rectangle["bbox_m"], inset=0.0)
+    ]
+    assert layout["leader_crossings"] == [
+        (crossing.a.label, crossing.b.label, crossing.x, crossing.y)
+        for crossing in find_leader_leader_crossings(segments)
+    ]
+
+
 @pytest.mark.parametrize("defect", (
     "extra-view", "scale", "configuration", "exploded", "carrier-hidden",
     "crop", "missing-section", "hatch", "partial", "label", "cut-plane",
