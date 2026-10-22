@@ -22,6 +22,7 @@ from _com import _early_bound
 from _drawing_annotation_extent import CalloutInk, move_annotation, require_clear, require_inside, sheet_region
 from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing, stamp_drawing_summary
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import set_arc_endpoints_to_max, set_reference_dimension
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
@@ -40,7 +41,7 @@ from _session import run_build
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
+from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -58,6 +59,7 @@ BOTTOM_KEEP = {"FlangeHeight": (0.132, 0.080)}
 SIDE_KEEP = {"NoseR": (0.266, 0.229), "SeatToAxis": (0.196, 0.165)}
 MOUNTING_KEEP = {"MountingX0": (0.045, 0.056), "MountingX1": (0.060, 0.046), "MountingY0": (0.030, 0.080)}
 TAP_KEEP = {"TapFromTip": (0.206, 0.226), "TapFromSide": (0.240, 0.240)}
+OVERALL_REFERENCE_XY = (0.174, 0.185)
 
 
 def _mounting_rims(view: Any) -> tuple[Any, ...]:
@@ -257,19 +259,57 @@ def _neck_to_foot_side(adapter: Any, side: Any, edges: Any) -> Any:
     return display.GetAnnotation()
 
 
+def _overall_reference(adapter: Any, side: Any, edges: Any) -> Any:
+    """Parenthesized seat-to-nose extreme, not another manufacturing control."""
+    seat = edges.exact_line_through((NECK_HALF_X, 0.0, SIDE_PLATE_Z[1]), label="overall mounting seat")
+    nose = edges.circle_at((NECK_HALF_X, 0.0, 0.0), NOSE_R, axis=(1.0, 0.0, 0.0), label="overall nose arc")
+    points = (seat.midpoint_mm, (NECK_HALF_X, 0.0, -NOSE_R))
+    picks = [model_point_in_view(adapter, side, tuple(v / 1000.0 for v in point), label="overall physical endpoint") for point in points]
+    entities = (seat.edge, nose.edge)
+    display = _early_bound(add_edge_dimension(
+        adapter, side, p0=picks[0], p1=picks[1], entities=entities,
+        text_xy=OVERALL_REFERENCE_XY, orientation="vertical", label="OverallHeight",
+    ), "IDisplayDimension")
+    set_arc_endpoints_to_max(adapter, display, label="OverallHeight")
+    native = _early_bound(display.GetDimension2(0), "IDimension")
+    native.Name = "OverallHeight"
+    native.DrivenState = 1  # swDimensionDriven: derived from the two physical edges.
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    set_reference_dimension(adapter, annotation, label="OverallHeight")
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION["OverallHeight"], -1, -1, -1)
+    display.CenterText = False
+    if not annotation.SetPosition2(*OVERALL_REFERENCE_XY, 0.0):
+        raise RuntimeError("overall reference text would not move")
+    if (
+        str(native.Name) != "OverallHeight" or int(native.DrivenState) != 1
+        or int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION["OverallHeight"]
+        or int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0
+        or str(display.GetText(1)) != "(" or str(display.GetText(2)) != ")"
+    ):
+        raise RuntimeError("overall height is not an unbanded native reference")
+    assert_dimension_measures(
+        adapter, display, expected_mm=SIDE_PLATE_Z[1] + NOSE_R,
+        entities=entities, label="OverallHeight",
+    )
+    return annotation
+
+
 def _layout_linear_annotations(
-    adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any,
+    adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any, overall_reference: Any,
 ) -> None:
     """Place reviewed text from native witnesses, then guard neighbours."""
-    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide", "NeckToFootSide")
-    # Retain the actual drawing-created edge dimension instead of rediscovering
-    # it through the model-item name lookup that failed in R32.
-    local_display = _early_bound(_early_bound(lateral_location, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
-    if str(_early_bound(local_display.GetDimension2(0), "IDimension").Name) != "NeckToFootSide":
-        raise RuntimeError("neck-to-foot retained native dimension name changed")
-    annotations = [*annotations, lateral_location]
-    by_name = {"NeckToFootSide": lateral_location}
-    for name in (*names[:-1], "SeatToAxis"):
+    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide", "NeckToFootSide", "OverallHeight")
+    # Retain drawing-created dimensions instead of rediscovering them through
+    # the imported-model name reader that failed on the lateral dimension.
+    by_name = {"NeckToFootSide": lateral_location, "OverallHeight": overall_reference}
+    for name, annotation in by_name.items():
+        display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+        if str(_early_bound(display.GetDimension2(0), "IDimension").Name) != name:
+            raise RuntimeError(f"{name}: retained native dimension name changed")
+    annotations = [*annotations, lateral_location, overall_reference]
+    for name in (*names, "SeatToAxis"):
+        if name in by_name:
+            continue
         matches = [item for item in annotations if dimension_name(adapter, item) == name]
         if len(matches) != 1:
             raise RuntimeError(f"bracket layout requires exactly one {name}")
@@ -289,7 +329,7 @@ def _layout_linear_annotations(
     front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
     targets = {
         "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, front_outline[3] + 0.004),
-        "FlangeDepth": (seat_line - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]), before["FlangeDepth"].text[1]),
+        "FlangeDepth": (min(seat_line, min(line.x0 for line in verticals("OverallHeight"))) - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]), before["FlangeDepth"].text[1]),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
         "MountingY0": (
@@ -402,6 +442,7 @@ async def build(adapter: Any) -> dict[str, str]:
     mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)
     edges = scan_view_edges(side, label="bracket through thread")
     lateral_location = _neck_to_foot_side(adapter, side, edges)
+    overall_reference = _overall_reference(adapter, side, edges)
     rim = edges.circle_at((NECK_HALF_X - MOUTH_CHAMFER, 0.0, 0.0), TAP_DRILL_DIA / 2.0, axis=(1.0, 0.0, 0.0), label="near through-tap inner rim")
     tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap")
     _curate_tap_callout(adapter, side, tap)
@@ -434,7 +475,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *mounting_dimensions, *annotations,
         _early_bound(mounting_callout, "IDisplayDimension").GetAnnotation(),
         _early_bound(tap, "IDisplayDimension").GetAnnotation(),
-    ], lateral_location=lateral_location)
+    ], lateral_location=lateral_location, overall_reference=overall_reference)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 
