@@ -334,11 +334,8 @@ does not discharge the physical operating assumptions or the two waivers below.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
   ±0.047 mm; the drawing's ±0.025 (`dt_cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
-  legitimate decision (it consumes 0.05 % MAE).
-  The cylinder gear's notch orientation is carried by the front-view
-  `1.5° ±0.25° NOTCH CCW FROM CAM LOBE` dimension and Detail A, not a separate
-  manufacturing note: the cam-side view and 120-tooth pattern identify the
-  first counter-clockwise root without repeating the requirement.
+  legitimate decision (it consumes 0.05 % MAE); `check:budget` pins
+  `ECCENTRICITY_TOLERANCE_MM` to the yaml so the two cannot silently diverge.
 - **The lever arms need no `precision` grade for accuracy**: at the general ±0.10 they use 1/7
   to 1/10 of their allowable. Their bores still carry the `shaft_in_bushing` fit, which is
   what the tighter size limit on the *bore* is for.
