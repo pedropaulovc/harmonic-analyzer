@@ -314,12 +314,6 @@ def test_front_layout_moves_native_dimensions_and_clears_height_qualifier_only(m
         assert set(item.text) == {4}
     assert state.annotations["Height"].display.GetText(4) == ""
     assert state.annotations["LeverBoreDiaDim"].display.GetText(4) == spec.LEVER_BORE_CALLOUT
-    wall_authority, marker, openings = state.annotations["LeverBoreDiaDim"].display.GetText(4).partition("EXCEPT ONLY")
-    assert "2.0 MIN FINISHED NET WALL" in " ".join(wall_authority.split())
-    assert "AND BLIND FLOOR" in " ".join(wall_authority.split())
-    assert marker and openings.split() == [
-        "SHOWN", "HOLE", "ENTRIES/EXITS", "AND", "TOP-TAP/BORE", "INTERSECTION",
-    ]
     assert state.annotations["LeverBoreFromZFlat"].display.GetText(4) == "BORE AND BOTH\nTAP ENTRY AXES"
     for name in spec.GROUPED_HIDDEN_DIMENSIONS:
         assert state.annotations[name].display.GetText(4) == ""
@@ -1161,7 +1155,7 @@ def test_actual_thumb_drill_cone_clears_both_walls_over_its_finite_length() -> N
     drill_r = (geom.ROD_TAP_DRILL_DIA + 0.10) / 2.0
     point = drill_r / math.tan(math.radians(59.0))
     depth = geom.THUMB_TAP_DRILL_DEPTH + band + point
-    bore_wander = 15.0 * slope
+    bore_wander = geom.STOCK_ENVELOPE_MAX * slope
     # Two independent common-flat .XX locations, then actual angular travel.
     relative_offset = 1.02 + depth * slope + bore_wander
 

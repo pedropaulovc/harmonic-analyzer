@@ -77,7 +77,7 @@ def test_rod_tap_floor_leaves_two_millimetres_under_the_lever_bore() -> None:
     point = drill_r_max / math.tan(math.radians(59.0))
     bore_r_max = (clamp.LEVER_BORE_DIA + 0.10) / 2.0
     slope = math.tan(math.radians(0.3))
-    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point - 15.0 * slope
+    floor = (clamp.LEVER_BORE_Y - 0.51) - bore_r_max - (12.75 + 0.51) - point - clamp.STOCK_ENVELOPE_MAX * slope
     assert clamp.ROD_TAP_FLOOR_WALL_WORST == pytest.approx(floor)
     assert floor >= 2.0
     assert clamp.LEVER_BORE_Y == 19.95  # fixed approved hook/seat interface
@@ -97,9 +97,9 @@ def test_thumb_screw_thread_is_one_and_a_half_diameters_at_worst() -> None:
 def test_hex_stock_and_extent_along_the_lever() -> None:
     assert clamp.HEX_AF == pytest.approx(0.5 * _IN)
     assert clamp.BLOCK_DEPTH == pytest.approx(clamp.HEX_AF * 2.0 / math.sqrt(3.0))
-    # A finished receiving envelope, not perfect-hex normals, bounds the
-    # entire angular run-off. Wall acceptance is independently explicit.
-    wander = 15.0 * math.tan(math.radians(0.3))
+    # The ordinary full-height size/angle profile, not nominal regular-hex
+    # corners, owns the conservative complete-body run-off distance.
+    wander = clamp.STOCK_ENVELOPE_MAX * math.tan(math.radians(0.3))
     assert wander == pytest.approx(clamp.BORE_FULL_ANGULAR)
 
 
