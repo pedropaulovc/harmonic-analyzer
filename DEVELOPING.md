@@ -864,6 +864,21 @@ failure names its other likely causes instead.
 
 ### Supervised farm releases
 
+During the rolling-main trial, the release manager continuously full-builds
+`main`. Individual PRs and stacks may merge after their authors provide focused
+source checks, appropriate native proof and the applicable code/render reviews;
+they do not need a full build of their own. Changed sheets still require
+automated machinist review under the existing direct/indirect sheet policy.
+Human review is exceptional and requires explicit owner authorization. See
+[the merge requirements](AGENTS.md#minimum-merge-gate-every-pr).
+
+The release manager attributes rolling-main failures and immediately delegates
+a simple, bounded repair for roll-forward; otherwise the attributable PR is
+rolled back. The daily release may publish only from green main, with a
+successful full build and applicable release checks for the exact source commit
+and artifacts being released. The trial does not change the task graph,
+executors, cache contracts or release checks.
+
 Never launch the `release` target through `farm-run.ps1`: it runs in a
 disposable snapshot, and cleanup would discard the publisher's post-release
 tracked image, `release.yaml` and migrated/enrolled process-plan revision updates. Launch
@@ -948,11 +963,12 @@ would lose live monitoring, so it is not used.
 ```
 
 The full closure is the same call with `"-Targets", "build"` and
-`"-Tag", "full-build"`. Keep it for the merge gate, not the dev/test loop: a
-miss on any changed part or drawing cascades into the top assembly, its
-drawing and its soundness gate, the slowest leaves on the farm, so iterate on
-the touched leaves only and run `build` once the loop has converged. Do not
-`hub stop` a live launcher to quiet the console —
+`"-Tag", "full-build"`. The release manager uses it for rolling-main validation
+and release qualification. A miss on any changed part or drawing cascades into
+the top assembly, its drawing and its soundness gate, the slowest leaves on the
+farm, so authors iterate on the touched leaves only. An individual PR or stack
+does not need this full closure to merge. Do not `hub stop` a live launcher to
+quiet the console;
 retune it with `op: "monitor"`, `progress: "ambient"` or `"off"`. The watcher is
 [`-Watch`](#tracking-a-run-status-watch-list-cancel), not the hub's console and
 not a loop waiting for `.done`. To hand off, pass the run id from the readiness
