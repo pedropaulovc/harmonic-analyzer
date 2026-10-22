@@ -717,8 +717,8 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
         picks[label] = (view, stem, target_mm, stations_m)
         return f"edge {label}"
 
-    def add(_adapter, view, **kwargs):
-        added.update(kwargs, view=view)
+    def add(_adapter, view, edges, *, text_xy, label):
+        added.update(view=view, entities=edges, text_xy=text_xy, label=label)
         return "display"
 
     def check(_adapter, display, *, expected_mm, label):
@@ -727,7 +727,7 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
 
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(drawing, "_pick_inset_edge", pick)
-    monkeypatch.setattr(drawing, "add_edge_dimension", add)
+    monkeypatch.setattr(drawing, "_add_inset_dimension", add)
     monkeypatch.setattr(drawing, "_checked_linear_dimension", check)
 
     assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
@@ -735,7 +735,7 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == len(
         drawing.NAMEPLATE_INSET_PICK_Z_M
     )
-    assert len(stations["points"]) == len(stations["names"]) == 4
+    assert len(stations["points"]) == len(stations["names"]) == 2
     plate_x = drawing.NAMEPLATE_MOUNT_POS[0]
     deck_x = plate_x + drawing.NAMEPLATE_END_INSET
     y_mm = drawing.NAMEPLATE_MOUNT_POS[1]
@@ -752,17 +752,6 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert added["view"] == "B-B"
     # The dimension spans exactly the read-back edges; the value check stays.
     assert added["entities"] == ("edge nameplate lower edge", "edge deck end")
-    first_z = drawing.NAMEPLATE_INSET_PICK_Z_M[0]
-    assert stations["points"][:2] == [
-        pytest.approx((plate_x / 1000.0, y_mm / 1000.0, first_z)),
-        pytest.approx((deck_x / 1000.0, y_mm / 1000.0, first_z)),
-    ]
-    assert added["p0"] == pytest.approx(
-        (0.300 + plate_x / 3000.0, 0.180 - first_z / 3.0)
-    )
-    assert added["p1"] == pytest.approx(
-        (0.300 + deck_x / 3000.0, 0.180 - first_z / 3.0)
-    )
     # The text, and the dimension line with it, sit past the base's outer edge:
     # below the plan view, clear of the plate and its lettering, beyond the
     # deck end and away from the plate.
@@ -1006,6 +995,121 @@ def test_inset_rays_need_exactly_one_shown_instance_with_a_body(monkeypatch) -> 
         drawing._inset_edge_rays(
             adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,)
         )
+
+
+class _InsetDrawing:
+    """A drawing whose dimensions dangle per the scripted ``dangling`` queue."""
+
+    def __init__(self, dangling) -> None:
+        self.dangling = list(dangling)
+        self.calls = []
+        self.SelectionManager = self
+        self.count = 0
+
+    def ActivateView(self, name):  # noqa: N802
+        self.calls.append(("activate", name))
+        return True
+
+    def ClearSelection2(self, _all):  # noqa: N802
+        self.count = 0
+
+    def CreateSelectData(self):  # noqa: N802
+        return SimpleNamespace(View=None)
+
+    def GetSelectedObjectCount2(self, _mark):  # noqa: N802
+        return self.count
+
+    def AddDimension2(self, x, y, z):  # noqa: N802
+        dangles = self.dangling.pop(0)
+        self.calls.append(("add", x, y, dangles))
+        annotation = SimpleNamespace(
+            IsDangling=lambda: dangles,
+            GetAttachedEntityTypes=lambda: (1, 1),
+            Select2=lambda append, mark: self.calls.append(("select-dim",)) or True,
+        )
+        return SimpleNamespace(GetAnnotation=lambda: annotation, dangles=dangles)
+
+    def EditDelete(self):  # noqa: N802
+        self.calls.append(("delete",))
+
+
+def _inset_dimension_harness(monkeypatch, dangling):
+    draw = _InsetDrawing(dangling)
+    events = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
+    monkeypatch.setattr(drawing._telemetry, "warn", lambda *a, **k: None)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+
+    def select_entity(edge, append):
+        draw.calls.append(("view-select", edge, append))
+        draw.count += 1
+        return True
+
+    view = SimpleNamespace(SelectEntity=select_entity)
+    edges = (
+        SimpleNamespace(Select4=lambda append, data: draw.calls.append(("select4", "a", append)) or (draw.__setattr__("count", draw.count + 1) or True)),
+        SimpleNamespace(Select4=lambda append, data: draw.calls.append(("select4", "b", append)) or (draw.__setattr__("count", draw.count + 1) or True)),
+    )
+    return SimpleNamespace(currentModel=draw), view, edges, draw, events
+
+
+def test_an_attached_inset_dimension_is_kept_from_the_view_selection(monkeypatch) -> None:
+    adapter, view, edges, draw, events = _inset_dimension_harness(monkeypatch, [False])
+    display = drawing._add_inset_dimension(
+        adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+    )
+    assert display.dangles is False
+    assert draw.calls == [
+        ("activate", view),
+        ("view-select", edges[0], False),
+        ("view-select", edges[1], True),
+        ("add", 0.4, 0.1, False),
+    ]
+    assert events == [
+        ("drawing.inset_dimension", {"label": "inset", "variant": "view.SelectEntity", "dangling": False, "types": (1, 1)})
+    ]
+
+
+def test_a_dangling_inset_dimension_is_deleted_and_the_entity_selection_tried(monkeypatch) -> None:
+    adapter, view, edges, draw, events = _inset_dimension_harness(monkeypatch, [True, False])
+    display = drawing._add_inset_dimension(
+        adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+    )
+    assert display.dangles is False
+    assert draw.calls[3:] == [
+        ("add", 0.4, 0.1, True),
+        ("select-dim",),
+        ("delete",),
+        ("activate", view),
+        ("select4", "a", False),
+        ("select4", "b", True),
+        ("add", 0.4, 0.1, False),
+    ]
+    assert [(e["variant"], e["dangling"]) for _n, e in events] == [
+        ("view.SelectEntity", True),
+        ("entity.Select4", False),
+    ]
+
+
+def test_inset_dimensions_dangling_under_every_selection_fail_the_sheet(monkeypatch) -> None:
+    adapter, view, edges, draw, _events = _inset_dimension_harness(monkeypatch, [True, True])
+    with pytest.raises(RuntimeError, match="every selection left the dimension dangling: view.SelectEntity: dangling=True.*entity.Select4: dangling=True"):
+        drawing._add_inset_dimension(adapter, view, edges, text_xy=(0.4, 0.1), label="inset")
+    assert draw.calls.count(("delete",)) == 2
+
+
+def test_a_checked_linear_dimension_refuses_to_dangle(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    annotation = SimpleNamespace(IsDangling=lambda: True, GetAttachedEntityTypes=lambda: (1, 1))
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: SimpleNamespace(SystemValue=0.004),
+        GetAnnotation=lambda: annotation,
+    )
+    with pytest.raises(RuntimeError, match="inset is dangling \\(attached entity types \\(1, 1\\)\\)"):
+        drawing._checked_linear_dimension(None, display, expected_mm=4.0, label="inset")
 
 
 class _InsetSelection:

@@ -22,6 +22,7 @@ from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
+    view_name,
     visible_component_entities,
 )
 
@@ -48,7 +49,6 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import _edge_endpoint_key
 from _drawing_leaders import distance_to_point, segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -405,6 +405,11 @@ def _checked_linear_dimension(
         raise RuntimeError(
             f"{label} measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
+    dangling, types = _dimension_attachment(display)
+    if dangling:
+        # A dangling dimension measures and prints (in the dangling colour)
+        # without being attached to anything the sheet draws.
+        raise RuntimeError(f"{label} is dangling (attached entity types {types})")
     if int(display.SetPrecision3(1, -1, -1, -1)) < 0:
         raise RuntimeError(f"failed to set {label} precision")
     if int(display.GetPrimaryPrecision2()) != 1:
@@ -925,26 +930,16 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         ("deck end", "fr-harmonic-base", DECK_HALF_X),
     )
     y_mm = NAMEPLATE_MOUNT_POS[1]
-    projected = model_points_in_view(
+    plate_line, deck_line = model_points_in_view(
         adapter,
         section,
         [
-            *(
-                (x_mm / 1000.0, y_mm / 1000.0, NAMEPLATE_INSET_PICK_Z_M[0])
-                for _, _, x_mm in targets
-            ),
-            *(
-                (x_mm / 1000.0, y_mm / 1000.0, NAMEPLATE_INSET_TEXT_Z_M)
-                for _, _, x_mm in targets
-            ),
+            (x_mm / 1000.0, y_mm / 1000.0, NAMEPLATE_INSET_TEXT_Z_M)
+            for _, _, x_mm in targets
         ],
-        label="nameplate inset stations",
-        names=[
-            *(f"{name} station" for name, _, _ in targets),
-            *(f"{name} text line" for name, _, _ in targets),
-        ],
+        label="nameplate inset text line",
+        names=[f"{name} text line" for name, _, _ in targets],
     )
-    plate_xy, deck_xy, plate_line, deck_line = projected
     gap = math.hypot(deck_line[0] - plate_line[0], deck_line[1] - plate_line[1])
     if gap <= 0.0:
         raise RuntimeError("nameplate inset edges coincide on the sheet")
@@ -963,18 +958,88 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         deck + (deck - plate) / gap * NAMEPLATE_INSET_TEXT_OFFSET_M
         for plate, deck in zip(plate_line, deck_line)
     )
-    display = add_edge_dimension(
-        adapter,
-        section,
-        p0=plate_xy,
-        p1=deck_xy,
-        text_xy=(text_xy[0], text_xy[1]),
-        label="nameplate end inset",
-        entities=edges,
+    display = _add_inset_dimension(
+        adapter, section, edges, text_xy=(text_xy[0], text_xy[1]), label="nameplate end inset"
     )
     return _checked_linear_dimension(
         adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
     )
+
+
+def _dimension_attachment(display: Any) -> tuple[bool, tuple[int, ...]]:
+    """``(dangling, attached entity types)`` of a display dimension."""
+    annotation = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+    )
+    return (
+        bool(annotation.IsDangling()),
+        tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ())),
+    )
+
+
+def _add_inset_dimension(
+    adapter: Any, view: Any, edges: Sequence[Any], *, text_xy: tuple[float, float], label: str
+) -> Any:
+    """Dimension between ``edges`` found in the model, attached in ``view``.
+
+    The ray gives each edge in its component's context, not as the view
+    draws it. Run 20261022T180853435Z selected both with
+    ``IEntity::Select4`` under the view's ``ISelectData`` and the dimension
+    came out DANGLING: measured 4.0, drawn in SolidWorks' dangling colour,
+    attached to nothing the sheet owns. So the edges are selected through
+    ``IView::SelectEntity`` first, the way a listed edge is ballooned, and the
+    dimension's ``IAnnotation::IsDangling`` is read before it is kept; a
+    dangling dimension is deleted and the ``Select4`` selection tried, each
+    attempt recorded on ``drawing.inset_dimension``, and the sheet fails
+    when neither attaches.
+    """
+    draw = adapter.currentModel
+    bound_view = _early_bound(view, "IView")
+    name = view_name(adapter, view)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+
+    def by_view(edge: Any, append: bool) -> bool:
+        return bool(bound_view.SelectEntity(edge, append))
+
+    def by_entity(edge: Any, append: bool) -> bool:
+        selection_data = manager.CreateSelectData()
+        selection_data.View = view
+        return bool(_early_bound(edge, "IEntity").Select4(append, selection_data))
+
+    attempts = []
+    for variant, select in (("view.SelectEntity", by_view), ("entity.Select4", by_entity)):
+        if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+        draw.ClearSelection2(True)
+        for index, edge in enumerate(edges):
+            if not select(edge, index > 0):
+                raise RuntimeError(f"{label}: {variant} failed to select edge {index}")
+            count = int(manager.GetSelectedObjectCount2(-1))
+            if count != index + 1:
+                raise RuntimeError(
+                    f"{label}: {variant} edge {index} changed the selection count to {count}"
+                )
+        display = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+        draw.ClearSelection2(True)
+        if display is None:
+            raise RuntimeError(f"{label}: {variant} added no dimension")
+        dangling, types = _dimension_attachment(display)
+        attempts.append(f"{variant}: dangling={dangling} types={types}")
+        _telemetry.event(
+            "drawing.inset_dimension", label=label, variant=variant, dangling=dangling, types=types
+        )
+        if not dangling:
+            return display
+        _telemetry.warn(f"{label}: {variant} dimension dangles (types {types}); deleting it")
+        annotation = _early_bound(
+            _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+        )
+        draw.ClearSelection2(True)
+        if not annotation.Select2(False, 0):
+            raise RuntimeError(f"{label}: failed to select the dangling {variant} dimension")
+        draw.EditDelete()
+        draw.ClearSelection2(True)
+    raise RuntimeError(f"{label}: every selection left the dimension dangling: {'; '.join(attempts)}")
 
 
 def _component_stem(component: Any) -> str:
