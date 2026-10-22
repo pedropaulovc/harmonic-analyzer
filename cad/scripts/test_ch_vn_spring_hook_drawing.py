@@ -1,6 +1,7 @@
 """Offline manufacturing boundaries for the trimmed channel-spring anchor."""
 
 import asyncio
+import json
 import math
 from types import SimpleNamespace
 
@@ -642,5 +643,134 @@ def test_channel_creation_uses_source_proof_and_returns_only_data(monkeypatch, f
         assert all(len(ref) == 2 and isinstance(ref[0], str) and isinstance(ref[1], dict) for ref in refs)
         assert {contract["label"]: contract["expected_mm"] for _key, contract in refs} == spec.SUPPLIER_EYE_MM
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError) as caught:
             drawing._supplier_references(scene.adapter, scene.views["FINISHED"])
+        packet = json.loads(caught.value.__notes__[0])
+        assert packet["requested_label"] == ("EyeID" if fault == "missing-id" else "EyeOD")
+        if fault == "missing-id":
+            assert packet["raw_origin_xy_od_circle_count"] == 1
+            assert packet["raw_origin_xy_id_circle_count"] == 0
+            assert packet["kind4"][0]["od_diameter_matches_observation_only"] is True
+            assert packet["kind4"][0]["id_diameter_matches"] is False
+
+
+def _channel_missing_eye_census(monkeypatch, scene, visible):
+    queries, selected = [], []
+
+    def entities(_view, kind, **_kwargs):
+        queries.append(kind)
+        return visible if kind == 4 else []
+
+    monkeypatch.setattr(drawing, "visible_view_entities", entities)
+    monkeypatch.setattr(
+        drawing, "_select_view_entity",
+        lambda *_args, **_kwargs: selected.append("selected"),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"])
+    assert type(caught.value) is RuntimeError
+    assert str(caught.value) == "EyeOD: unchanged spring eye has no circular silhouette"
+    assert len(caught.value.__notes__) == 1
+    packet = json.loads(caught.value.__notes__[0])
+    assert packet["observation_only"] is True
+    assert packet["requested_label"] == "EyeOD"
+    assert queries == [4, 1]
+    assert selected == []
+    json.dumps(packet, allow_nan=False)
+    return packet
+
+
+@pytest.mark.parametrize("fault", ("raw-empty", "foreign-owner", "source-path", "torus-major"))
+def test_channel_census_distinguishes_raw_inventory_and_strict_rejection(monkeypatch, fault):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    visible = [scene.contours["EyeOD"], scene.contours["EyeID"]]
+    if fault == "raw-empty":
+        visible = []
+    elif fault == "foreign-owner":
+        foreign = object()
+        scene.face.GetFeature = lambda: foreign
+    elif fault == "source-path":
+        scene.source.GetPathName = lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT")
+    else:
+        values = list(scene.surface.TorusParams)
+        values[6] += 0.001
+        scene.surface.TorusParams = tuple(values)
+    packet = _channel_missing_eye_census(monkeypatch, scene, visible)
+    assert packet["raw_exact_circle_count"] == len(visible)
+    assert packet["accepted_od_count"] == 0
+    assert packet["accepted_id_count"] == 0
+    assert len(packet["kind4"]) == len(visible)
+    assert len(packet["predicate_time"]) == len(visible)
+    if visible:
+        expected = {
+            "foreign-owner": "owner_same_as_expected",
+            "source-path": "source_lexical_path_matches",
+            "torus-major": "torus_major_matches",
+        }[fault]
+        assert {row["first_rejection"] for row in packet["predicate_time"]} == {expected}
+        assert packet["raw_origin_xy_od_circle_count"] == 1
+        assert packet["raw_origin_xy_id_circle_count"] == 1
+
+
+def test_channel_census_retains_original_false_before_later_true_readback(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    calls = []
+    foreign = object()
+
+    def owner():
+        calls.append("owner")
+        return foreign if len(calls) == 1 else scene.owner
+
+    scene.face.GetFeature = owner
+    packet = _channel_missing_eye_census(
+        monkeypatch, scene, [scene.contours["EyeOD"], scene.contours["EyeID"]],
+    )
+    first = packet["predicate_time"][0]
+    assert first["first_rejection"] == "owner_same_as_expected"
+    assert first["owner_same_as_expected"] == 0
+    assert first["surface_present"] == "unobserved"
+    assert packet["kind4"][0]["face"]["owner_same_as_expected"] == 1
+    assert packet["accepted_od_count"] == 1
+
+
+def test_channel_native_predicate_exception_is_not_replaced_by_census(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    eye = scene.contours["EyeOD"]
+    curve = eye.GetCurve()
+    error = OSError("original native eye disconnect")
+    calls, queries = [], []
+
+    def disconnected_once():
+        calls.append("curve")
+        if len(calls) == 1:
+            raise error
+        return curve
+
+    def entities(_view, kind, **_kwargs):
+        queries.append(kind)
+        return [eye, scene.contours["EyeID"]] if kind == 4 else []
+
+    eye.GetCurve = disconnected_once
+    monkeypatch.setattr(drawing, "visible_view_entities", entities)
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"])
+    assert caught.value is error
+    assert str(error) == "original native eye disconnect"
+    packet = json.loads(error.__notes__[0])
+    assert packet["predicate_time"][0]["stage"] == "GetCurve"
+    assert packet["predicate_time"][0]["error"]["message"] == str(error)
+    assert packet["raw_exact_circle_count"] == 2
+    assert queries == [4, 1]
+
+
+def test_channel_complete_readback_keeps_inclusive_origin_boundary(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    eye = scene.contours["EyeOD"]
+    curve = eye.GetCurve()
+    values = list(curve.CircleParams)
+    values[0] = 1e-8
+    curve.CircleParams = tuple(values)
+    scene.source.GetPathName = lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT")
+    packet = _channel_missing_eye_census(monkeypatch, scene, [eye])
+    assert packet["predicate_time"][0]["circle_center_matches"] is True
+    assert packet["kind4"][0]["circle_center_matches"] is True

@@ -108,6 +108,45 @@ the outer eye is not an alternative. As for CH, refreshes belong to the existing
 pre-save layout check, not the post-save observer, and successful save/leaf
 evidence is required before claiming post-save proof.
 
+## Rejected native candidate 10ae
+
+Source `10ae3ca0e95afd612b324f792ef142ffd281c136` produced two failed normal
+drawing leaves in run `20261022T201714479Z-50388d94c538424fae4dc16fafd5c040`,
+build `20261022T201743.641221Z-cd92a187b96d465eb7c0a837b1743981`. Both source
+part leaves succeeded, but neither drawing reached a qualified native save:
+
+- CH stopped during discovery with `EyeOD: unchanged spring eye has no circular
+  silhouette`.
+- SM stopped during discovery with `unchanged counter eye has no exact ID
+  circular silhouette`.
+
+These messages establish **zero accepted contours**, not zero raw native
+circles. This source's new view, referenced-path, native-feature and torus
+predicates can reject an otherwise circular contour. The two worker logs and
+native events contain no geometry census; both explicitly report no forensic
+captures. There is no successful feature-equality, annotation, after-SaveAs3 or
+PDF proof from this attempt.
+
+The exact 2942-to-10ae source comparison shows no new CH pre-discovery mode,
+configuration or refresh call. `_drawing_view_display`, `_drawing_edges` and
+`_drawing_common` have identical Git blobs between those sources. The later
+layout-before-reference refresh order was not reached by the CH failure, so it
+does not explain the new pre-creation rejection.
+
+The one approved combined failure census retains the original kind4 snapshot
+and buffers each actual predicate-time field, getter stage and first rejection.
+Only on failure does it attach a strict-JSON exception note with independent
+later readbacks, every candidate's predicate fields/errors, source/view/config
+and physical-path controls, native equality self-controls, relevant torus
+correspondence/roundtrip observations and a diagnostic kind1 inventory. A later
+true readback must not overwrite an earlier false predicate. These observations
+do not change acceptance, selection, view modes or the original exception.
+
+Generic `IsSame` dispatch signatures do not establish feature-class or
+drawing/source-context support. The documented results are 1 (same), 0 (not
+same), and -1 (unable to determine). Correspondence observations and matching
+names/geometry are not permission to waive the mandatory owner predicate.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate
