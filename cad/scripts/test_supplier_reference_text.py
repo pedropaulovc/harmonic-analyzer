@@ -222,6 +222,8 @@ class _Display:
                 - self.record["display"]["arrows"][0][transverse]
             )
             self.shift_stations(transverse, delta)
+            if self.defect == "enable-drifts-stations":
+                self.shift_stations(self.axis, 0.0001)
         self._offset = enabled
 
     def shift_stations(self, axis, delta):
@@ -679,6 +681,77 @@ def test_shelve_requires_a_settled_anchor_before_enabling(native_reads):
         )
 
 
+def test_shelve_refuses_when_enabling_offset_mode_moves_stations(native_reads):
+    # Native OffsetText enable drags the line along the axis: the core must
+    # refuse at that read-back, before the final along-axis text move.
+    displays, axes = _fleet()
+    nut = displays["RD1"]
+    nut.defect = "enable-drifts-stations"
+    with pytest.raises(RuntimeError, match="moved"):
+        core.shelve_reference_text(
+            None, reacquire=lambda: dict(displays), axes=axes, label=_LABEL
+        )
+    assert nut.position[0] == pytest.approx(nut.original_position[0])
+    assert nut.position[1] == pytest.approx(0.1588138)
+
+
+def _boundary_row(span):
+    """A vertical 3.5 mm native row centred on the origin inside ``span`` of
+    outside-arrow dimension line: tails past each tip, witnesses on each
+    station. Centred at 0.0 the font box height and the tip span are exact
+    doubles (2 * h/2, 2 * span/2), so the boundary comparison is exact."""
+    record = _recovered_head_height()
+    record["name"] = "SupplierBoundary"
+    text = record["display"]["texts"][0]
+    text["pos"] = (-text["w"] / 2, -text["h"] / 2, 0.0)
+    low, high = -span / 2, span / 2
+    record["pos"] = (0.0, 0.0, 0.0)
+    record["display"]["lines"] = [
+        [0, 0, 0, 0, 0.0106, low, 0, -0.0010, low, 0],
+        [0, 0, 0, 0, 0.0106, high, 0, -0.0010, high, 0],
+        [0, 0, 0, 0, 0.0, low, 0, 0.0, low - 0.00635, 0],
+        [0, 0, 0, 0, 0.0, high, 0, 0.0, high + 0.00635, 0],
+        [0, 0, 0, 0, 0.0, low, 0, 0.0, high, 0],
+    ]
+    record["display"]["arrows"] = [
+        [0.0, low, 0, 0, -1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+        [0.0, high, 0, 0, 1, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+    ]
+    return record
+
+
+@pytest.mark.parametrize(
+    ("span_mm", "shelved"),
+    ((7.8, True), (7.9, False), (7.9375, False), (8.0, False), (8.331, False)),
+    ids=("below", "exact", "near-boundary", "above", "wide"),
+)
+def test_shelve_default_rule_is_full_extent_plus_both_gaps_on_each_side(
+    native_reads, span_mm, shelved
+):
+    # 3.5 mm font: the row stays on its line only when the whole extent plus
+    # gap and settle on BOTH sides fit the arrow span, i.e. 7.9 mm exactly.
+    # A missing or halved allowance keeps the 7.8 mm row; a strict inequality
+    # shelves the exact one.
+    display = _Display(_boundary_row(span_mm / 1000), 1)
+    axes = {"SupplierBoundary": 1}
+    before = core.measure_reference_text(None, display, axis=1, label="row")
+    extent = before["text"].height
+    span = before["tips"][1][1] - before["tips"][0][1]
+    assert extent == 0.0035
+    assert span == span_mm / 1000
+    if span_mm == 7.9:
+        assert extent + 0.0044 == span  # exact doubles, not approx
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: {"SupplierBoundary": display}, axes=axes, label="row"
+    )
+    after = core.measure_reference_text(None, display, axis=1, label="row")
+    if shelved:
+        _assert_shelved(display, before, after)
+    else:
+        _assert_untouched(display, before, after)
+    proof()
+
+
 @pytest.mark.parametrize(
     ("axes", "force", "message"),
     (
@@ -691,7 +764,7 @@ def test_shelve_requires_a_settled_anchor_before_enabling(native_reads):
 )
 def test_shelve_rejects_invalid_axes_and_force(native_reads, axes, force, message):
     displays, _axes = _fleet()
-    with pytest.raises((ValueError, RuntimeError), match=message):
+    with pytest.raises(ValueError, match=message):
         core.shelve_reference_text(
             None, reacquire=lambda: dict(displays), axes=axes, label=_LABEL, force=force
         )
@@ -703,6 +776,8 @@ def test_shelve_rejects_invalid_axes_and_force(native_reads, axes, force, messag
 
 @pytest.mark.parametrize("phase", ("initial", "seeded", "enabled", "shelved"))
 def test_shelve_requires_every_named_display_each_phase(native_reads, phase):
+    # Initial measurement plus the three batched transition read-backs each
+    # reacquire; a handle lost at any of them refuses the whole shelf.
     displays, axes = _fleet()
     reads = []
 
@@ -715,16 +790,25 @@ def test_shelve_requires_every_named_display_each_phase(native_reads, phase):
         return found
 
     with pytest.raises(RuntimeError, match="RD1"):
-        proof = core.shelve_reference_text(
-            None, reacquire=reacquire, axes=axes, label=_LABEL
-        )
-        proof()  # A handle lost only after shelving fails the proof's read.
+        core.shelve_reference_text(None, reacquire=reacquire, axes=axes, label=_LABEL)
+
+
+def test_proof_requires_every_named_display(native_reads):
+    displays, axes = _fleet()
+    found = dict(displays)
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: dict(found), axes=axes, label=_LABEL
+    )
+    proof()
+    del found["RD1"]
+    with pytest.raises(RuntimeError, match="RD1"):
+        proof()
 
 
 def test_shelve_requires_every_axis_name_in_reacquire(native_reads):
     displays, axes = _fleet()
     del displays["RD1"]
-    with pytest.raises((KeyError, RuntimeError), match="RD1"):
+    with pytest.raises(RuntimeError, match="RD1"):
         core.shelve_reference_text(
             None, reacquire=lambda: dict(displays), axes=axes, label=_LABEL
         )
@@ -779,11 +863,24 @@ def test_proof_rejects_late_station_drift_on_every_measured_row(shelved, name):
 
 
 def test_proof_rejects_late_transverse_drift(shelved):
+    # The native line and witnesses stay put; the text block (with its
+    # attached fraction bar) and the annotation position creep across the
+    # line. Station proof passes; the transverse proof must refuse it.
     replacement = _recaptured(shelved, "RD1")
-    replacement.shift_stations(1 - replacement.axis, 2e-5)
-    with pytest.raises(RuntimeError, match="moved"):
+    stations = core.measure_reference_text(None, replacement, axis=0, label="RD1")
+
+    def creep(delta):
+        replacement.move_text(0.0, delta)
+        x, y, z = replacement.position
+        replacement.position = (x, y + delta, z)
+        replacement.record["pos"] = replacement.position
+
+    creep(2e-5)
+    drifted = core.measure_reference_text(None, replacement, axis=0, label="RD1")
+    core.assert_reference_text_stations(stations, drifted, label="RD1")
+    with pytest.raises(RuntimeError, match="transverse"):
         shelved.proof()
-    replacement.shift_stations(1 - replacement.axis, -2e-5 + 0.5e-5)
+    creep(-2e-5 + 0.5e-5)
     shelved.proof()
 
 
@@ -859,13 +956,20 @@ def test_proof_rejects_lost_witness_on_unselected_row(shelved):
         shelved.proof()
 
 
-def test_proof_never_moves_or_enables(shelved):
-    for name, display in shelved.displays.items():
+def test_proof_never_moves_enables_or_rebuilds(shelved, monkeypatch):
+    def refuse(*_args, **_kwargs):
+        raise AssertionError("proof must be read-only")
+
+    class _ReadOnly(_Display):
+        OffsetText = property(
+            lambda self: self._offset,
+            lambda self, _enabled: refuse(),
+        )
+
+    monkeypatch.setattr(core, "rebuild_drawing", refuse)
+    for name in shelved.displays:
         replacement = _recaptured(shelved, name)
-
-        def refuse(*_args, _name=name):
-            raise AssertionError(f"{_name}: proof must be read-only")
-
+        replacement.__class__ = _ReadOnly
         replacement.SetPosition2 = refuse
         replacement.shift_stations = refuse
     offsets = {name: d.OffsetText for name, d in shelved.found.items()}
