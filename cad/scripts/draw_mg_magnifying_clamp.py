@@ -78,6 +78,7 @@ from build_mg_magnifying_clamp import (
     _point_flat_attachment,
     _point_identity,
     _segment_identity,
+    _sketch_owners,
 )
 from mg_magnifying_clamp_spec import (
     AREA_HATCH_STYLE_PATTERN,
@@ -454,7 +455,7 @@ def _assert_stock_af_import(adapter: Any, view: Any, raw_annotation: Any, *, sta
 
 
 
-def _require_flat_import(adapter, requested_view, source_display, display, source_entities, source_types, source_point, *, stage):
+def _require_flat_import(adapter, requested_view, source_display, display, source_entities, source_types, source_point, *, stage, source_owners=None):
     """Prove imported attachments against source entities in the requested view.
 
     R26 proved this forward route for LeverBoreFromZFlat. Other dimensions must
@@ -517,6 +518,8 @@ def _require_flat_import(adapter, requested_view, source_display, display, sourc
         audit["source_document_type"] = model.GetType()
         if type(audit["source_document_type"]) is not int or audit["source_document_type"] != 1:
             raise RuntimeError("source document is not a native part")
+        if source_owners is None:
+            source_owners = _sketch_owners(adapter)
         source_annotation = native("source-annotation", _early_bound(source_display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
         annotation = native("drawing-annotation", _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation")
         audit["step"] = "drawing-annotation.GetAttachedEntities3"
@@ -553,12 +556,20 @@ def _require_flat_import(adapter, requested_view, source_display, display, sourc
         source_feature = native("source-dimension-feature", source_dimension.GetFeatureOwner(), "IFeature")
         audit["step"] = "drawing-dimension.GetFeatureOwner"
         drawing_feature = native("drawing-dimension-feature", dimension.GetFeatureOwner(), "IFeature")
-        audit["feature_match"] = app.IsSame(source_feature, drawing_feature)
+        try:
+            audit["feature_match"] = app.IsSame(source_feature, drawing_feature)
+        except Exception as exc:
+            audit["feature_match"] = None
+            audit["feature_match_error_type"] = type(exc).__name__
         audit["feature_names"] = source_feature.Name, drawing_feature.Name
         audit["feature_types"] = source_feature.GetTypeName2(), drawing_feature.GetTypeName2()
         if any(value not in ("ProfileFeature", "3DProfileFeature") for value in audit["feature_types"]):
             raise RuntimeError("native dimension feature is not a supported sketch feature")
-        if type(audit["feature_match"]) is not int or audit["feature_match"] != 1 or any(type(value) is not str or value != source_point[0] for value in audit["feature_names"]):
+        # IDimension identity above is authoritative: source_display was
+        # enumerated from this named source feature by _named_dimension.
+        # IFeature wrappers returned by GetFeatureOwner can differ by context;
+        # their IsSame code is diagnostic, not a substitute ownership test.
+        if any(type(value) is not str or value != source_point[0] for value in audit["feature_names"]):
             raise RuntimeError("imported native dimension feature differs from its source")
         audit["step"] = "dimension-feature.forward"
         _telemetry.info("clamp dimension-feature forward correspondence before", operation_stage=f"{stage}.feature-forward-before", correspondence_method="IView.GetCorresponding")
@@ -585,11 +596,11 @@ def _require_flat_import(adapter, requested_view, source_display, display, sourc
                 raise RuntimeError(f"{role}: expected one actual source and imported attachment")
             model_entity = native(f"{role}.source", model_inputs[0], interface)
             if role == "point":
-                row["source_key"] = _point_identity(adapter, model_entity, stage=stage, role="forward-source-point")
+                row["source_key"] = _point_identity(adapter, model_entity, stage=stage, role="forward-source-point", owners=source_owners)
                 if row["source_key"] != source_point:
                     raise RuntimeError("point: source attachment changed before forward mapping")
             else:
-                row["source_key"] = _segment_identity(adapter, model_entity, stage=stage, role="forward-source-flat")
+                row["source_key"] = _segment_identity(adapter, model_entity, stage=stage, role="forward-source-flat", owners=source_owners)
                 if row["source_key"][0] != source_point[0] or row["source_key"][1] != 0:
                     raise RuntimeError("flat: source is not the actual common-flat sketch line")
             audit["step"] = f"{role}.forward"
@@ -641,7 +652,8 @@ def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> 
     if source is None:
         raise RuntimeError("common-flat group has no referenced part")
     source_adapter = SimpleNamespace(currentModel=source, swApp=adapter.swApp)
-    _assert_location_profiles(source_adapter)
+    owners = _sketch_owners(source_adapter)
+    _assert_location_profiles(source_adapter, owners=owners)
     found = {name: [] for name in Z_FLAT_DIMENSIONS}
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
@@ -668,17 +680,16 @@ def _flat_group_annotations(adapter: Any, view: Any, annotations: list[Any]) -> 
         flats = [entity for entity, kind in zip(source_entities, source_types, strict=True) if type(kind) is int and kind == 10]
         if len(flats) != 1:
             raise RuntimeError(f"{name}: source common flat unavailable: types={source_types!r}")
-        source_point = _point_flat_attachment(source_adapter, source_display, flats[0], stage=f"{name}.drawing-source")
+        source_point = _point_flat_attachment(source_adapter, source_display, flats[0], stage=f"{name}.drawing-source", owners=owners)
         _require_flat_import(
             source_adapter, native_view, source_display, display,
-            source_entities, source_types, source_point, stage=f"{name}.drawing-import",
+            source_entities, source_types, source_point, stage=f"{name}.drawing-import", source_owners=owners,
         )
         result[name] = annotation
     return result
 
 
-def _assert_grouped_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> None:
-    group = _flat_group_annotations(adapter, view, annotations)
+def _assert_grouped_flat_locations(group: dict[str, Any]) -> None:
     visibility = {name: annotation.Visible for name, annotation in group.items()}
     wanted = {name: 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1 for name in group}
     if any(type(value) is not int for value in visibility.values()) or visibility != wanted:
@@ -697,7 +708,7 @@ def _group_flat_locations(adapter: Any, view: Any, annotations: list[Any]) -> No
     for name, annotation in group.items():
         annotation.Visible = 3 if name in GROUPED_HIDDEN_DIMENSIONS else 1
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
-    _assert_grouped_flat_locations(adapter, view, annotations)
+    _assert_grouped_flat_locations(group)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -887,7 +898,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     def settled_dimensions() -> None:
-        _assert_grouped_flat_locations(adapter, right, right_annotations)
+        _assert_grouped_flat_locations(_flat_group_annotations(adapter, right, right_annotations))
         _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):

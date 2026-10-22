@@ -15,7 +15,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import double_array, null_callout
 from solidworks_mcp.adapters.solidworks.drawing import add_note, dimension_full_name, dimension_name, place_view
 
 from _check import check
@@ -60,7 +60,6 @@ DETAIL_KEEP = {"ThreadLength": (0.323, 0.255), "IncompleteLength": (0.377, 0.165
 # keep the qualifier above the screw-seat note and below the free-end note.
 FRONT_KEEP = {"OverallLength": (0.115, 0.088), "RodDia": (0.055, 0.166)}
 DETAIL_THREAD_NOTE_XY = (0.2926, 0.245)
-DETAIL_THREAD_CALLOUT = PRINT_THREAD_CALLOUT.replace(" BRACKET", "\nBRACKET")
 CALLOUTS = {"RodDia": ROD_DIA_CALLOUT, "IncompleteLength": LEAD_CALLOUT}
 
 
@@ -91,7 +90,7 @@ def _circle(adapter: Any, view: Any, center: tuple[float, float], radius: float,
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(adapter.currentModel.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
-    manager.AddToDB = mark
+    manager.AddToDB = True
     try:
         circle = manager.CreateCircle(*points[0], *points[1])
     finally:
@@ -104,6 +103,8 @@ def _circle(adapter: Any, view: Any, center: tuple[float, float], radius: float,
         if int(segment.Color) != 0:
             raise RuntimeError("lever detail mark is not black")
         adapter.currentModel.ClearSelection2(True)
+    elif not _early_bound(circle, "ISketchSegment").Select4(False, null_callout()):
+        raise RuntimeError("could not select the authored lever crop circle")
 
 
 def _detail(adapter: Any) -> tuple[Any, list[Any]]:
@@ -126,6 +127,17 @@ def _detail(adapter: Any) -> tuple[Any, list[Any]]:
     view.UpdateViewDisplayGeometry()
     if status != 1 or not bool(view.IsCropped()) or bool(view.CropViewJaggedOutline) or bool(view.CropViewNoOutline):
         raise RuntimeError(f"lever thread detail crop failed: {status}")
+    fence = tuple(float(value) for value in view.GetDetailCircleInfo2())
+    if len(fence) < 17 or not all(math.isfinite(value) for value in fence) or fence[0] != 1:
+        raise RuntimeError(f"lever thread detail has an invalid native crop fence: {fence!r}")
+    centre = fence[2:4]
+    radius = math.dist(centre, fence[5:7])
+    if (
+        fence[11] != 3  # swLF_DETAIL
+        or math.dist(centre, DETAIL_CENTER) > 0.00005
+        or abs(radius - DETAIL_RADIUS_MM * DETAIL_SCALE[0] / 1000.0) > 0.00005
+    ):
+        raise RuntimeError(f"lever thread detail native crop fence moved: {fence!r}")
     names = {dimension_name(adapter, _early_bound(annotation, "IAnnotation")) for annotation in (view.GetAnnotations() or ())}
     if not set(DETAIL_KEEP) <= names:
         raise RuntimeError(f"lever thread detail crop lost dimensions: {set(DETAIL_KEEP) - names}")
@@ -238,7 +250,7 @@ def _free_end_face(adapter: Any, view: Any, annotations: list[Any]) -> Any:
     return matches[0]
 
 
-def _print_native_thread_callout(adapter: Any, view: Any) -> None:
+def _print_native_thread_callout(adapter: Any, view: Any) -> Any:
     """Edit ICThread's drawing INote, not the part's cosmetic-thread metadata."""
     native = _early_bound(view, "IView")
     count = int(native.GetCThreadCount())
@@ -459,6 +471,36 @@ def _print_native_thread_callout(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"lever thread text mutation replaced its native drawing callout; audit={evidence}")
     if audit["failed"]:
         raise RuntimeError(f"lever thread drawing callout lost its text, ownership or native attachment; audit={evidence}")
+    return annotation
+
+
+def _hide_other_thread_callouts(adapter: Any, view: Any) -> None:
+    """Keep the native thread ink, with its one controlling callout in Detail A."""
+    native = _early_bound(view, "IView")
+    count = int(native.GetCThreadCount())
+    if count not in (0, 1):
+        raise RuntimeError(f"lever noncontrolling thread inventory differs: {count}")
+    thread = native.GetFirstCThread()
+    for _index in range(count):
+        if thread is None:
+            raise RuntimeError("lever noncontrolling thread inventory is incomplete")
+        thread = _early_bound(thread, "ICThread")
+        note = _early_bound(thread.ThreadCallout, "INote")
+        if note is not None:
+            annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+            owner = annotation.Owner
+            owner_type = annotation.OwnerType
+            if (
+                type(owner_type) is not int or owner_type not in (0, 1) or owner is None
+                or (owner_type == 0 and adapter.swApp.IsSame(owner, native) != 1)
+            ):
+                raise RuntimeError("duplicate lever callout is not drawing-local")
+            annotation.Visible = 3  # swAnnotationHidden; drawing-local only
+            if annotation.Visible != 3:
+                raise RuntimeError("could not hide duplicate lever thread callout")
+        thread = thread.GetNext()
+    if thread is not None:
+        raise RuntimeError("lever noncontrolling thread inventory exceeds its count")
 
 
 
@@ -479,8 +521,18 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*detailed, *full]
     assert_imported_precision(adapter, annotations, {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()})
     set_dimension_callouts(adapter, annotations, CALLOUTS)
-    thread_pick = model_point_in_view(adapter, detail, (0.158, ROD_DIA / 2000.0, 0.0), label="lever thread callout landing")
-    add_attached_note(adapter, detail, text=DETAIL_THREAD_CALLOUT, entity_xy=thread_pick, note_xy=DETAIL_THREAD_NOTE_XY, label="native quarter-inch external thread", entity_type="SILHOUETTE")
+    seeds, instances = import_cosmetic_threads(adapter, detail)
+    if (seeds, instances) != (1, 1):
+        raise RuntimeError(f"lever thread detail needs one native external thread: {(seeds, instances)}")
+    thread_note = _print_native_thread_callout(adapter, detail)
+    if not thread_note.SetPosition2(*DETAIL_THREAD_NOTE_XY, 0.0):
+        raise RuntimeError("could not position the native lever thread-detail callout")
+    position = tuple(float(value) for value in thread_note.GetPosition())
+    if len(position) != 3 or not all(math.isfinite(value) for value in position) or math.dist(position[:2], DETAIL_THREAD_NOTE_XY) > 0.00005:
+        raise RuntimeError("native lever thread-detail callout moved")
+    thread_note.Visible = 1  # swAnnotationVisible
+    if thread_note.Visible != 1:
+        raise RuntimeError("native lever thread-detail callout is not visible")
     free_end = _free_end_face(adapter, front, annotations)
     add_attached_note(adapter, front, text=FREE_END_CALLOUT, entity=free_end, attached_to=free_end, note_xy=(0.030, 0.185), label="free end hemisphere", entity_type="FACE")
     seat_pick = model_point_in_view(adapter, front, (0.040, ROD_DIA / 4000.0, 0.0), label="whole-body screw seat finish")
@@ -495,7 +547,10 @@ async def build(adapter: Any) -> dict[str, str]:
     seeds, instances = import_cosmetic_threads(adapter, iso)
     if (seeds, instances) != (1, 1):
         raise RuntimeError(f"lever isometric external thread missing: {(seeds, instances)}")
-    _print_native_thread_callout(adapter, front)
+    for view in (front, iso):
+        _hide_other_thread_callouts(adapter, view)
+    if thread_note.Visible != 1:
+        raise RuntimeError("hiding other lever callouts hid the native detail authority")
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Lever Rod Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 

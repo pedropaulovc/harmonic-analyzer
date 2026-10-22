@@ -1007,7 +1007,7 @@ def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_n
     native = lever_tip_native
     before = tuple(native.back_extent)
     box = drawing._projection_note_box(native.back_caption)
-    assert drawing.boxes_clear(box, drawing._projection_crop_box(native.view))
+    assert drawing.boxes_clear(box, drawing._crop_box(native.view, drawing.LEVER_TIP))
     assert not drawing.boxes_clear(box, tuple(native.outline))
     settled = drawing._thread_projection_detail(
         native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
@@ -1071,7 +1071,7 @@ def test_native_crop_readback_refuses_nominal_only_or_shifted_fence(lever_tip_na
     native = lever_tip_native
     native.fence[:] = fence
     with pytest.raises(RuntimeError, match="native crop fence"):
-        drawing._projection_crop_box(native.view)
+        drawing._crop_box(native.view, drawing.LEVER_TIP)
 
 
 @pytest.mark.parametrize("failure", [
@@ -1296,14 +1296,16 @@ def test_lever_tip_placement_uses_opposite_native_view_and_isolation(monkeypatch
     assert math.hypot(half_span_m, drawing._LEVER_R * 0.004) < detail.crop_radius
 
 
+@pytest.mark.parametrize("detail", (drawing.LEVER_TIP, drawing.PRESSED, drawing.ENDSHAKE))
 @pytest.mark.parametrize("previous_direct", [False, True])
 @pytest.mark.parametrize("status,cropped", [(drawing.CROP_NO_ERROR, True), (0, False)])
 def test_lever_tip_reuses_native_crop_sketch_transform(
-    monkeypatch, status, cropped, previous_direct,
+    monkeypatch, status, cropped, previous_direct, detail,
 ):
     events = []
     transform = object()
 
+    scale = detail.scale[0] / detail.scale[1]
     class Point:
         def __init__(self, values):
             self.ArrayData = values
@@ -1311,7 +1313,7 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
         def MultiplyTransform(self, actual):
             assert actual is transform
             x, y, z = self.ArrayData
-            return Point((x / 4, y / 4, z))
+            return Point((x / scale, y / scale, z))
 
     manager = SimpleNamespace(AddToDB=previous_direct)
     fence = []
@@ -1319,7 +1321,7 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
 
     def circle(*points):
         events.append(("circle", points, manager.AddToDB))
-        cx, cy, _cz, rx, ry, _rz = (value * 4 for value in points)
+        cx, cy, _cz, rx, ry, _rz = (value * scale for value in points)
         if not manager.AddToDB:
             cx -= 0.0025  # R24's witness inference, not a native layout acceptance.
         fence[:] = _native_crop_fence((cx, cy), math.hypot(rx - cx, ry - cy))
@@ -1351,14 +1353,14 @@ def test_lever_tip_reuses_native_crop_sketch_transform(
     monkeypatch.setattr(drawing, "null_callout", lambda: None)
     monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
     if cropped:
-        drawing._crop(adapter, view, drawing.LEVER_TIP)
+        drawing._crop(adapter, view, detail)
     else:
         with pytest.raises(RuntimeError, match="not cropped"):
-            drawing._crop(adapter, view, drawing.LEVER_TIP)
-    cx, cy = drawing.LEVER_TIP.centre
-    radius = drawing.LEVER_TIP.crop_radius
+            drawing._crop(adapter, view, detail)
+    cx, cy = detail.centre
+    radius = detail.crop_radius
     assert events[0] == (
-        "circle", (cx / 4, cy / 4, 0.0, (cx + radius) / 4, cy / 4, 0.0), True,
+        "circle", (cx / scale, cy / scale, 0.0, (cx + radius) / scale, cy / scale, 0.0), True,
     )
     assert events[1:3] == [("select", False, None), ("Crop2", (False, False, 1))]
     assert events[-1] == ("refresh",)
@@ -1560,8 +1562,10 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
     monkeypatch.setattr(
         assembly, "blank_sketch", lambda adapter, feature: blanked.append(feature)
     )
+    monkeypatch.setattr(assembly, "_physical_thread_projection", lambda *_a: (stack.THREADED_TIP_X, stack.THREAD_FAR_FACE_X))
+    monkeypatch.setattr(assembly, "_assert_thread_projection_faces", lambda *_a: None)
 
-    asyncio.run(assembly._author_lever_setting_reference(Adapter()))
+    asyncio.run(assembly._author_lever_setting_reference(Adapter(), lever_name="lever-1", bracket_name="bracket-1"))
 
     tip = (stack.LEVER_TIP_X, stack.LEVER_AXIS_Y)
     clamp = (stack.CLAMP_CENTRE_X, stack.LEVER_AXIS_Y)

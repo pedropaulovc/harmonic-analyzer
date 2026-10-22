@@ -76,13 +76,13 @@ reserved:
     # error_budget.py fits every reference input to the output chain (loaded
     # spring coupling, wire ratio and the conservative COMPONENT operating
     # band from mg_magnifying_lever_geom.operating_clamp_radius_band()).
-    # Current knife-to-clamp/bottom-rod-axis bounds are 83.81 / 165 / 194.825 mm.
-    # The earliest accepted unthreaded root is (167.5-.8)-(18+.51)=148.19 mm.
+    # Current knife-to-clamp/bottom-rod-axis bounds are 83.775 / 165 / 193.260 mm.
+    # Fitted projection sets the rod position: free tip K=C-N/2-P+L, C=55 mm.
     # Credit the FULL derived 17 mm body bound from the actual interior tap axis,
-    # never +/-8.5 mm centring: R_min=215-148.19+17=83.81 mm. The bracket near
-    # face is another lower stop, but runout is stricter. At the free end the
-    # complete bore must stay on cylindrical plain stock beyond the hemisphere:
-    # R_max=215-(ROD_DIA_MAX/2+17)=194.825 mm. The built 165 mm pose is unchanged.
+    # never +/-8.5 mm centring. R_min=max(C-Nmin/2-Pmin+Tmax,C+Nmax/2)+17.
+    # Rod length cancels from that runout stop. At the free end use the shortest
+    # rod, thickest neck and largest projection together:
+    # R_max=Kmin-ROD_DIA_MAX/2-17=193.260 mm. Built 165 mm is unchanged.
     # clamp_radius_band(block_depth) is nominal MODEL travel, not capacity.
     # As-made inspection may admit more travel; published capacity credits none.
     # The pen sees the WIRE MOMENT ARM (error_budget.wire_moment_arm), not the

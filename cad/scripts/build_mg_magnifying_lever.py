@@ -87,6 +87,46 @@ def _assert_thread_extent_driving(adapter) -> None:
             raise RuntimeError(f"{name}@ThreadExtent: requested {nominal:g} mm, native value is {actual:g} mm")
 
 
+def _assert_native_thread(adapter, feature_name: str) -> None:
+    """Compare the actual cosmetic extent with its authored source dimensions."""
+    from _gtol_face_read import face_geometry
+    from _gtol_face_resolve import resolve_faces
+    from _gtol_planar import PlanarFace
+
+    values = {}
+    for feature, name in (
+        ("RodProfile", "OverallLength"),
+        ("RodProfile", "TipChamfer"),
+        ("ThreadExtent", "ThreadLength"),
+    ):
+        _, dimension = _named_dimension(adapter, feature, name)
+        values[name] = float(dimension.SystemValue)
+    if not all(math.isfinite(value) and value > 0.0 for value in values.values()):
+        raise RuntimeError(f"lever thread source dimensions are invalid: {values!r}")
+    face = resolve_faces(adapter.currentModel, {
+        "flat threaded tip": PlanarFace((1.0, 0.0, 0.0), values["OverallLength"] * 1000.0),
+    })["flat threaded tip"]
+    geometry = face_geometry(face)
+    if geometry is None or not math.isclose(geometry.parameters[3], values["OverallLength"], abs_tol=1e-9):
+        raise RuntimeError("lever flat physical tip differs from OverallLength")
+    feature = _early_bound(_early_bound(adapter.currentModel, "IPartDoc").FeatureByName(feature_name), "IFeature")
+    if feature is None:
+        raise RuntimeError("authored lever cosmetic thread is missing")
+    definition = _early_bound(feature.GetDefinition(), "ICosmeticThreadFeatureData")
+    if definition is None:
+        raise RuntimeError("authored lever cosmetic thread definition is unavailable")
+    depth = float(definition.BlindDepth)
+    # Both enums document Blind=0. No selection access/rollback or definition
+    # mutation is needed to read these scalar definition properties.
+    if (
+        int(definition.EndCondition) != 0
+        or int(definition.ApplyThread) != 0
+        or not math.isfinite(depth)
+        or not math.isclose(depth, values["ThreadLength"] - values["TipChamfer"], abs_tol=1e-9)
+    ):
+        raise RuntimeError(f"lever native thread extent differs from ThreadLength/TipChamfer: {depth!r}, {values!r}")
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import AddThreadParameters, RevolveParameters
 
@@ -131,7 +171,10 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
     adapter._zoom_to_fit(adapter.currentModel)
-    check("native quarter-inch external thread", await adapter.add_thread(AddThreadParameters(edge_point=[ROD_LENGTH - TIP_CHAMFER, R, 0.0], standard="ansi_inch", size=THREAD, end_type="blind", depth=THREAD_LENGTH - TIP_CHAMFER, note=THREAD_CALLOUT)))
+    thread = check("native quarter-inch external thread", await adapter.add_thread(AddThreadParameters(edge_point=[ROD_LENGTH - TIP_CHAMFER, R, 0.0], standard="ansi_inch", size=THREAD, end_type="blind", depth=THREAD_LENGTH - TIP_CHAMFER, note=THREAD_CALLOUT)))
+    thread_name = thread.get("name")
+    if type(thread_name) is not str or not thread_name:
+        raise RuntimeError("native lever thread returned no feature name")
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "rod axis")
     await name_bore_axis(adapter, "Right Plane", KNIFE_LOCAL_X, "Top Plane", KNIFE_LOCAL_Y, "knife axis")
     set_dimension_bilateral_tolerance(adapter, "RodProfile", "RodDia", *deviations(ROD_DIA_BAND))
@@ -158,6 +201,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(adapter, PART_NAME, {"Iso View Note": ISO_VIEW_NOTE})
     await report_mass_properties(adapter)
     await force_rebuild(adapter)
+    _assert_native_thread(adapter, thread_name)
     await volume_check(adapter, "full-body lever with one dome and a flat threaded tip", V_PROFILE, 0.005 * V_PROFILE)
     return await save_part_and_images(adapter, PART_NAME)
 

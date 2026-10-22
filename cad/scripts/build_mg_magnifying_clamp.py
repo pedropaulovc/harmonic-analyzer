@@ -128,20 +128,15 @@ V_ROD_TAP = blind_hole_volume_mm3(ROD_TAP_DRILL_DIA, ROD_TAP_DRILL_DEPTH)
 V_TOTAL = V_HEX - V_BORE - V_THUMB - V_ROD_TAP
 
 
-def _sketch_owner_name(adapter: Any, raw_owner: Any, readback: dict[str, Any]) -> str:
-    """Resolve a fresh native sketch owner through actual feature inventory."""
-    if raw_owner is None:
-        raise RuntimeError("native sketch entity has no owning sketch")
-    owner = _early_bound(raw_owner, "ISketch")
-    application = _early_bound(adapter.swApp, "ISldWorks")
-    readback["self"] = application.IsSame(owner, owner)
-    if type(readback["self"]) is not int or readback["self"] != 1:
-        raise RuntimeError("native sketch owner identity positive control failed")
+def _sketch_owners(adapter: Any) -> tuple[tuple[str, Any], ...]:
+    """Retain this stage's actual feature/sketch pairs, never across a rebuild."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.FeatureManager, "IFeatureManager")
     features = manager.GetFeatures(False)
     if features is None:
         raise RuntimeError("native sketch owner feature inventory unavailable")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    owners = []
     for raw_feature in features:
         if raw_feature is None:
             raise RuntimeError("native sketch owner feature inventory contains null")
@@ -152,31 +147,43 @@ def _sketch_owner_name(adapter: Any, raw_owner: Any, readback: dict[str, Any]) -
         if feature_type not in ("ProfileFeature", "3DProfileFeature"):
             continue
         name = feature.Name
-        candidate = {"name": name, "feature_type": feature_type}
-        readback["candidates"].append(candidate)
         if type(name) is not str or not name:
             raise RuntimeError(f"invalid native sketch owner feature name: {name!r}")
         specific = feature.GetSpecificFeature2()
         if specific is None:
             raise RuntimeError(f"native sketch owner sketch unavailable: {name!r}")
         sketch = _early_bound(specific, "ISketch")
-        self_code = application.IsSame(sketch, sketch)
-        code = application.IsSame(owner, sketch)
-        candidate.update(self_code=self_code, owner_match_code=code)
-        if type(self_code) is not int or self_code != 1:
+        code = application.IsSame(sketch, sketch)
+        if type(code) is not int or code != 1:
             raise RuntimeError(f"native inventory sketch identity positive control failed: {name!r}")
+        owners.append((name, sketch))
+    return tuple(owners)
+
+
+def _sketch_owner_name(adapter: Any, raw_owner: Any, readback: dict[str, Any], owners: tuple[tuple[str, Any], ...] | None) -> str:
+    """Read fresh identity against the stage's actual sketch owners."""
+    if raw_owner is None:
+        raise RuntimeError("native sketch entity has no owning sketch")
+    owner = _early_bound(raw_owner, "ISketch")
+    application = _early_bound(adapter.swApp, "ISldWorks")
+    readback["self"] = application.IsSame(owner, owner)
+    if type(readback["self"]) is not int or readback["self"] != 1:
+        raise RuntimeError("native sketch owner identity positive control failed")
+    if owners is None:
+        owners = _sketch_owners(adapter)
+    for name, sketch in owners:
+        code = application.IsSame(owner, sketch)
+        readback["candidates"].append({"name": name, "owner_match_code": code})
         if type(code) is not int or code not in (0, 1):
             raise RuntimeError(f"native sketch owner comparison unavailable: {name!r}, {code!r}")
         if code == 1:
             readback["matches"].append(name)
-    if not readback["matches"]:
-        raise RuntimeError("native sketch owner has no matching sketch feature")
     if len(readback["matches"]) != 1:
-        raise RuntimeError(f"native sketch owner has ambiguous sketch features: {readback['matches']!r}")
+        raise RuntimeError(f"native sketch owner has no unique matching sketch feature: {readback['matches']!r}")
     return readback["matches"][0]
 
 
-def _segment_identity(adapter: Any, entity: Any, *, stage: str, role: str) -> tuple[str, int, int, int]:
+def _segment_identity(adapter: Any, entity: Any, *, stage: str, role: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[str, int, int, int]:
     """Fresh actual owner/type/ordered-ID key; never cast ISketch to IFeature."""
     import _telemetry
 
@@ -190,7 +197,7 @@ def _segment_identity(adapter: Any, entity: Any, *, stage: str, role: str) -> tu
             raise RuntimeError(f"invalid native segment type: {kind!r}")
         if len(identifiers) != 2 or any(type(value) is not int for value in identifiers):
             raise RuntimeError(f"invalid native segment ID pair: {identifiers!r}")
-        name = _sketch_owner_name(adapter, segment.GetSketch(), owner_readback)
+        name = _sketch_owner_name(adapter, segment.GetSketch(), owner_readback, owners)
         key = name, kind, identifiers[0], identifiers[1]
         return key
     except Exception as exc:
@@ -206,7 +213,7 @@ def _segment_identity(adapter: Any, entity: Any, *, stage: str, role: str) -> tu
         )
 
 
-def _point_identity(adapter: Any, entity: Any, *, stage: str, role: str) -> tuple[str, str, int, int]:
+def _point_identity(adapter: Any, entity: Any, *, stage: str, role: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[str, str, int, int]:
     """Official point type + actual owner name + ordered GetID; never persistent."""
     import pythoncom
     import _telemetry
@@ -242,7 +249,7 @@ def _point_identity(adapter: Any, entity: Any, *, stage: str, role: str) -> tupl
         identifiers = tuple(point.GetID() or ())
         if len(identifiers) != 2 or any(type(value) is not int for value in identifiers):
             raise RuntimeError(f"invalid native point ID pair: {identifiers!r}")
-        name = _sketch_owner_name(adapter, point.GetSketch(), owner_readback)
+        name = _sketch_owner_name(adapter, point.GetSketch(), owner_readback, owners)
         key = name, "ISketchPoint", identifiers[0], identifiers[1]
         return key
     except Exception as exc:
@@ -286,13 +293,14 @@ def _require_location_selection(
         elif not error and (any(type(kind) is not int for kind in type_list) or type_list[0] not in _SKETCH_POINT_SELECTION_TYPES or type_list[1] != 10):
             error = "expected native sketch point and sketch segment selection types"
         if not error:
+            owners = _sketch_owners(adapter)
             selected = tuple(selected_list)
             if point is not None:
-                point_keys = tuple(_point_identity(adapter, entity, stage=stage, role=role) for role, entity in (("selected-point", selected[0]), ("expected-point", point)))
+                point_keys = tuple(_point_identity(adapter, entity, stage=stage, role=role, owners=owners) for role, entity in (("selected-point", selected[0]), ("expected-point", point)))
                 if point_keys[0] != point_keys[1]:
                     error = "actual selected point identity differs"
-            actual_key = _segment_identity(adapter, selected[1], stage=stage, role="selected")
-            expected_key = _segment_identity(adapter, segment, stage=stage, role="expected")
+            actual_key = _segment_identity(adapter, selected[1], stage=stage, role="selected", owners=owners)
+            expected_key = _segment_identity(adapter, segment, stage=stage, role="expected", owners=owners)
             if actual_key != expected_key:
                 error = "actual selected segment owner/type/ID differs"
     except Exception as exc:
@@ -480,7 +488,8 @@ def _measure_location(adapter: Any, center: Any, flat: Any, name: str) -> Any:
         raise RuntimeError(f"{name}: native measured manufacturing dimension did not persist")
     if type(retained_value) not in (int, float) or not math.isclose(retained_value * 1000.0, HEX_AF / 2.0, abs_tol=0.005):
         raise RuntimeError(f"{name}: measurement is not the normal distance to the actual flat: {retained_value!r} m")
-    if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-create") != _point_identity(adapter, center, stage=f"{name}.after-create", role="expected-location"):
+    owners = _sketch_owners(adapter)
+    if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-create", owners=owners) != _point_identity(adapter, center, stage=f"{name}.after-create", role="expected-location", owners=owners):
         raise RuntimeError(f"{name}: native dimension is not attached to its actual point")
     return display
 
@@ -616,7 +625,7 @@ def _witness_relation_records(relations: Any) -> tuple[list[dict[str, Any]], lis
     return rows, definitions
 
 
-def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str) -> None:
+def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: tuple[Any, ...], segment: Any = None, *, stage: str, owners: tuple[tuple[str, Any], ...] | None = None) -> None:
     """Require the exact requested constraint in the actual owner relation inventory.
 
     AddRelation and GetRelationType both document swConstraintType_e, not an
@@ -629,11 +638,13 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
     matches, rows = 0, []
     error = None
     try:
+        if owners is None:
+            owners = _sketch_owners(adapter)
         rows, definitions = _witness_relation_records(relations)
-        expected_point_keys = tuple(_point_identity(adapter, point, stage=stage, role=f"relation-source-point-{index}") for index, point in enumerate(points))
+        expected_point_keys = tuple(_point_identity(adapter, point, stage=stage, role=f"relation-source-point-{index}", owners=owners) for index, point in enumerate(points))
         if len(set(expected_point_keys)) != len(expected_point_keys):
             raise RuntimeError("native relation source points are not distinct")
-        expected_key = _segment_identity(adapter, segment, stage=stage, role="relation-source") if segment is not None else None
+        expected_key = _segment_identity(adapter, segment, stage=stage, role="relation-source", owners=owners) if segment is not None else None
         for row, entities in zip(rows, definitions, strict=True):
             # Census every row first; only the requested kind can define this constraint.
             if type(row["kind"]) is not int or row["kind"] != kind:
@@ -652,7 +663,7 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
                 axis = 0 if kind == 26 else 1
                 delta = coordinates[0][axis] - coordinates[1][axis]
                 row["alignment"] = {"target_coordinates": coordinates, "axis": axis, "delta_m": delta, "aligned": abs(delta) <= 1e-9}
-            actual_point_keys = [_point_identity(adapter, entity, stage=stage, role=f"relation-definition-point-{index}") for index, entity in enumerate(actual_points)]
+            actual_point_keys = [_point_identity(adapter, entity, stage=stage, role=f"relation-definition-point-{index}", owners=owners) for index, entity in enumerate(actual_points)]
             row["point_keys"] = tuple(actual_point_keys)
             row["expected_point_keys"] = expected_point_keys
             for point_key in expected_point_keys:
@@ -666,7 +677,7 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
                     row["segment_self_codes"] = self_codes
                     if any(type(code) is not int or code != 1 for code in self_codes):
                         raise RuntimeError("native relation segment self-identity unavailable")
-                    actual_key = _segment_identity(adapter, actual_segment, stage=stage, role="relation-definition")
+                    actual_key = _segment_identity(adapter, actual_segment, stage=stage, role="relation-definition", owners=owners)
                     row["segment_key"] = actual_key
                     if actual_key != expected_key:
                         continue
@@ -689,7 +700,7 @@ def _require_witness_relation(adapter: Any, relations: Any, kind: int, points: t
         raise RuntimeError(f"{stage}: {error}") from error
 
 
-def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any, *, stage: str) -> tuple[Any, Any]:
+def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any, *, stage: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[Any, Any]:
     """Equal solved coordinates must not merge independently associated native points."""
     import _telemetry
 
@@ -697,13 +708,15 @@ def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any,
     key, rows, comparisons, own_count, error = None, [], [], 0, None
     points = []
     try:
+        if owners is None:
+            owners = _sketch_owners(adapter)
         native = _early_bound(line, "ISketchSegment")
-        key = _segment_identity(adapter, native, stage=stage, role="endpoint-line")
+        key = _segment_identity(adapter, native, stage=stage, role="endpoint-line", owners=owners)
         owner = _early_bound(native.GetSketch(), "ISketch")
         straight = _early_bound(native, "ISketchLine")
         points = [("start", straight.GetStartPoint2()), ("end", straight.GetEndPoint2()), ("bore-center", center)]
         for candidate in owner.GetSketchSegments() or ():
-            candidate_key = _segment_identity(adapter, candidate, stage=stage, role="endpoint-inventory")
+            candidate_key = _segment_identity(adapter, candidate, stage=stage, role="endpoint-inventory", owners=owners)
             if candidate_key == key:
                 own_count += 1
             elif candidate_key[1] == 0:
@@ -715,7 +728,7 @@ def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any,
             if raw is None:
                 raise RuntimeError("native witness endpoint unavailable")
             point = _early_bound(raw, "ISketchPoint")
-            row["key"] = _point_identity(adapter, point, stage=stage, role=label)
+            row["key"] = _point_identity(adapter, point, stage=stage, role=label, owners=owners)
             row["self"] = application.IsSame(point, point)
             row["owner"] = application.IsSame(point.GetSketch(), owner)
             row["coordinates"] = (float(point.X), float(point.Y), float(point.Z))
@@ -743,23 +756,25 @@ def _require_independent_witness_endpoints(adapter: Any, line: Any, center: Any,
     return _early_bound(points[0][1], "ISketchPoint"), _early_bound(points[1][1], "ISketchPoint")
 
 
-def _assert_tap_projection(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str) -> tuple[Any, Any]:
+def _assert_tap_projection(adapter: Any, line: Any, point: Any, circle: Any, *, stage: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[Any, Any]:
     """Prove the actual tap's transverse projection; the rim only anchors construction."""
     import _telemetry
 
+    if owners is None:
+        owners = _sketch_owners(adapter)
     native = _early_bound(line, "ISketchSegment")
-    key = _segment_identity(adapter, native, stage=stage, role="measurement-line")
-    circle_key = _segment_identity(adapter, circle, stage=stage, role="bore-circle")
+    key = _segment_identity(adapter, native, stage=stage, role="measurement-line", owners=owners)
+    circle_key = _segment_identity(adapter, circle, stage=stage, role="bore-circle", owners=owners)
     if key[1] != 0 or circle_key[1] != 1 or key[0] != circle_key[0] or native.ConstructionGeometry is not True:
         raise RuntimeError(f"{stage}: measurement line is not construction in the actual bore witness")
     owner = _early_bound(native.GetSketch(), "ISketch")
     arc = _early_bound(circle, "ISketchArc")
     center = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-    start, end = _require_independent_witness_endpoints(adapter, native, center, stage=f"{stage}.endpoint-identity")
-    _require_witness_relation(adapter, native.GetRelations(), 4, (), native, stage=f"{stage}.horizontal-line")
-    _require_witness_relation(adapter, start.GetRelations(), 26, (start, point), stage=f"{stage}.actual-tap-axis")
-    _require_witness_relation(adapter, end.GetRelations(), 25, (end, center), stage=f"{stage}.bore-station")
-    _require_witness_relation(adapter, end.GetRelations(), 9, (end,), circle, stage=f"{stage}.actual-bore-rim")
+    start, end = _require_independent_witness_endpoints(adapter, native, center, stage=f"{stage}.endpoint-identity", owners=owners)
+    _require_witness_relation(adapter, native.GetRelations(), 4, (), native, stage=f"{stage}.horizontal-line", owners=owners)
+    _require_witness_relation(adapter, start.GetRelations(), 26, (start, point), stage=f"{stage}.actual-tap-axis", owners=owners)
+    _require_witness_relation(adapter, end.GetRelations(), 25, (end, center), stage=f"{stage}.bore-station", owners=owners)
+    _require_witness_relation(adapter, end.GetRelations(), 9, (end,), circle, stage=f"{stage}.actual-bore-rim", owners=owners)
     tap = _point_in_location_sketch(adapter, point, owner)
     actual = (float(start.X), float(start.Y), float(start.Z), float(end.X), float(end.Y), float(end.Z))
     radius = float(arc.GetRadius())
@@ -885,7 +900,7 @@ def _create_tap_projection(adapter: Any, point: Any, circle: Any, name: str) -> 
     return line
 
 
-def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str) -> tuple[str, str, int, int]:
+def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[str, str, int, int]:
     """Prove actual part attachments using fresh part-inventory identity keys."""
     import _telemetry
 
@@ -904,9 +919,11 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str)
         segments = [entity for entity, kind in zip(attached, types, strict=True) if kind == 10]
         if len(points) != 1 or len(segments) != 1:
             raise RuntimeError("invalid native point/flat attachment types")
-        point_key = _point_identity(adapter, points[0], stage=stage, role="attached-location-point")
-        flat_key = _segment_identity(adapter, segments[0], stage=stage, role="attached-flat")
-        expected_flat = _segment_identity(adapter, flat, stage=stage, role="expected-common-flat")
+        if owners is None:
+            owners = _sketch_owners(adapter)
+        point_key = _point_identity(adapter, points[0], stage=stage, role="attached-location-point", owners=owners)
+        flat_key = _segment_identity(adapter, segments[0], stage=stage, role="attached-flat", owners=owners)
+        expected_flat = _segment_identity(adapter, flat, stage=stage, role="expected-common-flat", owners=owners)
         if flat_key != expected_flat or flat_key[1] != 0:
             raise RuntimeError("native location is not attached to the exact common flat")
     except Exception as exc:
@@ -926,10 +943,12 @@ def _point_flat_attachment(adapter: Any, display: Any, flat: Any, *, stage: str)
     return point_key
 
 
-def _assert_tap_flat_attachment(adapter: Any, display: Any, point: Any, circle: Any, flat: Any, *, name: str, stage: str) -> tuple[Any, ...]:
+def _assert_tap_flat_attachment(adapter: Any, display: Any, point: Any, circle: Any, flat: Any, *, name: str, stage: str, owners: tuple[tuple[str, Any], ...] | None = None) -> tuple[Any, ...]:
     """Recover the independently source-proven tap projection from its measured point."""
-    point_key = _point_flat_attachment(adapter, display, flat, stage=stage)
-    flat_key = _segment_identity(adapter, flat, stage=stage, role="common-flat")
+    if owners is None:
+        owners = _sketch_owners(adapter)
+    point_key = _point_flat_attachment(adapter, display, flat, stage=stage, owners=owners)
+    flat_key = _segment_identity(adapter, flat, stage=stage, role="common-flat", owners=owners)
     native_circle = _early_bound(circle, "ISketchSegment")
     sketch = _early_bound(native_circle.GetSketch(), "ISketch")
     matches = []
@@ -937,13 +956,13 @@ def _assert_tap_flat_attachment(adapter: Any, display: Any, point: Any, circle: 
         segment = _early_bound(raw, "ISketchSegment")
         if segment.GetType() != 0:
             continue
-        key = _segment_identity(adapter, segment, stage=stage, role="projection-candidate")
+        key = _segment_identity(adapter, segment, stage=stage, role="projection-candidate", owners=owners)
         if key == flat_key:
             continue
         line = _early_bound(segment, "ISketchLine")
-        if _point_identity(adapter, line.GetStartPoint2(), stage=stage, role="projection-start") != point_key:
+        if _point_identity(adapter, line.GetStartPoint2(), stage=stage, role="projection-start", owners=owners) != point_key:
             continue
-        _assert_tap_projection(adapter, segment, point, circle, stage=stage)
+        _assert_tap_projection(adapter, segment, point, circle, stage=stage, owners=owners)
         matches.append(key)
     if len(matches) != 1:
         raise RuntimeError(f"{name}: native attachments do not identify exactly one actual tap projection")
@@ -982,7 +1001,9 @@ async def _location_profiles(adapter: Any) -> None:
     blank_reference_sketches(adapter, tuple(sources))
 
 
-def _assert_location_profiles(adapter: Any) -> None:
+def _assert_location_profiles(adapter: Any, *, owners: tuple[tuple[str, Any], ...] | None = None) -> None:
+    if owners is None:
+        owners = _sketch_owners(adapter)
     part = _early_bound(adapter.currentModel, "IPartDoc")
     for feature, (_plane, source_circle, _interface, flats) in _location_sources(adapter).items():
         native_feature = _early_bound(part.FeatureByName(feature), "IFeature")
@@ -1002,7 +1023,7 @@ def _assert_location_profiles(adapter: Any) -> None:
             converted_flats[name] = flat
             display, dimension = _named_dimension(adapter, feature, name)
             _assert_ordinary_location(display, dimension, name)
-            if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-rebuild") != _point_identity(adapter, center, stage=f"{name}.after-rebuild", role="expected-center"):
+            if _point_flat_attachment(adapter, display, flat, stage=f"{name}.after-rebuild", owners=owners) != _point_identity(adapter, center, stage=f"{name}.after-rebuild", role="expected-center", owners=owners):
                 raise RuntimeError(f"{name}: actual center attachment changed")
         if feature == "LeverBoreLocationProfile":
             flat = converted_flats["LeverBoreFromZFlat"]
@@ -1013,7 +1034,7 @@ def _assert_location_profiles(adapter: Any) -> None:
             for name, point in _tap_placement_points(adapter).items():
                 display, dimension = _named_dimension(adapter, feature, name)
                 _assert_ordinary_location(display, dimension, name)
-                key = _assert_tap_flat_attachment(adapter, display, point, circle, flat, name=name, stage=f"{name}.after-rebuild")
+                key = _assert_tap_flat_attachment(adapter, display, point, circle, flat, name=name, stage=f"{name}.after-rebuild", owners=owners)
                 if key in measured_lines:
                     raise RuntimeError(f"{name}: distinct tap witnesses merged into one native line")
                 measured_lines.add(key)
@@ -1094,7 +1115,8 @@ def _assert_stock_af_source(adapter: Any, *, stage: str) -> tuple[Any, Any]:
     _telemetry.info("clamp native stock AF source attachments", operation_stage=stage, attachment_count=count, attachment_types=repr(types), returned_count=len(entities), dangling=dangling)
     if type(count) is not int or count != 2 or len(entities) != 2 or len(types) != 2 or any(type(kind) is not int or kind != 11 for kind in types) or any(entity is None for entity in entities) or dangling is not False:
         raise RuntimeError(f"HexAf: actual two-point source attachment changed at {stage}")
-    keys = tuple(_point_identity(adapter, entity, stage=stage, role=f"af-endpoint-{index}") for index, entity in enumerate(entities))
+    owners = _sketch_owners(adapter)
+    keys = tuple(_point_identity(adapter, entity, stage=stage, role=f"af-endpoint-{index}", owners=owners) for index, entity in enumerate(entities))
     if keys[0] == keys[1] or any(key[:2] != ("HexProfile", "ISketchPoint") for key in keys):
         raise RuntimeError(f"HexAf: source endpoints are not distinct actual HexProfile points: {keys!r}")
     points = tuple(_early_bound(entity, "ISketchPoint") for entity in entities)
