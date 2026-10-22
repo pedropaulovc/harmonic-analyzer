@@ -6,6 +6,9 @@ pictorial clarity without replacing either manufacturing view.
 The property-linked tooth-system block comes from the rebuilt part: configured
 DP/PA, standard root/depth and the count-specific reference cutter, never the
 retired shallow chord-floor description.
+The owner-approved presentation uses 0.13 mm visible model edges in all three
+views of this drawing, not only the isometric. This drawing-component override
+does not alter the shared template, model appearance, geometry or other prints.
 """
 
 from __future__ import annotations
@@ -43,7 +46,6 @@ from _gear_drawing_entities import visible_circle_edge
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
-from _simplified_names import simplified_name
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from dt_alignment_pinion_spec import (
@@ -77,13 +79,16 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (1.0, 1.0)
 FRONT_SCALE = (2, 1)
 PROFILE_SCALE = (1, 1)
+# The actual 1:1 trial struck the border and tooth note. At 1:2 the complete
+# pictorial fits the upper-right field. Owner-approved fine model-edge ink
+# across all three views keeps the full-length teeth and brass shading readable.
 ISO_SCALE = (1, 2)
 # The side view is the lathe view at the sheet scale; the end view projects
 # to its left (third angle) at 2:1 so the teeth and bore read, and says so
 # under itself (machinist review r1: an unlabelled 2:1 projected view).
 FRONT_CENTER = (0.085, 0.150)
 RIGHT_CENTER = (0.255, 0.150)
-ISO_CENTER = (0.350, 0.215)
+ISO_CENTER = (0.350, 0.230)
 GEAR_DATA_POS = (0.018, 0.262)
 ISOMETRIC_NOTE_POS = (0.330, 0.262)
 END_VIEW_NOTE_POS = (0.066, 0.124)
@@ -240,16 +245,13 @@ def _prefix_diameter_symbol(adapter: Any, annotations: list[Any], name: str) -> 
         raise RuntimeError(f"{name}: diameter prefix did not persist ({applied!r})")
 
 
-def _show_side_view_simplified(adapter: Any, view: Any) -> None:
-    """Draw the side view by the simplified gear convention: the OD outline.
+def _show_full_tooth_profile(adapter: Any, view: Any) -> None:
+    """Keep the actual teeth in the manufacturing profile.
 
-    Every tooth edge along the 143 mm drum printed as a dense block of lines
-    (machinist review r5 of 6d23cf234, minor).  The part's derived
-    ``Default Simplified`` configuration suppresses only the tooth cut and
-    pattern (``_simplified_part``), so the side view shows the blank at the tip
-    diameter; the end view and the isometric keep every tooth.
+    Owner review of the v43-to-rolling drawing diff requested full tooth detail
+    back. The blank-only simplified configuration must not stand in for it.
     """
-    configuration = simplified_name("Default")
+    configuration = "Default"
     bound = _early_bound(view, "IView")
     bound.ReferencedConfiguration = configuration
     rebuild_drawing(adapter, label="side view configuration")
@@ -257,6 +259,67 @@ def _show_side_view_simplified(adapter: Any, view: Any) -> None:
     if observed != configuration:
         raise RuntimeError(
             f"side view references {observed!r} after setting {configuration!r}"
+        )
+
+
+def _set_drawing_model_edge_weight(adapter: Any, view: Any) -> float:
+    """Use the owner-approved Thin model-edge ink across this part's views.
+
+    Native trial 6d6b635 proved the part root's override affects all three views.
+    The owner explicitly accepted that scope for this print after inspecting
+    the complete thin-ink and thick-ink sheets side by side.
+    """
+    bound = _early_bound(view, "IView")
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment drawing has no part drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"),
+            _sw_type_info.constant("swDetailingNoOptionSpecified"),
+        )
+    )
+    if abs(thin_width - 0.00013) > 1e-9:
+        raise RuntimeError(
+            f"alignment template Thin slot is not the approved 0.13 mm: {thin_width}"
+        )
+    component.UseDocumentDefaults = False
+    # Visible edges=1, swLW_THIN=0. The third argument is unused for a
+    # standard weight; no custom-width or document-default setter is involved.
+    component.SetLineThickness(1, 0, 0.0)
+    _assert_drawing_model_edge_weight(adapter, view, thin_width)
+    return thin_width
+
+
+def _assert_drawing_model_edge_weight(
+    adapter: Any, view: Any, expected_width: float
+) -> None:
+    # Reacquire after display regeneration/rebuild rather than retain a root
+    # wrapper from the authoring stage.
+    bound = _early_bound(view, "IView")
+    raw_component = bound.RootDrawingComponent2(False)
+    if raw_component is None:
+        raise RuntimeError("alignment drawing lost its part drawing component")
+    component = _early_bound(raw_component, "IDrawingComponent")
+    weight, _custom_thickness = component.GetLineThickness(1)
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    thin_width = float(
+        extension.GetUserPreferenceDouble(
+            _sw_type_info.constant("swPageSetupPrinterThinLineWeight"),
+            _sw_type_info.constant("swDetailingNoOptionSpecified"),
+        )
+    )
+    if (
+        bool(component.UseDocumentDefaults)
+        or int(weight) != 0
+        or abs(thin_width - expected_width) > 1e-9
+    ):
+        raise RuntimeError(
+            "alignment drawing Thin model edges did not persist: "
+            f"default={component.UseDocumentDefaults}, "
+            f"weight={weight}, thin_width={thin_width}, expected={expected_width}"
         )
 
 
@@ -317,7 +380,7 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE
     )
-    _show_side_view_simplified(adapter, right)
+    _show_full_tooth_profile(adapter, right)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _verify_title_material_specification(drawing_model, material_binding)
@@ -384,6 +447,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view=right,
         height=0.0025,
     )
+    model_edge_width = _set_drawing_model_edge_weight(adapter, iso)
 
     return await finalize_drawing(
         adapter,
@@ -391,6 +455,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Alignment Pinion Drum Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_drawing_model_edge_weight(adapter, iso, model_edge_width),
+        ),
     )
 
 
