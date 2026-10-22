@@ -15,6 +15,7 @@ import pytest
 
 import _supplier_dimensions as supplier
 import _supplier_washer_drawing as washer_drawing
+import _supplier_washer_model as washer_model
 
 
 @dataclass(frozen=True)

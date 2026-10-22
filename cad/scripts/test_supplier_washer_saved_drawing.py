@@ -833,7 +833,7 @@ def test_saved_corruption_is_refused_by_real_native_assertions(saved_washer, fau
     elif fault == "wrong-source-attachment":
         thickness.annotation.attached = (object(), object())
     elif fault == "wrong-native-owner":
-        thickness.native.GetFeatureOwner = lambda: object()
+        thickness.native.GetFeatureOwner = lambda: case.features[source.FACE_FEATURE]
     elif fault == "band":
         thickness.native.Tolerance.minimum = -0.002
     elif fault == "body":
