@@ -1402,7 +1402,7 @@ PACKAGE_NATIVE_PY = (SCRIPTS_DIR / "package_native.py").resolve()
 # The gate suites, by SolidWorks-dependence -- the single source of truth for the
 # verify:/check: task names (reused by build + release so a new gate is wired in
 # one place).
-_VERIFY_NAMES = ("soundness", "kinematics")  # need SW (spine); subsystems retired
+_VERIFY_NAMES = ("soundness", "kinematics", "supplier_sketch_probe")
 # Offline checks REQUIRED on every build/release (fast, high-value):
 _CHECK_NAMES = (
     "math",
@@ -2283,6 +2283,10 @@ def _probe_cache(
     seat-holding caller releases the documents and re-probes instead. Under the
     farm executor the submitter holds no seat to release, so it fails loud.
     """
+    if label != "verify:supplier_sketch_probe" or [
+        path.resolve() for path in outputs
+    ] != [(REPORTS / "supplier-sketch-probe" / "result.json").resolve()]:
+        raise RuntimeError("private diagnostic refuses every other native task/output")
     _tag_cache_key(span, key)
     reason = _cache.forced_refresh(label)
     if reason is not None:
@@ -2296,6 +2300,8 @@ def _probe_cache(
             raise
         outcome = "locked"
     span.set_attribute("cache", outcome)
+    if outcome == "locked":
+        raise RuntimeError("private diagnostic refuses locked restore/document recovery")
     return outcome
 
 
@@ -3219,6 +3225,17 @@ def task_verify_soundness():
         }
 
 
+def _supplier_sketch_probe_file_deps() -> list[str]:
+    script = SCRIPTS_DIR / "supplier_sketch_probe.py"
+    deps = {str(script.resolve()), *_helper_deps(script)}
+    for stem in (
+        "ch_rocker_arm_tl_vn_oblique_riser_screw",
+        "ch_rocker_arm_tl_vn_oblique_leadscrew_nut",
+    ):
+        deps.update(_part_file_deps(SCRIPTS_DIR / f"build_{stem}.py", stem))
+    return sorted(deps)
+
+
 def task_verify():
     """SolidWorks verification suites -- cache-keyed COM leaves: the seat lock
     serializes them locally, and under ``--executor farm`` each dispatches ONE leaf
@@ -3227,6 +3244,28 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
+    probe_deps = _supplier_sketch_probe_file_deps()
+    probe_report = REPORTS / "supplier-sketch-probe" / "result.json"
+    yield {
+        "name": "supplier_sketch_probe",
+        "file_dep": probe_deps,
+        "targets": [str(probe_report)],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:supplier_sketch_probe",
+                    [sys.executable, str(SCRIPTS_DIR / "supplier_sketch_probe.py")],
+                    probe_deps,
+                    [probe_report],
+                    "supplier-sketch-probe",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
     child_stamps = [
         str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
         for stem in ASSEMBLY_ORDER
@@ -4845,6 +4884,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     for stem in ASSEMBLY_ORDER:
         rows.append((f"verify_soundness:{stem}", _soundness_file_deps(stem)))
     rows.append(("verify:kinematics", _kinematics_file_deps()))
+    rows.append(("verify:supplier_sketch_probe", _supplier_sketch_probe_file_deps()))
     rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
     from export_features import SUPPORTED_PARTS
