@@ -14,9 +14,9 @@ from types import ModuleType
 import pytest
 
 import _buildgraph as bg
-from test_dodo_recipe import (  # noqa: F401 -- pytest discovers imported fixtures
-    isolated_assembly_helper_keys,
-    local_executor,
+from test_dodo_recipe import (
+    isolated_assembly_helper_keys as isolated_assembly_helper_keys,
+    local_executor as local_executor,
 )
 
 pytestmark = pytest.mark.usefixtures("local_executor")

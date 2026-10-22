@@ -16,10 +16,10 @@ import sys
 import pytest
 
 import _buildgraph as bg
-from test_dodo_recipe import (  # noqa: F401 -- pytest discovers imported fixtures
+from test_dodo_recipe import (
     _load_dodo,
-    isolated_assembly_helper_keys,
-    local_executor,
+    isolated_assembly_helper_keys as isolated_assembly_helper_keys,
+    local_executor as local_executor,
 )
 
 pytestmark = pytest.mark.usefixtures("local_executor")
@@ -172,18 +172,45 @@ def test_real_summing_key_retains_exact_native_lever_execution_identity(isolated
 
 
 def _copied_python(root: Path, source: str):
-    # A fresh interpreter imports the copied closure, including every transitive
-    # consumer, without leaving temporary modules in the parent test process.
+    # Key discovery copies only selected config shards. Runtime accessors
+    # aggregate whole split documents, so give imports a complete copied config
+    # tree while preserving every existing fixture byte (including mutations).
+    config = SCRIPTS.parent / "config"
+    for original in config.rglob("*"):
+        if not original.is_file():
+            continue
+        copied = root / "cad" / "config" / original.relative_to(config)
+        if not copied.exists():
+            copied.parent.mkdir(parents=True, exist_ok=True)
+            copied.write_bytes(original.read_bytes())
+    # Runtime imports still need helpers deliberately excluded from recipe keys.
+    # Supply their copied bytes without adding them to the captured key inputs.
+    for name in bg.RECIPE_SKIP_MODULES:
+        original = SCRIPTS / name
+        copied = root / "cad" / "scripts" / name
+        if original.is_file() and not copied.exists():
+            copied.write_bytes(original.read_bytes())
+    # A fresh interpreter imports every consumer from this isolated tree. Keep
+    # the suite's child guard and refusal log, but never the live scripts path.
     environment = os.environ.copy()
-    environment["PYTHONPATH"] = str(root / "cad" / "scripts")
+    assert environment.get("HARMONIC_TEST_FORBID_SOLIDWORKS"), (
+        "child import needs the suite's refusal log"
+    )
+    guard = SCRIPTS.parents[1] / "tests" / "_child_guard"
+    environment["PYTHONPATH"] = os.pathsep.join((str(guard), str(root / "cad" / "scripts")))
+    source = "import sys\nassert 'harmonic_solidworks_guard' in sys.modules\n" + source
     result = subprocess.run(
         [sys.executable, "-B", "-c", source],
         cwd=root,
         env=environment,
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
         timeout=60,
+    )
+    assert result.returncode == 0, (
+        f"Copied-tree import failed with exit {result.returncode}\n"
+        f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
     return json.loads(result.stdout)
 
