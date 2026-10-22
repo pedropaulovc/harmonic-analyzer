@@ -23,6 +23,7 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -1521,7 +1522,11 @@ async def build_purchased_fastener_drawing(
             ),
         )
         if saved_check is not None:
-            saved_check(adapter, Path(artifacts["drawing"]))
+            result = saved_check(adapter, Path(artifacts["drawing"]))
+            if result is not None:
+                if inspect.iscoroutine(result):
+                    result.close()
+                raise TypeError("saved_check must be synchronous and return None")
         return artifacts
     except BaseException as error:
         primary = error
