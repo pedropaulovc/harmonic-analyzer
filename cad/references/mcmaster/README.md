@@ -1641,8 +1641,8 @@ collisions and refusal paths; they do not qualify a fresh native export.
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never
 measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
-starting or continuing optional observations. The failing ownership predicate
-remains strict; this evidence capture is not a claim that its native cause is fixed.
+starting or continuing optional observations. Identity refusals remain strict;
+optional observations do not license acceptance.
 
 Nut chord endpoints and washer witness points/segments attach in the drawing's
 namespace. Their independently checked part entities are mapped through the
@@ -1650,9 +1650,15 @@ exact owning view's `GetCorresponding`; native one-to-one identity, distinct
 endpoints and no extra attachments are required there. Direct comparison
 between a part object and a drawing object is not an attachment proof.
 The imported washer dimension's feature owner must also equal that source
-feature mapped into the exact drawing view. A part display instead retains its
-part-feature owner. Missing mappings and wrong owners fail; matching names,
-values or feature types cannot replace the same-context native identity check.
+feature mapped into the exact drawing view. A part display instead requires
+native `IDimension` identity with both the dimension enumerated from the source
+feature and `model.Parameter("Dimension@Feature")`; missing or different
+dimensions fail even when their names and values match. Native R47 proved all
+three part-dimension identities while `GetFeatureOwner` versus `FeatureByName`
+returned zero for equally named `ProfileFeature` handles. The reason for that
+feature-identity discrepancy remains unproven; it is not a part-dimension
+authority check. Drawing owner mappings and independent geometry/attachment
+checks remain strict. The corrected contract still needs native qualification.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical

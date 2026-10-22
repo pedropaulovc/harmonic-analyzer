@@ -172,10 +172,11 @@ def assert_supplier_washer_source_attachment(
 
     A diameter must attach to its exact construction circle. Thickness must
     attach to the two points of the sole line at the physical OD flank.
-    ``view=None`` checks the part's own display. A drawing import instead maps
-    those same independently checked entities into its exact owning view.
+    ``view=None`` checks canonical part-dimension identity. A drawing import
+    instead maps the checked source entities and feature into its exact view.
     """
     feature_name, dimension_name = SOURCE_DIMENSIONS[label]
+    parameter_name = f"{dimension_name}@{feature_name}"
     raw = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
     if raw is None:
         raise RuntimeError(f"{label}: missing source feature {feature_name}")
@@ -185,20 +186,33 @@ def assert_supplier_washer_source_attachment(
         adapter, feature_name, {dimension_name}, feature=feature
     )[dimension_name]
     native = _early_bound(display.GetDimension2(0), "IDimension")
+    part_parameter = None
+    part_parameter_read = False
     try:
+        if native is None or source_native is None:
+            raise RuntimeError(f"{label}: missing native dimension for its named model witness")
         full_name = str(native.FullName or "")
-        owner = native.GetFeatureOwner()
-        expected_owner = feature
-        # Imported feature owners, like their attachments, belong to the view.
-        if view is not None:
+        if view is None:
+            part_parameter = _early_bound(
+                _early_bound(model, "IModelDoc2").Parameter(parameter_name), "IDimension")
+            part_parameter_read = True
+            identity_proven = (
+                part_parameter is not None
+                and int(adapter.swApp.IsSame(native, source_native)) == 1
+                and int(adapter.swApp.IsSame(native, part_parameter)) == 1
+            )
+        else:
+            owner = native.GetFeatureOwner()
             mapped_owner = _early_bound(view, "IView").GetCorresponding(feature)
             expected_owner = None if mapped_owner is None else _early_bound(mapped_owner, "IFeature")
+            identity_proven = (
+                owner is not None and expected_owner is not None
+                and int(adapter.swApp.IsSame(owner, expected_owner)) == 1
+            )
         if (
-            full_name.split("@")[:2] != [dimension_name, feature_name]
+            not identity_proven
+            or full_name.split("@")[:2] != [dimension_name, feature_name]
             or str(source_native.FullName).split("@")[:2] != [dimension_name, feature_name]
-            or owner is None
-            or expected_owner is None
-            or int(adapter.swApp.IsSame(owner, expected_owner)) != 1
             or int(display.Type2) != int(source_display.Type2)
         ):
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
@@ -208,7 +222,7 @@ def assert_supplier_washer_source_attachment(
         try:
             fields = {"label": label, "expected_dimension": dimension_name,
                       "expected_feature": feature_name, "view_present": view is not None}
-            fields["model_parameter_query"] = f"{dimension_name}@{feature_name}"
+            fields["model_parameter_query"] = parameter_name
 
             def observe(name: str, reader: Any) -> Any:
                 try:
@@ -234,8 +248,16 @@ def assert_supplier_washer_source_attachment(
             source_document = observe("source_document_handle", lambda: _early_bound(model, "IModelDoc2"))
             source_path = observe("source_path", lambda: None if source_document is None else
                                   source_document.GetPathName())
-            parameter = observe("model_parameter_handle", lambda: None if source_document is None else
-                                _early_bound(source_document.Parameter(fields["model_parameter_query"]), "IDimension"))
+            if view is None:
+                if part_parameter_read:
+                    parameter = observe("model_parameter_handle", lambda: part_parameter)
+                else:
+                    parameter = None
+                    fields["model_parameter_handle_state"] = "UNAVAILABLE"
+                    fields["model_parameter_handle_reason"] = "source-part parameter lookup did not complete"
+            else:
+                parameter = observe("model_parameter_handle", lambda: None if source_document is None else
+                                    _early_bound(source_document.Parameter(parameter_name), "IDimension"))
             loaded_document = observe("loaded_document_handle", lambda: None if source_path is None else
                                       _early_bound(adapter.swApp.GetOpenDocumentByName(source_path), "IModelDoc2"))
             configuration_manager = observe("source_configuration_manager_handle", lambda: None
@@ -251,14 +273,18 @@ def assert_supplier_washer_source_attachment(
                 ("source_type", lambda: int(source_display.Type2)),
                 ("native_value_m", lambda: float(native.SystemValue)),
                 ("source_value_m", lambda: float(source_native.SystemValue)),
-                ("native_dimension_self", lambda: int(adapter.swApp.IsSame(native, native))),
-                ("source_dimension_self", lambda: int(adapter.swApp.IsSame(source_native, source_native))),
+                ("native_dimension_self", lambda: None if native is None else
+                 int(adapter.swApp.IsSame(native, native))),
+                ("source_dimension_self", lambda: None if source_native is None else
+                 int(adapter.swApp.IsSame(source_native, source_native))),
                 ("model_parameter_self", lambda: None if parameter is None else
                  int(adapter.swApp.IsSame(parameter, parameter))),
-                ("native_same_source_dimension", lambda: int(adapter.swApp.IsSame(native, source_native))),
-                ("native_same_model_parameter", lambda: None if parameter is None else
+                ("native_same_source_dimension", lambda: None if native is None or source_native is None else
+                 int(adapter.swApp.IsSame(native, source_native))),
+                ("native_same_model_parameter", lambda: None if native is None or parameter is None else
                  int(adapter.swApp.IsSame(native, parameter))),
-                ("source_dimension_same_model_parameter", lambda: None if parameter is None else
+                ("source_dimension_same_model_parameter", lambda: None
+                 if source_native is None or parameter is None else
                  int(adapter.swApp.IsSame(source_native, parameter))),
                 ("model_parameter_full_name", lambda: None if parameter is None else parameter.FullName),
                 ("model_parameter_value_m", lambda: None if parameter is None else float(parameter.SystemValue)),
