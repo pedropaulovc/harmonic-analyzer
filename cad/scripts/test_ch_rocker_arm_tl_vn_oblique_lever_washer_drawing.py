@@ -35,7 +35,7 @@ def test_catalogue_row_is_the_registered_mcmaster_washer() -> None:
     assert stock.skus == tuple(row["supplier_skus"]) == (spec.SKU,) == ("91812A230",)
     assert stock.supplier == row["supplier"] == "McMaster-Carr"
     assert stock.stock_name == row["stock_name"]
-    assert stock.material == row["material"] == part.MATERIAL == (
+    assert stock.material == part.MATERIAL == (
         "AISI 316 Stainless Steel Sheet (SS)"
     )
     assert row["number"] == "MHA-CH-06-TL-VN-71"
@@ -44,7 +44,7 @@ def test_catalogue_row_is_the_registered_mcmaster_washer() -> None:
     assert "316 stainless" in row["material_specification"]
     from _part_properties import part_properties
 
-    assert part_properties(STEM)["Material"] == stock.material
+    assert part_properties(STEM)["Material"] == row["material"] == "316 stainless steel"
     assert spec.CATALOG_MATERIAL == dims.CATALOG_MATERIAL == (
         "316 stainless steel, Rockwell C51, case hardened"
     )

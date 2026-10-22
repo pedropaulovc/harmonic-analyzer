@@ -394,9 +394,9 @@ replica-gated and no copy is kept here:
   run remains catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
 
-For these two washer SKUs only, the native catalogue and registry material
-now use the existing default SOLIDWORKS library entry
-`AISI 316 Stainless Steel Sheet (SS)`, replacing their former `AISI 304`
+For these two washer SKUs only, the native catalogue material now uses the
+existing default SOLIDWORKS library entry
+`AISI 316 Stainless Steel Sheet (SS)`, replacing the former `AISI 304`
 stand-in. That exact entry (material ID 91) and its existing density
 `8000.000133 kg/m³` were read on October 22, 2026 from
 `D:/Program Files/Dassault Systemes/SOLIDWORKS 3DEXPERIENCE/SOLIDWORKS/lang/english/sldmaterials/solidworks materials.sldmat`;
@@ -405,11 +405,15 @@ material/mass-property mapping, not a claim about supplier stock form or a
 lot certificate; the supplier's case-hardening and Rockwell C51 data remain
 in `material_specification` and `CATALOG_MATERIAL`. The two existing
 `build_*_washer` modules obtain their native material from those exact
-catalogue rows, while `_part_properties.part_properties` obtains the saved
-`Material` source property from each registry row. The purchased drawing
-requires that saved property to match the registry and links the title
-block to it, so the correction is source-owned rather than patched into
-sheet text. Both specs now carry three short factual supplier-data lines:
+catalogue rows. Separately, each registry's `material` is the verified
+supplier grade `316 stainless steel`, not the library's sheet-form name.
+`_part_properties.part_properties` stamps that registry value into the saved
+`Material` source property. The purchased drawing requires that saved property
+to match the registry and links the title block to it, so the source and
+printed cell truthfully identify the supplier grade without asserting sheet
+stock. This follows the existing separation between native library material
+and supplier-grade display used by the locating pin and thrust washer.
+Both specs now carry three short factual supplier-data lines:
 item/pair versus pack, complete-pair thickness/model maximum, and the
 unmodelled split/cams/serrations in the plain envelope. Existing dimensions,
 tolerance bands, construction references, quantities and physical geometry

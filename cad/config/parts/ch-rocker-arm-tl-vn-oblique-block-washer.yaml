@@ -5,7 +5,7 @@ ch-rocker-arm-tl-vn-oblique-block-washer:
   stock_name: Extreme-Vibration-Resistant Wedge Lock Washer
   supplier: McMaster-Carr
   supplier_skus: ["91812A215"]
-  material: AISI 316 Stainless Steel Sheet (SS)
+  material: 316 stainless steel
   material_specification: "316 stainless steel, Rockwell C51, case hardened; two-piece wedge-lock pair for No. 8 screws, ID 0.170 in x OD 0.300 in x 0.080-0.100 in; McMaster-Carr 91812A215"
   finish: AS SUPPLIED
   # https://www.mcmaster.com/91812A215/ read live 2026-10-22: 316 stainless;
