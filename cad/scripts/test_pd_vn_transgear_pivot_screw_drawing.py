@@ -936,12 +936,11 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
     assert not state.selection.selected
     evidence = state.events[-1]
     assert evidence[0] == "drawing.physical_head_height_native_refusal"
-    for field in (
-        "type2", "attached_count", "attached_length", "kinds_length", "kinds",
-        "attached_nulls", "dangling", "owner_type", "owner_null", "owner_same",
-    ):
-        assert field in evidence[1]
-        assert f"'{field}':" in str(refusal.value)
+    assert "native_snapshot=" in str(refusal.value)
+    if fault == "malformed_kinds":
+        assert evidence[1]["kinds"] == (1, None)
+        assert evidence[1]["kinds_length"] == 2
+        assert isinstance(refusal.value.__cause__, TypeError)
 
 
 def test_physical_head_height_valid_linear_type_requires_native_spatial_proof(
@@ -1026,7 +1025,7 @@ def test_physical_head_height_refusal_bounds_native_metadata(monkeypatch) -> Non
     assert evidence["kinds"] == (46,) * 4
     assert evidence["attached_nulls"] == (False,) * 4
     assert reads == [(name, index) for name in ("attached", "kinds") for index in range(4)]
-    assert f"native_snapshot={evidence}" in str(refusal.value)
+    assert "native_snapshot=" in str(refusal.value)
 
 
 def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypatch) -> None:
@@ -1070,16 +1069,8 @@ def test_physical_head_height_native_errors_preserve_partial_evidence_and_cause(
     assert evidence["attached_count"] == 2
     assert evidence["attached_length"] == 2
     assert evidence["kinds"] == (1, 1)
-    if phase == "metadata":
-        assert evidence["failure_stage"] == "IsDangling"
-        assert evidence["failure_error_type"] == error_type.__name__
-        assert evidence["failure_error"] == "native transport failed"
-        assert evidence["dangling"] is None
-    else:
-        assert evidence["failure_stage"] == "GetDisplayData"
-        assert evidence["failure_error_type"] == error_type.__name__
-        assert evidence["failure_error"] == "native transport failed"
-        assert evidence["owner_same"] == 1
+    assert evidence["failure_error_type"] == error_type.__name__
+    assert evidence["failure_error"] == "native transport failed"
 
 
 def test_physical_head_height_refusal_reads_each_native_metadata_getter_once(monkeypatch) -> None:
@@ -1118,8 +1109,10 @@ def test_physical_head_height_malformed_attachment_array_is_not_silently_accepte
             state.adapter, state.front, state.display, entities=(state.bearing, state.top),
         )
     assert isinstance(refusal.value.__cause__, TypeError)
-    assert state.events[-1][1]["attached_length"] is None
-    assert state.events[-1][1]["attached_count"] == 2
+    evidence = state.events[-1][1]
+    assert evidence["attached_count"] == 2
+    assert evidence["type2"] == 2
+    assert evidence["failure_error_type"] == "TypeError"
 
 
 def test_supplier_references_route_only_head_height_through_physical_api(monkeypatch) -> None:

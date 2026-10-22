@@ -102,10 +102,18 @@ def assert_native_physical_head_height(
         raw_kinds = annotation.GetAttachedEntityTypes()
         kinds_length = 0 if raw_kinds is None else len(raw_kinds)
         snapshot["kinds_length"] = kinds_length
+        # Record the bounded native slots before validation: a malformed slot
+        # must not erase the array/earlier slots the native getter did return.
+        # Non-scalar diagnostic representations are bounded, never coerced for
+        # acceptance. Validate the original values, with no second native read.
+        kind_slots = tuple(raw_kinds[index] for index in range(min(kinds_length, 4)))
         snapshot["kinds"] = tuple(
-            _native_integer(raw_kinds[index], f"attachment type {index}")
-            for index in range(min(kinds_length, 4))
+            kind if kind is None or isinstance(kind, (bool, int, float))
+            else repr(kind)[:120]
+            for kind in kind_slots
         )
+        for index, kind in enumerate(kind_slots):
+            _native_integer(kind, f"attachment type {index}")
         stage = "dangling"
         dangling = annotation.IsDangling()
         if not isinstance(dangling, bool):

@@ -299,7 +299,17 @@ def test_metadata_requires_matching_exact_edge_arrays_without_nulls(native, faul
 @pytest.mark.parametrize("value", [1.5, "1", None, True])
 def test_malformed_attachment_kind_is_not_coerced(native, value):
     native.kinds = (1, value)
-    native.refuse("attachment type 1 must be a native integer", "attached_types")
+    error, fields = native.refuse("attachment type 1 must be a native integer")
+    assert isinstance(error.__cause__, TypeError)
+    assert fields["kinds_length"] == 2
+    assert fields["kinds"][0] == 1
+    if isinstance(value, str):
+        assert isinstance(fields["kinds"][1], str)
+        assert len(fields["kinds"][1]) <= 120
+    else:
+        assert fields["kinds"][1] == value
+    assert native.reads["attached_types"] == 1
+    assert native.reads["dangling"] == native.reads["owner"] == 0
 
 
 @pytest.mark.parametrize("value", [None, 0, 1, "false"])
@@ -598,6 +608,53 @@ def test_failure_metadata_snapshot_has_true_lengths_and_only_first_four_slots(na
     assert native.reads["attached_entities"] == native.reads["attached_types"] == 1
     assert "failure_probe_error" not in fields
     assert not {"count_api", "attached_len", "kinds_len", "owner_is_same"} & fields.keys()
+
+
+def test_malformed_kind_preserves_all_bounded_raw_slots_before_validation(native):
+    class MalformedKinds(_BoundedMetadata):
+        def __getitem__(self, index):
+            super().__getitem__(index)
+            return (1, None, 46, 1)[index]
+
+    native.kinds = MalformedKinds(None)
+    _error, fields = native.refuse("attachment type 1 must be a native integer")
+    assert fields["kinds_length"] == 10000
+    assert fields["kinds"] == (1, None, 46, 1)
+    assert native.kinds.slots == [0, 1, 2, 3]
+    assert native.reads["attached_types"] == 1
+    assert native.reads["dangling"] == 0
+
+
+def test_malformed_kind_diagnostic_representation_is_bounded_without_coercion(native):
+    value = "1" * 2000
+    native.kinds = (1, value)
+    error, fields = native.refuse("attachment type 1 must be a native integer")
+    assert isinstance(error.__cause__, TypeError)
+    assert fields["kinds_length"] == 2
+    assert fields["kinds"][0] == 1
+    assert isinstance(fields["kinds"][1], str)
+    assert len(fields["kinds"][1]) <= 120
+
+
+@pytest.mark.parametrize("field,read_key", [
+    ("attached", "attached_entities"),
+    ("kinds", "attached_types"),
+])
+def test_scalar_native_arrays_refuse_with_original_length_error(native, field, read_key):
+    setattr(native, field, 7)
+    error, fields = native.refuse("has no len")
+    assert isinstance(error.__cause__, TypeError)
+    assert fields["attached_count"] == 2
+    assert native.reads[read_key] == 1
+    assert native.reads["dangling"] == 0
+
+
+def test_malformed_string_attachment_records_length_that_was_actually_read(native):
+    native.attached = "bad"
+    _error, fields = native.refuse("expected two nonnull actual edge attachments")
+    assert fields["attached_length"] == 3
+    assert fields["attached_nulls"] == (False, False, False)
+    assert native.reads["attached_entities"] == 1
 
 
 def test_failure_error_text_is_bounded_but_original_exception_is_unchanged(native):

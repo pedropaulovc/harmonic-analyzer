@@ -2258,8 +2258,10 @@ def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_maj
         bolt.HEAD_AF / (2000 * math.sqrt(3)),
     ))
     assert edge_calls == [(case.front, {
-        "p0": (points_m[0][0] + 0.1, points_m[0][1] + 0.1),
-        "p1": (points_m[1][0] + 0.1, points_m[1][1] + 0.1),
+        "p0": (points_m[0][0] * case.front.ScaleDecimal + 0.1,
+               points_m[0][1] * case.front.ScaleDecimal + 0.1),
+        "p1": (points_m[1][0] * case.front.ScaleDecimal + 0.1,
+               points_m[1][1] * case.front.ScaleDecimal + 0.1),
         "text_xy": (0.110, 0.255), "label": "SupplierHeadAF", "orientation": "horizontal",
     })]
     assert head_calls == [(case.front, (0.218, 0.216))]
