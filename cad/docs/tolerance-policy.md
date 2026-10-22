@@ -681,6 +681,14 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   and default drawn angles over the full height. It is not a separate printed
   envelope inspection or a guarantee for unconstrained as-supplied form.
 
+  The bracket-arm load screen uses the same fitted frame for gravity:
+  $a_{\max}=L_{\max}-N_{\min}/2-P_{\min}=161.565$ mm from the neck,
+  rather than the nominal fixed-tip 160 mm. It conservatively applies the
+  whole lever-group weight at that station; the built hook, wire direction,
+  neck and actual mounting row retain their actual machine coordinates.
+  Its material report remains a load-demand estimate with assumed elastic
+  moduli, not a certified strength or safety factor for generic low-carbon steel.
+
   What the pen sees is `error_budget.wire_moment_arm`, resolved from the same
   signed hook offset and wire tangent as the built run, not the clamp radius.
   With $g(R)=\texttt{pen_gain}(R)$ and $F$ the full-scale channel lift, the
