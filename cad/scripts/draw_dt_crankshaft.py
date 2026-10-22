@@ -41,12 +41,14 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import place_callout_clear
+from _drawing_attachment import _assert_attached_to
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -60,6 +62,7 @@ from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _machinist_review_mode import MachinistReviewMode
@@ -835,22 +838,30 @@ def _centres_note_field() -> Box:
         FAR_END_X + NOTE_TEXT_GAP,
         0.068,
         0.4181,
-        ISO_NOTE_XY[1] - NOTE_TEXT_GAP,
+        ISO_NOTE_XY[1] - 2.0 * 0.005 - NOTE_TEXT_GAP,  # both caption rows
     )
 
 
 def _add_centres_note(adapter: Any, drawing_model: Any, side: Any) -> Any:
     """Flag the FRONT plain end where a lathe centre hole may go."""
     label = "lathe centre hole end"
-    note = add_attached_note(
-        adapter,
-        side,
-        text=CENTRES_NOTE,
-        entity_xy=FAR_END_FRONT_RIM_PICK,
-        attached_to=_far_end_rim(adapter, side),
-        note_xy=CENTRES_NOTE_XY,
-        label=label,
-    )
+    # An edge-on rim can miss coordinate hit-testing. Use the same exact-edge
+    # selection + pre-insertion landing pattern as add_toothspace_callout.
+    rim = _far_end_rim(adapter, side)
+    _select_view_entity(adapter, side, "EDGE", None, label=label, entity=rim)
+    selection = _early_bound(drawing_model.SelectionManager, "ISelectionMgr")
+    x, y = FAR_END_FRONT_RIM_PICK
+    if selection.SetSelectionPoint2(1, -1, x, y, 0.0) is not True:
+        raise RuntimeError(f"{label}: failed to set the FRONT plain-end landing")
+    note = drawing_model.InsertNote(CENTRES_NOTE)
+    if note is None:
+        raise RuntimeError(f"{label}: failed to insert the note")
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    if annotation.SetLeader3(1, 0, True, False, False, False) != 0:
+        raise RuntimeError(f"{label}: failed to create the leader")
+    if not annotation.SetPosition2(*CENTRES_NOTE_XY, 0.0):
+        raise RuntimeError(f"{label}: failed to position the note")
+    rebuild_drawing(adapter, label=label)
     _place_note_text_in_field(
         drawing_model,
         note,
@@ -858,6 +869,10 @@ def _add_centres_note(adapter: Any, drawing_model: Any, side: Any) -> Any:
         hole=FAR_END_FRONT_RIM_WINDOW,
         label=label,
     )
+    _assert_attached_to(
+        adapter, annotation, rim, entity_type="EDGE", what="attached note", label=label
+    )
+    drawing_model.ClearSelection2(True)
     return note
 
 

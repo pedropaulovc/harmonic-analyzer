@@ -1173,7 +1173,8 @@ string-replacement script. Run `uv run --frozen ruff check` and never
 
 `draw_dt_crankshaft.py` attaches the unchanged centre-hole permission to
 FRONT's right-hand Ø9.000 plain end. Resolve the actual model circle at
-`SHAFT_LENGTH`, then require the sheet-point pick to attach that same edge;
+`SHAFT_LENGTH`, select that exact edge and set its selection point before
+inserting the note. Require the rebuilt attachment to remain that same edge;
 the isometric's apparent top end is not the identification contract.
 Keep the leader landing in its small FRONT-end window after measured text
 placement. The note's field is below the pictorial caption and above the

@@ -7,6 +7,7 @@ import math
 import re
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -649,7 +650,9 @@ def test_centres_note_field_clears_front_witnesses_title_block_and_caption() -> 
     assert x0 == pytest.approx(drawing.FAR_END_X + drawing.NOTE_TEXT_GAP)
     assert x0 < x1 < 0.4191  # ASME B inner border
     assert 0.065 < y0 < y1  # above the title block, including the field's floor
-    assert y1 == pytest.approx(drawing.ISO_NOTE_XY[1] - drawing.NOTE_TEXT_GAP)
+    assert y1 == pytest.approx(
+        drawing.ISO_NOTE_XY[1] - 2.0 * 0.005 - drawing.NOTE_TEXT_GAP
+    )
     assert drawing.CENTRES_NOTE_XY == (0.372, 0.093)
     assert drawing._inside(drawing.CENTRES_NOTE_XY, field)
     assert len(notes.CENTRES_NOTE.splitlines()) <= TEXT_ROW_LIMIT
@@ -727,40 +730,110 @@ def test_far_end_rim_refuses_a_missing_or_ambiguous_rim(
         drawing._far_end_rim(adapter, view)
 
 
-def test_centres_note_is_attached_to_the_far_end_rim_on_front(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+@pytest.fixture
+def centres_note_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     rim = _far_rim()
     adapter, side = _front_fakes(monkeypatch, [*_rim_distractors(), rim])
-    note, model = object(), object()
-    calls: dict[str, tuple] = {}
+    annotation = SimpleNamespace(
+        SetLeader3=Mock(return_value=0), SetPosition2=Mock(return_value=True)
+    )
+    note = SimpleNamespace(GetAnnotation=Mock(return_value=annotation))
+    prerequisites: list[str] = []
+    select = Mock(side_effect=lambda *args, **kwargs: prerequisites.append("select"))
 
-    def attach(adapter_, view, **kwargs):
-        calls["attach"] = (adapter_, view, kwargs)
+    def set_landing(*args):
+        prerequisites.append("landing")
+        return True
+
+    def insert(text):
+        # The exact rim and its landing must belong to the selection before
+        # insertion; later leader movement cannot establish that ownership.
+        assert prerequisites == ["select", "landing"]
         return note
 
-    def place(drawing_model, placed, field, *, hole, label):
-        calls["place"] = (drawing_model, placed, field, hole, label)
-        return field
-
-    monkeypatch.setattr(drawing, "add_attached_note", attach)
-    monkeypatch.setattr(drawing, "_place_note_text_in_field", place)
-
-    assert drawing._add_centres_note(adapter, model, side) is note
-    adapter_, view, kwargs = calls["attach"]
-    assert adapter_ is adapter and view is side
-    assert kwargs["entity_xy"] == drawing.FAR_END_FRONT_RIM_PICK
-    assert kwargs["attached_to"] is rim
-    assert "entity" not in kwargs
-    assert kwargs["text"] is notes.CENTRES_NOTE
-    assert kwargs["note_xy"] == drawing.CENTRES_NOTE_XY
-    assert calls["place"] == (
-        model,
-        note,
-        drawing._centres_note_field(),
-        drawing.FAR_END_FRONT_RIM_WINDOW,
-        kwargs["label"],
+    model = SimpleNamespace(
+        SelectionManager=SimpleNamespace(SetSelectionPoint2=Mock(side_effect=set_landing)),
+        InsertNote=Mock(side_effect=insert),
+        ClearSelection2=Mock(),
     )
+    rebuild = Mock()
+    place = Mock()
+    attached = Mock()
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(drawing, "_place_note_text_in_field", place)
+    monkeypatch.setattr(drawing, "_assert_attached_to", attached)
+    return SimpleNamespace(
+        adapter=adapter, side=side, rim=rim, model=model, note=note,
+        annotation=annotation, select=select, rebuild=rebuild, place=place,
+        attached=attached,
+    )
+
+
+def test_centres_note_is_attached_to_the_far_end_rim_on_front(
+    centres_note_fakes: SimpleNamespace,
+) -> None:
+    f = centres_note_fakes
+    label = "lathe centre hole end"
+
+    def place(*args, **kwargs):
+        f.rebuild.assert_called_once_with(f.adapter, label=label)
+
+    def attached(*args, **kwargs):
+        f.place.assert_called_once_with(
+            f.model, f.note, drawing._centres_note_field(),
+            hole=drawing.FAR_END_FRONT_RIM_WINDOW, label=label,
+        )
+        f.model.ClearSelection2.assert_not_called()
+
+    f.place.side_effect = place
+    f.attached.side_effect = attached
+    assert drawing._add_centres_note(f.adapter, f.model, f.side) is f.note
+    f.select.assert_called_once_with(
+        f.adapter, f.side, "EDGE", None, label=label, entity=f.rim
+    )
+    f.model.SelectionManager.SetSelectionPoint2.assert_called_once_with(
+        1, -1, *drawing.FAR_END_FRONT_RIM_PICK, 0.0
+    )
+    f.model.InsertNote.assert_called_once_with(notes.CENTRES_NOTE)
+    f.note.GetAnnotation.assert_called_once_with()
+    f.annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
+    f.annotation.SetPosition2.assert_called_once_with(*drawing.CENTRES_NOTE_XY, 0.0)
+    f.attached.assert_called_once_with(
+        f.adapter, f.annotation, f.rim, entity_type="EDGE",
+        what="attached note", label=label,
+    )
+    f.model.ClearSelection2.assert_called_once_with(True)
+
+
+@pytest.mark.parametrize("result", [False, None, 1])
+def test_centres_note_refuses_failed_selection_point_before_insertion(
+    centres_note_fakes: SimpleNamespace, result: object,
+) -> None:
+    f = centres_note_fakes
+    f.model.SelectionManager.SetSelectionPoint2.side_effect = None
+    f.model.SelectionManager.SetSelectionPoint2.return_value = result
+    with pytest.raises(RuntimeError, match="failed to set the FRONT plain-end landing"):
+        drawing._add_centres_note(f.adapter, f.model, f.side)
+    f.model.InsertNote.assert_not_called()
+    f.rebuild.assert_not_called()
+    f.place.assert_not_called()
+    f.attached.assert_not_called()
+
+
+def test_centres_note_refuses_missing_inserted_note(
+    centres_note_fakes: SimpleNamespace,
+) -> None:
+    f = centres_note_fakes
+    f.model.InsertNote.side_effect = None
+    f.model.InsertNote.return_value = None
+    with pytest.raises(RuntimeError, match="failed to insert the note"):
+        drawing._add_centres_note(f.adapter, f.model, f.side)
+    f.model.InsertNote.assert_called_once_with(notes.CENTRES_NOTE)
+    f.note.GetAnnotation.assert_not_called()
+    f.rebuild.assert_not_called()
+    f.place.assert_not_called()
+    f.attached.assert_not_called()
 
 
 def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
@@ -776,7 +849,7 @@ def test_centres_note_is_only_the_attached_note_and_build_places_it() -> None:
             for arg in (*node.args, *(kw.value for kw in node.keywords))
         )
     ]
-    assert [ast.unparse(node.func) for node in users] == ["add_attached_note"]
+    assert [ast.unparse(node.func) for node in users] == ["drawing_model.InsertNote"]
     (build,) = [
         node
         for node in tree.body
