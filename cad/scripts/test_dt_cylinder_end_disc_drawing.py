@@ -81,39 +81,68 @@ def test_axial_section_rejects_a_nonhorizontal_or_degenerate_axis(
         drawing._require_horizontal_axis(object(), object())
 
 
-@pytest.mark.parametrize("target", ["BoreDia", "DiscThick"])
-@pytest.mark.parametrize("failure", ["write", "ineffective", "partial", "read"])
-def test_required_callout_failure_prevents_export(
-    monkeypatch, tmp_path, target, failure
-) -> None:
+@pytest.fixture
+def disc_sheet(monkeypatch, tmp_path):
+    """Native text compartments and values survive the real callout boundary."""
     source = tmp_path / "disc.SLDPRT"
     source.touch()
     monkeypatch.setattr(drawing, "SOURCE", source)
-    exported = False
+    state = SimpleNamespace(exported=False)
+    native_sizes = {
+        "DiscDia": spec.WASHER_OD / 1000.0,
+        "BoreDia": spec.WASHER_BORE / 1000.0,
+        "DiscThick": spec.WASHER_THICK / 1000.0,
+    }
 
     class Display:
         def __init__(self, name):
-            self.name = name
-            self.text = ""
+            self.dimension = SimpleNamespace(Name=name, SystemValue=native_sizes[name])
+            self.precision = spec.DRAWING_PRECISION_BY_NAME[name]
+            self.ShowDimensionValue = True
+            # The part builder authors no callouts; the fresh drawing starts
+            # with empty above/below compartments.
+            self.text = {
+                1: "" if name == "DiscThick" else "<MOD-DIAM>",
+                2: "",
+                3: "",
+                4: "",
+            }
+            self.fault = None
 
         def GetDimension(self):
-            return SimpleNamespace(Name=self.name)
+            return self.dimension
 
-        def SetText(self, _part, text):
-            if self.name == target:
-                if failure == "write":
+        def GetPrimaryPrecision2(self):
+            return self.precision
+
+        def SetText(self, part, text):
+            if self.fault and self.fault.part == part and self.fault.kind != "read":
+                self.fault.triggered = True
+                if self.fault.kind == "write":
                     raise RuntimeError("native callout write failed")
-                if failure == "ineffective":
+                if self.fault.kind == "ineffective":
                     return
-                if failure == "partial":
-                    self.text = text.splitlines()[0]
+                if self.fault.kind == "partial":
+                    self.text[part] = text[:-1]
                     return
-            self.text = text
+                if self.fault.kind == "wrong_compartment":
+                    self.text[7 - part] = text
+                    return
+            if part == 0:
+                # Documented native whole-text replacement is NOT a callout:
+                # it hides the associative value and replaces its prefix.
+                self.text = {1: text, 2: "", 3: "", 4: ""}
+                self.ShowDimensionValue = False
+            else:
+                if part not in self.text:
+                    raise ValueError("unsupported native text compartment")
+                self.text[part] = text
 
-        def GetText(self, _part):
-            if self.name == target and failure == "read":
+        def GetText(self, part):
+            if self.fault and self.fault.part == part and self.fault.kind == "read":
+                self.fault.triggered = True
                 raise RuntimeError("native callout read failed")
-            return self.text
+            return self.text[part]
 
     class Annotation:
         def __init__(self, name):
@@ -134,8 +163,7 @@ def test_required_callout_failure_prevents_export(
         return None
 
     async def finalize(*_args, **_kwargs):
-        nonlocal exported
-        exported = True
+        state.exported = True
         return {}
 
     adapter = SimpleNamespace(
@@ -163,25 +191,89 @@ def test_required_callout_failure_prevents_export(
         lambda *_args, **_kwargs: ((0.0, 0.0), (0.01, 0.0)),
     )
     monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    state.annotations = [
+        Annotation("DiscDia"),
+        Annotation("BoreDia"),
+        Annotation("DiscThick"),
+    ]
+    state.displays = {
+        annotation.display.GetDimension().Name: annotation.display
+        for annotation in state.annotations
+    }
+    state.original = {
+        name: (
+            display.GetDimension(),
+            display.GetDimension().SystemValue,
+            display.GetPrimaryPrecision2(),
+            display.GetText(1),
+            display.GetText(2),
+        )
+        for name, display in state.displays.items()
+    }
     monkeypatch.setattr(
         drawing,
         "curate_view_dimensions",
-        lambda *_args, **_kwargs: [
-            Annotation("DiscDia"),
-            Annotation("BoreDia"),
-            Annotation("DiscThick"),
-        ],
+        lambda *_args, **_kwargs: state.annotations,
     )
-    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *_args: None)
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
 
-    expected = {
-        "write": "native callout write failed",
-        "ineffective": "below callout did not persist",
-        "partial": "below callout did not persist",
-        "read": "native callout read failed",
-    }[failure]
-    with pytest.raises(RuntimeError, match=expected):
-        asyncio.run(drawing.build(adapter))
-    assert not exported
+    state.adapter = adapter
+    return state
+
+
+def test_callout_layout_preserves_native_sizes_and_precision(disc_sheet) -> None:
+    # Exercise _set_required_callouts through build, including the real
+    # read-only imported-precision check and the export boundary.
+    asyncio.run(drawing.build(disc_sheet.adapter))
+
+    assert disc_sheet.exported
+    thickness = disc_sheet.displays["DiscThick"]
+    bore = disc_sheet.displays["BoreDia"]
+    assert thickness.GetText(3) == spec.THICKNESS_CALLOUT.replace("\n", " ")
+    assert thickness.GetText(4) == ""
+    assert bore.GetText(3) == ""
+    assert bore.GetText(4) == spec.BORE_CALLOUT
+    for name, display in disc_sheet.displays.items():
+        dimension, size, precision, prefix, suffix = disc_sheet.original[name]
+        assert display.GetDimension() is dimension
+        assert display.GetDimension().SystemValue == size
+        assert display.GetPrimaryPrecision2() == precision
+        assert display.ShowDimensionValue
+        assert display.GetText(1) == prefix
+        assert display.GetText(2) == suffix
+
+
+@pytest.mark.parametrize("target,part", [("BoreDia", 4), ("DiscThick", 3)])
+@pytest.mark.parametrize(
+    "failure", ["write", "ineffective", "partial", "read", "wrong_compartment"]
+)
+def test_required_callout_failure_prevents_export(
+    disc_sheet, target, part, failure
+) -> None:
+    fault = SimpleNamespace(part=part, kind=failure, triggered=False)
+    disc_sheet.displays[target].fault = fault
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(disc_sheet.adapter))
+    assert fault.triggered
+    assert not disc_sheet.exported
+
+
+@pytest.mark.parametrize("target", ["BoreDia", "DiscThick"])
+def test_missing_required_callout_prevents_export(disc_sheet, target) -> None:
+    disc_sheet.annotations[:] = [
+        annotation
+        for annotation in disc_sheet.annotations
+        if annotation.display.GetDimension().Name != target
+    ]
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(disc_sheet.adapter))
+    assert not disc_sheet.exported
+
+
+@pytest.mark.parametrize("target", ["DiscDia", "BoreDia", "DiscThick"])
+def test_lost_source_precision_prevents_export(disc_sheet, target) -> None:
+    disc_sheet.displays[target].precision += 1
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(disc_sheet.adapter))
+    assert not disc_sheet.exported

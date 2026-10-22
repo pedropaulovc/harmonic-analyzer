@@ -11,7 +11,5 @@ ch-rocker-arm-tl-vn-oblique-cl-dowel:
   quantity: 1
   tolerance_class: machined_block
   process: purchased
-  installation_notes: |-
-    PRESS CHAMFERED END FIRST. SET HEIGHT AT JIG ASSEMBLY.
-    STRAP MUST SEAT FLAT, LOCATE AND SLIP ON/OFF.
-    PIN MUST NOT STAND ABOVE STRAP.
+  # Installation direction, actual-riser set height and the named strap's
+  # seat/slip/top-clearance acceptance belong to MHA-CH-06-TL-00 step 11.

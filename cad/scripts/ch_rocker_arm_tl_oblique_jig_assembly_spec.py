@@ -1545,6 +1545,9 @@ ASSEMBLY_STEPS = (
     "CARRIER TOP: "
     f"{_HUB_HOLE}; {_CL_HOLE}; BREAK THE HUB HOLE BELOW "
     f"{hub_pin.HUB_HOLE_UNDERSIDE_BREAK_MIN:.1f} MIN X 45°.",
+    # The bought dowel's sheet carries supplier facts only. Its installation
+    # direction and strap acceptance stay here, at the existing owner-approved
+    # TIP_SET_MIN/MAX above the actual riser top, not a new pin-length band.
     "11. CLAMP THE RISER ON THE CARRIER TOP AND SPOT ITS "
     f"{len(riser.SCREW_HOLES) + 3} HOLES ({len(riser.SCREW_HOLES)} "
     f"{riser.SCREW_SIZE} COUNTERSUNK, HUB Ø{riser.HUB_DIA:.0f}, CL DOWEL, CR SCREW "
@@ -1552,11 +1555,12 @@ ASSEMBLY_STEPS = (
     "TAPPED HOLES; DRILL AND COUNTERSINK THEM TO "
     "MHA-CH-06-TL-24, THEN SCREW IT DOWN WITH "
     f"{len(riser.SCREW_HOLES)} {_RISER_SCREW}S {_item(RISER_SCREW)}. "
-    "ONLY NOW PRESS THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL "
-    f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN THROUGH THE RISER UNTIL ITS "
-    f"ROUND TIP IS {cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE "
-    "THE RISER; CHECK THE STRAP SEATS FLAT, LOCATES AND SLIDES ON AND OFF, AND "
-    "THE TIP IS NOT ABOVE IT. "
+    "ONLY NOW PRESS HUB PIN UP TO ITS HEAD AND CL DOWEL "
+    f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN THROUGH RISER; SET "
+    f"ROUND TIP {cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE "
+    "ACTUAL RISER TOP. ROCKER STRAP "
+    f"{carrier.STRAP_NUMBER} MUST SEAT FLAT, LOCATE AND SLIP ON/OFF; "
+    "TIP FLUSH OR BELOW STRAP TOP. "
     f"FACE THE HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-"
     f"{hub_pin.LOCATOR_SET_MAX:.2f} ABOVE THE RISER AND RECHAMFER IT "
     f"{hub_pin.LEAD_CHAMFER:.1f} X 45° MAX.",

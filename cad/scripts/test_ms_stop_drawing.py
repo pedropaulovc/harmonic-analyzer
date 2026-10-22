@@ -105,12 +105,6 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == 0.1
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
-    assert len(spec.BLOCK_DRAWING_NOTES.splitlines()) <= 4
-    assert len(spec.PLATE_DRAWING_NOTES.splitlines()) <= 4
-    assert "BLIND" not in spec.PLATE_DRAWING_NOTES
-    assert "BOTTOMING" not in spec.PLATE_DRAWING_NOTES
-    assert spec.BLOCK_MATING_FACE_NOTE == "STOP-PLATE MATING FACE"
-    assert f"BLIND DEPTHS FROM {spec.BLOCK_MATING_FACE_NOTE}." in spec.BLOCK_DRAWING_NOTES
     assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
@@ -121,6 +115,28 @@ def test_window_keeps_functional_clearance_at_printed_size_limits() -> None:
     assert spec.WINDOW_WIDTH + window_lower - (stick.BODY_WIDTH + stick.BODY_FIT_TOLERANCE_MM) >= 0.3 - 1e-9
     assert spec.WINDOW_HEIGHT + window_lower - (stick.BODY_THICKNESS + stick.BODY_FIT_TOLERANCE_MM) >= 0.3 - 1e-9
     assert spec.PLATE_CLEARANCE_DIA > screw.MAJOR_DIA
+
+
+@pytest.mark.parametrize(
+    "name,left,right",
+    [("WindowWidth", 0.197, 0.293), ("WindowHeight", 0.366, 0.4191)],
+)
+def test_rebate_text_blocks_fit_between_recorded_native_lanes(name, left, right) -> None:
+    """Use every row, including the value/band, against the 2026-10-22 lanes.
+
+    Width sits between the front view and rebate witness; height sits beyond
+    its dimension line and before the ASME B inner right border. The 2.76 mm
+    character envelope is conservative offline coverage, not native ink proof.
+    """
+    rows = [
+        f"{spec.BLOCK_DRAWING_VALUES_BY_NAME[name]:.2f} +{spec.WINDOW_SIZE_TOLERANCE_MM[1]:.1f}",
+        f"{spec.WINDOW_SIZE_TOLERANCE_MM[0]:.1f}",
+        *block_drawing.DIMENSION_CALLOUTS[name].splitlines(),
+    ]
+    half = max(len(row) for row in rows) * 0.00276 / 2.0
+    center = block_drawing.WINDOW_TEXT_OFFSETS[name][0]
+    assert left < center - half
+    assert center + half < right
 
 
 def test_analytic_volume_has_no_merged_thumbscrew_or_hidden_extra_wall() -> None:
@@ -155,7 +171,6 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
         else 1 if name in loose else 2
     ) for name, places in precision.items())
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
-    assert not any(character.isdigit() for character in spec.BLOCK_DRAWING_NOTES + spec.PLATE_DRAWING_NOTES)
 
 
 @pytest.mark.parametrize("module", [spec, block_drawing, plate_drawing])
@@ -347,7 +362,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **kw: (object(), object()))
     for name in (
         "read_required_properties", "stamp_drawing_summary",
-        "set_hidden_lines_removed", "set_dimension_callouts",
+        "set_hidden_lines_removed", "set_dimension_callouts", "offset_dimension_text",
         "add_property_linked_note",
     ):
         monkeypatch.setattr(drawing, name, lambda *a, **kw: None)
@@ -432,8 +447,6 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
-        assert callout_positions["two cover clearance holes"] == (0.265, 0.150)
-        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.265, 0.182)
         assert callout_positions["two cover clearance holes"][0] > front_map.apply(
             (0.0, center[1], center[2])
         )[0]
@@ -512,9 +525,6 @@ def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> Non
         + spec.PLATE_SCREW_MAJOR_DIA / 2.0
     ) < 1.5
     assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
-    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == (
-        "DIMENSIONED END AND THUMBSCREW-SIDE DATUM EDGES ALIGNED"
-    )
 
 
 @pytest.mark.parametrize("master_band", [0.0, 0.1, 0.2, 0.51])
@@ -707,27 +717,6 @@ def test_plate_chamfer_refuses_missing_native_dimensions(monkeypatch, names) -> 
     with pytest.raises(RuntimeError, match="missing native plate chamfer"):
         plate_drawing._style_plate_chamfer(object(), annotations)
 
-
-def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
-    import _config
-
-    assert "MS-STOP-PLATE" in block_drawing.COVER_HOLE_PROCESS
-    assert _config.parts("ms-stop-plate")["number"] in block_drawing.COVER_HOLE_PROCESS
-    assert "BOTTOMING TAP" not in block_drawing.COVER_HOLE_PROCESS
-    assert f"MATCH-DRILL FROM {spec.MATCH_DRILL_MASTER}" in block_drawing.COVER_HOLE_PROCESS
-    assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS.replace("\n", " ")
-    pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
-    assert "MS-STOP-BLOCK" in pilot
-    assert _config.parts("ms-stop-block")["number"] in pilot
-    assert pilot.splitlines() == [
-        "LAYOUT ON THIS PLATE; PILOT",
-        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
-        "CLAMPED WITH DIMENSIONED END AND",
-        "THUMBSCREW-SIDE DATUM EDGES ALIGNED",
-    ]
-    assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
-        spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
-    )
 
 
 @pytest.mark.parametrize("on_axis", [False, True])

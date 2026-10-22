@@ -29,6 +29,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -39,7 +40,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -81,7 +86,7 @@ SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.150, 0.175)
 RIGHT_CENTER = (0.280, 0.175)
 ISO_CENTER = (0.355, 0.225)
-ISO_NOTE_XY = (0.330, 0.185)
+ISO_NOTE_XY = (0.330, 0.195)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -124,6 +129,9 @@ FRONT_KEEP = {
     "CornerR": (0.215, 0.211),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.209)}
+# Native witnesses at X276.825/283.175 ended at Y204.444 through the value.
+# Offset the whole stock/value block left and above, without moving the span.
+THICKNESS_TEXT_OFFSET = {"Depth": (0.245, 0.226)}
 # Both holes stand on the one Y coordinate the part prints (Hole1Y); the one
 # printed fillet stands for all four equal corners (CornerR). A custom prefix
 # replaces SolidWorks' own radius "R", so it carries it ("4X 1.8" printed
@@ -133,8 +141,36 @@ DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # The bent leader elbows at the text's LEFT end and enters hole 2 from its
 # upper-right quadrant, crossing only the plate's right edge; the text stands
 # between that edge and the right view.
-HOLE_CALLOUT_XY = (0.230, 0.185)
+HOLE_CALLOUT_XY = (0.233, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
+# pd_vn_guide_lock_screw_spec spends these coordinate bands against the
+# rail's tap position in LOCK_SET_OFFSET; this is a screw-clearance set window,
+# not a locating/reamed fit and not a support-bar hole pattern.
+HOLE_MATE_CALLOUT = (
+    f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS\n"
+    f"{_config.parts('pd-platen-guide')['number']} PLATEN GUIDE\n"
+    "CLEARANCE FOR BIAS SETTING"
+)
+
+
+def _name_hole_mate(display: Any) -> None:
+    """Append the mate while preserving the Hole Wizard's live definitions.
+
+    As on draw_ch_channel_lever, writable below-text slot 4 corresponds to
+    definition slot 8; prefix, suffix and above definitions 5–7 stay native.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{HOLE_MATE_CALLOUT}" if below else HOLE_MATE_CALLOUT
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "guide-lock hole mate or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
 
 
 def _set_dimension_prefixes(
@@ -215,11 +251,12 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
+    offset_dimension_text(adapter, annotations, THICKNESS_TEXT_OFFSET)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    add_native_hole_callout(
+    hole_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -230,6 +267,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide-lock screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
+    _name_hole_mate(hole_callout)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

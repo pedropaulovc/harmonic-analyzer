@@ -136,12 +136,6 @@ def test_press_contract() -> None:
     )
 
 
-def test_the_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-
-
 def test_purchased_sheet_documents_the_built_part() -> None:
     import draw_ch_rocker_arm_tl_vn_oblique_cl_dowel as drawing
 

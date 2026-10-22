@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import math
 import re
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -12,6 +14,7 @@ from typing import Any
 import pytest
 
 import _drawing_edge_dimensions
+import _drawing_view_display
 import _dxf_text as dxf
 import build_fr_nameplate as part
 import draw_fr_nameplate as drawing
@@ -328,6 +331,194 @@ def test_section_a_crosses_the_plate_between_the_lettering_rows() -> None:
             assert max(xs) > spec.PLATE_WIDTH - drawing.SECTION_FIELD_X, ring[0]
         else:
             assert min(abs(min(ys) - y), abs(max(ys) - y)) >= 1.0, ring[0]
+
+
+class _NativeDisplayView:
+    """Native display state, including a refused or silently ignored change."""
+
+    def __init__(self) -> None:
+        self.mode = 1  # swHIDDEN_GREYED: hidden lines visible
+        self.blocked_mode: int | None = None
+        self.blocked_result = False
+
+    def SetDisplayMode4(  # noqa: N802 -- COM name
+        self,
+        _parent: bool,
+        mode: int,
+        _faceted: bool,
+        _edges: bool,
+        _threads: bool,
+    ) -> bool:
+        if mode == self.blocked_mode:
+            return self.blocked_result
+        changed = self.mode != mode
+        self.mode = mode
+        return changed
+
+    def GetDisplayMode2(self) -> int:  # noqa: N802 -- COM name
+        return self.mode
+
+
+@pytest.fixture
+def nameplate_display_build(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> SimpleNamespace:
+    """Exercise package display callbacks with simulated native collaborators."""
+    source = tmp_path / "fr-nameplate.SLDPRT"
+    source.touch()
+    source_model = object()
+    section = _NativeDisplayView()
+    state = SimpleNamespace(
+        section=section,
+        callback_modes=[],
+        settling_mode=1,
+        blocked_mode=None,
+        blocked_result=False,
+        mode_at_crop=None,
+        mode_after_sketch_restoration=None,
+        mode_after_annotations=None,
+        mode_after_settling=None,
+    )
+
+    def settle() -> bool:
+        section.mode = state.settling_mode
+        state.mode_after_settling = section.GetDisplayMode2()
+        section.blocked_mode = state.blocked_mode
+        section.blocked_result = state.blocked_result
+        return True
+
+    drawing_model = SimpleNamespace(EditRebuild3=settle)
+    adapter = SimpleNamespace(currentModel=None)
+    state.adapter = adapter
+
+    async def open_model(_path: str) -> SimpleNamespace:
+        adapter.currentModel = source_model
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    def new_drawing(*_args: Any, **_kwargs: Any) -> tuple[Any, None]:
+        adapter.currentModel = drawing_model
+        return drawing_model, None
+
+    @contextmanager
+    def sketches_shown(*_args: Any, **_kwargs: Any) -> Iterator[None]:
+        try:
+            yield
+        finally:
+            section.mode = 1
+            state.mode_after_sketch_restoration = section.GetDisplayMode2()
+
+    def crop(_adapter: Any, view: _NativeDisplayView) -> None:
+        state.mode_at_crop = view.GetDisplayMode2()
+        # The early HLR must remain: later cut-face picks depend on it.
+        assert state.mode_at_crop == 2
+
+    def floor_reference(*_args: Any) -> None:
+        section.mode = 1
+        state.mode_after_annotations = section.GetDisplayMode2()
+
+    async def finalize(
+        actual_adapter: Any,
+        _outputs: Any,
+        *,
+        settled_checks: Sequence[Callable[[], None]] = (),
+        **_kwargs: Any,
+    ) -> dict[str, str]:
+        # Simulate the documented settled-callback boundary. This fixture does
+        # not exercise the real finalizer or prove its rebuild/save ordering.
+        actual_adapter.currentModel.EditRebuild3()
+        for settled in settled_checks:
+            settled()
+        state.callback_modes.append(section.GetDisplayMode2())
+        return {}
+
+    def unrelated(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_drawing_view_display, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(
+        drawing, "place_view", lambda *_args, **_kwargs: _NativeDisplayView()
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda _a, _v, points, **_kwargs: points
+    )
+    monkeypatch.setattr(
+        drawing, "create_section_view", lambda *_args, **_kwargs: section
+    )
+    monkeypatch.setattr(drawing, "part_sketches_shown", sketches_shown)
+    monkeypatch.setattr(
+        drawing, "curate_view_dimensions", lambda *_args, **_kwargs: []
+    )
+    monkeypatch.setattr(drawing, "auto_center_marks", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(drawing, "scan_view_edges", unrelated)
+    monkeypatch.setattr(drawing, "_hole_rim_edge", lambda *_args: object())
+    monkeypatch.setattr(drawing, "_crop_section", crop)
+    monkeypatch.setattr(drawing, "_floor_reference", floor_reference)
+    monkeypatch.setattr(drawing, "add_note", lambda *_args: object())
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    for name in (
+        "read_required_properties",
+        "stamp_drawing_summary",
+        "_set_dimension_prefixes",
+        "set_dimension_callouts",
+        "assert_imported_precision",
+        "add_native_hole_callout",
+        "add_property_linked_note",
+        "_orient_section",
+        "_place_crop_on_center",
+        "_sketch_section_break",
+        "position_section_caption",
+    ):
+        monkeypatch.setattr(drawing, name, unrelated)
+    return state
+
+
+def test_section_settled_callback_restores_hlr_after_regeneration(
+    nameplate_display_build: SimpleNamespace,
+) -> None:
+    state = nameplate_display_build
+    asyncio.run(drawing.build(state.adapter))
+
+    assert state.mode_at_crop == 2
+    assert state.mode_after_sketch_restoration == 1
+    assert state.mode_after_annotations == 1
+    assert state.mode_after_settling == 1
+    assert state.section.GetDisplayMode2() == 2  # swHIDDEN: hidden lines removed
+    assert state.callback_modes == [2]
+
+
+@pytest.mark.parametrize("reported_success", (False, True), ids=("refused", "ignored"))
+@pytest.mark.parametrize(
+    ("settling_mode", "blocked_mode"),
+    ((0, 1), (1, 2)),
+    ids=("cannot-enter-hlv", "cannot-enter-hlr"),
+)
+def test_section_display_transition_failure_aborts_settled_callback(
+    nameplate_display_build: SimpleNamespace,
+    settling_mode: int,
+    blocked_mode: int,
+    reported_success: bool,
+) -> None:
+    state = nameplate_display_build
+    # Wireframe (0) exposes failure to enter the intermediate HLV state;
+    # HLV (1) is the late-regeneration defect whose HLR recovery must succeed.
+    state.settling_mode = settling_mode
+    state.blocked_mode = blocked_mode
+    state.blocked_result = reported_success
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(state.adapter))
+
+    assert state.mode_at_crop == 2
+    assert state.mode_after_sketch_restoration == 1
+    assert state.mode_after_annotations == 1
+    assert state.mode_after_settling == settling_mode
+    assert state.section.GetDisplayMode2() == settling_mode
+    assert state.callback_modes == []
 
 
 def test_section_a_crop_holds_the_border_the_groove_and_the_field() -> None:

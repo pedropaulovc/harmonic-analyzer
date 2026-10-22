@@ -36,7 +36,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import add_property_linked_note
@@ -75,16 +75,26 @@ BOTTOM_KEEP = {
 }
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS", "WindowWidth": "OPEN REBATE"}
+# The assembly's actual mate is the graduated stick, not the cover. Both
+# controlled rebate sizes retain free sliding clearance with the screw backed off.
+DIMENSION_CALLOUTS = {
+    "RoofChamferSize": "2 CORNERS",
+    "WindowWidth": f"SLIDES ON\nMS-STICK {_config.parts('ms-stick')['number']}",
+    "WindowHeight": f"SLIDES ON\nMS-STICK\n{_config.parts('ms-stick')['number']}",
+}
+# Keep the complete value/band/mate blocks outside the measured witnesses:
+# width witnesses X293/326.6, height dimension line X365 (2026-10-22 sheet).
+# The height's shorter mate rows leave room on both sides of its text lane,
+# instead of parking a full identity row within 1.3 mm of the right border.
+WINDOW_TEXT_OFFSETS = {"WindowWidth": (0.250, 0.143), "WindowHeight": (0.386, 0.192)}
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
-    f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
-    # Two short lines: one 55-character line ran through the left border.
-    + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
-    + "\n"
+    f"{_config.parts('ms-stop-plate')['number']}; KEEP AS MATCHED PAIR\n"
+    + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" FLUSH IN ", " FLUSH\nIN ")
+    + "\nNOT INTERCHANGEABLE\n"
 )
 
 
@@ -172,6 +182,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                                dimensions_by_feature=part.BLOCK_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, annotations, WINDOW_TEXT_OFFSETS)
     plate_edge = model_point_in_view(
         adapter, front, (
             (part.PLATE_HOLE_XS[1] + part.PLATE_TAP_DRILL_DIA / 2.0) / 1000.0,

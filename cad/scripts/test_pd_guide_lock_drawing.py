@@ -97,9 +97,13 @@ def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
 
 
 def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
-    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø3.18 THRU ALL"
-    assert text.split()[1] == "DRILL"
-    half = len(text) * _CHAR_WIDTH / 2.0
+    # Include every mate/reason row: the native drill row is no longer the
+    # widest. This is a conservative offline envelope, not native ink proof.
+    rows = [
+        f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø3.18 THRU ALL",
+        *drawing.HOLE_MATE_CALLOUT.splitlines(),
+    ]
+    half = max(len(row) for row in rows) * _CHAR_WIDTH / 2.0
     left, right = (
         drawing.HOLE_CALLOUT_XY[0] - half,
         drawing.HOLE_CALLOUT_XY[0] + half,
@@ -252,3 +256,59 @@ def test_part_registry_row_carries_the_title_block_facts() -> None:
     assert spec["material_specification"]
     assert "black oxide" in str(spec["finish"]).lower()
     assert int(spec["quantity"]) == 4
+
+
+class _NativeHoleCallout:
+    def __init__(self, below, *, ignore_write=False, corrupt_part=None):
+        self.definitions = {
+            5: "DRILL <hw-thruholedia>",
+            6: "<hw-thru>",
+            7: None,
+            8: below,
+        }
+        self.ignore_write = ignore_write
+        self.corrupt_part = corrupt_part
+        self.writes = []
+
+    def GetText(self, part):
+        return self.definitions[part]
+
+    def SetText(self, part, text):
+        self.writes.append((part, text))
+        if self.ignore_write:
+            return
+        assert part == 4
+        self.definitions[8] = text.replace("\n", "\r\n")
+        if self.corrupt_part is not None:
+            self.definitions[self.corrupt_part] = "lost native variable"
+
+
+@pytest.mark.parametrize("below", [None, "", "<hw-depth>\r\nEXISTING NOTE"])
+def test_hole_mate_appends_to_definition_and_preserves_native_variables(monkeypatch, below) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    native = _NativeHoleCallout(below)
+    before = {part: native.definitions[part] for part in (5, 6, 7)}
+    existing = str(below or "").replace("\r", "").rstrip()
+    expected = (
+        f"{existing}\n{drawing.HOLE_MATE_CALLOUT}"
+        if existing else drawing.HOLE_MATE_CALLOUT
+    )
+    drawing._name_hole_mate(native)
+    assert native.writes == [(4, expected)]
+    assert native.GetText(8).replace("\r", "") == expected
+    assert {part: native.definitions[part] for part in (5, 6, 7)} == before
+
+
+@pytest.mark.parametrize(
+    "ignore_write,corrupt_part",
+    [(True, None), (False, 5), (False, 6), (False, 7)],
+)
+def test_hole_mate_refuses_ignored_write_or_changed_native_definition(
+    monkeypatch, ignore_write, corrupt_part
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    native = _NativeHoleCallout(
+        "<hw-depth>", ignore_write=ignore_write, corrupt_part=corrupt_part
+    )
+    with pytest.raises(RuntimeError, match="mate or native definitions did not persist"):
+        drawing._name_hole_mate(native)

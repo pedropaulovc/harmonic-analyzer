@@ -65,19 +65,42 @@ SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
     (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
 )
+# Retained native audit/PDF ink from farm run 20261022T062316620Z:
+# DiscThick's origin is (225, 255) mm; its three below-layout baselines are
+# 257.7781, 252.2219 and 246.6656 mm (5.55625 mm pitch). The extension ends
+# at 247.6656 mm strike the last datum row's ink, 247.5996..251.1649 mm.
+# Translating that whole block also translates the extension ends; it cannot
+# remove the 0.066 mm strike, and the old top ink, 262.2774 mm, has only
+# 4.4226 mm to the 266.7 mm border.
+# Put the datum ABOVE the native size, not below the extension ends. Only its
+# line break becomes a space: every source word, mate identity and control is
+# retained. mg_magnifier_assembly_spec documents native run 20261012T185729782Z:
+# multiline slot 3 can read back yet print nothing, so use its single-line
+# above-callout pattern, not a known-nonprinting two-line block.
+# The retained datum-row widths total 129.476 mm, plus a 1.293 mm space;
+# reserve a conservative 140 mm lane, x155..295, centred at x225. It lies
+# inside x12.7..419.1 and left of the isometric's x303.541 outline.
+# Two rows (datum, native size) instead of three retain the y255 origin:
+# existing native above-callouts put the first baseline at the origin, then
+# the size one 5.55625 mm pitch below it. With the retained ink offsets this
+# projects top ink near y259.50, below the old y262.2774 envelope; lowering
+# the station is unnecessary. This is a layout estimate, NOT native clearance
+# proof: the next farm drawing and machinist review must prove the complete
+# visible datum, size, extension-line separation and border containment.
 SECTION_KEEP = {
     "DiscDia": (0.195, 0.175),
     "BoreDia": (0.270, 0.175),
     "DiscThick": (0.225, 0.255),
 }
-DIMENSION_CALLOUTS = {
-    "BoreDia": BORE_CALLOUT,
-    "DiscThick": THICKNESS_CALLOUT,
-}
-
-# swDimensionTextParts_e.swDimensionTextCalloutBelow. These are ordinary
-# model display dimensions, not Hole Wizard callouts (GetText excludes those).
+# swDimensionTextParts_e compartments for ordinary model display dimensions,
+# not Hole Wizard callouts (GetText excludes those). Never replace the native
+# value/prefix/suffix or rewrite model-owned precision to rearrange the text.
+_CALLOUT_ABOVE = 3
 _CALLOUT_BELOW = 4
+DIMENSION_CALLOUTS = {
+    "BoreDia": (_CALLOUT_BELOW, BORE_CALLOUT),
+    "DiscThick": (_CALLOUT_ABOVE, THICKNESS_CALLOUT.replace("\n", " ")),
+}
 
 
 def _set_required_callouts(adapter: Any, annotations: list[Any]) -> None:
@@ -90,7 +113,7 @@ def _set_required_callouts(adapter: Any, annotations: list[Any]) -> None:
         name = dimension_name(adapter, annotation)
         if name not in remaining:
             continue
-        text = remaining[name]
+        part, text = remaining[name]
         display = annotation.GetSpecificAnnotation()
         if display is None:
             raise RuntimeError(f"disc dimension {name!r} has no display annotation")
@@ -100,11 +123,12 @@ def _set_required_callouts(adapter: Any, annotations: list[Any]) -> None:
         # SetText returns void: do not route either call through _attempt,
         # which swallows COM exceptions. DRILL THRU selects the bore limits
         # used by the clearance proof, so an ineffective write must fail too.
-        display.SetText(_CALLOUT_BELOW, text)
-        actual = display.GetText(_CALLOUT_BELOW)
+        display.SetText(part, text)
+        actual = display.GetText(part)
+        location = "above" if part == _CALLOUT_ABOVE else "below"
         if actual != text:
             raise RuntimeError(
-                f"disc dimension {name!r} below callout did not persist: "
+                f"disc dimension {name!r} {location} callout did not persist: "
                 f"{actual!r} != {text!r}"
             )
         del remaining[name]

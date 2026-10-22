@@ -117,10 +117,12 @@ PLATE_DRAWING_DIMENSIONS = {
     "PilotDrillReference": {"PilotDrillDiameter"},
 }
 # The PLATE is the match-drill master. Its three absolute location bands
-# transfer to the block only when X=0/Y=0 datum edges are aligned; the block's
-# nominal locations are reference-only, never an independent pattern.
+# transfer only with the shared X=0 end and Y=0 edge flush. Both part sheets
+# show those as the right end and bottom edge in their cover-side front view;
+# the assembly instruction names those same part views, not its own orientation.
+# The block's nominal locations remain reference-only.
 MATCH_DRILL_MASTER = "MS-STOP-PLATE"
-MATCH_DRILL_DATUM_ALIGNMENT = "DIMENSIONED END AND THUMBSCREW-SIDE DATUM EDGES ALIGNED"
+MATCH_DRILL_DATUM_ALIGNMENT = "RIGHT ENDS AND BOTTOM EDGES FLUSH IN PART FRONT VIEWS"
 PLATE_THICKNESS_TOLERANCE_MM = 0.1
 PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1
 PLATE_LOCATION_DIMENSIONS = frozenset({
@@ -138,17 +140,16 @@ PLATE_DRAWING_PRECISION = {
 # Depth and cover length still need .XX; their .X bands would breach 1.5 mm.
 BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
-# Only the cover's cosmetic corners use .X; the block chamfer retains .XX.
+# Only the cover's cosmetic corners use .X. On the block, roof minimum 1.59
+# minus a .X chamfer maximum 1.80 would open the corner into the rebate;
+# retain the source-owned .XX control pending a dimensioned design choice.
 # Its native angle prints as 45 degrees, without redundant decimal places.
 PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAngle=0)
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
-BLOCK_DRAWING_NOTES = (
-    "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE.\n"
-    f"BLIND DEPTHS FROM {BLOCK_MATING_FACE_NOTE}."
-)
-PLATE_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
+# Matched-pair identification belongs on each hole callout, not a general note.
+BLOCK_DRAWING_NOTES = f"BLIND DEPTHS FROM {BLOCK_MATING_FACE_NOTE}."
 HOLE_CALLOUT_PRECISION = 2
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
 

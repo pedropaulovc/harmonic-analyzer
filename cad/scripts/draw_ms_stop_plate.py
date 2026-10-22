@@ -5,8 +5,10 @@ head-side edge. The aligned end view gives thickness; the native clearance
 callout gives the decimal drill size, never merely a screw designation.
 The shared millimetre hole-mouth coordinates convert to COM metres before
 projection into the cover-side *Back view.
-The two native, model-owned drill steps point to the same concentric hole
-pair from the right, clear of the overall and hole-location extension lines.
+The model-owned pilot and finished drill callouts identify the matched block,
+the physical registration edges and the web function of the absolute locations.
+Their text is shelved to the right of the measured extension lines; the cover
+thickness retains the screw-engagement stack and moves left of its witnesses.
 Separate native chamfer size and angle retain their model-owned precision.
 """
 
@@ -30,7 +32,7 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import set_dimension_callouts
+from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -57,15 +59,24 @@ FRONT_KEEP = {
     "PlateLeftFromEnd": (0.175, 0.115),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
-    # Below the chamfer-size witness line, above the clearance callout.
-    "PilotDrillDiameter": (0.265, 0.182),
+    # Right-edge witnesses are at X217; the chamfer arrow ends at Y187.85.
+    # The pilot block is right/down of both, with the finished drill below it.
+    "PilotDrillDiameter": (0.285, 0.171),
 }
 RIGHT_KEEP = {"PlateThickness": (RIGHT_CENTER[0], 0.225)}
+THICKNESS_TEXT_OFFSET = {"PlateThickness": (0.285, 0.245)}
 DIMENSION_CALLOUTS = {
     "PilotDrillDiameter": (
-        "LAYOUT ON THIS PLATE; PILOT\n"
-        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
-        "CLAMPED WITH " + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
+        f"MATCH-DRILL INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
+        + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" FLUSH IN ", " FLUSH\nIN ")
+        + "; KEEPS BLOCK WEBS\n"
+        "KEEP PAIR TOGETHER; NOT INTERCHANGEABLE"
+    ),
+    # The 0.9..1.1 thickness bounds the stock screw's penetration in the
+    # block's blind full-thread depth; it is not an arbitrary sheet tolerance.
+    "PlateThickness": (
+        f"SCREW STACK: {_config.parts('ms-vn-stop-plate-screw')['number']}\n"
+        f"IN MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}"
     ),
 }
 
@@ -136,6 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
                                                dimensions_by_feature=part.PLATE_DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter, iso)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, annotations, THICKNESS_TEXT_OFFSET)
     _style_pilot_diameter(adapter, annotations)
     _style_plate_chamfer(adapter, annotations)
     edge = model_point_in_view(
@@ -147,8 +159,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # imported pilot. Two adjacent native callouts avoid an unverified note
     # dimension-link format while keeping both 2X quantities and sizes live.
     # Both leaders stay right of the overall-height and hole-location lanes.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.265, 0.150),
-                           label="two cover clearance holes", process="THEN OPEN")
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.285, 0.132),
+                           label="two cover clearance holes", process="THEN DRILL")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
     assert_manufacturing_dimensions(
@@ -164,7 +176,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)

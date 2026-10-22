@@ -711,12 +711,17 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     _telemetry.info("nameplate drawing views, dimensions and notes placed")
 
+    # Annotation regeneration and reference-sketch restoration can bring back
+    # A-A's hidden edges; the finalizer's last rebuild can do the same. Keep
+    # the early HLR needed for cut-face selection, then reassert and read back
+    # the section's native HLR state after all settling, before any save.
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Nameplate Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: set_hidden_lines_removed(adapter, section),),
     )
 
 
