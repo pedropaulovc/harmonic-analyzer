@@ -8,9 +8,9 @@ import _config
 import _printed_angular_tolerance as angular
 import _printed_drilled_tolerance as drilled
 import _printed_tolerance as linear
-from test_dodo_recipe import (  # noqa: F401 -- pytest discovers imported fixtures
-    isolated_assembly_helper_keys,
-    local_executor,
+from test_dodo_recipe import (
+    isolated_assembly_helper_keys as isolated_assembly_helper_keys,
+    local_executor as local_executor,
 )
 
 pytestmark = pytest.mark.usefixtures("local_executor")
