@@ -275,32 +275,103 @@ def _assert_physical_head_height(
     """Prove native vertical value/attachments; settled and saved calls rescan rims."""
     if entities is None:
         entities = _head_height_entities(adapter, front)
-    if display is None:
-        raise RuntimeError("SupplierHeadHeight: missing native display dimension")
-    display = _early_bound(display, "IDisplayDimension")
-    if int(display.Type2) != 12:  # swDimensionType_e.swVertLinearDimension
-        raise RuntimeError("SupplierHeadHeight: native dimension is not vertical")
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    if annotation is None:
-        raise RuntimeError("SupplierHeadHeight: missing native annotation")
-    owner = annotation.Owner
-    if (
-        int(annotation.OwnerType) != 0 or owner is None
-        or int(adapter.swApp.IsSame(owner, front)) != 1
-    ):
-        raise RuntimeError("SupplierHeadHeight: annotation owner is not the exact front view")
-    attached = tuple(annotation.GetAttachedEntities3() or ())
-    kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
-    if (
-        len(attached) != 2 or int(annotation.GetAttachedEntityCount3()) != 2
-        or kinds != (1, 1)
-    ):
-        raise RuntimeError(
-            f"SupplierHeadHeight: expected two EDGE attachments, got {len(attached)} {kinds}"
+    snapshot: dict[str, Any] = {
+        "display_null": display is None, "annotation_null": None,
+        "type2": None, "count_api": None, "attached_len": None,
+        "kinds_len": None, "kinds": (), "attached_nulls": (),
+        "dangling": None, "owner_type": None, "owner_null": None,
+        "owner_is_same": None,
+    }
+    annotation = None
+    attached = ()
+    try:
+        if display is None:
+            raise RuntimeError("SupplierHeadHeight: missing native display dimension")
+        display = _early_bound(display, "IDisplayDimension")
+        snapshot["type2"] = display.Type2
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        snapshot["annotation_null"] = annotation is None
+        if annotation is None:
+            raise RuntimeError("SupplierHeadHeight: missing native annotation")
+        snapshot["count_api"] = annotation.GetAttachedEntityCount3()
+        attached_raw = annotation.GetAttachedEntities3()
+        snapshot["attached_len"] = 0 if attached_raw is None else len(attached_raw)
+        attached = tuple(
+            attached_raw[index] for index in range(min(snapshot["attached_len"], 4))
         )
-    return assert_dimension_measures(
-        adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
-    )
+        snapshot["attached_nulls"] = tuple(item is None for item in attached)
+        kinds_raw = annotation.GetAttachedEntityTypes()
+        snapshot["kinds_len"] = 0 if kinds_raw is None else len(kinds_raw)
+        snapshot["kinds"] = tuple(
+            kinds_raw[index] for index in range(min(snapshot["kinds_len"], 4))
+        )
+        snapshot["dangling"] = bool(annotation.IsDangling())
+        snapshot["owner_type"] = annotation.OwnerType
+        owner = annotation.Owner
+        snapshot["owner_null"] = owner is None
+        if owner is not None:
+            snapshot["owner_is_same"] = adapter.swApp.IsSame(owner, front)
+        if int(snapshot["type2"]) != 12:  # swDimensionType_e.swVertLinearDimension
+            raise RuntimeError("SupplierHeadHeight: native dimension is not vertical")
+        if (
+            int(snapshot["owner_type"]) != 0 or snapshot["owner_null"]
+            or int(snapshot["owner_is_same"]) != 1
+        ):
+            raise RuntimeError("SupplierHeadHeight: annotation owner is not the exact front view")
+        kinds = tuple(int(kind) for kind in snapshot["kinds"])
+        if (
+            snapshot["attached_len"] != 2 or int(snapshot["count_api"]) != 2
+            or snapshot["kinds_len"] != 2 or kinds != (1, 1)
+        ):
+            raise RuntimeError(
+                "SupplierHeadHeight: expected two EDGE attachments, "
+                f"got {snapshot['attached_len']} {kinds}"
+            )
+        if snapshot["dangling"] or any(snapshot["attached_nulls"]):
+            raise RuntimeError("SupplierHeadHeight is not the dimension between its named entities")
+        return assert_dimension_measures(
+            adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
+        )
+    except (RuntimeError, TypeError, ValueError, AttributeError, IndexError) as exc:
+        # Refusal-only probes: observe the native value and rendered arrows, never repair.
+        snapshot.update(native_dimension_null=None, system_value=None, attachment_is_same=(),
+                        display_data_null=None, arrow_count=None, arrows=())
+        try:
+            if display is not None:
+                native = display.GetDimension2(0)
+                snapshot["native_dimension_null"] = native is None
+                if native is not None:
+                    snapshot["system_value"] = _early_bound(native, "IDimension").SystemValue
+            snapshot["attachment_is_same"] = tuple(
+                tuple(
+                    None if actual is None or expected is None
+                    else adapter.swApp.IsSame(actual, expected)
+                    for expected in entities[:2]
+                )
+                for actual in attached[:2]
+            )
+            if annotation is not None:
+                data = annotation.GetDisplayData()
+                snapshot["display_data_null"] = data is None
+                if data is not None:
+                    data = _early_bound(data, "IDisplayData")
+                    count = int(data.GetArrowHeadCount())
+                    snapshot["arrow_count"] = count
+                    arrows = []
+                    for index in range(min(count, 4)):
+                        arrow = data.GetArrowHeadAtIndex2(index)
+                        arrows.append(
+                            None if arrow is None else tuple(
+                                arrow[slot] for slot in range(min(len(arrow), 12))
+                            )
+                        )
+                    snapshot["arrows"] = tuple(arrows)
+        except (RuntimeError, TypeError, ValueError, AttributeError, IndexError) as probe_error:
+            snapshot["failure_probe_error"] = str(probe_error)[:400]
+            _telemetry.event("drawing.pivot_head_height_refusal", **snapshot)
+            raise RuntimeError(f"{exc}; native_snapshot={snapshot}") from probe_error
+        _telemetry.event("drawing.pivot_head_height_refusal", **snapshot)
+        raise RuntimeError(f"{exc}; native_snapshot={snapshot}") from exc
 
 
 @_telemetry.traced("drawing.pivot_head_height_add")

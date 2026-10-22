@@ -314,25 +314,87 @@ def _assert_physical_head_height(
     """Prove the native value/attachments; settled/saved callers rescan stations."""
     if entities is None:
         entities = _head_height_entities(adapter, front)
+    if display is None:
+        raise RuntimeError("SupplierHeadHeight: native display dimension is null")
     display = _early_bound(display, "IDisplayDimension")
     raw_annotation = display.GetAnnotation()
     if raw_annotation is None:
         raise RuntimeError("SupplierHeadHeight: native dimension has no annotation")
     annotation = _early_bound(raw_annotation, "IAnnotation")
-    kinds = tuple(int(kind) for kind in (annotation.GetAttachedEntityTypes() or ()))
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    dimension_type = int(display.Type2)
+    count = int(annotation.GetAttachedEntityCount3())
+    attached = annotation.GetAttachedEntities3()
+    attached_length = 0 if attached is None else len(attached)
+    attached_slots = tuple(attached[index] for index in range(min(attached_length, 4)))
+    raw_kinds = annotation.GetAttachedEntityTypes()
+    kinds_length = 0 if raw_kinds is None else len(raw_kinds)
+    kinds = tuple(int(raw_kinds[index]) for index in range(min(kinds_length, 4)))
+    dangling = bool(annotation.IsDangling())
+    owner_type = int(annotation.OwnerType)
+    owner = annotation.Owner
+    owner_same = None if owner is None else int(app.IsSame(owner, front))
+    snapshot = {
+        "type2": dimension_type,
+        "attached_count": count,
+        "attached_length": attached_length,
+        "kinds_length": kinds_length,
+        "kinds": kinds,
+        "attached_nulls": tuple(item is None for item in attached_slots),
+        "dangling": dangling,
+        "owner_type": owner_type,
+        "owner_null": owner is None,
+        "owner_same": owner_same,
+    }
+    _telemetry.event("drawing.stud_head_height_native_snapshot", **snapshot)
+
+    def refuse(reason: str) -> None:
+        # Refusal-only native evidence: never infer orientation or relax Type2.
+        native = display.GetDimension2(0)
+        snapshot["native_dimension_null"] = native is None
+        snapshot["system_value"] = (
+            None if native is None else _early_bound(native, "IDimension").SystemValue
+        )
+        snapshot["attachment_same"] = tuple(
+            tuple(None if item is None or expected is None else int(app.IsSame(item, expected))
+                  for expected in entities[:2])
+            for item in attached_slots[:2]
+        )
+        raw_data = annotation.GetDisplayData()
+        snapshot["display_data_null"] = raw_data is None
+        arrow_count = None
+        arrows = []
+        if raw_data is not None:
+            data = _early_bound(raw_data, "IDisplayData")
+            arrow_count = int(data.GetArrowHeadCount())
+            for index in range(min(arrow_count, 4)):
+                arrow = data.GetArrowHeadAtIndex2(index)
+                arrows.append(
+                    None if arrow is None else tuple(
+                        float(arrow[slot]) for slot in range(min(len(arrow), 12))
+                    )
+                )
+        snapshot["arrow_count"] = arrow_count
+        snapshot["arrow_heads"] = arrows
+        _telemetry.event("drawing.stud_head_height_native_refusal", reason=reason, **snapshot)
+        raise RuntimeError(f"SupplierHeadHeight: {reason}; native_snapshot={snapshot!r}")
+
+    if dimension_type != 12:  # swVertLinearDimension; Type2=2 is not accepted.
+        refuse("expected vertical dimension Type2=12")
+    if owner_type != 0 or owner is None or owner_same != 1:
+        refuse("expected exact front-view owner (OwnerType=0, IsSame=1)")
     if (
-        int(display.Type2) != 12  # swVertLinearDimension
-        or int(annotation.GetAttachedEntityCount3()) != 2
+        count != 2 or attached_length != 2 or kinds_length != 2
         or kinds != (1, 1)  # swSelEDGES, never silhouettes or vertices
-        or len(tuple(annotation.GetAttachedEntities3() or ())) != 2
-        or int(annotation.OwnerType) != 0
-        or annotation.Owner is None
-        or int(_early_bound(adapter.swApp, "ISldWorks").IsSame(annotation.Owner, front)) != 1
+        or any(item is None for item in attached_slots) or dangling
     ):
-        raise RuntimeError("SupplierHeadHeight: expected a vertical dimension on two actual edges")
-    return assert_dimension_measures(
-        adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
-    )
+        refuse("expected two nonnull actual edge attachments, not dangling")
+    try:
+        return assert_dimension_measures(
+            adapter, display, expected_mm=HEAD_H, label="SupplierHeadHeight", entities=entities
+        )
+    except RuntimeError as exc:
+        refuse(str(exc))
 
 
 @_telemetry.traced("drawing.stud_head_height_add")

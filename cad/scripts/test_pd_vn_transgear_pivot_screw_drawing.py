@@ -609,6 +609,7 @@ def _physical_head_fixture(monkeypatch):
     annotation.GetAttachedEntityTypes = lambda: annotation.kinds
     annotation.GetAttachedEntityCount3 = lambda: annotation.count
     annotation.IsDangling = lambda: annotation.dangling
+    annotation.GetDisplayData = lambda: None
     tolerance = SimpleNamespace(Type=0)
     native = SimpleNamespace(
         SystemValue=screw.HEAD_H / 1000, FullName="D2@FinishedFront", Tolerance=tolerance,
@@ -863,6 +864,9 @@ def test_physical_head_height_refuses_bad_native_selection_and_creation(
     ("dangling", "named entities"),
     ("missing_native", "no native model dimension"),
     ("dimension_type", "not vertical"),
+    ("linear_dimension_type", "not vertical"),
+    ("unknown_owner", "exact front view"),
+    ("malformed_kinds", "int"),
     ("owner_type", "exact front view"),
     ("missing_owner", "exact front view"),
     ("wrong_owner", "exact front view"),
@@ -895,18 +899,181 @@ def test_physical_head_height_proves_creation_and_settled_native_state(
         state.display.GetDimension2 = lambda _index: None
     elif fault == "dimension_type":
         state.display.Type2 = 11
+    elif fault == "linear_dimension_type":
+        state.display.Type2 = 2
+    elif fault == "unknown_owner":
+        state.adapter.swApp.IsSame = lambda _first, _second: 2
+    elif fault == "malformed_kinds":
+        state.annotation.kinds = (1, None)
     elif fault == "owner_type":
         state.annotation.OwnerType = 1
     elif fault == "missing_owner":
         state.annotation.Owner = None
     elif fault == "wrong_owner":
         state.annotation.Owner = SimpleNamespace(name=state.front.name)
-    with pytest.raises(RuntimeError, match=message):
+    with pytest.raises(RuntimeError, match=message) as refusal:
         if phase == "creation":
             drawing._add_physical_head_height(state.adapter, state.front, (0.224, 0.201))
         else:
             drawing._assert_physical_head_height(state.adapter, state.front, state.display)
     assert not state.selection.selected
+    evidence = state.events[-1]
+    assert evidence[0] == "drawing.pivot_head_height_refusal"
+    for field in (
+        "type2", "count_api", "attached_len", "kinds_len", "kinds",
+        "attached_nulls", "dangling", "owner_type", "owner_null", "owner_is_same",
+        "native_dimension_null", "system_value", "attachment_is_same",
+        "display_data_null", "arrow_count", "arrows",
+    ):
+        assert field in evidence[1]
+        assert f"'{field}':" in str(refusal.value)
+
+
+def test_physical_head_height_valid_snapshot_returns_exact_height_without_failure_probes(
+    monkeypatch,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+
+    def forbidden():
+        raise AssertionError("Refusal-only display data must not be read on success")
+
+    state.annotation.GetDisplayData = forbidden
+    assert drawing._assert_physical_head_height(
+        state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+    ) == screw.HEAD_H
+    assert not state.events
+
+
+@pytest.mark.parametrize("missing", ("display", "annotation", "attached", "kinds"))
+def test_physical_head_height_missing_metadata_has_precise_snapshot(monkeypatch, missing) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    display = state.display
+    if missing == "display":
+        display = None
+    elif missing == "annotation":
+        state.display.GetAnnotation = lambda: None
+    elif missing == "attached":
+        state.annotation.GetAttachedEntities3 = lambda: None
+    else:
+        state.annotation.GetAttachedEntityTypes = lambda: None
+    with pytest.raises(RuntimeError, match="native_snapshot=") as refusal:
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, display, entities=(state.bearing, state.top),
+        )
+    evidence = state.events[-1][1]
+    if missing == "display":
+        assert "missing native display dimension" in str(refusal.value)
+        assert evidence["display_null"] is True
+    elif missing == "annotation":
+        assert "missing native annotation" in str(refusal.value)
+        assert evidence["annotation_null"] is True
+    else:
+        assert "expected two EDGE attachments" in str(refusal.value)
+        assert evidence["attached_len" if missing == "attached" else "kinds_len"] == 0
+
+
+def test_physical_head_height_refusal_bounds_metadata_and_rendered_arrow_evidence(
+    monkeypatch,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    reads = []
+
+    class BoundedNativeArray:
+        def __init__(self, name, length, value):
+            self.name, self.length, self.value = name, length, value
+
+        def __len__(self):
+            return self.length
+
+        def __getitem__(self, index):
+            assert 0 <= index < 4
+            reads.append((self.name, index))
+            return self.value
+
+        def __iter__(self):
+            raise AssertionError("Must not traverse an unbounded native collection")
+
+    state.annotation.GetAttachedEntities3 = lambda: BoundedNativeArray("attached", 200, state.top)
+    state.annotation.GetAttachedEntityTypes = lambda: BoundedNativeArray("kinds", 300, 46)
+    arrows = []
+    state.annotation.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: 100,
+        GetArrowHeadAtIndex2=lambda index: arrows.append(index) or tuple(range(20)),
+    )
+    with pytest.raises(RuntimeError, match="expected two EDGE attachments") as refusal:
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+        )
+    evidence = state.events[-1][1]
+    assert evidence["attached_len"] == 200
+    assert evidence["kinds_len"] == 300
+    assert evidence["kinds"] == (46,) * 4
+    assert evidence["attached_nulls"] == (False,) * 4
+    assert reads == [(name, index) for name in ("attached", "kinds") for index in range(4)]
+    assert evidence["native_dimension_null"] is False
+    assert evidence["system_value"] == screw.HEAD_H / 1000
+    assert evidence["attachment_is_same"] == ((0, 1), (0, 1))
+    assert evidence["display_data_null"] is False
+    assert evidence["arrow_count"] == 100
+    assert arrows == list(range(4))
+    assert evidence["arrows"] == (tuple(range(12)),) * 4
+    assert f"native_snapshot={evidence}" in str(refusal.value)
+
+
+def test_physical_head_height_refusal_diagnostic_error_remains_visible(monkeypatch) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.display.Type2 = 2
+
+    def broken_display_data():
+        raise RuntimeError("native display data failed")
+
+    state.annotation.GetDisplayData = broken_display_data
+    with pytest.raises(RuntimeError, match="not vertical.*native_snapshot=") as refusal:
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+        )
+    assert str(refusal.value.__cause__) == "native display data failed"
+    assert state.events[-1][1]["failure_probe_error"] == "native display data failed"
+
+
+def test_physical_head_height_refusal_reads_each_native_metadata_getter_once(monkeypatch) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.display.Type2 = 2
+    calls = []
+    for name in (
+        "GetAttachedEntities3", "GetAttachedEntityTypes", "GetAttachedEntityCount3", "IsDangling",
+    ):
+        original = getattr(state.annotation, name)
+
+        def read_once(original=original, name=name):
+            calls.append(name)
+            return original()
+
+        monkeypatch.setattr(state.annotation, name, read_once)
+    with pytest.raises(RuntimeError, match="not vertical"):
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+        )
+    assert len(calls) == 4
+    assert len(set(calls)) == 4
+    evidence = state.events[-1][1]
+    assert evidence["type2"] == 2
+    assert evidence["owner_is_same"] == 1
+    assert evidence["count_api"] == 2
+
+
+def test_physical_head_height_malformed_attachment_array_is_not_silently_accepted(
+    monkeypatch,
+) -> None:
+    state = _physical_head_fixture(monkeypatch)
+    state.annotation.GetAttachedEntities3 = lambda: 7
+    with pytest.raises(RuntimeError, match="has no len.*native_snapshot=") as refusal:
+        drawing._assert_physical_head_height(
+            state.adapter, state.front, state.display, entities=(state.bearing, state.top),
+        )
+    assert isinstance(refusal.value.__cause__, TypeError)
+    assert state.events[-1][1]["attached_len"] is None
+    assert state.events[-1][1]["count_api"] == 2
 
 
 def test_supplier_references_route_only_head_height_through_physical_api(monkeypatch) -> None:

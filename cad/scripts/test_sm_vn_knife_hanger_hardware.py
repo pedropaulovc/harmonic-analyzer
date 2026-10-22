@@ -1293,6 +1293,7 @@ def _stud_height_case(monkeypatch):
     annotation.GetAttachedEntityTypes = lambda: annotation.kinds
     annotation.GetAttachedEntityCount3 = lambda: annotation.count
     annotation.IsDangling = lambda: annotation.dangling
+    annotation.GetDisplayData = lambda: None
     native = SimpleNamespace(
         SystemValue=bolt.HEAD_H / 1000,
         FullName="SupplierHeadHeight@FinishedFront@Drawing",
@@ -1527,7 +1528,9 @@ def test_stud_head_height_refuses_selection_and_creation_failures_without_fallba
 @pytest.mark.parametrize(
     "fault",
     ("value", "attachments", "kinds", "count", "extra", "missing",
-     "dangling", "not_vertical", "missing_native", "owner"),
+     "dangling", "not_vertical", "linear_type2", "missing_native", "owner",
+     "owner_type", "owner_null", "owner_unknown", "kinds_extra", "attached_empty",
+     "kinds_empty"),
 )
 def test_stud_head_height_proves_native_measurement_and_actual_attachments_at_both_phases(
     monkeypatch, phase, fault
@@ -1549,15 +1552,214 @@ def test_stud_head_height_proves_native_measurement_and_actual_attachments_at_bo
         case.annotation.dangling = True
     elif fault == "not_vertical":
         case.display.Type2 = 11
+    elif fault == "linear_type2":
+        case.display.Type2 = 2
     elif fault == "missing_native":
         case.display.GetDimension2 = lambda _index: None
     elif fault == "owner":
         case.annotation.Owner = object()
+    elif fault == "owner_type":
+        case.annotation.OwnerType = 1
+    elif fault == "owner_null":
+        case.annotation.Owner = None
+    elif fault == "owner_unknown":
+        case.app.IsSame = lambda first, second: (
+            2 if first is case.front and second is case.front else int(first is second)
+        )
+    elif fault == "kinds_extra":
+        case.annotation.kinds = (1, 1, 1)
+    elif fault == "attached_empty":
+        case.annotation.attached = None
+    elif fault == "kinds_empty":
+        case.annotation.kinds = None
     with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
         if phase == "created":
             bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
         else:
             bolt_drawing._assert_physical_head_height(case.adapter, case.front, case.display)
+
+
+@pytest.mark.parametrize("missing", ["display", "annotation"])
+def test_stud_head_height_missing_native_handles_have_precise_refusals(monkeypatch, missing):
+    case = _stud_height_case(monkeypatch)
+    display = case.display
+    if missing == "display":
+        display = None
+    else:
+        display.GetAnnotation = lambda: None
+    with pytest.raises(RuntimeError, match="display dimension is null|has no annotation"):
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, display, entities=(case.bearing, case.top)
+        )
+
+
+def test_stud_head_height_refusal_reports_every_actual_native_field_once(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    calls = []
+    case.display.Type2 = 2
+    case.annotation.count = 7
+    case.annotation.attached = [case.bearing, None]
+    case.annotation.kinds = (1, 46)
+    case.annotation.dangling = True
+    case.annotation.OwnerType = 9
+    case.app.IsSame = lambda _first, _second: 2
+    for name in (
+        "GetAttachedEntityCount3", "GetAttachedEntities3", "GetAttachedEntityTypes",
+        "IsDangling",
+    ):
+        original = getattr(case.annotation, name)
+
+        def counted(original=original, name=name):
+            calls.append(name)
+            return original()
+
+        setattr(case.annotation, name, counted)
+    with pytest.raises(RuntimeError, match="Type2=12") as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    snapshot = next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_head_height_native_snapshot"
+    )
+    assert snapshot == {
+        "type2": 2, "attached_count": 7, "attached_length": 2,
+        "kinds_length": 2, "kinds": (1, 46), "attached_nulls": (False, True),
+        "dangling": True, "owner_type": 9, "owner_null": False, "owner_same": 2,
+    }
+    refusal = next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_head_height_native_refusal"
+    )
+    assert refusal["native_dimension_null"] is False
+    assert refusal["system_value"] == case.native.SystemValue
+    assert refusal["attachment_same"] == ((2, 2), (None, None))
+    assert refusal["display_data_null"] is True
+    assert refusal["arrow_count"] is None
+    assert refusal["arrow_heads"] == []
+    for key, value in refusal.items():
+        if key != "reason":
+            assert f"{key!r}: {value!r}" in str(error.value)
+    assert sorted(calls) == sorted((
+        "GetAttachedEntityCount3", "GetAttachedEntities3", "GetAttachedEntityTypes",
+        "IsDangling",
+    ))
+
+
+def test_stud_head_height_refusal_bounds_malformed_arrays_and_raw_arrows(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+
+    class BoundedArray:
+        def __len__(self):
+            return 1000
+
+        def __getitem__(self, index):
+            assert 0 <= index < 4
+            return case.bearing if index % 2 == 0 else None
+
+    class BoundedKinds:
+        def __len__(self):
+            return 1000
+
+        def __getitem__(self, index):
+            assert 0 <= index < 4
+            return 1
+
+    arrow_calls = []
+
+    def arrow(index):
+        arrow_calls.append(index)
+        return tuple(range(20))
+
+    case.annotation.attached = BoundedArray()
+    case.annotation.kinds = BoundedKinds()
+    case.annotation.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: 1000, GetArrowHeadAtIndex2=arrow,
+    )
+    with pytest.raises(RuntimeError, match="actual edge attachments") as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    refusal = next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_head_height_native_refusal"
+    )
+    assert refusal["attached_length"] == refusal["kinds_length"] == 1000
+    assert refusal["attached_nulls"] == (False, True, False, True)
+    assert refusal["kinds"] == (1, 1, 1, 1)
+    assert refusal["attachment_same"] == ((1, 0), (None, None))
+    assert refusal["arrow_count"] == 1000
+    assert refusal["arrow_heads"] == [tuple(float(n) for n in range(12))] * 4
+    assert arrow_calls == [0, 1, 2, 3]
+    assert "'arrow_count': 1000" in str(error.value)
+
+
+@pytest.mark.parametrize("fault", [None, "value", "attachments", "native"])
+def test_stud_head_height_shared_proof_keeps_receipt_and_good_path_skips_extra_calls(
+    monkeypatch, fault
+):
+    case = _stud_height_case(monkeypatch)
+    extra_calls = []
+    case.annotation.GetDisplayData = lambda: extra_calls.append("display_data")
+    if fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "attachments":
+        case.annotation.attached[1] = case.rear
+    elif fault == "native":
+        case.display.GetDimension2 = lambda _index: None
+    if fault is None:
+        assert bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        ) == pytest.approx(bolt.HEAD_H)
+        assert extra_calls == []
+    else:
+        with pytest.raises(RuntimeError, match="native_snapshot=") as error:
+            bolt_drawing._assert_physical_head_height(
+                case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+            )
+        assert isinstance(error.value.__context__, RuntimeError)
+        assert extra_calls == ["display_data"]
+
+
+def test_stud_head_height_null_owner_and_null_arrows_are_evidence_not_fallbacks(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.annotation.Owner = None
+    comparisons = []
+    case.app.IsSame = lambda first, second: comparisons.append((first, second)) or 1
+    case.annotation.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: 1, GetArrowHeadAtIndex2=lambda _index: None,
+    )
+    with pytest.raises(RuntimeError, match="exact front-view owner") as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    assert "'owner_null': True" in str(error.value)
+    assert "'owner_same': None" in str(error.value)
+    assert "'arrow_heads': [None]" in str(error.value)
+    assert comparisons == [
+        (case.bearing, case.bearing), (case.bearing, case.top),
+        (case.top, case.bearing), (case.top, case.top),
+    ]
+
+
+@pytest.mark.parametrize("stage", ["metadata", "refusal"])
+def test_stud_head_height_native_diagnostic_errors_are_not_swallowed(monkeypatch, stage):
+    case = _stud_height_case(monkeypatch)
+    failure = OSError("native metadata read failed")
+
+    def fail():
+        raise failure
+
+    if stage == "metadata":
+        case.annotation.GetAttachedEntityCount3 = fail
+    else:
+        case.display.Type2 = 2
+        case.annotation.GetDisplayData = fail
+    with pytest.raises(OSError) as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    assert error.value is failure
 
 
 def _settled_stud_height_case(monkeypatch):
