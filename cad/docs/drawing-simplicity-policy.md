@@ -79,10 +79,15 @@ cannot ask for what the authors were told to leave out.
   selected existing layout.
   The portrait footer's anchors and reserved boxes translate together above
   the existing 66 mm title block; other consumers retain their default positions.
-  Orthographic projected model origins align after fitting, before reference
-  annotation, without changing the selected scales or relaxing their cells.
+  The shared clamp and these six screws align orthographic projected model origins
+  after fitting, before reference annotation, without changing selected scales
+  or relaxing their cells.
   The existing linked title-cell fitter owns PART, the actual Material property
   and DWG. NO. together; it is not combined with the separate Number fitter.
+  Only these six Material notes use measured complete native-box vertical centering
+  in the actual ruled cell; x/z, source text, spacing and font face stay unchanged.
+  They retain the original font when it fits, with the same 2 mm floor and 0.6 mm
+  clearance. Other title consumers retain fixed alignment by default.
   Scale selection still tries the existing standard scales against complete
   native outlines, without subtracting fixed sheet-space padding. The shared clamp
   and these six screws shelve short reference text only when its measured extent

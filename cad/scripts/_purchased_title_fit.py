@@ -1,6 +1,7 @@
 """Opt-in native title-cell fitting for purchased-part drawings.
 
-Format existing source-linked notes, never source properties or saved templates.
+Format and optionally align existing source-linked notes, never source properties
+or saved templates.
 A native SetTextFormat call removes the Name note's leading FONT size tag; only
 that formatting syntax is excluded from property-expression identity checks.
 The caller selects the existing material property; no alias or link is authored.
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from _com import _early_bound
 from _drawing_layout_audit import annotation_display
@@ -72,7 +73,7 @@ def note_fits_cell(
 
 
 def _ruled_cell(sheet: Any, anchor: tuple[float, ...]) -> tuple[float, ...]:
-    """The actual sheet-format rules surrounding this note's unchanged anchor."""
+    """The actual sheet-format rules surrounding this note's existing anchor."""
     sketch = _early_bound(sheet.GetTemplateSketch(), "ISketch")
     if sketch is None:
         raise RuntimeError("purchased title block has no native sheet-format sketch")
@@ -106,8 +107,9 @@ def _ruled_cell(sheet: Any, anchor: tuple[float, ...]) -> tuple[float, ...]:
 def _fit_title_note(
     adapter: Any, draw: Any, sheet: Any, note: Any, *, label: str, minimum: float,
     material_property: str = "Material Specification",
+    alignment: Literal["fixed", "centered"] = "fixed",
 ) -> Callable[[], None]:
-    """Fit this existing linked note on a bounded native-height ladder."""
+    """Fit a linked note; optional measured centering moves only its sheet Y."""
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError(f"{label}: note has no annotation")
@@ -167,6 +169,8 @@ def _fit_title_note(
             rows=rows,
             extent=box,
             cell=cell,
+            alignment=alignment,
+            requested_anchor_m=anchor,
         )
         return box, rows
 
@@ -180,6 +184,33 @@ def _fit_title_note(
             raise RuntimeError(f"{label}: local text format setter refused")
         _rebuild(draw, phase=f"{label} title-cell fit")
         box, rows = measure("after-fit-rebuild")
+        if alignment == "centered":
+            # The portrait Material note's top anchor is low in its ruled cell.
+            # Align the complete measured text, not inferred font/spacing metrics.
+            target = (
+                anchor[0],
+                anchor[1] + centre[1] - (box[1] + box[3]) / 2,
+                anchor[2],
+            )
+            if not all(map(math.isfinite, target)):
+                raise RuntimeError(f"{label}: invalid centered title-cell position {target!r}")
+            if annotation.SetPosition2(
+                target[0], target[1], target[2]
+            ) is not True:
+                raise RuntimeError(f"{label}: centered title-cell position setter refused")
+            actual_anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
+            if (
+                len(actual_anchor) != 3
+                or not all(map(math.isfinite, actual_anchor))
+                or math.dist(actual_anchor, target) > _FORMAT_TOL
+            ):
+                raise RuntimeError(
+                    f"{label}: centered title-cell position did not persist; "
+                    f"expected {target!r}, actual {actual_anchor!r}"
+                )
+            anchor = target
+            _rebuild(draw, phase=f"{label} title-cell centering")
+            box, rows = measure("after-title-center-rebuild")
         if note_fits_cell(box, rows, limit):
             break
         if height <= minimum + _FORMAT_TOL:
@@ -205,6 +236,7 @@ def _fit_title_note(
             or str(actual_format.TypeFaceName) != face
             or annotation.GetUseDocTextFormat(0) is not False
             or len(actual_anchor) != 3
+            or not all(map(math.isfinite, actual_anchor))
             or math.dist(actual_anchor, anchor) > _FORMAT_TOL
             or not note_fits_cell(box, rows, limit)
         ):
@@ -225,12 +257,18 @@ def _fit_title_note(
 def fit_purchased_title_block(
     adapter: Any, *, spec: DrawingSpec,
     material_property: str = "Material Specification",
+    material_alignment: Literal["fixed", "centered"] = "fixed",
 ) -> Callable[[], None]:
     """Fit Name/selected Material/Number; return strict final-rebuild checks.
 
     ``material_property`` names the source property already linked by the sheet.
     The default preserves the captured-pivot and kit consumers unchanged.
+    ``material_alignment="centered"`` vertically aligns that note's complete
+    measured text in its native ruled cell, without moving its sheet X/Z.
+    The default retains every note's original fixed anchor.
     """
+    if material_alignment not in ("fixed", "centered"):
+        raise ValueError("material_alignment must be 'fixed' or 'centered'")
     # Native metres, not authored points converted at 72 dpi. The material floor
     # remains 2 mm even if the complete purchased specification cannot fit.
     fields = {
@@ -274,6 +312,11 @@ def fit_purchased_title_block(
             label=f"{spec.artifact_stem} {label}",
             minimum=minimum,
             material_property=material_property,
+            alignment=(
+                material_alignment
+                if expression == property_link(material_property)
+                else "fixed"
+            ),
         )
         for expression, (label, minimum) in fields.items()
     )

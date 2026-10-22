@@ -175,6 +175,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         view_layout="tall_top",
+        align_orthographic=True,
         supplier_dimensions=partial(
             _annotate_supplier_dimensions,
             settled_checks=checks,

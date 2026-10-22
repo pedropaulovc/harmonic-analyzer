@@ -31,7 +31,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_layout="portrait_reference",
         align_orthographic=True,
         title_block_setup=partial(
-            fit_purchased_title_block, spec=SPEC, material_property="Material"
+            fit_purchased_title_block, spec=SPEC, material_property="Material",
+            material_alignment="centered",
         ),
         supplier_dimensions=partial(
             annotate_supplier_screw_with_shelves,
