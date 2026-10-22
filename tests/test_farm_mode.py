@@ -111,6 +111,9 @@ def _undrifted_checkout(monkeypatch):
     monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
     monkeypatch.setenv("HARMONIC_FARM_BUILD_ID", BUILD_ID)
     monkeypatch.setattr(_farm, "STATUS_POLL_INTERVAL_S", 0)
+    # This suite owns Temporal behavior; preparation publication has its own
+    # guarded boundary and singleflight regressions in test_preparation_publication.
+    monkeypatch.setattr(_farm, "_ensure_preparation_published", lambda _request: None)
 
     class Producer:
         def __enter__(self):

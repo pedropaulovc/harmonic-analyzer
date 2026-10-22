@@ -466,6 +466,11 @@ def _farm_command(command_class, display_name: str | None = None):
                     return 2
                 raise
             previous_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
+            previous_agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY")
+            if pool_identity is None:
+                os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
+            else:
+                os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = pool_identity[0]
             os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = json.dumps(admitted)
             try:
                 with _farm.producer_build(label) as producer:
@@ -486,6 +491,10 @@ def _farm_command(command_class, display_name: str | None = None):
                     os.environ.pop("HARMONIC_FARM_ADMITTED_LEAVES", None)
                 else:
                     os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = previous_admission
+                if previous_agent_identity is None:
+                    os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
+                else:
+                    os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = previous_agent_identity
 
     return FarmCommand
 

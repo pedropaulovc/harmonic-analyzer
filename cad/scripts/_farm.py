@@ -4,6 +4,9 @@ The constants and frozen wire types below mirror
 ``solidworks-pool/agent/contract.py`` field-for-field; ``FARM_PROTOCOL_VERSION``
 mirrors ``agent/protocol.py`` and guards drift between the two repos (a mismatch
 fails admission on the farm). This module must never import the pool package.
+Preparation publication uses the build wrapper's selected-pool CLI bridge only
+when a cache-missing leaf is about to submit; local/cache-only work never loads
+the pool runtime or exports a graph.
 
 Configuration is the same ``~/.solidworks-pool/config.json`` that ``farm.py``
 writes (``farm.py credentials issue``); ``SOLIDWORKS_POOL_CONFIG`` overrides the
@@ -895,6 +898,94 @@ def _display_name(label: str | None = None) -> str:
     return label
 
 
+_PREPARATION_LOCK = threading.Lock()
+_PREPARATION_PUBLICATIONS: dict[
+    tuple[str, Path, Path, str, str], Exception | None
+] = {}
+
+
+def _publish_preparation(
+    pool: Path, workspace: Path, commit: str, agent_identity: str
+) -> None:
+    # Use the existing operational bridge, which selects the pool's own locked
+    # environment. The CLI imports agent.preparation.publish_for_submission;
+    # this producer does not duplicate its storage or graph-publisher protocol.
+    from build import _pool_farm
+
+    result = _pool_farm(
+        pool,
+        "preparation",
+        "publish",
+        "--workspace",
+        str(workspace),
+        "--commit",
+        commit,
+        "--json",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"farm preparation publication failed (exit {result.returncode}): "
+            f"{result.stdout.strip()}"
+        )
+    try:
+        published = json.loads(result.stdout)
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            "farm preparation publication returned an invalid response"
+        ) from None
+    if (
+        not isinstance(published, dict)
+        or published.get("configured") is not True
+        or published.get("commit") != commit
+        or published.get("agent_identity_sha256") != agent_identity
+    ):
+        raise RuntimeError(
+            "farm preparation publication does not match the admitted "
+            "source and pool agent identity"
+        )
+
+
+def _ensure_preparation_published(request: LeafRequest) -> None:
+    """Singleflight the first real remote leaf, including publication failures.
+
+    A spawned action process owns its own memo. Existing exact descriptors are
+    cheap hits in the pool publisher, not new graph exports. A failed publication
+    never becomes a cache miss or allows a later leaf in this build to dispatch.
+    """
+    from build import _pool_home
+
+    commit = request.commit
+    agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY", "")
+    for name, value, length in (
+        ("HARMONIC_FARM_COMMIT", commit, 40),
+        ("HARMONIC_FARM_AGENT_IDENTITY", agent_identity, 64),
+    ):
+        if len(value) != length or any(char not in "0123456789abcdef" for char in value):
+            raise RuntimeError(
+                f"farm preparation publication requires admitted {name} "
+                f"as a full lowercase {length}-hex identity"
+            )
+    if commit != os.environ.get("HARMONIC_FARM_COMMIT"):
+        raise RuntimeError(
+            "farm preparation publication source does not match the admitted commit"
+        )
+    workspace = REPO_ROOT.resolve()
+    pool = _pool_home().resolve()
+    key = (request.build_id, workspace, pool, commit, agent_identity)
+    with _PREPARATION_LOCK:
+        if key in _PREPARATION_PUBLICATIONS:
+            failure = _PREPARATION_PUBLICATIONS[key]
+            if failure is not None:
+                raise failure
+            return
+        try:
+            _publish_preparation(pool, workspace, commit, agent_identity)
+        except Exception as exc:
+            _PREPARATION_PUBLICATIONS[key] = exc
+            raise
+        _PREPARATION_PUBLICATIONS[key] = None
+
+
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     _display_name()
     if request.build_id != _required_build_id():
@@ -906,6 +997,10 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         _connect_client(request.submitter), timeout=FIFO_RPC_TIMEOUT_S
     )
     coordinator = await _fifo_handle(client)
+    # Parent registration and its independent lease renewer already precede all
+    # task/cache work. Publish only here, after a genuine miss and coordinator
+    # admission, but before recording or accepting the first remote reservation.
+    _ensure_preparation_published(request)
     identity = {
         "workflow_id": wf_id,
         "task": request.task,
