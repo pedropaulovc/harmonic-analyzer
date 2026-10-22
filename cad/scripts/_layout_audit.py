@@ -3938,6 +3938,13 @@ _SUPPLIER_REFERENCE_ENFORCED_KINDS = frozenset(
     }
 )
 
+# The six oblique-jig screws additionally enforce their portrait frame and
+# title-block boundaries. text-on-view / arrow-near-text cover foreign owners,
+# not text over its own body. Keep every raw finding in the report.
+_PURCHASED_SCREW_ENFORCED_KINDS = _SUPPLIER_REFERENCE_ENFORCED_KINDS | frozenset(
+    {"keep-out", "outside-border"}
+)
+
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),
@@ -3947,6 +3954,19 @@ STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
         "pn-vn-pen-hanger-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
         "pn-vn-pen-hanger-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
         "sm-vn-boss-hook-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        # Carriage alone: source 0c61a8f5's complete five-dimension inventory
+        # has no fractions, and its four native extension findings were
+        # corroborated against individual printed spans, including the
+        # multiline ThreadDiameter. This is not a decimal-text exemption or
+        # a claim that every fraction/decimal row is reliable; the five
+        # imperial screws retain raw extension findings without REPORT refusal.
+        "ch-rocker-arm-tl-vn-oblique-carriage-screw": _PURCHASED_SCREW_ENFORCED_KINDS
+        | {"extension-through-own-text"},
+        "ch-rocker-arm-tl-vn-oblique-block-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-rail-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-clamp-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-lever-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
     }
 )
 

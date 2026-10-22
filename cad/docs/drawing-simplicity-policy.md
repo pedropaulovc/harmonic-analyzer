@@ -67,24 +67,30 @@ cannot ask for what the authors were told to leave out.
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
-  The shared clamp screw and the six oblique-jig carriage, block, bracket,
-  rail, clamp and lever screws select the purchased sheet's `tall_top` layout.
-  Its 96 mm outer Top cell retains each sheet's existing annotation reserve:
-  46 mm for the shared clamp screw leaves 50 mm for its native outline; the
-  oblique screws' 52 mm reserve leaves 44 mm. The bottom-row cells' tops and
-  the Isometric's bottom lower 32 mm. For the oblique screws this reduces the
-  Front geometry cell from 59 to 27 mm, so their common orthographic scale
-  must be selected again and readability judged on every rendered sheet.
-  Sheets not selecting this layout retain `standard`.
+  The shared clamp screw retains `tall_top`: its 96 mm outer Top cell less
+  the unchanged 46 mm annotation reserve leaves 50 mm for the native outline.
+  The six oblique-jig carriage, block, bracket, rail, clamp and lever screws
+  instead use the existing ANSI B portrait sheet and `portrait_reference`.
+  Their 88.4 mm outer Top cell less its unchanged 52 mm reserve leaves
+  36.4 mm for native geometry. With their empty installation/data footer,
+  Front retains 127 mm of geometry height, rather than the rejected landscape
+  `tall_top` allocation's 27 mm. Longer footer content must still raise the
+  existing caption floor and pass actual containment. Other sheets keep their
+  selected existing layout.
+  The portrait footer's anchors and reserved boxes translate together above
+  the existing 66 mm title block; other consumers retain their default positions.
+  Orthographic projected model origins align after fitting, before reference
+  annotation, without changing the selected scales or relaxing their cells.
+  The existing linked title-cell fitter owns PART, the actual Material property
+  and DWG. NO. together; it is not combined with the separate Number fitter.
   Scale selection still tries the existing standard scales against complete
-  native outlines,
-  without subtracting fixed sheet-space padding. Short clamp-reference text
-  is shelved only when its measured extent cannot clear the native arrow
-  span; the measured arrow/witness stations stay fixed and final native
-  paths, text and cell containment remain checked. Missing, duplicate, foreign
-  or wrong-view native references refuse with expected and observed inventories.
-  This layout contract is not a substitute for the rendered comparison with
-  the supplier drawing.
+  native outlines, without subtracting fixed sheet-space padding. The shared clamp
+  and these six screws shelve short reference text only when its measured extent
+  cannot clear the native arrow span; measured arrow/witness stations stay fixed.
+  Final native paths, text and cell containment remain checked. Missing, duplicate,
+  foreign or wrong-view native references refuse with expected and observed inventories.
+  Neither the larger field nor a pre-fit budget proves printed readability:
+  every changed sheet still needs the rendered supplier comparison.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and

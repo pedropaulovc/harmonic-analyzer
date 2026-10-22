@@ -10,8 +10,9 @@ from typing import Any
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
-from _supplier_screw_dimensions import annotate_supplier_screw
+from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_title_fit import fit_purchased_title_block
+from _supplier_screw_reference_text import annotate_supplier_screw_with_shelves
 from _supplier_screw_layout import supplier_screw_margins
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as supplier
 
@@ -23,21 +24,25 @@ ITEM = "1/4-20 X 7/8 SHCS"
 
 async def build(adapter: Any) -> dict[str, str]:
     checks = []
-    # The 18-character registry number overruns the template's DWG. NO.
-    # cell into REV; fit it there, measured.
+    # One linked title-cell fitter owns PART, MATERIAL and the long DWG. NO.,
+    # using the portrait's actual ruled cells rather than a second Number fit.
     return await build_purchased_fastener_drawing(
         adapter,
         SPEC,
         item=ITEM,
-        view_layout="tall_top",
-        number_fit=NumberFit.SHRINK_TO_CELL,
+        view_layout="portrait_reference",
+        align_orthographic=True,
+        title_block_setup=partial(
+            fit_purchased_title_block, spec=SPEC, material_property="Material"
+        ),
         supplier_dimensions=partial(
-            annotate_supplier_screw,
+            annotate_supplier_screw_with_shelves,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
             formats=supplier.SUPPLIER_REFERENCE_FORMATS,
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            label=SPEC.artifact_stem,
             settled_checks=checks,
         ),
         supplier_margins=supplier_screw_margins(

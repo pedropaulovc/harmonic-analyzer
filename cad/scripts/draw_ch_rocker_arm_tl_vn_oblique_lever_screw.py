@@ -11,7 +11,8 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
-from _supplier_screw_dimensions import annotate_supplier_screw
+from _purchased_title_fit import fit_purchased_title_block
+from _supplier_screw_reference_text import annotate_supplier_screw_with_shelves
 from _supplier_screw_layout import supplier_screw_margins
 import ch_rocker_arm_tl_vn_oblique_lever_screw_spec as supplier
 
@@ -27,14 +28,19 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
-        view_layout="tall_top",
+        view_layout="portrait_reference",
+        align_orthographic=True,
+        title_block_setup=partial(
+            fit_purchased_title_block, spec=SPEC, material_property="Material"
+        ),
         supplier_dimensions=partial(
-            annotate_supplier_screw,
+            annotate_supplier_screw_with_shelves,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
             formats=supplier.SUPPLIER_REFERENCE_FORMATS,
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            label=SPEC.artifact_stem,
             settled_checks=checks,
         ),
         supplier_margins=supplier_screw_margins(

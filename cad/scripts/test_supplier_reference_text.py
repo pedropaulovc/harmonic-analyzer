@@ -326,6 +326,15 @@ def test_measure_reads_actual_nut_fraction_row_as_all_native_fragments(native_re
     assert record == original
 
 
+def test_measure_rejects_non_finite_native_witness(native_reads):
+    # NaN can make station comparisons vacuous. Keep the actual RD1 text,
+    # arrow tips and other primitives intact while corrupting one witness.
+    record = _nut_rd1()
+    record["display"]["lines"][1][5] = float("nan")
+    with pytest.raises(RuntimeError, match="line geometry"):
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+
 def test_measure_reads_recovered_vertical_head_height(native_reads):
     record = _recovered_head_height()
     geometry = core.measure_reference_text(None, _static(record), axis=1, label=_LABEL)

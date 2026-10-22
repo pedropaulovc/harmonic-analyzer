@@ -84,15 +84,16 @@ _PROPERTIES = (
     *TITLE_BLOCK_TOLERANCE_PROPERTIES,
 )
 
-# Footer geometry, ASME B landscape (431.8 x 279.4), sheet metres.  The border
-# is 12.7 mm in; the title block fills x >= 215.9 mm below y = 65.1 mm, so every
-# footer row stops at _FOOTER_RIGHT.  Note y is the text's top edge; 3 mm text
-# advances at most _LINE_PITCH a line.
+# Base footer geometry, ASME B landscape (431.8 x 279.4), sheet metres.  The
+# border is 12.7 mm in; every row stops at _FOOTER_RIGHT, left of the landscape
+# title block. Portrait translates every anchor and reserved box together.
+# Note y is the text's top edge; 3 mm text advances at most _LINE_PITCH a line.
 _NOTE_X = 0.018
 _VALUE_X = 0.052
 _FOOTER_RIGHT = 0.2155
 _LINE_PITCH = 0.0045
 _FOOTER_ROWS = (("ITEM:", 0.044), ("SUPPLIER:", 0.034), ("SKU:", 0.024))
+_FOOTER_ROW_BELOW = 0.007
 _GENERAL_Y = 0.054
 # The general line's box bottom; the notes above it end at or over this.
 _GENERAL_BOTTOM = _GENERAL_Y - 0.007
@@ -583,24 +584,44 @@ def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
     return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
 
 
-def footer_top(notes: str, *, label: str, supplier_data: Sequence[str] = ()) -> float:
-    """The top edge of installation notes and separate supplier operating data."""
+def footer_top(
+    notes: str,
+    *,
+    label: str,
+    supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
+) -> float:
+    """The top edge of installation notes/data, translated with the footer."""
+    if not math.isfinite(y_offset):
+        raise ValueError(f"{label}: purchased footer y_offset must be finite")
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
     if not lines and not data:
-        return _GENERAL_Y
+        return _GENERAL_Y + y_offset
     gap = _LINE_PITCH if lines and data else 0.0
-    return _NOTES_BOTTOM + (len(lines) + len(data)) * _LINE_PITCH + gap + 0.001
+    return (
+        _NOTES_BOTTOM
+        + (len(lines) + len(data)) * _LINE_PITCH
+        + gap
+        + 0.001
+        + y_offset
+    )
 
 
 def view_band_bottom(
-    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+    notes: str,
+    *,
+    label: str,
+    supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
 ) -> float:
     """Bottom-row captions clear the complete footer and title block."""
     return max(
-        footer_top(notes, label=label, supplier_data=supplier_data)
+        footer_top(
+            notes, label=label, supplier_data=supplier_data, y_offset=y_offset
+        )
         + _CAPTION_CLEARANCE,
-        _LOWEST_CAPTION_Y,
+        _LOWEST_CAPTION_Y + y_offset,
     )
 
 
@@ -611,7 +632,9 @@ def _cell(
 
 
 def fastener_view_cells(
-    caption_y: float, *, layout: Literal["standard", "tall_top"] = "standard"
+    caption_y: float,
+    *,
+    layout: Literal["standard", "tall_top", "portrait_reference"] = "standard",
 ) -> tuple:
     """Third-angle Front/Top/Right with the Isometric upper right.
 
@@ -623,10 +646,19 @@ def fastener_view_cells(
     ``tall_top`` gives an annotated axial Top profile 96 mm rather than 64 mm,
     lowering both bottom-row cells' tops and the Isometric's bottom together
     while retaining the caption gaps.
+    ``portrait_reference`` uses the existing ANSI B portrait sheet, with a
+    separate tall Right band and an independent Isometric band.
     """
-    if layout not in ("standard", "tall_top"):
+    if layout not in ("standard", "tall_top", "portrait_reference"):
         raise ValueError(f"unknown purchased fastener view layout: {layout!r}")
     bottom = caption_y + _CAPTION_TO_CELL
+    if layout == "portrait_reference":
+        return (
+            _cell("*Front", 0.025, bottom, 0.135, 0.310),
+            _cell("*Top", 0.025, 0.326, 0.135, 0.4144),
+            _cell("*Right", 0.144, bottom, 0.262, 0.292),
+            _cell(_ISOMETRIC, 0.144, 0.302, 0.262, 0.4144),
+        )
     row_top = 0.150 if layout == "tall_top" else 0.182
     top_bottom = 0.166 if layout == "tall_top" else 0.198
     isometric_bottom = 0.160 if layout == "tall_top" else 0.192
@@ -1038,6 +1070,70 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
     return scales
 
 
+@_telemetry.traced("drawing.purchased_align_orthographic", label_param="label")
+def _align_orthographic_views(
+    adapter: Any,
+    draw: Any,
+    views: list[Any],
+    cells: tuple,
+    *,
+    scales: dict[str, tuple[int, int]],
+    label: str,
+) -> None:
+    """Align actual model origins after fitting, without changing scale/cells."""
+    by_name = {
+        name: view for view, (name, _, _) in zip(views, cells, strict=True)
+    }
+    origins: dict[str, tuple[float, float]] = {}
+    for name in ("*Front", "*Top", "*Right"):
+        view = by_name[name]
+        view.UpdateViewDisplayGeometry()
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} alignment origin"
+        )
+        if not all(map(math.isfinite, origin)):
+            raise RuntimeError(f"{label} {name}: invalid projected origin {origin!r}")
+        origins[name] = origin
+    front = origins["*Front"]
+    aligned = {
+        "*Front": front,
+        "*Top": (front[0], origins["*Top"][1]),
+        "*Right": (origins["*Right"][0], front[1]),
+    }
+    for name in ("*Top", "*Right"):
+        view = by_name[name]
+        position = tuple(float(value) for value in view.Position)
+        if len(position) != 2 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"{label} {name}: invalid native view position {position!r}")
+        target = [
+            position[i] + aligned[name][i] - origins[name][i] for i in range(2)
+        ]
+        if not view.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"{label} {name}: failed to align purchased view")
+    _rebuild(draw, phase="align purchased orthographic origins")
+    for view, (name, _, cell) in zip(views, cells, strict=True):
+        box, _outlines = _refreshed_native_fit_bounds(view, label=f"{label} {name}")
+        if tuple(view.ScaleRatio) != scales[name] or view.UseSheetScale != 0:
+            raise RuntimeError(f"{label} {name}: alignment changed fitted view scale")
+        if not _inside(box, cell):
+            raise RuntimeError(
+                f"{label} {name}: aligned native view leaves its fitted cell: {box!r}"
+            )
+        if name == _ISOMETRIC:
+            continue
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} aligned origin"
+        )
+        if not all(map(math.isfinite, origin)) or any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(origin, aligned[name], strict=True)
+        ):
+            raise RuntimeError(
+                f"{label} {name}: native projected origin failed to align: "
+                f"{origin!r}, expected {aligned[name]!r}"
+            )
+
+
 @_telemetry.traced("drawing.purchased_center_marks")
 def _center_marks_without_lines(views: list[Any], cells: tuple) -> dict[str, int]:
     """Drop the extension lines of every template-inserted centre mark.
@@ -1355,13 +1451,17 @@ def add_purchased_footer(
     cut_to_suit: bool = False,
     label: str,
     supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
     Returns (note, linked text, resolved text, reserved box) for the native
     readback.  ``cut_to_suit`` says the part is cut at assembly (its note says
     where); otherwise the general line says it is used as supplied.
+    ``y_offset`` translates every annotation anchor and its reserved box equally.
     """
+    if not math.isfinite(y_offset):
+        raise ValueError(f"{label}: purchased footer y_offset must be finite")
     item = check_item(item, label=label)
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
@@ -1373,48 +1473,74 @@ def add_purchased_footer(
         apply_custom_properties(adapter, {"Installation Notes": text}, model=draw)
         # $PRP (this drawing), not $PRPSHEET (the model in view).
         link = '$PRP:"Installation Notes"'
-        top = footer_top(text, label=label)
+        top = footer_top(text, label=label, y_offset=y_offset)
         note = _literal_note(adapter, link, _NOTE_X, top)
         placed.append(
             (
                 note,
                 link,
                 text,
-                (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, top + 0.001),
+                (0.015, _NOTES_BOTTOM - 0.001 + y_offset, _FOOTER_RIGHT, top + 0.001),
             )
         )
     if data:
         text = "\n".join(data)
-        top = footer_top(notes, label=label, supplier_data=supplier_data)
+        top = footer_top(
+            notes, label=label, supplier_data=supplier_data, y_offset=y_offset
+        )
         bottom = (
-            footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+            footer_top(notes, label=label, y_offset=y_offset) + _LINE_PITCH
+            if lines
+            else _NOTES_BOTTOM + y_offset
         )
         note = _literal_note(adapter, text, _NOTE_X, top)
         placed.append(
             (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
     general = _GENERAL_TEXT[cut_to_suit]
-    note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y)
+    note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y + y_offset)
     placed.append(
         (
             note,
             general,
             general,
-            (0.015, _GENERAL_BOTTOM, _FOOTER_RIGHT, _GENERAL_Y + 0.001),
+            (
+                0.015,
+                _GENERAL_BOTTOM + y_offset,
+                _FOOTER_RIGHT,
+                _GENERAL_Y + 0.001 + y_offset,
+            ),
         )
     )
     for row, y in _FOOTER_ROWS:
-        row_note = _literal_note(adapter, row, _NOTE_X, y)
+        row_note = _literal_note(adapter, row, _NOTE_X, y + y_offset)
         placed.append(
-            (row_note, row, row, (0.015, y - 0.007, _VALUE_X - 0.002, y + 0.001))
+            (
+                row_note,
+                row,
+                row,
+                (
+                    0.015,
+                    y - _FOOTER_ROW_BELOW + y_offset,
+                    _VALUE_X - 0.002,
+                    y + 0.001 + y_offset,
+                ),
+            )
         )
-        box = (_VALUE_X - 0.002, y - 0.007, _FOOTER_RIGHT, y + 0.001)
+        box = (
+            _VALUE_X - 0.002,
+            y - _FOOTER_ROW_BELOW + y_offset,
+            _FOOTER_RIGHT,
+            y + 0.001 + y_offset,
+        )
         if row == "ITEM:":
-            value = _literal_note(adapter, item, _VALUE_X, y)
+            value = _literal_note(adapter, item, _VALUE_X, y + y_offset)
             placed.append((value, item, item, box))
             continue
         name = "Supplier" if row == "SUPPLIER:" else "Supplier SKUs"
-        value = add_property_linked_note(adapter, name, _VALUE_X, y, char_height=0.003)
+        value = add_property_linked_note(
+            adapter, name, _VALUE_X, y + y_offset, char_height=0.003
+        )
         placed.append(
             (_early_bound(value, "INote"), property_link(name), properties[name], box)
         )
@@ -1428,12 +1554,14 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
-    view_layout: Literal["standard", "tall_top"] = "standard",
+    view_layout: Literal["standard", "tall_top", "portrait_reference"] = "standard",
+    align_orthographic: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
     saved_check: Callable[[Any, Path], None] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
@@ -1446,10 +1574,16 @@ async def build_purchased_fastener_drawing(
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
     ``view_layout="tall_top"`` reallocates space to an annotated axial Top view
     without changing annotation margins or the standard-scale fitting contract.
+    ``portrait_reference`` requires the existing ANSI B portrait template.
+    ``align_orthographic`` aligns Top's projected model-origin X and Right's Y
+    with Front after fitting, before supplier annotations capture their origins.
     Supplier hooks import native reference sizes after fitting; explicit margins
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``title_block_setup`` uses the existing linked Name/Material/Number fitter
+    and returns its final-rebuild proof; it replaces, rather than combines
+    with, the separate opt-in ``number_fit``.
     ``saved_check`` optionally reads the saved native drawing after the finalizer
     closes it, while the supplier-source byte-preservation guard still owns it.
     """
@@ -1506,11 +1640,13 @@ async def build_purchased_fastener_drawing(
             document_title=str(registry["title"]),
             number_fit=number_fit,
             view_layout=view_layout,
+            align_orthographic=align_orthographic,
             supplier_dimensions=supplier_dimensions,
             supplier_margins=supplier_margins,
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            title_block_setup=title_block_setup,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
@@ -1644,7 +1780,8 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
-    view_layout: Literal["standard", "tall_top"] = "standard",
+    view_layout: Literal["standard", "tall_top", "portrait_reference"] = "standard",
+    align_orthographic: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
@@ -1652,6 +1789,7 @@ async def _build_reference_sheet(
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     source_checkpoint: Callable[[str], None] | None = None,
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1660,11 +1798,37 @@ async def _build_reference_sheet(
     check_item(item, label=label)
     if not isinstance(number_fit, NumberFit):
         raise TypeError(f"{label}: number_fit must be a NumberFit: {number_fit!r}")
+    if type(align_orthographic) is not bool:
+        raise TypeError(f"{label}: align_orthographic must be a bool")
+    if title_block_setup is not None:
+        if not callable(title_block_setup):
+            raise TypeError(f"{label}: title block setup must be callable")
+        if number_fit is not NumberFit.TEMPLATE:
+            raise ValueError(
+                f"{label}: title block setup owns Number; a second Number fitter is not allowed"
+            )
+    footer_y_offset = 0.0
+    if view_layout == "portrait_reference":
+        if (
+            spring
+            or spec.layout is not DrawingLayout.PORTRAIT
+            or (template.width_m, template.height_m) != (0.2794, 0.4318)
+        ):
+            raise ValueError(
+                f"{label}: portrait_reference requires the ANSI B portrait fastener template"
+            )
+        footer_y_offset = (
+            template.title_block_top_m
+            + _CAPTION_CLEARANCE
+            - min(y - _FOOTER_ROW_BELOW for _, y in _FOOTER_ROWS)
+        )
     if configuration is not None and (
         not isinstance(configuration, str) or not configuration.strip()
     ):
         raise ValueError(f"{label}: source configuration must be a nonempty name")
-    caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
+    caption_y = view_band_bottom(
+        notes, label=label, supplier_data=supplier_data, y_offset=footer_y_offset
+    )
     cells = (
         spring_view_cells(caption_y)
         if spring
@@ -1745,6 +1909,10 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, fit_cells)
+    if align_orthographic:
+        _align_orthographic_views(
+            adapter, draw, views, fit_cells, scales=scales, label=label
+        )
     fitted_origins: dict[str, tuple[float, float]] = {}
     fitted_sources: dict[str, tuple[str, str]] = {}
     if supplier_dimensions is not None:
@@ -1860,6 +2028,7 @@ async def _build_reference_sheet(
                 cut_to_suit=cut_to_suit,
                 label=label,
                 supplier_data=supplier_data,
+                y_offset=footer_y_offset,
             )
         )
     with _telemetry.span("drawing.purchased_native_contract"):
@@ -1890,6 +2059,15 @@ async def _build_reference_sheet(
                     adapter, draw, layout=spec.layout, number=properties["Number"]
                 ),
             )
+        if title_block_setup is not None:
+            title_check = title_block_setup(adapter)
+            if not callable(title_check):
+                if inspect.iscoroutine(title_check):
+                    title_check.close()
+                raise TypeError(
+                    f"{label}: title block setup must synchronously return a settled check"
+                )
+            final_checks = (*final_checks, title_check)
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:
