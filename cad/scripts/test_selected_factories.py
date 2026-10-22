@@ -381,7 +381,7 @@ def _case_selected_check_does_not_construct_other_check_specs(dodo, monkeypatch)
         commands.append(command)
         return {str(dodo.VERIFY_PY)}
 
-    monkeypatch.setattr(dodo, "_check_recipe_spec", forbidden)
+    monkeypatch.setitem(dodo._CHECK_SPEC_BUILDERS, "recipe", forbidden)
     monkeypatch.setattr(dodo, "_feature_bundle_outputs", forbidden)
     monkeypatch.setattr(dodo, "_machinist_review_file_deps", forbidden)
     monkeypatch.setattr(dodo, "_executed_closure", executed)
@@ -401,6 +401,29 @@ def _case_selected_check_does_not_construct_other_check_specs(dodo, monkeypatch)
     assert action.args == [
         commands[0], "check math", selected.targets[0], "check:math",
     ]
+
+
+def _case_registered_checks_require_enrollment_without_building_siblings(dodo, monkeypatch):
+    constructed = []
+
+    def unrelated(_pytest_cmd):
+        constructed.append("unrelated")
+        pytest.fail("selecting check:math must not construct an unrelated check")
+
+    name = "selected_factory_enrollment_probe"
+    monkeypatch.setitem(dodo._CHECK_SPEC_BUILDERS, name, unrelated)
+    with pytest.raises(AssertionError, match="check specs vs check-names drift"):
+        dodo.canonical_tasks(["check:math"])
+    assert not constructed
+
+    monkeypatch.setattr(dodo, "_OPTIONAL_CHECK_NAMES", (*dodo._OPTIONAL_CHECK_NAMES, name))
+    monkeypatch.setattr(dodo, "_executed_closure", lambda _cmd: {str(dodo.VERIFY_PY)})
+    selected, = dodo.canonical_tasks(["check:math"])
+    assert selected.name == "check:math"
+    action, = selected.actions
+    assert action.py_callable is dodo._run_stamped
+    assert action.args[0] == [dodo.sys.executable, str(dodo.VERIFY_PY), "--suite", "math"]
+    assert not constructed
 
 
 def _case_concurrent_selections_have_independent_mutable_task_state(dodo, monkeypatch):
@@ -941,6 +964,7 @@ def test_selected_factories_portfolio(
         (_case_invalid_or_duplicate_names_fail_before_task_construction, {'names': [None]}),
         (_case_empty_selection_constructs_nothing, {}),
         (_case_selected_check_does_not_construct_other_check_specs, {}),
+        (_case_registered_checks_require_enrollment_without_building_siblings, {}),
         (_case_concurrent_selections_have_independent_mutable_task_state, {}),
         (_case_assembly_keeps_trackers_wrappers_and_doit_reserved_arguments, {}),
         (_case_target_ownership_matches_every_normal_declared_target, {}),

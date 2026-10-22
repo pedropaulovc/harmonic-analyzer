@@ -634,10 +634,12 @@ has inferred task dependencies from file dependencies. It compares task names,
 task/file dependencies, targets and Python callable identities against the trusted
 graph, and checks live target ownership so an existing output cannot hide an
 omitted producer.
-Before loading doit configuration or constructing tasks, the selective loader
-validates that the provider's `REPO_ROOT` matches its workspace, then changes to
-that workspace like the ordinary loader. Relative recipe inputs therefore do not
-depend on the caller's working directory; rejected authority never changes it.
+The selective loader first imports `dodo` under the caller's working directory.
+It then validates that the provider's `REPO_ROOT` matches its workspace and
+changes to that workspace before loading doit configuration or invoking the
+canonical task/ownership providers and task actions. Factory inputs and actions
+therefore use workspace-relative paths; module import has no such cwd guarantee.
+The authority check itself does not change cwd when it refuses a provider.
 
 Serialized Python is never executed. Action arguments come from the live
 canonical factories, not graph JSON; the producer deliberately does not duplicate
