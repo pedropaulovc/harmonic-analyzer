@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import math
 from types import SimpleNamespace
+from contextlib import nullcontext
 
 import pytest
 
@@ -21,7 +22,12 @@ import _drawing_balloons
 import _component_references
 import _drawing_tables
 import _drawing_common
+import _drawing_detail_crop
 import _drawing_dimensions
+import _drawing_projection
+import _drawing_sections
+import _drawing_selection
+import _section_axis
 import _drawing_view_configuration
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
@@ -92,11 +98,13 @@ def _nut_bracket(dx: float = 0.0, dy: float = 0.0) -> list[tuple[float, float]]:
     return [(x + dx, y + dy) for x, y in corners]
 
 
-def _exploded_part_points(stem, bounds):
-    """Conservative native part-box corners under the actual explode transform."""
-    shift = tuple(spec.explode_shift(stem, axis) for axis in "xyz")
+def _exploded_part_points(stem, bounds, indices=None):
+    """Conservative part-box corners under each actual occurrence transform."""
     points = []
-    for origin, rows in spec.PLACEMENTS[stem]:
+    for index, (origin, rows) in enumerate(spec.PLACEMENTS[stem]):
+        if indices is not None and index not in indices:
+            continue
+        shift = tuple(spec.explode_shift(spec.instance_name(stem, index), axis) for axis in "xyz")
         for x in bounds[0]:
             for y in bounds[1]:
                 for z in bounds[2]:
@@ -109,7 +117,7 @@ def _exploded_part_points(stem, bounds):
     return points
 
 
-def _capture_cluster_extent():
+def _capture_cluster_extent(support=None):
     retention, hardware = spec.retention, spec.retention_hardware
     cotter, wire = spec.pivot_cotter, spec.pivot_wire
     wire_controls = [
@@ -169,7 +177,13 @@ def _capture_cluster_extent():
     }
     points = [
         point for stem, bounds in boxes.items()
-        for point in _exploded_part_points(stem, bounds)
+        for point in _exploded_part_points(
+            stem, bounds,
+            None if support is None else range(
+                support * (spec.QUANTITIES[stem] // 2),
+                (support + 1) * (spec.QUANTITIES[stem] // 2),
+            ),
+        )
     ]
     return [(x, y) for x, y, _z in points], (
         min(z for _x, _y, z in points), max(z for _x, _y, z in points)
@@ -397,7 +411,7 @@ def test_exploded_wire_stays_near_its_heads_and_apart_from_the_cotter() -> None:
     def project(stem, point, index=0):
         origin, rows = spec.PLACEMENTS[stem][index]
         world = tuple(
-            origin[axis] + spec.explode_shift(stem, "xyz"[axis])
+            origin[axis] + spec.explode_shift(spec.instance_name(stem, index), "xyz"[axis])
             + sum(point[k] * rows[k][axis] for k in range(3))
             for axis in range(3)
         )
@@ -435,7 +449,7 @@ def test_exploded_wire_stays_near_its_heads_and_apart_from_the_cotter() -> None:
 def test_exploded_captions_fit_their_text_region() -> None:
     for cluster in drawing.CLUSTERS:
         if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET:
-            continue  # Native pair placement has its own per-field coverage.
+            continue  # Sheet 4's four views have independent measured fields.
         scale = drawing.cluster_ring_scale(
             _cluster_outline(cluster), cluster.scale, label=cluster.sheet
         )
@@ -639,7 +653,7 @@ def test_bom_extent_rejects_border_title_and_reserved_content_intrusions() -> No
 def test_each_cluster_rings_inside_its_sheet() -> None:
     for cluster in drawing.CLUSTERS:
         if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET:
-            continue  # The pair no longer uses the whole-sheet ring fitter.
+            continue  # Sheet 4 uses its local, independent view fitter.
         initial = _cluster_outline(cluster)
         scale = drawing.cluster_ring_scale(initial, cluster.scale, label=cluster.sheet)
         # Fit at the returned scale, not the initial placement scale. Every
@@ -2034,6 +2048,47 @@ class _InspectionSheetSketch:
         return _InspectionTransform(denominator / numerator)
 
 
+class _CaptureViewTransform:
+    """Native math-boundary double, retaining 3-D projection and view rotation."""
+
+    def __init__(self, view):
+        self.view = view
+
+    def apply(self, xyz):
+        view = self.view
+        delta = tuple(xyz[i] - view.model_origin[i] for i in range(3))
+        x = sum(delta[i] * view.right[i] for i in range(3))
+        y = sum(delta[i] * view.up[i] for i in range(3))
+        c, s = math.cos(view.Angle), math.sin(view.Angle)
+        ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+        return (view.Position[0] + ratio * (c*x - s*y),
+                view.Position[1] + ratio * (s*x + c*y), 0.0)
+
+
+class _CaptureViewSketch:
+    def __init__(self, view):
+        self.view = view
+        self.segments = []
+        self.sketch_origin = None
+
+    def GetSketchSegments(self):
+        return tuple(self.segments)
+
+    @property
+    def ModelToSketchTransform(self):
+        scale = self.view.ScaleRatio[1] / self.view.ScaleRatio[0]
+        rotation = _InspectionTransform(scale, angle=0.37, origin=(0.0, 0.0, 0.0))
+        position = rotation.apply((*self.view.Position, 0.0))
+        if self.sketch_origin is None:
+            # The first native read retains the nonidentity authored transform.
+            self.sketch_origin = tuple(
+                position[i] + (-0.013, 0.021, 0.0)[i] for i in range(3)
+            )
+        # A view sketch moves/scales with its owner; persisted geometry does not.
+        origin = tuple(self.sketch_origin[i] - position[i] for i in range(3))
+        return _InspectionTransform(scale, angle=0.37, origin=origin)
+
+
 @pytest.fixture
 def native_property_package(monkeypatch):
     """Double the COM boundary, not recipe view placement or property linking.
@@ -2071,6 +2126,10 @@ def native_property_package(monkeypatch):
         sketch_lines=[], sketch_segments=[], paper_edits=[], balloon_landings=[],
         display_scale=1.0, display_shift=(0.0, 0.0), hidden_line=None,
         inspection_fit_denominator=20.0,
+        active_view=None, selected=[], crop_circles=[], crop_calls=[], section_segments=[],
+        attached_notes=[], events=[], bom_inserted=False, crop_status=1,
+        bad_crop=False, bad_section=False, bad_pick=False, bad_attachment=False,
+        capture_fit_denominator=4.0,
     )
     for name in physical_names:
         sheet = SimpleNamespace(
@@ -2096,6 +2155,7 @@ def native_property_package(monkeypatch):
         if name not in doc.sheets:
             return False
         doc.active = name
+        doc.active_view = None
         return True
 
     def create_view(model_path, orientation, x, y, z):
@@ -2105,7 +2165,10 @@ def native_property_package(monkeypatch):
             model_path=model_path, Sheet=sheet, Position=(x, y),
             ScaleRatio=(1.0, 1.0), ReferencedDocument=source,
             ReferencedConfiguration=drawing.ASSEMBLY_VIEW_CONFIGURATION,
-            exploded=False,
+            exploded=False, Angle=0.0, cropped=False, crop=None, notes=[],
+            mode=_drawing_common._SW_SHADED_EDGES, section=None,
+            model_origin=tuple(v / 1000.0 for v in spec.PIVOT_PIN_ORIGINS[0]),
+            right=spec.VIEW_AXES[orientation][0], up=spec.VIEW_AXES[orientation][1],
         )
         if sheet.name == drawing.CARTRIDGE_SHEET:
             # Native view insertion may auto-drift the requested sheet scale.
@@ -2113,12 +2176,49 @@ def native_property_package(monkeypatch):
             sheet.properties[2:4] = [1.0, 5.0]
         view.GetName2 = lambda: f"DrawingView-{sheet.name}-{index}"
         view.GetOrientationName = lambda: orientation
-        view.GetDisplayMode2 = lambda: _drawing_common._SW_SHADED_EDGES
+        view.GetDisplayMode2 = lambda: view.mode
         view.IsExploded = lambda: view.exploded
         view.UpdateViewDisplayGeometry = lambda: None
         view.GetNextView = lambda: (
             sheet.views[index + 1] if index + 1 < len(sheet.views) else None
         )
+        view.GetUseParentDisplayMode = lambda: False
+        view.GetSection = lambda: view.section
+        view.GetNotes = lambda: tuple(view.notes)
+        view.IsCropped = lambda: view.cropped
+        view.ModelToViewTransform = _CaptureViewTransform(view)
+        view.sketch = _CaptureViewSketch(view)
+        view.GetSketch = lambda: view.sketch
+        leaves = []
+        for stem, count in spec.QUANTITIES.items():
+            for occurrence in range(count):
+                component = SimpleNamespace(Name2=spec.instance_name(stem, occurrence),
+                                            GetPathName=lambda stem=stem: f"{stem}.SLDPRT")
+                leaves.append(SimpleNamespace(
+                    Name=component.Name2, Component=component, Visible=True,
+                    GetChildren=lambda: (),
+                ))
+        view.components = leaves
+        view.RootDrawingComponent2 = lambda _resolve: SimpleNamespace(GetChildren=lambda: tuple(leaves))
+
+        def crop(_jagged, _no_outline, _intensity):
+            assert (_jagged, _no_outline, _intensity) == (False, False, 1)
+            circle, = doc.selected
+            assert any(circle is segment for segment in view.sketch.segments)
+            assert circle.GetType() == 1 and circle.IsCircle() == 1
+            assert not circle.ConstructionGeometry
+            inverse = view.sketch.ModelToSketchTransform.Inverse()
+            centre = inverse.apply(circle.centre)
+            edge = inverse.apply((circle.centre[0] + circle.radius,
+                                  circle.centre[1], circle.centre[2]))
+            radius = math.dist(centre, edge)
+            ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+            view.crop = (tuple((centre[i] - view.Position[i]) / ratio for i in (0, 1)), radius / ratio)
+            doc.crop_calls.append((view, circle))
+            view.cropped = not doc.bad_crop
+            return doc.crop_status
+
+        view.Crop2 = crop
 
         def show_exploded(show):
             view.exploded = show
@@ -2138,6 +2238,20 @@ def native_property_package(monkeypatch):
             else:
                 size = _iso_size(0.0)
             box = _view_box(view.Position, *size, view.ScaleRatio)
+            if sheet.name == drawing.PIVOT_CAPTURE_SHEET and index == 0:
+                plan, (bottom, top) = _capture_cluster_extent(0)
+                span = max(p[0] for p in plan) - min(p[0] for p in plan) + max(p[1] for p in plan) - min(p[1] for p in plan)
+                size = (span * math.sqrt(0.5) * OUTLINE_GROWTH[0],
+                        (span * ISO / 2.0 + (top-bottom) * ISO) * OUTLINE_GROWTH[1])
+                box = _view_box(view.Position, *size, view.ScaleRatio)
+                if view.ScaleRatio[1] < doc.capture_fit_denominator:
+                    box = (box[0], box[1], box[2] + 0.3, box[3])
+            if view.crop is not None:
+                offset, radius = view.crop
+                ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+                centre = tuple(view.Position[i] + ratio * offset[i] for i in (0, 1))
+                box = (centre[0] - radius*ratio, centre[1] - radius*ratio,
+                       centre[0] + radius*ratio, centre[1] + radius*ratio)
             if (doc.oversized == sheet.name
                     or (sheet.name == drawing.CARTRIDGE_SHEET
                         and view.ScaleRatio[1] < doc.inspection_fit_denominator)):
@@ -2149,6 +2263,7 @@ def native_property_package(monkeypatch):
         view.SetViewPosition = move
         view.GetOutline = outline
         sheet.views.append(view)
+        doc.events.append(("view", view.GetName2(), doc.bom_inserted))
         return view
 
     doc.ActivateSheet = activate
@@ -2184,11 +2299,198 @@ def native_property_package(monkeypatch):
 
     doc.GetFirstView = first_view
     doc.CreateDrawViewFromModelView3 = create_view
-    doc.ClearSelection2 = lambda _all: None
+    doc.ClearSelection2 = lambda _all: doc.selected.clear()
     doc.EditRebuild3 = lambda: True
     doc.EditSheet = lambda: doc.paper_edits.append(doc.active)
 
+    def activate_view(name):
+        views = doc.sheets[doc.active].views
+        doc.active_view = next((v for v in views if v.GetName2() == name), None)
+        return doc.active_view is not None
+
+    doc.ActivateView = activate_view
+
+    def select_segment(segment, append, data):
+        if data.View is not doc.active_view or segment.GetSketch() is not doc.active_view.sketch:
+            return False
+        if not append:
+            doc.selected.clear()
+        doc.selected.append(segment)
+        return True
+
+    def create_circle(*coordinates):
+        view = doc.active_view
+        assert view is not None and doc.SketchManager.AddToDB is True
+        centre, edge = (tuple(coordinates[i:i+3]) for i in (0, 3))
+        circle = SimpleNamespace(
+            centre=centre, radius=math.dist(centre, edge),
+            ConstructionGeometry=False, GetType=lambda: 1, IsCircle=lambda: 1,
+            GetSketch=lambda: view.sketch,
+        )
+        circle.GetCenterPoint2 = lambda: SimpleNamespace(
+            X=circle.centre[0], Y=circle.centre[1], Z=circle.centre[2],
+        )
+        circle.GetRadius = lambda: circle.radius
+        circle.Select4 = lambda append, data: select_segment(circle, append, data)
+        view.sketch.segments.append(circle)
+        doc.crop_circles.append(circle)
+        return circle
+
+    def native_note(text, view, *, entity=None, world=None, linked=""):
+        note = SimpleNamespace(text=text, position=[0.0, 0.0, 0.0],
+                               PropertyLinkedText=linked, entity=entity,
+                               world=world, view=view, landing_shift=(0.0, 0.0),
+                               IsBomBalloon=lambda: False)
+        format_ = SimpleNamespace(CharHeight=0.0035)
+        annotation = SimpleNamespace(
+            OwnerType=0, GetTextFormat=lambda _index: format_,
+            GetAttachedEntities3=lambda: () if note.entity is None else (note.entity,),
+            GetAttachedEntityCount3=lambda: int(note.entity is not None),
+            GetAttachedEntityTypes=lambda: () if note.entity is None else (1,),
+            GetLeaderCount=lambda: int(note.entity is not None),
+            IsDangling=lambda: False, GetPosition=lambda: tuple(note.position),
+            SetLeader3=lambda *_args: 0,
+        )
+
+        def set_position(x, y, z):
+            note.position[:] = (x, y, z)
+            return True
+
+        def set_format(_index, _use_doc, value):
+            format_.CharHeight = value.CharHeight
+            return True
+
+        def extent():
+            lines = text.splitlines()
+            h = format_.CharHeight
+            return (note.position[0], note.position[1] - len(lines)*h*1.2, 0.0,
+                    note.position[0] + max(map(len, lines))*h*0.55, note.position[1], 0.0)
+
+        def leader(_index):
+            point = view.ModelToViewTransform.apply(note.world)
+            point = (point[0]+note.landing_shift[0], point[1]+note.landing_shift[1], 0.0)
+            bounds = extent()
+            x = bounds[3]+0.001 if point[0] > bounds[3] else bounds[0]-0.001
+            return (x, note.position[1]-format_.CharHeight*0.6, 0.0, *point)
+
+        annotation.SetPosition2 = set_position
+        annotation.SetTextFormat = set_format
+        annotation.GetLeaderPointsAtIndex = leader
+        note.GetAnnotation = lambda: annotation
+        note.GetExtent = extent
+        note.GetText = lambda: note.text
+        note.annotation = annotation
+        view.notes.append(note)
+        return note
+
+    def select_edge(_name, kind, x, y, _z, _append, _mark, _callout, _option):
+        assert kind == "EDGE"
+        view = doc.active_view
+        candidates = []
+        index = doc.sheets[doc.active].views.index(view)
+        for reading in drawing.capture_readings():
+            if reading.view_index != index:
+                continue
+            world = drawing._capture_world_point(reading)
+            projected = view.ModelToViewTransform.apply(world)
+            candidates.append((math.dist((x, y), projected[:2]), reading, world))
+        distance, reading, world = min(candidates, key=lambda item: item[0])
+        assert distance < 1e-8
+        instance = spec.instance_name(reading.stem, reading.index)
+        if doc.bad_pick:
+            instance = spec.instance_name(spec.PIVOT_BLOCK, 1)
+        component = next(leaf.Component for leaf in view.components if leaf.Component.Name2 == instance)
+        entity = SimpleNamespace(GetComponent=lambda: component, world=world)
+        doc.selected[:] = [entity]
+        return True
+
+    def selection_point(index, mark, x, y, z):
+        assert (index, mark, z) == (1, -1, 0.0)
+        doc.selection_point = (x, y)
+        return True
+
+    def insert_note(text):
+        entity, = doc.selected
+        note = native_note(text, doc.active_view, entity=entity, world=entity.world)
+        if doc.bad_attachment:
+            note.entity = object()
+        doc.attached_notes.append(note)
+        return note
+
+    doc.Extension = SimpleNamespace(SelectByID2=select_edge)
+    doc.SelectionManager = SimpleNamespace(
+        CreateSelectData=lambda: SimpleNamespace(View=None),
+        GetSelectedObjectCount2=lambda _mark: len(doc.selected),
+        GetSelectedObject6=lambda index, _mark: doc.selected[index-1],
+        SetSelectionPoint2=selection_point,
+    )
+    doc.InsertNote = insert_note
+
+    def create_section(x, y, z, letter, options, excluded, depth):
+        assert doc.bom_inserted is False
+        assert options == 0x1 | 0x8 | 0x10
+        assert excluded is None and depth == 0.0
+        if doc.bad_section:
+            return None
+        line, = doc.selected
+        parent = doc.active_view
+        inverse = parent.sketch.ModelToSketchTransform.Inverse()
+        a, b = (inverse.apply(point)[:2] for point in line.points)
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        axis = tuple(dx*parent.right[i] + dy*parent.up[i] for i in range(3))
+        length = math.sqrt(sum(v*v for v in axis))
+        view = create_view(parent.model_path, spec.PLAN_VIEW, x, y, z)
+        view.right, view.up = tuple(v/length for v in axis), (0.0, 0.0, 1.0)
+        view.ReferencedConfiguration = parent.ReferencedConfiguration
+        section = SimpleNamespace(label=letter, hatch=False, partial=True,
+                                  cut_only=False, reversed=False, ExcludeFasteners=False,
+                                  line_shift=(0.0, 0.0, 0.0), parent=parent, line=line)
+        section.GetAutoHatch = lambda: section.hatch
+        section.SetAutoHatch = lambda value: setattr(section, "hatch", value)
+        section.GetLabel = lambda: section.label
+        def set_label(value):
+            section.label = value
+            return 0
+        section.SetLabel2 = set_label
+        section.GetView = lambda: section.parent
+        section.GetPartialSection = lambda: section.partial
+        section.GetDisplayOnlySurfaceCut = lambda: section.cut_only
+        section.SetDisplayOnlySurfaceCut = lambda value: setattr(section, "cut_only", value)
+        section.GetReversedCutDirection = lambda: section.reversed
+        section.SetReversedCutDirection = lambda value: setattr(section, "reversed", value)
+        # GetLineInfo exposes the actual CreateLine sketch coordinates. Only
+        # arrow/text annotations below use the inverse-to-paper endpoints.
+        section.GetLineInfo = lambda: tuple(
+            point[i] + section.line_shift[i] for point in line.points for i in range(3)
+        )
+        section.GetArrowInfo = lambda: (*a, 0.0, a[0], a[1]+0.002, 0.0,
+                                       *b, 0.0, b[0], b[1]+0.002, 0.0)
+        section.GetTextInfo = lambda: (a[0]+0.002, a[1], 0.0, b[0]+0.002, b[1], 0.0)
+        view.section = section
+        native_note(f"SECTION {letter}-{letter}", view, linked="<VLLABEL> <VLSCALEV>")
+        return view
+
+    doc.CreateSectionViewAt5 = create_section
+
     def create_line(x0, y0, z0, x1, y1, z1):
+        if doc.active_view is not None:
+            assert doc.SketchManager.AddToDB is True
+            points = ((x0, y0, z0), (x1, y1, z1))
+            view = doc.active_view
+            segment = SimpleNamespace(
+                points=points, GetType=lambda: 0, ConstructionGeometry=False,
+                GetSketch=lambda: view.sketch,
+            )
+            segment.GetStartPoint2 = lambda: SimpleNamespace(
+                X=segment.points[0][0], Y=segment.points[0][1], Z=segment.points[0][2],
+            )
+            segment.GetEndPoint2 = lambda: SimpleNamespace(
+                X=segment.points[1][0], Y=segment.points[1][1], Z=segment.points[1][2],
+            )
+            segment.Select4 = lambda append, data: select_segment(segment, append, data)
+            view.sketch.segments.append(segment)
+            doc.section_segments.append(segment)
+            return segment
         assert doc.paper_edits[-1] == doc.active
         assert doc.SketchManager.AddToDB is True
         index = len(doc.sketch_lines)
@@ -2209,20 +2511,22 @@ def native_property_package(monkeypatch):
         doc.sketch_segments.append(segment)
         return segment
 
-    doc.SketchManager = SimpleNamespace(AddToDB=False, CreateLine=create_line)
+    doc.SketchManager = SimpleNamespace(AddToDB=False, CreateLine=create_line, CreateCircle=create_circle)
 
     def member(obj, name):
         value = getattr(obj, name)
         return value() if callable(value) else value
 
     adapter = SimpleNamespace(
-        currentModel=doc, _attempt=lambda callback: callback(), _get_attr_or_call=member,
+        currentModel=doc, _attempt=lambda callback, **_kwargs: callback(), _get_attr_or_call=member,
         swApp=SimpleNamespace(
             GetMathUtility=lambda: SimpleNamespace(CreatePoint=_InspectionMathPoint),
             IsSame=lambda a, b: 1 if a is b else 0,
         ),
     )
-    for module in (drawing, _drawing_common, _drawing_view_configuration):
+    for module in (drawing, _drawing_common, _drawing_view_configuration,
+                   _drawing_sections, _drawing_selection, _drawing_balloons,
+                   _drawing_detail_crop, _section_axis):
         monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound_or_flag",
@@ -2231,24 +2535,32 @@ def native_property_package(monkeypatch):
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound", lambda value, _interface: value
     )
-    for module in (drawing, _drawing_common._sw_drawing):
+    for module in (drawing, _drawing_common._sw_drawing, _drawing_projection, _drawing_sections):
         monkeypatch.setattr(module, "double_array", lambda values: values)
+    monkeypatch.setattr(
+        _drawing_projection, "_com_invoke",
+        lambda obj, _interface, name, *args: getattr(obj, name)(*args)
+        if callable(getattr(obj, name)) else getattr(obj, name),
+    )
     for module in (drawing, _drawing_common):
         monkeypatch.setattr(
             module, "set_high_quality_shaded_with_edges", lambda *args, **kwargs: None
         )
-    for module in (_drawing_common, _drawing_view_configuration):
+    for module in (drawing, _drawing_common, _drawing_view_configuration, _drawing_sections, _drawing_balloons, _section_axis):
         monkeypatch.setattr(module, "rebuild_drawing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *args, **kwargs: None)
-    for name in ("_create_package_sheets", "_require_view_axes", "_add_plan_tags",
-                 "set_hidden_lines_removed", "isolate_drawing_view_components"):
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda _adapter, view: setattr(view, "mode", 2))
+    for name in ("_create_package_sheets", "_require_view_axes", "_add_plan_tags"):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
     monkeypatch.setattr(drawing, "_cl_tip_setting", lambda *_args: lambda: None)
     monkeypatch.setattr(
         drawing, "_fit_cluster_view",
         lambda _adapter, _view, cluster, _configuration, *, label: cluster.scale,
     )
-    monkeypatch.setattr(drawing, "insert_bom_table", lambda *args, **kwargs: object())
+    def insert_bom(*_args, **_kwargs):
+        doc.bom_inserted = True
+        doc.events.append(("bom", None, True))
+        return object()
+    monkeypatch.setattr(drawing, "insert_bom_table", insert_bom)
     monkeypatch.setattr(
         drawing, "_validate_bom",
         lambda *_args: tuple(drawing.BOM_ITEM_NUMBERS.items()),
@@ -2257,13 +2569,22 @@ def native_property_package(monkeypatch):
 
     def balloons(_adapter, view, cluster, _items, _bom):
         centre = drawing._region_center(view.GetOutline())
-        landings = [
-            SimpleNamespace(
-                stem=stem,
-                note=SimpleNamespace(circle=(*centre, drawing.BALLOON_RADIUS)),
-            )
-            for stem in cluster.stems
-        ]
+        stems = (*cluster.stems, spec.BEARING) if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET else cluster.stems
+        used_bearings = 0
+        landings = []
+        for stem in stems:
+            occurrence = used_bearings if stem == spec.BEARING else 0
+            if stem == spec.BEARING:
+                used_bearings += 1
+            landings.append(SimpleNamespace(
+                stem=stem, instance=spec.instance_name(stem, occurrence), view=view,
+                note=SimpleNamespace(
+                    circle=(*centre, drawing.BALLOON_RADIUS),
+                    IsBomBalloon=lambda: True,
+                    GetBomBalloonText=lambda _upper, stem=stem: str(spec.ITEM_NUMBERS[stem]),
+                ),
+            ))
+            view.notes.append(landings[-1].note)
         doc.balloon_landings.extend(landings)
         return landings
 
@@ -2272,9 +2593,15 @@ def native_property_package(monkeypatch):
         drawing, "rendered_balloon_circle", lambda note, **_kwargs: note.circle
     )
 
-    def note(_adapter, text, x, y):
+    def note(_adapter, text, x, y, *, height=None):
         doc.notes.append((doc.active, text, (x, y)))
-        return SimpleNamespace(GetText=lambda: text)
+        if doc.active_view is None:
+            return SimpleNamespace(GetText=lambda: text)
+        result = native_note(text, doc.active_view)
+        annotation = result.GetAnnotation()
+        annotation.GetTextFormat(0).CharHeight = height or 0.0035
+        annotation.SetPosition2(x, y, 0.0)
+        return result
 
     monkeypatch.setattr(drawing, "add_note", note)
     monkeypatch.setattr(
@@ -2317,7 +2644,8 @@ def test_every_physical_sheet_links_to_its_actual_live_model_view(
     links = []
     for name, sheet in package.doc.sheets.items():
         assert len(sheet.views) == (
-            2 if name in (drawing.ASSEMBLED_SHEET, drawing.PIVOT_CAPTURE_SHEET) else 1
+            4 if name == drawing.PIVOT_CAPTURE_SHEET
+            else 2 if name == drawing.ASSEMBLED_SHEET else 1
         )
         # Read what the real finalizer wrote, resolving the name against this
         # physical sheet's real placement results, not a recipe-owned mapping.
@@ -2507,64 +2835,614 @@ def test_instruction_reference_refuses_a_native_outline_outside_its_room(
         drawing._place_package(package.adapter)
 
 
-def test_capture_pair_places_two_source_views_and_only_one_balloon_set(
-    native_property_package, monkeypatch,
+def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_owner(
+    native_property_package,
 ) -> None:
     package = native_property_package
-    isolated = []
-    monkeypatch.setattr(
-        drawing, "isolate_drawing_view_components",
-        lambda _adapter, view, *, visible_stems, label: isolated.append(
-            (view, visible_stems)
-        ),
-    )
     scales, settled = drawing._place_package(package.adapter)
     sheet = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET]
-    assert len(sheet.views) == 2
-    capture = next(
-        cluster for cluster in drawing.CLUSTERS
-        if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET
-    )
-    pair_isolation = [(view, names) for view, names in isolated if view.Sheet is sheet]
-    assert len(pair_isolation) == 2
-    for support, (view, names) in enumerate(pair_isolation):
-        assert names == drawing.capture_support_instances(capture, support)
-        assert tuple(view.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET]
-        assert _inside(
-            view.GetOutline(), drawing.CAPTURE_PAIR_REGIONS[support]
-        )
-    assert sheet.views[0].Position[0] < drawing.CLUSTER_CENTER[0]
-    assert sheet.views[1].Position[0] > drawing.CLUSTER_CENTER[0]
-    capture_landings = [
-        landing for landing in package.doc.balloon_landings
-        if landing.stem in capture.stems
+    exploded, locator, main, bolt = sheet.views
+    assert [view.IsExploded() for view in sheet.views] == [True, False, False, False]
+    assert [view.ReferencedConfiguration for view in sheet.views] == [
+        drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        drawing.ASSEMBLY_VIEW_CONFIGURATION,
+        drawing.ASSEMBLY_VIEW_CONFIGURATION,
+        drawing.ASSEMBLY_VIEW_CONFIGURATION,
     ]
-    assert sorted(landing.stem for landing in capture_landings) == sorted(capture.stems)
-    assert len(package.doc.balloon_landings) == len(spec.BOM_ORDER)
+    assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
+    assert tuple(locator.ScaleRatio) == (1, 4)
+    assert tuple(main.ScaleRatio) == tuple(bolt.ScaleRatio) == (1, 1)
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
+    installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
+    for index, view in enumerate(sheet.views):
+        shown = {leaf.Component.Name2 for leaf in view.components if leaf.Visible}
+        assert shown == (drawing.capture_support_instances(cluster, 0) if index == 0 else installed)
+        assert _inside(view.GetOutline(), drawing.CAPTURE_VIEW_REGIONS[index])
+    assert not exploded.IsCropped()
+    assert all(view.IsCropped() for view in (locator, main, bolt))
+    assert len(package.doc.section_segments) == 2
+    assert len(package.doc.crop_circles) == len(package.doc.crop_calls) == 3
+    for index, model_radius in ((1, 0.055), (2, 0.039), (3, 0.014)):
+        view = sheet.views[index]
+        circle = package.doc.crop_circles[index - 1]
+        assert package.doc.crop_calls[index - 1] == (view, circle)
+        assert circle.GetSketch() is view.sketch
+        assert circle.GetType() == circle.IsCircle() == 1
+        assert circle.ConstructionGeometry is False
+        point = circle.GetCenterPoint2()
+        assert (point.X, point.Y, point.Z) == circle.centre
+        assert circle.GetRadius() == circle.radius
+        assert view.crop[1] == pytest.approx(model_radius)
+    assert [segment.GetType() for segment in locator.sketch.GetSketchSegments()] == [1, 0, 0]
+    assert package.doc.SketchManager.AddToDB is False
+    for section, letter in ((main.GetSection(), "A"), (bolt.GetSection(), "B")):
+        assert section.GetView() is locator
+        assert section.GetAutoHatch() and section.GetPartialSection()
+        assert not section.ExcludeFasteners and not section.GetDisplayOnlySurfaceCut()
+        assert section.GetLabel() == letter
+    assert all(not after_bom for event, _name, after_bom in package.doc.events if event == "view")
+    landings = [item for item in package.doc.balloon_landings if item.stem in cluster.stems]
+    assert len(landings) == 9 and all(item.view is exploded for item in landings)
+    assert len(package.doc.balloon_landings) == len(spec.BOM_ORDER) + 1
+    bearings = [item for item in landings if item.stem == spec.BEARING]
+    assert {item.instance for item in bearings} == {spec.instance_name(spec.BEARING, i) for i in (0, 1)}
+    assert all(item.note.GetBomBalloonText(True) == "14" for item in bearings)
+    assert len(package.doc.attached_notes) == len(drawing.capture_readings())
+    assert all(note.entity.GetComponent().Name2 in installed for note in package.doc.attached_notes)
+    targets = []
+    for reading in drawing.capture_readings():
+        view = sheet.views[reading.view_index]
+        world = drawing._capture_world_point(reading)
+        targets.append((reading.view_index, world))
+        point = drawing.model_point_in_view(package.adapter, view, world, label="capture crop reading")
+        ratio = view.ScaleRatio[0] / view.ScaleRatio[1]
+        offset, radius = view.crop
+        centre = tuple(view.Position[i] + ratio * offset[i] for i in (0, 1))
+        assert math.dist(point, centre) < ratio * radius
+    # A carrier point shared by C4 and C5A needs one combined attached label,
+    # not stacked arrows ending at precisely the same physical location.
+    assert len(set(targets)) == len(targets)
     settled[-1]()
 
 
-@pytest.mark.parametrize("defect", ("twin-left", "twin-scale", "twin-collapsed", "balloon-border"))
-def test_capture_pair_settled_guard_refuses_drift(native_property_package, defect) -> None:
+def test_capture_sections_use_actual_distinct_longitudinal_and_bolt_planes() -> None:
+    def distance_to_plane(point, letter):
+        a, b = drawing.capture_cut_points(letter)
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        return abs((point[0]-a[0])*dy - (point[1]-a[1])*dx) / math.hypot(dx, dy)
+
+    for origin in (spec.PIVOT_PIN_ORIGINS[0], spec.PIVOT_CLEVIS_PIN_PLACEMENTS[0][0]):
+        assert distance_to_plane(tuple(v/1000.0 for v in origin), "A") < 1e-12
+    for reading in drawing.capture_readings():
+        if reading.view_index not in (2, 3):
+            continue
+        point = drawing._capture_world_point(reading)
+        letter = "A" if reading.view_index == 2 else "B"
+        assert distance_to_plane(point, letter) < 1e-12
+        if reading.stem == spec.PIVOT_CAP_SCREW:
+            # The real underhead footprint is NOT on the pivot/clevis plane.
+            assert distance_to_plane(point, "A") > 0.001
+            assert reading.local_mm[2] == 0.0
+        if reading.stem == spec.CARRIER:
+            assert point[2]*1000.0 == pytest.approx(spec.trammel.CARRIER_TOP_Z)
+        if reading.stem == spec.PIVOT_CLEVIS_PIN:
+            # The attachment is on the represented head, not its larger
+            # purchased-envelope limits, which lie outside the actual body.
+            x, y, z = reading.local_mm
+            assert x == pytest.approx(-spec.clevis_pin.CLEVIS_HEAD_HEIGHT)
+            assert y*y + z*z == pytest.approx((spec.clevis_pin.CLEVIS_HEAD_DIA / 2.0)**2)
+        if reading.stem == spec.PIVOT_RETAINER and reading.local_mm[2] == spec.pivot_retainer.THICKNESS:
+            # The native retainer is a square-edged annulus. Shop relief is
+            # inspected at that real mouth, not projected from an unmodelled
+            # maximum edge-break envelope.
+            x, y, _z = reading.local_mm
+            assert x*x + y*y == pytest.approx((spec.pivot_retainer.BORE_DIA / 2.0)**2)
+
+
+def test_capture_exploded_fit_does_not_shrink_assembled_reading_scales(native_property_package) -> None:
+    package = native_property_package
+    package.doc.capture_fit_denominator = 8.0
+    scales, settled = drawing._place_package(package.adapter)
+    exploded, locator, main, bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    assert tuple(exploded.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET] == (1.0, 8.0)
+    assert tuple(locator.ScaleRatio) == (1, 4)
+    assert tuple(main.ScaleRatio) == tuple(bolt.ScaleRatio) == (1, 1)
+    settled[-1]()
+
+
+@pytest.mark.parametrize("defect, refusal", (
+    ("bad_section", "failed to create section view"),
+    ("crop_status", "native crop failed"),
+    ("bad_crop", "native crop failed"),
+    ("bad_pick", "own edge"),
+    ("bad_attachment", "lost its edge attachment"),
+))
+def test_capture_refuses_real_creation_crop_and_attachment_failures(
+    native_property_package, defect, refusal,
+) -> None:
+    package = native_property_package
+    setattr(package.doc, defect, 0 if defect == "crop_status" else True)
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._place_package(package.adapter)
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("letter, view_index", (("A", 2), ("B", 3)))
+def test_capture_section_native_xyz_comes_from_authored_line_not_paper_annotations(
+    native_property_package, letter, view_index,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    views = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    parent, view = views[1], views[view_index]
+    section = view.section
+    line = package.doc.section_segments[view_index - 2]
+    authored = line.points
+    assert section.line is line and line.GetSketch() is parent.sketch
+    assert section.GetLineInfo() == tuple(value for point in authored for value in point)
+    inverse = parent.sketch.ModelToSketchTransform.Inverse()
+    paper = tuple(inverse.apply(point) for point in authored)
+    assert math.dist(authored[0], paper[0]) > 0.001
+    arrows = section.GetArrowInfo()
+    assert arrows[:3] == pytest.approx(paper[0])
+    assert arrows[6:9] == pytest.approx(paper[1])
+    assert section.GetTextInfo() == pytest.approx((
+        paper[0][0] + 0.002, paper[0][1], 0.0,
+        paper[1][0] + 0.002, paper[1][1], 0.0,
+    ))
+    drawing._assert_capture_section(package.adapter, parent, view, letter)
+    line.points = authored[::-1]
+    assert section.GetLineInfo() == tuple(value for point in authored[::-1] for value in point)
+    drawing._assert_capture_section(package.adapter, parent, view, letter)
+    assert section.GetArrowInfo() == arrows
+
+
+@pytest.mark.parametrize("letter, view_index", (("A", 2), ("B", 3)))
+@pytest.mark.parametrize("defect", (
+    "start-z", "both-z", "underlength", "overlength", "length-only",
+    "translated-on-axis", "translated-off-axis", "oblique", "paper-as-sketch",
+    "current-sketch-transform",
+))
+def test_capture_section_proof_refuses_actual_sketch_endpoint_counterexamples(
+    native_property_package, letter, view_index, defect,
+) -> None:
     package = native_property_package
     _scales, settled = drawing._place_package(package.adapter)
-    first, twin = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
-    if defect == "twin-left":
-        twin.Position = first.Position
-    elif defect == "twin-scale":
-        twin.ScaleRatio = (1.0, 100.0)
-    elif defect == "twin-collapsed":
-        twin.exploded = False
+    views = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    parent, view = views[1], views[view_index]
+    line = package.doc.section_segments[view_index - 2]
+    authored = line.points
+    a, b = authored
+    length = math.dist(a, b)
+    along = tuple((b[i] - a[i]) / length for i in range(3))
+    across = (-along[1], along[0], 0.0)
+    if defect in {"start-z", "both-z"}:
+        line.points = (
+            (a[0], a[1], a[2] + 0.001),
+            (b[0], b[1], b[2] + (0.001 if defect == "both-z" else 0.0)),
+        )
+        assert line.points[0][:2] == a[:2] and line.points[1][:2] == b[:2]
+    elif defect in {"underlength", "overlength", "length-only"}:
+        shift = 7.5e-8 if defect == "length-only" else 0.0005
+        if defect == "overlength":
+            shift = -shift
+        line.points = (
+            tuple(a[i] + shift * along[i] for i in range(3)),
+            tuple(b[i] - shift * along[i] for i in range(3)),
+        )
+        if defect == "length-only":
+            assert max(math.dist(p, q) for p, q in zip(line.points, authored)) < 1e-7
+            assert abs(math.dist(*line.points) - length) > 1e-7
+    elif defect in {"translated-on-axis", "translated-off-axis"}:
+        direction = along if defect == "translated-on-axis" else across
+        line.points = tuple(
+            tuple(point[i] + 0.001 * direction[i] for i in range(3))
+            for point in authored
+        )
+    elif defect == "oblique":
+        line.points = (a, tuple(b[i] + 0.001 * across[i] for i in range(3)))
+    elif defect == "paper-as-sketch":
+        inverse = parent.sketch.ModelToSketchTransform.Inverse()
+        line.points = tuple(inverse.apply(point) for point in authored)
     else:
-        capture = next(
-            cluster for cluster in drawing.CLUSTERS
-            if cluster.sheet == drawing.PIVOT_CAPTURE_SHEET
+        origin = parent.sketch.sketch_origin
+        parent.sketch.sketch_origin = (origin[0] + 0.001, *origin[1:])
+    # The native getter reads mutated authored geometry, never a production
+    # expectation; annotations and the child view's model axes stay untouched.
+    if defect != "current-sketch-transform":
+        assert view.section.GetLineInfo() == tuple(
+            value for point in line.points for value in point
         )
-        landing = next(
-            landing for landing in package.doc.balloon_landings
-            if landing.stem in capture.stems
-        )
-        left, bottom, _right, top = drawing.CAPTURE_PAIR_REGIONS[0]
-        landing.note.circle = (left, (bottom + top) / 2.0, drawing.BALLOON_RADIUS)
-    with pytest.raises(RuntimeError, match="jig capture support"):
+    with pytest.raises(RuntimeError, match="native cut plane misses its model reading axes"):
+        drawing._assert_capture_section(package.adapter, parent, view, letter)
+    refusal = (
+        "persisted native crop centre or model radius changed"
+        if defect == "current-sketch-transform"
+        else "native cut plane misses its model reading axes"
+    )
+    with pytest.raises(RuntimeError, match=refusal):
         settled[-1]()
+
+
+@pytest.mark.parametrize("defect", ("snapped-x", "snapped-z", "wrong-radius"))
+def test_capture_crop_refuses_created_native_geometry_before_crop2(
+    native_property_package, defect,
+) -> None:
+    package = native_property_package
+    manager = package.doc.SketchManager
+    create = manager.CreateCircle
+
+    def displaced(*coordinates):
+        circle = create(*coordinates)
+        if defect == "wrong-radius":
+            circle.radius += 0.001
+        else:
+            axis = 0 if defect == "snapped-x" else 2
+            circle.centre = tuple(
+                value + (0.001 if i == axis else 0.0)
+                for i, value in enumerate(circle.centre)
+            )
+        return circle
+
+    manager.CreateCircle = displaced
+    with pytest.raises(RuntimeError, match="created native crop circle moved or changed radius"):
+        drawing._place_package(package.adapter)
+    assert package.doc.crop_calls == []
+    assert manager.AddToDB is False
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("defect, refusal", (
+    ("refused", "failed to select native crop circle"),
+    ("empty", "crop circle selection is not one profile"),
+    ("extra", "crop circle selection is not one profile"),
+))
+def test_capture_crop_refuses_selection_failure_or_wrong_count_before_crop2(
+    native_property_package, defect, refusal,
+) -> None:
+    package = native_property_package
+    manager = package.doc.SketchManager
+    create = manager.CreateCircle
+    selections = []
+
+    def with_bad_selection(*coordinates):
+        circle = create(*coordinates)
+        select = circle.Select4
+
+        def bad_select(append, data):
+            assert append is False and data.View is circle.GetSketch().view
+            selections.append(circle)
+            if defect == "refused":
+                return False
+            assert select(append, data)
+            if defect == "empty":
+                package.doc.selected.clear()
+            else:
+                package.doc.selected.append(object())
+            return True
+
+        circle.Select4 = bad_select
+        return circle
+
+    manager.CreateCircle = with_bad_selection
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._place_package(package.adapter)
+    assert selections == package.doc.crop_circles
+    assert package.doc.crop_calls == []
+    assert manager.AddToDB is False
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("previous_add_to_db", (False, True))
+@pytest.mark.parametrize("failure", ("none", "exception"))
+def test_capture_crop_creation_refusal_restores_database_mode(
+    native_property_package, previous_add_to_db, failure,
+) -> None:
+    package = native_property_package
+    manager = package.doc.SketchManager
+    manager.AddToDB = previous_add_to_db
+
+    def refuse(*_coordinates):
+        assert manager.AddToDB is True
+        if failure == "exception":
+            raise RuntimeError("native crop creation error")
+        return None
+
+    manager.CreateCircle = refuse
+    refusal = "native crop creation error" if failure == "exception" else "failed to create crop circle"
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._place_package(package.adapter)
+    assert manager.AddToDB is previous_add_to_db
+    assert package.doc.crop_calls == []
+    assert not package.doc.bom_inserted
+
+
+def test_capture_native_crop_boundary_uses_explicit_view_owned_selection_not_last_created(
+    native_property_package,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    doc = package.doc
+    views = doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
+    view, circle = views[1], doc.crop_circles[0]
+    assert doc.ActivateSheet(drawing.PIVOT_CAPTURE_SHEET)
+    assert doc.ActivateView(view.GetName2())
+    doc.ClearSelection2(True)
+    manager = doc.SketchManager
+    previous = manager.AddToDB
+    manager.AddToDB = True
+    try:
+        other = manager.CreateCircle(*circle.centre, circle.centre[0] + circle.radius * 0.8,
+                                     circle.centre[1], circle.centre[2])
+    finally:
+        manager.AddToDB = previous
+    assert other is not circle and doc.selected == []
+    with pytest.raises(ValueError):
+        view.Crop2(False, False, 1)
+    data = doc.SelectionManager.CreateSelectData()
+    data.View = views[2]
+    assert circle.Select4(False, data) is False
+    assert doc.selected == []
+    data.View = view
+    assert circle.Select4(False, data) is True
+    assert view.Crop2(False, False, 1) == 1
+    assert doc.crop_calls[-1] == (view, circle)
+    assert view.crop[1] == pytest.approx(0.055)
+    assert other.Select4(True, data) is True
+    assert len(doc.selected) == 2
+    with pytest.raises(ValueError):
+        view.Crop2(False, False, 1)
+    assert other.Select4(False, data) is True
+    assert doc.selected == [other]
+    assert view.Crop2(False, False, 1) == 1
+    assert doc.crop_calls[-1] == (view, other)
+    assert view.crop[1] == pytest.approx(0.055 * 0.8)
+
+
+@pytest.mark.parametrize("view_index", (1, 2, 3))
+@pytest.mark.parametrize("change", ("position", "scale"))
+def test_capture_native_crop_geometry_stays_view_attached_during_recenter_or_refit(
+    native_property_package, view_index, change,
+) -> None:
+    package = native_property_package
+    drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    circle = package.doc.crop_circles[view_index - 1]
+    authored = (circle.centre, circle.radius)
+    if change == "position":
+        view.Position = (view.Position[0] + 0.001, view.Position[1] - 0.002)
+    else:
+        view.ScaleRatio = (view.ScaleRatio[0], view.ScaleRatio[1] * 2.0)
+    drawing._assert_capture_crop(package.adapter, view, view_index)
+    assert (circle.centre, circle.radius) == authored
+
+
+@pytest.mark.parametrize("view_index", (1, 2, 3))
+@pytest.mark.parametrize("defect, refusal", (
+    ("centre-x", "persisted native crop centre or model radius changed"),
+    ("centre-z", "persisted native crop centre or model radius changed"),
+    ("radius", "persisted native crop centre or model radius changed"),
+    ("paper-as-sketch", "persisted native crop centre or model radius changed"),
+    ("current-sketch-transform", "persisted native crop centre or model radius changed"),
+    ("missing", "expected one persisted native crop circle"),
+    ("extra", "expected one persisted native crop circle"),
+    ("line-not-arc", "expected one persisted native crop circle"),
+    ("construction", "expected one persisted native crop circle"),
+    ("noncircle", "native fence is not a complete circle"),
+))
+def test_capture_settled_crop_proof_reads_fresh_persisted_geometry_not_flags_or_notes(
+    native_property_package, view_index, defect, refusal,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    view = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
+    circle = package.doc.crop_circles[view_index - 1]
+    rendered_crop, outline = view.crop, view.GetOutline()
+    targets = tuple(note.world for note in package.doc.attached_notes)
+    if defect in {"centre-x", "centre-z"}:
+        axis = 0 if defect == "centre-x" else 2
+        circle.centre = tuple(
+            value + (0.001 if i == axis else 0.0)
+            for i, value in enumerate(circle.centre)
+        )
+    elif defect == "radius":
+        circle.radius += 0.001
+    elif defect == "paper-as-sketch":
+        inverse = view.sketch.ModelToSketchTransform.Inverse()
+        edge = inverse.apply((circle.centre[0] + circle.radius,
+                              circle.centre[1], circle.centre[2]))
+        circle.centre = inverse.apply(circle.centre)
+        circle.radius = math.dist(circle.centre, edge)
+    elif defect == "current-sketch-transform":
+        origin = view.sketch.sketch_origin
+        view.sketch.sketch_origin = (origin[0], origin[1], origin[2] + 0.001)
+    elif defect == "missing":
+        view.sketch.segments.remove(circle)
+    elif defect == "extra":
+        package.doc.ActivateSheet(drawing.PIVOT_CAPTURE_SHEET)
+        assert package.doc.ActivateView(view.GetName2())
+        manager = package.doc.SketchManager
+        previous = manager.AddToDB
+        manager.AddToDB = True
+        try:
+            other = manager.CreateCircle(*circle.centre, circle.centre[0] + circle.radius,
+                                         circle.centre[1], circle.centre[2])
+        finally:
+            manager.AddToDB = previous
+        assert other is not circle
+    elif defect == "line-not-arc":
+        circle.GetType = lambda: 0
+    elif defect == "construction":
+        circle.ConstructionGeometry = True
+    else:
+        circle.IsCircle = lambda: 0
+    assert view.IsCropped() is True
+    assert view.crop == rendered_crop and view.GetOutline() == outline
+    assert tuple(note.world for note in package.doc.attached_notes) == targets
+    with pytest.raises(RuntimeError, match=refusal):
+        drawing._assert_capture_crop(package.adapter, view, view_index)
+    with pytest.raises(RuntimeError, match=refusal):
+        settled[-1]()
+
+
+@pytest.mark.parametrize("defect", (
+    "extra-view", "scale", "configuration", "exploded", "carrier-hidden",
+    "crop", "missing-section", "hatch", "partial", "label", "cut-plane",
+    "cut-axis", "fasteners", "cut-only", "hidden-lines", "cut-arrows", "legacy-xy-cut",
+    "attachment", "edge-owner", "view-owner", "wrong-note-view", "right-balloon",
+    "missing-native-balloon", "extra-native-balloon", "substituted-native-balloon",
+    "landing", "font", "caption",
+    "caption-overlap", "note-overlap", "balloon-border", "bearing-duplicate",
+    "bearing-number", "third-bearing", "other-duplicate",
+))
+def test_capture_settled_proof_refuses_native_drift(native_property_package, defect) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    sheet = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET]
+    exploded, locator, main, bolt = sheet.views
+    first_note = package.doc.attached_notes[0]
+    bearings = [item for item in package.doc.balloon_landings if item.stem == spec.BEARING]
+    if defect == "extra-view":
+        sheet.views.append(locator)
+    elif defect == "scale":
+        main.ScaleRatio = (1, 2)
+    elif defect == "configuration":
+        main.ReferencedConfiguration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    elif defect == "exploded":
+        locator.exploded = True
+    elif defect == "carrier-hidden":
+        next(leaf for leaf in main.components if leaf.Component.Name2 == spec.instance_name(spec.CARRIER, 0)).Visible = False
+    elif defect == "crop":
+        bolt.cropped = False
+    elif defect == "missing-section":
+        main.section = None
+    elif defect == "hatch":
+        main.section.hatch = False
+    elif defect == "partial":
+        main.section.partial = False
+    elif defect == "label":
+        bolt.section.label = "A"
+    elif defect == "cut-plane":
+        main.section.line_shift = (0.0, 0.001, 0.0)
+    elif defect == "legacy-xy-cut":
+        main.section.GetLineInfo = lambda: (0.1, 0.2, 0.3, 0.4)
+    elif defect == "cut-axis":
+        main.Angle += 0.1
+    elif defect == "fasteners":
+        main.section.ExcludeFasteners = True
+    elif defect == "cut-only":
+        main.section.cut_only = True
+    elif defect == "hidden-lines":
+        main.mode = 3
+    elif defect == "cut-arrows":
+        main.section.GetArrowInfo = lambda: (0.0,) * 12
+    elif defect == "attachment":
+        first_note.entity = object()
+    elif defect == "edge-owner":
+        first_note.entity.GetComponent = lambda: SimpleNamespace(Name2=spec.instance_name(spec.PIVOT_PIN, 1))
+    elif defect == "view-owner":
+        first_note.annotation.OwnerType = 1
+    elif defect == "landing":
+        first_note.landing_shift = (0.001, 0.0)
+    elif defect == "font":
+        first_note.annotation.GetTextFormat(0).CharHeight = 0.003
+    elif defect == "wrong-note-view":
+        main.notes.remove(first_note)
+        bolt.notes.append(first_note)
+    elif defect == "right-balloon":
+        first_note.IsBomBalloon = lambda: True
+    elif defect == "missing-native-balloon":
+        exploded.notes.remove(bearings[0].note)
+    elif defect == "extra-native-balloon":
+        exploded.notes.append(SimpleNamespace(**vars(bearings[0].note)))
+    elif defect == "substituted-native-balloon":
+        exploded.notes[exploded.notes.index(bearings[0].note)] = SimpleNamespace(**vars(bearings[0].note))
+    elif defect == "caption":
+        main.notes[0].PropertyLinkedText = ""
+    elif defect == "caption-overlap":
+        main.notes[0].position[:] = first_note.position
+    elif defect == "note-overlap":
+        package.doc.attached_notes[1].position[:] = first_note.position
+    elif defect == "balloon-border":
+        left, bottom, _right, top = drawing.CAPTURE_EXPLODED_REGION
+        bearings[0].note.circle = (left, (bottom+top)/2.0, drawing.BALLOON_RADIUS)
+    elif defect == "bearing-duplicate":
+        bearings[1].instance = bearings[0].instance
+    elif defect == "bearing-number":
+        bearings[1].note.GetBomBalloonText = lambda _upper: "4"
+    elif defect in {"third-bearing", "other-duplicate"}:
+        # The retained callback must also refuse a changed capture landing set.
+        cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
+        landings = [item for item in package.doc.balloon_landings if item.stem in cluster.stems]
+        landings.append(bearings[0] if defect == "third-bearing" else next(item for item in landings if item.stem != spec.BEARING))
+        with pytest.raises(RuntimeError, match="exactly two bearings"):
+            drawing._assert_capture_coverage(landings, cluster.stems)
+        return
+    with pytest.raises(RuntimeError, match="jig capture|reading label"):
+        settled[-1]()
+
+
+def test_capture_both_bearings_join_one_existing_ring_and_keep_exact_item14(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_args: None)
+    links, calls, rings = [], [], []
+    monkeypatch.setattr(drawing, "_link_view_to_bom", lambda view, bom, **_kw: links.append((view, bom)))
+    monkeypatch.setattr(drawing, "_source_configuration_active", lambda *_a, **_kw: nullcontext())
+    monkeypatch.setattr(drawing, "_ring_balloons", lambda _a, _v, landings, **_kw: rings.append(tuple(landings)))
+    cluster = next(c for c in drawing.CLUSTERS if c.sheet == drawing.PIVOT_CAPTURE_SHEET)
+    view = object()
+
+    def create(_adapter, requested_view, *, items, anchors, **_kwargs):
+        assert requested_view is view
+        calls.append((tuple(items), anchors))
+        return [
+            drawing.BalloonLanding(
+                stem=stem, instance=anchors[stem].instance or spec.instance_name(stem, 0),
+                note=SimpleNamespace(GetBomBalloonText=lambda _upper, item=item: str(item)),
+                sheet_xy=(0.1, 0.1), label="native balloon boundary",
+            )
+            for stem, item in items
+        ]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", create)
+    landings = drawing._balloon_cluster(object(), view, cluster, tuple(spec.ITEM_NUMBERS.items()), "JigBOM")
+    assert links == [(view, "JigBOM")]
+    assert len(calls) == 2 and len(calls[0][0]) == 8 and len(calls[1][0]) == 1
+    assert calls[0][1][spec.BEARING].instance is None
+    assert calls[1][1][spec.BEARING].instance == spec.instance_name(spec.BEARING, 1)
+    assert len(landings) == 9 and rings == [tuple(landings)]
+    drawing._assert_capture_coverage(landings, cluster.stems)
+
+
+def test_capture_fit_exhaustion_refuses_before_any_bom(native_property_package) -> None:
+    package = native_property_package
+    package.doc.oversized = drawing.PIVOT_CAPTURE_SHEET
+    with pytest.raises(RuntimeError, match="no measured scale fits"):
+        drawing._place_package(package.adapter)
+    assert not package.doc.bom_inserted
+
+
+@pytest.mark.parametrize("defect", ("section-xyz", "persisted-crop"))
+def test_capture_native_proof_is_called_by_real_finalizer_after_rebuild(
+    native_property_package, defect,
+) -> None:
+    package = native_property_package
+    scales, settled = drawing._place_package(package.adapter)
+    main = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[2]
+    if defect == "section-xyz":
+        # An XYZ-only drift cannot be caught by paper-plane XY collinearity.
+        main.section.line_shift = (0.0, 0.0, 0.001)
+        refusal = "native cut plane"
+    else:
+        circle = package.doc.crop_circles[1]
+        circle.radius += 0.001
+        assert main.IsCropped() is True
+        refusal = "persisted native crop centre or model radius changed"
+    with pytest.raises(RuntimeError, match=refusal):
+        asyncio.run(drawing.finalize_drawing(
+            package.adapter, drawing.OUTPUTS, layout=drawing.SPEC.layout,
+            pdf_title="native capture lifecycle", scale=drawing.SHEET_SCALE,
+            expected_sheet_names=drawing.SHEET_NAMES,
+            sheet_layouts=drawing.SHEET_LAYOUTS, sheet_scales=scales,
+            settled_checks=(settled[-1],),
+        ))

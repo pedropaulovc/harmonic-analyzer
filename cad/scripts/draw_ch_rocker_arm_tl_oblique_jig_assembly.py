@@ -15,18 +15,18 @@ associative SH-VN-57 Number. A BOM-scoped key identifies their common purchased
 SKU and maps the native items to named configurations and installed counts,
 never kit purchase quantities. Its measured note box stays below the reference
 view and clear of the rebuilt BOM, border and title block. Vendor Numbers have
-their own 56 mm column. Sheets 3 to 6 each show the builder-owned
-``JIG_EXPLODED`` presentation with one sub-assembly's families only (rail bars,
-pivot capture, leadscrew feed, carrier), at the largest scale whose balloon
-ring fits the sheet, each family ballooned once on one ring, on no other sheet.
-Sheet 7 is the assembly order, whose steps cite the fasteners by item number,
-in two columns, and the checks. Sheet 8 carries the cartridge bench work in
-print order (C2A, C1-C2), with its signed functional inspection schematic,
-followed by feed checks F1-F2. Sheet 9 carries cap seating/wiring (C3-C3C),
-then the actual carrier and top capture fit (C4-C5D). The schematic is not a
-manufacturing view or dimension. These three instruction sheets retain a small,
-visible collapsed reference isometric at the largest measured fit from 1:20,
-1:25 and 1:30 below the right-column text:
+their own 56 mm column. Sheets 3 to 6 show the builder-owned ``JIG_EXPLODED``
+presentation with one sub-assembly's families only. Sheet 4 also has a collapsed
+plan locator and two real assembled sections; both separated bearings carry
+item 14 on the left exploded view's single balloon ring. Other families are
+ballooned once. Sheet 7 is the assembly order, whose steps cite fasteners by
+item number. Sheet 8 carries the cartridge bench work in print order (C2A,
+C1-C2), with its signed functional inspection schematic, followed by feed
+checks F1-F2. Sheet 9 carries cap seating/wiring (C3-C3C), then the actual
+carrier and top capture fit (C4-C5D). The schematic is not a manufacturing
+view or dimension. These three instruction sheets retain a small, visible
+collapsed reference isometric at the largest measured fit from 1:20, 1:25
+and 1:30 below the right-column text:
 their native model views supply the live ``$PRPSHEET`` title-block links.
 Sheet 10 carries operation/service (C6-C7), the hold-down stud measurement,
 limits and installed acceptance (HD1-HD3), tooling clearance (C8) and machine acceptance, with the
@@ -72,23 +72,29 @@ from _drawing_balloons import (
     BalloonAnchor,
     BalloonLanding,
     _spread_balloons,
+    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
 )
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _drawing_layout_check import LeaderSegment, _segment_crosses_box, find_leader_leader_crossings
 from _drawing_tables import (
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
 )
+from _drawing_sections import create_section_view
+from _drawing_selection import _select_view_entity
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
+from _section_axis import position_section_caption
 from _drawing_view_configuration import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_MAX_SCALE,
@@ -147,9 +153,9 @@ class Cluster:
 # converged and crossed, and the small screws could not be told apart (blind
 # review r4). So each sub-assembly explodes on its own sheet: what stands on
 # the table and rides its rails, the feed bolted along rail 1 and onto pivot
-# block 1, and what rides the pins. Each family is shown and ballooned in
-# exactly one, in BOM order. Each initial scale is fitted to the largest
-# ladder scale that holds the view's measured balloon ring.
+# block 1, and what rides the pins. Each family belongs to one ballooned
+# cluster sheet, in BOM order; Sheet 4 repeats only the separated bearing.
+# Each initial scale fits the largest ladder rung holding its measured ring.
 CLUSTERS = (
     Cluster(
         "RAIL BARS EXPLODED",
@@ -420,23 +426,30 @@ TITLE_BLOCK_KEEP_OUT = (
     TITLE_BLOCK[2],
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE,
 )
-# Sheet 4's two supports need independent native views: moving a whole-source
-# view cannot separate them on paper. Reserve equal fields above the title
-# block, with border air and an inter-view gutter; only the left is ballooned.
-CAPTURE_PAIR_REGIONS = (
-    (
-        CLUSTER_RING_REGION[0] + BOM_SHEET_CLEARANCE,
-        TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
-        CLUSTER_CENTER[0] - REGION_GAP,
-        CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
-    ),
-    (
-        CLUSTER_CENTER[0] + REGION_GAP,
-        TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
-        CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
-        CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
-    ),
+# Sheet 4 keeps its reviewed left exploded field and uses the former duplicate
+# field for a visible assembled locator, a longitudinal section and one small
+# bolt-seat section. These four actual views have independent measured scales.
+CAPTURE_EXPLODED_REGION = (
+    CLUSTER_RING_REGION[0] + BOM_SHEET_CLEARANCE,
+    TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
+    CLUSTER_CENTER[0] - REGION_GAP,
+    CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
 )
+CAPTURE_READING_REGION = (
+    CLUSTER_CENTER[0] + REGION_GAP,
+    TITLE_BLOCK_KEEP_OUT[3] + BOM_SHEET_CLEARANCE,
+    CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
+    CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
+)
+CAPTURE_VIEW_REGIONS = (
+    CAPTURE_EXPLODED_REGION,
+    (0.224, 0.222, 0.278, 0.263),
+    (0.278, 0.119, 0.364, 0.211),
+    (0.360, 0.226, 0.403, 0.261),
+)
+CAPTURE_LOCATOR_SCALE = (1, 4)
+CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.360, 0.222))
+CAPTURE_NOTE_HEIGHT = 0.002
 
 
 # Sheet 7: the assembly sequence in two columns of one width, the heading and
@@ -585,9 +598,8 @@ if max(map(len, BOM_DESCRIPTIONS.values())) > BOM_DESCRIPTION_MAX_CHARS:
 # the spec does (BOM_ORDER); the recipe refuses any other numbering.
 BOM_ITEM_NUMBERS = dict(spec.ITEM_NUMBERS)
 
-# One balloon per BOM row, each on its family's lowest-named shown instance,
-# on the one cluster sheet that shows the family; each sheet's balloons
-# share one ring (_ring_balloons).
+# One balloon per BOM row, except Sheet 4's two distinct bearing occurrences
+# both carry item 14. All capture landings share the same ring and proofs.
 BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
 for _family in spec.KIT_IDENTITIES:
     BALLOON_ANCHORS[_family] = BalloonAnchor(instance=spec.instance_name(_family, 0))
@@ -2503,99 +2515,444 @@ def capture_support_instances(cluster: Cluster, support: int) -> frozenset[str]:
     )
 
 
-def _assert_capture_pair(
-    adapter: Any,
-    views: Sequence[Any],
-    scale: tuple[float, float],
-    landings: Sequence[BalloonLanding] = (),
-) -> None:
-    """Keep both exploded supports and the single balloon set in their fields."""
-    _activate_sheet(adapter, PIVOT_CAPTURE_SHEET)
-    if len(views) != len(CAPTURE_PAIR_REGIONS):
-        raise RuntimeError("jig capture pair: expected two native source views")
-    for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
-        label = f"jig capture support {support + 1}"
-        bound = _early_bound(view, "IView")
-        ratio = tuple(float(value) for value in bound.ScaleRatio)
-        if (
-            len(ratio) != 2
-            or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9
-            or str(bound.ReferencedConfiguration) != SIMPLIFIED_VIEW_CONFIGURATION
-            or not bool(bound.IsExploded())
-        ):
-            raise RuntimeError(f"{label}: changed scale/configuration/exploded state")
-        _assert_view_on_sheet(
-            view, margin=BALLOON_RING_REACH, bounds=region, label=label
-        )
-    left, bottom, right, top = CAPTURE_PAIR_REGIONS[0]
-    for landing in landings:
-        x, y, radius = rendered_balloon_circle(
-            landing.note, label="jig capture support 1"
-        )
-        if not (
-            left <= x - radius and x + radius <= right
-            and bottom <= y - radius and y + radius <= top
-        ):
-            raise RuntimeError(
-                f"jig capture support 1: {landing.stem} balloon leaves its field"
-            )
+@dataclass(frozen=True)
+class CaptureReading:
+    """One real installed feature, in its occurrence's own millimetres."""
+
+    view_index: int
+    stem: str
+    local_mm: tuple[float, float, float]
+    text: str
+    text_xy: tuple[float, float]
+    index: int = 0
 
 
-def _place_capture_pair(
-    adapter: Any, cluster: Cluster
-) -> tuple[tuple[Any, ...], tuple[float, float]]:
-    """Separate the two real exploded cartridges without altering source poses."""
-    _activate_sheet(adapter, cluster.sheet)
-    views = []
-    for support, region in enumerate(CAPTURE_PAIR_REGIONS):
-        label = f"jig capture support {support + 1}"
-        view = _place_named_view(
-            adapter, spec.ISOMETRIC_VIEW, _region_center(region),
-            cluster.scale, label=label,
-        )
-        set_high_quality_shaded_with_edges(adapter, view, label=label)
-        configuration = apply_view_configuration(adapter, view, label=label)
-        set_view_exploded_state(
-            adapter, view, True, configuration=configuration, label=label
-        )
-        # File-family identities would also show the other support. The existing
-        # isolator accepts occurrence names and refuses missing occurrences.
-        isolate_drawing_view_components(
-            adapter, view, visible_stems=capture_support_instances(cluster, support),
-            label=label,
-        )
-        views.append(view)
-    findings = []
-    placed = cluster.scale
-    # Preserve the reviewed 1:4 size; this repair distributes the views, rather
-    # than enlarging them. Smaller existing rungs remain native-fit fallbacks.
-    for scale in CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(cluster.scale):]:
-        overflows = []
-        for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
-            label = f"jig capture support {support + 1}"
-            if scale != placed:
-                _set_view_scale(adapter, view, scale, label=label)
-            _shift, misses = ring_fit_shift(
-                _view_outline(view, label=label), region, grow=BALLOON_RING_REACH
-            )
-            overflows.extend(f"support {support + 1}: {miss}" for miss in misses)
-        placed = scale
-        if not overflows:
-            break
-        findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
+def _capture_local_point(stem: str, world: Sequence[float]) -> tuple[float, float, float]:
+    origin, rows = spec.PLACEMENTS[stem][0]
+    return tuple(sum((world[i] - origin[i]) * row[i] for i in range(3)) for row in rows)
+
+
+def capture_readings() -> tuple[CaptureReading, ...]:
+    r, pin, washer = spec.retention, spec.pivot_pin, spec.pivot_retainer
+    def band(limits):
+        return f"{limits[0]:.2f}-{limits[1]:.2f}"
+    rim = r.PIN_STOP_FACE_MEASUREMENT_DIAMETER / 2.0
+    mouth = washer.BORE_DIA / 2.0
+    land = (mouth + washer.EDGE_BREAK_MAX + washer.OUTER_DIA / 2.0) / 2.0
+    def carrier_face(side):
+        origin = spec.PIVOT_PIN_ORIGINS[0]
+        world = (origin[0] + side * land * spec.PIN_ROWS[0][0],
+                 origin[1] + side * land * spec.PIN_ROWS[0][1],
+                 spec.trammel.CARRIER_TOP_Z)
+        return _capture_local_point(spec.CARRIER, world)
+    top = washer.THICKNESS
+    bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
+    cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
+    roof = _capture_local_point(spec.PIVOT_CAP, (
+        spec.PIVOT_PIN_ORIGINS[0][0] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][0],
+        spec.PIVOT_PIN_ORIGINS[0][1] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][1],
+        cap_origin[2] + r.CAP_POCKET_DEPTH,
+    ))
+    return (
+        CaptureReading(2, spec.PIVOT_PIN, (-rim, 0.0, pin.FLANGE_BOTTOM_STATION),
+                       f"C2 LOWER RIM / FLOOR\n{band(r.PIN_LOWER_GAP)}", (0.224, 0.143)),
+        CaptureReading(2, spec.PIVOT_PIN, (-rim, 0.0, pin.FLANGE_TOP_STATION),
+                       f"C2 UPPER RIM / ROOF\n{band(r.PIN_UPPER_GAP)}", (0.224, 0.155)),
+        CaptureReading(2, spec.PIVOT_CAP, roof,
+                       f"C2 CHAMBER MINUS FLANGE\n{band(r.CAP_CHAMBER_EXCESS)}\nEXCESS, NOT A THIRD GAP", (0.365, 0.128)),
+        *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
+                         f"C4 MOUTH / FLAT LAND\nFULL SHANK PAST MOUTH\n{spec.TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN, BOTH SIDES", (x, 0.199))
+          for side, x in ((-1.0, 0.224), (1.0, 0.365))),
+        *(CaptureReading(2, spec.CARRIER, carrier_face(side),
+                         f"C4 COMMON SHANK / LAND\nSOLID CARRIER BACKING\n{spec.TOP_CARRIER_BACKED_BEARING_STRIP_MIN:.1f} MIN, BOTH SIDES"
+                         + ("\nC5A CARRIER FACE\nREAD TO FLAT PIN END" if side > 0.0 else ""),
+                         (x, 0.184))
+          for side, x in ((-1.0, 0.224), (1.0, 0.365))),
+        CaptureReading(2, spec.PIVOT_RETAINER, (land, 0.0, 0.0),
+                       f"C4A CARRIER / RETAINER\n{band(r.TOP_RUNNING_GAP)}", (0.365, 0.157)),
+        CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
+                       f"C5A FLAT PIN END\nAXIAL TAKE-UP {r.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX", (0.305, 0.216)),
+        CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0),
+                       "C4A UPPER CROSS-HOLE EDGE\nHOLD CLEVIS UP FOR FIT", (0.224, 0.216)),
+        CaptureReading(2, spec.PIVOT_CLEVIS_PIN,
+                       (-spec.clevis_pin.CLEVIS_HEAD_HEIGHT, 0.0,
+                        -spec.clevis_pin.CLEVIS_HEAD_DIA / 2.0),
+                       f"C5B HEAD / SHANK REGIONS\n{r.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN TO CARRIER", (0.224, 0.190)),
+        CaptureReading(1, spec.PIVOT_COTTER,
+                       (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
+                       f"C5B COTTER EYE / PRONGS\n{r.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN\nSEE C5B-C5C MOTION CHECKS", (0.282, 0.257)),
+        CaptureReading(3, spec.PIVOT_CAP, (0.0, bolt_y, 0.0),
+                       f"C3A CAP / BLOCK LAND\n{r.CAP_BASE_SEATING_GAP_MAX:.2f} MAX", (0.279, 0.2235)),
+        CaptureReading(3, spec.PIVOT_CAP_SCREW, (spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
+                       f"C3A UNDERHEAD FOOTPRINT\n{r.CAP_HEAD_SEATING_GAP_MAX:.2f} MAX", (0.282, 0.232)),
+    )
+
+
+def _capture_world_point(reading: CaptureReading) -> tuple[float, float, float]:
+    origin, rows = spec.PLACEMENTS[reading.stem][reading.index]
+    return tuple((origin[axis] + sum(reading.local_mm[k] * rows[k][axis] for k in range(3))) / 1000.0 for axis in range(3))
+
+
+def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], ...]:
+    """A-A contains pivot + clevis axes; B-B contains one actual bolt row."""
+    if section_label == "A":
+        origin, rows = spec.PIVOT_PIN_ORIGINS[0], spec.PIN_ROWS
+    elif section_label == "B":
+        origin, rows = spec.compose(spec.PIVOT_CAP_PLACEMENTS[0], (0.0, spec.retention.CAP_BOLT_Y_OFFSETS[0], 0.0))
     else:
-        raise RuntimeError(
-            "jig capture pair: no common ladder scale fits: " + " | ".join(findings)
-        )
-    for support, (view, region) in enumerate(zip(views, CAPTURE_PAIR_REGIONS)):
-        _center_view_outline(
-            adapter, view, _region_center(region),
-            label=f"jig capture support {support + 1}",
-        )
-    pair = tuple(views)
-    _assert_capture_pair(adapter, pair, scale)
-    _telemetry.info(f"jig capture pair: side-by-side at {_scale_text(scale)}")
-    return pair, scale
+        raise ValueError(f"unknown cartridge section {section_label!r}")
+    return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-65.0, 65.0))
+
+
+def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> None:
+    """Reuse the paper-drive native circular crop in this view's sketch."""
+    view = _early_bound(view, "IView")
+    draw = adapter.currentModel
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(str(view.GetName2())):
+        raise RuntimeError(f"{label}: failed to activate crop view")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(view.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = [_inspection_transform_point(utility, transform, (x, y, 0.0)) for x, y in (centre, (centre[0] + radius, centre[1]))]
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous
+    if circle is None:
+        raise RuntimeError(f"{label}: failed to create crop circle")
+    actual_centre, actual_radius = native_circle_geometry(circle, label=label)
+    expected_radius = math.dist(*points)
+    if math.dist(actual_centre, points[0]) > 1e-7 or abs(actual_radius - expected_radius) > 1e-7:
+        raise RuntimeError(f"{label}: created native crop circle moved or changed radius")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = _early_bound(selection.CreateSelectData(), "ISelectData")
+    data.View = view
+    if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
+        raise RuntimeError(f"{label}: failed to select native crop circle")
+    if int(selection.GetSelectedObjectCount2(-1)) != 1:
+        raise RuntimeError(f"{label}: crop circle selection is not one profile")
+    status = int(view.Crop2(False, False, 1))
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    view.UpdateViewDisplayGeometry()
+    if status != 1 or not bool(view.IsCropped()):
+        raise RuntimeError(f"{label}: native crop failed ({status=})")
+
+
+def _assert_capture_crop(adapter: Any, view: Any, index: int) -> None:
+    """Read the persisted circle in its current view-sketch/model frame."""
+    label = f"jig capture view {index} crop"
+    origin = tuple(value / 1000.0 for value in spec.PIVOT_PIN_ORIGINS[0])
+    if index == 1:
+        anchor, radius = origin, 0.055
+    elif index == 2:
+        anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
+        radius = 0.039
+    elif index == 3:
+        anchor = tuple(value / 1000.0 for value in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
+        radius = 0.014
+    else:
+        raise ValueError(f"{label}: not an assembled crop view")
+    bound = _early_bound(view, "IView")
+    sketch = _early_bound(bound.GetSketch(), "ISketch")
+    circles = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if int(segment.GetType()) == 1 and not bool(segment.ConstructionGeometry):
+            circles.append(segment)
+    if len(circles) != 1:
+        raise RuntimeError(f"{label}: expected one persisted native crop circle")
+    actual_centre, actual_radius = native_circle_geometry(circles[0], label=label)
+    # Refit scales and moved view origins invalidate old paper/sketch maps.
+    point = model_point_in_view(adapter, bound, anchor, label=label)
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    expected_centre = _inspection_transform_point(utility, transform, (*point, 0.0))
+    if math.dist(actual_centre, expected_centre) > 1e-7 or abs(actual_radius - radius) > 1e-7:
+        raise RuntimeError(f"{label}: persisted native crop centre or model radius changed")
+
+
+def _fit_capture_view(adapter: Any, view: Any, region: tuple[float, float, float, float], ladder: Sequence[tuple[float, float]], *, margin: float = 0.0, label: str) -> tuple[float, float]:
+    for scale in ladder:
+        _set_view_scale(adapter, view, scale, label=label)
+        _shift, misses = ring_fit_shift(_view_outline(view, label=label), region, grow=margin)
+        if not misses:
+            _center_view_outline(adapter, view, _region_center(region), label=label)
+            _assert_view_on_sheet(view, margin=margin, bounds=region, label=label)
+            return scale
+    raise RuntimeError(f"{label}: no measured scale fits its reserved field")
+
+
+def _orient_capture_section(adapter: Any, view: Any, axis: Sequence[float]) -> None:
+    def axes():
+        points = model_points_in_view(adapter, view, ((0.0, 0.0, 0.0), tuple(v / 1000.0 for v in axis), (0.0, 0.0, 0.001)), label="capture section axes")
+        return tuple(tuple(p[i] - points[0][i] for i in range(2)) for p in points[1:])
+    horizontal, vertical = axes()
+    section = _early_bound(view.GetSection(), "IDrSection")
+    if horizontal[0] * vertical[1] - horizontal[1] * vertical[0] < 0.0:
+        reverse = not bool(section.GetReversedCutDirection())
+        section.SetReversedCutDirection(reverse)
+        rebuild_drawing(adapter, label="capture section cut direction")
+        if bool(section.GetReversedCutDirection()) != reverse:
+            raise RuntimeError("capture section: cut direction did not persist")
+        horizontal, vertical = axes()
+    view.Angle = float(view.Angle) - math.atan2(horizontal[1], horizontal[0])
+    rebuild_drawing(adapter, label="capture section orientation")
+    horizontal, vertical = axes()
+    if horizontal[0] <= 0.0 or vertical[1] <= 0.0 or abs(horizontal[1]) > 1e-8 or abs(vertical[0]) > 1e-8:
+        raise RuntimeError("capture section: model axes did not orient right/up")
+
+
+def _capture_note_bounds(note: Any) -> tuple[float, float, float, float]:
+    raw = tuple(float(v) for v in (_early_bound(note, "INote").GetExtent() or ()))
+    if len(raw) != 6 or not all(math.isfinite(v) for v in raw) or raw[3] <= raw[0] or raw[4] <= raw[1]:
+        raise RuntimeError("jig capture: unreadable native note extents")
+    return raw[0], raw[1], raw[3], raw[4]
+
+
+def _capture_inside(box: Sequence[float], region: Sequence[float]) -> bool:
+    return region[0] <= box[0] < box[2] <= region[2] and region[1] <= box[1] < box[3] <= region[3]
+
+
+def _capture_overlap(a: Sequence[float], b: Sequence[float]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _place_capture_readings(adapter: Any, views: Sequence[Any]) -> tuple[tuple[Any, ...], ...]:
+    records = []
+    for reading in capture_readings():
+        view = views[reading.view_index]
+        label = f"jig capture {reading.text.splitlines()[0]}"
+        point = model_point_in_view(adapter, view, _capture_world_point(reading), label=label)
+        entity = _select_view_entity(adapter, view, "EDGE", point, label=label)
+        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2")
+        wanted = spec.instance_name(reading.stem, reading.index)
+        if component is None or str(component.Name2).casefold() != wanted.casefold():
+            raise RuntimeError(f"{label}: reading point did not select {wanted!r}'s own edge")
+        manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+        if manager.SetSelectionPoint2(1, -1, *point, 0.0) is not True:
+            raise RuntimeError(f"{label}: could not set native reading point")
+        note = adapter.currentModel.InsertNote(reading.text)
+        if note is None:
+            raise RuntimeError(f"{label}: native attached note failed")
+        note = _early_bound(note, "INote")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        format_ = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+        format_.CharHeight = CAPTURE_NOTE_HEIGHT
+        if not annotation.SetTextFormat(0, False, format_):
+            raise RuntimeError(f"{label}: failed to set reading-label height")
+        if annotation.SetLeader3(1, 0, True, False, False, False) != 0:
+            raise RuntimeError(f"{label}: failed to create attached leader")
+        if not annotation.SetPosition2(*reading.text_xy, 0.0):
+            raise RuntimeError(f"{label}: failed to position reading label")
+        records.append((reading, note, entity))
+        adapter.currentModel.ClearSelection2(True)
+    rebuild_drawing(adapter, label="capture attached reading labels")
+    return tuple(records)
+
+
+def _assert_capture_section(adapter: Any, parent: Any, view: Any, letter: str) -> None:
+    label = f"jig capture section {letter}-{letter}"
+    section = _early_bound(view.GetSection(), "IDrSection")
+    if section is None or not bool(section.GetAutoHatch()) or str(section.GetLabel()) != letter:
+        raise RuntimeError(f"{label}: missing real labelled auto-hatched section")
+    # A deliberately local removed section closes within the large carrier.
+    # It is not an accidentally short full cut; keep out-of-plane keeper ink.
+    if not bool(section.GetPartialSection()) or bool(section.GetDisplayOnlySurfaceCut()) or bool(section.ExcludeFasteners):
+        raise RuntimeError(f"{label}: wrong local cut or hidden fastener/secondary geometry")
+    if int(adapter.swApp.IsSame(section.GetView(), parent)) != 1:
+        raise RuntimeError(f"{label}: wrong native cutting-line parent")
+    if int(view.GetDisplayMode2()) != 2 or bool(view.GetUseParentDisplayMode()):
+        raise RuntimeError(f"{label}: section must independently remove hidden lines")
+    axis = spec.PIN_ROWS[0] if letter == "A" else spec.PIVOT_CAP_PLACEMENTS[0][1][0]
+    axes = model_points_in_view(adapter, view, ((0.0, 0.0, 0.0), tuple(v / 1000.0 for v in axis), (0.0, 0.0, 0.001)), label=label)
+    horizontal, vertical = (tuple(p[i] - axes[0][i] for i in range(2)) for p in axes[1:])
+    if horizontal[0] <= 0.0 or vertical[1] <= 0.0 or abs(horizontal[1]) > 1e-8 or abs(vertical[0]) > 1e-8:
+        raise RuntimeError(f"{label}: settled cut axes are not horizontal/right and vertical/up")
+    paper_points = model_points_in_view(adapter, parent, capture_cut_points(letter), label=label)
+    sketch = _early_bound(_early_bound(parent, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = tuple(_inspection_transform_point(utility, transform, (*point, 0.0)) for point in paper_points)
+    raw = tuple(float(v) for v in (section.GetLineInfo() or ()))
+    # IDrSection.SetLineInfo documents GetLineInfo's paired XYZ endpoints.
+    if len(raw) != 6 or not all(math.isfinite(v) for v in raw):
+        raise RuntimeError(f"{label}: not one readable straight native cut plane")
+    a, b = points
+    length = math.dist(a, b)
+    actual = (raw[:3], raw[3:])
+    endpoint_drift = min(
+        max(math.dist(found, wanted) for found, wanted in zip(actual, expected))
+        for expected in (points, tuple(reversed(points)))
+    )
+    if length <= 0.0 or abs(math.dist(*actual) - length) > 1e-7 or endpoint_drift > 1e-7:
+        raise RuntimeError(f"{label}: native cut plane misses its model reading axes")
+    for accessor, count in (("GetArrowInfo", 12), ("GetTextInfo", 6)):
+        values = tuple(float(v) for v in (getattr(section, accessor)() or ()))
+        if len(values) != count or not all(math.isfinite(v) for v in values):
+            raise RuntimeError(f"{label}: unreadable native cut arrows/labels")
+        for i in range(0, count, 3):
+            x, y = values[i:i + 2]
+            if not (CAPTURE_READING_REGION[0] <= x <= CAPTURE_READING_REGION[2]
+                    and CAPTURE_READING_REGION[1] <= y <= CAPTURE_READING_REGION[3]):
+                raise RuntimeError(f"{label}: native cut arrows/labels leave reading field")
+
+
+def _assert_capture_coverage(landings: Sequence[BalloonLanding], stems: Sequence[str]) -> None:
+    if sorted(item.stem for item in landings) != sorted((*stems, spec.BEARING)):
+        raise RuntimeError("jig capture: require every family once and exactly two bearings")
+    bearings = [item for item in landings if item.stem == spec.BEARING]
+    if {item.instance for item in bearings} != {spec.instance_name(spec.BEARING, i) for i in (0, 1)}:
+        raise RuntimeError("jig capture: item 14 must land on two distinct actual bearings")
+    if any(str(_early_bound(item.note, "INote").GetBomBalloonText(True)).strip() != str(BOM_ITEM_NUMBERS[spec.BEARING]) for item in bearings):
+        raise RuntimeError("jig capture: both bearing balloons must resolve to item 14")
+
+
+def _assert_capture_sheet(
+    adapter: Any, views: Sequence[Any], scales: Sequence[tuple[float, float]],
+    records: Sequence[tuple[Any, ...]], landings: Sequence[BalloonLanding] = (),
+) -> None:
+    sheet = _activate_sheet(adapter, PIVOT_CAPTURE_SHEET)
+    actual_views = tuple(sheet.GetViews() or ())
+    if len(views) != 4 or len(actual_views) != 4 or any(int(adapter.swApp.IsSame(a, b)) != 1 for a, b in zip(actual_views, views)):
+        raise RuntimeError("jig capture: expected exactly four ordered native model views")
+    cluster = next(c for c in CLUSTERS if c.sheet == PIVOT_CAPTURE_SHEET)
+    installed = capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
+    for index, (view, scale, region) in enumerate(zip(views, scales, CAPTURE_VIEW_REGIONS, strict=True)):
+        bound = _early_bound(view, "IView")
+        ratio = tuple(float(v) for v in bound.ScaleRatio)
+        configuration = SIMPLIFIED_VIEW_CONFIGURATION if index == 0 else ASSEMBLY_VIEW_CONFIGURATION
+        if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9 or str(bound.ReferencedConfiguration) != configuration or bool(bound.IsExploded()) != (index == 0):
+            raise RuntimeError(f"jig capture view {index}: changed scale/configuration/exploded state")
+        shown = {leaf.path for leaf in _view_component_leaves(adapter, view, label="jig capture") if leaf.visible}
+        if shown != (capture_support_instances(cluster, 0) if index == 0 else installed):
+            raise RuntimeError(f"jig capture view {index}: wrong visible occurrence isolation")
+        if index:
+            if not bool(bound.IsCropped()):
+                raise RuntimeError(f"jig capture view {index}: assembled reading view lost its crop")
+            _assert_capture_crop(adapter, bound, index)
+        if index and any(bool(_early_bound(note, "INote").IsBomBalloon()) for note in (bound.GetNotes() or ())):
+            raise RuntimeError(f"jig capture view {index}: assembled reading views must remain unballooned")
+        _assert_view_on_sheet(view, margin=BALLOON_RING_REACH if index == 0 else 0.0,
+                              bounds=region, label=f"jig capture view {index}")
+    _assert_capture_section(adapter, views[1], views[2], "A")
+    _assert_capture_section(adapter, views[1], views[3], "B")
+    notes = []
+    locator_captions = [note for note in (views[1].GetNotes() or ())
+                        if str(_early_bound(note, "INote").GetText() or "").startswith("ASSEMBLED PLAN")]
+    if len(locator_captions) != 1 or str(locator_captions[0].GetText()) != f"ASSEMBLED PLAN {_scale_text(scales[1])}":
+        raise RuntimeError("jig capture: locator lost its independently fitted scale caption")
+    notes.append((locator_captions[0], _capture_note_bounds(locator_captions[0]), "locator caption"))
+    leaders = []
+    for reading, note, entity in records:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        label = f"jig capture {reading.text.splitlines()[0]} {reading.local_mm}"
+        if int(annotation.OwnerType) != 0 or str(note.GetText()).replace("\r\n", "\n") != reading.text:
+            raise RuntimeError(f"{label}: changed text or lost drawing-view ownership")
+        if not any(int(adapter.swApp.IsSame(note, owned)) == 1 for owned in (views[reading.view_index].GetNotes() or ())):
+            raise RuntimeError(f"{label}: reading label is not owned by its actual model view")
+        height = float(_early_bound(annotation.GetTextFormat(0), "ITextFormat").CharHeight)
+        if abs(height - CAPTURE_NOTE_HEIGHT) > 1e-8:
+            raise RuntimeError(f"{label}: native reading-label height changed")
+        component = _early_bound(_early_bound(entity, "IEntity").GetComponent(), "IComponent2")
+        if component is None or str(component.Name2) != spec.instance_name(reading.stem, reading.index):
+            raise RuntimeError(f"{label}: lost source occurrence edge ownership")
+        _assert_attached_to(adapter, annotation, entity, entity_type="EDGE", what="reading label", label=label)
+        point = model_point_in_view(adapter, views[reading.view_index], _capture_world_point(reading), label=label)
+        _assert_leader_lands(annotation, point, what="reading label", label=label, tolerance=0.0002)
+        bounds = _capture_note_bounds(note)
+        if not _capture_inside(bounds, CAPTURE_READING_REGION):
+            raise RuntimeError(f"{label}: native reading label leaves its field")
+        notes.append((note, bounds, label))
+        raw = tuple(float(v) for v in annotation.GetLeaderPointsAtIndex(0))
+        leaders.extend(LeaderSegment(label=label, kind="note", x0=raw[i], y0=raw[i+1], x1=raw[i+3], y1=raw[i+4]) for i in range(0, len(raw) - 3, 3))
+        if any(_segment_crosses_box(segment, _view_outline(other, label=label), inset=0.001)
+               for segment in leaders if segment.label == label
+               for other in views[1:] if other is not views[reading.view_index]):
+            raise RuntimeError(f"{label}: native reading leader crosses another view")
+    for view in views[2:]:
+        captions = [note for note in (view.GetNotes() or ()) if "<VLLABEL>" in str(_early_bound(note, "INote").PropertyLinkedText or "")]
+        if len(captions) != 1:
+            raise RuntimeError("jig capture: missing native linked section caption")
+        notes.append((captions[0], _capture_note_bounds(captions[0]), "section caption"))
+    for i, (_note, box, owner_label) in enumerate(notes):
+        if not _capture_inside(box, CAPTURE_READING_REGION) or any(_capture_overlap(box, other[1]) for other in notes[i + 1:]):
+            raise RuntimeError("jig capture: native captions/reading labels overlap or leave field")
+        if any(_capture_overlap(box, _view_outline(view, label="jig capture")) for view in views[1:]):
+            raise RuntimeError("jig capture: native caption/reading label covers model geometry")
+        if any(segment.label != owner_label and _segment_crosses_box(segment, box, inset=0.0) for segment in leaders):
+            raise RuntimeError("jig capture: native reading leader crosses another label/caption")
+    if find_leader_leader_crossings(leaders):
+        raise RuntimeError("jig capture: reading-label leaders cross")
+    if landings:
+        _assert_capture_coverage(landings, cluster.stems)
+        native_balloons = tuple(note for note in (views[0].GetNotes() or ()) if note.IsBomBalloon())
+        if len(native_balloons) != len(landings) or any(
+            not any(int(adapter.swApp.IsSame(note, landing.note)) == 1 for landing in landings)
+            for note in native_balloons
+        ):
+            raise RuntimeError("jig capture: native exploded balloons differ from proved landings")
+    for landing in landings:
+        x, y, radius = rendered_balloon_circle(landing.note, label="jig capture")
+        if not _capture_inside((x-radius, y-radius, x+radius, y+radius), CAPTURE_EXPLODED_REGION):
+            raise RuntimeError("jig capture: balloon leaves exploded field")
+
+
+def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...], tuple[tuple[float, float], ...], tuple[tuple[Any, ...], ...]]:
+    _activate_sheet(adapter, cluster.sheet)
+    exploded = _place_named_view(adapter, spec.ISOMETRIC_VIEW, _region_center(CAPTURE_EXPLODED_REGION), cluster.scale, label="jig capture exploded")
+    set_high_quality_shaded_with_edges(adapter, exploded, label="jig capture exploded")
+    configuration = apply_view_configuration(adapter, exploded, label="jig capture exploded")
+    set_view_exploded_state(adapter, exploded, True, configuration=configuration, label="jig capture exploded")
+    isolate_drawing_view_components(adapter, exploded, visible_stems=capture_support_instances(cluster, 0), label="jig capture exploded")
+    scale = _fit_capture_view(adapter, exploded, CAPTURE_EXPLODED_REGION, CLUSTER_SCALE_LADDER[CLUSTER_SCALE_LADDER.index(cluster.scale):], margin=BALLOON_RING_REACH, label="jig capture exploded")
+    installed = capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
+    locator = _place_named_view(adapter, spec.PLAN_VIEW, (0.250, 0.242), CAPTURE_LOCATOR_SCALE, label="jig capture locator")
+    configuration = apply_view_configuration(adapter, locator, role=ViewRole.FULL_DETAIL, label="jig capture locator")
+    set_view_exploded_state(adapter, locator, False, configuration=configuration, label="jig capture locator")
+    isolate_drawing_view_components(adapter, locator, visible_stems=installed, label="jig capture locator")
+    origin = tuple(v / 1000.0 for v in spec.PIVOT_PIN_ORIGINS[0])
+    centre = model_point_in_view(adapter, locator, origin, label="jig capture locator")
+    _crop_capture_view(adapter, locator, centre, 0.055 / 4.0, label="jig capture locator")
+    set_hidden_lines_removed(adapter, locator)
+    locator_scale = _fit_capture_view(adapter, locator, CAPTURE_VIEW_REGIONS[1], ((1, 4), (1, 5), (1, 6)), label="jig capture locator")
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(str(locator.GetName2())):
+        raise RuntimeError("jig capture: could not activate locator caption owner")
+    if add_note(adapter, f"ASSEMBLED PLAN {_scale_text(locator_scale)}", 0.224, 0.222, height=CAPTURE_NOTE_HEIGHT) is None:
+        raise RuntimeError("jig capture: failed to place locator scale caption")
+    views = [exploded, locator]
+    scales = [scale, locator_scale]
+    for index, letter in enumerate(("A", "B"), start=2):
+        points = model_points_in_view(adapter, locator, capture_cut_points(letter), label=f"jig capture cut {letter}")
+        view = _early_bound(create_section_view(adapter, locator, line_start=points[0], line_end=points[1],
+                            view_xy=_region_center(CAPTURE_VIEW_REGIONS[index]), section_label=letter,
+                            scale=(1, 1), partial=True, label=f"jig capture section {letter}"), "IView")
+        # Child occurrence flags do not reliably inherit; isolate it explicitly.
+        isolate_drawing_view_components(adapter, view, visible_stems=installed, label=f"jig capture section {letter}")
+        if str(view.ReferencedConfiguration) != ASSEMBLY_VIEW_CONFIGURATION or bool(view.IsExploded()):
+            raise RuntimeError("jig capture: section did not inherit full-detail collapsed parent")
+        section = _early_bound(view.GetSection(), "IDrSection")
+        section.SetDisplayOnlySurfaceCut(False)
+        _orient_capture_section(adapter, view, spec.PIN_ROWS[0] if letter == "A" else spec.PIVOT_CAP_PLACEMENTS[0][1][0])
+        if letter == "A":
+            anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
+            radius = 0.039
+        else:
+            anchor = tuple(v / 1000.0 for v in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
+            radius = 0.014
+        centre = model_point_in_view(adapter, view, anchor, label=f"jig capture crop {letter}")
+        _crop_capture_view(adapter, view, centre, radius, label=f"jig capture section {letter}")
+        set_hidden_lines_removed(adapter, view)
+        scales.append(_fit_capture_view(adapter, view, CAPTURE_VIEW_REGIONS[index], ((1, 1), (1, 2)), label=f"jig capture section {letter}"))
+        position_section_caption(adapter, view, CAPTURE_SECTION_CAPTIONS[index - 2], label=f"jig capture {letter}")
+        views.append(view)
+    records = _place_capture_readings(adapter, views)
+    _assert_capture_sheet(adapter, views, scales, records)
+    return tuple(views), tuple(scales), records
 
 
 def _balloon_cluster(
@@ -2605,8 +2962,7 @@ def _balloon_cluster(
     items: Sequence[tuple[str, str]],
     bom_name: str,
 ) -> list[BalloonLanding]:
-    """Link one cluster view to the BOM, balloon each of its families once,
-    all on one ring."""
+    """One BOM-linked ring; only the capture sheet repeats the bearing item."""
     _activate_sheet(adapter, cluster.sheet)
     label = f"jig {cluster.sheet.lower()}"
     _link_view_to_bom(view, bom_name, label=label)
@@ -2620,10 +2976,22 @@ def _balloon_cluster(
             label=f"{label} BOM coverage",
             margin=BALLOON_MARGIN,
         )
+        if cluster.sheet == PIVOT_CAPTURE_SHEET:
+            bearing_item = next(item for item in wanted if item[0] == spec.BEARING)
+            landings += add_component_bom_balloons(
+                adapter, view, items=(bearing_item,),
+                anchors={spec.BEARING: replace(
+                    BALLOON_ANCHORS[spec.BEARING],
+                    instance=spec.instance_name(spec.BEARING, 1),
+                )},
+                label=f"{label} upper bearing item 14", margin=BALLOON_MARGIN,
+            )
     _ring_balloons(adapter, view, landings, label=f"{label} balloons")
     if cluster.sheet != PIVOT_CAPTURE_SHEET:
         landings = _relax_cluster_slide(adapter, view, landings, label=f"{label} ring")
-    if sorted(landing.stem for landing in landings) != sorted(cluster.stems):
+    if cluster.sheet == PIVOT_CAPTURE_SHEET:
+        _assert_capture_coverage(landings, cluster.stems)
+    elif sorted(landing.stem for landing in landings) != sorted(cluster.stems):
         raise RuntimeError(
             f"{label} carries balloons for "
             f"{sorted(landing.stem for landing in landings)!r}, "
@@ -2774,9 +3142,9 @@ def _place_package(
     capture_cluster = next(
         cluster for cluster in CLUSTERS if cluster.sheet == PIVOT_CAPTURE_SHEET
     )
-    capture_pair, capture_scale = _place_capture_pair(adapter, capture_cluster)
+    capture_views, capture_scales, capture_records = _place_capture_sheet(adapter, capture_cluster)
     placed = [
-        (cluster, capture_pair[0], capture_scale) if cluster is capture_cluster
+        (cluster, capture_views[0], capture_scales[0]) if cluster is capture_cluster
         else (cluster, *_place_cluster_view(adapter, cluster))
         for cluster in CLUSTERS
     ]
@@ -2813,15 +3181,15 @@ def _place_package(
             EXPLODED_CAPTION_XY,
             label=f"{cluster.sheet.lower()} caption",
         )
-    if sorted(landing.stem for landing in landings) != sorted(BOM_COMPONENTS):
+    if sorted(landing.stem for landing in landings) != sorted((*BOM_COMPONENTS, spec.BEARING)):
         raise RuntimeError(
-            f"jig package carries {len(landings)} balloons, expected one per "
-            f"BOM row ({len(BOM_COMPONENTS)}) across the exploded sheets"
+            "jig package requires one balloon per BOM row, except the two "
+            "distinct item-14 bearings on the capture sheet"
         )
     capture_landings = [
         landing for landing in landings if landing.stem in capture_cluster.stems
     ]
-    _assert_capture_pair(adapter, capture_pair, capture_scale, capture_landings)
+    _assert_capture_sheet(adapter, capture_views, capture_scales, capture_records, capture_landings)
     _place_steps_notes(adapter)
     _place_capture_notes(adapter)
     # The fitted reference can select 1:25 or 1:30. Author paper-only sketch
@@ -2865,8 +3233,8 @@ def _place_package(
         cl_tip_settled,
         kit_note_settled,
         inspection_settled,
-        lambda: _assert_capture_pair(
-            adapter, capture_pair, capture_scale, capture_landings
+        lambda: _assert_capture_sheet(
+            adapter, capture_views, capture_scales, capture_records, capture_landings
         ),
     )
 

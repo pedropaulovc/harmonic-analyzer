@@ -183,19 +183,44 @@ leaves 2.475 mm vertical air under the conservative text model. Keep the
 feature endpoints fixed and retain both the offline overlap checks and native
 endpoint/display proofs.
 
-The e12 assembly review requires the two exploded capture supports to use
-the sheet's left and right fields, not stay bunched at the left of one large
-source view. Insert two native assembly views with the existing occurrence
-visibility isolation, the same source configuration/explode and one common
-measured ladder scale. Fit their native outlines plus balloon reach in
-separate equal fields above the title block; balloon the first support only.
-Do not run the whole-sheet ring relaxation afterwards: it would move that
-support toward the full sheet's centre again. Retain real-edge ownership,
-ring uncrossing and settled landing proofs, and recheck both native fields
-and the rendered balloon circles after finalization. The C2A schematic and
-its exact sheet-scale/endpoint/display proof travel with the bench procedure
-to sheet 8; feed checks, cap seating and carrier capture have distinct
-headings in that print order, without new acceptance criteria.
+The e12 review required the capture presentation to use the available sheet
+width. The 808 review then showed why a second identical exploded cartridge
+was not useful: both bearings still hid behind the block, and the clevis had
+followed the retainer lift instead of its pin's cross-hole. Keep one coherent
+native exploded cartridge on the left. Select upper/lower bearing occurrences
+separately so C1 reads pin/upper bearing, upper seat, then lower bearing;
+attach item 14 to both actual bearings. Correct only the clevis/cotter's
+vertical presentation to follow the pin, retaining their axial withdrawals.
+Preserve every-instance translation/rotation readbacks and the proof that
+collapse restores the operational assembly; these are presentation changes,
+not changes to mating geometry or fit-up criteria.
+
+Replace the unballooned twin with a visible assembled plan locator, a genuine
+longitudinal section A-A through the pivot and clevis axes, and a small
+bolt-seat section B-B for the underhead point that the centre plane cannot cut.
+Reuse native `create_section_view` and the existing assembly `Crop2` pattern,
+explicitly isolating the parent and each child. Keep their section/crop,
+configuration, visible-occurrence, scale, attachment and paper-field
+readbacks through the final rebuild. The exploded view stays first for the
+sheet's live property association; the assembled inspection views carry no
+additional BOM balloons. Do not run whole-sheet ring relaxation on a view
+reserved to the left field. Retain real-edge ownership, ring uncrossing and
+settled-landing proofs, with exactly the two intended bearing attachments.
+`IDrSection.GetLineInfo` returns parent-sketch/model-space XYZ endpoints, not
+paper coordinates. Read the parent's current sketch transform on every replay;
+compare full endpoints in either order and their model-space length. Arrow and
+text positions remain sheet-space. Author crop circles with protected
+`AddToDB=True`, select the closed profile explicitly, and read the persisted
+circle's centre and model radius again after refitting or moving the view.
+
+Inspection callouts identify the existing C-step reading points and limits:
+chamber excess is chamber height minus flange thickness, not a third gap.
+Neither a centre section nor a static nominal pose replaces the prescribed
+whole-face, endplay, clocking and motion inspections.
+
+The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
+the bench procedure to sheet 8; feed checks, cap seating and carrier capture
+have distinct headings in that print order, without new acceptance criteria.
 
 For the assembly's imported CL-tip reference, curate the native dimension at
 a near-tip **dimension-line anchor**, reset inherited `OffsetText`, then use

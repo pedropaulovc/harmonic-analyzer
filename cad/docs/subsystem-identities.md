@@ -211,6 +211,15 @@ pass changes, the complete installed stud contract (HD1–HD3), the numbered
 actual spindle/tool/holder clearance check C8 and machine acceptance remain
 on **CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
 
+Sheet 4 presents one exploded cartridge in C1 press order, with separate
+upper/lower bearing occurrences and both real bearings identified as item 14.
+The clevis/cotter presentation stays aligned with the pin's cross-hole.
+The former unballooned duplicate is replaced by an assembled plan locator,
+a longitudinal cartridge section A-A and a small cap-bolt-seat section B-B. These
+identify the existing C2–C5 reading points, relieved mouths, flat lands and
+carrier-backed shank strips; they introduce no new limits and do not certify
+the whole-face or moving/endplay acceptance from one static view.
+
 C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
 With the actual pin/block/cap benched without bearings and the cap temporarily
 seated by the C3 method, without wire, C2A requires **minimum pin-tip recess

@@ -930,21 +930,23 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # on the brackets, the handwheel slid off its end, the bracket screws dropped
 # out of bar 1's underside and the KP08 screws lifted out; the carriages over
 # their rails with the rail screws lifted out between; each pivot block over
-# its carriage with its bearings pressed out beneath it, its carriage screws
-# and its pivot pin above it, as it is pressed in; block 1 carries the nut
-# bracket and the nut, their screws backed out along the axes they are
+# its carriage, its upper bearing between block and pin and its lower bearing
+# visibly below the block; its carriage screws and pivot pin above it.
+# Block 1 carries the nut bracket and the nut, their screws backed out along
+# the axes they are
 # driven on, each block screw's wedge-lock pair halfway out to its head;
 # then the carrier, its HUB pin dropped out beneath it (step 11 presses it up
 # from below once the riser is down) and its CL dowel lifted out above the
 # riser (step 11 presses it down through the riser), and the riser and the
 # feed lever over it with their screws above them, each lever screw's
 # wedge-lock pair halfway out to its head.
-# Each step's families move by a signed distance along a machine
-# axis; a family's displacement along an axis is the sum of the steps naming
-# it (``explode_shift``; ``explode_lift`` along Z). The rail 1 axis runs
-# along -X within 9 degrees, so the nut screws back out along +X and the
-# handwheel slides off along -X.
-# (label, families, axis, signed distance mm).
+# Each step's selectors move by a signed distance along a machine axis.
+# Ordinary selectors are family stems; only the two bearing extraction steps
+# name exact occurrences. ``explode_shift`` sums both kinds for an occurrence;
+# a family query is valid only when every occurrence shares that axis shift.
+# The rail 1 axis runs along -X within 9 degrees, so the nut screws back out
+# along +X and the handwheel slides off along -X.
+# (label, selectors, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 _CARRIER_RIDERS = (
@@ -974,12 +976,7 @@ _BLOCK_RIDERS = (
 EXPLODE_STEPS = (
     ("cotters withdraw after straightening", (PIVOT_COTTER,), "y", 40.0),
     ("clevis pins withdraw", (PIVOT_CLEVIS_PIN, PIVOT_COTTER), "x", 40.0),
-    (
-        "top retainers lift clear",
-        (PIVOT_RETAINER, PIVOT_CLEVIS_PIN, PIVOT_COTTER),
-        "z",
-        170.0,
-    ),
+    ("top retainers lift clear", (PIVOT_RETAINER,), "z", 170.0),
     ("discard lock wire", (PIVOT_LOCK_WIRE,), "y", -16.0),
     ("lock wire lifts clear", (PIVOT_LOCK_WIRE,), "z", 176.0),
     ("cap screws lift clear", (PIVOT_CAP_SCREW,), "z", 160.0),
@@ -1010,8 +1007,24 @@ EXPLODE_STEPS = (
     ("wedge-lock pairs back out", (BLOCK_LOCK_WASHER,), "y", -20.0),
     ("pivot blocks lift off", (PIVOT_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
-    ("pivot pins press out up", (PIVOT_PIN,), "z", 60.0),
-    ("bearings press out down", (BEARING,), "z", -35.0),
+    (
+        "pivot pins press out up",
+        (PIVOT_PIN, PIVOT_CLEVIS_PIN, PIVOT_COTTER),
+        "z",
+        60.0,
+    ),
+    (
+        "upper bearings press out up",
+        (instance_name(BEARING, 1), instance_name(BEARING, 3)),
+        "z",
+        24.0,
+    ),
+    (
+        "lower bearings press out down",
+        (instance_name(BEARING, 0), instance_name(BEARING, 2)),
+        "z",
+        -80.0,
+    ),
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),
     ("rail screws lift out", (RAIL_SCREW,), "z", 35.0),
     ("handwheel slides off", (HANDWHEEL,), "x", -50.0),
@@ -1032,18 +1045,41 @@ EXPLODE_STATIC = (
 )
 
 
-def explode_shift(family: str, axis: str) -> float:
-    """``family``'s total exploded displacement along machine ``axis`` (mm, signed)."""
-    return sum(
-        d
-        for _label, families, step_axis, d in EXPLODE_STEPS
-        if step_axis == axis and family in families
-    )
+def explode_shift(component_or_family: str, axis: str) -> float:
+    """Signed machine-axis presentation shift (mm) of an occurrence or family.
+
+    A family has no common shift on an axis whose occurrences separate; callers
+    projecting real geometry must use ``instance_name(stem, index)`` instead.
+    """
+    if component_or_family in QUANTITIES:
+        family = component_or_family
+        names = tuple(instance_name(family, index) for index in range(QUANTITIES[family]))
+    else:
+        family, _separator, _suffix = component_or_family.rpartition("-")
+        if family not in QUANTITIES or component_or_family not in (
+            instance_name(family, index) for index in range(QUANTITIES[family])
+        ):
+            raise ValueError(f"unknown explode occurrence: {component_or_family!r}")
+        names = (component_or_family,)
+    shifts = {
+        sum(
+            distance
+            for _label, selectors, step_axis, distance in EXPLODE_STEPS
+            if step_axis == axis and (family in selectors or name in selectors)
+        )
+        for name in names
+    }
+    if len(shifts) != 1:
+        raise ValueError(
+            f"{component_or_family}: nonuniform exploded {axis.upper()} displacement; "
+            "use an exact instance_name(stem, index)"
+        )
+    return shifts.pop()
 
 
-def explode_lift(family: str) -> float:
-    """``family``'s total exploded displacement along machine Z (mm, signed)."""
-    return explode_shift(family, "z")
+def explode_lift(component_or_family: str) -> float:
+    """Signed machine-Z presentation shift (mm); reject nonuniform families."""
+    return explode_shift(component_or_family, "z")
 
 
 # The isometric looks down along (-1, +1, -1): a part under the lifted carrier
@@ -1068,26 +1104,58 @@ if PIN_BOTTOM_Z + explode_lift(PIVOT_PIN) <= (
 # The riser must clear the HUB pin's locator before it moves sideways.
 if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_PIN_TOP_Z - trammel.CARRIER_TOP_Z:
     raise AssertionError("the exploded riser does not clear the HUB pin")
-_moved = {
-    family for _label, families, _axis, _d in EXPLODE_STEPS for family in families
+_instances = {
+    instance_name(family, index)
+    for family in BOM_ORDER
+    for index in range(QUANTITIES[family])
 }
-if _moved & set(EXPLODE_STATIC) or _moved | set(EXPLODE_STATIC) != set(BOM_ORDER):
-    raise AssertionError("every family is exploded or deliberately static, not both")
-# Each pivot block's stack reads apart: carriage, its rail screws under it,
-# the bearings between it and the lifted block.
-_CARRIAGE_TOP_EXPLODED = trammel.CARRIAGE_TOP_Z + explode_lift(CARRIAGE)
-if not (
-    _CARRIAGE_TOP_EXPLODED
-    < PIN_BOTTOM_Z + explode_lift(BEARING)
-    < BEARING_SEAT_Z[1]
-    + trammel.BEARING_WIDTH
-    + trammel.CARRIAGE_TOP_Z
-    + explode_lift(BEARING)
-    < trammel.CARRIAGE_TOP_Z + explode_lift(PIVOT_BLOCK)
-):
-    raise AssertionError(
-        "the exploded bearings do not stand between carriage and block"
+_bearing_instances = {
+    instance_name(BEARING, index) for index in range(QUANTITIES[BEARING])
+}
+_moved: set[str] = set()
+for _label, _selectors, _axis, _distance in EXPLODE_STEPS:
+    for _selector in _selectors:
+        if _selector in QUANTITIES:
+            _moved.update(
+                instance_name(_selector, index)
+                for index in range(QUANTITIES[_selector])
+            )
+        elif _selector in _bearing_instances:
+            _moved.add(_selector)
+        else:
+            raise AssertionError(f"unknown explode selector: {_selector}")
+_static = {
+    instance_name(family, index)
+    for family in EXPLODE_STATIC
+    for index in range(QUANTITIES[family])
+}
+if _moved & _static or _moved | _static != _instances:
+    raise AssertionError("every occurrence is exploded or deliberately static, not both")
+# C1: upper bearing on the pin, that pair into the upper seat, lower bearing
+# last from below. Each actual occurrence must stand on its own side of its
+# support, not merely share a family displacement somewhere under the block.
+for _support, (_block_origin, _block_rows) in enumerate(PIVOT_BLOCK_PLACEMENTS):
+    _block_bottom = _block_origin[2] + explode_lift(instance_name(PIVOT_BLOCK, _support))
+    _block_top = _block_bottom + pivot_block.BLOCK_HEIGHT
+    _lower, _upper = (2 * _support, 2 * _support + 1)
+    _lower_top = (
+        BEARING_PLACEMENTS[_lower][0][2]
+        + explode_lift(instance_name(BEARING, _lower))
+        + bearing.WIDTH
     )
+    _upper_bottom = (
+        BEARING_PLACEMENTS[_upper][0][2]
+        + explode_lift(instance_name(BEARING, _upper))
+    )
+    _pin_bottom = (
+        PIVOT_PIN_ORIGINS[_support][2]
+        + explode_lift(instance_name(PIVOT_PIN, _support))
+    )
+    if not (
+        _lower_top < _block_bottom < _block_top
+        < _upper_bottom < _upper_bottom + bearing.WIDTH < _pin_bottom
+    ):
+        raise AssertionError("the exploded bearing occurrences do not show C1 press order")
 _RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + explode_lift(RAIL_SCREW)
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):
     raise AssertionError("the exploded rail screws stand inside the carriages")
@@ -1139,6 +1207,41 @@ for _name, (_right, _up, _sight) in VIEW_AXES.items():
         > 1e-12
     ):
         raise AssertionError(f"{_name}: not a right-handed orthonormal frame")
+# A lower bearing can be axially clear yet hidden behind the block's wing in
+# this isometric. Separate their complete sheet-up envelopes: the block uses
+# its conservative enclosing footprint (including both wings); the bearing
+# uses its exact cylindrical OD silhouette, not its centre or a seat stub.
+# Net lower +10 Z puts its faces at block-bottom +11..20, 70 mm below the
+# lifted block; the old +55 Z faces at +56..65 did not clear this projection.
+_iso_up = VIEW_AXES[ISOMETRIC_VIEW][1]
+for _support, _block in enumerate(PIVOT_BLOCK_PLACEMENTS):
+    _block_name = instance_name(PIVOT_BLOCK, _support)
+    _block_floor_up = min(
+        sum(value * up for value, up in zip(frame_point(_block, (x, y, 0.0)), _iso_up))
+        for x in (pivot_block.BLOCK_X0, max(pivot_block.BLOCK_X1, pivot_block.WING_X1))
+        for y in (
+            -max(pivot_block.BLOCK_WIDTH, pivot_block.WING_WIDTH) / 2.0,
+            max(pivot_block.BLOCK_WIDTH, pivot_block.WING_WIDTH) / 2.0,
+        )
+    ) + sum(
+        explode_shift(_block_name, axis) * up for axis, up in zip("xyz", _iso_up)
+    )
+    _lower = 2 * _support
+    _lower_origin, _lower_rows = BEARING_PLACEMENTS[_lower]
+    _lower_name = instance_name(BEARING, _lower)
+    _lower_radius_up = bearing.OD / 2.0 * math.hypot(
+        sum(value * up for value, up in zip(_lower_rows[0], _iso_up)),
+        sum(value * up for value, up in zip(_lower_rows[2], _iso_up)),
+    )
+    _lower_top_up = (
+        sum(value * up for value, up in zip(_lower_origin, _iso_up))
+        + bearing.WIDTH * sum(value * up for value, up in zip(_lower_rows[1], _iso_up))
+        + _lower_radius_up
+        + sum(explode_shift(_lower_name, axis) * up for axis, up in zip("xyz", _iso_up))
+    )
+    if _lower_top_up >= _block_floor_up:
+        raise AssertionError("the exploded block hides a lower bearing in the isometric")
+
 PLAN_VIEW_LABEL = "PLAN, FROM ABOVE"
 ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 
@@ -1711,7 +1814,7 @@ CARTRIDGE_STEPS = (
     "THE UPPER BLOCK SEAT, DRIVING ITS OUTER RACE ONLY. SUPPORT THE PIN "
     "AND PRESS THE LOWER BEARING WITH A DRIVER ON BOTH RACES UNTIL THE "
     "OUTER RACE SEATS; DO NOT PRESS THROUGH BALLS.",
-    "C2. AFTER PRESS ASSEMBLY, VERIFY THE LOWER FLANGE-RIM/FLOOR GAP "
+    "C2. A-A, SHEET 4: AFTER PRESS ASSEMBLY, VERIFY THE LOWER FLANGE-RIM/FLOOR GAP "
     f"{retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f} AND TOTAL "
     f"CHAMBER EXCESS {retention.CAP_CHAMBER_EXCESS[0]:.2f}-"
     f"{retention.CAP_CHAMBER_EXCESS[1]:.2f}, INCLUDING FACE VARIATION; "
@@ -1744,7 +1847,7 @@ CAP_SEATING_STEPS = (
     "BEFORE SEATING, WITHOUT FILLET INTERFERENCE OR BOTTOMING. TIGHTEN "
     f"CROSSWISE TO {retention.CAP_SEATING_TORQUE_NM:.2f} +/- "
     f"{retention.CAP_SEATING_TORQUE_BAND_NM:.2f} N·m.",
-    "C3A. WITH CAPS SEATED, REPEAT C2. BEFORE WIRING, CHECK A SEPARATE "
+    "C3A. B-B, SHEET 4: WITH CAPS SEATED, REPEAT C2. BEFORE WIRING, CHECK A SEPARATE "
     f"{retention.CAP_BASE_SEATING_GAP_MAX:.2f} MAX CAP/BLOCK GAP AROUND "
     "THE WHOLE MOUNTING-LAND PERIMETER AND "
     f"{retention.CAP_HEAD_SEATING_GAP_MAX:.2f} MAX UNDER EACH HEAD OVER "
@@ -1778,7 +1881,7 @@ TOP_FULL_SECTION_SHANK_OVERLAP_MIN = 2.0
 TOP_CARRIER_BACKED_BEARING_STRIP_MIN = 2.0
 
 TOP_CAPTURE_STEPS = (
-    "C4. STOP/ISOLATE THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER. "
+    "C4. C4-C5 POINTS: A-A, SHEET 4. STOP/ISOLATE THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER. "
     "FOR THE MATCHED SET, MEASURE ACTUAL RELIEVED RETAINER BORE MOUTHS, "
     "FLAT LANDS, CARRIER BACKING AND UNINTERRUPTED FULL-DIAMETER CLEVIS "
     "SHANK; EXCLUDE FILLETS, CHAMFERS AND THE COTTER BORE. AT BOTH CLEVIS "

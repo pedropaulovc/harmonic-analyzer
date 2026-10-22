@@ -373,13 +373,21 @@ def test_nut_bracket_hangs_on_pivot_block_1_round_the_screw() -> None:
 
 def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     assert spec.EXPLODED_VIEW_NAME == "JIG_EXPLODED"
-    for _label, families, axis, distance in spec.EXPLODE_STEPS:
-        assert set(families) <= set(spec.QUANTITIES)
+    instances = {
+        family: {
+            spec.instance_name(family, index)
+            for index in range(spec.QUANTITIES[family])
+        }
+        for family in spec.BOM_ORDER
+    }
+    for _label, selectors, axis, distance in spec.EXPLODE_STEPS:
+        assert set(selectors) <= set(spec.QUANTITIES) | instances[spec.BEARING]
         assert axis in {"x", "y", "z"} and distance != 0.0
     moved = {
-        family
-        for _label, families, _axis, _d in spec.EXPLODE_STEPS
-        for family in families
+        name
+        for _label, selectors, _axis, _d in spec.EXPLODE_STEPS
+        for selector in selectors
+        for name in instances.get(selector, {selector})
     }
     # The frame stays: the bars, the rails and end brackets screwed to
     # them, the screw in its KP08s and the studs; the nut bracket lifts with
@@ -392,15 +400,22 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
         spec.PILLOW_BLOCK,
         spec.HOLD_DOWN_STUD,
     }
-    assert moved == set(spec.QUANTITIES) - set(spec.EXPLODE_STATIC)
-    lift = {family: spec.explode_shift(family, "z") for family in spec.QUANTITIES}
+    static = {
+        name for family in spec.EXPLODE_STATIC for name in instances[family]
+    }
+    assert not moved & static
+    assert moved | static == set().union(*instances.values())
+    lift = {
+        family: spec.explode_lift(family)
+        for family in spec.QUANTITIES if family != spec.BEARING
+    }
     assert all(
-        spec.explode_shift(family, axis) == 0.0
-        for family in spec.EXPLODE_STATIC for axis in "xyz"
+        spec.explode_shift(name, axis) == 0.0
+        for name in static for axis in "xyz"
     )
     assert all(
-        any(spec.explode_shift(family, axis) != 0.0 for axis in "xyz")
-        for family in moved
+        any(spec.explode_shift(name, axis) != 0.0 for axis in "xyz")
+        for name in moved
     )
     # Sideways only where a part leaves sideways: rail 1 runs along -X, so the
     # nut screws back out along +X and the handwheel slides off along -X; the
@@ -432,10 +447,278 @@ def test_explode_stands_every_layer_clear_and_in_sight() -> None:
     # the HUB pin still leaves downward from the carrier.
     hub_steps = [d for _l, fams, _a, d in spec.EXPLODE_STEPS if fams == (spec.HUB_PIN,)]
     pin_steps = [
-        d for _l, fams, _a, d in spec.EXPLODE_STEPS if fams == (spec.PIVOT_PIN,)
+        d for _l, selectors, axis, d in spec.EXPLODE_STEPS
+        if spec.PIVOT_PIN in selectors
+        and spec.PIVOT_BLOCK not in selectors and axis == "z"
     ]
     assert hub_steps and all(distance < 0.0 for distance in hub_steps)
     assert pin_steps and all(distance > 0.0 for distance in pin_steps)
+
+
+def _exploded_point(family: str, index: int, point=(0.0, 0.0, 0.0)):
+    origin, rows = spec.PLACEMENTS[family][index]
+    assembled = _image(rows, origin, point)
+    name = spec.instance_name(family, index)
+    return tuple(
+        assembled[axis] + spec.explode_shift(name, key)
+        for axis, key in enumerate("xyz")
+    )
+
+
+def test_each_actual_bearing_shows_its_c1_seat_side_and_pin_axis() -> None:
+    for support, block in enumerate(spec.PIVOT_BLOCK_PLACEMENTS):
+        pin = _exploded_point(spec.PIVOT_PIN, support)
+        block_bottom = _exploded_point(spec.PIVOT_BLOCK, support)[2]
+        block_top = block_bottom + pivot_block.BLOCK_HEIGHT
+        lower, upper = 2 * support, 2 * support + 1
+        # Seat ordering is owned by the assembled placements, not by a copied
+        # presentation-coordinate table or the order COM enumerates components.
+        assert spec.BEARING_PLACEMENTS[lower][0][2] < (
+            spec.BEARING_PLACEMENTS[upper][0][2]
+        )
+        for index in (lower, upper):
+            bottom = _exploded_point(spec.BEARING, index)
+            top = _exploded_point(spec.BEARING, index, (0.0, bearing.WIDTH, 0.0))
+            assert bottom[:2] == pytest.approx(pin[:2])
+            assert top[:2] == pytest.approx(pin[:2])
+            if index == lower:
+                assert top[2] < block_bottom
+            else:
+                assert block_top < bottom[2] < top[2] < pin[2]
+
+
+def test_lower_bearings_clear_the_blocks_full_isometric_envelopes() -> None:
+    up = spec.VIEW_AXES[spec.ISOMETRIC_VIEW][1]
+    for support in range(len(spec.PIVOT_BLOCK_PLACEMENTS)):
+        # Both actual block prisms, including the broad spindle-side wing.
+        block_floor = min(
+            sum(value * axis for value, axis in zip(
+                _exploded_point(spec.PIVOT_BLOCK, support, (x, y, 0.0)), up
+            ))
+            for x0, x1, width in (
+                (pivot_block.BLOCK_X0, pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH),
+                (pivot_block.BLOCK_X0, pivot_block.WING_X1, pivot_block.WING_WIDTH),
+            )
+            for x in (x0, x1)
+            for y in (-width / 2.0, width / 2.0)
+        )
+        index = 2 * support
+        _origin, rows = spec.BEARING_PLACEMENTS[index]
+        cylinder_top = _exploded_point(
+            spec.BEARING, index, (0.0, bearing.WIDTH, 0.0)
+        )
+        radius_up = bearing.OD / 2.0 * math.hypot(
+            sum(a * b for a, b in zip(rows[0], up)),
+            sum(a * b for a, b in zip(rows[2], up)),
+        )
+        bearing_top = sum(a * b for a, b in zip(cylinder_top, up)) + radius_up
+        assert bearing_top < block_floor
+
+
+def _assert_crosspin_withdrawal_axes() -> None:
+    for support in range(len(spec.PIVOT_PIN_ORIGINS)):
+        shifts = {
+            family: tuple(
+                spec.explode_shift(spec.instance_name(family, support), axis)
+                for axis in "xyz"
+            )
+            for family in (spec.PIVOT_PIN, spec.PIVOT_CLEVIS_PIN, spec.PIVOT_COTTER)
+        }
+        # The loose clevis keeps its installed loaded-contact offset inside the
+        # real cross-hole; presentation adds only its 40 mm axial withdrawal.
+        clevis_withdrawal = tuple(
+            a - b for a, b in zip(
+                shifts[spec.PIVOT_CLEVIS_PIN], shifts[spec.PIVOT_PIN]
+            )
+        )
+        cotter_withdrawal = tuple(
+            a - b for a, b in zip(
+                shifts[spec.PIVOT_COTTER], shifts[spec.PIVOT_CLEVIS_PIN]
+            )
+        )
+        assert clevis_withdrawal == pytest.approx(
+            tuple(40.0 * value for value in spec.PIN_ROWS[0])
+        )
+        assert cotter_withdrawal == pytest.approx(
+            tuple(40.0 * value for value in spec.PIN_ROWS[1])
+        )
+
+
+def test_clevis_and_cotter_withdraw_along_their_displaced_pin_axes() -> None:
+    _assert_crosspin_withdrawal_axes()
+
+
+@pytest.mark.parametrize(
+    ("family", "axis", "distance"),
+    (
+        (spec.PIVOT_CLEVIS_PIN, "z", 110.0),
+        (spec.PIVOT_COTTER, "z", 110.0),
+        (spec.PIVOT_CLEVIS_PIN, "y", 1.0),
+        (spec.PIVOT_COTTER, "x", 1.0),
+    ),
+)
+def test_crosspin_axis_proof_refuses_retainer_lift_or_sideways_drift(
+    monkeypatch, family: str, axis: str, distance: float,
+) -> None:
+    monkeypatch.setattr(spec, "EXPLODE_STEPS", (
+        *spec.EXPLODE_STEPS, ("misaligned cross-pin", (family,), axis, distance),
+    ))
+    with pytest.raises(AssertionError):
+        _assert_crosspin_withdrawal_axes()
+
+
+def test_occurrence_shift_sums_common_and_exact_steps_and_rejects_ambiguity() -> None:
+    for family, count in spec.QUANTITIES.items():
+        for axis in "xyz":
+            expected = []
+            for index in range(count):
+                name = spec.instance_name(family, index)
+                total = sum(
+                    distance
+                    for _label, selectors, direction, distance in spec.EXPLODE_STEPS
+                    if direction == axis
+                    and any(selector in (family, name) for selector in selectors)
+                )
+                assert spec.explode_shift(name, axis) == pytest.approx(total)
+                if axis == "z":
+                    assert spec.explode_lift(name) == pytest.approx(total)
+                expected.append(total)
+            if len(set(expected)) == 1:
+                assert spec.explode_shift(family, axis) == pytest.approx(expected[0])
+            else:
+                assert family == spec.BEARING and axis == "z"
+                with pytest.raises(ValueError, match="nonuniform"):
+                    spec.explode_shift(family, axis)
+                with pytest.raises(ValueError, match="nonuniform"):
+                    spec.explode_lift(family)
+    with pytest.raises(ValueError, match="unknown explode occurrence"):
+        spec.explode_shift(spec.instance_name(spec.BEARING, 4), "z")
+
+
+def _assert_explode_source_guards(steps) -> None:
+    """Exercise the production assertions with altered presentation data only."""
+    path = Path(spec.__file__)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    start = next(
+        node.lineno for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "explode_shift"
+    )
+    stop = next(
+        node.lineno for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "PLAN_VIEW_LABEL"
+                for target in node.targets)
+    )
+    body = [node for node in tree.body if start <= node.lineno < stop]
+    namespace = dict(vars(spec), EXPLODE_STEPS=steps)
+    exec(compile(ast.Module(body=body, type_ignores=[]), str(path), "exec"), namespace)
+
+
+@pytest.mark.parametrize("support", (0, 1))
+def test_explode_source_refuses_a_bearing_on_the_wrong_seat_side(support: int) -> None:
+    lower = spec.instance_name(spec.BEARING, 2 * support)
+    upper = spec.instance_name(spec.BEARING, 2 * support + 1)
+    swapped = {lower: upper, upper: lower}
+    steps = tuple(
+        (label, tuple(swapped.get(selector, selector) for selector in selectors), axis, d)
+        for label, selectors, axis, d in spec.EXPLODE_STEPS
+    )
+    with pytest.raises(AssertionError, match="C1 press order"):
+        _assert_explode_source_guards(steps)
+
+
+def test_explode_source_refuses_axially_clear_but_projected_hidden_bearings() -> None:
+    _assert_explode_source_guards(spec.EXPLODE_STEPS)
+    lower_names = {
+        spec.instance_name(spec.BEARING, 2 * support)
+        for support in range(len(spec.PIVOT_BLOCK_PLACEMENTS))
+    }
+    steps = tuple(
+        (label, selectors, axis, -35.0 if set(selectors) == lower_names else d)
+        for label, selectors, axis, d in spec.EXPLODE_STEPS
+    )
+    # This is the real old failure: net +55 leaves the lower bearing wholly
+    # below the block in Z, yet its full projected OD still hides behind it.
+    for support in range(len(spec.PIVOT_BLOCK_PLACEMENTS)):
+        assembled_top = spec.BEARING_PLACEMENTS[2 * support][0][2] + bearing.WIDTH
+        common_lift = spec.explode_lift(spec.instance_name(spec.PIVOT_BLOCK, support))
+        assert assembled_top + common_lift - 35.0 < (
+            spec.PIVOT_BLOCK_PLACEMENTS[support][0][2] + common_lift
+        )
+    with pytest.raises(AssertionError, match="hides a lower bearing"):
+        _assert_explode_source_guards(steps)
+
+
+@pytest.mark.parametrize("failure", ("missing motion", "static rider"))
+def test_explode_source_refuses_incomplete_or_static_motion_coverage(failure: str) -> None:
+    if failure == "missing motion":
+        steps = tuple(
+            (label, tuple(s for s in selectors if s != spec.PIVOT_COTTER), axis, d)
+            for label, selectors, axis, d in spec.EXPLODE_STEPS
+        )
+    else:
+        steps = (*spec.EXPLODE_STEPS, (
+            "table structure must not move", (spec.BASE_BAR,), "z", 1.0,
+        ))
+    with pytest.raises(AssertionError, match="every occurrence"):
+        _assert_explode_source_guards(steps)
+
+
+def test_builder_selects_bearing_names_not_native_enumeration_order() -> None:
+    tree = ast.parse(BUILDER.read_text(encoding="utf-8"))
+    function = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_create_jig_explode"
+    )
+    loop = next(
+        node for node in ast.walk(function)
+        if isinstance(node, ast.For)
+        and isinstance(node.target, ast.Tuple)
+        and any(isinstance(target, ast.Name) and target.id == "step_index"
+                for target in node.target.elts)
+    )
+    stop = next(
+        index for index, node in enumerate(loop.body)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "distance"
+                for target in node.targets)
+    )
+    assert stop > 0
+    selection = compile(
+        ast.Module(body=loop.body[:stop], type_ignores=[]), str(BUILDER), "exec"
+    )
+    # Deliberately reverse every family: lower/upper cannot be chosen by a
+    # component list's ordinal, and both supports must still move separately.
+    groups = {
+        family: [
+            types.SimpleNamespace(Name2=spec.instance_name(family, index))
+            for index in reversed(range(count))
+        ]
+        for family, count in spec.QUANTITIES.items()
+    }
+    for label, selectors, _axis, _d in spec.EXPLODE_STEPS:
+        namespace = dict(spec=spec, groups=groups, label=label, selectors=selectors)
+        exec(selection, namespace)
+        intended = {
+            name
+            for selector in selectors
+            for name in (
+                (spec.instance_name(selector, index)
+                 for index in range(spec.QUANTITIES[selector]))
+                if selector in spec.QUANTITIES else (selector,)
+            )
+        }
+        actual = [str(component.Name2) for component in namespace["moved"]]
+        assert len(actual) == len(intended)
+        assert set(actual) == intended
+    name = spec.instance_name(spec.BEARING, 1)
+    groups[spec.BEARING] = [
+        component for component in groups[spec.BEARING] if component.Name2 != name
+    ]
+    with pytest.raises(RuntimeError, match="expected one bearing occurrence"):
+        exec(selection, dict(
+            spec=spec, groups=groups, label="missing upper bearing", selectors=(name,)
+        ))
 
 
 def test_named_views_are_the_machine_frame() -> None:
