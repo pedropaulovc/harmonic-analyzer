@@ -57,11 +57,12 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm, drill_process
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
-from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION, ROOT_CALLOUT
+from ch_channel_lever_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from ch_channel_lever_spec import (
     BAR_PIN_HOLE_SPEC,
     BAR_PIN_X,
@@ -74,6 +75,9 @@ from ch_channel_lever_spec import (
     TIP_END_X,
 )
 from ch_fulcrum_shaft_spec import SHAFT_DIA, SHAFT_DIA_BAND
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["ch_channel_lever"]
@@ -137,10 +141,11 @@ STATIONS = _config.machine("channels", "count")
 _CLEARANCE_LEAST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[1]) - (SHAFT_DIA + SHAFT_DIA_BAND[0])
 _CLEARANCE_MOST = (PIVOT_HOLE_DIA + PIVOT_HOLE_BAND[0]) - (SHAFT_DIA + SHAFT_DIA_BAND[1])
 
+# The bar-to-hub roots are inside corners: the title block's INSIDE CORNERS
+# R1.0 MAX row controls them, so no callout repeats it (rule 2; review r1-r3).
 FRONT_CALLOUTS = {
-    "HubDia": ROOT_CALLOUT,
     "FulcrumDia": (
-        f"REAM; RUNS ON SHAFT\n{SHAFT_NUMBER},"
+        f"REAM THRU; RUNS ON\nSHAFT {SHAFT_NUMBER},"
         f" {_CLEARANCE_LEAST:.2f}-{_CLEARANCE_MOST:.2f}\nDIAMETRAL CLEARANCE"
     ),
     "BarHeight": "FULL R AT TIP",
