@@ -856,6 +856,7 @@ def test_physical_lines_exclude_true_off_support_strokes_but_keep_raw_record(
     assert after["physical_lines"] == original["physical_lines"]
     core.assert_reference_text_stations(original, after, label=_LABEL)
 
+
 def test_measure_keeps_offset_ink_in_record_but_out_of_witnesses(native_reads):
     record = _recovered_head_height()
     display = _static(record)
@@ -1365,6 +1366,7 @@ def test_measure_keeps_strict_perpendicular_collinearity(
         with pytest.raises(RuntimeError, match="lost a native witness"):
             core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
 
+
 # --------------------------------------------------------------------------
 # assert_reference_text_stations
 # --------------------------------------------------------------------------
@@ -1483,6 +1485,7 @@ def test_unrelated_ink_cannot_restore_missing_witness_coverage(
     assert after["tips"] == before["tips"]
     with pytest.raises(RuntimeError, match="witnesses moved"):
         core.assert_reference_text_stations(before, after, label=_LABEL)
+
 
 # --------------------------------------------------------------------------
 # shelve_reference_text
@@ -1797,6 +1800,7 @@ def test_shelve_and_proof_preserve_original_disjoint_coverage(native_reads, witn
     replacement.record = copy.deepcopy(equivalent_record)
     proof()
 
+
 def test_shelve_force_shelves_long_row_too(native_reads):
     displays, axes = _fleet()
     before = _measure_all(displays, axes)
@@ -2034,6 +2038,7 @@ def test_shelve_fit_boundary_uses_physical_anchored_rotated_extent(
     settled_record = copy.deepcopy(display.record)
     proof()
     assert display.record == settled_record
+
 
 @pytest.mark.parametrize(
     ("axes", "force", "message"),
@@ -2320,6 +2325,7 @@ def test_proof_rejects_late_interior_gap_on_every_measured_row(shelved, name):
         with pytest.raises(RuntimeError, match="witnesses moved"):
             shelved.proof()
 
+
 def test_proof_reacquires_and_rejects_text_back_on_its_line(shelved):
     replacement = _recaptured(shelved, "SupplierHeadHeight")
     replacement.record["display"]["texts"][0]["pos"] = (0.0916157, 0.232235, 0)
@@ -2401,6 +2407,7 @@ def test_proof_refuses_late_unknown_fragment_anchor(shelved):
     replacement.record["display"]["texts"][1]["ref"] = 6
     with pytest.raises(RuntimeError, match="reference|fragment"):
         shelved.proof()
+
 
 def test_proof_rejects_late_unmeasured_fragment(shelved):
     replacement = _recaptured(shelved, "RD1")
