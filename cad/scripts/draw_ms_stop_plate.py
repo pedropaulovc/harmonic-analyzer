@@ -57,22 +57,28 @@ FRONT_CENTER = (0.175, 0.170)
 RIGHT_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
-    "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
+    "PlateLength": (0.175, 0.235), "PlateHeight": (0.070, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
-    "PlateLeftFromEnd": (0.175, 0.113),
+    # Hole-location texts sit where no other witness line crosses their
+    # mate callouts: 3.50 outboard right, 4.00 below its own witness span.
+    "PlateLeftFromEnd": (0.250, 0.113),
     "PlateRightFromEnd": (0.175, 0.095),
-    "PlateFromHeadFace": (0.115, 0.148),
+    "PlateFromHeadFace": (0.100, 0.135),
     # Right of the outline and below the chamfer-size dimension line.
     "PilotDrillDiameter": (0.285, 0.178),
 }
 # Text left of the thin edge view, so neither witness line strikes it.
 RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
+HOLE_STATION_FIT = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
 DIMENSION_CALLOUTS = {
     "PilotDrillDiameter": (
         "LAYOUT ON THIS PLATE; PILOT\n"
         f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
-        f"CLAMPED, {part.MATCH_DRILL_DATUM_ALIGNMENT}"
+        f"CLAMPED, {part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
+        f"{part.MATCHED_PAIR_NOTE}"
     ),
+    # The +/-0.1 hole stations become the block's tapped-hole stations.
+    **{name: HOLE_STATION_FIT for name in part.PLATE_LOCATION_DIMENSIONS},
     # The thickness band sets the plate screws' reach into the blind taps.
     "PlateThickness": (
         "SETS SCREW REACH IN\nMS-STOP-BLOCK\n"
@@ -194,7 +200,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.124)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Plate Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout)

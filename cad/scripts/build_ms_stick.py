@@ -122,74 +122,87 @@ def numeral_feature_names() -> list[str]:
     return ["Numerals" if i == 0 else f"Numerals{i + 1}" for i in range(len(NUMERAL_LAYER_DXFS))]
 
 
+def _assert_one_numeral_cut(adapter, name: str) -> None:
+    """Read one native numeral cut's depth and V draft back."""
+    half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    definition = feature.GetDefinition()
+    if definition is None:
+        raise RuntimeError(f"{name}: missing native extrusion definition")
+    definition = _early_bound(definition, "IExtrudeFeatureData2")
+    depth = float(definition.GetDepth(True)) * 1000.0
+    if abs(depth - NUMERAL_DEPTH) > 1e-6:
+        raise RuntimeError(f"{name}: expected depth {NUMERAL_DEPTH}; got depth {depth}")
+    drafted = bool(definition.GetDraftWhileExtruding(True))
+    angle = math.degrees(float(definition.GetDraftAngle(True)))
+    outward = bool(definition.GetDraftOutward(True))
+    if not drafted or outward or abs(angle - half_angle) > 1e-6:
+        raise RuntimeError(
+            f"{name}: expected a {half_angle:g} deg inward draft (a "
+            f"{NUMERAL_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
+            f"drafted={drafted} outward={outward} angle={angle:.6g}"
+        )
+
+
 def _assert_numeral_cut(adapter) -> None:
     """Read every native numeral cut's depth and V draft, including after the final save."""
-    half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
     for name in numeral_feature_names():
-        feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
-        definition = feature.GetDefinition()
-        if definition is None:
-            raise RuntimeError(f"{name}: missing native extrusion definition")
-        definition = _early_bound(definition, "IExtrudeFeatureData2")
-        depth = float(definition.GetDepth(True)) * 1000.0
-        if abs(depth - NUMERAL_DEPTH) > 1e-6:
-            raise RuntimeError(f"{name}: expected depth {NUMERAL_DEPTH}; got depth {depth}")
-        drafted = bool(definition.GetDraftWhileExtruding(True))
-        angle = math.degrees(float(definition.GetDraftAngle(True)))
-        outward = bool(definition.GetDraftOutward(True))
-        if not drafted or outward or abs(angle - half_angle) > 1e-6:
-            raise RuntimeError(
-                f"{name}: expected a {half_angle:g} deg inward draft (a "
-                f"{NUMERAL_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
-                f"drafted={drafted} outward={outward} angle={angle:.6g}"
-            )
+        _assert_one_numeral_cut(adapter, name)
 
 
-def _draft_numeral_walls(adapter, name: str) -> None:
-    """Draft the cut's walls inward at half the V angle.
+def _drafted_v_cut(adapter, sketch_name: str) -> None:
+    """Native single-ended blind ``FeatureCut4`` with both walls drafted inward.
 
-    A drafted cut CREATED by FeatureCut4 on the old glyph outlines returned
-    None on the farm (run 20261011T121420933Z-2979f651), so the cut is made on
-    the proven adapter path and the draft added to its definition afterwards;
-    the profiles are plain disjoint rectangles whose walls stay apart."""
+    The adapter's blind cut takes no draft, and adding one afterwards through
+    ``ModifyDefinition`` reported success yet left straight walls (run
+    20261023T193801341Z-862662a6: the first layer removed the straight-wall
+    3.1352 mm^3, not the V's 1.5603). The profiles are plain disjoint
+    rectangles whose walls stay apart at the root, unlike the old glyph
+    outlines a drafted FeatureCut4 refused (run 20261011T121420933Z-2979f651).
+    """
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
-    definition = _early_bound(feature.GetDefinition(), "IExtrudeFeatureData2")
-    if not definition.AccessSelections(model, None):
-        raise RuntimeError(f"{name}: AccessSelections failed")
-    try:
-        definition.SetDraftWhileExtruding(True, True)
-        definition.SetDraftAngle(True, math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
-        definition.SetDraftOutward(True, False)
-        if not feature.ModifyDefinition(definition._oleobj_, model, null_callout()):
-            raise RuntimeError(f"{name}: ModifyDefinition (V draft) failed")
-    except BaseException:
-        try:
-            definition.ReleaseSelectionAccess()
-        except Exception as cleanup_exc:  # noqa: BLE001
-            _telemetry.warn(f"{name}: selection cleanup failed: {cleanup_exc}")
-        raise
-    model.EditRebuild3()
+    raw = adapter.currentModel
+    model = _early_bound(raw, "IModelDoc2")
+    manager = _early_bound(model.FeatureManager, "IFeatureManager")
+    raw.ClearSelection2(True)
+    if not raw.Extension.SelectByID2(sketch_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"select sketch {sketch_name!r} failed")
+    blind = adapter.constants.get("swEndCondBlind", 0)
+    sketch_plane = adapter.constants.get("swStartSketchPlane", 0)
+    # Sd, Flip, Dir, T1, T2, D1, D2, Dchk1, Dchk2, Ddir1 (True = inward), Ddir2,
+    # Dang1, Dang2, OffsetReverse1/2, TranslateSurface1/2, NormalCut,
+    # UseFeatScope, UseAutoSelect, AssemblyFeatureScope, AutoSelectComponents,
+    # PropagateFeatureToParts, T0, StartOffset, FlipStartOffset,
+    # OptimizeGeometry (absent from the 26-parameter SW-2025 form).
+    args = (
+        True, False, False, blind, blind, NUMERAL_DEPTH / 1000.0, 0.0,
+        True, False, True, False,
+        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,
+        False, False, False, False, False, False, True, False, False, False,
+        sketch_plane, 0.0, False, False,
+    )
+    feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
+    if not feature:
+        feature, short_error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args[:-1]))
+        error = f"{error} | 26-parameter form: {short_error}"
+    raw.ClearSelection2(True)
+    if not feature:
+        raise RuntimeError(f"drafted V FeatureCut4 on {sketch_name} returned None: {error}")
 
 
 async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str) -> None:
-    """Blind cut of one imported stroke layer, then its inward V draft."""
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
-    check(
-        f"cut {name}",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=NUMERAL_DEPTH)),
-    )
+    """Blind V cut of one imported stroke layer, read back at once."""
+    _drafted_v_cut(adapter, f"{name}Sketch")
     name_last_feature(adapter, name)
-    # The adapter cut carries D1 (direction-1 blind depth) and an unused D2 at
-    # the same value; D1 is the depth, as for TickDepth@Tick0Cut. It is named
-    # before the draft adds its angle dimension; the GetDepth(True) readback
-    # independently proves the value.
-    name_dimensions(adapter, name, ["NumeralDepth"])
+    # Rename the one dimension reading the depth (the draft adds an angle).
+    rows = dump_dimensions(adapter, name)
+    depth_rows = [row["index"] for row in rows if abs(row["value_mm"] - NUMERAL_DEPTH) < 1e-6]
+    if len(depth_rows) != 1:
+        raise RuntimeError(f"{name}: expected one dimension reading {NUMERAL_DEPTH} mm, found {rows}")
+    name_dimensions(adapter, name, [None] * depth_rows[0] + ["NumeralDepth"])
     drive_jobs.append((f"NumeralDepth@{name}", '"NumeralDepth"'))
-    _draft_numeral_walls(adapter, name)
+    _assert_one_numeral_cut(adapter, name)
 
 
 async def _volume_mm3(adapter) -> float:

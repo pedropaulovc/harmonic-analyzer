@@ -780,7 +780,6 @@ class _NumeralDefinition:
     def __init__(self, depth=None, drafted=True, outward=False, angle_deg=15.0):
         self.depth = spec.NUMERAL_DEPTH if depth is None else depth
         self.drafted, self.outward, self.angle_deg = drafted, outward, angle_deg
-        self.calls = []
 
     def GetDepth(self, forward):  # noqa: N802 - COM member name
         return self.depth / 1000.0
@@ -794,62 +793,70 @@ class _NumeralDefinition:
     def GetDraftAngle(self, forward):  # noqa: N802 - COM member name
         return math.radians(self.angle_deg)
 
-    def AccessSelections(self, model, component):  # noqa: N802 - COM member name
-        self.calls.append("access")
-        return True
 
-    def SetDraftWhileExtruding(self, forward, value):  # noqa: N802 - COM member name
-        self.calls.append(("drafted", forward, value))
-
-    def SetDraftAngle(self, forward, value):  # noqa: N802 - COM member name
-        self.calls.append(("angle", forward, value))
-
-    def SetDraftOutward(self, forward, value):  # noqa: N802 - COM member name
-        self.calls.append(("outward", forward, value))
-
-    def ReleaseSelectionAccess(self):  # noqa: N802 - COM member name
-        self.calls.append("release")
-
-
-def test_numeral_cut_uses_its_own_depth_drives_it_and_drafts_a_v(monkeypatch) -> None:
+@pytest.mark.parametrize("long_form_works", [True, False])
+def test_numeral_cut_is_one_native_inward_drafted_v_and_drives_its_depth(monkeypatch, long_form_works) -> None:
     import solidworks_mcp.adapters.pywin32_adapter as pywin32_adapter
 
-    depths, names, modified = [], [], []
-    definition = _NumeralDefinition()
-    definition._oleobj_ = definition
+    selected, cuts, names = [], [], []
+    feature = SimpleNamespace(GetDefinition=lambda: _NumeralDefinition())
 
-    def modify(data, model, callout):
-        modified.append((data, model))
-        return True
+    def cut(*args):
+        cuts.append(args)
+        if len(args) == 27 and not long_form_works:
+            raise TypeError("26-parameter seat")
+        return feature
 
-    feature = SimpleNamespace(GetDefinition=lambda: definition, ModifyDefinition=modify)
-    model = SimpleNamespace(EditRebuild3=lambda: True)
+    manager = SimpleNamespace(FeatureCut4=cut)
+    model = SimpleNamespace(
+        FeatureManager=manager, ClearSelection2=lambda clear: None,
+        Extension=SimpleNamespace(SelectByID2=lambda *args: selected.append(args[:2]) or True),
+    )
 
-    class Adapter:
-        currentModel = model
+    def attempt(fn):
+        try:
+            return fn(), None
+        except Exception as exc:  # noqa: BLE001
+            return None, exc
 
-        async def create_cut_extrude(self, params):
-            depths.append(params.depth)
-            return SimpleNamespace(is_success=True, data=None, error=None)
-
+    adapter = SimpleNamespace(currentModel=model, constants={"swEndCondBlind": 0, "swStartSketchPlane": 0},
+                              _attempt_with_error=attempt)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
+    monkeypatch.setattr(builder, "dump_dimensions", lambda actual, name: [
+        {"index": 0, "full_name": f"D1@{name}", "value_mm": spec.NUMERAL_DEPTH},
+        {"index": 1, "full_name": f"D2@{name}", "value_mm": 261.8},
+    ])
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
     monkeypatch.setattr(pywin32_adapter, "null_callout", lambda: None)
     jobs = []
-    asyncio.run(builder._cut_numerals(Adapter(), jobs, "Numerals2"))
-    assert depths == [spec.NUMERAL_DEPTH]
+    asyncio.run(builder._cut_numerals(adapter, jobs, "Numerals2"))
+    assert selected == [("Numerals2Sketch", "SKETCH")]
+    args = cuts[-1]
+    assert len(args) == (27 if long_form_works else 26)
+    # Single-ended blind, into the bar, both walls drafted inward at 15 deg.
+    assert args[:7] == (True, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
+    assert args[7:11] == (True, False, True, False)
+    assert args[11] == pytest.approx(math.radians(15.0))
     assert names == [("Numerals2", ["NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals2", '"NumeralDepth"')]
-    assert definition.calls == [
-        "access",
-        ("drafted", True, True),
-        ("angle", True, pytest.approx(math.radians(15.0))),
-        ("outward", True, False),
-    ]
-    assert modified == [(definition, model)]
     assert builder.numeral_feature_names() == ["Numerals", "Numerals2", "Numerals3"]
+
+
+def test_numeral_cut_refuses_a_refused_native_v(monkeypatch) -> None:
+    import solidworks_mcp.adapters.pywin32_adapter as pywin32_adapter
+
+    model = SimpleNamespace(
+        FeatureManager=SimpleNamespace(FeatureCut4=lambda *args: None),
+        ClearSelection2=lambda clear: None,
+        Extension=SimpleNamespace(SelectByID2=lambda *args: True),
+    )
+    adapter = SimpleNamespace(currentModel=model, constants={}, _attempt_with_error=lambda fn: (fn(), None))
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(pywin32_adapter, "null_callout", lambda: None)
+    with pytest.raises(RuntimeError, match="drafted V FeatureCut4 on NumeralsSketch returned None"):
+        builder._drafted_v_cut(adapter, "NumeralsSketch")
 
 
 @pytest.mark.parametrize("definition,message", [

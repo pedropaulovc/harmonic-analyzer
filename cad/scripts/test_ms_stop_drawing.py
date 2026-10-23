@@ -105,13 +105,14 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == 0.1
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
-    assert len(spec.BLOCK_DRAWING_NOTES.splitlines()) <= 4
-    assert len(spec.PLATE_DRAWING_NOTES.splitlines()) <= 4
-    assert "BLIND" not in spec.PLATE_DRAWING_NOTES
-    assert "BOTTOMING" not in spec.PLATE_DRAWING_NOTES
+    # Rule 7: the pair is flagged at both match-drill callouts, not in a loose note.
+    assert not hasattr(spec, "BLOCK_DRAWING_NOTES") and not hasattr(spec, "PLATE_DRAWING_NOTES")
+    assert spec.MATCHED_PAIR_NOTE == "MATCHED PAIR; NOT INTERCHANGEABLE"
+    assert block_drawing.COVER_HOLE_PROCESS.splitlines()[-1] == spec.MATCHED_PAIR_NOTE
+    assert plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"].splitlines()[-1] == spec.MATCHED_PAIR_NOTE
     assert spec.BLOCK_MATING_FACE_NOTE == "STOP-PLATE MATING FACE"
-    # Depth symbols measure from the entry face; no note restates it.
-    assert "BLIND" not in spec.BLOCK_DRAWING_NOTES
+    for module in (block, plate, block_drawing, plate_drawing):
+        assert '"Manufacturing Notes"' not in Path(module.__file__).read_text(encoding="utf-8")
     assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
@@ -156,7 +157,6 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
         else 1 if name in loose else 2
     ) for name, places in precision.items())
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
-    assert not any(character.isdigit() for character in spec.BLOCK_DRAWING_NOTES + spec.PLATE_DRAWING_NOTES)
 
 
 @pytest.mark.parametrize("module", [spec, block_drawing, plate_drawing])
@@ -726,7 +726,11 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
         "LAYOUT ON THIS PLATE; PILOT",
         f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
         "CLAMPED, LOCATING ENDS AND EDGES FLUSH",
+        "MATCHED PAIR; NOT INTERCHANGEABLE",
     ]
+    station = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
+    for name in spec.PLATE_LOCATION_DIMENSIONS:
+        assert plate_drawing.DIMENSION_CALLOUTS[name] == station
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
     )
@@ -1109,7 +1113,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     assert "ReferenceWindowWidth" in hidden
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
-    assert properties[0]["Manufacturing Notes"] == spec.BLOCK_DRAWING_NOTES
+    assert "Manufacturing Notes" not in properties[0]
     assert "chamfer MAX" in bands
 
 

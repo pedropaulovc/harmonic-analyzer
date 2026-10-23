@@ -73,7 +73,7 @@ FRONT_KEEP = {
     "PlateFromHeadFace": (0.100, 0.163),
 }
 RIGHT_KEEP = {
-    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.310, 0.130),
+    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
 }
 BOTTOM_KEEP = {
@@ -92,7 +92,7 @@ DIMENSION_CALLOUTS = {
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
-LOCATING_EDGE_XY = (0.155, 0.145)
+LOCATING_EDGE_XY = (0.137, 0.150)
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
@@ -100,6 +100,7 @@ COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
     f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
     f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
+    f"{part.MATCHED_PAIR_NOTE}\n"
 )
 
 
@@ -248,7 +249,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,

@@ -149,8 +149,9 @@ ROOF_CHAMFER_BAND_MM = (-ROOF_END_CHAMFER, 0.0)  # (lower, upper) deviations
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
-BLOCK_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
-PLATE_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
+# Rule 7: the matched pair is flagged at both match-drill callouts, which
+# already name the mate, not in a loose general note.
+MATCHED_PAIR_NOTE = "MATCHED PAIR; NOT INTERCHANGEABLE"
 HOLE_CALLOUT_PRECISION = 2
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
 
