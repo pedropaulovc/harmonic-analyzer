@@ -138,9 +138,8 @@ EXPECTED_CONTROLS = {
 }
 
 
-def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
+def _verify_controls(annotations: list[Any]) -> None:
     trim_drawing.verify_machining_controls(
-        adapter,
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
@@ -455,7 +454,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
-    _verify_controls(adapter, annotations)
+    _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
     add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
@@ -483,7 +482,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
-            lambda: _verify_controls(adapter, annotations),
+            lambda: _verify_controls(annotations),
             lambda: _verify_supplier_references(
                 adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
             ),

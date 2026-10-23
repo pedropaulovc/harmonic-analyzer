@@ -991,6 +991,45 @@ Catalog specifications checked on September 10, 2026:
   independently inspect the cut bolt's tail and
   #10-24 class 2A thread; none is a new supplied SKU length or tolerance.
   The head bears on the new washer, not the obsolete #6 counterbore floor.
+  The head-height drawing reference uses the physical outer hex bearing edge
+  at `Y=LENGTH` and the outer trim rim at `Y=HEAD_TOP_Y`, radius `HEAD_AF/2`.
+  It does not measure the crown-dish floor or a corner-trim transition. The
+  HLR edge scan distinguishes trimmed circular arcs by an exact point on the
+  frontmost rim; ambiguous or missing edges refuse rather than using a
+  silhouette or an approximate height. Selection identities and the measured
+  `HEAD_H` are checked at insertion, after settling and from the reopened
+  read-only saved drawing. These are native model-reference checks, not new
+  supplier tolerances or proof that a catalogue-only depiction is vendor CAD.
+  The shared `_drawing_physical_axial_dimension.py` proof requires drawing
+  dimension type 2 (`swLinearDimension`) **and** two finite, opposing vertical
+  native arrows. Their witness stations must match the fresh physical-edge
+  projection and their span must equal the physical axial length times the
+  native view scale; the type code alone cannot establish verticality.
+  The separate original-stock sheet measures 50.8 mm from that same outer hex
+  bearing boundary at `Y=46.7` to the factory tip-face rim at `Y=-4.1`, radius
+  `1.512358333... mm` (`major_dia/2 - 0.851*pitch`), not the finished cut end
+  or the factory chamfer's major junction. A fresh HLR scan of the view's exact
+  `AS SUPPLIED STOCK` configuration resolves those physical entities.
+  `IView.SelectEntity` selects
+  them in the drawing view; native selection and attachment identities, exact
+  axial stations and the scaled span must agree. A missing selection, null
+  creation or angular result refuses. Both head and stock references undergo
+  the same strict creation, settled and independently reopened saved-file proof.
+  Before the already-saved drawing closes, a fresh native-object census binds
+  both original authored annotations to their actual serialized FullNames.
+  The cold read matches those exact names, not guessed or normalized pre-save
+  strings, and repeats every physical/source/configuration proof. Missing,
+  stale or ambiguous native identity refuses with actual boundary inventories.
+  The head-height caption uses the shared measured native text-only shelf;
+  moving its text must preserve the physical arrows and complete witness runs.
+  Fresh settled and cold-saved reads retain the stricter physical/source proof.
+  The complete caption and adjacent purchased-note text still require independent
+  full-sheet PDF-ink clearance; a native axial or shelf proof is not paper approval.
+  A separate after-save native `IsSame` census captures the purchased note's
+  actual annotation `GetName`. The original head-top attachment is a trimmed
+  noncircular boundary, not an assumed circle. Fresh all-edge identity and source
+  ownership checks retain its actual trim endpoints, parameter bounds, sense
+  and top-station landing during settled and cold exact-name paper readback.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1170,6 +1209,50 @@ Catalog specifications checked on September 10, 2026:
   the hex socket; full thread starts 1.7653 below the shoulder's end face,
   and the joint charges one full pitch at the faced tip, so the worst-case
   engagement is 1.515D (1.582D nominal).
+  Its head-height drawing reference spans the actual outer bearing rim at
+  `Y=0` and the chamfer-reduced top rim at `Y=HEAD_H`,
+  radius `HEAD_DIA/2 - HEAD_CHAMFER`. The full-radius chamfer junction below
+  the top and the socket rim cannot substitute for that top boundary. Exact
+  visible model edges, distinct native selections and their dimension
+  attachments are checked under HLR; the measured height is checked again
+  after settling and on the reopened read-only saved drawing. Interior face
+  points are not reliable drawing-edge picks, even when their projection
+  crosses the apparent rim.
+  The shared `_drawing_physical_axial_dimension.py` proof requires type 2
+  (`swLinearDimension`), not a type-12-or-type-2 alternative, and independently
+  proves verticality from both native arrows, projected physical stations and
+  the native view scale. Its `1e-8 m` sheet-position bound inherits the exact
+  physical-edge pick precision; it is not fitted to a rendered result.
+  The separate native-length tolerance remains `1e-5 mm`. The original-stock
+  thread reference spans the shoulder's outer end rim at `Y=-12.7`, radius
+  `2.38125 mm`, to the factory tip-face rim at `Y=-22.225`, radius `1.707896 mm`,
+  for exactly 9.525 mm. Its factory chamfer is `0.374904 mm`, not the finished
+  tip's 0.60 mm preparation. Fresh HLR entities from the exact
+  `AS SUPPLIED STOCK` view are selected with `IView.SelectEntity`, not an
+  interior-face coordinate hit test. Native closest points establish actual
+  trimmed-edge membership; an unresolved distinct-edge tie refuses rather
+  than silently substituting a circle, silhouette or finished-tip station.
+  Both head and stock references are checked afresh at creation, after settling
+  and after independently reopening the saved drawing without repair or resave.
+  Saved identity is captured from the original authored annotations after the
+  existing saves and before close, using a unique fresh native `IsSame` census.
+  Reopening requires those exact serialized FullNames, not a suffix-stripped
+  or geometry-only substitute. Boundary and failure inventories preserve the
+  original and observed names; capture never assumes a FullName survives saving.
+  Head-height and socket-AF captions use the shared measured native text-only
+  shelves, retaining the physical arrows and complete witness runs. The socket
+  shelf has its own exact serialized identity and cold-saved presentation checks;
+  it is not a vertical-axial proof. The purchased-head note remains attached to
+  the physical head-top rim. Its complete text, leader, aligned end view and finite
+  native centre mark require fresh full-sheet clearance, not a native-value-only
+  approval.
+  The purchased note's name is captured independently from the original native
+  annotation after saving. Native `ITextFormat.LineLength` wraps the unchanged
+  property-linked text without inserted line breaks or font compression. Its
+  straight leader retains the exact trimmed sheet-left head-top extremum,
+  derived from the actual view projection. The left text field must clear the
+  complete shoulder-length text, witnesses and arrows as well as neighbouring
+  ink, views and border, including a fresh exact-name cold readback.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

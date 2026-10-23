@@ -134,6 +134,19 @@ and again during final settled and saved drawing checks. Import persistence
 transfers only the independently validated source's documented `SetUnits2`
 settings; it does not rewrite source or imported values, bands, precision or text.
 
+Post-import original-source checks retain that Part annotation context (`view=None`)
+and supply a separate paired `known_view`/`known_imported` binding. Both members
+are required and independently tied to the named source and exact model
+parameter; the imported annotation must belong to the known view. The single
+canonical feature-correspondence proof can then validate the named source
+dimension's original or mapped-and-reversed feature owner without substituting
+the drawing annotation for its Part annotation. The authoritative named source
+display's own `GetAnnotation` must still prove its actual Part owner and original
+attachments. A feature's unrelated first display, an observed failure, matching
+names or values, and null annotation correspondence never supply this context.
+Source path and each actual view configuration are frozen before import and
+rechecked after import, during placement and after the read-only saved reopen.
+
 Only immutable scalar stations, outlines and annotation positions cross into the
 saved washer reader. It reacquires the actual source, configurations, views and
 references from the read-only reopened drawing; it never calls the mutating shelf
