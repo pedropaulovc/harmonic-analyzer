@@ -86,9 +86,9 @@ STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
 # worst-case walls between the 1.5 floor and 2.0 target are stated as facts.
 DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
-    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}\nBACK WALL {part.WINDOW_BACK_WALL_MIN:.2f} MIN",
+    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}\n{part.WINDOW_BACK_WALL_CALLOUT}",
     "WindowHeight": STICK_FIT,
-    "RoofThickness": f"WALL {part.ROOF_THICKNESS_MIN:.2f} MIN",
+    "RoofThickness": part.ROOF_WALL_CALLOUT,
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)

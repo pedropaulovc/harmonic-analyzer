@@ -252,3 +252,8 @@ assert PLATE_TAP_WINDOW_WEB_MIN >= 1.5 and PLATE_TAP_END_WEB_MIN >= 1.5
 assert WINDOW_BACK_WALL_MIN >= 1.5
 assert PLATE_CLEARANCE_END_WEB_MIN >= 1.5 and PLATE_CLEARANCE_HEAD_WEB_MIN >= 1.5
 assert PLATE_RADIAL_CLEARANCE_MIN > 0.0
+
+# The two worst-case walls between the 1.5 floor and the 2.0 target, stated
+# on the block print as facts beside their dimensions (rule 20).
+ROOF_WALL_CALLOUT = f"WALL {ROOF_THICKNESS_MIN:.2f} MIN"
+WINDOW_BACK_WALL_CALLOUT = f"BACK WALL {WINDOW_BACK_WALL_MIN:.2f} MIN"
