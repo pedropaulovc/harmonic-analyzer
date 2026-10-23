@@ -94,7 +94,9 @@ cannot ask for what the authors were told to leave out.
   clearance; the label's identity, anchor and full native style stay unchanged.
   The value retains its original font when it fits, with the same 2 mm floor
   and all non-height style/source content preserved. Other title consumers
-  retain fixed alignment by default.
+  retain fixed alignment by default. Native title-state refusals report changed
+  fields with expected/observed values and the existing comparison tolerance;
+  diagnostic output never relaxes the protected state or fitting guards.
   Scale selection still tries the existing standard scales against complete
   native outlines, without subtracting fixed sheet-space padding. The shared clamp
   and these six screws shelve short reference text only when its measured extent

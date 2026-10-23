@@ -210,7 +210,7 @@ def _fit_title_note(
         label_use_doc = use_doc_state(label_annotation, len(label_style))
         value_use_doc = use_doc_state(annotation, len(value_style))
 
-    def check_label_right_state(*, formatted: bool) -> None:
+    def check_label_right_state(*, phase: str, formatted: bool) -> None:
         if alignment != "label_right":
             return
         actual_label_anchor = tuple(
@@ -258,7 +258,94 @@ def _fit_title_note(
             or (accepted_style is not None and actual_style != accepted_style)
             or abs(dict(actual_style[0])["CharHeight"] - height) > _FORMAT_TOL
         ):
-            raise RuntimeError(f"{label}: MATERIAL label or protected value style/anchor changed")
+            # Diagnose only a refused candidate. Keep the predicate above and
+            # its accepted-path native read surface unchanged; baseline styles
+            # are detached primitives captured before any Material writes.
+            differences: dict[str, dict[str, Any]] = {}
+
+            def collect_difference(
+                field: str, expected: Any, actual: Any, *, tolerance: float = 0,
+            ) -> None:
+                if expected == actual:
+                    return
+                change = {"expected": expected, "actual": actual, "tolerance": tolerance}
+                if type(expected) in (int, float) and type(actual) in (int, float):
+                    delta = actual - expected
+                    if tolerance and abs(delta) <= tolerance:
+                        return
+                    change["delta"] = delta
+                elif (
+                    type(expected) is tuple
+                    and type(actual) is tuple
+                    and len(expected) == len(actual)
+                    and all(type(value) in (int, float) for value in (*expected, *actual))
+                ):
+                    change["delta"] = tuple(
+                        after - before for before, after in zip(expected, actual)
+                    )
+                    if tolerance:
+                        distance = math.dist(expected, actual)
+                        if distance <= tolerance:
+                            return
+                        change["distance"] = distance
+                        change["comparison"] = "euclidean"
+                differences[field] = change
+
+            collect_difference("label.raw", "MATERIAL", label_note.PropertyLinkedText)
+            collect_difference("label.resolved", "MATERIAL", label_note.GetText())
+            collect_difference("label.OwnerType", 2, label_annotation.OwnerType)
+            collect_difference("material.OwnerType", 2, annotation.OwnerType)
+            collect_difference("label.anchor_m", label_anchor, actual_label_anchor)
+            collect_difference(
+                "material.anchor_m", anchor, actual_anchor, tolerance=_FORMAT_TOL,
+            )
+            for field, actual in (
+                ("label.cell_m", actual_label_anchor), ("material.cell_m", actual_anchor),
+            ):
+                # Invalid anchors already differ above; do not invent a cell
+                # or call the native grid extractor with an unreadable point.
+                if len(actual) == 3 and all(map(math.isfinite, actual)):
+                    collect_difference(field, cell, _ruled_cell(sheet, actual))
+            style_pairs = (
+                ("label.style", label_style, _note_text_style(label_annotation)),
+                ("material.protected_style", original_protected_style, protected_style),
+            )
+            if accepted_style is not None:
+                style_pairs += (("material.accepted_style", accepted_style, actual_style),)
+            for field, expected, actual in style_pairs:
+                collect_difference(f"{field}.count", len(expected), len(actual))
+                for index, (before, after) in enumerate(zip(expected, actual)):
+                    after_fields = dict(after)
+                    for member, value in before:
+                        collect_difference(
+                            f"{field}[{index}].{member}", value, after_fields[member],
+                        )
+            for field, expected, actual in (
+                ("label.layout", label_layout, layout_state(label_note)),
+                ("material.layout", value_layout, layout_state(note)),
+            ):
+                for member, before, after in zip(
+                    ("angle", "horizontal_justification", "vertical_justification"),
+                    expected, actual, strict=True,
+                ):
+                    collect_difference(f"{field}.{member}", before, after)
+            for field, expected, actual in (
+                ("label.useDoc", label_use_doc,
+                 use_doc_state(label_annotation, len(label_style))),
+                ("material.useDoc", expected_use_doc,
+                 use_doc_state(annotation, len(actual_style))),
+            ):
+                collect_difference(f"{field}.count", len(expected), len(actual))
+                for index, (before, after) in enumerate(zip(expected, actual)):
+                    collect_difference(f"{field}[{index}]", before, after)
+            collect_difference(
+                "material.height_m", height, dict(actual_style[0])["CharHeight"],
+                tolerance=_FORMAT_TOL,
+            )
+            raise RuntimeError(
+                f"{label}: MATERIAL label or protected value style/anchor changed; "
+                f"phase={phase!r}, formatted={formatted!r}, differences={differences!r}"
+            )
 
     def measure(phase: str, *, formatted: bool = True) -> tuple[tuple[float, ...], int]:
         nonlocal right_region
@@ -269,7 +356,7 @@ def _fit_title_note(
             raise RuntimeError(
                 f"{exc}; phase={phase!r}, native={_number_state(adapter, note, annotation)}"
             ) from exc
-        check_label_right_state(formatted=formatted)
+        check_label_right_state(phase=phase, formatted=formatted)
         with _zoomed_on(adapter, centre, half):
             box = _box(note.GetExtent(), label=label, kind="note")
             display, refused = annotation_display(adapter, annotation)

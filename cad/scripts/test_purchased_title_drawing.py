@@ -7,6 +7,7 @@ source 91022397a28fbfc307f24bfab0fcfdf2f08dffc1, not its whole jig branch.
 """
 from __future__ import annotations
 
+import ast
 import copy
 import math
 from types import SimpleNamespace
@@ -932,6 +933,84 @@ def test_label_right_rereads_both_native_notes_after_each_candidate_rebuild(
         _fit_material_only(scene)
     assert scene.draw.rebuilds >= (1 if stage == "format-rebuild" else 2)
     assert not scene.header.annotation.formats and not scene.header.annotation.positions
+
+
+@pytest.mark.parametrize("target,index", (("header", 0), ("header", 1), ("material", 0), ("material", 1)))
+def test_label_right_guard_diagnostic_names_rebuilt_format_member(
+    measured_material_title, target, index,
+):
+    scene = measured_material_title("Material")
+    annotation = getattr(scene, target).annotation
+    annotation.extra_formats = [_Format(height=0.0019)]
+    annotation.extra_use_doc = [False]
+    baseline, fresh = 1.25, 1.25000005
+    fmt = annotation._format if index == 0 else annotation.extra_formats[index - 1]
+    fmt.CharSpacingFactor = baseline
+
+    def drift():
+        current = annotation._format if index == 0 else annotation.extra_formats[index - 1]
+        current.CharSpacingFactor = fresh
+
+    scene.draw.rebuild_actions[1] = drift
+    with pytest.raises(
+        RuntimeError, match="MATERIAL label or protected value style/anchor changed",
+    ) as refused:
+        _fit_material_only(scene)
+    message = str(refused.value)
+    assert "phase='after-fit-rebuild', formatted=True" in message
+    differences = ast.literal_eval(message.split("differences=", 1)[1])
+    prefix = "label.style" if target == "header" else "material.protected_style"
+    assert differences == {
+        f"{prefix}[{index}].CharSpacingFactor": {
+            "expected": baseline, "actual": fresh, "delta": fresh - baseline, "tolerance": 0,
+        },
+    }
+    assert 0 < fresh - baseline < 1e-7  # Exact formatting, not an anchor/height band.
+    assert scene.draw.rebuilds == 1
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+def test_label_right_guard_diagnostic_reports_rebuilt_anchor_delta(
+    measured_material_title, target,
+):
+    scene = measured_material_title("Material")
+    note = getattr(scene, target)
+    baseline = note.anchor
+    fresh = (*baseline[:2], baseline[2] + 0.00001)
+    scene.draw.rebuild_actions[1] = lambda: setattr(note, "anchor", fresh)
+    with pytest.raises(
+        RuntimeError, match="MATERIAL label or protected value style/anchor changed",
+    ) as refused:
+        _fit_material_only(scene)
+    differences = ast.literal_eval(str(refused.value).split("differences=", 1)[1])
+    change = {
+        "expected": baseline, "actual": fresh, "delta": (0.0, 0.0, 0.00001),
+        "tolerance": 0 if target == "header" else 1e-7,
+    }
+    if target == "material":
+        change.update(distance=0.00001, comparison="euclidean")
+    assert differences == {f"{'label' if target == 'header' else 'material'}.anchor_m": change}
+    assert scene.draw.rebuilds == 1
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("member,field", (("_link", "raw"), ("_text", "resolved")))
+def test_label_right_guard_diagnostic_reports_literal_label_identity(
+    measured_material_title, member, field,
+):
+    scene = measured_material_title("Material")
+    scene.draw.rebuild_actions[1] = lambda: setattr(scene.header, member, "MATERIAL changed")
+    with pytest.raises(
+        RuntimeError, match="MATERIAL label or protected value style/anchor changed",
+    ) as refused:
+        _fit_material_only(scene)
+    differences = ast.literal_eval(str(refused.value).split("differences=", 1)[1])
+    assert differences == {
+        f"label.{field}": {"expected": "MATERIAL", "actual": "MATERIAL changed", "tolerance": 0},
+    }
+    assert scene.draw.rebuilds == 1
+    assert not scene.material.annotation.positions
 
 
 @pytest.mark.parametrize("fault", ("missing", "duplicate", "renamed", "split-cell"))
