@@ -50,9 +50,3 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked dimension must state its decimal places")
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-
-# The cutter's corner at every root where the bar meets the hub (its flanks
-# in the front view, the plate-offset steps in the top view) is unmodelled;
-# like ch_amplitude_bar_notes.ROOT_CALLOUT (Main-ruled 2026-09-27), the limit
-# rides a dimension's callout -- the hub diameter's.
-ROOT_CALLOUT = "ALL BAR-TO-HUB\nROOTS R1 MAX"
