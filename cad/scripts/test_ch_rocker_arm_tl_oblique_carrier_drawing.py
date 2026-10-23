@@ -6,14 +6,21 @@ import inspect
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 import _config
+import _drawing_edge_dimensions
 import build_ch_rocker_arm_tl_oblique_carrier as part
 import ch_rocker_arm_tl_oblique_carrier_spec as spec
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
+from _drawing_layout_check import LeaderSegment, _proper_crossing
+from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
@@ -174,12 +181,23 @@ def test_cl_dowel_is_a_press_in_its_finished_hole() -> None:
     assert spec.CL_DOWEL_INTERFERENCE == (0.008, 0.028)
 
 
-def test_planar_selectors_use_offset_along_their_normal() -> None:
-    """PlanarFace.offset_mm is n·p (farm jig-r1): the underside at y = -12
-    seen along -Y sits at +12."""
-    seat = requirements_for(drawing)["pin_collar_seat"].faces[0]
-    assert seat.normal == (0.0, -1.0, 0.0)
-    assert seat.offset_mm == spec.THICKNESS
+def test_bottom_face_preserves_the_finished_plate_thickness() -> None:
+    bottom = requirements_for(drawing)["bottom_face"]
+    (face,) = bottom.faces
+    assert face.normal == (0.0, -1.0, 0.0)
+    assert face.offset_mm == spec.THICKNESS
+    feature = _features()["bottom_face"]
+    assert feature["normal"] == [0.0, -1.0, 0.0]
+    assert feature["plane"] == {
+        "frame": "model",
+        "axis": "y",
+        "value": -spec.THICKNESS,
+    }
+    assert feature["height_nominal"] == spec.THICKNESS
+    assert feature["height"] == [
+        spec.THICKNESS - spec.THICKNESS_BAND,
+        spec.THICKNESS + spec.THICKNESS_BAND,
+    ]
 
 
 def test_spot_stations_print_from_the_hidden_reference_sketch() -> None:
@@ -581,3 +599,1122 @@ def test_tap_callout_leaders_clear_every_station_text() -> None:
                 name,
                 dim,
             )
+
+
+
+def test_all_four_bore_axes_own_the_bottom_normal_inspection() -> None:
+    assert (
+        spec.PIN_AXIS_DEVIATION_MAX
+        == retention.CARRIER_AXIS_DEVIATION_MAX
+        == 0.05
+    )
+    assert (
+        spec.PIN_AXIS_MEASUREMENT_SPAN
+        == retention.CARRIER_AXIS_MEASUREMENT_SPAN
+        == 10.5
+    )
+    bottom = _features()["bottom_face"]
+    assert bottom["normal"] == [0.0, -1.0, 0.0]
+    exported = _features()
+    for key, (x, y) in spec.PIN_HOLES.items():
+        name = f"pin_hole_{key.lower()}"
+        feature = exported[name]
+        assert feature["axis"] == bottom["normal"]
+        assert feature["at"] == [x, 0.0, -y]
+        assert feature["dia"] == [10.0, 10.015]
+        assert feature["thru"] is True
+        assert "note" in feature["requirements"]
+        assert feature["note"] == " ".join(
+            (spec.CALLOUTS_BELOW["PinHoleDia"] + "\n" + spec.PIN_LAND_CALLOUT).splitlines()
+        )
+        (face,) = requirements_for(drawing)[name].faces
+        assert face.contains_x_mm == x
+        assert face.contains_z_mm == -y
+    assert spec.PIN_AXIS_MEASUREMENT_SPAN <= retention.CARRIER_ENGAGEMENT_MIN
+    # The normal reference is the same physical underside the two pin collars
+    # seat on; no added support, skid or change to the H7/h6 fit is involved.
+    assert spec.PIN_CLEARANCE_MIN == 0.0
+    assert math.isclose(spec.PIN_CLEARANCE_MAX, 0.024)
+
+
+def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
+    b2x, b2y = _top_text("B2DX")
+    assert b2y + 10.0 < _on_sheet(0.0, spec.OUTLINE_Y[0])[1] - 3.0
+    # Review 88c6d: B2DX's rows (~28 wide, "SETS R816 ON") stand wholly
+    # outboard of B2's extension line and the 520.0's at the plate's +X end,
+    # so neither strikes the text, and above the isometric.
+    half_width = len("SETS R816 ON") * 2.36 / 2.0
+    assert b2x - half_width - 3.0 > _on_sheet(spec.OUTLINE_X[1], 0.0)[0]
+    assert b2x + half_width < _BORDER[2] - 3.0
+    iso_top = drawing.ISO_CENTER[1] * 1000.0 + 17.0
+    assert b2y - 8.0 - 3.0 > iso_top
+
+
+def _b9e4_native_layout():
+    """Complete observed native/PDF sheet, never an after-fix native claim."""
+    import json
+    from dataclasses import replace
+    from _layout_audit import sheet_model
+    from _layout_geometry import AnnotationGeometry, Segment
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures" / "ch_rocker_arm_tl_oblique_carrier_b9e4.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert fixture["pdf_sha256"] == (
+        "fb5665173e2e05055de59018d92c8fbeebdb0cf9fde4e7201e82647b5113c744"
+    )
+    assert fixture["coordinate_quantum_m"] == 1e-7
+    (dump,) = fixture["sheets"]
+    model = sheet_model(dump)
+    # Includes every native dimension, all centre marks, the section pointers,
+    # linked caption and notes. No hand-picked obstacle census replaces it.
+    assert len(model.geometry.annotations) == 50
+    assert fixture["pdf_lines"]["coordinates"] == "sheet_metres"
+    pdf_lines = tuple(
+        Segment(*row[1:]) for row in fixture["pdf_lines"]["segments"]
+    )
+    assert len(pdf_lines) == 1645
+    section_lines = tuple(
+        Segment(*row[1:]) for row in fixture["pdf_lines"]["segments"]
+        if row[0] == fixture["section_outline_pdf_path"]
+    )
+    assert len(section_lines) == 42
+    section = AnnotationGeometry(
+        label="PDF actual section outline", kind="geometry",
+        owner=dump["views"][2]["name"], segments=section_lines,
+    )
+    geometry = replace(
+        model.geometry, annotations=(*model.geometry.annotations, section)
+    )
+    return SimpleNamespace(
+        dump=dump, geometry=geometry, section=section, pdf_lines=pdf_lines,
+        unmatched=model.unmatched,
+    )
+
+
+def _b9e4_annotation(layout, name, view_index=0):
+    matches = [
+        annotation for annotation in layout.dump["views"][view_index]["annotations"]
+        if annotation["name"] == name
+    ]
+    assert len(matches) == 1, name
+    return matches[0]
+
+
+def _b9e4_named(layout, name, view_index=0):
+    owner = layout.dump["views"][view_index]["name"]
+    matches = [
+        annotation for annotation in layout.geometry.annotations
+        if annotation.owner == owner
+        and annotation.label.split(" ", 2)[1] == name
+    ]
+    assert len(matches) == 1, (owner, name)
+    return matches[0]
+
+
+def _b9e4_translated(annotation, old_xy, new_xy):
+    from dataclasses import replace
+    from _layout_geometry import Box
+
+    dx, dy = new_xy[0] - old_xy[0], new_xy[1] - old_xy[1]
+    return replace(
+        annotation, position=new_xy,
+        text_boxes=tuple(
+            Box(box.xmin + dx, box.ymin + dy, box.xmax + dx, box.ymax + dy)
+            for box in annotation.text_boxes
+        ),
+    )
+
+
+def _b9e4_crossing(a, b):
+    return _proper_crossing(
+        LeaderSegment("candidate", "dim", a.x0, a.y0, a.x1, a.y1),
+        LeaderSegment("neighbor", "dim", b.x0, b.y0, b.x1, b.y1),
+        tol=1e-4,
+    )
+
+
+def _conditional_b9e4_layout():
+    """Translate observed glyphs; conditionally reroute, not native elbow proof.
+
+    REAM keeps its measured shoulder dimensions and the real bore centre/radius,
+    but its new diameter angle is conditional. The linear OffsetText route has
+    NOT been observed: bound its connector and shoulder separately below.
+    UNDERSIDE keeps the real native attachment; only its text-relative leader
+    start translates, and its arrow rotates conditionally toward that start.
+    A fresh native audit/PDF remains necessary for all three regenerated routes.
+    """
+    from dataclasses import replace
+    from _layout_audit import arrowhead_segments
+    from _layout_geometry import Segment
+
+    layout = _b9e4_native_layout()
+    changes = {}
+    ream = _b9e4_named(layout, "PinHoleDia")
+    raw = _b9e4_annotation(layout, "PinHoleDia")
+    ream_xy = tuple(value / 1000.0 for value in _top_text("PinHoleDia"))
+    moved = _b9e4_translated(ream, raw["pos"], ream_xy)
+    dx, dy = (ream_xy[i] - raw["pos"][i] for i in (0, 1))
+    first, diameter, shoulder = raw["display"]["lines"]
+    centre = tuple((diameter[4 + i] + diameter[7 + i]) / 2.0 for i in (0, 1))
+    radius = math.dist(diameter[4:6], diameter[7:9]) / 2.0
+    elbow = (first[7] + dx, first[8] + dy)
+    direction = tuple((elbow[i] - centre[i]) / math.dist(elbow, centre) for i in (0, 1))
+    near = tuple(centre[i] + radius * direction[i] for i in (0, 1))
+    far = tuple(centre[i] - radius * direction[i] for i in (0, 1))
+    approach = Segment(*near, *elbow, "dim-line")
+    ream_shoulder = Segment(
+        shoulder[4] + dx, shoulder[5] + dy,
+        shoulder[7] + dx, shoulder[8] + dy, "shoulder",
+    )
+    arrow = list(raw["display"]["arrows"][0])
+    arrow[:2], arrow[3:5] = near, direction
+    changes[ream.label] = replace(
+        moved, segments=(
+            approach, Segment(*far, *near, "dim-line"), ream_shoulder,
+            *arrowhead_segments(arrow),
+        ),
+    )
+
+    land = _b9e4_named(layout, "RD1", 2)
+    raw_land = _b9e4_annotation(layout, "RD1", 2)
+    moved = _b9e4_translated(land, raw_land["pos"], drawing.PIN_LAND_TEXT_XY)
+    line_x, line_y = drawing.PIN_LAND_LINE_XY
+    # Actual native wall endpoints remain fixed. The 1 mm witness overrun is
+    # measured in b9e4; these new right-side witnesses/routes are conditional.
+    tips = tuple(
+        (line_x, arrow[1]) for arrow in raw_land["display"]["arrows"]
+    )
+    witnesses = tuple(
+        Segment(row[4], row[5], line_x + 0.001, row[8], "ext-line")
+        for row in raw_land["display"]["lines"][:2]
+    )
+    arrows = []
+    for raw_arrow, tip in zip(raw_land["display"]["arrows"], tips, strict=True):
+        arrow = list(raw_arrow)
+        arrow[:2] = tip
+        arrows.extend(arrowhead_segments(arrow))
+    text_dx = drawing.PIN_LAND_TEXT_XY[0] - raw_land["pos"][0]
+    text_dy = drawing.PIN_LAND_TEXT_XY[1] - raw_land["pos"][1]
+    left = min(run["pos"][0] for run in raw_land["display"]["texts"]) + text_dx
+    right = max(
+        run["pos"][0] + run["w"] for run in raw_land["display"]["texts"]
+    ) + text_dx
+    baseline = min(run["pos"][1] for run in raw_land["display"]["texts"]) + text_dy
+    connector = Segment(line_x, line_y, left, baseline, "leader")
+    land_shoulder = Segment(left, baseline, right, baseline, "shoulder")
+    changes[land.label] = replace(
+        moved, segments=(
+            *witnesses, Segment(*tips[0], *tips[1], "dim-line"),
+            connector, land_shoulder, *arrows,
+        ),
+    )
+
+    underside = _b9e4_named(layout, "DetailItem364", 2)
+    raw_under = _b9e4_annotation(layout, "DetailItem364", 2)
+    # The captured note was authored with (-20,-7) mm. Its actual edge landing
+    # is NOT the ideal projected selection point and must never translate.
+    delta = (
+        drawing.UNDERSIDE_LABEL_OFFSET[0] - (-0.020),
+        drawing.UNDERSIDE_LABEL_OFFSET[1] - (-0.007),
+    )
+    note_xy = tuple(raw_under["pos"][i] + delta[i] for i in (0, 1))
+    moved = _b9e4_translated(underside, raw_under["pos"], note_xy)
+    (native_leader,) = raw_under["leaders"]
+    start = tuple(native_leader[i] + delta[i] for i in (0, 1))
+    landing = tuple(native_leader[3:5])
+    under_route = Segment(*start, *landing, "leader")
+    arrow = list(raw_under["display"]["arrows"][0])
+    arrow[3:5] = tuple(
+        (start[i] - landing[i]) / math.dist(start, landing) for i in (0, 1)
+    )
+    changes[underside.label] = replace(
+        moved, segments=(under_route, *arrowhead_segments(arrow)),
+        leader_spans=((start, landing),),
+    )
+    proposed = replace(
+        layout.geometry,
+        annotations=tuple(changes.get(a.label, a) for a in layout.geometry.annotations),
+    )
+    return SimpleNamespace(
+        observed=layout, proposed=proposed, changes=changes, ream=changes[ream.label],
+        land=changes[land.label], underside=changes[underside.label],
+        approach=approach, ream_shoulder=ream_shoulder,
+        land_routes=(connector, land_shoulder), land_witnesses=witnesses,
+        land_tips=tips, bore=(centre, radius), underside_route=under_route,
+    )
+
+
+def test_b9e4_complete_native_rows_record_the_actual_three_layout_defects() -> None:
+    from _layout_geometry import Box, segment_box_overlap_length
+
+    layout = _b9e4_native_layout()
+    ream = _b9e4_named(layout, "PinHoleDia")
+    raw = _b9e4_annotation(layout, "PinHoleDia")
+    assert len(raw["display"]["texts"]) == 14
+    assert len(ream.text_boxes) == 10  # +.015 row, diameter/.000, all eight below
+    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
+        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    )
+    assert not [item for item in layout.unmatched if "PinHoleDia" in item[0]]
+    near_y = _b9e4_named(layout, "PlateNearY")
+    assert "45.00" in near_y.label
+    # The +.015 stack shares the 45.00's printed row, close enough to read as
+    # its tolerance; the actual 45 line/arrow cross the diameter and THRU row.
+    assert near_y.text_boxes[0].gap(ream.text_boxes[0]) < 0.0035
+    for role in ("dim-line", "arrow"):
+        assert any(
+            segment_box_overlap_length(segment, box) > 0.00015
+            for segment in near_y.segments if segment.role == role
+            for box in ream.text_boxes[1:3]
+        ), role
+    bottom_extension = next(
+        segment for segment in near_y.segments
+        if segment.role == "ext-line"
+        and abs(segment.y0 - 0.1525) < 1e-7
+        and abs(segment.y1 - 0.1525) < 1e-7
+    )
+    assert segment_box_overlap_length(bottom_extension, ream.text_boxes[2]) > 0.01
+
+    land = _b9e4_named(layout, "RD1", 2)
+    assert len(land.text_boxes) == 4
+    top = max(segment.y0 for segment in layout.section.segments)
+    top_edges = [
+        segment for segment in layout.section.segments
+        if abs(segment.y0 - top) < 1e-7 and abs(segment.y1 - top) < 1e-7
+    ]
+    assert any(
+        segment_box_overlap_length(edge, land.text_boxes[0]) > 0.00015
+        for edge in top_edges
+    )
+    assert any(
+        segment_box_overlap_length(arrow, land.text_boxes[0]) > 0.00015
+        for arrow in land.segments if arrow.role == "arrow"
+    )
+    slab = layout.section.box()
+    assert slab is not None
+    for box in land.text_boxes[1:]:
+        assert slab.xmin < box.xmin < box.xmax < slab.xmax
+        assert slab.ymin < box.ymin < box.ymax < slab.ymax
+
+    underside = _b9e4_named(layout, "DetailItem364", 2)
+    (box,) = underside.text_boxes
+    # A cap-height-wide strip at the word's E end, not fabricated per-glyph
+    # bounds: the captured PDF run and native leader prove the terminal strike.
+    terminal_ink = Box(box.xmax - box.height, box.ymin, box.xmax, box.ymax)
+    assert any(
+        segment_box_overlap_length(segment, terminal_ink) > 0.00015
+        for segment in underside.segments if segment.role == "leader"
+    )
+
+
+def test_conditional_b9e4_all_rows_and_routes_clear_every_native_neighbor() -> None:
+    from _layout_audit import (
+        find_arrows_near_text, find_leader_across_lines, find_leader_through_text,
+        find_lines_through_own_text, find_merged_blocks, find_text_clearance,
+        find_text_separation,
+    )
+    from _layout_geometry import (
+        find_border_breaches, find_leader_crossings, find_text_on_line,
+        find_text_on_text, segment_box_overlap_length,
+    )
+
+    candidate = _conditional_b9e4_layout()
+    observed = candidate.observed.geometry
+    proposed = candidate.proposed
+    # Every original annotation and all its rows/segments remain unless one of
+    # the three repaired controls owns them. In particular, 45.00, stock,
+    # chamfer, caption, all location blocks and every centre mark remain.
+    assert [a.label for a in observed.annotations] == [a.label for a in proposed.annotations]
+    for old, new in zip(observed.annotations, proposed.annotations, strict=True):
+        assert len(new.text_boxes) == len(old.text_boxes)
+        if old.label not in candidate.changes:
+            assert new == old
+    assert len(candidate.ream.text_boxes) == 10
+    assert len(candidate.land.text_boxes) == 4
+    assert candidate.bore[0] == pytest.approx((0.10946615, 0.175))
+    assert candidate.bore[1] == pytest.approx(0.0025, abs=1e-7)
+    for predicate in (
+        find_text_clearance, find_text_separation, find_merged_blocks,
+        find_leader_through_text, find_leader_across_lines,
+        find_lines_through_own_text, find_arrows_near_text, find_text_on_line,
+        find_text_on_text, find_leader_crossings, find_border_breaches,
+    ):
+        affected = [
+            finding for finding in predicate(proposed)
+            if finding.a in candidate.changes or finding.b in candidate.changes
+        ]
+        assert affected == [], (predicate.__name__, affected)
+    # Also retain the full 1645-segment PDF vector census, including model
+    # edges not present in the native display arrays, against every moved row.
+    # These are OLD printed vectors, not evidence of future native regeneration.
+    for annotation in candidate.changes.values():
+        for box in annotation.text_boxes:
+            assert all(
+                segment_box_overlap_length(segment, box) <= 0.00015
+                for segment in candidate.observed.pdf_lines
+            ), annotation.label
+
+    crossings = []
+    for annotation in proposed.annotations:
+        if annotation.label == candidate.ream.label:
+            continue
+        for line in annotation.segments:
+            if line.role not in ("line", "dim-line", "ext-line"):
+                continue
+            # The text shoulder may cross NOTHING. The diameter's approach
+            # may cross genuine witness extensions, never a dimension line.
+            assert _b9e4_crossing(candidate.ream_shoulder, line) is None, annotation.label
+            if _b9e4_crossing(candidate.approach, line) is not None:
+                assert line.role == "ext-line", (annotation.label, line)
+                crossings.append(annotation.label)
+    for name in ("PlateLength", "PlateHalfLength"):
+        assert _b9e4_named(candidate.observed, name).label in crossings
+    for box in candidate.ream.text_boxes:
+        assert box.xmin - proposed.region.xmin > 0.003
+    # The old complete block, not just its diameter value, is now below the
+    # real Y152.5 extension and clear of the unchanged 45.00 glyph and arrow.
+    near_y = _b9e4_named(candidate.observed, "PlateNearY")
+    assert 0.1525 - max(box.ymax for box in candidate.ream.text_boxes) > 0.003
+    assert all(box.gap(near_y.text_boxes[0]) > 0.0035 for box in candidate.ream.text_boxes)
+
+
+def test_captured_land_arrow_corridor_has_margin_from_chamfer_and_section() -> None:
+    from _layout_audit import arrowhead_segments
+    from _layout_geometry import segment_box_distance
+
+    candidate = _conditional_b9e4_layout()
+    raw = _b9e4_annotation(candidate.observed, "RD1", 2)
+    chamfer = _b9e4_named(candidate.observed, "PinChamferSize", 2)
+    # Parent's focused run found the old x149 placement too close: use every
+    # captured arrow edge and every complete chamfer row, not just arrow tips.
+    crowded_arrows = tuple(
+        edge
+        for arrow in raw["display"]["arrows"]
+        for edge in arrowhead_segments([0.149, *arrow[1:]])
+    )
+    crowded_gap = min(
+        segment_box_distance(edge, box)
+        for edge in crowded_arrows for box in chamfer.text_boxes
+    )
+    assert crowded_gap == pytest.approx(0.001897, abs=1e-7)
+    assert crowded_gap < 0.002
+    proposed_arrows = tuple(
+        edge for edge in candidate.land.segments if edge.role == "arrow"
+    )
+    assert min(
+        segment_box_distance(edge, box)
+        for edge in proposed_arrows for box in chamfer.text_boxes
+    ) > 0.0025
+    slab = candidate.observed.section.box()
+    assert slab is not None
+    assert min(min(edge.x0, edge.x1) for edge in proposed_arrows) - slab.xmax > 0.0025
+
+
+def test_conditional_b9e4_land_is_exterior_with_fixed_arrows_and_route_air() -> None:
+    from _layout_geometry import segment_box_overlap_length
+
+    candidate = _conditional_b9e4_layout()
+    slab = candidate.observed.section.box()
+    assert slab is not None
+    # Merely lowering the old block within the bore is not a repair. ALL four
+    # complete rows must stand to the right of the real section silhouette.
+    assert all(box.xmin - slab.xmax > 0.0035 for box in candidate.land.text_boxes)
+    for box in candidate.land.text_boxes:
+        for line in candidate.land.segments:
+            if line.role in ("arrow", "ext-line", "dim-line"):
+                assert box.gap(line.box()) > 0.002
+        assert box.gap(slab) > 0.0035
+    raw = _b9e4_annotation(candidate.observed, "RD1", 2)
+    assert candidate.land_tips == tuple(
+        (drawing.PIN_LAND_LINE_XY[0], arrow[1]) for arrow in raw["display"]["arrows"]
+    )
+    assert sorted(tip[1] for tip in candidate.land_tips) == pytest.approx([0.0279, 0.063])
+    # The unknown native offset elbow is constrained by TWO envelopes, not an
+    # invented verified route: connector corridor, then the text shoulder.
+    # Keeping them separate avoids treating empty paper under the whole text
+    # block as a leader that could strike the chamfer's first row.
+    for route in candidate.land_routes:
+        envelope = route.box()
+        for annotation in candidate.proposed.annotations:
+            if annotation.label == candidate.land.label:
+                continue
+            for box in annotation.text_boxes:
+                assert envelope.gap(box) > 0.002, annotation.label
+            for line in annotation.segments:
+                assert segment_box_overlap_length(line, envelope) <= 0.00015, annotation.label
+        assert envelope.gap(slab) > 0.002
+    underside = candidate.underside_route
+    (under_box,) = candidate.underside.text_boxes
+    assert segment_box_overlap_length(underside, under_box) == 0.0
+    # The translated native text-relative start stays to the RIGHT of final E,
+    # and the real native attachment does not follow the label.
+    assert underside.x0 > under_box.xmax
+    native_under = _b9e4_annotation(candidate.observed, "DetailItem364", 2)
+    assert (underside.x1, underside.y1) == tuple(native_under["leaders"][0][3:5])
+    chamfer = _b9e4_named(candidate.observed, "PinChamferSize", 2)
+    for line in chamfer.segments:
+        if line.role == "dim-line":
+            assert _b9e4_crossing(underside, line) is None
+
+
+def _native_axis_fixture(monkeypatch):
+    """Replace only COM reads; retain the production vector and rim algorithms."""
+    model = object()
+    faces, geometries, rims, resolved = {}, {}, {}, []
+
+    def bore(name, axis=(0.0, -1.0, 0.0), land=11.7):
+        length = math.hypot(*axis)
+        axis = tuple(component / length for component in axis)
+        x, y = spec.PIN_HOLES[name]
+        origin = (x / 1000.0, 0.0, -y / 1000.0)
+        rims[name] = [
+            (*origin, *axis, 0.005),
+            (*(p + a * land / 1000.0 for p, a in zip(origin, axis)), *axis, 0.005),
+        ]
+        faces[name] = SimpleNamespace(
+            GetEdges=lambda: tuple(
+                SimpleNamespace(
+                    GetCurve=lambda circle=circle: SimpleNamespace(
+                        IsCircle=lambda: True, CircleParams=circle
+                    )
+                )
+                for circle in rims[name]
+            )
+        )
+        geometries[name] = FaceGeometry(
+            faces[name], SURFACE_CYLINDER, (*origin, *axis, 0.005), None, ()
+        )
+
+    def plane(normal=(0.0, -1.0, 0.0), offset=12.0, identity=SURFACE_PLANE):
+        faces["underside"] = object()
+        geometries["underside"] = FaceGeometry(
+            faces["underside"], identity,
+            (*normal, *(component * offset / 1000.0 for component in normal)),
+            normal, (),
+        )
+
+    def resolve(actual_model, requests):
+        assert actual_model is model
+        assert set(requests) == {"underside", "A1", "B1", "A2", "B2"}
+        resolved.append(requests)
+        return faces
+
+    def geometry(face):
+        return next(geometries[key] for key, value in faces.items() if value is face)
+
+    plane()
+    for name in spec.PIN_HOLES:
+        bore(name)
+    monkeypatch.setattr(drawing, "resolve_faces", resolve)
+    monkeypatch.setattr(drawing, "face_geometry", geometry)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    return SimpleNamespace(
+        model=model, bore=bore, plane=plane, rims=rims,
+        geometries=geometries, resolved=resolved,
+    )
+
+
+def test_native_axes_return_all_four_actual_lands_with_one_resolution(monkeypatch):
+    native = _native_axis_fixture(monkeypatch)
+    for index, name in enumerate(spec.PIN_HOLES):
+        native.bore(name, land=10.5 + index * 0.3)
+    assert drawing._assert_pin_axis_geometry(native.model) == pytest.approx(
+        dict(zip(spec.PIN_HOLES, (10.5, 10.8, 11.1, 11.4)))
+    )
+    assert len(native.resolved) == 1
+
+
+@pytest.mark.parametrize("name", ("A1", "B1", "A2", "B2"))
+def test_each_native_bore_rejects_resultant_diagonal_tilt(monkeypatch, name):
+    native = _native_axis_fixture(monkeypatch)
+    component = 0.04 / 10.5
+    assert component < 0.05 / 10.5 < math.hypot(component, component)
+    native.bore(name, axis=(component, -1.0, component))
+    with pytest.raises(RuntimeError, match=f"{name}: native axis exceeds resultant"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize("azimuth", (0.0, 0.37, 1.19, 2.31, 4.81))
+@pytest.mark.parametrize("factor", (0.999, 1.0, 1.001))
+def test_native_axis_boundary_is_azimuth_independent(monkeypatch, azimuth, factor):
+    native = _native_axis_fixture(monkeypatch)
+    slope = factor * 0.05 / 10.5
+    # A reversed cylinder axis describes the same physical bore.
+    native.bore("B2", axis=(slope * math.cos(azimuth), 1.0, slope * math.sin(azimuth)))
+    if factor > 1.0:
+        with pytest.raises(RuntimeError, match="B2: native axis exceeds resultant"):
+            drawing._assert_pin_axis_geometry(native.model)
+    else:
+        assert drawing._assert_pin_axis_geometry(native.model)["B2"] == pytest.approx(11.7)
+
+
+def test_axes_use_native_underside_not_world_y(monkeypatch):
+    native = _native_axis_fixture(monkeypatch)
+    angle = 0.01  # Within the plane selector, outside the axis acceptance.
+    normal = (math.sin(angle), -math.cos(angle), 0.0)
+    native.plane(normal=normal)
+    with pytest.raises(RuntimeError, match="A1: native axis exceeds resultant"):
+        drawing._assert_pin_axis_geometry(native.model)
+    for name in spec.PIN_HOLES:
+        native.bore(name, axis=normal)
+    assert drawing._assert_pin_axis_geometry(native.model) == pytest.approx(
+        {name: 11.7 for name in spec.PIN_HOLES}
+    )
+
+
+@pytest.mark.parametrize(
+    "normal,offset,identity",
+    (
+        ((0.0, 1.0, 0.0), 12.0, SURFACE_PLANE),
+        ((0.0, -1.0, 0.0), 0.0, SURFACE_PLANE),
+        ((0.0, -1.0, 0.0), 12.0, SURFACE_CYLINDER),
+        ((0.1, -math.sqrt(0.99), 0.0), 12.0, SURFACE_PLANE),
+    ),
+)
+def test_native_underside_must_match_real_seating_plane(
+    monkeypatch, normal, offset, identity
+):
+    native = _native_axis_fixture(monkeypatch)
+    native.plane(normal=normal, offset=offset, identity=identity)
+    with pytest.raises(RuntimeError, match="native underside plane"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize("name", ("A1", "B1", "A2", "B2"))
+def test_actual_native_land_not_nominal_stock_controls_minimum(monkeypatch, name):
+    native = _native_axis_fixture(monkeypatch)
+    native.bore(name, land=10.49)
+    with pytest.raises(RuntimeError, match=f"{name}: native straight land"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ("missing", "duplicate", "third_station", "truncated", "nonfinite", "radius", "axis"),
+)
+def test_malformed_native_straight_land_rims_are_rejected(monkeypatch, failure):
+    native = _native_axis_fixture(monkeypatch)
+    circles = native.rims["A2"]
+    if failure == "missing":
+        circles.clear()
+    elif failure == "duplicate":
+        circles[1] = circles[0]
+    elif failure == "third_station":
+        circles.append((circles[0][0], -0.006, circles[0][2], 0.0, -1.0, 0.0, 0.005))
+    elif failure == "truncated":
+        circles[1] = circles[1][:-1]
+    elif failure == "nonfinite":
+        circles[1] = (math.nan, *circles[1][1:])
+    elif failure == "radius":
+        circles[1] = (*circles[1][:-1], 0.0053)
+    elif failure == "axis":
+        circles[1] = (*circles[1][:3], 1.0, 0.0, 0.0, 0.005)
+    with pytest.raises(RuntimeError, match="A2: .*straight-land rim"):
+        drawing._assert_pin_axis_geometry(native.model)
+
+
+def _native_dimension_fixture(monkeypatch, *, land=False):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        _drawing_edge_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, *_args: value,
+    )
+    vertices = (object(), object())
+    state = SimpleNamespace(attached=vertices, dangling=False, low=0.0, high=0.000015)
+    owner = SimpleNamespace(Name="PinHoleProfile")
+    tolerance = SimpleNamespace(
+        Type=0, GetMinValue=lambda: state.low, GetMaxValue=lambda: state.high
+    )
+    dimension = SimpleNamespace(
+        FullName="PinHoleDia@PinHoleProfile@carrier.SLDPRT",
+        SystemValue=spec.PIN_STRAIGHT_LAND / 1000.0 if land else 0.010,
+        Tolerance=tolerance, DrivenState=1, GetFeatureOwner=lambda: owner,
+    )
+    texts = {
+        1: "(" if land else "", 2: ")" if land else "",
+        4: spec.PIN_LAND_CALLOUT if land else spec.CALLOUTS_BELOW["PinHoleDia"],
+        8: spec.PIN_LAND_CALLOUT if land else spec.CALLOUTS_BELOW["PinHoleDia"],
+    }
+    annotation = SimpleNamespace(
+        Visible=1, IsDangling=lambda: state.dangling,
+        GetAttachedEntities3=lambda: state.attached,
+        GetAttachedEntityTypes=lambda: (3, 3),
+    )
+    state.precision = 1
+    display = SimpleNamespace(
+        Type2=2 if land else 6, ShowDimensionValue=True,
+        GetDimension2=lambda _index: dimension, GetAnnotation=lambda: annotation,
+        GetText=lambda index: texts.get(index, ""),
+        GetPrimaryPrecision2=lambda: state.precision,
+    )
+    annotation.GetSpecificAnnotation = lambda: display
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    return SimpleNamespace(
+        adapter=adapter, annotation=annotation, display=display, dimension=dimension,
+        owner=owner, tolerance=tolerance, state=state, texts=texts, vertices=vertices,
+    )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        None, "owner", "name", "name_owner", "kind", "value", "low", "high",
+        "symmetric_band", "hidden_value", "hidden_annotation", "dangling",
+        "native_below", "resolved_below",
+    ),
+)
+def test_ream_control_rejects_native_manufacturing_mutations(monkeypatch, failure):
+    native = _native_dimension_fixture(monkeypatch)
+    if failure == "owner":
+        native.owner.Name = "SpotReference"
+    elif failure == "name":
+        native.dimension.FullName = "SpotDia@PinHoleProfile@carrier"
+    elif failure == "name_owner":
+        native.dimension.FullName = "PinHoleDia@SpotReference@carrier"
+    elif failure == "kind":
+        native.display.Type2 = 2
+    elif failure == "value":
+        native.dimension.SystemValue = 0.0101
+    elif failure == "low":
+        native.state.low = -0.000015
+    elif failure == "high":
+        native.state.high = 0.0
+    elif failure == "symmetric_band":
+        native.state.low, native.state.high = -0.000015, 0.000015
+    elif failure == "hidden_value":
+        native.display.ShowDimensionValue = False
+    elif failure == "hidden_annotation":
+        native.annotation.Visible = 0
+    elif failure == "dangling":
+        native.state.dangling = True
+    elif failure == "native_below":
+        native.texts[4] = spec.PIN_HOLE_CALLOUT
+    elif failure == "resolved_below":
+        native.texts[8] = spec.PIN_HOLE_CALLOUT
+    if failure is None:
+        drawing._assert_ream_control(native.adapter, native.annotation)
+    else:
+        with pytest.raises(RuntimeError, match="4X REAM lost"):
+            drawing._assert_ream_control(native.adapter, native.annotation)
+
+
+@pytest.mark.parametrize("kind", (2, 11, 12))
+def test_native_land_accepts_linear_reference_with_actual_endpoints(monkeypatch, kind):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    native.display.Type2 = kind
+    assert spec.PIN_STRAIGHT_LAND == pytest.approx(spec.THICKNESS - spec.PIN_CHAMFER)
+    assert spec.PIN_STRAIGHT_LAND == pytest.approx(11.7)
+    drawing._assert_land_control(native.adapter, native.display, native.vertices)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        "angular", "diameter", "wrong_endpoint", "duplicate_endpoint",
+        "extra_endpoint", "dangling", "fake_min_value", "chamfer_included",
+        "nonfinite_value", "banded", "driving", "hidden_value", "hidden_annotation",
+        "no_parentheses", "precision", "native_min", "resolved_min",
+    ),
+)
+def test_native_land_rejects_false_reference_and_minimum_controls(monkeypatch, failure):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    if failure in ("angular", "diameter"):
+        native.display.Type2 = 3 if failure == "angular" else 6
+        native.display.GetAnnotation = lambda: pytest.fail("kind guard ran too late")
+    elif failure == "wrong_endpoint":
+        native.state.attached = (native.vertices[0], object())
+    elif failure == "duplicate_endpoint":
+        native.state.attached = (native.vertices[0], native.vertices[0])
+    elif failure == "extra_endpoint":
+        native.state.attached = (*native.vertices, object())
+    elif failure == "dangling":
+        native.state.dangling = True
+    elif failure == "fake_min_value":
+        native.dimension.SystemValue = 0.0105
+    elif failure == "chamfer_included":
+        native.dimension.SystemValue = spec.THICKNESS / 1000.0
+    elif failure == "nonfinite_value":
+        native.dimension.SystemValue = math.nan
+    elif failure == "banded":
+        native.tolerance.Type = 2
+    elif failure == "driving":
+        native.dimension.DrivenState = 0
+    elif failure == "hidden_value":
+        native.display.ShowDimensionValue = False
+    elif failure == "hidden_annotation":
+        native.annotation.Visible = 0
+    elif failure == "no_parentheses":
+        native.texts[1], native.texts[2] = "", ""
+    elif failure == "precision":
+        native.state.precision = 2
+    elif failure == "native_min":
+        native.texts[4] = "4X STRAIGHT\nLAND"
+    elif failure == "resolved_min":
+        native.texts[8] = "4X STRAIGHT\nLAND"
+    with pytest.raises(RuntimeError, match="straight.land"):
+        drawing._assert_land_control(native.adapter, native.display, native.vertices)
+
+
+@pytest.mark.parametrize("section_sign", (-1.0, 1.0))
+@pytest.mark.parametrize(
+    "failure",
+    (
+        None, "endpoint_after_rebuild", "value_after_rebuild", "ref_after_rebuild",
+        "wrong_label_edge", "missing_leader", "dangling_label", "moved_landing",
+        "hidden_label", "changed_label", "ignored_offset", "ignored_offset_reset",
+        "ignored_line_move", "malformed_line_arrow", "ignored_text_move",
+        "line_follows_text", "nonfinite_offset_text",
+        "malformed_offset_arrow", "offset_after_rebuild", "text_after_rebuild",
+        "arrow_after_rebuild", "duplicate_arrow_after_rebuild",
+        "missing_arrow_after_rebuild", "nonfinite_arrow_after_rebuild",
+    ),
+)
+def test_native_land_authoring_and_settled_physical_underside(
+    monkeypatch, section_sign, failure
+):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    import _drawing_dimensions
+
+    # Model native OffsetText semantics, not a monkeypatched offset helper:
+    # moving an un-offset dimension moves its line AND text; OffsetText moves
+    # text only. Start inherited-offset, so the explicit reset is exercised.
+    native.state.offset = True
+    native.state.position = (0.118, 0.0555, 0.1275)
+    native.state.line_position = native.state.position[:2]
+    native.state.arrows = []
+    native.state.position_calls = []
+    native.state.rebuilds = []
+
+    class NativeDisplay(SimpleNamespace):
+        @property
+        def OffsetText(self):
+            return native.state.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            if (failure == "ignored_offset" and value) or (
+                failure == "ignored_offset_reset" and not value
+            ):
+                return
+            native.state.offset = bool(value)
+
+    native.display = NativeDisplay(**vars(native.display))
+    native.display.GetDimension = lambda: native.dimension
+    native.display.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: len(native.state.arrows),
+        GetArrowHeadAtIndex2=lambda index: native.state.arrows[index],
+    )
+    native.dimension.Name = "RD1"
+    native.annotation.GetSpecificAnnotation = lambda: native.display
+    native.annotation.GetPosition = lambda: native.state.position
+    native.adapter._attempt = lambda operation: operation()
+    native.adapter._get_attr_or_call = lambda obj, name: getattr(obj, name)
+    for module in (drawing, _drawing_dimensions):
+        monkeypatch.setattr(
+            module, "rebuild_drawing",
+            lambda _adapter, *, label: native.state.rebuilds.append(label),
+        )
+    section = object()
+    wall_x = spec.PIN_HOLES["A1"][0] + spec.PIN_HOLE_DIA / 2.0
+    endpoints = (
+        (wall_x, 0.0, 0.0),
+        (wall_x, -spec.THICKNESS + spec.PIN_CHAMFER, 0.0),
+    )
+    underside_point = (
+        spec.PIN_HOLES["A1"][0] - section_sign * 7.0, -spec.THICKNESS, 0.0
+    )
+    underside = object()
+    picked = []
+
+    def vertex_at(point, *, label):
+        picked.append(point)
+        return native.vertices[endpoints.index(point)]
+
+    def line_through(point, *, label):
+        assert point == underside_point
+        return SimpleNamespace(edge=underside)
+
+    scanner = SimpleNamespace(exact_vertex_at=vertex_at, exact_line_through=line_through)
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_args, **_kwargs: scanner)
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: [point[:2] for point in points],
+    )
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, _view, point, **_kwargs: point[:2],
+    )
+    monkeypatch.setattr(
+        drawing, "_section_axes",
+        lambda *_args: ((section_sign, 0.0, 0.0), (0.0, 1.0, 0.0)),
+    )
+
+    def refresh_arrows():
+        native.state.arrows = [
+            (
+                native.state.line_position[0], point[1] / 1000.0, 0.1275,
+                0.0, direction, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0,
+            )
+            for point, direction in zip(endpoints, (-1.0, 1.0), strict=True)
+        ]
+
+    def set_position(x, y, z):
+        native.state.position_calls.append((native.display.OffsetText, (x, y, z)))
+        if (
+            not native.display.OffsetText and failure != "ignored_line_move"
+        ) or failure == "line_follows_text":
+            native.state.line_position = (x, y)
+            refresh_arrows()
+        if not (native.display.OffsetText and failure == "ignored_text_move"):
+            native.state.position = (x, y, z)
+        if native.display.OffsetText and failure == "nonfinite_offset_text":
+            native.state.position = (x, math.nan, z)
+        if native.display.OffsetText and failure == "malformed_offset_arrow":
+            native.state.arrows[0] = native.state.arrows[0][:-1]
+        if not native.display.OffsetText and failure == "malformed_line_arrow":
+            native.state.arrows[0] = native.state.arrows[0][:-1]
+        return True  # Even the ignored native operations report success.
+
+    native.annotation.SetPosition2 = set_position
+
+    def add_dimension(adapter, view, **kwargs):
+        assert adapter is native.adapter and view is section
+        assert kwargs["entities"] == native.vertices
+        assert kwargs["entity_types"] == ("VERTEX", "VERTEX")
+        assert kwargs["orientation"] == "vertical"
+        assert kwargs["p0"] == tuple(value / 1000.0 for value in endpoints[0][:2])
+        assert kwargs["p1"] == tuple(value / 1000.0 for value in endpoints[1][:2])
+        assert kwargs["text_xy"] == drawing.PIN_LAND_LINE_XY
+        native.state.line_position = (
+            (kwargs["text_xy"][0] + 0.005, kwargs["text_xy"][1])
+            if failure == "ignored_line_move" else kwargs["text_xy"]
+        )
+        refresh_arrows()
+        return native.display
+
+    def reference(adapter, annotation, **_kwargs):
+        assert adapter is native.adapter and annotation is native.annotation
+        native.texts[1], native.texts[2] = "(", ")"
+
+    def precision(places, *_args):
+        native.state.precision = places
+        return True
+
+    def text(index, value):
+        assert index == 4
+        native.texts[4] = native.texts[8] = value
+        return True
+
+    native.dimension.DrivenState = 0
+    native.texts.update({1: "", 2: "", 4: "", 8: ""})
+    native.state.precision = 3
+    native.display.SetPrecision3 = precision
+    native.display.SetText = text
+    monkeypatch.setattr(drawing, "add_edge_dimension", add_dimension)
+    monkeypatch.setattr(drawing, "set_reference_dimension", reference)
+    under_xy = tuple(value / 1000.0 for value in underside_point[:2])
+    label_state = SimpleNamespace(
+        edge=underside, text="UNDERSIDE", leaders=1, dangling=False, landing=under_xy
+    )
+    label_annotation = SimpleNamespace(
+        Visible=1, GetAttachedEntities3=lambda: (label_state.edge,),
+        GetAttachedEntityCount3=lambda: 1, GetAttachedEntityTypes=lambda: (1,),
+        GetLeaderCount=lambda: label_state.leaders,
+        IsDangling=lambda: label_state.dangling,
+        GetLeaderPointsAtIndex=lambda _index: (0.0, 0.0, 0.0, *label_state.landing, 0.0),
+    )
+
+    def add_label(adapter, view, **kwargs):
+        assert adapter is native.adapter and view is section
+        assert kwargs["text"] == "UNDERSIDE"
+        assert kwargs["attached_to"] is underside
+        assert kwargs["entity_xy"] == under_xy
+        assert kwargs["note_xy"] == tuple(
+            value + delta
+            for value, delta in zip(under_xy, drawing.UNDERSIDE_LABEL_OFFSET, strict=True)
+        )
+        return SimpleNamespace(
+            GetAnnotation=lambda: label_annotation, GetText=lambda: label_state.text
+        )
+
+    monkeypatch.setattr(drawing, "add_attached_note", add_label)
+    immediate_failures = {
+        "ignored_offset", "ignored_offset_reset", "ignored_text_move",
+        "ignored_line_move", "malformed_line_arrow", "line_follows_text",
+        "nonfinite_offset_text", "malformed_offset_arrow",
+    }
+    if failure in immediate_failures:
+        with pytest.raises(RuntimeError, match="straight.land") as caught:
+            drawing._add_pin_land_control(native.adapter, section)
+        message = str(caught.value)
+        if failure in ("ignored_line_move", "malformed_line_arrow"):
+            assert "phase=before-text-offset" in message
+            assert repr((drawing.PIN_LAND_LINE_XY[0], 0.0)) in message
+            assert len(native.state.position_calls) == 1
+            assert native.state.rebuilds == ["carrier straight-land dimension-line anchor"]
+        elif failure in ("line_follows_text", "malformed_offset_arrow"):
+            assert "phase=after-text-offset" in message
+            assert repr((drawing.PIN_LAND_LINE_XY[0], 0.0)) in message
+            assert len(native.state.position_calls) == 2
+        if failure in ("ignored_line_move", "line_follows_text"):
+            assert repr(tuple(tuple(arrow[:2]) for arrow in native.state.arrows)) in message
+        elif failure in ("malformed_line_arrow", "malformed_offset_arrow"):
+            assert repr(tuple(native.state.arrows[0])) in message
+        return
+    settled = drawing._add_pin_land_control(native.adapter, section)
+    assert picked == list(endpoints)
+    assert native.display.OffsetText is True
+    assert native.state.position[:2] == drawing.PIN_LAND_TEXT_XY
+    assert native.state.line_position == drawing.PIN_LAND_LINE_XY
+    assert native.state.position_calls == [
+        (False, (*drawing.PIN_LAND_LINE_XY, 0.1275)),
+        (True, (*drawing.PIN_LAND_TEXT_XY, 0.0)),
+    ]
+    assert native.state.rebuilds == [
+        "carrier straight-land dimension-line anchor", "offset_dimension_text"
+    ]
+    settled()
+    # Model the final rebuild changing evaluated native state, not Python wiring.
+    if failure == "endpoint_after_rebuild":
+        native.state.attached = (native.vertices[0], object())
+    elif failure == "value_after_rebuild":
+        native.dimension.SystemValue = 0.0105
+    elif failure == "ref_after_rebuild":
+        native.dimension.DrivenState = 0
+    elif failure == "offset_after_rebuild":
+        native.state.offset = False
+    elif failure == "text_after_rebuild":
+        native.state.position = (
+            drawing.PIN_LAND_TEXT_XY[0] - 0.005,
+            drawing.PIN_LAND_TEXT_XY[1], 0.1275,
+        )
+    elif failure == "arrow_after_rebuild":
+        arrow = native.state.arrows[1]
+        native.state.arrows[1] = (arrow[0] + 0.005, *arrow[1:])
+    elif failure == "duplicate_arrow_after_rebuild":
+        native.state.arrows[1] = native.state.arrows[0]
+    elif failure == "missing_arrow_after_rebuild":
+        native.state.arrows.pop()
+    elif failure == "nonfinite_arrow_after_rebuild":
+        arrow = native.state.arrows[0]
+        native.state.arrows[0] = (math.nan, *arrow[1:])
+    elif failure == "wrong_label_edge":
+        label_state.edge = object()
+    elif failure == "missing_leader":
+        label_state.leaders = 0
+    elif failure == "dangling_label":
+        label_state.dangling = True
+    elif failure == "moved_landing":
+        label_state.landing = (under_xy[0] + 0.005, under_xy[1])
+    elif failure == "hidden_label":
+        label_annotation.Visible = 0
+    elif failure == "changed_label":
+        label_state.text = "TOP"
+    if failure is None:
+        settled()
+    else:
+        with pytest.raises(RuntimeError, match="straight.land|underside.plane"):
+            settled()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        None, "auxiliary_arrow", "offset_false", "text_missing", "text_short", "text_extra",
+        "text_nonfinite_z", "text_diagonal_drift", "text_just_outside",
+        "arrow_missing", "arrow_duplicate", "arrow_short", "arrow_extra_field",
+        "arrow_nonfinite_direction", "arrow_y_drift", "arrow_x_drift",
+    ),
+)
+def test_native_land_layout_reads_complete_text_and_both_real_arrow_arrays(
+    monkeypatch, failure
+):
+    native = _native_dimension_fixture(monkeypatch, land=True)
+    layout = _b9e4_native_layout()
+    captured = _b9e4_annotation(layout, "RD1", 2)
+    projected = [(0.133, arrow[1]) for arrow in captured["display"]["arrows"]]
+    position = [*drawing.PIN_LAND_TEXT_XY, captured["pos"][2]]
+    arrows = [list(arrow) for arrow in captured["display"]["arrows"]]
+    for arrow in arrows:
+        arrow[0] = drawing.PIN_LAND_LINE_XY[0]
+    # Native ordering and auxiliary offset-leader arrows are not promised.
+    # Match BOTH physical endpoints, not indexes or a duplicate endpoint.
+    arrows.reverse()
+    native.display.OffsetText = failure != "offset_false"
+    if failure == "text_missing":
+        position = []
+    elif failure == "text_short":
+        position.pop()
+    elif failure == "text_extra":
+        position.append(0.0)
+    elif failure == "text_nonfinite_z":
+        position[2] = math.nan
+    elif failure == "text_diagonal_drift":
+        position[0] += 0.00004
+        position[1] += 0.00004  # each axis < .05 mm; resultant exceeds it
+    elif failure == "text_just_outside":
+        position[0] += 0.0000501
+    elif failure == "arrow_missing":
+        arrows.pop()
+    elif failure == "arrow_duplicate":
+        arrows[1] = list(arrows[0])
+    elif failure == "arrow_short":
+        arrows[0].pop()
+    elif failure == "arrow_extra_field":
+        arrows[0].append(0.0)
+    elif failure == "arrow_nonfinite_direction":
+        arrows[0][3] = math.inf
+    elif failure == "arrow_y_drift":
+        arrows[0][1] += 0.0000501
+    elif failure == "arrow_x_drift":
+        arrows[0][0] += 0.0000501
+    else:
+        # Accept a finite native readback inside the real radial tolerance,
+        # including nonzero z and small movement at both independent arrowtips.
+        position[0] += 0.000049
+        arrows[0][0] += 0.000049
+        arrows[1][1] -= 0.000049
+    if failure == "auxiliary_arrow":
+        arrows.append([
+            0.160, 0.050, 0.1275, -1.0, 0.0, 0.0,
+            0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0,
+        ])
+    native.annotation.GetPosition = lambda: position
+    native.display.GetDisplayData = lambda: SimpleNamespace(
+        GetArrowHeadCount=lambda: len(arrows),
+        GetArrowHeadAtIndex2=lambda index: arrows[index],
+    )
+    if failure in (None, "auxiliary_arrow"):
+        drawing._assert_land_layout(native.display, projected)
+    else:
+        with pytest.raises(RuntimeError, match="straight.land native") as caught:
+            drawing._assert_land_layout(native.display, projected)
+        message = str(caught.value)
+        if failure == "offset_false" or failure.startswith("text_"):
+            assert f"OffsetText={native.display.OffsetText!r}" in message
+            assert f"actual={tuple(position)!r}" in message
+            assert f"requested={drawing.PIN_LAND_TEXT_XY!r}" in message
+            error = re.search(r"error_m=([^,\s]+)", message)
+            assert error is not None
+            actual_error = float(error.group(1))
+            expected_error = (
+                math.dist(position[:2], drawing.PIN_LAND_TEXT_XY)
+                if len(position) >= 2 and all(math.isfinite(value) for value in position[:2])
+                else math.inf
+            )
+            if math.isinf(expected_error):
+                assert math.isinf(actual_error)
+            else:
+                assert actual_error == pytest.approx(expected_error)
+        else:
+            assert "phase=after-text-offset" in message
+            requested = tuple((drawing.PIN_LAND_LINE_XY[0], y) for _x, y in projected)
+            assert f"requested={requested!r}" in message
+            if failure in ("arrow_short", "arrow_extra_field", "arrow_nonfinite_direction"):
+                assert repr(tuple(arrows[0])) in message
+            else:
+                assert f"actual={tuple(tuple(arrow[:2]) for arrow in arrows)!r}" in message

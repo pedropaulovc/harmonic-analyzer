@@ -28,9 +28,10 @@ class StockRecipeDeclaration:
 # recipe they use and pass its callable in StockComponent. Importing recipes here
 # would make every stock fastener depend on every diagnostic geometry module.
 def stock_recipe(sku: str, *, threaded: bool) -> Callable[[RecipeAuthor], RecipeAuthor]:
-    """Declare a SKU without wrapping its author or introducing a recipe registry."""
+    """Declare the actual SKU; use underscores for hyphens in Python names."""
+    python_sku = sku.replace("-", "_")
     declaration = StockRecipeDeclaration(
-        sku, f"diagnostics.diag_build_{sku}", f"build_{sku}", threaded
+        sku, f"diagnostics.diag_build_{python_sku}", f"build_{python_sku}", threaded
     )
 
     def declare(author: RecipeAuthor) -> RecipeAuthor:

@@ -37,6 +37,7 @@ async def build_purchased_part_drawing(
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
 ) -> dict[str, str]:
     """Front/Top/Right plus Isometric of a purchased part, its note in the footer.
 
@@ -44,6 +45,8 @@ async def build_purchased_part_drawing(
     marks stock its note cuts at assembly. Source identity/read-only state and
     bytes are observed through export and close; this detects mutation, not a
     native source-preservation guarantee.
+    ``title_block_setup`` formats this drawing's existing linked notes after
+    their source resolves and returns the check to repeat after the final rebuild.
     """
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
@@ -76,6 +79,7 @@ async def build_purchased_part_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            title_block_setup=title_block_setup,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
