@@ -175,6 +175,7 @@ def _set_dimension_prefixes(
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
+@_telemetry.traced("drawing.hole_callout_below")
 def _set_hole_callout_below(display: Any, text: str) -> None:
     """Write ``text`` under the native hole callout and read it back.
 
@@ -183,7 +184,8 @@ def _set_hole_callout_below(display: Any, text: str) -> None:
     stay untouched, so the Hole Wizard variables stay associative
     (draw_ch_channel_lever._name_hole_mate)."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    below = definitions[8].rstrip()
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
     updated = f"{below}\n{text}" if below else text
     display.SetText(4, updated)
     if str(display.GetText(8) or "").replace("\r", "") != updated or any(
