@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,7 @@ import pytest
 
 import _config
 import _drawing_common as drawing_common
+import _purchased_title_fit as title_fit
 import _supplier_screw_dimensions as supplier_dimensions
 import _supplier_dimensions as supplier_presentation
 import _supplier_spring_drawing as supplier_drawing
@@ -1627,6 +1629,328 @@ def test_supplier_stock_all_three_keep_native_identity_value_and_attachment_guar
 
 
 @pytest.fixture
+def number_title_native(monkeypatch):
+    """Native-shaped notes/rules and the real canonical fitter, without COM.
+
+    Only the initial horizontal envelope is seeded from bb179's measured PDF.
+    Font heights and height-to-width response below are synthetic controls,
+    not evidence that a particular native rung will repair the actual sheet.
+    """
+    state = SimpleNamespace(
+        properties={"Number": ROW["number"], "Material": "ALLOY STEEL"},
+        notes=[], fit_calls=[], writes=[], rebuilds=[], measurements=[],
+        bindings=[], walks=[], closed=False, rows=1, width=0.061989821,
+        initial_height=0.0048, extent_override=None,
+    )
+
+    def live():
+        assert not state.closed, "Number check touched closed native handles"
+
+    class Annotation:
+        def __init__(self):
+            self.position = (0.310763482, 0.028775844, 0.0)
+            self.format = SimpleNamespace(
+                CharHeight=state.initial_height, TypeFaceName="Arial", LineLength=0.2,
+            )
+            self.use_doc = True
+
+        def GetPosition(self):
+            live()
+            return self.position
+
+        def GetTextFormat(self, index):
+            live()
+            assert index == 0
+            return SimpleNamespace(**vars(self.format))
+
+        def SetTextFormat(self, index, use_doc, text_format):
+            live()
+            assert index == 0 and use_doc is False
+            self.format = SimpleNamespace(**vars(text_format))
+            self.use_doc = use_doc
+            state.writes.append(vars(self.format).copy())
+            return True
+
+        def GetUseDocTextFormat(self, index):
+            live()
+            assert index == 0
+            return self.use_doc
+
+    class Note:
+        def __init__(self, key, link, text):
+            self.key, self.link, self.text = key, link, text
+            self.annotation = Annotation() if key == "Number" else None
+
+        @property
+        def PropertyLinkedText(self):
+            live()
+            return self.link
+
+        def GetText(self):
+            live()
+            assert self.key == "Number", "non-Number resolved text was inspected"
+            return self.text
+
+        def GetNext(self):
+            live()
+            state.walks.append(self.key)
+            index = state.notes.index(self) + 1
+            return state.notes[index] if index < len(state.notes) else None
+
+        def GetAnnotation(self):
+            live()
+            assert self.key == "Number", "non-Number note was fitted"
+            return self.annotation
+
+        def GetExtent(self):
+            live()
+            if state.extent_override is not None:
+                return state.extent_override
+            x, y, z = self.annotation.position
+            height = self.annotation.format.CharHeight
+            return (
+                x, y - height, z,
+                x + state.width * height / state.initial_height, y, z,
+            )
+
+    # Material deliberately uses this drawing's property, not the all-fields
+    # fitter's Material Specification contract. Equal literal text is a decoy.
+    state.notes = [
+        Note("Name", property_link("SW-Title(Title)"), STEM),
+        Note("Material", property_link("Material"), state.properties["Material"]),
+        Note("literal", state.properties["Number"], state.properties["Number"]),
+        Note("Number", property_link("Number"), state.properties["Number"]),
+        Note("REV", property_link("Revision"), "44"),
+    ]
+    state.number = state.notes[3]
+    state.new_number = lambda: Note(
+        "Number", property_link("Number"), state.properties["Number"],
+    )
+    state.rule_points = (
+        ((0.3083506, 0.021), (0.372310091, 0.021)),
+        ((0.3083506, 0.035906), (0.372310091, 0.035906)),
+        ((0.3083506, 0.021), (0.3083506, 0.035906)),
+        ((0.372310091, 0.021), (0.372310091, 0.035906)),
+    )
+
+    def line(start, end):
+        return SimpleNamespace(
+            GetType=lambda: 0,
+            GetStartPoint2=lambda: SimpleNamespace(X=start[0], Y=start[1]),
+            GetEndPoint2=lambda: SimpleNamespace(X=end[0], Y=end[1]),
+        )
+
+    segments = tuple(line(*points) for points in state.rule_points)
+    state.sheet = SimpleNamespace(
+        name="ActualLeadSheet",
+        GetTemplateSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: segments),
+    )
+    state.sheet.GetName = lambda: state.sheet.name
+    state.current_sheet = state.sheet
+    state.sheet_view = SimpleNamespace(
+        GetFirstNote2=lambda: state.notes[0] if state.notes else None,
+    )
+
+    def rebuild():
+        live()
+        state.rebuilds.append(state.number.annotation.format.CharHeight)
+        return True
+
+    state.drawing = SimpleNamespace(
+        GetCurrentSheet=lambda: state.current_sheet,
+        GetFirstView=lambda: state.sheet_view, EditRebuild3=rebuild,
+    )
+    state.adapter = SimpleNamespace(currentModel=state.drawing)
+
+    def early_bound(value, kind):
+        state.bindings.append((value, kind))
+        return value
+
+    def display(adapter, annotation):
+        live()
+        assert adapter is state.adapter and annotation is state.number.annotation
+        state.measurements.append(annotation.format.CharHeight)
+        return {
+            "texts": [{"pos": (0.0, row * 0.004)} for row in range(state.rows)],
+        }, []
+
+    def fit(adapter, drawing, sheet, note, **kwargs):
+        state.fit_calls.append((adapter, drawing, sheet, note, kwargs))
+        return title_fit._fit_title_note(adapter, drawing, sheet, note, **kwargs)
+
+    monkeypatch.setattr(draw, "_early_bound", early_bound)
+    monkeypatch.setattr(title_fit, "_early_bound", early_bound)
+    monkeypatch.setattr(title_fit, "_zoomed_on", lambda *_args: nullcontext())
+    monkeypatch.setattr(title_fit, "annotation_display", display)
+    monkeypatch.setattr(title_fit, "_number_state", lambda *_args: "synthetic native state")
+    monkeypatch.setattr(title_fit._telemetry, "event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(title_fit._telemetry, "info", lambda *_args: None)
+    monkeypatch.setattr(draw, "_fit_title_note", fit)
+    state.run = lambda: draw._fit_number_title_note(
+        state.adapter, expected_number=state.properties["Number"],
+    )
+    return state
+
+
+@pytest.mark.parametrize("font_prefix", ("", "<FONT size=15PTS>"))
+def test_number_title_fits_only_existing_number_with_canonical_contract(
+    number_title_native, font_prefix,
+):
+    state = number_title_native
+    state.number.link = font_prefix + property_link("Number")
+    properties, rules = state.properties.copy(), state.rule_points
+    links = tuple((note.link, note.text) for note in state.notes)
+    assert state.number.GetExtent()[3] > rules[3][0][0]
+    settled = state.run()
+    assert state.fit_calls == [(
+        state.adapter, state.drawing, state.sheet, state.number,
+        {"label": "Number", "minimum": 0.003},
+    )]
+    assert state.walks == ["Name", "Material", "literal", "Number", "REV"]
+    assert (state.number, "INote") in state.bindings
+    assert [row["CharHeight"] for row in state.writes] == pytest.approx([0.0048, 0.0047])
+    assert state.number.GetExtent()[3] <= rules[3][0][0] - 0.0006
+    expected_length = rules[3][0][0] - 0.0006 - state.number.annotation.position[0] - 0.0003
+    assert all(row["LineLength"] == pytest.approx(expected_length) for row in state.writes)
+    assert all(row["TypeFaceName"] == "Arial" for row in state.writes)
+    authored = (len(state.writes), len(state.rebuilds))
+    for _ in range(4):
+        settled()
+    assert (len(state.writes), len(state.rebuilds)) == authored
+    assert state.properties == properties and state.rule_points == rules
+    assert tuple((note.link, note.text) for note in state.notes) == links
+    assert state.current_sheet is state.sheet
+
+
+def test_number_title_uses_already_read_full_source_value_not_literal_identity(
+    number_title_native,
+):
+    state = number_title_native
+    state.number.text = state.properties["Number"] = "COMPLETE-ALTERNATE-SOURCE-NUMBER"
+    state.run()()
+    assert state.number.text == "COMPLETE-ALTERNATE-SOURCE-NUMBER"
+    assert len(state.fit_calls) == 1
+
+
+@pytest.mark.parametrize("fault", ("missing", "duplicate"))
+def test_number_title_requires_exactly_one_owned_property_note(number_title_native, fault):
+    state = number_title_native
+    if fault == "missing":
+        state.notes.remove(state.number)
+    else:
+        state.notes.append(state.new_number())
+    with pytest.raises(RuntimeError, match="requires exactly one source-linked note"):
+        state.run()
+    assert state.fit_calls == state.writes == state.rebuilds == []
+
+
+@pytest.mark.parametrize("link", (
+    '$PRP:"Number"', '$PRPSHEET:"Other"', 'NUMBER $PRPSHEET:"Number"',
+    '$PRPSHEET:"Number" suffix', '$PRPSHEET:"Number"$PRPSHEET:"Material"',
+    '<FONT size=0PTS>$PRPSHEET:"Number"', ROW["number"],
+))
+def test_number_title_rejects_wrong_expression_even_with_exact_resolved_number(
+    number_title_native, link,
+):
+    state = number_title_native
+    state.number.link = link
+    with pytest.raises(RuntimeError, match="requires exactly one source-linked note"):
+        state.run()
+    assert state.fit_calls == state.writes == []
+
+
+@pytest.mark.parametrize("value", (
+    "MHA-CH-06-TL-VN-5", "MHA-CH-06-TL-VN-54 ", "mha-ch-06-tl-vn-54", "",
+))
+def test_number_title_rejects_incomplete_or_changed_resolved_value(number_title_native, value):
+    state = number_title_native
+    state.number.text = value
+    with pytest.raises(RuntimeError, match="source property expression or complete value changed"):
+        state.run()
+    assert state.fit_calls == state.writes == []
+
+
+@pytest.mark.parametrize("fault", ("sheet", "view", "sheet_name", "null_sheet_name"))
+def test_number_title_refuses_missing_native_context(number_title_native, fault):
+    state = number_title_native
+    if fault == "sheet":
+        state.current_sheet = None
+    elif fault == "view":
+        state.sheet_view = None
+    elif fault == "sheet_name":
+        state.sheet.name = ""
+    else:
+        state.sheet.name = None
+    with pytest.raises(RuntimeError, match="has no native sheet"):
+        state.run()
+    assert state.fit_calls == state.writes == []
+
+
+@pytest.mark.parametrize("missing", (False, True))
+def test_number_title_settled_refuses_wrong_sheet_before_reading_number(
+    number_title_native, missing,
+):
+    state = number_title_native
+    settled = state.run()
+    state.current_sheet = None if missing else SimpleNamespace(GetName=lambda: "OtherSheet")
+    counts = (len(state.measurements), len(state.writes), len(state.rebuilds))
+    with pytest.raises(RuntimeError, match="current sheet changed"):
+        settled()
+    assert (len(state.measurements), len(state.writes), len(state.rebuilds)) == counts
+    assert state.current_sheet is not state.sheet  # No silent activation.
+
+
+@pytest.mark.parametrize("fault", (
+    "expression", "resolved", "height", "line_length", "face", "doc_format",
+    "anchor", "overflow", "rows",
+))
+def test_number_title_canonical_settled_check_is_pure_and_rejects_drift(
+    number_title_native, fault,
+):
+    state = number_title_native
+    settled = state.run()
+    annotation = state.number.annotation
+    if fault == "expression":
+        state.number.link = '$PRP:"Number"'
+    elif fault == "resolved":
+        state.number.text = state.number.text[:-1]
+    elif fault == "height":
+        annotation.format.CharHeight = 0.003
+    elif fault == "line_length":
+        annotation.format.LineLength = 0.2
+    elif fault == "face":
+        annotation.format.TypeFaceName = "Other Face"
+    elif fault == "doc_format":
+        annotation.use_doc = True
+    elif fault == "anchor":
+        annotation.position = (0.310863482, 0.028775844, 0.0)
+    elif fault == "overflow":
+        state.extent_override = (0.311, 0.024, 0.0, 0.3724, 0.029, 0.0)
+    else:
+        state.rows = 2
+    authored = (len(state.writes), len(state.rebuilds))
+    with pytest.raises(RuntimeError, match=(
+        "source property expression or complete value changed"
+        if fault in ("expression", "resolved") else "linked title-cell fit did not persist"
+    )):
+        settled()
+    assert (len(state.writes), len(state.rebuilds)) == authored
+
+
+def test_number_title_cannot_fit_below_unchanged_three_mm_floor(number_title_native):
+    state = number_title_native
+    state.width = 0.1
+    properties, rules = state.properties.copy(), state.rule_points
+    with pytest.raises(RuntimeError, match="readable floor 0.003"):
+        state.run()
+    assert state.writes[-1]["CharHeight"] == 0.003
+    assert min(row["CharHeight"] for row in state.writes) == 0.003
+    assert state.properties == properties and state.rule_points == rules
+    assert state.number.link == property_link("Number")
+    assert state.number.text == properties["Number"]
+
+
+@pytest.fixture
 def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
     """Drive the real builder and original formatter through native-like events."""
     state = supplier_stock_presentation
@@ -1635,7 +1959,12 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
     state.lifecycle, state.check_batches = [], []
     state.mutate_at = state.save_failure = None
     state.duplicate_before = state.reenter = False
+    state.number_calls, state.number_mutate_at, state.number_changed = [], None, False
+    state.builder_properties = {
+        "Number": ROW["number"], "Supplier": "supplier", "Supplier SKUs": "sku",
+    }
     state.primary = RuntimeError("native save primary")
+    state.real_number_fit = draw._fit_number_title_note
     original_prepare = draw._prepare_supplier_stock_inset
     original_place = draw.place_view
     original_annotate = draw.annotate_supplier_screw
@@ -1655,6 +1984,8 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
         if state.mutate_at == stage:
             state.settled_displays["SupplierStockLength"].text[4] = ""
             state.lifecycle.append(f"mutate {stage}")
+        if state.number_mutate_at == stage:
+            state.number_changed = True
 
     def prepare(adapter):
         author = original_prepare(adapter)
@@ -1713,9 +2044,28 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
             f"ITEM: {draw.ITEM}\nSUPPLIER: supplier\nSKU: sku"
         ))
 
+    def fit_number(adapter, *, expected_number):
+        # The separate native-shaped fixture exercises the real canonical fit.
+        # Here a pure returned-check spy observes builder/finalizer ordering
+        # without replacing any supplier authoring or presentation proof.
+        assert adapter is state.adapter
+        assert expected_number == state.builder_properties["Number"]
+        assert state.lifecycle[-1] == "detail reset"
+        assert state.events == ["capture"] and state.format_calls == []
+        state.number_calls.append(("fit", tuple(state.lifecycle)))
+
+        def pure():
+            assert not state.closed, "Number check touched closed COM"
+            state.number_calls.append(("check", tuple(state.lifecycle)))
+            if state.number_changed:
+                raise RuntimeError("Number presentation drift")
+
+        return pure
+
     async def finalize(_adapter, outputs, *, settled_checks, checkpoint, **_kwargs):
         state.checkpoint = checkpoint
         reset("finalizer reset")
+        mutate("finalizer")
         for check in settled_checks:
             check()
         assert state.events == ["capture"] and state.format_calls == []
@@ -1748,9 +2098,10 @@ def supplier_stock_lifecycle(monkeypatch, supplier_stock_presentation):
     monkeypatch.setattr(draw, "_prepare_supplier_stock_inset", prepare)
     monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
     monkeypatch.setattr(draw, "place_view", placed)
-    monkeypatch.setattr(draw, "read_required_properties", lambda *_args, **_kwargs: {
-        "Supplier": "supplier", "Supplier SKUs": "sku",
-    })
+    monkeypatch.setattr(
+        draw, "read_required_properties", lambda *_args, **_kwargs: state.builder_properties,
+    )
+    monkeypatch.setattr(draw, "_fit_number_title_note", fit_number)
     monkeypatch.setattr(draw, "new_project_drawing", lambda *_args, **_kwargs: (
         source.drawing, object(),
     ))
@@ -1804,6 +2155,126 @@ class TestSupplierStockLateLifecycle:
         assert state.adapter.currentModel is source.drawing
         assert source.sheet == "OriginalSheet" and source.edit_sheet is True
         assert source.active_view is None
+
+    def test_number_fits_once_before_finalizer_and_checks_only_live_boundaries(
+        self, supplier_stock_lifecycle,
+    ):
+        state = supplier_stock_lifecycle
+        state.builder_properties["Number"] = "COMPLETE-ALTERNATE-SOURCE-NUMBER"
+        state.run()
+        assert [kind for kind, _events in state.number_calls] == ["fit"] + ["check"] * 5
+        assert state.number_calls[0][1] == (
+            "capture", "main reset", "section reset", "detail reset",
+        )
+        snapshots = [events for kind, events in state.number_calls if kind == "check"]
+        assert snapshots[0][-1] == "finalizer reset"
+        assert [events.count("strict") for events in snapshots] == [0, 1, 2, 3, 4]
+        assert snapshots[1][-2:] == ("author", "strict")
+        assert snapshots[2][-2:] == ("drawing save", "strict")
+        assert snapshots[3][-2:] == ("pdf save", "strict")
+        assert snapshots[4][-2:] == ("audit", "strict")
+        assert all("close" not in events and "pdf proof" not in events for events in snapshots)
+        assert state.lifecycle.count("author") == state.events.count("format") == 1
+        assert state.closed and state.lifecycle[-1] == "pdf proof"
+
+    @pytest.mark.parametrize("stage", (
+        "finalizer", "afterauthor", "drawing", "pdf", "beforeclose",
+    ))
+    def test_number_drift_refuses_at_each_boundary_without_refit_or_reauthor(
+        self, supplier_stock_lifecycle, stage,
+    ):
+        state = supplier_stock_lifecycle
+        state.number_mutate_at = stage
+        with pytest.raises(RuntimeError, match="Number presentation drift"):
+            state.run()
+        assert [kind for kind, _events in state.number_calls].count("fit") == 1
+        authors = 0 if stage == "finalizer" else 1
+        assert state.lifecycle.count("author") == state.events.count("format") == authors
+        assert "close" not in state.lifecycle and "pdf proof" not in state.lifecycle
+        assert state.source_state.sheet == "OriginalSheet"
+        assert state.adapter.currentModel is state.source_state.drawing
+
+    @pytest.mark.parametrize("kind", ("drawing", "pdf"))
+    def test_number_after_save_refusal_keeps_primary_native_failure(
+        self, supplier_stock_lifecycle, kind,
+    ):
+        state = supplier_stock_lifecycle
+        state.save_failure = state.number_mutate_at = kind
+        with pytest.raises(RuntimeError) as refused:
+            state.run()
+        assert refused.value is state.primary
+        assert any(
+            f"after_{kind}_save checkpoint also failed" in note
+            and "Number presentation drift" in note
+            for note in refused.value.__notes__
+        )
+        assert state.lifecycle.count("author") == state.events.count("format") == 1
+        assert [event for event, _events in state.number_calls].count("fit") == 1
+        assert "audit" not in state.lifecycle and "pdf proof" not in state.lifecycle
+
+    @pytest.mark.parametrize("stage", (
+        None, "finalizer", "afterauthor", "drawing", "pdf", "beforeclose",
+    ))
+    def test_real_number_contract_replays_through_builder_native_lifecycle(
+        self, number_title_native, supplier_stock_lifecycle, monkeypatch, stage,
+    ):
+        native, state = number_title_native, supplier_stock_lifecycle
+        source = state.source_state
+        native.adapter, native.drawing = state.adapter, source.drawing
+        native.sheet.name = source.sheet
+        native.number.text = state.builder_properties["Number"]
+        original_sheet = source.drawing.GetCurrentSheet
+        fit_events, check_events = [], []
+
+        def current_sheet():
+            assert not state.closed, "Number sheet read touched closed COM"
+            sheet = original_sheet()
+            return native.sheet if sheet.GetName() == native.sheet.name else sheet
+
+        original_fit = draw._fit_title_note
+
+        def fit(*args, **kwargs):
+            fit_events.append(tuple(state.lifecycle))
+            pure = original_fit(*args, **kwargs)
+
+            def check():
+                assert not state.closed, "canonical Number check touched closed COM"
+                check_events.append(tuple(state.lifecycle))
+                if state.number_changed:
+                    native.number.annotation.format.LineLength = 0.2
+                pure()
+
+            return check
+
+        monkeypatch.setattr(source.drawing, "GetCurrentSheet", current_sheet)
+        monkeypatch.setattr(
+            source.drawing, "GetFirstView", lambda: native.sheet_view, raising=False,
+        )
+        monkeypatch.setattr(draw, "_fit_title_note", fit)
+        monkeypatch.setattr(draw, "_fit_number_title_note", state.real_number_fit)
+        state.number_mutate_at = stage
+        if stage is None:
+            state.run()
+            assert [events.count("strict") for events in check_events] == [0, 1, 2, 3, 4]
+            assert state.closed and state.lifecycle[-1] == "pdf proof"
+        else:
+            with pytest.raises(RuntimeError, match="linked title-cell fit did not persist"):
+                state.run()
+            assert "close" not in state.lifecycle and "pdf proof" not in state.lifecycle
+        assert fit_events == [("capture", "main reset", "section reset", "detail reset")]
+        assert len(native.fit_calls) == 1
+        assert native.fit_calls[0][1:4] == (
+            source.drawing, native.sheet, native.number,
+        )
+        assert native.fit_calls[0][4] == {"label": "Number", "minimum": 0.003}
+        # All later checks, including the post-author one, only read the
+        # canonical fit: no formatting or rebuild re-entry repairs the drift.
+        assert len(native.writes) == 2
+        assert all("close" not in events for events in check_events)
+        authors = 0 if stage == "finalizer" else 1
+        assert state.lifecycle.count("author") == state.events.count("format") == authors
+        assert source.sheet == "OriginalSheet"
+        assert state.adapter.currentModel is source.drawing
 
     @pytest.mark.parametrize("stage", ("afterauthor", "drawing", "pdf", "beforeclose"))
     def test_later_text_mutation_is_refused_without_reauthoring(
