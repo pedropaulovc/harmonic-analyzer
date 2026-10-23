@@ -1748,6 +1748,10 @@ def _assert_note_arrow(current: Any, landing: tuple, record: dict) -> None:
             f"arrow_count={len(arrows)}, arrow_lengths={[len(row) for row in arrows[:4]]!r}, "
             f"first_arrow={tuple(arrows[0][:12]) if arrows else ()!r}"
         )
+    # annotation_geometry replaces matching display runs with registered
+    # leaders. Give it this same validated native read, not the collector's
+    # rounded leader points, so intended endpoint contact stays endpoint contact.
+    record["leaders"] = [points]
     text = display_box({"texts": record["display"].get("texts") or ()})
     if text is None or not any(
         len(line) == 10 and all(map(math.isfinite, line))
@@ -1916,17 +1920,34 @@ def _assert_paper_layout(
         )], label="actual source head silhouette stations",
     )
     outline = [Segment(*first, *second) for first, second in zip(head, (*head[1:], head[0]), strict=True)]
-    for run in note_ink.segments:
+    for run_index, run in enumerate(note_ink.segments):
         midpoint = ((run.x0 + run.x1) / 2, (run.y0 + run.y1) / 2)
         crosses = [
             (edge.x1 - edge.x0) * (midpoint[1] - edge.y0)
             - (edge.y1 - edge.y0) * (midpoint[0] - edge.x0) for edge in outline
         ]
-        if min(crosses) > 1e-12 or any(
-            (point := _segment_crossing(run, edge)) is not None and math.dist(point, landing) > 1e-8
-            for edge in outline
-        ) or _segment_enters_box(run, body):
-            raise RuntimeError("Purchased Screw Note: actual leader enters projected head/Top body")
+        intersections = [
+            (index, point, math.dist(point, landing))
+            for index, edge in enumerate(outline)
+            if (point := _segment_crossing(run, edge)) is not None
+        ]
+        inside_head = min(crosses) > 1e-12
+        crosses_head = any(distance > 1e-8 for _index, _point, distance in intersections)
+        enters_top = _segment_enters_box(run, body)
+        if inside_head or crosses_head or enters_top:
+            native_display = note_record["display"]
+            raise RuntimeError(
+                "Purchased Screw Note: actual leader enters projected head/Top body; "
+                f"run_index={run_index}, role={run.role!r}, "
+                f"endpoints={(run.x0, run.y0, run.x1, run.y1)!r}, midpoint={midpoint!r}, "
+                f"inside_head={inside_head}, crosses_head={crosses_head}, enters_top={enters_top}, "
+                f"head={head!r}, signed_crosses={crosses!r}, intersections={intersections!r}, "
+                f"landing={landing!r}, top_box={body!r}, "
+                f"registered_leaders={note_record['leaders']!r}, "
+                f"native_arrows={native_display['arrows']!r}, "
+                f"native_line_count={len(native_display['lines'])}, "
+                f"native_lines={native_display['lines'][:4]!r}"
+            )
 
 
 async def build(adapter: Any) -> dict[str, str]:

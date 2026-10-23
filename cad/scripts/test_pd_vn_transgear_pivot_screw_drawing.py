@@ -2992,10 +2992,16 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         length = math.hypot(dx, dy)
         arrow = [*state.landing, 0.0, dx / length, dy / length, 0.0,
                  0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
-        return dict(type=6, name="Purchased note", visible=1, owner_type=0, display=dict(
-            texts=rows, lines=[] if state.note_ink_missing else [_native_line(start, state.landing)],
-            arrows=[] if state.note_ink_missing else [list(arrow) for _ in range(state.note_arrow_count)],
-        ))
+        # The real collector rounds registered leaders independently of the
+        # display primitives. The native point getter above remains unrounded.
+        return dict(
+            type=6, name="Purchased note", visible=1, owner_type=0,
+            leaders=[[round(float(value), 7) for value in state.note_annotation.GetLeaderPointsAtIndex(0)]],
+            display=dict(
+                texts=rows, lines=[] if state.note_ink_missing else [_native_line(start, state.landing)],
+                arrows=[] if state.note_ink_missing else [list(arrow) for _ in range(state.note_arrow_count)],
+            ),
+        )
     state.note_annotation.paper_record = note_record
     def note_display_data():
         # Native doubles are independent of the audit dump's serialization.
@@ -3613,7 +3619,39 @@ def test_cold_tail_cannot_keep_box_but_drop_native_minimum_acceptance_wording(mo
 
 
 @pytest.mark.parametrize("phase", ("settled", "saved"))
-@pytest.mark.parametrize("fault", ("none", "native_arrow_tip", "native_line_tip"))
+def test_complete_native_note_ink_still_refuses_actual_head_body_intrusion(
+    monkeypatch, tmp_path, phase,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    inside = drawing.model_points_in_view(
+        state.adapter, state.front,
+        [(-0.000125, screw.HEAD_H / 2000, 0.0), (0.000125, screw.HEAD_H / 2000, 0.0)],
+        label="actual source head interior negative",
+    )
+    original_record = state.note_annotation.paper_record
+    def inside_stroke():
+        record = original_record()
+        record["display"]["lines"].append(_native_line(*inside))
+        return record
+    state.note_annotation.paper_record = inside_stroke
+    with pytest.raises(RuntimeError, match="actual leader enters projected head/Top body"):
+        if phase == "saved":
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+        else:
+            state.adapter.currentModel = state.saved
+            state.note_check()
+            drawing._assert_paper_layout(
+                state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+                state.paper_displays, purchased_text=state.note_text,
+            )
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("fault", ("none", "native_arrow_tip", "native_line_tip", "native_registered_tip"))
 def test_native_note_precision_cannot_be_replaced_by_rounded_paper(
     monkeypatch, tmp_path, phase, fault,
 ):
@@ -3640,6 +3678,13 @@ def test_native_note_precision_cannot_be_replaced_by_rounded_paper(
         )
         state.paper["wrap"] = state.note_frame
         state.adapter.currentModel = state.previous
+    elif fault == "native_registered_tip":
+        original_points = state.note_annotation.GetLeaderPointsAtIndex
+        def wrong_native_registered_tip(index):
+            points = list(original_points(index))
+            points[4] += 2e-8
+            return points
+        state.note_annotation.GetLeaderPointsAtIndex = wrong_native_registered_tip
     else:
         original_record = state.note_annotation.paper_record
         def wrong_native_tip():
@@ -3661,13 +3706,19 @@ def test_native_note_precision_cannot_be_replaced_by_rounded_paper(
                 ]
         return record
     monkeypatch.setattr(drawing, "_dump_annotation", rounded_dump)
-    expected = drawing._purchased_head_target(state.adapter, state.front)[1]
+    # Independent source dimensions and the actual native origin, not the
+    # recipe's target helper or the rounded leader's own coordinates.
+    expected = (
+        0.140 - (screw.HEAD_DIA / 2 - screw.HEAD_CHAMFER) * 4 / 1000,
+        (0.186285034189251 if fault == "none" else 0.186285) + screw.HEAD_H * 4 / 1000,
+    )
     reported = drawing._paper_annotation(
         state.adapter, state.note_annotation, label="Purchased Screw Note",
-    )["display"]
+    )
     reported_errors = (
-        math.dist(reported["arrows"][0][:2], expected),
-        math.dist(reported["lines"][0][7:9], expected),
+        math.dist(reported["display"]["arrows"][0][:2], expected),
+        math.dist(reported["display"]["lines"][0][7:9], expected),
+        math.dist(reported["leaders"][0][3:5], expected),
     )
     if fault == "none":
         assert all(error > 1e-8 for error in reported_errors)
