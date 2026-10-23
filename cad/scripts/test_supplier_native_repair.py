@@ -779,6 +779,7 @@ def test_washer_refuses_unavailable_measured_paint_instead_of_estimated_text(mon
 def _retained_washer_layout(monkeypatch, scope):
     from test_purchased_fastener_drawing import _washer_import_native
     import _supplier_washer_drawing as washer
+    from _supplier_reference_text import measure_reference_text
 
     captures = json.loads(Path(__file__).with_name("test_supplier_washer_native_paint.json").read_text())
     captured = captures["cases"][scope]
@@ -805,9 +806,46 @@ def _retained_washer_layout(monkeypatch, scope):
             item.native.Tolerance.GetMinValue = lambda deviation=(lower - value) / 1000: deviation
             item.native.Tolerance.GetMaxValue = lambda deviation=(upper - value) / 1000: deviation
         case.paint[label].record = copy.deepcopy(captured["records"][label])
-    # These captures are the settled exported sheets, where the thickness
-    # already uses OffsetText. Replaying them must not move its witnesses.
-    case.imports[washer.THICKNESS].display.OffsetText = True
+    # Retain the actual exported phase, including its True native mode and
+    # complete connector/underline paint. It is not a fresh authoring seed.
+    thick = washer.THICKNESS
+    case.retained_thickness = SimpleNamespace(
+        phase="retained-export", record=copy.deepcopy(captured["records"][thick]),
+        offset_text=True,
+    )
+    display = case.imports[thick].display
+    display.OffsetText = case.retained_thickness.offset_text
+    retained = measure_reference_text(case.adapter, display, axis=1, label=thick)
+    case.retained_thickness.stations = retained
+    record = case.paint[thick].record
+    lines = record["display"]["lines"]
+    texts = record["display"]["texts"]
+    # These retained captures have exactly one complete offset text path after
+    # their four physical runs. Prove its raw endpoints before deriving the
+    # pre-offset paint; no arbitrary physical primitive may be discarded.
+    assert len(lines) == 6
+    support = retained["tips"][0][0]
+    assert retained["tips"][1][0] == support
+    midpoint = (support, sum(tip[1] for tip in retained["tips"]) / 2)
+    baseline = (min(text["pos"][0] for text in texts),
+                min(text["pos"][1] for text in texts))
+    advance = (max(text["pos"][0] + text["w"] for text in texts), baseline[1])
+    assert tuple(lines[4][4:6]) == pytest.approx(midpoint, abs=1e-7, rel=0)
+    assert tuple(lines[4][7:9]) == pytest.approx(baseline, abs=1e-7, rel=0)
+    assert tuple(lines[5][4:6]) == pytest.approx(baseline, abs=1e-7, rel=0)
+    assert tuple(lines[5][7:9]) == pytest.approx(advance, abs=1e-7, rel=0)
+    del lines[4:]
+    # Like the saved fixture's explicit authoring reset, derive only native
+    # phase state. The false-mode anchor must already be on arrow support:
+    # seeding it from the retained transverse anchor would move physical ink.
+    record["pos"][0] = support
+    display.OffsetText = False
+    case.paint[thick].settled_offset = False
+    fresh = measure_reference_text(case.adapter, display, axis=1, label=thick)
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
+        assert fresh[field] == retained[field]
+    assert record["display"]["texts"] == case.retained_thickness.record["display"]["texts"]
+    assert record["display"]["arrows"] == case.retained_thickness.record["display"]["arrows"]
     for orientation, outline in captured["view_outlines"].items():
         case.views[orientation].GetOutline = lambda outline=outline: tuple(outline)
     return case, captured
@@ -818,13 +856,19 @@ def _retained_washer_layout(monkeypatch, scope):
 ))
 def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
     from _layout_audit import display_box
-    from _supplier_screw_layout import supplier_top_text_geometry
+    from _supplier_reference_text import measure_reference_text
 
     case, captured = _retained_washer_layout(monkeypatch, scope)
     outer, thick = case.helper.OUTER_DIAMETER, case.helper.THICKNESS
     before_source = _washer_source_state(case)
     before = copy.deepcopy(case.paint[outer].record)
-    before_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    assert case.retained_thickness.phase == "retained-export"
+    assert case.retained_thickness.offset_text is True
+    assert case.retained_thickness.record == captured["records"][thick]
+    assert case.imports[thick].display.OffsetText is False
+    before_station = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     face = case.views["*Top" if captured["axis"] == "y" else "*Front"]
     assert display_box({"texts": before["display"]["texts"]}).xmin < face.GetOutline()[2]
 
@@ -839,9 +883,14 @@ def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbor
         (row["t"], row["w"], row["h"]) for row in before["display"]["texts"]
     ]
     assert case.imports[outer].display.OffsetText is False
-    after_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
-    for field in ("tips", "witnesses", "physical_lines"):
+    after_station = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
         assert after_station[field] == before_station[field]
+        assert after_station[field] == case.retained_thickness.stations[field]
+    assert after_station["text"].ymin >= after_station["reach"] + .002
+    assert case.retained_thickness.record == captured["records"][thick]
     bounds = tuple(value * 1000 for value in (box.xmin, box.ymin, box.xmax, box.ymax))
     left, bottom, right, top = captured["printable_mm"]
     assert left <= bounds[0] < bounds[2] <= right
@@ -854,9 +903,14 @@ def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbor
 
 def test_washer_final_consumer_refuses_actual_r50_od_strike_after_other_guards_pass(monkeypatch):
     from _layout_audit import display_box
+    from _supplier_reference_text import measure_reference_text
 
     case, captured = _retained_washer_layout(monkeypatch, "ch-thrust")
     outer = case.helper.OUTER_DIAMETER
+    thick = case.helper.THICKNESS
+    assert case.retained_thickness.offset_text is True
+    assert case.retained_thickness.record == captured["records"][thick]
+    assert case.imports[thick].display.OffsetText is False
     old = copy.deepcopy(case.paint[outer].record)
     point = tuple(value / 1000 for value in captured["observed_od_contact_mm"])
     old_box = display_box({"texts": old["display"]["texts"]})
@@ -865,12 +919,19 @@ def test_washer_final_consumer_refuses_actual_r50_od_strike_after_other_guards_p
     before = _washer_source_state(case)
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
+    thickness = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
+        assert thickness[field] == case.retained_thickness.stations[field]
+    assert thickness["text"].ymin >= thickness["reach"] + .002
     new_box = display_box({"texts": case.paint[outer].record["display"]["texts"]})
     assert new_box.xmin > point[0]
     case.paint[outer].record = old
     with pytest.raises(RuntimeError):
         settled()
     assert _washer_source_state(case) == before
+    assert case.retained_thickness.record == captured["records"][thick]
 
 
 @pytest.mark.parametrize("label", ("supplier outer diameter", "supplier bore diameter"))
