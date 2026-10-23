@@ -27,7 +27,7 @@ keeps the first that every guard passes. A guard failure refuses the sheet.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import partial
 import math
@@ -263,17 +263,37 @@ def _move_text(
         raise RuntimeError(f"{label}: text placement was rejected")
 
 
-def lines_through_own_text(records: Mapping[str, Mapping[str, Any]]) -> list[str]:
-    """The layout audit's own-text finder over these dimensions' native ink."""
+def lines_through_own_text(
+    records: Mapping[str, Mapping[str, Any]], names: Iterable[str] | None = None
+) -> list[str]:
+    """The layout audit's own-text finder over the named dimensions' native ink.
+
+    The glyph advance is calibrated over every record given, as the sheet audit
+    calibrates over the sheet. The single-run height texts have no exact width
+    sample, so alone they fall back to the 0.62 default, which boxes
+    "(0.005 in)" 1.1 mm past its native width onto its own offset leg: run
+    054fe692 refused the pass-1 geometry the sheet audit had passed. The two
+    diameter rows supply exact samples (0.43 on run 86053b8e's records).
+    """
     advance = calibrate_sheet_advance(tuple(records.values()))
+    wanted = set(records if names is None else names)
     sheet = SimpleNamespace(
         name=supplier_spec.SKU,
         annotations=[
             annotation_geometry(record, owner="view", advance=advance)
-            for record in records.values()
+            for name, record in records.items()
+            if name in wanted
         ],
     )
     return [finding.detail for finding in find_lines_through_own_text(sheet)]
+
+
+def _size_records(adapter: Any, displays: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        name: _text_record(adapter, displays[name], label=name)
+        for sides in TEXT_SIDES.values()
+        for name in sides
+    }
 
 
 def _segments(record: Mapping[str, Any]) -> list[tuple[tuple[float, float], ...]]:
@@ -403,10 +423,7 @@ def _assert_heights(
     displays: Mapping[str, Any],
     stations: Mapping[str, Mapping[str, Any]],
 ) -> None:
-    records = {
-        name: _text_record(adapter, displays[name], label=name)
-        for name in TEXT_SIDES["free_front"]
-    }
+    records = _size_records(adapter, displays)
     for name, side in TEXT_SIDES["free_front"].items():
         geometry = supplier_top_text_geometry(records[name], horizontal=False)
         if displays[name].OffsetText is not True or not stations_match(
@@ -414,7 +431,7 @@ def _assert_heights(
         ):
             raise RuntimeError(f"{name}: offset text moved its native lines")
         assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
-    struck = lines_through_own_text(records)
+    struck = lines_through_own_text(records, TEXT_SIDES["free_front"])
     if struck:
         raise RuntimeError(
             f"{supplier_spec.SKU}: size text struck by its own line: {struck}"
@@ -427,20 +444,20 @@ def _assert_diameters(
     plan: tuple[float, float, float, float],
     placement: PlanPlacement,
 ) -> None:
-    records = {
-        name: _text_record(adapter, displays[name], label=name)
-        for name in placement.sides
-    }
+    records = _size_records(adapter, displays)
     for name, side in placement.sides.items():
         assert_diameter_ink(
             records[name], plan, side, label=f"{supplier_spec.SKU} {name}"
         )
     assert_plan_leaders(
-        {name: dimension_segments(displays[name].GetAnnotation()) for name in records},
+        {
+            name: dimension_segments(displays[name].GetAnnotation())
+            for name in placement.sides
+        },
         plan,
         label=f"{supplier_spec.SKU} plan diameters",
     )
-    struck = lines_through_own_text(records)
+    struck = lines_through_own_text(records, placement.sides)
     if struck:
         raise RuntimeError(
             f"{supplier_spec.SKU}: size text struck by its own line: {struck}"
