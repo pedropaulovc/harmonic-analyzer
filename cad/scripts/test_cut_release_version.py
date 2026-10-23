@@ -748,7 +748,7 @@ def feature_release(
 ) -> Path:
     """Real registry, scene/member coverage, certified copies, feature gates and ZIP.
 
-    Only producer/native-source identity and unrelated release content are fake.
+    Only producer/native-source identity, host metadata and unrelated content are fake.
     Every declared feature part keeps its real members: their scene mesh keys,
     physical neutral paths and certificate must agree before later gates run.
     All output roots are temporary; subprocesses, publication and render/build
@@ -760,6 +760,8 @@ def feature_release(
     from test_features_bound import bound_output
 
     # Install refusals before generating data or allowing bundle() past coverage.
+    # platform.platform() may shell out to uname on uncached POSIX hosts.
+    monkeypatch.setattr(cut_release.platform, "platform", lambda: "offline fixture platform")
     for name in ("run", "Popen"):
         monkeypatch.setattr(subprocess, name, _refuse_release_host_action)
     for name in ("publish", "render_diff", "extract_release_pdfs", "_start_release_log"):
