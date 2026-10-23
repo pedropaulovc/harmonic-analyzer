@@ -202,8 +202,15 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     assert stock_min == pytest.approx(199.2)
     assert last_center_max == pytest.approx(198.6)
     assert stock_min - (last_center_max + values["Tick0Width"] / 2.0) == pytest.approx(0.40)
-    # Any groove up to 1.20 wide (3x the 0.40 minimum) keeps the last tick whole.
+    # Any groove up to 1.20 wide (3x the 0.40 minimum) keeps the last tick whole;
+    # the stated 0.62 MAX stays inside that and keeps neighbours apart on the
+    # 1.42 minor pitch even with both stations at their band.
     assert 2.0 * (stock_min - last_center_max) == pytest.approx(1.20)
+    assert spec.GRADUATION_WIDTH_MAX_MM < 2.0 * (stock_min - last_center_max)
+    land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
+    assert land_min == pytest.approx(0.70)
+    assert spec.GRADUATION_WIDTH_CALLOUT == "0.62 MAX ON 1.42 PITCH"
+    assert drawing.DIMENSION_CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
     last_edge_nominal = (
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
@@ -227,6 +234,9 @@ def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
     assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE 2.0 MIN"
     assert drawing.DIMENSION_CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
+    # The V depth states the same stock under it, so it is bounded too.
+    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"].endswith(spec.NUMERAL_FLOOR_CALLOUT)
+    assert spec.NUMERAL_FLOOR_CALLOUT == "STOCK UNDER 2.0 MIN"
     depth_max = values["BodyThickness"] - bands["BodyThickness"] - spec.GRADUATION_FLOOR_MIN_MM
     assert depth_max == pytest.approx(0.90)
     assert values["TickDepth"] == pytest.approx(0.50)
@@ -763,8 +773,8 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
     assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.5)
     assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
-    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"] == (
-        "NUMERAL DEPTH\n30° INCLUDED V\nHOLDS ENAMEL FILL")
+    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"].splitlines()[:3] == [
+        "NUMERAL DEPTH", "30° INCLUDED V", "HOLDS ENAMEL FILL"]
     assert not hasattr(spec, "NUMERAL_TOOL_NOTE")
     assert not hasattr(drawing, "NUMERAL_TOOL_NOTE_XY")
 
@@ -864,7 +874,7 @@ def _patch_cut_bookkeeping(monkeypatch, names):
 
 
 def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> None:
-    v = spec.NUMERAL_FIRST_LAYER_VOLUME_MM3
+    v = spec.NUMERAL_LAYER_VOLUMES_MM3[0]
     # Keyed (reversed, Ddir1, drafted): Ddir1 False flares (2x), Ddir1 True is
     # the V -- the volume, not the flag, decides.
     seat = _CutSeat({(True, False, True): 3.35 * v / 1.56, (True, True, True): v})
@@ -907,6 +917,16 @@ def test_numeral_readback_requires_one_draft_sense(monkeypatch) -> None:
     monkeypatch.setattr(builder, "_assert_one_numeral_cut", lambda adapter, name: next(senses))
     with pytest.raises(RuntimeError, match="disagree on draft direction"):
         builder._assert_numeral_cut(object())
+
+
+@pytest.mark.parametrize("proved", [None, True, False])
+def test_numeral_readback_holds_the_volume_proved_sense(monkeypatch, proved) -> None:
+    monkeypatch.setattr(builder, "_assert_one_numeral_cut", lambda adapter, name: True)
+    if proved is False:
+        with pytest.raises(RuntimeError, match="sense flipped"):
+            builder._assert_numeral_cut(object(), proved)
+    else:
+        assert builder._assert_numeral_cut(object(), proved) is True
 
 
 @pytest.mark.parametrize("definition,message", [
@@ -957,6 +977,8 @@ def test_numeral_definition_is_proved_after_drives_and_final_save() -> None:
     assert isinstance(after_save, ast.Expr) and isinstance(after_save.value, ast.Call)
     assert isinstance(after_save.value.func, ast.Name)
     assert after_save.value.func.id == "_assert_numeral_cut"
+    # ...against the sense read when the per-layer volumes proved the V.
+    assert [ast.unparse(arg) for arg in after_save.value.args] == ["adapter", "numeral_sense"]
 
 
 @pytest.mark.parametrize("refusal", ["surface", "partial", "parent-scale", "scale", "centering"])
@@ -1027,8 +1049,8 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     # The V depth callout (placed by its centre) sits between detail F's circle
     # and the section, its dimension line level with the V grooves.
     depth_x, depth_y = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"]
-    half_text = len("HOLDS ENAMEL FILL") * 0.00275 / 2.0
-    assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.008
+    half_text = max(map(len, drawing.DIMENSION_CALLOUTS["NumeralDepth"].splitlines())) * 0.00275 / 2.0
+    assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.005
     assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020
     # The cutting line misses every graduation.

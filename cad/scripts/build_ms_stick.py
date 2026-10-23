@@ -95,7 +95,7 @@ from ms_stick_spec import (
     NUMERAL_HEIGHT_MM,
     NUMERAL_GAP_MM,
     NUMERAL_DEPTH,
-    NUMERAL_FIRST_LAYER_VOLUME_MM3,
+    NUMERAL_LAYER_VOLUMES_MM3,
     NUMERAL_V_INCLUDED_ANGLE_DEG,
     NUMERAL_VOLUME_MM3,
     REFERENCE_DIMENSIONS,
@@ -147,13 +147,19 @@ def _assert_one_numeral_cut(adapter, name: str) -> bool:
     return bool(definition.GetDraftOutward(True))
 
 
-def _assert_numeral_cut(adapter) -> None:
-    """Read every native numeral cut's depth and V draft, including after the
-    final save: all layers keep the one draft sense the first layer's removed
-    volume proved inward."""
+def _assert_numeral_cut(adapter, proved: bool | None = None) -> bool:
+    """Read every native numeral cut's depth and V draft; returns their one
+    draft sense. Pass ``proved``, the sense read right after the per-layer
+    volumes proved the V inward, to require it after drives and the save."""
     senses = {name: _assert_one_numeral_cut(adapter, name) for name in numeral_feature_names()}
     if len(set(senses.values())) != 1:
         raise RuntimeError(f"numeral cuts disagree on draft direction: {senses}")
+    sense = next(iter(senses.values()))
+    if proved is not None and sense != proved:
+        raise RuntimeError(
+            f"numeral draft sense flipped from the volume-proved {proved} to {sense}"
+        )
+    return sense
 
 
 # FeatureCut3 forms tried on the first stroke layer, in order. On the 2026
@@ -212,8 +218,10 @@ async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     if isinstance(feature, Exception):
         result = str(feature)
     else:
-        removed = pre - await _volume_mm3(adapter)
-        adapter.currentModel.EditUndo2(1)
+        try:
+            removed = pre - await _volume_mm3(adapter)
+        finally:  # undo the probe even if the measurement fails
+            adapter.currentModel.EditUndo2(1)
         result = f"created, removed {removed:.4f} mm^3"
     _telemetry.info(f"V cut probe on {sketch_name}: {result}")
     return result
@@ -230,7 +238,7 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
             tried.append(f"{label}: {feature}")
             continue
         removed = pre - await _volume_mm3(adapter)
-        expected = NUMERAL_FIRST_LAYER_VOLUME_MM3
+        expected = NUMERAL_LAYER_VOLUMES_MM3[0]
         if abs(removed - expected) <= NUMERAL_VOLUME_REL_TOL * expected:
             _telemetry.info(f"V cut form: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
             return args
@@ -248,7 +256,7 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
     for label, args in probes.items():
         tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
     raise RuntimeError(
-        f"no FeatureCut3 form removed the first layer's {NUMERAL_FIRST_LAYER_VOLUME_MM3:.4f} mm^3 V: "
+        f"no FeatureCut3 form removed the first layer's {NUMERAL_LAYER_VOLUMES_MM3[0]:.4f} mm^3 V: "
         + "; ".join(tried)
     )
 
@@ -672,7 +680,9 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(f"numerals DXF not found: {path}")
     pre = await _volume_mm3(adapter)
     cut_form = None  # found (and volume-proved) on the first layer
-    for path, name in zip(NUMERAL_LAYER_DXFS, numeral_feature_names(), strict=True):
+    for path, name, layer_volume in zip(
+        NUMERAL_LAYER_DXFS, numeral_feature_names(), NUMERAL_LAYER_VOLUMES_MM3, strict=True
+    ):
         check(
             f"import {path.name}",
             await adapter.import_dxf_dwg(
@@ -689,9 +699,13 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, f"{name}Sketch")
+        layer_pre = await _volume_mm3(adapter)
         cut_form = await _cut_numerals(adapter, drive_jobs, name, cut_form)
+        # Each layer on its own: a stroke dropped from a small later layer
+        # hides inside the combined allowance.
+        _check_numeral_volume(name, layer_pre - await _volume_mm3(adapter), layer_volume)
     _check_numeral_volume("all numerals", pre - await _volume_mm3(adapter), NUMERAL_VOLUME_MM3)
-    _assert_numeral_cut(adapter)
+    numeral_sense = _assert_numeral_cut(adapter)
 
     await apply_material(adapter, MATERIAL)
 
@@ -707,7 +721,7 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    _assert_numeral_cut(adapter)
+    _assert_numeral_cut(adapter, numeral_sense)
     await volume_check(
         adapter, "driven measuring-stick (equations neutral)", v_built, 0.005 * v_built
     )
@@ -763,7 +777,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _hide_manufacturing_chords(adapter)
     outputs = await save_part_and_images(adapter, PART_NAME)
-    _assert_numeral_cut(adapter)
+    _assert_numeral_cut(adapter, numeral_sense)
     return outputs
 
 

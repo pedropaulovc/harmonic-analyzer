@@ -119,7 +119,10 @@ def test_pinned_bbox_and_volumes_match_the_generator():
     for got, want in zip((s["x0"], s["y0"], s["x1"], s["y1"]), part.NUMERALS_BBOX, strict=True):
         assert abs(got - want) < 0.001, (s, part.NUMERALS_BBOX)
     assert abs(s["volume_mm3"] - part.NUMERAL_VOLUME_MM3) < 1e-3, s
-    assert abs(s["first_layer_volume_mm3"] - part.NUMERAL_FIRST_LAYER_VOLUME_MM3) < 1e-3, s
+    assert len(s["layer_volumes_mm3"]) == len(part.NUMERAL_LAYER_VOLUMES_MM3)
+    for got, want in zip(s["layer_volumes_mm3"], part.NUMERAL_LAYER_VOLUMES_MM3, strict=True):
+        assert abs(got - want) < 1e-3, s
+    assert abs(sum(part.NUMERAL_LAYER_VOLUMES_MM3) - part.NUMERAL_VOLUME_MM3) < 1e-3
 
 
 def test_first_layer_volume_is_the_closed_form_v():
@@ -134,7 +137,7 @@ def test_first_layer_volume_is_the_closed_form_v():
             return (a - 2.0 * z * slope) * (b - 2.0 * z * slope)
 
         exact += depth / 6.0 * (area(0.0) + area(depth) + 4.0 * area(depth / 2.0))
-    assert abs(exact - part.NUMERAL_FIRST_LAYER_VOLUME_MM3) < 1e-3, exact
+    assert abs(exact - part.NUMERAL_LAYER_VOLUMES_MM3[0]) < 1e-3, exact
 
 
 def test_glyph_polylines_basic_shapes():

@@ -270,6 +270,13 @@ def removed_volume(rects: list[Ring]) -> float:
     return total
 
 
+def layer_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
+    """Each layer's removal over the layers cut before it (they overlap)."""
+    cumulative = [removed_volume([rect for layer in split[:i + 1] for rect in layer])
+                  for i in range(len(split))]
+    return tuple(after - before for before, after in zip([0.0, *cumulative], cumulative, strict=False))
+
+
 def _clusters(rects: list[Ring]) -> list[list[Ring]]:
     """Rectangles grouped by numeral (numerals are far apart along X)."""
     groups: list[list[Ring]] = []
@@ -294,7 +301,7 @@ def summary() -> dict[str, float | int]:
     return {
         "strokes": len(rects),
         "layers": len(split),
-        "first_layer_volume_mm3": removed_volume(split[0]),
+        "layer_volumes_mm3": layer_volumes(split),
         "volume_mm3": removed_volume(rects),
         "x0": x0,
         "y0": y0,
@@ -315,7 +322,7 @@ def main() -> int:
         print(f"wrote {path} ({len(data)} bytes)")
     s = summary()
     print(f"strokes {s['strokes']} in {s['layers']} layers")
-    print(f"removed volume {s['volume_mm3']:.4f} mm^3 (first layer {s['first_layer_volume_mm3']:.4f})")
+    print(f"removed volume {s['volume_mm3']:.4f} mm^3 (by layer {', '.join(f'{v:.4f}' for v in s['layer_volumes_mm3'])})")
     print(f"bbox x {s['x0']:.4f}..{s['x1']:.4f}  y {s['y0']:.4f}..{s['y1']:.4f}")
     return 0
 

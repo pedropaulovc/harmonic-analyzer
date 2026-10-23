@@ -58,7 +58,9 @@ NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * math.tan(
 )
 NUMERALS_BBOX = (57.300, 1.721, 197.700, 4.400)
 NUMERAL_VOLUME_MM3 = 2.6526
-NUMERAL_FIRST_LAYER_VOLUME_MM3 = 1.5603
+# Each stroke layer's V removal over the layers cut before it (layers overlap
+# at stroke joints): gen_ms_stick_numerals_dxf.summary()["layer_volumes_mm3"].
+NUMERAL_LAYER_VOLUMES_MM3 = (1.5603, 0.9996, 0.0927)
 
 # Width and thickness give the sliding clearance in the 8.4 x 3.4 stop
 # rebate; graduation positions set the amplitude-bar stations through the
@@ -67,13 +69,19 @@ NUMERAL_FIRST_LAYER_VOLUME_MM3 = 1.5603
 # 199.2 shortest bar still keeps the last tick whole (0.375 land past a 0.40
 # groove). Graduation width and both engraving depths name no mate, so they
 # are single "n.nn MIN" limits that hold the enamel fill (coordinator ruling
-# 2026-10-23); the graduation depth's ceiling is the stated 2.0 of stock left
-# under the groove (bar 2.90 MIN, so the deepest groove is 0.90).
+# 2026-10-23). Their ceilings are stated facts, not bands (coordinator ruling
+# 2026-10-23, on codjiflo's #1905 review): the graduation width stays 0.62 MAX
+# on the 1.42 minor pitch, so neighbouring grooves never merge and the last
+# one stays on the shortest bar; both depths leave the stated 2.0 of stock
+# under them (bar 2.90 MIN, so the deepest groove or V is 0.90).
 TITLE_BLOCK_X_TOLERANCE_MM = 0.8
 BODY_FIT_TOLERANCE_MM = 0.1
 GRADUATION_POSITION_TOLERANCE_MM = 0.05
 GRADUATION_FLOOR_MIN_MM = 2.0
 GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {GRADUATION_FLOOR_MIN_MM:.1f} MIN"
+NUMERAL_FLOOR_CALLOUT = f"STOCK UNDER {GRADUATION_FLOOR_MIN_MM:.1f} MIN"
+GRADUATION_WIDTH_MAX_MM = 0.62
+GRADUATION_WIDTH_CALLOUT = f"{GRADUATION_WIDTH_MAX_MM:.2f} MAX ON {MINOR_SPACING:.2f} PITCH"
 # swTolType_e.swTolMIN prints the nominal plus MIN: the model value is the
 # printed minimum. (lower, upper) deviations are the stored readback pair.
 MIN_LIMIT_TOL_TYPE = 5

@@ -128,12 +128,12 @@ NUMERAL_KEEP = {
 }
 DEPTH_KEEP = {"TickDepth": (0.380, 0.175)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.231, 0.138)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
 DIMENSION_CALLOUTS = {
     "BodyWidth": STOP_REBATE_FIT,
     "BodyThickness": STOP_REBATE_FIT,
     "ScaleStartX": f"SCALE ZERO CENTRELINE\n{AMPLITUDE_STATIONS}",
-    "Tick0Width": f"ALL GRADUATIONS\n{ENAMEL}",
+    "Tick0Width": f"ALL GRADUATIONS\n{ENAMEL}\n{part.GRADUATION_WIDTH_CALLOUT}",
     "TickDepth": f"GRADUATIONS ONLY, SQUARE-BOTTOM\n{ENAMEL}\n{part.GRADUATION_FLOOR_CALLOUT}",
     "FullTickLength": "FULL TICKS",
     "MinorTickLength": "MINOR TICKS",
@@ -143,7 +143,10 @@ DIMENSION_CALLOUTS = {
     "NumeralHeight": "NUMERAL HEIGHT",
     "NumeralXGap": "NUMERAL TO TICK EDGE",
     "NumeralYGap": "NUMERAL TO FULL-TICK END",
-    "NumeralDepth": f"NUMERAL DEPTH\n{part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{ENAMEL}",
+    "NumeralDepth": (
+        f"NUMERAL DEPTH\n{part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{ENAMEL}\n"
+        f"{part.NUMERAL_FLOOR_CALLOUT}"
+    ),
 }
 
 
