@@ -77,7 +77,7 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
 FRONT_CENTER = (0.100, 0.1805)
-ISO_CENTER = (0.310, 0.213)
+ISO_CENTER = (0.310, 0.209)
 # The settled front view's native outline is the 31.3 part plus SolidWorks'
 # boundary pad: 0.0848 half-height about the centre (run 0c4519c5 read
 # y 0.1014..0.2711 at centre 0.18625), and it must stay inside the B sheet's
@@ -87,6 +87,9 @@ ISO_CENTER = (0.310, 0.213)
 # the deburr texts keep their reviewed stations: still right of the shank,
 # clear of their own extension lines (review r8: centred under the 2.3 mm leg
 # they were struck) and above the notes.
+# The settled isometric outline is 0.0543 half-height about its centre (run
+# 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
+# centred at 0.209 its top is 0.2633 and its bottom 0.1547.
 FRONT_KEEP = {
     "FinishedOverall": (0.042, FRONT_CENTER[1]),
     "ChamferWidth": (0.168, 0.100),
