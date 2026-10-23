@@ -247,44 +247,47 @@ def _assert_washer_source_attachment(case, label, display):
 @pytest.mark.parametrize("label", (
     "supplier outer diameter", "supplier bore diameter", "supplier thickness",
 ))
-def test_washer_owner_identity_uses_the_part_or_exact_view_namespace(monkeypatch, label):
+@pytest.mark.parametrize("axis", ("y", "z"))
+@pytest.mark.parametrize("owner_namespace", ("source", "view"))
+def test_washer_canonical_dimension_and_view_entities_do_not_depend_on_feature_owner(
+    monkeypatch, label, axis, owner_namespace,
+):
     from test_purchased_fastener_drawing import _washer_import_native
 
-    case = _washer_import_native(monkeypatch)
+    case = _washer_import_native(monkeypatch, axis=axis)
     source = case.sources[label]
     imported = case.imports[label]
-    orientation = "*Front" if label == case.helper.THICKNESS else "*Top"
-    view = case.views[orientation]
+    side = "*Front" if axis == "y" else "*Top"
+    face = "*Top" if axis == "y" else "*Front"
+    view = case.views[side if label == case.helper.THICKNESS else face]
+    feature_name, dimension_name = case.source_helper.SOURCE_DIMENSIONS[label]
     source_owner = source.native.GetFeatureOwner()
-    imported_owner = imported.native.GetFeatureOwner()
-    assert case.adapter.swApp.IsSame(source_owner, imported_owner) == 0
-    assert case.adapter.swApp.IsSame(view.GetCorresponding(source_owner), imported_owner) == 1
+    if owner_namespace == "source":
+        imported.native.GetFeatureOwner = lambda: source_owner
+    observed_owner = imported.native.GetFeatureOwner()
+    assert case.adapter.swApp.IsSame(observed_owner, source_owner) == (owner_namespace == "source")
+    assert case.adapter.swApp.IsSame(
+        observed_owner, view.GetCorresponding(source_owner)) == (owner_namespace == "view")
+    assert case.adapter.swApp.IsSame(imported.native, source.native) == 1
+    assert case.adapter.swApp.IsSame(
+        imported.native, case.model.Parameter(f"{dimension_name}@{feature_name}")) == 1
+    before = (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
+              source.native.Tolerance.Type, source.annotation.entities)
     for display, owner_view in ((source.display, None), (imported.display, view)):
         case.source_helper.assert_supplier_washer_source_attachment(
             case.adapter, case.model, display, view=owner_view, label=label,
-            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+            axis=axis, bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
+    assert (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
+            source.native.Tolerance.Type, source.annotation.entities) == before
 
 
-@pytest.mark.parametrize("defect", (
-    "foreign_mapping", "missing_mapping", "part_owner", "missing_owner",
-    "native_name", "source_name", "native_type",
-))
-def test_washer_view_owner_requires_native_identity_not_matching_metadata(monkeypatch, defect):
+@pytest.mark.parametrize("defect", ("native_name", "source_name", "native_type"))
+def test_washer_canonical_dimension_still_requires_correct_names_and_type(monkeypatch, defect):
     case, label, display = _washer_failure_case(monkeypatch)
     source = case.sources[label]
     imported = case.imports[label]
-    feature_name = case.source_helper.THICKNESS_FEATURE
-    feature = case.model.FeatureByName(feature_name)
-    if defect == "foreign_mapping":
-        case.mapped[id(feature)] = SimpleNamespace(Name=feature_name, GetTypeName2=lambda: "ProfileFeature")
-    elif defect == "missing_mapping":
-        case.mapped.pop(id(feature))
-    elif defect == "part_owner":
-        imported.native.GetFeatureOwner = lambda: feature
-    elif defect == "missing_owner":
-        imported.native.GetFeatureOwner = lambda: None
-    elif defect == "native_name":
+    if defect == "native_name":
         imported.native.FullName = "Other@SupplierWasherThicknessReference@stock"
     elif defect == "source_name":
         source.native.FullName = "Other@SupplierWasherThicknessReference@stock"
@@ -325,10 +328,12 @@ def test_washer_part_uses_canonical_dimension_despite_different_feature_owner(mo
     "wrong_parameter", "missing_parameter", "wrong_enumerated", "missing_enumerated",
     "wrong_native", "missing_native",
 ))
-def test_washer_part_rejects_other_native_dimensions_despite_matching_metadata(monkeypatch, defect):
+@pytest.mark.parametrize("context", ("part", "drawing"))
+def test_washer_rejects_other_canonical_dimensions_despite_matching_metadata(monkeypatch, defect, context):
     case, label, _display = _washer_failure_case(monkeypatch)
     source = case.sources[label]
     original = source.native
+    display = source.display if context == "part" else case.imports[label].display
     other = SimpleNamespace(**vars(original))
     assert other.FullName == original.FullName and other.SystemValue == original.SystemValue
     before = (original.SystemValue, dict(vars(source.state)), dict(source.text),
@@ -342,19 +347,20 @@ def test_washer_part_rejects_other_native_dimensions_despite_matching_metadata(m
     elif defect == "missing_enumerated":
         source.native = None
     elif defect == "wrong_native":
-        source.display.GetDimension2 = lambda _index: other
+        display.GetDimension2 = lambda _index: other
     else:
-        source.display.GetDimension2 = lambda _index: None
+        display.GetDimension2 = lambda _index: None
     with pytest.raises(RuntimeError, match="named model witness"):
         case.source_helper.assert_supplier_washer_source_attachment(
-            case.adapter, case.model, source.display, view=None, label=label,
+            case.adapter, case.model, display, view=None if context == "part" else case.views["*Front"], label=label,
             axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
     assert (original.SystemValue, dict(vars(source.state)), dict(source.text),
             original.Tolerance.Type, source.annotation.entities) == before
 
 
-def test_washer_part_parameter_reader_failure_is_not_retried_by_diagnostics(monkeypatch):
+@pytest.mark.parametrize("context", ("part", "drawing"))
+def test_washer_parameter_reader_failure_is_not_retried_by_diagnostics(monkeypatch, context):
     case, label, _display = _washer_failure_case(monkeypatch)
     original = RuntimeError("canonical source-part parameter lookup failed")
     observations = []
@@ -370,7 +376,9 @@ def test_washer_part_parameter_reader_failure_is_not_retried_by_diagnostics(monk
     monkeypatch.setattr(case.source_helper._telemetry, "info", lambda _message, **fields: observations.append(fields))
     with pytest.raises(RuntimeError) as caught:
         case.source_helper.assert_supplier_washer_source_attachment(
-            case.adapter, case.model, case.sources[label].display, view=None, label=label,
+            case.adapter, case.model,
+            case.sources[label].display if context == "part" else case.imports[label].display,
+            view=None if context == "part" else case.views["*Front"], label=label,
             axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
     assert caught.value is original
@@ -388,6 +396,7 @@ def test_washer_owner_failure_reports_remaining_context_despite_an_independent_r
 
     foreign_owner = SimpleNamespace(Name="Foreign", GetTypeName2=interrupted_type)
     case.imports[label].native.GetFeatureOwner = lambda: foreign_owner
+    case.model.Parameter = lambda _name: SimpleNamespace(**vars(case.sources[label].native))
     monkeypatch.setattr(case.source_helper._telemetry, "info", lambda _message, **fields: observations.append(fields))
     with pytest.raises(RuntimeError, match="named model witness"):
         _assert_washer_source_attachment(case, label, display)
@@ -406,13 +415,13 @@ def test_washer_owner_failure_reports_remaining_context_despite_an_independent_r
 
 def test_washer_original_native_interrupt_aborts_without_failure_only_observers(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
-    original = SystemExit("original native owner reader")
+    original = SystemExit("original native parameter reader")
     observations = []
 
-    def native_failure():
+    def native_failure(_name):
         raise original
 
-    case.imports[label].native.GetFeatureOwner = native_failure
+    case.model.Parameter = native_failure
     monkeypatch.setattr(
         case.source_helper._telemetry, "info",
         lambda *_args, **_kwargs: observations.append("observed"),
@@ -432,6 +441,7 @@ def test_washer_failure_observer_interrupt_aborts_immediately(monkeypatch):
 
     foreign_owner = SimpleNamespace(Name="Foreign", GetTypeName2=interrupted_type)
     case.imports[label].native.GetFeatureOwner = lambda: foreign_owner
+    case.model.Parameter = lambda _name: SimpleNamespace(**vars(case.sources[label].native))
     with pytest.raises(KeyboardInterrupt) as caught:
         _assert_washer_source_attachment(case, label, display)
     assert caught.value is original
@@ -439,22 +449,22 @@ def test_washer_failure_observer_interrupt_aborts_immediately(monkeypatch):
 
 def test_washer_ordinary_observer_error_does_not_replace_original_native_failure(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
-    original = RuntimeError("original native owner reader")
+    original = RuntimeError("original native parameter reader")
 
-    def native_failure():
+    def native_failure(_name):
         raise original
 
     def log_failure(*_args, **_kwargs):
         raise ValueError("secondary observer failure")
 
-    case.imports[label].native.GetFeatureOwner = native_failure
+    case.model.Parameter = native_failure
     monkeypatch.setattr(case.source_helper._telemetry, "info", log_failure)
     with pytest.raises(RuntimeError) as caught:
         _assert_washer_source_attachment(case, label, display)
     assert caught.value is original
 
 
-def test_washer_healthy_owner_check_does_not_run_failure_only_observers(monkeypatch):
+def test_washer_healthy_canonical_check_does_not_read_feature_owners_or_diagnostics(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
 
     def unexpected_observation(*_args, **_kwargs):
@@ -462,9 +472,10 @@ def test_washer_healthy_owner_check_does_not_run_failure_only_observers(monkeypa
 
     monkeypatch.setattr(case.source_helper._telemetry, "info", unexpected_observation)
     case.model.GetPathName = unexpected_observation
-    # The owner/source identity check is healthy, but the original display has
-    # not been formatted by the drawing yet. The attachment proof itself is
-    # independent of that presentation operation.
+    case.sources[label].native.GetFeatureOwner = unexpected_observation
+    case.imports[label].native.GetFeatureOwner = unexpected_observation
+    # Canonical identity and physical attachments are independent of optional
+    # feature-owner observations and the later drawing presentation operation.
     _assert_washer_source_attachment(case, label, display)
 
 

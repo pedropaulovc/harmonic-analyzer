@@ -1649,20 +1649,19 @@ namespace. Their independently checked part entities are mapped through the
 exact owning view's `GetCorresponding`; native one-to-one identity, distinct
 endpoints and no extra attachments are required there. Direct comparison
 between a part object and a drawing object is not an attachment proof.
-The imported washer dimension's feature owner must also equal that source
-feature mapped into the exact drawing view. A part display instead requires
-native `IDimension` identity with both the dimension enumerated from the source
-feature and `model.Parameter("Dimension@Feature")`; missing or different
-dimensions fail even when their names and values match. Native R47 proved all
-three part-dimension identities while `GetFeatureOwner` versus `FeatureByName`
-returned zero for equally named `ProfileFeature` handles. The reason for that
-feature-identity discrepancy remains unproven; it is not a part-dimension
-authority check. Drawing owner mappings and independent geometry/attachment
-checks remain strict. Native R48 qualified the back washer's banded thickness
-dimension at the part, imported drawing and final original-part checkpoints.
-Its unbanded OD and bore references passed the physical-rim guards; they were
-not three banded part-dimension qualifications. All 18 source-preservation
-checkpoints retained the original native-file hash and clean, read-only state.
+Both part displays and drawing imports require native `IDimension` identity
+with the dimension independently enumerated from the source feature and exact
+`model.Parameter("Dimension@Feature")`. Missing or different dimensions fail
+even when their names, values and types match. Feature-owner wrappers are not
+dimension identity: native R47/R49 returned unequal feature handles while all
+three canonical dimension identities were one. The reason for the wrapper
+discrepancy remains unproven. `GetFeatureOwner` and mapped-feature observations
+remain failure-only diagnostics, not an alternative acceptance path. Exact
+typed source-to-view entity mapping, physical geometry, source identity,
+configuration, values, tolerance bands and source-preservation guards remain
+required independently. Native R49's five refused drawings reached the obsolete
+mapped-feature guard with all three canonical dimension identities one; those
+five still require fresh native qualification after this contract correction.
 
 R48 also exposed actual thickness-text/witness and bore-qualifier/outline
 crossings. The shared washer drawing author now settles the full formatted
@@ -1672,9 +1671,15 @@ The entire bore value/qualifier block moves to the right of the face outline,
 without applying the unsupported diameter `OffsetText` mode. Both use the
 existing 2 mm text clearance plus 0.2 mm placement allowance and retain the
 physical dimension stations, exact native/source identities and supplier bands.
-This drawing-only placement affects all seven washer-sheet consumers. Its
-final native export and whole-sheet layout still require qualification for
-those seven sheets; R48 does not establish the new placements.
+This drawing-only placement affects all seven washer-sheet consumers. R49
+freshly authored and exported the MG back and front sheets: both whole native
+PNGs and unresampled thickness/bore crops were clear, both native layout audits
+had zero findings, and both retained 18 clean, read-only, unchanged-hash source
+checkpoints. Their banded thickness and unbanded physical-rim references passed
+the then-current guards. The other five sheets refused the old feature-owner
+predicate before final export; their placement authoring span succeeded, but no
+finished sheet or final layout acceptance is claimed for them. R49 does not
+qualify the new unified canonical-dimension guard.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
