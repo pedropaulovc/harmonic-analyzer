@@ -284,6 +284,14 @@ following the kit's measured-text pattern and shared `display_box`. Missing or
 zero native width is a refusal with all run metadata, never a font-width estimate.
 Keep whole-note extent containment and the separate leader checks as well.
 
+The pivot-capture native PDF exposed a 2.463 mm C5A/C3A block gap below the
+3.234 mm row pitch and a cotter leader crossing the A cut line after the
+glyph guards passed. Move the reading text, not its physical criterion anchor.
+Replay the original PDF's vector strokes as well as the cached audit JSON,
+which retains only their count, before checking neighboring ink. Translated
+label previews predict native junction routing; the unchanged native guards
+and final PDF audit must still qualify the result.
+
 On refusal at the four final layout guards, report all indexed glyph and
 whole-note rectangles, outside-field entries and overlapping pairs, not only the first
 conflict. Field gaps are left/bottom/right/top; pair gaps are horizontal/vertical,

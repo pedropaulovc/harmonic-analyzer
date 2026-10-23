@@ -523,6 +523,155 @@ def _plan_xy(x_mm: float, y_mm: float) -> tuple[float, float]:
     )
 
 
+def _captured_capture_callout(label, note_xy=None):
+    """Native 2f1b2c01 capture sheet: actual PDF rows and registered leader."""
+    from _layout_geometry import AnnotationGeometry, Box, Segment
+
+    # PDF SHA256 33298ca5...; native JSON 869af329... . These measured
+    # Century Gothic rows retain their printed heights, not nominal font boxes.
+    measurements = {
+        "C5A FLAT PIN END": (
+            (0.305, 0.216),
+            ((0.3051439, 0.2135337, 0.3278642, 0.215571),
+             (0.3050640, 0.2105337, 0.3360759, 0.212571)),
+            (0.3362056, 0.2122206, 0.3209239, 0.181),
+        ),
+        "C3A CAP / BLOCK LAND": (
+            (0.279, 0.2235),
+            ((0.2791439, 0.2208203, 0.3102947, 0.223071),
+             (0.2790853, 0.2180337, 0.2908703, 0.220071)),
+            (0.3107404, 0.2193691, 0.3875625, 0.2419),
+        ),
+        "C5B COTTER EYE / PRONGS": (
+            (0.282, 0.257),
+            ((0.2821440, 0.2543203, 0.3165099, 0.256571),
+             (0.2820853, 0.2515337, 0.2927014, 0.253571),
+             (0.2820347, 0.2485337, 0.3213904, 0.250571)),
+            (0.281432, 0.2557663, 0.25535, 0.2402265),
+        ),
+    }
+    position, rows, registered = measurements[label]
+    dx, dy = (0.0, 0.0) if note_xy is None else (
+        note_xy[0] - position[0], note_xy[1] - position[1],
+    )
+    leader = Segment(
+        registered[0] + dx, registered[1] + dy,
+        registered[2], registered[3], "leader",
+    )
+    # Translate only the native junction offset. The physical landing and
+    # measured 3.556 mm arrow length stay fixed; this is not native qualification.
+    length = math.hypot(leader.x0 - leader.x1, leader.y0 - leader.y1)
+    arrow = Segment(
+        leader.x1, leader.y1,
+        leader.x1 + 0.003556 * (leader.x0 - leader.x1) / length,
+        leader.y1 + 0.003556 * (leader.y0 - leader.y1) / length, "arrow",
+    )
+    return AnnotationGeometry(
+        label=label, kind="note", owner="captured TL-00",
+        text_boxes=tuple(Box(row[0] + dx, row[1] + dy, row[2] + dx, row[3] + dy) for row in rows),
+        segments=(leader, arrow),
+    )
+
+
+def _captured_capture_sheet(*annotations):
+    from _layout_geometry import DrawableRegion, SheetGeometry
+
+    return SheetGeometry(
+        name=drawing.PIVOT_CAPTURE_SHEET, width=0.4318, height=0.2794,
+        region=DrawableRegion.whole_sheet(0.4318, 0.2794), annotations=annotations,
+    )
+
+
+def _captured_cotter_glyph(note_xy):
+    # Native IDisplayData: three measured rows, 39.5611 mm maximum width,
+    # lower-left 9 mm below the annotation point, upper edge 1 mm below it.
+    x, y = note_xy
+    return (x, y - 0.009, x + 0.0395611, y - 0.001)
+
+
+def test_capture_measured_callout_rows_clear_cap_and_relocated_cotter():
+    from _layout_audit import ROW_PITCH_HEIGHTS, find_merged_blocks, text_height
+
+    flat, cap, cotter = "C5A FLAT PIN END", "C3A CAP / BLOCK LAND", "C5B COTTER EYE / PRONGS"
+    before = [_captured_capture_callout(label) for label in (flat, cap, cotter)]
+    baseline = find_merged_blocks(_captured_capture_sheet(*before))
+    assert any({finding.a, finding.b} == {flat, cap} for finding in baseline)
+    authored = {reading.text.splitlines()[0]: reading.text_xy for reading in drawing.capture_readings()}
+    after = [
+        _captured_capture_callout(label, authored[label]) for label in (flat, cap, cotter)
+    ]
+    assert find_merged_blocks(_captured_capture_sheet(*after)) == []
+    for old, moved in zip(before, after, strict=True):
+        assert [box.height for box in moved.text_boxes] == pytest.approx(
+            [box.height for box in old.text_boxes], abs=1e-12,
+        )
+    for other in (after[1], after[2]):
+        a, b = after[0].text_boxes[0], other.text_boxes[0]
+        for box in after[0].text_boxes[1:]:
+            a = a.union(box)
+        for box in other.text_boxes[1:]:
+            b = b.union(box)
+        gap = max(a.ymin - b.ymax, b.ymin - a.ymax)
+        assert gap >= ROW_PITCH_HEIGHTS * min(text_height(after[0]), text_height(other))
+
+
+def test_capture_measured_cotter_leader_clears_both_native_cut_lines():
+    from _layout_audit import find_leader_across_lines
+    from _layout_geometry import AnnotationGeometry, Segment
+
+    cuts = tuple(
+        AnnotationGeometry(
+            label=f"section-line {letter}", kind="section-line", owner="Drawing View9",
+            segments=(Segment(*coordinates, "line"),),
+        )
+        for letter, coordinates in (
+            ("A", (0.2346284, 0.2403916, 0.2671284, 0.2403916)),
+            ("B", (0.2659427, 0.2497668, 0.2337767, 0.2451200)),
+        )
+    )
+    label = "C5B COTTER EYE / PRONGS"
+    old = _captured_capture_callout(label)
+    baseline = find_leader_across_lines(_captured_capture_sheet(old, *cuts))
+    assert any(
+        finding.kind == "leader-crosses-section-line" and finding.b == "section-line A"
+        for finding in baseline
+    )
+    reading = next(reading for reading in drawing.capture_readings() if reading.text.startswith(label))
+    candidate = _captured_capture_callout(label, reading.text_xy)
+    assert find_leader_across_lines(_captured_capture_sheet(candidate, *cuts)) == []
+
+
+def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_model():
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    authored = {reading.text.splitlines()[0]: reading.text_xy for reading in drawing.capture_readings()}
+    cotter = _captured_capture_callout("C5B COTTER EYE / PRONGS", authored["C5B COTTER EYE / PRONGS"])
+    flat = _captured_capture_callout("C5A FLAT PIN END", authored["C5A FLAT PIN END"])
+    cross_hole = Segment(0.2545473, 0.2122206, 0.3184239, 0.17925, "leader")
+    locator_caption = (0.224, 0.2154743, 0.2705646, 0.2189743)
+    section_a = (0.2924833, 0.1402120, 0.3495167, 0.1897880)
+    assert drawing._segment_crosses_box(cross_hole, _captured_cotter_glyph((0.280, 0.205)), inset=0.0)
+    assert drawing._segment_crosses_box(flat.segments[0], _captured_cotter_glyph((0.291, 0.205)), inset=0.0)
+    assert drawing._capture_overlap(_captured_cotter_glyph((0.250, 0.219)), locator_caption)
+    assert drawing._capture_overlap(_captured_cotter_glyph((0.288, 0.198)), section_a)
+    glyph = _captured_cotter_glyph(authored["C5B COTTER EYE / PRONGS"])
+    assert drawing._capture_inside(glyph, drawing.CAPTURE_READING_REGION)
+    for neighbor in (cross_hole, flat.segments[0]):
+        assert not drawing._segment_crosses_box(neighbor, glyph, inset=0.0)
+        assert segment_box_distance(neighbor, Box(*glyph)) > 0.0
+    for obstacle in (locator_caption, section_a):
+        assert not drawing._capture_overlap(glyph, obstacle)
+        assert not drawing._segment_crosses_box(cotter.segments[0], obstacle, inset=0.0)
+    leaders = [
+        LeaderSegment(label=label, kind="note", x0=segment.x0, y0=segment.y0,
+                      x1=segment.x1, y1=segment.y1)
+        for label, segment in (
+            ("cotter", cotter.segments[0]), ("flat pin", flat.segments[0]), ("cross-hole", cross_hole),
+        )
+    ]
+    assert find_leader_leader_crossings(leaders) == []
+
+
 def test_plan_tags_stand_apart_inside_the_sheet() -> None:
     boxes = [_note_box(tag.text, _plan_xy(*tag.text_xy)) for tag in spec.PLAN_TAGS]
     others = (
