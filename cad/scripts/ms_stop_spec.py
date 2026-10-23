@@ -145,13 +145,10 @@ PLATE_DRAWING_PRECISION = {
 BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
 BLOCK_DRAWING_PRECISION["Block"]["BlockDepth"] = 1
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
-# The cover's cosmetic corners use .X. The block chamfer is a single .X limit,
-# printed 1.0 MAX: a .X band could cut through the 2.1 roof at its open end.
-# Its native angle prints as 45 degrees, without redundant decimal places.
+# Only the cover's cosmetic corners use .X; the block chamfer retains .XX,
+# the routine +/-0.51 the 2026-10-09 roof ruling (ms-stop-block.yaml RV-02)
+# sized the 2.1 roof against. Its native angle prints as 45 degrees.
 PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAngle=0)
-BLOCK_DRAWING_PRECISION["RoofChamfers"]["RoofChamferSize"] = 1
-ROOF_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX: the nominal is the printed limit
-ROOF_CHAMFER_BAND_MM = (-ROOF_END_CHAMFER, 0.0)  # (lower, upper) deviations
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"

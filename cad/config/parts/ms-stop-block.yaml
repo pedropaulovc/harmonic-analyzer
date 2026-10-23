@@ -12,3 +12,8 @@ ms-stop-block:
       where: "right side view, under the 2.10 roof thickness: WALL 1.59 MIN"
       finding: "roof over the open rebate below the 2.0 mm target (rule 17)"
       reason: "owner ruling 2026-10-09 (option B in stop_roof_options_v1.png): height 14.1 with a directly dimensioned 2.1 roof replaced the sketch's 14 / 2.0; at the routine .XX +/-0.51 the roof keeps 1.59 MIN, above the 1.5 floor. Recorded here in the form the gate reads; not a new ruling"
+    - id: "RV-02"
+      kind: "minor"
+      where: "front view, 1.00 x 45 degree roof-end chamfer, 2 CORNERS"
+      finding: "plain edge chamfer given two decimal places (rule 3)"
+      reason: "owner ruling 2026-10-09 (option B in stop_roof_options_v1.png): the 2.0 roof of the sketch was thickened to 2.1 for the routine .XX +/-0.51 chamfer-to-window margin, so the 1.00 chamfer keeps .XX (1.51 largest) inside the 1.59 thinnest roof; at .X +/-0.8 it could cut through. Recorded here in the form the gate reads; not a new ruling"

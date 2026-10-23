@@ -208,10 +208,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "McMaster 9714K24's catalogue OD tolerance (plus, minus): indexed for "
         "the largest spring under the hub's O10.2"
     ),
-    ("ms_stop_spec", "ROOF_CHAMFER_BAND_MM"): (
-        "single-limit 1.0 MAX edge-break chamfer (swTolMAX) on the stop block's "
-        "open end: the print-contract readback band, not a fit"
-    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them

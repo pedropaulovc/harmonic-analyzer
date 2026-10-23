@@ -12,7 +12,6 @@ Run only through the supervised farm launcher: part:ms_stop_block.
 
 from __future__ import annotations
 
-import math
 import sys
 
 import ms_stop_spec as spec
@@ -65,26 +64,6 @@ def _author_reference_dimensions(adapter) -> None:
             or not bool(display.ShowDimensionValue)
         ):
             raise RuntimeError(f"{name}: model reference-only display did not persist")
-
-
-def _roof_chamfer_max_limit(adapter) -> None:
-    """RoofChamferSize as the single limit "1.0 MAX" (swTolMAX prints the
-    nominal plus MAX), keeping the roof's open end edge at every chamfer size."""
-    lower, upper = spec.ROOF_CHAMFER_BAND_MM
-    _, dimension = _named_dimension(adapter, "RoofChamfers", "RoofChamferSize")
-    if not math.isclose(float(dimension.SystemValue), spec.ROOF_END_CHAMFER / 1000.0,
-                        abs_tol=1e-9):
-        raise RuntimeError("RoofChamferSize: nominal is not the printed MAX limit")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = spec.ROOF_CHAMFER_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"RoofChamferSize: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != spec.ROOF_CHAMFER_TOL_TYPE
-        or not math.isclose(float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12)
-        or not math.isclose(float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12)
-    ):
-        raise RuntimeError("RoofChamferSize: MAX-limit tolerance readback changed")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -184,7 +163,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(adapter, "Window", "WindowWidth", lower, upper)
     set_dimension_bilateral_tolerance(adapter, "ReferenceWindowWidth", "WindowWidth", lower, upper)
     _author_reference_dimensions(adapter)
-    _roof_chamfer_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature, names)

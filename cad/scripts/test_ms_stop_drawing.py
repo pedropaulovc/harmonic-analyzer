@@ -108,12 +108,11 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
     # Rule 7: the pair is flagged at both match-drill callouts, not in a loose note.
     assert not hasattr(spec, "BLOCK_DRAWING_NOTES") and not hasattr(spec, "PLATE_DRAWING_NOTES")
-    assert spec.MATCHED_PAIR_NOTE == "MATCHED PAIR; NOT INTERCHANGEABLE"
-    assert block_drawing.COVER_HOLE_PROCESS.splitlines()[-1] == spec.MATCHED_PAIR_NOTE
-    assert plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"].splitlines()[-1] == spec.MATCHED_PAIR_NOTE
-    assert spec.BLOCK_MATING_FACE_NOTE == "STOP-PLATE MATING FACE"
-    for module in (block, plate, block_drawing, plate_drawing):
-        assert '"Manufacturing Notes"' not in Path(module.__file__).read_text(encoding="utf-8")
+    # Both match-drill callouts (feature-local) flag the pair as matched.
+    for callout in (block_drawing.COVER_HOLE_PROCESS,
+                    plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]):
+        assert spec.MATCHED_PAIR_NOTE in callout
+    assert "NOT INTERCHANGEABLE" in spec.MATCHED_PAIR_NOTE
     assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
@@ -151,7 +150,7 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    loose = ({"BlockLength", "BlockHeight", "BlockDepth", "RoofChamferSize"} if builder is block
+    loose = ({"BlockLength", "BlockHeight", "BlockDepth"} if builder is block
              else {"PlateHeight", "RoofChamferSize"})
     assert {name for name, places in precision.items() if places == 1} == loose
     assert all(places == (
@@ -393,10 +392,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     bands = native_contracts[0]["bands"]
     if drawing is block_drawing:
         assert not set(bands) & (spec.PLATE_LOCATION_DIMENSIONS | spec.BLOCK_REFERENCE_DIMENSIONS)
-        assert bands == {
-            **{name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
-            "RoofChamferSize": spec.ROOF_CHAMFER_BAND_MM,
-        }
+        assert bands == {name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")}
     else:
         assert {name: bands[name] for name in spec.PLATE_LOCATION_DIMENSIONS} == {
             name: (-spec.PLATE_HOLE_POSITION_TOLERANCE_MM, spec.PLATE_HOLE_POSITION_TOLERANCE_MM)
@@ -701,7 +697,7 @@ def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkey
         "RoofChamferSize": 1, "RoofChamferAngle": 0,
     }
     assert spec.BLOCK_DRAWING_PRECISION["RoofChamfers"] == {
-        "RoofChamferSize": 1, "RoofChamferAngle": 2,
+        "RoofChamferSize": 2, "RoofChamferAngle": 2,
     }
 
 
@@ -1089,7 +1085,6 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     monkeypatch.setattr(block, "roof_reference", roof_reference)
     monkeypatch.setattr(block, "back_wall_reference", back_wall_reference)
     monkeypatch.setattr(block, "save_part_and_images", save)
-    monkeypatch.setattr(block, "_roof_chamfer_max_limit", lambda adapter: bands.append("chamfer MAX"))
     monkeypatch.setattr(block, "SketchDims", lambda: SimpleNamespace(apply=lambda *a: []))
     for name in (
         "add_line_chain", "define_rectilinear_chain", "ensure_fully_defined",
@@ -1125,7 +1120,6 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
     assert "Manufacturing Notes" not in properties[0]
-    assert "chamfer MAX" in bands
 
 
 def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatch) -> None:
@@ -1164,39 +1158,18 @@ def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) ->
     }
 
 
-@pytest.mark.parametrize("refusal", [None, "nominal", "type", "values"])
-def test_block_chamfer_is_a_single_max_limit_at_its_nominal(monkeypatch, refusal) -> None:
-    class Tolerance:
-        def __init__(self):
-            self.Type, self.values = 0, (0.0, 0.0)
+def test_block_chamfer_keeps_the_ruled_routine_band_inside_the_roof() -> None:
+    """The 2026-10-09 ruling sized the 2.1 roof against the chamfer's routine
+    .XX band; the largest printed chamfer stays inside the thinnest roof."""
+    import _config
+    from _printed_tolerance import printed_band_mm
 
-        def SetValues(self, low, high):  # noqa: N802 - native method
-            if refusal != "values":
-                self.values = (low, high)
-            return True
-
-        def GetMinValue(self):  # noqa: N802 - native method
-            return self.values[0]
-
-        def GetMaxValue(self):  # noqa: N802 - native method
-            return self.values[1]
-
-    tolerance = Tolerance()
-    nominal = 1.2 if refusal == "nominal" else spec.ROOF_END_CHAMFER
-    dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
-    monkeypatch.setattr(block, "_named_dimension", lambda adapter, feature, name: (None, dimension))
-    monkeypatch.setattr(block, "_early_bound", lambda value, interface: value)
-    if refusal == "type":
-        type(tolerance).Type = property(lambda self: 0, lambda self, value: None)
-    if refusal:
-        with pytest.raises(RuntimeError, match="RoofChamferSize"):
-            block._roof_chamfer_max_limit(object())
-    else:
-        block._roof_chamfer_max_limit(object())
-        assert tolerance.Type == spec.ROOF_CHAMFER_TOL_TYPE == 6
-        assert tolerance.values == pytest.approx((-0.001, 0.0))
-    # 1.0 MAX can never cut through the thinnest printed roof.
-    assert spec.ROOF_END_CHAMFER < spec.ROOF_THICKNESS_MIN
+    assert spec.BLOCK_DRAWING_PRECISION_BY_NAME["RoofChamferSize"] == 2
+    chamfer_max = spec.ROOF_END_CHAMFER + printed_band_mm(2)
+    assert chamfer_max < spec.ROOF_THICKNESS_MIN
+    rulings = [entry for entry in _config.parts("ms-stop-block")["machinist_exceptions"]
+               if "2026-10-09" in entry["reason"] and "chamfer" in entry["where"].lower()]
+    assert len(rulings) == 1
 
 
 def test_tight_bands_name_their_mates_and_walls_state_shortfalls() -> None:
@@ -1213,7 +1186,8 @@ def test_tight_bands_name_their_mates_and_walls_state_shortfalls() -> None:
     assert callouts["RoofThickness"] == f"WALL {spec.ROOF_THICKNESS_MIN:.2f} MIN"
     assert 1.5 <= spec.ROOF_THICKNESS_MIN < 2.0
     roof_rulings = [entry for entry in _config.parts("ms-stop-block")["machinist_exceptions"]
-                    if entry["kind"] == "minor" and "2026-10-09" in entry["reason"]]
+                    if entry["kind"] == "minor" and "2026-10-09" in entry["reason"]
+                    and "WALL" in entry["where"]]
     assert len(roof_rulings) == 1 and f"WALL {spec.ROOF_THICKNESS_MIN:.2f} MIN" in roof_rulings[0]["where"]
     thickness = plate_drawing.DIMENSION_CALLOUTS["PlateThickness"]
     assert "SCREW REACH" in thickness

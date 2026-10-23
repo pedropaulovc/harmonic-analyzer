@@ -245,10 +245,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_manufacturing_dimensions(
         adapter, annotations, part.BLOCK_DRAWING_VALUES_BY_NAME,
         part.BLOCK_DRAWING_PRECISION_BY_NAME,
-        bands={
-            **{name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
-            "RoofChamferSize": part.ROOF_CHAMFER_BAND_MM,
-        },
+        bands={name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
         angular=frozenset({"RoofChamferAngle"}),
     )
     _assert_reference_dimensions(adapter, annotations)
