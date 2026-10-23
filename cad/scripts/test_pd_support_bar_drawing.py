@@ -534,8 +534,11 @@ def test_slot_callout_refuses_section_or_station_crowding(
     line = (0.106, 0.048, 0.106, 0.056)
     if collision == "leader":
         line = (0.053, 0.048, 0.106, 0.056)
-    # The 440.50 line 4 mm over the callout's text, or a hairline over it.
-    station_y = 0.081 if collision == "station" else 0.084
+    # The native text reaches 3 mm over the shoulder-mirrored estimate (its
+    # stacked upper limit). The 440.50 line clears the native text by 3 mm,
+    # or clears the estimate by 4.5 mm but the native upper limit by 1.5 mm.
+    native = (text[0], text[1], text[2], text[3] + 0.003)
+    station_y = 0.0845 if collision == "station" else 0.086
     ink = CalloutInk(
         "slot counterbore width",
         text,
@@ -549,7 +552,7 @@ def test_slot_callout_refuses_section_or_station_crowding(
     )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(drawing, "callout_ink", lambda *_args, **_kwargs: ink)
-    monkeypatch.setattr(drawing, "_native_text_box", lambda *_args, **_kwargs: text)
+    monkeypatch.setattr(drawing, "_native_text_box", lambda *_args, **_kwargs: native)
     monkeypatch.setattr(
         drawing,
         "dimension_segments",
