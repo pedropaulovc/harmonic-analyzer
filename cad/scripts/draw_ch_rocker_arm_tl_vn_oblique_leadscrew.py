@@ -1800,7 +1800,6 @@ async def _build_read_only_source(
     annotations += _add_clock_sections(adapter, main)
     annotations += _add_end_details(adapter, main)
     verify_machining_controls(
-        adapter,
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,

@@ -3232,9 +3232,6 @@ def test_thread_is_called_out_on_the_main_view() -> None:
 def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     """A reference-only, moved, banded or re-placed control is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     assert draw.EXPECTED_CONTROLS["CutLength"] == (
         pytest.approx(0.410),
         pytest.approx(-0.0008),
@@ -3259,7 +3256,7 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
             GetMaxValue=lambda value=upper: value,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, value=dimension: value,
@@ -3290,7 +3287,6 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
 
     def verify() -> None:
         trim_drawing.verify_machining_controls(
-            None,
             annotations,
             expected=draw.EXPECTED_CONTROLS,
             tolerance_types=spec.DIMENSION_TOLERANCE_TYPES,
@@ -3802,3 +3798,83 @@ def test_supplier_attachment_non_json_scalar_is_labelled_without_hiding_refusal(
     assert batch["attachments"]["members"][0]["id"] == [0, 1]
     assert state.private_cache == {}
     json.dumps(capture["attachment_context"], allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    ("fault", "message"),
+    [
+        (None, None),
+        ("name", "invalid, duplicate or unexpected machining control name"),
+        ("nominal", "native dimension nominal changed"),
+    ],
+)
+def test_untyped_native_annotation_keeps_control_identity_and_value_guards(
+    monkeypatch, fault, message
+) -> None:
+    """A dynamic property result is not the generated zero-argument method."""
+    name = "CutLength"
+    nominal, lower, upper = draw.EXPECTED_CONTROLS[name]
+    dimension = SimpleNamespace(
+        Name=name if fault != "name" else "UnrelatedControl",
+        DrivenState=2,
+        SystemValue=nominal + (0.001 if fault == "nominal" else 0.0),
+        Tolerance=SimpleNamespace(
+            Type=spec.DIMENSION_TOLERANCE_TYPES[name],
+            GetMinValue=lambda: lower,
+            GetMaxValue=lambda: upper,
+        ),
+    )
+    display = SimpleNamespace(
+        GetDimension2=lambda _configuration: dimension,
+        GetText=lambda _index: "",
+        GetPrimaryPrecision2=lambda: spec.DIMENSION_PRECISION[name],
+    )
+
+    class SpecificDispatch:
+        def __init__(self, specific):
+            self.specific = specific
+
+        def __call__(self):
+            raise RuntimeError("returned dispatch has no default member")
+
+    class DynamicAnnotation:
+        def __init__(self, specific):
+            self.specific = specific
+
+        @property
+        def GetSpecificAnnotation(self):
+            # Dynamic attribute lookup has already invoked the property.
+            return SpecificDispatch(self.specific)
+
+    class TypedAnnotation:
+        def __init__(self, specific):
+            self.specific = specific
+
+        def GetSpecificAnnotation(self):
+            return self.specific
+
+    def early_bound(value, interface):
+        if isinstance(value, DynamicAnnotation):
+            if interface != "IAnnotation":
+                raise TypeError("native annotation requires IAnnotation")
+            return TypedAnnotation(value.specific)
+        return value
+
+    annotation = DynamicAnnotation(display)
+    with pytest.raises(RuntimeError, match="no default member"):
+        annotation.GetSpecificAnnotation()
+    monkeypatch.setattr(trim_drawing, "_early_bound", early_bound)
+
+    def verify():
+        trim_drawing.verify_machining_controls(
+            [annotation],
+            expected={name: (nominal, lower, upper)},
+            tolerance_types=spec.DIMENSION_TOLERANCE_TYPES,
+            precision=spec.DIMENSION_PRECISION,
+        )
+
+    if fault is None:
+        verify()
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            verify()

@@ -6,10 +6,18 @@ Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
 
 from __future__ import annotations
 
+from _surface_finish import surface_finish_by_key
 from dt_crankshaft_spec import (
     DRIVE_PIN_DEPTH_TOL,
     DRIVE_PIN_KNOCKOUT_PROCESS,
     DRIVE_PIN_SPIGOT_RIM_WORST,
+    SURFACE_FINISHES,
+)
+
+# Native roughness readback uses the same part-owned control as symbol authoring.
+# Keep manufacturing text derivation out of the presentation-only recipe.
+COLLAR_REAR_FINISH_TEXT = (
+    f"Ra {surface_finish_by_key(SURFACE_FINISHES, 'collar_rear_face').roughness_ra}"
 )
 
 # Matched-fit requirement on the feature callout (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), naming both mates

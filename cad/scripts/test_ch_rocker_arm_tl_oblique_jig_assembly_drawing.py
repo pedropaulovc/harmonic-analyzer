@@ -2697,6 +2697,18 @@ def native_property_package(monkeypatch, native_bom_bindings):
             point = view.ModelToViewTransform.apply(note.world)
             point = (point[0]+note.landing_shift[0], point[1]+note.landing_shift[1], 0.0)
             bounds = extent()
+            label = text.splitlines()[0]
+            if label in (
+                "C5A FLAT PIN END", "C3A CAP / BLOCK LAND", "C5B COTTER EYE / PRONGS",
+            ):
+                # The 2f1b2c01 native capture registers the actual text-side
+                # junction, including C5A's right-side attachment. A landing
+                # inside the text's X span does not imply a left-side junction.
+                # Keep the physical transformed landing (and defect shift)
+                # live: only the measured junction offset is replayed.
+                captured = _captured_capture_callout(label, note.position[:2])
+                junction = captured.segments[0]
+                return (junction.x0, junction.y0, 0.0, *point)
             x = bounds[3]+0.001 if point[0] > bounds[3] else bounds[0]-0.001
             return (x, note.position[1]-format_.CharHeight*0.6, 0.0, *point)
 
@@ -5025,6 +5037,43 @@ def test_capture_native_glyph_bounds_union_all_measured_runs(native_bom_bindings
         {"t": " ", "w": 0.0, "h": 0.0, "pos": (0.9, 0.9), "ref": 0, "ang": 0.0},
     ])
     assert drawing._capture_note_bounds(note) == pytest.approx((0.1, 0.19, 0.128, 0.204))
+
+
+def test_capture_settled_rejects_wrong_left_flat_pin_junction(
+    native_property_package, monkeypatch,
+) -> None:
+    """The old fake's left-side C5A junction crosses the cotter ink.
+
+    Native 2f1b2c01 registers a right-side junction; preserve that clear
+    baseline, then prove the real settled guard still rejects the bad route.
+    """
+    import ast
+
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    note = next(
+        note for note in package.doc.attached_notes
+        if note.text.startswith("C5A FLAT PIN END")
+    )
+    annotation = note.GetAnnotation()
+    original = annotation.GetLeaderPointsAtIndex(0)
+    extent = note.GetExtent()
+    height = annotation.GetTextFormat(0).CharHeight
+    wrong = (
+        extent[0] - 0.001, note.position[1] - height * 0.6, 0.0,
+        *original[3:],
+    )
+    monkeypatch.setattr(annotation, "GetLeaderPointsAtIndex", lambda _index: wrong)
+    with pytest.raises(
+        RuntimeError, match="native reading leader crosses another label/caption",
+    ) as refusal:
+        settled[-1]()
+    layout = ast.literal_eval(str(refusal.value).split("; layout=", 1)[1])
+    assert any(
+        layout["leaders"][leader][0].startswith("jig capture C5A FLAT PIN END")
+        and layout["rectangles"][label]["label"].startswith("jig capture C5B COTTER EYE")
+        for leader, label in layout["leader_label_crossings"]
+    )
 
 
 @pytest.mark.parametrize("whole_outside", (False, True))

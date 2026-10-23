@@ -396,7 +396,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     verify_machining_controls(
-        adapter,
         verify_cut_length_reference(adapter, annotations),
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
