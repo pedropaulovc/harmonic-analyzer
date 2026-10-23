@@ -1721,12 +1721,24 @@ clearance is0.525 and minimum tip projection0.740. Rod length variation moves
 the fitted free tip; it does not define a second fixed-position joint proof.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
-The owner chose **“Keep geometry; explain controls”**, superseding
-the earlier removal of structural qualifiers. Keep all three radius/location
-±0.05 bands and import their source-owned `RETAINS TAP WALL` below-text. This
-is material retention, not an invented outside-profile fit. The choice
-authorizes annotations, not a new machinist exception; the annotated sheet
-must be reviewed on its merits. The foot prints explicit **3.175±0.13** with
+After comparing the head-options PNG, the owner explicitly selected
+**“A — Keep geometry; approve exception”** in this session. This later explicit
+reply, not the earlier timed-out selector or annotation-only direction,
+authorizes package-owned **RV-03 — Retained head wall controls**, `kind: accept`,
+in `config/parts/mg-magnifying-bracket.yaml`. Its rules4/17 scope is exactly
+**NoseR R5.50±0.05** and **TapFromTip/TapFromSide5.50±0.05**, retaining the
+existing head geometry, these three bands and their native `RETAINS TAP WALL`
+below-text. The exception is review context, not a new note on the sheet.
+There is no outside-profile fit mate or new finished-thread-major limit.
+The finished head minimum wall remains **unknown**: the6.35 BASIC major is
+not a manufactured maximum, and the nominal2.325 head /2.125 mouth walls
+certify neither the2.0 target nor the1.5 floor. RV-03 accepts only this retained
+head/control decision; it does not waive foot grip, mounting mate flags,
+drawing line clearance, other walls or installed engagement. The separate
+RV-02 retention acceptance is unchanged. The mate-flagged native PDF still
+requires native redraw and Codex machinist review; approval is not print proof.
+
+The foot prints explicit **3.175±0.13** with
 `MHA-MG-VN-53` / `SCREW GRIP` below it: full engagement3.305 exceeds3.2766,
 with0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that
 joint. One-place overall foot length/width change precision, not model geometry;
