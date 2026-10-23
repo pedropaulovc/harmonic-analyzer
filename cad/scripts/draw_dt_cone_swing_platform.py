@@ -926,28 +926,18 @@ def _look_section_south(
 PIVOT_SECTION_BORE_XY = (0.372, SECTION_SHIFT[1] + 0.09865)
 # Looking south, A-A's outline is the whole plate south of the cut, 131 mm
 # across at 2:1 (run 20261023T182942818Z: 28.2 mm past the border), as C-C's
-# was (r9), so it is cropped to its strip the same way.
+# was (r9), so it is cropped to its strip the same way -- but only once its
+# model dimensions are imported and curated: cropped first, the PlateThk
+# import found nothing to attach to (run 20261023T185029293Z), its native
+# witnesses standing at the plate's far south-west extent.  The carrier
+# section crops after curating the same way.
 PIVOT_CROP_MARGIN_MM = HOLDDOWN_CROP_MARGIN_MM
 
 
-def _crop_and_place_pivot_section(adapter: Any, section: Any) -> None:
-    """Crop A-A to its strip, then move its bore axis at the underside onto
+def _place_pivot_section(adapter: Any, section: Any) -> None:
+    """Move A-A so its bore axis at the underside stands on
     PIVOT_SECTION_BORE_XY."""
     native = _early_bound(section, "IView")
-    corners = [
-        model_point_in_view(
-            adapter,
-            section,
-            (plate_edge_mm(0.0, side) / 1000.0, y_mm / 1000.0, 0.0),
-            label=f"A-A strip corner {side:+d}",
-        )
-        for side, y_mm in ((-1, 0.0), (1, PLATE_THICKNESS))
-    ]
-    margin = PIVOT_CROP_MARGIN_MM * 2.0 / 1000.0
-    xs = [float(corner[0]) for corner in corners]
-    ys = [float(corner[1]) for corner in corners]
-    fence = (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
-    _crop_section_to_fence(adapter, section, fence, label="A-A")
     target = PIVOT_SECTION_BORE_XY
     for _attempt in range(3):
         origin = model_point_in_view(
@@ -969,6 +959,26 @@ def _crop_and_place_pivot_section(adapter: Any, section: Any) -> None:
         f"section A-A bore axis at the underside: {tuple(float(v) for v in origin[:2])} "
         f"outline={tuple(float(value) for value in native.GetOutline())}"
     )
+
+
+def _crop_pivot_section(adapter: Any, section: Any) -> None:
+    """Crop A-A to its strip, then prove its bore axis still stands on
+    PIVOT_SECTION_BORE_XY."""
+    corners = [
+        model_point_in_view(
+            adapter,
+            section,
+            (plate_edge_mm(0.0, side) / 1000.0, y_mm / 1000.0, 0.0),
+            label=f"A-A strip corner {side:+d}",
+        )
+        for side, y_mm in ((-1, 0.0), (1, PLATE_THICKNESS))
+    ]
+    margin = PIVOT_CROP_MARGIN_MM * 2.0 / 1000.0
+    xs = [float(corner[0]) for corner in corners]
+    ys = [float(corner[1]) for corner in corners]
+    fence = (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+    _crop_section_to_fence(adapter, section, fence, label="A-A")
+    _place_pivot_section(adapter, section)
 
 
 def _look_holddown_section_south(
@@ -1993,7 +2003,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _look_section_south(adapter, profile, section, cut, z_mm=0.0, label="A-A")
-    _crop_and_place_pivot_section(adapter, section)
+    _place_pivot_section(adapter, section)
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(
@@ -2102,10 +2112,10 @@ async def build(adapter: Any) -> dict[str, str]:
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
             # The witnesses run from the faces' native origin, right of the
             # strip (x415 before SECTION_SHIFT when A-A looked north), to the
-            # dimension line.  Read where they start now -- cropped, the origin
-            # need not stay there -- and widen each gap so they start 1.2 mm
-            # right of the cut edge (x339), without changing the model
-            # dimension or hiding either witness.
+            # dimension line.  Read where they start rather than assume that
+            # origin, and widen each gap so they start 1.2 mm right of the
+            # cut edge (x339), without changing the model dimension or hiding
+            # either witness.
             starts = [
                 max(segment.x0, segment.x1)
                 for segment in _display_lines(
@@ -2133,6 +2143,7 @@ async def build(adapter: Any) -> dict[str, str]:
                     raise RuntimeError("plate thickness witness gap did not persist")
                 print(f"PlateThk witness {witness_index}: old_gap_m={old_gap} gap_m={actual_gap}")
             rebuild_drawing(adapter, label="plate thickness cut-edge witness gaps")
+    _crop_pivot_section(adapter, section)
     detail_annotations = curate_view_dimensions(
         adapter,
         detail,

@@ -1821,15 +1821,8 @@ def test_sections_turn_to_look_south_top_face_up(monkeypatch, defect) -> None:
             look()
 
 
-@pytest.mark.parametrize("ignored", [False, True])
-def test_reversed_pivot_section_is_cropped_and_moved_back(monkeypatch, ignored):
-    """Run 20261023T181910549Z: reversed, A-A kept its underside at 0.12635
-    and grew 12.7 mm upward; run 20261023T182942818Z: its outline was the
-    whole plate south of the cut, 28.2 mm past the border.  The view is
-    cropped to its strip, then moved until the bore axis at the underside
-    reads PIVOT_SECTION_BORE_XY; a move SolidWorks ignores is refused."""
-    state = {"origin": (0.3725, 0.12635)}
-    fences = []
+def _fake_pivot_section(monkeypatch, *, origin, ignored=False):
+    state = {"origin": origin}
 
     def move(position, _snap):
         if not ignored:
@@ -1848,31 +1841,74 @@ def test_reversed_pivot_section_is_cropped_and_moved_back(monkeypatch, ignored):
     monkeypatch.setattr(drawing, "double_array", list)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "model_point_in_view", project)
+    return state, view
+
+
+@pytest.mark.parametrize("ignored", [False, True])
+def test_reversed_pivot_section_is_moved_back_onto_its_station(monkeypatch, ignored):
+    """Run 20261023T181910549Z: reversed, A-A kept its underside at 0.12635
+    and grew 12.7 mm upward, so one PlateThk witness missed its level.  The
+    view is moved until the bore axis at the underside reads
+    PIVOT_SECTION_BORE_XY; a move SolidWorks ignores is refused."""
+    state, view = _fake_pivot_section(
+        monkeypatch, origin=(0.3725, 0.12635), ignored=ignored
+    )
+    assert drawing.PIVOT_SECTION_BORE_XY == pytest.approx((0.372, 0.11365))
+    if ignored:
+        with pytest.raises(RuntimeError, match="landed at"):
+            drawing._place_pivot_section(object(), view)
+        return
+    drawing._place_pivot_section(object(), view)
+    assert state["origin"] == pytest.approx(drawing.PIVOT_SECTION_BORE_XY)
+
+
+def test_pivot_section_is_cropped_to_its_strip_after_its_dimensions(monkeypatch):
+    """Run 20261023T182942818Z: looking south, A-A's outline was the whole
+    plate south of the cut, 28.2 mm past the border, so it is cropped to its
+    strip -- after its dimensions are curated: cropped first, PlateThk found
+    nothing to import onto (run 20261023T185029293Z)."""
+    state, view = _fake_pivot_section(monkeypatch, origin=drawing.PIVOT_SECTION_BORE_XY)
+    fences = []
     monkeypatch.setattr(
         drawing,
         "_crop_section_to_fence",
         lambda _adapter, _view, fence, *, label: fences.append((label, fence)),
     )
-    assert drawing.PIVOT_SECTION_BORE_XY == pytest.approx((0.372, 0.11365))
-    if ignored:
-        with pytest.raises(RuntimeError, match="landed at"):
-            drawing._crop_and_place_pivot_section(object(), view)
-        return
-    drawing._crop_and_place_pivot_section(object(), view)
+    drawing._crop_pivot_section(object(), view)
     assert state["origin"] == pytest.approx(drawing.PIVOT_SECTION_BORE_XY)
     [(label, fence)] = fences
+    x0, y0 = drawing.PIVOT_SECTION_BORE_XY
     margin = drawing.PIVOT_CROP_MARGIN_MM * 2 / 1000.0
-    east = drawing.plate_edge_mm(0.0, -1)
-    west = drawing.plate_edge_mm(0.0, 1)
     assert label == "A-A"
     assert fence == pytest.approx(
         (
-            0.3725 + 2 * east / 1000.0 - margin,
-            0.12635 - margin,
-            0.3725 + 2 * west / 1000.0 + margin,
-            0.12635 + 2 * spec.PLATE_THICKNESS / 1000.0 + margin,
+            x0 + 2 * drawing.plate_edge_mm(0.0, -1) / 1000.0 - margin,
+            y0 - margin,
+            x0 + 2 * drawing.plate_edge_mm(0.0, 1) / 1000.0 + margin,
+            y0 + 2 * spec.PLATE_THICKNESS / 1000.0 + margin,
         )
     )
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    build = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
+    )
+    curated = next(
+        node.lineno
+        for node in build.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "section_annotations"
+    )
+    cropped = next(
+        node.lineno
+        for node in build.body
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and getattr(node.value.func, "id", None) == "_crop_pivot_section"
+    )
+    assert curated < cropped
 
 
 @pytest.mark.parametrize(
