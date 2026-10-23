@@ -94,8 +94,7 @@ def _capture_original_washer_source_failure(
     try:
         proof = _WasherSourceReadback(adapter, THICKNESS)
         missing = object()
-        failed_correspondence: dict[tuple[str, int], str] = {}
-        failed_identities: dict[tuple[int, int], str] = {}
+        failed_reads: dict[tuple[int, str, tuple], str] = {}
         point_reads: dict[int, tuple[str, Any]] = {}
         surfaces: dict[int, tuple[Any, int]] = {}
         dispatch_surfaces: dict[int, tuple[Any, int]] = {}
@@ -120,10 +119,24 @@ def _capture_original_washer_source_failure(
                 dispatch_surfaces[id(dispatch)] = (dispatch, key)
             return key
 
-        def read(field: str, getter: Callable[[], Any]) -> Any:
+        def read(
+            field: str, getter: Callable[[], Any], *,
+            operation: tuple[Any, str, tuple] | None = None,
+        ) -> Any:
+            key = None if operation is None else (
+                surface_key(operation[0]), operation[1], operation[2],
+            )
+            if key is not None and key in failed_reads:
+                try:
+                    proof.read(f"{field}.unavailable", lambda: "prior_getter_failed:" + failed_reads[key])
+                except BaseException:
+                    pass
+                return missing
             try:
                 return proof.read(field, getter)
             except BaseException:
+                if key is not None:
+                    failed_reads[key] = field
                 return missing
 
         def available(value: Any) -> bool:
@@ -131,7 +144,8 @@ def _capture_original_washer_source_failure(
 
         def bind(field: str, value: Any, interface: str) -> Any:
             if not available(value):
-                read(f"{field}.unavailable", lambda: "getter_failed" if value is missing else "null")
+                if f"{field}.unavailable" not in proof.fields:
+                    read(f"{field}.unavailable", lambda: "getter_failed" if value is missing else "null")
                 return missing
             key = surface_key(value)
             native = read(f"{field}.interface", lambda: _early_bound(value, interface))
@@ -150,14 +164,11 @@ def _capture_original_washer_source_failure(
                     if not available(first) or not available(second):
                         read(f"{name}.unavailable", lambda: "null_or_failed_input")
                         continue
-                    key = (surface_key(first), surface_key(second))
-                    if key in failed_identities:
-                        read(f"{name}.unavailable", lambda: "prior_getter_failed:" + failed_identities[key])
-                        continue
-                    result = read(name, lambda first=first, second=second: proof.app.IsSame(first, second))
+                    result = read(
+                        name, lambda first=first, second=second: proof.app.IsSame(first, second),
+                        operation=(proof.app, "ISldWorks.IsSame", (surface_key(first), surface_key(second))),
+                    )
                     results[left, right] = result
-                    if result is missing:
-                        failed_identities[key] = name
             return results
 
         def slots(field: str, raw: Any, expected: int, *, count: Any) -> tuple:
@@ -182,27 +193,19 @@ def _capture_original_washer_source_failure(
             if not available(value) or not available(owning_view):
                 read(f"{field}.unavailable", lambda: "input_or_view_unavailable")
                 return missing
-            key = ("forward", surface_key(value))
-            if key in failed_correspondence:
-                read(f"{field}.unavailable", lambda: "prior_getter_failed:" + failed_correspondence[key])
-                return missing
-            result = read(field, lambda: owning_view.GetCorresponding(value))
-            if result is missing:
-                failed_correspondence[key] = field
-            return result
+            return read(
+                field, lambda: owning_view.GetCorresponding(value),
+                operation=(owning_view, "IView.GetCorresponding", (surface_key(value),)),
+            )
 
         def reverse(field: str, value: Any) -> Any:
             if not available(value) or not available(extension):
                 read(f"{field}.unavailable", lambda: "input_or_extension_unavailable")
                 return missing
-            key = ("reverse", surface_key(value))
-            if key in failed_correspondence:
-                read(f"{field}.unavailable", lambda: "prior_getter_failed:" + failed_correspondence[key])
-                return missing
-            result = read(field, lambda: extension.GetCorresponding2(value))
-            if result is missing:
-                failed_correspondence[key] = field
-            return result
+            return read(
+                field, lambda: extension.GetCorresponding2(value),
+                operation=(extension, "IModelDocExtension.GetCorresponding2", (surface_key(value),)),
+            )
 
         def source_mapping(field: str, value: Any, context: dict[str, Any] | None = None) -> Any:
             mapped = forward(f"{field}.forward", value)
@@ -243,10 +246,16 @@ def _capture_original_washer_source_failure(
                 return previous[1]
             point_reads[key] = (field, native)
             if available(native):
-                read(f"{field}.id", lambda: native.GetID())
-                sketch = read(f"{field}.sketch", lambda: native.GetSketch())
+                read(f"{field}.id", lambda: native.GetID(), operation=(native, "ISketchPoint.GetID", ()))
+                sketch = read(
+                    f"{field}.sketch", lambda: native.GetSketch(),
+                    operation=(native, "ISketchPoint.GetSketch", ()),
+                )
                 for coordinate in ("X", "Y", "Z"):
-                    read(f"{field}.{coordinate}", lambda coordinate=coordinate: getattr(native, coordinate))
+                    read(
+                        f"{field}.{coordinate}", lambda coordinate=coordinate: getattr(native, coordinate),
+                        operation=(native, f"ISketchPoint.{coordinate}", ()),
+                    )
                 matrix(f"{field}.sketch_identity", {"owner": sketch, **sketches})
             return native
 
@@ -255,8 +264,14 @@ def _capture_original_washer_source_failure(
                 return missing, ()
             # ISketch has no documented total segment-count getter. Inspect the
             # returned array length, never enumerate beyond the one known line.
-            raw = read(f"{field}.segments", lambda: sketch.GetSketchSegments())
-            read(f"{field}.point_count", lambda: sketch.GetSketchPointsCount2())
+            raw = read(
+                f"{field}.segments", lambda: sketch.GetSketchSegments(),
+                operation=(sketch, "ISketch.GetSketchSegments", ()),
+            )
+            read(
+                f"{field}.point_count", lambda: sketch.GetSketchPointsCount2(),
+                operation=(sketch, "ISketch.GetSketchPointsCount2", ()),
+            )
             segments = slots(
                 f"{field}.segments", raw, 1,
                 count=len(raw) if type(raw) in (tuple, list) else missing,
@@ -267,10 +282,19 @@ def _capture_original_washer_source_failure(
             segment = bind(f"{field}.segment", segments[0], "ISketchSegment")
             if not available(segment):
                 return missing, ()
-            kind = read(f"{field}.segment.type", lambda: segment.GetType())
-            read(f"{field}.segment.id", lambda: segment.GetID())
-            owner = read(f"{field}.segment.sketch", lambda: segment.GetSketch())
-            read(f"{field}.segment.construction", lambda: segment.ConstructionGeometry)
+            kind = read(
+                f"{field}.segment.type", lambda: segment.GetType(),
+                operation=(segment, "ISketchSegment.GetType", ()),
+            )
+            read(f"{field}.segment.id", lambda: segment.GetID(), operation=(segment, "ISketchSegment.GetID", ()))
+            owner = read(
+                f"{field}.segment.sketch", lambda: segment.GetSketch(),
+                operation=(segment, "ISketchSegment.GetSketch", ()),
+            )
+            read(
+                f"{field}.segment.construction", lambda: segment.ConstructionGeometry,
+                operation=(segment, "ISketchSegment.ConstructionGeometry", ()),
+            )
             matrix(f"{field}.segment.sketch_identity", {"owner": owner, "expected": sketch})
             if type(kind) is not int or kind != 0:
                 read(f"{field}.endpoints.unavailable", lambda: "unexpected_segment_type")
@@ -279,8 +303,10 @@ def _capture_original_washer_source_failure(
             if not available(line):
                 return segment, ()
             return segment, (
-                read(f"{field}.start", lambda: line.GetStartPoint2()),
-                read(f"{field}.end", lambda: line.GetEndPoint2()),
+                read(f"{field}.start", lambda: line.GetStartPoint2(),
+                     operation=(line, "ISketchLine.GetStartPoint2", ())),
+                read(f"{field}.end", lambda: line.GetEndPoint2(),
+                     operation=(line, "ISketchLine.GetEndPoint2", ())),
             )
 
         read("diagnostic.phase", lambda: phase)
@@ -290,33 +316,43 @@ def _capture_original_washer_source_failure(
         owning_view = bind("view", view, "IView")
         extension = missing
         if available(source):
-            read("source.document_type", lambda: source.GetType())
-            read("source.path", lambda: source.GetPathName())
+            read("source.document_type", lambda: source.GetType(), operation=(source, "IModelDoc2.GetType", ()))
+            read("source.path", lambda: source.GetPathName(), operation=(source, "IModelDoc2.GetPathName", ()))
             extension = bind(
-                "source.extension", read("source.extension", lambda: source.Extension), "IModelDocExtension",
+                "source.extension", read("source.extension", lambda: source.Extension,
+                                         operation=(source, "IModelDoc2.Extension", ())), "IModelDocExtension",
             )
             manager = bind(
                 "source.configuration_manager",
-                read("source.configuration_manager", lambda: source.ConfigurationManager),
+                read("source.configuration_manager", lambda: source.ConfigurationManager,
+                     operation=(source, "IModelDoc2.ConfigurationManager", ())),
                 "IConfigurationManager",
             )
             if available(manager):
                 configuration = bind(
                     "source.active_configuration",
-                    read("source.active_configuration", lambda: manager.ActiveConfiguration), "IConfiguration",
+                    read("source.active_configuration", lambda: manager.ActiveConfiguration,
+                         operation=(manager, "IConfigurationManager.ActiveConfiguration", ())), "IConfiguration",
                 )
                 if available(configuration):
-                    read("source.active_configuration.name", lambda: configuration.Name)
+                    read("source.active_configuration.name", lambda: configuration.Name,
+                         operation=(configuration, "IConfiguration.Name", ()))
         if available(owning_view):
-            read("view.orientation", lambda: owning_view.GetOrientationName())
-            read("view.configuration", lambda: owning_view.ReferencedConfiguration)
-            read("view.referenced_path", lambda: owning_view.GetReferencedModelName())
+            read("view.orientation", lambda: owning_view.GetOrientationName(),
+                 operation=(owning_view, "IView.GetOrientationName", ()))
+            read("view.configuration", lambda: owning_view.ReferencedConfiguration,
+                 operation=(owning_view, "IView.ReferencedConfiguration", ()))
+            read("view.referenced_path", lambda: owning_view.GetReferencedModelName(),
+                 operation=(owning_view, "IView.GetReferencedModelName", ()))
             referenced = bind(
-                "view.document", read("view.document", lambda: owning_view.ReferencedDocument), "IModelDoc2",
+                "view.document", read("view.document", lambda: owning_view.ReferencedDocument,
+                                      operation=(owning_view, "IView.ReferencedDocument", ())), "IModelDoc2",
             )
             if available(referenced):
-                read("view.document_type", lambda: referenced.GetType())
-                read("view.document_path", lambda: referenced.GetPathName())
+                read("view.document_type", lambda: referenced.GetType(),
+                     operation=(referenced, "IModelDoc2.GetType", ()))
+                read("view.document_path", lambda: referenced.GetPathName(),
+                     operation=(referenced, "IModelDoc2.GetPathName", ()))
             matrix("view.document_identity", {"source": source, "referenced": referenced})
 
         feature_name, dimension_name = SOURCE_DIMENSIONS[THICKNESS]
@@ -326,13 +362,15 @@ def _capture_original_washer_source_failure(
         if available(source):
             parameter = bind(
                 "dimension.parameter",
-                read("dimension.parameter", lambda: source.Parameter(f"{dimension_name}@{feature_name}")),
+                read("dimension.parameter", lambda: source.Parameter(f"{dimension_name}@{feature_name}"),
+                     operation=(source, "IModelDoc2.Parameter", (f"{dimension_name}@{feature_name}",))),
                 "IDimension",
             )
             part = bind("source.part", source, "IPartDoc")
             if available(part):
                 feature = bind(
-                    "source.feature", read("source.feature", lambda: part.FeatureByName(feature_name)), "IFeature",
+                    "source.feature", read("source.feature", lambda: part.FeatureByName(feature_name),
+                                           operation=(part, "IPartDoc.FeatureByName", (feature_name,))), "IFeature",
                 )
         mapped_feature = bind("mapped.feature", source_mapping("feature", feature), "IFeature")
         reverse_feature = mapped_mapping("mapped.feature", mapped_feature)
@@ -340,12 +378,15 @@ def _capture_original_washer_source_failure(
         for name, current_feature in (("source", feature), ("mapped", mapped_feature)):
             sketch = missing
             if available(current_feature):
-                read(f"{name}.feature.name", lambda: current_feature.Name)
-                kind = read(f"{name}.feature.type", lambda: current_feature.GetTypeName2())
+                read(f"{name}.feature.name", lambda: current_feature.Name,
+                     operation=(current_feature, "IFeature.Name", ()))
+                kind = read(f"{name}.feature.type", lambda: current_feature.GetTypeName2(),
+                            operation=(current_feature, "IFeature.GetTypeName2", ()))
                 if type(kind) is str and kind == "ProfileFeature":
                     sketch = bind(
                         f"{name}.sketch",
-                        read(f"{name}.sketch", lambda: current_feature.GetSpecificFeature2()), "ISketch",
+                        read(f"{name}.sketch", lambda: current_feature.GetSpecificFeature2(),
+                             operation=(current_feature, "IFeature.GetSpecificFeature2", ())), "ISketch",
                     )
                 else:
                     read(f"{name}.sketch.unavailable", lambda: (
@@ -360,7 +401,8 @@ def _capture_original_washer_source_failure(
         if available(feature):
             original_display = bind(
                 "source.first_display",
-                read("source.first_display", lambda: feature.GetFirstDisplayDimension()), "IDisplayDimension",
+                read("source.first_display", lambda: feature.GetFirstDisplayDimension(),
+                     operation=(feature, "IFeature.GetFirstDisplayDimension", ())), "IDisplayDimension",
             )
         imported_display = bind("imported.display", imported, "IDisplayDimension")
         displays = {"source": original_display, "imported": imported_display}
@@ -370,18 +412,24 @@ def _capture_original_washer_source_failure(
         for name, display in displays.items():
             if not available(display):
                 continue
-            read(f"{name}.display.selection_name", lambda: display.GetNameForSelection())
-            read(f"{name}.display.type", lambda: display.Type2)
+            read(f"{name}.display.selection_name", lambda: display.GetNameForSelection(),
+                 operation=(display, "IDisplayDimension.GetNameForSelection", ()))
+            read(f"{name}.display.type", lambda: display.Type2,
+                 operation=(display, "IDisplayDimension.Type2", ()))
             dimensions[name] = bind(
-                f"{name}.dimension", read(f"{name}.dimension", lambda: display.GetDimension2(0)), "IDimension",
+                f"{name}.dimension", read(f"{name}.dimension", lambda: display.GetDimension2(0),
+                                          operation=(display, "IDisplayDimension.GetDimension2", (0,))), "IDimension",
             )
             annotations[name] = bind(
-                f"{name}.annotation", read(f"{name}.annotation", lambda: display.GetAnnotation()), "IAnnotation",
+                f"{name}.annotation", read(f"{name}.annotation", lambda: display.GetAnnotation(),
+                                           operation=(display, "IDisplayDimension.GetAnnotation", ())), "IAnnotation",
             )
         for name, dimension in dimensions.items():
             if available(dimension):
-                full_name = read(f"{name}.dimension.full_name", lambda: dimension.FullName)
-                read(f"{name}.dimension.name", lambda: dimension.Name)
+                full_name = read(f"{name}.dimension.full_name", lambda: dimension.FullName,
+                                 operation=(dimension, "IDimension.FullName", ()))
+                read(f"{name}.dimension.name", lambda: dimension.Name,
+                     operation=(dimension, "IDimension.Name", ()))
                 if name == "source":
                     read("source.first_display.expected_dimension_heads", lambda: (dimension_name, feature_name))
                     read("source.first_display.dimension_state", lambda: (
@@ -392,7 +440,8 @@ def _capture_original_washer_source_failure(
                     ))
                 features[f"{name}_owner"] = bind(
                     f"{name}.dimension.owner",
-                    read(f"{name}.dimension.owner", lambda: dimension.GetFeatureOwner()), "IFeature",
+                    read(f"{name}.dimension.owner", lambda: dimension.GetFeatureOwner(),
+                         operation=(dimension, "IDimension.GetFeatureOwner", ())), "IFeature",
                 )
         matrix("dimension.identity", dimensions)
         matrix("display.identity", displays)
@@ -420,14 +469,21 @@ def _capture_original_washer_source_failure(
         for name, annotation in annotations.items():
             if not available(annotation):
                 continue
-            read(f"{name}.annotation.owner_type", lambda: annotation.OwnerType)
-            owner = read(f"{name}.annotation.owner", lambda: annotation.Owner)
+            read(f"{name}.annotation.owner_type", lambda: annotation.OwnerType,
+                 operation=(annotation, "IAnnotation.OwnerType", ()))
+            owner = read(f"{name}.annotation.owner", lambda: annotation.Owner,
+                         operation=(annotation, "IAnnotation.Owner", ()))
             matrix(f"{name}.annotation.owner_identity", {"owner": owner, "model": source, "view": owning_view})
-            count = read(f"{name}.annotation.count", lambda: annotation.GetAttachedEntityCount3())
-            types = read(f"{name}.annotation.types", lambda: annotation.GetAttachedEntityTypes())
-            entities = read(f"{name}.annotation.entities", lambda: annotation.GetAttachedEntities3())
-            read(f"{name}.annotation.dangling", lambda: annotation.IsDangling())
-            read(f"{name}.annotation.visible", lambda: annotation.Visible)
+            count = read(f"{name}.annotation.count", lambda: annotation.GetAttachedEntityCount3(),
+                         operation=(annotation, "IAnnotation.GetAttachedEntityCount3", ()))
+            types = read(f"{name}.annotation.types", lambda: annotation.GetAttachedEntityTypes(),
+                         operation=(annotation, "IAnnotation.GetAttachedEntityTypes", ()))
+            entities = read(f"{name}.annotation.entities", lambda: annotation.GetAttachedEntities3(),
+                            operation=(annotation, "IAnnotation.GetAttachedEntities3", ()))
+            read(f"{name}.annotation.dangling", lambda: annotation.IsDangling(),
+                 operation=(annotation, "IAnnotation.IsDangling", ()))
+            read(f"{name}.annotation.visible", lambda: annotation.Visible,
+                 operation=(annotation, "IAnnotation.Visible", ()))
             slots(f"{name}.annotation.types", types, 2, count=count)
             attached = slots(f"{name}.annotation.entities", entities, 2, count=count)
             for index, entity in enumerate(attached):

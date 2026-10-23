@@ -2892,6 +2892,289 @@ def test_original_source_capture_internal_error_receipt_preserves_captured_excep
     ].ReferencedConfiguration
 
 
+@pytest.mark.parametrize("member,first,later,other", (
+    ("GetType", "source.document_type", "view.document_type", "view.document_path"),
+    ("GetPathName", "source.path", "view.document_path", "view.document_type"),
+))
+@pytest.mark.parametrize("rebind", (False, True), ids=("held-object", "rebound-dispatch"))
+def test_original_source_capture_document_failure_is_borrowed_across_known_aliases(
+    original_source_capture, monkeypatch, member, first, later, other, rebind,
+):
+    case = original_source_capture
+    calls = []
+
+    def getter():
+        calls.append(member)
+        raise ValueError("known document " + member)
+
+    monkeypatch.setattr(case.model, member, getter)
+    if rebind:
+        _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == [member]
+    assert reads[first] == {"error_type": "ValueError", "read_error": "known document " + member}
+    assert later not in reads
+    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
+    assert reads[other]["value"] == (str(case.source_path) if member == "GetType" else 1)
+    assert reads["source.annotation.visible"]["value"] == 1
+    assert reads["imported.annotation.visible"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,source_field,referenced_field", (
+    ("GetType", "source.document_type", "view.document_type"),
+    ("GetPathName", "source.path", "view.document_path"),
+))
+@pytest.mark.parametrize("failing", ("source", "referenced", "both"))
+def test_original_source_capture_document_native_equality_keeps_distinct_getter_outcomes(
+    original_source_capture, monkeypatch, member, source_field, referenced_field, failing,
+):
+    case = original_source_capture
+    referenced = _Part(**vars(case.model))
+    monkeypatch.setattr(case.original[case.side], "ReferencedDocument", referenced)
+    calls = {"source": 0, "referenced": 0}
+
+    def getter(context):
+        calls[context] += 1
+        if failing in {context, "both"}:
+            raise ValueError(context + " document sentinel")
+        return 1 if member == "GetType" else str(case.source_path)
+
+    for context, model in (("source", case.model), ("referenced", referenced)):
+        monkeypatch.setattr(model, member, lambda context=context: getter(context))
+    actual_same = case.app.IsSame
+
+    def same(first, second):
+        if ((first is case.model and second is referenced)
+                or (first is referenced and second is case.model)):
+            return 1
+        return actual_same(first, second)
+
+    monkeypatch.setattr(case.app, "IsSame", same)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == {"source": 1, "referenced": 1}
+    for context, field in (("source", source_field), ("referenced", referenced_field)):
+        if failing in {context, "both"}:
+            assert reads[field] == {
+                "error_type": "ValueError", "read_error": context + " document sentinel",
+            }
+        else:
+            assert reads[field]["value"] == (1 if member == "GetType" else str(case.source_path))
+        assert field + ".unavailable" not in reads
+    assert reads["view.document_identity.source.referenced"]["value"] == 1
+    assert reads["view.document_identity.referenced.source"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,field", (
+    ("Name", "feature.name"), ("GetTypeName2", "feature.type"), ("GetSpecificFeature2", "sketch"),
+))
+@pytest.mark.parametrize("rebind", (False, True), ids=("held-object", "rebound-dispatch"))
+def test_original_source_capture_feature_metadata_failure_is_borrowed_across_roles(
+    original_source_capture, monkeypatch, member, field, rebind,
+):
+    case = original_source_capture
+    original = case.features[source.THICKNESS_FEATURE]
+    sketch = original.GetSpecificFeature2()
+    calls = {"Name": 0, "GetTypeName2": 0, "GetSpecificFeature2": 0}
+
+    def getter(name, value):
+        calls[name] += 1
+        if name == member:
+            raise ValueError("known feature " + member)
+        return value
+
+    class FeatureMetadata:
+        @property
+        def Name(self):
+            return getter("Name", source.THICKNESS_FEATURE)
+
+        def GetTypeName2(self):
+            return getter("GetTypeName2", "ProfileFeature")
+
+        def GetSpecificFeature2(self):
+            return getter("GetSpecificFeature2", sketch)
+
+        def GetFirstDisplayDimension(self):
+            return case.source_displays[source.THICKNESS]
+
+    feature = FeatureMetadata()
+    monkeypatch.setitem(case.features, source.THICKNESS_FEATURE, feature)
+    monkeypatch.setitem(case.original[case.side].forward, id(feature), feature)
+    monkeypatch.setitem(case.model.Extension.reverse, id(feature), feature)
+    if rebind:
+        _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls[member] == 1
+    assert reads[f"source.{field}"] == {
+        "error_type": "ValueError", "read_error": "known feature " + member,
+    }
+    assert f"mapped.{field}" not in reads
+    assert reads[f"mapped.{field}.unavailable"]["value"] == f"prior_getter_failed:source.{field}"
+    if member == "GetTypeName2":
+        assert calls["GetSpecificFeature2"] == 0
+    elif member != "GetSpecificFeature2":
+        assert calls["GetSpecificFeature2"] == 2
+    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
+    assert reads["source.annotation.count"]["value"] == 2
+    assert reads["imported.annotation.count"]["value"] == 2
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,field", (
+    ("FullName", "full_name"), ("Name", "name"), ("GetFeatureOwner", "owner"),
+))
+def test_original_source_capture_dimension_metadata_failure_is_borrowed_only_for_known_surface(
+    original_source_capture, monkeypatch, member, field,
+):
+    case = original_source_capture
+    feature = case.features[source.THICKNESS_FEATURE]
+    full_name = case.source_natives[source.THICKNESS].FullName
+    calls = {"FullName": 0, "Name": 0, "GetFeatureOwner": 0}
+
+    def getter(name, value):
+        calls[name] += 1
+        if name == member:
+            raise ValueError("known dimension " + member)
+        return value
+
+    class DimensionMetadata:
+        @property
+        def FullName(self):
+            return getter("FullName", full_name)
+
+        @property
+        def Name(self):
+            return getter("Name", "SupplierThickness")
+
+        def GetFeatureOwner(self):
+            return getter("GetFeatureOwner", feature)
+
+    native = DimensionMetadata()
+    monkeypatch.setitem(case.canonical_parameters, "SupplierThickness@SupplierWasherThicknessReference", native)
+    for display in (case.source_displays[source.THICKNESS], _authoring_display(case, source.THICKNESS)):
+        monkeypatch.setattr(display, "GetDimension2", lambda _index: native)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls[member] == 1
+    assert all(count == 3 for name, count in calls.items() if name != member)
+    first = "parameter.dimension." + field
+    assert reads[first] == {"error_type": "ValueError", "read_error": "known dimension " + member}
+    for role in ("source", "imported"):
+        later = role + ".dimension." + field
+        assert later not in reads
+        assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
+    assert reads["source.annotation.visible"]["value"] == 1
+    assert reads["imported.annotation.visible"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,field", (
+    ("GetAttachedEntityCount3", "count"), ("GetAttachedEntityTypes", "types"),
+    ("GetAttachedEntities3", "entities"), ("Visible", "visible"),
+))
+def test_original_source_capture_annotation_metadata_failure_is_borrowed_across_roles(
+    original_source_capture, monkeypatch, member, field,
+):
+    case = original_source_capture
+    annotation = case.source_displays[source.THICKNESS].annotation
+    calls = []
+
+    def refuse():
+        calls.append(member)
+        raise ValueError("known annotation " + member)
+
+    class AnnotationMetadata:
+        def __getattr__(self, name):
+            if name == member:
+                return refuse() if member == "Visible" else refuse
+            return getattr(annotation, name)
+
+    shared = AnnotationMetadata()
+    for display in (case.source_displays[source.THICKNESS], _authoring_display(case, source.THICKNESS)):
+        monkeypatch.setattr(display, "GetAnnotation", lambda: shared)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == [member]
+    first = "source.annotation." + field
+    later = "imported.annotation." + field
+    assert reads[first] == {"error_type": "ValueError", "read_error": "known annotation " + member}
+    assert later not in reads
+    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
+    assert reads["source.annotation.dangling"]["value"] is False
+    assert reads["imported.annotation.owner_type"]["value"] == 3
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,field,arguments", (
+    ("GetDimension2", "dimension", (0,)),
+    ("GetAnnotation", "annotation", ()),
+    ("GetNameForSelection", "display.selection_name", ()),
+))
+def test_original_source_capture_display_failed_member_and_arguments_are_not_retried(
+    original_source_capture, monkeypatch, member, field, arguments,
+):
+    case = original_source_capture
+    display = _authoring_display(case, source.THICKNESS)
+    calls = []
+
+    def getter(*args):
+        calls.append(args)
+        raise ValueError("known display " + member)
+
+    monkeypatch.setattr(case.features[source.THICKNESS_FEATURE], "GetFirstDisplayDimension", lambda: display)
+    monkeypatch.setattr(display, member, getter)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == [arguments]
+    first = "source." + field
+    later = "imported." + field
+    assert reads[first] == {"error_type": "ValueError", "read_error": "known display " + member}
+    assert later not in reads
+    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
+    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
+    assert reads["source.point.0.X"]["value"] == 0.005
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("member,field", (
+    ("GetSketchSegments", "segments"), ("GetSketchPointsCount2", "point_count"),
+    ("GetID", "segment.id"),
+))
+def test_original_source_capture_witness_metadata_failure_is_borrowed_across_roles(
+    original_source_capture, monkeypatch, member, field,
+):
+    case = original_source_capture
+    feature = case.features[source.THICKNESS_FEATURE]
+    view = case.original[case.side]
+    monkeypatch.setitem(view.forward, id(feature), feature)
+    monkeypatch.setitem(case.model.Extension.reverse, id(feature), feature)
+    surface = (case.diagnostic_sketch.GetSketchSegments()[0] if member == "GetID"
+               else case.diagnostic_sketch)
+    calls = []
+
+    def getter():
+        calls.append(member)
+        raise ValueError("known witness " + member)
+
+    monkeypatch.setattr(surface, member, getter)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == [member]
+    first = "source." + field
+    later = "mapped." + field
+    assert reads[first] == {"error_type": "ValueError", "read_error": "known witness " + member}
+    assert later not in reads
+    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
+    if member == "GetSketchPointsCount2":
+        assert reads["source.start"]["present"] is True
+        assert reads["mapped.end"]["present"] is True
+    assert reads["source.annotation.visible"]["value"] == 1
+    assert reads["imported.annotation.visible"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
 @pytest.mark.parametrize("failure_stage", ("none", "logging", "note"))
 @pytest.mark.parametrize("label", (source.THICKNESS, source.OUTER_DIAMETER))
 def test_source_attachment_diagnostic_preserves_original_exception(
