@@ -893,6 +893,8 @@ def _capture_saved_supplier_references(adapter, refs_by_sheet, view_contracts, p
     It never derives a name from the old key, reads captured geometry, refreshes
     views, or changes a source configuration. Any unavailable metadata refuses.
     """
+    if prior is None:
+        raise RuntimeError("counter anchor has no successfully verified original snapshot")
     expected = {
         (sheet, key): contract
         for sheet, refs in refs_by_sheet.items() for key, contract in refs
@@ -1219,7 +1221,7 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
     notes_by_sheet = {SHEET_NAMES[0]: finished_notes, SHEET_NAMES[1]: stock_notes}
-    settled_reference_identities = ()
+    settled_reference_identities = None
     saved_supplier_references = None
 
     def verify_settled_supplier_references():

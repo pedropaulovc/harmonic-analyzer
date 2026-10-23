@@ -2186,14 +2186,16 @@ def test_native_owner_proof_rejects_foreign_or_inconsistent_same_name_view(
         _capture_saved(scene, saved)
 
 
-@pytest.mark.parametrize("fault", ("missing-original", "duplicate-original", "foreign-original-key", "foreign-label"))
+@pytest.mark.parametrize("fault", ("unpublished-original", "missing-original", "duplicate-original", "foreign-original-key", "foreign-label"))
 def test_saved_capture_requires_complete_original_reference_contract(
     supplier_eye_scene, monkeypatch, fault,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
     _save_supplier_keys(saved)
-    if fault == "missing-original":
+    if fault == "unpublished-original":
+        saved.prior = None
+    elif fault == "missing-original":
         saved.prior = saved.prior[:-1]
     elif fault == "duplicate-original":
         saved.prior = (*saved.prior[:-1], saved.prior[0])
