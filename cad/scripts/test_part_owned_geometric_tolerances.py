@@ -445,6 +445,42 @@ def _require_typed_controls(spec_tree: ast.Module) -> None:
         ), "typed control lacks a part-owned tolerance"
 
 
+def _require_nonreflective_projection(tree: ast.Module) -> None:
+    """Refuse reflective namespaces instead of pretending to interpret Python.
+
+    This bounded contract covers ordinary imports, bindings and public field
+    projections. Dynamic code/namespace access cannot establish static ownership.
+    Trusted production helpers are not imported or executed by this scanner.
+    """
+    reflective_names = {
+        "__import__", "compile", "delattr", "eval", "exec", "getattr",
+        "globals", "locals", "setattr", "vars",
+    }
+    reflective_modules = {"builtins", "importlib", "inspect", "operator"}
+    sys_aliases = {
+        alias.asname or alias.name for node in ast.walk(tree) if isinstance(node, ast.Import)
+        for alias in node.names if alias.name == "sys"
+    }
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            assert node.id not in reflective_names, "reflective typed projection is unproven"
+        elif isinstance(node, ast.Attribute):
+            assert not node.attr.startswith("__"), "private namespace escapes typed ownership"
+            assert not (
+                _root_name(node) in sys_aliases and node.attr in {"modules", "_getframe"}
+            ), "runtime module/frame lookup escapes typed ownership"
+        elif isinstance(node, ast.Import):
+            assert all(
+                alias.name.split(".")[0] not in reflective_modules for alias in node.names
+            ), "reflective imports escape typed ownership"
+        elif isinstance(node, ast.ImportFrom):
+            assert (node.module or "").split(".")[0] not in reflective_modules
+            assert not (
+                node.module == "sys"
+                and any(alias.name == "modules" or alias.name.startswith("_") for alias in node.names)
+            ), "runtime module/frame imports escape typed ownership"
+
+
 def _require_part_control_projection(
     tree: ast.Module, call: ast.Call, spec_tree: ast.Module, spec_module: str,
 ) -> None:
@@ -456,13 +492,17 @@ def _require_part_control_projection(
     public uppercase spec data may cross this boundary; constructors and their
     mutable class namespaces remain spec-owned.
     """
+    _require_nonreflective_projection(tree)
     assert not any(
         (
             isinstance(node, ast.Import)
             and any(alias.name == "_gtol_controls" for alias in node.names)
         ) or (
             isinstance(node, ast.ImportFrom) and node.module == "_gtol_controls"
-            and any(alias.name == "GeometricControl" for alias in node.names)
+            and any(
+                alias.name == "GeometricControl" or alias.name.startswith("_")
+                for alias in node.names
+            )
         )
         for node in ast.walk(tree)
     ), "GeometricControl constructors/type mutation belong to the part spec"
@@ -706,6 +746,13 @@ def test_typed_projection_allows_unrelated_spec_text_methods() -> None:
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom sample_spec import GeometricControl as Row\nRow.tolerance = property(lambda _: '9.9')"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom _gtol_controls import GeometricControl as Row\nRow.tolerance = property(lambda _: '9.9')"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport _gtol_controls as rows\nrows.GeometricControl.tolerance = property(lambda _: '9.9')"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom _gtol_controls import __dict__ as state\nstate['GeometricControl'].tolerance = property(lambda _: '9.9')"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nRow = part_spec.PART_DATUMS[0].__class__.__post_init__.__globals__['GeometricControl']\nRow.tolerance = property(lambda _: '9.9')"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    datum = part_spec.PART_DATUMS[0]\n    Row = datum.__class__"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nread = getattr"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom builtins import getattr as read"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport operator as reflect"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport sys as runtime\nstate = runtime.modules"),
     ("control = controls[index]", "control = controls[index]\n        state = control.__dict__\n        state['tolerance'] = '9.9'"),
     (
         "    controls = part_spec.GEOMETRIC_CONTROLS",
