@@ -480,8 +480,8 @@ if (
 # outboard journal, inside the bore mouth) and the land past the inboard
 # journal (to the Ø9 seat step).  The shank fits the crank hub and carries
 # the ShaftDiaDim band. Both non-mating necks use the title block's .X:
-# the right imports NeckDiaDim; the left is a native physical-edge drawing
-# measurement (the hub's fit band on either neck would be over-specified).
+# the right imports NeckDiaDim; the left measures the full width between
+# opposite native silhouettes (the hub's fit band would be over-specified).
 SHAFT_CORE_LANDS = (
     (0.0, SEAT_COLLAR),
     (COLLAR_REAR, JOURNAL_START),
@@ -491,8 +491,8 @@ if any(start >= end for start, end in SHAFT_CORE_LANDS):
     raise AssertionError("every bare Ø9.525 core land must have a length")
 NECK_DIA_PLACES = 1
 # The collar-side neck has no separate authored model dimension to import.
-# Its drawing-only, geometry-measured driven diameter uses the same loose
-# places as the existing right-hand NeckDiaDim, not the shank's fit band.
+# Its drawing-only driven linear full-width measurement carries only a native
+# diameter-symbol prefix and the right-hand neck's loose places, not the shank fit.
 DRAWING_REFERENCE_PRECISION = {"OutboardNeckDia": NECK_DIA_PLACES}
 if SHAFT_DIA + dt_crank_pinion_spec.printed_band_mm(NECK_DIA_PLACES) >= (
     JOURNAL_DIA + JOURNAL_DIA_BAND[1]

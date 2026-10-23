@@ -56,11 +56,13 @@ from _drawing_dimensions import (
     set_dimension_callouts,
     set_reference_dimension,
 )
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
@@ -294,7 +296,8 @@ OUTBOARD_NECK_ARROW_WINDOW = (
 )
 # Sheet-space display readback tolerance, not a model-size tolerance.
 NECK_ARROW_LANDING_TOLERANCE_M = 1e-5  # 0.01 mm against a ~2.34 mm axial land
-NECK_ARROW_DIRECTION_X_SLACK = 1e-6  # normalized-X roundoff near a vertical arrow
+NECK_ARROW_DIRECTION_X_SLACK = 1e-6  # normalized-X roundoff for vertical arrows
+NECK_GEOMETRY_TOLERANCE_M = 1e-8  # native endpoint/face-box roundoff, not a size band
 # The shank's band is the hub's fit; each bare neck has its own loose
 # diameter. The 2X Ø11.388 still names both bearing lands across the relief.
 CALLOUTS_ABOVE = {
@@ -842,107 +845,182 @@ def _far_end_rim(adapter: Any, view: Any) -> Any:
     return matches[0]
 
 
-def _outboard_neck_rim(adapter: Any, view: Any) -> Any:
-    """Resolve the physical core rim where the collar-side neck meets the journal.
+def _neck_numbers(raw: Any, count: int, *, label: str) -> tuple[float, ...]:
+    """Require complete finite native numeric evidence, without coercing nulls/bools."""
+    if (
+        type(raw) not in (tuple, list) or len(raw) != count
+        or any(type(value) not in (int, float) or not math.isfinite(value) for value in raw)
+    ):
+        raise RuntimeError(f"{label}: malformed native geometry {raw!r}")
+    return tuple(float(value) for value in raw)
 
-    Enumerate all solid/sheet bodies of FRONT's referenced part, not the
-    visible-edge list: the physical rim need not occur in that list. The
-    same-sized right neck and dome-root circle are not this feature.
-    The caller selects the exact model edge with IView.SelectEntity and
-    proves its source/view correspondence, never a silhouette or hit-test.
-    """
-    try:
-        document = _early_bound(view, "IView").ReferencedDocument
-    except Exception as exc:
-        raise RuntimeError(
-            f"collar-side neck: failed to read FRONT referenced document: {exc}"
-        ) from exc
-    if document is None:
-        raise RuntimeError("collar-side neck: FRONT has no referenced document")
-    try:
-        document_type = _early_bound(document, "IModelDoc2").GetType()
-    except Exception as exc:
-        raise RuntimeError(
-            f"collar-side neck: failed to read referenced document type: {exc}"
-        ) from exc
-    if type(document_type) is not int or document_type != 1:  # swDocPART
-        raise RuntimeError(
-            f"collar-side neck: FRONT referenced document is not a part "
-            f"(type={document_type!r})"
-        )
-    try:
-        bodies = tuple(
-            _early_bound(document, "IPartDoc").GetBodies2(-1, False) or ()
-        )  # swAllBodies; include nonvisible solid/sheet bodies
-    except Exception as exc:
-        raise RuntimeError(
-            f"collar-side neck: failed to read referenced part bodies: {exc}"
-        ) from exc
+
+def _is_outboard_neck_cylinder(face: Any, *, label: str) -> bool:
+    """Identify the exact short core land, not another equal-radius shaft face."""
+    face = _early_bound(face, "IFace2")
+    raw = face.GetSurface()
+    if raw is None:
+        raise RuntimeError(f"{label}: face has no native surface")
+    surface = _early_bound(raw, "ISurface")
+    cylinder = surface.IsCylinder()
+    if type(cylinder) is not bool:
+        raise RuntimeError(f"{label}: IsCylinder did not return a native BOOL")
+    if not cylinder:
+        return False
+    ox, _oy, oz, ax, ay, az, radius = _neck_numbers(
+        surface.CylinderParams, 7, label=f"{label} cylinder"
+    )
+    box = _neck_numbers(face.GetBox(), 6, label=f"{label} face box")
+    expected_radius = SHAFT_DIA / 2000.0
+    expected_box = (
+        -expected_radius, COLLAR_REAR / 1000.0, -expected_radius,
+        expected_radius, JOURNAL_START / 1000.0, expected_radius,
+    )
+    # GetBox is approximate: it is a bounded source-face discriminator, never
+    # the measured diameter. Native silhouette endpoints and SystemValue below
+    # independently establish the stations, radial normals and full width.
+    return (
+        max(abs(ox), abs(oz), abs(radius - expected_radius)) <= NECK_GEOMETRY_TOLERANCE_M
+        and max(abs(ax), abs(az), abs(abs(ay) - 1.0)) <= 1e-9
+        and all(abs(actual - expected) <= NECK_GEOMETRY_TOLERANCE_M
+                for actual, expected in zip(box, expected_box))
+    )
+
+
+def _outboard_neck_source_face(side: Any) -> Any:
+    """Independently resolve the physical source cylinder from all part bodies."""
+    source = _early_bound(side, "IView").ReferencedDocument
+    if source is None or source == "":
+        raise RuntimeError("collar-side neck: FRONT has no referenced source")
+    model = _early_bound(source, "IModelDoc2")
+    kind = model.GetType()
+    if type(kind) is not int or kind != 1:  # swDocPART
+        raise RuntimeError(f"collar-side neck: referenced source is not a part ({kind!r})")
+    bodies = tuple(_early_bound(source, "IPartDoc").GetBodies2(-1, False) or ())
     if not bodies:
-        raise RuntimeError("collar-side neck: FRONT referenced part has no bodies")
-    matches: list[Any] = []
-    for body_index, body in enumerate(bodies):
+        raise RuntimeError("collar-side neck: referenced source has no bodies")
+    matches = []
+    for body in bodies:
         if body is None:
-            raise RuntimeError(f"collar-side neck: referenced body {body_index} is null")
-        try:
-            edges = tuple(_early_bound(body, "IBody2").GetEdges() or ())
-        except Exception as exc:
-            raise RuntimeError(
-                f"collar-side neck: failed to read referenced body {body_index} edges: {exc}"
-            ) from exc
-        if not edges:
-            raise RuntimeError(
-                f"collar-side neck: referenced body {body_index} has no edges"
-            )
-        for edge in edges:
-            edge = _early_bound(edge, "IEdge")
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            params = tuple(float(value) for value in (curve.CircleParams or ()))
-            if len(params) != 7 or not all(math.isfinite(value) for value in params):
-                raise RuntimeError(f"collar-side neck: unreadable circle parameters {params}")
-            cx, cy, cz, ax, ay, az, radius = params
-            if (
-                abs(cx) < 1e-6
-                and abs(cz) < 1e-6
-                and abs(cy - JOURNAL_START / 1000.0) < 1e-6
-                and abs(radius - SHAFT_DIA / 2000.0) < 1e-6
-                and abs(ax) < 1e-9
-                and abs(az) < 1e-9
-                and abs(abs(ay) - 1.0) < 1e-9
-            ):
-                matches.append(edge)
+            raise RuntimeError("collar-side neck: null source body")
+        faces = tuple(_early_bound(body, "IBody2").GetFaces() or ())
+        if not faces or any(face is None for face in faces):
+            raise RuntimeError("collar-side neck: source body has no complete face inventory")
+        for face in faces:
+            if _is_outboard_neck_cylinder(face, label="collar-side neck source"):
+                matches.append(face)
     if len(matches) != 1:
-        raise RuntimeError(
-            f"collar-side neck: FRONT referenced part has {len(matches)} physical core "
-            f"rims at journal start {JOURNAL_START}; expected exactly one"
-        )
+        raise RuntimeError(f"collar-side neck: expected one physical short-neck cylinder, got {len(matches)}")
     return matches[0]
 
 
-def _assert_outboard_neck_view_rim(
-    adapter: Any, side: Any, view_entity: Any, rim: Any, *, label: str
-) -> None:
-    """Require the view attachment's reverse map to the exact physical source rim."""
-    view = _early_bound(side, "IView")
-    source = view.ReferencedDocument
-    if source is None or source == "":
-        raise RuntimeError(f"{label}: physical rim attachment has no referenced source")
-    model = _early_bound(source, "IModelDoc2")
-    extension = _early_bound(model.Extension, "IModelDocExtension")
-    # The documented reverse map is required; the native target rim has no
-    # forward source-to-view correspondence. Compare only source-context edges.
-    canonical = extension.GetCorrespondingEntity2(view_entity)
-    if canonical is None:
-        raise RuntimeError(f"{label}: physical rim attachment has no source correspondence")
+def _neck_silhouette_points(entity: Any, *, label: str) -> tuple[tuple[float, ...], ...]:
+    """Read MathPoint endpoints as evidence, never as selectable IVertex objects."""
+    silhouette = _early_bound(entity, "ISilhouetteEdge")
+    points = []
+    for raw in (silhouette.GetStartPoint(), silhouette.GetEndPoint()):
+        if raw is None:
+            raise RuntimeError(f"{label}: silhouette has no native endpoint")
+        points.append(_neck_numbers(_early_bound(raw, "IMathPoint").ArrayData, 3, label=label))
+    return tuple(sorted(points, key=lambda point: point[1]))
+
+
+def _assert_neck_silhouette(
+    adapter: Any, side: Any, entity: Any, source_face: Any, sign: int, *, label: str,
+) -> tuple[Any, tuple[tuple[float, ...], ...]]:
+    """Prove one exact generatrix and its required inverse source-face identity."""
+    if entity is None:
+        raise RuntimeError(f"{label}: null neck silhouette")
+    silhouette = _early_bound(entity, "ISilhouetteEdge")
+    owner = silhouette.GetView()
     if (
-        int(adapter.swApp.IsSame(canonical, rim)) != 1
-        or int(adapter.swApp.IsSame(rim, canonical)) != 1
+        owner is None or int(adapter.swApp.IsSame(owner, side)) != 1
+        or int(adapter.swApp.IsSame(side, owner)) != 1
     ):
-        raise RuntimeError(
-            f"{label}: physical rim attachment maps to a different source edge"
-        )
+        raise RuntimeError(f"{label}: silhouette owner is not FRONT")
+    points = _neck_silhouette_points(silhouette, label=label)
+    radius = sign * SHAFT_DIA / 2000.0
+    expected = ((0.0, COLLAR_REAR / 1000.0, radius), (0.0, JOURNAL_START / 1000.0, radius))
+    if any(math.dist(actual, target) > NECK_GEOMETRY_TOLERANCE_M
+           for actual, target in zip(points, expected)):
+        raise RuntimeError(f"{label}: silhouette is not the exact opposite short-neck generatrix")
+    face = silhouette.GetFace()
+    if face is None or not _is_outboard_neck_cylinder(face, label=label):
+        raise RuntimeError(f"{label}: silhouette has the wrong short-neck cylinder")
+    source = _early_bound(side, "IView").ReferencedDocument
+    if source is None or source == "":
+        raise RuntimeError(f"{label}: silhouette has no referenced source")
+    canonical = _early_bound(
+        _early_bound(source, "IModelDoc2").Extension, "IModelDocExtension"
+    ).GetCorrespondingEntity2(face)
+    # Drawing-context face 49 is NOT directly IsSame to physical face 6.
+    # Require the documented inverse map; geometry alone or a null forward
+    # map cannot substitute for source-context identity in both directions.
+    if canonical is None:
+        raise RuntimeError(f"{label}: neck face has no source correspondence")
+    if (
+        int(adapter.swApp.IsSame(canonical, source_face)) != 1
+        or int(adapter.swApp.IsSame(source_face, canonical)) != 1
+    ):
+        raise RuntimeError(f"{label}: neck face maps to a different source cylinder")
+    return face, points
+
+
+def _assert_neck_silhouette_pair(
+    adapter: Any, side: Any, entities: tuple[Any, Any], source_face: Any, *, label: str,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Require both opposite flanks of one cylinder and the actual FRONT projection."""
+    lower_face, lower = _assert_neck_silhouette(
+        adapter, side, entities[0], source_face, -1, label=label,
+    )
+    upper_face, upper = _assert_neck_silhouette(
+        adapter, side, entities[1], source_face, 1, label=label,
+    )
+    if (
+        int(adapter.swApp.IsSame(lower_face, upper_face)) != 1
+        or int(adapter.swApp.IsSame(upper_face, lower_face)) != 1
+    ):
+        raise RuntimeError(f"{label}: opposite silhouettes do not own the same native cylinder")
+    station = COLLAR_REAR / 1000.0
+    radius = SHAFT_DIA / 2000.0
+    points = (*lower, *upper, (0.0, station, 0.0), (radius, station, 0.0))
+    projected = model_points_in_view(adapter, side, points, label=label)
+    if len(projected) != len(points):
+        raise RuntimeError(f"{label}: incomplete native FRONT projection")
+    sheet = [_neck_numbers(point, 2, label=label) for point in projected]
+    expected = [
+        (_sheet_x(point[1] * 1000.0), _sheet_y(point[2] * 1000.0)) for point in points
+    ]
+    if any(math.dist(actual, target) > NECK_GEOMETRY_TOLERANCE_M
+           for actual, target in zip(sheet, expected)):
+        raise RuntimeError(f"{label}: native FRONT axis/normal/separation projection changed")
+    # The two extra points prove model X is the view normal, not a hidden
+    # transverse component; Y is horizontal and the full model Z width is vertical.
+    if abs((upper[0][2] - lower[0][2]) * 1000.0 - SHAFT_DIA) > 1e-5:
+        raise RuntimeError(f"{label}: opposite silhouette separation is not the full diameter")
+    return sheet[0], sheet[2]
+
+
+def _outboard_neck_silhouettes(adapter: Any, side: Any) -> tuple[Any, tuple[Any, Any]]:
+    """Find exactly the two real outlines on the spec-owned left-hand short land."""
+    source_face = _outboard_neck_source_face(side)
+    matches: dict[int, list[Any]] = {-1: [], 1: []}
+    for _component, entities in visible_component_entities(adapter, side, 4):
+        for entity in entities:
+            points = _neck_silhouette_points(entity, label="collar-side neck enumeration")
+            for sign in (-1, 1):
+                expected = (
+                    (0.0, COLLAR_REAR / 1000.0, sign * SHAFT_DIA / 2000.0),
+                    (0.0, JOURNAL_START / 1000.0, sign * SHAFT_DIA / 2000.0),
+                )
+                if all(math.dist(actual, target) <= NECK_GEOMETRY_TOLERANCE_M
+                       for actual, target in zip(points, expected)):
+                    matches[sign].append(entity)
+    if any(len(flanks) != 1 for flanks in matches.values()):
+        raise RuntimeError("collar-side neck: expected exactly two opposite short-neck silhouettes")
+    pair = matches[-1][0], matches[1][0]
+    _assert_neck_silhouette_pair(adapter, side, pair, source_face, label="collar-side neck source")
+    return source_face, pair
 
 
 def _native_neck_annotations(side: Any, *, label: str) -> tuple[tuple[Any, int], ...]:
@@ -1072,20 +1150,21 @@ def _assert_imported_neck_inventory(
 
 
 def _assert_plain_neck_size(
-    display: Any, *, label: str, expected_driven_state: int
+    display: Any, *, label: str, expected_driven_state: int, linear: bool,
 ) -> float:
     """Prove a loose native size without rewriting the imported dimension."""
     native = display.GetDimension2(0)
     if native is None:
         raise RuntimeError(f"{label}: no native IDimension")
     dimension = _early_bound(native, "IDimension")
-    if int(display.Type2) != 6:  # swDiameterDimension, not doubled linear (15)
-        raise RuntimeError(f"{label}: native display is not a diameter")
+    expected_types = (2, 12) if linear else (6,)  # swLinear/VertLinear versus imported diameter
+    if type(display.Type2) is not int or display.Type2 not in expected_types:
+        raise RuntimeError(f"{label}: native display type {display.Type2!r} not in {expected_types}")
     value = dimension.SystemValue
-    if value is None:
-        raise RuntimeError(f"{label}: no native measured value")
-    measured_mm = float(value) * 1000.0
-    if not math.isfinite(measured_mm) or abs(measured_mm - SHAFT_DIA) > 1e-5:
+    if type(value) not in (int, float) or not math.isfinite(value):
+        raise RuntimeError(f"{label}: no finite native measured value {value!r}")
+    measured_mm = value * 1000.0
+    if abs(measured_mm - SHAFT_DIA) > 1e-5:
         raise RuntimeError(f"{label}: measures {measured_mm!r} mm, expected {SHAFT_DIA}")
     if type(dimension.DrivenState) is not int or dimension.DrivenState != expected_driven_state:
         raise RuntimeError(
@@ -1093,66 +1172,68 @@ def _assert_plain_neck_size(
             f"!= preserved/required state {expected_driven_state}"
         )
     places = display.GetPrimaryPrecision2()
-    if places != NECK_DIA_PLACES:
+    if type(places) is not int or places != NECK_DIA_PLACES:
         raise RuntimeError(f"{label}: primary places {places!r} != {NECK_DIA_PLACES}")
     tolerance = dimension.Tolerance
-    if tolerance is None or int(_early_bound(tolerance, "IDimensionTolerance").Type) != 0:
+    tolerance_type = None if tolerance is None else _early_bound(tolerance, "IDimensionTolerance").Type
+    if type(tolerance_type) is not int or tolerance_type != 0:
         raise RuntimeError(f"{label}: unexpected explicit tolerance band")
     if display.GetOverride() is not False or display.ShowParenthesis is not False:
         raise RuntimeError(f"{label}: overridden or parenthesized value loses the general band")
     prefix = str(display.GetText(1) or "")
     prose = tuple(str(display.GetText(part) or "") for part in (2, 3, 4))
-    if prefix not in ("", "<MOD-DIAM>") or any(prose):
+    allowed_prefixes = ("<MOD-DIAM>",) if linear else ("", "<MOD-DIAM>")
+    if prefix not in allowed_prefixes or any(prose):
         raise RuntimeError(f"{label}: unexpected native diameter text {prefix!r}, {prose!r}")
+    if linear and display.ShowDimensionValue is not True:
+        raise RuntimeError(f"{label}: native dimension value is hidden")
     return measured_mm
 
 
 def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
-    """Prove rendered diameter arrows identify the short neck, not the journal."""
+    """Require two vertical linear tips, one on each physical short-neck flank."""
     raw = display.GetDisplayData()
     if raw is None:
         raise RuntimeError(f"{label}: no native diameter display data")
     data = _early_bound(raw, "IDisplayData")
     count = data.GetArrowHeadCount()
-    if type(count) is not int or count <= 0:
-        raise RuntimeError(f"{label}: no readable native diameter arrowheads")
+    if type(count) is not int or count != 2:
+        raise RuntimeError(f"{label}: expected two readable native diameter arrowheads")
     arrows = []
+    tolerance = NECK_ARROW_LANDING_TOLERANCE_M
+    x0, y0, x1, y1 = OUTBOARD_NECK_ARROW_WINDOW
     for index in range(count):
-        values = tuple(float(value) for value in (data.GetArrowHeadAtIndex2(index) or ()))
-        if len(values) != 12 or not all(math.isfinite(value) for value in values):
-            raise RuntimeError(f"{label}: malformed native arrowhead {index}: {values!r}")
+        values = _neck_numbers(data.GetArrowHeadAtIndex2(index), 12, label=f"{label} arrowhead")
         tip = values[0], values[1]
-        tolerance = NECK_ARROW_LANDING_TOLERANCE_M
-        x0, y0, x1, y1 = OUTBOARD_NECK_ARROW_WINDOW
         if not (
             x0 - tolerance <= tip[0] <= x1 + tolerance
-            and y0 - tolerance <= tip[1] <= y1 + tolerance
+            and min(abs(tip[1] - y0), abs(tip[1] - y1)) <= tolerance
         ):
-            raise RuntimeError(f"{label}: diameter arrow {tip!r} does not identify the neck")
-        # _layout_audit.arrowhead_segments records 125/125 calibrated PDF
-        # arrows: the direction points from tip back to the arrow's base /
-        # leader body. Positive sheet X therefore approaches from the journal.
-        dx, dy = values[3:5]
+            raise RuntimeError(f"{label}: diameter arrow {tip!r} does not identify a physical neck flank")
+        dx, dy, dz = values[3:6]
         length = math.hypot(dx, dy)
-        if not math.isfinite(length) or length == 0.0:
+        if length == 0.0 or abs(dz) > 1e-9:
             raise RuntimeError(f"{label}: unreadable native arrow direction {values[3:6]!r}")
-        direction = dx / length, dy / length
-        if direction[0] > NECK_ARROW_DIRECTION_X_SLACK:
-            raise RuntimeError(f"{label}: diameter arrow approaches from the journal side")
-        arrows.append((tip, direction))
-    _telemetry.info(f"{label}: native diameter arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}")
+        if abs(dx / length) > NECK_ARROW_DIRECTION_X_SLACK:
+            raise RuntimeError(f"{label}: full-width dimension arrows are not vertical")
+        nx, ny, nz = values[9:12]
+        if max(abs(nx), abs(ny), abs(abs(nz) - 1.0)) > 1e-9:
+            raise RuntimeError(f"{label}: arrowhead normal is not sheet-normal")
+        arrows.append(tip)
+    lower, upper = sorted(arrows, key=lambda point: point[1])
+    if (
+        abs(lower[1] - y0) > tolerance or abs(upper[1] - y1) > tolerance
+        or abs(lower[0] - upper[0]) > tolerance
+    ):
+        raise RuntimeError(f"{label}: arrowheads do not bracket both opposite physical neck flanks")
+    _telemetry.info(f"{label}: native full-width arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}")
 
 
 def _assert_outboard_neck_dimension(
     adapter: Any, side: Any, identity: Any, right_driven_state: int,
     imported: tuple[tuple[Any, str, float, int], ...], *, phase: str,
 ) -> None:
-    """Re-read the view's native dimension and physical attachment, without writes.
-
-    Diameter leaders are not note leaders: GetLeaderCount is diagnostic,
-    not an invented one-leader contract. Type, one exact physical edge and
-    its native measured value establish the dimension's correspondence.
-    """
+    """Reacquire the native linear size and both exact physical silhouettes."""
     label = f"collar-side neck ({phase})"
     _assert_neck_measurement_domain(side, label=label)
     reference = _early_bound(identity, "IDimension")
@@ -1185,39 +1266,49 @@ def _assert_outboard_neck_dimension(
     annotation, display = matches[0]
     owner = annotation.Owner
     if (
-        int(annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
+        type(annotation.OwnerType) is not int or annotation.OwnerType != 0  # drawing view
         or owner is None
         or int(adapter.swApp.IsSame(owner, side)) != 1
         or int(adapter.swApp.IsSame(side, owner)) != 1
     ):
         raise RuntimeError(f"{label}: native annotation owner is not FRONT")
-    measured_mm = _assert_plain_neck_size(display, label=label, expected_driven_state=1)
+    measured_mm = _assert_plain_neck_size(
+        display, label=label, expected_driven_state=1, linear=True,
+    )
     if len(inboard) != 1:
         raise RuntimeError(f"{label}: expected one unchanged right-hand NeckDiaDim")
     _assert_plain_neck_size(
         inboard[0], label=f"right-hand NeckDiaDim ({phase})",
-        expected_driven_state=right_driven_state,
+        expected_driven_state=right_driven_state, linear=False,
     )
     _assert_imported_neck_inventory(adapter, current_imported, imported, label=label)
-    rim = _outboard_neck_rim(adapter, side)
+    source_face, entities = _outboard_neck_silhouettes(adapter, side)
     attached = tuple(annotation.GetAttachedEntities3() or ())
-    count = int(annotation.GetAttachedEntityCount3())
-    types = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-    valid_attachment = (
-        count == 1
-        and len(attached) == 1
-        and types == (1,)  # swSelEDGES
-        and attached[0] is not None
+    count = annotation.GetAttachedEntityCount3()
+    types = tuple(annotation.GetAttachedEntityTypes() or ())
+    if (
+        type(count) is not int or count != 2 or len(attached) != 2
+        or types != (46, 46)  # swSelSILHOUETTES
+        or any(type(kind) is not int for kind in types)
+        or any(entity is None for entity in attached)
+        or annotation.IsDangling() is not False
+    ):
+        raise RuntimeError(f"{label}: lost exact two-silhouette attachment: count={count}, types={types}")
+    ordered = tuple(sorted(
+        attached, key=lambda entity: _neck_silhouette_points(entity, label=label)[0][2],
+    ))
+    _assert_neck_silhouette_pair(adapter, side, ordered, source_face, label=f"{label} attachment")
+    # Shared silhouette identity is owning-face identity, not unsupported
+    # ISldWorks.IsSame on ISilhouetteEdge. The stricter endpoints above
+    # distinguish the two flanks even though they share the same face.
+    assert_dimension_measures(
+        adapter, display, expected_mm=SHAFT_DIA, label=label,
+        entities=entities, entity_types=("SILHOUETTE", "SILHOUETTE"),
     )
-    if not valid_attachment or annotation.IsDangling() is not False:
-        raise RuntimeError(
-            f"{label}: lost exact physical rim attachment: count={count}, types={types}"
-        )
-    _assert_outboard_neck_view_rim(adapter, side, attached[0], rim, label=label)
     _assert_neck_arrow_landing(display, label=label)
     _telemetry.info(
         f"{label}: native diameter {full_name!r}, measured_mm={measured_mm}, "
-        f"driven=1, places={NECK_DIA_PLACES}, tolerance=NONE, exact_rim=True, "
+        f"driven=1, places={NECK_DIA_PLACES}, tolerance=NONE, opposite_silhouettes=True, "
         f"native_leaders={annotation.GetLeaderCount()}"
     )
 
@@ -1237,45 +1328,43 @@ def _add_outboard_neck_dimension(
     right_driven_state = original[0][2].DrivenState
     if type(right_driven_state) is not int or right_driven_state not in (1, 2):
         raise RuntimeError(f"{label}: unreadable original driven state {right_driven_state!r}")
-    rim = _outboard_neck_rim(adapter, side)
-    name = view_name(adapter, side)
-    if _early_bound(drawing_model, "IDrawingDoc").ActivateView(name) is not True:
-        raise RuntimeError(f"{label}: failed to activate drawing view {name!r}")
-    drawing_model.ClearSelection2(True)
-    # Official Dimension Edge in Drawing example and _supplier_pin_drawing
-    # use IView.SelectEntity for model-edge -> drawing-view selection.
-    if _early_bound(side, "IView").SelectEntity(rim, False) is not True:
-        raise RuntimeError(f"{label}: failed to select the physical rim in FRONT")
+    _assert_neck_measurement_domain(side, label=label)
+    source_face, entities = _outboard_neck_silhouettes(adapter, side)
     selection = _early_bound(drawing_model.SelectionManager, "ISelectionMgr")
-    count = selection.GetSelectedObjectCount2(-1)
-    if type(count) is not int or count != 1:
-        raise RuntimeError(f"{label}: selected {count!r} entities; expected exactly one")
-    selected = selection.GetSelectedObject6(1, -1)
-    if selected is None:
-        raise RuntimeError(f"{label}: selected physical rim has no view entity")
-    owner = selection.GetSelectedObjectsDrawingView2(1, -1)
-    if (
-        owner is None
-        or int(adapter.swApp.IsSame(owner, side)) != 1
-        or int(adapter.swApp.IsSame(side, owner)) != 1
-    ):
-        raise RuntimeError(f"{label}: selected physical rim owner is not FRONT")
-    _assert_outboard_neck_view_rim(
-        adapter, side, selected, rim, label=f"{label} selection"
-    )
-    extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
+    selected = []
+    for sign, entity in zip((-1, 1), entities):
+        picked = _select_view_entity(
+            adapter, side, "SILHOUETTE", None, label=label, entity=entity,
+        )
+        count = selection.GetSelectedObjectCount2(-1)
+        kind = selection.GetSelectedObjectType3(1, -1)
+        if type(count) is not int or count != 1 or type(kind) is not int or kind != 46:
+            raise RuntimeError(f"{label}: exact silhouette selection count/type is invalid")
+        owner = selection.GetSelectedObjectsDrawingView2(1, -1)
+        if (
+            owner is None or int(adapter.swApp.IsSame(owner, side)) != 1
+            or int(adapter.swApp.IsSame(side, owner)) != 1
+        ):
+            raise RuntimeError(f"{label}: selected silhouette owner is not FRONT")
+        _assert_neck_silhouette(
+            adapter, side, picked, source_face, sign, label=f"{label} selection",
+        )
+        selected.append(picked)
+    # Capture every imported native dimension before the factory can change
+    # anything. The shared helper then selects these exact two objects using
+    # ISilhouetteEdge.Select2 + SelectData.View and checks the pair's count.
     imported = tuple(
         _neck_dimension_record(native, label=label)
         for _annotation, _display, native in _native_neck_view_dimensions(side, label=label)
     )
-    display, status = extension.AddSpecificDimension(
-        *OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0  # swDiameterDimension; out status
+    display = add_edge_dimension(
+        adapter, side, p0=(COLLAR_REAR_X, _sheet_y(-SHAFT_DIA / 2.0)),
+        p1=(COLLAR_REAR_X, _sheet_y(SHAFT_DIA / 2.0)),
+        text_xy=OUTBOARD_NECK_DIAMETER_XY, label=label, orientation="vertical",
+        entities=(selected[0], selected[1]), entity_types=("SILHOUETTE", "SILHOUETTE"),
     )
-    if display is None or type(status) is not int or status != 0:  # success = 0
-        raise RuntimeError(
-            f"{label}: physical edge-on circle rejected native diameter (status={status!r}); "
-            "no note or doubled-linear fallback is permitted"
-        )
+    if display is None:
+        raise RuntimeError(f"{label}: native vertical linear factory returned no display")
     display = _early_bound(display, "IDisplayDimension")
     native = display.GetDimension2(0)
     if native is None:
@@ -1285,7 +1374,7 @@ def _add_outboard_neck_dimension(
     actual_type = display.Type2
     mode = _early_bound(side, "IView").ProjectedDimensions
     _telemetry.info(
-        f"{label}: factory type={actual_type!r}, status={status!r}, "
+        f"{label}: vertical linear factory type={actual_type!r}, "
         f"SystemValue={value!r}, ProjectedDimensions={mode!r}"
     )
     if (
@@ -1294,11 +1383,16 @@ def _add_outboard_neck_dimension(
         or abs(value * 1000.0 - SHAFT_DIA) > 1e-5
     ):
         raise RuntimeError(f"{label}: immediate native value {value!r} m, expected {SHAFT_DIA} mm")
-    if type(actual_type) is not int or actual_type != 6:
-        raise RuntimeError(f"{label}: factory native display is not a diameter")
+    if type(actual_type) is not int or actual_type not in (2, 12):  # linear / vertical linear
+        raise RuntimeError(f"{label}: factory native display is not linear (2 or 12)")
     if mode is not False:
         raise RuntimeError(f"{label}: factory ProjectedDimensions must remain False")
     dimension.DrivenState = 1  # swDimensionDriven; only the new drawing dimension
+    if type(dimension.DrivenState) is not int or dimension.DrivenState != 1:
+        raise RuntimeError(f"{label}: new native dimension did not become driven")
+    display.SetText(1, "<MOD-DIAM>")  # symbol-only prefix; never swDimensionTextAll
+    if display.GetText(1) != "<MOD-DIAM>":
+        raise RuntimeError(f"{label}: native diameter-symbol prefix did not persist")
     status = display.SetPrecision3(
         DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
     )
