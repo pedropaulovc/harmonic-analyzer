@@ -136,9 +136,12 @@ cannot ask for what the authors were told to leave out.
   independent scale and refreshed cell containment must survive unchanged;
   the operation does not refit views. Other recipes retain the default-off
   alignment behavior.
-  The boss-hook nut keys its existing installation instruction to the visible
-  boundary of its z=0 bearing face, the face seated on the summing-lever boss
-  by the assembly recipe. A native attached leader and its single linked
+  The boss-hook and pen-hanger jam nuts share `_supplier_nut_installation_flag`,
+  passing their artifact identity and assembly-derived bearing point in final
+  model millimetres. The boss nut's z=0 face seats on MHA-SM-03; the hanger jam
+  nut's z=THICKNESS face contacts the outboard z=0 face of MHA-PN-VN-54.
+  Each key attaches to that face's visible physical boundary, not a nominal
+  construction carrier. A native attached leader and its single linked
   legend are re-proved after the final rebuild. Every reported key text
   fragment must have three finite position coordinates, a finite angle and
   positive finite dimensions before forming its aggregate bounds; a valid

@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-SM-VN-55 counter-anchor jam nut (McMaster 90760A140)."""
+"""Boss-nut recipe contracts and shared physical installation-flag boundaries."""
 
 from __future__ import annotations
 
@@ -217,12 +217,22 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     )
 
 
-@pytest.fixture
-def boss_installation_native(monkeypatch):
+@pytest.fixture(params=(SHEET, "pn_vn_pen_hanger_jam_nut"), ids=(
+    "boss-z0", "hanger-jam-z-thickness",
+))
+def nut_installation_native(monkeypatch, request):
     """Real selection/attachment/ink math; replace only native COM access."""
     from types import SimpleNamespace
 
-    import draw_sm_vn_boss_hook_jam_nut as drawing
+    if request.param == SHEET:
+        import draw_sm_vn_boss_hook_jam_nut as drawing
+        supplier = spec
+        bearing_z_mm = 0.0
+    else:
+        import draw_pn_vn_pen_hanger_jam_nut as drawing
+        import pn_vn_pen_hanger_jam_nut_spec as supplier
+        bearing_z_mm = supplier.THICKNESS
+    import _supplier_nut_installation_flag as flags
     import _drawing_layout_audit as collector
     from _drawing_edges import ViewEdge, ViewEdges
     from test_purchased_fastener_drawing import (
@@ -231,15 +241,19 @@ def boss_installation_native(monkeypatch):
         _KitFlagNativeWrapper as Wrapper,
     )
 
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(flags, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(collector, "_early_bound", lambda value, _kind: value)
-    notes_text = _config.parts(STEM)["installation_notes"]
-    cells = drawing.fastener_view_cells(
-        drawing.view_band_bottom(notes_text, label=STEM)
+    artifact_stem = drawing.SPEC.artifact_stem
+    notes_text = _config.parts(artifact_stem)["installation_notes"]
+    cells = flags.fastener_view_cells(
+        flags.view_band_bottom(notes_text, label=artifact_stem)
     )
     _, center, cell = next(row for row in cells if row[0] == "*Right")
     state = SimpleNamespace(
-        drawing=drawing, cell=cell, center=center, note=None, projections=[],
+        drawing=drawing, flags=flags, supplier=supplier,
+        artifact_stem=artifact_stem,
+        bearing_point_mm=(supplier.ACROSS_FLATS / 2.0, 0.0, bearing_z_mm),
+        cell=cell, center=center, note=None, projections=[],
         authored=[], inventory_reads=0, repeat_wrappers=False, text_fault=None,
         notes_text=notes_text, Edge=Edge, Wrapper=Wrapper,
     )
@@ -273,16 +287,18 @@ def boss_installation_native(monkeypatch):
     state.right = View("Right")
     state.sheet = View("Sheet")
     state.foreign = View("OtherSheetRight")
-    half_af = spec.ACROSS_FLATS / 2000
-    half_flat = spec.ACROSS_FLATS * math.tan(math.pi / 6) / 2000
-    endpoints = ((half_af, -half_flat, 0.0), (half_af, half_flat, 0.0))
+    half_af = supplier.ACROSS_FLATS / 2000
+    half_flat = supplier.ACROSS_FLATS * math.tan(math.pi / 6) / 2000
+    target_z = bearing_z_mm / 1000
+    other_z = (supplier.THICKNESS - bearing_z_mm) / 1000
+    endpoints = ((half_af, -half_flat, target_z), (half_af, half_flat, target_z))
     state.target = Edge(endpoints=endpoints)
-    # Same flat at the opposite end, opposite flat, and a trimmed segment
-    # that omits the physical midpoint must not masquerade as the z=0 edge.
+    # Both real nut ends are present. The opposite end, opposite flat and a
+    # trimmed segment omitting the midpoint must not impersonate the contact.
     state.decoys = [
-        Edge(endpoints=tuple((x, y, spec.THICKNESS / 1000) for x, y, z in endpoints)),
+        Edge(endpoints=tuple((x, y, other_z) for x, y, z in endpoints)),
         Edge(endpoints=tuple((-x, y, z) for x, y, z in endpoints)),
-        Edge(endpoints=((half_af, half_flat / 2, 0.0), endpoints[1])),
+        Edge(endpoints=((half_af, half_flat / 2, target_z), endpoints[1])),
     ]
     state.edges = [*state.decoys, state.target]
 
@@ -401,20 +417,25 @@ def boss_installation_native(monkeypatch):
 
     state.add_legend = add_legend
     state.extra_key = extra_key
-    monkeypatch.setattr(drawing, "scan_view_edges", scan)
-    monkeypatch.setattr(drawing, "model_points_in_view", project)
-    monkeypatch.setattr(drawing, "add_attached_note", author)
+    monkeypatch.setattr(flags, "scan_view_edges", scan)
+    monkeypatch.setattr(flags, "model_points_in_view", project)
+    monkeypatch.setattr(flags, "add_attached_note", author)
     return state
 
 
-def test_boss_flag_targets_actual_z0_and_checks_settled_readonly(
-    boss_installation_native,
+def test_nut_flag_targets_recipe_bearing_end_and_checks_settled_readonly(
+    nut_installation_native,
 ):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     assert callable(settled)
     assert state.inventory_reads == 0  # Footer is not authored yet.
-    assert state.projections == [((spec.ACROSS_FLATS / 2000, 0.0, 0.0),)]
+    assert state.projections == [(
+        (state.supplier.ACROSS_FLATS / 2000, 0.0, state.bearing_point_mm[2] / 1000),
+    )]
     state.add_legend(state.notes_text.replace("\n", "\r\n"))
     # Dispatch wrappers can repeat without representing competing notes.
     state.repeat_wrappers = True
@@ -438,11 +459,14 @@ def test_boss_flag_targets_actual_z0_and_checks_settled_readonly(
     )
 
 
-def test_boss_flag_preserves_actual_ink_with_an_equivalent_upper_left_reference(
-    boss_installation_native,
+def test_nut_flag_preserves_actual_ink_with_an_equivalent_upper_left_reference(
+    nut_installation_native,
 ):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     state.add_legend()
     state.text_fault = "upper-left-equivalent"
     before = state.note.GetExtent(), tuple(state.note.annotation.moves)
@@ -450,11 +474,14 @@ def test_boss_flag_preserves_actual_ink_with_an_equivalent_upper_left_reference(
     assert (state.note.GetExtent(), tuple(state.note.annotation.moves)) == before
 
 
-def test_boss_flag_distinguishes_template_border_zone_from_authored_key(
-    boss_installation_native,
+def test_nut_flag_distinguishes_template_border_zone_from_authored_key(
+    nut_installation_native,
 ):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     state.add_legend()
     zone = state.extra_key(state.sheet)
     zone.annotation.OwnerType = 2  # swAnnotationOwner_DrawingTemplate.
@@ -466,11 +493,14 @@ def test_boss_flag_distinguishes_template_border_zone_from_authored_key(
 
 
 @pytest.mark.parametrize("owner_type", [0, 1])
-def test_boss_flag_rejects_competing_key_beside_template_zone(
-    boss_installation_native, owner_type,
+def test_nut_flag_rejects_competing_key_beside_template_zone(
+    nut_installation_native, owner_type,
 ):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     state.add_legend()
     zone = state.extra_key(state.sheet)
     zone.annotation.OwnerType = 2
@@ -480,14 +510,35 @@ def test_boss_flag_rejects_competing_key_beside_template_zone(
         settled()
 
 
-@pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed"])
-def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometry):
-    state = boss_installation_native
+@pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed", "duplicate"])
+def test_nut_flag_rejects_nonbearing_geometry(nut_installation_native, geometry):
+    state = nut_installation_native
     state.edges = {
         "missing": [], "wrong-end": [state.decoys[0]], "trimmed": [state.decoys[2]],
+        "duplicate": [state.target, state.Edge(endpoints=state.target.endpoints)],
     }[geometry]
     with pytest.raises(RuntimeError):
-        state.drawing._installation_flag(state.adapter, state.right)
+        state.flags.add_supplier_nut_installation_flag(
+            state.adapter, state.right, artifact_stem=state.artifact_stem,
+            bearing_point_mm=state.bearing_point_mm,
+        )
+    assert not state.authored
+
+
+@pytest.mark.parametrize("key", ["", "2 "])
+def test_nut_flag_refuses_unbound_instruction_before_authoring(
+    nut_installation_native, monkeypatch, key,
+):
+    state = nut_installation_native
+    unkeyed = state.notes_text.removeprefix("1 ")
+    monkeypatch.setattr(state.flags._config, "parts", lambda _stem: {
+        "installation_notes": key + unkeyed,
+    })
+    with pytest.raises(RuntimeError, match="instruction has no matching key"):
+        state.flags.add_supplier_nut_installation_flag(
+            state.adapter, state.right, artifact_stem=state.artifact_stem,
+            bearing_point_mm=state.bearing_point_mm,
+        )
     assert not state.authored
 
 
@@ -507,9 +558,12 @@ def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometr
     "duplicate-literal-instruction", "duplicate-unkeyed-instruction",
     "duplicate-template-legend", "duplicate-template-instruction",
 ])
-def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+def test_nut_flag_rejects_settled_native_drift(nut_installation_native, fault):
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     legend = state.add_legend()
     note, annotation = state.note, state.note.annotation
     if fault == "edge-identity":
@@ -625,30 +679,33 @@ def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault)
         settled()
 
 
-def test_boss_flag_legend_is_captured_not_reread(
-    boss_installation_native, monkeypatch,
+def test_nut_flag_legend_is_captured_not_reread(
+    nut_installation_native, monkeypatch,
 ):
-    state = boss_installation_native
-    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state = nut_installation_native
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
     changed = state.notes_text + " CHANGED"
     state.add_legend(changed)
-    monkeypatch.setattr(state.drawing._config, "parts", lambda _stem: {
+    monkeypatch.setattr(state.flags._config, "parts", lambda _stem: {
         "installation_notes": changed,
     })
     with pytest.raises(RuntimeError):
         settled()
 
 
-def test_boss_supplier_dimension_closure_keeps_both_consumers(
-    boss_installation_native, monkeypatch,
+def test_nut_supplier_dimensions_keep_independent_dimension_and_flag_guards(
+    nut_installation_native, monkeypatch,
 ):
-    state = boss_installation_native
+    state = nut_installation_native
     dimension = {"valid": True}
 
     def dimensions(_adapter, views, **kwargs):
         assert _adapter is state.adapter
         assert views["*Right"] is state.right
-        assert kwargs["thickness_mm"] == spec.THICKNESS
+        assert kwargs["thickness_mm"] == state.supplier.THICKNESS
 
         def settled_dimensions():
             if not dimension["valid"]:

@@ -13,6 +13,7 @@ from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _supplier_nut_drawing import add_supplier_nut_dimensions, assert_saved_supplier_nut_nominal
+from _supplier_nut_installation_flag import add_supplier_nut_installation_flag
 from _supplier_screw_layout import supplier_screw_margins
 import pn_vn_pen_hanger_jam_nut_spec as supplier
 
@@ -35,7 +36,7 @@ SUPPLIER_MARGINS["*Right"] = (
 def _supplier_dimensions(
     adapter: Any, views_by_orientation: dict[str, Any]
 ) -> Callable[[], None]:
-    return add_supplier_nut_dimensions(
+    dimensions_check = add_supplier_nut_dimensions(
         adapter,
         views_by_orientation,
         across_flats_mm=supplier.ACROSS_FLATS,
@@ -47,6 +48,17 @@ def _supplier_dimensions(
         reference_dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         reference_starts=supplier.SUPPLIER_REFERENCE_STARTS,
     )
+    # The jam nut's z=THICKNESS face contacts the VN-54 nut at local z=0.
+    flag_check = add_supplier_nut_installation_flag(
+        adapter, views_by_orientation["*Right"], artifact_stem=SPEC.artifact_stem,
+        bearing_point_mm=(supplier.ACROSS_FLATS / 2.0, 0.0, supplier.THICKNESS),
+    )
+
+    def assert_settled() -> None:
+        dimensions_check()
+        flag_check()
+
+    return assert_settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
