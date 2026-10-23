@@ -3104,12 +3104,20 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     import export_features
 
     globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    # Shared configured producers cite the saved/default member's real spec,
+    # not a synthetic aggregate spec. Keep this oracle independent of the resolver.
+    member_specs = {
+        "sh_vn_clamping_kit_hardware": "sh_vn_clamping_kit_hold_down_stud_spec",
+    }
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
         drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
-        spec = (SCRIPTS_DIR / f"{stem}_spec.py").resolve()
+        spec_module = member_specs.get(stem, f"{stem}_spec")
+        spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
+        assert spec.is_file(), stem
         assert {drawing, spec} <= sources, stem
-        assert {Path(path).resolve() for path in module_deps_of(drawing)} <= sources, stem
+        for root in (drawing, spec):
+            assert {Path(path).resolve() for path in module_deps_of(root)} <= sources, (stem, root)
         assert {
             path.name for path in sources if path.name.startswith("draw_")
         } == {drawing.name}, stem
