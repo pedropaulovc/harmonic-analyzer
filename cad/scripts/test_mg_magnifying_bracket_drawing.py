@@ -1258,3 +1258,40 @@ def test_foot_finish_uses_unique_visible_back_seat_and_checks_native_ink(monkeyp
 
 
 
+
+
+class _NoseRadiusDisplay:
+    def __init__(self, name: str, fault: str | None) -> None:
+        self.name = name
+        self.fault = fault
+        self.Diametric = fault == "diametric"
+        self.ArcExtensionLineOrOppositeSide = True
+        self.ArrowSide = 0
+        self._solid = True
+
+    @property
+    def SolidLeader(self) -> bool:
+        return self._solid
+
+    @SolidLeader.setter
+    def SolidLeader(self, value: bool) -> None:
+        if self.fault != "solid_leader":
+            self._solid = value
+
+    def GetSpecificAnnotation(self):
+        return self
+
+
+@pytest.mark.parametrize("fault", (None, "solid_leader", "diametric", "missing"))
+def test_nose_radius_leader_stops_at_the_arc_instead_of_the_tap_centre(monkeypatch, fault):
+    nose = _NoseRadiusDisplay("NoseR" if fault != "missing" else "D1", fault)
+    other = _NoseRadiusDisplay("TapFromTip", None)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    if fault:
+        with pytest.raises(RuntimeError, match="NoseR"):
+            drawing._exterior_nose_radius(object(), [other, nose])
+        return
+    drawing._exterior_nose_radius(object(), [other, nose])
+    assert (nose.ArcExtensionLineOrOppositeSide, nose.ArrowSide, nose.SolidLeader) == (False, 1, False)
+    assert (other.ArrowSide, other.SolidLeader) == (0, True)
