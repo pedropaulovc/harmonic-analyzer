@@ -5,9 +5,10 @@ The caller owns the exact native dimension/source/attachment inventory through
 moving the complete measured text block beyond its outside-arrow tail. Widths
 and heights come from native display data, not estimated glyph advances.
 
-Native font boxes are not printed glyph ink: a fraction bar may legitimately
-lie inside their union. Every native fragment and line remains in ``record``;
-this core does not prove clearance from other annotations or the part body.
+Native font boxes are not printed glyph ink: even an empty or whitespace text
+fragment can have measured advance, and a fraction bar may lie inside their
+union. Every native fragment and line remains in ``record``; this core does not
+prove clearance from other annotations or the part body.
 The caller must retain its settled layout checks and the post-export drawing
 layout audit with PDF ink. No font, value, tolerance, source or scale is edited.
 """
@@ -15,17 +16,219 @@ layout audit with PDF ink. No font, value, tolerance, source or scale is edited.
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Mapping
-from math import dist, isfinite
+import json
+from math import cos, dist, isfinite, sin
 from typing import Any
 
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
-from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_audit import TextItem, _rotated_hull, annotation_geometry, calibrate_sheet_advance
+from _layout_geometry import Box, Segment, point_segment_distance, union_boxes
+import _telemetry
 
 # The existing shared-clamp native station/readback contract, not a new allowance.
 _POSITION_TOLERANCE_M = 1e-5
+
+
+def measured_native_text_bounds(
+    texts: Collection[Mapping[str, Any]], *, label: str
+) -> tuple[Box, tuple[Box, ...]]:
+    """Return the union and one measured box per raw native fragment, in order.
+
+    ``GetTextRefPositionAtIndex`` uses all six ``swTextPosition_e`` anchors;
+    ``GetTextAngleAtIndex`` is CCW radians. Normalize each anchor to its rotated
+    lower-left before the existing unfiltered font-rectangle hull, retaining
+    measured metre widths/heights. Each BSTR fragment, including empty/whitespace
+    advance, must have readable geometry and a finite derived box BEFORE union.
+    No glyph estimate or lower-left fallback can hide malformed geometry.
+    Raw records are never modified and fragment cardinality/order is preserved.
+    """
+    if not texts:
+        raise RuntimeError(f"{label}: supplier reference text has no measured native size")
+    fragments = []
+    for index, raw in enumerate(texts):
+        reference = raw.get("ref")
+        fragment_label = f"{label} fragment {index} ref={reference!r}"
+        value = raw.get("t")
+        if not isinstance(value, str):
+            raise RuntimeError(f"{fragment_label}: unreadable native text")
+        try:
+            width, height = (float(raw.get(key) or 0.0) for key in ("w", "h"))
+        except (TypeError, ValueError, OverflowError) as error:
+            raise RuntimeError(f"{fragment_label}: unreadable measured native size") from error
+        if not all(isfinite(value) and value > 0.0 for value in (width, height)):
+            raise RuntimeError(f"{fragment_label}: text has no measured native size")
+        try:
+            at = tuple(float(value) for value in raw.get("pos", ()))
+            angle = float(raw["ang"])
+        except (KeyError, TypeError, ValueError, OverflowError) as error:
+            raise RuntimeError(f"{fragment_label}: unreadable native position/angle") from error
+        if len(at) != 3 or not all(map(isfinite, (*at, angle))):
+            raise RuntimeError(f"{fragment_label}: unreadable native position/angle")
+        if type(reference) is not int or reference not in range(6):
+            raise RuntimeError(f"{fragment_label}: unreadable native reference position")
+        # SDK swTextPosition_e: upper-left, lower-left, centre, upper-right,
+        # lower-right, upper-centre. Rotate the LOCAL anchor offset, not the
+        # raw sheet position; this is the existing measured-caption convention.
+        dx, dy = {
+            0: (0.0, -height), 1: (0.0, 0.0),
+            2: (-width / 2, -height / 2), 3: (-width, -height),
+            4: (-width, 0.0), 5: (-width / 2, -height),
+        }[reference]
+        cosine, sine = cos(angle), sin(angle)
+        normalized = (
+            at[0] + cosine * dx - sine * dy,
+            at[1] + sine * dx + cosine * dy,
+            at[2],
+        )
+        if not all(map(isfinite, normalized)):
+            raise RuntimeError(f"{fragment_label}: non-finite normalized native position")
+        # display_box intentionally excludes blank visible-ink runs. Native
+        # font advances are different: retain every measured rectangle, using
+        # that same hull primitive without its semantic text filter.
+        fragment = _rotated_hull(
+            TextItem(value, normalized[0], normalized[1], height, angle, 1), width
+        )
+        if not all(map(isfinite, (
+            fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax
+        ))):
+            raise RuntimeError(f"{fragment_label}: no finite measured native bounds")
+        fragments.append(fragment)
+    text = union_boxes(fragments)
+    if text is None or not all(map(isfinite, (text.xmin, text.ymin, text.xmax, text.ymax))):
+        raise RuntimeError(f"{label}: supplier reference text has no finite measured native bounds")
+    return text, tuple(fragments)
+
+
+def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> str:
+    """Bound already-read primitives only; never inspect or repr a native object."""
+    def bounded(value: Any, depth: int = 0) -> Any:
+        if value is None or type(value) in (bool, int):
+            return value
+        if type(value) is float:
+            return value if isfinite(value) else {"non_finite": repr(value)}
+        if type(value) is str:
+            if len(value) <= 128:
+                return value
+            return {"prefix": value[:128], "omitted_characters": len(value) - 128}
+        if depth < 3 and type(value) in (tuple, list):
+            return {
+                "items": [bounded(item, depth + 1) for item in value[:16]],
+                "omitted_items": max(0, len(value) - 16),
+            }
+        if depth < 3 and type(value) is dict:
+            fields = list(value.items())
+            return {
+                "fields": {
+                    key[:128] if type(key) is str else "<non-string-key>":
+                    bounded(item, depth + 1)
+                    for key, item in fields[:16]
+                },
+                "omitted_fields": max(0, len(fields) - 16),
+            }
+        return {"unreadable_type": type(value).__name__[:128]}
+
+    texts = (record.get("display") or {}).get("texts") or ()
+    census = {
+        "label": bounded(label),
+        "axis": axis,
+        "annotation": {
+            key: bounded(record.get(key))
+            for key in ("type", "name", "owner_type", "pos", "visible", "layer")
+        },
+        "fragment_count": len(texts),
+        "omitted_fragments": max(0, len(texts) - 16),
+        "fragments": [
+            {"index": index, "raw": bounded(raw),
+             "reference_python_type": type(raw.get("ref")).__name__[:128]}
+            for index, raw in enumerate(texts[:16])
+        ],
+    }
+    return "supplier_reference_native_fontbox_fields " + json.dumps(census, allow_nan=False)
+
+
+def _offset_text_path_indices(
+    physical: list[Segment],
+    tips: tuple[tuple[float, float], ...],
+    texts: Collection[Mapping[str, Any]],
+    *,
+    font_bottom: float,
+) -> tuple[int, int] | None:
+    """Recognize one complete native horizontal offset-text path, not its ink area.
+
+    The lowest native lower-left, unrotated fragment supplies the full baseline
+    advance. Its connector starts at the arrow midpoint; its separate underline
+    starts at that same baseline. Unknown or competing paths stay physical.
+    These are indices of distinct raw primitives: never clip their intervals
+    out of other, possibly overlapping, physical dimension-line primitives.
+    """
+    midpoint = (
+        tips[0][0] + (tips[1][0] - tips[0][0]) / 2,
+        tips[0][1] + (tips[1][1] - tips[0][1]) / 2,
+    )
+
+    def oriented(run: Segment, start: tuple[float, float], end: tuple[float, float]):
+        first, last = (run.x0, run.y0), (run.x1, run.y1)
+        matches = [
+            (a, b)
+            for a, b in ((first, last), (last, first))
+            if max(dist(a, start), dist(b, end)) <= _POSITION_TOLERANCE_M
+            and abs(dist(a, b) - dist(start, end)) <= _POSITION_TOLERANCE_M
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    candidates = []
+    for raw in texts:
+        if raw["ref"] != 1 or float(raw["ang"]) != 0.0:
+            continue
+        baseline = tuple(float(value) for value in raw["pos"][:2])
+        advance = (baseline[0] + float(raw["w"]), baseline[1])
+        # This supported fragment's baseline is its own measured lower edge;
+        # it must be the global font bottom, not an arbitrary higher text row.
+        if (
+            abs(baseline[1] - font_bottom) > _POSITION_TOLERANCE_M
+            or baseline[0] <= tips[1][0]
+        ):
+            continue
+        for connector_index, connector in enumerate(physical):
+            connector_ends = oriented(connector, midpoint, baseline)
+            if connector_ends is None:
+                continue
+            for underline_index, underline in enumerate(physical):
+                if underline_index == connector_index:
+                    continue
+                underline_ends = oriented(underline, baseline, advance)
+                if (
+                    underline_ends is None
+                    or dist(connector_ends[1], underline_ends[0])
+                    > _POSITION_TOLERANCE_M
+                ):
+                    continue
+                # Endpoint-to-fragment and fragment-to-bottom allowances must
+                # not stack. Prove the actual text-path endpoints directly
+                # against the global font bottom with the same radial bound.
+                if any(
+                    dist(point, expected) > _POSITION_TOLERANCE_M
+                    for point, expected in (
+                        (connector_ends[1], (baseline[0], font_bottom)),
+                        (underline_ends[0], (baseline[0], font_bottom)),
+                        (underline_ends[1], (advance[0], font_bottom)),
+                    )
+                ):
+                    continue
+                remaining = [
+                    run for index, run in enumerate(physical)
+                    if index not in (connector_index, underline_index)
+                ]
+                if not remaining:
+                    continue
+                reach = max(max(run.x0, run.x1) for run in remaining)
+                if baseline[0] - reach < CLEAR_GAP_M:
+                    continue
+                candidates.append((connector_index, underline_index))
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def measure_reference_text(
@@ -35,10 +238,19 @@ def measure_reference_text(
 
     ``axis`` is 0 for a horizontal dimension, 1 for a vertical dimension. The
     returned record retains all native lines, including fraction bars and
-    offset-text connectors. ``reach`` is only the maximum positive-axis reach
-    of tip-incident dimension lines and arrowheads, not text-format strokes.
-    This is a read, not a rebuild; callers needing settled pre-transition data
-    must rebuild first. :func:`shelve_reference_text` does that itself.
+    offset-text connectors. ``reach`` is the maximum positive-axis reach of
+    physical dimension lines and arrowheads, not off-support text-format ink.
+    ``witnesses`` contains one primitive ``(station, low, high)`` triple per
+    disjoint perpendicular coverage interval. ``physical_lines`` retains each
+    disjoint axial union as ``(normal_low, normal_high, axial_low, axial_high)``;
+    actual normal bounds are not snapped to the arrow support line. Both use
+    the existing readback tolerance, without padding their stored endpoints.
+    Coincident text-format ink stays conservatively physical except for one
+    positively identified complete native offset-text path: live True mode,
+    the lowest supported baseline and a unique midpoint connector/full-advance
+    underline pair. Only those raw primitives are excluded, never an overlapping
+    physical interval. This is a read, not a rebuild; callers needing settled
+    pre-transition data must rebuild first. The shelf core does that.
     """
     if isinstance(axis, bool) or not isinstance(axis, int) or axis not in (0, 1):
         raise ValueError(f"{label}: reference axis must be 0 or 1")
@@ -50,26 +262,25 @@ def measure_reference_text(
         raise RuntimeError(f"{label}: unreadable supplier reference annotation: {errors}")
     data = record.get("display") or {}
     texts = data.get("texts") or ()
-    if not texts or any(
-        not isfinite(float(row.get(key) or 0.0)) or float(row.get(key) or 0.0) <= 0.0
-        for row in texts
-        for key in ("w", "h")
-    ):
-        raise RuntimeError(f"{label}: supplier reference text has no measured native size")
-    if any(
-        len(row.get("pos") or ()) != 3
-        or not all(isfinite(float(value)) for value in row["pos"])
-        or row.get("ang") is None
-        or not isfinite(float(row["ang"]))
-        for row in texts
-    ):
-        raise RuntimeError(f"{label}: supplier reference text has unreadable native position/angle")
-    text = display_box({"texts": texts})
+    try:
+        text, _ = measured_native_text_bounds(texts, label=label)
+    except RuntimeError as error:
+        try:
+            error.add_note(_fontbox_failure_note(record, axis=axis, label=label))
+        except Exception as diagnostic_error:
+            error.add_note(
+                "supplier reference fontbox field census formatting failed "
+                f"({type(diagnostic_error).__name__}); original failure retained"
+            )
+        raise
+    # This existing native property is semantic authority, not an inferred
+    # field in the display-data dump. A failed getter must remain a failure.
+    offset_text = display.OffsetText
+    if type(offset_text) is not bool:
+        raise RuntimeError(f"{label}: unreadable native reference text offset state")
     arrows = data.get("arrows") or ()
     if (
-        text is None
-        or not all(isfinite(value) for value in (text.xmin, text.ymin, text.xmax, text.ymax))
-        or len(arrows) != 2
+        len(arrows) != 2
         or any(
             len(row) < 8 or not all(isfinite(float(value)) for value in row)
             for row in arrows
@@ -92,18 +303,47 @@ def measure_reference_text(
         for run in geometry.segments
     ):
         raise RuntimeError(f"{label}: unreadable supplier reference native line geometry")
+    normal = 1 - axis
+    support = tips[0][normal] + (tips[1][normal] - tips[0][normal]) / 2
     physical = [
         segment
         for segment in geometry.segments
         if segment.role == "dim-line"
         and abs((segment.y1 - segment.y0) if axis == 0 else (segment.x1 - segment.x0))
         <= _POSITION_TOLERANCE_M
-        and any(
-            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
-            for tip in tips
+        and all(
+            abs(endpoint[normal] - support) <= _POSITION_TOLERANCE_M
             for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
         )
     ]
+    # Preserve complete collinear physical ink, including detached fragments.
+    # OffsetText can add a connector/underline exactly ON the support line.
+    # Remove only one positively explained pair; all other ink stays physical.
+    if offset_text and axis == 0:
+        text_path = _offset_text_path_indices(
+            physical, tips, texts, font_bottom=text.ymin
+        )
+        if text_path is not None:
+            physical = [
+                run for index, run in enumerate(physical) if index not in text_path
+            ]
+    intervals = []
+    for segment in physical:
+        start, end = (segment.x0, segment.y0), (segment.x1, segment.y1)
+        intervals.append((
+            min(start[normal], end[normal]), max(start[normal], end[normal]),
+            min(start[axis], end[axis]), max(start[axis], end[axis]),
+        ))
+    physical_lines = []
+    for normal_low, normal_high, low, high in sorted(intervals, key=lambda row: row[2]):
+        if physical_lines and low <= physical_lines[-1][3] + _POSITION_TOLERANCE_M:
+            prior = physical_lines[-1]
+            physical_lines[-1] = (
+                min(prior[0], normal_low), max(prior[1], normal_high),
+                prior[2], max(prior[3], high),
+            )
+        else:
+            physical_lines.append((normal_low, normal_high, low, high))
     # OffsetText connectors can be classified as ext-line too. Only the
     # perpendicular runs on actual arrow stations are physical witnesses.
     witnesses = []
@@ -121,19 +361,25 @@ def measure_reference_text(
         ]
         if not runs:
             raise RuntimeError(f"{label}: supplier reference lost a native witness")
-        across = [
-            value
-            for segment in runs
-            for value in (
+        intervals = sorted(
+            tuple(sorted(
                 (segment.y0, segment.y1) if axis == 0 else (segment.x0, segment.x1)
-            )
-        ]
-        witnesses.append((tip[axis], min(across), max(across)))
+            ))
+            for segment in runs
+        )
+        coverage = []
+        for low, high in intervals:
+            if coverage and low <= coverage[-1][1] + _POSITION_TOLERANCE_M:
+                coverage[-1] = (coverage[-1][0], max(coverage[-1][1], high))
+            else:
+                coverage.append((low, high))
+        witnesses.extend((tip[axis], low, high) for low, high in coverage)
+    # A tolerance-closed station union cannot supply missing native tip ink.
+    # Prove radial support against each actual finite segment, not its union.
     if any(
         not any(
-            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
+            point_segment_distance(tip, segment) <= _POSITION_TOLERANCE_M
             for segment in physical
-            for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
         )
         for tip in tips
     ):
@@ -154,6 +400,7 @@ def measure_reference_text(
         axis=axis,
         tips=tips,
         witnesses=tuple(witnesses),
+        physical_lines=tuple(physical_lines),
         reach=reach,
     )
 
@@ -161,8 +408,8 @@ def measure_reference_text(
 def assert_reference_text_stations(
     before: dict[str, Any], after: dict[str, Any], *, label: str
 ) -> None:
-    """Require unchanged native arrow tips and complete physical witness runs."""
-    for key in ("tips", "witnesses"):
+    """Require original tips, complete witnesses and physical dimension-line ink."""
+    for key in ("tips", "witnesses", "physical_lines"):
         if len(before[key]) != len(after[key]) or any(
             dist(old, new) > _POSITION_TOLERANCE_M
             for old, new in zip(before[key], after[key], strict=True)
@@ -177,6 +424,7 @@ def _position(annotation: Any, *, label: str) -> tuple[float, ...]:
     return position
 
 
+@_telemetry.traced("drawing.shelve_reference_text", label_param="label")
 def shelve_reference_text(
     adapter: Any,
     *,
@@ -184,6 +432,7 @@ def shelve_reference_text(
     axes: Mapping[str, int],
     label: str,
     force: Collection[str] = (),
+    audit_records: Callable[[Mapping[str, Mapping[str, Any]]], None] | None = None,
 ) -> Callable[[], None]:
     """Shelve short references in the +axis direction; return a read-only proof.
 
@@ -195,7 +444,11 @@ def shelve_reference_text(
     The sequence retains the proven shared-clamp measurement rebuild and three
     batched transition rebuilds. The returned proof performs no writes or
     rebuilds; its original measured stations stay private to the closure.
-    Callers separately retain complete native/PDF layout collision enforcement.
+    ``audit_records``, if supplied, receives the same freshly measured raw
+    records once every row passes the settled proof, initially and on each
+    later invocation. It must be read-only: no native or record mutation.
+    Records are local to that checkpoint, never copied or cached by this core.
+    Callers retain complete native/PDF layout collision enforcement.
     """
     axes = dict(axes)
     if not axes or any(
@@ -273,18 +526,20 @@ def shelve_reference_text(
         rebuild_drawing(adapter, label=f"{label} measured reference text shelves")
 
     stations = {
-        name: {key: geometry[key] for key in ("tips", "witnesses")}
+        name: {key: geometry[key] for key in ("tips", "witnesses", "physical_lines")}
         for name, geometry in before.items()
     }
 
     def settled() -> None:
         found = current_displays()
+        records = {}
         for name, original in stations.items():
             display = _early_bound(found[name], "IDisplayDimension")
             actual = measure_reference_text(
                 adapter, display, axis=axes[name], label=f"{label} {name}"
             )
             assert_reference_text_stations(original, actual, label=f"{label} {name}")
+            records[name] = actual["record"]
             if name not in positions:
                 continue
             axis = axes[name]
@@ -296,6 +551,8 @@ def shelve_reference_text(
             position = _position(annotation, label=f"{label} {name}")
             if abs(position[1 - axis] - positions[name][1 - axis]) > _POSITION_TOLERANCE_M:
                 raise RuntimeError(f"{label} {name}: supplier reference transverse position moved")
+        if audit_records is not None:
+            audit_records(records)
 
     settled()
     return settled

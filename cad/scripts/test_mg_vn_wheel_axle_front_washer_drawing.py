@@ -187,3 +187,131 @@ def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
+
+
+@pytest.mark.parametrize(
+    "name,original_front,original_top",
+    [
+        (
+            "mg_vn_wheel_axle_back_washer",
+            (0.0, 0.008, 0.040, 0.006),
+            (0.0, 0.008, 0.035, 0.008),
+        ),
+        (
+            "mg_vn_wheel_axle_front_washer",
+            (0.0, 0.008, 0.040, 0.006),
+            (0.0, 0.008, 0.035, 0.008),
+        ),
+        (
+            "ch_rocker_arm_tl_vn_oblique_lever_washer",
+            (0.0, 0.008, 0.035, 0.008),
+            (0.0, 0.008, 0.040, 0.006),
+        ),
+        (
+            "ch_rocker_arm_tl_vn_oblique_block_washer",
+            (0.0, 0.008, 0.035, 0.008),
+            (0.0, 0.008, 0.040, 0.006),
+        ),
+        (
+            "pd_vn_transgear_pivot_shim",
+            (0.0, 0.006, 0.035, 0.006),
+            (0.0, 0.008, 0.040, 0.008),
+        ),
+        (
+            "ch_vn_rocker_thrust_washer",
+            (0.0, 0.008, 0.040, 0.008),
+            (0.0, 0.006, 0.035, 0.006),
+        ),
+        (
+            "sm_vn_knife_hanger_washer",
+            (0.0, 0.008, 0.035, 0.008),
+            (0.0, 0.008, 0.040, 0.006),
+        ),
+    ],
+)
+def test_seven_washer_recipes_reserve_projected_axes_before_fit(
+    monkeypatch, name, original_front, original_top
+) -> None:
+    """Exercise actual recipe arguments and shared pure cell geometry, not COM."""
+    import importlib
+
+    import _purchased_fastener_drawing as purchased
+
+    drawing = importlib.import_module(f"draw_{name}")
+    captured = []
+
+    async def capture(_adapter, sheet, **kwargs):
+        assert sheet is drawing.SPEC
+        captured.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(drawing, "build_purchased_fastener_drawing", capture)
+    assert asyncio.run(drawing.build(object())) == {}
+    (arguments,) = captured
+    margins = arguments["supplier_margins"]
+    assert margins is drawing.SUPPLIER_MARGINS
+    # Reserved views are the dimension-bearing Front/Top, never the bare Right.
+    # This offline recipe census does not establish the native dimension census.
+    assert set(margins) == {"*Front", "*Top"}
+    assert callable(arguments["supplier_dimensions"])
+    assert callable(arguments["saved_check"])
+    assert len(arguments["settled_checks"]) == 1
+
+    label = drawing.SPEC.artifact_stem
+    # Match the builder: supplier operating data is a separate footer input.
+    notes = str(_config.parts(label).get("installation_notes", ""))
+    caption_y = purchased.view_band_bottom(
+        notes, label=label, supplier_data=arguments.get("supplier_data", ())
+    )
+    cells = purchased.fastener_view_cells(caption_y)
+    outer = {view: bounds for view, _center, bounds in cells}
+    fitted = {
+        view: (center, bounds)
+        for view, center, bounds in purchased.supplier_fit_cells(
+            cells, margins, label=label
+        )
+    }
+    original = {
+        view: center
+        for view, center, _bounds in purchased.supplier_fit_cells(
+            cells,
+            {"*Front": original_front, "*Top": original_top},
+            label=label,
+        )
+    }
+    # The actual former 40/35 mm right reserves displaced X by 2.5 mm.
+    assert abs(original["*Top"][0] - original["*Front"][0]) == pytest.approx(
+        0.0025
+    )
+    assert fitted["*Top"][0][0] == pytest.approx(fitted["*Front"][0][0])
+    assert fitted["*Right"][0][1] == pytest.approx(fitted["*Front"][0][1])
+
+    for view, previous in (("*Front", original_front), ("*Top", original_top)):
+        # Keep at least every authored lane; symmetry only enlarges MG Front top.
+        left, bottom, right, top = margins[view]
+        assert left == previous[0]
+        assert bottom == previous[1]
+        assert right == 0.040
+        assert top >= previous[3]
+        assert top == (bottom if view == "*Front" else previous[3])
+        bounds = fitted[view][1]
+        assert bounds[1] == pytest.approx(outer[view][1] + bottom)
+        assert bounds[3] == pytest.approx(outer[view][3] - top)
+    y_difference = original_front[1] - original_front[3]
+    assert original["*Front"][1] - original["*Right"][1] == pytest.approx(
+        y_difference / 2
+    )
+    if y_difference:
+        # Only the two MG Fronts had +1 mm Y from 8 mm bottom / 6 mm top.
+        assert y_difference == pytest.approx(0.002)
+        assert margins["*Front"][3] == pytest.approx(original_front[3] + y_difference)
+    assert "*Right" not in margins
+    assert fitted["*Right"][1] == outer["*Right"]
+    assert fitted["*Isometric"][1] == outer["*Isometric"]
+    for view, (_center, bounds) in fitted.items():
+        assert bounds[0] >= outer[view][0]
+        assert bounds[1] >= outer[view][1]
+        assert bounds[2] <= outer[view][2]
+        assert bounds[3] <= outer[view][3]
+        assert bounds[0] < bounds[2]
+        assert bounds[1] < bounds[3]

@@ -69,10 +69,101 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Washer source checks keep the named model display's Part annotation separate
+  from an imported drawing annotation. Before import and during part authoring,
+  the native dimension owner and original attachments must belong to the model
+  witness directly. After import, an explicit paired owning view and imported
+  display may prove the named dimension's feature-owner context through the
+  same original/mapped feature and reverse-correspondence proof. Both members
+  are required; names, values, a failed check or an unrelated first feature
+  display cannot supply missing context. Independently resolved named source,
+  imported and model-parameter dimensions must retain exact native identity,
+  and the imported annotation must belong to that actual view with the frozen
+  source path/configuration. The named source annotation still requires its
+  actual Part owner and original source entities; drawing context never
+  substitutes for that source-side proof. Settled and saved-read-only checks
+  reacquire and repeat both distinct contracts without repairing the source.
+  Shared supplier-reference text shelving retains the original perpendicular
+  witnesses and axial physical dimension lines as canonical interval unions,
+  including every disjoint component and gap, not merely outside endpoints or
+  maximum reach. Equivalent fragmentation, coalescing, reversal and ordering
+  are harmless; changed coverage or actual transverse bounds fail against the
+  immutable pre-transition measurement. Union gaps use the existing 10
+  micrometre readback tolerance once, without padding stored endpoints or
+  adopting a later station as the baseline. Physical candidates must lie on
+  the actual arrow support line at both ends. Each arrow tip must also lie
+  within the existing radial 10 micrometre bound of an actual finite physical
+  segment; a gap-closed union cannot supply synthetic tip support. Off-support
+  text strokes remain in the raw record. Native `OffsetText` can add a
+  connector and underline exactly on the arrow support line. Only a positive
+  live Boolean `OffsetText` read permits the narrow observed distinction:
+  one unique pair of distinct raw primitives joins the arrow midpoint to a
+  validated lower-left, unrotated horizontal fragment on the lowest validated
+  native font baseline, then spans its complete measured advance. Its
+  endpoints, actual junction, full lengths and direct agreement with that
+  global baseline use the existing tolerance once, without stacked allowances.
+  The baseline must clear the remaining physical reach by the existing
+  clearance. Exclude only those two matched primitives, never their spatial
+  intervals from overlapping physical runs. Getter failures propagate;
+  non-Boolean mode, incomplete, duplicated, competing or unsupported paths
+  are not a text escape.
+  Every other on-support candidate remains conservatively physical against
+  the original baseline. This is not a general glyph-clearance classifier.
+  Every reported text fragment participates, including all fraction parts
+  and measured empty/whitespace BSTR advances. The shared native bounds reader
+  normalizes all six SDK anchor positions and their rotation using measured
+  font rectangles, without the visible-ink filter or estimated glyph widths.
+  Each fragment must have readable string data, positive finite dimensions,
+  a finite position and
+  angle, and a known reference before forming the union; blank text never
+  excuses malformed geometry or removes a fragment from the measured inventory.
+  Native station/extent proof is not exact glyph or foreign-line clearance
+  proof: retain every line, including fraction bars, and inspect the actual
+  PDF ink, whole sheet and automated machinist result after regeneration.
+  A consumer's read-only native path audit can use `audit_records`: after all
+  strict station and shelf checks, the core passes that checkpoint's same
+  freshly measured record mapping once, without a second annotation dump.
+  The audit must not mutate native state or records; failures propagate.
+  Initial and later proofs each collect their own records, never a cached
+  snapshot from before a rebuild or save.
+  Separately opted-in purchased recipes align projected model origins before
+  supplier annotation capture: only Top X and Right Y move. Each native view's
+  independent scale and refreshed cell containment must survive unchanged;
+  the operation does not refit views. Other recipes retain the default-off
+  alignment behavior.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
+  Washer model-item import can replace an explicit supplier unit display with
+  drawing-document units while retaining the same native model dimension,
+  value, tolerance, precision and reference text. `_supplier_washer_drawing`
+  validates the original source display and native `IDimension` identity, then
+  transfers only the source unit/fraction settings with `SetUnits2`; it never
+  rewrites imported precision, text, values or bands. The original strict
+  presentation and source-geometry checks run after import and final rebuild.
+  Washer source geometry is independently resolved from the named part feature;
+  a drawing check supplies its actual owning view. A native dimension's feature
+  owner may remain in part context or be returned in drawing-view context—even
+  when obtained through the original source display after import. The checker
+  proves the exact source feature or its view-mapped feature with a native
+  reverse feature identity, never merely a matching name, value or sketch ID.
+  The complete independent endpoint/circle inventory must map to distinct
+  native view objects in the mapped feature's actual sketch, and every
+  attachment must match exactly the geometry-selected subset with no extras.
+  Circles additionally prove native reverse/roundtrip identity. Points use the
+  complete forward native bijection: the nullable API does not promise an
+  inverse for every sketch point. The original part-only checker remains
+  strict; drawing-context ownership is not a waiver for a part-only check.
+  These sheets also use the purchased builder's post-close `saved_check` hook:
+  reopen the actual SLDDRW read-only, reacquire its source/configuration and
+  dimensions, repeat native identity/value/attachment/band/presentation checks,
+  and require the saved drawing's SHA-256 to remain unchanged. The source
+  context must be read-only with native `GetSaveFlag()` exactly `False`, whether
+  resident or autoloaded; record both its residency and save flag. Per-field
+  getter readbacks accompany refusals as notes on the original exception.
+  A pre-save check, dirty in-memory source, or authoring-view handle is not
+  saved-file evidence.
   The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
   outer Top cell retains the existing 46 mm annotation reserve, leaving
   50 mm for the measured native outline. The bottom-row cells' tops and

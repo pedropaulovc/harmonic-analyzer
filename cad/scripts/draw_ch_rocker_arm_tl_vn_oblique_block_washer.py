@@ -3,28 +3,30 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable
+from pathlib import Path
 import sys
 from typing import Any
 
 import _telemetry
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
-from _supplier_washer_drawing import supplier_washer_dimensions
+from _supplier_washer_drawing import SupplierWasherProof, supplier_washer_dimensions
 import ch_rocker_arm_tl_vn_oblique_block_washer_spec as part
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_block_washer"]
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "#8 WEDGE-LOCK WASHER PAIR, ID 4.32 x OD 7.62"
+# Front/Top share outer X bounds, so both need the face's 40 mm right reserve.
+# Front's equal bottom/top reserves already align Y with the uninset Right.
 SUPPLIER_MARGINS = {
     "*Top": (0.0, 0.008, 0.040, 0.006),
-    "*Front": (0.0, 0.008, 0.035, 0.008),
+    "*Front": (0.0, 0.008, 0.040, 0.008),
 }
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    proofs: list[Callable[[], None]] = []
+    proofs: list[SupplierWasherProof] = []
 
     def supplier_dimensions(adapter: Any, views: dict[str, Any]) -> None:
         proofs.append(supplier_washer_dimensions(
@@ -39,10 +41,19 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("91812A215 supplier dimensions must be authored exactly once")
         proofs[0]()
 
+    def saved_dimensions(adapter: Any, path: Path) -> None:
+        if len(proofs) != 1:
+            raise RuntimeError("supplier washer dimensions must be authored exactly once before saved proof")
+        saved = proofs[0].saved_check
+        proofs.clear()
+        saved(adapter, path)
+
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
+        number_fit=NumberFit.SHRINK_TO_CELL,
         settled_checks=(assert_supplier_dimensions,),
+        saved_check=saved_dimensions,
         supplier_data=part.SUPPLIER_DATA,
     )
 

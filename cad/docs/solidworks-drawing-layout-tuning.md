@@ -111,6 +111,67 @@ attachment, value and format checks, complete cell/caption containment, its
 settled layout checks and post-export inspection/audit using actual PDF ink.
 Native shelf separation alone does not prove body or foreign-line clearance.
 
+The supplier-washer consumer forces this shelf only for the imported linear
+thickness reference, on its measured vertical axis. Every phase first reacquires
+and re-proves all three source/rim references, native identity, value, band and
+presentation against the captured source path and view configurations. Diameter
+references do not use `OffsetText`: the existing near-side diameter leader helper
+is followed by rebuild and native style readback. Placement measures every native
+caption fragment (including the diameter prefix and the below-caption screw-size
+text), normalizes its documented text-reference position, and moves the complete
+caption beyond the face outline and arrow extent with the same 2 mm clearance
+and 0.2 mm settle. Fresh graphics must have no own leader/text intersection or
+arrow/text clearance violation.
+
+The independently enumerated named source dimension must also be the native
+dimension returned by the source model's exact `Parameter("Dimension@Feature")`
+lookup. This positive identity control supplements, rather than replaces, the
+complete source/view feature and entity correspondence proof, its distinctness
+controls and its reverse/round-trip checks. The guard requires an explicit owning
+`view`: part authoring passes `None`; imported drawing references pass their
+actual view. Original-source references are checked before import, after import
+and again during final settled and saved drawing checks. Import persistence
+transfers only the independently validated source's documented `SetUnits2`
+settings; it does not rewrite source or imported values, bands, precision or text.
+
+Post-import original-source checks retain that Part annotation context (`view=None`)
+and supply a separate paired `known_view`/`known_imported` binding. Both members
+are required and independently tied to the named source and exact model
+parameter; the imported annotation must belong to the known view. The single
+canonical feature-correspondence proof can then validate the named source
+dimension's original or mapped-and-reversed feature owner without substituting
+the drawing annotation for its Part annotation. The authoritative named source
+display's own `GetAnnotation` must still prove its actual Part owner and original
+attachments. A feature's unrelated first display, an observed failure, matching
+names or values, and null annotation correspondence never supply this context.
+Source path and each actual view configuration are frozen before import and
+rechecked after import, during placement and after the read-only saved reopen.
+
+Failure readbacks and diagnostic notes are best effort: getter, serialization,
+formatting or note-transport failures must not replace the exact original
+exception, including a `BaseException`. Saved cleanup still attempts its independent
+close and file-hash checks. It preserves the proof error, or raises the first
+cleanup error if the proof succeeded; secondary reporting never turns a failure
+into success.
+
+Only immutable scalar stations, outlines and annotation positions cross into the
+saved washer reader. It reacquires the actual source, configurations, views and
+references from the read-only reopened drawing; it never calls the mutating shelf
+or retains authoring COM handles in that callback. The source-material receipt
+reads actual native `MaterialIdName`, return type, configuration and source-file
+hash, not the assignment request or installed-library expectation. A resident
+source is explicitly not a cold-source-open proof. These predicates and receipts
+do not replace complete-sheet native render/ink inspection and machinist review.
+
+The washer also retains the core's complete canonical `physical_lines` interval
+union from the original measurement before any shelf transition. Each immutable
+component records its actual normal envelope and axial interval in metres; the
+core alone normalizes collinear fragments. Final settled and saved checks compare
+that original union as well as tips and witnesses. Moving a free tail, changing
+its transverse envelope or introducing an interior gap cannot pass merely
+because arrow tips and witness extrema still match. Reordering, reversing or
+splitting fragments without changing the physical union is not a geometry change.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report
@@ -471,10 +532,13 @@ For a round washer, the filing-button convention moves the genuine imported
 OD from the circular face to `*Right` with `move_model_dimension`.
 
 A purchased drawing whose Number overruns the REV divider opts into
-`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52). This measures and fits
-the linked native note locally; do not change the shared template or rename
-the part. Inspect the fresh native witnesses, callouts and Number/REV gap:
-source positions alone are not after-fix evidence.
+`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52 and VN-70). This measures
+and fits the complete linked native Number locally; do not change its identity,
+the shared template or the REV field. Retain the current native font, anchor,
+extent and bounded fit readbacks, including the existing readable-height floor.
+Inspect the fresh native witnesses and callouts, and measure positive clearance
+between the printed Number's glyph ink and the actual divider's stroke envelope:
+historical template dimensions and source positions are not after-fix evidence.
 
 ### Rocker R19 regression and local placement contract
 
@@ -1578,6 +1642,35 @@ in their authored views, non-dangling, with unchanged native definitions.
 The shared finalizer's exact-count contract is unchanged for other recipes.
 
 **q. A standard view placed as-is is not necessarily in projection.**
+
+Purchased washer annotation reserves must preserve projected axes **before**
+strict native fitting. For the seven MG axle, CH oblique lever/block, PD pivot
+shim, CH thrust and SM knife-hanger washer recipes, Front and Top share outer
+X bounds 25–205 mm. Insetting a cell by `(left, bottom, right, top)` shifts its
+centre by `((left - right) / 2, (bottom - top) / 2)`. Their former 40/35 mm right
+reserves therefore put the paired X centres at 95/97.5 mm: a real 2.5 mm
+misalignment, not a generic clearance allowance. Both now retain the larger
+existing 40 mm reserve and centre at 95 mm.
+
+Front and Right also share their outer Y bounds. Only the two MG washers'
+original Front reserves were asymmetric in Y (8 mm bottom, 6 mm top), shifting
+their centre +1 mm. Increasing their Front top reserve to the existing 8 mm
+bottom reserve removes that shift without reducing any annotation lane. Right
+remains uninset and unannotated. Reserving even a derived 2 mm bottom margin
+on Right was incorrect: the actual `4fd50c9ac` MG native leaves refused because
+the settled supplier-view guard requires reserved views to match the native
+dimension-bearing view census, and Right has no dimensions. Preserve that
+guard, not a Right reserve. The other five Fronts already have equal
+bottom/top reserves and retain their default Right cells unchanged.
+These recipe-only reserves preserve or enlarge existing Front/Top vertical
+annotation lanes, retain catalogue/common orthographic scale selection, native
+containment and saved proofs, and neither move views after fitting nor alter
+shared fitting APIs. The existing
+`test_mg_vn_wheel_axle_front_washer_drawing.py` exercises all seven actual
+recipe calls with real `supplier_fit_cells` geometry and requires the reserved
+view set to remain exactly Front/Top. This is an offline axis/containment and
+recipe-census contract, not a native census or rendered-sheet acceptance claim.
+
 Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
 `*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
 (source `8d6d2088a`, launcher `20261012T124257186Z`): `*Top` was the principal

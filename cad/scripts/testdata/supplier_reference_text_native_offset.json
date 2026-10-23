@@ -1,0 +1,755 @@
+{
+  "schema": 1,
+  "record_type": "raw_native_offset_text_captured_regression_source",
+  "purpose": "Retain the four actual AF/thickness annotations for a future source-approved regression. Evidence only; no source, native, or test admission.",
+  "stem": "pn-vn-pen-hanger-jam-nut",
+  "method": "Select existing manifest-named audit annotations by exact view orientation and annotation name. Raw annotation objects retain every captured field and array entry; no filtering, normalization, geometry recomputation, or fabricated OffsetText state.",
+  "execution_limits": "Only standard-library JSON evidence assembly and artifact hashing. No project/SDK imports, tests, build, lint, formatter, census, COM, probes, git, or D writes.",
+  "uncaptured_fields": {
+    "OffsetText": "MISSING from both raw annotations in both captures; no captured state is inferred.",
+    "annotation_leaders": "MISSING from both raw annotations in both captures.",
+    "semantic_line_roles_or_native_segment_identity": "MISSING; raw display.lines header and endpoints are retained as captured."
+  },
+  "sources": [
+    {
+      "phase": "before",
+      "source_sha": "8c0e04a4a2c6f860fef8e49ffe7e083933ed022c",
+      "run_id": "20261022T183536971Z-d534525e684044cbab825aa8784c5349",
+      "manifest_path": "D:/farm-runs/rolling-main-post-v44-20261021/nut1850-8c0e04a4-native-artifacts-handoff.json",
+      "audit_sha256_recorded_in_manifest": "f8c6da57d42d87ea9dc182261a47e2874005246e9252ff8a7ee03c1e9140bf88",
+      "pdf_sha256_recorded_in_manifest": "c08f1027bb825b137d427127b74448350164f64a58d5b27928ece64ead96ea0d",
+      "audit_path": "D:/farm-runs/rolling-main-post-v44-20261021/20261022T183536971Z-d534525e684044cbab825aa8784c5349.out/reports/layout-audit/pn-vn-pen-hanger-jam-nut.json",
+      "pdf_path": "D:/farm-runs/rolling-main-post-v44-20261021/20261022T183536971Z-d534525e684044cbab825aa8784c5349.out/pdf/pn-vn-pen-hanger-jam-nut.pdf",
+      "raw_annotations": [
+        {
+          "dimension_role": "across_flats",
+          "view_name": "Drawing View1",
+          "view_orientation": "*Front",
+          "axis": 0,
+          "axis_authority": "_supplier_nut_drawing.add_supplier_nut_dimensions sets axis 0 for all three native dimensions; arrow arrays independently show both tips share Y.",
+          "source_json_pointer": "/sheets/0/views/0/annotations/1",
+          "raw_annotation": {
+            "type": 4,
+            "name": "RD1",
+            "visible": 1,
+            "owner_type": 0,
+            "pos": [
+              0.115,
+              0.1661689,
+              -0.0059531
+            ],
+            "layer": "",
+            "display": {
+              "lines": [
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.1099372,
+                  0.169306,
+                  -0.0059531,
+                  0.113549,
+                  0.169306,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1444154,
+                  -0.0059531,
+                  0.099125,
+                  0.1598138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.130875,
+                  0.1444154,
+                  -0.0059531,
+                  0.130875,
+                  0.1598138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  0.092775,
+                  0.1588138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  0.130875,
+                  0.1588138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.130875,
+                  0.1588138,
+                  -0.0059531,
+                  0.137225,
+                  0.1588138,
+                  -0.0059531
+                ]
+              ],
+              "arrows": [
+                [
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  -1.0,
+                  -0.0,
+                  0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.130875,
+                  0.1588138,
+                  -0.0059531,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "texts": [
+                {
+                  "t": "(",
+                  "pos": [
+                    0.1077035,
+                    0.1664411,
+                    -0.0059531
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0017208
+                },
+                {
+                  "t": "1",
+                  "pos": [
+                    0.11045,
+                    0.1689983,
+                    -0.0059531
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0025861
+                },
+                {
+                  "t": "4",
+                  "pos": [
+                    0.11045,
+                    0.16437,
+                    -0.0059531
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0025861
+                },
+                {
+                  "t": "\" in)",
+                  "pos": [
+                    0.1140618,
+                    0.1664411,
+                    -0.0059531
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0082347
+                },
+                {
+                  "t": "ACROSS FLATS",
+                  "pos": [
+                    0.0988757,
+                    0.1588138,
+                    -0.0059531
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0322486
+                }
+              ]
+            },
+            "dim": {
+              "hole_callout": false
+            }
+          }
+        },
+        {
+          "dimension_role": "thickness",
+          "view_name": "Drawing View3",
+          "view_orientation": "*Right",
+          "axis": 0,
+          "axis_authority": "_supplier_nut_drawing.add_supplier_nut_dimensions sets axis 0 for all three native dimensions; arrow arrays independently show both tips share Y.",
+          "source_json_pointer": "/sheets/0/views/2/annotations/0",
+          "raw_annotation": {
+            "type": 4,
+            "name": "RD1",
+            "visible": 1,
+            "owner_type": 0,
+            "pos": [
+              0.315,
+              0.1083311,
+              0.0
+            ],
+            "layer": "",
+            "display": {
+              "lines": [
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.1300846,
+                  0.0,
+                  0.3209531,
+                  0.104553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3090469,
+                  0.1300846,
+                  0.0,
+                  0.3090469,
+                  0.104553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  0.3273031,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  0.3090469,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3090469,
+                  0.105553,
+                  0.0,
+                  0.3026969,
+                  0.105553,
+                  0.0
+                ]
+              ],
+              "arrows": [
+                [
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  1.0,
+                  -0.0,
+                  -0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.3090469,
+                  0.105553,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "texts": [
+                {
+                  "t": " (0.094 in) ",
+                  "pos": [
+                    0.3036323,
+                    0.105553,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0227354
+                }
+              ]
+            },
+            "dim": {
+              "hole_callout": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "source_sha": "27f11084a0c9449eab72b066cfa03d1662cdff17",
+      "run_id": "20261022T220225221Z-7f2282487c0847d88dfd647d05b513be",
+      "manifest_path": "D:/farm-runs/rolling-main-post-v44-20261021/nut1850-27f11084a-native-handoff.json",
+      "audit_sha256_recorded_in_manifest": "0f341dd7fcddf77098b8ec033488d6be3123dcb9fecc3d4612361fc614833683",
+      "pdf_sha256_recorded_in_manifest": "fbf3c7aa0fc243653b6e156342d6c47729d22a0ec9aed8478ecb78e1773d8fb0",
+      "audit_path": "D:/farm-runs/rolling-main-post-v44-20261021/20261022T220225221Z-7f2282487c0847d88dfd647d05b513be.out/reports/layout-audit/pn-vn-pen-hanger-jam-nut.json",
+      "pdf_path": "D:/farm-runs/rolling-main-post-v44-20261021/20261022T220225221Z-7f2282487c0847d88dfd647d05b513be.out/pdf/pn-vn-pen-hanger-jam-nut.pdf",
+      "raw_annotations": [
+        {
+          "dimension_role": "across_flats",
+          "view_name": "Drawing View1",
+          "view_orientation": "*Front",
+          "axis": 0,
+          "axis_authority": "_supplier_nut_drawing.add_supplier_nut_dimensions sets axis 0 for all three native dimensions; arrow arrays independently show both tips share Y.",
+          "source_json_pointer": "/sheets/0/views/0/annotations/1",
+          "raw_annotation": {
+            "type": 4,
+            "name": "RD1",
+            "visible": 1,
+            "owner_type": 0,
+            "pos": [
+              0.1555493,
+              0.1661689,
+              0.0
+            ],
+            "layer": "",
+            "display": {
+              "lines": [
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.1504865,
+                  0.169306,
+                  0.0,
+                  0.1540983,
+                  0.169306,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1444154,
+                  -0.0059531,
+                  0.099125,
+                  0.1598138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.130875,
+                  0.1444154,
+                  -0.0059531,
+                  0.130875,
+                  0.1598138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  0.092775,
+                  0.1588138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  0.130875,
+                  0.1588138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.130875,
+                  0.1588138,
+                  -0.0059531,
+                  0.137225,
+                  0.1588138,
+                  -0.0059531
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.115,
+                  0.1588138,
+                  -0.0059531,
+                  0.139425,
+                  0.1588138,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.139425,
+                  0.1588138,
+                  0.0,
+                  0.1716736,
+                  0.1588138,
+                  0.0
+                ]
+              ],
+              "arrows": [
+                [
+                  0.099125,
+                  0.1588138,
+                  -0.0059531,
+                  -1.0,
+                  -0.0,
+                  0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.130875,
+                  0.1588138,
+                  -0.0059531,
+                  1.0,
+                  0.0,
+                  -0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "texts": [
+                {
+                  "t": "(",
+                  "pos": [
+                    0.1482528,
+                    0.1664411,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0017208
+                },
+                {
+                  "t": "1",
+                  "pos": [
+                    0.1509993,
+                    0.1689983,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0025861
+                },
+                {
+                  "t": "4",
+                  "pos": [
+                    0.1509993,
+                    0.16437,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0025861
+                },
+                {
+                  "t": "\" in)",
+                  "pos": [
+                    0.1546111,
+                    0.1664411,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0082347
+                },
+                {
+                  "t": "ACROSS FLATS",
+                  "pos": [
+                    0.139425,
+                    0.1588138,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0322486
+                }
+              ]
+            },
+            "dim": {
+              "hole_callout": false
+            }
+          }
+        },
+        {
+          "dimension_role": "thickness",
+          "view_name": "Drawing View3",
+          "view_orientation": "*Right",
+          "axis": 0,
+          "axis_authority": "_supplier_nut_drawing.add_supplier_nut_dimensions sets axis 0 for all three native dimensions; arrow arrays independently show both tips share Y.",
+          "source_json_pointer": "/sheets/0/views/2/annotations/0",
+          "raw_annotation": {
+            "type": 4,
+            "name": "RD1",
+            "visible": 1,
+            "owner_type": 0,
+            "pos": [
+              0.3408708,
+              0.1083311,
+              -0.0
+            ],
+            "layer": "",
+            "display": {
+              "lines": [
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.1300846,
+                  0.0,
+                  0.3209531,
+                  0.104553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3090469,
+                  0.1300846,
+                  0.0,
+                  0.3090469,
+                  0.104553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  0.3273031,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  0.3090469,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3090469,
+                  0.105553,
+                  0.0,
+                  0.3026969,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.315,
+                  0.105553,
+                  0.0,
+                  0.3295031,
+                  0.105553,
+                  0.0
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.3295031,
+                  0.105553,
+                  0.0,
+                  0.3522385,
+                  0.105553,
+                  0.0
+                ]
+              ],
+              "arrows": [
+                [
+                  0.3209531,
+                  0.105553,
+                  0.0,
+                  1.0,
+                  -0.0,
+                  -0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ],
+                [
+                  0.3090469,
+                  0.105553,
+                  0.0,
+                  -1.0,
+                  0.0,
+                  0.0,
+                  0.003556,
+                  0.000762,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "texts": [
+                {
+                  "t": " (0.094 in) ",
+                  "pos": [
+                    0.3295031,
+                    0.105553,
+                    0.0
+                  ],
+                  "h": 0.0035,
+                  "ref": 1,
+                  "ang": 0.0,
+                  "font": "Century Gothic",
+                  "ls": 0.001,
+                  "w": 0.0227354
+                }
+              ]
+            },
+            "dim": {
+              "hole_callout": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

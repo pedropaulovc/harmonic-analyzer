@@ -233,10 +233,6 @@ def _washer_failure_case(monkeypatch):
     case = _washer_import_native(monkeypatch)
     label = case.helper.THICKNESS
     display = case.imports[label].display
-    feature = case.model.FeatureByName(case.source_helper.THICKNESS_FEATURE)
-    feature.Name = case.source_helper.THICKNESS_FEATURE
-    feature.GetTypeName2 = lambda: "ProfileFeature"
-    case.model.GetPathName = lambda: "C:/native-washer.SLDPRT"
     return case, label, display
 
 
@@ -252,7 +248,7 @@ def _assert_washer_source_attachment(case, label, display):
 ))
 @pytest.mark.parametrize("axis", ("y", "z"))
 @pytest.mark.parametrize("owner_namespace", ("source", "view"))
-def test_washer_canonical_dimension_and_view_entities_do_not_depend_on_feature_owner(
+def test_washer_canonical_dimension_accepts_only_source_or_corresponding_view_owner(
     monkeypatch, label, axis, owner_namespace,
 ):
     from test_purchased_fastener_drawing import _washer_import_native
@@ -274,6 +270,11 @@ def test_washer_canonical_dimension_and_view_entities_do_not_depend_on_feature_o
     assert case.adapter.swApp.IsSame(imported.native, source.native) == 1
     assert case.adapter.swApp.IsSame(
         imported.native, case.model.Parameter(f"{dimension_name}@{feature_name}")) == 1
+    parameter = case.model.Parameter(f"{dimension_name}@{feature_name}")
+    assert source.native is not imported.native and parameter is not source.native
+    assert parameter is not imported.native
+    # A hidden authoring witness is legitimate; its actual drawing must be visible.
+    source.annotation.Visible = 0
     before = (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
               source.native.Tolerance.Type, source.annotation.entities)
     for display, owner_view in ((source.display, None), (imported.display, view)):
@@ -285,33 +286,43 @@ def test_washer_canonical_dimension_and_view_entities_do_not_depend_on_feature_o
             source.native.Tolerance.Type, source.annotation.entities) == before
 
 
-@pytest.mark.parametrize("defect", ("native_name", "source_name", "native_type"))
-def test_washer_canonical_dimension_still_requires_correct_names_and_type(monkeypatch, defect):
-    case, label, display = _washer_failure_case(monkeypatch)
+@pytest.mark.parametrize("defect", (
+    "native_name", "source_name", "native_type", "source_feature_name", "source_feature_type",
+))
+@pytest.mark.parametrize("context", ("part", "drawing"))
+def test_washer_canonical_dimension_still_requires_correct_names_and_type(monkeypatch, defect, context):
+    case, label, _display = _washer_failure_case(monkeypatch)
     source = case.sources[label]
-    imported = case.imports[label]
+    imported = source if context == "part" else case.imports[label]
+    feature = case.model.FeatureByName(case.source_helper.THICKNESS_FEATURE)
     if defect == "native_name":
         imported.native.FullName = "Other@SupplierWasherThicknessReference@stock"
     elif defect == "source_name":
         source.native.FullName = "Other@SupplierWasherThicknessReference@stock"
-    else:
+    elif defect == "native_type":
         imported.display.Type2 = 6
+    elif defect == "source_feature_name":
+        feature.Name = "OtherWitness"
+    else:
+        feature.GetTypeName2 = lambda: "RefPlane"
     with pytest.raises(RuntimeError):
-        _assert_washer_source_attachment(case, label, display)
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display,
+            view=None if context == "part" else case.views["*Front"], label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
 
 
 @pytest.mark.parametrize("label", (
     "supplier outer diameter", "supplier bore diameter", "supplier thickness",
 ))
-def test_washer_part_uses_canonical_dimension_despite_different_feature_owner(monkeypatch, label):
+def test_washer_part_canonical_identity_does_not_waive_exact_source_feature_owner(monkeypatch, label):
     from test_purchased_fastener_drawing import _washer_import_native
 
     case = _washer_import_native(monkeypatch)
     source = case.sources[label]
     feature_name, dimension_name = case.source_helper.SOURCE_DIMENSIONS[label]
     feature = case.model.FeatureByName(feature_name)
-    feature.Name = feature_name
-    feature.GetTypeName2 = lambda: "ProfileFeature"
     other_owner = SimpleNamespace(Name=feature_name, GetTypeName2=lambda: "ProfileFeature")
     source.native.GetFeatureOwner = lambda: other_owner
     assert case.adapter.swApp.IsSame(other_owner, feature) == 0
@@ -319,10 +330,11 @@ def test_washer_part_uses_canonical_dimension_despite_different_feature_owner(mo
         source.native, case.model.Parameter(f"{dimension_name}@{feature_name}")) == 1
     before = (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
               source.native.Tolerance.Type, source.annotation.entities)
-    case.source_helper.assert_supplier_washer_source_attachment(
-        case.adapter, case.model, source.display, view=None, label=label,
-        axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
-    )
+    with pytest.raises(RuntimeError, match="named model witness"):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, source.display, view=None, label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
     assert (source.native.SystemValue, dict(vars(source.state)), dict(source.text),
             source.native.Tolerance.Type, source.annotation.entities) == before
 
@@ -337,6 +349,8 @@ def test_washer_rejects_other_canonical_dimensions_despite_matching_metadata(mon
     source = case.sources[label]
     original = source.native
     display = source.display if context == "part" else case.imports[label].display
+    feature_name, dimension_name = case.source_helper.SOURCE_DIMENSIONS[label]
+    feature = case.model.FeatureByName(feature_name)
     other = SimpleNamespace(**vars(original))
     assert other.FullName == original.FullName and other.SystemValue == original.SystemValue
     before = (original.SystemValue, dict(vars(source.state)), dict(source.text),
@@ -346,9 +360,9 @@ def test_washer_rejects_other_canonical_dimensions_despite_matching_metadata(mon
     elif defect == "missing_parameter":
         case.model.Parameter = lambda _name: None
     elif defect == "wrong_enumerated":
-        source.native = other
+        feature.dimensions[dimension_name] = (source.display, other)
     elif defect == "missing_enumerated":
-        source.native = None
+        feature.dimensions[dimension_name] = (source.display, None)
     elif defect == "wrong_native":
         display.GetDimension2 = lambda _index: other
     else:
@@ -366,17 +380,14 @@ def test_washer_rejects_other_canonical_dimensions_despite_matching_metadata(mon
 def test_washer_parameter_reader_failure_is_not_retried_by_diagnostics(monkeypatch, context):
     case, label, _display = _washer_failure_case(monkeypatch)
     original = RuntimeError("canonical source-part parameter lookup failed")
-    observations = []
-    responses = iter((original, case.sources[label].native))
+    observations, queries = [], []
 
-    def failed_parameter(_name):
-        response = next(responses)
-        if response is original:
-            raise original
-        return response
+    def failed_parameter(name):
+        queries.append(name)
+        raise original
 
     case.model.Parameter = failed_parameter
-    monkeypatch.setattr(case.source_helper._telemetry, "info", lambda _message, **fields: observations.append(fields))
+    monkeypatch.setattr(case.source_helper._telemetry, "info", observations.append)
     with pytest.raises(RuntimeError) as caught:
         case.source_helper.assert_supplier_washer_source_attachment(
             case.adapter, case.model,
@@ -385,35 +396,43 @@ def test_washer_parameter_reader_failure_is_not_retried_by_diagnostics(monkeypat
             axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )
     assert caught.value is original
-    fields, = observations
-    assert fields["model_parameter_handle_state"] == "UNAVAILABLE"
-    assert fields["model_parameter_handle_reason"] == "source-part parameter lookup did not complete"
+    feature_name, dimension_name = case.source_helper.SOURCE_DIMENSIONS[label]
+    assert queries == [f"{dimension_name}@{feature_name}"]
+    message, = observations
+    fields = json.loads(message.split(": ", 1)[1])["reads"]
+    assert fields["dimension.model_parameter"]["error_type"] == "RuntimeError"
+    assert fields["dimension.model_parameter"]["read_error"] == str(original)
+    assert fields["dimension.model_parameter_query"]["value"] == queries[0]
+    assert "dimension.owner" not in fields
 
 
-def test_washer_owner_failure_reports_remaining_context_despite_an_independent_reader_error(monkeypatch):
+def test_washer_required_owner_reader_failure_retains_only_observed_fields_without_retry(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
-    observations = []
+    observations, calls = [], []
+    original = RuntimeError("required owner type reader failed")
 
     def interrupted_type():
-        raise RuntimeError("optional owner type reader failed")
+        calls.append("owner_type")
+        raise original
 
-    foreign_owner = SimpleNamespace(Name="Foreign", GetTypeName2=interrupted_type)
+    foreign_owner = SimpleNamespace(
+        Name=case.source_helper.THICKNESS_FEATURE, GetTypeName2=interrupted_type,
+    )
     case.imports[label].native.GetFeatureOwner = lambda: foreign_owner
-    case.model.Parameter = lambda _name: SimpleNamespace(**vars(case.sources[label].native))
-    monkeypatch.setattr(case.source_helper._telemetry, "info", lambda _message, **fields: observations.append(fields))
-    with pytest.raises(RuntimeError, match="named model witness"):
+    monkeypatch.setattr(case.source_helper._telemetry, "info", observations.append)
+    with pytest.raises(RuntimeError) as caught:
         _assert_washer_source_attachment(case, label, display)
-    fields, = observations
-    assert fields["owner_same_source"] == 0
-    assert fields["owner_type_state"] == "UNAVAILABLE"
-    assert fields["owner_type_error_type"] == "RuntimeError"
-    assert fields["source_feature_type"] == "ProfileFeature"
-    assert fields["source_path"] == "C:/native-washer.SLDPRT"
-    assert fields["view_source_same"] == 1
-    assert fields["native_type"] == fields["source_type"] == 2
-    assert fields["mapped_candidate_present"] == (True, True)
-    assert fields["attachment_same_source_row_major"] == (0, 0, 0, 0)
-    assert fields["attachment_same_view_row_major"] == (1, 0, 0, 1)
+    assert caught.value is original
+    assert calls == ["owner_type"]
+    message, = observations
+    fields = json.loads(message.split(": ", 1)[1])["reads"]
+    assert fields["dimension.owner_type"]["error_type"] == "RuntimeError"
+    assert fields["source.feature_type"]["value"] == "ProfileFeature"
+    assert fields["source.path"]["value"] == case.model.GetPathName()
+    assert fields["view.source_identity"]["value"] == 1
+    assert fields["dimension.source_parameter_identity"]["value"] == 1
+    assert fields["dimension.imported_parameter_identity"]["value"] == 1
+    assert "source.segments" not in fields and "annotation.entities" not in fields
 
 
 def test_washer_original_native_interrupt_aborts_without_failure_only_observers(monkeypatch):
@@ -435,16 +454,17 @@ def test_washer_original_native_interrupt_aborts_without_failure_only_observers(
     assert observations == []
 
 
-def test_washer_failure_observer_interrupt_aborts_immediately(monkeypatch):
+def test_washer_required_owner_reader_interrupt_aborts_immediately(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
-    original = KeyboardInterrupt("interrupt during optional owner type read")
+    original = KeyboardInterrupt("interrupt during required owner type read")
 
     def interrupted_type():
         raise original
 
-    foreign_owner = SimpleNamespace(Name="Foreign", GetTypeName2=interrupted_type)
+    foreign_owner = SimpleNamespace(
+        Name=case.source_helper.THICKNESS_FEATURE, GetTypeName2=interrupted_type,
+    )
     case.imports[label].native.GetFeatureOwner = lambda: foreign_owner
-    case.model.Parameter = lambda _name: SimpleNamespace(**vars(case.sources[label].native))
     with pytest.raises(KeyboardInterrupt) as caught:
         _assert_washer_source_attachment(case, label, display)
     assert caught.value is original
@@ -467,19 +487,143 @@ def test_washer_ordinary_observer_error_does_not_replace_original_native_failure
     assert caught.value is original
 
 
-def test_washer_healthy_canonical_check_does_not_read_feature_owners_or_diagnostics(monkeypatch):
+def test_washer_healthy_canonical_and_owner_checks_emit_no_failure_receipts(monkeypatch):
     case, label, display = _washer_failure_case(monkeypatch)
 
     def unexpected_observation(*_args, **_kwargs):
         raise AssertionError("healthy ownership path called failure-only diagnostics")
 
     monkeypatch.setattr(case.source_helper._telemetry, "info", unexpected_observation)
-    case.model.GetPathName = unexpected_observation
-    case.sources[label].native.GetFeatureOwner = unexpected_observation
-    case.imports[label].native.GetFeatureOwner = unexpected_observation
-    # Canonical identity and physical attachments are independent of optional
-    # feature-owner observations and the later drawing presentation operation.
     _assert_washer_source_attachment(case, label, display)
+
+
+@pytest.mark.parametrize("axis", ("y", "z"))
+def test_washer_references_read_explicit_source_model_not_adapter_receiver(monkeypatch, axis):
+    from test_purchased_fastener_drawing import _washer_import_native
+
+    case = _washer_import_native(monkeypatch, axis=axis)
+    case.adapter.currentModel = SimpleNamespace()
+    before = _washer_source_state(case)
+    case.source_helper.assert_supplier_washer_references(case.adapter, case.model, **case.kwargs)
+    assert _washer_source_state(case) == before
+
+
+@pytest.mark.parametrize("context", ("part", "drawing"))
+@pytest.mark.parametrize("relation", ("imported-source", "source-parameter", "imported-parameter"))
+@pytest.mark.parametrize("result", (False, True, 0.0, 1.0, -1, 2, None, "1"))
+def test_washer_canonical_controls_require_native_integer_identity(monkeypatch, context, relation, result):
+    case, label, _display = _washer_failure_case(monkeypatch)
+    original = case.sources[label]
+    imported = original if context == "part" else case.imports[label]
+    feature, name = case.source_helper.SOURCE_DIMENSIONS[label]
+    parameter = case.model.Parameter(f"{name}@{feature}")
+    first, second = {
+        "imported-source": (imported.native, original.native),
+        "source-parameter": (original.native, parameter),
+        "imported-parameter": (imported.native, parameter),
+    }[relation]
+    actual_same = case.adapter.swApp.IsSame
+    case.adapter.swApp.IsSame = lambda left, right: (
+        result if left is first and right is second else actual_same(left, right)
+    )
+    with pytest.raises(RuntimeError, match="native integer identity"):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display,
+            view=None if context == "part" else case.views["*Front"], label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+
+
+@pytest.mark.parametrize("defect", (
+    "source_document", "source_type", "source_path", "view_path", "view_configuration",
+    "source_feature_name", "source_feature_type", "mapped_feature_name", "mapped_feature_type",
+    "reverse_feature", "foreign_owner", "missing_map", "collapsed_map", "wrong_member_sketch",
+    "wrong_annotation_owner", "hidden", "dangling", "construction", "geometry",
+))
+def test_washer_canonical_identity_never_waives_view_lineage_bijection_or_geometry(monkeypatch, defect):
+    case, label, display = _washer_failure_case(monkeypatch)
+    view = case.views["*Front"]
+    feature_name, name = case.source_helper.SOURCE_DIMENSIONS[label]
+    feature = case.model.FeatureByName(feature_name)
+    mapped_feature = view.GetCorresponding(feature)
+    entities = case.entities[label]
+    mapped = tuple(view.GetCorresponding(entity) for entity in entities)
+    assert case.adapter.swApp.IsSame(case.imports[label].native, case.sources[label].native) == 1
+    assert case.adapter.swApp.IsSame(
+        case.sources[label].native, case.model.Parameter(f"{name}@{feature_name}"),
+    ) == 1
+    # All three canonical dimensions remain valid. Each mutation independently
+    # breaks a physical or context predicate that canonical identity cannot prove.
+    if defect == "source_document":
+        view.ReferencedDocument = SimpleNamespace(**vars(case.model))
+    elif defect == "source_type":
+        case.model.GetType = lambda: 3
+    elif defect == "source_path":
+        case.model.GetPathName = lambda: "C:/foreign-washer.SLDPRT"
+    elif defect == "view_path":
+        view.GetReferencedModelName = lambda: "C:/foreign-washer.SLDPRT"
+    elif defect == "view_configuration":
+        view.ReferencedConfiguration = ""
+    elif defect == "source_feature_name":
+        feature.Name = "OtherWitness"
+    elif defect == "source_feature_type":
+        feature.GetTypeName2 = lambda: "RefPlane"
+    elif defect == "mapped_feature_name":
+        mapped_feature.Name = "OtherWitness"
+    elif defect == "mapped_feature_type":
+        mapped_feature.GetTypeName2 = lambda: "RefPlane"
+    elif defect == "reverse_feature":
+        case.model.Extension.reverse[id(mapped_feature)] = SimpleNamespace(**vars(feature))
+    elif defect == "foreign_owner":
+        case.imports[label].native.GetFeatureOwner = lambda: SimpleNamespace(**vars(mapped_feature))
+    elif defect == "missing_map":
+        view.forward[id(entities[1])] = None
+    elif defect == "collapsed_map":
+        view.forward[id(entities[1])] = mapped[0]
+    elif defect == "wrong_member_sketch":
+        mapped[1].GetSketch = feature.GetSpecificFeature2
+    elif defect == "wrong_annotation_owner":
+        case.imports[label].annotation.Owner = case.views["*Top"]
+    elif defect == "hidden":
+        case.imports[label].annotation.Visible = 0
+    elif defect == "dangling":
+        case.imports[label].annotation.IsDangling = lambda: True
+    elif defect == "construction":
+        feature.GetSpecificFeature2().GetSketchSegments()[0].ConstructionGeometry = False
+    else:
+        entities[1].Y *= 2
+    with pytest.raises(RuntimeError):
+        _assert_washer_source_attachment(case, label, display)
+
+
+@pytest.mark.parametrize("defect", ("unselected_null", "unselected_collapse", "reverse", "roundtrip"))
+def test_washer_canonical_circle_retains_complete_inventory_and_reverse_roundtrip(monkeypatch, defect):
+    from test_purchased_fastener_drawing import _washer_import_native
+
+    case = _washer_import_native(monkeypatch)
+    label, bore_label = case.helper.OUTER_DIAMETER, case.helper.BORE_DIAMETER
+    view = case.views["*Top"]
+    outer, = case.entities[label]
+    bore, = case.entities[bore_label]
+    mapped_outer = view.GetCorresponding(outer)
+    if defect == "unselected_null":
+        view.forward[id(bore)] = None
+    elif defect == "unselected_collapse":
+        view.forward[id(bore)] = mapped_outer
+    elif defect == "reverse":
+        case.model.Extension.reverse[id(mapped_outer)] = bore
+    else:
+        def reverse(entity):
+            if entity is mapped_outer:
+                view.forward[id(outer)] = SimpleNamespace(**vars(mapped_outer))
+                return outer
+            return case.model.Extension.reverse.get(id(entity))
+        case.model.Extension.GetCorresponding2 = reverse
+    with pytest.raises(RuntimeError):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, case.imports[label].display, view=view, label=label,
+            axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
 
 
 def test_washer_import_refuses_uninherited_tolerance_precision_without_repairing_source(monkeypatch):
@@ -540,28 +684,35 @@ def test_washer_complete_consumer_replay_clears_limits_and_diameters_without_mov
 ):
     import copy
     from _layout_audit import display_box
-    from _supplier_screw_layout import supplier_top_text_geometry
+    from _supplier_reference_text import measure_reference_text
 
     case = _r48_washer_layout(monkeypatch, axis=axis, banded=banded)
     thick = case.helper.THICKNESS
     diameters = (case.helper.OUTER_DIAMETER, case.helper.BORE_DIAMETER)
     before = _washer_source_state(case)
     before_records = copy.deepcopy({label: paint.record for label, paint in case.paint.items()})
-    before_stations = supplier_top_text_geometry(before_records[thick], horizontal=False)
+    before_stations = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     face = case.views["*Top" if axis == "y" else "*Front"]
-    assert before_stations["text"].xmin < before_stations["right"]
+    assert before_stations["text"].ymin < before_stations["reach"]
     assert all(display_box({"texts": before_records[label]["display"]["texts"]}).xmin
                < face.GetOutline()[2] for label in diameters)
-    # Offset mode changes the full native block only on rebuild. Measuring the
-    # pre-mode box would leave 6 mm of this real-width stack in the witness lane.
+    # Offset mode settles a transverse text shift only on rebuild. Measure the
+    # full settled stack against the physical +Y reach, not its transverse X.
     case.paint[thick].offset_shift = -.006
     diameter_y = {label: case.paint[label].record["pos"][1] for label in diameters}
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
-    after = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    after = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     for field in ("tips", "witnesses", "physical_lines"):
         assert after[field] == before_stations[field]
-    assert after["text"].xmin - after["right"] >= .002
+    assert after["axis"] == before_stations["axis"] == 1
+    assert after["reach"] == before_stations["reach"]
+    assert after["text"].ymin > before_stations["text"].ymin
+    assert after["text"].ymin >= after["reach"] + .002
     for label in diameters:
         assert display_box({"texts": case.paint[label].record["display"]["texts"]}).xmin - face.GetOutline()[2] >= .002
         assert case.paint[label].record["pos"][1] == diameter_y[label]
@@ -628,6 +779,7 @@ def test_washer_refuses_unavailable_measured_paint_instead_of_estimated_text(mon
 def _retained_washer_layout(monkeypatch, scope):
     from test_purchased_fastener_drawing import _washer_import_native
     import _supplier_washer_drawing as washer
+    from _supplier_reference_text import measure_reference_text
 
     captures = json.loads(Path(__file__).with_name("test_supplier_washer_native_paint.json").read_text())
     captured = captures["cases"][scope]
@@ -654,9 +806,77 @@ def _retained_washer_layout(monkeypatch, scope):
             item.native.Tolerance.GetMinValue = lambda deviation=(lower - value) / 1000: deviation
             item.native.Tolerance.GetMaxValue = lambda deviation=(upper - value) / 1000: deviation
         case.paint[label].record = copy.deepcopy(captured["records"][label])
-    # These captures are the settled exported sheets, where the thickness
-    # already uses OffsetText. Replaying them must not move its witnesses.
-    case.imports[washer.THICKNESS].display.OffsetText = True
+    # Retain the actual exported phase, including its True native mode and
+    # complete connector/underline paint. It is not a fresh authoring seed.
+    thick = washer.THICKNESS
+    case.retained_thickness = SimpleNamespace(
+        phase="retained-export", record=copy.deepcopy(captured["records"][thick]),
+        offset_text=True,
+    )
+    display = case.imports[thick].display
+    display.OffsetText = case.retained_thickness.offset_text
+    retained = measure_reference_text(case.adapter, display, axis=1, label=thick)
+    case.retained_thickness.stations = retained
+    record = case.paint[thick].record
+    lines = record["display"]["lines"]
+    texts = record["display"]["texts"]
+    # These retained captures have exactly one complete offset text path after
+    # their four physical runs. Prove its raw endpoints before deriving the
+    # pre-offset paint; no arbitrary physical primitive may be discarded.
+    from decimal import Decimal
+
+    coordinate_tolerance = Decimal("0.0000001")
+    assert len(lines) == 6
+    raw_tips = tuple(
+        tuple(Decimal(str(value)) for value in arrow[:2])
+        for arrow in record["display"]["arrows"]
+    )
+    assert len(raw_tips) == 2
+    support = raw_tips[0][0]
+    assert raw_tips[1][0] == support
+    assert raw_tips[0][1] != raw_tips[1][1]
+    midpoint = (support, sum(tip[1] for tip in raw_tips) / 2)
+    baseline = (min(Decimal(str(text["pos"][0])) for text in texts),
+                min(Decimal(str(text["pos"][1])) for text in texts))
+    advance = (
+        max(Decimal(str(text["pos"][0])) + Decimal(str(text["w"])) for text in texts),
+        baseline[1],
+    )
+    # Select by the independently recorded topology across every raw row,
+    # including reversed endpoints. Duplicate/ambiguous paths are not seeds.
+    for start, end, expected in ((midpoint, baseline, 4), (baseline, advance, 5)):
+        matches = [
+            index for index, row in enumerate(lines)
+            if any(
+                all(
+                    abs(Decimal(str(row[first + coordinate])) - start[coordinate])
+                    <= coordinate_tolerance
+                    for coordinate in (0, 1)
+                )
+                and all(
+                    abs(Decimal(str(row[last + coordinate])) - end[coordinate])
+                    <= coordinate_tolerance
+                    for coordinate in (0, 1)
+                )
+                for first, last in ((4, 7), (7, 4))
+            )
+        ]
+        assert matches == [expected]
+    case.paint[thick].offset_path_templates = copy.deepcopy(lines[4:])
+    case.paint[thick].offset_path_indices = None
+    del lines[4:]
+    # Like the saved fixture's explicit authoring reset, this False mode is
+    # DERIVED unit-test input, not an observed native False. Its anchor comes
+    # directly from raw arrows, not the production measurement/classifier.
+    # Seeding from the retained transverse anchor would move physical ink.
+    record["pos"][0] = record["display"]["arrows"][0][0]
+    display.OffsetText = False
+    case.paint[thick].settled_offset = False
+    fresh = measure_reference_text(case.adapter, display, axis=1, label=thick)
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
+        assert fresh[field] == retained[field]
+    assert record["display"]["texts"] == case.retained_thickness.record["display"]["texts"]
+    assert record["display"]["arrows"] == case.retained_thickness.record["display"]["arrows"]
     for orientation, outline in captured["view_outlines"].items():
         case.views[orientation].GetOutline = lambda outline=outline: tuple(outline)
     return case, captured
@@ -667,13 +887,19 @@ def _retained_washer_layout(monkeypatch, scope):
 ))
 def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
     from _layout_audit import display_box
-    from _supplier_screw_layout import supplier_top_text_geometry
+    from _supplier_reference_text import measure_reference_text
 
     case, captured = _retained_washer_layout(monkeypatch, scope)
     outer, thick = case.helper.OUTER_DIAMETER, case.helper.THICKNESS
     before_source = _washer_source_state(case)
     before = copy.deepcopy(case.paint[outer].record)
-    before_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    assert case.retained_thickness.phase == "retained-export"
+    assert case.retained_thickness.offset_text is True
+    assert case.retained_thickness.record == captured["records"][thick]
+    assert case.imports[thick].display.OffsetText is False
+    before_station = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     face = case.views["*Top" if captured["axis"] == "y" else "*Front"]
     assert display_box({"texts": before["display"]["texts"]}).xmin < face.GetOutline()[2]
 
@@ -688,9 +914,14 @@ def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbor
         (row["t"], row["w"], row["h"]) for row in before["display"]["texts"]
     ]
     assert case.imports[outer].display.OffsetText is False
-    after_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
-    for field in ("tips", "witnesses", "physical_lines"):
+    after_station = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
         assert after_station[field] == before_station[field]
+        assert after_station[field] == case.retained_thickness.stations[field]
+    assert after_station["text"].ymin >= after_station["reach"] + .002
+    assert case.retained_thickness.record == captured["records"][thick]
     bounds = tuple(value * 1000 for value in (box.xmin, box.ymin, box.xmax, box.ymax))
     left, bottom, right, top = captured["printable_mm"]
     assert left <= bounds[0] < bounds[2] <= right
@@ -703,9 +934,14 @@ def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbor
 
 def test_washer_final_consumer_refuses_actual_r50_od_strike_after_other_guards_pass(monkeypatch):
     from _layout_audit import display_box
+    from _supplier_reference_text import measure_reference_text
 
     case, captured = _retained_washer_layout(monkeypatch, "ch-thrust")
     outer = case.helper.OUTER_DIAMETER
+    thick = case.helper.THICKNESS
+    assert case.retained_thickness.offset_text is True
+    assert case.retained_thickness.record == captured["records"][thick]
+    assert case.imports[thick].display.OffsetText is False
     old = copy.deepcopy(case.paint[outer].record)
     point = tuple(value / 1000 for value in captured["observed_od_contact_mm"])
     old_box = display_box({"texts": old["display"]["texts"]})
@@ -714,12 +950,19 @@ def test_washer_final_consumer_refuses_actual_r50_od_strike_after_other_guards_p
     before = _washer_source_state(case)
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
+    thickness = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
+    for field in ("tips", "witnesses", "physical_lines", "reach"):
+        assert thickness[field] == case.retained_thickness.stations[field]
+    assert thickness["text"].ymin >= thickness["reach"] + .002
     new_box = display_box({"texts": case.paint[outer].record["display"]["texts"]})
     assert new_box.xmin > point[0]
     case.paint[outer].record = old
     with pytest.raises(RuntimeError):
         settled()
     assert _washer_source_state(case) == before
+    assert case.retained_thickness.record == captured["records"][thick]
 
 
 @pytest.mark.parametrize("label", ("supplier outer diameter", "supplier bore diameter"))

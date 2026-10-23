@@ -3,19 +3,26 @@
 Stock recipes initially make +Y solids. Their optional normalization moves
 bodies only, so witnesses are authored directly in the final model planes.
 Neither this module nor the drawing changes a solid or a native size value.
+
+Post-import source checks accept only an explicit owning-view/imported-display
+pair. Feature ownership may then use proved mapped/reverse lineage, while the
+independently named source annotation must still be Part-owned and attached to
+the original witness. No context is inferred from a failed source-only check.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+import json
 import math
+from pathlib import Path
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.com_variant import double_array
 
 import _telemetry
 from _check import check
-from _com import _bind, _early_bound
+from _com import _early_bound
 from _drawing_marks import mark_dimensions_for_drawing
 from _drawing_precision import _named_dimensions
 from _feature_tree import name_last_feature
@@ -164,255 +171,452 @@ def _assert_point(actual: tuple[float, ...], expected: tuple[float, ...], label:
         raise RuntimeError(f"{label}: source geometry {actual!r} != {expected!r}")
 
 
+def _washer_source_field(value: Any) -> dict[str, Any]:
+    """Bound receipts without repr-ing COM objects or reading more properties."""
+    field: dict[str, Any] = {"python_type": type(value).__name__}
+    if value is None or type(value) in (bool, int, float):
+        field["value"] = value
+    elif isinstance(value, str):
+        field["value"] = value[:512]
+    elif type(value) in (tuple, list):
+        field["count"] = len(value)
+        field["items"] = [
+            {"python_type": type(item).__name__,
+             "value": item[:512] if isinstance(item, str) else item}
+            if item is None or type(item) in (bool, int, float, str)
+            else {"python_type": type(item).__name__, "present": True}
+            for item in value[:4]
+        ]
+    else:
+        field["present"] = True
+    return field
+
+
+class _WasherSourceReadback:
+    """Only the bounded fields consumed by this read-only witness guard."""
+
+    def __init__(self, adapter: Any, label: str) -> None:
+        self.app = adapter.swApp
+        self.label = label
+        self.fields: dict[str, Any] = {}
+
+    def __enter__(self) -> _WasherSourceReadback:
+        return self
+
+    def __exit__(self, _kind: Any, error: Any, _traceback: Any) -> None:
+        if error is None or not isinstance(error, Exception):
+            return
+        try:
+            message = "supplier washer source attachment readback: " + json.dumps(
+                {"label": self.label, "reads": self.fields}, sort_keys=True,
+            )
+        except BaseException:
+            return
+        # Either transport may fail; neither may replace the original refusal.
+        try:
+            error.add_note(message)
+        except BaseException:
+            pass
+        try:
+            _telemetry.info(message)
+        except BaseException:
+            pass
+
+    def read(self, field: str, getter: Callable[[], Any]) -> Any:
+        try:
+            value = getter()
+        except BaseException as error:
+            try:
+                self.fields[field] = {
+                    "error_type": type(error).__name__, "read_error": str(error)[:512],
+                }
+            except BaseException:
+                pass
+            raise
+        self.fields[field] = _washer_source_field(value)
+        return value
+
+    def object(self, field: str, getter: Callable[[], Any], interface: str) -> Any:
+        value = self.read(field, getter)
+        if value is None:
+            raise RuntimeError(f"{self.label}: {field} is unavailable")
+        return self.read(f"{field}.interface", lambda: _early_bound(value, interface))
+
+    def same(self, field: str, first: Any, second: Any) -> int:
+        value = self.read(field, lambda: self.app.IsSame(first, second))
+        if type(value) is not int or value not in (0, 1):
+            raise RuntimeError(f"{self.label}: {field} is not a native integer identity")
+        return value
+
+    def matrix(self, field: str, rows: tuple[Any, ...], columns: tuple[Any, ...]) -> tuple:
+        return tuple(tuple(self.same(f"{field}.{i}.{j}", row, column)
+                           for j, column in enumerate(columns))
+                     for i, row in enumerate(rows))
+
+
+def _washer_view_source_context(
+    proof: _WasherSourceReadback, model: Any, view: Any, feature: Any,
+    native: Any, source_native: Any, owner: Any, *, feature_name: str,
+) -> tuple[Any, Any, Any]:
+    """Prove feature lineage; an already-part owner must not be reversed."""
+    source = proof.object("source.document", lambda: model, "IModelDoc2")
+    view = proof.object("view", lambda: view, "IView")
+    kind = proof.read("source.document_type", source.GetType)
+    referenced = proof.object("view.document", lambda: view.ReferencedDocument, "IModelDoc2")
+    referenced_kind = proof.read("view.document_type", referenced.GetType)
+    identity = proof.same("view.source_identity", referenced, source)
+    paths = (
+        proof.read("source.path", source.GetPathName),
+        proof.read("view.document_path", referenced.GetPathName),
+        proof.read("view.referenced_path", view.GetReferencedModelName),
+    )
+    configuration = proof.read("view.configuration", lambda: view.ReferencedConfiguration)
+    if (
+        type(kind) is not int or kind != 1  # swDocPART
+        or type(referenced_kind) is not int or referenced_kind != 1
+        or identity != 1
+        or any(not isinstance(path, str) or not path.strip() for path in paths)
+        or len({Path(path).resolve() for path in paths}) != 1
+        or not isinstance(configuration, str) or not configuration.strip()
+    ):
+        raise RuntimeError(f"{proof.label}: source/view native part binding differs")
+    # The caller independently captures/rechecks each view's configuration.
+    # A source's one active configuration need not equal all legitimate views.
+    if proof.same("dimension.source_identity", native, source_native) != 1:
+        raise RuntimeError(f"{proof.label}: imported dimension is not its actual native source")
+    mapped_feature = proof.object(
+        "mapped.feature", lambda: view.GetCorresponding(feature), "IFeature",
+    )
+    mapped_name = proof.read("mapped.feature_name", lambda: mapped_feature.Name)
+    mapped_type = proof.read("mapped.feature_type", mapped_feature.GetTypeName2)
+    if mapped_name != feature_name or mapped_type != "ProfileFeature":
+        raise RuntimeError(f"{proof.label}: mapped feature is not its named model witness")
+    extension = proof.object("source.extension", lambda: source.Extension, "IModelDocExtension")
+    reverse = proof.object(
+        "mapped.feature_reverse", lambda: extension.GetCorresponding2(mapped_feature), "IFeature",
+    )
+    if proof.same("mapped.feature_reverse_identity", reverse, feature) != 1:
+        raise RuntimeError(f"{proof.label}: mapped feature does not return to its source witness")
+    mapped_sketch = proof.object(
+        "mapped.feature_sketch", mapped_feature.GetSpecificFeature2, "ISketch",
+    )
+    owner = proof.object("dimension.owner", lambda: owner, "IFeature")
+    owner_name = proof.read("dimension.owner_name", lambda: owner.Name)
+    owner_type = proof.read("dimension.owner_type", owner.GetTypeName2)
+    source_owner = proof.same("dimension.owner_source_identity", owner, feature)
+    mapped_owner = proof.same("dimension.owner_mapped_identity", owner, mapped_feature)
+    if owner_name != feature_name or owner_type != "ProfileFeature":
+        raise RuntimeError(f"{proof.label}: imported dimension does not belong to its named model witness")
+    if source_owner != 1:
+        if mapped_owner != 1:
+            raise RuntimeError(f"{proof.label}: imported dimension does not belong to its named model witness")
+        reverse_owner = proof.object(
+            "dimension.owner_reverse", lambda: extension.GetCorresponding2(owner), "IFeature",
+        )
+        if proof.same("dimension.owner_reverse_identity", reverse_owner, feature) != 1:
+            raise RuntimeError(f"{proof.label}: imported dimension does not belong to its named model witness")
+    return view, mapped_sketch, extension
+
+
+def _assert_washer_view_attachments(
+    proof: _WasherSourceReadback, view: Any, extension: Any, sketch: Any,
+    mapped_sketch: Any, annotation: Any, inventory: tuple[Any, ...],
+    selected: tuple[int, ...], *, points: bool,
+) -> None:
+    """A complete native forward bijection, never coordinate/ID matching."""
+    interface = "ISketchPoint" if points else "ISketchSegment"
+    identity = ((1, 0), (0, 1))
+    if proof.matrix("source.self_distinct", inventory, inventory) != identity:
+        raise RuntimeError(f"{proof.label}: source witness members are not independently distinct")
+    mapped = []
+    for index, entity in enumerate(inventory):
+        member = proof.object(f"source.member.{index}", lambda: entity, interface)
+        owning_sketch = proof.object(f"source.member.{index}.sketch", member.GetSketch, "ISketch")
+        if proof.same(f"source.member.{index}.sketch_identity", owning_sketch, sketch) != 1:
+            raise RuntimeError(f"{proof.label}: source entity belongs to another sketch")
+        mapped_member = proof.object(
+            f"mapped.member.{index}", lambda: view.GetCorresponding(entity), interface,
+        )
+        owning_sketch = proof.object(
+            f"mapped.member.{index}.sketch", mapped_member.GetSketch, "ISketch",
+        )
+        if proof.same(f"mapped.member.{index}.sketch_identity", owning_sketch, mapped_sketch) != 1:
+            raise RuntimeError(f"{proof.label}: mapped entity belongs to another sketch")
+        mapped.append(mapped_member)
+    mapped = tuple(mapped)
+    if proof.matrix("mapped.self_distinct", mapped, mapped) != identity:
+        raise RuntimeError(f"{proof.label}: mapped witness members are not independently distinct")
+    if not points:
+        for index, member in enumerate(mapped):
+            reverse = proof.object(
+                f"mapped.member.{index}.reverse",
+                lambda: extension.GetCorresponding2(member), "ISketchSegment",
+            )
+            roundtrip = proof.object(
+                f"mapped.member.{index}.roundtrip",
+                lambda: view.GetCorresponding(reverse), "ISketchSegment",
+            )
+            if (
+                proof.same(f"mapped.member.{index}.reverse_identity", reverse, inventory[index]) != 1
+                or proof.same(f"mapped.member.{index}.roundtrip_identity", roundtrip, member) != 1
+            ):
+                raise RuntimeError(f"{proof.label}: construction circle correspondence differs")
+    # GetSpecificFeature2 on the mapped FEATURE defines its sketch. Generic
+    # sketch correspondence does not commute, and point inverse can be null.
+    owner_type = proof.read("annotation.owner_type", lambda: annotation.OwnerType)
+    owner = proof.object("annotation.owner", lambda: annotation.Owner, "IView")
+    owner_identity = proof.same("annotation.owner_view_identity", owner, view)
+    count = proof.read("annotation.count", annotation.GetAttachedEntityCount3)
+    types = tuple(proof.read("annotation.types", annotation.GetAttachedEntityTypes) or ())
+    attached = tuple(proof.read("annotation.entities", annotation.GetAttachedEntities3) or ())
+    if type(owner_type) is not int or owner_type != 0 or owner_identity != 1:
+        raise RuntimeError(f"{proof.label}: source attachment does not belong to its actual view")
+    if (
+        type(count) is not int or count != len(attached) or count != len(types)
+        or count != len(selected)
+    ):
+        raise RuntimeError(f"{proof.label}: unexpected, hidden or dangling source attachments")
+    allowed_types = (11, 25) if points else (10, 24)
+    for entity, kind in zip(attached, types, strict=True):
+        if entity is None or type(kind) is not int or kind not in allowed_types:
+            raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
+    self_matrix = proof.matrix("attached.self_distinct", attached, attached)
+    if self_matrix != tuple(tuple(int(i == j) for j in range(count)) for i in range(count)):
+        raise RuntimeError(f"{proof.label}: unexpected, hidden or dangling source attachments")
+    matrix = proof.matrix("attached.mapped", attached, mapped)
+    indices = []
+    for row in matrix:
+        matches = [index for index, value in enumerate(row) if value == 1]
+        if len(matches) != 1:
+            raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
+        indices.append(matches[0])
+    if len(set(indices)) != len(indices) or set(indices) != set(selected):
+        raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
+    for index, entity in enumerate(attached):
+        member = proof.object(f"attached.member.{index}", lambda: entity, interface)
+        owning_sketch = proof.object(f"attached.member.{index}.sketch", member.GetSketch, "ISketch")
+        if proof.same(f"attached.member.{index}.sketch_identity", owning_sketch, mapped_sketch) != 1:
+            raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
+    if not points:
+        for index, (entity, source_index) in enumerate(zip(attached, indices, strict=True)):
+            reverse = proof.object(
+                f"attached.member.{index}.reverse",
+                lambda: extension.GetCorresponding2(entity), "ISketchSegment",
+            )
+            roundtrip = proof.object(
+                f"attached.member.{index}.roundtrip",
+                lambda: view.GetCorresponding(reverse), "ISketchSegment",
+            )
+            if (
+                proof.same(f"attached.member.{index}.reverse_identity", reverse, inventory[source_index]) != 1
+                or proof.same(f"attached.member.{index}.roundtrip_identity", roundtrip, entity) != 1
+            ):
+                raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
+    if proof.read("annotation.dangling", annotation.IsDangling) or (
+        int(proof.read("annotation.visible", lambda: annotation.Visible)) != 1
+    ):
+        raise RuntimeError(f"{proof.label}: unexpected, hidden or dangling source attachments")
+
+
 def assert_supplier_washer_source_attachment(
     adapter: Any, model: Any, display: Any, *, view: Any | None, label: str,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
+    known_view: Any | None = None, known_imported: Any | None = None,
 ) -> None:
-    """Resolve the named owner's actual geometry independently of the import.
+    """Independently prove exact source geometry and its actual attachment.
 
-    A diameter must attach to its exact construction circle. Thickness must
-    attach to the two points of the sole line at the physical OD flank.
-    Both part and drawing dimensions must match the independently enumerated
-    source IDimension and exact model parameter. Drawing attachments additionally
-    map the checked physical source entities into their exact view.
+    Source-only authoring/pre-import checks remain strict. After import, callers
+    may supply both known_view and known_imported, never either alone or together
+    with view. This proves the source IDimension's owner through the existing
+    feature correspondence proof, not by substituting the imported owner's
+    feature. The named source annotation remains independently Part-owned with
+    original attachments; imported annotations require the full view bijection.
     """
-    feature_name, dimension_name = SOURCE_DIMENSIONS[label]
-    parameter_name = f"{dimension_name}@{feature_name}"
-    raw = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
-    if raw is None:
-        raise RuntimeError(f"{label}: missing source feature {feature_name}")
-    feature = _early_bound(raw, "IFeature")
-    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
-    source_display, source_native = _named_dimensions(
-        adapter, feature_name, {dimension_name}, feature=feature
-    )[dimension_name]
-    native = _early_bound(display.GetDimension2(0), "IDimension")
-    part_parameter = None
-    part_parameter_read = False
-    try:
-        if native is None or source_native is None:
-            raise RuntimeError(f"{label}: missing native dimension for its named model witness")
-        full_name = str(native.FullName or "")
-        part_parameter = _early_bound(
-            _early_bound(model, "IModelDoc2").Parameter(parameter_name), "IDimension")
-        part_parameter_read = True
-        identity_proven = (
-            part_parameter is not None
-            and int(adapter.swApp.IsSame(native, source_native)) == 1
-            and int(adapter.swApp.IsSame(native, part_parameter)) == 1
+    with _WasherSourceReadback(adapter, label) as proof:
+        if (known_view is None) != (known_imported is None) or (
+            view is not None and known_view is not None
+        ):
+            raise RuntimeError(f"{label}: source import context requires only a complete view/display pair")
+        feature_name, dimension_name = SOURCE_DIMENSIONS[label]
+        raw = proof.read("source.feature", lambda: _early_bound(model, "IPartDoc").FeatureByName(feature_name))
+        if raw is None:
+            raise RuntimeError(f"{label}: missing source feature {feature_name}")
+        feature = _early_bound(raw, "IFeature")
+        source_name = proof.read("source.feature_name", lambda: feature.Name)
+        source_type = proof.read("source.feature_type", feature.GetTypeName2)
+        if source_name != feature_name or source_type != "ProfileFeature":
+            raise RuntimeError(f"{label}: source feature is not its named model witness")
+        sketch = proof.object("source.feature_sketch", feature.GetSpecificFeature2, "ISketch")
+        source_display, source_native = proof.read(
+            "dimension.named_source",
+            lambda: _named_dimensions(adapter, feature_name, {dimension_name}, feature=feature),
+        )[dimension_name]
+        native = proof.object("dimension.imported", lambda: display.GetDimension2(0), "IDimension")
+        source_native = proof.object("dimension.source", lambda: source_native, "IDimension")
+        source_model = proof.object("source.document", lambda: model, "IModelDoc2")
+        parameter_name = proof.read(
+            "dimension.model_parameter_query", lambda: f"{dimension_name}@{feature_name}",
+        )
+        parameter = proof.object(
+            "dimension.model_parameter", lambda: source_model.Parameter(parameter_name), "IDimension",
+        )
+        imported_annotation = None
+        binding_native = native
+        if known_view is not None:
+            known_imported = proof.object(
+                "known.imported", lambda: known_imported, "IDisplayDimension",
+            )
+            binding_native = proof.object(
+                "known.dimension", lambda: known_imported.GetDimension2(0), "IDimension",
+            )
+            if proof.same("dimension.display_source_identity", native, source_native) != 1:
+                raise RuntimeError(f"{label}: source display is not its independently named dimension")
+        # IsSame returns a native integer (VT_I4), not a truthy Boolean.
+        # Names and values cannot replace any of these independent controls.
+        imported_source = proof.same("dimension.source_identity", binding_native, source_native)
+        source_parameter = proof.same("dimension.source_parameter_identity", source_native, parameter)
+        imported_parameter = proof.same("dimension.imported_parameter_identity", binding_native, parameter)
+        if imported_source != 1 or source_parameter != 1 or imported_parameter != 1:
+            raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+        full_name = str(proof.read("dimension.imported_full_name", lambda: binding_native.FullName) or "")
+        owner = proof.read(
+            "dimension.owner",
+            source_native.GetFeatureOwner if known_view is not None else native.GetFeatureOwner,
         )
         if (
-            not identity_proven
-            or full_name.split("@")[:2] != [dimension_name, feature_name]
-            or str(source_native.FullName).split("@")[:2] != [dimension_name, feature_name]
-            or int(display.Type2) != int(source_display.Type2)
+            full_name.split("@")[:2] != [dimension_name, feature_name]
+            or str(proof.read("dimension.source_full_name", lambda: source_native.FullName)).split("@")[:2]
+            != [dimension_name, feature_name]
+            or owner is None
         ):
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
-    except Exception:
-        # Failure-only, bounded native observations. No formatting, tolerance,
-        # source or selection changes; no observation licenses acceptance.
-        try:
-            fields = {"label": label, "expected_dimension": dimension_name,
-                      "expected_feature": feature_name, "view_present": view is not None}
-            fields["model_parameter_query"] = parameter_name
-
-            def observe(name: str, reader: Any) -> Any:
-                try:
-                    value = reader()
-                    fields[f"{name}_state"] = "UNAVAILABLE_NULL" if value is None else "OBSERVED"
-                    if value is None or isinstance(value, (str, bool, int, float)):
-                        fields[name] = value
-                    elif isinstance(value, (tuple, list)) and all(
-                        isinstance(item, (str, bool, int, float)) for item in value
-                    ):
-                        fields[name] = tuple(value)
-                    else:
-                        fields[f"{name}_python_type"] = type(value).__name__
-                    return value
-                except Exception as secondary:
-                    fields[f"{name}_state"] = "UNAVAILABLE"
-                    fields[f"{name}_error_type"] = type(secondary).__name__
-                    return None
-
-            actual_owner = observe("owner_handle", lambda: native.GetFeatureOwner())
-            mapped_feature = observe("mapped_feature_handle", lambda: None if view is None else
-                                     _early_bound(view, "IView").GetCorresponding(feature))
-            source_document = observe("source_document_handle", lambda: _early_bound(model, "IModelDoc2"))
-            source_path = observe("source_path", lambda: None if source_document is None else
-                                  source_document.GetPathName())
-            if part_parameter_read:
-                parameter = observe("model_parameter_handle", lambda: part_parameter)
-            else:
-                parameter = None
-                fields["model_parameter_handle_state"] = "UNAVAILABLE"
-                fields["model_parameter_handle_reason"] = "source-part parameter lookup did not complete"
-            loaded_document = observe("loaded_document_handle", lambda: None if source_path is None else
-                                      _early_bound(adapter.swApp.GetOpenDocumentByName(source_path), "IModelDoc2"))
-            configuration_manager = observe("source_configuration_manager_handle", lambda: None
-                                            if source_document is None else _early_bound(
-                                                source_document.ConfigurationManager, "IConfigurationManager"))
-            configuration = observe("source_configuration_handle", lambda: None
-                                    if configuration_manager is None else _early_bound(
-                                        configuration_manager.ActiveConfiguration, "IConfiguration"))
-            for name, reader in (
-                ("native_full_name", lambda: str(native.FullName)),
-                ("source_full_name", lambda: str(source_native.FullName)),
-                ("native_type", lambda: int(display.Type2)),
-                ("source_type", lambda: int(source_display.Type2)),
-                ("native_value_m", lambda: float(native.SystemValue)),
-                ("source_value_m", lambda: float(source_native.SystemValue)),
-                ("native_dimension_self", lambda: None if native is None else
-                 int(adapter.swApp.IsSame(native, native))),
-                ("source_dimension_self", lambda: None if source_native is None else
-                 int(adapter.swApp.IsSame(source_native, source_native))),
-                ("model_parameter_self", lambda: None if parameter is None else
-                 int(adapter.swApp.IsSame(parameter, parameter))),
-                ("native_same_source_dimension", lambda: None if native is None or source_native is None else
-                 int(adapter.swApp.IsSame(native, source_native))),
-                ("native_same_model_parameter", lambda: None if native is None or parameter is None else
-                 int(adapter.swApp.IsSame(native, parameter))),
-                ("source_dimension_same_model_parameter", lambda: None
-                 if source_native is None or parameter is None else
-                 int(adapter.swApp.IsSame(source_native, parameter))),
-                ("model_parameter_full_name", lambda: None if parameter is None else parameter.FullName),
-                ("model_parameter_value_m", lambda: None if parameter is None else float(parameter.SystemValue)),
-                ("owner_same_source", lambda: None if actual_owner is None else
-                 int(adapter.swApp.IsSame(actual_owner, feature))),
-                ("owner_same_view_feature", lambda: None
-                 if actual_owner is None or mapped_feature is None else
-                 int(adapter.swApp.IsSame(actual_owner, mapped_feature))),
-                ("source_feature_type", lambda: feature.GetTypeName2()),
-                ("source_feature_name", lambda: feature.Name),
-                ("source_feature_self", lambda: int(adapter.swApp.IsSame(feature, feature))),
-                ("owner_name", lambda: None if actual_owner is None else
-                 str(_early_bound(actual_owner, "IFeature").Name)),
-                ("owner_type", lambda: None if actual_owner is None else
-                 str(_early_bound(actual_owner, "IFeature").GetTypeName2())),
-                ("owner_self", lambda: None if actual_owner is None else
-                 int(adapter.swApp.IsSame(actual_owner, actual_owner))),
-                ("source_document_type", lambda: None if source_document is None else source_document.GetType()),
-                ("source_read_only", lambda: None if source_document is None else source_document.IsOpenedReadOnly()),
-                ("source_save_flag", lambda: None if source_document is None else source_document.GetSaveFlag()),
-                ("source_configuration", lambda: None if configuration is None else configuration.Name),
-                ("source_same_loaded_document", lambda: None
-                 if source_document is None or loaded_document is None else
-                 int(adapter.swApp.IsSame(source_document, loaded_document))),
-                ("view_reference_configuration", lambda: None if view is None else
-                 _early_bound(view, "IView").ReferencedConfiguration),
-                ("view_source_same", lambda: None if view is None else
-                 int(adapter.swApp.IsSame(view.ReferencedDocument, model))),
-                ("attached_types", lambda: _early_bound(
-                    display.GetAnnotation(), "IAnnotation").GetAttachedEntityTypes()),
-                ("source_attached_types", lambda: _early_bound(
-                    source_display.GetAnnotation(), "IAnnotation").GetAttachedEntityTypes()),
-                ("dangling", lambda: _early_bound(display.GetAnnotation(), "IAnnotation").IsDangling()),
-                ("visible", lambda: int(_early_bound(display.GetAnnotation(), "IAnnotation").Visible)),
+        if known_view is not None:
+            display_type = proof.read("dimension.imported_type2", lambda: known_imported.Type2)
+            source_type = proof.read("dimension.source_type2", lambda: source_display.Type2)
+            if type(display_type) is not int or type(source_type) is not int or display_type != source_type:
+                raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+            imported_annotation = proof.object(
+                "known.annotation", known_imported.GetAnnotation, "IAnnotation",
+            )
+            owner_type = proof.read("known.annotation.owner_type", lambda: imported_annotation.OwnerType)
+            annotation_owner = proof.object(
+                "known.annotation.owner", lambda: imported_annotation.Owner, "IView",
+            )
+            if type(owner_type) is not int or owner_type != 0 or (
+                proof.same("known.annotation.owner_view_identity", annotation_owner, known_view) != 1
             ):
-                observe(name, reader)
-            segments = observe("source_segments", lambda: sketch.GetSketchSegments())
-            attached = observe("attached_entities", lambda: _early_bound(
-                display.GetAnnotation(), "IAnnotation").GetAttachedEntities3())
-            if segments is not None:
-                fields["source_segment_count"] = len(segments)
-                observe("source_segment_types", lambda: tuple(
-                    int(_early_bound(segment, "ISketchSegment").GetType()) for segment in segments))
-                if label == THICKNESS and len(segments) == 1:
-                    line = observe("source_line", lambda: _early_bound(segments[0], "ISketchLine"))
-                    candidates = observe("source_candidates", lambda: (
-                        line.GetStartPoint2(), line.GetEndPoint2()))
-                else:
-                    candidates = tuple(segments)
-                    observe("source_radii_m", lambda: tuple(
-                        float(_early_bound(segment, "ISketchArc").GetRadius())
-                        for segment in segments))
-                if candidates is not None:
-                    fields["source_candidate_count"] = len(candidates)
-                    interface = "ISketchPoint" if label == THICKNESS else "ISketchSegment"
-                    mapped = observe("mapped_candidates", lambda: None if view is None else tuple(
-                        _early_bound(view, "IView").GetCorresponding(entity) for entity in candidates))
-                    if mapped is not None:
-                        fields["mapped_candidate_present"] = tuple(entity is not None for entity in mapped)
-                    if attached is not None:
-                        fields["attachment_count"] = len(attached)
-                        for namespace, expected in (("source", candidates), ("view", mapped)):
-                            if expected is not None:
-                                observe(f"attachment_same_{namespace}_row_major", lambda expected=expected: tuple(
-                                    -1 if actual is None or entity is None else int(adapter.swApp.IsSame(
-                                        _early_bound(_bind(actual, interface), interface),
-                                        _early_bound(_bind(entity, interface), interface),
-                                    )) for actual in attached for entity in expected))
-            _telemetry.info("supplier washer model-witness ownership failed", **fields)
-        except Exception:
-            pass
-        raise
-    segments = [_early_bound(segment, "ISketchSegment")
-                for segment in sketch.GetSketchSegments() or ()]
-    if len(segments) != (1 if label == THICKNESS else 2) or any(
-        segment.ConstructionGeometry is not True for segment in segments
-    ):
-        raise RuntimeError(f"{label}: unexpected source witness segment inventory")
-    top_plane = (axis == "y") != (label == THICKNESS)
-    # Independently check the sketch's final model plane, including Top's -Z.
-    for local, expected in (
-        ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
-        ((0.001, 0.0, 0.0), (0.001, 0.0, 0.0)),
-        ((0.0, 0.001, 0.0), (0.0, 0.0, -0.001) if top_plane else (0.0, 0.001, 0.0)),
-    ):
-        _assert_point(_model_point(adapter, sketch, local), expected, label)
-    if label == THICKNESS:
-        segment = segments[0]
-        if int(segment.GetType()) != 0 or int(display.Type2) not in (2, 11, 12):
-            raise RuntimeError(f"{label}: source thickness is not a native line dimension")
-        line = _early_bound(segment, "ISketchLine")
-        points = (line.GetStartPoint2(), line.GetEndPoint2())
-        sign = 1.0 if axis == "y" else -1.0
-        expected_local = ((outer_mm / 2000.0, 0.0, 0.0),
-                          (outer_mm / 2000.0, sign * thickness_mm / 1000.0, 0.0))
-        for point, expected in zip(points, expected_local, strict=True):
-            _assert_point(_point_coordinates(point), expected, label)
-        expected_entities = points
-    else:
-        circles = []
-        for segment in segments:
-            if int(segment.GetType()) != 1:
-                raise RuntimeError(f"{label}: source face contains a non-circle")
-            circle = _early_bound(segment, "ISketchArc")
-            if int(circle.IsCircle()) != 1:
-                raise RuntimeError(f"{label}: source diameter is a partial arc")
-            _assert_point(_point_coordinates(circle.GetCenterPoint2()), (0.0, 0.0, 0.0), label)
-            circles.append((segment, float(circle.GetRadius()) * 2000.0))
-        for diameter in (outer_mm, bore_mm):
-            if sum(math.isclose(value, diameter, rel_tol=0.0, abs_tol=1e-6)
-                   for _, value in circles) != 1:
-                raise RuntimeError(f"{label}: source circles differ from the exact solid recipe")
-        expected_mm = outer_mm if label == OUTER_DIAMETER else bore_mm
-        expected_entities = tuple(segment for segment, diameter in circles
-                                  if math.isclose(diameter, expected_mm, rel_tol=0.0, abs_tol=1e-6))
-        if int(display.Type2) != 6:
-            raise RuntimeError(f"{label}: source diameter lost its native diameter type")
-    interface = "ISketchPoint" if label == THICKNESS else "ISketchSegment"
-    if view is not None:
-        drawing_entities = []
-        for entity in expected_entities:
-            mapped = _early_bound(view, "IView").GetCorresponding(entity)
-            if mapped is None:
-                raise RuntimeError(f"{label}: source entity is unavailable in its drawing view")
-            drawing_entities.append(_early_bound(_bind(mapped, interface), interface))
-        if len(drawing_entities) == 2 and int(adapter.swApp.IsSame(*drawing_entities)) != 0:
-            raise RuntimeError(f"{label}: mapped source endpoints are not distinct")
-        expected_entities = tuple(drawing_entities)
-    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-    attached = list(annotation.GetAttachedEntities3() or ())
-    for entity in expected_entities:
-        matches = [i for i, item in enumerate(attached)
-                   if item is not None and int(adapter.swApp.IsSame(
-                       _early_bound(_bind(item, interface), interface), entity
-                   )) == 1]
-        if len(matches) != 1:
+                raise RuntimeError(f"{label}: known imported annotation does not belong to its actual view")
+            context_view, mapped_sketch, extension = _washer_view_source_context(
+                proof, model, known_view, feature, binding_native, source_native, owner,
+                feature_name=feature_name,
+            )
+        elif view is None:
+            if (
+                proof.same("dimension.owner_source_identity", owner, feature) != 1
+                or int(proof.read("dimension.imported_type2", lambda: display.Type2))
+                != int(proof.read("dimension.source_type2", lambda: source_display.Type2))
+            ):
+                raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+        else:
+            display_type = proof.read("dimension.imported_type2", lambda: display.Type2)
+            source_type = proof.read("dimension.source_type2", lambda: source_display.Type2)
+            if type(display_type) is not int or type(source_type) is not int or display_type != source_type:
+                raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+            view, mapped_sketch, extension = _washer_view_source_context(
+                proof, model, view, feature, native, source_native, owner, feature_name=feature_name,
+            )
+        segments = [_early_bound(segment, "ISketchSegment")
+                    for segment in proof.read("source.segments", sketch.GetSketchSegments) or ()]
+        if len(segments) != (1 if label == THICKNESS else 2) or any(
+            proof.read(f"source.segment.{index}.construction", lambda: segment.ConstructionGeometry) is not True
+            for index, segment in enumerate(segments)
+        ):
+            raise RuntimeError(f"{label}: unexpected source witness segment inventory")
+        top_plane = (axis == "y") != (label == THICKNESS)
+        # Independently check the sketch's final model plane, including Top's -Z.
+        for index, (local, expected) in enumerate((
+            ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+            ((0.001, 0.0, 0.0), (0.001, 0.0, 0.0)),
+            ((0.0, 0.001, 0.0), (0.0, 0.0, -0.001) if top_plane else (0.0, 0.001, 0.0)),
+        )):
+            _assert_point(proof.read(f"source.plane.{index}", lambda: _model_point(adapter, sketch, local)),
+                          expected, label)
+        if label == THICKNESS:
+            segment = segments[0]
+            if int(proof.read("source.segment.0.type", segment.GetType)) != 0 or int(display.Type2) not in (2, 11, 12):
+                raise RuntimeError(f"{label}: source thickness is not a native line dimension")
+            line = _early_bound(segment, "ISketchLine")
+            points = (proof.read("source.start", line.GetStartPoint2), proof.read("source.end", line.GetEndPoint2))
+            sign = 1.0 if axis == "y" else -1.0
+            expected_local = ((outer_mm / 2000.0, 0.0, 0.0),
+                              (outer_mm / 2000.0, sign * thickness_mm / 1000.0, 0.0))
+            for index, (point, expected) in enumerate(zip(points, expected_local, strict=True)):
+                _assert_point(proof.read(f"source.point.{index}", lambda: _point_coordinates(point)), expected, label)
+            expected_entities = points
+            inventory, selected = points, (0, 1)
+        else:
+            circles = []
+            for index, segment in enumerate(segments):
+                if int(proof.read(f"source.segment.{index}.type", segment.GetType)) != 1:
+                    raise RuntimeError(f"{label}: source face contains a non-circle")
+                circle = _early_bound(segment, "ISketchArc")
+                if int(proof.read(f"source.segment.{index}.is_circle", circle.IsCircle)) != 1:
+                    raise RuntimeError(f"{label}: source diameter is a partial arc")
+                center = proof.read(f"source.segment.{index}.center", circle.GetCenterPoint2)
+                _assert_point(proof.read(f"source.segment.{index}.center_coordinates",
+                                        lambda: _point_coordinates(center)), (0.0, 0.0, 0.0), label)
+                circles.append((segment, float(proof.read(f"source.segment.{index}.radius", circle.GetRadius)) * 2000.0))
+            for diameter in (outer_mm, bore_mm):
+                if sum(math.isclose(value, diameter, rel_tol=0.0, abs_tol=1e-6)
+                       for _, value in circles) != 1:
+                    raise RuntimeError(f"{label}: source circles differ from the exact solid recipe")
+            expected_mm = outer_mm if label == OUTER_DIAMETER else bore_mm
+            expected_entities = tuple(segment for segment, diameter in circles
+                                      if math.isclose(diameter, expected_mm, rel_tol=0.0, abs_tol=1e-6))
+            inventory = tuple(segment for segment, _ in circles)
+            selected = tuple(index for index, (_, diameter) in enumerate(circles)
+                             if math.isclose(diameter, expected_mm, rel_tol=0.0, abs_tol=1e-6))
+            if int(display.Type2) != 6:
+                raise RuntimeError(f"{label}: source diameter lost its native diameter type")
+        if known_view is not None:
+            _assert_washer_view_attachments(
+                proof, context_view, extension, sketch, mapped_sketch, imported_annotation,
+                inventory, selected, points=label == THICKNESS,
+            )
+        annotation = proof.object(
+            "source.annotation" if view is None else "annotation",
+            (source_display if view is None else display).GetAnnotation, "IAnnotation",
+        )
+        if view is not None:
+            _assert_washer_view_attachments(
+                proof, view, extension, sketch, mapped_sketch, annotation, inventory, selected,
+                points=label == THICKNESS,
+            )
+            return
+        owner_type = proof.read("source.annotation.owner_type", lambda: annotation.OwnerType)
+        annotation_owner = proof.object("source.annotation.owner", lambda: annotation.Owner, "IModelDoc2")
+        if type(owner_type) is not int or owner_type != 3 or (
+            proof.same("source.annotation.owner_model_identity", annotation_owner, source_model) != 1
+        ):
+            raise RuntimeError(f"{label}: named source annotation does not belong to its original part")
+        count = proof.read("source.annotation.count", annotation.GetAttachedEntityCount3)
+        types = tuple(proof.read("source.annotation.types", annotation.GetAttachedEntityTypes) or ())
+        attached = list(proof.read("source.annotation.entities", annotation.GetAttachedEntities3) or ())
+        if type(count) is not int or count != len(attached) or count != len(types) or (
+            count != len(expected_entities)
+        ):
+            raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
+        allowed_types = (11, 25) if label == THICKNESS else (10, 24)
+        if any(type(kind) is not int or kind not in allowed_types for kind in types):
             raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
-        attached.pop(matches[0])
-    if attached or annotation.IsDangling() or (view is not None and int(annotation.Visible) != 1):
-        raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
+        for entity in expected_entities:
+            matches = [i for i, item in enumerate(attached)
+                       if item is not None and proof.same("attached.source_identity", item, entity) == 1]
+            if len(matches) != 1:
+                raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
+            attached.pop(matches[0])
+        if attached or proof.read("source.annotation.dangling", annotation.IsDangling):
+            raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
 
 
 def _finish_reference(
@@ -473,7 +677,8 @@ async def author_supplier_washer_references(
     """Append only banded witnesses after the unchanged +Y stock recipe."""
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
-    assert_supplier_washer_body(adapter.currentModel, axis="y", bore_mm=bore_mm,
+    model = adapter.currentModel
+    assert_supplier_washer_body(model, axis="y", bore_mm=bore_mm,
                                outer_mm=outer_mm, thickness_mm=thickness_mm)
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     face_labels = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label in bands)
@@ -507,7 +712,7 @@ async def author_supplier_washer_references(
     _finish_reference(adapter, dims, THICKNESS_FEATURE, (THICKNESS,), values=values, units=units,
                       precision=precision, bands=bands, bore_callout=bore_callout)
     assert_supplier_washer_references(
-        adapter, adapter.currentModel, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
         units=units, precision=precision, bands=bands, bore_callout=bore_callout,
     )
 
@@ -518,16 +723,31 @@ def assert_supplier_washer_references(
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
+    import_context: Mapping[str, tuple[Any, Any]] | None = None,
 ) -> None:
+    """Read original sources; optional context must cover exactly every band.
+
+    Each pair is (validated owning IView, current imported IDisplayDimension).
+    The drawing caller freezes/rechecks source path and per-view configuration
+    before supplying these handles; an absent context never enables mapping.
+    """
+    if import_context is not None:
+        if set(import_context) != set(bands) or any(
+            type(pair) is not tuple or len(pair) != 2 or any(item is None for item in pair)
+            for pair in import_context.values()
+        ):
+            raise RuntimeError("supplier washer source import context must cover exactly all bands with view/display pairs")
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     part = _early_bound(model, "IPartDoc")
     for label, band in bands.items():
         feature, name = SOURCE_DIMENSIONS[label]
         raw = part.FeatureByName(feature)
         display, _ = _named_dimensions(adapter, feature, {name}, feature=raw)[name]
+        known_view, known_imported = (None, None) if import_context is None else import_context[label]
         assert_supplier_washer_source_attachment(
-            adapter, part, display, view=None, label=label, axis=axis, bore_mm=bore_mm,
+            adapter, model, display, view=None, label=label, axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm,
+            known_view=known_view, known_imported=known_imported,
         )
         _assert_supplier_washer_presentation(
             display, label=label, units=units, precision=precision[label],
