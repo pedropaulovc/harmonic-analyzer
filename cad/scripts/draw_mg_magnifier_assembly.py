@@ -872,16 +872,27 @@ def _stack_dimensions(
         )
         for annotation in annotations
     ]
-    if sorted(name for name, _ in displays) != sorted(stack.DIMENSION_TOLERANCES):
+    if sorted(name for name, _ in displays) != sorted(
+        stack.DRAWING_PRECISION[stack.FEATURE]
+    ):
         raise RuntimeError(f"stack details imported {sorted(n for n, _ in displays)}")
     _assert_callouts(displays, callouts)
     source_step("stack settings import and readback")
 
     def settled() -> None:
         for name, display in displays:
-            band_m = stack.DIMENSION_TOLERANCES[name] / 1000.0
             dimension = _early_bound(display.GetDimension2(0), "IDimension")
             tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            if name in stack.REFERENCE_DIMENSIONS:
+                if (
+                    int(tolerance.Type) != 0  # swTolNONE
+                    or bool(display.ShowParenthesis)
+                    or str(display.GetText(1) or "") != "("
+                    or str(display.GetText(2) or "") != ")"
+                ):
+                    raise RuntimeError(f"{name}: settled reference form changed")
+                continue
+            band_m = stack.DIMENSION_TOLERANCES[name] / 1000.0
             if (
                 int(tolerance.Type) != 4  # swTolSYMMETRIC
                 or abs(float(tolerance.GetMaxValue()) - band_m) > 1e-9
