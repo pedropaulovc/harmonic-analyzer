@@ -824,20 +824,32 @@ def _retained_washer_layout(monkeypatch, scope):
     # their four physical runs. Prove its raw endpoints before deriving the
     # pre-offset paint; no arbitrary physical primitive may be discarded.
     assert len(lines) == 6
-    support = retained["tips"][0][0]
-    assert retained["tips"][1][0] == support
-    midpoint = (support, sum(tip[1] for tip in retained["tips"]) / 2)
+    raw_tips = tuple(tuple(arrow[:2]) for arrow in record["display"]["arrows"])
+    assert len(raw_tips) == 2
+    support = raw_tips[0][0]
+    assert raw_tips[1][0] == support
+    assert raw_tips[0][1] != raw_tips[1][1]
+    midpoint = (support, sum(tip[1] for tip in raw_tips) / 2)
     baseline = (min(text["pos"][0] for text in texts),
                 min(text["pos"][1] for text in texts))
     advance = (max(text["pos"][0] + text["w"] for text in texts), baseline[1])
-    assert tuple(lines[4][4:6]) == pytest.approx(midpoint, abs=1e-7, rel=0)
-    assert tuple(lines[4][7:9]) == pytest.approx(baseline, abs=1e-7, rel=0)
-    assert tuple(lines[5][4:6]) == pytest.approx(baseline, abs=1e-7, rel=0)
-    assert tuple(lines[5][7:9]) == pytest.approx(advance, abs=1e-7, rel=0)
+    # Select by the independently recorded topology across every raw row,
+    # including reversed endpoints. Duplicate/ambiguous paths are not seeds.
+    for start, end, expected in ((midpoint, baseline, 4), (baseline, advance, 5)):
+        matches = [
+            index for index, row in enumerate(lines)
+            if any(
+                tuple(row[first:first + 2]) == pytest.approx(start, abs=1e-7, rel=0)
+                and tuple(row[last:last + 2]) == pytest.approx(end, abs=1e-7, rel=0)
+                for first, last in ((4, 7), (7, 4))
+            )
+        ]
+        assert matches == [expected]
     del lines[4:]
-    # Like the saved fixture's explicit authoring reset, derive only native
-    # phase state. The false-mode anchor must already be on arrow support:
-    # seeding it from the retained transverse anchor would move physical ink.
+    # Like the saved fixture's explicit authoring reset, this False mode is
+    # DERIVED unit-test input, not an observed native False. Its anchor comes
+    # directly from raw arrows, not the production measurement/classifier.
+    # Seeding from the retained transverse anchor would move physical ink.
     record["pos"][0] = support
     display.OffsetText = False
     case.paint[thick].settled_offset = False
