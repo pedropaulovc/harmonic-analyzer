@@ -150,45 +150,61 @@ def _assert_numeral_cut(adapter) -> None:
         _assert_one_numeral_cut(adapter, name)
 
 
+def _v_cut_args(half_angle_deg: float, drafted: bool = True) -> tuple:
+    """FeatureCut4's 27 arguments for a single-ended blind cut into the bar.
+
+    The 91255A148 socket idiom (diag_mcmaster_phillips_flat_head, farm run
+    20261017T051944296Z): Ddir1 = False is INWARD on the seat, whatever the
+    API page says (True flared the walls there)."""
+    return (
+        True, False, False,  # Sd single-ended, no flip, default direction
+        0, 0, NUMERAL_DEPTH / 1000.0, 0.0,  # T1/T2 blind, D1, D2
+        drafted, False, False, False,  # Dchk1, Dchk2, Ddir1 (False = inward), Ddir2
+        math.radians(half_angle_deg), 0.0,  # Dang1, Dang2
+        False, False, False, False, False,  # offsets, translate, NormalCut
+        False, True, False, False, False,  # scope, auto-select, assembly flags
+        0, 0.0, False, False,  # T0 sketch plane, StartOffset, flip, OptimizeGeometry
+    )
+
+
 def _drafted_v_cut(adapter, sketch_name: str) -> None:
-    """Native single-ended blind ``FeatureCut4`` with both walls drafted inward.
+    """Native single-ended blind ``FeatureCut4`` with every wall drafted inward.
 
     The adapter's blind cut takes no draft, and adding one afterwards through
     ``ModifyDefinition`` reported success yet left straight walls (run
     20261023T193801341Z-862662a6: the first layer removed the straight-wall
-    3.1352 mm^3, not the V's 1.5603). The profiles are plain disjoint
-    rectangles whose walls stay apart at the root, unlike the old glyph
-    outlines a drafted FeatureCut4 refused (run 20261011T121420933Z-2979f651).
+    3.1352 mm^3, not the V's 1.5603). If the seat refuses the V, the same
+    selection is probed with a 10-degree draft and with none, so the failure
+    says whether the near-closed root or the draft itself is refused.
     """
-    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+    from _com import _read_member
 
-    raw = adapter.currentModel
-    model = _early_bound(raw, "IModelDoc2")
-    manager = _early_bound(model.FeatureManager, "IFeatureManager")
-    raw.ClearSelection2(True)
-    if not raw.Extension.SelectByID2(sketch_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0):
-        raise RuntimeError(f"select sketch {sketch_name!r} failed")
-    blind = adapter.constants.get("swEndCondBlind", 0)
-    sketch_plane = adapter.constants.get("swStartSketchPlane", 0)
-    # Sd, Flip, Dir, T1, T2, D1, D2, Dchk1, Dchk2, Ddir1 (True = inward), Ddir2,
-    # Dang1, Dang2, OffsetReverse1/2, TranslateSurface1/2, NormalCut,
-    # UseFeatScope, UseAutoSelect, AssemblyFeatureScope, AutoSelectComponents,
-    # PropagateFeatureToParts, T0, StartOffset, FlipStartOffset,
-    # OptimizeGeometry (absent from the 26-parameter SW-2025 form).
-    args = (
-        True, False, False, blind, blind, NUMERAL_DEPTH / 1000.0, 0.0,
-        True, False, True, False,
-        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,
-        False, False, False, False, False, False, True, False, False, False,
-        sketch_plane, 0.0, False, False,
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    manager = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
+
+    def cut(args: tuple) -> object:
+        model.ClearSelection2(True)
+        _feature_by_name(adapter, sketch_name).Select2(False, 0)
+        feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
+        model.ClearSelection2(True)
+        return feature or error
+
+    half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
+    feature = cut(_v_cut_args(half_angle))
+    if feature and not isinstance(feature, Exception):
+        return
+    probes = {
+        "10 deg draft": cut(_v_cut_args(10.0)),
+        "no draft": cut(_v_cut_args(0.0, drafted=False)),
+    }
+    outcome = ", ".join(
+        f"{label}: {'created' if result and not isinstance(result, Exception) else result}"
+        for label, result in probes.items()
     )
-    feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
-    if not feature:
-        feature, short_error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args[:-1]))
-        error = f"{error} | 26-parameter form: {short_error}"
-    raw.ClearSelection2(True)
-    if not feature:
-        raise RuntimeError(f"drafted V FeatureCut4 on {sketch_name} returned None: {error}")
+    raise RuntimeError(
+        f"drafted V FeatureCut4 on {sketch_name} returned {feature!r} at {half_angle:g} deg "
+        f"inward; probes on the same sketch -- {outcome}"
+    )
 
 
 async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str) -> None:

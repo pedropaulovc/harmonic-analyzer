@@ -92,7 +92,10 @@ DIMENSION_CALLOUTS = {
 }
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 LOCATING_END_XY = (0.232, 0.160)
+# The edge label sits wholly left of its leader's landing point, so the
+# leader leaves the text's end, between the two hole witness lines.
 LOCATING_EDGE_XY = (0.137, 0.150)
+LOCATING_EDGE_X_MM = 5.0
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
@@ -164,7 +167,7 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
     face_z = part.PLATE_Z_MAX / 1000.0
     for text, model_xyz, note_xy in (
         (part.LOCATING_END_NOTE, (0.0, 2.0 / 1000.0, face_z), LOCATING_END_XY),
-        (part.LOCATING_EDGE_NOTE, (part.THUMB_AXIS_X / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
+        (part.LOCATING_EDGE_NOTE, (LOCATING_EDGE_X_MM / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
     ):
         edge_xy = model_point_in_view(adapter, front, model_xyz, label=text.lower())
         add_attached_note(adapter, front, text=text, entity_xy=edge_xy,

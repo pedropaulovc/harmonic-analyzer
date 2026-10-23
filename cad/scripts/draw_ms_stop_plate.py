@@ -60,10 +60,11 @@ FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.070, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
     # Hole-location texts sit where no other witness line crosses their
-    # mate callouts: 3.50 outboard right, 4.00 below its own witness span.
+    # mate callouts: 3.50 outboard right, 4.00 below its own witness span and
+    # the 14.1 arrow, 17.50 centred between its witness lines.
     "PlateLeftFromEnd": (0.250, 0.113),
-    "PlateRightFromEnd": (0.175, 0.095),
-    "PlateFromHeadFace": (0.100, 0.135),
+    "PlateRightFromEnd": (0.182, 0.095),
+    "PlateFromHeadFace": (0.100, 0.122),
     # Right of the outline and below the chamfer-size dimension line.
     "PilotDrillDiameter": (0.285, 0.178),
 }
@@ -89,7 +90,10 @@ CLEARANCE_CALLOUT_XY = (0.285, 0.140)
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 # Note positions are the text's upper-left corner.
 LOCATING_END_XY = (0.228, 0.128)
-LOCATING_EDGE_XY = (0.162, 0.132)
+# The edge label sits wholly left of its leader's landing point, so the
+# leader leaves the text's end, between the two hole witness lines.
+LOCATING_EDGE_XY = (0.150, 0.130)
+LOCATING_EDGE_X_MM = 7.0
 
 
 def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
@@ -138,7 +142,7 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
     face_z = part.PLATE_Z_MIN / 1000.0
     for text, model_xyz, note_xy in (
         (part.LOCATING_END_NOTE, (0.0, 1.0 / 1000.0, face_z), LOCATING_END_XY),
-        (part.LOCATING_EDGE_NOTE, (part.THUMB_AXIS_X / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
+        (part.LOCATING_EDGE_NOTE, (LOCATING_EDGE_X_MM / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
     ):
         edge_xy = model_point_in_view(adapter, front, model_xyz, label=text.lower())
         add_attached_note(adapter, front, text=text, entity_xy=edge_xy,
