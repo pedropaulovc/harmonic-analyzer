@@ -147,6 +147,13 @@ names or values, and null annotation correspondence never supply this context.
 Source path and each actual view configuration are frozen before import and
 rechecked after import, during placement and after the read-only saved reopen.
 
+Failure readbacks and diagnostic notes are best effort: getter, serialization,
+formatting or note-transport failures must not replace the exact original
+exception, including a `BaseException`. Saved cleanup still attempts its independent
+close and file-hash checks. It preserves the proof error, or raises the first
+cleanup error if the proof succeeded; secondary reporting never turns a failure
+into success.
+
 Only immutable scalar stations, outlines and annotation positions cross into the
 saved washer reader. It reacquires the actual source, configurations, views and
 references from the read-only reopened drawing; it never calls the mutating shelf

@@ -368,7 +368,7 @@ def _persist_imported_units(
     units: Literal["in", "mm"], precision: int, expected_mm: float,
     callout: str | None,
 ) -> None:
-    """Transfer only unit-display ownership lost by native model-item import."""
+    """Transfer unit-display ownership; failure readback cannot replace refusal."""
     model = _early_bound(view, "IView").ReferencedDocument
     if model is None:
         raise RuntimeError(f"{label}: imported supplier dimension has no source part")
@@ -402,10 +402,13 @@ def _persist_imported_units(
             callout=callout,
         )
     except Exception as error:
-        error.add_note("supplier washer source/import readback: " + json.dumps(
-            {"source": _saved_display_readback(source), "imported": _saved_display_readback(display)},
-            sort_keys=True, default=repr,
-        ))
+        try:
+            error.add_note("supplier washer source/import readback: " + json.dumps(
+                {"source": _saved_display_readback(source), "imported": _saved_display_readback(display)},
+                sort_keys=True, default=repr,
+            ))
+        except BaseException:
+            pass
         raise
 
 
@@ -1166,7 +1169,7 @@ def _supplier_washer_proof(
                     app.CloseDoc(title)  # VT_VOID, closes only this invocation's target
                     if app.GetOpenDocumentByName(path_string) is not None:
                         raise RuntimeError("saved washer proof document did not close")
-            except Exception as error:
+            except BaseException as error:
                 cleanup_errors.append(error)
             try:
                 with saved_path.open("rb") as saved_file:
@@ -1174,24 +1177,29 @@ def _supplier_washer_proof(
                 receipt["sha256_after"] = after
                 if after != before:
                     raise RuntimeError("saved washer proof changed the native drawing bytes")
-            except Exception as error:
+            except BaseException as error:
                 cleanup_errors.append(error)
-            if primary is not None:
-                primary.add_note("saved washer native readback: " + json.dumps(
-                    receipt, sort_keys=True, default=repr,
-                ))
-            if cleanup_errors:
-                if primary is not None:
-                    for error in cleanup_errors:
-                        primary.add_note(f"saved washer cleanup: {type(error).__name__}: {error}")
-                else:
-                    error = cleanup_errors[0]
-                    for extra in cleanup_errors[1:]:
-                        error.add_note(f"saved washer cleanup: {type(extra).__name__}: {extra}")
-                    error.add_note("saved washer native readback: " + json.dumps(
+            failure = primary if primary is not None else (
+                cleanup_errors[0] if cleanup_errors else None
+            )
+            if failure is not None:
+                # Readback/formatting/note transport is secondary to the proof
+                # or first cleanup failure, including interruption exceptions.
+                try:
+                    failure.add_note("saved washer native readback: " + json.dumps(
                         receipt, sort_keys=True, default=repr,
                     ))
-                    raise error
+                except BaseException:
+                    pass
+                for error in cleanup_errors:
+                    if error is failure:
+                        continue
+                    try:
+                        failure.add_note(f"saved washer cleanup: {type(error).__name__}: {error}")
+                    except BaseException:
+                        pass
+            if primary is None and cleanup_errors:
+                raise cleanup_errors[0]
         _telemetry.info("supplier washer saved native proof: " + json.dumps(
             receipt, sort_keys=True, default=repr,
         ))

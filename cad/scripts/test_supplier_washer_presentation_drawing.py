@@ -579,3 +579,67 @@ def test_source_refusal_note_reports_actual_source_and_import_fields(
     assert (vars(pair.source_state), pair.source_text) == source_before
     assert _presentation_snapshot(case) == imported_before
     _assert_source_unchanged(case)
+
+
+@pytest.mark.parametrize("transport", (
+    "source-readback-runtime", "source-readback-interrupt",
+    "imported-readback-runtime", "imported-readback-interrupt",
+    "json-runtime", "json-interrupt", "note-runtime", "note-interrupt",
+))
+def test_import_primary_identity_getter_failure_survives_secondary_transport(
+    washer_import, monkeypatch, transport,
+):
+    pair = washer_import
+    case = pair.imported
+    attempts = []
+    secondary = (KeyboardInterrupt if transport.endswith("interrupt") else RuntimeError)(
+        "secondary source/import failure transport"
+    )
+
+    class Primary(RuntimeError):
+        def add_note(self, note):
+            attempts.append("note")
+            if transport.startswith("note-"):
+                raise secondary
+            super().add_note(note)
+
+    primary = Primary("actual imported native identity getter failed")
+
+    def identity(*_args):
+        attempts.append("IsSame")
+        raise primary
+
+    # Execute the real source-presentation guard and fail the real independent
+    # native identity read, before any imported-unit setter can run.
+    object.__setattr__(pair.adapter.swApp, "IsSame", identity)
+    actual_readback = washer_drawing._saved_display_readback
+
+    def readback(display):
+        role = "source" if display is pair.source else "imported"
+        attempts.append(role + "-readback")
+        if transport.startswith(role + "-readback-"):
+            raise secondary
+        return actual_readback(display)
+
+    monkeypatch.setattr(washer_drawing, "_saved_display_readback", readback)
+    if transport.startswith("json-"):
+        def serialize(*_args, **_kwargs):
+            attempts.append("json")
+            raise secondary
+        monkeypatch.setattr(washer_drawing, "json", SimpleNamespace(dumps=serialize))
+    before = _presentation_snapshot(case)
+    source_before = deepcopy(vars(pair.source_state)), dict(pair.source_text)
+    with pytest.raises(Primary) as caught:
+        pair.persist()
+    assert caught.value is primary
+    assert attempts.count("IsSame") == 1
+    assert attempts.count("source-readback") == 1
+    assert attempts.count("imported-readback") == int(not transport.startswith("source-readback-"))
+    if transport.startswith("json-"):
+        assert attempts.count("json") == 1 and "note" not in attempts
+    elif transport.startswith("note-"):
+        assert attempts.count("note") == 1
+    assert not case.calls and not pair.source_calls
+    assert _presentation_snapshot(case) == before
+    assert (vars(pair.source_state), pair.source_text) == source_before
+    _assert_source_unchanged(case)

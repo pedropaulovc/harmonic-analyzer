@@ -2222,6 +2222,161 @@ def test_primary_strict_failure_survives_cleanup_and_hash_failures(saved_washer)
     assert not case.messages
 
 
+@pytest.mark.parametrize("primary_kind", (RuntimeError, KeyboardInterrupt), ids=("exception", "base-exception"))
+@pytest.mark.parametrize("transport", (
+    "none", "note-runtime", "note-interrupt", "json-runtime", "json-interrupt", "cleanup-str",
+))
+def test_saved_primary_getter_failure_survives_cleanup_and_receipt_transport(
+    saved_washer, monkeypatch, primary_kind, transport,
+):
+    case = saved_washer
+    attempts = []
+    secondary = (KeyboardInterrupt if transport.endswith("interrupt") else RuntimeError)(
+        "secondary saved failure transport"
+    )
+
+    class Primary(primary_kind):
+        def add_note(self, note):
+            attempts.append("note")
+            if transport.startswith("note-"):
+                raise secondary
+            super().add_note(note)
+
+    class CloseFailure(KeyboardInterrupt):
+        def __str__(self):
+            if transport == "cleanup-str":
+                attempts.append("cleanup-str")
+                raise KeyboardInterrupt("secondary cleanup formatting failure")
+            return super().__str__()
+
+    primary = Primary("actual saved native readonly getter failed")
+    close_failure = CloseFailure("cleanup CloseDoc interruption")
+    hash_failure = KeyboardInterrupt("independent cleanup hash interruption")
+
+    def readonly():
+        attempts.append("readonly")
+        raise primary
+
+    def close():
+        attempts.append("close")
+        raise close_failure
+
+    # Fail an actual proof getter, not the proof callback or a strict predicate.
+    case.drawing.IsOpenedReadOnly = readonly
+    case.app.on_close = close
+    actual_digest = washer.hashlib.file_digest
+    drawing_hashes = []
+
+    def digest(native_file, algorithm):
+        if Path(native_file.name).resolve() == case.path:
+            drawing_hashes.append(native_file.name)
+            if len(drawing_hashes) == 2:
+                attempts.append("cleanup-hash")
+                raise hash_failure
+        return actual_digest(native_file, algorithm)
+
+    monkeypatch.setattr(washer, "hashlib", SimpleNamespace(file_digest=digest))
+    if transport.startswith("json-"):
+        def serialize(*_args, **_kwargs):
+            attempts.append("json")
+            raise secondary
+        monkeypatch.setattr(washer, "json", SimpleNamespace(dumps=serialize))
+    with pytest.raises(primary_kind) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is primary
+    assert attempts.count("readonly") == 1
+    assert attempts.count("close") == 1 and attempts.count("cleanup-hash") == 1
+    assert attempts.index("close") < attempts.index("cleanup-hash")
+    assert len(drawing_hashes) == 2
+    if transport.startswith("json-"):
+        assert attempts.count("json") == 1 and attempts.count("note") == 2
+    elif transport == "cleanup-str":
+        assert attempts.count("cleanup-str") == 1 and attempts.count("note") == 2
+    else:
+        assert attempts.count("note") == 3
+    assert case.app.close_calls == [case.path.name]
+    assert case.path.read_bytes() == case.original_bytes
+    assert case.source_path.read_bytes() == case.source_bytes
+    assert not case.messages
+
+
+@pytest.mark.parametrize("first_cleanup", ("close", "hash"))
+@pytest.mark.parametrize("transport", (
+    "note-runtime", "note-interrupt", "json-runtime", "json-interrupt", "cleanup-str",
+))
+def test_saved_first_cleanup_baseexception_survives_later_cleanup_and_transport(
+    saved_washer, monkeypatch, first_cleanup, transport,
+):
+    case = saved_washer
+    attempts = []
+    secondary = (KeyboardInterrupt if transport.endswith("interrupt") else RuntimeError)(
+        "secondary cleanup failure transport"
+    )
+
+    class FirstCleanup(KeyboardInterrupt):
+        def add_note(self, note):
+            attempts.append("note")
+            if transport.startswith("note-"):
+                raise secondary
+            super().add_note(note)
+
+    class LaterCleanup(RuntimeError):
+        def __str__(self):
+            if transport == "cleanup-str":
+                attempts.append("cleanup-str")
+                raise KeyboardInterrupt("later cleanup formatting failed")
+            return super().__str__()
+
+    first = FirstCleanup("first actual cleanup interruption")
+    later = LaterCleanup("later independent cleanup hash failure")
+
+    def close():
+        attempts.append("close")
+        if first_cleanup == "close":
+            raise first
+
+    case.app.on_close = close
+    actual_digest = washer.hashlib.file_digest
+    drawing_hashes = []
+
+    def digest(native_file, algorithm):
+        if Path(native_file.name).resolve() == case.path:
+            drawing_hashes.append(native_file.name)
+            if len(drawing_hashes) == 2:
+                attempts.append("cleanup-hash")
+                raise first if first_cleanup == "hash" else later
+        return actual_digest(native_file, algorithm)
+
+    monkeypatch.setattr(washer, "hashlib", SimpleNamespace(file_digest=digest))
+    if transport.startswith("json-"):
+        def serialize(*_args, **_kwargs):
+            attempts.append("json")
+            raise secondary
+        monkeypatch.setattr(washer, "json", SimpleNamespace(dumps=serialize))
+    with pytest.raises(KeyboardInterrupt) as caught:
+        case.proof.saved_check(case.adapter, case.path)
+    assert caught.value is first
+    assert attempts.count("close") == 1 and attempts.count("cleanup-hash") == 1
+    assert attempts.index("close") < attempts.index("cleanup-hash")
+    assert len(drawing_hashes) == 2
+    if transport.startswith("json-"):
+        assert attempts.count("json") == 1
+        assert attempts.count("note") == int(first_cleanup == "close")
+    elif transport == "cleanup-str":
+        assert attempts.count("note") == 1
+        assert attempts.count("cleanup-str") == int(first_cleanup == "close")
+    else:
+        assert attempts.count("note") == (2 if first_cleanup == "close" else 1)
+    assert case.app.close_calls == [case.path.name]
+    if first_cleanup == "hash":
+        _assert_closed_unchanged(case)
+    else:
+        assert case.app.loaded[str(case.path)] is case.drawing
+        assert case.path.read_bytes() == case.original_bytes
+        assert case.source_path.read_bytes() == case.source_bytes
+    assert not case.messages
+
+
 @pytest.mark.parametrize("missing", (False, True), ids=("wrong-extension", "missing-file"))
 def test_reader_requires_existing_native_drawing(saved_washer, missing):
     case = saved_washer
