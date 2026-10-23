@@ -1419,6 +1419,49 @@ def _assert_neck_right_advance(
         raise RuntimeError(f"{label}: unreadable actual journal-roof/right-wall bay")
     right = min(walls)
     if min(shelf.x0, shelf.x1) < x or max(shelf.x0, shelf.x1) > right:
+        # Held evidence only: do not re-read COM or change this exact predicate.
+        # These native decoders/Segment retain doubles; repr adds no rounding.
+        try:
+            diagnostic = {
+                "authored_line_x_m": x,
+                "shelf_m": (shelf.x0, shelf.y0, shelf.x1, shelf.y1),
+                "ordinary_lines_m": tuple((line.x0, line.y0, line.x1, line.y1) for line in lines),
+                "nonblank_text_advances_m": tuple(
+                    {**row, "advance": (
+                        row["advance"].xmin, row["advance"].ymin,
+                        row["advance"].xmax, row["advance"].ymax,
+                    )}
+                    for row in texts
+                ),
+                "heads_m": tuple(
+                    tuple((line.x0, line.y0, line.x1, line.y1) for line in heads[index:index + 3])
+                    for index in (0, 3)
+                ),
+                "journal_roof_m": roof,
+                "candidate_wall_segments_m": tuple(
+                    (line.x0, line.y0, line.x1, line.y1) for line in foreign_lines
+                    if line.x0 == line.x1 and line.x0 > x
+                    and min(line.y0, line.y1) <= roof <= max(line.y0, line.y1)
+                ),
+                "candidate_wall_xs_m": tuple(walls),
+                "chosen_right_wall_m": right,
+                "LEFT": min(shelf.x0, shelf.x1) < x,
+                "RIGHT_OVERFLOW": max(shelf.x0, shelf.x1) > right,
+                "signed_min_shelf_minus_authored_x_m": min(shelf.x0, shelf.x1) - x,
+                "signed_max_shelf_minus_right_wall_m": max(shelf.x0, shelf.x1) - right,
+                "native_proof_log_labels": (label, "collar-side neck: vertical linear factory"),
+                "native_context": (
+                    "Same-phase arrow proof and existing factory type/SystemValue/ProjectedDimensions logs; "
+                    "owner/scale guards already ran, with no additional reads here."
+                ),
+                "numeric_conversion": (
+                    "_neck_numbers, _layout_audit._floats/line_segment and Segment do not round; "
+                    "native floats and their signed differences are represented with repr."
+                ),
+            }
+            _telemetry.error(f"{label}: RIGHT shelf predicate diagnostic {diagnostic!r}")
+        except Exception:  # noqa: BLE001 - diagnostic failure must not replace the native refusal
+            pass
         raise RuntimeError(f"{label}: ordinary native diameter shelf is not RIGHT")
     if not any(abs(endpoint - x) <= NECK_GEOMETRY_TOLERANCE_M for endpoint in (shelf.x0, shelf.x1)):
         raise RuntimeError(f"{label}: ordinary native shelf lost its actual vertical root")

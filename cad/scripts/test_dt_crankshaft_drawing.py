@@ -3395,3 +3395,117 @@ def test_actual_pdf_refuses_ambiguous_overlong_head_paint_even_with_full_native_
     _neck_proof(f, "final settling rebuild")
     with pytest.raises(RuntimeError, match="ambiguous actual head stroke extends beyond its native edge"):
         _neck_proof(f, "after_pdf_save")
+
+
+@pytest.mark.parametrize("case", ["left", "right-overflow", "both", "left-roundoff", "right-roundoff"])
+@pytest.mark.parametrize("diagnostic_fails", [False, True], ids=["capture", "diagnostic-write-failure"])
+def test_native_right_shelf_diagnostic_retains_exact_independent_failures_without_new_native_reads(
+    neck_dimension_fakes, monkeypatch, case, diagnostic_fails,
+) -> None:
+    f = neck_dimension_fakes
+    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
+    roof = drawing._sheet_y(drawing.JOURNAL_DIA / 2.0)
+    foreign = tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.foreign_lines)
+    walls = (
+        foreign[0],
+        drawing.Segment(0.20567890123456789, roof - 0.004, 0.20567890123456789, roof + 0.004),
+        drawing.Segment(0.19687654321098765, roof + 0.003, 0.19687654321098765, roof - 0.003),
+    )
+    foreign = (
+        *walls, foreign[1],
+        drawing.Segment(x - 0.001, roof - 0.002, x - 0.001, roof + 0.002),
+        drawing.Segment(0.18987654321012345, roof + 0.001, 0.18987654321012345, roof + 0.002),
+    )
+    right = min(wall.x0 for wall in walls)
+    low, high = x, f.neck_lines[0][3]
+    if case in ("left", "both"):
+        low = x - 0.0005
+    elif case == "left-roundoff":
+        low = math.nextafter(x, -math.inf)
+    if case in ("right-overflow", "both"):
+        high = right + 0.0005
+    elif case == "right-roundoff":
+        high = math.nextafter(right, math.inf)
+    shelf = list(f.neck_lines[0])
+    shelf[0], shelf[3] = low, high
+    f.neck_lines[0] = tuple(shelf)
+    heads = tuple(segment for row in f.arrow_rows for segment in drawing.arrowhead_segments(row))
+    telemetry = Mock(side_effect=OSError("diagnostic sink unavailable") if diagnostic_fails else None)
+    monkeypatch.setattr(drawing._telemetry, "error", telemetry)
+    label = "collar-side neck (diagnostic fixture)"
+
+    with pytest.raises(RuntimeError) as refusal:
+        drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label=label)
+    assert str(refusal.value) == f"{label}: ordinary native diameter shelf is not RIGHT"
+    assert refusal.value.__cause__ is None
+    assert refusal.value.__context__ is None
+    telemetry.assert_called_once()
+    message = telemetry.call_args.args[0]
+    diagnostic = ast.literal_eval(message.split(": RIGHT shelf predicate diagnostic ", 1)[1])
+    assert diagnostic["authored_line_x_m"] == x
+    assert diagnostic["shelf_m"] == (low, shelf[1], high, shelf[4])
+    assert diagnostic["ordinary_lines_m"] == tuple(
+        (row[0], row[1], row[3], row[4]) for row in f.neck_lines
+    )
+    assert diagnostic["heads_m"] == tuple(
+        tuple((line.x0, line.y0, line.x1, line.y1) for line in heads[index:index + 3])
+        for index in (0, 3)
+    )
+    assert diagnostic["journal_roof_m"] == roof
+    assert diagnostic["candidate_wall_segments_m"] == tuple(
+        (wall.x0, wall.y0, wall.x1, wall.y1) for wall in walls
+    )
+    assert diagnostic["candidate_wall_xs_m"] == tuple(wall.x0 for wall in walls)
+    assert diagnostic["chosen_right_wall_m"] == right
+    assert diagnostic["LEFT"] is (case in ("left", "both", "left-roundoff"))
+    assert diagnostic["RIGHT_OVERFLOW"] is (case in ("right-overflow", "both", "right-roundoff"))
+    assert diagnostic["signed_min_shelf_minus_authored_x_m"] == low - x
+    assert diagnostic["signed_max_shelf_minus_right_wall_m"] == high - right
+    assert repr(low - x) in message
+    assert repr(high - right) in message
+    assert diagnostic["nonblank_text_advances_m"] == tuple(
+        {
+            **row, "angle": 0.0, "reference": 1,
+            "advance": (
+                row["position"][0], row["position"][1],
+                row["position"][0] + row["width"], row["position"][1] + row["height"],
+            ),
+        }
+        for row in f.native_texts if row["text"].strip()
+    )
+    assert diagnostic["native_proof_log_labels"] == (label, "collar-side neck: vertical linear factory")
+    if case.endswith("roundoff"):
+        delta = low - x if case == "left-roundoff" else high - right
+        assert 0.0 < abs(delta) < drawing.NECK_GEOMETRY_TOLERANCE_M
+        assert repr(low if case == "left-roundoff" else high) in message
+
+    expected_calls = {
+        "GetLineCount": [call()],
+        "GetLineAtIndex3": [call(index) for index in range(3)],
+        "GetTextCount": [call()],
+        "GetTextAtIndex": [call(index) for index in range(3)],
+        "GetTextPositionAtIndex": [call(1), call(2)],
+        "GetTextHeightAtIndex": [call(1), call(2)],
+        "GetTextInBoxWidthAtIndex": [call(1), call(2)],
+        "GetTextAngleAtIndex": [call(1), call(2)],
+        "GetTextRefPositionAtIndex": [call(1), call(2)],
+        "GetArrowHeadCount": [],
+        "GetArrowHeadAtIndex2": [],
+    }
+    assert set(vars(f.arrow_data)) == set(expected_calls)
+    for name, calls in expected_calls.items():
+        assert getattr(f.arrow_data, name).call_args_list == calls
+
+
+def test_native_right_shelf_diagnostic_does_not_log_or_change_a_valid_route(
+    neck_dimension_fakes, monkeypatch,
+) -> None:
+    f = neck_dimension_fakes
+    heads = tuple(segment for row in f.arrow_rows for segment in drawing.arrowhead_segments(row))
+    foreign = tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.foreign_lines)
+    telemetry = Mock(side_effect=OSError("unused diagnostic sink"))
+    monkeypatch.setattr(drawing._telemetry, "error", telemetry)
+    lines, texts = drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="valid RIGHT")
+    assert lines == tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.neck_lines)
+    assert tuple(row["text"] for row in texts) == ("<MOD-DIAM>", "9.5 ")
+    telemetry.assert_not_called()
