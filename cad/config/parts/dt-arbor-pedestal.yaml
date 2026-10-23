@@ -6,9 +6,3 @@ dt-arbor-pedestal:
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
   process: "machined from solid stock or casting"
-  machinist_exceptions:
-    - id: "RV-01"
-      kind: "accept"
-      where: "inside corner where the upright's back face meets the foot's top face"
-      finding: "sharp internal corner with no stated fillet or maximum radius (rule 16)"
-      reason: "owner ruling 2026-10-18 (fr-top-frame precedent): the sharp inside corner is accepted without a geometry change; the shop's R1.0 MAX ceiling is now carried by the title-block inside-corner default under #1625, with no duplicate loose note (owner-accepted)"

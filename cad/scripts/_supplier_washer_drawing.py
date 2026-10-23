@@ -1,25 +1,32 @@
 """Import model-owned washer supplier bands; add only unbanded rim refs.
 
 The part owns every banded dimension's native value, tolerance and supplier
-presentation. Drawing imports are positioned, then inspected read-only.
+specification. Imports get their drawing-local ink explicitly, without relying
+on native import inheriting the part's display-unit flag.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any, Literal
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
 
 from _com import _early_bound
 from _drawing_attachment import _is_same_attachment
+from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+from _drawing_common import rebuild_drawing
 from _drawing_edges import ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_layout_audit import _Reader, _dump_annotation
+from _layout_audit import display_box
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_screw_layout import supplier_top_text_geometry
 from _supplier_washer_model import (
     BORE_DIAMETER,
     OUTER_DIAMETER,
@@ -28,6 +35,7 @@ from _supplier_washer_model import (
     assert_supplier_washer_band,
     assert_supplier_washer_body,
     assert_supplier_washer_source_attachment,
+    assert_supplier_washer_references,
 )
 import _telemetry
 
@@ -119,12 +127,100 @@ def _visible_dimensions(view: Any) -> list[Any]:
     return visible
 
 
+def _washer_text_record(adapter: Any, display: Any) -> dict[str, Any]:
+    reader = _Reader(adapter)
+    record = _dump_annotation(reader, display.GetAnnotation())
+    errors = reader.take_errors()
+    if errors or record is None or int(record.get("type", 0)) != 4:
+        raise RuntimeError(f"supplier washer text read failed: {errors}")
+    position = record.get("pos") or ()
+    texts = (record.get("display") or {}).get("texts") or ()
+    if (
+        len(position) != 3 or not all(isfinite(float(value)) for value in position)
+        or not texts or any(
+            not isfinite(float(row.get("w") or 0.0)) or float(row.get("w") or 0.0) <= 0.0
+            for row in texts
+        )
+    ):
+        raise RuntimeError("supplier washer text has no measured native position/width")
+    return record
+
+
+def _assert_washer_text(
+    adapter: Any, face: Any, displays: Mapping[str, Any], stations: Mapping[str, Any],
+) -> None:
+    thickness = displays[THICKNESS]
+    actual = supplier_top_text_geometry(_washer_text_record(adapter, thickness), horizontal=False)
+    for field in ("tips", "witnesses", "physical_lines"):
+        if len(stations[field]) != len(actual[field]) or any(
+            len(prior) != len(current)
+            or any(abs(a - b) > 1e-5 for a, b in zip(prior, current, strict=True))
+            for prior, current in zip(stations[field], actual[field], strict=True)
+        ):
+            raise RuntimeError(f"supplier washer text moved native {field}")
+    if thickness.OffsetText is not True or actual["text"].xmin - actual["right"] < CLEAR_GAP_M:
+        raise RuntimeError("supplier washer thickness text is not clear of its native lines")
+    outline_right = float(face.GetOutline()[2])
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        record = _washer_text_record(adapter, displays[label])
+        text = display_box({"texts": record["display"]["texts"]})
+        if abs(float(record["pos"][1]) - float(stations["diameter_y"][label])) > 1e-5:
+            raise RuntimeError(f"{label}: callout changed its native Y station")
+        if text is None or text.xmin - outline_right < CLEAR_GAP_M:
+            raise RuntimeError(f"{label}: callout is not outside the face outline")
+
+
+def _position_washer_text(
+    adapter: Any, face: Any, displays: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Measure formatted text shelves; keep native dimensions and stations."""
+    rebuild_drawing(adapter, label="supplier washer formatted text settled")
+    thickness = displays[THICKNESS]
+    record = _washer_text_record(adapter, thickness)
+    stations = supplier_top_text_geometry(record, horizontal=False)
+    annotation = _early_bound(thickness.GetAnnotation(), "IAnnotation")
+    anchor = (sum(tip[0] for tip in stations["tips"]) / 2.0, float(record["pos"][1]))
+    if not annotation.SetPosition2(*anchor, 0.0):
+        raise RuntimeError("supplier washer thickness offset anchor was rejected")
+    rebuild_drawing(adapter, label="supplier washer physical thickness station")
+    thickness.OffsetText = True
+    if not annotation.SetPosition2(*anchor, 0.0):
+        raise RuntimeError("supplier washer thickness offset mode was rejected")
+    rebuild_drawing(adapter, label="supplier washer native offset text settled")
+    # Native offset mode can change the formatted block. Measure it only after
+    # that mode settles; SetPosition2 now moves text, not its witnesses.
+    record = _washer_text_record(adapter, thickness)
+    actual = supplier_top_text_geometry(record, horizontal=False)
+    dx = max(0.0, actual["right"] + CLEAR_GAP_M + PLACE_SETTLE_M - actual["text"].xmin)
+    if dx and not annotation.SetPosition2(float(record["pos"][0]) + dx, float(record["pos"][1]), 0.0):
+        raise RuntimeError("supplier washer thickness text shelf was rejected")
+    stations["diameter_y"] = {}
+    outline_right = float(face.GetOutline()[2])
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        diameter = displays[label]
+        record = _washer_text_record(adapter, diameter)
+        stations["diameter_y"][label] = float(record["pos"][1])
+        text = display_box({"texts": record["display"]["texts"]})
+        if text is None:
+            raise RuntimeError(f"{label}: callout has no measured text")
+        dx = max(0.0, outline_right + CLEAR_GAP_M + PLACE_SETTLE_M - text.xmin)
+        # A diameter already has a leader; OffsetText is not applicable to it.
+        if dx and not _early_bound(diameter.GetAnnotation(), "IAnnotation").SetPosition2(
+            float(record["pos"][0]) + dx, float(record["pos"][1]), 0.0,
+        ):
+            raise RuntimeError(f"{label}: callout placement was rejected")
+    rebuild_drawing(adapter, label="supplier washer text shelves settled")
+    _assert_washer_text(adapter, face, displays, stations)
+    return stations
+
+
 @_telemetry.traced("drawing.assert_supplier_washer_dimensions")
 def assert_supplier_washer_dimensions(
     adapter: Any, views: dict[str, Any], references: tuple[_WasherReference, ...], *,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
     units: Literal["in", "mm"], precision: Mapping[str, int],
     bands: Mapping[str, tuple[float, float, str]],
+    thickness_stations: Mapping[str, Any],
 ) -> None:
     """Reacquire displays, source entities and final solid rims after rebuild."""
     if len(references) != 3 or {reference.label for reference in references} != {
@@ -178,7 +274,8 @@ def assert_supplier_washer_dimensions(
         if reference.imported:
             assert_supplier_washer_source_attachment(
                 adapter, model, display, label=reference.label, axis=axis,
-                bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm, visible=True,
+                bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+                view=reference.view,
             )
         else:
             _assert_rim(adapter, display, face_rims[reference.label], label=reference.label)
@@ -186,6 +283,14 @@ def assert_supplier_washer_dimensions(
             display, nominal_mm=reference.expected_mm, band=bands.get(reference.label),
             precision=precision[reference.label], label=reference.label,
         )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=next(
+            reference.callout for reference in references if reference.label == BORE_DIAMETER
+        ),
+    )
+    _assert_washer_text(adapter, face, current, thickness_stations)
 
 
 @_telemetry.traced("drawing.supplier_washer_dimensions")
@@ -198,6 +303,19 @@ def supplier_washer_dimensions(
     """Import every banded size; author only bandless OD/ID physical refs."""
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
+    # The purchased-sheet source checkpoint has already proved this view's
+    # referenced document/path against the original read-only source.
+    model = _early_bound(views["*Front"], "IView").ReferencedDocument
+    if model is None:
+        raise RuntimeError("supplier washer drawing has no referenced source part")
+    assert_supplier_washer_body(
+        model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+    )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=bore_callout,
+    )
     face = views["*Top" if axis == "y" else "*Front"]
     side = views["*Front" if axis == "y" else "*Top"]
     bounds = tuple(float(value) for value in face.GetOutline())
@@ -210,6 +328,7 @@ def supplier_washer_dimensions(
     positions[THICKNESS] = (side_bounds[2] + 0.014, (side_bounds[1] + side_bounds[3]) / 2.0)
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     references: list[_WasherReference] = []
+    displays: dict[str, Any] = {}
     for view, labels in ((face, (OUTER_DIAMETER, BORE_DIAMETER)), (side, (THICKNESS,))):
         imported_labels = tuple(label for label in labels if label in bands)
         if not imported_labels:
@@ -229,14 +348,25 @@ def supplier_washer_dimensions(
         for label in imported_labels:
             annotation = named[SOURCE_DIMENSIONS[label][1]]
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-            # No units, precision, tolerance or reference-ink setter on imports.
-            assert_supplier_reference_dimension(
+            # Import uses drawing-local display settings. Dress that display,
+            # never its source value or tolerance; recheck both part and import.
+            supplier_reference_dimension(
                 adapter, display, label=label, units=units, precision=precision[label],
                 expected_mm=values[label], presentation="length" if label == THICKNESS else "diameter",
                 callout=bore_callout if label == BORE_DIAMETER else None,
             )
             references.append(_reference(display, view, label, values[label], imported=True,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
+            displays[label] = display
+            assert_supplier_washer_band(
+                display, nominal_mm=values[label], band=bands[label],
+                precision=precision[label], label=label,
+            )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=bore_callout,
+    )
     unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
     if unbanded:
         edges = scan_view_edges(face, label="supplier washer unbanded face rims")
@@ -251,12 +381,16 @@ def supplier_washer_dimensions(
             )
             references.append(_reference(display, face, label, values[label], imported=False,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
+            displays[label] = display
+
+    thickness_stations = _position_washer_text(adapter, face, displays)
 
     def settled_check() -> None:
         assert_supplier_washer_dimensions(
             adapter, views, tuple(references), axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm, units=units,
             precision=precision, bands=bands,
+            thickness_stations=thickness_stations,
         )
 
     return settled_check
