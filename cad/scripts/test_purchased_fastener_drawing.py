@@ -9853,6 +9853,8 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
 
 def _washer_paint_native(monkeypatch, case):
     """Replay R48 native paint; only native I/O is doubled, not placement/math."""
+    import _supplier_reference_text as reference_text
+
     washer = case.helper
     thick, outer, bore = washer.THICKNESS, washer.OUTER_DIAMETER, washer.BORE_DIAMETER
     # Retained native paint, metres: R48 thickness/bore and R50 outer diameter.
@@ -9973,7 +9975,7 @@ def _washer_paint_native(monkeypatch, case):
         return copy.deepcopy(case.paint[label].record)
 
     monkeypatch.setattr(washer, "rebuild_drawing", rebuild)
-    monkeypatch.setattr(washer, "_dump_annotation", record)
+    monkeypatch.setattr(reference_text, "_dump_annotation", record)
 
     rims = tuple(case.model.GetBodies2(0, False)[0].GetEdges())
 

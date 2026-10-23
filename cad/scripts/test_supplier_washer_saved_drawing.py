@@ -2621,8 +2621,14 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
     def gate(adapter, model, **kwargs):
         gate_calls.append((adapter, model, kwargs))
         if phase != "after_import" or len(gate_calls) == 2:
+            if transport == "getter":
+                # Corrupt only the intended failing phase. The after-import
+                # case must first pass the real strict pre-import source guard.
+                case.source_displays[source.THICKNESS].GetAnnotation = fail_getter
             raise original
-        return actual_guard(adapter, model, **kwargs)
+        result = actual_guard(adapter, model, **kwargs)
+        attempts.append(("preimport-guard-passed",))
+        return result
 
     def capture(error, adapter, model, view, **kwargs):
         capture_calls.append((error, adapter, model, view, kwargs))
@@ -2639,8 +2645,6 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
         if transport in {"logging", "note-and-logging"}:
             raise ValueError("independent telemetry transport failure")
 
-    if transport == "getter":
-        case.source_displays[source.THICKNESS].GetAnnotation = fail_getter
     monkeypatch.setattr(washer, "assert_supplier_washer_references", gate)
     monkeypatch.setattr(washer, "_capture_original_washer_source_failure", capture)
     monkeypatch.setattr(washer._telemetry, "info", log)
@@ -2663,6 +2667,7 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
             washer.supplier_washer_dimensions(case.adapter, case.original, **case.arguments)
     assert caught.value is original
     assert len(gate_calls) == (2 if phase == "after_import" else 1)
+    assert sum(attempt[0] == "preimport-guard-passed" for attempt in attempts) == int(phase == "after_import")
     for index, (adapter, model, kwargs) in enumerate(gate_calls):
         assert adapter is case.adapter and model is case.model
         expected = {**case.arguments, "bore_callout": None}
@@ -2685,6 +2690,10 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
         assert any(attempt[0] == "logging" for attempt in attempts)
     if transport == "getter":
         assert sum(attempt[0] == "getter" for attempt in attempts) == 1
+        if phase == "after_import":
+            assert next(i for i, attempt in enumerate(attempts) if attempt[0] == "preimport-guard-passed") < next(
+                i for i, attempt in enumerate(attempts) if attempt[0] == "getter"
+            )
         assert any("independent named source annotation getter failure" in attempt[1]
                    for attempt in attempts if attempt[0] == "note")
     if transport == "span":
@@ -3377,9 +3386,20 @@ _PLACEMENT_PHASES = (
 def _corrupt_original_source(case, fault):
     label = source.THICKNESS
     if fault == "original-owner":
-        case.source_natives[label].GetFeatureOwner = lambda: case.mapped_features[
-            case.original[case.side]
-        ][source.THICKNESS_FEATURE]
+        feature = case.features[source.THICKNESS_FEATURE]
+        # The corresponding mapped feature is legitimate with paired context.
+        # Corrupt ownership with a distinct foreign feature while retaining its
+        # name, native type and geometry so identity alone must disprove it.
+        foreign = SimpleNamespace(**vars(feature))
+        assert foreign.Name == feature.Name
+        assert foreign.GetTypeName2() == feature.GetTypeName2()
+        assert foreign.GetSpecificFeature2() is feature.GetSpecificFeature2()
+        assert case.app.IsSame(foreign, feature) == 0
+        assert all(
+            case.app.IsSame(foreign, case.mapped_features[view][source.THICKNESS_FEATURE]) == 0
+            for collection in (case.original, case.fresh) for view in collection.values()
+        )
+        case.source_natives[label].GetFeatureOwner = lambda: foreign
     elif fault == "original-attachment":
         case.source_displays[label].annotation.attached = (case.source_entities[label][0],) * 2
     elif fault == "canonical-parameter":
