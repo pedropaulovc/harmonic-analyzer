@@ -759,6 +759,56 @@ def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
     assert head_left - _iso((x, y, z))[0] > 5.0
 
 
+def test_the_north_keeper_balloons_on_detail_c_right_of_its_lifted_screws() -> None:
+    """#1895 machinist review: on the 1:7 view the north keeper stands in
+    front of the near-black rocker bank, and leaders 8-10 crossing it were
+    lost. Its family balloons on DETAIL C, the caption says so, and the
+    keeper's leader lands on its inner crown apex, which projects right of
+    both lifted screws (eye on +x +y +z), so its ring slot is the right-most
+    and its leader crosses neither screw."""
+    from _hole_spec import THREAD_MAJOR_MM
+    import ch_fulcrum_keeper_spec as keeper
+    import ch_vn_frame_side_screw_spec as foot_screw
+
+    explode = drawing.explode
+    detail = drawing.NORTH_KEEPER_DETAIL
+    family = {explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}
+    assert drawing.KEEPER_DETAIL_BALLOON_STEMS == detail.stems == family
+    assert detail.title in drawing.EXPLODED_CAPTION
+    assert drawing.BALLOON_POINTS_MM[explode.KEEPER] == (
+        -keeper.LUG_HALF_T,
+        keeper.CROWN_TOP_Y,
+        0.0,
+    )
+    # North keeper: part +x is outboard, machine +z. Relative to the lug
+    # mid-plane, the apex sits 4 inboard, the set screw on the mid-plane and
+    # the foot screw SCREW_X outboard; both screws move straight up.
+    for stem in (explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW):
+        moved = drawing.exploded_offset(stem, "north")
+        carried = drawing.exploded_offset(explode.KEEPER, "north")
+        assert (moved[0], moved[2]) == (carried[0], carried[2])
+    apex_u = _iso((0.0, 0.0, -keeper.LUG_HALF_T))[0]
+    set_screw_right = THREAD_MAJOR_MM[keeper.SET_SCREW_THREAD] / 2.0
+    foot_screw_right = _iso((0.0, 0.0, keeper.SCREW_X))[0] + foot_screw.HEAD_DIA / 2.0
+    assert apex_u - set_screw_right > 1.5
+    assert apex_u - foot_screw_right > 5.0
+    # The ring stays in the column above DETAIL C: the farm read its outline
+    # 44.1 mm tall about the crop centre (run 20261023T222629630Z), so the
+    # top balloon reaches 22.05 + margin + a balloon radius over it, under
+    # DETAIL B's three-line label.
+    bracket_label_bottom = (
+        drawing.NORTH_BRACKET_DETAIL.crop_label_xy[1]
+        - len(drawing.NORTH_BRACKET_DETAIL.label_text.splitlines()) * NOTE_LINE_PITCH
+    )
+    ring_top = (
+        detail.centre[1]
+        + 0.02205
+        + drawing.KEEPER_DETAIL_BALLOON_MARGIN
+        + drawing.BALLOON_MAX_RADIUS
+    )
+    assert ring_top + 0.004 < bracket_label_bottom
+
+
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 19
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
