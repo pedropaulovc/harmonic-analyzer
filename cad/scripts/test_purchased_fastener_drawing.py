@@ -9304,9 +9304,9 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
 def _washer_paint_native(monkeypatch, case):
     """Replay R48 native paint; only native I/O is doubled, not placement/math."""
     washer = case.helper
-    thick, bore = washer.THICKNESS, washer.BORE_DIAMETER
-    # Retained R48 draw data, metres. Text rows intentionally include the entire
-    # limits stack and the below-value qualifier, not just the nominal value.
+    thick, outer, bore = washer.THICKNESS, washer.OUTER_DIAMETER, washer.BORE_DIAMETER
+    # Retained native paint, metres: R48 thickness/bore and R50 outer diameter.
+    # Include complete limits/qualifier blocks, not nominal-value surrogates.
     records = {
         thick: dict(type=4, pos=[.144901, .23, .0000039], display=dict(
             lines=[
@@ -9324,6 +9324,19 @@ def _washer_paint_native(monkeypatch, case):
                 dict(t="0.043", pos=[.1365472, .23, 0], w=.0116375),
                 dict(t="0.029", pos=[.1365472, .2254743, 0], w=.0116375),
                 dict(t=" in) ", pos=[.1481847, .2274941, 0], w=.008084),
+            ],
+        )),
+        outer: dict(type=4, pos=[.1364005, .1455, -.0019651], display=dict(
+            lines=[
+                [0, 0, 0, 0, .1162203, .1443043, 0, .1130599, .1426951, 0],
+                [0, 0, 0, 0, .0737797, .1226957, 0, .1162203, .1443043, 0],
+            ],
+            arrows=[[.1162203, .1443043, 0, .8911429, .4537227, 0,
+                     .003556, .000762, 0, 0, 0, -1]],
+            texts=[
+                dict(t=" (", pos=[.1146474, .1427486, 0], w=.0030139),
+                dict(t="<MOD-DIAM>", pos=[.1176613, .1426951, 0], w=.0052784),
+                dict(t="0.375 ±0.002 in) ", pos=[.1229397, .1427486, 0], w=.0352139),
             ],
         )),
         bore: dict(type=4, pos=[.140401, .12025, -.002275], display=dict(
@@ -9347,7 +9360,7 @@ def _washer_paint_native(monkeypatch, case):
     for label, record in records.items():
         bounds = (side if label == thick else face).GetOutline()
         xy = (bounds[2] + (.014 if label == thick else .012),
-              (bounds[1] + bounds[3]) / 2 + (0 if label == thick else -.012))
+              (bounds[1] + bounds[3]) / 2 + (0 if label == thick else (.012 if label == outer else -.012)))
         dx, dy = xy[0] - record["pos"][0], xy[1] - record["pos"][1]
         for row in record["display"]["lines"]:
             for index in (4, 7):

@@ -160,18 +160,20 @@ def _assert_washer_text(
             raise RuntimeError(f"supplier washer text moved native {field}")
     if thickness.OffsetText is not True or actual["text"].xmin - actual["right"] < CLEAR_GAP_M:
         raise RuntimeError("supplier washer thickness text is not clear of its native lines")
-    bore = _washer_text_record(adapter, displays[BORE_DIAMETER])
-    text = display_box({"texts": bore["display"]["texts"]})
-    if abs(float(bore["pos"][1]) - float(stations["bore_y"])) > 1e-5:
-        raise RuntimeError("supplier washer bore callout changed its native Y station")
-    if text is None or text.xmin - float(face.GetOutline()[2]) < CLEAR_GAP_M:
-        raise RuntimeError("supplier washer bore callout is not outside the face outline")
+    outline_right = float(face.GetOutline()[2])
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        record = _washer_text_record(adapter, displays[label])
+        text = display_box({"texts": record["display"]["texts"]})
+        if abs(float(record["pos"][1]) - float(stations["diameter_y"][label])) > 1e-5:
+            raise RuntimeError(f"{label}: callout changed its native Y station")
+        if text is None or text.xmin - outline_right < CLEAR_GAP_M:
+            raise RuntimeError(f"{label}: callout is not outside the face outline")
 
 
 def _position_washer_text(
     adapter: Any, face: Any, displays: Mapping[str, Any],
 ) -> Mapping[str, Any]:
-    """Two measured text moves; keep native dimensions and physical stations."""
+    """Measure formatted text shelves; keep native dimensions and stations."""
     rebuild_drawing(adapter, label="supplier washer formatted text settled")
     thickness = displays[THICKNESS]
     record = _washer_text_record(adapter, thickness)
@@ -192,18 +194,21 @@ def _position_washer_text(
     dx = max(0.0, actual["right"] + CLEAR_GAP_M + PLACE_SETTLE_M - actual["text"].xmin)
     if dx and not annotation.SetPosition2(float(record["pos"][0]) + dx, float(record["pos"][1]), 0.0):
         raise RuntimeError("supplier washer thickness text shelf was rejected")
-    bore = displays[BORE_DIAMETER]
-    record = _washer_text_record(adapter, bore)
-    stations["bore_y"] = float(record["pos"][1])
-    text = display_box({"texts": record["display"]["texts"]})
-    if text is None:
-        raise RuntimeError("supplier washer bore callout has no measured text")
-    dx = max(0.0, float(face.GetOutline()[2]) + CLEAR_GAP_M + PLACE_SETTLE_M - text.xmin)
-    # A diameter already has a leader; OffsetText is not applicable to it.
-    if dx and not _early_bound(bore.GetAnnotation(), "IAnnotation").SetPosition2(
-        float(record["pos"][0]) + dx, float(record["pos"][1]), 0.0,
-    ):
-        raise RuntimeError("supplier washer bore callout placement was rejected")
+    stations["diameter_y"] = {}
+    outline_right = float(face.GetOutline()[2])
+    for label in (OUTER_DIAMETER, BORE_DIAMETER):
+        diameter = displays[label]
+        record = _washer_text_record(adapter, diameter)
+        stations["diameter_y"][label] = float(record["pos"][1])
+        text = display_box({"texts": record["display"]["texts"]})
+        if text is None:
+            raise RuntimeError(f"{label}: callout has no measured text")
+        dx = max(0.0, outline_right + CLEAR_GAP_M + PLACE_SETTLE_M - text.xmin)
+        # A diameter already has a leader; OffsetText is not applicable to it.
+        if dx and not _early_bound(diameter.GetAnnotation(), "IAnnotation").SetPosition2(
+            float(record["pos"][0]) + dx, float(record["pos"][1]), 0.0,
+        ):
+            raise RuntimeError(f"{label}: callout placement was rejected")
     rebuild_drawing(adapter, label="supplier washer text shelves settled")
     _assert_washer_text(adapter, face, displays, stations)
     return stations

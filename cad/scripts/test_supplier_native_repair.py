@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import copy
+import importlib
+import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -532,7 +535,7 @@ def _washer_source_state(case):
 
 @pytest.mark.parametrize("axis", ("y", "z"))
 @pytest.mark.parametrize("banded", ("thickness", "all"))
-def test_washer_complete_consumer_replay_clears_limits_and_bore_qualifier_without_moving_witnesses(
+def test_washer_complete_consumer_replay_clears_limits_and_diameters_without_moving_witnesses(
     monkeypatch, axis, banded,
 ):
     import copy
@@ -540,30 +543,33 @@ def test_washer_complete_consumer_replay_clears_limits_and_bore_qualifier_withou
     from _supplier_screw_layout import supplier_top_text_geometry
 
     case = _r48_washer_layout(monkeypatch, axis=axis, banded=banded)
-    thick, bore = case.helper.THICKNESS, case.helper.BORE_DIAMETER
+    thick = case.helper.THICKNESS
+    diameters = (case.helper.OUTER_DIAMETER, case.helper.BORE_DIAMETER)
     before = _washer_source_state(case)
     before_records = copy.deepcopy({label: paint.record for label, paint in case.paint.items()})
     before_stations = supplier_top_text_geometry(before_records[thick], horizontal=False)
     face = case.views["*Top" if axis == "y" else "*Front"]
     assert before_stations["text"].xmin < before_stations["right"]
-    assert display_box({"texts": before_records[bore]["display"]["texts"]}).xmin < face.GetOutline()[2]
+    assert all(display_box({"texts": before_records[label]["display"]["texts"]}).xmin
+               < face.GetOutline()[2] for label in diameters)
     # Offset mode changes the full native block only on rebuild. Measuring the
     # pre-mode box would leave 6 mm of this real-width stack in the witness lane.
     case.paint[thick].offset_shift = -.006
-    bore_y = case.paint[bore].record["pos"][1]
+    diameter_y = {label: case.paint[label].record["pos"][1] for label in diameters}
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
     after = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
     for field in ("tips", "witnesses", "physical_lines"):
         assert after[field] == before_stations[field]
     assert after["text"].xmin - after["right"] >= .002
-    assert display_box({"texts": case.paint[bore].record["display"]["texts"]}).xmin - face.GetOutline()[2] >= .002
-    assert case.paint[bore].record["pos"][1] == bore_y
-    assert case.imports[bore].display.OffsetText is False
+    for label in diameters:
+        assert display_box({"texts": case.paint[label].record["display"]["texts"]}).xmin - face.GetOutline()[2] >= .002
+        assert case.paint[label].record["pos"][1] == diameter_y[label]
+        assert case.imports[label].display.OffsetText is False
     assert _washer_source_state(case) == before
     # A subsequent native layout regression must be caught at the real final
     # consumer guard, even when every value, band and source identity is sound.
-    case.paint[bore].record = before_records[bore]
+    case.paint[case.helper.BORE_DIAMETER].record = before_records[case.helper.BORE_DIAMETER]
     with pytest.raises(RuntimeError):
         settled()
 
@@ -593,7 +599,7 @@ def test_washer_refuses_unrealized_native_thickness_shelf_without_altering_sourc
     assert _washer_source_state(case) == before
 
 
-@pytest.mark.parametrize("drift", ("witness", "bore_y"))
+@pytest.mark.parametrize("drift", ("witness", "outer_y", "bore_y"))
 def test_washer_final_guard_refuses_physical_station_drift_with_clear_text(monkeypatch, drift):
     case = _r48_washer_layout(monkeypatch)
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
@@ -601,7 +607,8 @@ def test_washer_final_guard_refuses_physical_station_drift_with_clear_text(monke
     if drift == "witness":
         case.paint[case.helper.THICKNESS].record["display"]["lines"][0][4] += .003
     else:
-        case.paint[case.helper.BORE_DIAMETER].record["pos"][1] += .003
+        label = case.helper.OUTER_DIAMETER if drift == "outer_y" else case.helper.BORE_DIAMETER
+        case.paint[label].record["pos"][1] += .003
     with pytest.raises(RuntimeError):
         settled()
 
@@ -616,6 +623,127 @@ def test_washer_refuses_unavailable_measured_paint_instead_of_estimated_text(mon
         record["display"]["texts"][0]["w"] = 0.0
     with pytest.raises(RuntimeError):
         case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+
+
+def _retained_washer_layout(monkeypatch, scope):
+    from test_purchased_fastener_drawing import _washer_import_native
+    import _supplier_washer_drawing as washer
+
+    captures = json.loads(Path(__file__).with_name("test_supplier_washer_native_paint.json").read_text())
+    captured = captures["cases"][scope]
+    part = importlib.import_module(f"{captured['stem']}_spec")
+    values = {
+        washer.OUTER_DIAMETER: part.OD,
+        washer.BORE_DIAMETER: part.ID,
+        washer.THICKNESS: getattr(part, captured["thickness_attribute"]),
+    }
+    case = _washer_import_native(monkeypatch, axis=captured["axis"], values=values)
+    units, precision, bands = part.SUPPLIER_UNITS, part.DRAWING_REFERENCE_PRECISION, part.SUPPLIER_TOLERANCES
+    qualifier = getattr(part, "SUPPLIER_BORE_CALLOUT", None)
+    case.kwargs.update(units=units, precision=precision, bands=bands, bore_callout=qualifier)
+    for label, value in values.items():
+        for collection in (case.sources, case.imports):
+            item = collection[label]
+            item.state.unit = 3 if units == "in" else 0
+            item.state.precision = precision[label]
+            item.display.GetPrimaryTolPrecision2 = lambda places=precision[label]: places
+            item.text.update({2: f" {units})",
+                              4: (qualifier or "") if label == washer.BORE_DIAMETER else ""})
+            lower, upper, style = bands.get(label, (value, value, None))
+            item.native.Tolerance.Type = {"bilateral": 2, "limits": 3, "symmetric": 4, None: 0}[style]
+            item.native.Tolerance.GetMinValue = lambda deviation=(lower - value) / 1000: deviation
+            item.native.Tolerance.GetMaxValue = lambda deviation=(upper - value) / 1000: deviation
+        case.paint[label].record = copy.deepcopy(captured["records"][label])
+    # These captures are the settled exported sheets, where the thickness
+    # already uses OffsetText. Replaying them must not move its witnesses.
+    case.imports[washer.THICKNESS].display.OffsetText = True
+    for orientation, outline in captured["view_outlines"].items():
+        case.views[orientation].GetOutline = lambda outline=outline: tuple(outline)
+    return case, captured
+
+
+@pytest.mark.parametrize("scope", (
+    "ch-block", "ch-lever", "ch-thrust", "pd-shim", "sm-hanger", "mg-back", "mg-front",
+))
+def test_washer_consumer_clears_retained_native_od_blocks_and_preserves_neighbors(monkeypatch, scope):
+    from _layout_audit import display_box
+    from _supplier_screw_layout import supplier_top_text_geometry
+
+    case, captured = _retained_washer_layout(monkeypatch, scope)
+    outer, thick = case.helper.OUTER_DIAMETER, case.helper.THICKNESS
+    before_source = _washer_source_state(case)
+    before = copy.deepcopy(case.paint[outer].record)
+    before_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    face = case.views["*Top" if captured["axis"] == "y" else "*Front"]
+    assert display_box({"texts": before["display"]["texts"]}).xmin < face.GetOutline()[2]
+
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    record = case.paint[outer].record
+    box = display_box({"texts": record["display"]["texts"]})
+    assert box.xmin - face.GetOutline()[2] >= .002
+    assert record["pos"][1] == before["pos"][1]
+    assert record["pos"][0] > before["pos"][0]
+    assert [(row["t"], row["w"], row["h"]) for row in record["display"]["texts"]] == [
+        (row["t"], row["w"], row["h"]) for row in before["display"]["texts"]
+    ]
+    assert case.imports[outer].display.OffsetText is False
+    after_station = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    for field in ("tips", "witnesses", "physical_lines"):
+        assert after_station[field] == before_station[field]
+    bounds = tuple(value * 1000 for value in (box.xmin, box.ymin, box.xmax, box.ymax))
+    left, bottom, right, top = captured["printable_mm"]
+    assert left <= bounds[0] < bounds[2] <= right
+    assert bottom <= bounds[1] < bounds[3] <= top
+    for neighbor in captured["neighbors"]:
+        x0, y0, x1, y1 = neighbor["bounds_mm"]
+        assert bounds[2] < x0 or bounds[0] > x1 or bounds[3] < y0 or bounds[1] > y1
+    assert _washer_source_state(case) == before_source
+
+
+def test_washer_final_consumer_refuses_actual_r50_od_strike_after_other_guards_pass(monkeypatch):
+    from _layout_audit import display_box
+
+    case, captured = _retained_washer_layout(monkeypatch, "ch-thrust")
+    outer = case.helper.OUTER_DIAMETER
+    old = copy.deepcopy(case.paint[outer].record)
+    point = tuple(value / 1000 for value in captured["observed_od_contact_mm"])
+    old_box = display_box({"texts": old["display"]["texts"]})
+    assert old_box.xmin < point[0] < old_box.xmax
+    assert old_box.ymin < point[1] < old_box.ymax
+    before = _washer_source_state(case)
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    new_box = display_box({"texts": case.paint[outer].record["display"]["texts"]})
+    assert new_box.xmin > point[0]
+    case.paint[outer].record = old
+    with pytest.raises(RuntimeError):
+        settled()
+    assert _washer_source_state(case) == before
+
+
+@pytest.mark.parametrize("label", ("supplier outer diameter", "supplier bore diameter"))
+@pytest.mark.parametrize("defect", ("reject", "clamp"))
+def test_washer_refuses_unrealized_diameter_text_clearance_without_source_changes(monkeypatch, label, defect):
+    case = _r48_washer_layout(monkeypatch)
+    before = _washer_source_state(case)
+    setattr(case.paint[label], defect, True)
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    assert _washer_source_state(case) == before
+
+
+def test_washer_already_clear_od_is_unchanged_without_repositioning(monkeypatch):
+    case = _r48_washer_layout(monkeypatch)
+    record = case.paint[case.helper.OUTER_DIAMETER].record
+    for row in record["display"]["texts"]:
+        row["pos"][0] += .05
+    record["pos"][0] += .05
+    before = copy.deepcopy(record)
+    case.paint[case.helper.OUTER_DIAMETER].reject = True
+    settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    settled()
+    assert case.paint[case.helper.OUTER_DIAMETER].record == before
 
 
 @pytest.mark.parametrize(

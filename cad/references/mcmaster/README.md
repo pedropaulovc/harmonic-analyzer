@@ -1659,27 +1659,23 @@ discrepancy remains unproven. `GetFeatureOwner` and mapped-feature observations
 remain failure-only diagnostics, not an alternative acceptance path. Exact
 typed source-to-view entity mapping, physical geometry, source identity,
 configuration, values, tolerance bands and source-preservation guards remain
-required independently. Native R49's five refused drawings reached the obsolete
-mapped-feature guard with all three canonical dimension identities one; those
-five still require fresh native qualification after this contract correction.
+required independently. Native R50 freshly qualified this unified contract on
+the five previously refused washer sheets, each with 18 clean, read-only,
+unchanged-hash source checkpoints. This is source/identity proof, not blanket
+layout acceptance: its CH thrust sheet retained an actual outer-rim strike
+through the OD reference's opening parenthesis.
 
-R48 also exposed actual thickness-text/witness and bore-qualifier/outline
-crossings. The shared washer drawing author now settles the full formatted
-thickness limits stack in native linear `OffsetText` mode, then measures its
-text and physical witnesses before placing the text on a right-hand shelf.
-The entire bore value/qualifier block moves to the right of the face outline,
-without applying the unsupported diameter `OffsetText` mode. Both use the
-existing 2 mm text clearance plus 0.2 mm placement allowance and retain the
-physical dimension stations, exact native/source identities and supplier bands.
-This drawing-only placement affects all seven washer-sheet consumers. R49
-freshly authored and exported the MG back and front sheets: both whole native
-PNGs and unresampled thickness/bore crops were clear, both native layout audits
-had zero findings, and both retained 18 clean, read-only, unchanged-hash source
-checkpoints. Their banded thickness and unbanded physical-rim references passed
-the then-current guards. The other five sheets refused the old feature-owner
-predicate before final export; their placement authoring span succeeded, but no
-finished sheet or final layout acceptance is claimed for them. R49 does not
-qualify the new unified canonical-dimension guard.
+The shared washer drawing author settles the complete formatted thickness
+limits stack in native linear `OffsetText` mode, then measures its text and
+physical witnesses before placing the text on a right-hand shelf. Both full
+diameter value/qualifier blocks use the same measured placement beyond the face
+outline, without the unsupported diameter `OffsetText` mode. All use the
+existing 2 mm clearance plus 0.2 mm placement allowance and retain physical
+dimension stations, exact native/source identities and supplier bands.
+This drawing-only rule affects all seven washer sheets: R49/R50 native records
+show every OD block requires a move under that rule. Those retained records
+provide behavioral replays, not proof of the new settled native leader routes;
+all seven changed drawing outputs require fresh native visual qualification.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
