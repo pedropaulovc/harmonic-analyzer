@@ -271,6 +271,8 @@ both verdicts and the finding diff.
   full-resolution crops resolve fine detail. A contact sheet alone is not proof.
   The judge defaults independently to Claude Opus 5.5 at medium effort
   (`--judge-reviewer`, `--judge-model`, `--judge-effort` select alternatives).
+  PDF text coordinates use PDFium's page-to-device mapping with `ctypes.c_int`
+  outputs, matching its `int*` binding contract on Linux and Windows.
 - Before either Claude session receives its review/judge prompt, the runner uses
   that same CLI process's SDK control channel to await the private `sheets`
   connection and its `view_sheet`/`crop` tool catalogue. A separately probed

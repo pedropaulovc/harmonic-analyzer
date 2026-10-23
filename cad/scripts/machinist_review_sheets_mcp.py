@@ -17,7 +17,7 @@ import math
 import os
 import re
 import threading
-from ctypes import byref, c_long
+from ctypes import byref, c_int
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -322,7 +322,7 @@ def _text_spans(
     spans: list[dict[str, Any]] = []
 
     def to_device(x: float, y: float) -> tuple[int, int]:
-        out_x, out_y = c_long(), c_long()
+        out_x, out_y = c_int(), c_int()
         raw.FPDF_PageToDevice(
             page.raw, 0, 0, view_size[0], view_size[1], 0, x, y,
             byref(out_x), byref(out_y),
