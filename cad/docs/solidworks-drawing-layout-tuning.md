@@ -1793,21 +1793,55 @@ Require exactly two finite twelve-value `GetArrowHeadAtIndex2` records,
 vertical nonzero projected directions and sheet-normal arrow planes.
 Both actual tips must lie within the short land's axial extent, one at each
 physical opposite flank, on the same vertical dimension line, with only
-the declared 0.01 mm sheet-space readback tolerance. Merely falling inside
+the declared 0.01 mm sheet-space tip readback tolerance. Merely falling inside
 the neck's rectangular window does not prove either physical landing.
-This replaces the old circle-leader approach-direction assumption.
+Also require positive native width (along the normalized direction) and height
+(across it). Construct all three head vertices using the same tip-to-base
+direction semantics as `_layout_audit.arrowhead_segments`: the full horizontal
+envelope must stay inside the exact physical X trim, **without** extending it
+by the tip tolerance. Log both actual head bounds and the minimum physical-X
+clearance in millimetres at all four proofs. Inside/outside arrow directions
+are both legitimate; no additional inward-Y requirement is imposed.
 
-Keep the native line at the neck's axial midpoint. The late-authoring source
-proved all four normal native checkpoints, including both actual save
-boundaries, with 9.525 mm, driven state 1, one decimal place, no explicit
-tolerance, two physical flank tips and the complete preexisting inventory.
-Its lower text shoulder nevertheless crossed an existing axial witness line.
-The bounded layout candidate changes only text Y from 0.1515 to 0.1960 m,
-above that witness and the journal, without moving the physical arrow X.
-The nominal shoulder gap above the journal is only an estimate, not ink proof.
-**Qualification of this changed placement remains pending**: inspect the
-actual complete exported sheet for collar, Ra and fit-block clearance and
-retain every native association/value/arrow/inventory/save assertion.
+The bounded presentation candidate requests the new native dimension at
+`(JOURNAL_START_X - 0.0005, 0.1949) m`, i.e. `(178.2, 194.9) mm`.
+Keep both actual dimension tips and their complete heads inside the physical
+neck X trim `[176.36, 178.70] mm`; the opposite physical flank tips are at
+Y=`170.475` and `189.525 mm`. Only the collar-rear finish symbol's Y changes
+to `0.1973 m`; retain X=`COLLAR_REAR_X + 0.0069`, the exact physical tip
+`(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2))`, its part-owned control and all
+other surface finishes, stations, values and model geometry.
+
+Capture `_collar_rear_rim(adapter, side)` once and retain the actual
+`ISFSymbol` returned by `add_surface_finish`, whose existing authoring helper
+qualifies the controlled face and exact edge attachment. At each of the four
+normal neck checkpoints, early-bind its live `GetAnnotation()` result and
+reuse `_assert_attached_to(..., entity_type="EDGE")` plus
+`_assert_leader_lands` with its unchanged **1 mm** default, not the stale
+5 mm helper-doc wording. Require native `GetSymbol() == 1` and
+`GetText(8)` to equal `dt_crankshaft_notes.COLLAR_REAR_FINISH_TEXT`, derived
+from the actual part control rather than authored in the presentation recipe,
+without a literal value override or setter. Record the phase, actual native edge-identity result,
+symbol type, roughness and all finite bent-leader points (physical tip last).
+The captured interfaces must survive actual SLDDRW/PDF SaveAs; no cold reopen,
+fallback identity strings, extra redraw/rebuild/save cycle or source-part write.
+
+**[INFERENCE]**, pending the new exact-source native export: predicted DD
+glyph bounds are `[179.47, 193.0]–[191.07, 196.6] mm`; its shelf at
+Y=`192.0951` clears the journal's `191.388` silhouette by `0.7071 mm`.
+The rear finish's flat at `197.3` clears the DD glyph top by `0.7 mm`;
+its middle bar at `202.9118` clears the collar shelf at `203.6951` by
+`0.7915 mm` endpoint distance. Conservative native finish-text advance to the
+JournalDiaDim vertical remains `0.6963 mm`, not the roof-only `1.0086 mm`.
+Predicted finish-head to new-DD-glyph separation is `2.15 mm` horizontally
+(`2.22 mm` Euclidean); the complete DD-head X extent
+`[177.819, 178.581] mm` leaves `0.119 mm` to the physical right boundary.
+These are predictions, **not** new thresholds, qualifications or a PASS:
+the full existing **2 mm ARROW_TEXT** rule applies everywhere. Exact-source
+native qualification and final PDF inspection of both actual arrowheads'
+legibility remain pending. Inspect the complete sheet for collar, Ra, fit-block
+and witness clearance while retaining every association/value/head/inventory
+and actual-save proof.
 The discarded type-6 circle factory produced native 19.05 mm under projected
 mode and a type-mismatch under false-mode initialization; its resolver, factory
 and circle-only fixtures are not retained. Accept only exact-source native

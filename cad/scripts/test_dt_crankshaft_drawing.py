@@ -471,8 +471,19 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     assert spec.NECK_DIA_PLACES == 1
     neck_x, neck_y = drawing.OUTBOARD_NECK_DIAMETER_XY
     assert drawing.COLLAR_REAR_X < neck_x < drawing.JOURNAL_START_X
+    assert neck_x == pytest.approx(drawing.JOURNAL_START_X - 0.0005)
+    assert neck_y == pytest.approx(0.1949)
     assert drawing._sheet_y(spec.JOURNAL_DIA / 2.0) < neck_y
     assert neck_y < drawing._sheet_y(spec.COLLAR_DIA / 2.0)
+    finish_pick, finish_symbol = drawing.COLLAR_REAR_FINISH
+    assert neck_y < finish_symbol[1] < finish_pick[1]
+    assert finish_symbol[0] == pytest.approx(drawing.COLLAR_REAR_X + 0.0069)
+    assert finish_symbol[1] == pytest.approx(0.1973)
+    assert finish_pick == (
+        drawing.COLLAR_REAR_X, drawing._sheet_y(spec.COLLAR_DIA / 2.0),
+    )
+    # These relative presentation positions do not certify glyph/leader
+    # clearance: the changed native sheet must pass the normal ink audit.
     assert drawing.SIDE_KEEP["JournalOutboardStation"][1] < neck_y
     assert drawing.SIDE_KEEP["CollarRearStation"][1] < neck_y
     for name in ("PinionSeatStation", "JournalInboardStation", "ReliefInboardStation"):
@@ -1213,6 +1224,27 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(drawing, "dimension_name", lambda adapter, item: item.name)
     factory = Mock(wraps=drawing.add_edge_dimension)
     monkeypatch.setattr(drawing, "add_edge_dimension", factory)
+    collar_rim = object()
+    collar_annotation = SimpleNamespace(
+        GetType=Mock(return_value=8),
+        GetAttachedEntities3=Mock(return_value=(collar_rim,)),
+        GetAttachedEntityCount3=Mock(return_value=1),
+        GetAttachedEntityTypes=Mock(return_value=(1,)),
+        GetLeaderCount=Mock(return_value=1), IsDangling=Mock(return_value=False),
+        GetLeaderPointsAtIndex=Mock(return_value=(
+            *drawing.COLLAR_REAR_FINISH[1], 0.0,
+            drawing.COLLAR_REAR_X + 0.002, drawing.COLLAR_REAR_FINISH[1][1], 0.0,
+            *drawing.COLLAR_REAR_FINISH[0], 0.0,
+        )),
+    )
+    collar_texts = {
+        8: f"Ra {drawing.surface_finish_by_key(spec.SURFACE_FINISHES, 'collar_rear_face').roughness_ra}",
+    }
+    collar_symbol = SimpleNamespace(
+        GetSymbol=Mock(return_value=1),
+        GetText=Mock(side_effect=lambda part: collar_texts[part]),
+        GetAnnotation=Mock(return_value=collar_annotation),
+    )
     return SimpleNamespace(
         adapter=adapter, model=model, side=side, component=component, source=source, body=body,
         source_face=source_face, view_face=view_face, canonical_face=canonical_face,
@@ -1224,6 +1256,8 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         preexisting_annotations=preexisting_annotations, selection=selection, selected=selected,
         rebuild=rebuild, factory=factory, arrow_data=arrow_data, arrow_rows=arrow_rows,
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
+        collar_rim=collar_rim, collar_symbol=collar_symbol,
+        collar_annotation=collar_annotation, collar_texts=collar_texts,
         preexisting=(
             (right_native, right_native.FullName, spec.SHAFT_DIA / 1000.0, 2, right_annotation),
             (station_native, station_native.FullName, 0.0, 0, station_annotation),
@@ -1329,7 +1363,9 @@ def _create_neck_dimension(f):
     f.side.GetAnnotations.side_effect = lambda: (
         saved_annotations if f.model.AddVerticalDimension2.called else f.preexisting_annotations
     )
-    return drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+    return drawing._add_outboard_neck_dimension(
+        f.adapter, f.model, f.side, f.collar_rim, f.collar_symbol,
+    )
 
 
 _NECK_PHASES = (
@@ -1343,12 +1379,9 @@ def _neck_proof(f, phase):
     f.native.DrivenState = 1
     f.display.ShowParenthesis = False
     f.texts[1] = "<MOD-DIAM>"
-    if phase in ("after_drawing_save", "after_pdf_save"):
-        return drawing._outboard_neck_checkpoint(
-            f.adapter, f.side, f.native, 2, f.preexisting, phase,
-        )
-    return drawing._assert_outboard_neck_dimension(
-        f.adapter, f.side, f.native, 2, f.preexisting, phase=phase,
+    return drawing._outboard_neck_checkpoint(
+        f.adapter, f.side, f.native, 2, f.preexisting,
+        f.collar_rim, f.collar_symbol, phase,
     )
 
 
@@ -1747,7 +1780,10 @@ def test_neither_neck_accepts_numeric_text_quantity_or_reference_decoration(neck
     _neck_proof(f, "final settling rebuild")
     (f.texts if neck == "new" else f.right_texts)[part] = text
     with pytest.raises(RuntimeError, match="unexpected native diameter text"):
-        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.preexisting, "after_pdf_save")
+        drawing._outboard_neck_checkpoint(
+            f.adapter, f.side, f.native, 2, f.preexisting,
+            f.collar_rim, f.collar_symbol, "after_pdf_save",
+        )
 
 
 @pytest.mark.parametrize("phase", _NECK_PHASES)
@@ -1945,16 +1981,29 @@ def test_neck_requires_both_original_and_exact_new_native_view_dimensions(neck_d
         _neck_proof(f, "after_drawing_save")
 
 
-@pytest.mark.parametrize("phase", ("after_drawing_save", "after_pdf_save"))
-def test_neck_checkpoint_uses_only_existing_post_save_boundaries(neck_dimension_fakes, monkeypatch, phase) -> None:
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_neck_checkpoint_uses_only_existing_rebuild_and_post_save_boundaries(
+    neck_dimension_fakes, monkeypatch, phase,
+) -> None:
     f = neck_dimension_fakes
     verify = Mock()
     monkeypatch.setattr(drawing, "_assert_outboard_neck_dimension", verify)
-    drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.preexisting, phase)
+    drawing._outboard_neck_checkpoint(
+        f.adapter, f.side, f.native, 2, f.preexisting,
+        f.collar_rim, f.collar_symbol, phase,
+    )
     verify.assert_called_once_with(f.adapter, f.side, f.native, 2, f.preexisting, phase=phase)
+    f.collar_symbol.GetAnnotation.assert_called_once_with()
+    f.collar_annotation.GetLeaderPointsAtIndex.assert_called_with(0)
     for unused in ("before_drawing_save", "before_pdf_save", "before_drawing_close", "after_drawing_close"):
-        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.preexisting, unused)
+        drawing._outboard_neck_checkpoint(
+            f.adapter, f.side, f.native, 2, f.preexisting,
+            f.collar_rim, f.collar_symbol, unused,
+        )
     verify.assert_called_once()
+    f.collar_symbol.GetAnnotation.assert_called_once()
+    f.model.GraphicsRedraw2.assert_not_called()
+    f.rebuild.assert_not_called()
 
 
 def test_build_retains_empty_init_full_inventory_and_all_four_normal_proofs() -> None:
@@ -1964,7 +2013,7 @@ def test_build_retains_empty_init_full_inventory_and_all_four_normal_proofs() ->
     assert sum(ast.unparse(item.func) == "_add_outboard_neck_dimension" for item in calls) == 1
     finalizer = next(item for item in calls if ast.unparse(item.func) == "finalize_drawing")
     keywords = {item.arg: item.value for item in finalizer.keywords}
-    for key, function in (("settled_checks", "_assert_outboard_neck_dimension"), ("checkpoint", "_outboard_neck_checkpoint")):
+    for key, function in (("settled_checks", "_outboard_neck_checkpoint"), ("checkpoint", "_outboard_neck_checkpoint")):
         assert function in ast.unparse(keywords[key])
         assert "preexisting_side_dimensions" in ast.unparse(keywords[key])
     initialization = next(
@@ -1998,17 +2047,211 @@ def test_build_retains_empty_init_full_inventory_and_all_four_normal_proofs() ->
     assert not hasattr(drawing, "_assert_outboard_neck_view_rim")
 
 
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("index", [0, 1], ids=["lower", "upper"])
+@pytest.mark.parametrize("boundary", ["left", "right"])
 @pytest.mark.parametrize(
-    "unexpected_dimension", [False, True],
-    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension"],
+    "overhang", [1e-6, 0.0002], ids=["below-tip-tolerance", "visible-crossing"],
+)
+def test_neck_rejects_full_head_crossing_physical_x_trim_with_tip_inside(
+    neck_dimension_fakes, phase, index, boundary, overhang,
+) -> None:
+    f = neck_dimension_fakes
+    row = list(f.arrow_rows[index])
+    x0, _y0, x1, _y1 = drawing.OUTBOARD_NECK_ARROW_WINDOW
+    inset = row[7] / 2.0 - overhang
+    row[0] = x0 + inset if boundary == "left" else x1 - inset
+    assert x0 < row[0] < x1
+    f.arrow_rows[index] = tuple(row)
+    with pytest.raises(RuntimeError, match="complete native arrowhead X envelope"):
+        _neck_proof(f, phase)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("field", [6, 7], ids=["width-along", "height-across"])
+@pytest.mark.parametrize("value", [0.0, -0.001, None, False, float("nan"), float("inf")])
+def test_neck_requires_positive_finite_native_head_dimensions(
+    neck_dimension_fakes, phase, field, value,
+) -> None:
+    f = neck_dimension_fakes
+    row = list(f.arrow_rows[0])
+    row[field] = value
+    f.arrow_rows[0] = tuple(row)
+    with pytest.raises(RuntimeError, match="arrowhead"):
+        _neck_proof(f, phase)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("inside", [False, True], ids=["outside", "inside"])
+def test_neck_records_actual_normalized_head_bounds_and_positive_x_clearance(
+    neck_dimension_fakes, monkeypatch, phase, inside,
+) -> None:
+    f = neck_dimension_fakes
+    for index, native in enumerate(f.arrow_rows):
+        row = list(native)
+        row[4] *= -7.0 if inside else 7.0
+        f.arrow_rows[index] = tuple(row)
+    telemetry = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", telemetry)
+    _neck_proof(f, phase)
+    message = next(
+        item.args[0] for item in telemetry.call_args_list if "head_bounds_m=" in item.args[0]
+    )
+    bounds = ast.literal_eval(re.search(r"head_bounds_m=(.*), min_physical", message).group(1))
+    for row, actual in zip(f.arrow_rows, bounds):
+        base_y = row[1] + math.copysign(row[6], row[4])
+        assert actual == pytest.approx((
+            row[0] - row[7] / 2.0, min(row[1], base_y),
+            row[0] + row[7] / 2.0, max(row[1], base_y),
+        ))
+    clearance = float(message.split("min_physical_x_clearance_mm=")[1])
+    expected = (
+        drawing.JOURNAL_START_X - f.arrow_rows[0][0] - f.arrow_rows[0][7] / 2.0
+    ) * 1000.0
+    assert clearance == pytest.approx(expected)
+    assert clearance > 0.0
+    assert phase in message
+
+
+@pytest.mark.parametrize("boundary", ["left", "right"])
+def test_neck_head_envelope_uses_native_width_along_small_actual_direction(
+    neck_dimension_fakes, boundary,
+) -> None:
+    f = neck_dimension_fakes
+    row = list(f.arrow_rows[0])
+    ux = drawing.NECK_ARROW_DIRECTION_X_SLACK / 2.0
+    uy = math.sqrt(1.0 - ux * ux)
+    sign = -1.0 if boundary == "left" else 1.0
+    row[3:6] = (sign * ux * 3.0, -uy * 3.0, 0.0)
+    edge = drawing.COLLAR_REAR_X if boundary == "left" else drawing.JOURNAL_START_X
+    # Height alone would fit: native along-direction width crosses the exact trim.
+    row[0] = edge - sign * (uy * row[7] / 2.0 + ux * row[6] / 2.0)
+    f.arrow_rows[0] = tuple(row)
+    with pytest.raises(RuntimeError, match="complete native arrowhead X envelope"):
+        drawing._assert_neck_arrow_landing(f.display, label="native small direction")
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("failure", [
+    "missing-symbol", "missing-rim", "null-annotation", "wrong-symbol-type", "bool-symbol-type",
+    "wrong-roughness", "no-attachment", "duplicate-attachment", "count-mismatch",
+    "wrong-entity-type", "foreign-edge", "native-identity-zero", "dangling",
+    "no-leader", "extra-leader", "unreadable-leader", "nonfinite-leader", "moved-tip",
+])
+def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_four_proofs(
+    neck_dimension_fakes, phase, failure,
+) -> None:
+    f = neck_dimension_fakes
+    annotation = f.collar_annotation
+    if failure == "missing-symbol":
+        f.collar_symbol = None
+    elif failure == "missing-rim":
+        f.collar_rim = None
+    elif failure == "null-annotation":
+        f.collar_symbol.GetAnnotation.return_value = None
+    elif failure in ("wrong-symbol-type", "bool-symbol-type"):
+        f.collar_symbol.GetSymbol.return_value = 0 if failure == "wrong-symbol-type" else True
+    elif failure == "wrong-roughness":
+        f.collar_texts[8] = "Ra 99"
+    elif failure == "no-attachment":
+        annotation.GetAttachedEntities3.return_value = ()
+        annotation.GetAttachedEntityCount3.return_value = 0
+    elif failure == "duplicate-attachment":
+        annotation.GetAttachedEntities3.return_value = (f.collar_rim, f.collar_rim)
+        annotation.GetAttachedEntityCount3.return_value = 2
+    elif failure == "count-mismatch":
+        annotation.GetAttachedEntityCount3.return_value = 0
+    elif failure == "wrong-entity-type":
+        annotation.GetAttachedEntityTypes.return_value = (2,)
+    elif failure == "foreign-edge":
+        annotation.GetAttachedEntities3.return_value = (object(),)
+    elif failure == "native-identity-zero":
+        same = f.adapter.swApp.IsSame.side_effect
+        f.adapter.swApp.IsSame.side_effect = lambda left, right: (
+            0 if left is f.collar_rim and right is f.collar_rim else same(left, right)
+        )
+    elif failure == "dangling":
+        annotation.IsDangling.return_value = True
+    elif failure in ("no-leader", "extra-leader"):
+        annotation.GetLeaderCount.return_value = 0 if failure == "no-leader" else 2
+    elif failure == "unreadable-leader":
+        annotation.GetLeaderPointsAtIndex.return_value = ()
+    else:
+        points = list(annotation.GetLeaderPointsAtIndex.return_value)
+        points[-3] = float("nan") if failure == "nonfinite-leader" else points[-3] + 0.0015
+        annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+    with pytest.raises(RuntimeError):
+        _neck_proof(f, phase)
+    f.rebuild.assert_not_called()
+    assert f.model.GraphicsRedraw2.call_count == 1
+
+
+@pytest.mark.parametrize("roughness_um", [0.8, 1.6, 3.2])
+def test_collar_rear_finish_expected_text_follows_part_owned_control(
+    monkeypatch, roughness_um,
+) -> None:
+    from dataclasses import replace
+    import runpy
+
+    control = drawing.surface_finish_by_key(spec.SURFACE_FINISHES, "collar_rear_face")
+    assert notes.COLLAR_REAR_FINISH_TEXT == f"Ra {control.roughness_ra}"
+    assert drawing.COLLAR_REAR_FINISH_TEXT == notes.COLLAR_REAR_FINISH_TEXT
+    controls = tuple(
+        replace(item, roughness_um=roughness_um) if item.key == control.key else item
+        for item in spec.SURFACE_FINISHES
+    )
+    monkeypatch.setattr(spec, "SURFACE_FINISHES", controls)
+    contract = runpy.run_path(notes.__file__)
+    assert contract["COLLAR_REAR_FINISH_TEXT"] == f"Ra {roughness_um:.1f}"
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_collar_rear_finish_records_actual_native_spec_identity_and_last_point_tip(
+    neck_dimension_fakes, monkeypatch, phase,
+) -> None:
+    f = neck_dimension_fakes
+    assert f.collar_texts[8] == notes.COLLAR_REAR_FINISH_TEXT
+    points = list(f.collar_annotation.GetLeaderPointsAtIndex.return_value)
+    points[0] += 0.005  # text origin is not the physical tip
+    points[-3] += 0.00061  # existing helper's legitimate same-edge re-solve
+    f.collar_annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+    telemetry = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", telemetry)
+    _neck_proof(f, phase)
+    message = next(
+        item.args[0] for item in telemetry.call_args_list if "native_symbol_type=" in item.args[0]
+    )
+    actual = ast.literal_eval(re.search(r"leader_points_m=(.*), actual_tip_m=", message).group(1))
+    assert actual == tuple(points)
+    assert ast.literal_eval(re.search(r"actual_tip_m=(.*), requested_tip_m=", message).group(1)) == tuple(points[-3:])
+    assert "same_edge=1" in message
+    assert f"native_roughness={notes.COLLAR_REAR_FINISH_TEXT!r}" in message
+    assert phase in message
+    f.adapter.swApp.IsSame.assert_any_call(f.collar_rim, f.collar_rim)
+    f.collar_symbol.GetText.assert_called_once_with(8)
+    f.rebuild.assert_not_called()
+    assert f.model.GraphicsRedraw2.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "failure", [None, "unexpected-dimension", *_NECK_PHASES],
+    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension", *_NECK_PHASES],
 )
 def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
-    neck_dimension_fakes, monkeypatch: pytest.MonkeyPatch, unexpected_dimension: bool,
+    neck_dimension_fakes, monkeypatch: pytest.MonkeyPatch, failure: str | None,
 ) -> None:
-    """Run actual build phases and all four real neck proofs around a native callout."""
+    """Run the real neck/finish proofs and refuse physical landing drift at each phase."""
     f = neck_dimension_fakes
     events = []
     live_annotations = []
+
+    def drift_finish(phase):
+        if failure == phase:
+            points = list(f.collar_annotation.GetLeaderPointsAtIndex.return_value)
+            points[-3] += 0.0015  # same edge, but outside the unchanged 1 mm landing bound
+            f.collar_annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+
+    f.rebuild.side_effect = lambda *args, **kwargs: drift_finish("after insertion rebuild")
     end, iso = object(), object()
     callout_native = SimpleNamespace(
         FullName="NativeCrossHole@FRONT@Drawing1", SystemValue=0.003, DrivenState=1,
@@ -2076,9 +2319,23 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         "_set_dimension_suffixes", "assert_imported_precision", "add_view_centerline",
         "_visible_cylindrical_face", "_visible_cross_hole_edge", "_set_callout_text",
         "_drop_coaxial_step", "_band_hole_depth", "place_callout_clear", "add_attached_note",
-        "_place_note_text_in_field", "_add_centres_note", "add_surface_finish", "_collar_rear_rim",
+        "_place_note_text_in_field", "_add_centres_note",
     ):
         monkeypatch.setattr(drawing, name, Mock())
+    rim_resolver = Mock(return_value=f.collar_rim)
+    monkeypatch.setattr(drawing, "_collar_rear_rim", rim_resolver)
+
+    def finish(adapter, view, **kwargs):
+        assert view is f.side
+        events.append(f"finish:{kwargs['control'].key}")
+        if kwargs["control"].key == "collar_rear_face":
+            assert kwargs["edge_entity"] is f.collar_rim
+            assert kwargs["leader_attach_xy"] == drawing.COLLAR_REAR_FINISH[0]
+            live_annotations.append(f.collar_annotation)
+            return f.collar_symbol
+        return object()
+
+    monkeypatch.setattr(drawing, "add_surface_finish", finish)
 
     def factory(*xyz):
         assert events[-2:] == ["property:Manufacturing Notes", "property:Isometric View Note"]
@@ -2100,20 +2357,23 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
 
     async def finalize(adapter, outputs, *, settled_checks, checkpoint, **kwargs):
         assert events[-1] == "neck-factory"
-        if unexpected_dimension:
+        if failure == "unexpected-dimension":
             foreign = SimpleNamespace(FullName="Unexpected@FRONT@Drawing1", SystemValue=0.002, DrivenState=1)
             live_annotations.append(SimpleNamespace(
                 OwnerType=0, Owner=f.side, name="Unexpected", GetType=lambda: 4,
                 GetSpecificAnnotation=lambda: SimpleNamespace(GetDimension2=lambda index: foreign),
             ))
+        drift_finish("final settling rebuild")
         for settled in settled_checks:
             settled()
+        drift_finish("after_drawing_save")
         checkpoint("after_drawing_save")
+        drift_finish("after_pdf_save")
         checkpoint("after_pdf_save")
         return {"status": "fixture-finalized"}
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
-    if unexpected_dimension:
+    if failure == "unexpected-dimension":
         with pytest.raises(RuntimeError, match="preexisting dimension inventory missing/extra") as exc:
             asyncio.run(drawing.build(f.adapter))
         message = str(exc.value)
@@ -2121,9 +2381,22 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         assert "NativeCrossHole@FRONT@Drawing1" in message
         assert "Unexpected@FRONT@Drawing1" in message
         assert "owner_wrapper_id" in message
+    elif failure in _NECK_PHASES:
+        with pytest.raises(RuntimeError, match="leader attachment moved") as exc:
+            asyncio.run(drawing.build(f.adapter))
+        assert f"({failure})" in str(exc.value)
+        assert "limit=0.001 m" in str(exc.value)
+        assert f.model.GraphicsRedraw2.call_count == _NECK_PHASES.index(failure) + 1
+        rim_resolver.assert_called_once_with(f.adapter, f.side)
+        return
     else:
         assert asyncio.run(drawing.build(f.adapter)) == {"status": "fixture-finalized"}
         assert f.model.GraphicsRedraw2.call_count == 4
+        rim_resolver.assert_called_once_with(f.adapter, f.side)
+        assert f.collar_symbol.GetAnnotation.call_count == 4
+        f.collar_symbol.GetSymbol.assert_has_calls([call()] * 4)
+        f.collar_symbol.GetText.assert_has_calls([call(8)] * 4)
+        assert events.index("finish:collar_rear_face") < events.index("neck-factory")
     snapshot = captured["preexisting"]
     assert len(snapshot) == 3
     assert snapshot[2][0] is callout_native and snapshot[2][4] is callout_annotation

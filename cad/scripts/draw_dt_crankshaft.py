@@ -41,7 +41,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 from _drawing_annotation_extent import place_callout_clear
-from _drawing_attachment import _assert_attached_to
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -77,6 +77,7 @@ from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
     CENTRES_NOTE,
     CHAIN_AIR_MATE,
+    COLLAR_REAR_FINISH_TEXT,
     COLLAR_REAR_MATE,
     COLLAR_SEAT_MATE,
     CROSS_HOLE_CALLOUT,
@@ -286,10 +287,10 @@ DIAMETER_POSITIONS = {
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
-# Keep the line between the two real shoulders, with text above the journal.
-# Below the neck, its native shoulder crossed the existing axial witness
-# (9bc98ddd6); the changed sheet must still prove Ra/fit/collar ink clearance.
-OUTBOARD_NECK_DIAMETER_XY = ((COLLAR_REAR_X + JOURNAL_START_X) / 2.0, 0.1960)
+# Keep the complete native arrowheads inside the real short land, with text
+# above the journal and below the collar-rear finish leader. Both annotations
+# must prove actual ink clearance; nominal positions are not a layout waiver.
+OUTBOARD_NECK_DIAMETER_XY = (JOURNAL_START_X - 0.0005, 0.1949)
 OUTBOARD_NECK_ARROW_WINDOW = (
     COLLAR_REAR_X, _sheet_y(-SHAFT_DIA / 2.0),
     JOURNAL_START_X, _sheet_y(SHAFT_DIA / 2.0),
@@ -350,9 +351,10 @@ JOURNAL_FINISHES = {
 # rim itself is selected as a model edge (_collar_rear_rim), and SolidWorks
 # lands a point on an edge-on circle at its projected extreme, not 1 mm
 # inside it (run 20261001T051043622Z: requested y 0.1986, landed 0.2006).
+# Keep the symbol above the neck diameter without moving its physical landing.
 COLLAR_REAR_FINISH = (
     (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0)),
-    (COLLAR_REAR_X + 0.0069, 0.195),
+    (COLLAR_REAR_X + 0.0069, 0.1973),
 )
 # The drive-pin holes' native REAM callout (size and depth from the cut, the
 # depth's band appended by _band_hole_depth)
@@ -1225,7 +1227,7 @@ def _assert_plain_neck_size(
 
 
 def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
-    """Require two vertical linear tips, one on each physical short-neck flank."""
+    """Require both physical flank tips and complete heads inside the neck's X trim."""
     raw = display.GetDisplayData()
     if raw is None:
         raise RuntimeError(f"{label}: no native diameter display data")
@@ -1234,6 +1236,8 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
     if type(count) is not int or count != 2:
         raise RuntimeError(f"{label}: expected two readable native diameter arrowheads")
     arrows = []
+    head_bounds = []
+    x_clearances_mm = []
     tolerance = NECK_ARROW_LANDING_TOLERANCE_M
     x0, y0, x1, y1 = OUTBOARD_NECK_ARROW_WINDOW
     for index in range(count):
@@ -1253,6 +1257,29 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
         nx, ny, nz = values[9:12]
         if max(abs(nx), abs(ny), abs(abs(nz) - 1.0)) > 1e-9:
             raise RuntimeError(f"{label}: arrowhead normal is not sheet-normal")
+        width, height = values[6:8]
+        if width <= 0.0 or height <= 0.0:
+            raise RuntimeError(f"{label}: native arrowhead width/height must be positive")
+        # SDK width is along dir, height across it; dir points tip-to-base.
+        # Match _layout_audit.arrowhead_segments, including nonunit native dir.
+        ux, uy = dx / length, dy / length
+        base = (tip[0] + ux * width, tip[1] + uy * width)
+        vertices = (
+            tip,
+            (base[0] - uy * height / 2.0, base[1] + ux * height / 2.0),
+            (base[0] + uy * height / 2.0, base[1] - ux * height / 2.0),
+        )
+        bounds = (
+            min(point[0] for point in vertices), min(point[1] for point in vertices),
+            max(point[0] for point in vertices), max(point[1] for point in vertices),
+        )
+        if bounds[0] < x0 or bounds[2] > x1:
+            raise RuntimeError(
+                f"{label}: complete native arrowhead X envelope {bounds[0], bounds[2]} "
+                f"escapes physical neck trim {x0, x1}"
+            )
+        head_bounds.append(bounds)
+        x_clearances_mm.append(min(bounds[0] - x0, x1 - bounds[2]) * 1000.0)
         arrows.append(tip)
     lower, upper = sorted(arrows, key=lambda point: point[1])
     if (
@@ -1260,7 +1287,11 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
         or abs(lower[0] - upper[0]) > tolerance
     ):
         raise RuntimeError(f"{label}: arrowheads do not bracket both opposite physical neck flanks")
-    _telemetry.info(f"{label}: native full-width arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}")
+    _telemetry.info(
+        f"{label}: native full-width arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}, "
+        f"head_bounds_m={head_bounds}, "
+        f"min_physical_x_clearance_mm={min(x_clearances_mm)}"
+    )
 
 
 def _assert_outboard_neck_dimension(
@@ -1348,7 +1379,7 @@ def _assert_outboard_neck_dimension(
 
 
 def _add_outboard_neck_dimension(
-    adapter: Any, drawing_model: Any, side: Any
+    adapter: Any, drawing_model: Any, side: Any, collar_rear_rim: Any, collar_rear_symbol: Any,
 ) -> tuple[Any, int, tuple[tuple[Any, str, float, int, Any], ...]]:
     """Add only a native driven measurement; never write a diameter value."""
     label = "collar-side neck"
@@ -1439,23 +1470,69 @@ def _add_outboard_neck_dimension(
         raise RuntimeError(f"{label}: new native dimension has no FullName")
     drawing_model.ClearSelection2(True)
     rebuild_drawing(adapter, label=label)
-    _assert_outboard_neck_dimension(
-        adapter, side, dimension, right_driven_state, preexisting, phase="after insertion rebuild",
+    _outboard_neck_checkpoint(
+        adapter, side, dimension, right_driven_state, preexisting,
+        collar_rear_rim, collar_rear_symbol, "after insertion rebuild",
     )
     return dimension, right_driven_state, preexisting
 
 
+def _assert_collar_rear_finish(
+    adapter: Any, rim: Any, symbol: Any, *, phase: str,
+) -> None:
+    """Keep the captured native finish on its exact physical rim through export."""
+    label = f"crankshaft collar rear (post boss) face finish ({phase})"
+    if symbol is None or rim is None:
+        raise RuntimeError(f"{label}: missing captured native symbol or rim")
+    symbol = _early_bound(symbol, "ISFSymbol")
+    symbol_type = symbol.GetSymbol()
+    roughness = str(symbol.GetText(8) or "").strip()
+    if type(symbol_type) is not int or symbol_type != 1:
+        raise RuntimeError(f"surface-finish symbol type did not persist ({label})")
+    if roughness != COLLAR_REAR_FINISH_TEXT:
+        raise RuntimeError(f"surface-finish roughness did not persist ({label})")
+    raw_annotation = symbol.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError(f"{label}: captured native symbol has no annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    _assert_attached_to(
+        adapter, annotation, rim, entity_type="EDGE",
+        what="surface-finish symbol", label=label,
+    )
+    _assert_leader_lands(
+        annotation, COLLAR_REAR_FINISH[0], what="surface-finish symbol", label=label,
+    )
+    points = _neck_numbers(
+        annotation.GetLeaderPointsAtIndex(0), 9, label=f"{label} native bent leader",
+    )
+    attached = annotation.GetAttachedEntities3()
+    same_edge = int(adapter.swApp.IsSame(attached[0], rim))
+    if same_edge != 1:
+        raise RuntimeError(f"{label}: native rim identity did not persist")
+    _telemetry.info(
+        f"{label}: native_symbol_type={symbol_type}, native_roughness={roughness!r}, "
+        f"same_edge={same_edge}, leader_points_m={points}, "
+        f"actual_tip_m={points[-3:]}, requested_tip_m={COLLAR_REAR_FINISH[0]}"
+    )
+
+
 def _outboard_neck_checkpoint(
     adapter: Any, side: Any, identity: Any, right_driven_state: int,
-    preexisting: tuple[tuple[Any, str, float, int, Any], ...], phase: str,
+    preexisting: tuple[tuple[Any, str, float, int, Any], ...],
+    collar_rear_rim: Any, collar_rear_symbol: Any, phase: str,
 ) -> None:
-    """Use the finalizer's existing save boundaries; never reopen the drawing."""
+    """Prove both annotations at existing rebuild/save boundaries without reopening."""
     if phase in (
+        "after insertion rebuild",
+        "final settling rebuild",
         "after_drawing_save",
         "after_pdf_save",
     ):
         _assert_outboard_neck_dimension(
             adapter, side, identity, right_driven_state, preexisting, phase=phase
+        )
+        _assert_collar_rear_finish(
+            adapter, collar_rear_rim, collar_rear_symbol, phase=phase,
         )
 
 
@@ -1826,10 +1903,11 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )
-    add_surface_finish(
+    collar_rear_rim = _collar_rear_rim(adapter, side)
+    collar_rear_symbol = add_surface_finish(
         adapter,
         side,
-        edge_entity=_collar_rear_rim(adapter, side),
+        edge_entity=collar_rear_rim,
         leader_attach_xy=COLLAR_REAR_FINISH[0],
         symbol_xy=COLLAR_REAR_FINISH[1],
         control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
@@ -1844,7 +1922,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     (
         outboard_neck_dimension, right_neck_driven_state, preexisting_side_dimensions,
-    ) = _add_outboard_neck_dimension(adapter, drawing_model, side)
+    ) = _add_outboard_neck_dimension(
+        adapter, drawing_model, side, collar_rear_rim, collar_rear_symbol,
+    )
 
     return await finalize_drawing(
         adapter,
@@ -1853,14 +1933,15 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(
-            lambda: _assert_outboard_neck_dimension(
+            lambda: _outboard_neck_checkpoint(
                 adapter, side, outboard_neck_dimension, right_neck_driven_state,
-                preexisting_side_dimensions, phase="final settling rebuild",
+                preexisting_side_dimensions, collar_rear_rim, collar_rear_symbol,
+                "final settling rebuild",
             ),
         ),
         checkpoint=lambda phase: _outboard_neck_checkpoint(
             adapter, side, outboard_neck_dimension, right_neck_driven_state,
-            preexisting_side_dimensions, phase
+            preexisting_side_dimensions, collar_rear_rim, collar_rear_symbol, phase
         ),
     )
 
