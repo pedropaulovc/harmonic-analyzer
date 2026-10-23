@@ -72,12 +72,17 @@ PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE
 # the title block's general band for its places (machinist review of
 # d84a42ca7: the former explicit +/-0.10 on the axis height and the tap's
 # stations had no fit the reader could see; the stacks close at .XX and .XXX).
-# The width prints .XXX: PassageCenter and FootTapX locate from the -X face,
-# so the width's band lands on the +X face, which stands over the plate's
-# narrow west edge; at .X that face could overhang it at the printed limits
-# (build_dt_drive_train_assembly's print-worst containment), at .XX it keeps
-# only 0.19 of the 0.50 it needs.
-BLOCK_WIDTH_PLACES = 3
+# The width's band lands on the +X face (PassageCenter and FootTapX locate
+# from the -X face), which stands over the plate's narrow west edge
+# (build_dt_drive_train_assembly's print-worst containment).  Machinist
+# review of 83e3370f9 (rules 4 and 19, gating): a symmetric .XXX band bought
+# that containment with a tight band on a size that only has to stay inside
+# an edge.  The face may only come in, so the width carries a one-sided band
+# under its 17.0 nominal (rule 3: the band tolerances it, its places only
+# spell it): containment holds at 17.0 and the -X-face webs and the pinch
+# screw's tip recess hold at 16.5.
+BLOCK_WIDTH_BAND = (0.0, -0.5)
+BLOCK_WIDTH_PLACES = 1
 BLOCK_DEPTH_PLACES = 3
 BLOCK_HEIGHT_PLACES = 1
 # .XX: the tip's vertical capture in the adjuster cup
@@ -87,7 +92,9 @@ PINCH_HEIGHT_PLACES = 2
 PASSAGE_CENTER_PLACES = 3
 PINCH_DEPTH_PLACES = 1
 SLIT_W_PLACES = 2
-SLIT_DEPTH_PLACES = 1
+# The slit depth does not print: its modelled floor stands wholly inside the
+# adjuster tap drill (checked below), so the print says SLOT INTO BORE on the
+# slit width instead.
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
 SLIT_W = 1.2
 SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
@@ -156,6 +163,11 @@ def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
     return printed + lower, printed + upper
 
 
+# (min, max) of the width, which carries its own band rather than a grade.
+_width_lower, _width_upper = deviations(BLOCK_WIDTH_BAND)
+BLOCK_WIDTH_LIMITS = (BLOCK_X + _width_lower, BLOCK_X + _width_upper)
+
+
 def printed_band_mm(places: int) -> float:
     """Half-width of the title block's general band at ``places`` decimals."""
     return _BAND_BY_PLACES[places]
@@ -166,9 +178,9 @@ AXIS_HEIGHT_TOL_MM = printed_band_mm(AXIS_HEIGHT_PLACES)
 
 # r3 (Main, 2026-09-25): PassageCenter prints from the -X face, which the
 # plate frame puts on the east.  The +X (west) face carries only the pinch
-# screw's head, so the width's band lands on that side; it prints .XXX
-# because the swing platform's trimmed west edge bounds it there
-# (build_dt_drive_train_assembly asserts the print-worst containment).
+# screw's head, so the width's band lands on that side, where the swing
+# platform's trimmed west edge bounds it (BLOCK_WIDTH_BAND;
+# build_dt_drive_train_assembly asserts the print-worst containment).
 XDatumFace = Literal["-X", "+X"]
 PASSAGE_CENTER_DATUM: XDatumFace = "-X"
 
@@ -181,7 +193,7 @@ def worst_half_widths_mm(datum: XDatumFace) -> dict[XDatumFace, float]:
     if datum not in ("-X", "+X"):
         raise ValueError(f"unknown PassageCenter datum face {datum!r}")
     passage = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
-    width = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
+    width = BLOCK_WIDTH_LIMITS
     far = width[1] - passage[0]
     if datum == "-X":
         return {"-X": passage[1], "+X": far}
@@ -238,7 +250,7 @@ WORST_TOP_LIGAMENT_MM = (
     - _worst_clearance_radius
     - 2.0 * EDGE_BREAK_MAX_MM
 )
-_width_limits = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
+_width_limits = BLOCK_WIDTH_LIMITS
 _depth_limits = _printed_limits(BLOCK_Z, BLOCK_DEPTH_PLACES)
 WORST_ADJUSTER_SIDE_LIGAMENT_MM = (
     _width_limits[0]
@@ -260,18 +272,26 @@ for _name, _web in (
         raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
-# The slit must open into the adjuster thread or its jaws never grip it: the
-# slit floor (SlitDepth down from the top) stays under the tap-drill crown
-# (AxisHeight up from the foot) at the printed extremes.  Below the thread the
-# slit may run on: the jaws only lengthen.
+# The slit must open into the adjuster thread or its jaws never grip it.  The
+# print states that extent (SLOT INTO BORE) rather than a depth: the model's
+# floor (SlitDepth down from the top) stands wholly inside the tap drill, so
+# the cut leaves no floor face to measure to.  WORST_SLIT_BREAKTHROUGH_MM is
+# how far that modelled floor stands under the tap-drill crown.  Below the
+# crown the slit may run on: the jaws only lengthen.
 SLIT_BREAKTHROUGH_MARGIN_MM = 0.25
-WORST_SLIT_BREAKTHROUGH_MM = (_axis_limits[0] + ADJUSTER_BORE_DIA / 2.0) - (
-    _height_limits[1] - _printed_limits(SLIT_DEPTH, SLIT_DEPTH_PLACES)[0]
-)
+WORST_SLIT_BREAKTHROUGH_MM = ADJUSTER_AXIS_HEIGHT + ADJUSTER_BORE_DIA / 2.0 - SLIT_FLOOR
 if WORST_SLIT_BREAKTHROUGH_MM < SLIT_BREAKTHROUGH_MARGIN_MM - 1e-9:
     raise AssertionError(
-        f"slit floor can stop {WORST_SLIT_BREAKTHROUGH_MM:.3f} short of breaking "
+        f"slit floor stops {WORST_SLIT_BREAKTHROUGH_MM:.3f} short of breaking "
         f"into the adjuster thread (< {SLIT_BREAKTHROUGH_MARGIN_MM})"
+    )
+if (
+    math.hypot(SLIT_FLOOR - ADJUSTER_AXIS_HEIGHT, SLIT_W / 2.0)
+    >= ADJUSTER_BORE_DIA / 2.0
+):
+    raise AssertionError(
+        "the slit floor leaves a face outside the adjuster tap drill; "
+        "SLOT INTO BORE no longer describes it"
     )
 # r3 blocker (codex FIX review of 72ab): the Ø3.26 near-jaw clearance printed
 # 6.9 blind, a .X depth whose 6.1 floor stops short of a near jaw the print
@@ -501,7 +521,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # r3: the pinch-hole centre from the foot, no longer chained off the axis.
     "PinchHeightReference": {"PinchHeight"},
     "SlitProfile": {"SlitW"},
-    "TopSlit": {"SlitDepth"},
     # 2026-09-29: the hold-down tap's stations on the foot (hidden reference
     # sketches; the tap's size and depths print on its Hole Wizard callout).
     "FootTapXReference": {"FootTapX"},
@@ -524,13 +543,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchDepthReference": {"PinchDepthCenter": PINCH_DEPTH_PLACES},
     "PinchHeightReference": {"PinchHeight": PINCH_HEIGHT_PLACES},
     "SlitProfile": {"SlitW": SLIT_W_PLACES},
-    "TopSlit": {"SlitDepth": SLIT_DEPTH_PLACES},
     "FootTapXReference": {"FootTapX": FOOT_TAP_X_PLACES},
     "FootTapZReference": {"FootTapZ": FOOT_TAP_Z_PLACES},
 }
-# The stacks above read these grades; the print must carry exactly them.
+# The stacks above read these grades; the print must carry exactly them.  The
+# width's stacks read its own band (BLOCK_WIDTH_LIMITS), not a grade.
 _STACK_GRADES = {
-    ("BlockProfile", "Width"): BLOCK_WIDTH_PLACES,
     ("BlockProfile", "Depth"): BLOCK_DEPTH_PLACES,
     ("Block", "BlockHt"): BLOCK_HEIGHT_PLACES,
     ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_PLACES,
@@ -538,7 +556,6 @@ _STACK_GRADES = {
     ("PinchDepthReference", "PinchDepthCenter"): PINCH_DEPTH_PLACES,
     ("PinchHeightReference", "PinchHeight"): PINCH_HEIGHT_PLACES,
     ("SlitProfile", "SlitW"): SLIT_W_PLACES,
-    ("TopSlit", "SlitDepth"): SLIT_DEPTH_PLACES,
     ("FootTapXReference", "FootTapX"): FOOT_TAP_X_PLACES,
     ("FootTapZReference", "FootTapZ"): FOOT_TAP_Z_PLACES,
 }

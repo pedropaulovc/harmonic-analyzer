@@ -52,6 +52,8 @@ from _sketch import (
 )
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_precision import apply_drawing_precision
+from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _fit_deviations import deviations
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from dt_cone_tip_block_spec import (
     ADJUSTER_BORE_SPEC,
@@ -59,6 +61,8 @@ from dt_cone_tip_block_spec import (
     ADJUSTER_CSK,
     ADJUSTER_AXIS_HEIGHT,
     BLOCK_HEIGHT,
+    BLOCK_WIDTH_BAND,
+    BLOCK_WIDTH_PLACES,
     BLOCK_X,
     BLOCK_Z,
     DRAWING_DIMENSIONS,
@@ -528,6 +532,15 @@ async def build(adapter) -> dict[str, str]:
         feature_name="FootTapZReference",
         dimension_name="FootTapZ",
         drive_expression='"FootTapZ"',
+    )
+    # The width may only come in from its 17.0 (the +X face's containment
+    # over the plate's west edge, dt_cone_tip_block_spec.BLOCK_WIDTH_BAND).
+    set_dimension_bilateral_tolerance(
+        adapter,
+        "BlockProfile",
+        "Width",
+        *deviations(BLOCK_WIDTH_BAND),
+        places=BLOCK_WIDTH_PLACES,
     )
     # Model-owned places are applied only after the reference sketches exist.
     apply_drawing_precision(adapter, DRAWING_PRECISION)

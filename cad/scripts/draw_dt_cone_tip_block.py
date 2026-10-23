@@ -156,13 +156,14 @@ ROUND_OUT = 0.0001
 # right view.  #946 / MHA-DT-21: at 9a0f50b1c it stood below-right of the hole
 # and its leader climbed ~28 mm over the front view to the rim, ~16 mm
 # further than the hole's approach from the right face, reading as an edge of
-# the part.  The short way in, from the right face, is SLOT DEPTH's: its
-# lower extension line leaves the slit floor 0.97 mm under the hole centre
-# and runs out to its value, so the callout stands under that line with its
-# ADJUSTER ENTRY name over it (review: named above the thread callout it
-# describes): the name's top an arrow clearance (plus half an arrowhead)
-# under the line, clear of the 15.2's lower arrow, and the callout a text
-# clearance under the name.  Its leader leaves the shoulder's left end at
+# the part.  The short way in is from the right face, so the callout stands
+# right of the hole with its ADJUSTER ENTRY name over it (review: named above
+# the thread callout it describes): the name's top keeps the height it took
+# an arrow clearance (plus half an arrowhead) under the slit floor's depth
+# witness, which no longer prints (machinist review of e04fd60ab: the floor
+# stands inside the bore, dt_cone_tip_block_spec), so the right-hand views
+# keep their measured places, and the callout a text clearance under the
+# name.  Its leader leaves the shoulder's left end at
 # ADJUSTER_LEADER_ANGLE: at 45 deg the run over the part is 4.4 mm longer
 # than the hole's approach, past Main's ~4 mm brief (swing's RD2 fix,
 # 4dda16fd5, left 3.8); at 3:2, 40 deg made it 3.2.  At 2:1 the hole's
@@ -210,20 +211,19 @@ BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
 # stand outside the slot walls and the text sits right of the right arrow's
 # tail on the extended dimension line.  Right, because on the adjuster
 # elevation PassageCenter's span from the -X face (r3) occupies the slot's
-# left.
-SLIT_TEXT_RISE = 0.0145
-SLIT_TEXT_OFFSET = (
-    SLIT_W * _S / 2.0 + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH
-)
+# left.  Its one-line SLOT INTO BORE row above the value is wider than the
+# value, so the text block's left edge stands a text clearance past the
+# right arrow's tail (an outside arrow runs 6.4 mm past its extension line,
+# OUTSIDE_ARROW_RUN below), which also clears PassageCenter's outside tail
+# over the slot centre.  The line stands 8 mm over the block's top, so the
+# row prints under PassageCenter's line with text clearance between them.
+SLIT_LINE_RISE = 0.008
+SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 # Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
 # above a dimension); below it, the full mate number gets its own row.
 DIMENSION_CALLOUTS = {
-    # The slit's depth only has to break into the adjuster bore: its floor
-    # stands inside the bore, so the line ends where no edge is left
-    # (machinist reviews of d84a42ca7 and cd1153854, minor).
-    "SlitDepth": "SLOT INTO BORE",
     # The adjuster thread runs through the block's depth: its length is the
     # cup screw's engagement window (build_dt_drive_train_assembly's embed
     # stack).  Separate the full number at the existing font size; the whole
@@ -236,8 +236,13 @@ DIMENSION_CALLOUTS_ABOVE = {
     # rule 4's few words of reason name the edge it keeps inside (machinist
     # review of c4c0e848a: "STAYS ON" named no feature).
     "Width": "WITHIN MHA-DT-20 EDGE",
-    # The adjuster axis across the block: the shaft tip's lateral stack.
     "PassageCenter": "LOCATES MHA-DT-04 TIP",
+    # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
+    # stands inside the Ø4.04 bore, so its lower extension line ended on no
+    # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
+    # centre.  The slit only has to open into the bore, so the part no longer
+    # marks its depth and the slot width states the extent.
+    "SlitW": "SLOT INTO BORE",
 }
 # Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
 # print 25.3 mm wide, and each row stacks 4.55 mm (the 15.2 over SLOT
@@ -276,8 +281,10 @@ FRONT_KEEP = {
     ),
     "BlockHt": (FRONT_CENTER[0] - BLOCK_HEIGHT_LINE_DX, FRONT_CENTER[1]),
     "SlitW": (
-        FRONT_CENTER[0] + SLIT_TEXT_OFFSET,
-        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + SLIT_TEXT_RISE,
+        FRONT_CENTER[0]
+        + SLIT_ROW_LEFT
+        + _callout_half_width(DIMENSION_CALLOUTS_ABOVE["SlitW"]),
+        _elevation_y(BLOCK_HEIGHT, FRONT_CENTER) + SLIT_LINE_RISE + TWO_ROW_LINE_DROP,
     ),
 }
 # PassageCenter stands above SlitW on the adjuster elevation, its line
@@ -290,15 +297,12 @@ PASSAGE_CENTER_RISE = 0.0212 + TWO_ROW_LINE_DROP
 # (d84a42ca7: the 4.875's line and arrows struck its "5"); outside, a
 # vertical dimension prints no line between them.
 ARROWS_OUTSIDE = ("SlitW", "Depth", "FootTapZ")
-# Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
-# tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its span holds the two-line
-# value and both arrows inside.  The pinch depth's span holds its two 3.4 mm
+# The pinch depth's span holds its two 3.4 mm
 # arrows: with no outside tail right of the hole-centre witness, the pinch
 # clearance callout's leader passes there (leader-crosses-line, af13c8ff8).
 # The width and FootTapX hold theirs inside too, so no tail runs toward the
 # bottom view's callout.
 ARROWS_INSIDE = (
-    "SlitDepth",
     "PinchHeight",
     "PinchDepthCenter",
     "Width",
@@ -442,10 +446,6 @@ def _adjuster_axis_keep(
             adjuster_center[0] + minus_x_side * BLOCK_X * _S / 4.0,
             _elevation_y(BLOCK_HEIGHT, adjuster_center) + PASSAGE_CENTER_RISE,
         ),
-        "SlitDepth": (
-            adjuster_center[0] + 0.043,
-            _elevation_y(BLOCK_HEIGHT - SLIT_DEPTH / 2.0, adjuster_center),
-        ),
     }
 
 
@@ -546,8 +546,8 @@ _VALUE_EXTENTS = {
             ("Depth", BLOCK_Z, DIMENSION_CALLOUTS["Depth"]),
             ("Width", BLOCK_X, DIMENSION_CALLOUTS_ABOVE["Width"]),
             ("PassageCenter", BLOCK_X / 2.0, DIMENSION_CALLOUTS_ABOVE["PassageCenter"]),
-            # "15.2" over its callout line.
-            ("SlitDepth", SLIT_DEPTH, DIMENSION_CALLOUTS["SlitDepth"]),
+            # "1.20" under its SLOT INTO BORE row.
+            ("SlitW", SLIT_W, DIMENSION_CALLOUTS_ABOVE["SlitW"]),
         )
     },
 }
@@ -841,13 +841,6 @@ def sheet_dimension_ink(
         ),
         "PassageCenter": (
             h, (ax - plus_x * half_x, ax), (top, top), drop("PassageCenter"), out
-        ),
-        "SlitDepth": (
-            v,
-            (_elevation_y(BLOCK_HEIGHT - SLIT_DEPTH, adjuster_center), top),
-            (ax + slit, ax + half_x),
-            keeps["SlitDepth"][0],
-            out,
         ),
         "Depth": (
             v,
