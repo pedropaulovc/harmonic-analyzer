@@ -696,8 +696,431 @@ def test_supplier_stock_center_refusal_records_native_frame_and_target(
 
 
 @pytest.fixture
-def supplier_stock_inset(monkeypatch, request):
-    """Recorded frame offset and synthetic two-row native glyph/stroke data."""
+def supplier_stock_source_state(monkeypatch):
+    """Stateful document/configuration transitions, not native attachment proof."""
+    stock = spec.SUPPLIER_STOCK_CONFIGURATION
+    state = SimpleNamespace(
+        original="InstalledOriginal", configuration="InstalledOriginal",
+        path=draw.SOURCE.resolve(), dirty=False, read_only=True,
+        members=("Default", "InstalledOriginal", stock), events=[],
+        body_counts={"Default": (1, 0), "InstalledOriginal": (1, 0), stock: (0, 0)},
+        activation_fault=None, stock_show_fault=None, dirty_on_activation=False,
+        restore_source_error=None, restore_drawing_error=None,
+        sheet="OriginalSheet", edit_sheet=True, wrong_view_identity=False,
+    )
+    previous = SimpleNamespace(GetName2=lambda: "OriginalDrawingView")
+    other = SimpleNamespace(GetName2=lambda: "OtherDrawingView")
+    state.active_view = previous
+    state.views = {"OriginalDrawingView": previous, "OtherDrawingView": other}
+
+    class Source:
+        Extension = SimpleNamespace(NeedsRebuild2=0)
+        SketchManager = SimpleNamespace(ActiveSketch=None)
+
+        @property
+        def ConfigurationManager(self):
+            return SimpleNamespace(
+                ActiveConfiguration=SimpleNamespace(Name=state.configuration),
+            )
+
+        def GetTitle(self):
+            return "Source.SLDPRT"
+
+        def GetPathName(self):
+            return str(state.path)
+
+        def GetSaveFlag(self):
+            return state.dirty
+
+        def IsOpenedReadOnly(self):
+            return state.read_only
+
+        def GetConfigurationNames(self):
+            return state.members
+
+        def GetBodies2(self, kind, visible_only):
+            assert visible_only is False
+            return (object(),) * state.body_counts[state.configuration][kind]
+
+        def ShowConfiguration2(self, name):
+            state.events.append(("configuration", name))
+            if name == state.original and state.restore_source_error is not None:
+                raise state.restore_source_error
+            if name == stock and state.stock_show_fault == "return":
+                return False
+            state.configuration = (
+                "Default" if name == stock and state.stock_show_fault == "readback" else name
+            )
+            return True
+
+        def EditRebuild3(self):
+            state.events.append(("source rebuild", state.configuration))
+            self.Extension.NeedsRebuild2 = 0
+            return True
+
+    class Drawing:
+        SketchManager = SimpleNamespace(ActiveSketch=None)
+
+        def GetTitle(self):
+            return "Original.SLDDRW"
+
+        def GetPathName(self):
+            return self.GetTitle()
+
+        def GetCurrentSheet(self):
+            return SimpleNamespace(GetName=lambda: state.sheet)
+
+        @property
+        def ActiveDrawingView(self):
+            return state.active_view
+
+        def GetEditSheet(self):
+            return state.edit_sheet
+
+        def ActivateSheet(self, name):
+            state.events.append(("sheet", name))
+            state.sheet, state.active_view, state.edit_sheet = name, None, True
+            return True
+
+        def ActivateView(self, name):
+            state.events.append(("view", name))
+            state.active_view = state.views.get(name)
+            if name and state.wrong_view_identity:
+                state.active_view = SimpleNamespace(GetName2=lambda: name)
+            # SDK: sheet activation may return False; verify the actual context.
+            return bool(name)
+
+
+    model, drawing = Source(), Drawing()
+    app = SimpleNamespace(ActiveDoc=drawing, IsSame=lambda left, right: int(left is right))
+    adapter = SimpleNamespace(currentModel=drawing, swApp=app)
+    intruder = object()
+
+    def activate(title, use_preferences, rebuild, errors):
+        assert use_preferences is False and rebuild == 1 and errors == 0
+        state.events.append(("activate", title))
+        target = {model.GetTitle(): model, drawing.GetTitle(): drawing}[title]
+        if target is drawing and state.restore_drawing_error is not None:
+            raise state.restore_drawing_error
+        if target is model:
+            # A switch can disturb the inactive drawing: restoration is not a no-op.
+            state.sheet, state.active_view, state.edit_sheet = "OtherSheet", other, False
+            if state.dirty_on_activation:
+                state.dirty = True
+        app.ActiveDoc = target
+        if target is model and state.activation_fault is not None:
+            fault, state.activation_fault = state.activation_fault, None
+            if fault == "returned_identity":
+                return intruder, 0
+            if fault == "active_identity":
+                app.ActiveDoc = intruder
+            if fault == "status":
+                return target, 1
+        return target, 0
+
+    app.ActivateDoc3 = activate
+    monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(supplier_drawing, "_early_bound", lambda value, _kind: value)
+    for module in (draw, supplier_drawing):
+        monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.GetName2())
+    monkeypatch.setattr(draw._telemetry, "info", lambda _message: None)
+    state.model, state.drawing, state.adapter = model, drawing, adapter
+    state.previous = previous
+
+    def bind_view(view):
+        view.ReferencedDocument = model
+        view.ReferencedConfiguration = stock
+        view.GetReferencedModelName = lambda: str(draw.SOURCE.resolve())
+        if not hasattr(view, "GetName2"):
+            view.GetName2 = lambda: "SupplierStockView"
+        state.view = view
+        state.capture = supplier_drawing._CapturedReferenceView(
+            source=supplier_drawing._ReferenceSourceState(
+                draw.SOURCE.resolve(), model, state.original,
+                tuple(sorted(state.members)), (1, 0), True,
+            ),
+            view=view, name=view.GetName2(), configuration=stock,
+            features=("SupplierReference",), geometry=(object(),),
+        )
+        return state.capture
+
+    state.bind_view = bind_view
+    bind_view(SimpleNamespace())
+    return state
+
+
+@pytest.mark.parametrize("outcome", ("success", "annotation_failure", "refusal"))
+@pytest.mark.parametrize("active_view", (False, True))
+def test_supplier_stock_source_scope_restores_original_nondefault_and_drawing_context(
+    supplier_stock_source_state, outcome, active_view,
+) -> None:
+    state = supplier_stock_source_state
+    state.active_view = state.previous if active_view else None
+    edit_sheet = state.edit_sheet
+    expected_view = state.active_view
+    primary = RuntimeError(outcome)
+    calls = []
+
+    def annotate():
+        assert state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
+        assert state.adapter.currentModel is state.drawing
+        assert state.adapter.swApp.ActiveDoc is state.drawing
+        assert (state.sheet, state.active_view, state.edit_sheet) == (
+            "OriginalSheet", expected_view, edit_sheet,
+        )
+        calls.append("annotation")
+        state.dirty = True  # Explicit annotation presentation phase; never saved.
+        state.sheet, state.active_view, state.edit_sheet = "OtherSheet", None, not edit_sheet
+        if outcome != "success":
+            raise primary
+
+    def scoped():
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            annotate()
+
+    if outcome == "success":
+        scoped()
+    else:
+        with pytest.raises(RuntimeError) as refused:
+            scoped()
+        assert refused.value is primary
+    assert calls == ["annotation"]
+    assert state.configuration == "InstalledOriginal" != "Default"
+    assert state.dirty is True
+    assert state.adapter.currentModel is state.drawing
+    assert state.adapter.swApp.ActiveDoc is state.drawing
+    assert (state.sheet, state.active_view, state.edit_sheet) == (
+        "OriginalSheet", expected_view, edit_sheet,
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ("returned_identity", "active_identity", "status", "configuration_return", "configuration_readback"),
+)
+def test_supplier_stock_source_scope_refuses_activation_without_callback(
+    supplier_stock_source_state, fault,
+) -> None:
+    state = supplier_stock_source_state
+    if fault.startswith("configuration_"):
+        state.stock_show_fault = fault.removeprefix("configuration_")
+    else:
+        state.activation_fault = fault
+    calls = []
+    with pytest.raises(RuntimeError):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            calls.append("unexpected")
+    assert calls == []
+    assert state.configuration == state.original
+    assert state.adapter.currentModel is state.drawing
+    assert (state.sheet, state.active_view, state.edit_sheet) == (
+        "OriginalSheet", state.previous, True,
+    )
+
+
+@pytest.mark.parametrize(
+    "fault", ("configuration", "binding", "read_only", "bodies", "members", "path", "dirty_type"),
+)
+def test_supplier_stock_source_scope_rechecks_callback_source_invariants(
+    supplier_stock_source_state, fault,
+) -> None:
+    state = supplier_stock_source_state
+    with pytest.raises(RuntimeError):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            if fault == "configuration":
+                state.configuration = "Default"
+            elif fault == "binding":
+                state.view.ReferencedDocument = object()
+            elif fault == "read_only":
+                state.read_only = False
+            elif fault == "bodies":
+                state.body_counts[spec.SUPPLIER_STOCK_CONFIGURATION] = (0, 1)
+            elif fault == "members":
+                state.members += ("UnexpectedConfiguration",)
+            elif fault == "path":
+                state.path = state.path.with_name("unexpected.SLDPRT")
+            else:
+                state.dirty = 1
+    assert state.configuration == state.original
+    assert state.adapter.currentModel is state.drawing
+    assert (state.sheet, state.active_view, state.edit_sheet) == (
+        "OriginalSheet", state.previous, True,
+    )
+
+
+@pytest.mark.parametrize("fault", ("source", "drawing", "both"))
+@pytest.mark.parametrize("primary_failure", (False, True))
+def test_supplier_stock_source_scope_attempts_both_restorations_and_preserves_primary(
+    supplier_stock_source_state, fault, primary_failure,
+) -> None:
+    state = supplier_stock_source_state
+    primary = RuntimeError("original annotation refusal")
+    source_error, drawing_error = OSError("source restore failed"), OSError("drawing restore failed")
+    with pytest.raises((RuntimeError, OSError)) as refused:
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            if fault in ("source", "both"):
+                state.restore_source_error = source_error
+            if fault in ("drawing", "both"):
+                state.restore_drawing_error = drawing_error
+            if primary_failure:
+                raise primary
+    expected = primary if primary_failure else source_error if fault != "drawing" else drawing_error
+    assert refused.value is expected
+    source_attempt = state.events.index(("configuration", state.original))
+    assert ("activate", state.drawing.GetTitle()) in state.events[source_attempt + 1:]
+    if fault == "source":
+        assert state.adapter.currentModel is state.drawing
+        assert (state.sheet, state.active_view, state.edit_sheet) == (
+            "OriginalSheet", state.previous, True,
+        )
+    if fault == "drawing":
+        assert state.configuration == state.original
+    notes = "\n".join(getattr(refused.value, "__notes__", ()))
+    if primary_failure:
+        assert ("source restore failed" in notes) == (fault in ("source", "both"))
+        assert ("drawing restore failed" in notes) == (fault in ("drawing", "both"))
+    elif fault == "both":
+        assert "drawing restore failed" in notes
+
+
+@pytest.mark.parametrize("allow_dirty", (False, True))
+def test_supplier_stock_source_scope_refuses_activation_only_dirty_change(
+    supplier_stock_source_state, allow_dirty,
+) -> None:
+    state = supplier_stock_source_state
+    state.dirty_on_activation = True
+    calls = []
+    with pytest.raises(RuntimeError):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+            allow_presentation_dirty=allow_dirty,
+        ):
+            calls.append("unexpected")
+    assert calls == []
+    assert state.configuration == state.original
+    assert state.dirty is True  # Refuse, never clear the evidence.
+    assert state.adapter.currentModel is state.drawing
+
+
+def test_supplier_stock_source_scope_refuses_dirty_immediate_entry(
+    supplier_stock_source_state,
+) -> None:
+    state = supplier_stock_source_state
+    state.dirty = True
+    calls = []
+    with pytest.raises(RuntimeError):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            calls.append("unexpected")
+    assert calls == []
+    assert ("configuration", spec.SUPPLIER_STOCK_CONFIGURATION) not in state.events
+    assert state.configuration == state.original
+    assert state.dirty is True
+    assert state.adapter.currentModel is state.drawing
+
+
+def test_supplier_stock_source_scope_refuses_equal_name_wrong_drawing_view_identity(
+    supplier_stock_source_state,
+) -> None:
+    state = supplier_stock_source_state
+    state.wrong_view_identity = True
+    calls = []
+    with pytest.raises(RuntimeError, match="drawing sheet/view/edit context"):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            calls.append("unexpected")
+    assert calls == []
+    assert state.configuration == state.original
+    assert state.adapter.currentModel is state.drawing
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ("read_only", "path", "members", "stock_bodies", "binding_cfg", "binding_doc",
+     "binding_path", "edit_context"),
+)
+def test_supplier_stock_source_scope_refuses_invalid_entry_without_callback(
+    supplier_stock_source_state, fault,
+) -> None:
+    state = supplier_stock_source_state
+    if fault == "read_only":
+        state.read_only = False
+    elif fault == "path":
+        state.path = state.path.with_name("unexpected.SLDPRT")
+    elif fault == "members":
+        state.members += ("UnexpectedConfiguration",)
+    elif fault == "stock_bodies":
+        state.body_counts[spec.SUPPLIER_STOCK_CONFIGURATION] = (1, 0)
+    elif fault == "binding_cfg":
+        state.view.ReferencedConfiguration = "Default"
+    elif fault == "binding_doc":
+        state.view.ReferencedDocument = object()
+    elif fault == "binding_path":
+        state.view.GetReferencedModelName = lambda: "unexpected.SLDPRT"
+    else:
+        state.edit_sheet = False
+    calls = []
+    with pytest.raises(RuntimeError):
+        with draw._supplier_stock_source_scope(
+            state.adapter, state.view, capture=state.capture,
+        ):
+            calls.append("unexpected")
+    assert calls == []
+    assert state.configuration == state.original
+    assert state.adapter.currentModel is state.drawing
+
+
+def test_supplier_stock_source_scope_keeps_equal_xyz_distinct_native_identity_refusal(
+    supplier_stock_source_state, supplier_attachment_state, monkeypatch,
+) -> None:
+    source, attachment = supplier_stock_source_state, supplier_attachment_state
+    source.bind_view(attachment.view)
+    predicate_same = attachment.adapter.swApp.IsSame
+    source.adapter.swApp.IsSame = lambda left, right: (
+        predicate_same(left, right)
+        if hasattr(left, "token") and hasattr(right, "token") else int(left is right)
+    )
+    original_source_feature = supplier_dimensions._assert_dimension_source
+
+    def source_feature(*args, **kwargs):
+        assert source.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
+        assert source.adapter.currentModel is source.drawing
+        return original_source_feature(*args, **kwargs)
+
+    monkeypatch.setattr(supplier_dimensions, "_assert_dimension_source", source_feature)
+    assert attachment.attached[0].xyz == attachment.mapped_points[0].xyz
+    assert attachment.attached[0].token != attachment.mapped_points[0].token
+    with pytest.raises(
+        RuntimeError, match="nominal supplier attachment changed source sketch",
+    ) as refused:
+        with draw._supplier_stock_source_scope(
+            source.adapter, source.view, capture=source.capture,
+        ):
+            supplier_dimensions._assert_source(
+                source.adapter, source.view, attachment.display,
+                name="SupplierStockLength", feature="SupplierReference",
+            )
+    assert source.configuration == source.original
+    assert source.adapter.currentModel is source.drawing
+    assert attachment.captures[0]["exception"] is refused.value
+    proof = attachment.captures[0]["attachment_context"]["attachment_correspondence"]
+    assert proof["proven"] is False
+    assert attachment.private_cache == {}
+
+
+@pytest.fixture
+def supplier_stock_inset(monkeypatch, request, supplier_stock_source_state):
+    """Synthetic layout ink; real local source scope, no attachment-proof substitute."""
     options = getattr(request, "param", {})
     monkeypatch.setattr(draw, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(draw, "double_array", tuple)
@@ -705,15 +1128,13 @@ def supplier_stock_inset(monkeypatch, request):
         fresh=options.get("fresh", False),
         move_annotations=options.get("move_annotations", True),
     )
+    source_state = supplier_stock_source_state
+    source_state.bind_view(view)
     rebuilds, redraws = [], []
-    drawing = SimpleNamespace(
-        EditRebuild3=lambda: True,
-        GraphicsRedraw2=lambda: redraws.append("redraw"),
-        ActivateView=lambda name: name == "",
-        GetEditSheet=lambda: True,
-        ActiveDrawingView=None,
-    )
-    adapter = SimpleNamespace(currentModel=drawing)
+    drawing = source_state.drawing
+    drawing.EditRebuild3 = lambda: True
+    drawing.GraphicsRedraw2 = lambda: redraws.append("redraw")
+    adapter = source_state.adapter
     events, messages, allowance_reads, annotation_cells = [], [], [], []
     projections, geometry_reads, reacquisitions = [], [], []
     caption_position = [0.140, 0.264, 0.007]
@@ -855,10 +1276,13 @@ def supplier_stock_inset(monkeypatch, request):
             "*Front": spec.SUPPLIER_STOCK_CONFIGURATION
         }
         events.append("capture")
-        return {"*Front": "native capture"}
+        return {"*Front": source_state.capture}
 
     def bounds(_adapter, native_view, **kwargs):
-        assert native_view is view and kwargs["capture"] == "native capture"
+        assert native_view is view and kwargs["capture"] is source_state.capture
+        assert source_state.configuration == source_state.original
+        assert adapter.currentModel is drawing
+        source_state.events.append(("layout", source_state.configuration))
         allowance_reads.append(kwargs["allow_presentation_dirty"])
         assert ("format" in events) == kwargs["allow_presentation_dirty"]
         view.UpdateViewDisplayGeometry()
@@ -866,12 +1290,24 @@ def supplier_stock_inset(monkeypatch, request):
 
     def annotate(_adapter, views, **kwargs):
         assert views == {"*Front": view} and events == ["capture"]
+        assert source_state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
+        assert adapter.currentModel is drawing
+        assert source_state.dirty is False
+        source_state.events.append(("annotation", source_state.configuration))
         assert kwargs["dimensions"] is spec.SUPPLIER_REFERENCE_DIMENSIONS
         assert kwargs["formats"] is spec.SUPPLIER_REFERENCE_FORMATS
         assert kwargs["starts"] is spec.SUPPLIER_REFERENCE_STARTS
         assert kwargs["units"] is spec.SUPPLIER_REFERENCE_UNITS
         events.append("format")
-        kwargs["settled_checks"].append(lambda: events.append("source check"))
+        source_state.dirty = True
+
+        def check_source():
+            assert source_state.configuration == spec.SUPPLIER_STOCK_CONFIGURATION
+            assert adapter.currentModel is drawing
+            source_state.events.append(("source check", source_state.configuration))
+            events.append("source check")
+
+        kwargs["settled_checks"].append(check_source)
         return displays
 
     def reacquire(_adapter, views, **kwargs):
@@ -924,6 +1360,7 @@ def supplier_stock_inset(monkeypatch, request):
         caption_moves=caption_moves, caption_extents=caption_extents,
         redraws=redraws, rebuilds=rebuilds, geometry_reads=geometry_reads,
         reacquisitions=reacquisitions, adapter=adapter,
+        source_state=source_state,
     )
 
     def create():
@@ -934,6 +1371,36 @@ def supplier_stock_inset(monkeypatch, request):
     if not options.get("defer", False):
         create()
     return state
+
+
+def test_supplier_stock_source_scope_wires_immediate_and_settled_before_layout(
+    supplier_stock_inset,
+) -> None:
+    state = supplier_stock_inset
+    source = state.source_state
+    stock = spec.SUPPLIER_STOCK_CONFIGURATION
+    assert source.configuration == source.original
+    assert source.dirty is True
+    assert [row for row in source.events if row[0] == "annotation"] == [
+        ("annotation", stock),
+    ]
+    immediate_end = len(source.events)
+    state.settled()
+    assert source.configuration == source.original
+    assert state.adapter.currentModel is source.drawing
+    for callback, rows in (
+        ("annotation", source.events[:immediate_end]),
+        ("source check", source.events[immediate_end:]),
+    ):
+        callback_index = rows.index((callback, stock))
+        stock_index = rows.index(("configuration", stock))
+        restored_index = rows.index(("configuration", source.original))
+        assert stock_index < callback_index < restored_index
+        assert any(row[0] == "layout" for row in rows[restored_index + 1:])
+    assert all(
+        row[1] == source.original for row in source.events if row[0] == "layout"
+    )
+    assert state.events == ["capture", "format", "source check"]
 
 
 def test_supplier_stock_caption_seats_complete_extent_not_insertion_point(
@@ -986,7 +1453,7 @@ def test_supplier_stock_jointly_places_actual_frame_and_complete_measured_glyphs
     assert len(state.annotation_cells) == 2  # After movement and after final rebuild.
     assert state.redraws == ["redraw"] * 5  # Includes freshness after final rebuild.
     assert len(state.rebuilds) == 7  # Distinct source/format/measurement/move barriers.
-    assert "supplier stock captured:" in state.messages[0]
+    assert any("supplier stock captured:" in row for row in state.messages)
     assert any("joint placement before:" in row for row in state.messages)
     assert "curve_frame_offset_m=" in state.messages[-1]
     frame, curves = state.view.GetOutline(), state.view.reference_bounds()
@@ -1955,6 +2422,58 @@ def test_supplier_attachment_equal_xyz_different_identity_still_refuses(
     assert state.attachment_reads == ["entities", "types"]
     logged = json.loads(state.messages[0].split(": ", 1)[1])
     assert logged == json.loads(json.dumps(context, allow_nan=False))
+
+
+@pytest.mark.parametrize("getter_fails", [False, True])
+def test_supplier_attachment_failure_early_binds_actual_source_feature_type(
+    supplier_attachment_state, monkeypatch, getter_fails,
+) -> None:
+    """Late dispatch can expose the no-argument method as an already-read string."""
+    state = supplier_attachment_state
+    raw_feature = supplier_dimensions._assert_dimension_source()
+    raw_feature.GetTypeName2 = "ProfileFeature"
+    original_early_bound = supplier_dimensions._early_bound
+
+    def feature_type():
+        if getter_fails:
+            raise OSError("typed feature type getter failed")
+        return "ProfileFeature"
+
+    bound_feature = SimpleNamespace(
+        token=raw_feature.token,
+        Name=raw_feature.Name,
+        GetSpecificFeature2=raw_feature.GetSpecificFeature2,
+        GetTypeName2=feature_type,
+    )
+
+    def early_bound(value, interface):
+        if value is raw_feature and interface == "IFeature":
+            return bound_feature
+        return original_early_bound(value, interface)
+
+    monkeypatch.setattr(supplier_dimensions, "_early_bound", early_bound)
+    with pytest.raises(
+        RuntimeError, match="nominal supplier attachment changed source sketch",
+    ) as refused:
+        state.verify()
+    capture = state.captures[0]
+    assert capture["exception"] is refused.value
+    batch = capture["attachment_context"]["failure_native_readback"]
+    actual_type = batch["context"]["source_feature_type"]
+    if getter_fails:
+        assert actual_type == {
+            "member": "IFeature.GetTypeName2",
+            "error_type": "OSError",
+            "message": "typed feature type getter failed",
+        }
+    else:
+        assert actual_type == "ProfileFeature"
+    assert batch["attachments"]["members"][0]["id"] == [0, 1]
+    assert batch["native_dimension"]["system_values"] == [0.600]
+    assert state.source_sketch.inventory_reads == {11: 1, 10: 0}
+    assert set(state.mapping_reads.values()) == {1}
+    assert state.attachment_reads == ["entities", "types"]
+    assert state.private_cache == {}
 
 
 @pytest.mark.parametrize(
