@@ -1185,17 +1185,23 @@ misalignment, not a generic clearance allowance. Both now retain the larger
 existing 40 mm reserve and centre at 95 mm.
 
 Front and Right also share their outer Y bounds. Only the two MG washers'
-Front reserves are asymmetric in Y (8 mm bottom, 6 mm top), shifting their
-centre +1 mm. Their previously uninset Right cells now reserve exactly the
-derived 2 mm difference at the bottom, shifting +1 mm too; no top or horizontal
-Right reserve is needed. The other five Fronts have equal bottom/top reserves,
-so their default Right Y centres already match and remain unchanged. These
-recipe-only reserves preserve existing Front/Top vertical annotation lanes,
-catalogue/common orthographic scale selection, native containment and saved
-proofs; they do not move views after fitting or alter shared fitting APIs.
-The existing `test_mg_vn_wheel_axle_front_washer_drawing.py` exercises all seven
-actual recipe calls with real `supplier_fit_cells` geometry. This is an offline
-axis/containment contract, not a native rendered-sheet acceptance claim.
+original Front reserves were asymmetric in Y (8 mm bottom, 6 mm top), shifting
+their centre +1 mm. Increasing their Front top reserve to the existing 8 mm
+bottom reserve removes that shift without reducing any annotation lane. Right
+remains uninset and unannotated. Reserving even a derived 2 mm bottom margin
+on Right was incorrect: the actual `4fd50c9ac` MG native leaves refused because
+the settled supplier-view guard requires reserved views to match the native
+dimension-bearing view census, and Right has no dimensions. Preserve that
+guard, not a Right reserve. The other five Fronts already have equal
+bottom/top reserves and retain their default Right cells unchanged.
+These recipe-only reserves preserve or enlarge existing Front/Top vertical
+annotation lanes, retain catalogue/common orthographic scale selection, native
+containment and saved proofs, and neither move views after fitting nor alter
+shared fitting APIs. The existing
+`test_mg_vn_wheel_axle_front_washer_drawing.py` exercises all seven actual
+recipe calls with real `supplier_fit_cells` geometry and requires the reserved
+view set to remain exactly Front/Top. This is an offline axis/containment and
+recipe-census contract, not a native census or rendered-sheet acceptance claim.
 
 Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
 `*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09

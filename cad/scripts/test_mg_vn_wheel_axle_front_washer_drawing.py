@@ -250,6 +250,9 @@ def test_seven_washer_recipes_reserve_projected_axes_before_fit(
     (arguments,) = captured
     margins = arguments["supplier_margins"]
     assert margins is drawing.SUPPLIER_MARGINS
+    # Reserved views are the dimension-bearing Front/Top, never the bare Right.
+    # This offline recipe census does not establish the native dimension census.
+    assert set(margins) == {"*Front", "*Top"}
     assert callable(arguments["supplier_dimensions"])
     assert callable(arguments["saved_check"])
     assert len(arguments["settled_checks"]) == 1
@@ -285,22 +288,26 @@ def test_seven_washer_recipes_reserve_projected_axes_before_fit(
     assert fitted["*Right"][0][1] == pytest.approx(fitted["*Front"][0][1])
 
     for view, previous in (("*Front", original_front), ("*Top", original_top)):
-        # Keep every authored vertical lane and the larger existing right lane.
-        assert margins[view] == (previous[0], previous[1], 0.040, previous[3])
+        # Keep at least every authored lane; symmetry only enlarges MG Front top.
+        left, bottom, right, top = margins[view]
+        assert left == previous[0]
+        assert bottom == previous[1]
+        assert right == 0.040
+        assert top >= previous[3]
+        assert top == (bottom if view == "*Front" else previous[3])
         bounds = fitted[view][1]
-        assert bounds[1] == pytest.approx(outer[view][1] + previous[1])
-        assert bounds[3] == pytest.approx(outer[view][3] - previous[3])
+        assert bounds[1] == pytest.approx(outer[view][1] + bottom)
+        assert bounds[3] == pytest.approx(outer[view][3] - top)
     y_difference = original_front[1] - original_front[3]
     assert original["*Front"][1] - original["*Right"][1] == pytest.approx(
         y_difference / 2
     )
     if y_difference:
-        # Only the two MG Fronts have +1 mm Y from 8 mm bottom / 6 mm top.
+        # Only the two MG Fronts had +1 mm Y from 8 mm bottom / 6 mm top.
         assert y_difference == pytest.approx(0.002)
-        assert margins["*Right"] == pytest.approx((0.0, y_difference, 0.0, 0.0))
-    else:
-        assert "*Right" not in margins
-        assert fitted["*Right"][1] == outer["*Right"]
+        assert margins["*Front"][3] == pytest.approx(original_front[3] + y_difference)
+    assert "*Right" not in margins
+    assert fitted["*Right"][1] == outer["*Right"]
     assert fitted["*Isometric"][1] == outer["*Isometric"]
     for view, (_center, bounds) in fitted.items():
         assert bounds[0] >= outer[view][0]

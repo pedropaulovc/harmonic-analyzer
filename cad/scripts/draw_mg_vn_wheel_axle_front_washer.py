@@ -21,11 +21,10 @@ ITEM = "#4 FLAT WASHER"
 # Sheet-metre reserves: 12 mm face picks plus the supplier screw callout,
 # and a 14 mm Top thickness pick plus native stacked-limit ink.
 # Front/Top share outer X bounds: equal 40 mm right reserves align their X.
-# Front's bottom-minus-top reserve is 2 mm: match that on Right for shared Y.
+# Match Front's bottom/top reserves for shared Y; unannotated Right stays uninset.
 SUPPLIER_MARGINS = {
-    "*Front": (0.0, 0.008, 0.040, 0.006),
+    "*Front": (0.0, 0.008, 0.040, 0.008),
     "*Top": (0.0, 0.008, 0.040, 0.008),
-    "*Right": (0.0, 0.002, 0.0, 0.0),
 }
 
 
