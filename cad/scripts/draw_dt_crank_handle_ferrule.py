@@ -107,10 +107,10 @@ BORE_TOP_Y = SECTION_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0  # 0.1804
 # Each block is its value plus callout rows at 5.55 pitch, ~2.75 per
 # character, centred on its keep point.
 SECTION_KEEP = {
-    # "(Ø14.29)" over four rows, the widest 15 chars: 41.3 x 27.8, so x
-    # 0.1544-0.1956 and y 0.151-0.179.  It clears the section's left edge
-    # (x 0.201) by 5.4, the OD's extension lines (y 0.135, 0.195) by 16, and
-    # the end view (right edge x 0.115) by 39.
+    # "(Ø14.29)" over four rows, the widest 14 chars: 38.5 x 27.8, so x
+    # 0.1558-0.1943 and y 0.151-0.179.  It clears the section's left edge
+    # (x 0.201) by 6.7, the OD's extension lines (y 0.135, 0.195) by 16, and
+    # the end view (right edge x 0.115) by 40.
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.026, SECTION_CENTER[1]),
     # "Ø7.70 ±0.1" over three rows, the widest 25 chars: 68.8 x 22.2, so x
     # 0.2626-0.3314 and y 0.1539-0.1761, between the bore's extension lines
@@ -122,15 +122,15 @@ SECTION_KEEP = {
     "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.012),
     # The seat mouth's axial leg (1.4 at 4:1, at the upper bore corner by
     # the seat face) reads up and right of it, outside the ring.  Value plus
-    # five callout rows: 6 x 5.55 = 33.3 tall, the widest row 21 chars x
-    # 2.75 = 57.75 wide, so the box spans x 0.2331-0.2909, y 0.1843-0.2176.
+    # six callout rows: 7 x 5.55 = 38.85 tall, the widest row 20 chars x
+    # 2.75 = 55 wide, so the box spans x 0.2345-0.2895, y 0.1838-0.2227.
     # It clears the seat face and Length's right extension line (x 0.229,
-    # from 0.1946 up) by 4.1; the Ø7.70's upper extension line (y 0.1804) by
-    # 3.9 and its callout block (top y 0.1761) by 8.2; the "7.0" (right edge
-    # 0.2181) by 15.  The dimension line runs under the last row back to the
+    # from 0.1946 up) by 5.5; the Ø7.70's upper extension line (y 0.1804) by
+    # 3.4 and its callout block (top y 0.1761) by 7.7; the "7.0" (right edge
+    # 0.2181) by 16.  The dimension line runs under the last row back to the
     # chamfer's extension lines and crosses no other dimension or extension
     # line.
-    "SeatMouthChamfer": (SEAT_FACE_X + 0.033, BORE_TOP_Y + 0.0205),
+    "SeatMouthChamfer": (SEAT_FACE_X + 0.033, BORE_TOP_Y + 0.0228),
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)

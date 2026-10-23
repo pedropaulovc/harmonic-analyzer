@@ -152,7 +152,7 @@ def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
         "DIAMETRAL CLEARANCE",
     ]
     assert notes.OUTER_DIA_CALLOUT.splitlines() == [
-        "9/16 ROD STOCK;",
+        "STOCK;",
         "SKIM TO <MOD-DIAM>12.5",
         "WITH MHA-DT-08",
         "AFTER CURE",
@@ -187,9 +187,14 @@ def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
         "X 45 DEG SEAT END;",
         "MIN CLEARS MHA-DT-08",
         "TENON ROOT R0.3;",
-        "MAX LEAVES 3.5 BONDED",
-        "ON THE 5.0 TENON",
+        "MAX KEEPS 3.5 BONDED",
+        "ON THE 4.2 MIN TENON",
+        "AFTER ITS 0.25 BREAK",
     ]
+    # The stack it quotes holds at the printed maximum: the shortest tenon,
+    # less its end break and the largest chamfer, keeps the bonded floor.
+    assert 4.2 - 0.25 - spec.SEAT_MOUTH_CHAMFER_MAX >= spec.TENON_GLUE_LENGTH_FLOOR
+    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(4.2 - 0.25 - 0.4)
     # Modelled in the revolve profile at 45 degrees by equation, before the
     # INSTALLED split, so the skimmed ring keeps it too.
     source = Path(part.__file__).read_text(encoding="utf-8")

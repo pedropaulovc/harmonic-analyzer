@@ -23,6 +23,7 @@ from dt_crank_handle_ferrule_spec import (
     TENON_GLUE_LINE,
     TENON_LENGTH,
 )
+from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 
 # The mating part, quoted only to identify it (rule 7); the offline test
 # checks it against the registry.
@@ -44,12 +45,13 @@ BORE_FIT_CALLOUT = "\n".join(
         "DIAMETRAL CLEARANCE",
     )
 )
-# The OD is the 9/16-in rod as supplied (a reference), skimmed to the grip
-# contour with the handle after the epoxy cures (user ruling 2026-10-01); the
-# finished size sits on the OD itself (r1-r3 finding 2).
+# The OD is the 9/16-in rod as supplied (a reference: STOCK, rule 4; the title
+# block's MATERIAL already names the rod), skimmed to the grip contour with
+# the handle after the epoxy cures (user ruling 2026-10-01); the finished size
+# sits on the OD itself (r1-r3 finding 2).
 OUTER_DIA_CALLOUT = "\n".join(
     (
-        "9/16 ROD STOCK;",
+        "STOCK;",
         f"SKIM TO <MOD-DIAM>{INSTALLED_OUTER_DIA:.1f}",
         f"WITH {HANDLE_NUMBER}",
         "AFTER CURE",
@@ -57,16 +59,20 @@ OUTER_DIA_CALLOUT = "\n".join(
 )
 # Both limits of the seat mouth's band are functional (owner ruling A on
 # #1661): the minimum clears the MHA-DT-08 tenon root so the ring seats on its
-# shoulder, and the maximum is the glue-length budget on the 5.0 tenon (r2-r3
-# finding 4: a callout naming only the clearance left the upper limit
-# unexplained; ENFORCE iteration 1: "keeps glue length" alone read as if the
-# whole 7.0 ring were glued, so it quotes the floor and the tenon it is on).
+# shoulder, and the maximum is the glue-length budget on the shortest tenon.
+# r2-r3 finding 4: a callout naming only the clearance left the upper limit
+# unexplained.  ENFORCE iterations 1-2: "keeps glue length" and "leaves 3.5
+# on the 5.0 tenon" read as slack, because the sheet showed neither the
+# tenon's .X band nor its end break, so it states the shortest tenon and the
+# break the chamfer's maximum shares it with.
+_SHORTEST_TENON = round(TENON_LENGTH - GENERAL_1PL_TOL_MM, 6)
 SEAT_MOUTH_CHAMFER_CALLOUT = "\n".join(
     (
         "X 45 DEG SEAT END;",
         f"MIN CLEARS {HANDLE_NUMBER}",
         f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f};",
-        f"MAX LEAVES {TENON_GLUE_LENGTH_FLOOR:.1f} BONDED",
-        f"ON THE {TENON_LENGTH:.1f} TENON",
+        f"MAX KEEPS {TENON_GLUE_LENGTH_FLOOR:.1f} BONDED",
+        f"ON THE {_SHORTEST_TENON:.1f} MIN TENON",
+        f"AFTER ITS {EDGE_BREAK_MAX_MM:.2f} BREAK",
     )
 )
