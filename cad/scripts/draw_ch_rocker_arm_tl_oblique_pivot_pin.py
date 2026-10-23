@@ -80,12 +80,11 @@ from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
     BEARING_LENGTH,
     CALLOUTS_ABOVE,
     CARRIER_STATION,
-    COLLAR_DIA,
-    COLLAR_HEIGHT,
     COLLAR_STATION,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_MM,
     OVERALL_LENGTH,
 )
 
@@ -500,16 +499,19 @@ def _add_stop_face_controls(adapter: Any, profile: Any) -> Callable[[], None]:
         symbol_xy=_bearing_datum_symbol_xy(journal_axis, datum_landing), datum=datum.letter,
         leader_attach_xy=datum_landing, label="k5 bearing-journal datum axis",
     )
+    if {row.key for row in controls} != set(GEOMETRIC_TOLERANCES_MM):
+        raise RuntimeError("pivot stop frames do not cover the spec's geometric controls")
+    rows = {row.key: row for row in controls}
+    landings = dict(zip((row.key for row in controls), stop_landings, strict=True))
     frames = {}
-    for index in range(len(controls)):
-        control = controls[index]
-        landing = stop_landings[index]
-        frames[control.key] = add_feature_control_frame(
-            adapter, profile, entity=faces[control.key], entity_type="FACE",
-            leader_attach_xy=landing, frame_xy=STOP_FACE_FRAME_XY[control.key],
-            characteristic=control.characteristic, tolerance=control.tolerance,
+    for (key,) in (("flange_lower_stop",), ("flange_upper_stop",)):
+        control = rows[key]
+        frames[key] = add_feature_control_frame(
+            adapter, profile, entity=faces[key], entity_type="FACE",
+            leader_attach_xy=landings[key], frame_xy=STOP_FACE_FRAME_XY[key],
+            characteristic=control.characteristic, tolerance=GEOMETRIC_TOLERANCES_MM[key],
             datums=control.datums, diameter=control.tolerance_zone == "diametral",
-            label=control.key,
+            label=key,
         )
 
     def settled() -> None:
