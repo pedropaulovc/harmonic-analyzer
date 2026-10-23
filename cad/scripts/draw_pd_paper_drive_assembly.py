@@ -442,16 +442,19 @@ CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
 # has read its outline yet, and sheet 1's showed the outline (the projected
 # box) well past the ink, so the view takes the largest ladder scale whose
-# ring fits right of the steps and over the title block (step_down_to_fit). Every
-# ladder scale is 1:2 or smaller, so a rescale keeps the simplified
-# configuration the explode is shown in.
+# ring fits right of the steps and over the title block (step_down_to_fit).
+# Its balloons must resolve against the Default BOM: native run
+# 20261023T205501918Z showed a "Default Simplified" occurrence resolve item
+# "*" there, so (release-manager ruling, PR #1895) this view is full-detail and
+# shows Default's own persisted explode at every ladder scale.
 EXPLODED_SCALE_LADDER = ((1.0, 3.0), (1.0, 4.0), (1.0, 5.0))
+EXPLODED_VIEW_ROLE = ViewRole.FULL_DETAIL
 if any(
-    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
+    view_configuration(scale, _SW_SHADED_EDGES, EXPLODED_VIEW_ROLE) != BOM_CONFIGURATION
     for scale in EXPLODED_SCALE_LADDER
 ):
     raise AssertionError(
-        "a rescale on the exploded-view ladder would switch configuration"
+        "a rescale on the exploded-view ladder would leave the BOM configuration"
     )
 EXPLODED_SCALE = EXPLODED_SCALE_LADDER[0]
 EXPLODED_CENTER = (0.318, 0.168)
@@ -3065,7 +3068,9 @@ def _place_exploded_sheet(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_CENTER, scale=EXPLODED_SCALE
     )
     set_high_quality_shaded_with_edges(adapter, view, label=label)
-    configuration = apply_view_configuration(adapter, view, label=label)
+    configuration = apply_view_configuration(
+        adapter, view, role=EXPLODED_VIEW_ROLE, label=label
+    )
     set_view_exploded_state(
         adapter, view, True, configuration=configuration, label=label
     )
