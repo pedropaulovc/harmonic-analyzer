@@ -13,7 +13,7 @@ import copy
 import gc
 import json
 import weakref
-from math import cos, isfinite, pi, sin
+from math import cos, dist, isfinite, pi, sin
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -2384,7 +2384,10 @@ def test_recorded_offset_paths_preserve_actual_physical_stations(
     data = case.after["display"]
     connector, underline = data["lines"][case.connector_index:]
     baseline = data["texts"][-1]
-    assert connector[4] == sum(point[0] for point in case.tips) / 2
+    # This asserts the native geometric contract, not binary equality of
+    # midpoint arithmetic on the capture's decoded decimal coordinates.
+    midpoint = tuple(sum(point[axis] for point in case.tips) / 2 for axis in (0, 1))
+    assert dist(tuple(connector[4:6]), midpoint) <= _TOL
     assert connector[7:9] == baseline["pos"][:2] == underline[4:6]
     assert underline[7] == pytest.approx(baseline["pos"][0] + baseline["w"])
     assert case.after["pos"][1] != baseline["pos"][1]
