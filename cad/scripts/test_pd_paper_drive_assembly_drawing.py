@@ -2290,6 +2290,7 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
 
 
 _PD_NATIVE_PART_WIDTH = 0.046824451973134076
+_PD_MODEL_PROPERTIES = ("Description", "Number")
 
 
 def _pd_bom_fixture(monkeypatch, *, native_columns=False):
@@ -2344,6 +2345,9 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
                 values.get((selected, property_name), "")
             ),
             GetConfigurationByName=native_configurations.get,
+            # The drawing's views load the simplified members (native PD evidence).
+            active_configuration=components_by_key[key][0].ReferencedConfiguration,
+            written=[],
         )
         for component in components_by_key[key]:
             component.GetModelDoc2 = lambda native=native: native
@@ -2499,28 +2503,31 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
             return ""
         return columns[index].property_name
 
+    def linked_text(group, property_name):
+        values = set()
+        for component in group:
+            native = component.GetModelDoc2()
+            configuration = (
+                native.GetConfigurationByName(component.ReferencedConfiguration)
+                if property_name == "Description"
+                else None
+            )
+            values.add(str(
+                configuration.Description
+                if configuration is not None and configuration.UseDescriptionInBOM
+                else (
+                    native.GetCustomInfoValue(
+                        component.ReferencedConfiguration, property_name
+                    )
+                    or native.GetCustomInfoValue("", property_name)
+                    or ""
+                )
+            ).strip())
+        return "; ".join(sorted(values))
+
     def bind_property(index, property_name):
         for row, group in enumerate(native_rows, 1):
-            values = set()
-            for component in group:
-                native = component.GetModelDoc2()
-                configuration = (
-                    native.GetConfigurationByName(component.ReferencedConfiguration)
-                    if property_name == "Description"
-                    else None
-                )
-                values.add(str(
-                    configuration.Description
-                    if configuration is not None and configuration.UseDescriptionInBOM
-                    else (
-                        native.GetCustomInfoValue(
-                            component.ReferencedConfiguration, property_name
-                        )
-                        or native.GetCustomInfoValue("", property_name)
-                        or ""
-                    )
-                ).strip())
-            cells[row][index] = "; ".join(sorted(values))
+            cells[row][index] = linked_text(group, property_name)
 
     def set_custom_property(index, property_name):
         if not 0 <= index < len(columns) or columns[index].kind != 204:
@@ -2626,6 +2633,16 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
         physical = raw_index(index, include_hidden)
         if physical is None:
             raise IndexError(index)
+        column = columns[physical]
+        if row and column.kind == 204 and column.property_name in _PD_MODEL_PROPERTIES:
+            # Native PD 2026-10-23: a linked cell edit writes the property into
+            # each part's active configuration; the cell re-reads its member's.
+            group = native_rows[row - 1]
+            for native in {id(c.GetModelDoc2()): c.GetModelDoc2() for c in group}.values():
+                native.properties[(native.active_configuration, column.property_name)] = text
+                native.written.append((native.active_configuration, column.property_name))
+            cells[row][physical] = linked_text(group, column.property_name)
+            return
         cells[row][physical] = text
 
 
@@ -2670,6 +2687,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     table.RowHidden.side_effect = row_hidden
     table.IsCellTextEditable.return_value = True
     table.SetText2.side_effect = set_text
+    table.GetAllCustomProperties.side_effect = lambda: _PD_MODEL_PROPERTIES
     table.SetColumnWidth.side_effect = set_width
     table.GetHeaderCount.return_value = 1
     table.GetRowHeight.side_effect = row_height
@@ -3466,6 +3484,86 @@ def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_v
         table, configuration=configuration, label="paper-drive",
         expected_rows=44, occurrence_quantities=True,
     ) == before
+
+
+def _pd_description_writes(scene):
+    return {
+        write
+        for group in scene.state.native_rows
+        for component in group
+        for write in component.GetModelDoc2().written
+    }
+
+
+def test_default_bom_descriptions_do_not_write_back_to_simplified_members(monkeypatch):
+    # Native run 20261023T190254133Z: the linked DESCRIPTION write landed in
+    # sh-vn-clamp-screw's active "Default Simplified" while the Default row
+    # re-read "Default": '' != 'FILLISTER SCREW, MCMASTER 90280A201'.
+    configuration = drawing.BOM_CONFIGURATION
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    table = scene.insert()
+    assert table.GetColumnCustomProperty(2) == (
+        _drawing_tables._DETACHED_DESCRIPTION_PROPERTY
+    )
+    assert table.GetColumnTitle2(2, False) == "DESCRIPTION"
+    assert _pd_description_writes(scene) == set()
+    assert {
+        key: scene.cells[row][2] for row, key in enumerate(scene.state.row_keys, 1)
+    } == drawing.BOM_DESCRIPTIONS
+
+
+def test_default_bom_refuses_linked_description_write_back(monkeypatch):
+    # Negative control: without the detach the native write-back is refused.
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    monkeypatch.setattr(
+        _drawing_tables, "_detach_bom_description_column", lambda *_, **__: None
+    )
+    with pytest.raises(RuntimeError, match="BOM description did not persist: ''"):
+        scene.insert()
+    writes = _pd_description_writes(scene)
+    assert writes
+    assert all(
+        name.endswith(" Simplified") and prop == "Description" for name, prop in writes
+    )
+
+
+def test_view_configuration_bom_keeps_linked_description_column(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()
+    assert table.GetColumnCustomProperty(2) == "Description"
+    assert scene.state.configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+
+
+def test_default_bom_refuses_detached_description_without_row_text(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    monkeypatch.setattr(
+        drawing,
+        "BOM_DESCRIPTIONS",
+        {key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"},
+    )
+
+    def insert():
+        return _drawing_tables.insert_bom_table(
+            scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
+            expected_components=tuple(drawing.BOM_PART_NUMBERS),
+            descriptions=drawing.BOM_DESCRIPTIONS,
+            component_identities=drawing.BOM_COMPONENT_IDENTITIES,
+            part_number_property="Number", configuration_grouping="same-name",
+            configuration=drawing.BOM_CONFIGURATION, label="paper-drive",
+        )
+
+    with pytest.raises(RuntimeError, match="DESCRIPTION column left 1 of 43 rows blank"):
+        insert()
+
+
+def test_detached_description_name_must_not_be_a_model_property(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    scene.table.GetAllCustomProperties.side_effect = lambda: (
+        "Description", _drawing_tables._DETACHED_DESCRIPTION_PROPERTY.title(),
+    )
+    with pytest.raises(RuntimeError, match="detached DESCRIPTION name is a real custom property"):
+        scene.insert()
+    assert scene.table.GetColumnCustomProperty(2) == "Description"
 
 
 def test_default_bom_hides_native_column_without_materializing_latent_quantity(monkeypatch):

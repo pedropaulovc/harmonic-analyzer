@@ -1114,8 +1114,11 @@ def insert_bom_table(
     be nonempty. Bind it before Number, quantity and layout authoring.
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
-    property, and a blank column reads as an unreleased sheet. Returns the
-    table rebound as ``ITableAnnotation``.
+    property, and a blank column reads as an unreleased sheet. A cell write on
+    the template's ``$PRP:"Description"`` column writes back to the part's
+    active configuration, so under an explicit ``configuration`` the column is
+    first detached to a plain user column and every row must be described.
+    Returns the table rebound as ``ITableAnnotation``.
     """
     grouping_values = {"separate": 1, "same-part": 2, "same-name": 3}
     if configuration_grouping not in grouping_values:
@@ -1132,6 +1135,7 @@ def insert_bom_table(
         raise ValueError("an explicit BOM configuration must be nonempty")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
+    explicit_configuration = configuration is not None
     if configuration is None:
         configuration = str(
             adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
@@ -1329,6 +1333,9 @@ def insert_bom_table(
         description_column = header.index("DESCRIPTION")
         part_column = header.index("PART NUMBER")
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
+        if explicit_configuration:
+            _detach_bom_description_column(adapter, table, description_column, label=label)
+        described = 0
         for row in range(1, rows):
             part = (
                 str(
@@ -1355,10 +1362,16 @@ def insert_bom_table(
                 label=f"{label} BOM description",
                 configuration=configuration,
             )
+            described += 1
         if remaining:
             raise RuntimeError(
                 f"{label} BOM descriptions not applied (no matching row): "
                 f"{sorted(remaining)}"
+            )
+        if explicit_configuration and described != rows - 1:
+            raise RuntimeError(
+                f"{label} detached BOM DESCRIPTION column left "
+                f"{rows - 1 - described} of {rows - 1} rows blank"
             )
         rebuild_drawing(adapter, label="insert_bom_table")
     final_rows = int(table.RowCount)
@@ -1418,26 +1431,56 @@ def _set_bom_cell_text(
     configuration: str | None = None,
 ) -> None:
     """Write and verify one physical BOM cell."""
-    before = (
-        _bom_cell_evidence(table, row, column, configuration)
-        if configuration is not None
-        else None
-    )
     table.SetText2(row, column, True, text)
     applied = str(table.DisplayedText2(row, column, True) or "")
     if applied != text:
         error = RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
-        error.add_note(f"row {row} before write: {before}")
         error.add_note(
             f"row {row} after write: "
             f"{_bom_cell_evidence(table, row, column, configuration)}"
         )
-        if row > 1:
-            error.add_note(
-                f"row {row - 1} (written earlier): "
-                f"{_bom_cell_evidence(table, row - 1, column, configuration)}"
-            )
         raise error
+
+
+# Not a model property, so the column becomes a plain user column (SDK
+# IBomTableAnnotation.SetColumnCustomProperty remarks); the header is restored.
+_DETACHED_DESCRIPTION_PROPERTY = "HARMONIC BOM DESCRIPTION TEXT"
+
+
+def _detach_bom_description_column(
+    adapter: Any, table: Any, column: int, *, label: str
+) -> None:
+    """Stop DESCRIPTION cell writes from writing back into component models."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        table,
+        "IBomTableAnnotation",
+        "GetAllCustomProperties",
+        "GetColumnCustomProperty",
+        "SetColumnCustomProperty",
+    )
+    available = {
+        str(name).strip().lower()
+        for name in (annotation.GetAllCustomProperties() or ())
+    }
+    if _DETACHED_DESCRIPTION_PROPERTY.lower() in available:
+        raise RuntimeError(
+            f"{label} BOM detached DESCRIPTION name is a real custom property"
+        )
+    before = _bom_physical_columns(table, label=label)
+    result = annotation.SetColumnCustomProperty(column, _DETACHED_DESCRIPTION_PROPERTY)
+    if result is not True:
+        raise RuntimeError(f"{label} BOM DESCRIPTION detach failed: {result!r}")
+    bound = str(annotation.GetColumnCustomProperty(column) or "")
+    if bound != _DETACHED_DESCRIPTION_PROPERTY:
+        raise RuntimeError(f"{label} BOM DESCRIPTION detach did not persist: {bound!r}")
+    if _bom_physical_columns(table, label=label) != before:
+        raise RuntimeError(f"{label} BOM column sequence changed during DESCRIPTION detach")
+    if not table.SetColumnTitle2(column, "DESCRIPTION", True):
+        raise RuntimeError(f"{label} BOM DESCRIPTION header could not be restored")
+    rebuild_drawing(adapter, label="detach_bom_description_column")
+    header = str(table.DisplayedText2(0, column, True) or "").strip().upper()
+    if header != "DESCRIPTION":
+        raise RuntimeError(f"{label} BOM DESCRIPTION header reads {header!r}")
 
 
 def _bom_cell_evidence(
