@@ -112,6 +112,10 @@ Keep the lane budgets, independent-scale readback, strict native containment,
 caption checks and supplier-source preservation guards unchanged. Do not
 shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
 or suppress exhaustion to make the old 12 mm allocation pass.
+When a build has already failed, failure capture and supplemental diagnostic
+formatting/notes are best-effort: a secondary reporting exception, including
+cancellation or interruption, must not replace the original primary failure.
+With no primary failure, a source-preservation error still fails normally.
 
 ### Measured native supplier-reference text shelves
 
