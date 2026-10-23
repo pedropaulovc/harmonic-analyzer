@@ -13,6 +13,7 @@ import copy
 import gc
 import json
 import weakref
+from asyncio import CancelledError
 from math import cos, dist, isfinite, pi, sin
 from pathlib import Path
 from types import SimpleNamespace
@@ -587,6 +588,228 @@ def test_station_diagnostic_failure_does_not_mask_actual_tail_refusal(
         "supplier reference station field census formatting failed "
         "(ValueError); original failure retained"
     ]
+
+
+@pytest.mark.parametrize("interrupt_type", (KeyboardInterrupt, CancelledError))
+@pytest.mark.parametrize("fault_site", ("str", "repr", "add_note"))
+def test_station_secondary_baseexception_retains_actual_tail_error_identity(
+    native_reads, physical_case, monkeypatch, interrupt_type, fault_site
+):
+    case = physical_case
+    display = _static(case.record)
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    case.record["display"]["lines"][case.index][7 + case.axis] -= 0.0001
+    moved = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    primaries = []
+    note_attempts = []
+    formatting_faults = []
+    serialized_censuses = []
+    secondary = interrupt_type("secondary diagnostic fault")
+
+    class CapturedRuntimeError(RuntimeError):
+        def __init__(self, message):
+            super().__init__(message)
+            primaries.append(self)
+
+        def add_note(self, note):
+            note_attempts.append(note)
+            if fault_site == "add_note":
+                raise secondary
+            super().add_note(note)
+
+    class FormattingFault:
+        def __str__(self):
+            formatting_faults.append("str")
+            raise secondary
+
+        def __repr__(self):
+            formatting_faults.append("repr")
+            raise secondary
+
+    class DiagnosticJSON(str):
+        def __radd__(self, prefix):
+            assert prefix == "supplier_reference_native_station_fields "
+            # Fault only while composing an already-serialized diagnostic,
+            # never while inspecting an opaque native text object.
+            if fault_site == "str":
+                str(FormattingFault())
+            else:
+                repr(FormattingFault())
+            raise AssertionError("formatting fault must propagate")
+
+    dumps = json.dumps
+
+    def diagnostic_dumps(census, **kwargs):
+        encoded = dumps(census, **kwargs)
+        serialized_censuses.append(json.loads(encoded))
+        return encoded if fault_site == "add_note" else DiagnosticJSON(encoded)
+
+    monkeypatch.setattr(core, "RuntimeError", CapturedRuntimeError, raising=False)
+    monkeypatch.setattr(core.json, "dumps", diagnostic_dumps)
+    with pytest.raises(CapturedRuntimeError) as exc:
+        core.assert_reference_text_stations(original, moved, label=_LABEL)
+
+    assert len(primaries) == 1
+    assert exc.value is primaries[0]
+    assert str(exc.value) == f"{_LABEL}: supplier reference native physical_lines moved"
+    assert exc.value.__cause__ is None
+    census, = serialized_censuses
+    assert census["label"] == _LABEL
+    assert census["before"]["physical_lines"] != census["after"]["physical_lines"]
+    fallback = (
+        "supplier reference station field census formatting failed "
+        f"({interrupt_type.__name__}); original failure retained"
+    )
+    if fault_site == "add_note":
+        assert formatting_faults == []
+        assert len(note_attempts) == 2
+        assert note_attempts[0].startswith("supplier_reference_native_station_fields ")
+        assert note_attempts[1] == fallback
+        assert not getattr(exc.value, "__notes__", [])
+    else:
+        assert formatting_faults == [fault_site]
+        assert note_attempts == [fallback]
+        assert exc.value.__notes__ == [fallback]
+
+
+@pytest.mark.parametrize("interrupt_type", (KeyboardInterrupt, CancelledError))
+@pytest.mark.parametrize("fault_site", ("str", "repr", "add_note"))
+def test_fontbox_secondary_baseexception_retains_actual_measure_error_identity(
+    native_reads, monkeypatch, interrupt_type, fault_site
+):
+    record = _nut_rd1()
+    record["display"]["texts"][1]["t"] = " "
+    record["display"]["texts"][1]["w"] = 0.0
+    primaries = []
+    note_attempts = []
+    formatting_faults = []
+    serialized_censuses = []
+    secondary = interrupt_type("secondary diagnostic fault")
+
+    class CapturedRuntimeError(RuntimeError):
+        def __init__(self, message):
+            super().__init__(message)
+            primaries.append(self)
+
+        def add_note(self, note):
+            note_attempts.append(note)
+            if fault_site == "add_note":
+                raise secondary
+            super().add_note(note)
+
+    class FormattingFault:
+        def __str__(self):
+            formatting_faults.append("str")
+            raise secondary
+
+        def __repr__(self):
+            formatting_faults.append("repr")
+            raise secondary
+
+    class DiagnosticJSON(str):
+        def __radd__(self, prefix):
+            assert prefix == "supplier_reference_native_fontbox_fields "
+            if fault_site == "str":
+                str(FormattingFault())
+            else:
+                repr(FormattingFault())
+            raise AssertionError("formatting fault must propagate")
+
+    dumps = json.dumps
+
+    def diagnostic_dumps(census, **kwargs):
+        encoded = dumps(census, **kwargs)
+        serialized_censuses.append(json.loads(encoded))
+        return encoded if fault_site == "add_note" else DiagnosticJSON(encoded)
+
+    monkeypatch.setattr(core, "RuntimeError", CapturedRuntimeError, raising=False)
+    monkeypatch.setattr(core.json, "dumps", diagnostic_dumps)
+    with pytest.raises(CapturedRuntimeError) as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    assert len(primaries) == 1
+    assert exc.value is primaries[0]
+    assert str(exc.value).startswith(f"{_LABEL} fragment 1 ref=1:")
+    census, = serialized_censuses
+    assert census["label"] == _LABEL
+    assert census["fragment_count"] == 5
+    assert census["fragments"][1]["raw"]["fields"]["t"] == " "
+    assert census["fragments"][1]["raw"]["fields"]["w"] == 0.0
+    fallback = (
+        "supplier reference fontbox field census formatting failed "
+        f"({interrupt_type.__name__}); original failure retained"
+    )
+    if fault_site == "add_note":
+        assert formatting_faults == []
+        assert len(note_attempts) == 2
+        assert note_attempts[0].startswith("supplier_reference_native_fontbox_fields ")
+        assert note_attempts[1] == fallback
+        assert not getattr(exc.value, "__notes__", [])
+    else:
+        assert formatting_faults == [fault_site]
+        assert note_attempts == [fallback]
+        assert exc.value.__notes__ == [fallback]
+
+
+@pytest.mark.parametrize("interrupt_type", (KeyboardInterrupt, CancelledError))
+def test_primary_fontbox_measurement_baseexception_propagates_unchanged(
+    native_reads, monkeypatch, interrupt_type
+):
+    record = _nut_rd1()
+    primary = interrupt_type("primary native measurement interruption")
+    calls = []
+
+    def interrupted_measurement(texts, *, label):
+        calls.append((texts, label))
+        raise primary
+
+    monkeypatch.setattr(core, "measured_native_text_bounds", interrupted_measurement)
+    with pytest.raises(interrupt_type) as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    assert exc.value is primary
+    assert calls == [(record["display"]["texts"], _LABEL)]
+    assert not getattr(primary, "__notes__", [])
+
+
+@pytest.mark.parametrize("interrupt_type", (KeyboardInterrupt, CancelledError))
+@pytest.mark.parametrize("boundary", ("mode-getter", "station-predicate"))
+def test_primary_baseexception_outside_station_diagnostics_propagates_unchanged(
+    native_reads, physical_case, monkeypatch, interrupt_type, boundary
+):
+    case = physical_case
+    primary = interrupt_type("primary native/predicate interruption")
+    calls = []
+    if boundary == "mode-getter":
+        class InterruptedModeDisplay(_StaticDisplay):
+            @property
+            def OffsetText(self):
+                calls.append("mode-getter")
+                raise primary
+
+        display = InterruptedModeDisplay(case.record, False)
+        with pytest.raises(interrupt_type) as exc:
+            core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    else:
+        original = core.measure_reference_text(
+            None, _static(case.record), axis=case.axis, label=_LABEL
+        )
+        case.record["display"]["lines"][case.index][7 + case.axis] -= 0.0001
+        moved = core.measure_reference_text(
+            None, _static(case.record), axis=case.axis, label=_LABEL
+        )
+
+        def interrupted_distance(*_args):
+            calls.append("station-predicate")
+            raise primary
+
+        monkeypatch.setattr(core, "dist", interrupted_distance)
+        with pytest.raises(interrupt_type) as exc:
+            core.assert_reference_text_stations(original, moved, label=_LABEL)
+
+    assert exc.value is primary
+    assert calls == [boundary]
+    assert not getattr(primary, "__notes__", [])
 
 
 def test_station_refusal_retains_held_modes_without_reading_native_again(

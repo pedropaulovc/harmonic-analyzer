@@ -327,11 +327,14 @@ def measure_reference_text(
     except RuntimeError as error:
         try:
             error.add_note(_fontbox_failure_note(record, axis=axis, label=label))
-        except Exception as diagnostic_error:
-            error.add_note(
-                "supplier reference fontbox field census formatting failed "
-                f"({type(diagnostic_error).__name__}); original failure retained"
-            )
+        except BaseException as diagnostic_error:
+            try:
+                error.add_note(
+                    "supplier reference fontbox field census formatting failed "
+                    f"({type(diagnostic_error).__name__}); original failure retained"
+                )
+            except BaseException:
+                pass
         raise
     # This existing native property is semantic authority, not an inferred
     # field in the display-data dump. A failed getter must remain a failure.
@@ -478,11 +481,14 @@ def assert_reference_text_stations(
             error = RuntimeError(f"{label}: supplier reference native {key} moved")
             try:
                 error.add_note(_station_failure_note(before, after, label=label))
-            except Exception as diagnostic_error:
-                error.add_note(
-                    "supplier reference station field census formatting failed "
-                    f"({type(diagnostic_error).__name__}); original failure retained"
-                )
+            except BaseException as diagnostic_error:
+                try:
+                    error.add_note(
+                        "supplier reference station field census formatting failed "
+                        f"({type(diagnostic_error).__name__}); original failure retained"
+                    )
+                except BaseException:
+                    pass
             raise error
 
 
