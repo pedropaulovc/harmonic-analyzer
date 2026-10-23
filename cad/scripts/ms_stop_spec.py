@@ -104,6 +104,7 @@ BLOCK_DRAWING_DIMENSIONS = {
     "WindowProfile": {"WindowHeight"},
     "ReferenceWindowWidth": {"WindowWidth"},
     "RoofThicknessReference": {"RoofThickness"},
+    "BackWallReference": {"BackWall"},
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "ThumbLocationReference": {"ThumbFromEnd", "ThumbFromPlate"},
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
@@ -127,6 +128,10 @@ PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1
 PLATE_LOCATION_DIMENSIONS = frozenset({
     "PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace",
 })
+# The back wall is dimensioned directly, as the 2026-10-09 ruling did for the
+# roof, so its .XX band lands on the wall; the approved 11.0 envelope depth
+# follows from the rebate and the wall and prints as a reference "(11.0)".
+BLOCK_REFERENCE_DIMENSIONS = frozenset({"BlockDepth"})
 BLOCK_DRAWING_PRECISION = {
     feature: {name: 2 for name in names}
     for feature, names in BLOCK_DRAWING_DIMENSIONS.items()
@@ -136,8 +141,9 @@ PLATE_DRAWING_PRECISION = {
     for feature, names in PLATE_DRAWING_DIMENSIONS.items()
 }
 # The stock bands remain loose wherever the actual worst-case web permits it.
-# Depth and cover length still need .XX; their .X bands would breach 1.5 mm.
+# Cover length still needs .XX; its .X band would breach 1.5 mm.
 BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
+BLOCK_DRAWING_PRECISION["Block"]["BlockDepth"] = 1
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
 # The cover's cosmetic corners use .X. The block chamfer is a single .X limit,
 # printed 1.0 MAX: a .X band could cut through the 2.1 roof at its open end.
@@ -166,6 +172,7 @@ BLOCK_DRAWING_VALUES_BY_NAME = {
     "BlockLength": BLOCK_LENGTH, "BlockHeight": BLOCK_HEIGHT,
     "BlockDepth": BLOCK_DEPTH, "WindowHeight": WINDOW_HEIGHT,
     "RoofThickness": ROOF_THICKNESS, "WindowWidth": WINDOW_WIDTH,
+    "BackWall": BACK_WALL_THICKNESS,
     "RoofChamferSize": ROOF_END_CHAMFER, "RoofChamferAngle": ROOF_CHAMFER_ANGLE,
     "ThumbFromEnd": THUMB_AXIS_X, "ThumbFromPlate": THUMB_AXIS_Z,
     "PlateLeftFromEnd": PLATE_HOLE_XS[0], "PlateRightFromEnd": PLATE_HOLE_XS[1],
@@ -187,7 +194,7 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 HOLE_LINEAR_TOLERANCE_MM = printed_band_mm(HOLE_CALLOUT_PRECISION)
 BLOCK_PRINTED_BANDS_MM = {
     name: printed_band_mm(BLOCK_DRAWING_PRECISION_BY_NAME[name])
-    for name in ("BlockLength", "BlockHeight", "BlockDepth", "RoofThickness")
+    for name in ("BlockLength", "BlockHeight", "RoofThickness", "BackWall")
 }
 PLATE_PRINTED_BANDS_MM = {
     name: printed_band_mm(PLATE_DRAWING_PRECISION_BY_NAME[name])
@@ -202,7 +209,10 @@ PLATE_SCREW_PENETRATION_MAX = PLATE_SCREW_LENGTH + PLATE_SCREW_LENGTH_RESERVE_MM
 PLATE_FULL_THREAD_MIN = PLATE_TAP_THREAD_DEPTH - HOLE_LINEAR_TOLERANCE_MM
 PLATE_FULL_THREAD_MAX = PLATE_TAP_THREAD_DEPTH + HOLE_LINEAR_TOLERANCE_MM
 PLATE_TAP_LEAD_MIN = PLATE_TAP_DRILL_DEPTH - HOLE_LINEAR_TOLERANCE_MM - PLATE_FULL_THREAD_MAX
-PLATE_TAP_BACK_WALL_MIN = BLOCK_DEPTH - BLOCK_PRINTED_BANDS_MM["BlockDepth"] - (
+# The reference depth is the rebate plus the directly toleranced back wall.
+BLOCK_DEPTH_MIN = (WINDOW_WIDTH + WINDOW_SIZE_TOLERANCE_MM[0]
+                   + BACK_WALL_THICKNESS - BLOCK_PRINTED_BANDS_MM["BackWall"])
+PLATE_TAP_BACK_WALL_MIN = BLOCK_DEPTH_MIN - (
     PLATE_TAP_DRILL_DEPTH + HOLE_LINEAR_TOLERANCE_MM
     + (PLATE_TAP_DRILL_DIA + DRILL_OVERSIZE_MM) / 2.0 * DRILL_POINT_H
 )
@@ -230,9 +240,7 @@ def transferred_tap_end_web_min(master_position_band_mm: float) -> float:
 
 
 PLATE_TAP_END_WEB_MIN = transferred_tap_end_web_min(PLATE_HOLE_POSITION_TOLERANCE_MM)
-WINDOW_BACK_WALL_MIN = BLOCK_DEPTH - BLOCK_PRINTED_BANDS_MM["BlockDepth"] - (
-    WINDOW_WIDTH + WINDOW_SIZE_TOLERANCE_MM[1]
-)
+WINDOW_BACK_WALL_MIN = BACK_WALL_THICKNESS - BLOCK_PRINTED_BANDS_MM["BackWall"]
 PLATE_CLEARANCE_END_WEB_MIN = BLOCK_LENGTH - PLATE_PRINTED_BANDS_MM["PlateLength"] - (
     PLATE_HOLE_XS[1] + PLATE_HOLE_POSITION_TOLERANCE_MM
     + (PLATE_CLEARANCE_DIA + DRILL_OVERSIZE_MM) / 2.0
@@ -250,11 +258,11 @@ assert PLATE_TAP_LEAD_MIN >= PLATE_SCREW_PITCH  # one-pitch bottoming-tap lead
 assert PLATE_TAP_BACK_WALL_MIN >= 1.5
 assert ROOF_THICKNESS_MIN >= 1.5
 assert PLATE_TAP_WINDOW_WEB_MIN >= 1.5 and PLATE_TAP_END_WEB_MIN >= 1.5
-assert WINDOW_BACK_WALL_MIN >= 1.5
+assert WINDOW_BACK_WALL_MIN >= 2.0
 assert PLATE_CLEARANCE_END_WEB_MIN >= 1.5 and PLATE_CLEARANCE_HEAD_WEB_MIN >= 1.5
 assert PLATE_RADIAL_CLEARANCE_MIN > 0.0
 
-# The two worst-case walls between the 1.5 floor and the 2.0 target, stated
-# on the block print as facts beside their dimensions (rule 20).
+# The roof's worst case between the 1.5 floor and the 2.0 target, stated on
+# the block print as a fact beside its dimension (rule 20); the owner's
+# 2026-10-09 ruling accepting it is recorded as ms-stop-block.yaml RV-01.
 ROOF_WALL_CALLOUT = f"WALL {ROOF_THICKNESS_MIN:.2f} MIN"
-WINDOW_BACK_WALL_CALLOUT = f"BACK WALL {WINDOW_BACK_WALL_MIN:.2f} MIN"

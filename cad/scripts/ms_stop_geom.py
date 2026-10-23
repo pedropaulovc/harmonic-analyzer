@@ -148,6 +148,41 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     ], strict=True))
 
 
+@_telemetry.traced("sketch.stop_back_wall")
+async def back_wall_reference(adapter: Any) -> list[tuple[str, str]]:
+    """Direct back wall, from the rebate's back face to the block's back face.
+
+    Right-plane local X is -Z. The chord continues the rebate-width chord at
+    the roof station, so 8.40 and the wall chain from the cover face; the
+    block depth is their sum and prints only as a reference.
+    """
+    feature = "BackWallReference"
+    check(feature, await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    line = check(feature, await adapter.add_line(
+        -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX,
+        -spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX,
+    ))
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not segment.ConstructionGeometry:
+        raise RuntimeError("back wall reference construction flag rejected")
+    check(feature, await adapter.add_sketch_constraint(line, None, "horizontal"))
+    await dimension_between(adapter, f"{line}.start", f"{line}.end",
+                            "horizontal_distance", spec.BACK_WALL_THICKNESS, feature)
+    await anchor_point_to_origin(adapter, f"{line}.start",
+                                 -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX, feature)
+    await ensure_fully_defined(adapter, feature)
+    check(feature, await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    # Both anchor coordinates are non-zero: station along -Z, then height.
+    names = name_dimensions(adapter, feature, ["BackWall", "BackWallStationZ", "BackWallStationY"])
+    return list(zip(names, [
+        '"BlockDepth" - "WindowWidth"', '"WindowWidth"', '"BlockHeight" - "RoofThickness"',
+    ], strict=True))
+
+
 @_telemetry.traced("sketch.stop_plate_pilot")
 async def pilot_drill_reference(adapter: Any) -> list[tuple[str, str]]:
     """Own the earlier match-drill size without changing the finished clearance.

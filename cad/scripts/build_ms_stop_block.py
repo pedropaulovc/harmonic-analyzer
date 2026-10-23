@@ -37,7 +37,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    roof_reference, window_width_reference,
+    back_wall_reference, roof_reference, window_width_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -46,10 +46,13 @@ DRAWING_DIMENSIONS = spec.BLOCK_DRAWING_DIMENSIONS
 DRAWING_PRECISION = spec.BLOCK_DRAWING_PRECISION
 
 
-def _author_plate_location_references(adapter) -> None:
-    """Save reference-only receiver labels; the plate owns the absolute bands."""
-    for name in spec.PLATE_LOCATION_DIMENSIONS:
-        display, dimension = _named_dimension(adapter, "PlateLocationReference", name)
+def _author_reference_dimensions(adapter) -> None:
+    """Save reference-only labels: the receiver's plate locations (the plate
+    owns the absolute bands) and the envelope depth (rebate plus back wall)."""
+    owners = [("PlateLocationReference", name) for name in sorted(spec.PLATE_LOCATION_DIMENSIONS)]
+    owners += [("Block", name) for name in sorted(spec.BLOCK_REFERENCE_DIMENSIONS)]
+    for feature, name in owners:
+        display, dimension = _named_dimension(adapter, feature, name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         tolerance.Type = 0  # swTolType_e.swTolNONE; property put, no success retval
         # Use the established native prefix/suffix channel around the live
@@ -169,6 +172,7 @@ async def build(adapter) -> dict[str, str]:
     )
     jobs += await roof_reference(adapter)
     jobs += await window_width_reference(adapter)
+    jobs += await back_wall_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -179,7 +183,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowHeight", lower, upper)
     set_dimension_bilateral_tolerance(adapter, "Window", "WindowWidth", lower, upper)
     set_dimension_bilateral_tolerance(adapter, "ReferenceWindowWidth", "WindowWidth", lower, upper)
-    _author_plate_location_references(adapter)
+    _author_reference_dimensions(adapter)
     _roof_chamfer_max_limit(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
@@ -191,7 +195,7 @@ async def build(adapter) -> dict[str, str]:
     })
     hide_location_references(adapter, (
         "ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference",
-        "ReferenceWindowWidth",
+        "ReferenceWindowWidth", "BackWallReference",
     ))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)

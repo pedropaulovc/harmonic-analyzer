@@ -75,6 +75,8 @@ FRONT_KEEP = {
 RIGHT_KEEP = {
     "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
     "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
+    # Above the roof, left of the roof-thickness text, under the (11.0).
+    "BackWall": (0.345, 0.224),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.090, 0.080),
@@ -82,11 +84,11 @@ BOTTOM_KEEP = {
 STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-# The rebate bands exist only for the stick that slides in it; the two
-# worst-case walls between the 1.5 floor and 2.0 target are stated as facts.
+# The rebate bands exist only for the stick that slides in it; the roof's
+# worst case between the 1.5 floor and 2.0 target is stated as a fact.
 DIMENSION_CALLOUTS = {
     "RoofChamferSize": "2 CORNERS",
-    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}\n{part.WINDOW_BACK_WALL_CALLOUT}",
+    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
     "WindowHeight": STICK_FIT,
     "RoofThickness": part.ROOF_WALL_CALLOUT,
 }
@@ -138,9 +140,10 @@ def _orient_bottom_view(adapter: Any, view: Any) -> None:
         )
 
 
-def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> None:
-    """Read back the source-owned parentheses and absence of receiver bands."""
-    remaining = set(part.PLATE_LOCATION_DIMENSIONS)
+def _assert_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Read back the source-owned parentheses and absence of bands on the
+    receiver's plate locations and the reference envelope depth."""
+    remaining = set(part.PLATE_LOCATION_DIMENSIONS | part.BLOCK_REFERENCE_DIMENSIONS)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name not in remaining:
@@ -157,9 +160,9 @@ def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> N
             or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
             or not bool(display.ShowDimensionValue)
         ):
-            raise RuntimeError(f"{name}: imported plate-master reference lost its source display")
+            raise RuntimeError(f"{name}: imported reference lost its source display")
     if remaining:
-        raise RuntimeError(f"missing plate-master reference dimensions: {sorted(remaining)}")
+        raise RuntimeError(f"missing reference dimensions: {sorted(remaining)}")
 
 
 def _label_locating_edges(adapter: Any, front: Any) -> None:
@@ -248,7 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         angular=frozenset({"RoofChamferAngle"}),
     )
-    _assert_plate_location_references(adapter, annotations)
+    _assert_reference_dimensions(adapter, annotations)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)

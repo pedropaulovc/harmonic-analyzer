@@ -6,3 +6,9 @@ ms-stop-block:
   quantity: 1
   tolerance_class: machined_block
   process: "milled 21 x 14.1 x 11 brass block; window milled open into the plate-side face; #4-40 thumbscrew tap up through the head face; two #2-56 plate-screw holes match-drilled with its ms-stop-plate in one pilot pass, then bottoming-tapped blind from the plate mating face (parts paired, not interchangeable)"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "right side view, under the 2.10 roof thickness: WALL 1.59 MIN"
+      finding: "roof over the open rebate below the 2.0 mm target (rule 17)"
+      reason: "owner ruling 2026-10-09 (option B in stop_roof_options_v1.png): height 14.1 with a directly dimensioned 2.1 roof replaced the sketch's 14 / 2.0; at the routine .XX +/-0.51 the roof keeps 1.59 MIN, above the 1.5 floor. Recorded here in the form the gate reads; not a new ruling"
