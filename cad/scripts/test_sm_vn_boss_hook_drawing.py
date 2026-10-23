@@ -1116,12 +1116,22 @@ class _StockView(SimpleNamespace):
         return _StockTransform(self.projection_scale, *self.Position, self.angle)
 
 
+class _StockSourceCurve(SimpleNamespace):
+    def __getattr__(self, name):
+        if name in ("Color", "Width", "Style", "Layer", "LayerOverride"):
+            pytest.fail(f"queried undefined source/LayerOverride property {name}")
+        raise AttributeError(name)
+
+
 @pytest.fixture
 def stock_source_scene(monkeypatch, tmp_path):
     """Exercise real capture/analytic projection with offline COM boundaries."""
     calls, scalar_reads, body_reads, correspondences = [], [], [], []
 
-    def bind(value, _kind):
+    def bind(value, kind):
+        supported = getattr(value, "_interfaces", None)
+        if supported is not None and kind not in supported:
+            raise TypeError(f"native object does not expose {kind}")
         return value
 
     for module in (drawing, supplier_dimensions, reference_geometry, purchased_drawing):
@@ -1132,7 +1142,11 @@ def stock_source_scene(monkeypatch, tmp_path):
     monkeypatch.setattr(drawing, "bstr_array", tuple)
     source_path = tmp_path / "anchor.SLDPRT"
     monkeypatch.setattr(drawing, "SOURCE", source_path)
-    state = SimpleNamespace(active="OriginalFinished", changed_visibility=False, target_seen=False)
+    state = SimpleNamespace(
+        active="OriginalFinished", changed_visibility=False, target_seen=False,
+        selected=None, selected_count=1, selected_kind=24, select_result=True,
+        after_select=None, after_color=None, after_drawing_rebuild=None,
+    )
 
     def point(xyz):
         return SimpleNamespace(X=xyz[0], Y=xyz[1], Z=xyz[2])
@@ -1143,11 +1157,15 @@ def stock_source_scene(monkeypatch, tmp_path):
         ((0.0, 0.0, 0.0), drawing.SUPPLIER_EYE_ID_MM / 2000.0),
         ((0.03, 0.0, 0.0), drawing.SUPPLIER_NOMINAL_WIRE_MM / 2000.0),
     ):
-        circle = SimpleNamespace(center=point(center), radius=radius, ConstructionGeometry=True)
+        circle = _StockSourceCurve(
+            center=point(center), radius=radius, ConstructionGeometry=True,
+            _interfaces={"ISketchSegment", "ISketchArc"},
+        )
         circle.GetType = lambda: 1
         circle.IsCircle = lambda: 1
         circle.GetCenterPoint2 = lambda circle=circle: circle.center
         circle.GetRadius = lambda circle=circle: circle.radius
+        circle.GetLength = lambda circle=circle: math.tau * circle.radius
         circles.append(circle)
     outline = drawing.SUPPLIER_STOCK_SHANK_OUTLINE_MM
     pairs = [
@@ -1156,13 +1174,17 @@ def stock_source_scene(monkeypatch, tmp_path):
     ] + list(zip(drawing.SUPPLIER_STOCK_AXIS_MM, drawing.SUPPLIER_STOCK_AXIS_MM[1:]))
     lines = []
     for start, end in pairs:
-        line = SimpleNamespace(
+        line = _StockSourceCurve(
             start=point((start[0] / 1000.0, start[1] / 1000.0, 0.0)),
             end=point((end[0] / 1000.0, end[1] / 1000.0, 0.0)),
             ConstructionGeometry=True, GetType=lambda: 0,
+            _interfaces={"ISketchSegment", "ISketchLine"},
         )
         line.GetStartPoint2 = lambda line=line: line.start
         line.GetEndPoint2 = lambda line=line: line.end
+        line.GetLength = lambda line=line: math.dist(
+            (line.start.X, line.start.Y, line.start.Z), (line.end.X, line.end.Y, line.end.Z),
+        )
         lines.append(line)
     segments = circles + lines
 
@@ -1252,6 +1274,50 @@ def stock_source_scene(monkeypatch, tmp_path):
             features[name].Visible = 1
 
     monkeypatch.setattr(drawing, "blank_reference_sketches", blank)
+    mapped, selections, colors = {}, [], []
+
+    def make_instance(source, native_id=None):
+        instance = _StockSourceCurve(
+            _interfaces=set(source._interfaces), native_id=object() if native_id is None else native_id,
+            ConstructionGeometry=source.ConstructionGeometry, GetType=source.GetType,
+            Color=0x808080, Width=0, Style=2, Layer="",
+        )
+        if source.GetType() == 1:
+            instance.center = point((source.center.X, source.center.Y, source.center.Z))
+            instance.radius = source.radius
+            instance.IsCircle = lambda: 1
+            instance.GetCenterPoint2 = lambda: instance.center
+            instance.GetRadius = lambda: instance.radius
+            instance.GetLength = lambda: math.tau * instance.radius
+        else:
+            instance.start = point((source.start.X, source.start.Y, source.start.Z))
+            instance.end = point((source.end.X, source.end.Y, source.end.Z))
+            instance.GetStartPoint2 = lambda: instance.start
+            instance.GetEndPoint2 = lambda: instance.end
+            instance.GetLength = lambda: math.dist(
+                (instance.start.X, instance.start.Y, instance.start.Z),
+                (instance.end.X, instance.end.Y, instance.end.Z),
+            )
+
+        def select(append, data):
+            assert append is False and data.View is stock
+            assert model.ActiveDrawingView is stock and state.selected is None
+            selections.append((instance, append, data.View))
+            state.selected = instance
+            if state.after_select is not None:
+                state.after_select(instance)
+            return state.select_result
+
+        instance.Select4 = select
+        return instance
+
+    for source_curve in segments:
+        mapped[id(source_curve)] = make_instance(source_curve)
+
+    def corresponding(segment):
+        correspondences.append(segment)
+        return mapped.get(id(segment))
+
     stock = _StockView(
         Name="stock", ReferencedDocument=source,
         ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
@@ -1264,14 +1330,55 @@ def stock_source_scene(monkeypatch, tmp_path):
         GetSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: ()),
         GetFirstDisplayDimension6=lambda: None, GetAnnotations=lambda: (),
         UpdateViewDisplayGeometry=lambda: calls.append("view-update"),
-        GetCorresponding=lambda segment: correspondences.append(segment) or SimpleNamespace(),
+        GetCorresponding=corresponding,
         GetOutline=lambda: pytest.fail("stock geometry must not use a cached view outline"),
     )
     utility = SimpleNamespace(CreatePoint=lambda xyz: _StockMathPoint(xyz))
-    model = SimpleNamespace(EditRebuild3=lambda: calls.append("drawing-rebuild") or True)
+    def clear(all_selections):
+        assert all_selections is True
+        calls.append("clear")
+        state.selected = None
+
+    def activate(name):
+        assert name in ("", stock.Name)
+        model.ActiveDrawingView = stock if name else None
+        calls.append(("activate-view", name))
+        return name != ""
+
+    def set_color(color):
+        assert model.ActiveDrawingView is stock and color == 0
+        assert state.selected is not None and state.selected_count == 1 and state.selected_kind == 24
+        colors.append(state.selected)
+        state.selected.Color = color
+        if state.after_color is not None:
+            state.after_color(state.selected)
+        # IDrawingDoc.SetLineColor is VOID, deliberately return None.
+
+    def drawing_rebuild():
+        calls.append("drawing-rebuild")
+        if state.after_drawing_rebuild is not None:
+            state.after_drawing_rebuild()
+        return True
+
+    model = SimpleNamespace(
+        EditRebuild3=drawing_rebuild, ClearSelection2=clear, ActivateView=activate,
+        ActiveDrawingView=None, SetLineColor=set_color,
+        SelectionManager=SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(View=None),
+            GetSelectedObjectCount2=lambda _mark: state.selected_count,
+            GetSelectedObjectType3=lambda _index, _mark: state.selected_kind,
+            GetSelectedObject6=lambda _index, _mark: state.selected,
+        ),
+        Extension=SimpleNamespace(SelectByID2=lambda *_args: pytest.fail("profile must never use a point fallback")),
+    )
     adapter = SimpleNamespace(
         currentModel=source,
-        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second), GetMathUtility=lambda: utility),
+        swApp=SimpleNamespace(
+            IsSame=lambda first, second: int(
+                getattr(first, "native_id", first) is getattr(second, "native_id", second)
+            ),
+            GetMathUtility=lambda: utility,
+        ),
     )
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
     return SimpleNamespace(
@@ -1280,6 +1387,7 @@ def stock_source_scene(monkeypatch, tmp_path):
         circles=circles, lines=lines, dimensions=dimensions, displays=displays,
         values=values, calls=calls, scalar_reads=scalar_reads, body_reads=body_reads,
         correspondences=correspondences, model=model, source_path=source_path,
+        mapped=mapped, selections=selections, colors=colors, make_instance=make_instance,
     )
 
 
@@ -1627,7 +1735,7 @@ def test_source_inventory_and_showing_must_complete_before_stock_coverage(stock_
     elif fault == "extra":
         scene.segments.append(scene.lines[0])
     elif fault == "no-correspondence":
-        scene.stock.GetCorresponding = lambda segment: None if segment is scene.lines[2] else object()
+        scene.mapped[id(scene.lines[2])] = None
     with pytest.raises(RuntimeError):
         drawing._supplier_stock_diagram(scene.adapter, scene.source, capture)
 
@@ -2240,3 +2348,646 @@ def test_pre_save_identity_snapshot_refuses_shared_native_annotation_for_two_ref
     settled.displays["FINISHED"][1].GetAnnotation = lambda: eye_annotation
     with pytest.raises(RuntimeError, match="distinct native annotations"):
         drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
+
+
+def _blacken_stock(scene, capture):
+    scene.adapter.currentModel = scene.model
+    return drawing._blacken_supplier_stock_profile(scene.adapter, scene.stock, scene.source, capture)
+
+
+def test_black_stock_profile_changes_only_all_nine_exact_drawing_instance_colors(stock_source_scene):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    before = {
+        id(source): (
+            source.ConstructionGeometry, source.GetType(), source.GetLength(),
+            instance.Width, instance.Style, instance.Layer,
+        )
+        for source in scene.segments
+        for instance in (scene.mapped[id(source)],)
+    }
+    spare = scene.make_instance(scene.circles[0])
+    calls_before = len(scene.calls)
+    assert _blacken_stock(scene, capture) is None
+    instances = [scene.mapped[id(source)] for source in scene.segments]
+    assert [entry[0] for entry in scene.selections] == instances
+    assert scene.colors == instances
+    assert sorted(segment.GetType() for segment in scene.colors) == [0] * 6 + [1] * 3
+    assert all(append is False and view is scene.stock for _segment, append, view in scene.selections)
+    for source, instance in zip(scene.segments, instances, strict=True):
+        assert source is not instance
+        assert instance.Color == 0 and type(instance.Color) is int
+        assert (
+            instance.ConstructionGeometry, instance.GetType(), instance.GetLength(),
+            instance.Width, instance.Style, instance.Layer,
+        ) == before[id(source)]
+        assert source.ConstructionGeometry is True
+    assert spare.Color == 0x808080
+    assert scene.state.selected is None and scene.state.active == "OriginalFinished"
+    assert scene.feature.Visible == scene.thread.Visible == 1
+    assert not any(isinstance(call, tuple) and call[0] in ("show", "source-rebuild", "blank")
+                   for call in scene.calls[calls_before:])
+    assert scene.correspondences == scene.segments * 2
+
+
+@pytest.mark.parametrize("fault", (
+    "source-identity", "source-path", "view-path", "view-configuration",
+    "configuration-id", "missing-configuration", "capture-path", "source-type",
+))
+def test_black_profile_requires_exact_source_view_configuration_before_any_setter(stock_source_scene, fault):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    if fault == "source-identity":
+        scene.stock.ReferencedDocument = SimpleNamespace(**vars(scene.source))
+    elif fault == "source-path":
+        scene.source.GetPathName = lambda: "D:/foreign.SLDPRT"
+    elif fault == "view-path":
+        scene.stock.GetReferencedModelName = lambda: "D:/foreign.SLDPRT"
+    elif fault == "view-configuration":
+        scene.stock.ReferencedConfiguration = "OriginalFinished"
+    elif fault == "configuration-id":
+        scene.configuration.GetID = lambda: 24
+    elif fault == "missing-configuration":
+        scene.source.GetConfigurationByName = lambda _name: None
+    elif fault == "capture-path":
+        capture = replace(capture, source_path="D:/foreign.SLDPRT")
+    else:
+        scene.source.GetType = lambda: 2
+    with pytest.raises(RuntimeError):
+        _blacken_stock(scene, capture)
+    assert scene.selections == scene.colors == []
+
+
+@pytest.mark.parametrize("fault", (
+    "missing-circle", "missing-line", "extra", "duplicate-source", "missing-map",
+    "duplicate-map", "source-as-map", "wrong-feature", "wrong-feature-type",
+    "source-circle-drift", "source-line-drift", "mapped-circle-drift", "mapped-line-drift",
+    "mapped-length-drift", "mapped-construction", "mapped-partial-circle",
+    "mapped-circle-bool", "mapped-kind", "mapped-circle-interface",
+))
+def test_black_profile_refuses_incomplete_foreign_duplicate_or_changed_native_inventory(stock_source_scene, fault):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    circle = scene.mapped[id(scene.circles[0])]
+    line = scene.mapped[id(scene.lines[0])]
+    if fault == "missing-circle":
+        scene.segments.remove(scene.circles[0])
+    elif fault == "missing-line":
+        scene.segments.remove(scene.lines[0])
+    elif fault == "extra":
+        scene.segments.append(scene.lines[0])
+    elif fault == "duplicate-source":
+        scene.segments[-1] = scene.segments[-2]
+    elif fault == "missing-map":
+        scene.mapped[id(scene.circles[1])] = None
+    elif fault == "duplicate-map":
+        scene.mapped[id(scene.circles[1])] = circle
+    elif fault == "source-as-map":
+        scene.mapped[id(scene.circles[0])] = scene.circles[0]
+    elif fault == "wrong-feature":
+        scene.feature.Name = "ForeignProfile"
+    elif fault == "wrong-feature-type":
+        scene.feature.GetTypeName2 = lambda: "3DProfileFeature"
+    elif fault == "source-circle-drift":
+        scene.circles[0].center.X += 0.001
+    elif fault == "source-line-drift":
+        scene.lines[0].end.Y += 0.001
+    elif fault == "mapped-circle-drift":
+        circle.radius += 0.001
+    elif fault == "mapped-line-drift":
+        line.end.X += 0.001
+    elif fault == "mapped-length-drift":
+        line.GetLength = lambda: 0.001
+    elif fault == "mapped-construction":
+        circle.ConstructionGeometry = False
+    elif fault == "mapped-partial-circle":
+        circle.IsCircle = lambda: 0
+    elif fault == "mapped-circle-bool":
+        circle.IsCircle = lambda: True
+    elif fault == "mapped-kind":
+        circle.GetType = lambda: 3
+    else:
+        circle._interfaces.remove("ISketchSegment")
+    with pytest.raises((RuntimeError, TypeError)):
+        _blacken_stock(scene, capture)
+    assert scene.selections == scene.colors == []
+
+
+@pytest.mark.parametrize("count", (0, 2, True, 1.0))
+def test_black_profile_requires_exact_native_selected_count_one(stock_source_scene, count):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    scene.state.selected_count = count
+    with pytest.raises(RuntimeError, match="one native EXTSKETCHSEGMENT"):
+        _blacken_stock(scene, capture)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("kind", (1, 12, 25, 46, True, 24.0))
+def test_black_profile_requires_native_external_sketch_segment_not_other_kind(stock_source_scene, kind):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    scene.state.selected_kind = kind
+    with pytest.raises(RuntimeError, match="one native EXTSKETCHSEGMENT"):
+        _blacken_stock(scene, capture)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("fault", ("missing", "foreign-same-geometry", "selected-source"))
+def test_black_profile_selected_object_must_be_exact_mapped_native_identity(stock_source_scene, fault):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    foreign = scene.make_instance(scene.circles[0])
+
+    def changed(_instance):
+        scene.state.selected = (
+            None if fault == "missing" else scene.circles[0] if fault == "selected-source" else foreign
+        )
+
+    scene.state.after_select = changed
+    with pytest.raises(RuntimeError, match="exact mapped native curve"):
+        _blacken_stock(scene, capture)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("same", (True, False, -1, 2, 1.0, "1", None))
+def test_black_profile_never_coerces_native_issame_results(stock_source_scene, same):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    original_same = scene.adapter.swApp.IsSame
+
+    def is_same(first, second):
+        if scene.state.selected is not None and first is scene.state.selected and second is first:
+            return same
+        return original_same(first, second)
+
+    scene.adapter.swApp.IsSame = is_same
+    with pytest.raises(RuntimeError, match="unknown native IsSame"):
+        _blacken_stock(scene, capture)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("circle_index", (0, 1, 2))
+@pytest.mark.parametrize("result", (False, None, 1))
+def test_all_three_circles_require_typed_select4_without_fallback(stock_source_scene, circle_index, result):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    rejected = scene.mapped[id(scene.circles[circle_index])]
+    scene.state.after_select = lambda segment: setattr(
+        scene.state, "select_result", result if segment is rejected else True,
+    )
+    with pytest.raises(RuntimeError, match="Select4 refused"):
+        _blacken_stock(scene, capture)
+    assert len(scene.selections) == circle_index + 1
+    assert scene.selections[-1][0] is rejected and rejected.GetType() == 1
+    assert len(scene.colors) == circle_index and scene.state.selected is None
+
+
+@pytest.mark.parametrize("field", ("radius", "length", "construction", "type", "Width", "Style", "Layer"))
+def test_selected_native_geometry_and_appearance_are_rechecked_before_color(stock_source_scene, field):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+
+    def drift(segment):
+        if field == "radius":
+            segment.radius += 0.001
+        elif field == "length":
+            segment.GetLength = lambda: 0.001
+        elif field == "construction":
+            segment.ConstructionGeometry = False
+        elif field == "type":
+            segment.GetType = lambda: 3
+        else:
+            setattr(segment, field, "FOREIGN" if field == "Layer" else 99)
+
+    scene.state.after_select = drift
+    with pytest.raises(RuntimeError):
+        _blacken_stock(scene, capture)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("color", (0x808080, -1, False, None))
+def test_void_color_setter_must_read_back_integer_black(stock_source_scene, color):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    scene.state.after_color = lambda segment: setattr(segment, "Color", color)
+    with pytest.raises(RuntimeError, match="color expected=0"):
+        _blacken_stock(scene, capture)
+    assert len(scene.colors) == 1 and scene.state.selected is None
+
+
+@pytest.mark.parametrize("field", ("radius", "length", "construction", "type", "Width", "Style", "Layer"))
+def test_color_setter_must_not_change_curve_or_width_style_layer(stock_source_scene, field):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+
+    def drift(segment):
+        if field == "radius":
+            segment.radius += 0.001
+        elif field == "length":
+            segment.GetLength = lambda: 0.001
+        elif field == "construction":
+            segment.ConstructionGeometry = False
+        elif field == "type":
+            segment.GetType = lambda: 3
+        else:
+            setattr(segment, field, "FOREIGN" if field == "Layer" else 99)
+
+    scene.state.after_color = drift
+    with pytest.raises(RuntimeError):
+        _blacken_stock(scene, capture)
+    assert len(scene.colors) == 1 and scene.state.selected is None
+
+
+def test_native_color_setter_failure_preserves_error_and_clears_selection(stock_source_scene):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    failure = OSError("native SetLineColor refused")
+
+    def refused(_color):
+        raise failure
+
+    scene.model.SetLineColor = refused
+    with pytest.raises(OSError) as caught:
+        _blacken_stock(scene, capture)
+    assert caught.value is failure
+    assert scene.state.selected is None
+
+
+def test_black_profile_reacquires_fresh_instances_after_drawing_rebuild(stock_source_scene):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    old = tuple(scene.mapped.values())
+
+    def stale(*_args):
+        pytest.fail("read stale native curve after drawing rebuild")
+
+    def refresh():
+        for source in scene.segments:
+            previous = scene.mapped[id(source)]
+            current = scene.make_instance(source, previous.native_id)
+            current.Color = previous.Color
+            scene.mapped[id(source)] = current
+            previous.GetType = previous.GetLength = stale
+        scene.segments.reverse()  # Native enumeration order is not identity.
+
+    scene.state.after_drawing_rebuild = refresh
+    _blacken_stock(scene, capture)
+    assert all(current is not previous for current, previous in zip(scene.mapped.values(), old, strict=True))
+    assert len(scene.colors) == 9 and all(instance.Color == 0 for instance in scene.mapped.values())
+
+
+@pytest.mark.parametrize("fault", ("color", "Width", "Style", "Layer", "geometry", "identity", "rebuild"))
+def test_black_profile_properties_must_survive_the_settling_rebuild(stock_source_scene, fault):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+
+    def changed():
+        segment = scene.mapped[id(scene.circles[0])]
+        if fault == "color":
+            segment.Color = 0x808080
+        elif fault in ("Width", "Style", "Layer"):
+            setattr(segment, fault, "FOREIGN" if fault == "Layer" else 99)
+        elif fault == "geometry":
+            segment.radius += 0.001
+        elif fault == "identity":
+            replacement = scene.make_instance(scene.circles[0])
+            replacement.Color = 0
+            scene.mapped[id(scene.circles[0])] = replacement
+
+    if fault == "rebuild":
+        scene.model.EditRebuild3 = lambda: False
+    else:
+        scene.state.after_drawing_rebuild = changed
+    with pytest.raises(RuntimeError):
+        _blacken_stock(scene, capture)
+    assert len(scene.colors) == 9 and scene.state.selected is None
+
+
+@pytest.mark.parametrize("fault", ("activation-refused", "foreign-active-view", "foreign-selection-view"))
+def test_black_profile_requires_exact_activated_and_selection_bound_stock_view(stock_source_scene, fault):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    if fault == "activation-refused":
+        scene.model.ActivateView = lambda _name: False
+    elif fault == "foreign-active-view":
+        scene.model.ActivateView = lambda _name: setattr(scene.model, "ActiveDrawingView", object()) or True
+    else:
+        class ForeignSelectData:
+            @property
+            def View(self):
+                return scene.source
+
+            @View.setter
+            def View(self, _view):
+                pass
+
+        scene.model.SelectionManager.CreateSelectData = ForeignSelectData
+    with pytest.raises(RuntimeError):
+        _blacken_stock(scene, capture)
+    assert scene.colors == scene.selections == []
+
+
+def test_black_profile_refuses_distinct_source_proxies_with_duplicate_native_identity(stock_source_scene):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    scene.circles[0].native_id = scene.circles[1].native_id = object()
+    with pytest.raises(RuntimeError, match="duplicate native source"):
+        _blacken_stock(scene, capture)
+    assert scene.colors == scene.selections == []
+
+
+class _SupplierCalloutDisplay(SimpleNamespace):
+    def __getattr__(self, name):
+        if name == "OffsetText":
+            pytest.fail("diametric callouts must not query unavailable OffsetText")
+        raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name == "OffsetText":
+            pytest.fail("diametric callouts must not set unavailable OffsetText")
+        super().__setattr__(name, value)
+
+
+@pytest.fixture
+def stock_diagram_scene(stock_source_scene, monkeypatch):
+    """Real existing annotation curation, with native import/export boundaries mocked."""
+    from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+
+    scene = stock_source_scene
+    scene.capture = _stock_capture(scene)
+    scene.adapter.currentModel = scene.model
+    scene.adapter._attempt = lambda operation: operation()
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: scene.stock)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_show_hidden_owners", lambda *_args, **_kwargs: [drawing.SUPPLIER_STOCK_FEATURE])
+    monkeypatch.setattr(
+        native_drawing._sw_type_info, "early_bound_or_flag",
+        lambda value, _kind, *_members: value,
+    )
+    monkeypatch.setattr(native_drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    old_keep = {
+        "SupplierNominalEyeOD": (0.180, 0.244),
+        "SupplierNominalWire": (0.255, 0.235),
+        "SupplierStockShank": (0.105, 0.160),
+        "SupplierStockOverall": (0.065, 0.175),
+    }
+    annotations, placed, contracts, notes = [], [], [], []
+    for name, old in old_keep.items():
+        native = scene.dimensions[name]
+        display = _SupplierCalloutDisplay(GetDimension2=lambda _index, native=native: native)
+        annotation = SimpleNamespace(
+            name=name, position=(*old, 0.0002),
+            GetSpecificAnnotation=lambda display=display: display,
+        )
+
+        def set_position(x, y, _z, annotation=annotation):
+            placed.append((annotation.name, (x, y)))
+            annotation.position = (x, y, 0.0002)
+            return True
+
+        annotation.SetPosition = set_position
+        annotation.GetPosition = lambda annotation=annotation: annotation.position
+        display.GetAnnotation = lambda annotation=annotation: annotation
+        annotations.append(annotation)
+
+    def curate(actual_adapter, stock, *, keep, view_label, dimensions_by_feature):
+        assert actual_adapter is scene.adapter and stock is scene.stock
+        assert dimensions_by_feature is drawing.SUPPLIER_STOCK_DIMENSIONS
+        assert view_label == "as-supplied nominal stock envelope and wire section"
+        return native_drawing.curate_dimensions(actual_adapter, annotations, reposition=keep)
+
+    def reference(_adapter, display, **contract):
+        contracts.append(contract)
+        return display
+
+    def note(_adapter, text, x, y):
+        assert scene.model.ActiveDrawingView is None
+        notes.append((text, x, y))
+        return SimpleNamespace()
+
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", curate)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", reference)
+    monkeypatch.setattr(drawing, "add_note", note)
+    monkeypatch.setattr(drawing, "sheet_drawable_region", lambda *_args, **_kwargs: SimpleNamespace(
+        xmin=0.0127, ymin=0.0127, xmax=0.4191, ymax=0.2667,
+    ))
+    scene.model.GetEditSheet = lambda: scene.model.ActiveDrawingView is None
+    scene.model.GetCurrentSheet = lambda: SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 0, 0, 0, 0.4318, 0.2794),
+    )
+    scene.annotations, scene.placed, scene.contracts, scene.notes = annotations, placed, contracts, notes
+    return scene
+
+
+def test_supplier_diagram_uses_supported_complete_annotation_curation_without_changing_source(stock_diagram_scene):
+    scene = stock_diagram_scene
+    values = dict(scene.values)
+    stock, refs, notes = drawing._supplier_stock_diagram(scene.adapter, scene.source, scene.capture)
+    assert stock is scene.stock and len(refs) == 4 and len(notes) == 2
+    assert dict(scene.placed) == {
+        "SupplierNominalEyeOD": (0.200, 0.250),
+        "SupplierNominalWire": (0.255, 0.235),
+        "SupplierStockShank": (0.105, 0.159),
+        "SupplierStockOverall": (0.065, 0.175),
+    }
+    assert len(scene.colors) == 9 and scene.model.ActiveDrawingView is None
+    assert scene.values == values and scene.state.active == "OriginalFinished"
+    assert scene.feature.Visible == scene.thread.Visible == 1
+    eye = next(contract for contract in scene.contracts if contract["label"] == "SupplierNominalEyeOD")
+    assert eye == {
+        "label": "SupplierNominalEyeOD", "expected_mm": spec.SUPPLIER_NOMINAL_EYE_OD_MM,
+        "units": "in", "precision": spec.SUPPLIER_REFERENCE_PRECISION["SupplierNominalEyeOD"],
+        "presentation": "diameter", "fraction_denominator": spec.SUPPLIER_FRACTION_DENOMINATOR,
+        "callout": "NOMINAL EYE ENVELOPE",
+    }
+    assert scene.notes[0][0] == "SUPPLIER NOMINAL STOCK ENVELOPE — AS SUPPLIED"
+    assert scene.notes[0][1:] == pytest.approx((0.016, 0.2627))
+    assert scene.notes[1] == (
+        "NOMINAL PROFILE ONLY — INSTALLED VENDOR-CAD EYE UNCHANGED\n"
+        "STOCK REFERENCES ONLY — FINISHED TRIM AND CHAMFER: SHEET 1",
+        0.016, 0.089,
+    )
+    assert drawing.STOCK_SCALE == (2.0, 1.0)
+    assert scene.stock.Position == pytest.approx((0.150, 0.2337375))
+
+
+@pytest.mark.parametrize("name", ("SupplierNominalEyeOD", "SupplierStockShank"))
+@pytest.mark.parametrize("position", (None, (), (0.180, 0.244, 0.0002), (math.nan, 0.250, 0.0002)))
+def test_complete_supplier_annotation_placement_requires_finite_exact_readback(stock_diagram_scene, name, position):
+    scene = stock_diagram_scene
+    annotation = next(item for item in scene.annotations if item.name == name)
+    annotation.GetPosition = lambda: position
+    with pytest.raises(RuntimeError, match="did not retain its placement"):
+        drawing._supplier_stock_diagram(scene.adapter, scene.source, scene.capture)
+
+
+# Raw original native text rows from the recovered 9bb same-saved-attempt SM
+# layout audit. These immutable measurements are offline translation regressions,
+# not native proof that the new diameter leader takes a collision-free route.
+_EYE_NATIVE_ROWS_MM = (
+    ("(", 168.7712, 244.2722, 1.7208, 3.5),
+    ("<MOD-DIAM>", 170.4920, 244.2187, 5.2784, 3.5),
+    ("11", 176.7962, 246.8294, 5.1722, 3.5),
+    ("16", 176.7962, 242.2011, 5.1722, 3.5),
+    ('" in)', 182.9941, 244.2722, 8.2347, 3.5),
+    ("NOMINAL EYE ENVELOPE", 152.2674, 236.6449, 55.4653, 3.5),
+)
+
+
+def _translated_eye_rows_mm(anchor):
+    dx, dy = anchor[0] * 1000.0 - 180.0, anchor[1] * 1000.0 - 244.0
+    return tuple(
+        (text, (x + dx, y + dy, x + dx + width, y + dy + height))
+        for text, x, y, width, height in _EYE_NATIVE_ROWS_MM
+    )
+
+
+def _boxes_clear(first, second, gap):
+    return (
+        first[2] + gap <= second[0] or second[2] + gap <= first[0]
+        or first[3] + gap <= second[1] or second[3] + gap <= first[1]
+    )
+
+
+@pytest.mark.parametrize("anchor, clears", (
+    ((0.180, 0.244), False),  # Original label crosses the large nominal eye.
+    ((0.200, 0.244), False),  # Rejected shelf intersects the separate wire circle.
+    (drawing.STOCK_KEEP["SupplierNominalEyeOD"], True),
+))
+def test_complete_eye_callout_translates_every_native_row_clear_of_all_three_circles(anchor, clears):
+    rows = _translated_eye_rows_mm(anchor)
+    # Actual PDF wire-circle ink bounds; eye circle extrema agree with the
+    # proved immutable source profile projected at the retained 2:1 stock frame.
+    circles = (
+        (132.5375, 216.2750, 167.4625, 251.2000),
+        (142.0625, 225.8000, 157.9375, 241.6750),
+        (205.237494, 228.974999, 214.762494, 238.499999),
+    )
+    assert all(_boxes_clear(box, circle, 3.5) for _text, box in rows for circle in circles) is clears
+    if clears:
+        label = dict(rows)["NOMINAL EYE ENVELOPE"]
+        assert label == pytest.approx((172.2674, 242.6449, 227.7327, 246.1449))
+        assert label[0] - circles[0][2] == pytest.approx(4.8049)
+        assert label[1] - circles[2][3] == pytest.approx(4.144901)
+
+
+@pytest.mark.parametrize("anchor, fits", (
+    (drawing.STOCK_KEEP["SupplierNominalEyeOD"], True),
+    ((0.200, 0.252), False),  # Label alone fits, but the fraction numerator does not.
+))
+def test_complete_native_eye_fraction_and_label_rows_fit_unchanged_stock_cell(anchor, fits):
+    rows = _translated_eye_rows_mm(anchor)
+    cell = (12.7, 94.0, 419.1, 257.7)
+    inside = all(
+        cell[0] <= box[0] <= box[2] <= cell[2] and cell[1] <= box[1] <= box[3] <= cell[3]
+        for _text, box in rows
+    )
+    assert inside is fits
+    if fits:
+        top = max(box[3] for _text, box in rows)
+        assert top == pytest.approx(256.3294)
+        assert cell[3] - top == pytest.approx(1.3706)
+        assert min(box[0] for _text, box in rows) == pytest.approx(172.2674)
+
+
+@pytest.mark.parametrize("anchor, clears", (
+    ((0.105, 0.160), False),
+    (drawing.STOCK_KEEP["SupplierStockShank"], True),
+))
+def test_shank_complete_printed_block_gap_to_overall_keeps_actual_height_threshold(anchor, clears):
+    # Whole actual PDF glyph boxes, including numerator/denominator/qualifier.
+    shank = (72.1415, 153.2055, 137.7278, 167.2446)
+    overall = (40.5463, 170.3776, 89.4443, 179.5646)
+    dx, dy = anchor[0] * 1000.0 - 105.0, anchor[1] * 1000.0 - 160.0
+    translated = (shank[0] + dx, shank[1] + dy, shank[2] + dx, shank[3] + dy)
+    actual_text_height = 3.9386
+    assert _boxes_clear(translated, overall, actual_text_height) is clears
+    if clears:
+        gap = overall[1] - translated[3]
+        assert gap == pytest.approx(4.1330)
+        assert gap - actual_text_height == pytest.approx(0.1944)
+
+
+@pytest.mark.parametrize("anchor, fits", (
+    (drawing.STOCK_KEEP["SupplierNominalEyeOD"], True),
+    ((0.200, 0.252), False),
+))
+def test_settled_layout_checks_complete_native_eye_rows_not_only_qualifier_box(
+    stock_source_scene, monkeypatch, anchor, fits,
+):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    scene.stock.Position = (0.150, 0.2337375)
+    contracts, notes = _stock_layout_scene(scene, monkeypatch)
+    annotation = SimpleNamespace(
+        OwnerType=0, Owner=scene.stock, Visible=1, IsDangling=lambda: False,
+    )
+    display = _SupplierCalloutDisplay(
+        GetDimension2=lambda _index: scene.dimensions["SupplierNominalEyeOD"],
+        GetAnnotation=lambda: annotation, GetOverride=lambda: False,
+        ShowDimensionValue=True, GetNext5=lambda: None,
+    )
+    scene.stock.GetFirstDisplayDimension6 = lambda: display
+    rows = _translated_eye_rows_mm(anchor)
+    geometry = {
+        "texts": [
+            {
+                "t": text, "pos": (box[0] / 1000.0, box[1] / 1000.0, 0.0002),
+                "w": (box[2] - box[0]) / 1000.0, "h": (box[3] - box[1]) / 1000.0,
+                "ang": 0.0, "ref": 1,
+            }
+            for text, box in rows
+        ],
+    }
+    monkeypatch.setattr(purchased_drawing, "annotation_display", lambda *_args: (geometry, ()))
+    if fits:
+        drawing._verify_supplier_layout(scene.adapter, contracts, notes, scene.source, capture)
+    else:
+        # The qualifier is still below the cell top; only the complete row set,
+        # including its numerator, exposes the real overflow.
+        qualifier = dict(rows)["NOMINAL EYE ENVELOPE"]
+        assert qualifier[3] < 257.7
+        with pytest.raises(RuntimeError, match="supplier dimension leaves its cell"):
+            drawing._verify_supplier_layout(scene.adapter, contracts, notes, scene.source, capture)
+
+
+@pytest.mark.parametrize("anchor, clears", (
+    (drawing.STOCK_KEEP["SupplierNominalEyeOD"], True),
+    ((0.255, 0.250), False),  # Over the wire numeral/fraction, despite clearing its circle.
+    ((0.140, 0.267), False),  # Into the actual stock header, not merely the sheet border.
+))
+def test_complete_eye_native_rows_clear_actual_header_and_entire_wire_callout(anchor, clears):
+    rows = _translated_eye_rows_mm(anchor)
+    # Original same-attempt native note extent, including its full title row.
+    header = (15.7412, 258.3656, 133.4536, 263.1313)
+    # Every original SupplierNominalWire text fragment: complete fractional
+    # value, diameter symbol, units, parentheses and the full qualifier row.
+    wire_rows = (
+        (243.7712, 235.2722, 245.4920, 238.7722),
+        (245.4920, 235.2187, 250.7704, 238.7187),
+        (253.0892, 237.8294, 255.6753, 241.3294),
+        (251.7962, 233.2011, 256.9684, 236.7011),
+        (257.9941, 235.2722, 266.2288, 238.7722),
+        (227.7340, 227.6449, 282.2659, 231.1449),
+    )
+    # All four native wire-callout line fragments, including its fraction bar
+    # and whole shoulder. Pad by half the actual 0.13 mm PDF dimension stroke.
+    wire_lines = (
+        (251.2833 - 0.065, 238.1371 - 0.065, 257.4812 + 0.065, 238.1371 + 0.065),
+        (214.4558 - 0.065, 227.6449 - 0.065, 226.1465 + 0.065, 232.0562 + 0.065),
+        (205.5442 - 0.065, 232.0562 - 0.065, 214.4558 + 0.065, 235.4188 + 0.065),
+        (226.1465 - 0.065, 227.6449 - 0.065, 282.2660 + 0.065, 227.6449 + 0.065),
+    )
+    # Enclose the existing native arrowhead conservatively around its actual
+    # tip by its 3.556 mm length plus half its 0.762 mm width and half stroke.
+    # This proves clearance without guessing the new eye leader's routing.
+    reach = 3.556 + 0.762 / 2.0 + 0.065
+    wire_arrow = (214.4558 - reach, 232.0562 - reach, 214.4558 + reach, 232.0562 + reach)
+    neighbors = (header, *wire_rows, *wire_lines, wire_arrow)
+    assert all(_boxes_clear(box, neighbor, 3.5) for _text, box in rows for neighbor in neighbors) is clears
+    if clears:
+        label = dict(rows)["NOMINAL EYE ENVELOPE"]
+        assert label[0] - header[2] == pytest.approx(38.8138)
+        assert label[1] - wire_rows[-1][3] == pytest.approx(11.5)

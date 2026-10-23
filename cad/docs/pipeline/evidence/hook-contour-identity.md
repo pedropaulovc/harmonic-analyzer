@@ -637,16 +637,182 @@ circle, source-part correspondence, authoritative Wire/torus, tolerance and
 nominal-model contracts. PDF-save and pre-close observations require the
 same captured keys to remain stable and recheck current native identities
 and physical attachment. These observers do not refresh geometry, rebuild
-or activate a source configuration; restoring FINISHED is UI sheet state.
+or activate a source configuration. Native/PDF observers restore FINISHED UI
+state; the pre-close observer instead preserves its exact entry sheet/title.
 The temporary failure-only collector is superseded by this strict capture.
 
 The shared callback still runs when an operation unwinds a failure, so a
 callback alone never proves SaveAs success and cannot replace the primary
 save error. All eight exports remain absent from this failed attempt, with
 no uploaded failure assets. Still-open final attachment, actual complete
-PDF ink, released-v44 comparison, automated machinist SHIP and exact-source
-Claude HIGH remain separate required gates. No cold-reopen persistence
-claim follows.
+PDF ink, released-v44 comparison, automated machinist SHIP and independent
+exact-source code review remain separate required gates. No cold-reopen
+persistence claim follows. The current session's explicit review-route
+substitution is recorded below; exhausted Claude routes are not retried.
+
+## Independent post-export close failures at 9bb
+
+Permanent identity-cutover source `9bb6e4e07570c57d243180f6841271e59fd3dde6`
+passed 733 focused tests, F821, 149 adapter methods and 110 native-binding
+contracts. The normal pair ran on the independently admitted C carrier as
+`20261023T033934343Z-443b70489e2b4d6a8d0c544594ddd632`.
+The complete original handoff is
+`C:/ha-release-manager-20261023/runs/repair-fleet/hook1853-9bb6e4e0-saved-identity-native-handoff.json`,
+SHA-256 `7e0f9a371ac02b4f0d1f7d32b96ce02571a0de86866081f1ca834e99903d057e`.
+Its small D pointer is
+`hook-contour-proof/final-saved-identity-9bb6e4e0-native-handoff.json`.
+Both original drawing leaves failed; neither is a native success.
+
+The independent worker errors are:
+
+```text
+drawing 'ch-vn-spring-hook - SUPPLIER-STOCK' did not close after export
+drawing 'sm-vn-boss-hook - SUPPLIER-STOCK' did not close after export
+```
+
+Both logs reach PDF export and the two-sheet layout audit before this new
+failure. The former EyeOD/EyeID missing-key error is not the current refusal.
+This is control-flow evidence, **not printed per-annotation IsSame/current-key
+measurements, a qualified final attachment, or a borrowed SM-to-CH proof**.
+The original controller has none of the eight requested exports and the
+original failure capture has no forensic files. Filesystem-only recovery
+of already-exported worker files is separate after-terminal provenance;
+recovery must not rewrite those original failed outcomes.
+
+The shared finalizer reads an opaque native drawing title before emitting
+`before_drawing_close`, then passes that captured value to its one `CloseDoc`
+call. The owned observer previously restored FINISHED after inspecting both
+sheets, including at that close boundary. The logs print the captured
+SUPPLIER-STOCK title; they do not print the post-callback title or a native
+document table. The title-change cause is therefore a source-ordering
+inference until the corrected runtime contract succeeds, not an invented
+raw readback.
+
+The owned correction captures the entry `ISheet.GetName()` and opaque
+`IModelDoc2.GetTitle()`, performs the same complete identity/key/physical
+checks, and restores the **exact entry sheet in a finally boundary** before
+normal return. Its current title must equal the original opaque title.
+A failed restoration cannot replace an earlier verification error: both
+are retained with the original primary. Native-save and PDF-save FINISHED
+restoration semantics remain unchanged. There is no suffix parsing,
+second close attempt, CloseAll, ignored closed-file check, or shared
+finalizer change. Both getters are concrete no-argument native BSTR methods.
+
+The actual aggregate audit reports are CH two gating findings
+(`dim-line-through-own-text` 1, `extension-through-own-text` 1), and SM five
+gating findings (`extension-through-own-text` 4, `view-edges-missing` 1)
+plus one advisory `text-separation`. Missing edges are **not** waived for
+the zero-body stock diagram. Aggregate categories do not identify offending
+sheets, dimensions or coordinates. Retained full audit JSON and whole PDFs
+must be inspected before selecting presentation repairs or dispatching
+another production pair. No cleanup-only unchanged-paper rerun is used as
+layout qualification.
+
+## Recovered whole paper and actual presentation findings
+
+Filesystem-only, exact-worker/source recovery retained the already-existing
+PDF, PNG, SLDDRW and full audit JSON from each failed 9bb worker. These are
+after-terminal recovered files, **not successful native leaves or an exact
+native-save capture**. Their manifests, local hashes and original failure
+boundary are retained separately:
+
+- CH PDF SHA-256:
+  `0752c51ce01993bf1d73b191b6e48fcf76fbb75fb9f7f04ccea6d40cffc3ef1e`.
+- SM PDF SHA-256:
+  `6b6bdebf89028735f8d469d5c0432921bb0c4b78ddcec5f61c90cf94c12a3427`.
+- Complete paper proof:
+  `C:/ha-release-manager-20261023/runs/repair-fleet/hook1853-9bb-paper-proof/`.
+
+The whole released-v44 comparison covers both changed FINISHED pages and
+both added stock pages. All four overlays were inspected. Standard automated
+`gpt-6-astra` medium machinist review ran three independent runs per part,
+then both judges, without retries or quota substitution. Both aggregate
+verdicts are **FIX**, with their gating clarity findings unanimous 3/3:
+
+- CH's upper angular leader/arc crosses the `45°` numerals.
+- SM's complete `NOMINAL EYE ENVELOPE` callout crosses the stock eye rings.
+
+These are actual paper defects, not native contour-identity failures.
+Unchanged v44 tolerance/catalogue wording is retained despite two nongating
+one-of-three SM suggestions. The raw runs, judges, aggregates, command and
+exit-1 execution receipt remain under `machinist-review/`. New changed paper
+requires a new review; an unchanged FIX is never rerolled.
+
+### CH angular text shelf
+
+The angular dimension keeps its existing native arc anchor `(124,117)mm`.
+Only its text uses the existing supported angular `OffsetText` mechanism
+at `(137,117)mm`, with native position/mode readback and strict refusal.
+The observed annotation plane is finite Z=0.0005m; this existing annotation
+position contract checks XY, not an invented Z=0 plane. Physical eye-circle
+centre/normal tolerances are separate and unchanged.
+
+The whole recorded witnesses, arcs and arrowhead polygons have maximum
+X=129.3085mm. At the new text shelf the actual glyph left edge is
+133.5972mm. Conservatively allowing half the widest recorded0.35mm ink
+stroke gives a4.1137mm gap, exceeding the3.5mm native text height.
+The smaller proposal with only0.0972mm paint clearance was rejected.
+Final whole-annotation and neighbor clearance still require actual paper.
+
+### SM complete diameter callout and stock ink
+
+`IDisplayDimension.OffsetText` is explicitly unavailable for radial and
+diametric dimensions because they already have a leader. It is not tried.
+The existing primary `curate_model_dimensions` / `IAnnotation.SetPosition`
+placement instead moves the complete nominal EyeOD annotation to
+`(200,250)mm`; the exact native circle, dimension value, configuration,
+source binding, tolerance and physical attachment criteria do not change.
+
+The initially proposed `(200,244)mm` was rejected before native dispatch:
+the actual adjacent wire-section circle occupies
+`[205.237494,228.974999]..[214.762494,238.499999]mm`, and the proposed label
+would cross it. At `(200,250)mm`, the predicted complete-label left edge
+172.2674mm clears the eye ring by4.8049mm and its bottom242.6449mm clears
+the wire circle by4.1449mm. The conservative highest native fraction text
+extent is256.3294mm, below the unchanged257.7mm stock-cell top by1.3706mm.
+These calculations bound the source placement, not a final native/PDF
+claim; the complete leader route, all fraction text and every neighbor
+must still be inspected. The nominal shank text moves down1mm to159mm,
+without changing its geometry or value.
+
+The actual recovered stock profile has412 dashed PDF pieces in
+RGB(128,128,128), width0.129998609mm. The existing audit's ink input excludes
+nonblack strokes, explaining why this valid source-projected profile is
+absent from that coverage operand. Zero bodies and a projection oracle
+alone do **not** prove printed ink coverage.
+
+The recipe reuses the existing native mapped-sketch selection pattern to
+make exactly the nine drawing-view instances black: three complete circles
+and six lines belonging to the authoritative stock sketch. Each selection
+must be the exact mapped native entity, one expected external-sketch
+selection, with unchanged finite source geometry and construction state.
+`IDrawingDoc.SetLineColor(0)` is void; native Color0 is read back, and native
+width/style/layer remain unchanged. No source-part style, construction,
+geometry, configuration or save is changed. Missing, duplicate, foreign,
+wrong-type, wrong-identity or changed-geometry instances refuse. Native
+circle-selection proof and actual final black coverage of all nine curves
+remain mandatory; no unsupported segment type or missing-edge waiver is
+accepted.
+
+Four SM raw `extension-through-own-text` findings are the fraction bars
+themselves: native horizontal6.1979mm segments between the actual numerator
+and denominator rows. Independent black PDF segments match their native
+endpoints within0.000048mm. The raw findings are retained. There is no
+decimalization, suppression or unauthorized shared-classifier change.
+This report-mode classification does not excuse a real profile-coverage
+or presentation failure.
+
+## Current session review route
+
+The latest explicit user instruction replaces the unavailable Claude code
+gate for this session with an **independent `codex-gpt-6-1-sol-xhigh`
+subagent running `e-code-review XHIGH`**: ten inline review angles,
+deduplication and a gap sweep against the exact frozen base/head and all
+five owned files. Same-family review is explicitly permitted. No paid
+remote reviewer, repeated Claude route probe or quota waiting is used.
+No completed review is claimed here. Final focused source checks, both
+normal native outputs, complete changed-paper v44 comparison, automated
+machinist SHIP and this independent exact-source review are distinct gates.
 
 ## Evidence boundary
 

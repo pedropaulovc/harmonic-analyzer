@@ -9,6 +9,9 @@ import pytest
 import _config
 import _purchased_fastener_drawing as purchased_drawing
 import _drawing_common as drawing_common
+import _drawing_dimensions as drawing_dimensions
+from _layout_audit import arc_segments, arrowhead_segments
+from _layout_geometry import Box, Segment, segment_box_distance
 import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
 import draw_sm_vn_boss_hook as boss_drawing
@@ -318,6 +321,309 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
         drawing._verify_controls(None, annotations)
 
 
+# Recovered 9bb FINISHED native display data. Keep BOTH whole witnesses,
+# BOTH arc fragments and the full arrow polygons, not just one crossing or tip.
+# These fixtures and the measured PDF glyph boxes predict a placement budget;
+# they do not certify regenerated native ink or an exact-head saved drawing.
+_CH_9BB_ANGLE_LINES = (
+    Segment(0.1120414, 0.1039811, 0.1293085, 0.1039811),
+    Segment(0.1094701, 0.1069666, 0.1226235, 0.12012),
+)
+_CH_9BB_ANGLE_ARCS = (
+    (0, 0, -1, -1, 0.1283085, 0.1039811, 0.0005,
+     0.1257565, 0.1142219, 0.0005, 0.1064846, 0.1039811, 0.0005, 0, 0, 1, 1),
+    (0, 0, -1, -1, 0.124, 0.117, 0.0005,
+     0.1219164, 0.1194129, 0.0005, 0.1064846, 0.1039811, 0.0005, 0, 0, 1, 1),
+)
+_CH_9BB_ANGLE_ARROWS = (
+    (0.1283085, 0.1039811, 0.0005, -0.0806729, 0.9967406, 0,
+     0.003556, 0.000762, 0, 0, 0, 1),
+    (0.1219164, 0.1194129, 0.0005, 0.6477577, -0.7618464, 0,
+     0.003556, 0.000762, 0, 0, 0, 1),
+)
+
+
+def _chamfer_angle_scene(monkeypatch, *, fault=None):
+    """Use the real offset helper against native-shaped, observable objects."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing_dimensions, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(
+        drawing_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, _kind, *_members: value,
+    )
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, item: item.name)
+    fragments = (
+        *_CH_9BB_ANGLE_LINES,
+        *(segment for raw in _CH_9BB_ANGLE_ARCS for segment in arc_segments(raw)),
+        *(segment for raw in _CH_9BB_ANGLE_ARROWS for segment in arrowhead_segments(raw)),
+    )
+    state = SimpleNamespace(
+        position=(0.190, 0.140, 0.0005), offset=True, stage=None,
+        arc_xy=(0.124, 0.117), geometry=fragments, read_only=False,
+        bad_stage=None, bad_position=None,
+    )
+    events = []
+    controls, native_controls = [], []
+    for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
+        native = SimpleNamespace(
+            FullName=f"{name}@OriginalCutControl@original-anchor.SLDPRT",
+            DrivenState=2, SystemValue=nominal,
+            Tolerance=SimpleNamespace(
+                Type=spec.DIMENSION_TOLERANCE_TYPES[name],
+                GetMinValue=lambda lower=lower: lower,
+                GetMaxValue=lambda upper=upper: upper,
+            ),
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native,
+            GetText=lambda _index: "",
+            GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
+        )
+        annotation = SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display,
+        )
+        controls.append(annotation)
+        native_controls.append(native)
+    angle = controls[-1]
+    original_display = angle.GetSpecificAnnotation()
+
+    class AngularDisplay:
+        GetDimension2 = staticmethod(original_display.GetDimension2)
+        GetText = staticmethod(original_display.GetText)
+        GetPrimaryPrecision2 = staticmethod(original_display.GetPrimaryPrecision2)
+
+        @property
+        def OffsetText(self):
+            return state.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            assert not state.read_only, "read-only proof wrote OffsetText"
+            events.append(("offset", value))
+            if (fault, value) not in (("reset-flag", False), ("shelf-flag", True)):
+                state.offset = value
+
+    display = AngularDisplay()
+    angle.GetSpecificAnnotation = lambda: display
+
+    def position(x, y, z):
+        assert not state.read_only, "read-only proof moved an annotation"
+        stage = "shelf" if state.offset is True else "arc"
+        state.stage = stage
+        events.append(("position", state.offset, (x, y, z)))
+        if fault == f"{stage}-setter":
+            return False
+        if fault == f"{stage}-ignored":
+            return True
+        if state.offset is False:
+            dx, dy = x - state.arc_xy[0], y - state.arc_xy[1]
+            state.geometry = tuple(
+                Segment(item.x0 + dx, item.y0 + dy, item.x1 + dx, item.y1 + dy, item.role)
+                for item in state.geometry
+            )
+            state.arc_xy = (x, y)
+        # Native GetPosition reports its display plane's Z=0.0005 even after
+        # SetPosition2(..., 0). Only finite XYZ and the exact XY contract apply.
+        state.position = (x, y, 0.0005)
+        return True
+
+    def read_position():
+        if state.bad_stage == state.stage:
+            return state.bad_position
+        return state.position
+
+    def rebuild():
+        assert not state.read_only, "read-only proof rebuilt drawing geometry"
+        events.append(("rebuild",))
+
+    angle.SetPosition2 = position
+    angle.GetPosition = read_position
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=rebuild),
+        _attempt=lambda operation: operation(),
+    )
+    return SimpleNamespace(
+        adapter=adapter, annotations=controls, angle=angle, display=display,
+        native_controls=tuple(native_controls), state=state,
+        fragments=fragments, events=events,
+    )
+
+
+def test_chamfer_shelf_moves_only_original_native_text_and_keeps_controls(monkeypatch):
+    scene = _chamfer_angle_scene(monkeypatch)
+    original_annotations = tuple(scene.annotations)
+    original_dimensions = scene.native_controls
+    original_names = tuple(item.FullName for item in original_dimensions)
+    drawing._verify_controls(scene.adapter, scene.annotations)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    drawing._verify_controls(scene.adapter, scene.annotations)
+    assert drawing.FRONT_KEEP["ChamferAngle"] == (0.124, 0.117)
+    assert drawing.CHAMFER_ANGLE_TEXT_XY == (0.137, 0.117)
+    assert scene.events == [
+        ("offset", False), ("position", False, (0.124, 0.117, 0.0)),
+        ("offset", True), ("position", True, (0.137, 0.117, 0.0)), ("rebuild",),
+    ]
+    assert scene.state.arc_xy == (0.124, 0.117)
+    assert scene.state.geometry == scene.fragments
+    assert scene.state.position == (0.137, 0.117, 0.0005)
+    assert all(actual is original for actual, original in zip(scene.annotations, original_annotations))
+    assert all(
+        actual.GetSpecificAnnotation().GetDimension2(0) is original
+        for actual, original in zip(scene.annotations, original_dimensions)
+    )
+    assert tuple(item.FullName for item in original_dimensions) == original_names
+    before = list(scene.events)
+    scene.state.read_only = True
+    drawing._verify_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.events == before
+
+
+@pytest.mark.parametrize(
+    "fault", ("reset-flag", "arc-setter", "arc-ignored", "shelf-setter", "shelf-flag", "shelf-ignored"),
+)
+def test_chamfer_shelf_refuses_native_noops_and_false_setters(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch, fault=fault)
+    with pytest.raises(RuntimeError):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    if fault.startswith("arc") or fault == "reset-flag":
+        assert ("offset", True) not in scene.events
+    if fault == "shelf-flag":
+        # An ignored True put leaves whole-annotation mode active. Refuse it
+        # rather than publishing geometry dragged into the proposed text lane.
+        assert scene.state.geometry != scene.fragments
+
+
+@pytest.mark.parametrize("stage", ("arc", "shelf"))
+@pytest.mark.parametrize(
+    "position",
+    (None, (), (0.137, 0.117), (0.137, 0.117, 0, 0),
+     (float("nan"), 0.117, 0.0005), (0.137, float("inf"), 0.0005),
+     (0.137, 0.117, float("nan")), ("0.137", 0.117, 0.0005),
+     (True, 0.117, 0.0005), (0.1371, 0.117, 0.0005)),
+)
+def test_chamfer_shelf_refuses_bad_native_position_arrays(monkeypatch, stage, position):
+    scene = _chamfer_angle_scene(monkeypatch)
+    scene.state.bad_stage, scene.state.bad_position = stage, position
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+
+
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "renamed", "missing-display"))
+def test_chamfer_shelf_requires_one_original_imported_angular_annotation(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch)
+    if fault == "missing":
+        scene.annotations.remove(scene.angle)
+    elif fault == "duplicate":
+        scene.annotations.append(scene.angle)
+    elif fault == "renamed":
+        scene.angle.name = "UnrelatedAngle"
+    else:
+        scene.angle.GetSpecificAnnotation = lambda: None
+    with pytest.raises(RuntimeError):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert not scene.events
+
+
+@pytest.mark.parametrize("member", ("GetPosition", "OffsetText"))
+def test_chamfer_shelf_preserves_native_getter_errors(monkeypatch, member):
+    scene = _chamfer_angle_scene(monkeypatch)
+    error = OSError(f"native {member} disconnected")
+
+    def fail():
+        raise error
+
+    if member == "GetPosition":
+        scene.angle.GetPosition = fail
+    else:
+        monkeypatch.setattr(type(scene.display), "OffsetText", property(lambda _self: fail(), lambda *_args: None))
+    with pytest.raises(OSError) as caught:
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert caught.value is error
+
+
+@pytest.mark.parametrize("fault", ("offset-false", "truthy-offset", "text-drift"))
+def test_settled_chamfer_text_check_is_read_only_and_refuses_drift(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    if fault == "offset-false":
+        scene.state.offset = False
+    elif fault == "truthy-offset":
+        scene.state.offset = 1
+    else:
+        scene.state.position = (0.1371, 0.117, 0.0005)
+    scene.state.read_only = True
+    before = list(scene.events)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._verify_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.events == before
+    assert scene.state.geometry == scene.fragments
+
+
+@pytest.mark.parametrize("shelf_x, qualifies", ((0.1275, False), (0.137, True)))
+def test_chamfer_shelf_budget_uses_whole_recorded_ink_and_neighbors(
+    monkeypatch, shelf_x, qualifies,
+):
+    """Predict text-only translation, NOT regenerated native/PDF acceptance."""
+    monkeypatch.setattr(drawing, "CHAMFER_ANGLE_TEXT_XY", (shelf_x, 0.117))
+    scene = _chamfer_angle_scene(monkeypatch)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.state.geometry == scene.fragments
+    arcs = tuple(segment for raw in _CH_9BB_ANGLE_ARCS for segment in arc_segments(raw))
+    arrows = tuple(segment for raw in _CH_9BB_ANGLE_ARROWS for segment in arrowhead_segments(raw))
+    assert len(_CH_9BB_ANGLE_LINES) == 2 and len(arcs) >= 4 and len(arrows) == 6
+    assert max(max(item.x0, item.x1) for item in scene.fragments) == pytest.approx(0.1293085)
+    assert max(max(item.x0, item.x1) for item in arcs) == pytest.approx(0.1283085)
+    assert max(max(item.x0, item.x1) for item in arrows) > 0.1284
+    assert max(max(item.x0, item.x1) for item in arrows[3:]) > 0.1245
+    dx = scene.state.position[0] - 0.124
+    glyphs = Box(0.1205972 + dx, 0.1151558, 0.1273748 + dx, 0.1187211)
+    native_text_height = 0.0035  # GetTextHeightAtIndex, not the PDF's glyph height.
+    max_half_ink = 0.00035 / 2  # Include model 0.35 mm as well as dimension 0.13 mm.
+    actual_fragment_gap = min(segment_box_distance(item, glyphs) for item in scene.fragments) - max_half_ink
+    assert (actual_fragment_gap >= native_text_height) is qualifies
+    if not qualifies:
+        assert actual_fragment_gap < native_text_height
+        return
+    whole_ink_right = max(max(item.x0, item.x1) for item in scene.fragments)
+    conservative_paint_gap = glyphs.xmin - whole_ink_right - max_half_ink
+    assert conservative_paint_gap == pytest.approx(0.0041137)
+    assert conservative_paint_gap > native_text_height
+    # All adjacent native controls' PDF glyph rows, including BOTH full
+    # ChamferWidth explanatory lines and the supplier thread's qualifier.
+    neighbors = (
+        Box(0.0376377, 0.1844058, 0.0463483, 0.1879711),  # FinishedOverall
+        Box(0.1571706, 0.103712, 0.1787735, 0.1072773),  # ChamferWidth value
+        Box(0.1234882, 0.0981558, 0.2125071, 0.1017211),  # MIN row
+        Box(0.1207782, 0.0925995, 0.2153525, 0.0961648),  # MAX row
+        Box(0.1538924, 0.1778521, 0.1547272, 0.1823694),
+        Box(0.1604347, 0.1778521, 0.1781072, 0.1823694),
+        Box(0.1507211, 0.1731291, 0.1814563, 0.1767084),
+        Box(0.1285766, 0.1675728, 0.2036568, 0.1711381),
+        Box(0.016348, 0.0798005, 0.1309902, 0.0828565),
+        Box(0.016348, 0.0755365, 0.1432069, 0.0788565),
+        Box(0.01636, 0.0718005, 0.1233485, 0.0748565),
+    )
+    assert min(glyphs.gap(item) for item in neighbors) > native_text_height
+    neighbor_lines = (
+        Segment(0.099, 0.2604811, 0.041, 0.2604811),
+        Segment(0.116526, 0.1039811, 0.041, 0.1039811),
+        Segment(0.042, 0.2604811, 0.042, 0.1890281),
+        Segment(0.042, 0.1039811, 0.042, 0.1834719),
+        Segment(0.108763, 0.1052594, 0.108763, 0.0906656),
+        Segment(0.1064846, 0.1029811, 0.1064846, 0.0906656),
+        Segment(0.108763, 0.0916656, 0.2154785, 0.0916656),
+        Segment(0.108763, 0.0916656, 0.1064846, 0.0916656),
+        Segment(0.1064846, 0.0916656, 0.1001346, 0.0916656),
+        Segment(0.091237, 0.1435436, 0.091237, 0.1676389),
+        Segment(0.108763, 0.1435436, 0.108763, 0.1676389),
+        Segment(0.091237, 0.1666389, 0.108763, 0.1666389),
+        Segment(0.108763, 0.1666389, 0.203834, 0.1666389),
+    )
+    assert min(segment_box_distance(item, glyphs) for item in neighbor_lines) - max_half_ink > native_text_height
+
+
 def test_nut_thread_interference_literal_matches_the_specs():
     assert CHANNEL_ANCHOR_NUT_THREAD == pytest.approx(
         (
@@ -485,6 +791,7 @@ def test_finished_view_creation_fits_recorded_native_cell(
         "check", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
         "_verify_controls", "_verify_supplier_references", "_verify_source_state",
+        "_place_chamfer_angle_text", "_verify_chamfer_angle_text",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
@@ -555,11 +862,17 @@ def _settled_eye_scene(monkeypatch, module):
     monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(module, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
     state = SimpleNamespace(sheet="FINISHED", saved=False)
+    sheet = SimpleNamespace(GetName=lambda: state.sheet)
     model = SimpleNamespace(
         ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
         ActiveDrawingView=None, GetEditSheet=lambda: True,
         GetType=lambda: 3,
         GetPathName=lambda: str(module.OUTPUTS.slddrw.resolve()) if state.saved else "",
+        GetCurrentSheet=lambda: sheet,
+        GetTitle=lambda: {
+            "FINISHED": "opaque drawing window / first # 71",
+            "SUPPLIER-STOCK": "opaque drawing window / second # 24",
+        }[state.sheet],
     )
     model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
     owner = SimpleNamespace(Name="Wire")
@@ -1071,7 +1384,10 @@ def test_settled_eye_reacquires_physical_owner_without_old_handles(monkeypatch, 
               "pdf-key", "close-key", "pdf-circle", "close-circle",
               "pdf-owner", "close-source", "pdf-output-path"),
 )
-def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypatch, tmp_path, module, drift):
+@pytest.mark.parametrize("close_entry", ("FINISHED", "SUPPLIER-STOCK"))
+def test_build_retains_controls_and_refuses_native_save_physical_drift(
+    monkeypatch, tmp_path, module, drift, close_entry,
+):
     """Execute the real build and its supplied finalizer callbacks, not extracted AST."""
     source_path = tmp_path / "anchor.SLDPRT"
     source_path.touch()
@@ -1113,6 +1429,27 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
             name=name, dimension=dimension,
             GetSpecificAnnotation=lambda display=display: display,
         ))
+    presentation_calls = []
+    if module is drawing:
+        def place_chamfer(native_adapter, annotations):
+            assert native_adapter is scene.adapter
+            assert annotations is imported_controls
+            assert not scene.state.saved
+            presentation_calls.append("place")
+
+        def verify_chamfer(native_adapter, annotations):
+            assert native_adapter is scene.adapter
+            assert annotations is imported_controls
+            assert not scene.state.saved
+            presentation_calls.append("settled")
+
+        monkeypatch.setattr(module, "_place_chamfer_angle_text", place_chamfer)
+        monkeypatch.setattr(module, "_verify_chamfer_angle_text", verify_chamfer)
+    else:
+        monkeypatch.setattr(
+            module, "_blacken_supplier_stock_profile",
+            lambda *_args: pytest.fail("mocked stock diagram unexpectedly re-entered profile styling"),
+        )
 
     async def open_model(_path):
         scene.adapter.currentModel = source
@@ -1170,6 +1507,7 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock,))
     saved = []
+    close_calls = []
 
     async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
         for verify in settled_checks:
@@ -1235,8 +1573,20 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
             scene.annotations["EyeID"].entities = [scene.contour(scene.diameters["EyeID"] + 1.0, fresh_face)]
         elif drift == "close-source":
             front.ReferencedDocument = SimpleNamespace(**vars(source))
-        checkpoint("before_drawing_close")
-        assert scene.state.sheet == "FINISHED"
+        model.ActivateSheet(close_entry)
+        close_title = model.GetTitle()
+
+        def close_one(title):
+            assert not close_calls
+            assert title == close_title == model.GetTitle()
+            close_calls.append(title)
+            scene.adapter.currentModel = None
+
+        scene.adapter.swApp.CloseDoc = close_one
+        with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
+            scene.adapter.swApp.CloseDoc(close_title)
+        assert scene.state.sheet == close_entry
+        assert close_calls == [close_title]
         saved.append("pdf-export")
         return {"drawing": "saved"}
 
@@ -1244,11 +1594,16 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
     if drift is None:
         assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
         assert saved == ["native-save", "pdf-export"]
+        assert presentation_calls == (["place", "settled"] if module is drawing else [])
+        assert len(close_calls) == 1
     else:
         with pytest.raises(RuntimeError):
             asyncio.run(module.build(scene.adapter))
         assert saved == ([] if drift in ("lost-imported-control", "changed-imported-control")
                          else ["native-save"])
+        assert close_calls == []
+        if drift in ("close-key", "close-circle", "close-source"):
+            assert scene.state.sheet == close_entry
 
 
 @pytest.mark.parametrize("module", (drawing, boss_drawing))
@@ -1366,11 +1721,16 @@ def _note_build_scene(monkeypatch, tmp_path, module):
             False, 0.4318, 0.2794,
         ),
         GetZoneMargin=lambda _side: 0.0127,
+        GetName=lambda: state.sheet,
     )
     model = SimpleNamespace(
         ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
         GetCurrentSheet=lambda: sheet, GetEditSheet=lambda: state.edit_sheet,
         ActiveDrawingView=None,
+        GetTitle=lambda: {
+            "FINISHED": "opaque note drawing / first # 61",
+            "SUPPLIER-STOCK": "opaque note drawing / second # 87",
+        }[state.sheet],
     )
 
     def activate_view(name):
@@ -1484,6 +1844,26 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         "_verify_controls", "_verify_supplier_references", "_verify_source_state",
     ):
         monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    presentation_calls = []
+    if module is drawing:
+        def place_chamfer(native_adapter, annotations):
+            assert native_adapter is adapter and annotations == []
+            assert state.sheet == "FINISHED" and not state.saved
+            presentation_calls.append("place")
+
+        def verify_chamfer(native_adapter, annotations):
+            assert native_adapter is adapter and annotations == []
+            assert not state.saved
+            assert refreshed, "shelf was checked before final layout geometry refresh"
+            presentation_calls.append("settled")
+
+        monkeypatch.setattr(module, "_place_chamfer_angle_text", place_chamfer)
+        monkeypatch.setattr(module, "_verify_chamfer_angle_text", verify_chamfer)
+    else:
+        monkeypatch.setattr(
+            module, "_blacken_supplier_stock_profile",
+            lambda *_args: pytest.fail("mocked stock diagram unexpectedly re-entered profile styling"),
+        )
     snapshot = (object(),)
     monkeypatch.setattr(module, "_verify_supplier_references", lambda *_args, **_kwargs: snapshot)
 
@@ -1525,7 +1905,167 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         front=front, iso=iso, stock=stock, stock_iso=stock_iso,
         placements=placements, notes=linked_notes, stock_notes=stock_notes,
         property_reads=property_reads, refreshed=refreshed,
+        presentation_calls=presentation_calls,
     )
+
+
+@pytest.mark.parametrize("fault", (None, "placement-refused", "settled-refused"))
+def test_build_places_chamfer_before_save_and_refuses_settled_text_drift(
+    monkeypatch, tmp_path, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    place, verify = drawing._place_chamfer_angle_text, drawing._verify_chamfer_angle_text
+    error = RuntimeError(f"native chamfer shelf {fault}")
+
+    def place_once(adapter, annotations):
+        place(adapter, annotations)
+        if fault == "placement-refused":
+            raise error
+
+    def verify_settled(adapter, annotations):
+        verify(adapter, annotations)
+        assert set(scene.refreshed) == {
+            "finished-front", "finished-iso", "stock-front", "stock-iso",
+        }
+        if fault == "settled-refused":
+            raise error
+
+    monkeypatch.setattr(drawing, "_place_chamfer_angle_text", place_once)
+    monkeypatch.setattr(drawing, "_verify_chamfer_angle_text", verify_settled)
+    if fault is not None:
+        with pytest.raises(RuntimeError) as caught:
+            asyncio.run(drawing.build(scene.adapter))
+        assert caught.value is error
+        assert not scene.state.saved
+    else:
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+    assert scene.presentation_calls == (
+        ["place"] if fault == "placement-refused" else ["place", "settled"]
+    )
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("entry_sheet", ("FINISHED", "SUPPLIER-STOCK"))
+@pytest.mark.parametrize(
+    "check_failure,restore_failure",
+    (
+        (None, None), ("capture", None), ("geometry", None),
+        (None, "false"), (None, "raise"), (None, "noop"), (None, "title"),
+        ("capture", "false"), ("geometry", "raise"), ("geometry", "title"),
+    ),
+)
+def test_close_observer_restores_exact_entry_context_and_preserves_primary_error(
+    monkeypatch, tmp_path, module, entry_sheet, check_failure, restore_failure,
+):
+    """Common's captured opaque title must still identify this one open drawing."""
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    other_sheet = next(name for name in module.SHEET_NAMES if name != entry_sheet)
+    primary = RuntimeError(f"strict close {check_failure} check refused")
+    restoration = OSError("native close-entry sheet activation disconnected")
+    capture, verify = module._capture_saved_supplier_references, module._verify_supplier_references
+    activate = scene.model.ActivateSheet
+    closed, checks = [], []
+    scene.state.closing = scene.state.title_changed = False
+    titles = {
+        "FINISHED": "opaque native title [window A; token 19]",
+        "SUPPLIER-STOCK": "opaque native title [window B; token 62]",
+    }
+    scene.model.GetTitle = lambda: (
+        "unmatched opaque native title [token changed]"
+        if scene.state.title_changed else titles[scene.state.sheet]
+    )
+
+    def activate_sheet(name):
+        if scene.state.closing and name == entry_sheet:
+            if restore_failure == "false":
+                return False
+            if restore_failure == "raise":
+                raise restoration
+            if restore_failure == "noop":
+                return True
+        return activate(name)
+
+    def capture_during_close(*args):
+        observed = capture(*args)
+        if scene.state.closing:
+            checks.append("capture")
+            scene.model.ActivateSheet(other_sheet)
+            if check_failure == "capture":
+                raise primary
+        return observed
+
+    def verify_during_close(*args):
+        result = verify(*args)
+        if scene.state.closing:
+            checks.append("geometry")
+            scene.model.ActivateSheet(other_sheet)
+            if restore_failure == "title":
+                scene.state.title_changed = True
+            if check_failure == "geometry":
+                raise primary
+        return result
+
+    def close_one(title):
+        assert not closed
+        assert scene.adapter.currentModel is scene.model
+        assert title == titles[entry_sheet] == scene.model.GetTitle()
+        closed.append(title)
+        scene.adapter.currentModel = None
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for check in settled_checks:
+            check()
+        scene.state.saved = True
+        checkpoint("after_drawing_save")
+        assert scene.state.sheet == "FINISHED"
+        checkpoint("after_pdf_save")
+        assert scene.state.sheet == "FINISHED"
+        assert scene.model.ActivateSheet(entry_sheet) is True
+        # Match Common: capture the unparsed title before invoking the observer.
+        close_title = scene.model.GetTitle()
+        scene.state.closing = True
+        with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
+            scene.adapter.swApp.CloseDoc(close_title)
+        return {"drawing": "closed"}
+
+    scene.adapter.swApp = SimpleNamespace(CloseDoc=close_one)
+    scene.model.ActivateSheet = activate_sheet
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", capture_during_close)
+    monkeypatch.setattr(module, "_verify_supplier_references", verify_during_close)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    if check_failure is None and restore_failure is None:
+        assert asyncio.run(module.build(scene.adapter)) == {"drawing": "closed"}
+        assert closed == [titles[entry_sheet]]
+        assert scene.adapter.currentModel is None
+    else:
+        with pytest.raises((RuntimeError, OSError)) as caught:
+            asyncio.run(module.build(scene.adapter))
+        assert closed == []
+        assert scene.adapter.currentModel is scene.model
+        if check_failure is not None:
+            assert caught.value is primary
+            notes = getattr(primary, "__notes__", [])
+            if restore_failure is None:
+                assert notes == []
+            else:
+                assert len(notes) == 1
+                assert notes[0].startswith(
+                    "before_drawing_close entry-context restoration also failed: ",
+                )
+                if restore_failure == "raise":
+                    assert notes[0].endswith(f"OSError: {restoration}")
+        elif restore_failure == "raise":
+            assert caught.value is restoration
+        elif restore_failure == "title":
+            assert "opaque native drawing title changed" in str(caught.value)
+        else:
+            assert "close-entry sheet" in str(caught.value)
+    assert checks == (["capture"] if check_failure == "capture" else ["capture", "geometry"])
+    if restore_failure in ("false", "raise", "noop"):
+        assert scene.state.sheet == other_sheet
+    else:
+        assert scene.state.sheet == entry_sheet
 
 
 @pytest.mark.parametrize("module", (drawing, boss_drawing))
@@ -1935,6 +2475,7 @@ def test_finished_source_notes_keep_links_resolved_text_and_sheet_ownership(
 ):
     scene = _note_build_scene(monkeypatch, tmp_path, module)
     assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+    assert scene.presentation_calls == (["place", "settled"] if module is drawing else [])
     assert len(scene.property_reads) == 1
     assert set(scene.notes) == {
         "Supplier", "Supplier SKUs", "Stock Name", "Isometric View Note", "Manufacturing Notes",

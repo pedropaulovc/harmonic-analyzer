@@ -37,7 +37,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
+from _drawing_dimensions import (
+    offset_dimension_text, set_dimension_callouts, set_dimension_precision,
+)
 from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import (
     _show_hidden_owners, curate_view_dimensions as curate_stock_dimensions,
@@ -129,6 +131,12 @@ FRONT_KEEP = {
     "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }
+# 9bb's complete angular witnesses reach X129.3085 mm; its PDF glyph box
+# starts at X120.5972 mm. A text-only +13 mm shelf predicts 4.1137 mm of
+# painted clearance even with the maximum 0.35 mm stroke, above native
+# 3.5 mm text height. Keep FRONT_KEEP's original arc/line anchor; new native
+# routing and whole-sheet ink still require qualification.
+CHAMFER_ANGLE_TEXT_XY = (0.137, 0.117)
 # The deburr band is tighter than the title block on both sides (review r8
 # read it as a plain lead-in): its minimum leg brings the cut end under the
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its
@@ -166,6 +174,61 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
         precision=DIMENSION_PRECISION,
     )
+
+
+def _chamfer_angle_annotation(adapter: Any, annotations: list[Any]) -> tuple[Any, Any]:
+    matches = [
+        raw for raw in annotations if dimension_name(adapter, raw) == "ChamferAngle"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("cut end needs exactly one native ChamferAngle")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    raw_display = annotation.GetSpecificAnnotation()
+    if raw_display is None:
+        raise RuntimeError("ChamferAngle: native display dimension is missing")
+    return annotation, _early_bound(raw_display, "IDisplayDimension")
+
+
+def _verify_chamfer_angle_position(
+    annotation: Any, expected_xy: tuple[float, float],
+) -> None:
+    position = annotation.GetPosition()
+    if (
+        not isinstance(position, (tuple, list)) or len(position) != 3
+        or any(type(value) not in (int, float) or not math.isfinite(value) for value in position)
+        or math.dist(position[:2], expected_xy) > 1e-5
+    ):
+        raise RuntimeError(
+            "ChamferAngle: native position did not persist; "
+            f"expected_xy={expected_xy!r}, actual={position!r}, tolerance_m=1e-5"
+        )
+
+
+def _verify_chamfer_angle_text(adapter: Any, annotations: list[Any]) -> None:
+    """Read native shelf only; never repair a settled or saved dimension."""
+    annotation, display = _chamfer_angle_annotation(adapter, annotations)
+    actual_offset = display.OffsetText
+    if actual_offset is not True:
+        raise RuntimeError(
+            "ChamferAngle: native text shelf did not persist; "
+            f"OffsetText={actual_offset!r}"
+        )
+    _verify_chamfer_angle_position(annotation, CHAMFER_ANGLE_TEXT_XY)
+
+
+def _place_chamfer_angle_text(adapter: Any, annotations: list[Any]) -> None:
+    """Leave the model-owned 45-degree arc in place and move only its text."""
+    annotation, display = _chamfer_angle_annotation(adapter, annotations)
+    display.OffsetText = False
+    if display.OffsetText is not False:
+        raise RuntimeError("ChamferAngle: inherited text offset could not be reset")
+    if annotation.SetPosition2(*FRONT_KEEP["ChamferAngle"], 0.0) is not True:
+        raise RuntimeError("ChamferAngle: native arc placement was refused")
+    _verify_chamfer_angle_position(annotation, FRONT_KEEP["ChamferAngle"])
+    offset_dimension_text(
+        adapter, [annotation], {"ChamferAngle": CHAMFER_ANGLE_TEXT_XY},
+    )
+    _verify_chamfer_angle_text(adapter, [annotation])
 
 
 def _native_equality(app, left, right):
@@ -789,6 +852,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(adapter, annotations)
+    _place_chamfer_angle_text(adapter, annotations)
     refs = _supplier_references(adapter, front)
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
@@ -831,25 +895,61 @@ async def build(adapter: Any) -> dict[str, str]:
         nonlocal saved_refs_by_sheet
         if event not in ("after_drawing_save", "after_pdf_save", "before_drawing_close"):
             return
-        # Checkpoints also run on failed operations: this neither asserts save
-        # success nor replaces the shared finalizer's original save exception.
-        current_refs = _capture_saved_supplier_references(
-            adapter, refs_by_sheet, view_contracts, pre_save_identities,
-        )
-        if event == "after_drawing_save":
-            if saved_refs_by_sheet is not None:
-                raise RuntimeError("supplier native-save identities were already captured")
-        elif saved_refs_by_sheet is None or current_refs != saved_refs_by_sheet:
-            raise RuntimeError("saved supplier exact native keys changed after the drawing save")
-        _verify_supplier_references(
-            adapter,
-            current_refs if event == "after_drawing_save" else saved_refs_by_sheet,
-            view_contracts,
-        )
-        if event == "after_drawing_save":
-            saved_refs_by_sheet = current_refs
-        if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
-            raise RuntimeError("cannot restore finished spring anchor sheet after saved-eye inspection")
+        entry_sheet = entry_title = None
+        primary_error = None
+        try:
+            if event == "before_drawing_close":
+                entry_model = _early_bound(adapter.currentModel, "IModelDoc2")
+                entry_drawing = _early_bound(entry_model, "IDrawingDoc")
+                sheet = _early_bound(entry_drawing.GetCurrentSheet(), "ISheet")
+                name = sheet.GetName()
+                if not isinstance(name, str) or not name:
+                    raise RuntimeError("cannot read the native drawing close-entry sheet")
+                entry_sheet = name
+                entry_title = entry_model.GetTitle()
+                if not isinstance(entry_title, str) or not entry_title:
+                    raise RuntimeError("cannot read the opaque native drawing close-entry title")
+            # Checkpoints also run on failed operations: this neither asserts
+            # save success nor replaces the shared finalizer's save exception.
+            current_refs = _capture_saved_supplier_references(
+                adapter, refs_by_sheet, view_contracts, pre_save_identities,
+            )
+            if event == "after_drawing_save":
+                if saved_refs_by_sheet is not None:
+                    raise RuntimeError("supplier native-save identities were already captured")
+            elif saved_refs_by_sheet is None or current_refs != saved_refs_by_sheet:
+                raise RuntimeError("saved supplier exact native keys changed after the drawing save")
+            _verify_supplier_references(
+                adapter,
+                current_refs if event == "after_drawing_save" else saved_refs_by_sheet,
+                view_contracts,
+            )
+            if event == "after_drawing_save":
+                saved_refs_by_sheet = current_refs
+            if event != "before_drawing_close" and drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+                raise RuntimeError("cannot restore finished spring anchor sheet after saved-eye inspection")
+        except BaseException as exc:
+            primary_error = exc
+            raise
+        finally:
+            if entry_sheet is not None:
+                try:
+                    # Common has already captured its opaque CloseDoc title.
+                    # Restore the exact entry context, not a chosen UI sheet.
+                    if entry_drawing.ActivateSheet(entry_sheet) is not True:
+                        raise RuntimeError("cannot restore the native drawing close-entry sheet")
+                    restored = _early_bound(entry_drawing.GetCurrentSheet(), "ISheet")
+                    if restored.GetName() != entry_sheet:
+                        raise RuntimeError("native drawing close-entry sheet restoration changed sheets")
+                    if entry_model.GetTitle() != entry_title:
+                        raise RuntimeError("opaque native drawing title changed during the close checkpoint")
+                except BaseException as restoration_error:
+                    if primary_error is None:
+                        raise
+                    primary_error.add_note(
+                        "before_drawing_close entry-context restoration also failed: "
+                        f"{type(restoration_error).__name__}: {restoration_error}"
+                    )
 
     return await finalize_drawing(
         adapter,
@@ -864,6 +964,7 @@ async def build(adapter: Any) -> dict[str, str]:
             # The existing layout check refreshes every view before the final
             # attachment readback; the shared verifier stays geometry-read-only.
             lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),
+            lambda: _verify_chamfer_angle_text(adapter, annotations),
             verify_settled_references,
         ),
         checkpoint=verify_after_native_save,
