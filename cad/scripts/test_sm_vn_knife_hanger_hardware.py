@@ -9,6 +9,8 @@ from __future__ import annotations
 import ast
 import asyncio
 import contextlib
+from copy import deepcopy
+from dataclasses import replace
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,7 +18,14 @@ from types import SimpleNamespace
 import pytest
 
 import _config
+import _drawing_edge_dimensions as edge_dimensions
+import _drawing_annotation_extent as annotation_extent
+import _drawing_layout_audit as native_layout
+import _drawing_physical_axial_dimension as physical_axial_dimension
+import _drawing_serialized_note_identity as serialized_note_identity
+import _supplier_dimensions as supplier_dimensions
 import _mcmaster_92314a253 as bolt_catalogue
+import _supplier_reference_text as reference_text
 import _stock_trim_drawing as trim_drawing
 import build_sm_summing_assembly as asm
 import build_sm_vn_knife_hanger_stud as bolt_part
@@ -27,6 +36,7 @@ import sm_vn_knife_hanger_stud_spec as bolt
 import sm_vn_knife_hanger_washer_spec as washer
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_edges import ViewEdge, ViewEdges
 from _fastener_catalog import FASTENERS
 from _hole_spec import TAP_DRILL_MM
 from _mcmaster_92314a253 import DIMS as BOLT_DIMS
@@ -345,17 +355,7 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
         assert sheet.script.is_file()
 
 
-@pytest.mark.parametrize("name", tuple(bolt_drawing.EXPECTED_CONTROLS))
-@pytest.mark.parametrize(
-    "fault", [None, "reference", "nominal", "type", "band", "precision", "missing"]
-)
-def test_sheet_readback_refuses_lost_cut_or_inspection_control(
-    monkeypatch, name, fault
-):
-    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
+def _native_machining_control_annotations():
     annotations = []
     for key, (nominal, lower, upper) in bolt_drawing.EXPECTED_CONTROLS.items():
         tolerance = SimpleNamespace(
@@ -364,7 +364,7 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
             GetMaxValue=lambda upper=upper: upper,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=key, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -379,13 +379,50 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
                 GetSpecificAnnotation=lambda display=display: display,
             )
         )
+    return annotations
+
+
+def _verify_native_machining_controls(annotations):
+    trim_drawing.verify_machining_controls(
+        annotations,
+        expected=bolt_drawing.EXPECTED_CONTROLS,
+        tolerance_types=bolt.DIMENSION_TOLERANCE_TYPES,
+        precision=bolt.DIMENSION_PRECISION,
+    )
+
+
+@pytest.mark.parametrize("name", tuple(bolt_drawing.EXPECTED_CONTROLS))
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "reference",
+        "reference_prefix",
+        "nominal",
+        "type",
+        "minimum",
+        "band",
+        "precision",
+        "missing",
+    ],
+)
+def test_sheet_readback_refuses_lost_cut_or_inspection_control(
+    monkeypatch, name, fault
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
     target = next(annotation for annotation in annotations if annotation.name == name)
     if fault == "reference":
         target.dimension.DrivenState = 1
+    elif fault == "reference_prefix":
+        target.display.GetText = lambda _index: "("
     elif fault == "nominal":
         target.dimension.SystemValue += 0.001
     elif fault == "type":
         target.dimension.Tolerance.Type = 0
+    elif fault == "minimum":
+        lower = bolt_drawing.EXPECTED_CONTROLS[name][1]
+        target.dimension.Tolerance.GetMinValue = lambda: lower - 0.001
     elif fault == "band":
         target.dimension.Tolerance.GetMaxValue = lambda: 0.01
     elif fault == "precision":
@@ -394,19 +431,149 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
         annotations.remove(target)
 
     def verify():
-        trim_drawing.verify_machining_controls(
-            None,
-            annotations,
-            expected=bolt_drawing.EXPECTED_CONTROLS,
-            tolerance_types=bolt.DIMENSION_TOLERANCE_TYPES,
-            precision=bolt.DIMENSION_PRECISION,
-        )
+        _verify_native_machining_controls(annotations)
 
     if fault is None:
         verify()
     else:
         with pytest.raises(RuntimeError):
             verify()
+
+
+@pytest.mark.parametrize("obsolete_api", ["absent", "raises"])
+def test_machining_controls_use_native_names_without_the_obsolete_getter(
+    monkeypatch, obsolete_api
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+
+    def obsolete_getter(*_args):
+        pytest.fail("machining controls must not read obsolete GetDimension")
+
+    for annotation in annotations:
+        annotation.name = "NotTheNativeDimensionName"
+        if obsolete_api == "raises":
+            annotation.display.GetDimension = obsolete_getter
+    _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "",
+        " ",
+        None,
+        False,
+        7,
+        1.5,
+        (),
+        [],
+        "UnknownNativeControl",
+        "ChamferWidth@StockDeburrProfile",
+    ],
+)
+def test_machining_controls_refuse_invalid_native_names(monkeypatch, bad_name):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    annotations[0].dimension.Name = bad_name
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+def test_machining_controls_do_not_coerce_native_names_to_strings(monkeypatch):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    native_name = annotations[0].dimension.Name
+
+    class StringLikeNativeName:
+        def __str__(self):
+            return native_name
+
+    annotations[0].dimension.Name = StringLikeNativeName()
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("fault", ["extra", "duplicate", "missing"])
+def test_machining_controls_require_the_exact_native_name_inventory(monkeypatch, fault):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    if fault == "missing":
+        annotations.pop()
+    else:
+        extra = _native_machining_control_annotations()[0]
+        if fault == "extra":
+            extra.dimension.Name = "UnrequestedNativeControl"
+        annotations.append(extra)
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("getter", ["dimension", "name"])
+def test_machining_controls_preserve_native_getter_failures(monkeypatch, getter):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    failure = OSError("native machining-control getter failed")
+
+    def failed_dimension(*_args):
+        raise failure
+
+    if getter == "dimension":
+        annotations[0].display.GetDimension2 = failed_dimension
+    else:
+
+        class UnreadableNativeName:
+            @property
+            def Name(self):
+                raise failure
+
+        unreadable = UnreadableNativeName()
+        annotations[0].display.GetDimension2 = lambda _configuration: unreadable
+    with pytest.raises((OSError, RuntimeError)) as caught:
+        _verify_native_machining_controls(annotations)
+    assert caught.value is failure or caught.value.__cause__ is failure
+
+
+@pytest.mark.parametrize("missing", ["display", "dimension"])
+def test_machining_controls_refuse_a_missing_native_dimension(monkeypatch, missing):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    if missing == "display":
+        annotations[0].GetSpecificAnnotation = lambda: None
+    else:
+        annotations[0].display.GetDimension2 = lambda _configuration: None
+    with pytest.raises((AttributeError, RuntimeError)):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("first_is_valid", [True, False])
+def test_machining_controls_read_name_and_values_from_the_same_native_object(
+    monkeypatch, first_is_valid
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    first = annotations[0].dimension
+    decoy = _native_machining_control_annotations()[0].dimension
+    decoy.Name = "NotTheIdentifiedNativeControl"
+    if first_is_valid:
+        decoy.SystemValue += 0.001
+    else:
+        first.SystemValue += 0.001
+    modern_dimensions = iter((first, decoy))
+    annotations[0].display.GetDimension2 = (
+        lambda _configuration: next(modern_dimensions)
+    )
+    if first_is_valid:
+        _verify_native_machining_controls(annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            _verify_native_machining_controls(annotations)
 
 
 @pytest.mark.parametrize(
@@ -909,7 +1076,12 @@ def test_production_cut_positions_complete_stock_at_finished_head_pose(monkeypat
     )
 
 
-@pytest.mark.parametrize("fault", [None, "callout", "link", "text"])
+@pytest.mark.parametrize(
+    "fault",
+    [None, "callout", "link", "text", "checkpoint_missing", "checkpoint_duplicate",
+     "capture_wrong_annotation", "capture_wrong_owner", "capture_wrong_configuration",
+     "capture_wrong_path"],
+)
 def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch, tmp_path, fault
 ):
@@ -926,18 +1098,86 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     curated = []
     offsets = []
     projected = []
+    finalization = []
+    case = _settled_stud_height_case(monkeypatch)
+    _stud_paper_fixture(case, monkeypatch)
+    case.front.name = "*Front"
+    case.views[1].name = "*Isometric"
+    references = case.references
+    original_identities = bolt_drawing._supplier_reference_identities(case.adapter, references)
+    case.native_doc_path = str(tmp_path / "unsaved-drawing.SLDDRW")
+    case.model.GetPathName = lambda: case.native_doc_path
+    case.model.GetType = lambda: 3
+    case.model.GetTitle = lambda: Path(case.native_doc_path).name
+    case.app.ActiveDoc = case.model
+    case.app.GetOpenDocumentByName = lambda path: (
+        case.model if path == case.native_doc_path else None
+    )
+    output_path = tmp_path / "saved-stud.SLDDRW"
+    capture_calls = []
+    shared_capture = bolt_drawing.capture_serialized_physical_axial_names
+
+    def capture(adapter, captured_references, identities, configurations, **kwargs):
+        capture_calls.append(dict(identities))
+        assert identities == original_identities
+        assert set(captured_references) == {"SupplierHeadHeight", "SupplierStockLength"}
+        assert all(captured_references[name] is references[name] for name in captured_references)
+        if fault != "capture_wrong_path":
+            assert adapter.currentModel.GetPathName() == str(output_path.resolve())
+        result = shared_capture(adapter, captured_references, identities, configurations, **kwargs)
+        finalization.append("captured")
+        return result
+
+    def saved_reader(_adapter, identities, _configurations, *, serialized_full_names, purchased_note):
+        assert identities == original_identities
+        assert serialized_full_names == {
+            "SupplierHeadHeight": case.native.FullName,
+            "SupplierStockLength": case.stock_case.native.FullName,
+        }
+        assert all(serialized_full_names[name] != identities[name][0] for name in serialized_full_names)
+        assert purchased_note["text"] == properties["Purchased Screw Note"]
+        assert purchased_note["landing"] == case.note_landing
+        assert purchased_note["name"] == case.note_name != "DetailItem347"
+        finalization.append("saved physical proof")
 
     async def open_model(_path):
         pass
 
-    async def finalize(*_args, **_kwargs):
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for settled in settled_checks:
+            settled()
+        assert case.native.FullName == original_identities["SupplierHeadHeight"][0]
+        assert case.stock_case.native.FullName == original_identities["SupplierStockLength"][0]
+        finalization.append("settled")
+        checkpoint("before_native_save")
+        case.native_doc_path = str(output_path.resolve())
+        for display in case.displays.values():
+            native = display.GetDimension2(0)
+            native.FullName = f"{native.FullName}@SERIALIZED"
+        case.note_name = "DetailItem347@ACTUAL-SERIALIZED"
+        checkpoint("after_native_save")
+        checkpoint("after_pdf_save")
+        finalization.append("saved and strict-audited")
+        if fault == "capture_wrong_annotation":
+            impostor = SimpleNamespace(**vars(case.annotation))
+            case.display.GetAnnotation = lambda: impostor
+        elif fault == "capture_wrong_owner":
+            case.annotation.Owner = case.views[1]
+        elif fault == "capture_wrong_configuration":
+            case.front.ReferencedConfiguration = "ForeignConfiguration"
+        elif fault == "capture_wrong_path":
+            case.model.GetPathName = lambda: str(tmp_path / "wrong.SLDDRW")
+        if fault != "checkpoint_missing":
+            checkpoint("before_drawing_close")
+        if fault == "checkpoint_duplicate":
+            checkpoint("before_drawing_close")
+        finalization.append("finalized")
+        checkpoint("after_drawing_close")
         return {"drawing": "recorded"}
 
     def place_view(_adapter, _source, orientation, *_args, **_kwargs):
         views.append((orientation, _kwargs["scale"]))
-        return SimpleNamespace(
-            name=orientation, ReferencedConfiguration="Default"
-        )
+        return case.front if orientation == "*Front" else case.views[1]
 
     def read_properties(_model, names, *, required: tuple[str, ...]):
         properties.update({name: properties.get(name, name) for name in names})
@@ -967,7 +1207,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
 
     def project(_adapter, view, xyz, *, label):
         projected.append((view.name, xyz, label))
-        return (0.1, 0.2)
+        return case.paper_project(_adapter, view, xyz, label=label)
 
     def callout(_adapter, view, *, property_name, edge_xy, note_xy):
         printed.append((view.name, property_name, edge_xy, note_xy))
@@ -977,7 +1217,9 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
             link = bolt_drawing.property_link("Wrong Property")
         if fault == "text":
             text += " WRONG"
-        return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
+        case.note.PropertyLinkedText = link
+        case.note.text = text
+        return case.note
 
     for name in (
         "check",
@@ -990,6 +1232,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     ):
         monkeypatch.setattr(bolt_drawing, name, lambda *_args, **_kwargs: None)
     monkeypatch.setattr(bolt_drawing, "SOURCE", source)
+    monkeypatch.setattr(bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=output_path))
     monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         bolt_drawing, "dimension_name", lambda _adapter, item: item.name
@@ -998,9 +1241,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(
         bolt_drawing,
         "new_project_drawing",
-        lambda *_args, **_kwargs: (
-            SimpleNamespace(ActivateSheet=lambda _name: True), object()
-        ),
+        lambda *_args, **_kwargs: (case.model, object()),
     )
     monkeypatch.setattr(bolt_drawing, "place_view", place_view)
     monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", annotations)
@@ -1013,33 +1254,41 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     monkeypatch.setattr(bolt_drawing, "add_property_linked_callout", callout)
     monkeypatch.setattr(bolt_drawing, "finalize_drawing", finalize)
     monkeypatch.setattr(
-        bolt_drawing, "_add_supplier_references", lambda *_args: {}
+        bolt_drawing, "_add_supplier_references",
+        lambda *_args: {name: annotation for name, annotation in references.items()
+                       if name != "SupplierStockLength"},
     )
     monkeypatch.setattr(
         bolt_drawing,
         "_add_stock_reference",
-        lambda _adapter: (
-            SimpleNamespace(
-                name="stock-front",
-                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
-            ),
-            SimpleNamespace(
-                name="stock-isometric",
-                ReferencedConfiguration=bolt_drawing.SUPPLIER_STOCK_CONFIGURATION,
-            ),
-            object(),
-        ),
+        lambda _adapter: (case.stock_case.front, case.views[3], case.stock_case.annotation),
     )
-    monkeypatch.setattr(
-        bolt_drawing, "_supplier_reference_identities", lambda *_args: {}
-    )
+    monkeypatch.setattr(bolt_drawing, "capture_serialized_physical_axial_names", capture)
+    monkeypatch.setattr(bolt_drawing, "_assert_saved_physical_references", saved_reader)
     monkeypatch.setattr(bolt_drawing, "view_name", lambda _adapter, view: view.name)
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_model)
+    adapter = case.adapter
+    adapter.open_model = open_model
     if fault is not None:
-        with pytest.raises(RuntimeError, match="did not persist"):
+        expected = (
+            "did not persist" if fault in ("callout", "link", "text")
+            else "checkpoint.*not called" if fault == "checkpoint_missing"
+            else "more than once" if fault == "checkpoint_duplicate"
+            else "SupplierHeadHeight|serialized|identity"
+        )
+        with pytest.raises(RuntimeError, match=expected):
             asyncio.run(bolt_drawing.build(adapter))
+        if fault == "checkpoint_missing":
+            assert not capture_calls
+        elif fault == "checkpoint_duplicate":
+            assert len(capture_calls) == 1
+        assert "saved physical proof" not in finalization
         return
     assert asyncio.run(bolt_drawing.build(adapter)) == {"drawing": "recorded"}
+    assert finalization == [
+        "settled", "saved and strict-audited", "captured", "finalized", "saved physical proof",
+    ]
+    assert len(capture_calls) == 1
+    assert capture_calls[0] == original_identities
     assert "Purchased Screw Note" in required
     for retired in (
         "Machining Route",
@@ -1057,12 +1306,11 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     # Every control on the main view; the chamfer text leaves on a leader.
     assert curated == [("*Front", bolt_drawing.FRONT_KEEP)]
     assert offsets == [{"ChamferWidth": bolt_drawing.CHAMFER_TEXT_XY}]
-    (head,) = projected
-    assert head[0] == "*Front"
-    assert head[1] == pytest.approx((bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0))
-    assert printed == [
-        ("*Front", "Purchased Screw Note", (0.1, 0.2), bolt_drawing.PURCHASED_NOTE_XY)
-    ]
+    assert projected
+    assert all(head[0] == "*Front" for head in projected)
+    assert all(head[1] == pytest.approx(
+        (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0)
+    ) for head in projected)
 
 
 def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:
@@ -1201,3 +1449,3100 @@ def test_hanger_direct_adapter_calls_bind_to_the_vendored_sdk(recipe: str) -> No
                 f"{recipe}:{call.lineno}: {call.func.attr} cannot bind "
                 f"{source}:{method.lineno}: {error}"
             )
+
+
+def _stud_height_case(monkeypatch):
+    """No-COM physical edges, native selection manager and measured dimension."""
+    case = SimpleNamespace(
+        fault=None, fault_index=1, selections=[], selection_log=[], selection_points=[],
+        clears=[], creations=[], scans=[], events=[], projections=[],
+    )
+    front = SimpleNamespace(
+        name="FinishedFront", ReferencedConfiguration="Default",
+        GetDisplayMode2=lambda: 2, ScaleDecimal=2.0,
+    )
+    case.front = front
+    bearing_point, top_point = bolt_drawing._head_height_points_mm()
+
+    def selection_fault(name):
+        return case.fault == name and len(case.selection_log) == case.fault_index
+
+    def select(edge, append, data):
+        case.selection_log.append((edge, append, data.View))
+        if selection_fault("select"):
+            return False
+        if not append:
+            case.selections.clear()
+        actual = edge
+        if selection_fault("wrong_selected"):
+            actual = object()
+        elif selection_fault("missing_selected"):
+            actual = None
+        elif selection_fault("duplicate_selected") and case.selections:
+            actual = case.selections[0]
+        case.selections.append(actual)
+        return True
+
+    case.select = select
+
+    def edge(nearest):
+        raw = SimpleNamespace(nearest=nearest, closest_calls=[])
+
+        def closest(*xyz):
+            raw.closest_calls.append(xyz)
+            return raw.nearest
+
+        raw.GetClosestPointOn = closest
+        raw.Select4 = lambda append, data: select(raw, append, data)
+        return raw
+
+    case.edge = edge
+    case.bearing = edge(tuple(value / 1000 for value in bearing_point) + (0.0, 0.0))
+    case.top = edge(tuple(value / 1000 for value in top_point) + (0.0, 0.0))
+    case.rear = edge((0.0, top_point[1] / 1000, -top_point[2] / 1000, 0.0, 0.0))
+    case.bearing_item = ViewEdge(
+        edge=case.bearing,
+        line=((0.0, bolt.LENGTH, bolt.HEAD_AF / math.sqrt(3)),
+              (bolt.HEAD_AF / 2, bolt.LENGTH, bolt.HEAD_AF / (2 * math.sqrt(3)))),
+        circle=None, vertices=None,
+    )
+    case.top_item = ViewEdge(
+        edge=case.top, line=None, vertices=None,
+        circle=(0.0, bolt.HEAD_TOP_Y, 0.0, 0.0, 1.0, 0.0, bolt.HEAD_AF / 2),
+    )
+    case.rear_item = replace(case.top_item, edge=case.rear)
+    case.crown_item = replace(
+        case.top_item, edge=edge(None),
+        circle=(0.0, bolt.HEAD_TOP_Y, 0.0, 0.0, 1.0, 0.0, 0.45 * bolt.HEAD_AF),
+    )
+    case.floor_item = replace(
+        case.top_item, edge=edge(None),
+        circle=(0.0, bolt.HEAD_TOP_Y - 0.1 * bolt.HEAD_H, 0.0,
+                0.0, 1.0, 0.0, bolt.HEAD_AF / 2),
+    )
+    front.scan = ViewEdges(
+        label="fixture physical stations",
+        edges=(case.bearing_item, case.crown_item, case.floor_item,
+               case.rear_item, case.top_item),
+    )
+    case.annotation = SimpleNamespace(
+        attached=[case.bearing, case.top], kinds=(1, 1), count=2,
+        dangling=False, Visible=1, OwnerType=0, Owner=front,
+    )
+    annotation = case.annotation
+    annotation.GetAttachedEntities3 = lambda: annotation.attached
+    annotation.GetAttachedEntityTypes = lambda: annotation.kinds
+    annotation.GetAttachedEntityCount3 = lambda: annotation.count
+    annotation.IsDangling = lambda: annotation.dangling
+    station_ys = tuple(
+        point[1] / 1000 * front.ScaleDecimal + 0.1
+        for point in (bearing_point, top_point)
+    )
+    case.arrows = [
+        (0.2, y, 0.0, 0.0, sign, 0.0, 0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for y, sign in zip(station_ys, (1.0, -1.0), strict=True)
+    ]
+    case.display_data = SimpleNamespace(
+        GetArrowHeadCount=lambda: len(case.arrows),
+        GetArrowHeadAtIndex2=lambda index: case.arrows[index],
+    )
+    annotation.GetDisplayData = lambda: case.display_data
+    native = SimpleNamespace(
+        SystemValue=bolt.HEAD_H / 1000,
+        FullName="SupplierHeadHeight@FinishedFront@Drawing",
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    settings = bolt.SUPPLIER_REFERENCE_DIMENSIONS["SupplierHeadHeight"]
+    case.native = native
+    case.display = SimpleNamespace(
+        Type2=2, GetDimension2=lambda _index: native,
+        GetAnnotation=lambda: annotation, ShowParenthesis=False, ShowDimensionValue=True,
+        GetUseDocUnits=lambda: False,
+        GetUnits=lambda: 3 if settings["units"] == "in" else 0,
+        precision=settings["precision"], GetFractionBase=lambda: 1,
+        GetOverride=lambda: False,
+        GetText=lambda index: {
+            1: "(", 2: f" {settings['units']})", 4: settings.get("callout", ""),
+        }.get(index, ""),
+    )
+    case.display.GetPrimaryPrecision2 = lambda: case.display.precision
+    case.result = case.display
+    annotation.GetSpecificAnnotation = lambda: case.display
+    manager = SimpleNamespace(
+        CreateSelectData=lambda: SimpleNamespace(View=None),
+        GetSelectedObjectCount2=lambda _mark: (
+            len(case.selections) + (1 if selection_fault("selection_count") else 0)
+        ),
+        GetSelectedObjectType3=lambda _index, _mark: (
+            46 if selection_fault("selection_type") else 1
+        ),
+        GetSelectedObject6=lambda index, _mark: case.selections[index - 1],
+    )
+
+    def set_point(*args):
+        case.selection_points.append(args)
+        return not (case.fault == "selection_point" and args[0] == case.fault_index)
+
+    manager.SetSelectionPoint2 = set_point
+    manager.GetSelectionPoint2 = lambda index, _mark: (
+        (9.0, 9.0, 9.0)
+        if case.fault == "selection_point_readback" and index == case.fault_index
+        else case.selection_points[index - 1][2:]
+    )
+
+    def clear(value):
+        case.clears.append(value)
+        case.selections.clear()
+
+    def create(*xyz):
+        case.creations.append(xyz)
+        if case.fault == "native_exception":
+            raise RuntimeError("native insertion failed")
+        return case.result
+
+    case.model = SimpleNamespace(
+        SelectionManager=manager, ClearSelection2=clear,
+        ActivateView=lambda _name: case.fault != "activation",
+        AddVerticalDimension2=create,
+    )
+    case.app = SimpleNamespace(IsSame=lambda first, second: int(first is second))
+    case.adapter = SimpleNamespace(currentModel=case.model, swApp=case.app)
+
+    def scan(view, *, label):
+        case.scans.append((case.adapter.currentModel, view, view.scan))
+        return view.scan
+
+    def project(_adapter, view, points, *, label):
+        case.projections.append((view, points, label))
+        return [
+            (point[0] * view.ScaleDecimal + getattr(view, "origin", (0.1, 0.1))[0],
+             point[1] * view.ScaleDecimal + getattr(view, "origin", (0.1, 0.1))[1])
+            for point in points
+        ]
+
+    monkeypatch.setattr(bolt_drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_axial_dimension, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(physical_axial_dimension, "model_points_in_view", project)
+    monkeypatch.setattr(
+        physical_axial_dimension, "view_name", lambda _adapter, view: view.name
+    )
+    monkeypatch.setattr(
+        edge_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, _kind, *_members: value,
+    )
+    monkeypatch.setattr(supplier_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(bolt_drawing, "scan_view_edges", scan)
+    monkeypatch.setattr(bolt_drawing, "model_points_in_view", project)
+    monkeypatch.setattr(bolt_drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(
+        bolt_drawing._telemetry, "event",
+        lambda name, **fields: case.events.append((name, fields)),
+    )
+    return case
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("axis_sign", [-1.0, 1.0])
+def test_stud_head_height_names_actual_hex_and_frontmost_split_trim_arc(
+    monkeypatch, reverse, axis_sign
+):
+    case = _stud_height_case(monkeypatch)
+    top = replace(
+        case.top_item,
+        circle=(0.0, bolt.HEAD_TOP_Y, 0.0, 0.0, axis_sign, 0.0, bolt.HEAD_AF / 2),
+    )
+    edges = [case.rear_item, case.crown_item, top, case.floor_item, case.bearing_item]
+    case.front.scan = ViewEdges("reordered", tuple(reversed(edges) if reverse else edges))
+    actual = bolt_drawing._head_height_entities(case.adapter, case.front)
+    assert actual[0] is case.bearing
+    assert actual[1] is case.top
+    point_m = tuple(value / 1000 for value in bolt_drawing._head_height_points_mm()[1])
+    assert case.top.closest_calls == [point_m]
+    assert case.rear.closest_calls == [point_m]
+    assert not case.crown_item.edge.closest_calls
+    assert not case.floor_item.edge.closest_calls
+    geometry = next(fields for name, fields in case.events if name.endswith("_geometry"))
+    assert geometry["bearing_matches"] == geometry["top_matches"] == 1
+    assert geometry["circle_count"] == 4
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "missing_bearing", "duplicate_bearing", "wrong_bearing_station",
+        "one_wrong_endpoint", "infinite_bearing", "zero_length_bearing",
+        "wrong_hex_side", "off_segment", "missing_top", "duplicate_top",
+        "crown_only", "floor_only", "wrong_top_station", "wrong_top_center",
+        "wrong_top_radius", "wrong_top_axis", "nearest_miss", "nearest_missing",
+        "nearest_short", "nearest_nan", "same_entity", "not_hlr",
+    ),
+)
+def test_stud_head_height_refuses_nonphysical_or_ambiguous_stations(monkeypatch, fault):
+    case = _stud_height_case(monkeypatch)
+    bearing, top = case.bearing_item, case.top_item
+    edges = [bearing, top]
+    if fault == "missing_bearing":
+        edges = [top]
+    elif fault == "duplicate_bearing":
+        edges.append(replace(bearing, edge=case.edge(None)))
+    elif fault in ("wrong_bearing_station", "one_wrong_endpoint"):
+        points = [
+            (x, y + (0.001 if index == 0 or fault == "wrong_bearing_station" else 0.0), z)
+            for index, (x, y, z) in enumerate(bearing.line)
+        ]
+        edges[0] = replace(bearing, line=tuple(points))
+    elif fault == "infinite_bearing":
+        edges[0] = replace(bearing, line=((math.nan, bolt.LENGTH, 0.0), bearing.line[1]))
+    elif fault == "zero_length_bearing":
+        point = bolt_drawing._head_height_points_mm()[0]
+        edges[0] = replace(bearing, line=(point, point))
+    elif fault == "wrong_hex_side":
+        edges[0] = replace(
+            bearing, line=tuple((x, y, -z) for x, y, z in bearing.line)
+        )
+    elif fault == "off_segment":
+        edges[0] = replace(
+            bearing,
+            line=((0.0, bolt.LENGTH, bolt.HEAD_AF / math.sqrt(3)),
+                  (bolt.HEAD_AF / 8, bolt.LENGTH, 7 * bolt.HEAD_AF / (8 * math.sqrt(3)))),
+        )
+    elif fault == "missing_top":
+        edges = [bearing]
+    elif fault == "duplicate_top":
+        edges.append(replace(top, edge=case.edge(case.top.nearest)))
+    elif fault in ("crown_only", "floor_only"):
+        edges[1] = case.crown_item if fault == "crown_only" else case.floor_item
+    elif fault.startswith("wrong_top"):
+        circle = list(top.circle)
+        if fault == "wrong_top_station":
+            circle[1] -= 0.001
+        elif fault == "wrong_top_center":
+            circle[0] += 0.001
+        elif fault == "wrong_top_radius":
+            circle[6] -= 0.001
+        else:
+            circle[3:6] = (1.0, 0.0, 0.0)
+        edges[1] = replace(top, circle=tuple(circle))
+    elif fault == "nearest_miss":
+        case.top.nearest = (0.0, bolt.HEAD_TOP_Y / 1000, bolt.HEAD_AF / 2000 + 2e-8)
+    elif fault == "nearest_missing":
+        case.top.nearest = None
+    elif fault == "nearest_short":
+        case.top.nearest = (0.0, 0.0)
+    elif fault == "nearest_nan":
+        case.top.nearest = (math.nan, bolt.HEAD_TOP_Y / 1000, bolt.HEAD_AF / 2000)
+    elif fault == "same_entity":
+        edges[1] = replace(top, edge=case.bearing)
+        case.bearing.nearest = case.top.nearest
+    elif fault == "not_hlr":
+        case.front.GetDisplayMode2 = lambda: 1
+    case.front.scan = ViewEdges("bad physical stations", tuple(edges))
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._head_height_entities(case.adapter, case.front)
+    assert not case.creations
+    if fault != "not_hlr":
+        assert any(name.endswith("_geometry") for name, _fields in case.events)
+
+
+def test_stud_head_height_creates_native_vertical_dimension_with_strict_edge_readback(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    display = bolt_drawing._add_physical_head_height(
+        case.adapter, case.front, (0.218, 0.216)
+    )
+    assert display is case.display
+    assert case.selection_log == [
+        (case.bearing, False, case.front), (case.top, True, case.front)
+    ]
+    assert case.creations == [(0.218, 0.216, 0.0)]
+    assert case.clears == [True, True]
+    assert not case.selections
+    assert len(case.scans) == 1  # Creation reuses the just-resolved pair for native readback.
+    projected = case.projections[0][1]
+    assert projected == [
+        tuple(value / 1000 for value in point)
+        for point in bolt_drawing._head_height_points_mm()
+    ]
+    assert case.selection_points == [
+        (index, -1, point[0] * case.front.ScaleDecimal + 0.1,
+         point[1] * case.front.ScaleDecimal + 0.1, 0.0)
+        for index, point in enumerate(projected, start=1)
+    ]
+
+
+@pytest.mark.parametrize("selection_index", [1, 2])
+@pytest.mark.parametrize(
+    "fault",
+    ("activation", "select", "wrong_selected", "missing_selected",
+     "selection_count", "selection_type", "selection_point", "null_creation",
+     "native_exception"),
+)
+def test_stud_head_height_refuses_selection_and_creation_failures_without_fallback(
+    monkeypatch, fault, selection_index
+):
+    case = _stud_height_case(monkeypatch)
+    case.fault = fault
+    case.fault_index = selection_index
+    if fault == "null_creation":
+        case.result = None
+    with pytest.raises(RuntimeError):
+        bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
+    assert case.clears == ([True] if fault == "activation" else [True, True])
+    assert not case.selections
+    assert len(case.creations) == (1 if fault in ("null_creation", "native_exception") else 0)
+
+
+@pytest.mark.parametrize("phase", ["created", "settled"])
+@pytest.mark.parametrize(
+    "fault",
+    ("value", "attachments", "kinds", "count", "extra", "missing",
+     "dangling", "not_vertical", "vertical_type12", "missing_native", "owner",
+     "owner_type", "owner_null", "owner_unknown", "kinds_extra", "attached_empty",
+     "kinds_empty"),
+)
+def test_stud_head_height_proves_native_measurement_and_actual_attachments_at_both_phases(
+    monkeypatch, phase, fault
+):
+    case = _stud_height_case(monkeypatch)
+    if fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "attachments":
+        case.annotation.attached[1] = case.rear
+    elif fault == "kinds":
+        case.annotation.kinds = (1, 46)
+    elif fault == "count":
+        case.annotation.count = 1
+    elif fault == "extra":
+        case.annotation.attached.append(object())
+    elif fault == "missing":
+        case.annotation.attached[1] = None
+    elif fault == "dangling":
+        case.annotation.dangling = True
+    elif fault == "not_vertical":
+        case.display.Type2 = 11
+    elif fault == "vertical_type12":
+        case.display.Type2 = 12
+    elif fault == "missing_native":
+        case.display.GetDimension2 = lambda _index: None
+    elif fault == "owner":
+        case.annotation.Owner = object()
+    elif fault == "owner_type":
+        case.annotation.OwnerType = 1
+    elif fault == "owner_null":
+        case.annotation.Owner = None
+    elif fault == "owner_unknown":
+        case.app.IsSame = lambda first, second: (
+            2 if first is case.front and second is case.front else int(first is second)
+        )
+    elif fault == "kinds_extra":
+        case.annotation.kinds = (1, 1, 1)
+    elif fault == "attached_empty":
+        case.annotation.attached = None
+    elif fault == "kinds_empty":
+        case.annotation.kinds = None
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        if phase == "created":
+            bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
+        else:
+            bolt_drawing._assert_physical_head_height(case.adapter, case.front, case.display)
+
+
+@pytest.mark.parametrize("missing", ["display", "annotation"])
+def test_stud_head_height_missing_native_handles_have_precise_refusals(monkeypatch, missing):
+    case = _stud_height_case(monkeypatch)
+    display = case.display
+    if missing == "display":
+        display = None
+    else:
+        display.GetAnnotation = lambda: None
+    with pytest.raises(RuntimeError, match="display dimension is null|has no annotation"):
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, display, entities=(case.bearing, case.top)
+        )
+
+
+def test_stud_head_height_linear_native_vertical_proof_uses_exact_model_stations(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    assert case.display.Type2 == 2
+    assert len(case.scans) == 1
+    assert tuple(case.projections[0][1]) == tuple(
+        tuple(value / 1000 for value in point)
+        for point in bolt_drawing._head_height_points_mm()
+    )
+    assert any(
+        name == "drawing.physical_axial_dimension_native_proof" for name, _ in case.events
+    )
+    # A reversed exact physical EDGE bijection remains valid.
+    case.annotation.attached.reverse()
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    assert len(case.scans) == 2
+
+
+def test_stud_head_height_refusal_reports_canonical_native_metadata(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.display.Type2 = 12
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    receipt = next(
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_refusal"
+    )
+    expected = {
+        "type2": 12, "attached_count": 2, "attached_length": 2,
+        "kinds_length": 2, "kinds": (1, 1), "attached_nulls": (False, False),
+        "dangling": False, "owner_type": 0, "owner_null": False, "owner_same": 1,
+    }
+    assert {key: receipt[key] for key in expected} == expected
+
+
+@pytest.mark.parametrize("getter", ["GetAnnotation", "GetAttachedEntityCount3", "GetDisplayData"])
+def test_stud_head_height_native_errors_retain_cause_and_visible_stage(monkeypatch, getter):
+    case = _stud_height_case(monkeypatch)
+    failure = OSError("native read failed")
+
+    def fail():
+        raise failure
+
+    target = case.display if getter == "GetAnnotation" else case.annotation
+    setattr(target, getter, fail)
+    with pytest.raises(RuntimeError, match="native read failed") as error:
+        bolt_drawing._assert_physical_head_height(
+            case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+        )
+    assert error.value.__cause__ is failure
+    receipt = next(
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_refusal"
+    )
+    assert receipt["failure_error_type"] == "OSError"
+    assert receipt["failure_error"] == "native read failed"
+
+
+_STUD_SPATIAL_FAULTS = (
+    "type12", "missing_data", "arrow_count", "null_arrow", "short_arrow", "long_arrow",
+    "nonfinite_arrow", "horizontal", "diagonal", "zero", "same_sign", "different_x",
+    "tip_z", "translated", "wrong_span", "zero_scale", "nonfinite_scale",
+    "wrong_scale", "projection", "projection_count", "nonfinite_projection",
+    "attachment", "duplicate_attachment", "value", "null_value", "nonfinite_value",
+)
+
+
+def _corrupt_stud_native_proof(case, monkeypatch, fault):
+    def change_arrow(index, slot, value):
+        record = list(case.arrows[index])
+        record[slot] = value
+        case.arrows[index] = tuple(record)
+
+    if fault == "type12":
+        case.display.Type2 = 12
+    elif fault == "missing_data":
+        case.annotation.GetDisplayData = lambda: None
+    elif fault == "arrow_count":
+        case.arrows.pop()
+    elif fault == "null_arrow":
+        case.arrows[0] = None
+    elif fault == "short_arrow":
+        case.arrows[0] = case.arrows[0][:-1]
+    elif fault == "long_arrow":
+        case.arrows[0] = (*case.arrows[0], 0.0)
+    elif fault == "nonfinite_arrow":
+        change_arrow(0, 7, float("nan"))
+    elif fault == "horizontal":
+        for index, sign in enumerate((1.0, -1.0)):
+            change_arrow(index, 3, sign)
+            change_arrow(index, 4, 0.0)
+    elif fault == "diagonal":
+        change_arrow(0, 3, 0.1)
+    elif fault == "zero":
+        change_arrow(0, 4, 0.0)
+    elif fault == "same_sign":
+        change_arrow(1, 4, case.arrows[0][4])
+    elif fault == "different_x":
+        change_arrow(0, 0, case.arrows[0][0] + 0.001)
+    elif fault == "tip_z":
+        change_arrow(0, 2, 0.001)
+    elif fault == "translated":
+        for index in range(2):
+            change_arrow(index, 1, case.arrows[index][1] + 0.001)
+    elif fault == "wrong_span":
+        change_arrow(1, 1, case.arrows[1][1] + 0.001)
+    elif fault == "zero_scale":
+        case.front.ScaleDecimal = 0.0
+    elif fault == "nonfinite_scale":
+        case.front.ScaleDecimal = float("nan")
+    elif fault == "wrong_scale":
+        case.front.ScaleDecimal = 3.0
+    elif fault in ("projection", "projection_count", "nonfinite_projection"):
+        original = physical_axial_dimension.model_points_in_view
+
+        def project(*args, **kwargs):
+            points = list(original(*args, **kwargs))
+            if args[1] is not case.front:
+                return points
+            if fault == "projection":
+                return [(x, y + 0.001) for x, y in points]
+            if fault == "projection_count":
+                return points[:1]
+            return [(float("nan"), points[0][1]), points[1]]
+
+        monkeypatch.setattr(physical_axial_dimension, "model_points_in_view", project)
+    elif fault == "attachment":
+        case.annotation.attached[1] = case.rear
+    elif fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "duplicate_attachment":
+        case.annotation.attached[1] = case.bearing
+    elif fault == "null_value":
+        case.native.SystemValue = None
+    elif fault == "nonfinite_value":
+        case.native.SystemValue = float("nan")
+    else:
+        raise AssertionError(f"unknown native proof fault: {fault}")
+
+
+@pytest.mark.parametrize("phase", ["created", "settled", "saved"])
+@pytest.mark.parametrize("fault", _STUD_SPATIAL_FAULTS)
+def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_height_case(monkeypatch)
+    # Prove valid data first, then mutate it: no cached proof may survive settle/reopen.
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display
+    ) == pytest.approx(bolt.HEAD_H)
+    _corrupt_stud_native_proof(case, monkeypatch, fault)
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        if phase == "created":
+            bolt_drawing._add_physical_head_height(
+                case.adapter, case.front, (0.218, 0.216)
+            )
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def _settled_stud_height_case(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    front = case.front
+    stock_case = _stud_stock_fixture(case)
+    case.stock_case = stock_case
+    stock, stock_iso = stock_case.front, SimpleNamespace(
+        name="StockIso", ReferencedConfiguration=bolt.SUPPLIER_STOCK_CONFIGURATION,
+        ScaleDecimal=2.0,
+    )
+    iso = SimpleNamespace(name="FinishedIso", ReferencedConfiguration="Default", ScaleDecimal=2.0)
+    case.views = (front, iso, stock, stock_iso)
+    displays = {
+        "SupplierHeadHeight": case.display, "SupplierStockLength": stock_case.display,
+    }
+    case.displays = displays
+    for name in bolt.SUPPLIER_REFERENCE_DIMENSIONS:
+        if name in displays:
+            continue
+        owner = front
+        native = SimpleNamespace(
+            FullName=(f"{name}@SupplierReference@Drawing" if name == "SupplierThreadMajor"
+                      else f"{name}@{owner.name}@Drawing"),
+            Tolerance=SimpleNamespace(Type=0),
+        )
+        annotation = SimpleNamespace(
+            Owner=owner, OwnerType=0, GetAttachedEntities3=lambda: (case.bearing,),
+            GetAttachedEntityTypes=lambda: (1,),
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native,
+            GetAnnotation=lambda annotation=annotation: annotation,
+        )
+        annotation.GetSpecificAnnotation = lambda display=display: display
+        displays[name] = display
+    for name, display in displays.items():
+        annotation = display.GetAnnotation()
+        annotation.GetName = lambda name=name: f"native-annotation:{name}"
+        display.GetNameForSelection = lambda name=name: f"native-selection:{name}"
+    for view in case.views:
+        view.ReferencedDocument = SimpleNamespace(
+            GetPathName=lambda: str(bolt_drawing.SOURCE.resolve())
+        )
+    for first, second in ((front, iso), (stock, stock_iso)):
+        first.GetNextView = lambda second=second: second
+        second.GetNextView = lambda: None
+        second.GetDisplayDimensions = lambda: ()
+    front.GetDisplayDimensions = lambda: tuple(
+        display for name, display in displays.items() if name != "SupplierStockLength"
+    )
+    stock.GetDisplayDimensions = lambda: (displays["SupplierStockLength"],)
+    note = SimpleNamespace(
+        PropertyLinkedText=bolt_drawing.property_link("Supplier Reference Title"),
+        GetText=lambda: bolt_drawing.SUPPLIER_STOCK_TITLE,
+    )
+    caption = SimpleNamespace(
+        OwnerType=1, GetType=lambda: 6, GetSpecificAnnotation=lambda: note,
+    )
+    sheet_views = (
+        SimpleNamespace(
+            name=bolt_drawing.SHEET_NAMES[0], ReferencedConfiguration="", ReferencedDocument=None,
+            GetNextView=lambda: front, GetAnnotations=lambda: (),
+            GetDisplayDimensions=lambda: None,
+        ),
+        SimpleNamespace(
+            name=bolt_drawing.SHEET_NAMES[1], ReferencedConfiguration="", ReferencedDocument=None,
+            GetNextView=lambda: stock, GetAnnotations=lambda: (caption,),
+            GetDisplayDimensions=lambda: (),
+        ),
+    )
+    case.sheet_index = 0
+
+    def activate(name):
+        case.sheet_index = bolt_drawing.SHEET_NAMES.index(name)
+        return True
+
+    case.model.ActivateSheet = activate
+    case.model.GetFirstView = lambda: sheet_views[case.sheet_index]
+    case.model.GetSheetNames = lambda: bolt_drawing.SHEET_NAMES
+    case.model.GetViews = lambda: (
+        (sheet_views[0], front, iso), (sheet_views[1], stock, stock_iso),
+    )
+    case.references = {name: display.GetAnnotation() for name, display in displays.items()}
+    case.identities = bolt_drawing._supplier_reference_identities(case.adapter, case.references)
+    case.configurations = {
+        view.name: (bolt_drawing.SHEET_NAMES[0 if index < 2 else 1],
+                    view.ReferencedConfiguration)
+        for index, view in enumerate(case.views)
+    }
+    case.supplier_checks = []
+    monkeypatch.setattr(
+        bolt_drawing, "assert_supplier_reference_dimension",
+        lambda _adapter, _display, **settings: case.supplier_checks.append(settings["label"]),
+    )
+    return case
+
+
+@pytest.mark.parametrize("fault", [None, "value", "attachment", "station"])
+def test_stud_settled_supplier_census_rescans_physical_head_height(monkeypatch, fault):
+    case = _settled_stud_height_case(monkeypatch)
+    if fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "attachment":
+        case.annotation.attached[1] = case.rear
+    elif fault == "station":
+        case.front.scan = ViewEdges("lost top station", (case.bearing_item, case.floor_item))
+    if fault is None:
+        bolt_drawing._assert_supplier_references(
+            case.adapter, case.identities, case.configurations
+        )
+        assert len(case.scans) == 2
+        assert set(case.supplier_checks) == set(bolt.SUPPLIER_REFERENCE_DIMENSIONS)
+    else:
+        with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+
+
+def _install_stud_note_source_edges(case):
+    """E8's original noncircular head boundary, with separate source/view bodies."""
+    case.note_source = case.front.ReferencedDocument
+    case.note_source_body, case.note_view_body = object(), object()
+    case.note_canonical = {}
+    case.note_source.GetType = lambda: 1
+    case.note_source.GetBodies2 = lambda body_type, visible: (
+        (case.note_source_body,) if (body_type, visible) == (0, False) else ()
+    )
+    case.note_source.ConfigurationManager = SimpleNamespace(
+        ActiveConfiguration=SimpleNamespace(Name=case.front.ReferencedConfiguration),
+    )
+    case.note_source.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda entity: case.note_canonical.get(id(entity)),
+    )
+    top = (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, math.sqrt(3) * bolt.HEAD_AF / 4000)
+    end = (
+        bolt.HEAD_AF / 2000,
+        (bolt.HEAD_TOP_Y - (bolt.HEAD_AF / math.sqrt(3) - bolt.HEAD_AF / 2)
+         / math.tan(math.radians(60))) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    )
+    # Endpoint/U/sense values are grounded in E8; numeric kernel-kind values
+    # below are controlled fake data, not an unobserved native Identity claim.
+    case.note_trim = SimpleNamespace(
+        StartPoint=top, EndPoint=end, UMinValue=0.002318718406006465,
+        UMaxValue=0.004628534409111542, Sense=True, CurveType=3006,
+    )
+
+    def install(trim, kind, *, raw=None):
+        raw = SimpleNamespace() if raw is None else raw
+        curve = SimpleNamespace(kind=kind)
+        curve.Identity = lambda: curve.kind
+        curve.IsCircle = lambda: curve.kind == 3002
+        curve.IsLine = lambda: curve.kind == 3001
+        raw.curve = curve
+        raw.trim = trim
+        raw.GetCurve = lambda: raw.curve
+        raw.GetCurveParams3 = lambda: raw.trim
+        raw.GetBody = lambda: case.note_view_body
+        if not hasattr(raw, "GetClosestPointOn"):
+            raw.GetClosestPointOn = lambda _x, _y, _z: (*raw.trim.StartPoint, raw.trim.UMinValue, 0.0)
+        canonical = SimpleNamespace(curve=curve, trim=trim, body=case.note_source_body)
+        canonical.GetCurve = lambda: canonical.curve
+        canonical.GetCurveParams3 = lambda: canonical.trim
+        canonical.GetBody = lambda: canonical.body
+        canonical.GetClosestPointOn = lambda _x, _y, _z: (
+            *canonical.trim.StartPoint, canonical.trim.UMinValue, 0.0,
+        )
+        case.note_canonical[id(raw)] = canonical
+        return raw, canonical
+
+    case.install_note_edge = install
+    case.note_edge, case.note_model_edge = install(case.note_trim, 3006)
+    case.note_annotation.attached = case.note_edge
+    case.front.scan = ViewEdges(
+        case.front.scan.label,
+        (*case.front.scan.edges, ViewEdge(edge=case.note_edge, line=None, circle=None, vertices=None)),
+    )
+    # A circular top trim is a DIFFERENT actual native edge, not rejected just
+    # by its kind. It shares the original tangent endpoint and projected leader
+    # position, so post-capture rejection must retain the full original trim.
+    top_circle = SimpleNamespace(
+        StartPoint=(-top[0], top[1], top[2]), EndPoint=top,
+        UMinValue=5.759586531581287, UMaxValue=6.806784082777885,
+        Sense=True, CurveType=3002,
+    )
+    install(top_circle, 3002, raw=case.top)
+    case.note_projection_inputs = []
+    case.front.ModelToViewTransform = object()
+
+    def point(data):
+        coordinates = tuple(float(value) for value in getattr(data, "value", data))
+        case.note_projection_inputs.append(coordinates)
+
+        def multiply(transform):
+            assert transform is case.front.ModelToViewTransform
+            x, y = case.paper_project(case.adapter, case.front, coordinates, label="native XYZ fake")
+            return SimpleNamespace(ArrayData=(x, y, coordinates[2] * case.front.ScaleDecimal))
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    case.note_math_utility = SimpleNamespace(CreatePoint=point)
+    case.app.GetMathUtility = lambda: case.note_math_utility
+    x, y = case.paper_project(case.adapter, case.front, top, label="native original endpoint fake")
+    case.note_landing = (x, y, top[2] * case.front.ScaleDecimal)
+    case.note_data["lines"][0][7:10] = case.note_landing
+    case.note_data["arrows"][0][0:3] = case.note_landing
+
+
+def _stud_paper_fixture(case, monkeypatch):
+    """Actual c356 FINISHED primitives through the real native dump/shelf boundary."""
+    monkeypatch.setattr(native_layout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(serialized_note_identity, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(serialized_note_identity, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(reference_text, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(annotation_extent, "_early_bound", lambda value, _kind: value)
+    case.front.origin = (0.110, 0.1208028)
+    case.front.GetOutline = lambda: (0.0964745, 0.1138592, 0.1235255, 0.2261408)
+    case.views[1].GetOutline = lambda: (0.3223184, 0.0811521, 0.3576816, 0.1888479)
+    case.views[1].GetAnnotations = lambda: ()
+    case.views[3].GetAnnotations = lambda: ()
+    case.stock_case.front.GetAnnotations = lambda: (case.stock_case.annotation,)
+    case.stock_case.annotation.GetType = lambda: 4
+    stock_caption = case.model.GetViews()[1][0].GetAnnotations()[0]
+    stock_caption.GetName = lambda: "Supplier Reference Title"
+    case.adapter._attempt = lambda fn: fn()
+    case.sheet = SimpleNamespace(
+        GetProperties2=lambda: (12, 0, 2, 1, 0, 0.4318, 0.2794, 0),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    case.model.GetCurrentSheet = lambda: case.sheet
+    case.rebuilds = []
+    case.model.EditRebuild3 = lambda: case.rebuilds.append(case.sheet_index) or True
+
+    def project(_adapter, view, point, *, label):
+        ox, oy = getattr(view, "origin", (0.1, 0.1))
+        return (point[0] * view.ScaleDecimal + ox, point[1] * view.ScaleDecimal + oy)
+
+    monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
+    case.paper_project = project
+
+    def row(text, x, y, width, z=0.0):
+        return {"t": text, "pos": [x, y, z], "w": width, "h": 0.0035,
+                "ref": 1, "ang": 0.0, "font": "Century Gothic", "ls": 0.001}
+
+    def data(native):
+        result = SimpleNamespace()
+        for key, count, getter in (
+            ("lines", "GetLineCount", "GetLineAtIndex2"),
+            ("arrows", "GetArrowHeadCount", "GetArrowHeadAtIndex2"),
+            ("arcs", "GetArcCount", "GetArcAtIndex2"),
+            ("polylines", "GetPolyLineCount", "GetPolylineAtIndex2"),
+            ("polygons", "GetPolygonCount", "GetPolygonAtIndex"),
+            ("triangles", "GetTriangleCount", "GetTriangleAtIndex"),
+            ("ellipses", "GetEllipseCount", "GetEllipseAtIndex2"),
+        ):
+            setattr(result, count, lambda key=key: len(native.get(key, ())))
+            setattr(result, getter, lambda index, key=key: native[key][index])
+        result.GetLineAtIndex3 = result.GetLineAtIndex2
+        result.GetTextCount = lambda: len(native.get("texts", ()))
+        for method, key in (
+            ("GetTextAtIndex", "t"), ("GetTextPositionAtIndex", "pos"),
+            ("GetTextHeightAtIndex", "h"), ("GetTextRefPositionAtIndex", "ref"),
+            ("GetTextAngleAtIndex", "ang"), ("GetTextFontAtIndex", "font"),
+            ("GetTextLineSpacingAtIndex", "ls"), ("GetTextInBoxWidthAtIndex", "w"),
+        ):
+            setattr(result, method, lambda index, key=key: native["texts"][index][key])
+        return result
+
+    def install(annotation, native, kind, position):
+        annotation.position = list(position)
+        annotation.native = native
+        annotation.GetPosition = lambda: tuple(annotation.position)
+        annotation.GetType = lambda: kind
+        annotation.Visible = 1
+        annotation.Layer = ""
+        annotation.GetLeaderCount = lambda: 0
+        annotation.GetDisplayData = lambda: data(native)
+
+        def move(x, y, z):
+            dx, dy = x - annotation.position[0], y - annotation.position[1]
+            for item in native.get("texts", ()):
+                item["pos"][0] += dx
+                item["pos"][1] += dy
+            annotation.position[:] = (x, y, z)
+            return True
+
+        annotation.SetPosition2 = move
+
+    case.paper_install = install
+    case.paper_row = row
+    case.paper_data = {
+        "lines": [
+            [0, 0, 0, 0, 0.1189375, 0.2142028, 0, 0.219, 0.2142028, 0],
+            [0, 0, 0, 0, 0.1149688, 0.2205528, 0, 0.219, 0.2205528, 0],
+            [0, 0, 0, 0, 0.218, 0.2142028, 0, 0.218, 0.2078528, 0],
+            [0, 0, 0, 0, 0.218, 0.2205528, 0, 0.218, 0.2269028, 0],
+        ],
+        "arrows": [
+            [0.218, y, 0, 0, sign, 0, 0.003556, 0.000762, 0, 0, 0, 1]
+            for y, sign in ((0.2142028, -1), (0.2205528, 1))
+        ],
+        "texts": [
+            row("(0.125 in)", 0.2079253, 0.216, 0.0201493),
+            row("HEAD HEIGHT", 0.2030497, 0.2104437, 0.0299007),
+        ],
+    }
+    case.arrows = case.paper_data["arrows"]
+    install(case.annotation, case.paper_data, 4, (0.218, 0.216, 0))
+    case.display.OffsetText = False
+    case.display.IsHoleCallout = lambda: False
+    for name, rows in (
+        ("SupplierHeadAF", [
+            row("(", 0.1014104, 0.2552722, 0.0017208),
+            row("5", 0.10545, 0.2578294, 0.0025861),
+            row("16", 0.1041569, 0.2532011, 0.0051722),
+            row('" in)', 0.1103549, 0.2552722, 0.0082347),
+            row("HEAD AF", 0.1001903, 0.2476449, 0.0196194),
+        ]),
+        ("SupplierThreadMajor", [row("THREAD MAJOR NOMINAL", 0.140, 0.186, 0.060)]),
+    ):
+        display = case.displays[name]
+        install(display.GetAnnotation(), {"texts": rows}, 4, (0.110, 0.255, 0))
+        display.IsHoleCallout = lambda: False
+    case.note_text = _config.parts(bolt_part.PART_NAME)["purchased_note"]
+    z = 2 * math.sqrt(3) * bolt.HEAD_AF / 4000
+    case.note_data = {
+        "texts": [row(case.note_text, 0.130, 0.2354743, 0.141191, z)],
+        "lines": [[0, 0, 0, 0, 0.1291411, 0.238506, z, 0.1139687, 0.2205528, z]],
+        "arrows": [[0.1139687, 0.2205528, z, 0.6454763, 0.7637803, 0,
+                    0.003556, 0.000762, 1, 0, 0, 1]],
+    }
+    case.note_name = "DetailItem347"
+    note_annotation = SimpleNamespace(
+        OwnerType=0, Owner=case.front, attached=case.top, dangling=False,
+        GetName=lambda: case.note_name,
+    )
+    install(note_annotation, case.note_data, 6, (0.130, 0.240, z))
+    move_note_text = note_annotation.SetPosition2
+
+    def move_note(x, y, z):
+        dx, dy = x - note_annotation.position[0], y - note_annotation.position[1]
+        result = move_note_text(x, y, z)
+        case.note_data["lines"][0][4] += dx
+        case.note_data["lines"][0][5] += dy
+        return result
+
+    note_annotation.SetPosition2 = move_note
+    note_annotation.GetAttachedEntityCount3 = lambda: 1
+    note_annotation.GetAttachedEntityTypes = lambda: (1,)
+    note_annotation.GetAttachedEntities3 = lambda: (note_annotation.attached,)
+    note_annotation.IsDangling = lambda: note_annotation.dangling
+    note_annotation.GetLeaderCount = lambda: 1
+    note_annotation.GetLeaderPointsAtIndex = lambda _index: (
+        note_annotation.position[0] - 0.0005098,
+        note_annotation.position[1] - 0.0017837, z, *case.note_landing,
+    )
+    case.note_landing = (0.1139687, 0.2205528, z)
+    case.note = SimpleNamespace(
+        PropertyLinkedText=bolt_drawing.property_link("Purchased Screw Note"),
+        text=case.note_text, GetAnnotation=lambda: case.note_annotation,
+        # Deliberately includes the leader: this MUST NOT drive text placement.
+        GetExtent=lambda: (0.1139143, 0.2207167, 0, 0.271182, 0.240256, 0),
+        IsBomBalloon=lambda: False,
+    )
+    case.note.GetText = lambda: case.note.text
+    note_annotation.GetSpecificAnnotation = lambda: case.note
+    case.note_annotation = note_annotation
+    case.foreign_annotations = []
+    case.front.GetAnnotations = lambda: (
+        *(display.GetAnnotation() for name, display in case.displays.items()
+          if name != "SupplierStockLength"),
+        case.note_annotation, *case.foreign_annotations,
+    )
+    _install_stud_note_source_edges(case)
+    return case
+
+
+def _stud_note_source_diagnostic_case(monkeypatch):
+    """Separate native contexts; the diagnostic outputs are not acceptance fakes."""
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    case.source = case.front.ReferencedDocument
+    case.source_body, case.view_body = object(), object()
+    case.source.GetType = lambda: 1
+    case.source.GetBodies2 = lambda body_type, visible: (
+        (case.source_body,) if (body_type, visible) == (0, False) else ()
+    )
+    case.source.ConfigurationManager = SimpleNamespace(
+        ActiveConfiguration=SimpleNamespace(Name="Default"),
+    )
+    case.model.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda _entity: pytest.fail("reverse mapping receiver must be SOURCE"),
+    )
+    case.reverse, case.forward = {}, {}
+    case.source.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda entity: case.reverse.get(id(entity)),
+    )
+    case.front.GetCorrespondingEntity = lambda entity: case.forward.get(id(entity))
+    case.model.SelectionManager.GetSelectedObjectsDrawingView2 = lambda _index, _mark: case.front
+    # D1's observed census has five circles, with three identical top-circle
+    # frames. Distinct trim data below are controlled native-shaped readbacks,
+    # not a claim that D1 captured these currently-unobserved endpoint values.
+    frame = (0.0, bolt.HEAD_TOP_Y, 0.0, 0.0, 1.0, 0.0, bolt.HEAD_AF / 2)
+    circles = (
+        frame, frame, frame,
+        (0.0, 46.560428147091706, 0.0, 0.0, 1.0, 0.0, 2.413),
+        (0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.813),
+    )
+
+    def install(raw, circle, index, body):
+        x, y, z, nx, ny, nz, radius = circle
+        angle = index * 0.4
+        start = (radius * math.cos(angle) / 1000, y / 1000, radius * math.sin(angle) / 1000)
+        end = (
+            radius * math.cos(angle + 0.2) / 1000, y / 1000,
+            radius * math.sin(angle + 0.2) / 1000,
+        )
+        curve = SimpleNamespace(
+            IsCircle=lambda: True, IsLine=lambda: False,
+            CircleParams=(x / 1000, y / 1000, z / 1000, nx, ny, nz, radius / 1000),
+        )
+        raw.GetBody = lambda: body
+        raw.GetCurve = lambda: curve
+        raw.GetCurveParams3 = lambda: SimpleNamespace(
+            StartPoint=start, EndPoint=end, UMinValue=angle, UMaxValue=angle + 0.2, Sense=True,
+        )
+        raw.GetClosestPointOn = lambda x, y, z: (*start, angle, 0.0)
+        return raw
+
+    items = []
+    case.canonical_edges, case.drawing_edges = [], []
+    for index, circle in enumerate(circles):
+        raw = install(SimpleNamespace(), circle, index, case.view_body)
+        canonical = install(SimpleNamespace(), circle, index, case.source_body)
+        drawing = install(SimpleNamespace(), circle, index, case.view_body)
+        case.canonical_edges.append(canonical)
+        case.drawing_edges.append(drawing)
+        case.reverse[id(raw)] = case.reverse[id(drawing)] = canonical
+        case.forward[id(raw)] = case.forward[id(canonical)] = drawing
+        items.append(ViewEdge(edge=raw, circle=circle, line=None, vertices=None))
+    case.front.scan = ViewEdges("D1-shaped note failure", (case.bearing_item, *items))
+    case.note_annotation.attached = case.drawing_edges[0]
+    case.diagnostic_candidates = items
+    return case
+
+
+def _refuse_stud_note_source_with_inventory(case):
+    with pytest.raises(RuntimeError) as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert str(error.value) == (
+        "Purchased Screw Note: actual attached head-top edge is not unique in its source view"
+    )
+    return next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_purchased_note_source_inventory"
+    )
+
+
+def test_stud_note_failure_records_all_raw_source_and_view_contexts_without_accepting_mapping(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    case.selections[:] = [case.note_annotation.attached]
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    assert receipt["candidate_count"] == len(case.front.scan.edges)
+    assert receipt["view_name"] == case.front.name
+    assert receipt["view_configuration"] == receipt["source_active_configuration_name"] == "Default"
+    assert receipt["source_path"] == str(bolt_drawing.SOURCE.resolve())
+    assert receipt["source_document_type"] == 1
+    assert receipt["current_selection_count"] == 1
+    assert receipt["current_selection_inventory"][0]["same_view"] == 1
+    assert receipt["current_selection_inventory"][0]["same_attached"] == 1
+    assert receipt["native_leader_points_m"][-3:] == case.note_landing
+    assert receipt["closest_point_queries_model_m"]["original_coordinate_pick"] == tuple(
+        value / 1000 for value in bolt_drawing.HEAD_PICK_MM
+    )
+    candidates = receipt["candidates"]
+    assert [row["candidate_index"] for row in candidates] == list(range(len(case.front.scan.edges)))
+    assert all(row["raw"]["same_attached"] == 0 for row in candidates)
+    circles = [row for row in candidates if row["scan_circle_mm"] is not None]
+    assert [row["reverse_same_attached_reverse"] for row in circles] == [1, 0, 0, 0, 0]
+    assert circles[0]["view_forward_reverse"]["same_attached"] == 1
+    assert circles[0]["raw"]["source_body_comparisons"][0]["same"] == 0
+    assert circles[0]["source_reverse"]["source_body_comparisons"][0]["same"] == 1
+    assert len({row["raw"]["circle_params_m"] for row in circles[:3]}) == 1
+    assert len({row["raw"]["trim_start_m"] for row in circles[:3]}) == 3
+    assert [row["raw"]["trim_u_min"] for row in circles[:3]] == [0.0, 0.4, 0.8]
+    assert all(row["raw"]["trim_sense"] is True for row in circles)
+    assert all(
+        set(row["raw"]["closest_points_m"]) == set(receipt["closest_point_queries_model_m"])
+        for row in candidates
+    )
+    assert not case.rebuilds
+    assert case.selections == [case.note_annotation.attached]
+
+
+def test_stud_note_failure_inventory_distinguishes_duplicate_direct_native_matches(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    item = case.diagnostic_candidates[0]
+    case.note_annotation.attached = item.edge
+    case.front.scan = ViewEdges("duplicate direct native note edge", (*case.front.scan.edges, item))
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 2
+    assert receipt["candidate_count"] == len(case.front.scan.edges)
+    assert [row["candidate_index"] for row in receipt["candidates"]] == list(range(len(case.front.scan.edges)))
+    assert sum(row["raw"]["same_attached"] == 1 for row in receipt["candidates"]) == 2
+
+
+@pytest.mark.parametrize("native_state", [-1, 2])
+def test_stud_note_unknown_direct_identity_is_observed_not_accepted_by_successful_mapping(
+    monkeypatch, native_state,
+):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    original_same = case.app.IsSame
+    case.app.IsSame = lambda left, right: (
+        native_state
+        if right is case.note_annotation.attached
+        and any(left is item.edge for item in case.diagnostic_candidates)
+        else original_same(left, right)
+    )
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    circles = [row for row in receipt["candidates"] if row["scan_circle_mm"] is not None]
+    assert all(row["raw"]["same_attached"] == native_state for row in circles)
+    assert circles[0]["view_forward_reverse"]["same_attached"] == 1
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["reverse_null", "forward_null", "reverse_error", "forward_error", "curve_error",
+     "trim_error", "body_error", "source_bodies_error", "body_same_error"],
+)
+def test_stud_note_diagnostic_nulls_and_native_getter_errors_never_mask_original_refusal(
+    monkeypatch, fault,
+):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    cause = OSError(f"diagnostic {fault}")
+
+    def fail(*_args):
+        raise cause
+
+    if fault == "reverse_null":
+        case.source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "forward_null":
+        case.front.GetCorrespondingEntity = lambda _entity: None
+    elif fault == "reverse_error":
+        case.source.Extension.GetCorrespondingEntity2 = fail
+    elif fault == "forward_error":
+        case.front.GetCorrespondingEntity = fail
+    elif fault == "curve_error":
+        case.diagnostic_candidates[0].edge.GetCurve = fail
+    elif fault == "trim_error":
+        case.diagnostic_candidates[0].edge.GetCurveParams3 = fail
+    elif fault == "body_error":
+        case.diagnostic_candidates[0].edge.GetBody = fail
+    elif fault == "source_bodies_error":
+        case.source.GetBodies2 = fail
+    elif fault == "body_same_error":
+        original_same = case.app.IsSame
+
+        def same(left, right):
+            if left is case.view_body and right is case.source_body:
+                raise cause
+            return original_same(left, right)
+
+        case.app.IsSame = same
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    assert len(receipt["candidates"]) == len(case.front.scan.edges)
+    if fault == "reverse_null":
+        assert receipt["attached"]["source_reverse_null"] is True
+        assert all(row["source_reverse_null"] is True for row in receipt["candidates"])
+    elif fault == "forward_null":
+        assert receipt["attached"]["source_reverse_null"] is False
+        assert receipt["attached"]["view_forward_raw_null"] is True
+        assert receipt["attached"]["view_forward_reverse_null"] is True
+    else:
+        # Check the original getter's readable evidence, not snapshot spelling
+        # or a fabricated empty inventory standing in for inaccessible data.
+        def errors(value):
+            if isinstance(value, dict):
+                yield from value.get("errors", ())
+                for child in value.values():
+                    yield from errors(child)
+            elif isinstance(value, (tuple, list)):
+                for child in value:
+                    yield from errors(child)
+
+        assert any(
+            error["type"] == "OSError" and error["error"] == str(cause)
+            for error in errors(receipt)
+        )
+    assert not case.rebuilds
+
+
+def test_stud_note_diagnostic_sink_failure_cannot_replace_original_native_guard(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+
+    def fail(*_args, **_kwargs):
+        raise OSError("diagnostic sink failed")
+
+    monkeypatch.setattr(bolt_drawing._telemetry, "event", fail)
+    with pytest.raises(RuntimeError, match="actual attached head-top edge is not unique"):
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+
+
+def test_stud_note_unique_direct_identity_uses_source_proof_without_failure_inventory(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("successful strict direct identity must not invoke failure inventory")
+
+    monkeypatch.setattr(bolt_drawing, "_record_purchased_note_source_failure", unexpected)
+    record, _box, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert record["physical_head_edge"]["start_m"] == case.note_trim.StartPoint
+    assert landing == case.note_landing
+    assert not any(name == "drawing.stud_purchased_note_source_inventory" for name, _ in case.events)
+
+
+def test_stud_original_noncircular_note_uses_native_source_and_full_xyz_without_forward_requirement(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def forbidden(*_args):
+        pytest.fail("forward correspondence is not a universal native acceptance predicate")
+
+    case.front.GetCorrespondingEntity = forbidden
+    record, _box, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert case.note_edge.GetCurve().IsCircle() is False
+    assert case.note_edge.GetCurve().IsLine() is False
+    assert record["physical_head_edge"]["start_m"] == case.note_trim.StartPoint
+    assert record["physical_head_edge"]["end_m"] == case.note_trim.EndPoint
+    assert case.note_projection_inputs[-1] == case.note_trim.StartPoint
+    assert landing[2] == case.note_trim.StartPoint[2] * case.front.ScaleDecimal > 0
+    assert landing == case.note_landing
+    assert not case.rebuilds
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["missing", "duplicate", "same_geometry_impostor", "inverse_null", "foreign_body",
+     "null_body", "no_bodies", "duplicate_bodies", "wrong_source", "relative_source",
+     "source_type", "source_configuration", "stock_configuration", "raw_trim",
+     "missing_endpoint", "ambiguous_endpoint", "curve_null", "trim_null", "nonfinite_u",
+     "reversed_u", "invalid_sense", "invalid_kind", "utility_null", "transform_null",
+     "point_null", "transform_result_null",
+     "projection_nonfinite", "projection_z", "leader_z"],
+)
+def test_stud_actual_noncircular_note_source_and_native_xyz_refuse_corruption(monkeypatch, fault):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    bolt_drawing._purchased_note_geometry(case.adapter, case.front, case.note, text=case.note_text)
+    if fault == "missing":
+        case.front.scan = ViewEdges(
+            "missing original native note edge",
+            tuple(item for item in case.front.scan.edges if item.edge is not case.note_edge),
+        )
+    elif fault == "duplicate":
+        item = next(item for item in case.front.scan.edges if item.edge is case.note_edge)
+        case.front.scan = ViewEdges("duplicate original native note edge", (*case.front.scan.edges, item))
+    elif fault == "same_geometry_impostor":
+        impostor, _canonical = case.install_note_edge(SimpleNamespace(**vars(case.note_trim)), 3006)
+        case.front.scan = ViewEdges(
+            "equal geometry is not original native identity",
+            tuple(
+                replace(item, edge=impostor) if item.edge is case.note_edge else item
+                for item in case.front.scan.edges
+            ),
+        )
+    elif fault == "inverse_null":
+        case.note_source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "foreign_body":
+        case.note_model_edge.body = object()
+    elif fault == "null_body":
+        case.note_model_edge.body = None
+    elif fault == "no_bodies":
+        case.note_source.GetBodies2 = lambda _kind, _visible: ()
+    elif fault == "duplicate_bodies":
+        case.note_source.GetBodies2 = lambda _kind, _visible: (case.note_source_body, case.note_source_body)
+    elif fault == "wrong_source":
+        case.note_source.GetPathName = lambda: str(bolt_drawing.SOURCE.with_name("foreign.SLDPRT").resolve())
+    elif fault == "relative_source":
+        case.note_source.GetPathName = lambda: bolt_drawing.SOURCE.name
+    elif fault == "source_type":
+        case.note_source.GetType = lambda: 2
+    elif fault == "source_configuration":
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = "FOREIGN"
+    elif fault == "stock_configuration":
+        case.front.ReferencedConfiguration = bolt.SUPPLIER_STOCK_CONFIGURATION
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = bolt.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "raw_trim":
+        case.note_edge.trim = SimpleNamespace(**vars(case.note_trim))
+        case.note_edge.trim.EndPoint = (case.note_trim.EndPoint[0] + 0.001, *case.note_trim.EndPoint[1:])
+    elif fault == "missing_endpoint":
+        case.note_trim.StartPoint = (case.note_trim.StartPoint[0] + 0.001, *case.note_trim.StartPoint[1:])
+    elif fault == "ambiguous_endpoint":
+        case.note_trim.EndPoint = case.note_trim.StartPoint
+    elif fault == "curve_null":
+        case.note_model_edge.curve = None
+    elif fault == "trim_null":
+        case.note_model_edge.trim = None
+    elif fault == "nonfinite_u":
+        case.note_trim.UMinValue = float("nan")
+    elif fault == "reversed_u":
+        case.note_trim.UMinValue, case.note_trim.UMaxValue = case.note_trim.UMaxValue, case.note_trim.UMinValue
+    elif fault == "invalid_sense":
+        case.note_trim.Sense = None
+    elif fault == "invalid_kind":
+        case.note_edge.curve.kind = None
+    elif fault == "utility_null":
+        case.app.GetMathUtility = lambda: None
+    elif fault == "transform_null":
+        case.front.ModelToViewTransform = None
+    elif fault == "point_null":
+        case.note_math_utility.CreatePoint = lambda _data: None
+    elif fault == "transform_result_null":
+        case.note_math_utility.CreatePoint = lambda _data: SimpleNamespace(MultiplyTransform=lambda _transform: None)
+    elif fault in ("projection_nonfinite", "projection_z"):
+        coordinates = (*case.note_landing[:2], float("nan") if fault == "projection_nonfinite" else case.note_landing[2] + 0.001)
+        case.note_math_utility.CreatePoint = lambda _data: SimpleNamespace(
+            MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=coordinates),
+        )
+    elif fault == "leader_z":
+        case.note_landing = (*case.note_landing[:2], case.note_landing[2] + 0.001)
+    else:
+        raise AssertionError(f"unknown original note source corruption {fault}")
+    with pytest.raises(RuntimeError, match="Purchased Screw Note"):
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+
+
+@pytest.mark.parametrize("getter", ["GetCurve", "GetCurveParams3"])
+def test_stud_original_native_note_descriptor_getter_failure_retains_cause(monkeypatch, getter):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    cause = OSError(f"actual original native {getter} failed")
+
+    def fail():
+        raise cause
+
+    setattr(case.note_model_edge, getter, fail)
+    with pytest.raises(RuntimeError, match="native head-top curve/trim") as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert error.value.__cause__ is cause
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("field", ["curve_type", "trim_curve_type", "start", "end", "u_min", "u_max", "sense"])
+def test_stud_original_native_note_trim_descriptor_is_immutable_and_freshly_reproved(
+    monkeypatch, tmp_path, phase, field,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    captured = dict(case.purchased_note_proof["edge_descriptor"])
+    if field == "curve_type":
+        case.note_edge.curve.kind += 1
+    elif field == "trim_curve_type":
+        case.note_trim.CurveType += 1
+    elif field == "start":
+        case.note_trim.StartPoint = (case.note_trim.StartPoint[0] + 0.000001, *case.note_trim.StartPoint[1:])
+    elif field == "end":
+        case.note_trim.EndPoint = (case.note_trim.EndPoint[0] + 0.000001, *case.note_trim.EndPoint[1:])
+    elif field == "u_min":
+        case.note_trim.UMinValue += 0.0000001
+    elif field == "u_max":
+        case.note_trim.UMaxValue += 0.0000001
+    elif field == "sense":
+        case.note_trim.Sense = not case.note_trim.Sense
+    else:
+        raise AssertionError(f"unknown native trim descriptor field {field}")
+    assert case.purchased_note_proof["edge_descriptor"] == captured
+    with pytest.raises(RuntimeError, match="physical head-top"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_note_source_configuration_getter_failure_is_not_ignored(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    cause = OSError("actual native source configuration getter failed")
+    original_bind = bolt_drawing._early_bound
+
+    def bind(value, kind):
+        if kind == "IConfigurationManager":
+            raise cause
+        return original_bind(value, kind)
+
+    monkeypatch.setattr(bolt_drawing, "_early_bound", bind)
+    with pytest.raises(OSError) as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert error.value is cause
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("fault", ["configuration", "body", "inverse", "path"])
+def test_stud_original_note_source_is_freshly_reproved_after_capture(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    if fault == "configuration":
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = "FOREIGN"
+    elif fault == "body":
+        case.note_model_edge.body = object()
+    elif fault == "inverse":
+        case.note_source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "path":
+        case.note_source.GetPathName = lambda: str(bolt_drawing.SOURCE.with_name("foreign.SLDPRT").resolve())
+    else:
+        raise AssertionError(f"unknown captured source corruption {fault}")
+    with pytest.raises(RuntimeError, match="physical head-top source"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def _shelve_stud_paper(case):
+    def reacquire():
+        displays = bolt_drawing._assert_supplier_references(
+            case.adapter, case.identities, case.configurations,
+        )
+        return {"SupplierHeadHeight": displays["SupplierHeadHeight"]}
+
+    case.shelf_check = bolt_drawing.shelve_reference_text(
+        case.adapter, reacquire=reacquire, axes={"SupplierHeadHeight": 1},
+        force=("SupplierHeadHeight",), label="knife-hanger physical head height",
+    )
+    case.note_check, case.purchased_note_proof = bolt_drawing._place_purchased_note_above_shelf(
+        case.adapter, case.front, case.display, case.note, text=case.note_text, reacquire=reacquire,
+    )
+
+
+def test_stud_actual_headheight_shelf_and_complete_note_clearance_preserve_physical_source(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    arrows = deepcopy(case.paper_data["arrows"])
+    lines = deepcopy(case.paper_data["lines"])
+    attached = tuple(case.annotation.attached)
+    original_note_attachment, = case.note_annotation.GetAttachedEntities3()
+    before = bolt_drawing._assert_supplier_references(
+        case.adapter, case.identities, case.configurations,
+    )
+    assert set(before) == set(bolt.SUPPLIER_REFERENCE_DIMENSIONS)
+    assert before["SupplierHeadHeight"] is case.display
+    assert case.sheet_index == 0
+    initial = reference_text.measure_reference_text(
+        case.adapter, case.display, axis=1, label="SupplierHeadHeight",
+    )
+    assert initial["text"].ymin < arrows[0][1] < initial["text"].ymax
+    _shelve_stud_paper(case)
+    shelf = reference_text.measure_reference_text(
+        case.adapter, case.display, axis=1, label="SupplierHeadHeight",
+    )
+    _record, note, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert shelf["text"].ymin == pytest.approx(0.2291028)
+    assert shelf["text"].ymax == pytest.approx(0.2381591)
+    assert note.ymin == pytest.approx(0.2403591)
+    assert note.ymax == pytest.approx(0.2438591)
+    assert case.note_annotation.position[:2] == pytest.approx((0.130, 0.2448848))
+    assert landing == case.note_landing
+    actual_note_attachment, = case.note_annotation.GetAttachedEntities3()
+    assert actual_note_attachment is original_note_attachment
+    assert tuple(case.annotation.attached) == attached
+    assert case.paper_data["arrows"] == arrows
+    assert case.paper_data["lines"] == lines
+    assert case.display.GetText(1) == "("
+    assert case.native.SystemValue == pytest.approx(bolt.HEAD_H / 1000)
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display,
+    ) == pytest.approx(bolt.HEAD_H)
+    case.shelf_check()
+    case.note_check()
+
+
+def test_stud_shelf_reacquires_replaced_native_display_on_active_finished_sheet(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    _shelve_stud_paper(case)
+    fresh = SimpleNamespace(**vars(case.display))
+    case.displays["SupplierHeadHeight"] = fresh
+    assert bolt_drawing._assert_supplier_references(
+        case.adapter, case.identities, case.configurations,
+    )["SupplierHeadHeight"] is fresh
+    assert case.sheet_index == 0
+    case.shelf_check()
+    fresh.OffsetText = False
+    with pytest.raises(RuntimeError, match="offset|crowds"):
+        case.shelf_check()
+
+
+@pytest.mark.parametrize("phase", ["native_offset_rebuild", "settled"])
+@pytest.mark.parametrize(
+    "fault", ["full_name", "duplicate", "missing", "owner", "attachment", "value", "band", "config"],
+)
+def test_stud_shelf_retains_exact_source_census_at_transition_and_late_readback(
+    monkeypatch, phase, fault,
+):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def corrupt():
+        if fault == "full_name":
+            case.native.FullName += "@STALE"
+        elif fault == "duplicate":
+            original = case.front.GetDisplayDimensions
+            case.front.GetDisplayDimensions = lambda: (*original(), case.display)
+        elif fault == "missing":
+            case.displays.pop("SupplierHeadHeight")
+        elif fault == "owner":
+            case.annotation.Owner = case.views[1]
+        elif fault == "attachment":
+            case.annotation.attached[1] = case.rear
+        elif fault == "value":
+            case.native.SystemValue += 0.00001
+        elif fault == "band":
+            case.native.Tolerance.Type = 2
+        else:
+            case.front.ReferencedConfiguration = "FOREIGN"
+
+    if phase == "native_offset_rebuild":
+        original = case.model.EditRebuild3
+        mutated = False
+
+        def rebuild():
+            nonlocal mutated
+            if case.display.OffsetText is True and not mutated:
+                mutated = True
+                corrupt()
+            return original()
+
+        case.model.EditRebuild3 = rebuild
+        with pytest.raises(RuntimeError):
+            _shelve_stud_paper(case)
+        assert mutated
+    else:
+        _shelve_stud_paper(case)
+        corrupt()
+        with pytest.raises(RuntimeError):
+            case.shelf_check()
+
+
+@pytest.mark.parametrize("fault", ["shelf_move", "note_move", "shelf_width", "note_width", "note_angle"])
+def test_stud_actual_boundary_refuses_silent_native_moves_and_unmeasured_complete_text(
+    monkeypatch, fault,
+):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    if fault == "shelf_move":
+        case.annotation.SetPosition2 = lambda *_xyz: True
+    elif fault == "note_move":
+        case.note_annotation.SetPosition2 = lambda *_xyz: True
+    elif fault == "shelf_width":
+        case.paper_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_width":
+        case.note_data["texts"][-1]["w"] = 0.0
+    else:
+        case.note_data["texts"][-1]["ang"] = math.nan
+    with pytest.raises(RuntimeError):
+        _shelve_stud_paper(case)
+
+
+_STUD_PAPER_FAULTS = (
+    "offset", "shelf_last_fragment", "note_last_fragment", "note_property", "note_text",
+    "note_landing", "note_attachment", "note_dangling", "note_owner", "note_visible",
+    "note_missing", "note_duplicate", "foreign_line", "foreign_text", "border", "other_view",
+    "shelf_width", "note_width", "note_position", "note_line",
+)
+
+
+def _corrupt_stud_paper(case, fault):
+    if fault == "offset":
+        case.display.OffsetText = False
+    elif fault == "shelf_width":
+        case.paper_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_width":
+        case.note_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_position":
+        case.note_annotation.position[0] = math.nan
+    elif fault == "note_line":
+        case.note_data["lines"][0] = [0, 0, 0, 0, 0.210, 0.232, 0, 0.240, 0.232, 0]
+    elif fault == "shelf_last_fragment":
+        case.paper_data["texts"][-1]["pos"][1] = 0.225
+    elif fault == "note_last_fragment":
+        case.note_data["texts"].append(
+            case.paper_row("HEAD UNMODIFIED", 0.210, 0.233, 0.045, 0.0068741)
+        )
+    elif fault == "note_property":
+        case.note.PropertyLinkedText = bolt_drawing.property_link("Wrong Property")
+    elif fault == "note_text":
+        case.note.text += " WRONG"
+    elif fault == "note_landing":
+        case.note_landing = (case.note_landing[0] + 0.001, *case.note_landing[1:])
+    elif fault == "note_attachment":
+        case.note_annotation.attached = case.bearing
+    elif fault == "note_dangling":
+        case.note_annotation.dangling = True
+    elif fault == "note_owner":
+        case.note_annotation.Owner = case.views[1]
+    elif fault == "note_visible":
+        case.note_annotation.Visible = 0
+    elif fault == "note_missing":
+        case.note_annotation.GetName = lambda: "DetailItem347@STALE"
+    elif fault == "note_duplicate":
+        case.foreign_annotations.append(case.note_annotation)
+    elif fault in ("foreign_line", "foreign_text"):
+        annotation = SimpleNamespace(
+            Owner=case.front, OwnerType=0, GetName=lambda: "foreign annotation",
+        )
+        native = (
+            {"lines": [[0, 0, 0, 0, 0.200, 0.232, 0, 0.245, 0.232, 0]]}
+            if fault == "foreign_line"
+            else {"texts": [case.paper_row("FOREIGN", 0.220, 0.241, 0.030)]}
+        )
+        case.paper_install(annotation, native, 7, (0.220, 0.232, 0))
+        case.foreign_annotations.append(annotation)
+    elif fault == "border":
+        case.note_data["texts"][-1]["pos"][0] = 0.400
+    elif fault == "other_view":
+        case.views[1].GetOutline = lambda: (0.210, 0.228, 0.260, 0.246)
+    else:
+        raise AssertionError(f"unknown actual-paper fault {fault}")
+
+
+@pytest.mark.parametrize("fault", _STUD_PAPER_FAULTS)
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+def test_stud_full_actual_paper_proof_refuses_late_complete_text_and_adjacent_ink_drift(
+    monkeypatch, tmp_path, fault, phase,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    _corrupt_stud_paper(case, fault)
+    rebuilds = tuple(case.rebuilds)
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    assert tuple(case.rebuilds) == rebuilds
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_paper_uses_only_fresh_native_reads_not_live_shelf_closures(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+
+    def stale():
+        raise AssertionError("closed live-COM proof must never be called")
+
+    case.shelf_check = case.note_check = stale
+    case.annotation.SetPosition2 = case.note_annotation.SetPosition2 = stale
+    case.model.EditRebuild3 = stale
+    bolt_drawing._assert_saved_physical_references(
+        case.adapter, case.identities, case.configurations,
+        serialized_full_names=case.serialized_full_names,
+        purchased_note=case.purchased_note_proof,
+    )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+def test_stud_note_preserves_actual_noncircular_boundary_and_independent_height_outer_rim(
+    monkeypatch, tmp_path, phase,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    descriptor = case.purchased_note_proof["edge_descriptor"]
+    assert descriptor["start_m"] == case.note_trim.StartPoint
+    assert descriptor["end_m"] == case.note_trim.EndPoint
+    assert descriptor["u"] == (case.note_trim.UMinValue, case.note_trim.UMaxValue)
+    assert descriptor["sense"] is case.note_trim.Sense
+    assert not case.note_edge.GetCurve().IsCircle()
+    assert not case.note_edge.GetCurve().IsLine()
+    assert case.note_annotation.attached is case.note_edge
+    assert case.annotation.attached[1] is case.top
+    if phase == "saved":
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+    else:
+        case.note_check()
+
+
+def test_stud_note_cold_read_requires_exact_actual_serialized_annotation_name(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    assert case.purchased_note_proof["name"] == case.note_name != "DetailItem347"
+    stale = dict(case.purchased_note_proof, name="DetailItem347")
+    with pytest.raises(RuntimeError, match="exact native note census"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names, purchased_note=stale,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("replacement", ["circle", "other_trim", "foreign_same_geometry"])
+def test_stud_note_refuses_other_native_target_despite_identical_projected_head_top_landing(
+    monkeypatch, tmp_path, phase, replacement,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    original_landing = case.note_landing
+    if replacement == "circle":
+        case.note_annotation.attached = case.top
+    else:
+        trim = SimpleNamespace(**vars(case.note_trim))
+        if replacement == "other_trim":
+            trim.EndPoint = (trim.EndPoint[0] + 0.001, *trim.EndPoint[1:])
+        raw, canonical = case.install_note_edge(trim, 3006)
+        if replacement == "foreign_same_geometry":
+            canonical.body = object()
+        case.front.scan = ViewEdges(
+            "different original-note target",
+            (*case.front.scan.edges, ViewEdge(edge=raw, line=None, circle=None, vertices=None)),
+        )
+        case.note_annotation.attached = raw
+    # Every replacement retains the same complete projected top endpoint.
+    assert case.note_landing == original_landing
+    message = "source body" if replacement == "foreign_same_geometry" else "source descriptor"
+    with pytest.raises(RuntimeError, match=message):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def _saved_stud_height_case(monkeypatch, tmp_path):
+    case = _settled_stud_height_case(monkeypatch)
+    _stud_paper_fixture(case, monkeypatch)
+    _shelve_stud_paper(case)
+    case.scans.clear()
+    case.events.clear()
+    path = tmp_path / "finished-stud.SLDDRW"
+    path.touch()
+    case.path = str(path.resolve())
+    case.model.GetType = lambda: 3
+    case.native_doc_path = str(tmp_path / "Drawing.SLDDRW")
+    case.model.GetPathName = lambda: case.native_doc_path
+    case.model.GetTitle = lambda: "finished-stud.SLDDRW"
+    case.previous_model = object()
+    case.open_calls = []
+    case.close_calls = []
+    case.open_result = (case.model, 0, 0)
+    case.app.ActiveDoc = case.model
+
+    def open_doc(*args):
+        case.open_calls.append(args)
+        case.loaded = True
+        return case.open_result
+
+    def close_doc(title):
+        case.close_calls.append(title)
+        case.loaded = False
+
+    case.app.OpenDoc6 = open_doc
+    case.app.CloseDoc = close_doc
+    case.app.GetOpenDocumentByName = lambda native_path: (
+        case.model if case.loaded and native_path == case.path else None
+    )
+    monkeypatch.setattr(bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=path))
+    monkeypatch.setattr(
+        bolt_drawing, "assert_supplier_reference_dimension",
+        supplier_dimensions.assert_supplier_reference_dimension,
+    )
+    # Simulate successful native/PDF saves before the pre-close checkpoint.
+    # Annotation COM anchors stay identical while actual document/name fields change.
+    original_identities = dict(case.identities)
+    case.native_doc_path = case.path
+    case.loaded = True
+    for name in ("SupplierHeadHeight", "SupplierStockLength"):
+        native = case.displays[name].GetDimension2(0)
+        native.FullName = f"{native.FullName}@finished-stud"
+    case.note_name = "DetailItem347@ACTUAL-SERIALIZED"
+    case.purchased_note_proof["name"] = bolt_drawing.capture_serialized_note_name(
+        case.adapter, case.note_annotation, case.front,
+        drawing_path=path, source_path=bolt_drawing.SOURCE,
+        sheet_names=bolt_drawing.SHEET_NAMES, sheet_name=bolt_drawing.SHEET_NAMES[0],
+        configuration=case.purchased_note_proof["source"][2], label="Purchased Screw Note",
+    )
+    case.serialized_full_names = bolt_drawing.capture_serialized_physical_axial_names(
+        case.adapter,
+        {name: case.references[name] for name in ("SupplierHeadHeight", "SupplierStockLength")},
+        case.identities, case.configurations,
+        labels=("SupplierHeadHeight", "SupplierStockLength"),
+        drawing_path=path, sheet_names=bolt_drawing.SHEET_NAMES,
+    )
+    assert case.identities == original_identities
+    case.loaded = False
+    case.adapter.currentModel = case.previous_model
+    # Captured creation handles deliberately cannot match the freshly reopened edges.
+    for name in ("SupplierHeadHeight", "SupplierStockLength"):
+        full_name, owner, _entities, kinds = case.identities[name]
+        case.identities[name] = (full_name, owner, (object(), object()), kinds)
+    return case
+
+
+def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_format(
+    monkeypatch, tmp_path
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    assert all(
+        case.identities[name][0] != actual_name
+        for name, actual_name in case.serialized_full_names.items()
+    )
+    bolt_drawing._assert_saved_physical_references(
+        case.adapter, case.identities, case.configurations,
+        serialized_full_names=case.serialized_full_names,
+        purchased_note=case.purchased_note_proof,
+    )
+    assert case.open_calls == [(case.path, 3, 3, "", 0, 0)]
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert not case.loaded
+    assert all(record[0] is case.model for record in case.scans)
+    assert {id(record[1]) for record in case.scans} == {id(case.front), id(case.stock_case.front)}
+    receipt = next(
+        fields for _name, fields in case.events if fields.get("phase") == "after_saved_reopen"
+    )
+    assert receipt["full_name"] == case.native.FullName
+    assert receipt["measured_mm"] == pytest.approx(bolt.HEAD_H)
+    assert receipt["top_radius_mm"] == pytest.approx(bolt.HEAD_AF / 2)
+    assert receipt["bearing_point_mm"][1] == bolt.LENGTH
+    assert receipt["top_point_mm"][1] == bolt.HEAD_TOP_Y
+    stock_receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length"
+    )
+    assert stock_receipt["full_name"] == case.stock_case.native.FullName
+    assert stock_receipt["measured_mm"] == pytest.approx(bolt.CATALOG_LENGTH)
+    assert stock_receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+    assert stock_receipt["tip_y_mm"] == pytest.approx(bolt.LENGTH - bolt.CATALOG_LENGTH)
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert {(fields["label"], fields["phase"]) for fields in proofs} == {
+        ("SupplierHeadHeight", "saved"), ("SupplierStockLength", "saved"),
+    }
+
+
+@pytest.mark.parametrize("fault", ["missing", "extra", "empty", "null", "duplicate"])
+def test_stud_saved_reader_requires_complete_distinct_serialized_mapping_before_open(
+    monkeypatch, tmp_path, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    serialized = dict(case.serialized_full_names)
+    if fault == "missing":
+        serialized.pop("SupplierStockLength")
+    elif fault == "extra":
+        serialized["SupplierHeadAF"] = "foreign-serialized-name"
+    elif fault == "empty":
+        serialized["SupplierHeadHeight"] = ""
+    elif fault == "null":
+        serialized["SupplierHeadHeight"] = None
+    else:
+        serialized["SupplierStockLength"] = serialized["SupplierHeadHeight"]
+    with pytest.raises(RuntimeError, match="serialized native FullNames"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert not case.open_calls and not case.close_calls and not case.scans
+    assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_reader_has_no_implicit_original_name_fallback(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    with pytest.raises(TypeError, match="serialized_full_names"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+        )
+    assert not case.open_calls and not case.close_calls
+
+
+@pytest.mark.parametrize("fault", ["original", "suffix_only", "near_match"])
+def test_stud_saved_reader_matches_only_the_actual_serialized_full_names(
+    monkeypatch, tmp_path, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    serialized = dict(case.serialized_full_names)
+    for name in serialized:
+        if fault == "original":
+            serialized[name] = case.identities[name][0]
+        elif fault == "suffix_only":
+            serialized[name] = serialized[name].split("@", 1)[1]
+        else:
+            serialized[name] += " "
+    with pytest.raises(RuntimeError, match="label_match_counts"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+            purchased_note=case.purchased_note_proof,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 0, "SupplierStockLength": 0,
+    }
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_missing_both_names_emits_full_actual_native_inventory_before_refusal(
+    monkeypatch, tmp_path,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    case.native.FullName = "ACTUAL-HEAD-AFTER-SAVE"
+    case.stock_case.native.FullName = "ACTUAL-STOCK-AFTER-SAVE"
+    case.views[3].GetDisplayDimensions = lambda: None
+    with pytest.raises(RuntimeError) as failure:
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["document"] == {
+        "title": "finished-stud.SLDDRW", "path": case.path, "type": 3,
+        "sheet_names": bolt_drawing.SHEET_NAMES,
+    }
+    assert receipt["expected_original_full_names"] == {
+        name: case.identities[name][0] for name in case.serialized_full_names
+    }
+    assert receipt["expected_serialized_full_names"] == case.serialized_full_names
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 0, "SupplierStockLength": 0,
+    }
+    observed = {
+        (sheet["sheet"], view["view"]): view
+        for sheet in receipt["inventory"] for view in sheet["views"]
+    }
+    assert set(observed) == {
+        (bolt_drawing.SHEET_NAMES[index], name)
+        for index, names in enumerate((
+            (bolt_drawing.SHEET_NAMES[0], "FinishedFront", "FinishedIso"),
+            (bolt_drawing.SHEET_NAMES[1], "StockFront", "StockIso"),
+        ))
+        for name in names
+    }
+    finished_sheet = observed[(bolt_drawing.SHEET_NAMES[0], bolt_drawing.SHEET_NAMES[0])]
+    stock_sheet = observed[(bolt_drawing.SHEET_NAMES[1], bolt_drawing.SHEET_NAMES[1])]
+    stock_iso = observed[(bolt_drawing.SHEET_NAMES[1], "StockIso")]
+    assert finished_sheet["raw_none"] is True and finished_sheet["count"] == 0
+    assert stock_sheet["raw_none"] is False and stock_sheet["count"] == 0
+    assert stock_iso["raw_none"] is True and stock_iso["count"] == 0
+    for name, owner, actual_full_name in (
+        ("SupplierHeadHeight", "FinishedFront", case.native.FullName),
+        ("SupplierStockLength", "StockFront", case.stock_case.native.FullName),
+    ):
+        sheet_name, configuration = case.configurations[owner]
+        view = observed[(sheet_name, owner)]
+        assert view["configuration"] == configuration
+        assert view["source_document_path"] == str(bolt_drawing.SOURCE.resolve())
+        dimension = next(row for row in view["dimensions"] if row["full_name"] == actual_full_name)
+        assert dimension["annotation_name"] == f"native-annotation:{name}"
+        assert dimension["selection_name"] == f"native-selection:{name}"
+        assert dimension["owner"] == owner
+        assert dimension["owner_type"] == 0 and dimension["owner_same"] == 1
+        assert actual_full_name in str(failure.value)
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+
+
+def test_stud_saved_inventory_visits_unexpected_actual_sheets_before_sheet_census_refusal(
+    monkeypatch, tmp_path,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    extra_name = "Unexpected actual saved sheet"
+    extra_view = SimpleNamespace(
+        name=extra_name, ReferencedConfiguration="", ReferencedDocument=None,
+        GetDisplayDimensions=lambda: None, GetNextView=lambda: None,
+    )
+    activate_original = case.model.ActivateSheet
+    first_original = case.model.GetFirstView
+    case.extra_active = False
+
+    def activate(name):
+        case.extra_active = name == extra_name
+        return True if case.extra_active else activate_original(name)
+
+    case.model.ActivateSheet = activate
+    case.model.GetFirstView = lambda: extra_view if case.extra_active else first_original()
+    case.model.GetSheetNames = lambda: (*bolt_drawing.SHEET_NAMES, extra_name)
+    with pytest.raises(RuntimeError, match=extra_name):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert [sheet["sheet"] for sheet in receipt["inventory"]] == [
+        *bolt_drawing.SHEET_NAMES, extra_name,
+    ]
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": 1, "SupplierStockLength": 1,
+    }
+    extra_record = receipt["inventory"][-1]["views"][0]
+    assert extra_record["view"] == extra_name
+    assert extra_record["raw_none"] is True and extra_record["count"] == 0
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+
+
+@pytest.mark.parametrize("getter", ["selection", "annotation", "dimension", "full_name", "view"])
+def test_stud_saved_inventory_continues_after_getter_failure_and_chains_original_cause(
+    monkeypatch, tmp_path, getter,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    cause = OSError(f"original native {getter} getter failure")
+
+    def fail(*_args):
+        raise cause
+
+    if getter == "selection":
+        case.display.GetNameForSelection = fail
+    elif getter == "annotation":
+        case.annotation.GetName = fail
+    elif getter == "dimension":
+        case.display.GetDimension2 = fail
+    elif getter == "full_name":
+        class BrokenDimension:
+            @property
+            def FullName(self):
+                raise cause
+
+        broken_dimension = BrokenDimension()
+        case.display.GetDimension2 = lambda _index: broken_dimension
+    else:
+        case.front.GetDisplayDimensions = fail
+    with pytest.raises(RuntimeError) as failure:
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert failure.value.__cause__ is cause
+    receipt = next(
+        fields for event, fields in case.events
+        if event == "drawing.physical_axial_identity_inventory" and fields["phase"] == "saved"
+    )
+    assert receipt["label_match_counts"] == {
+        "SupplierHeadHeight": int(getter in ("selection", "annotation")),
+        "SupplierStockLength": 1,
+    }
+    assert [sheet["sheet"] for sheet in receipt["inventory"]] == list(bolt_drawing.SHEET_NAMES)
+    stock_view = next(
+        view for sheet in receipt["inventory"] for view in sheet["views"]
+        if view.get("view") == "StockFront"
+    )
+    assert stock_view["dimensions"][0]["full_name"] == case.stock_case.native.FullName
+    assert str(cause) in str(failure.value)
+    if getter == "view":
+        front_view = next(
+            view for sheet in receipt["inventory"] for view in sheet["views"]
+            if view.get("view") == "FinishedFront"
+        )
+        assert "raw_none" not in front_view and "count" not in front_view
+    assert not case.scans
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "open_errors", "null_open", "bad_open_shape", "wrong_path", "wrong_type",
+        "wrong_current", "sheet_census", "activate_sheet", "missing_dimension",
+        "duplicate_dimension", "wrong_owner", "wrong_annotation_owner",
+        "same_named_foreign_owner", "wrong_owner_type",
+        "wrong_configuration", "value", "attachment", "station", "format", "band",
+        "missing_native", "missing_annotation", "close_failure",
+    ),
+)
+def test_stud_saved_reopen_refuses_corruption_and_restores_adapter_even_on_failure(
+    monkeypatch, tmp_path, fault
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    if fault == "open_errors":
+        case.open_result = (case.model, 4, 0)
+    elif fault == "null_open":
+        case.open_result = (None, 0, 0)
+    elif fault == "bad_open_shape":
+        case.open_result = case.model
+    elif fault == "wrong_path":
+        case.open_result = (SimpleNamespace(
+            GetType=lambda: 3, GetPathName=lambda: str(tmp_path / "wrong.SLDDRW")
+        ), 0, 0)
+    elif fault == "wrong_type":
+        case.open_result = (SimpleNamespace(
+            GetType=lambda: 1, GetPathName=lambda: case.path
+        ), 0, 0)
+    elif fault == "wrong_current":
+        case.app.ActiveDoc = object()
+    elif fault == "sheet_census":
+        case.model.GetSheetNames = lambda: (bolt_drawing.SHEET_NAMES[0],)
+    elif fault == "activate_sheet":
+        case.model.ActivateSheet = lambda _name: False
+    elif fault == "missing_dimension":
+        case.native.FullName = "Wrong@FinishedFront@Drawing"
+    elif fault == "duplicate_dimension":
+        original = case.front.GetDisplayDimensions
+        case.front.GetDisplayDimensions = lambda: (*original(), case.display)
+    elif fault == "wrong_owner":
+        case.front.name = "WrongView"
+    elif fault == "wrong_annotation_owner":
+        case.annotation.Owner = case.views[1]
+    elif fault == "same_named_foreign_owner":
+        case.annotation.Owner = SimpleNamespace(name=case.front.name)
+    elif fault == "wrong_owner_type":
+        case.annotation.OwnerType = 1
+    elif fault == "wrong_configuration":
+        case.front.ReferencedConfiguration = bolt.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "value":
+        case.native.SystemValue -= 0.0001
+    elif fault == "attachment":
+        case.annotation.attached[1] = case.rear
+    elif fault == "station":
+        case.front.scan = ViewEdges("saved crown only", (case.bearing_item, case.crown_item))
+    elif fault == "format":
+        case.display.precision += 1
+    elif fault == "band":
+        case.native.Tolerance.Type = 2
+    elif fault == "missing_native":
+        case.display.GetDimension2 = lambda _index: None
+    elif fault == "missing_annotation":
+        case.display.GetAnnotation = lambda: None
+    elif fault == "close_failure":
+        case.app.CloseDoc = lambda title: case.close_calls.append(title)
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert case.loaded is (fault == "close_failure")
+    if fault not in ("close_failure",):
+        assert not any(
+            fields.get("phase") == "after_saved_reopen" for _name, fields in case.events
+        )
+
+
+@pytest.mark.parametrize("already_open", [False, True])
+def test_stud_saved_proof_requires_existing_closed_finalized_file(
+    monkeypatch, tmp_path, already_open
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    if already_open:
+        case.loaded = True
+    else:
+        monkeypatch.setattr(
+            bolt_drawing, "OUTPUTS", SimpleNamespace(slddrw=tmp_path / "missing.SLDDRW")
+        )
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert not case.open_calls
+    assert not case.close_calls
+    assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_head_height_projects_actual_closest_points_not_nominal_interior_picks(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.bearing.nearest = (
+        case.bearing.nearest[0] + 1e-9, *case.bearing.nearest[1:]
+    )
+    case.top.nearest = (1e-9, *case.top.nearest[1:])
+    bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
+    assert case.projections[0][1] == [
+        tuple(case.bearing.nearest[:3]), tuple(case.top.nearest[:3])
+    ]
+
+
+@pytest.mark.parametrize("nearest", [None, (0.0,), (math.nan, 0.0, 0.0), (1.0, 1.0, 1.0)])
+def test_stud_head_height_refuses_unreadable_or_moved_actual_bearing_point(monkeypatch, nearest):
+    case = _stud_height_case(monkeypatch)
+    case.bearing.nearest = nearest
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._add_physical_head_height(case.adapter, case.front, (0.218, 0.216))
+    assert not case.selection_log
+    assert not case.creations
+
+
+@pytest.mark.parametrize(
+    "name",
+    ("_head_height_entities", "_add_physical_head_height",
+     "_assert_physical_head_height", "_assert_saved_physical_references"),
+)
+def test_stud_physical_head_height_native_entrypoints_are_traced(name):
+    assert hasattr(getattr(bolt_drawing, name), "__wrapped__")
+
+
+@pytest.mark.parametrize("wrong_value", [False, True])
+def test_stud_created_readback_reuses_named_pair_without_skipping_native_proof(
+    monkeypatch, wrong_value
+):
+    case = _stud_height_case(monkeypatch)
+
+    def unexpected_scan(*_args, **_kwargs):
+        raise AssertionError("creation readback must reuse its freshly resolved physical pair")
+
+    monkeypatch.setattr(bolt_drawing, "scan_view_edges", unexpected_scan)
+    if wrong_value:
+        case.native.SystemValue -= 0.0001
+        with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+            bolt_drawing._assert_physical_head_height(
+                case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+            )
+        return
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display, entities=(case.bearing, case.top)
+    ) == pytest.approx(bolt.HEAD_H)
+
+
+def test_stud_unique_physical_pair_does_not_repeat_the_bearing_identity_lookup(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    comparisons = []
+
+    def same(first, second):
+        comparisons.append((first, second))
+        return int(first is second)
+
+    case.app.IsSame = same
+    bearing, top = bolt_drawing._head_height_entities(case.adapter, case.front)
+    assert bearing is case.bearing
+    assert top is case.top
+    assert comparisons == [(case.bearing, case.top)]
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stud_changed_geometry_diagnostics_keep_nearest_lines_and_circles_bounded(
+    monkeypatch, reverse
+):
+    case = _stud_height_case(monkeypatch)
+    near_line = replace(
+        case.bearing_item,
+        line=tuple((x, y + 0.001, z) for x, y, z in case.bearing_item.line),
+    )
+    near_circle = replace(
+        case.top_item,
+        circle=(*case.top_item.circle[:6], bolt.HEAD_AF / 2 + 0.001),
+    )
+    far_lines = [
+        replace(
+            case.bearing_item, edge=case.edge(None),
+            line=tuple((x, y + 10 + index, z) for x, y, z in case.bearing_item.line),
+        )
+        for index in range(16)
+    ]
+    far_circles = [
+        replace(
+            case.top_item, edge=case.edge(None),
+            circle=(*case.top_item.circle[:6], bolt.HEAD_AF / 2 + 10 + index),
+        )
+        for index in range(16)
+    ]
+    invalid_line = replace(
+        case.bearing_item,
+        line=((math.nan, bolt.LENGTH, 0.0), case.bearing_item.line[1]),
+    )
+    invalid_circle = replace(
+        case.top_item, circle=(*case.top_item.circle[:6], math.nan)
+    )
+    edges = [*far_lines, *far_circles, invalid_line, invalid_circle, near_line, near_circle]
+    case.front.scan = ViewEdges(
+        "changed source with near misses", tuple(reversed(edges) if reverse else edges)
+    )
+    with pytest.raises(RuntimeError, match="SupplierHeadHeight"):
+        bolt_drawing._head_height_entities(case.adapter, case.front)
+    evidence = next(fields for name, fields in case.events if name.endswith("_geometry"))
+    assert evidence["line_count"] == evidence["circle_count"] == 18
+    assert len(evidence["lines"]) == len(evidence["circles"]) == 12
+    assert evidence["lines"][0]["line_mm"] == near_line.line
+    assert evidence["circles"][0]["circle_mm"] == near_circle.circle
+    assert evidence["lines"][0]["geometry_error_mm"] == pytest.approx(0.001)
+    assert evidence["circles"][0]["geometry_error_mm"] == pytest.approx(0.001)
+    assert not evidence["circles"][0]["shape_matches"]
+
+
+@pytest.mark.parametrize("missing_registered", [False, True])
+def test_stud_saved_proof_requires_the_opened_document_to_be_registered_by_exact_path(
+    monkeypatch, tmp_path, missing_registered
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    loaded_lookups = []
+
+    def lookup(path):
+        assert path == case.path
+        if not case.loaded:
+            return None
+        loaded_lookups.append(path)
+        if len(loaded_lookups) == 1:
+            return None if missing_registered else object()
+        return case.model
+
+    case.app.GetOpenDocumentByName = lookup
+    with pytest.raises(RuntimeError, match="wrong current drawing"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert not case.loaded
+    assert not case.scans
+
+
+@pytest.mark.parametrize("missing_current", [False, True])
+def test_stud_saved_proof_refuses_adapter_current_model_drift_before_geometry_readback(
+    monkeypatch, tmp_path, missing_current
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    original_activate = case.model.ActivateSheet
+
+    def activate(name):
+        result = original_activate(name)
+        case.adapter.currentModel = None if missing_current else case.previous_model
+        return result
+
+    case.model.ActivateSheet = activate
+    with pytest.raises(RuntimeError, match="adapter's exact current drawing"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+    assert not case.loaded
+    assert not case.scans
+
+
+def test_stud_supplier_head_af_direct_call_preserves_picks_format_and_thread_major(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    af_display, height_display, thread_display = object(), object(), object()
+    edge_calls, formats, head_calls, imports = [], [], [], []
+    thread_annotation = SimpleNamespace(GetSpecificAnnotation=lambda: thread_display)
+
+    def add_edge(_adapter, view, **kwargs):
+        edge_calls.append((view, kwargs))
+        return af_display
+
+    def add_height(_adapter, view, text_xy):
+        head_calls.append((view, text_xy))
+        return height_display
+
+    def format_reference(_adapter, display, name):
+        formats.append((display, name))
+        return name
+
+    def import_major(_adapter, view, **kwargs):
+        imports.append((view, kwargs))
+        return [thread_annotation]
+
+    monkeypatch.setattr(bolt_drawing, "add_edge_dimension", add_edge)
+    monkeypatch.setattr(bolt_drawing, "_add_physical_head_height", add_height)
+    monkeypatch.setattr(bolt_drawing, "_format_supplier_reference", format_reference)
+    monkeypatch.setattr(bolt_drawing, "curate_view_dimensions", import_major)
+    monkeypatch.setattr(
+        bolt_drawing, "dimension_name", lambda _adapter, _annotation: "SupplierThreadMajor"
+    )
+    result = bolt_drawing._add_supplier_references(case.adapter, case.front)
+    assert result == {
+        name: name for name in ("SupplierHeadAF", "SupplierHeadHeight", "SupplierThreadMajor")
+    }
+    points_m = case.projections[0][1]
+    assert points_m[0] == pytest.approx((
+        -bolt.HEAD_AF / 2000, (bolt.LENGTH + bolt.HEAD_H / 3) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    ))
+    assert points_m[1] == pytest.approx((
+        bolt.HEAD_AF / 2000, (bolt.LENGTH + bolt.HEAD_H / 3) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    ))
+    assert edge_calls == [(case.front, {
+        "p0": (points_m[0][0] * case.front.ScaleDecimal + 0.1,
+               points_m[0][1] * case.front.ScaleDecimal + 0.1),
+        "p1": (points_m[1][0] * case.front.ScaleDecimal + 0.1,
+               points_m[1][1] * case.front.ScaleDecimal + 0.1),
+        "text_xy": (0.110, 0.255), "label": "SupplierHeadAF", "orientation": "horizontal",
+    })]
+    assert head_calls == [(case.front, (0.218, 0.216))]
+    assert formats == [
+        (af_display, "SupplierHeadAF"), (height_display, "SupplierHeadHeight"),
+        (thread_display, "SupplierThreadMajor"),
+    ]
+    assert imports[0][0] is case.front
+    assert imports[0][1]["keep"] == {"SupplierThreadMajor": (0.170, 0.194)}
+    assert imports[0][1]["dimensions_by_feature"] is bolt.SUPPLIER_DRAWING_DIMENSIONS
+
+
+def _stud_stock_fixture(case):
+    """A second actual stock-view fixture; never borrow finished geometry/scale."""
+    stock = SimpleNamespace(adapter=case.adapter)
+    stock.front = front = SimpleNamespace(
+        name="StockFront", ReferencedConfiguration=bolt.SUPPLIER_STOCK_CONFIGURATION,
+        GetDisplayMode2=lambda: 2, ScaleDecimal=2.0,
+        ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(bolt_drawing.SOURCE.resolve())),
+    )
+    bearing_point = tuple(
+        value / 1000 for value in bolt_drawing._head_height_points_mm()[0]
+    )
+    tip_y = bolt.LENGTH - bolt.CATALOG_LENGTH
+    # Independent source expression, not a rounded expected radius.
+    tip_radius = BOLT_DIMS.major_dia / 2 - BOLT_DIMS.pitch * 0.851
+    tip_point = (0.0, tip_y / 1000, tip_radius / 1000)
+    stock.bearing = case.edge((*bearing_point, 0.0, math.nan))
+    stock.top = case.edge((*tip_point, 0.0, math.nan))
+    stock.rear = case.edge((0.0, tip_y / 1000, -tip_radius / 1000, 0.0, math.nan))
+    stock.bearing_item = replace(case.bearing_item, edge=stock.bearing)
+    stock.top_item = ViewEdge(
+        edge=stock.top, line=None, vertices=None,
+        circle=(0.0, tip_y, 0.0, 0.0, 1.0, 0.0, tip_radius),
+    )
+    stock.rear_item = replace(stock.top_item, edge=stock.rear)
+    front.scan = ViewEdges(
+        "actual supplier stock stations",
+        (stock.rear_item, stock.bearing_item, stock.top_item),
+    )
+    front.SelectEntity = lambda edge, append: case.select(
+        edge, append, SimpleNamespace(View=front)
+    )
+    stock.annotation = annotation = SimpleNamespace(
+        attached=[stock.bearing, stock.top], kinds=(1, 1), count=2,
+        dangling=False, Visible=1, OwnerType=0, Owner=front,
+    )
+    annotation.GetAttachedEntities3 = lambda: annotation.attached
+    annotation.GetAttachedEntityTypes = lambda: annotation.kinds
+    annotation.GetAttachedEntityCount3 = lambda: annotation.count
+    annotation.IsDangling = lambda: annotation.dangling
+    stock.arrows = [
+        (0.2, point[1] * front.ScaleDecimal + 0.1, 0.0, 0.0, sign, 0.0,
+         0.001, 0.001, 0.0, 0.0, 0.0, 1.0)
+        for point, sign in zip((bearing_point, tip_point), (1.0, -1.0), strict=True)
+    ]
+    stock.display_data = SimpleNamespace(
+        GetArrowHeadCount=lambda: len(stock.arrows),
+        GetArrowHeadAtIndex2=lambda index: stock.arrows[index],
+    )
+    annotation.GetDisplayData = lambda: stock.display_data
+    stock.native = native = SimpleNamespace(
+        FullName="SupplierStockLength@StockFront@Drawing",
+        SystemValue=bolt.CATALOG_LENGTH / 1000, Tolerance=SimpleNamespace(Type=0),
+    )
+    settings = bolt.SUPPLIER_REFERENCE_DIMENSIONS["SupplierStockLength"]
+    stock.display = display = SimpleNamespace(
+        Type2=2, GetDimension2=lambda _index: native, GetAnnotation=lambda: annotation,
+        ShowParenthesis=False, ShowDimensionValue=True, GetUseDocUnits=lambda: False,
+        GetUnits=lambda: 3 if settings["units"] == "in" else 0,
+        precision=settings["precision"], GetFractionBase=lambda: 1,
+        GetOverride=lambda: False,
+        GetText=lambda index: {
+            1: "(", 2: f" {settings['units']})", 4: settings.get("callout", ""),
+        }.get(index, ""),
+    )
+    display.GetPrimaryPrecision2 = lambda: display.precision
+    annotation.GetSpecificAnnotation = lambda: display
+    return stock
+
+
+def _stud_stock_case(monkeypatch):
+    case = _stud_height_case(monkeypatch)
+    case.stock_case = _stud_stock_fixture(case)
+    case.result = case.stock_case.display
+    return case
+
+
+def _create_stud_stock_reference(case, monkeypatch):
+    """Exercise the owned stock consumer, including rebuild/configuration/HLR."""
+    stock = case.stock_case
+    iso = SimpleNamespace(
+        name="StockIso", ReferencedConfiguration="Default", ScaleDecimal=2.0,
+    )
+    stock.front.ReferencedConfiguration = "Default"
+    case.stock_order = []
+    case.model.ActivateSheet = lambda name: (
+        case.stock_order.append(("sheet", name)) or True
+    )
+    case.model.EditRebuild3 = lambda: case.stock_order.append(("rebuild",)) or True
+    case.model.GetEditSheet = lambda: True
+
+    def place(_adapter, _source, orientation, *_args, **kwargs):
+        assert kwargs["scale"] == bolt_drawing.SHEET_SCALE
+        return stock.front if orientation == "*Front" else iso
+
+    def hidden(_adapter, view):
+        case.stock_order.append(("hlr", view.name))
+        view.GetDisplayMode2 = lambda: 2
+
+    original_scan = bolt_drawing.scan_view_edges
+
+    def scan(view, **kwargs):
+        assert ("rebuild",) in case.stock_order
+        assert ("hlr", view.name) in case.stock_order
+        assert view.ReferencedConfiguration == bolt.SUPPLIER_STOCK_CONFIGURATION
+        return original_scan(view, **kwargs)
+
+    monkeypatch.setattr(bolt_drawing, "place_view", place)
+    monkeypatch.setattr(bolt_drawing, "scan_view_edges", scan)
+    monkeypatch.setattr(bolt_drawing, "set_hidden_lines_removed", hidden)
+    monkeypatch.setattr(bolt_drawing, "set_view_position", lambda *_args: True)
+    monkeypatch.setattr(
+        bolt_drawing, "_format_supplier_reference",
+        lambda _adapter, display, name: (
+            display.GetAnnotation() if name == "SupplierStockLength" else None
+        ),
+    )
+    monkeypatch.setattr(
+        bolt_drawing, "add_property_linked_note",
+        lambda *_args: SimpleNamespace(
+            GetAnnotation=lambda: SimpleNamespace(OwnerType=1)
+        ),
+    )
+    return bolt_drawing._add_stock_reference(case.adapter)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("axis_sign", [-1.0, 1.0])
+def test_stud_stock_names_outer_hex_and_exact_original_factory_tip(monkeypatch, reverse, axis_sign):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    tip = replace(
+        stock.top_item,
+        circle=(*stock.top_item.circle[:4], axis_sign, *stock.top_item.circle[5:]),
+    )
+    edges = (stock.rear_item, stock.bearing_item, tip)
+    stock.front.scan = ViewEdges("reordered stock", tuple(reversed(edges)) if reverse else edges)
+    entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[0] is stock.bearing and entities[1] is stock.top
+    assert points == (stock.bearing.nearest[:3], stock.top.nearest[:3])
+    assert abs(points[0][1] - points[1][1]) * 1000 == pytest.approx(50.8)
+    assert bolt_drawing._stock_factory_tip_radius_mm() == (
+        BOLT_DIMS.major_dia / 2 - BOLT_DIMS.pitch * 0.851
+    )
+    # Independently expand the catalogue dimensions and supplier chamfer law;
+    # do not pin a separately rounded radius nominal.
+    assert bolt_drawing._stock_factory_tip_radius_mm() == pytest.approx(
+        4.826 / 2 - (25.4 / 24) * 0.851
+    )
+    assert stock.top.closest_calls == [stock.top.nearest[:3], stock.top.nearest[:3]]
+    receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_geometry"
+    )
+    assert receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+    assert receipt["bearing_matches"] == 1 and receipt["tip_matches"] == 2
+    assert len(receipt["lines"]) <= 12 and len(receipt["circles"]) <= 12
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "configuration", "hlr", "missing_bearing", "duplicate_bearing",
+        "one_wrong_endpoint", "interior_bearing", "outside_segment", "inner_runout",
+        "finished_tip", "major_chamfer_junction", "wrong_radius", "wrong_center",
+        "wrong_axis", "nonfinite_circle", "false_trim_plane", "false_trim_radius",
+        "trim_requery", "missing_point", "short_point", "nonfinite_parameter",
+        "bearing_point", "duplicate_tip", "same_entity",
+    ),
+)
+def test_stud_stock_refuses_wrong_geometry_configuration_or_trim(monkeypatch, fault):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    bearing, tip = stock.bearing_item, stock.top_item
+    edges = [bearing, tip]
+    if fault == "configuration":
+        stock.front.ReferencedConfiguration = "Default"
+    elif fault == "hlr":
+        stock.front.GetDisplayMode2 = lambda: 1
+    elif fault == "missing_bearing":
+        edges = [tip]
+    elif fault == "duplicate_bearing":
+        edges.append(replace(bearing, edge=case.edge(stock.bearing.nearest)))
+    elif fault == "one_wrong_endpoint":
+        x, y, z = bearing.line[0]
+        edges[0] = replace(bearing, line=((x, y + 0.001, z), bearing.line[1]))
+    elif fault == "interior_bearing":
+        edges[0] = replace(
+            bearing, line=tuple((x, y, 0.0) for x, y, _z in bearing.line)
+        )
+    elif fault == "outside_segment":
+        edges[0] = replace(bearing, line=(
+            bearing.line[0],
+            (bolt.HEAD_AF / 8, bolt.LENGTH, 7 * bolt.HEAD_AF / (8 * math.sqrt(3))),
+        ))
+    elif fault == "inner_runout":
+        edges[0] = replace(
+            bearing, line=None,
+            circle=(0.0, bolt.LENGTH, 0.0, 0.0, 1.0, 0.0, BOLT_DIMS.major_dia / 2 + 0.0508),
+        )
+    elif fault in (
+        "finished_tip", "major_chamfer_junction", "wrong_radius", "wrong_center",
+        "wrong_axis", "nonfinite_circle",
+    ):
+        circle = list(tip.circle)
+        if fault == "finished_tip":
+            circle[1] = 0.0
+        elif fault == "major_chamfer_junction":
+            circle[1] += BOLT_DIMS.pitch * 0.851
+            circle[6] = BOLT_DIMS.major_dia / 2
+        elif fault == "wrong_radius":
+            circle[6] += 0.001
+        elif fault == "wrong_center":
+            circle[0] = 0.001
+        elif fault == "wrong_axis":
+            circle[3:6] = (1.0, 0.0, 0.0)
+        else:
+            circle[6] = math.nan
+        edges[1] = replace(tip, circle=tuple(circle))
+    elif fault in ("false_trim_plane", "false_trim_radius"):
+        point = list(stock.top.nearest)
+        point[1 if fault == "false_trim_plane" else 2] += 2e-8
+        stock.top.nearest = tuple(point)
+    elif fault == "trim_requery":
+        original = stock.top.GetClosestPointOn
+        calls = []
+
+        def closest(*point):
+            calls.append(point)
+            if len(calls) == 1:
+                return original(*point)
+            return (stock.top.nearest[0] + 1e-6, *stock.top.nearest[1:])
+
+        stock.top.GetClosestPointOn = closest
+    elif fault == "missing_point":
+        stock.top.nearest = None
+    elif fault == "short_point":
+        stock.top.nearest = stock.top.nearest[:3]
+    elif fault == "nonfinite_parameter":
+        stock.top.nearest = (*stock.top.nearest[:3], math.nan, 0.0)
+    elif fault == "bearing_point":
+        stock.bearing.nearest = (0.0, bolt.LENGTH / 1000, 0.0, 0.0, 0.0)
+    elif fault == "duplicate_tip":
+        edges.append(replace(tip, edge=case.edge(stock.top.nearest)))
+    elif fault == "same_entity":
+        case.app.IsSame = lambda first, second: (
+            1 if first is stock.bearing and second is stock.top else int(first is second)
+        )
+    stock.front.scan = ViewEdges("bad actual stock", tuple(edges))
+    with pytest.raises(RuntimeError, match="SupplierStockLength"):
+        bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert not case.creations and not case.selection_log
+
+
+def test_stud_stock_uses_actual_trimmed_point_not_underlying_circle_extremum(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    radius_m = stock.top_item.circle[6] / 1000
+    actual = (radius_m / math.sqrt(2), stock.top.nearest[1], radius_m / math.sqrt(2))
+    stock.top.nearest = (*actual, 0.4, math.nan)
+    entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[1] is stock.top
+    assert points[1] == actual
+    assert stock.top.closest_calls[-1] == actual
+    assert points[1] != (0.0, actual[1], radius_m)
+
+
+def test_stud_stock_consumer_creates_native_linear_with_view_selection_and_creation_proof(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    # A model IEntity.Select4 is deliberately unusable in this drawing context.
+    for edge in (stock.bearing, stock.top):
+        edge.Select4 = lambda *_args: pytest.fail("stock must select through IView")
+    front, _iso, annotation = _create_stud_stock_reference(case, monkeypatch)
+    assert front is stock.front and annotation is stock.annotation
+    assert case.creations == [(0.130, 0.160, 0.0)]
+    assert case.selection_log == [
+        (stock.bearing, False, stock.front), (stock.top, True, stock.front),
+    ]
+    assert not case.selections and case.clears == [True, True]
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert len(proofs) == 1
+    assert proofs[0]["label"] == "SupplierStockLength"
+    assert proofs[0]["phase"] == "creation" and proofs[0]["type2"] == 2
+    assert proofs[0]["measured_mm"] == pytest.approx(50.8)
+
+
+@pytest.mark.parametrize("selection_index", [1, 2])
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "activation", "select", "wrong_selected", "missing_selected", "duplicate_selected",
+        "selection_count", "selection_type", "selection_point", "selection_point_readback",
+        "null_creation", "native_exception",
+    ),
+)
+def test_stud_stock_consumer_refuses_selection_null_or_creation_failure(
+    monkeypatch, selection_index, fault,
+):
+    case = _stud_stock_case(monkeypatch)
+    case.fault_index = selection_index
+    # A duplicate selection requires the second selection slot.
+    case.fault = fault
+    if fault == "duplicate_selected":
+        case.fault_index = 2
+    if fault == "null_creation":
+        case.result = None
+    with pytest.raises(RuntimeError, match="SupplierStockLength|native insertion failed"):
+        _create_stud_stock_reference(case, monkeypatch)
+    assert not case.selections
+    assert not any(
+        name == "drawing.physical_axial_dimension_native_proof" for name, _ in case.events
+    )
+
+
+@pytest.mark.parametrize("phase", ["creation", "settled", "saved"])
+@pytest.mark.parametrize("fault", ("angular", *_STUD_SPATIAL_FAULTS))
+def test_stud_stock_native_proof_is_required_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    if fault == "angular":
+        stock.display.Type2 = 3
+    else:
+        _corrupt_stud_native_proof(stock, monkeypatch, fault)
+    with pytest.raises(RuntimeError, match="SupplierStockLength"):
+        if phase == "creation":
+            _create_stud_stock_reference(case, monkeypatch)
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "configuration", "missing_tip", "wrong_factory_radius", "missing_dimension",
+        "duplicate_dimension", "owner", "annotation_owner", "format", "band",
+    ),
+)
+def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
+    monkeypatch, tmp_path, phase, fault,
+):
+    case = (
+        _saved_stud_height_case(monkeypatch, tmp_path) if phase == "saved"
+        else _settled_stud_height_case(monkeypatch)
+    )
+    stock = case.stock_case
+    if fault == "configuration":
+        stock.front.ReferencedConfiguration = "Default"
+    elif fault == "missing_tip":
+        stock.front.scan = ViewEdges("lost factory tip", (stock.bearing_item,))
+    elif fault == "wrong_factory_radius":
+        stock.front.scan = ViewEdges("wrong factory rim", (
+            stock.bearing_item,
+            replace(
+                stock.top_item,
+                circle=(*stock.top_item.circle[:6], stock.top_item.circle[6] + 0.001),
+            ),
+        ))
+    elif fault == "missing_dimension":
+        stock.front.GetDisplayDimensions = lambda: ()
+    elif fault == "duplicate_dimension":
+        stock.front.GetDisplayDimensions = lambda: (stock.display, stock.display)
+    elif fault == "owner":
+        stock.front.name = "WrongStockFront"
+    elif fault == "annotation_owner":
+        stock.annotation.Owner = case.front
+    elif fault == "format":
+        stock.display.precision += 1
+        monkeypatch.setattr(
+            bolt_drawing, "assert_supplier_reference_dimension",
+            lambda adapter, display, **settings: (
+                supplier_dimensions.assert_supplier_reference_dimension(adapter, display, **settings)
+                if settings["label"] == "SupplierStockLength" else None
+            ),
+        )
+    elif fault == "band":
+        stock.native.Tolerance.Type = 2
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("axis_scale", [-7.0, 0.25])
+def test_stud_stock_circle_axis_is_compared_after_normalization(monkeypatch, axis_scale):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    tip = replace(
+        stock.top_item,
+        circle=(*stock.top_item.circle[:4], axis_scale, *stock.top_item.circle[5:]),
+    )
+    stock.front.scan = ViewEdges("nonunit axis", (stock.bearing_item, tip))
+    entities, _points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert entities[1] is stock.top
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stud_stock_frontmost_distinct_trim_ties_refuse_independent_of_order(monkeypatch, reverse):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    radius_m = stock.top_item.circle[6] / 1000
+    angle = 0.4
+    x, z = radius_m * math.sin(angle), radius_m * math.cos(angle)
+    first = case.edge((x, stock.top.nearest[1], z, 0.4, 0.0))
+    second = case.edge((-x, stock.top.nearest[1], z, 2.7, 0.0))
+    edges = (
+        stock.bearing_item, replace(stock.top_item, edge=first),
+        replace(stock.top_item, edge=second),
+    )
+    stock.front.scan = ViewEdges("tied real arcs", tuple(reversed(edges)) if reverse else edges)
+    with pytest.raises(RuntimeError, match="distinct.*frontmost tie"):
+        bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    assert not case.creations
+
+
+def test_stud_stock_settled_census_requires_both_native_physical_proofs(monkeypatch):
+    case = _settled_stud_height_case(monkeypatch)
+    bolt_drawing._assert_supplier_references(case.adapter, case.identities, case.configurations)
+    proofs = [
+        fields for name, fields in case.events
+        if name == "drawing.physical_axial_dimension_native_proof"
+    ]
+    assert {(fields["label"], fields["phase"]) for fields in proofs} == {
+        ("SupplierHeadHeight", "settled"), ("SupplierStockLength", "settled"),
+    }
+    assert {id(record[1]) for record in case.scans} == {id(case.front), id(case.stock_case.front)}
+
+
+@pytest.mark.parametrize("name", ["SupplierHeadHeight", "SupplierStockLength"])
+@pytest.mark.parametrize("fault", ["captured_sheet", "captured_configuration", "moved_sheet"])
+def test_stud_saved_physical_census_requires_each_exact_sheet_and_source_configuration(
+    monkeypatch, tmp_path, name, fault,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    is_stock = name == "SupplierStockLength"
+    owner = case.identities[name][1]
+    if fault == "captured_sheet":
+        _sheet, configuration = case.configurations[owner]
+        case.configurations[owner] = (
+            bolt_drawing.SHEET_NAMES[0 if is_stock else 1], configuration,
+        )
+    elif fault == "captured_configuration":
+        sheet, _configuration = case.configurations[owner]
+        case.configurations[owner] = (
+            sheet, "Default" if is_stock else bolt.SUPPLIER_STOCK_CONFIGURATION,
+        )
+    else:
+        source = case.stock_case.front if is_stock else case.front
+        other = case.front if is_stock else case.stock_case.front
+        display = case.stock_case.display if is_stock else case.display
+        original_source, original_other = source.GetDisplayDimensions, other.GetDisplayDimensions
+        source.GetDisplayDimensions = lambda: tuple(
+            value for value in original_source() if value is not display
+        )
+        other.GetDisplayDimensions = lambda: (*original_other(), display)
+    with pytest.raises(RuntimeError, match=name):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert case.adapter.currentModel is case.previous_model
+    if fault == "moved_sheet":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+    else:
+        assert not case.open_calls and not case.close_calls
+
+
+@pytest.mark.parametrize("fault", ["rebuild", "configuration_readback"])
+def test_stud_stock_consumer_refuses_before_scan_when_stock_view_setup_fails(monkeypatch, fault):
+    case = _stud_height_case(monkeypatch)
+
+    class UnchangedConfiguration:
+        ReferencedConfiguration = property(lambda self: "Default", lambda self, value: None)
+
+    stock = (
+        UnchangedConfiguration() if fault == "configuration_readback"
+        else SimpleNamespace(ReferencedConfiguration="Default")
+    )
+    case.model.ActivateSheet = lambda _name: True
+    case.model.EditRebuild3 = lambda: fault != "rebuild"
+    monkeypatch.setattr(bolt_drawing, "place_view", lambda *_args, **_kwargs: stock)
+    monkeypatch.setattr(bolt_drawing, "set_view_position", lambda *_args: True)
+    monkeypatch.setattr(bolt_drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(
+        bolt_drawing, "scan_view_edges",
+        lambda *_args, **_kwargs: pytest.fail("must not scan a stale/finished stock view"),
+    )
+    with pytest.raises(RuntimeError, match="did not rebuild|references the finished bolt"):
+        bolt_drawing._add_stock_reference(case.adapter)
+    assert not case.selection_log and not case.creations
+
+
+def test_stud_stock_geometry_evidence_keeps_actual_points_and_nearest_candidates_bounded(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    wrong_lines = [
+        replace(
+            stock.bearing_item, edge=case.edge(None),
+            line=tuple((x, y + index + 1, z) for x, y, z in stock.bearing_item.line),
+        )
+        for index in range(18)
+    ]
+    wrong_circles = [
+        replace(
+            stock.top_item, edge=case.edge(None),
+            circle=(*stock.top_item.circle[:6], stock.top_item.circle[6] + index + 1),
+        )
+        for index in range(18)
+    ]
+    stock.front.scan = ViewEdges(
+        "many visible stock edges",
+        (*wrong_lines, *wrong_circles, stock.bearing_item, stock.top_item),
+    )
+    _entities, points = bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    geometry = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_geometry"
+    )
+    assert geometry["line_count"] == geometry["circle_count"] == 19
+    assert len(geometry["lines"]) == len(geometry["circles"]) == 12
+    assert geometry["lines"][0]["native_point_m"] == points[0]
+    assert geometry["circles"][0]["native_point_m"] == points[1]
+    assert geometry["circles"][0]["membership_error_m"] == 0.0
+
+
+@pytest.mark.parametrize("name", ["_stock_length_stations", "_assert_physical_stock_length"])
+def test_stud_stock_native_entrypoints_are_traced(name):
+    assert hasattr(getattr(bolt_drawing, name), "__wrapped__")
+
+
+@pytest.mark.parametrize("phase", ["creation", "settled", "saved"])
+@pytest.mark.parametrize("fault", ["null_document", "wrong_document", "empty_path", "relative_path"])
+def test_stud_stock_requires_observed_native_source_document_at_every_consumer(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    elif phase == "settled":
+        case = _settled_stud_height_case(monkeypatch)
+    else:
+        case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    if fault == "null_document":
+        stock.front.ReferencedDocument = None
+    else:
+        path = {
+            "wrong_document": str(
+                bolt_drawing.SOURCE.resolve().parent / "foreign" / bolt_drawing.SOURCE.name
+            ),
+            "empty_path": "",
+            "relative_path": bolt_drawing.SOURCE.name,
+        }[fault]
+        stock.front.ReferencedDocument = SimpleNamespace(GetPathName=lambda: path)
+    with pytest.raises(RuntimeError, match="SupplierStockLength.*native.*(document|source)"):
+        if phase == "creation":
+            _create_stud_stock_reference(case, monkeypatch)
+        elif phase == "settled":
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+        else:
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+    assert not any(record[1] is stock.front for record in case.scans)
+    assert not case.creations
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_stock_source_receipt_reports_observed_document_path_without_source_mutation(monkeypatch):
+    case = _stud_stock_case(monkeypatch)
+    stock = case.stock_case
+    native_path = str(bolt_drawing.SOURCE.resolve())
+    path_reads = []
+    stock.front.ReferencedDocument = SimpleNamespace(
+        GetPathName=lambda: path_reads.append(native_path) or native_path
+    )
+    bolt_drawing._stock_length_stations(case.adapter, stock.front)
+    receipt = next(
+        fields for name, fields in case.events if name == "drawing.physical_stock_length_source"
+    )
+    assert path_reads == [native_path]
+    assert receipt["native_source_path"] == native_path
+    assert receipt["configuration"] == bolt.SUPPLIER_STOCK_CONFIGURATION
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("name", ["SupplierHeadHeight", "SupplierStockLength"])
+def test_stud_physical_census_refuses_missing_native_dimension_before_full_name_read(
+    monkeypatch, tmp_path, phase, name,
+):
+    case = (
+        _saved_stud_height_case(monkeypatch, tmp_path) if phase == "saved"
+        else _settled_stud_height_case(monkeypatch)
+    )
+    display = case.display if name == "SupplierHeadHeight" else case.stock_case.display
+    display.GetDimension2 = lambda _index: None
+    with pytest.raises(RuntimeError, match="dimension has no native identity"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            bolt_drawing._assert_supplier_references(
+                case.adapter, case.identities, case.configurations
+            )
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
