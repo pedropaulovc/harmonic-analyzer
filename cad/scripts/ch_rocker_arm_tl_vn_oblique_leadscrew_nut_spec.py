@@ -123,25 +123,28 @@ SUPPLIER_DRAWING_URLS = (
 # Only what a drop-in substitute must match: the flange OD, the pilot (spigot)
 # diameter TL-29's counterbore takes, the overall length (C4's 1.5 + 3.5 + 10),
 # the flange thickness (the #4-40 screws' grip) and the bolt pattern.
-# Any Top-plane reference reserves at least 20 mm on every side of the 64 mm
-# Top cell, and a top/bottom lane 26 mm: horizontal end-view chords left a
-# 12 mm window, under every scale's padded native outline. Vertical chords
-# take the left/right lanes and leave 24 mm, which holds 1:2. Both Front
-# lengths start on their own lane's side; the pilot chord ends on the
-# length's anchored start.
+# The sheet is 1:1 in the purchased layout's ``tall_top`` cells: Front
+# 180 x 73 mm, Top (the end view) 180 x 96 mm. Every annotated view reserves
+# 20 mm a side plus 6 mm for a lane, and the native outline is the model
+# extent plus 11.176 mm. The Front (15 mm tall) thus takes the two vertical
+# lengths and ONE horizontal size, the pilot below it (20 + 26 + 26.176 <= 73);
+# the flange OD moves to the end view with the bolt pattern
+# (26 + 20 + 33.176 <= 96). The overall length runs on the axis and the pilot
+# on the spigot's end face: hidden construction chords print where an edge or
+# the centreline already is, never across a face.
 SUPPLIER_REFERENCE_DIMENSIONS = (
     ("SupplierLength", LENGTH, "vertical"),
     ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),
-    ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
     ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
+    ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
     ("SupplierMountingHoleDiameter", HOLE_DIA, "vertical"),
     ("SupplierHolePitchDiameter", HOLE_PCD, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
-    "SupplierLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
+    "SupplierLength": (0.0, -SPIGOT_LENGTH),
     "SupplierFlangeThickness": (-FLANGE_DIA / 2.0, 0.0),
-    "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
     "SupplierBodyDiameter": (-BODY_DIA / 2.0, -SPIGOT_LENGTH),
+    "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
     "SupplierMountingHoleDiameter": (
         HOLE_CENTRES[0][0],
         -HOLE_CENTRES[0][1] - HOLE_DIA / 2.0,
@@ -149,10 +152,12 @@ SUPPLIER_REFERENCE_STARTS = {
     "SupplierHolePitchDiameter": (0.0, -HOLE_PCD / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
+    "SupplierFlangeDiameter": "Top",
     "SupplierMountingHoleDiameter": "Top",
     "SupplierHolePitchDiameter": "Top",
 }
-SUPPLIER_REFERENCE_SIDES = {}
+# The pilot's lane is under the spigot, its witnesses dropping from its end.
+SUPPLIER_REFERENCE_SIDES = {"SupplierBodyDiameter": "bottom"}
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (0, "length", None, None),
     "SupplierFlangeThickness": (1, "length", None, None),

@@ -214,6 +214,176 @@ def test_sheet_prints_only_replacement_sizes_while_the_part_keeps_its_gauges() -
     assert drawing.SHEET_SPEC.OD_BAND == spec.OD_BAND
 
 
+# Native size records of the b344192 sheet (layout audit of farm run
+# 20261023T181332674Z), the state machinist review returned FIX on. Metres.
+def _native_record(name, pos, lines, texts, arrows):
+    return {
+        "type": 4, "name": name, "pos": [*pos, 0.0],
+        "display": {
+            "lines": [[0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0] for x0, y0, x1, y1 in lines],
+            "texts": [
+                {"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0,
+                 "font": "Century Gothic", "ls": 0.001, "w": w}
+                for t, x, y, w in texts
+            ],
+            "arrows": [
+                [x, y, 0.0, dx, dy, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+                for x, y, dx, dy in arrows
+            ],
+        },
+    }
+
+
+B344192 = {
+    "SupplierThickness": _native_record(
+        "SupplierThickness", (0.1008, 0.1335),
+        [(0.1305, 0.133373, 0.0998, 0.133373), (0.1305, 0.133627, 0.0998, 0.133627),
+         (0.1008, 0.133373, 0.1008, 0.127023), (0.1008, 0.133627, 0.1008, 0.139977)],
+        [(" (0.005 in) ", 0.0894323, 0.1307219, 0.0227354)],
+        [(0.1008, 0.133373, 0.0, -1.0), (0.1008, 0.133627, 0.0, 1.0)],
+    ),
+    "SupplierFreeHeight": _native_record(
+        "SupplierFreeHeight", (0.1622, 0.1335),
+        [(0.1198, 0.13223, 0.1632, 0.13223), (0.1198, 0.13477, 0.1632, 0.13477),
+         (0.1622, 0.13223, 0.1622, 0.12588), (0.1622, 0.13477, 0.1622, 0.14112)],
+        [(" (0.050 in) ", 0.1508323, 0.1307219, 0.0227354)],
+        [(0.1622, 0.13223, 0.0, -1.0), (0.1622, 0.13477, 0.0, 1.0)],
+    ),
+    "SupplierID": _native_record(
+        "SupplierID", (0.1008, 0.227),
+        [(0.122362, 0.223517, 0.124141, 0.224195), (0.140638, 0.230483, 0.122362, 0.223517)],
+        [(" (", 0.0790469, 0.2242486, 0.0030139),
+         ("<MOD-DIAM>", 0.0820608, 0.2241951, 0.0052784),
+         ("0.385 \u00b10.010 in) ", 0.0873392, 0.2242486, 0.0352139)],
+        [(0.1223622, 0.2235173, -0.9344335, -0.3561377)],
+    ),
+    "SupplierOD": _native_record(
+        "SupplierOD", (0.1622, 0.227),
+        [(0.143367, 0.222477, 0.138859, 0.224195), (0.119633, 0.231523, 0.143367, 0.222477)],
+        [(" (", 0.1404469, 0.2242486, 0.0030139),
+         ("<MOD-DIAM>", 0.1434608, 0.2241951, 0.0052784),
+         ("0.500 \u00b10.010 in) ", 0.1487392, 0.2242486, 0.0352139)],
+        [(0.1433673, 0.2224771, 0.9344335, -0.3561377)],
+    ),
+}
+# The full OD line ran rim to rim through the plan centre at (0.1315, 0.227).
+B344192_PLAN = (0.1315 - 0.0127, 0.227 - 0.0127, 0.1315 + 0.0127, 0.227 + 0.0127)
+
+
+def _segments(name):
+    return [((line[4], line[5]), (line[7], line[8])) for line in B344192[name]["display"]["lines"]]
+
+
+def _cell_x(key):
+    from _supplier_spring_drawing import supplier_state_cells
+
+    cell = next(cell for name, _, cell in supplier_state_cells(0.05, maximum=False) if name == key)
+    return cell[0], cell[2]
+
+
+def _moved(box, dx):
+    from _layout_geometry import Box
+
+    return Box(box.xmin + dx, box.ymin, box.xmax + dx, box.ymax)
+
+
+def test_build_places_the_size_texts_after_the_shared_disc_dimensions(monkeypatch) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    seen = {}
+
+    async def fake_build(adapter, sheet, **kwargs):
+        seen.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(drawing, "build_supplier_spring_drawing", fake_build)
+    asyncio.run(drawing.build(object()))
+    supplier_dimensions = seen["supplier_dimensions"]
+    assert supplier_dimensions.func is drawing.supplier_dimensions
+    assert supplier_dimensions.keywords["settled_checks"] is seen["settled_checks"]
+
+    calls = []
+
+    def shared(adapter, views, *, spec, reference_bounds, settled_checks):
+        assert spec is drawing.SHEET_SPEC
+        calls.append("shared")
+        settled_checks.append("shared check")
+
+    def place(adapter, views, *, reference_bounds):
+        calls.append("place")
+        return "placement check"
+
+    monkeypatch.setattr(drawing, "supplier_disc_spring_dimensions", shared)
+    monkeypatch.setattr(drawing, "place_size_texts", place)
+    supplier_dimensions(object(), {}, reference_bounds=lambda key: (0, 0, 1, 1))
+    assert calls == ["shared", "place"]
+    assert seen["settled_checks"] == ["shared check", "placement check"]
+
+
+@pytest.mark.parametrize("name", ["SupplierThickness", "SupplierFreeHeight"])
+def test_b344192_struck_height_text_shelves_clear_of_its_own_lines(name) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+    from _supplier_screw_layout import supplier_top_text_geometry
+
+    side = drawing.TEXT_SIDES["free_front"][name]
+    geometry = supplier_top_text_geometry(B344192[name], horizontal=False)
+    with pytest.raises(RuntimeError, match="from its own native lines"):
+        drawing.assert_height_text_clear(geometry, side, label=name)
+    shifted = {**geometry, "text": _moved(geometry["text"], drawing.height_text_shift(geometry, side))}
+    drawing.assert_height_text_clear(shifted, side, label=name)
+    left, right = _cell_x("free_front")
+    assert left < shifted["text"].xmin and shifted["text"].xmax < right
+    # Shelved away from the 2:1 OD x free-height envelope, never back across it.
+    diagram = (0.1315 - 0.0127, 0.1315 + 0.0127)
+    if side < 0:
+        assert shifted["text"].xmax < diagram[0]
+    else:
+        assert shifted["text"].xmin > diagram[1]
+
+
+@pytest.mark.parametrize("name", ["SupplierID", "SupplierOD"])
+def test_b344192_rim_diameter_text_moves_a_text_height_clear(name) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+    from _layout_audit import display_box
+
+    side = drawing.TEXT_SIDES["free_top"][name]
+    text = display_box({"texts": B344192[name]["display"]["texts"]})
+    with pytest.raises(RuntimeError, match="under a text height"):
+        drawing.assert_diameter_text_clear(text, B344192_PLAN, side, label=name)
+    moved = _moved(text, drawing.diameter_text_shift(text, B344192_PLAN, side))
+    drawing.assert_diameter_text_clear(moved, B344192_PLAN, side, label=name)
+    assert drawing.diameter_air(text) == pytest.approx(0.0035, abs=5e-4)
+    left, right = _cell_x("free_top")
+    assert left < moved.xmin and moved.xmax < right
+
+
+def test_plan_leaders_refuse_lines_through_the_centre() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    crossing = {name: _segments(name) for name in ("SupplierID", "SupplierOD")}
+    with pytest.raises(RuntimeError, match="leaders not clear"):
+        drawing.assert_plan_leaders(crossing, B344192_PLAN, label="b344192")
+    centre_y = 0.227
+    near_side = {
+        # Text shelf, then one leader to the rim nearest the text.
+        "SupplierID": [((0.0716, centre_y), (0.1151, centre_y)),
+                       ((0.1151, centre_y), (0.1315 - 0.0127 * spec.ID / spec.OD, centre_y))],
+        "SupplierOD": [((0.1914, centre_y), (0.1479, centre_y)),
+                       ((0.1479, centre_y), (0.1315 + 0.0127, centre_y))],
+    }
+    drawing.assert_plan_leaders(near_side, B344192_PLAN, label="near side")
+
+
+def test_settled_heights_refuse_a_moved_native_station() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+    from _supplier_screw_layout import supplier_top_text_geometry
+
+    geometry = supplier_top_text_geometry(B344192["SupplierThickness"], horizontal=False)
+    assert drawing.stations_match(geometry, geometry)
+    tips = tuple((x + 1e-4, y) for x, y in geometry["tips"])
+    assert not drawing.stations_match(geometry, {**geometry, "tips": tips})
+
+
 def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4

@@ -1,7 +1,8 @@
 """Create the four-view purchased-reference sheet for ZYLtech HW-SC-T8x2-NUT, Tr8x2 brass flange nut.
 
 Identification and supplier-native nominal size references, with its stock,
-ordering SKU and fitting note; no fabrication controls.
+ordering SKU and fitting note; no fabrication controls. The orthographic
+views are 1:1 in the ``tall_top`` cells (see the spec's lane budget).
 """
 
 from __future__ import annotations
@@ -19,7 +20,9 @@ from _session import run_build
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_view_display import _SW_HLR
 from _purchased_part_drawing import build_purchased_part_drawing
+from _purchased_title_fit import fit_purchased_title_block
 from _supplier_screw_dimensions import (
     _assert_supplier_top_stations,
     _supplier_top_record,
@@ -33,17 +36,22 @@ SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew_nut"]
 PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "TR8X2 BRASS FLANGE NUT"
-# The footer's supplier-data block; it also sets the bottom view row's floor.
-SUPPLIER_DATA = ("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",)
-# At 1:2 every chord but the 15 mm length is shorter on the sheet than its
-# horizontal text, and centred text sat across its own witness/dimension lines
-# (layout audit, farm run 20261023T173603916Z: 9 gating crossings). Each such
-# text slides sideways in offset-text mode, just past all of its own line ink
-# on its free side; the native tips, witnesses and dimension lines stay put.
+# The 41-character Name and the DWG. NO. overran their title cells (machinist
+# review, b344192): fit the linked notes inside their ruled cells.
+TITLE_BLOCK_SETUP = partial(fit_purchased_title_block, spec=SPEC)
+# No supplier-data footer: its two lines raised the bottom view row 12.5 mm,
+# which the 1:1 Front row cannot spare (spec lane budget).
+VIEW_LAYOUT = "tall_top"
+# Every chord's horizontal text is wider than its span or crosses its own
+# vertical dimension line, so centred text sat across its own witness or
+# dimension lines (layout audit, farm run 20261023T173603916Z). Each text
+# slides sideways in offset-text mode, just past all of its own line ink on
+# its free side; the native tips, witnesses and dimension lines stay put.
 TEXT_SHELVES = {
+    "SupplierLength": "right",
     "SupplierFlangeThickness": "left",
-    "SupplierFlangeDiameter": "left",
     "SupplierBodyDiameter": "right",
+    "SupplierFlangeDiameter": "right",
     "SupplierMountingHoleDiameter": "right",
     "SupplierHolePitchDiameter": "left",
 }
@@ -127,6 +135,18 @@ def _assert_text_shelves(
         _assert_supplier_top_stations(name, stations[name], actual)
 
 
+def _assert_hidden_lines_removed(views: Mapping[str, Any]) -> None:
+    """The orthographic views print no hidden edges after the final rebuild.
+
+    The reference chords show in their views as construction lines; they lie
+    on the axis or on visible edges, never as dashed edges across a face.
+    """
+    for name in ("*Front", "*Top", "*Right"):
+        mode = int(_early_bound(views[name], "IView").GetDisplayMode2())
+        if mode != _SW_HLR:
+            raise RuntimeError(f"{name}: nut view is not hidden-lines-removed ({mode})")
+
+
 def _annotate(
     adapter: Any, views: dict[str, Any], *, checks: list[Callable[[], None]]
 ) -> None:
@@ -149,6 +169,7 @@ def _annotate(
     checks.append(
         lambda: _assert_text_shelves(adapter, reference_check(), stations)
     )
+    checks.append(partial(_assert_hidden_lines_removed, dict(views)))
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -163,8 +184,9 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
         ),
-        supplier_data=SUPPLIER_DATA,
         settled_checks=checks,
+        title_block_setup=TITLE_BLOCK_SETUP,
+        view_layout=VIEW_LAYOUT,
     )
 
 

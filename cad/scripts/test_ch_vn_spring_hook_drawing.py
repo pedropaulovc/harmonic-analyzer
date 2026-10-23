@@ -297,3 +297,96 @@ def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, 
         return
     with pytest.raises(RuntimeError):
         check()
+
+
+def _mm_box(x0, y0, x1, y1):
+    from _layout_geometry import Box
+
+    return Box(x0 / 1000, y0 / 1000, x1 / 1000, y1 / 1000)
+
+
+def _mm_run(x0, y0, x1, y1, role):
+    from _layout_geometry import Segment
+
+    return Segment(x0 / 1000, y0 / 1000, x1 / 1000, y1 / 1000, role)
+
+
+def _deburr_ink(placement):
+    """The deburr controls' settled ink in sheet mm. ``b344192`` is the
+    machinist-reviewed render's layout audit: the 45 deg parked beside its
+    45 deg ray at radius 22.3. ``moved`` is FRONT_KEEP's: the text on the
+    bisector at radius 26 about the (106.5, 103.2) vertex, the arc broken
+    round it, and the width block 2 mm lower."""
+    from _layout_geometry import AnnotationGeometry
+
+    if placement == "b344192":
+        text, width_row = (120.6, 115.2, 127.4, 118.7), (123.5, 98.2, 212.5, 101.7)
+        runs = (
+            (109.5, 106.2, 122.9, 119.7, "ext-line"),
+            (112.0, 103.2, 129.8, 103.2, "ext-line"),
+            (128.8, 103.2, 124.0, 117.0, "dim-line"),
+            (124.0, 117.0, 123.1, 118.0, "dim-line"),
+            (128.8, 103.2, 128.1, 106.7, "arrow"),
+            (122.3, 119.0, 124.5, 116.3, "arrow"),
+        )
+    else:
+        text, width_row = (127.1, 111.4, 133.9, 114.9), (123.5, 96.2, 212.5, 99.7)
+        runs = (
+            (109.5, 106.2, 125.6, 122.3, "ext-line"),
+            (112.0, 103.2, 133.5, 103.2, "ext-line"),
+            (132.5, 103.2, 131.6, 109.9, "dim-line"),
+            (129.0, 116.2, 124.9, 121.6, "dim-line"),
+            (132.5, 103.2, 132.3, 106.7, "arrow"),
+            (124.9, 121.6, 127.2, 119.0, "arrow"),
+        )
+    angle = AnnotationGeometry(
+        "ChamferAngle", "dim", "front", (_mm_box(*text),),
+        tuple(_mm_run(*run) for run in runs),
+    )
+    width = AnnotationGeometry("ChamferWidth", "dim", "front", (_mm_box(*width_row),))
+    return {"ChamferAngle": angle, "ChamferWidth": width}
+
+
+@pytest.mark.parametrize("placement", ["moved", "b344192", "own_arrow"])
+def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
+    """Machinist b344192 (rule 14): the 45 deg sat on its own chamfer
+    extension line and arc arrowhead. The reviewed layout must fail the
+    settled check and the moved one pass; an own arrowhead within the
+    arrow-to-text clearance fails even with every line clear."""
+    from dataclasses import replace
+
+    ink = _deburr_ink("b344192" if placement == "b344192" else "moved")
+    if placement == "own_arrow":
+        angle = ink["ChamferAngle"]
+        ink["ChamferAngle"] = replace(
+            angle,
+            segments=(*angle.segments, _mm_run(129.0, 116.2, 128.0, 115.5, "arrow")),
+        )
+    reader = SimpleNamespace(take_errors=lambda: [])
+    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
+    monkeypatch.setattr(drawing, "_dump_annotation", lambda _reader, name: {"name": name})
+    monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
+    monkeypatch.setattr(
+        drawing, "annotation_geometry",
+        lambda record, *, owner, advance: ink[record["name"]],
+    )
+
+    def check():
+        drawing._verify_control_ink(None, list(ink))
+
+    if placement == "moved":
+        check()
+        return
+    with pytest.raises(RuntimeError, match="struck by line ink"):
+        check()
+
+
+def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
+    """An angle's text outside its 0..45 deg wedge measures another angle; on
+    the bisector at radius 26 it stands off both rays by more than its box."""
+    vertex = (0.1065, 0.1032)
+    x, y = drawing.FRONT_KEEP["ChamferAngle"]
+    bearing = math.degrees(math.atan2(y - vertex[1], x - vertex[0]))
+    assert bearing == pytest.approx(spec.CHAMFER_ANGLE_DEG / 2, abs=0.5)
+    assert math.hypot(x - vertex[0], y - vertex[1]) == pytest.approx(0.026, abs=2e-4)
+    assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100

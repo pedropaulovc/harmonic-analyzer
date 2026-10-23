@@ -130,39 +130,41 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert rows == {
         "SupplierLength": (spec.LENGTH, "vertical"),
         "SupplierFlangeThickness": (spec.FLANGE_THICK, "vertical"),
-        "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
         "SupplierBodyDiameter": (spec.BODY_DIA, "horizontal"),
+        "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
         "SupplierMountingHoleDiameter": (spec.HOLE_DIA, "vertical"),
         "SupplierHolePitchDiameter": (spec.HOLE_PCD, "vertical"),
     }
     assert set(spec.SUPPLIER_REFERENCE_STARTS) == set(rows) == set(spec.SUPPLIER_REFERENCE_FORMATS)
-    assert set(spec.SUPPLIER_REFERENCE_PLANES) == {
-        "SupplierMountingHoleDiameter",
-        "SupplierHolePitchDiameter",
+    # The end view carries the flange OD and the bolt pattern; the side view
+    # the two lengths and the pilot.
+    assert spec.SUPPLIER_REFERENCE_PLANES == {
+        "SupplierFlangeDiameter": "Top",
+        "SupplierMountingHoleDiameter": "Top",
+        "SupplierHolePitchDiameter": "Top",
     }
-    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Top"}
+    assert spec.SUPPLIER_REFERENCE_SIDES == {"SupplierBodyDiameter": "bottom"}
 
     def chord(name: str) -> tuple[tuple[float, float], tuple[float, float]]:
         (x, y), (value, orientation) = spec.SUPPLIER_REFERENCE_STARTS[name], rows[name]
         return (x, y), (x + value, y) if orientation == "horizontal" else (x, y + value)
 
-    # Front sketch (x = radius, y = station): each chord spans its own feature.
-    assert chord("SupplierLength") == (
-        (spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
-        (spec.BODY_DIA / 2.0, spec.FAR_END_Y),
-    )
+    # Front sketch (x = radius, y = station). The printed construction chords
+    # lie on the axis or on visible edges, never across a face: the overall
+    # length on the axis, the flange thickness on the flange rim, the pilot on
+    # the spigot's end face.
+    assert chord("SupplierLength") == ((0.0, -spec.SPIGOT_LENGTH), (0.0, spec.FAR_END_Y))
     assert chord("SupplierFlangeThickness") == (
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (-spec.FLANGE_DIA / 2.0, spec.FLANGE_THICK),
     )
-    assert chord("SupplierFlangeDiameter") == ((-spec.FLANGE_DIA / 2.0, 0.0), (spec.FLANGE_DIA / 2.0, 0.0))
-    # The pilot chord is the spigot's end face and ends on the length's start.
     assert chord("SupplierBodyDiameter") == (
         (-spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
-        spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"],
+        (spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
     )
-    # Top sketch reads model (x, -z): the hole chord crosses the first hole's
-    # centre and the pitch chord the bolt circle, both through their centres.
+    # Top sketch reads model (x, -z): every chord crosses its circle's centre,
+    # the flange OD and the pitch circle on the view's centrelines.
+    assert chord("SupplierFlangeDiameter") == ((-spec.FLANGE_DIA / 2.0, 0.0), (spec.FLANGE_DIA / 2.0, 0.0))
     (hx, hy0), (_, hy1) = chord("SupplierMountingHoleDiameter")
     centre_x, centre_z = spec.HOLE_CENTRES[0]
     assert hx == centre_x
@@ -170,7 +172,7 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert chord("SupplierHolePitchDiameter") == ((0.0, -spec.HOLE_PCD / 2.0), (0.0, spec.HOLE_PCD / 2.0))
 
 
-def test_short_chords_shelve_their_text_outward_and_the_length_keeps_its_own() -> None:
+def test_every_chord_shelves_its_text_outward() -> None:
     from _supplier_screw_layout import supplier_screw_lane_plan
 
     lanes = supplier_screw_lane_plan(
@@ -179,9 +181,9 @@ def test_short_chords_shelve_their_text_outward_and_the_length_keeps_its_own() -
         sides=spec.SUPPLIER_REFERENCE_SIDES,
     )
     rows = {name: orientation for name, _, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    # The 15 mm length (7.5 mm at 1:2) is the one chord whose text fits
-    # between its own witnesses; the native farm audit found it clear.
-    assert set(draw.TEXT_SHELVES) == set(rows) - {"SupplierLength"}
+    # At 1:1 each horizontal text is wider than its span or crosses its own
+    # vertical dimension line, so every one moves clear of its own ink.
+    assert set(draw.TEXT_SHELVES) == set(rows)
     for name, side in draw.TEXT_SHELVES.items():
         assert side in ("left", "right")
         if rows[name] == "vertical":
@@ -198,6 +200,32 @@ def test_shelf_gap_measures_clearance_on_the_shelf_side() -> None:
     text = SimpleNamespace(xmin=0.135, xmax=0.160)
     actual = {"left": 0.118, "right": 0.133, "text": text}
     assert draw._shelf_gap("SupplierMountingHoleDiameter", actual) == pytest.approx(0.002)
+
+
+def test_sheet_fits_its_title_cells_and_selects_the_tall_top_layout() -> None:
+    import _purchased_title_fit as title_fit
+
+    assert draw.TITLE_BLOCK_SETUP.func is title_fit.fit_purchased_title_block
+    assert draw.TITLE_BLOCK_SETUP.keywords == {"spec": draw.SPEC}
+    assert draw.VIEW_LAYOUT == "tall_top"
+    assert not hasattr(draw, "SUPPLIER_DATA")
+
+
+def test_hidden_line_guard_refuses_any_orthographic_view_not_hlr() -> None:
+    from _drawing_view_display import _SW_HLR
+
+    class View:
+        def __init__(self, mode: int) -> None:
+            self.mode = mode
+
+        def GetDisplayMode2(self) -> int:
+            return self.mode
+
+    views = {name: View(_SW_HLR) for name in ("*Front", "*Top", "*Right")}
+    draw._assert_hidden_lines_removed(views)
+    views["*Front"].mode = 1  # swHIDDEN_GREYED
+    with pytest.raises(RuntimeError, match="Front"):
+        draw._assert_hidden_lines_removed(views)
 
 
 # Native ``GetOutline`` at farm run 20261023T163903809Z (e04fd60ab): every
@@ -247,17 +275,24 @@ class _Drawing:
         return True
 
 
-def _fit_orthographic(monkeypatch, dimensions, planes) -> tuple[int, int]:
+def _fit_orthographic(
+    monkeypatch,
+    dimensions=spec.SUPPLIER_REFERENCE_DIMENSIONS,
+    planes=spec.SUPPLIER_REFERENCE_PLANES,
+    *,
+    sides=spec.SUPPLIER_REFERENCE_SIDES,
+    layout=draw.VIEW_LAYOUT,
+    supplier_data=(),
+) -> tuple[int, int]:
     import _purchased_fastener_drawing as purchased
     from _supplier_screw_layout import supplier_screw_margins
 
     monkeypatch.setattr(purchased, "double_array", tuple)
-    # The sheet's footer: its one-line note plus the supplier-data block.
     caption_y = purchased.view_band_bottom(
-        spec.DRAWING_NOTES, label=STEM, supplier_data=draw.SUPPLIER_DATA
+        spec.DRAWING_NOTES, label=STEM, supplier_data=supplier_data
     )
-    cells = purchased.fastener_view_cells(caption_y)
-    margins = supplier_screw_margins(dimensions, planes=planes, sides=spec.SUPPLIER_REFERENCE_SIDES)
+    cells = purchased.fastener_view_cells(caption_y, layout=layout)
+    margins = supplier_screw_margins(dimensions, planes=planes, sides=sides)
     fitted = purchased.supplier_fit_cells(cells, margins, label=STEM)
     members = [
         (_PaddedView(name, center), (name, center, bounds))
@@ -267,17 +302,23 @@ def _fit_orthographic(monkeypatch, dimensions, planes) -> tuple[int, int]:
     return purchased._fit_group(_Drawing(), members)
 
 
-def test_supplier_lanes_leave_a_standard_scale_for_the_padded_native_outlines(monkeypatch) -> None:
-    assert (
-        _fit_orthographic(monkeypatch, spec.SUPPLIER_REFERENCE_DIMENSIONS, spec.SUPPLIER_REFERENCE_PLANES)
-        == (1, 2)
-    )
+def test_supplier_lanes_leave_one_to_one_for_the_padded_native_outlines(monkeypatch) -> None:
+    assert _fit_orthographic(monkeypatch) == (1, 1)
 
 
-def test_horizontal_end_view_lanes_reproduce_the_native_no_scale_failure(monkeypatch) -> None:
-    horizontal = tuple(
-        (name, value, "horizontal" if name in spec.SUPPLIER_REFERENCE_PLANES else orientation)
-        for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS
-    )
-    with pytest.raises(RuntimeError, match="no project-standard scale fitting"):
-        _fit_orthographic(monkeypatch, horizontal, spec.SUPPLIER_REFERENCE_PLANES)
+def test_each_part_of_the_layout_is_needed_for_one_to_one(monkeypatch) -> None:
+    # The standard 64 mm Top cell: a 46 mm reserve leaves 18 mm, so 1:4.
+    assert _fit_orthographic(monkeypatch, layout="standard") == (1, 4)
+    # supplier_top's 70 mm Top cell leaves 24 mm: 1:2.
+    assert _fit_orthographic(monkeypatch, layout="supplier_top") == (1, 2)
+    # Restoring the two-line supplier-data footer lowers the tall_top Front
+    # row to 60.5 mm, a 14.5 mm window: 1:8.
+    data = ("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",)
+    assert _fit_orthographic(monkeypatch, supplier_data=data) == (1, 8)
+    # A second horizontal Front size (the flange OD back in the side view)
+    # takes a second bottom lane: 1:2.
+    front_od = {
+        name: plane for name, plane in spec.SUPPLIER_REFERENCE_PLANES.items()
+        if name != "SupplierFlangeDiameter"
+    }
+    assert _fit_orthographic(monkeypatch, planes=front_od) == (1, 2)
