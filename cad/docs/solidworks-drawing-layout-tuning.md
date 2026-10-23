@@ -2005,6 +2005,28 @@ the blank space between value and below-text is not glyph ink. Keep the full
 union for neighbour, silhouette and sheet containment. This remains the same
 single sheet and four views; native redraw and machinist review decide fit.
 
+The 2026-10-23 R7 bracket attempt `20261023T062821Z-1-881fad50`
+(source `6e9e4a5e5884`) captured all final native ink before refusing
+`NoseR: neighbouring native line crowds its text`. Its radius text union was
+X245.683–286.317/Y223.4437–232.500mm. The through-tap leader from
+(230.5142,212.8907) to (314.4281,227.6389)mm crossed that union's 2mm
+clearance envelope for 9.2782mm. The same capture also showed the
+`TapFromTip` outward-arrow flank crossing its `RETAINS TAP WALL` row.
+No forensic PDF/image was captured, so these are native envelope measurements,
+not exported glyph proof.
+
+Retain the associative through-tap annotation as the radius lane authority.
+Keep the radius union's X station and put its bottom4mm above that leader's
+measured top (R7 coordinates imply Y231.6389mm, +8.1952mm). Set and rebuild
+`TapFromTip` offset mode before measuring: place its complete union4mm left
+of its own vertical witnesses and4mm above its settled native line/arrow
+extent. The captured X206mm witness and40.634mm text width imply
+X161.366mm instead of165.366mm; the new Y depends on the actual offset-mode
+rebuild, not the old arrow position. Preserve the 2mm neighbour guard,
+individual-run own-ink guards, all functional rows/bands and all four views.
+The regression retains R7's head rows, tap leader and arrow flanks; new
+offset-mode geometry/moves remain simulations until the next native redraw.
+
 The overall seat-to-nose span is a native drawing reference, not a second
 manufacturing tolerance: select the actual mounting-seat edge and nose arc,
 set/read back the maximum arc endpoint, and parenthesize the measured result.

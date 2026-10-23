@@ -315,7 +315,7 @@ def _overall_reference(adapter: Any, side: Any, edges: Any) -> Any:
 
 
 def _layout_linear_annotations(
-    adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any, overall_reference: Any,
+    adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any, overall_reference: Any, tap_callout: Any,
 ) -> None:
     """Place reviewed text from native witnesses, then guard neighbours."""
     names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NoseR", "TapFromTip", "TapFromSide", "NeckToFootSide", "OverallHeight")
@@ -326,7 +326,10 @@ def _layout_linear_annotations(
         display = _early_bound(_early_bound(annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         if str(_early_bound(display.GetDimension2(0), "IDimension").Name) != name:
             raise RuntimeError(f"{name}: retained native dimension name changed")
-    annotations = [*annotations, lateral_location, overall_reference]
+    # The native through-tap leader bounds the radius text lane. Retain its
+    # handle too: its generated dimension name is not a stable model contract.
+    by_name["LeverTapCallout"] = tap_callout
+    annotations = [*annotations, lateral_location, overall_reference, tap_callout]
     for name in (*names, "SeatToAxis"):
         if name in by_name:
             continue
@@ -350,8 +353,8 @@ def _layout_linear_annotations(
     rebuild_drawing(adapter, label="measure bracket linear callouts")
     initial = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
     capture("before_text_modes", [(name, by_name[name], ink) for name, ink in initial.items()])
-    placed_names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide")
-    offset_names = ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromSide")
+    placed_names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromTip", "TapFromSide")
+    offset_names = ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide")
     for name in placed_names:
         display = _early_bound(_early_bound(by_name[name], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         display.CenterText = False
@@ -389,6 +392,18 @@ def _layout_linear_annotations(
         "MountingY0": (
             left_foot - 0.004 - (before["MountingY0"].text[2] - before["MountingY0"].text[0]),
             max(max(line.y0, line.y1) for line in before["MountingY0"].leader) + 0.0022,
+        ),
+        # R7's associative through-tap leader ran within 2 mm of the radius
+        # reason row. Use that retained leader's measured top, not a PDF nudge.
+        "NoseR": (
+            before["NoseR"].text[0],
+            max(max(line.y0, line.y1) for line in before["LeverTapCallout"].leader) + 0.004,
+        ),
+        # Its old below-value row crossed the outward arrow flank. Keep the
+        # complete offset text left of its witnesses and above its native ink.
+        "TapFromTip": (
+            min(line.x0 for line in verticals("TapFromTip")) - 0.004 - (before["TapFromTip"].text[2] - before["TapFromTip"].text[0]),
+            max(max(line.y0, line.y1) for line in before["TapFromTip"].leader) + 0.004,
         ),
         "TapFromSide": (
             max(line.x0 for line in verticals("TapFromSide")) + 0.004,
@@ -530,12 +545,12 @@ async def build(adapter: Any) -> dict[str, str]:
         "isometric view": iso_outline,
         "title block": (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m),
     })
+    tap_annotation = _early_bound(tap, "IDisplayDimension").GetAnnotation()
     _layout_linear_annotations(adapter, front, bottom, [
         *imported["front"], *imported["mounting face"], *imported["thread-axis end"],
         *mounting_dimensions, *annotations,
         _early_bound(mounting_callout, "IDisplayDimension").GetAnnotation(),
-        _early_bound(tap, "IDisplayDimension").GetAnnotation(),
-    ], lateral_location=lateral_location, overall_reference=overall_reference)
+    ], lateral_location=lateral_location, overall_reference=overall_reference, tap_callout=tap_annotation)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Magnifying Bracket Manufacturing Drawing", scale=SHEET_SCALE, layout=SPEC.layout)
 
 

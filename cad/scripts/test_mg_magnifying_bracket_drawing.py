@@ -702,10 +702,11 @@ def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_
 @pytest.mark.parametrize("row_mm", (5.64, 6.35))
 @pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name", "overall_name"))
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault, row_mm):
-    """Historical native stations; mode-change geometry/moves are simulations.
+    """R7 head ink plus historical foot witnesses; new moves are simulations.
 
-    R2 did not capture MountingY0's final primitive. The extra mode-created
-    shoulder below is a deliberate stale-geometry control, NOT its native trace.
+    R2 did not capture MountingY0's final primitive. Its extra mode-created
+    shoulder is a stale-geometry control, NOT its native trace. R7 did capture
+    the head's real rows, tap leader and outward arrow flanks below.
     """
     rows = {
         "NeckThickness": [("12.5", .1070212, .185, .012)],
@@ -721,18 +722,25 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "FlangeWidth": [("54.2", .0718882, .0952219, .0142236)],
         "NeckToFootSide": [("0.85", .247, .096, .010)],
         "NoseR": [
-            ("R5.50 ±0.05", .266, .229, .028),
-            ("RETAINS TAP WALL", .266, .224, .039),
+            ("R5.50 ±0.05", .2536042, .229, .0247917),
+            ("RETAINS TAP WALL", .245683, .2234437, .040634),
         ],
         "TapFromTip": [
-            ("5.50 ±0.05", .165, .246, .025),
-            ("RETAINS TAP WALL", .165, .241, .039),
+            ("5.50 ±0.05", .1747042, .226, .0219576),
+            ("RETAINS TAP WALL", .165366, .2204437, .040634),
         ],
         "TapFromSide": [
-            ("5.50 ±0.05", .2277281, .2372219, .0245438),
-            ("RETAINS TAP WALL", .2277281, .2322219, .039),
+            ("5.50 ±0.05", .2290212, .240, .0219576),
+            ("RETAINS TAP WALL", .219683, .2344437, .040634),
         ],
         "OverallHeight": [("(105.90)", .162, .1822219, .022)],
+        "LeverTapCallout": [
+            ("DRILL ", .3200021, .2388049, .0129597),
+            ("<MOD-DIAM>", .3329618, .2387514, .0052784),
+            (" 5.11 THRU ALL", .3382403, .2388049, .0317576),
+            ("TAP 1/4-20 UNC THRU ALL", .3167813, .2331951, .0564375),
+            ("MATES MHA-MG-03 LEVER", .3160156, .2276389, .0579687),
+        ],
     }
     lines = {
         "NeckThickness": [(.091125, .2114488, .091125, .1784438), (.103625, .2114488, .103625, .1784438), (.091125, .1794438, .1633882, .1794438)],
@@ -744,14 +752,47 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
         "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
         "OverallHeight": [(.228, .1120512, .173, .1120512), (.228, .2179488, .173, .2179488), (.174, .1120512, .174, .181), (.174, .2179488, .174, .189)],
-        "NoseR": [(.228, .218, .264, .230)],
-        "TapFromTip": [(.2335, .217, .2335, .239), (.165, .239, .234, .239)],
+        "NoseR": [
+            (.2325415, .2155511, .2440955, .2234438),
+            (.228, .2124488, .2325415, .2155511),
+            (.2440955, .2234438, .286317, .2234438),
+            (.2325415, .2155511, .2352629, .2178715),
+            (.2352629, .2178715, .2356927, .2172423),
+            (.2356927, .2172423, .2325415, .2155511),
+        ],
+        "TapFromTip": [
+            (.2325, .2179488, .205, .2179488),
+            (.2325, .2124488, .205, .2124488),
+            (.165366, .2204438, .206, .2204438),
+            (.206, .2204438, .206, .2179488),
+            (.206, .2124488, .206, .2060988),
+            (.206, .2179488, .205619, .2215048),
+            (.205619, .2215048, .206381, .2215048),
+            (.206381, .2215048, .206, .2179488),
+            (.206, .2124488, .206381, .2088928),
+            (.206381, .2088928, .205619, .2088928),
+            (.205619, .2088928, .206, .2124488),
+        ],
         "TapFromSide": [
-            (.2335, .2134488, .2335, .2382219),
-            (.228, .2185015, .228, .2382219),
-            (.2335, .2372219, .2522719, .2372219),
-            (.2335, .2372219, .228, .2372219),
-            (.228, .2372219, .22165, .2372219),
+            (.2335, .2134488, .2335, .2354438),
+            (.228, .2185015, .228, .2354438),
+            (.2335, .2344438, .260317, .2344438),
+            (.2335, .2344438, .228, .2344438),
+            (.228, .2344438, .22165, .2344438),
+            (.2335, .2344438, .237056, .2348248),
+            (.237056, .2348248, .237056, .2340628),
+            (.237056, .2340628, .2335, .2344438),
+            (.228, .2344438, .224444, .2340628),
+            (.224444, .2340628, .224444, .2348248),
+            (.224444, .2348248, .228, .2344438),
+        ],
+        "LeverTapCallout": [
+            (.2305142, .2128907, .3144281, .2276389),
+            (.2254858, .2120069, .2305142, .2128907),
+            (.3144281, .2276389, .3739844, .2276389),
+            (.2305142, .2128907, .2339506, .2138815),
+            (.2339506, .2138815, .2340825, .213131),
+            (.2340825, .213131, .2305142, .2128907),
         ],
     }
     items = {name: SimpleNamespace(name=name, dx=0.0, dy=0.0, CenterText=True, OffsetText=False) for name in rows}
@@ -765,7 +806,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
     def rebuild(_adapter, *, label):
         if label == "settle bracket linear text modes" and fault != "unsettled_modes":
-            assert all(items[name].OffsetText for name in ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromSide"))
+            assert all(items[name].OffsetText for name in ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromTip", "TapFromSide"))
             state.modes_settled = True
 
     def native_display(_adapter, item):
@@ -774,6 +815,34 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
             native_lines = [(a, b, c, d + item.dy) if i < 2 else (a, b + item.dy, c, d + item.dy) for i, (a, b, c, d) in enumerate(native_lines)]
         elif item.name == "FlangeDepth":
             native_lines = [(a if i < 2 else a + item.dx, b, c + item.dx, d) for i, (a, b, c, d) in enumerate(native_lines)]
+        elif item.name == "NoseR":
+            native_lines = [
+                (a, b, c + item.dx, d + item.dy) if i == 0 else
+                (a + item.dx, b + item.dy, c + item.dx, d + item.dy) if i == 2 else (a, b, c, d)
+                for i, (a, b, c, d) in enumerate(native_lines)
+            ]
+        elif item.name == "TapFromTip" and item.OffsetText and state.modes_settled:
+            # New offset mode is a simulation, retaining R7's fixed witnesses
+            # and complete outward-arrow triangles. Do not translate arrows.
+            x, y = rows[item.name][1][1] + item.dx, rows[item.name][1][2] + item.dy
+            native_lines = [
+                *native_lines[:2], (.206, .2179488, .206, .2242988),
+                native_lines[4], *native_lines[5:],
+                (.206, .2151988, x, y), (x, y, x + .040634, y),
+            ]
+        elif item.name == "TapFromSide" and item.OffsetText and state.modes_settled:
+            # R7 captured these settled mode coordinates before any text move.
+            x, y = .2159433 + item.dx, .2458861 + item.dy
+            native_lines = [
+                (.2335, .2134488, .2335, .241), (.228, .2185015, .228, .241),
+                (.2335, .240, .23985, .240), (.2335, .240, .228, .240),
+                (.228, .240, .22165, .240), (.23075, .240, x, y),
+                (x, y, x + .040634, y),
+                (.2335, .240, .237056, .240381), (.237056, .240381, .237056, .239619),
+                (.237056, .239619, .2335, .240),
+                (.228, .240, .224444, .239619), (.224444, .239619, .224444, .240381),
+                (.224444, .240381, .228, .240),
+            ]
         if item.name == "MountingY0" and item.OffsetText and state.modes_settled:
             native_lines.extend((
                 (.030, .080 + row_mm / 1000.0, rows[item.name][0][1] + item.dx, rows[item.name][0][2] + item.dy),
@@ -785,8 +854,9 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         if fault == "neighbour_crossing" and item.name == "FlangeWidth" and items["MountingX1"].dx:
             x = rows["MountingX1"][0][1] + items["MountingX1"].dx + .010
             native_lines.append((x, .041, x, .050))
+        mode_dx, mode_dy = (-.0037397, .0114424) if item.name == "TapFromSide" and item.OffsetText and state.modes_settled else (0.0, 0.0)
         return {
-            "texts": [_native_text(text, x + item.dx, y + item.dy, width) for text, x, y, width in rows[item.name]],
+            "texts": [_native_text(text, x + item.dx + mode_dx, y + item.dy + mode_dy, width) for text, x, y, width in rows[item.name]],
             "lines": [_native_line(*line) for line in native_lines],
         }, {}
 
@@ -803,7 +873,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     # R32 created and measured this native edge dimension successfully, but
     # later model-item name discovery did not find it. Its retained handle
     # must still receive the same real ink and neighbour-clearance checks.
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("NeckToFootSide", "OverallHeight") else item.name)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("NeckToFootSide", "OverallHeight", "LeverTapCallout") else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
@@ -815,12 +885,19 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1]), ("TapFromSide", lines["TapFromSide"][0])):
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
+    # Causal R7 controls: the through-tap diagonal crowds the radius's 2 mm
+    # envelope, and the top outward arrow crosses TapFromTip's reason glyphs.
+    nose = drawing._dimension_layout_ink(object(), items["NoseR"], label="NoseR").text
+    expanded_nose = Box(nose[0] - .002, nose[1] - .002, nose[2] + .002, nose[3] + .002)
+    assert segment_box_overlap_length(Segment(*lines["LeverTapCallout"][0]), expanded_nose) == pytest.approx(.0092782, abs=1e-7)
+    tip_reason = Box(.165366 + .00015, .2204437 + .00015, .206 - .00015, .2239437 - .00015)
+    assert segment_box_overlap_length(Segment(*lines["TapFromTip"][5]), tip_reason) > .0009
     if fault:
         message = "retained native dimension name" if fault in ("lateral_name", "overall_name") else ("did not settle" if fault == "ignored_move" else ("own native line" if fault in ("own_crossing", "unsettled_modes") else "neighbouring native line"))
         with pytest.raises(RuntimeError, match=message):
-            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"])
+            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight", "LeverTapCallout")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
     else:
-        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"])
+        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight", "LeverTapCallout")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
         assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
         assert items["NeckThickness"].OffsetText
@@ -846,6 +923,12 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         # the real historical witnesses' Y band, without inventing its new jog.
         assert ink["TapFromSide"].text[1] > max(max(line[1], line[3]) for line in lines["TapFromSide"][:2])
         assert items["TapFromSide"].OffsetText
+        assert ink["NoseR"].text[0] == pytest.approx(.245683)
+        assert ink["NoseR"].text[1] == pytest.approx(.2276389 + .004)
+        assert ink["TapFromTip"].text[2] == pytest.approx(.206 - .004)
+        assert ink["TapFromTip"].text[1] == pytest.approx(.2242988 + .004)
+        assert items["TapFromTip"].OffsetText
+        assert items["LeverTapCallout"].dx == items["LeverTapCallout"].dy == 0.0
     if fault not in ("lateral_name", "overall_name", "ignored_move"):
         stages = [json.loads(fields["auditJSON"]) for _message, fields in messages if "auditJSON" in fields]
         assert [record["stage"] for record in stages] == ["before_text_modes", "settled_text_modes", "placed"]
