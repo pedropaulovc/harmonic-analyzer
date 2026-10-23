@@ -85,6 +85,9 @@ cannot ask for what the authors were told to leave out.
   by the assembly recipe. A native attached leader and its single linked
   legend are re-proved after the final rebuild; this flag does not establish
   full-thread engagement or waive the physical shortfall review.
+  Numeric border zones owned by the drawing template are not installation-key
+  candidates. Sheet- or foreign-view duplicates still fail; the whole-inventory
+  linked-legend and instruction uniqueness checks remain unchanged.
   The five nut stems additionally enforce `text-clearance`, `text-on-line`,
   `dim-line-through-own-text`, `text-on-view` and `arrow-near-text`.
   `extension-through-own-text` remains reported rather than newly enforced:

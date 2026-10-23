@@ -428,6 +428,36 @@ def test_boss_flag_targets_actual_z0_and_checks_settled_readonly(
     )
 
 
+def test_boss_flag_distinguishes_template_border_zone_from_authored_key(
+    boss_installation_native,
+):
+    state = boss_installation_native
+    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state.add_legend()
+    zone = state.extra_key(state.sheet)
+    zone.annotation.OwnerType = 2  # swAnnotationOwner_DrawingTemplate.
+    settled()
+    # The same visible format zone cannot stand in for the authored flag.
+    state.right.notes.remove(state.note)
+    with pytest.raises(RuntimeError, match="native_key_count=0, template_key_count=1"):
+        settled()
+
+
+@pytest.mark.parametrize("owner_type", [0, 1])
+def test_boss_flag_rejects_competing_key_beside_template_zone(
+    boss_installation_native, owner_type,
+):
+    state = boss_installation_native
+    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state.add_legend()
+    zone = state.extra_key(state.sheet)
+    zone.annotation.OwnerType = 2
+    duplicate = state.extra_key(state.foreign if owner_type == 0 else state.sheet)
+    duplicate.annotation.OwnerType = owner_type
+    with pytest.raises(RuntimeError, match="native_key_count=2, template_key_count=1"):
+        settled()
+
+
 @pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed"])
 def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometry):
     state = boss_installation_native
@@ -450,6 +480,7 @@ def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometr
     "nonfinite-position", "duplicate-key", "foreign-key", "replaced-key",
     "missing-legend", "changed-legend", "unlinked-legend", "duplicate-legend",
     "duplicate-literal-instruction", "duplicate-unkeyed-instruction",
+    "duplicate-template-legend", "duplicate-template-instruction",
 ])
 def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault):
     state = boss_installation_native
@@ -541,6 +572,12 @@ def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault)
     elif fault == "duplicate-unkeyed-instruction":
         duplicate = state.add_legend(state.notes_text.removeprefix("1 "))
         duplicate.PropertyLinkedText = duplicate.resolved_text
+    elif fault == "duplicate-template-legend":
+        state.add_legend().annotation.OwnerType = 2
+    elif fault == "duplicate-template-instruction":
+        duplicate = state.add_legend()
+        duplicate.PropertyLinkedText = state.notes_text
+        duplicate.annotation.OwnerType = 2
     else:
         raise AssertionError(f"unowned boss flag drift: {fault}")
     with pytest.raises(RuntimeError):

@@ -14,7 +14,7 @@ import _config
 from _com import _early_bound
 from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_edges import scan_view_edges
-from _drawing_layout_audit import annotation_display
+from _drawing_layout_audit import _OWNER_DRAWING_TEMPLATE, annotation_display
 from _drawing_leader_notes import add_attached_note
 from _drawing_projection import model_points_in_view
 from _layout_audit import display_box
@@ -147,7 +147,17 @@ def _installation_flag(adapter: Any, right: Any) -> Callable[[], None]:
                         for prior in inventory
                     ):
                         inventory.append((current_note, current_annotation))
-        keys = [item for item in inventory if item[0].GetText() == key]
+        keys = []
+        template_keys = []
+        for current_note, current_annotation in inventory:
+            if current_note.GetText() != key:
+                continue
+            # The format's numeric border zone is not an installation key.
+            # Do not exclude sheet/foreign keys or any legend/instruction.
+            if int(current_annotation.OwnerType) == _OWNER_DRAWING_TEMPLATE:
+                template_keys.append((current_note, current_annotation))
+            else:
+                keys.append((current_note, current_annotation))
         legends = [
             item for item in inventory
             if item[0].PropertyLinkedText == '$PRP:"Installation Notes"'
@@ -164,11 +174,34 @@ def _installation_flag(adapter: Any, right: Any) -> Callable[[], None]:
             or legends[0][0].GetText().replace("\r\n", "\n") != legend
             or len(instructions) != 1
         ):
-            raise RuntimeError(f"{label}: expected one native key and its unchanged linked legend")
+            key_details = []
+            for current_note, current_annotation in (*keys, *template_keys):
+                try:
+                    details = {
+                        "owner_type": int(current_annotation.OwnerType),
+                        "text": current_note.GetText(),
+                        "authored_key_is_same": int(
+                            adapter.swApp.IsSame(current_annotation, annotation)
+                        ),
+                    }
+                except Exception as error:
+                    details = {
+                        "native_read_error": f"{type(error).__name__}: {error}"
+                    }
+                key_details.append(details)
+            raise RuntimeError(
+                f"{label}: expected one native key and its unchanged linked legend "
+                f"(native_key_count={len(keys)}, template_key_count={len(template_keys)}, "
+                f"linked_legend_count={len(legends)}, "
+                f"installation_instruction_count={len(instructions)}, "
+                f"key_candidates={key_details!r})"
+            )
         _telemetry.annotate(
             key=key, model_point_mm=point_mm, landing_xy_m=current_pick,
             leader_xyz_m=points, text_box_m=text_box, cell_m=cell,
             native_key_count=len(keys), linked_legend_count=len(legends),
+            template_key_count=len(template_keys),
+            raw_key_candidate_count=len(keys) + len(template_keys),
             installation_instruction_count=len(instructions),
         )
 
