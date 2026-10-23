@@ -2127,6 +2127,24 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         assert len(source_models) == 2
         assert source_models[0] is source
         assert source_models[1] is stock_scene.capture
+        midpoint = (
+            0.0,
+            (module.SUPPLIER_STOCK_AXIS_MM[0][1] + module.SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
+            0.0,
+        )
+        projected = module.model_points_in_view(
+            stock_adapter, stock, [midpoint], label="source stock envelope centre",
+        )[0]
+        before = tuple(stock.Position)
+        stock.Position = (
+            before[0] + module.STOCK_CENTER[0] - projected[0],
+            before[1] + module.STOCK_CENTER[1] - projected[1],
+        )
+        # This supplied SimpleNamespace view has a fixed fake transform, unlike
+        # the production view. Keep its projection consistent with the position.
+        stock.ModelToViewTransform = type(stock.ModelToViewTransform)(
+            stock.projection_scale, *stock.Position, stock.angle,
+        )
         profile = module._blacken_supplier_stock_profile(
             stock_adapter, stock, source, stock_scene.capture,
         )
