@@ -99,23 +99,29 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
 
 
-def test_blank_ends_are_drawn_dashed_and_carry_the_cut_length() -> None:
+def test_blank_ends_run_from_the_pin_corners_to_the_blank_length() -> None:
     """ENFORCE review 2026-10-23: the 7.5 BLANK witnesses rose from empty
-    space past the installed outline. The blank's ends are construction
-    geometry in the shown reference sketch (thin dashed on the sheet; fix r1:
-    the note's "PHANTOM" did not match that pattern), and the cut length runs
-    between their lower corners."""
-    build = _build_source()
-    assert "_as_construction(adapter, line)" in build
-    assert (
-        'f"{left_end}.end",\n        f"{right_end}.end",\n'
-        '        "horizontal_distance",\n        PIN_BLANK_LENGTH,'
-    ) in build
-    assert (
-        build.count('blank.record(f"BlankStub{side.title()}", \'"PinLen" / 2\')') == 1
-    )
-    assert 'blank.record("BlankEndDia", \'"PinDia"\')' in build
-    assert "THIN DASHED ENDS" in notes.DRAWING_NOTES
+    space past the installed outline. The blank's two ends (construction
+    geometry, drawn dashed on the sheet) leave the installed pin's corners,
+    stand at the blank's cut length, span its diameter, and lie wholly
+    outside the installed outline, so the cut length has drawn geometry to
+    dimension between."""
+    pin_r, half_len = spec.PIN_DIA / 2.0, spec.PIN_INSTALLED_LENGTH / 2.0
+    chains = part.BLANK_END_CHAINS
+    assert set(chains) == {"left", "right"}
+    end_xs = []
+    for side, sign in (("left", -1.0), ("right", 1.0)):
+        start, top, bottom, finish = chains[side]
+        assert start == pytest.approx((sign * half_len, pin_r))
+        assert finish == pytest.approx((sign * half_len, -pin_r))
+        # Stubs along the pin's edges, the end line square across them.
+        assert start[1] == top[1] and bottom[1] == finish[1]
+        assert top[0] == bottom[0]
+        assert top[1] - bottom[1] == pytest.approx(spec.PIN_DIA)
+        assert abs(top[0]) > half_len
+        end_xs.append(top[0])
+    assert end_xs[1] - end_xs[0] == pytest.approx(spec.PIN_BLANK_LENGTH)
+    assert end_xs[0] == pytest.approx(-end_xs[1])
 
 
 def test_precision_and_band_are_authored_on_the_part() -> None:

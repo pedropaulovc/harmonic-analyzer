@@ -80,6 +80,19 @@ _SAVED_DRAWING_PROPERTIES = (
 PIN_R = PIN_DIA / 2.0
 HALF_LEN = PIN_INSTALLED_LENGTH / 2.0
 V_PIN = math.pi * PIN_R**2 * PIN_INSTALLED_LENGTH
+BLANK_HALF = PIN_BLANK_LENGTH / 2.0
+# BlankReference's two ends (mm, Front sketch): a stub along the top edge from
+# the installed pin's corner, the blank's end line top -> bottom, and a stub
+# back along the bottom edge to the other corner.
+BLANK_END_CHAINS: dict[str, tuple[tuple[float, float], ...]] = {
+    side: (
+        (sign * HALF_LEN, PIN_R),
+        (sign * BLANK_HALF, PIN_R),
+        (sign * BLANK_HALF, -PIN_R),
+        (sign * HALF_LEN, -PIN_R),
+    )
+    for side, sign in (("left", -1.0), ("right", 1.0))
+}
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -176,28 +189,20 @@ async def build(adapter) -> dict[str, str]:
     # its witnesses rise from drawn geometry (ENFORCE review 2026-10-23: a
     # 7.5 BLANK dimensioned to an outline the sheet never drew).
     blank = SketchDims()
-    blank_half = PIN_BLANK_LENGTH / 2.0
     check("create_sketch blank reference", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    blank_line = check(
-        "blank centerline",
-        await adapter.add_centerline(-blank_half, 0.0, blank_half, 0.0),
-    )
-    # Each end: stub along the top edge, end line top -> bottom, stub back
-    # along the bottom edge.
     ends: dict[str, list[str]] = {}
-    for side, sign in (("left", -1.0), ("right", 1.0)):
-        ends[side] = await add_line_chain(
-            adapter,
-            [
-                (sign * HALF_LEN, PIN_R),
-                (sign * blank_half, PIN_R),
-                (sign * blank_half, -PIN_R),
-                (sign * HALF_LEN, -PIN_R),
-            ],
-            close=False,
+    set_sketch_direct_db(adapter, True)
+    try:
+        blank_line = check(
+            "blank centerline",
+            await adapter.add_centerline(-BLANK_HALF, 0.0, BLANK_HALF, 0.0),
         )
-    set_sketch_direct_db(adapter, False)
+        for side, points in BLANK_END_CHAINS.items():
+            ends[side] = await add_line_chain(adapter, list(points), close=False)
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
     for lines in ends.values():
         for line in lines:
             _as_construction(adapter, line)
