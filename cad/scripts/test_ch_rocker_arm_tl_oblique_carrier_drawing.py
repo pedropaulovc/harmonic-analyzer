@@ -736,53 +736,62 @@ def _b9e4_crossing(a, b):
     )
 
 
-# The current REAM rows' native (width, baseline - annotation y), sheet m, read
-# from the layout audit of farm run
-# 20261023T221615220Z-ecf9bdf512a4457e989c2c7ec5d79601 (cde5928fa). Century
-# Gothic is proportional, so a character count cannot bound them; a text
-# change must be re-measured here before the b9e4 replay can cover it.
-_CURRENT_REAM_ROWS_M = {
-    "4X REAM THRU (0.000-0.024": (0.0600007, 0.0093649),
-    "DIAMETRAL CLEARANCE ON": (0.0632187, 0.0038087),
-    "MHA-CH-06-TL-23 PIVOT PIN)": (0.0633063, -0.0017476),
-    "AXES SQUARE TO UNDERSIDE:": (0.065241, -0.0073038),
-    "0.05 MAX LEAN IN 10.50 OF": (0.0601174, -0.0128601),
-    "LAND, ANY DIRECTION, SO PIN": (0.0677979, -0.0184163),
-    "CLEARS MHA-CH-06-TL-30 CAP": (0.0682451, -0.0239726),
-}
+# Every current REAM text run's native (text, x - annotation x, width,
+# baseline - annotation y), sheet m, read from the layout audit of farm run
+# 20261023T221615220Z-ecf9bdf512a4457e989c2c7ec5d79601 (cde5928fa); each run
+# is 3.5 high, ref 1, unrotated, as in b9e4. Century Gothic is proportional,
+# so a character count cannot bound them; a text change must be re-measured
+# here before the b9e4 replay can cover it.
+_CURRENT_REAM_RUNS_M = (
+    ("<MOD-DIAM>", -0.0176309, 0.0052784, 0.0149212),
+    ("10.000 ", -0.0123524, 0.0155167, 0.0149747),
+    ("+", 0.0031642, 0.0028292, 0.0194469),
+    (" ", 0.0039323, 0.0012931, 0.0149212),
+    ("0.015", 0.0059934, 0.0116375, 0.0194469),
+    ("0.000", 0.0059934, 0.0116375, 0.0149212),
+    ("4X REAM THRU (0.000-0.024", -0.0300003, 0.0600007, 0.0093649),
+    ("DIAMETRAL CLEARANCE ON", -0.0316094, 0.0632187, 0.0038087),
+    ("MHA-CH-06-TL-23 PIVOT PIN)", -0.0316531, 0.0633063, -0.0017476),
+    ("AXES SQUARE TO UNDERSIDE:", -0.0326205, 0.0652410, -0.0073038),
+    ("0.05 MAX LEAN IN 10.50 OF", -0.0300587, 0.0601174, -0.0128601),
+    ("LAND, ANY DIRECTION, SO PIN", -0.0338990, 0.0677979, -0.0184163),
+    ("CLEARS MHA-CH-06-TL-30 CAP", -0.0341226, 0.0682451, -0.0239726),
+)
 
 
 def _b9e4_ream_row_envelope(raw, boxes):
-    """Widen b9e4's below-rows into one contiguous, block-wide envelope.
+    """Replace b9e4's REAM text boxes with the hull of the whole block.
 
-    b9e4 printed the earlier eight below-rows; the current block has its own
-    row count and widths. Each recorded below-row box becomes as wide as the
-    widest recorded row, centred on the block, and reaches down to the next
-    row, so any current row no wider than that and within the recorded
-    vertical extent lies inside the replayed boxes.
+    b9e4 printed the earlier nine-row block; the shorter current block keeps
+    the anchor but shifts every row, size and tolerance rows included. Every
+    current run lies, relative to the anchor, inside the recorded runs' extent
+    (same height, reference and angle), so it lies inside the hull of the
+    recorded boxes after their translation to the current anchor. The hull is
+    returned as contiguous full-width slices, one per recorded box.
     """
     from _layout_geometry import Box
 
-    rows = [run for run in raw["display"]["texts"][6:]]
-    width = max(run["w"] for run in rows)
-    centre = rows[0]["pos"][0] + rows[0]["w"] / 2.0
-    for run in rows:
-        assert math.isclose(run["pos"][0] + run["w"] / 2.0, centre, abs_tol=2e-7)
-    current = spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
-    assert list(_CURRENT_REAM_ROWS_M) == current
-    assert all(run["h"] == 0.0035 for run in rows)
-    assert max(w for w, _ in _CURRENT_REAM_ROWS_M.values()) <= width
-    baselines = [run["pos"][1] - raw["pos"][1] for run in rows]
-    assert all(
-        min(baselines) <= dy <= max(baselines) for _, dy in _CURRENT_REAM_ROWS_M.values()
+    recorded = raw["display"]["texts"]
+    assert {(run["h"], run["ref"], run["ang"]) for run in recorded} == {(0.0035, 1, 0.0)}
+    rel_x = [run["pos"][0] - raw["pos"][0] for run in recorded]
+    rel_y = [run["pos"][1] - raw["pos"][1] for run in recorded]
+    left = min(rel_x)
+    right = max(x + run["w"] for x, run in zip(rel_x, recorded, strict=True))
+    current = [text for text, *_ in _CURRENT_REAM_RUNS_M]
+    assert current[6:] == spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    assert current[:6] == [run["t"] for run in recorded[:6]]
+    for text, x, width, y in _CURRENT_REAM_RUNS_M:
+        assert left - 1e-9 <= x and x + width <= right + 1e-9, text
+        assert min(rel_y) <= y <= max(rel_y), text
+    xmin = min(box.xmin for box in boxes)
+    xmax = max(box.xmax for box in boxes)
+    ymin = min(box.ymin for box in boxes)
+    ymax = max(box.ymax for box in boxes)
+    pitch = (ymax - ymin) / len(boxes)
+    return tuple(
+        Box(xmin, ymax - (i + 1) * pitch, xmax, ymax - i * pitch)
+        for i in range(len(boxes))
     )
-    below = sorted(boxes[2:], key=lambda box: -box.ymax)
-    assert len(below) == len(rows)
-    widened = []
-    for upper, lower in zip(below, [*below[1:], None]):
-        floor = upper.ymin if lower is None else lower.ymax
-        widened.append(Box(centre - width / 2.0, floor, centre + width / 2.0, upper.ymax))
-    return (*boxes[:2], *widened)
 
 
 def _conditional_b9e4_layout():
