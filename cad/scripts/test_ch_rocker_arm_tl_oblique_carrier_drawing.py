@@ -855,9 +855,15 @@ def test_b9e4_complete_native_rows_record_the_actual_three_layout_defects() -> N
     raw = _b9e4_annotation(layout, "PinHoleDia")
     assert len(raw["display"]["texts"]) == 14
     assert len(ream.text_boxes) == 10  # +.015 row, diameter/.000, all eight below
-    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
-        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
-    )
+    # b9e4 printed the earlier nine-row REAM block. The plain squareness
+    # wording keeps its fit rows and has fewer, no wider rows, so the observed
+    # glyph block still bounds the current text for the layout replay below.
+    recorded = [run["t"] for run in raw["display"]["texts"][6:]]
+    current = spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    fit_rows = spec.PIN_HOLE_CALLOUT.splitlines()
+    assert recorded[: len(fit_rows)] == current[: len(fit_rows)] == fit_rows
+    assert len(current) <= len(recorded)
+    assert max(map(len, current)) <= max(map(len, recorded))
     assert not [item for item in layout.unmatched if "PinHoleDia" in item[0]]
     near_y = _b9e4_named(layout, "PlateNearY")
     assert "45.00" in near_y.label
