@@ -113,12 +113,16 @@ LENGTH_KEEP = {
     ),
     "TopChamfer": (LENGTH_CENTER[0] + 0.040, LENGTH_CENTER[1] + 0.120),
 }
-CROSS_HOLE_CALLOUT = {"CrossHoleDia": CROSS_HOLE_CALLOUT_TEXT}
 # The cut length is set at assembly: the supply size rides above the (1018.8)
 # reference and the cut-to-fit stack below it (rule 19), so the requirement
 # is flagged on the length itself rather than in the note block.
-LENGTH_SUPPLY = {"Length": LENGTH_SUPPLY_CALLOUT}
-LENGTH_FIT = {"Length": LENGTH_FIT_CALLOUT}
+ABOVE_CALLOUTS = {
+    "CrossHoleDia": CROSS_HOLE_CALLOUT_TEXT,
+    "Length": LENGTH_SUPPLY_CALLOUT,
+}
+BELOW_CALLOUTS = {"Length": LENGTH_FIT_CALLOUT}
+_CALLOUT_ABOVE = 3  # swDimensionTextParts_e.swDimensionTextCalloutAbove
+_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
 
@@ -291,9 +295,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     dimensions = [outer_diameter, *length_annotations]
-    set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
-    set_dimension_callouts(adapter, dimensions, LENGTH_SUPPLY, location="above")
-    set_dimension_callouts(adapter, dimensions, LENGTH_FIT, location="below")
+    set_dimension_callouts(adapter, dimensions, ABOVE_CALLOUTS, location="above")
+    set_dimension_callouts(adapter, dimensions, BELOW_CALLOUTS, location="below")
     hole_text = model_point_in_view(
         adapter,
         length,
@@ -316,6 +319,8 @@ async def build(adapter: Any) -> dict[str, str]:
         display.SetText(2, CROSS_HOLE_MATES_SUFFIX)
         if str(display.GetText(2) or "") != CROSS_HOLE_MATES_SUFFIX:
             raise RuntimeError("cross-hole mates suffix did not persist")
+        if str(display.GetText(_CALLOUT_ABOVE) or "") != CROSS_HOLE_CALLOUT_TEXT:
+            raise RuntimeError("cross-hole match-drill callout did not persist")
         display = _early_bound(display, "IDisplayDimension")
         hole_dimension = _early_bound(display.GetDimension2(0), "IDimension")
         if "CrossHoleProfile" not in str(hole_dimension.FullName):
@@ -387,6 +392,18 @@ async def build(adapter: Any) -> dict[str, str]:
             references[0],
             label=f"{name} reference",
         )
+        if name == "Length":
+            # The supply minimum and the cut-to-fit stack are the only place
+            # the sheet states them; a dropped SetText must fail the sheet.
+            lanes = {
+                part: str(display.GetText(part) or "").replace("\r\n", "\n")
+                for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
+            }
+            if lanes != {
+                _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
+                _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
+            }:
+                raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
     chamfers = [
         annotation
         for annotation in dimensions
