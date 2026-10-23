@@ -6461,6 +6461,7 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
             assert caught.value is original_attachment_error
             assert census == {}
             assert context["attachment_error"] == {
+                "member": "attachment proof",
                 "error_type": "RuntimeError",
                 "message": str(original_attachment_error),
             }
