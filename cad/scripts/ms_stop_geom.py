@@ -12,7 +12,7 @@ from _dimensions import name_dimensions
 from _feature_tree import name_last_feature
 from _sketch import (
     SketchDims, add_line_chain, anchor_point_to_origin, dimension_between,
-    ensure_fully_defined, set_sketch_direct_db,
+    ensure_fully_defined,
 )
 from _sketch_circle import define_circle
 from _drawing_precision import set_dimension_display_precision
@@ -32,9 +32,7 @@ async def location_reference(
     check(f"create sketch {feature}", await adapter.create_sketch(plane))
     first = None
     for index, span in enumerate(spans):
-        set_sketch_direct_db(adapter, True)
-        line = check(feature, await adapter.add_line(0.0, station, span, station))
-        set_sketch_direct_db(adapter, False)
+        (line,) = await add_line_chain(adapter, [(0.0, station), (span, station)], close=False)
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
         segment.ConstructionGeometry = True
         if not segment.ConstructionGeometry:
@@ -123,12 +121,10 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     """
     feature = "RoofThicknessReference"
     check(feature, await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    line = check(feature, await adapter.add_line(
-        -spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX,
-        -spec.WINDOW_Z_MIN, spec.BLOCK_HEIGHT,
-    ))
-    set_sketch_direct_db(adapter, False)
+    # add_line_chain restores AddToDB even when the line is refused.
+    (line,) = await add_line_chain(adapter, [
+        (-spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX), (-spec.WINDOW_Z_MIN, spec.BLOCK_HEIGHT),
+    ], close=False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not segment.ConstructionGeometry:
