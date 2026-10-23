@@ -508,10 +508,13 @@ def _retain_supplier_source_failure(
         )
     except BaseException as capture_error:
         if capture_error is not error:
-            error.add_note(
-                "source lifecycle capture also failed: "
-                f"{type(capture_error).__name__}: {capture_error}"
-            )
+            try:
+                error.add_note(
+                    "source lifecycle capture also failed: "
+                    f"{type(capture_error).__name__}: {capture_error}"
+                )
+            except BaseException:
+                pass  # Reporting must not replace the already-caught primary.
     raise error
 
 
@@ -2102,9 +2105,12 @@ async def build_purchased_fastener_drawing(
                 )
         except BaseException as preservation_error:
             if primary is not None:
-                primary.add_note(
-                    f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
-                )
+                try:
+                    primary.add_note(
+                        f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
+                    )
+                except BaseException:
+                    pass  # Reporting must not replace the already-caught primary.
             else:
                 _retain_supplier_source_failure(
                     spec, preservation_error, source_evidence
@@ -2181,9 +2187,12 @@ async def build_purchased_spring_drawing(
                 )
         except BaseException as preservation_error:
             if primary is not None:
-                primary.add_note(
-                    f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
-                )
+                try:
+                    primary.add_note(
+                        f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
+                    )
+                except BaseException:
+                    pass  # Reporting must not replace the already-caught primary.
             else:
                 _retain_supplier_source_failure(
                     spec, preservation_error, source_evidence
