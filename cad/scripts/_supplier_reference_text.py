@@ -15,7 +15,7 @@ layout audit with PDF ink. No font, value, tolerance, source or scale is edited.
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Mapping
-from math import dist, isfinite
+from math import cos, dist, isfinite, sin
 from typing import Any
 
 from _com import _early_bound
@@ -23,9 +23,75 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_geometry import Box, union_boxes
+import _telemetry
 
 # The existing shared-clamp native station/readback contract, not a new allowance.
 _POSITION_TOLERANCE_M = 1e-5
+
+
+def measured_native_text_bounds(
+    texts: Collection[Mapping[str, Any]], *, label: str
+) -> tuple[Box, tuple[Box, ...]]:
+    """Return the union and one measured box per raw native fragment, in order.
+
+    ``GetTextRefPositionAtIndex`` uses all six ``swTextPosition_e`` anchors;
+    ``GetTextAngleAtIndex`` is CCW radians. Normalize each anchor to its rotated
+    lower-left before the existing display hull, retaining measured metre
+    widths/heights. Each fragment must be readable and its derived box finite
+    BEFORE union; no glyph estimate or lower-left fallback can hide bad ink.
+    Raw records are never modified and fragment cardinality/order is preserved.
+    """
+    if not texts:
+        raise RuntimeError(f"{label}: supplier reference text has no measured native size")
+    fragments = []
+    for index, raw in enumerate(texts):
+        reference = raw.get("ref")
+        fragment_label = f"{label} fragment {index} ref={reference!r}"
+        try:
+            width, height = (float(raw.get(key) or 0.0) for key in ("w", "h"))
+        except (TypeError, ValueError, OverflowError) as error:
+            raise RuntimeError(f"{fragment_label}: unreadable measured native size") from error
+        if not all(isfinite(value) and value > 0.0 for value in (width, height)):
+            raise RuntimeError(f"{fragment_label}: text has no measured native size")
+        try:
+            at = tuple(float(value) for value in raw.get("pos", ()))
+            angle = float(raw["ang"])
+        except (KeyError, TypeError, ValueError, OverflowError) as error:
+            raise RuntimeError(f"{fragment_label}: unreadable native position/angle") from error
+        if len(at) != 3 or not all(map(isfinite, (*at, angle))):
+            raise RuntimeError(f"{fragment_label}: unreadable native position/angle")
+        if type(reference) is not int or reference not in range(6):
+            raise RuntimeError(f"{fragment_label}: unreadable native reference position")
+        # SDK swTextPosition_e: upper-left, lower-left, centre, upper-right,
+        # lower-right, upper-centre. Rotate the LOCAL anchor offset, not the
+        # raw sheet position; this is the existing measured-caption convention.
+        dx, dy = {
+            0: (0.0, -height), 1: (0.0, 0.0),
+            2: (-width / 2, -height / 2), 3: (-width, -height),
+            4: (-width, 0.0), 5: (-width / 2, -height),
+        }[reference]
+        cosine, sine = cos(angle), sin(angle)
+        normalized = {
+            **raw, "ref": 1,
+            "pos": (
+                at[0] + cosine * dx - sine * dy,
+                at[1] + sine * dx + cosine * dy,
+                at[2],
+            ),
+        }
+        if not all(map(isfinite, normalized["pos"])):
+            raise RuntimeError(f"{fragment_label}: non-finite normalized native position")
+        fragment = display_box({"texts": [normalized]})
+        if fragment is None or not all(map(
+            isfinite, (fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax)
+        )):
+            raise RuntimeError(f"{fragment_label}: no finite measured native bounds")
+        fragments.append(fragment)
+    text = union_boxes(fragments)
+    if text is None or not all(map(isfinite, (text.xmin, text.ymin, text.xmax, text.ymax))):
+        raise RuntimeError(f"{label}: supplier reference text has no finite measured native bounds")
+    return text, tuple(fragments)
 
 
 def measure_reference_text(
@@ -37,6 +103,8 @@ def measure_reference_text(
     returned record retains all native lines, including fraction bars and
     offset-text connectors. ``reach`` is only the maximum positive-axis reach
     of tip-incident dimension lines and arrowheads, not text-format strokes.
+    ``witnesses`` contains one primitive ``(station, low, high)`` triple per
+    disjoint perpendicular coverage interval, sorted by station and interval.
     This is a read, not a rebuild; callers needing settled pre-transition data
     must rebuild first. :func:`shelve_reference_text` does that itself.
     """
@@ -50,26 +118,10 @@ def measure_reference_text(
         raise RuntimeError(f"{label}: unreadable supplier reference annotation: {errors}")
     data = record.get("display") or {}
     texts = data.get("texts") or ()
-    if not texts or any(
-        not isfinite(float(row.get(key) or 0.0)) or float(row.get(key) or 0.0) <= 0.0
-        for row in texts
-        for key in ("w", "h")
-    ):
-        raise RuntimeError(f"{label}: supplier reference text has no measured native size")
-    if any(
-        len(row.get("pos") or ()) != 3
-        or not all(isfinite(float(value)) for value in row["pos"])
-        or row.get("ang") is None
-        or not isfinite(float(row["ang"]))
-        for row in texts
-    ):
-        raise RuntimeError(f"{label}: supplier reference text has unreadable native position/angle")
-    text = display_box({"texts": texts})
+    text, _ = measured_native_text_bounds(texts, label=label)
     arrows = data.get("arrows") or ()
     if (
-        text is None
-        or not all(isfinite(value) for value in (text.xmin, text.ymin, text.xmax, text.ymax))
-        or len(arrows) != 2
+        len(arrows) != 2
         or any(
             len(row) < 8 or not all(isfinite(float(value)) for value in row)
             for row in arrows
@@ -121,14 +173,19 @@ def measure_reference_text(
         ]
         if not runs:
             raise RuntimeError(f"{label}: supplier reference lost a native witness")
-        across = [
-            value
-            for segment in runs
-            for value in (
+        intervals = sorted(
+            tuple(sorted(
                 (segment.y0, segment.y1) if axis == 0 else (segment.x0, segment.x1)
-            )
-        ]
-        witnesses.append((tip[axis], min(across), max(across)))
+            ))
+            for segment in runs
+        )
+        coverage = []
+        for low, high in intervals:
+            if coverage and low <= coverage[-1][1] + _POSITION_TOLERANCE_M:
+                coverage[-1] = (coverage[-1][0], max(coverage[-1][1], high))
+            else:
+                coverage.append((low, high))
+        witnesses.extend((tip[axis], low, high) for low, high in coverage)
     if any(
         not any(
             dist(tip, endpoint) <= _POSITION_TOLERANCE_M
@@ -177,6 +234,7 @@ def _position(annotation: Any, *, label: str) -> tuple[float, ...]:
     return position
 
 
+@_telemetry.traced("drawing.shelve_reference_text", label_param="label")
 def shelve_reference_text(
     adapter: Any,
     *,

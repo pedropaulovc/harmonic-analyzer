@@ -72,11 +72,17 @@ cannot ask for what the authors were told to leave out.
   Their native nominal-major, across-flats and thickness text blocks use the
   shared measured-shelf convention: seed offset mode at the actual arrow
   station, then move the complete text beyond the outside-arrow tail without
-  changing the physical witnesses. Every reported text fragment participates,
-  including both fraction parts and all three nominal-major rows. Native
-  station/extent proof is not exact glyph or foreign-line clearance proof;
-  retain every line, including fraction bars, and inspect the actual PDF ink,
-  whole sheet and automated machinist result after regeneration.
+  changing the physical witnesses. Original perpendicular witness coverage is
+  retained as a canonical interval union, not merely its outside endpoints:
+  equivalent fragmentation or ordering is harmless, but a new interior gap
+  fails the same settled proof. Every reported text fragment participates,
+  including both fraction parts and all three nominal-major rows. The shared
+  native bounds reader normalizes all six SDK anchor positions and their
+  rotation using measured font-box dimensions, never estimated glyph widths;
+  unreadable or unknown fragment references fail before forming their union.
+  Native station/extent proof is not exact glyph or foreign-line clearance
+  proof; retain every line, including fraction bars, and inspect the actual
+  PDF ink, whole sheet and automated machinist result after regeneration.
   Front and Right reserve the same vertical annotation margins before fitting,
   so their physical projection centres remain aligned without moving a fitted
   view or changing its shared scale; per-view horizontal budgets remain intact.
