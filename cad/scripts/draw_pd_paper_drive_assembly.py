@@ -102,6 +102,7 @@ from _drawing_view_configuration import (
     view_configuration,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
@@ -137,6 +138,9 @@ import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
 from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_paper_drive_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
