@@ -1,19 +1,18 @@
 r"""Pure model/drawing contract for the graduated brass stick.
 
 The 2026-10-10 user Option B ruling keeps the 200 x 8 x 3 blank and
-groove geometry, shifting the whole scale and numeral DXF 1.00 mm left.
+groove geometry, shifting the whole scale and numerals 1.00 mm left.
 Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
-drawings, not the generated build-input DXF. Name its pinned outline font on the
-print while retaining the native model as the exact numeral-outline authority.
-The 2026-10-11 user Option A numeral ruling changes only their cut envelope:
-0.10 +/-0.05 deep, cut with a 30-degree included V bit (a print note; the model
-carries the depth as straight walls).
-Surface glyph outlines/placement and the square-bottom graduations stay fixed.
+drawings, not the generated build-input DXFs.
+The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
+numerals cut as true 30-degree included V grooves (the model drafts every
+stroke wall 15 degrees). The square-bottom graduations stay fixed.
 """
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from ms_stick_geom import (
@@ -33,32 +32,56 @@ TICK_WIDTH = 0.4
 TICK_LENGTH = 3.0
 MINOR_TICK_LENGTH = 1.8
 HALF_TICK_LENGTH = 4.0
-TICK_DEPTH = 0.5
+TICK_DEPTH = 0.50
 TICK_OVERHANG = 1.0
-NUMERALS_DXF = Path(__file__).resolve().parents[1] / "references" / "ms-stick-numerals.dxf"
+_REFERENCES = Path(__file__).resolve().parents[1] / "references"
+# One DXF per stroke layer (gen_ms_stick_numerals_dxf colours overlapping
+# strokes apart; a drafted cut needs disjoint profiles). Literal names keep
+# them in _buildgraph's data dependencies.
+NUMERAL_LAYER_DXFS = (
+    _REFERENCES / "ms-stick-numerals-1.dxf",
+    _REFERENCES / "ms-stick-numerals-2.dxf",
+    _REFERENCES / "ms-stick-numerals-3.dxf",
+)
 NUMERAL_HEIGHT_MM = 2.0
 NUMERAL_GAP_MM = 0.6
 NUMERAL_ROTATION_DEG = 90
-NUMERAL_AREA_MM2 = 13.108
-NUMERAL_DEPTH = 0.10
-NUMERAL_DEPTH_TOLERANCE_MM = 0.05
-NUMERAL_V_BIT_INCLUDED_ANGLE_DEG = 30.0
-NUMERALS_BBOX = (57.300, 1.393, 197.700, 4.400)
+# 2026-10-23 owner ruling: V-engrave the numerals with a 30-degree included
+# V bit (the easiest hobby-mill route in brass). Single-stroke numerals, 0.24
+# wide at the face (12% of the 2.0 height, legible and enamel-holding) and
+# 0.40 deep; the drafted walls leave only NUMERAL_TIP_FLAT_MM at the root.
+NUMERAL_V_INCLUDED_ANGLE_DEG = 30.0
+NUMERAL_STROKE_WIDTH_MM = 0.24
+NUMERAL_DEPTH = 0.40
+NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * math.tan(
+    math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0)
+)
+NUMERALS_BBOX = (57.300, 1.721, 197.700, 4.400)
+NUMERAL_VOLUME_MM3 = 2.6526
+NUMERAL_FIRST_LAYER_VOLUME_MM3 = 1.5603
 
-# Width and thickness govern the running clearance in the 8.4 x 3.4 stop
-# window; engraving position accuracy is noncumulative along the scale.
-# The 2026-10-10 user Option B ruling keeps the complete last tick:
-# routine +/-0.1 facing gives a 199.90 minimum against a 198.825 maximum
-# groove edge, leaving 1.075 mm worst-case land (1.30 mm nominal).
-# Depth only holds enamel: its loose band leaves 2.3 mm of stock at worst case
-# (minimum thickness minus maximum depth), above the 2.0 mm web target.
-BODY_LENGTH_TOLERANCE_MM = 0.1
+# Width and thickness give the sliding clearance in the 8.4 x 3.4 stop
+# rebate; graduation positions set the amplitude-bar stations through the
+# linear READOUT table. Overall length (one place), tick lengths and numeral
+# layout take the title block (2026-10-23 owner ruling): at .X +/-0.8 the
+# 199.2 shortest bar still keeps the last tick whole (0.375 land past a 0.40
+# groove). Graduation width and both engraving depths name no mate, so they
+# are single "n.nn MIN" limits that hold the enamel fill (coordinator ruling
+# 2026-10-23); the graduation depth's ceiling is the stated 2.0 of stock left
+# under the groove (bar 2.90 MIN, so the deepest groove is 0.90).
+TITLE_BLOCK_X_TOLERANCE_MM = 0.8
 BODY_FIT_TOLERANCE_MM = 0.1
 GRADUATION_POSITION_TOLERANCE_MM = 0.05
-GRADUATION_WIDTH_TOLERANCE_MM = 0.05
-GRADUATION_DEPTH_TOLERANCE_MM = 0.1
-GRADUATION_LENGTH_TOLERANCE_MM = 0.1
-NUMERAL_TOLERANCE_MM = 0.1
+GRADUATION_FLOOR_MIN_MM = 2.0
+GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {GRADUATION_FLOOR_MIN_MM:.1f} MIN"
+# swTolType_e.swTolMIN prints the nominal plus MIN: the model value is the
+# printed minimum. (lower, upper) deviations are the stored readback pair.
+MIN_LIMIT_TOL_TYPE = 5
+MIN_LIMIT_DEVIATIONS_MM = {
+    "Tick0Width": (0.0, TICK_WIDTH),
+    "TickDepth": (0.0, TICK_DEPTH),
+    "NumeralDepth": (0.0, NUMERAL_DEPTH),
+}
 
 # Construction chords use the actual finished edge and actual groove/glyph
 # extents. ScaleStartX and both pitch chords terminate at true groove centres,
@@ -83,36 +106,22 @@ DRAWING_DIMENSIONS = {
     **{feature: {row[0]} for feature, row in REFERENCE_DIMENSIONS.items()},
 }
 DRAWING_PRECISION = {
-    feature: {name: 2 for name in names}
+    feature: {name: 1 if name == "BodyLength" else 2 for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {
     name: places for dims in DRAWING_PRECISION.values() for name, places in dims.items()
 }
 DRAWING_TOLERANCES = {
-    "BodyLength": BODY_LENGTH_TOLERANCE_MM,
     "BodyWidth": BODY_FIT_TOLERANCE_MM,
     "BodyThickness": BODY_FIT_TOLERANCE_MM,
-    "Tick0Width": GRADUATION_WIDTH_TOLERANCE_MM,
-    "TickDepth": GRADUATION_DEPTH_TOLERANCE_MM,
-    "NumeralDepth": NUMERAL_DEPTH_TOLERANCE_MM,
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
-    "FullTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
-    "MinorTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
-    "HalfTickLength": GRADUATION_LENGTH_TOLERANCE_MM,
     "FullTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
     "MinorTickPitch": GRADUATION_POSITION_TOLERANCE_MM,
-    "NumeralHeight": NUMERAL_TOLERANCE_MM,
-    "NumeralXGap": NUMERAL_TOLERANCE_MM,
-    "NumeralYGap": NUMERAL_TOLERANCE_MM,
 }
-# gen_ms_stick_numerals_dxf uses _dxf_text's pinned DejaVuSans.ttf closed loops,
-# not a single-stroke font or a constant-width graduation cutter path.
-DRAWING_NOTES = "NUMERALS: DEJAVU SANS OUTLINES\nNUMERAL OUTLINES: ms-stick.SLDPRT (REFERENCE)"
-NUMERAL_TOOL_NOTE = (
-    f"NUMERALS: {NUMERAL_V_BIT_INCLUDED_ANGLE_DEG:g}° INCLUDED V ENGRAVING BIT;\n"
-    "ENAMEL-FILLED"
-)
+# The model's stroke shapes are representative; the shop's own single-stroke
+# sans font engraves the same V at the shown height and gaps.
+DRAWING_NOTES = "NUMERALS: ANY SINGLE-STROKE SANS FONT"
 NUMERAL_PLACEMENT_NOTE = (
     "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
     "10 LEFT OF FINAL FULL TICK.\n"

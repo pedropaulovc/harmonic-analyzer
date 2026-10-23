@@ -1,4 +1,4 @@
-"""Offline contracts for Option B scale placement and Option A numeral cuts."""
+"""Offline contracts for Option B scale placement and the V-engraved numerals."""
 
 from __future__ import annotations
 
@@ -33,7 +33,6 @@ def test_numeral_detail_ink_clears_border_and_placement_note() -> None:
     dx = drawing.NUMERAL_CENTER[0] - 0.140
     dy = drawing.NUMERAL_CENTER[1] - 0.135
     for name, old_xy in (
-        ("NumeralHeight", (0.145, 0.183)),
         ("NumeralXGap", (0.075, 0.170)),
         ("NumeralYGap", (0.075, 0.155)),
     ):
@@ -41,6 +40,11 @@ def test_numeral_detail_ink_clears_border_and_placement_note() -> None:
         assert math.dist(drawing.NUMERAL_KEEP[name],
                          (old_xy[0] + dx, old_xy[1] + dy)) < 1e-9
     assert drawing.DETAIL_SCALE == (6.0, 1.0)
+    # The NUMERAL HEIGHT text sits wholly right of its own extension lines
+    # (the r3 review saw them strike through the centred text).
+    height_text_left = drawing.NUMERAL_KEEP["NumeralHeight"][0] - len("NUMERAL HEIGHT") * 0.00275 / 2.0
+    right_extension = drawing.NUMERAL_CENTER[0] + spec.NUMERAL_HEIGHT_MM * drawing.DETAIL_SCALE[0] / 2000.0
+    assert height_text_left - right_extension >= 0.005
     # The label's measured leader/witness start is farther left than PDF ink.
     end_gap_left = drawing.NUMERAL_KEEP["NumeralYGap"][0] - 0.0618528
     assert end_gap_left - 0.0127 >= 0.005
@@ -59,16 +63,15 @@ def test_numeral_detail_ink_clears_border_and_placement_note() -> None:
     assert placement_note.ymin >= 0.0127 + 0.005
 
 
-def test_numeral_font_note_preserves_cad_outline_authority() -> None:
-    """Name the actual closed-outline font without permitting substitute glyphs."""
-    import _dxf_text as dxf_text
+def test_numeral_font_note_frees_the_shop_single_stroke_font() -> None:
+    """A V bit follows centrelines: the model's strokes are representative."""
     import gen_ms_stick_numerals_dxf as numeral_generator
 
-    assert dxf_text.DEJAVU_SANS.name == "DejaVuSans.ttf"
-    assert numeral_generator.dxf is dxf_text
-    assert "NUMERALS: DEJAVU SANS OUTLINES" in spec.DRAWING_NOTES
-    assert "NUMERAL OUTLINES: ms-stick.SLDPRT (REFERENCE)" in spec.DRAWING_NOTES
-    assert "CHOICE" not in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES == "NUMERALS: ANY SINGLE-STROKE SANS FONT"
+    assert "SLDPRT" not in spec.DRAWING_NOTES and "DEJAVU" not in spec.DRAWING_NOTES
+    assert sorted(numeral_generator.DIGIT_STROKES) == [str(digit) for digit in range(10)]
+    for strokes in numeral_generator.DIGIT_STROKES.values():
+        assert all(len(stroke) >= 2 for stroke in strokes)
 
 
 def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> None:
@@ -94,7 +97,7 @@ def test_builder_authors_model_owned_numeral_placement_property(monkeypatch) -> 
     eval(compile(expression, builder.__file__, "eval"), vars(builder), {"adapter": adapter})
     assert authored["Numeral Placement Note"] == spec.NUMERAL_PLACEMENT_NOTE
     assert authored["Manufacturing Notes"] == spec.DRAWING_NOTES
-    assert authored["Numeral Tool Note"] == spec.NUMERAL_TOOL_NOTE
+    assert "Numeral Tool Note" not in authored
     assert "Scale End Note" not in authored
     assert spec.NUMERAL_PLACEMENT_NOTE == (
         "NUMERALS 0-9 RIGHT OF FULL TICKS;\n"
@@ -109,7 +112,9 @@ def test_current_identity_and_drawing_paths() -> None:
     assert drawing.SLDDRW.name == "ms-stick.SLDDRW"
     assert drawing.PDF.name == "ms-stick.pdf"
     assert drawing.PNG.name == "ms-stick_drawing.png"
-    assert spec.NUMERALS_DXF.name == "ms-stick-numerals.dxf"
+    assert [path.name for path in spec.NUMERAL_LAYER_DXFS] == [
+        "ms-stick-numerals-1.dxf", "ms-stick-numerals-2.dxf", "ms-stick-numerals-3.dxf",
+    ]
 
 
 def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> None:
@@ -119,8 +124,7 @@ def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> Non
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
     assert spec.SCALE_END_MARGIN == pytest.approx(1.5)
     assert spec.SCALE_START_X == pytest.approx(56.5)
-    assert spec.NUMERALS_BBOX == (57.300, 1.393, 197.700, 4.400)
-    assert spec.NUMERAL_AREA_MM2 == pytest.approx(13.108)
+    assert spec.NUMERALS_BBOX == (57.300, 1.721, 197.700, 4.400)
     assert spec.SCALE_SPAN == pytest.approx(
         (spec.DIVISION_COUNT - 1) * spec.DIVISION_SPACING, rel=0.0, abs=1e-12,
     )
@@ -129,7 +133,7 @@ def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> Non
     )
     assert (spec.NUMERAL_HEIGHT_MM, spec.NUMERAL_GAP_MM, spec.NUMERAL_ROTATION_DEG) == (2.0, 0.6, 90)
     for name in ("BODY_LENGTH", "BODY_WIDTH", "BODY_THICKNESS", "SCALE_START_X",
-                 "TICK_WIDTH", "TICK_DEPTH", "NUMERALS_DXF"):
+                 "TICK_WIDTH", "TICK_DEPTH", "NUMERAL_LAYER_DXFS"):
         assert getattr(builder, name) == getattr(spec, name)
 
 
@@ -142,7 +146,9 @@ def test_every_printed_size_is_owned_and_precisioned_by_model() -> None:
             | set(drawing.NUMERAL_DEPTH_KEEP)
             | set().union(*(set(row[4]) for row in drawing.LENGTH_DETAILS)))
     assert kept == marked == set(spec.DRAWING_VALUES_BY_NAME) == set(spec.DRAWING_PRECISION_BY_NAME)
-    assert all(places == 2 for places in spec.DRAWING_PRECISION_BY_NAME.values())
+    # The overall length is noncritical: one place, the .X title-block band.
+    assert {name: places for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places != 2} == {
+        "BodyLength": 1}
     assert set(spec.DRAWING_TOLERANCES) <= marked
     assert {"BodyThickness", "TickDepth", "FullTickLength", "MinorTickLength",
             "HalfTickLength", "FullTickPitch", "MinorTickPitch", "NumeralHeight",
@@ -180,35 +186,51 @@ def test_scale_has_one_printed_origin_without_closing_chain() -> None:
 
 
 def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
-    """Noncumulative pitch allows one station error, not ten chained errors."""
+    """Noncumulative pitch allows one station error, not ten chained errors.
+
+    The overall length takes the .X title block (2026-10-23 owner ruling);
+    the graduation width is a MIN limit, so the land bounds the widest
+    groove that still leaves the last graduation whole."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
-    stock_min = values["BodyLength"] - bands["BodyLength"]
+    assert "BodyLength" not in bands
+    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 1
+    stock_min = values["BodyLength"] - spec.TITLE_BLOCK_X_TOLERANCE_MM
     last_center_max = (
         values["ScaleStartX"] + bands["ScaleStartX"]
         + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + bands["FullTickPitch"]
     )
-    last_edge_max = last_center_max + (values["Tick0Width"] + bands["Tick0Width"]) / 2.0
-    assert spec.DRAWING_PRECISION_BY_NAME["BodyLength"] == 2
-    assert stock_min == pytest.approx(199.90)
-    assert last_edge_max == pytest.approx(198.825)
-    assert stock_min >= last_edge_max
-    assert stock_min - last_edge_max == pytest.approx(1.075)
+    assert stock_min == pytest.approx(199.2)
+    assert last_center_max == pytest.approx(198.6)
+    assert stock_min - (last_center_max + values["Tick0Width"] / 2.0) == pytest.approx(0.40)
+    # Any groove up to 1.20 wide (3x the 0.40 minimum) keeps the last tick whole.
+    assert 2.0 * (stock_min - last_center_max) == pytest.approx(1.20)
     last_edge_nominal = (
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
     )
     assert values["BodyLength"] - last_edge_nominal == pytest.approx(1.30)
-    assert values["Tick0Width"] == pytest.approx(0.40)
-    assert bands["Tick0Width"] == pytest.approx(0.05)
 
 
-def test_loose_cosmetic_depth_keeps_the_structural_floor() -> None:
+def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:
+    """No mate needs a band on the engraving: width and both depths are
+    single MIN limits (model value = printed limit) that hold the fill, and
+    the graduation depth's ceiling is the stated 2.0 of stock under it."""
+    assert spec.MIN_LIMIT_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.MIN_LIMIT_DEVIATIONS_MM == {
+        "Tick0Width": (0.0, spec.TICK_WIDTH),
+        "TickDepth": (0.0, spec.TICK_DEPTH),
+        "NumeralDepth": (0.0, spec.NUMERAL_DEPTH),
+    }
+    assert not set(spec.MIN_LIMIT_DEVIATIONS_MM) & set(spec.DRAWING_TOLERANCES)
+    for name in spec.MIN_LIMIT_DEVIATIONS_MM:
+        assert drawing.DIMENSION_CALLOUTS[name].count("HOLDS ENAMEL FILL") == 1, name
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
-    floor_min = values["BodyThickness"] - bands["BodyThickness"] - values["TickDepth"] - bands["TickDepth"]
-    assert bands["TickDepth"] == pytest.approx(0.1)
-    assert bands["Tick0Width"] == pytest.approx(0.05)
-    assert floor_min == pytest.approx(2.3)
-    assert floor_min >= 2.0
+    assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE 2.0 MIN"
+    assert drawing.DIMENSION_CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
+    depth_max = values["BodyThickness"] - bands["BodyThickness"] - spec.GRADUATION_FLOOR_MIN_MM
+    assert depth_max == pytest.approx(0.90)
+    assert values["TickDepth"] == pytest.approx(0.50)
+    assert values["TickDepth"] < depth_max
 
 
 
@@ -433,9 +455,10 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     def create_detail(*args):
         label = args[6]
         parent = active["parent"]
-        assert args[2:] == (0.0, 0, *drawing.DETAIL_SCALE, label, 1, True, False, False, 5)
+        scale = drawing.DEPTH_SCALE if label == "B" else drawing.DETAIL_SCALE
+        assert args[2:] == (0.0, 0, *scale, label, 1, True, False, False, 5)
         parent.Circles.append(DetailCircle(label))
-        detail = make_view(args[:2], drawing.DETAIL_SCALE, 0.0646, parent.Orientation)
+        detail = make_view(args[:2], scale, 0.0646, parent.Orientation)
         detail_calls.append((label, active["sheet"], parent, detail))
         return detail
 
@@ -488,7 +511,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_dimension_callouts", "assert_manufacturing_dimensions",
-        "rebuild_drawing", "add_note",
+        "rebuild_drawing",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
     required_properties, linked_notes = [], []
@@ -524,14 +547,12 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         definition = SimpleNamespace(
             SetDisplayOnlySurfaceCut=lambda value: setattr(definition, "surface", value),
             GetDisplayOnlySurfaceCut=lambda: definition.surface,
-            GetPartialSection=lambda: kwargs["partial"],
+            GetPartialSection=lambda: kwargs.get("partial", False),
         )
-        left = spec.SCALE_START_X + spec.TICK_WIDTH / 2.0 + spec.NUMERAL_GAP_MM
         # Start displaced so the real G-G helper must move the native view and
         # re-project the physical centre; make_view's model frame is in metres.
         initial_xy = (kwargs["view_xy"][0] + 0.006, kwargs["view_xy"][1] - 0.004)
-        section = make_view(initial_xy, kwargs["scale"],
-                            (left + spec.NUMERAL_HEIGHT_MM / 2.0 + 0.05) / 1000.0, "*Top")
+        section = make_view(initial_xy, kwargs["scale"], drawing.NUMERAL_SECTION_X / 1000.0, "*Top")
 
         def set_view_position(position, move_children):
             assert move_children is False
@@ -562,15 +583,21 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert "Numeral Placement Note" in required_properties
     assert "Scale End Note" not in required_properties
     assert ("ENGRAVING", "Numeral Placement Note", drawing.NUMERAL_NOTE_XY) in linked_notes
-    assert "Numeral Tool Note" in required_properties
-    assert ("ENGRAVING", "Numeral Tool Note", drawing.NUMERAL_TOOL_NOTE_XY) in linked_notes
+    assert "Numeral Tool Note" not in required_properties
+    assert all(name != "Numeral Tool Note" for _sheet, name, _xy in linked_notes)
+    assert ("BAR", "Manufacturing Notes", (0.045, 0.075)) in linked_notes
     assert len(profiles) == 1
     sheet, profile_parent, profile_args, profile = profiles[0]
     assert sheet == "ENGRAVING"
     assert profile_parent.Position == drawing.NUMERAL_PROFILE_PARENT_CENTER
-    assert profile_args["partial"] and profile_args["section_label"] == "G"
+    assert profile_parent.ScaleRatio == drawing.SHEET_SCALE
+    assert not profile_args.get("partial") and profile_args["section_label"] == "G"
     assert profile_args["view_xy"] == drawing.NUMERAL_PROFILE_CENTER
-    assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (20.0, 1.0)
+    assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (10.0, 1.0)
+    # The cutting line crosses the whole bar width at the zero's mid-height.
+    start, end = utility.points[15:17]
+    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -0.004, 0.0))
+    assert end == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, 0.012, 0.0))
     assert tuple(profile.ScaleRatio) == drawing.NUMERAL_PROFILE_SCALE
     assert profile.UseParentScale is False
     assert len(section_moves) == 1
@@ -583,11 +610,11 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     ]
     assert len(numeral_depth_imports) == 1
     depth_import_view, depth_import_args = numeral_depth_imports[0]
-    assert depth_import_view.Orientation == "*Top"
-    assert depth_import_view.Position == drawing.DEPTH_PARENT_CENTER
+    # The V depth is dimensioned where the V reads: on section G-G.
+    assert depth_import_view is profile
     assert depth_import_args["dimensions_by_feature"] is spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["Numerals"] == set(depth_import_args["keep"])
-    assert profile.GetSection().GetDisplayOnlySurfaceCut()
+    assert not profile.GetSection().GetDisplayOnlySurfaceCut()
     assert any(view is profile for view in clean_views)
     assert len(utility.points) == 22  # six fences, profile endpoints, centre and placement readback
     expected = [
@@ -612,7 +639,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         assert (label, sheet) == (wanted_label, wanted_sheet)
         assert detail.Position == xy
         assert parent.ScaleRatio == (1.0, 2.0)
-        assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
+        scale = drawing.DEPTH_SCALE if label == "B" else drawing.DETAIL_SCALE
+        assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == scale
         projection_index = 3 * index + (4 if label == "B" else 0)
         assert utility.points[projection_index] == pytest.approx(model_xyz)
         projected = parent.ModelToViewTransform.apply(model_xyz)
@@ -647,7 +675,6 @@ def test_graduation_location_chords_terminate_at_groove_centres() -> None:
         _, start, end = spec.REFERENCE_DIMENSIONS[feature]
         assert start == zero[2]
         assert end == (spec.SCALE_START_X + spacing, spec.BODY_WIDTH)
-    assert spec.DRAWING_NOTES.endswith("ms-stick.SLDPRT (REFERENCE)")
 
 
 def test_numeral_fence_contains_real_full_tick_endpoint() -> None:
@@ -720,70 +747,186 @@ def test_detail_letter_refuses_missing_ambiguous_or_ignored_native_placement(
         )
 
 
-def test_numeral_depth_and_tool_contract_are_independent_of_graduations() -> None:
-    assert spec.NUMERAL_DEPTH == 0.10
-    assert spec.NUMERAL_DEPTH_TOLERANCE_MM == 0.05
-    assert spec.NUMERAL_V_BIT_INCLUDED_ANGLE_DEG == 30.0
+def test_numeral_v_contract_is_independent_of_graduations() -> None:
+    import math as _math
+
+    assert spec.NUMERAL_DEPTH == 0.40
+    assert spec.NUMERAL_V_INCLUDED_ANGLE_DEG == 30.0
+    assert spec.NUMERAL_STROKE_WIDTH_MM == 0.24
+    # A true V: the 15-degree walls leave under 0.03 mm of root at 0.40 deep.
+    assert spec.NUMERAL_TIP_FLAT_MM == pytest.approx(
+        0.24 - 0.80 * _math.tan(_math.radians(15.0)), abs=1e-12)
+    assert 0.0 < spec.NUMERAL_TIP_FLAT_MM < 0.03
     assert spec.DRAWING_DIMENSIONS["Numerals"] == {"NumeralDepth"}
     assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 2}
     assert spec.DRAWING_VALUES_BY_NAME["NumeralDepth"] == spec.NUMERAL_DEPTH
-    assert spec.DRAWING_TOLERANCES["NumeralDepth"] == spec.NUMERAL_DEPTH_TOLERANCE_MM
     assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.5)
-    assert spec.DRAWING_TOLERANCES["Tick0Width"] == 0.05
-    assert spec.DRAWING_TOLERANCES["TickDepth"] == 0.1
     assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
-    assert spec.NUMERAL_TOOL_NOTE == "NUMERALS: 30° INCLUDED V ENGRAVING BIT;\nENAMEL-FILLED"
-    assert "0.10" not in spec.NUMERAL_TOOL_NOTE
+    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"] == (
+        "NUMERAL DEPTH\n30° INCLUDED V\nHOLDS ENAMEL FILL")
+    assert not hasattr(spec, "NUMERAL_TOOL_NOTE")
+    assert not hasattr(drawing, "NUMERAL_TOOL_NOTE_XY")
 
 
-def test_unchanged_dxf_owns_surface_outlines(monkeypatch) -> None:
-    import _dxf_text as dxf
-    import gen_ms_stick_numerals_dxf as generator
-
-    # Git may materialize this text asset with CRLF; glyph identity is the
-    # canonical LF payload, not a workstation's checkout newline convention.
-    artwork = dxf.normalize_newlines(spec.NUMERALS_DXF.read_bytes())
-    import hashlib
-
-    assert hashlib.sha256(artwork).hexdigest() == (
-        "685cada7499cae0c6cc3e482ab687f875e68488fcde6060a0856433ef225569c"
-    )
-    assert artwork == generator.render()
-    rings = [ring for ring, closed in dxf.read_lwpolylines(artwork.decode("ascii")) if closed]
-    assert dxf.net_area(rings) == pytest.approx(spec.NUMERAL_AREA_MM2, rel=1e-3)
-    monkeypatch.setattr(spec, "NUMERAL_DEPTH", 0.15)
-    assert generator.render() == artwork
+def test_every_tight_band_states_its_function() -> None:
+    """Rule 4: a band tighter than the title block names its mate or purpose."""
+    reasons = {
+        "BodyWidth": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
+        "BodyThickness": "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE",
+        "ScaleStartX": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
+        "FullTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
+        "MinorTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
+    }
+    assert set(reasons) == set(spec.DRAWING_TOLERANCES)
+    for name, reason in reasons.items():
+        assert drawing.DIMENSION_CALLOUTS[name].endswith(reason), name
+    for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
+                 "NumeralHeight", "NumeralXGap", "NumeralYGap", *spec.MIN_LIMIT_DEVIATIONS_MM):
+        assert name not in spec.DRAWING_TOLERANCES, name
 
 
-def test_numeral_cut_uses_its_own_depth_and_drives_it(monkeypatch) -> None:
-    depths, names = [], []
-    definition = SimpleNamespace(GetDepth=lambda forward: spec.NUMERAL_DEPTH / 1000.0)
-    feature = SimpleNamespace(GetDefinition=lambda: definition)
+class _NumeralDefinition:
+    def __init__(self, depth=None, drafted=True, outward=False, angle_deg=15.0):
+        self.depth = spec.NUMERAL_DEPTH if depth is None else depth
+        self.drafted, self.outward, self.angle_deg = drafted, outward, angle_deg
 
-    class Adapter:
-        async def create_cut_extrude(self, params):
-            depths.append(params.depth)
-            return SimpleNamespace(is_success=True, data=None, error=None)
+    def GetDepth(self, forward):  # noqa: N802 - COM member name
+        return self.depth / 1000.0
 
+    def GetDraftWhileExtruding(self, forward):  # noqa: N802 - COM member name
+        return self.drafted
+
+    def GetDraftOutward(self, forward):  # noqa: N802 - COM member name
+        return self.outward
+
+    def GetDraftAngle(self, forward):  # noqa: N802 - COM member name
+        return math.radians(self.angle_deg)
+
+
+class _CutSeat:
+    """Seat fake: FeatureCut3 removes a volume chosen per form."""
+
+    def __init__(self, removed_by_form, arity=26):
+        self.removed_by_form, self.arity = removed_by_form, arity
+        self.volume, self.cuts, self.selected, self.undone = 4800.0, [], [], 0
+        seat = self
+
+        class Model:
+            FeatureManager = SimpleNamespace(FeatureCut3=seat.cut)
+            Extension = SimpleNamespace(SelectByID2=lambda *args: seat.selected.append(args[:2]) or True)
+
+            @staticmethod
+            def ClearSelection2(clear):  # noqa: N802 - COM member name
+                return None
+
+            @staticmethod
+            def EditUndo2(steps):  # noqa: N802 - COM member name
+                seat.undone += steps
+                seat.volume = 4800.0
+
+        async def mass():
+            return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=seat.volume))
+
+        def attempt(fn):
+            try:
+                return fn(), None
+            except Exception as exc:  # noqa: BLE001
+                return None, exc
+
+        self.adapter = SimpleNamespace(currentModel=Model, get_mass_properties=mass, _attempt_with_error=attempt)
+
+    def cut(self, *args):
+        if len(args) != self.arity:
+            raise TypeError(f"{len(args)} arguments")
+        self.cuts.append(args)
+        removed = self.removed_by_form.get((args[2], args[9], args[7]))
+        if removed is None:
+            return None
+        self.volume -= removed
+        return object()
+
+
+def _patch_cut_bookkeeping(monkeypatch, names):
+    import solidworks_mcp.adapters.pywin32_adapter as pywin32_adapter
+
+    feature = SimpleNamespace(GetDefinition=lambda: _NumeralDefinition())
+    monkeypatch.setattr(pywin32_adapter, "null_callout", lambda: None)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
+    monkeypatch.setattr(builder, "dump_dimensions", lambda actual, name: [
+        {"index": 0, "full_name": f"D3@{name}", "value_mm": 261.8},
+        {"index": 1, "full_name": f"D1@{name}", "value_mm": spec.NUMERAL_DEPTH},
+        {"index": 2, "full_name": f"D2@{name}", "value_mm": spec.NUMERAL_DEPTH},
+    ])
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
+
+
+def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> None:
+    v = spec.NUMERAL_FIRST_LAYER_VOLUME_MM3
+    # Keyed (reversed, Ddir1, drafted): Ddir1 False flares (2x), Ddir1 True is
+    # the V -- the volume, not the flag, decides.
+    seat = _CutSeat({(True, False, True): 3.35 * v / 1.56, (True, True, True): v})
+    names = []
+    _patch_cut_bookkeeping(monkeypatch, names)
     jobs = []
-    asyncio.run(builder._cut_numerals(Adapter(), jobs))
-    assert depths == [spec.NUMERAL_DEPTH]
-    assert names == [("Numerals", ["NumeralDepth"])]
+    form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals", None))
+    assert [(args[2], args[9]) for args in seat.cuts] == [(True, False), (True, True)]
+    assert seat.undone == 1 and seat.selected[0] == ("NumeralsSketch", "SKETCH")
+    assert form == builder._v_cut_args(True)
+    args = seat.cuts[-1]
+    # Single-ended, reversed into the bar, blind, both walls drafted 15 deg.
+    assert args[:7] == (True, False, True, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
+    assert args[7] is True and args[11] == pytest.approx(math.radians(15.0))
+    assert names == [("Numerals", [None, "NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
+    # Later layers reuse the proved form without re-probing.
+    builder_form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals2", form))
+    assert builder_form is form and seat.cuts[-1] == form
+    assert seat.selected[-1] == ("Numerals2Sketch", "SKETCH")
+    assert builder.numeral_feature_names() == ["Numerals", "Numerals2", "Numerals3"]
 
 
-def test_native_numeral_readback_refuses_old_depth(monkeypatch) -> None:
-    definition = SimpleNamespace(GetDepth=lambda forward: spec.TICK_DEPTH / 1000.0)
+def test_no_form_that_removes_the_v_fails_with_discriminating_probes(monkeypatch) -> None:
+    seat = _CutSeat({(True, False, True): 3.0, (True, False, False): 3.1352})
+    _patch_cut_bookkeeping(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="no FeatureCut3 form removed") as raised:
+        asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None))
+    message = str(raised.value)
+    assert "single-ended reversed, Ddir1 False: removed 3.0000" in message
+    assert "single-ended reversed, Ddir1 True: FeatureCut3 returned None" in message
+    assert "probe undrafted reversed: created, removed 3.1352" in message
+    assert "probe undrafted default direction: FeatureCut3 returned None" in message
+    # Every cut a form or probe made was undone.
+    assert seat.volume == 4800.0
+
+
+def test_numeral_readback_requires_one_draft_sense(monkeypatch) -> None:
+    senses = iter([False, True, False])
+    monkeypatch.setattr(builder, "_assert_one_numeral_cut", lambda adapter, name: next(senses))
+    with pytest.raises(RuntimeError, match="disagree on draft direction"):
+        builder._assert_numeral_cut(object())
+
+
+@pytest.mark.parametrize("definition,message", [
+    (_NumeralDefinition(depth=spec.TICK_DEPTH), "expected depth"),
+    (_NumeralDefinition(drafted=False), "draft on every wall"),
+    (_NumeralDefinition(angle_deg=30.0), "draft on every wall"),
+])
+def test_native_numeral_readback_refuses_square_or_wrong_v(monkeypatch, definition, message) -> None:
     feature = SimpleNamespace(GetDefinition=lambda: definition)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
-    with pytest.raises(RuntimeError, match="expected depth"):
+    with pytest.raises(RuntimeError, match=message):
         builder._assert_numeral_cut(object())
+
+
+@pytest.mark.parametrize("removed", [0.0, 2.0 * spec.NUMERAL_VOLUME_MM3])
+def test_numeral_volume_gate_refuses_missed_or_square_cuts(removed) -> None:
+    builder._check_numeral_volume("all numerals", spec.NUMERAL_VOLUME_MM3, spec.NUMERAL_VOLUME_MM3)
+    with pytest.raises(RuntimeError, match="V cut removed"):
+        builder._check_numeral_volume("all numerals", removed, spec.NUMERAL_VOLUME_MM3)
 
 
 @pytest.mark.parametrize("full_name,value", [
@@ -796,7 +939,7 @@ def test_print_refuses_numeral_depth_bound_to_tick_or_old_value(monkeypatch, ful
     display = SimpleNamespace(GetDimension2=lambda config: dimension)
     annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
-    with pytest.raises(RuntimeError, match="wrong feature|independent shallow cut"):
+    with pytest.raises(RuntimeError, match="wrong feature|V-engraved cut"):
         drawing._assert_numeral_depth_owner(annotation)
 
 
@@ -823,7 +966,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
         def __init__(self):
             object.__setattr__(self, "UseParentScale", True)
             object.__setattr__(self, "ScaleRatio", (1.0, 2.0))
-            object.__setattr__(self, "surface", False)
+            object.__setattr__(self, "surface", True)
             object.__setattr__(self, "Position", drawing.NUMERAL_PROFILE_CENTER)
 
         def __setattr__(self, name, value):
@@ -844,7 +987,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
             return self.surface
 
         def GetPartialSection(self):  # noqa: N802 - COM member name
-            return refusal != "partial"
+            return refusal == "partial"
 
         def SetViewPosition(self, position, move_children):  # noqa: N802 - COM member name
             return False
@@ -863,23 +1006,31 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
             if view is section and refusal == "centering" else drawing.NUMERAL_PROFILE_CENTER
         ),
     )
-    with pytest.raises(RuntimeError, match="removed|scale|centred"):
+    with pytest.raises(RuntimeError, match="full section|scale|centred"):
         drawing._numeral_profile(object(), parent)
 
 
-def test_numeral_profile_scale_makes_shallow_cut_readable_without_crowding() -> None:
+def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     ratio = drawing.NUMERAL_PROFILE_SCALE[0] / drawing.NUMERAL_PROFILE_SCALE[1]
-    assert spec.NUMERAL_DEPTH * ratio >= 2.0
-    # The actual removed span is 2.00 mm glyph height plus 0.20/0.30 margins;
-    # its stock thickness is unchanged. Bounds here describe native cut ink,
-    # not the whole-part extent that SolidWorks may put around a partial view.
-    half_width = (spec.NUMERAL_HEIGHT_MM + 0.5) * ratio / 2000.0
-    half_height = spec.BODY_THICKNESS * ratio / 2000.0
+    assert spec.NUMERAL_DEPTH * ratio >= 4.0
+    assert spec.NUMERAL_STROKE_WIDTH_MM * ratio >= 2.4
+    # The full 8 x 3 bar section reads upright: thickness across, width up.
+    half_width = spec.BODY_THICKNESS * ratio / 2000.0
+    half_height = spec.BODY_WIDTH * ratio / 2000.0
     x, y = drawing.NUMERAL_PROFILE_CENTER
     profile = Box(x - half_width, y - half_height, x + half_width, y + half_height)
     assert (profile.xmin, profile.ymin, profile.xmax, profile.ymax) == pytest.approx(
-        (0.245, 0.095, 0.295, 0.155),
+        (0.265, 0.085, 0.295, 0.165),
     )
-    assert profile.xmin - (drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 2000.0) > 0.005
-    assert drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DETAIL_SCALE[0] / 2000.0 - profile.xmax > 0.020
-    assert drawing.NUMERAL_TOOL_NOTE_XY[1] - 0.014 - profile.ymax > 0.020
+    numeral_right = drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    depth_left = drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DEPTH_SCALE[0] / 1000.0
+    # The V depth callout (placed by its centre) sits between detail F's circle
+    # and the section, its dimension line level with the V grooves.
+    depth_x, depth_y = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"]
+    half_text = len("HOLDS ENAMEL FILL") * 0.00275 / 2.0
+    assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.008
+    assert profile.ymin < depth_y < profile.ymax
+    assert depth_left - profile.xmax > 0.020
+    # The cutting line misses every graduation.
+    minor = spec.SCALE_START_X + spec.MINOR_SPACING
+    assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.1
