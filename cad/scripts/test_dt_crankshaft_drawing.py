@@ -430,15 +430,44 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
         assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
     # The collar's rear face runs on the thrust washer: its own control, its
-    # leader landing on that face's edge-on rim, at the collar's silhouette
-    # where SolidWorks lands a point on an edge-on circle.
+    # leader landing on that face's edge-on line, clear of the corner it
+    # shares with the Ø20.6 OD and above the neck it steps down to.
     (washer_face,) = [c for c in spec.SURFACE_FINISHES if c.key not in lands]
     assert washer_face.key == "collar_rear_face"
     pick, _symbol = drawing.COLLAR_REAR_FINISH
     assert pick[0] == pytest.approx(drawing._sheet_x(washer_face.face.offset_mm))
-    assert pick[1] - drawing.SIDE_CENTER[1] == pytest.approx(
-        spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    )
+    corner_y = drawing._sheet_y(spec.COLLAR_DIA / 2.0)
+    assert drawing._sheet_y(spec.SHAFT_DIA / 2.0) < pick[1] <= corner_y - 0.0015
+
+
+@pytest.mark.parametrize("case", ["thrust-face", "no-plane", "two-planes", "one-face"])
+def test_collar_rear_finish_resolves_the_controlled_thrust_face_from_its_rim(
+    monkeypatch: pytest.MonkeyPatch, case: str,
+) -> None:
+    from _gtol_face import SURFACE_CYLINDER, SURFACE_PLANE, FaceGeometry
+
+    rear_m, radius_m = spec.COLLAR_REAR / 1000.0, spec.COLLAR_DIA / 2000.0
+    thrust, od = object(), object()
+    geometries = {
+        thrust: FaceGeometry(
+            thrust, SURFACE_PLANE, (0.0, 1.0, 0.0, 0.0, rear_m, 0.0), (0.0, 1.0, 0.0), (),
+        ),
+        od: FaceGeometry(
+            od, SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 1.0, 0.0, radius_m), None, (),
+        ),
+    }
+    if case == "no-plane":
+        geometries[thrust] = geometries[od]
+    elif case == "two-planes":
+        geometries[od] = geometries[thrust]
+    monkeypatch.setattr(drawing, "face_geometry", lambda face: geometries[face])
+    faces = (thrust,) if case == "one-face" else (od, thrust)
+    rim = SimpleNamespace(GetTwoAdjacentFaces2=Mock(return_value=faces))
+    if case == "thrust-face":
+        assert drawing._collar_rear_face(rim) is thrust
+    else:
+        with pytest.raises(RuntimeError, match="collar rear rim: expected one"):
+            drawing._collar_rear_face(rim)
 
 
 def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
@@ -481,9 +510,9 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     finish_pick, finish_symbol = drawing.COLLAR_REAR_FINISH
     assert neck_y < finish_symbol[1] < finish_pick[1]
     assert finish_symbol[0] == pytest.approx(drawing.COLLAR_REAR_X + 0.0069)
-    assert finish_symbol[1] == pytest.approx(0.1973)
+    assert finish_symbol[1] == pytest.approx(0.1983)
     assert finish_pick == (
-        drawing.COLLAR_REAR_X, drawing._sheet_y(spec.COLLAR_DIA / 2.0),
+        drawing.COLLAR_REAR_X, drawing._sheet_y(spec.COLLAR_DIA / 2.0 - 0.8),
     )
     # These relative presentation positions do not certify glyph/leader
     # clearance: the changed native sheet must pass the normal ink audit.
@@ -1305,32 +1334,37 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(drawing, "dimension_name", lambda adapter, item: item.name)
     factory = Mock(wraps=drawing.add_edge_dimension)
     monkeypatch.setattr(drawing, "add_edge_dimension", factory)
-    collar_rim = object()
+    collar_face = object()
     collar_annotation = SimpleNamespace(
         GetType=Mock(return_value=8),
-        GetAttachedEntities3=Mock(return_value=(collar_rim,)),
+        GetAttachedEntities3=Mock(return_value=(collar_face,)),
         GetAttachedEntityCount3=Mock(return_value=1),
-        GetAttachedEntityTypes=Mock(return_value=(1,)),
+        GetAttachedEntityTypes=Mock(return_value=(2,)),  # swSelFACES
         GetLeaderCount=Mock(return_value=1), IsDangling=Mock(return_value=False),
         GetLeaderStyle=Mock(return_value=1), SetLeader3=Mock(return_value=0),
         GetLeaderPointsAtIndex=Mock(return_value=(
             *drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0,
         )),
     )
+    # Native symbol legs as read at the corner-landing root (0.18326, 0.1973),
+    # carried with the symbol to its current root.
+    dy = drawing.COLLAR_REAR_FINISH[1][1] - 0.1973
     finish_lines = [
         (*drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0),
-        (0.18326, 0.1973, 0.0, 0.181095, 0.20105, 0.0),
-        (0.185425, 0.20105, 0.0, 0.181095, 0.20105, 0.0),
-        (0.18326, 0.1973, 0.0, 0.1874735, 0.2044425, 0.0),
-        (0.1847905, 0.2029118, 0.0, 0.1817295, 0.2029118, 0.0),
-        (0.1874735, 0.2044425, 0.0, 0.1977225, 0.2044425, 0.0),
+        (0.18326, 0.1973 + dy, 0.0, 0.181095, 0.20105 + dy, 0.0),
+        (0.185425, 0.20105 + dy, 0.0, 0.181095, 0.20105 + dy, 0.0),
+        (0.18326, 0.1973 + dy, 0.0, 0.1874735, 0.2044425 + dy, 0.0),
+        (0.1847905, 0.2029118 + dy, 0.0, 0.1817295, 0.2029118 + dy, 0.0),
+        (0.1874735, 0.2044425 + dy, 0.0, 0.1977225, 0.2044425 + dy, 0.0),
     ]
     finish_native_texts = [{
-        "text": notes.COLLAR_REAR_FINISH_TEXT, "position": (0.18826, 0.2008713, 0.0),
+        "text": notes.COLLAR_REAR_FINISH_TEXT, "position": (0.18826, 0.2008713 + dy, 0.0),
         "height": 0.0025, "width": 0.0098437,
     }]
     finish_arrows = [
-        (*drawing.COLLAR_REAR_FINISH[0], 0.0, 0.0069, -0.0033, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0),
+        (*drawing.COLLAR_REAR_FINISH[0], 0.0, *(
+            root - tip for root, tip in zip(*drawing.COLLAR_REAR_FINISH[::-1])
+        ), 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0),
     ]
     finish_data = _native_presentation_data(finish_lines, finish_native_texts, finish_arrows)
     collar_annotation.GetDisplayData = Mock(return_value=finish_data)
@@ -1358,7 +1392,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         preexisting_annotations=preexisting_annotations, selection=selection, selected=selected,
         rebuild=rebuild, factory=factory, arrow_data=arrow_data, arrow_rows=arrow_rows,
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
-        collar_rim=collar_rim, collar_symbol=collar_symbol,
+        collar_face=collar_face, collar_symbol=collar_symbol,
         collar_annotation=collar_annotation, collar_texts=collar_texts,
         neck_lines=neck_lines, native_texts=native_texts, foreign_lines=foreign_lines,
         station_lines=station_lines, finish_lines=finish_lines, finish_arrows=finish_arrows,
@@ -1469,7 +1503,7 @@ def _create_neck_dimension(f):
         saved_annotations if f.model.AddVerticalDimension2.called else f.preexisting_annotations
     )
     return drawing._add_outboard_neck_dimension(
-        f.adapter, f.model, f.side, f.collar_rim, f.collar_symbol,
+        f.adapter, f.model, f.side, f.collar_face, f.collar_symbol,
     )
 
 
@@ -1486,7 +1520,7 @@ def _neck_proof(f, phase):
     f.texts[1] = "<MOD-DIAM>"
     return drawing._outboard_neck_checkpoint(
         f.adapter, f.side, f.native, 2, f.preexisting,
-        f.collar_rim, f.collar_symbol, phase,
+        f.collar_face, f.collar_symbol, phase,
     )
 
 
@@ -1887,7 +1921,7 @@ def test_neither_neck_accepts_numeric_text_quantity_or_reference_decoration(neck
     with pytest.raises(RuntimeError, match="unexpected native diameter text"):
         drawing._outboard_neck_checkpoint(
             f.adapter, f.side, f.native, 2, f.preexisting,
-            f.collar_rim, f.collar_symbol, "after_pdf_save",
+            f.collar_face, f.collar_symbol, "after_pdf_save",
         )
 
 
@@ -2193,7 +2227,7 @@ def test_neck_checkpoint_uses_only_existing_rebuild_and_post_save_boundaries(
     for unused in ("before_drawing_save", "before_pdf_save", "before_drawing_close", "after_drawing_close"):
         drawing._outboard_neck_checkpoint(
             f.adapter, f.side, f.native, 2, f.preexisting,
-            f.collar_rim, f.collar_symbol, unused,
+            f.collar_face, f.collar_symbol, unused,
         )
     verify.assert_called_once()
     f.collar_symbol.GetAnnotation.assert_called_once()
@@ -2363,9 +2397,9 @@ def test_neck_head_trim_reuses_raw_shared_segments_without_dump_quantization(
 
 @pytest.mark.parametrize("phase", _NECK_PHASES)
 @pytest.mark.parametrize("failure", [
-    "missing-symbol", "missing-rim", "null-annotation", "wrong-symbol-type", "bool-symbol-type",
+    "missing-symbol", "missing-face", "null-annotation", "wrong-symbol-type", "bool-symbol-type",
     "wrong-roughness", "no-attachment", "duplicate-attachment", "count-mismatch",
-    "wrong-entity-type", "foreign-edge", "native-identity-zero", "dangling",
+    "wrong-entity-type", "foreign-face", "native-identity-zero", "dangling",
     "no-leader", "extra-leader", "unreadable-leader", "nonfinite-leader", "moved-tip",
 ])
 def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_four_proofs(
@@ -2375,8 +2409,8 @@ def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_
     annotation = f.collar_annotation
     if failure == "missing-symbol":
         f.collar_symbol = None
-    elif failure == "missing-rim":
-        f.collar_rim = None
+    elif failure == "missing-face":
+        f.collar_face = None
     elif failure == "null-annotation":
         f.collar_symbol.GetAnnotation.return_value = None
     elif failure in ("wrong-symbol-type", "bool-symbol-type"):
@@ -2387,18 +2421,18 @@ def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_
         annotation.GetAttachedEntities3.return_value = ()
         annotation.GetAttachedEntityCount3.return_value = 0
     elif failure == "duplicate-attachment":
-        annotation.GetAttachedEntities3.return_value = (f.collar_rim, f.collar_rim)
+        annotation.GetAttachedEntities3.return_value = (f.collar_face, f.collar_face)
         annotation.GetAttachedEntityCount3.return_value = 2
     elif failure == "count-mismatch":
         annotation.GetAttachedEntityCount3.return_value = 0
     elif failure == "wrong-entity-type":
-        annotation.GetAttachedEntityTypes.return_value = (2,)
-    elif failure == "foreign-edge":
+        annotation.GetAttachedEntityTypes.return_value = (1,)  # swSelEDGES: the rim
+    elif failure == "foreign-face":
         annotation.GetAttachedEntities3.return_value = (object(),)
     elif failure == "native-identity-zero":
         same = f.adapter.swApp.IsSame.side_effect
         f.adapter.swApp.IsSame.side_effect = lambda left, right: (
-            0 if left is f.collar_rim and right is f.collar_rim else same(left, right)
+            0 if left is f.collar_face and right is f.collar_face else same(left, right)
         )
     elif failure == "dangling":
         annotation.IsDangling.return_value = True
@@ -2454,10 +2488,10 @@ def test_collar_rear_finish_records_actual_native_spec_identity_and_last_point_t
     actual = ast.literal_eval(re.search(r"leader_points_m=(.*), actual_tip_m=", message).group(1))
     assert actual == tuple(points)
     assert ast.literal_eval(re.search(r"actual_tip_m=(.*), requested_tip_m=", message).group(1)) == tuple(points[-3:])
-    assert "same_edge=1" in message
+    assert "same_face=1" in message
     assert f"native_roughness={notes.COLLAR_REAR_FINISH_TEXT!r}" in message
     assert phase in message
-    f.adapter.swApp.IsSame.assert_any_call(f.collar_rim, f.collar_rim)
+    f.adapter.swApp.IsSame.assert_any_call(f.collar_face, f.collar_face)
     f.collar_symbol.GetText.assert_called_once_with(8)
     f.rebuild.assert_not_called()
     assert f.model.GraphicsRedraw2.call_count == 1
@@ -2559,14 +2593,19 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         "_place_note_text_in_field", "_add_centres_note",
     ):
         monkeypatch.setattr(drawing, name, Mock())
-    rim_resolver = Mock(return_value=f.collar_rim)
+    collar_rim = object()
+    rim_resolver = Mock(return_value=collar_rim)
     monkeypatch.setattr(drawing, "_collar_rear_rim", rim_resolver)
+    face_resolver = Mock(return_value=f.collar_face)
+    monkeypatch.setattr(drawing, "_collar_rear_face", face_resolver)
 
     def finish(adapter, view, **kwargs):
         assert view is f.side
         events.append(f"finish:{kwargs['control'].key}")
         if kwargs["control"].key == "collar_rear_face":
-            assert kwargs["edge_entity"] is f.collar_rim
+            assert kwargs["entity"] is f.collar_face
+            assert kwargs["entity_type"] == "FACE"
+            assert "edge_entity" not in kwargs and "edge_xy" not in kwargs
             assert kwargs["leader_attach_xy"] == drawing.COLLAR_REAR_FINISH[0]
             live_annotations.append(f.collar_annotation)
             return f.collar_symbol
@@ -2631,11 +2670,13 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         assert "limit=0.001 m" in str(exc.value)
         assert f.model.GraphicsRedraw2.call_count == _NECK_PHASES.index(failure) + 1
         rim_resolver.assert_called_once_with(f.adapter, f.side)
+        face_resolver.assert_called_once_with(collar_rim)
         return
     else:
         assert asyncio.run(drawing.build(f.adapter)) == {"status": "fixture-finalized"}
         assert f.model.GraphicsRedraw2.call_count == 4
         rim_resolver.assert_called_once_with(f.adapter, f.side)
+        face_resolver.assert_called_once_with(collar_rim)
         assert f.collar_symbol.GetAnnotation.call_count == 5
         f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
         f.collar_symbol.GetSymbol.assert_has_calls([call()] * 4)
@@ -3010,7 +3051,7 @@ def test_straight_finish_allows_safe_native_body_vertex_root_without_origin_over
     neck_dimension_fakes, phase,
 ) -> None:
     f = neck_dimension_fakes
-    root = (0.181095, 0.20105)
+    root = (0.181095, drawing.COLLAR_REAR_FINISH[1][1] + 0.00375)  # the V's upper-left vertex
     tip = drawing.COLLAR_REAR_FINISH[0]
     points = (*root, 0.0, *tip, 0.0)
     f.collar_annotation.GetLeaderPointsAtIndex.return_value = points
