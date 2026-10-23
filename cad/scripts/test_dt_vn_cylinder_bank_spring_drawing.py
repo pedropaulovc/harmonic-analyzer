@@ -200,6 +200,20 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.layout in DRAWING_TEMPLATES
 
 
+def test_sheet_prints_only_replacement_sizes_while_the_part_keeps_its_gauges() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+    from _supplier_disc_spring_drawing import supplier_disc_reference_features
+
+    assert spec.SUPPLIER_APPLICATION_DIMENSIONS == ("WORKING_HEIGHT", "WORKING_DEFLECTION")
+    assert drawing.SHEET_SPEC.SUPPLIER_APPLICATION_DIMENSIONS == ()
+    assert supplier_disc_reference_features(drawing.SHEET_SPEC) == {
+        "free_front": ("DiscSupplierHeight", "DiscSupplierStrip"),
+        "free_top": ("DiscSupplierPlan",),
+    }
+    assert drawing.SHEET_SPEC.ID_BAND == spec.ID_BAND
+    assert drawing.SHEET_SPEC.OD_BAND == spec.OD_BAND
+
+
 def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
