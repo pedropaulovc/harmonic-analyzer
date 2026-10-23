@@ -24,6 +24,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -70,9 +72,14 @@ from _purchased_fastener_drawing import (
     assert_supplier_annotations_fit,
 )
 from _supplier_spring_drawing import (
+    _activate_reference_document,
+    _assert_reference_binding,
+    _assert_reference_capture_binding,
+    _assert_reference_source_restored,
     _capture_reference_views,
     _preserve_reference_source_file,
     _reference_view_bounds,
+    _show_reference_configuration,
     reacquire_supplier_dimensions,
 )
 from _supplier_screw_dimensions import annotate_supplier_screw
@@ -1145,6 +1152,120 @@ def _supplier_stock_translation(
     return ((dx[0] + dx[1]) / 2, (dy[0] + dy[1]) / 2)
 
 
+@contextmanager
+def _supplier_stock_source_scope(
+    adapter: Any, view: Any, *, capture: Any, allow_presentation_dirty: bool = False,
+):
+    """Keep source proxies local to Stock while operating in the original drawing.
+
+    Entry requires the existing drawing sheet-edit context, never template edit.
+    The immediate annotation phase enters clean; settled checks may enter with
+    existing presentation dirtiness. Activation alone must never change that
+    flag. Only the annotation/check body may leave presentation dirtiness, never
+    saved source changes. No source feature/sketch/point proxy is retained here
+    or by the supplier callbacks across restoration of the captured original
+    configuration. Layout readers run outside this scope against that original.
+    """
+    label = "leadscrew supplier stock source scope"
+    state = capture.source
+    model = state.model
+    stock = supplier.SUPPLIER_STOCK_CONFIGURATION
+    stock_state = replace(state, configuration=stock, body_counts=(0, 0))
+    drawing_model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    sheet_name = str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
+    previous = drawing.ActiveDrawingView
+    previous_name = view_name(adapter, previous) if previous is not None else None
+    edit_sheet = drawing.GetEditSheet()
+    if (
+        not sheet_name or edit_sheet is not True
+        or (previous is not None and not previous_name)
+    ):
+        raise RuntimeError(f"{label}: unreadable drawing sheet/view/edit context")
+
+    def restore_drawing() -> None:
+        _activate_reference_document(adapter, drawing_model, label=label)
+        restored = drawing.ActivateSheet(sheet_name)
+        activated = drawing.ActivateView(previous_name or "")
+        active = drawing.ActiveDrawingView
+        active_name = view_name(adapter, active) if active is not None else None
+        if (
+            restored is not True
+            or (previous_name is not None and activated is not True)
+            or active_name != previous_name
+            or str(_early_bound(drawing.GetCurrentSheet(), "ISheet").GetName())
+            != sheet_name
+            or drawing.GetEditSheet() is not edit_sheet
+            or (previous is not None and int(adapter.swApp.IsSame(active, previous)) != 1)
+        ):
+            raise RuntimeError(f"{label}: cannot restore drawing sheet/view/edit context")
+
+    def assert_stock(*, allow_dirty: bool) -> None:
+        _assert_reference_source_restored(
+            adapter, stock_state, label=label, allow_presentation_dirty=allow_dirty,
+        )
+        _assert_reference_binding(
+            adapter, view, source=state.path, model=model,
+            configuration=stock, label=label,
+        )
+
+    primary: BaseException | None = None
+    callback_started = False
+    try:
+        _assert_reference_capture_binding(
+            adapter, view, capture=capture, source=SOURCE.resolve(), model=model,
+            features=(FEATURE_BY_PLANE["Front"],), configuration=stock, label=label,
+        )
+        _assert_reference_source_restored(
+            adapter, state, label=label,
+            allow_presentation_dirty=allow_presentation_dirty,
+        )
+        was_dirty = model.GetSaveFlag()
+        _activate_reference_document(adapter, model, label=label)
+        _show_reference_configuration(adapter, model, stock, label=label)
+        assert_stock(allow_dirty=allow_presentation_dirty)
+        restore_drawing()
+        assert_stock(allow_dirty=allow_presentation_dirty)
+        if model.GetSaveFlag() is not was_dirty:
+            raise RuntimeError(f"{label}: activation changed source dirty status")
+        callback_started = True
+        yield
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        restoration_errors: list[BaseException] = []
+        if callback_started:
+            try:
+                assert_stock(allow_dirty=True)
+            except BaseException as restore_error:
+                restoration_errors.append(restore_error)
+        try:
+            active = adapter.swApp.ActiveDoc
+            if active is None or int(adapter.swApp.IsSame(active, model)) != 1:
+                _activate_reference_document(adapter, model, label=label)
+            _show_reference_configuration(adapter, model, state.configuration, label=label)
+            _assert_reference_source_restored(
+                adapter, state, label=label,
+                allow_presentation_dirty=allow_presentation_dirty or callback_started,
+            )
+        except BaseException as restore_error:
+            restoration_errors.append(restore_error)
+        try:
+            restore_drawing()
+        except BaseException as restore_error:
+            restoration_errors.append(restore_error)
+        if restoration_errors:
+            failure = primary if primary is not None else restoration_errors[0]
+            additional = restoration_errors if primary is not None else restoration_errors[1:]
+            for restore_error in additional:
+                failure.add_note(
+                    f"{label}: source/drawing restoration also failed: {restore_error!r}"
+                )
+            if primary is None:
+                raise failure
+
+
 def _add_supplier_stock_inset(adapter: Any):
     """Jointly place the actual native frame and complete supplier diagram ink.
 
@@ -1219,15 +1340,16 @@ def _add_supplier_stock_inset(adapter: Any):
         f"native_outline_m={native_outline!r}; curve_frame_offset_m={captured_offset!r}"
     )
     checks = []
-    displays = annotate_supplier_screw(
-        adapter,
-        {"*Front": view},
-        dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-        formats=supplier.SUPPLIER_REFERENCE_FORMATS,
-        starts=supplier.SUPPLIER_REFERENCE_STARTS,
-        units=supplier.SUPPLIER_REFERENCE_UNITS,
-        settled_checks=checks,
-    )
+    with _supplier_stock_source_scope(adapter, view, capture=captures["*Front"]):
+        displays = annotate_supplier_screw(
+            adapter,
+            {"*Front": view},
+            dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            formats=supplier.SUPPLIER_REFERENCE_FORMATS,
+            starts=supplier.SUPPLIER_REFERENCE_STARTS,
+            units=supplier.SUPPLIER_REFERENCE_UNITS,
+            settled_checks=checks,
+        )
     _place_supplier_stock_dimensions(adapter, view, displays, curve_bounds)
     draw.ActivateView("")
     if not draw.GetEditSheet() or draw.ActiveDrawingView is not None:
@@ -1395,8 +1517,11 @@ def _add_supplier_stock_inset(adapter: Any):
     placed_readback("after joint placement")
 
     def settled() -> None:
-        for check_source in checks:
-            check_source()
+        with _supplier_stock_source_scope(
+            adapter, view, capture=captures["*Front"], allow_presentation_dirty=True,
+        ):
+            for check_source in checks:
+                check_source()
         if (
             str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
             or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE

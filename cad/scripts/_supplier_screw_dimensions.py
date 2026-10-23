@@ -561,7 +561,10 @@ def _assert_source(
                 "drawing_path": scalar("IModelDoc2.GetPathName", lambda: drawing.GetPathName()),
                 "drawing_edit_sheet": scalar("IDrawingDoc.GetEditSheet", lambda: _early_bound(drawing, "IDrawingDoc").GetEditSheet()),
                 "source_feature_name": scalar("IFeature.Name", lambda: source_feature.Name),
-                "source_feature_type": scalar("IFeature.GetTypeName2", lambda: source_feature.GetTypeName2()),
+                "source_feature_type": scalar(
+                    "IFeature.GetTypeName2",
+                    lambda: _early_bound(source_feature, "IFeature").GetTypeName2(),
+                ),
                 "model_to_view": scalar(
                     "IView.ModelToViewTransform / IMathTransform.ArrayData",
                     lambda: tuple(float(value) for value in _early_bound(
