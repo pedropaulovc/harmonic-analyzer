@@ -1119,6 +1119,10 @@ def _place_supplier_stock_dimensions(
             else (length_line if name == "SupplierStockLength" else pitch_line)
             + SUPPLIER_STOCK_PLACE_AIR
         )
+        if name == "SupplierThreadPitch":
+            # Printed glyphs rise above the native cap box. Lower only this
+            # offset text block; its gauge line and source geometry stay fixed.
+            bottom -= 0.001
         if not annotation.SetPosition2(
             position[0] + x_shift, position[1] + bottom - text.ymin, position[2]
         ):
