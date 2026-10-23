@@ -2147,6 +2147,31 @@ with controlled-face validation and native attachment/landing readback.
 The title block's `CAST/MACHINED` row and `blued` finish specify no roughness
 grade and do not replace the symbol. RV-02/RV-03 cover neither this seat nor
 the mounting flags or line clearance.
+
+R11c at source70b14d82f0ae natively passed the jointR0.25 construction,
+four cylinder-geometry guards and19trimmed-point probes
+(maximum serialized gap7.800000024e−8mm), plus controlled-seat PMI/drawing
+attachment readback. Cylinder parameter arrays and attached-face identities
+were **not** serialized; distinguish guard execution from a raw binding dump.
+This qualified the local foot/root/head geometry, not installed assembly
+soundness or sheet readability. The actual PDF and all three Codex runs
+confirmed one gating finish defect: `Ra3.2`'s diagonal leader and filled arrow
+strike the `a`. Its native segment ran from(75.475,104.0512) to
+(79.125,112.0512)mm through the actual text; process success and a clear
+annotation-envelope box did not make that readable.
+
+Keep the exact controlled edge and projected landing. Create the symbol
+**10mm to the right** and8mm below that landing, instead of10mm left:
+the right-reading native grade is then away from the diagonal's route.
+Do not drag the attached tip or relax its face/identity/landing guards.
+Before accepting the placement, capture actual native display data and
+refuse any own stroke or decoded arrow through an individual native text
+run. Reuse the linear-callout guard's0.15mm run inset and1e−7m overlap limit;
+these are ink-identity allowances, not new manufacturing or neighbour bands.
+Retain the existing2mm neighbour clearance checks. FrozenR11c primitives
+must fail the guard, while a clear simulated placement is only an offline
+control: the next native sheet and actual PDF must still qualify the new ink.
+
 For the12.5 thickness, jog its text beyond the outermost actual
 native vertical witness plus4mm and above the front outline. R33 reported an
 own-line crossing at the former qualified text's Xstation; the exact crossing

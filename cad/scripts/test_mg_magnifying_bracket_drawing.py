@@ -1105,7 +1105,96 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
         assert all(record["gap_mm"] == pytest.approx(0.0, abs=1e-12) for record in records)
 
 
-@pytest.mark.parametrize("fault", (None, "wrong_seat", "wrong_side", "duplicate", "missing", "outside", "crowded"))
+def _r11c_foot_finish_display(*, shifted=False):
+    """Portable DetailItem353 native R11c ink; shifted mode is simulation only."""
+    display = {
+        "lines": [
+            [0., 0., 0., 0., .067875, .1040512, .1003976, .075475, .1040512, .1003976],
+            [0., 0., 0., 0., .075475, .1040512, .1003976, .079125, .1120512, .0055],
+            [0., 0., 0., 0., .069125, .1040512, 0., .06696, .1078012, 0.],
+            [0., 0., 0., 0., .07129, .1078012, 0., .06696, .1078012, 0.],
+            [0., 0., 0., 0., .069125, .1040512, 0., .0733385, .1111937, 0.],
+            [0., 0., 0., 0., .0706555, .109663, 0., .0675945, .109663, 0.],
+            [0., 0., 0., 0., .0733385, .1111937, 0., .0836564, .1111937, 0.],
+        ],
+        "arrows": [[.079125, .1120512, .0055, -.4150878, -.9097814, -0., .003556, .000762, 1., 0., 0., 1.]],
+        "texts": [{
+            "t": "Ra 3.2", "pos": [.074125, .1076225, 0.], "h": .0025,
+            "ref": 1, "ang": 0., "font": "Century Gothic", "ls": .001, "w": .0098437,
+        }],
+    }
+    if shifted:
+        # Simulate moving the whole symbol/text 20 mm right, not its attached
+        # tip. Recompute the arrow from the new shoulder to that same tip.
+        for index, line in enumerate(display["lines"]):
+            line[4] += .020
+            if index != 1:
+                line[7] += .020
+        display["texts"][0]["pos"][0] += .020
+        arrow = display["arrows"][0]
+        shoulder = display["lines"][1][4:6]
+        dx, dy = shoulder[0] - arrow[0], shoulder[1] - arrow[1]
+        length = math.hypot(dx, dy)
+        arrow[3:5] = [dx / length, dy / length]
+    return display
+
+
+@pytest.mark.parametrize("fault", (
+    None, "native_crossing", "arrow_only", "stroke_only", "missing_lines", "missing_arrows",
+    "short_line", "short_arrow", "nonfinite_line", "nonfinite_arrow",
+    "zero_arrow_direction", "zero_arrow_size", "missing_text", "bad_text", "nonfinite_text",
+))
+def test_foot_finish_own_ink_guard_rejects_r11c_stroke_and_arrow_crossings(fault):
+    display = _r11c_foot_finish_display(shifted=fault != "native_crossing")
+    if fault == "arrow_only":
+        # Preserve the exact R11c arrow and text, removing all crossing strokes.
+        display = _r11c_foot_finish_display()
+        display["lines"] = [_native_line(.020, .020, .030, .020)]
+    elif fault == "stroke_only":
+        display = _r11c_foot_finish_display()
+        display["arrows"] = [[.020, .020, 0., 1., 0., 0., .003556, .000762]]
+    elif fault == "missing_lines":
+        display.pop("lines")
+    elif fault == "missing_arrows":
+        display.pop("arrows")
+    elif fault == "short_line":
+        display["lines"][0].pop()
+    elif fault == "short_arrow":
+        display["arrows"][0] = display["arrows"][0][:7]
+    elif fault == "nonfinite_line":
+        display["lines"][0][4] = math.nan
+    elif fault == "nonfinite_arrow":
+        display["arrows"][0][3] = math.inf
+    elif fault == "zero_arrow_direction":
+        display["arrows"][0][3:5] = [0., 0.]
+    elif fault == "zero_arrow_size":
+        display["arrows"][0][6] = 0.
+    elif fault == "missing_text":
+        display.pop("texts")
+    elif fault == "bad_text":
+        display["texts"][0].pop("w")
+    elif fault == "nonfinite_text":
+        display["texts"][0]["w"] = math.nan
+    if fault:
+        with pytest.raises(RuntimeError, match="native|crosses its text"):
+            drawing._assert_foot_finish_text_clear(display)
+    else:
+        assert display["arrows"][0][:3] == [.079125, .1120512, .0055]
+        drawing._assert_foot_finish_text_clear(display)
+
+
+def test_foot_finish_guard_keeps_whitespace_between_native_text_runs():
+    display = {
+        "texts": [_native_text("Ra", .050, .050, .004, height=.0025),
+                  _native_text("3.2", .060, .050, .005, height=.0025)],
+        "lines": [_native_line(.057, .045, .057, .060)],
+        "arrows": [[.020, .020, 0., 1., 0., 0., .003556, .000762]],
+    }
+    # The line crosses the union envelope, but neither measured run.
+    drawing._assert_foot_finish_text_clear(display)
+
+
+@pytest.mark.parametrize("fault", (None, "wrong_seat", "wrong_side", "duplicate", "missing", "outside", "crowded", "read_errors"))
 def test_foot_finish_uses_unique_visible_back_seat_and_checks_native_ink(monkeypatch, fault):
     from _gtol_face import FaceGeometry, SURFACE_PLANE
 
@@ -1141,6 +1230,12 @@ def test_foot_finish_uses_unique_visible_back_seat_and_checks_native_ink(monkeyp
     monkeypatch.setattr(drawing, "gdt_box", native_box)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "_dimension_layout_ink", lambda *_a, **_kw: SimpleNamespace(text=box if fault == "crowded" else (.200, .200, .220, .205)))
+
+    def native_display(actual_adapter, actual_annotation):
+        assert actual_adapter is adapter and actual_annotation is annotation
+        return _r11c_foot_finish_display(shifted=True), {"GetTextWidthAtIndex": 1} if fault == "read_errors" else {}
+
+    monkeypatch.setattr(drawing, "annotation_display", native_display)
     if fault:
         with pytest.raises(RuntimeError):
             drawing._add_foot_finish(adapter, front, [dimension])
@@ -1151,7 +1246,7 @@ def test_foot_finish_uses_unique_visible_back_seat_and_checks_native_ink(monkeyp
         assert projected == [(-.025, .0055, mounting.SIDE_PLATE_Z[1] / 1000.0)]
         assert len(calls) == 1 and calls[0]["edge_entity"] is selected
         assert calls[0]["leader_attach_xy"] == (.100, .150)
-        assert calls[0]["symbol_xy"] == pytest.approx((.090, .142))
+        assert calls[0]["symbol_xy"] == pytest.approx((.110, .142))
         control = calls[0]["control"]
         for normal, point, matches in (
             ((0.0, 0.0, 1.0), (0.0, 0.0, mounting.SIDE_PLATE_Z[1] / 1000.0), True),

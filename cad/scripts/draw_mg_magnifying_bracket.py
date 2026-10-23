@@ -450,6 +450,29 @@ def _add_mounting_callout(adapter: Any, bottom: Any, edge: Any) -> Any:
     return display
 
 
+def _assert_foot_finish_text_clear(display: dict[str, Any]) -> None:
+    """Refuse own native strokes/arrows through individual finish-text runs."""
+    label = "foot locating seat finish"
+    if not display.get("lines") or not display.get("arrows"):
+        raise RuntimeError(f"{label}: missing native leader/arrow ink")
+    if any(
+        len(row) != 10 or not all(math.isfinite(value) for value in row)
+        for row in display["lines"]
+    ) or any(
+        len(row) < 8 or not all(math.isfinite(value) for value in row)
+        or math.hypot(row[3], row[4]) == 0.0 or min(row[6:8]) <= 0.0
+        for row in display["arrows"]
+    ):
+        raise RuntimeError(f"{label}: invalid native leader/arrow ink")
+    segments = _display_segments(display)
+    # Match the existing linear-callout guard's run inset/intersection limit.
+    # This is not a new clearance band and does not erase whitespace between runs.
+    for box in _dimension_text_boxes(display, label=label):
+        inner = Box(box.xmin + 0.00015, box.ymin + 0.00015, box.xmax - 0.00015, box.ymax - 0.00015)
+        if any(segment_box_overlap_length(segment, inner) > 1e-7 for segment in segments):
+            raise RuntimeError(f"{label}: own native line/arrow crosses its text")
+
+
 def _add_foot_finish(adapter: Any, front: Any, annotations: list[Any]) -> None:
     """Attach the source-owned grade to the real SM-facing +Z seat edge."""
     candidates = []
@@ -470,11 +493,17 @@ def _add_foot_finish(adapter: Any, front: Any, annotations: list[Any]) -> None:
     )
     symbol = add_surface_finish(
         adapter, front, edge_entity=edge.edge, leader_attach_xy=landing,
-        symbol_xy=(landing[0] - 0.010, landing[1] - 0.008),
+        symbol_xy=(landing[0] + 0.010, landing[1] - 0.008),
         control=surface_finish_by_key(SURFACE_FINISHES, "foot_seat"),
         label="foot locating seat finish", char_height=0.0025,
     )
     annotation = _early_bound(symbol, "ISFSymbol").GetAnnotation()
+    display, errors = annotation_display(adapter, annotation)
+    evidence = json.dumps({"native_display": display, "read_errors": errors}, sort_keys=True)
+    _telemetry.info(f"foot locating seat finish native ink: {evidence}", auditJSON=evidence)
+    if errors:
+        raise RuntimeError(f"foot locating seat finish: native ink read failed: {errors}")
+    _assert_foot_finish_text_clear(display)
     box = gdt_box(adapter, annotation, label="foot locating seat finish")
     require_inside("foot locating seat finish", box, sheet_region(adapter))
     require_clear("foot locating seat finish", box, {
