@@ -4,6 +4,8 @@ Only COM transport, visible-edge enumeration and feature-dimension enumeration
 are substituted. Canonical Parameter lookup and context-specific dimension
 wrappers are seeded independently of drawing imports. The saved reader and
 strict body/rim/value/band/presentation/source assertions execute unchanged.
+Physical-line controls rewrite raw native rows; only the real core constructs
+and compares canonical support-line interval unions.
 """
 
 from __future__ import annotations
@@ -2733,6 +2735,214 @@ def test_recorded_thrust_od_native_leader_strike_is_not_hidden_by_style_getters(
     with pytest.raises(RuntimeError, match="leader crosses|arrow crowds"):
         washer._assert_diameter_placement(case.adapter, display, case.fresh[case.face], label="actual thrust OD")
     assert not display.placement_calls
+
+
+def _rewrite_thickness_physical_lines(display, change):
+    """Change only native line rows, never tips, witness runs or numeric ink."""
+    graphics = deepcopy(display.graphics())
+    lines = graphics["lines"]
+    if change == "free-tail":
+        # Shorten the lower free tail by 100 um. The other tail still defines
+        # maximum reach, so this is not an incidental caption-clearance fault.
+        lines[2][8] += 0.0001
+    elif change == "interior-gap":
+        near, far = list(lines[2]), list(lines[2])
+        near[8], far[5] = 0.02705, 0.02695
+        lines[2:3] = [near, far]
+    elif change == "normal-component":
+        # Retain both original axial extrema and the tip-incident stub, but
+        # move only the interior physical component 100 um transversely.
+        near, middle, far = (list(lines[2]) for _ in range(3))
+        near[8] = middle[5] = 0.028
+        middle[8] = far[5] = 0.026
+        middle[4] += 0.0001
+        middle[7] += 0.0001
+        lines[2:3] = [near, middle, far]
+    elif change in {"split", "reordered", "reversed", "split-reordered-reversed"}:
+        if change in {"split", "split-reordered-reversed"}:
+            fragments = []
+            for row in lines[2:]:
+                near, far = list(row), list(row)
+                near[8] = far[5] = (row[5] + row[8]) / 2
+                fragments.extend((near, far))
+            lines[2:] = fragments
+        if change in {"reordered", "split-reordered-reversed"}:
+            lines.reverse()
+        if change in {"reversed", "split-reordered-reversed"}:
+            for row in lines:
+                row[4:7], row[7:10] = row[7:10], row[4:7]
+    else:
+        raise AssertionError(change)
+    display.layout["graphics"] = graphics
+
+
+@pytest.mark.parametrize("phase", _PLACEMENT_PHASES[1:])
+@pytest.mark.parametrize("fault", ("free-tail", "interior-gap", "normal-component"))
+def test_linear_consumer_rejects_physical_line_union_changes_after_each_transition(
+    saved_washer, phase, fault,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    display = _authoring_display(case, source.THICKNESS)
+    before = reference_text.measure_reference_text(case.adapter, display, axis=1, label="before line mutation")
+    numeric = (display.native.FullName, display.native.SystemValue, deepcopy(display.text))
+    reached = []
+
+    def corrupt(label):
+        if label.endswith(phase):
+            reached.append(label)
+            _rewrite_thickness_physical_lines(display, fault)
+            after = reference_text.measure_reference_text(
+                case.adapter, display, axis=1, label="after line mutation",
+            )
+            assert after["tips"] == before["tips"]
+            assert after["witnesses"] == before["witnesses"]
+            assert after["physical_lines"] != before["physical_lines"]
+            old_lines, new_lines = before["physical_lines"], after["physical_lines"]
+            assert max(row[3] for row in new_lines) == max(row[3] for row in old_lines)
+            if fault == "free-tail":
+                assert min(row[2] for row in new_lines) == pytest.approx(
+                    min(row[2] for row in old_lines) + 0.0001,
+                )
+            else:
+                # The 100 um shifted middle is off-support, not a larger
+                # physical normal envelope; its missing interval must survive.
+                assert any(row[2] < 0.027 < row[3] for row in old_lines)
+                assert not any(row[2] < 0.027 < row[3] for row in new_lines)
+            assert (display.native.FullName, display.native.SystemValue, display.text) == numeric
+
+    case.transition.on_rebuild = corrupt
+    with pytest.raises(RuntimeError):
+        _author_again(case)
+    assert len(reached) == 1
+    assert not case.app.open_calls
+    assert not case.app.close_calls
+    assert case.path.read_bytes() == case.original_bytes
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("stage", ("settled", "saved", "saved-matching-authoring"))
+@pytest.mark.parametrize("fault", ("free-tail", "interior-gap", "normal-component"))
+def test_final_and_saved_proofs_refuse_physical_line_union_changes_without_repair(
+    saved_washer, stage, fault,
+):
+    case = saved_washer
+    display = (_authoring_display(case, source.THICKNESS) if stage == "settled"
+               else _display(case, source.THICKNESS))
+    before = reference_text.measure_reference_text(case.adapter, display, axis=1, label="captured line union")
+    numeric = (display.native.FullName, display.native.SystemValue, deepcopy(display.text))
+    _rewrite_thickness_physical_lines(display, fault)
+    if stage == "saved-matching-authoring":
+        # The reopened drawing cannot self-certify by agreeing with a late
+        # mutation of the old authoring view instead of its captured union.
+        _rewrite_thickness_physical_lines(_authoring_display(case, source.THICKNESS), fault)
+    after = reference_text.measure_reference_text(case.adapter, display, axis=1, label="changed line union")
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["physical_lines"] != before["physical_lines"]
+    old_lines, new_lines = before["physical_lines"], after["physical_lines"]
+    assert max(row[3] for row in new_lines) == max(row[3] for row in old_lines)
+    if fault == "free-tail":
+        assert min(row[2] for row in new_lines) == pytest.approx(
+            min(row[2] for row in old_lines) + 0.0001,
+        )
+    else:
+        # Off-support shifted ink is excluded by the real core classifier,
+        # leaving a physical gap just as the explicit missing-middle case does.
+        assert any(row[2] < 0.027 < row[3] for row in old_lines)
+        assert not any(row[2] < 0.027 < row[3] for row in new_lines)
+    assert (display.native.FullName, display.native.SystemValue, display.text) == numeric
+    layout = deepcopy(display.layout)
+    writes = tuple(display.placement_calls)
+    count = len(case.rebuilds)
+    with pytest.raises(RuntimeError):
+        if stage == "settled":
+            case.proof()
+        else:
+            case.invalidate()
+            case.proof.saved_check(case.adapter, case.path)
+    assert len(case.rebuilds) == count
+    assert display.layout == layout
+    assert tuple(display.placement_calls) == writes
+    if stage == "settled":
+        assert not case.app.open_calls
+        assert not case.app.close_calls
+        assert case.path.read_bytes() == case.original_bytes
+        assert case.source_path.read_bytes() == case.source_bytes
+    else:
+        _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("phase", _PLACEMENT_PHASES[1:])
+@pytest.mark.parametrize("change", ("split", "reordered", "reversed", "split-reordered-reversed"))
+def test_equivalent_physical_line_fragments_survive_each_transition(saved_washer, phase, change):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    display = _authoring_display(case, source.THICKNESS)
+    before = reference_text.measure_reference_text(case.adapter, display, axis=1, label="original native rows")
+    numeric = (display.native.FullName, display.native.SystemValue, deepcopy(display.text))
+    reached = []
+
+    def rewrite(label):
+        if label.endswith(phase):
+            reached.append(label)
+            _rewrite_thickness_physical_lines(display, change)
+            after = reference_text.measure_reference_text(
+                case.adapter, display, axis=1, label="equivalent native fragments",
+            )
+            assert after["tips"] == before["tips"]
+            assert after["witnesses"] == before["witnesses"]
+            assert after["physical_lines"] == before["physical_lines"]
+            assert (display.native.FullName, display.native.SystemValue, display.text) == numeric
+
+    case.transition.on_rebuild = rewrite
+    proof = _author_again(case)
+    assert len(reached) == 1
+    count = len(case.rebuilds)
+    writes = tuple(display.placement_calls)
+    proof()
+    assert len(case.rebuilds) == count
+    assert tuple(display.placement_calls) == writes
+    assert not case.app.open_calls
+    assert not case.app.close_calls
+    assert case.path.read_bytes() == case.original_bytes
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("stage", ("settled", "saved"))
+@pytest.mark.parametrize("change", ("split", "reordered", "reversed", "split-reordered-reversed"))
+def test_equivalent_physical_line_fragments_survive_final_and_saved_proofs(saved_washer, stage, change):
+    case = saved_washer
+    display = (_authoring_display(case, source.THICKNESS) if stage == "settled"
+               else _display(case, source.THICKNESS))
+    before = reference_text.measure_reference_text(case.adapter, display, axis=1, label="original line union")
+    numeric = (display.native.FullName, display.native.SystemValue, deepcopy(display.text))
+    original_rows = deepcopy(display.graphics()["lines"])
+    _rewrite_thickness_physical_lines(display, change)
+    assert display.graphics()["lines"] != original_rows
+    after = reference_text.measure_reference_text(case.adapter, display, axis=1, label="equivalent line union")
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["physical_lines"] == before["physical_lines"]
+    assert (display.native.FullName, display.native.SystemValue, display.text) == numeric
+    layout = deepcopy(display.layout)
+    writes = tuple(display.placement_calls)
+    count = len(case.rebuilds)
+    if stage == "settled":
+        case.proof()
+    else:
+        case.invalidate()
+        case.proof.saved_check(case.adapter, case.path)
+    assert len(case.rebuilds) == count
+    assert display.layout == layout
+    assert tuple(display.placement_calls) == writes
+    if stage == "settled":
+        assert not case.app.open_calls
+        assert not case.app.close_calls
+        assert case.path.read_bytes() == case.original_bytes
+        assert case.source_path.read_bytes() == case.source_bytes
+    else:
+        _assert_closed_unchanged(case)
 
 
 @pytest.mark.parametrize("phase", _PLACEMENT_PHASES[1:4])

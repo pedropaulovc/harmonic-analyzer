@@ -301,6 +301,7 @@ class _WasherPlacement:
 
     tips: tuple[tuple[float, ...], ...]
     witnesses: tuple[tuple[float, ...], ...]
+    physical_lines: tuple[tuple[float, float, float, float], ...]
     thickness_x: float
     face_outline: tuple[float, ...]
     diameter_positions: tuple[tuple[str, tuple[float, ...]], ...]
@@ -389,7 +390,12 @@ def _assert_washer_placement(
     display = _early_bound(current[THICKNESS], "IDisplayDimension")
     actual = measure_reference_text(adapter, display, axis=1, label=THICKNESS)
     assert_reference_text_stations(
-        {"tips": expected.tips, "witnesses": expected.witnesses}, actual, label=THICKNESS,
+        {
+            "tips": expected.tips,
+            "witnesses": expected.witnesses,
+            "physical_lines": expected.physical_lines,
+        },
+        actual, label=THICKNESS,
     )
     if display.OffsetText is not True or actual["text"].ymin < actual["reach"] + CLEAR_GAP_M:
         raise RuntimeError("washer thickness text crowds its native line")
@@ -557,7 +563,8 @@ def _supplier_washer_proof(
             precision=precision, bands=bands,
         )
 
-    reacquire()
+    current = reacquire()
+    original_thickness = measure_reference_text(adapter, current[THICKNESS], axis=1, label=THICKNESS)
     thickness_name = next(reference.full_name for reference in references if reference.label == THICKNESS)
 
     def reacquire_thickness() -> dict[str, Any]:
@@ -594,10 +601,10 @@ def _supplier_washer_proof(
         rebuild_drawing(adapter, label="supplier washer complete diameter captions")
     current = reacquire()
     shelf_check()
-    thickness = measure_reference_text(adapter, current[THICKNESS], axis=1, label=THICKNESS)
     placement = _WasherPlacement(
-        tips=tuple(tuple(map(float, tip)) for tip in thickness["tips"]),
-        witnesses=tuple(tuple(map(float, witness)) for witness in thickness["witnesses"]),
+        tips=tuple(tuple(map(float, tip)) for tip in original_thickness["tips"]),
+        witnesses=tuple(tuple(map(float, witness)) for witness in original_thickness["witnesses"]),
+        physical_lines=original_thickness["physical_lines"],
         thickness_x=_placement_position(
             _early_bound(current[THICKNESS].GetAnnotation(), "IAnnotation"), label=THICKNESS,
         )[0],

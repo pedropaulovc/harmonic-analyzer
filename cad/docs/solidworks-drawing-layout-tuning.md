@@ -143,6 +143,15 @@ hash, not the assignment request or installed-library expectation. A resident
 source is explicitly not a cold-source-open proof. These predicates and receipts
 do not replace complete-sheet native render/ink inspection and machinist review.
 
+The washer also retains the core's complete canonical `physical_lines` interval
+union from the original measurement before any shelf transition. Each immutable
+component records its actual normal envelope and axial interval in metres; the
+core alone normalizes collinear fragments. Final settled and saved checks compare
+that original union as well as tips and witnesses. Moving a free tail, changing
+its transverse envelope or introducing an interior gap cannot pass merely
+because arrow tips and witness extrema still match. Reordering, reversing or
+splitting fragments without changing the physical union is not a geometry change.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report
