@@ -3067,7 +3067,6 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
     decorate(tail, "ThreadLengthMin", native, tail_display)
     import _stock_trim_drawing as controls
     monkeypatch.setattr(controls, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(controls, "dimension_name", lambda _adapter, annotation: annotation.GetName())
     state.note_annotation.GetType = lambda: 6
     state.note_annotation.GetName = lambda: "Saved purchased note"
     state.note_annotation.GetSpecificAnnotation = lambda: state.note
@@ -3478,6 +3477,7 @@ def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
     tail = SimpleNamespace(paper_record=tail_record, Owner=state.front, OwnerType=0)
     nominal, lower, upper = drawing.EXPECTED_CONTROLS["ThreadLengthMin"]
     native = SimpleNamespace(
+        Name="ThreadLengthMin",
         FullName="ThreadLengthMin@ThreadTailAcceptance@pivot.SLDPRT", SystemValue=nominal, DrivenState=2,
         Tolerance=SimpleNamespace(
             Type=drawing.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"],

@@ -1069,7 +1069,7 @@ def _assert_saved_paper(adapter: Any, front: Any, top: Any, iso: Any, *, shelf_m
     _assert_note_wrap(adapter, note, landing=landing, frame=paper["wrap"])
     tail = fresh["ThreadLengthMin"].GetAnnotation()
     verify_machining_controls(
-        adapter, [tail], expected={"ThreadLengthMin": EXPECTED_CONTROLS["ThreadLengthMin"]},
+        [tail], expected={"ThreadLengthMin": EXPECTED_CONTROLS["ThreadLengthMin"]},
         tolerance_types=DIMENSION_TOLERANCE_TYPES, precision=DIMENSION_PRECISION,
     )
     _assert_tail_layout(adapter, tail, fresh["SupplierThreadMajor"].GetAnnotation(), frame=paper["tail"])
@@ -2080,7 +2080,7 @@ async def build(adapter: Any) -> dict[str, str]:
         tail_check()
         note_check()
         verify_machining_controls(
-            adapter, [by_name[name] for name in EXPECTED_CONTROLS],
+            [by_name[name] for name in EXPECTED_CONTROLS],
             expected=EXPECTED_CONTROLS, tolerance_types=DIMENSION_TOLERANCE_TYPES,
             precision=DIMENSION_PRECISION,
         )
