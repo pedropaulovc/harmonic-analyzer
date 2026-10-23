@@ -130,7 +130,63 @@ def test_every_tight_band_states_its_mate_or_function_at_the_callout() -> None:
     assert "GAIN" in callouts["CamCy"]
     assert "PHASE" in callouts["NotchPhase"]
     assert "FLANKS" in callouts["NotchWidth"]
+    assert "NO MATING PART" in callouts["NotchWidth"]
     assert "MHA-DT-13" in notes.BORE_FIT_CALLOUT
+
+
+def _kerf_flank_hits(width: float) -> int:
+    """Tooth material above the root inside a ``width`` kerf at NOTCH_X."""
+    root = spec.STOCK_FORM.root_radius_max_mm
+    nx, ny = 40, 300
+    hits = 0
+    for i in range(nx):
+        x = part.NOTCH_X - width / 2.0 + i * width / (nx - 1)
+        for j in range(ny):
+            y = root + (j + 0.5) * (spec.TIP_RADIUS - root) / ny
+            hits += math.hypot(x, y) > root and part.is_solid(x, y)
+    return hits
+
+
+def test_sighted_notch_prints_only_its_flank_clear_maximum() -> None:
+    # Nothing engages the kerf, so it carries one limit: swTolMAX prints the
+    # model value, so the modelled width IS the maximum, banded down to zero.
+    assert spec.NOTCH_WIDTH_TOL_TYPE == 6
+    assert spec.NOTCH_WIDTH_BAND == (0.0, -spec.NOTCH_WIDTH)
+    assert ("NotchProfile", "NotchWidth") not in model_toleranced_dimensions(part)
+    # At that maximum the kerf takes no tooth material above the root; the
+    # former +0.10/0 band's 0.50 would have nicked both neighbouring flanks.
+    assert _kerf_flank_hits(spec.NOTCH_WIDTH) == 0
+    assert _kerf_flank_hits(0.50) > 0
+
+
+def test_notch_width_limit_is_set_and_read_back_natively(monkeypatch) -> None:
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, low, high):
+            self.low, self.high = low, high
+            return True
+
+        def GetMinValue(self):
+            return self.low
+
+        def GetMaxValue(self):
+            return self.high
+
+    tolerance = Tolerance()
+    dimension = SimpleNamespace(
+        SystemValue=spec.NOTCH_WIDTH / 1000.0, Tolerance=tolerance
+    )
+    monkeypatch.setattr(part, "_named_dimension", lambda _a, f, n: (None, dimension))
+    monkeypatch.setattr(part, "_early_bound", lambda value, _interface: value)
+    part._notch_width_max_limit(None)
+    assert tolerance.Type == 6
+    assert (tolerance.low, tolerance.high) == pytest.approx(
+        (-spec.NOTCH_WIDTH / 1000.0, 0.0)
+    )
+    dimension.SystemValue = 0.5 / 1000.0
+    with pytest.raises(RuntimeError, match="is not the limit"):
+        part._notch_width_max_limit(None)
 
 
 def test_worst_case_cam_wall_is_printed_and_clears_the_floor() -> None:
