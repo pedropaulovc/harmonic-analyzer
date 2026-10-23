@@ -1121,7 +1121,7 @@ def insert_bom_table(
     property, and a blank column reads as an unreleased sheet. A cell write on
     the template's ``$PRP:"Description"`` column writes back to the part's
     active configuration, so under an explicit ``configuration`` that column is
-    first replaced by a plain inserted one and every row must be described.
+    first unlinked in place and every row must be described.
     Returns the table rebound as ``ITableAnnotation``.
     """
     grouping_values = {"separate": 1, "same-part": 2, "same-name": 3}
@@ -1246,7 +1246,7 @@ def insert_bom_table(
         ]
         if headers.count("DESCRIPTION") != 1:
             raise RuntimeError(f"{label} BOM header has no unique DESCRIPTION: {headers!r}")
-        _replace_linked_bom_description_column(
+        _unlink_bom_description_column(
             adapter, table, headers.index("DESCRIPTION"), label=label
         )
     if part_number_property is not None:
@@ -1455,18 +1455,19 @@ def _set_bom_cell_text(
         raise error
 
 
-def _replace_linked_bom_description_column(
+def _unlink_bom_description_column(
     adapter: Any, table: Any, column: int, *, label: str
 ) -> None:
     """Stop DESCRIPTION cell writes from writing back into component models.
 
     Native PD runs 20261023T190254133Z and 20261023T192129678Z: SetText2 on any
     property-bound cell (even one rebound to a nonexistent property) writes the
-    text into the part's active configuration. An inserted column has no
-    property (as for the Number column above), so its cells hold plain text.
+    text into the part's active configuration. Clear the binding in place, to
+    the inserted-column signature ``(204, '', 0)`` (native run
+    20261023T203233011Z); inserting/deleting columns moves the latent Quantity.
     """
     annotation = _sw_type_info.early_bound_or_flag(
-        table, "IBomTableAnnotation", "GetColumnCustomProperty"
+        table, "IBomTableAnnotation", "GetColumnCustomProperty", "SetColumnCustomProperty"
     )
     before = _bom_physical_columns(table, label=label)
     rows = int(table.RowCount)
@@ -1474,23 +1475,21 @@ def _replace_linked_bom_description_column(
         annotation.GetColumnCustomProperty(column) or ""
     ):
         raise RuntimeError(f"{label} BOM DESCRIPTION column is not property-linked")
-    if not table.InsertColumn2(
-        3,  # swTableItemInsertPosition_After
-        column,
-        "DESCRIPTION",
-        0,  # swInsertColumn_DefaultWidth
-    ):
-        raise RuntimeError(f"{label} BOM plain DESCRIPTION column could not be inserted")
-    if not table.DeleteColumn2(column, True):
-        raise RuntimeError(f"{label} BOM linked DESCRIPTION column could not be deleted")
-    if _bom_physical_columns(table, label=label) != before or int(table.RowCount) != rows:
-        raise RuntimeError(f"{label} BOM structure changed replacing DESCRIPTION")
+    result = annotation.SetColumnCustomProperty(column, "")
+    if result is not True:
+        raise RuntimeError(f"{label} BOM DESCRIPTION unlink failed: {result!r}")
     bound = str(annotation.GetColumnCustomProperty(column) or "")
-    if bound:
-        raise RuntimeError(f"{label} BOM DESCRIPTION column still reads property {bound!r}")
+    kind, property_data, status = table.GetColumnType3(column, True)
+    if bound or (kind, property_data or "", status) != (204, "", 0):
+        raise RuntimeError(
+            f"{label} BOM DESCRIPTION column still reads property {bound!r}/"
+            f"{property_data!r}"
+        )
+    if _bom_physical_columns(table, label=label) != before or int(table.RowCount) != rows:
+        raise RuntimeError(f"{label} BOM structure changed unlinking DESCRIPTION")
     if not table.SetColumnTitle2(column, "DESCRIPTION", True):
         raise RuntimeError(f"{label} BOM DESCRIPTION header could not be set")
-    rebuild_drawing(adapter, label="replace_linked_bom_description_column")
+    rebuild_drawing(adapter, label="unlink_bom_description_column")
     header = str(table.DisplayedText2(0, column, True) or "").strip().upper()
     if header != "DESCRIPTION":
         raise RuntimeError(f"{label} BOM DESCRIPTION header reads {header!r}")

@@ -2567,15 +2567,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
             row.insert(insertion, name if row is cells[0] else "")
         return True
 
-    def delete_column(index, include_hidden):
-        physical = raw_index(index, include_hidden)
-        if physical is None or columns[physical] is state.quantity:
-            return False
-        columns.pop(physical)
-        for row in cells:
-            row.pop(physical)
-        return True
-
     def hide_column(index, hidden):
         if type(index) is not int:
             raise IndexError(index)
@@ -2696,7 +2687,6 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     table.RowHidden.side_effect = row_hidden
     table.IsCellTextEditable.return_value = True
     table.SetText2.side_effect = set_text
-    table.DeleteColumn2.side_effect = delete_column
     table.SetColumnWidth.side_effect = set_width
     table.GetHeaderCount.return_value = 1
     table.GetRowHeight.side_effect = row_height
@@ -3538,7 +3528,7 @@ def test_default_bom_refuses_property_bound_description_write_back(monkeypatch, 
     # Negative controls: any property-bound column writes back and is refused.
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
     monkeypatch.setattr(
-        _drawing_tables, "_replace_linked_bom_description_column", replacement
+        _drawing_tables, "_unlink_bom_description_column", replacement
     )
     with pytest.raises(RuntimeError, match="BOM description did not persist: ''"):
         scene.insert()
@@ -3570,16 +3560,20 @@ def test_default_bom_refuses_plain_description_without_row_text(monkeypatch):
         )
 
 
-@pytest.mark.parametrize("fault", ("insert", "delete"))
-def test_default_bom_refuses_unreplaced_description_column(monkeypatch, fault):
+@pytest.mark.parametrize("fault", ("status", "readback"))
+def test_default_bom_refuses_linked_description_column_left_bound(monkeypatch, fault):
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
-    method = {"insert": "InsertColumn2", "delete": "DeleteColumn2"}[fault]
-    native = getattr(scene.table, method).side_effect
-    getattr(scene.table, method).side_effect = lambda *args: (
-        False if "DESCRIPTION" in args or args == (2, True) else native(*args)
-    )
-    with pytest.raises(RuntimeError, match="DESCRIPTION column could not be"):
+    native = scene.table.SetColumnCustomProperty.side_effect
+
+    def set_custom_property(index, property_name):
+        if property_name:
+            return native(index, property_name)
+        return False if fault == "status" else True  # Readback keeps Description.
+
+    scene.table.SetColumnCustomProperty.side_effect = set_custom_property
+    with pytest.raises(RuntimeError, match="DESCRIPTION (unlink failed|column still reads)"):
         scene.insert()
+    assert scene.table.GetColumnCustomProperty(2) == "Description"
     assert _pd_description_writes(scene) == set()
 
 
