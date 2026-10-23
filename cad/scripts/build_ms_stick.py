@@ -154,12 +154,12 @@ def _assert_numeral_cut(adapter) -> None:
         raise RuntimeError(f"numeral cuts disagree on draft direction: {senses}")
 
 
-# FeatureCut4 forms tried on the first stroke layer, in order. The seat's
-# answer is not the API page's: an early-bound single-ended drafted cut, and
-# even an undrafted one, returned None on these imported sketches (runs
-# 20261023T200553835Z-02d5bd36 and 20261023T202808806Z-2e8adf1c), while the
-# adapter's late-bound double-ended form cuts them; Ddir1's inward sense is
-# also seat-specific (diag_mcmaster_phillips_flat_head: True flared). The
+# FeatureCut4 forms tried on the first stroke layer, in order. On the 2026
+# seat (revision 34) the adapter's undrafted single-ended FeatureCut4 cuts
+# these imported sketches, but every drafted form returned None (runs
+# 20261023T200553835Z-02d5bd36 and 20261023T203610712Z-4012d9c4); Ddir1's
+# inward sense is also seat-specific (diag_mcmaster_phillips_flat_head: True
+# flared). If none cuts, discriminating probes are reported. The
 # removed volume, not the flags, decides: the first layer's V is pinned to
 # 1e-4 by its closed form, and a flared or straight cut removes 2-3x as much.
 V_CUT_VARIANTS = (
@@ -170,38 +170,52 @@ V_CUT_VARIANTS = (
 )
 
 
-def _v_cut_args(single_ended: bool, ddir1: bool) -> tuple:
-    """FeatureCut4's 26 leading arguments for a blind V cut into the bar."""
+def _v_cut_args(single_ended: bool, ddir1: bool, *, half_angle_deg: float | None = None,
+                depth_mm: float = NUMERAL_DEPTH, drafted: bool = True) -> tuple:
+    """FeatureCut4's 27 arguments for a blind V cut into the bar."""
+    half = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0 if half_angle_deg is None else half_angle_deg
     return (
         single_ended, False, False,  # Sd, Flip, Dir (default: into the bar)
-        0, 0, NUMERAL_DEPTH / 1000.0, 0.0,  # T1/T2 blind, D1, D2
-        True, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
-        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
+        0, 0, depth_mm / 1000.0, 0.0,  # T1/T2 blind, D1, D2
+        drafted, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
+        math.radians(half), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
         False, True, False, False, False,  # scope, auto-select, assembly flags
-        0, 0.0, False,  # T0 sketch plane, StartOffset, FlipStartOffset
+        0, 0.0, False, False,  # T0 sketch plane, StartOffset, FlipStartOffset, OptimizeGeometry
     )
 
 
-def _feature_cut4(adapter, sketch_name: str, args: tuple) -> object:
-    """The adapter's late-bound FeatureCut4 on the named sketch (26 arguments,
-    or 27 with OptimizeGeometry where the install wants it)."""
+def _feature_cut4(adapter, sketch_name: str, args: tuple, region_xy: tuple | None = None) -> object:
+    """FeatureCut4 on the named sketch (or on one of its regions)."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
     model.ClearSelection2(True)
-    if not model.Extension.SelectByID2(sketch_name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0):
-        raise RuntimeError(f"select sketch {sketch_name!r} failed")
-    manager = model.FeatureManager
-    feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
-    if not feature:
-        feature, long_error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args, False))
-        error = f"{error} | 27 arguments: {long_error}"
+    if region_xy is None:
+        selected = model.Extension.SelectByID2(sketch_name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0)
+    else:
+        x, y = region_xy
+        selected = model.Extension.SelectByID2(
+            "", "SKETCHREGION", x / 1000.0, y / 1000.0, 0.0, False, 1, null_callout(), 0)
+    if not selected:
+        raise RuntimeError(f"select {sketch_name!r} {region_xy or ''} failed")
+    feature, error = adapter._attempt_with_error(lambda: model.FeatureManager.FeatureCut4(*args))
     model.ClearSelection2(True)
     return feature or RuntimeError(f"FeatureCut4 returned None ({error})")
 
 
-async def _first_v_cut(adapter, sketch_name: str) -> tuple:
+async def _try_cut(adapter, sketch_name: str, args: tuple, region_xy: tuple | None = None) -> str:
+    """Diagnostic: make one cut, report what it removed, and undo it."""
+    pre = await _volume_mm3(adapter)
+    feature = _feature_cut4(adapter, sketch_name, args, region_xy)
+    if isinstance(feature, Exception):
+        return str(feature)
+    removed = pre - await _volume_mm3(adapter)
+    adapter.currentModel.EditUndo2(1)
+    return f"created, removed {removed:.4f} mm^3"
+
+
+async def _first_v_cut(adapter, sketch_name: str, first_rect_center: tuple) -> tuple:
     """Find the form that removes exactly the first layer's V; undo the rest."""
     pre = await _volume_mm3(adapter)
     tried = []
@@ -221,10 +235,30 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
         restored = pre - await _volume_mm3(adapter)
         if abs(restored) > 1e-6:
             raise RuntimeError(f"undo of the {label} V cut left {restored:.4f} mm^3 removed; tried {tried}")
+    # Discriminate the refusal: the undrafted control, a shallow (wide-root)
+    # V, a gentle draft, and the full V on a single stroke region.
+    probes = {
+        "undrafted": _v_cut_args(True, False, drafted=False),
+        **{f"15 deg 0.10 deep Ddir1 {d}": _v_cut_args(True, d, depth_mm=0.10) for d in (False, True)},
+        **{f"5 deg Ddir1 {d}": _v_cut_args(True, d, half_angle_deg=5.0) for d in (False, True)},
+    }
+    for label, args in probes.items():
+        tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
+    for d in (False, True):
+        result = await _try_cut(adapter, sketch_name, _v_cut_args(True, d), first_rect_center)
+        tried.append(f"probe one region Ddir1 {d}: {result}")
     raise RuntimeError(
         f"no FeatureCut4 form removed the first layer's {NUMERAL_FIRST_LAYER_VOLUME_MM3:.4f} mm^3 V: "
         + "; ".join(tried)
     )
+
+
+def _first_rect_center() -> tuple[float, float]:
+    """Model (x, y) mm inside the first layer's first stroke rectangle."""
+    from _dxf_text import read_lwpolylines
+
+    ring, _closed = read_lwpolylines(NUMERAL_LAYER_DXFS[0].read_text(encoding="ascii"))[0]
+    return (sum(x for x, _ in ring) / len(ring), sum(y for _, y in ring) / len(ring))
 
 
 async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None) -> tuple:
@@ -232,7 +266,7 @@ async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, a
     the FeatureCut4 form, found on the first layer and reused after it."""
     sketch = f"{name}Sketch"
     if args is None:
-        args = await _first_v_cut(adapter, sketch)
+        args = await _first_v_cut(adapter, sketch, _first_rect_center())
     else:
         feature = _feature_cut4(adapter, sketch, args)
         if isinstance(feature, Exception):
