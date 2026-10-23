@@ -21,6 +21,53 @@ from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
 from _hole_spec import THREAD_MAJOR_MM
 
 
+def _source_properties(names):
+    values = {
+        "Supplier": "McMaster-Carr",
+        "Supplier SKUs": "9489T111",
+        "Stock Name": "PURCHASED EYEBOLT — RETAIN THE EYE",
+        "Isometric View Note": "ISOMETRIC VIEW SCALE 3:1",
+        "Manufacturing Notes": "CUT TO FINISHED LENGTH\nRESTORE THE END DEBURR",
+    }
+    return {name: values.get(name, f"source {name}") for name in names}
+
+
+def _note_double(link, text, x=0.016, y=0.060, *, owner_type=1):
+    note = SimpleNamespace(
+        PropertyLinkedText=link, text=text, annotation=SimpleNamespace(OwnerType=owner_type),
+        extent=(x, y - 0.003, 0.0, x + 0.025, y, 0.0),
+    )
+    note.GetAnnotation = lambda: note.annotation
+    note.GetText = lambda: note.text
+    note.annotation.GetType = lambda: 6
+    note.annotation.GetSpecificAnnotation = lambda: note
+    note.GetExtent = lambda: note.extent
+    return note
+
+
+def _stock_note_contracts(module):
+    if module is drawing:
+        labels = (
+            ("AS-SUPPLIED EYEBOLT BODY — SUPPLIER REFERENCE", 0.016, 0.2627),
+            (
+                "SUPPLIED HEX NUT OMITTED FROM THIS BODY VIEW\n"
+                "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
+                0.016, 0.089,
+            ),
+            ("ISOMETRIC VIEW SCALE 3:1", 0.275, 0.163),
+        )
+    else:
+        labels = (
+            ("SUPPLIER NOMINAL STOCK ENVELOPE — AS SUPPLIED", 0.016, 0.2627),
+            (
+                "NOMINAL PROFILE ONLY — INSTALLED VENDOR-CAD EYE UNCHANGED\n"
+                "STOCK REFERENCES ONLY — FINISHED TRIM AND CHAMFER: SHEET 1",
+                0.016, 0.089,
+            ),
+        )
+    return [(_note_double(text, text, x, y), text, text) for text, x, y in labels]
+
+
 def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
     cut_end = anchor.eye_od_mm / 2 - spec.FINISHED_OVERALL_MM
     assert cut_end == pytest.approx(spec.TRIM.shank_end_y_mm)
@@ -298,8 +345,10 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
     )
     model = SimpleNamespace(
         ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
-        GetCurrentSheet=lambda: sheet,
+        GetCurrentSheet=lambda: sheet, GetEditSheet=lambda: True,
+        ActiveDrawingView=None,
     )
+    model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
     adapter = SimpleNamespace(currentModel=model, _attempt=lambda operation: operation())
     views, placements, refreshed, checked_cells = {}, [], [], []
 
@@ -329,6 +378,7 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
         else:
             view = make_view("finished-iso", (0.280, 0.180, 0.340, 0.240))
         views[orientation] = view
+        model.ActiveDrawingView = view
         return view
 
     stock = make_view("stock-front", (0.110, 0.110, 0.190, 0.240))
@@ -364,17 +414,25 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
     monkeypatch.setattr(drawing, "active_configuration_name", lambda *_args: "Default")
     monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (model, sheet))
     for name in (
-        "check", "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "check", "create_blank_drawing_sheets", "stamp_drawing_summary",
         "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
-        "add_property_linked_note", "_verify_controls", "_verify_supplier_references",
-        "_verify_source_state",
+        "_verify_controls", "_verify_supplier_references", "_verify_source_state",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "read_required_properties", lambda _model, names, **_kwargs: _source_properties(names),
+    )
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda _adapter, name, x, y, **_kwargs: _note_double(
+            drawing.property_link(name), _source_properties((name,))[name], x, y,
+        ),
+    )
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(drawing, "_supplier_references", lambda *_args: [])
     monkeypatch.setattr(
         drawing, "_supplier_stock_sheet",
-        lambda *_args: (stock, stock_iso, [], []),
+        lambda *_args: (stock, stock_iso, [], _stock_note_contracts(drawing)),
     )
     monkeypatch.setattr(drawing, "place_view", place_view)
     monkeypatch.setattr(drawing, "iter_views", iter_views)
@@ -412,7 +470,11 @@ def _settled_eye_scene(monkeypatch, module):
     monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(module, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
     state = SimpleNamespace(sheet="FINISHED")
-    model = SimpleNamespace(ActivateSheet=lambda name: setattr(state, "sheet", name) or True)
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        ActiveDrawingView=None, GetEditSheet=lambda: True,
+    )
+    model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
     owner = SimpleNamespace(Name="Wire")
     source = SimpleNamespace(
         GetPathName=lambda: str(module.SOURCE.resolve()).upper().replace("/", "\\"),
@@ -763,10 +825,19 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
     monkeypatch.setattr(module, "check", lambda *_args: None)
     monkeypatch.setattr(module, "active_configuration_name", lambda *_args: "Default")
     monkeypatch.setattr(module, "new_project_drawing", new_drawing)
-    for name in ("read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-                 "set_dimension_precision", "set_dimension_callouts", "add_property_linked_note",
+    for name in ("create_blank_drawing_sheets", "stamp_drawing_summary",
+                 "set_dimension_precision", "set_dimension_callouts",
                  "set_hidden_lines_removed", "_verify_supplier_layout", "_verify_source_state"):
         monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        module, "read_required_properties", lambda _model, names, **_kwargs: _source_properties(names),
+    )
+    monkeypatch.setattr(
+        module, "add_property_linked_note",
+        lambda _adapter, name, x, y, **_kwargs: _note_double(
+            module.property_link(name), _source_properties((name,))[name], x, y,
+        ),
+    )
     monkeypatch.setattr(module, "curate_view_dimensions", lambda *_args, **_kwargs: imported_controls)
     monkeypatch.setattr(module, "place_view", lambda _adapter, _path, orientation, *_args, **_kwargs:
                         front if orientation == "*Front" else iso)
@@ -782,12 +853,12 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
     monkeypatch.setattr(module, "_supplier_references", supplier_references)
     if module is drawing:
         monkeypatch.setattr(module, "_supplier_stock_sheet", lambda *_args:
-                            (stock, stock_iso, scene.refs["SUPPLIER-STOCK"], []))
+                            (stock, stock_iso, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)))
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock, stock_iso))
     else:
         monkeypatch.setattr(module, "_supplier_stock_diagram", lambda *_args:
-                            (stock, scene.refs["SUPPLIER-STOCK"], []))
+                            (stock, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)))
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock,))
     saved = []
@@ -944,3 +1015,390 @@ def test_channel_creation_preserves_native_errors_without_rescanning(monkeypatch
     assert caught.value is error
     assert calls == ["curve"]
     assert queries == [4]
+
+
+def _note_build_scene(monkeypatch, tmp_path, module):
+    """Exercise real build/layout callbacks with native-shaped notes and views."""
+    source_path = tmp_path / "note-source.SLDPRT"
+    source_path.touch()
+    monkeypatch.setattr(module, "SOURCE", source_path)
+    monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(purchased_drawing, "_early_bound", lambda value, _kind: value)
+    source = SimpleNamespace()
+    state = SimpleNamespace(
+        sheet="FINISHED", edit_sheet=True, keep_view_active=False, missing_creation=False,
+        target_sheet="FINISHED", mutate_note=lambda _note: None, saved=False,
+    )
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        GetCurrentSheet=lambda: sheet, GetEditSheet=lambda: state.edit_sheet,
+        ActiveDrawingView=None,
+    )
+
+    def activate_view(name):
+        assert name == ""
+        if not state.keep_view_active:
+            model.ActiveDrawingView = None
+        return False  # Normal native sheet-context return, not a failed transition.
+
+    model.ActivateView = activate_view
+    adapter = SimpleNamespace(currentModel=source, _attempt=lambda operation: operation())
+    placements, linked_notes, property_reads, refreshed = [], {}, [], []
+
+    def refresh(name):
+        if state.saved:
+            pytest.fail("post-save callback refreshed drawing geometry")
+        refreshed.append(name)
+
+    def view(name, configuration):
+        return SimpleNamespace(
+            Name=name, ReferencedConfiguration=configuration,
+            GetOutline=lambda: (0.100, 0.110, 0.170, 0.240),
+            GetFirstDisplayDimension6=lambda: None, GetAnnotations=lambda: (),
+            UpdateViewDisplayGeometry=lambda: refresh(name),
+        )
+
+    front = view("finished-front", "Default")
+    iso = view("finished-iso", "Default")
+    stock = view("stock-front", module.SUPPLIER_STOCK_CONFIGURATION)
+    stock_iso = view("stock-iso", module.SUPPLIER_STOCK_CONFIGURATION)
+    stock_notes = _stock_note_contracts(module)
+
+    async def open_model(_path):
+        adapter.currentModel = source
+        return {"success": True}
+
+    def read_properties(native_source, names, *, required):
+        assert native_source is source
+        assert tuple(required) == tuple(names)
+        properties = _source_properties(names)
+        property_reads.append(properties)
+        return properties
+
+    def new_drawing(*_args, **_kwargs):
+        adapter.currentModel = model
+        return model, sheet
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        native_view = front if orientation == "*Front" else iso
+        model.ActiveDrawingView = native_view
+        return native_view
+
+    def references(*_args):
+        model.ActiveDrawingView = front
+        return []
+
+    def linked_note(_adapter, name, x, y, *, char_height):
+        if state.missing_creation and name == "Supplier":
+            return None
+        note = _note_double(
+            module.property_link(name), property_reads[0][name].replace("\n", "\r\n"), x, y,
+            owner_type=0 if model.ActiveDrawingView is not None else 1,
+        )
+        note.position, note.char_height = (x, y), char_height
+        linked_notes[name] = note
+        if state.target_sheet == "FINISHED" and name == "Supplier":
+            state.mutate_note(note)
+        return note
+
+    def supplier_stock(*_args):
+        model.ActiveDrawingView = None
+        if state.target_sheet == "SUPPLIER-STOCK" and stock_notes:
+            state.mutate_note(stock_notes[0][0])
+        if module is drawing:
+            return stock, stock_iso, [], stock_notes
+        return stock, [], stock_notes
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        checkpoint("before_drawing_save")
+        state.saved = True
+        checkpoint("after_drawing_save")
+        checkpoint("after_pdf_save")
+        return {"drawing": "saved"}
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(module, "active_configuration_name", lambda *_args: "Default")
+    for name in (
+        "check", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
+        "_verify_controls", "_verify_supplier_references", "_verify_source_state",
+    ):
+        monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "read_required_properties", read_properties)
+    monkeypatch.setattr(module, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(module, "place_view", place_view)
+    monkeypatch.setattr(module, "curate_view_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(module, "_supplier_references", references)
+    monkeypatch.setattr(module, "add_property_linked_note", linked_note)
+    monkeypatch.setattr(
+        module, "_supplier_stock_sheet" if module is drawing else "_supplier_stock_diagram",
+        supplier_stock,
+    )
+    monkeypatch.setattr(module, "iter_views", lambda _adapter:
+                        (front, iso) if state.sheet == "FINISHED" else
+                        (stock, stock_iso) if module is drawing else (stock,))
+    monkeypatch.setattr(module, "view_name", lambda _adapter, native_view: native_view.Name)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    return SimpleNamespace(
+        adapter=adapter, state=state, model=model, front=front, stock=stock,
+        placements=placements, notes=linked_notes, stock_notes=stock_notes,
+        property_reads=property_reads, refreshed=refreshed,
+    )
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_finished_source_notes_keep_links_resolved_text_and_sheet_ownership(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+    assert len(scene.property_reads) == 1
+    assert set(scene.notes) == {
+        "Supplier", "Supplier SKUs", "Stock Name", "Isometric View Note", "Manufacturing Notes",
+    }
+    expected_positions = {
+        "Supplier": ((0.016, 0.060), 0.003),
+        "Supplier SKUs": ((0.080, 0.060), 0.003),
+        "Stock Name": ((0.016, 0.049), 0.003),
+        "Isometric View Note": ((0.275, 0.163), None),
+        "Manufacturing Notes": ((0.016, 0.083 if module is drawing else 0.076), 0.003),
+    }
+    for name, note in scene.notes.items():
+        assert note.annotation.OwnerType == 1
+        assert note.PropertyLinkedText == module.property_link(name)
+        assert note.GetText().replace("\r\n", "\n") == scene.property_reads[0][name]
+        assert (note.position, note.char_height) == expected_positions[name]
+    # These are legal sheet labels below the unchanged 65.1 mm geometry cell.
+    assert scene.notes["Supplier"].extent[1] < 0.0651
+    assert scene.placements == [
+        ("*Front", *module.FRONT_CENTER, module.SHEET_SCALE),
+        ("*Isometric", *module.ISO_CENTER, module.ISO_SCALE),
+    ]
+    assert scene.state.sheet == "FINISHED"
+    assert scene.state.saved
+    assert len(scene.refreshed) == (4 if module is drawing else 3)
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("edit-template", "active-view", "missing-note"))
+def test_finished_note_creation_requires_checked_sheet_context_and_a_note(
+    monkeypatch, tmp_path, module, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.edit_sheet = fault != "edit-template"
+    scene.state.keep_view_active = fault == "active-view"
+    scene.state.missing_creation = fault == "missing-note"
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.notes
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("sheet_name", ("FINISHED", "SUPPLIER-STOCK"))
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "view-owner", "template-owner", "missing-annotation", "wrong-link", "wrong-resolved",
+        "left", "bottom", "right", "top", "short-extent", "nan-extent", "inverted-extent",
+    ),
+)
+def test_build_refuses_sheet_note_ownership_text_and_actual_border_drift(
+    monkeypatch, tmp_path, module, sheet_name, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.target_sheet = sheet_name
+
+    def mutate(note):
+        if fault in ("view-owner", "template-owner"):
+            note.annotation.OwnerType = 0 if fault == "view-owner" else 2
+        elif fault == "missing-annotation":
+            note.annotation = None
+        elif fault == "wrong-link":
+            note.PropertyLinkedText = '$PRPSHEET:"Foreign Property"'
+        elif fault == "wrong-resolved":
+            note.text += " CHANGED"
+        elif fault == "short-extent":
+            note.extent = note.extent[:-1]
+        else:
+            extent = list(note.extent)
+            if fault == "nan-extent":
+                extent[0] = math.nan
+            elif fault == "inverted-extent":
+                extent[3] = extent[0]
+            else:
+                index, boundary, direction = {
+                    "left": (0, 0.0127, -1),
+                    "bottom": (1, 0.0127, -1),
+                    "right": (3, 0.4191, 1),
+                    "top": (4, 0.2667, 1),
+                }[fault]
+                extent[index] = boundary + direction * 1e-12
+            note.extent = tuple(extent)
+
+    scene.state.mutate_note = mutate
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("literal-instead-of-link", "unresolved-property"))
+def test_finished_notes_require_both_live_links_and_authoritative_resolved_text(
+    monkeypatch, tmp_path, module, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+
+    def mutate(note):
+        if fault == "literal-instead-of-link":
+            note.PropertyLinkedText = note.text
+        else:
+            note.text = note.PropertyLinkedText
+
+    scene.state.mutate_note = mutate
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("missing-contract", "null-note"))
+def test_stock_note_mapping_retains_every_literal_contract(monkeypatch, tmp_path, module, fault):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    if fault == "missing-contract":
+        scene.stock_notes.pop()
+    else:
+        _note, link, text = scene.stock_notes[0]
+        scene.stock_notes[0] = (None, link, text)
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_sheet_owned_note_still_in_native_view_inventory_is_not_waived(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.front.GetAnnotations = lambda: (scene.notes["Supplier"].annotation,)
+    with pytest.raises(RuntimeError, match="supplier note leaves its cell"):
+        asyncio.run(module.build(scene.adapter))
+    assert scene.notes["Supplier"].annotation.OwnerType == 1
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("fault", (None, "edit-template", "active-view", "missing-note"))
+def test_channel_stock_builder_returns_sheet_owned_literal_triples(monkeypatch, fault):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    stock = SimpleNamespace(Position=drawing.STOCK_CENTER, UpdateViewDisplayGeometry=lambda: None)
+    iso = SimpleNamespace()
+    model = SimpleNamespace(
+        ActiveDrawingView=stock, GetEditSheet=lambda: fault != "edit-template",
+        GetCurrentSheet=lambda: sheet, EditRebuild3=lambda: True,
+    )
+
+    def activate_view(name):
+        assert name == ""
+        if fault != "active-view":
+            model.ActiveDrawingView = None
+        return False
+
+    model.ActivateView = activate_view
+    adapter = SimpleNamespace(currentModel=model, _attempt=lambda operation: operation())
+    placements, created = [], []
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        return stock if orientation == "*Front" else iso
+
+    def add_note(_adapter, text, x, y):
+        if fault == "missing-note":
+            return None
+        note = _note_double(text, text, x, y, owner_type=0 if model.ActiveDrawingView else 1)
+        created.append(note)
+        return note
+
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_show_hidden_owners", lambda *_args, **_kwargs:
+                        (drawing.SUPPLIER_STOCK_FEATURE,))
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_args, **_kwargs:
+                        (drawing.STOCK_CENTER,))
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(drawing, "add_note", add_note)
+    if fault is not None:
+        with pytest.raises(RuntimeError):
+            drawing._supplier_stock_sheet(adapter)
+        assert not created
+        return
+    actual_stock, actual_iso, refs, notes = drawing._supplier_stock_sheet(adapter)
+    assert (actual_stock, actual_iso, refs) == (stock, iso, [])
+    assert [note for note, _link, _text in notes] == created
+    expected = _stock_note_contracts(drawing)
+    assert [(link, text) for _note, link, text in notes] == [
+        (link, text) for _note, link, text in expected
+    ]
+    assert all(note.annotation.OwnerType == 1 for note in created)
+    for (note, _link, _text), (expected_note, _expected_link, _expected_text) in zip(notes, expected):
+        assert note.extent == pytest.approx(expected_note.extent)
+    assert placements == [
+        ("*Front", *drawing.STOCK_CENTER, drawing.STOCK_SCALE),
+        ("*Isometric", *drawing.ISO_CENTER, drawing.ISO_SCALE),
+    ]
+    assert stock.ReferencedConfiguration == iso.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("sheet_name", ("FINISHED", "SUPPLIER-STOCK"))
+def test_note_ownership_failure_is_reported_before_a_native_view_cell_failure(
+    monkeypatch, tmp_path, module, sheet_name,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.target_sheet = sheet_name
+    scene.state.mutate_note = lambda note: setattr(note.annotation, "OwnerType", 0)
+    native_view = scene.front if sheet_name == "FINISHED" else scene.stock
+    native_view.GetOutline = lambda: (0.100, 0.010, 0.170, 0.240)
+    with pytest.raises(RuntimeError, match="actual owner=0"):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("newline", ("\n", "\r\n", "\r"), ids=("authored-lf", "native-crlf", "bare-cr-drift"))
+def test_finished_note_line_endings_preserve_authored_lf_without_accepting_bare_cr(
+    monkeypatch, tmp_path, module, newline,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    create_note = module.add_property_linked_note
+
+    def linked_note(adapter, name, x, y, *, char_height):
+        note = create_note(adapter, name, x, y, char_height=char_height)
+        if name == "Manufacturing Notes":
+            authored = scene.property_reads[0][name]
+            assert "\n" in authored and "\r" not in authored
+            note.text = authored.replace("\n", newline)
+        return note
+
+    monkeypatch.setattr(module, "add_property_linked_note", linked_note)
+    if newline == "\r":
+        with pytest.raises(RuntimeError, match="changed or leaves the usable sheet"):
+            asyncio.run(module.build(scene.adapter))
+        assert not scene.state.saved
+    else:
+        assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+    note = scene.notes["Manufacturing Notes"]
+    assert note.PropertyLinkedText == module.property_link("Manufacturing Notes")
+    assert note.GetText() == scene.property_reads[0]["Manufacturing Notes"].replace("\n", newline)

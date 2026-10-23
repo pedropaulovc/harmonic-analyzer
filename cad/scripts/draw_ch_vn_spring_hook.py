@@ -40,7 +40,7 @@ from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import (
     _show_hidden_owners, curate_view_dimensions as curate_stock_dimensions,
 )
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -359,7 +359,7 @@ def _supplier_stock_sheet(adapter):
         note = add_note(adapter, text, x, y)
         if note is None:
             raise RuntimeError("cannot label the original supplier stock body")
-        notes.append((_early_bound(note, "INote"), text))
+        notes.append((_early_bound(note, "INote"), text, text))
     for view in (stock, iso):
         set_hidden_lines_removed(adapter, view)
     return stock, iso, refs, notes
@@ -433,7 +433,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                     )
 
 
-def _verify_supplier_layout(adapter, view_contracts, notes):
+def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
     """Inspect every view's settled native ink and sheet-owned source labels."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     for sheet_name, (names, _configuration) in view_contracts.items():
@@ -449,6 +449,36 @@ def _verify_supplier_layout(adapter, view_contracts, notes):
             region.xmin, 0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
             region.xmax, region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
         )
+        notes = notes_by_sheet.get(sheet_name)
+        expected_count = 5 if sheet_name == SHEET_NAMES[0] else 3
+        if notes is None or len(notes) != expected_count:
+            raise RuntimeError(
+                f"{sheet_name}: expected {expected_count} sheet notes; "
+                f"actual count={None if notes is None else len(notes)}"
+            )
+        for note, expected_link, expected_text in notes:
+            if note is None:
+                raise RuntimeError(f"{sheet_name}: source label is missing: {expected_link}")
+            raw_annotation = note.GetAnnotation()
+            if raw_annotation is None:
+                raise RuntimeError(f"{sheet_name}: source label has no annotation: {expected_link}")
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            bounds = _box(note.GetExtent(), label=expected_link, kind="note")
+            owner = int(annotation.OwnerType)
+            linked = str(note.PropertyLinkedText)
+            resolved = str(note.GetText()).replace("\r\n", "\n")
+            expected_text = expected_text.replace("\r\n", "\n")
+            if (
+                owner != 1 or not _inside(bounds, border)
+                or linked != expected_link
+                or resolved != expected_text
+            ):
+                raise RuntimeError(
+                    f"{sheet_name}: source label changed or leaves the usable sheet: "
+                    f"expected owner=1, link={expected_link!r}, text={expected_text!r}; "
+                    f"actual owner={owner}, link={linked!r}, text={resolved!r}, "
+                    f"bounds={bounds}, border={border}"
+                )
         views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
         for name in names:
             if name not in views:
@@ -456,15 +486,6 @@ def _verify_supplier_layout(adapter, view_contracts, notes):
             view = views[name]
             view.UpdateViewDisplayGeometry()
             assert_supplier_view_fits(adapter, view, cell, label=f"spring anchor {sheet_name}")
-        if sheet_name == SHEET_NAMES[1]:
-            for note, text in notes:
-                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-                bounds = _box(note.GetExtent(), label=text, kind="note")
-                if (
-                    int(annotation.OwnerType) != 1 or not _inside(bounds, border)
-                    or str(note.GetText()).replace("\r\n", "\n") != text
-                ):
-                    raise RuntimeError(f"original stock label changed or leaves the usable sheet: {text}")
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
@@ -496,7 +517,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Manufacturing Notes",
         "Isometric View Note",
     )
-    read_required_properties(adapter.currentModel, required, required=required)
+    source_properties = read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -531,13 +552,23 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(adapter, annotations)
     refs = _supplier_references(adapter, front)
-    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
-    add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
-    )
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter finished spring anchor sheet context for labels")
+    finished_notes = []
+    for name, x, y, char_height in (
+        ("Supplier", 0.016, 0.060, 0.003),
+        ("Supplier SKUs", 0.080, 0.060, 0.003),
+        ("Stock Name", 0.016, 0.049, 0.003),
+        ("Isometric View Note", 0.275, 0.163, None),
+        ("Manufacturing Notes", 0.016, 0.083, 0.003),
+    ):
+        note = add_property_linked_note(adapter, name, x, y, char_height=char_height)
+        if note is None:
+            raise RuntimeError(f"cannot create finished spring anchor source label: {name}")
+        finished_notes.append(
+            (_early_bound(note, "INote"), property_link(name), source_properties[name])
+        )
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
@@ -549,6 +580,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SHEET_NAMES[1]: ((view_name(adapter, stock), view_name(adapter, stock_iso)), SUPPLIER_STOCK_CONFIGURATION),
     }
     refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
+    notes_by_sheet = {SHEET_NAMES[0]: finished_notes, SHEET_NAMES[1]: stock_notes}
 
     def verify_after_native_save(event):
         if event != "after_drawing_save":
@@ -571,7 +603,7 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda: _verify_controls(adapter, annotations),
             # The existing layout check refreshes every view before the final
             # attachment readback; the shared verifier stays geometry-read-only.
-            lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
+            lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),
             lambda: _verify_supplier_references(adapter, refs_by_sheet, view_contracts),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),

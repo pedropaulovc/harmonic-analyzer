@@ -124,20 +124,30 @@ torus's top-inner point `(cx, cy + major_radius - minor_radius, cz)` into the
 drawing view with `model_points_in_view`, then calls the established
 `_select_view_entity(..., "SILHOUETTE", sheet_xy)` hit test.
 
-The acquired native selection must immediately have count one and type 46.
-Before creating the dimension, its returned `ISilhouetteEdge.GetCurve()` must
-prove the exact finite origin-ID circle, and its face must map to the
-authoritative source `Wire` eye torus. The point is only an acquisition input:
-it is not a synthetic contour or a nominal dimension, and selecting the OD,
-another circle, another feature or an ambiguous source torus is refused. There
-is no visible-enumerator rescue, edge substitution or relaxed criterion.
+The coordinate hit test can select its drawing-view container as well as the
+physical contour. Its initial selection must contain exactly one non-null
+native type-46 silhouette, optionally accompanied by exactly one native type-12
+drawing view whose `ISldWorks.IsSame` identity is the expected front view.
+Additional geometry, duplicate silhouettes or views, foreign views and missing
+entities are refused. The silhouette must already prove the exact finite
+origin-ID circle and mapped-source `Wire` torus; matching names are insufficient.
+
+The recipe then unconditionally selects that validated native silhouette
+directly through the existing `ISilhouetteEdge.Select2` helper. It does not retry
+another acquisition method. Before dimension creation, the resulting current
+selection must have **count one, type 46**, and pass the physical-circle and
+source-owner predicates again. A two-object UI hit-test result is never accepted
+as the dimension's attachment selection. The point is only an acquisition input,
+not a synthetic contour or nominal dimension. There is no visible-enumerator
+rescue, edge substitution, outer-eye substitute or relaxed criterion.
 
 `IModelDocExtension.SelectByID2` documents the `SILHOUETTE` selection string.
 The existing pinion-bracket coordinate-silhouette caller records a real farm
 positive control, whereas `SelectByRay` is not documented to select silhouettes.
-Those contracts support this acquisition design, not a claim that the SM hit
-test has succeeded. Only the repaired recipe's actual native leaf can prove
-the required physical contour and subsequent attachment survival.
+Those contracts support the primary acquisition design. The `7d815` readback
+below now supplies a native positive acquisition result for SM itself, but not
+proof of direct single-entity reselection, dimension creation or attachment
+survival. Those remain obligations of the repaired normal native leaf.
 
 The final and still-open post-native-save checks retain type 46 and exactly one
 live attachment, and reuse the same strict circle, source-view, native feature
@@ -244,14 +254,88 @@ returned a non-null object. It then failed the immediate count/type guard:
 count and type were not emitted. Do not infer count one, type 46, an acquired
 ID circle, or an alternate valid type from that exception.
 
-Failure receipts therefore retain each assertion's expected and actual
-primitive values separately, plus the complete live selected-object inventory,
-native curve/source-face identity and model-to-sheet acquisition context.
-Original predicate-time values remain distinct from independent later reads;
-individual getter errors cannot mask the original failure. These observations
-run only on failure, before selection is cleared, and do not change selection
-or any acceptance predicate. They are not another visible-geometry census or
-evidence that SM's actual discovery failure has been repaired.
+The subsequent changed-source attempt retained complete failure-only
+observations before selection cleanup. The original predicate-time values are
+separate from later getter observations; individual getter errors did not
+replace the original exception. This provisional collector is not part of the
+permanent repair.
+
+## Actual selection and note boundaries at 7d815
+
+Source `7d815e54d5d115bc15c9116ef8a4a014a9e2976a`, run
+`20261023T000132301Z-713bd8ee25904fa1a57fbcd1c713daab`, build
+`20261023T000202.778340Z-1565d5157ca04938aa556af1dac98f8b`, again had two
+source-part cache hits and two failed drawings. No PDF, PNG, native drawing or
+layout audit was exported. Its complete immutable handoff is
+`hook-contour-proof/placement-selection-7d815e54d-native-handoff.json` under the
+out-of-tree evidence directory.
+
+### SM: expected view container plus exact physical ID
+
+The original guard read `selected_count = 2` and raised
+`counter eye ID selection expected count=1; actual count=2`. Its type, entity
+and strict-circle reads were consequently **not executed**.
+
+The independent later read returned the same count, with exactly these objects:
+
+1. Type 12, drawing view `Drawing View1`, configuration `Default`, HLR mode 2,
+   exact source-part path and the same model-to-view transform as the expected
+   front. The packet did not compare this selected view to the expected front
+   with `IsSame`; the repaired production guard must do so.
+2. Type 46, native `ISilhouetteEdge`, analytic circle identity 3002:
+
+   ```text
+   (-4.4201138409138974e-11, -1.3548712585881306e-10, 0,
+    -0, -0, -1, 0.003968749644849558)
+   ```
+
+   This is physical ID `7.937499289699116 mm`, not the OD or an edge. Its face
+   maps into the referenced source part; the mapped owner compares equal to
+   authoritative source `Wire`, feature ID 49 (`IsSame == 1`). Direct
+   drawing-owner/source-owner equality is 0, as in the earlier context census.
+   The mapped torus has the exact centre, Z axis, major radius
+   `0.006381749644849558 m` and minor radius `0.0024129999999999998 m`.
+
+The source torus produced model point
+`(-4.4201138409138974e-11, 0.003968749509362433, 0) m` and projected sheet point
+`(0.09999999999999999, 0.2374969178902139) m`. The native transform had identity
+rotation, translation `(0.10000000017680455, 0.22162191985276417, 0) m` and
+scale 4. Thus primary native point acquisition found the physical ID even
+though visible-silhouette enumeration did not list it. These are distinct API
+observations, not a claim that enumeration is complete.
+
+The raw untruncated 6752-byte observation is retained as
+`hook-contour-proof/placement-selection-7d815e54d-raw-copy-0.json`, SHA-256
+`8fdcd142b13ec40850a893773da9dad9a23b5f6ad510184bb6a090c839c0a0ce`.
+It proves the UI selection-composition root, not successful normalization or a
+saved dimension. The permanent repair validates the complete initial group
+before direct single-silhouette reselection; it never discards unvalidated
+additional contours.
+
+### CH: model outline passes; sheet-note context remains to prove
+
+The 5 mm placement correction passed the earlier native view-outline refusal.
+The next unchanged model-cell guard rejected a note with native bounds
+`(0.01574120401337792, 0.05630050167224085, 0.04481188628762542,
+0.060113050167224125) m`, below cell minimum Y `0.0651 m`.
+
+The bounds match the source's supplier-note placement at `(0.016, 0.060) m`
+by inference; the failure did not emit that note's text or native owner type.
+The SDK note helper clears selection but does not deactivate a drawing view.
+Both hook recipes now explicitly enter checked sheet context before creating
+their existing FINISHED property-linked notes, reusing their stock-sheet
+pattern: `ActivateView("")`, `GetEditSheet() == True`, and no active drawing
+view. A false `ActivateView("")` result is normal for sheet context.
+
+The note coordinates, property links, resolved source text, heights, sheet
+border and geometry-only cells are unchanged. Retained notes on both sheets
+must have native owner type 1, exact authored links or literals, exact resolved
+text (normalizing only CRLF), and native extents wholly inside the actual sheet
+border. Model views, dimensions and genuinely view-owned notes retain the
+unchanged model-cell guard. This is an ownership correction, not a hidden note,
+a larger model cell or permission to skip a guard. Its native outcome, and
+both recipes' subsequent rebuild/save boundaries, remain unproven until the
+next changed-source production pair.
 
 ## Evidence boundary
 
