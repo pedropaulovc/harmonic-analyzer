@@ -262,9 +262,10 @@ CAPTION_SETTLE_M = 0.0006
 # right, its text under the slot's lower edge the same way (inside its 4.98
 # span the block was struck by its own dimension line, r4), the slot's
 # travel below and the counterbore's above; its label right of the slot's
-# width. The slot width's block centres on its point; its fourth callout
-# line (the head's reason for the upper limit) lifts it 3 mm off the
-# border, and the label 2.5 mm to keep its air over the block. It is a cropped
+# width. The slot width's block centres on its point; its five callout
+# lines (the head's reason for the upper limit, then the take-up's) put
+# that point 5 mm higher than the three-line block's, off the border, and
+# the label 4.5 mm higher to keep its air over the block. It is a cropped
 # *Back model view, dimensioned uncropped then cropped (the
 # draw_ch_amplitude_bar notch details): a model view has no native label or
 # parent circle, so its label is a note in the native label's words and its
@@ -281,7 +282,7 @@ DETAIL_SCALE = (2, 1)
 DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0  # sheet metres per mm
 DETAIL_RADIUS_MM = 7.5
 DETAIL_LABEL = f"DETAIL C\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
-DETAIL_LABEL_XY = (0.200, 0.0625)  # top centre, above the slot-width text
+DETAIL_LABEL_XY = (0.200, 0.0645)  # top centre, above the slot-width text
 DETAIL_LETTER = "C"
 DETAIL_LETTER_TOP = (LEFT_END - 0.004, BACK_CENTER[1] - 0.0025)  # top centre
 DETAIL_POSITION_TOL_M = 1e-4
@@ -292,7 +293,7 @@ CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # fixed character-width estimates missed the previous collision.
 DETAIL_KEEP = {
     "ClampSlotCboreWidth": (DETAIL_CENTER[0] - 0.017, DETAIL_CENTER[1] + 0.020),
-    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.016),
+    "ClampSlotWidth": (DETAIL_CENTER[0] + 0.026, DETAIL_CENTER[1] - 0.014),
     "ClampSlotTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] - 0.020),
     "ClampSlotCboreTravel": (DETAIL_CENTER[0] + 0.015, DETAIL_CENTER[1] + 0.021),
 }
