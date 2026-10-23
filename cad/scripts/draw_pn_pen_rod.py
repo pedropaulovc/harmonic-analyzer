@@ -208,6 +208,7 @@ _EDGE_TOL_MM = 1e-4
 # How far the side view's projected stations may sit from the _sx/_sy frame
 # every position above is computed in before the build stops.
 _FRAME_TOL_M = 2.5e-4
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 # End view (5:1, square 0.0675..0.0925 x 0.0625..0.0875).  The SQ size's
 # four-row block centres on its dimension line (audit 20261014T053239477Z:
@@ -344,6 +345,13 @@ def _dress_shoulder_radius(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
     _telemetry.info(
         f"shoulder radius: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
+    )
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
 
 
@@ -528,8 +536,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    # The template may centre-mark the tap as the view is placed: farm run
+    # 20261023T212137739Z's layout audit found two identical marks on it
+    # (duplicate-annotation, fleet issue #913) after the explicit call.  Mark
+    # only a bare view, then prove the tap carries exactly one.
+    if _center_mark_count(end) == 0 and not auto_center_marks(
+        adapter, end, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to the stud tap")
+    if (found := _center_mark_count(end)) != 1:
+        raise RuntimeError(
+            f"end view carries {found} centre marks, not the stud tap's one"
+        )
 
     # Pick the tap-drill rim, not the cosmetic thread or the hole centre.
     stud_callout = add_native_hole_callout(
