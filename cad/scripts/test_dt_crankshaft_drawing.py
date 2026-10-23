@@ -3397,88 +3397,7 @@ def test_actual_pdf_refuses_ambiguous_overlong_head_paint_even_with_full_native_
         _neck_proof(f, "after_pdf_save")
 
 
-@pytest.mark.parametrize("case", ["left", "right-overflow", "both", "left-roundoff", "right-roundoff"])
-@pytest.mark.parametrize("diagnostic_fails", [False, True], ids=["capture", "diagnostic-write-failure"])
-def test_native_right_shelf_diagnostic_retains_exact_independent_failures_without_new_native_reads(
-    neck_dimension_fakes, monkeypatch, case, diagnostic_fails,
-) -> None:
-    f = neck_dimension_fakes
-    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
-    roof = drawing._sheet_y(drawing.JOURNAL_DIA / 2.0)
-    foreign = tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.foreign_lines)
-    walls = (
-        foreign[0],
-        drawing.Segment(0.20567890123456789, roof - 0.004, 0.20567890123456789, roof + 0.004),
-        drawing.Segment(0.19687654321098765, roof + 0.003, 0.19687654321098765, roof - 0.003),
-    )
-    foreign = (
-        *walls, foreign[1],
-        drawing.Segment(x - 0.001, roof - 0.002, x - 0.001, roof + 0.002),
-        drawing.Segment(0.18987654321012345, roof + 0.001, 0.18987654321012345, roof + 0.002),
-    )
-    right = min(wall.x0 for wall in walls)
-    low, high = x, f.neck_lines[0][3]
-    if case in ("left", "both"):
-        low = x - 0.0005
-    elif case == "left-roundoff":
-        low = math.nextafter(x, -math.inf)
-    if case in ("right-overflow", "both"):
-        high = right + 0.0005
-    elif case == "right-roundoff":
-        high = math.nextafter(right, math.inf)
-    shelf = list(f.neck_lines[0])
-    shelf[0], shelf[3] = low, high
-    f.neck_lines[0] = tuple(shelf)
-    heads = tuple(segment for row in f.arrow_rows for segment in drawing.arrowhead_segments(row))
-    telemetry = Mock(side_effect=OSError("diagnostic sink unavailable") if diagnostic_fails else None)
-    monkeypatch.setattr(drawing._telemetry, "error", telemetry)
-    label = "collar-side neck (diagnostic fixture)"
-
-    with pytest.raises(RuntimeError) as refusal:
-        drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label=label)
-    assert str(refusal.value) == f"{label}: ordinary native diameter shelf is not RIGHT"
-    assert refusal.value.__cause__ is None
-    assert refusal.value.__context__ is None
-    telemetry.assert_called_once()
-    message = telemetry.call_args.args[0]
-    diagnostic = ast.literal_eval(message.split(": RIGHT shelf predicate diagnostic ", 1)[1])
-    assert diagnostic["authored_line_x_m"] == x
-    assert diagnostic["shelf_m"] == (low, shelf[1], high, shelf[4])
-    assert diagnostic["ordinary_lines_m"] == tuple(
-        (row[0], row[1], row[3], row[4]) for row in f.neck_lines
-    )
-    assert diagnostic["heads_m"] == tuple(
-        tuple((line.x0, line.y0, line.x1, line.y1) for line in heads[index:index + 3])
-        for index in (0, 3)
-    )
-    assert diagnostic["journal_roof_m"] == roof
-    assert diagnostic["candidate_wall_segments_m"] == tuple(
-        (wall.x0, wall.y0, wall.x1, wall.y1) for wall in walls
-    )
-    assert diagnostic["candidate_wall_xs_m"] == tuple(wall.x0 for wall in walls)
-    assert diagnostic["chosen_right_wall_m"] == right
-    assert diagnostic["LEFT"] is (case in ("left", "both", "left-roundoff"))
-    assert diagnostic["RIGHT_OVERFLOW"] is (case in ("right-overflow", "both", "right-roundoff"))
-    assert diagnostic["signed_min_shelf_minus_authored_x_m"] == low - x
-    assert diagnostic["signed_max_shelf_minus_right_wall_m"] == high - right
-    assert repr(low - x) in message
-    assert repr(high - right) in message
-    assert diagnostic["nonblank_text_advances_m"] == tuple(
-        {
-            **row, "angle": 0.0, "reference": 1,
-            "advance": (
-                row["position"][0], row["position"][1],
-                row["position"][0] + row["width"], row["position"][1] + row["height"],
-            ),
-        }
-        for row in f.native_texts if row["text"].strip()
-    )
-    assert diagnostic["native_proof_log_labels"] == (label, "collar-side neck: vertical linear factory")
-    if case.endswith("roundoff"):
-        delta = low - x if case == "left-roundoff" else high - right
-        assert 0.0 < abs(delta) < drawing.NECK_GEOMETRY_TOLERANCE_M
-        assert repr(low if case == "left-roundoff" else high) in message
-
+def _assert_neck_bay_native_read_counts(data) -> None:
     expected_calls = {
         "GetLineCount": [call()],
         "GetLineAtIndex3": [call(index) for index in range(3)],
@@ -3492,20 +3411,187 @@ def test_native_right_shelf_diagnostic_retains_exact_independent_failures_withou
         "GetArrowHeadCount": [],
         "GetArrowHeadAtIndex2": [],
     }
-    assert set(vars(f.arrow_data)) == set(expected_calls)
+    assert set(vars(data)) == set(expected_calls)
     for name, calls in expected_calls.items():
-        assert getattr(f.arrow_data, name).call_args_list == calls
+        assert getattr(data, name).call_args_list == calls
 
 
-def test_native_right_shelf_diagnostic_does_not_log_or_change_a_valid_route(
-    neck_dimension_fakes, monkeypatch,
+@pytest.mark.parametrize("which", [
+    "shelf-min-x", "shelf-max-x", "advance-xmin", "advance-xmax", "advance-ymin", "advance-ymax",
+])
+@pytest.mark.parametrize("outside_ulps", [-3, -2, -1, 0, 1, 2, 3, 4])
+def test_native_inclusive_bay_boundaries_accept_only_two_outward_ulps(
+    neck_dimension_fakes, which, outside_ulps,
 ) -> None:
     f = neck_dimension_fakes
+    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
+    right = f.foreign_lines[0][0]
+    roof = drawing._sheet_y(drawing.JOURNAL_DIA / 2.0)
+    # This actual wall ends at the roof, so it bounds the bay without making
+    # a shelf endpoint an independent strict route/foreign-wall intersection.
+    foreign = (drawing.Segment(right, roof - 0.001, right, roof),)
+    boundaries = {
+        "shelf-min-x": x, "shelf-max-x": right,
+        "advance-xmin": x, "advance-xmax": right,
+        "advance-ymin": f.neck_lines[0][1], "advance-ymax": drawing.COLLAR_REAR_FINISH[1][1],
+    }
+    lower = which in ("shelf-min-x", "advance-xmin", "advance-ymin")
+    direction = -math.inf if lower else math.inf
+    if outside_ulps < 0:
+        direction = -direction
+    target = boundaries[which]
+    for _ in range(abs(outside_ulps)):
+        target = math.nextafter(target, direction)
+    if which.startswith("shelf"):
+        row = list(f.neck_lines[0])
+        row[0 if lower else 3] = target
+        f.neck_lines[0] = tuple(row)
+    else:
+        row = f.native_texts[1 if lower else 2]
+        px, py, pz = row["position"]
+        if which == "advance-xmin":
+            px = target
+        elif which == "advance-xmax":
+            px = right - 0.0078125
+            row["width"] = target - px
+            assert px + row["width"] == target
+        elif which == "advance-ymin":
+            py = target
+        else:
+            py = drawing.COLLAR_REAR_FINISH[1][1] - 0.00390625
+            row["height"] = target - py
+            assert py + row["height"] == target
+        row["position"] = (px, py, pz)
     heads = tuple(segment for row in f.arrow_rows for segment in drawing.arrowhead_segments(row))
-    foreign = tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.foreign_lines)
-    telemetry = Mock(side_effect=OSError("unused diagnostic sink"))
-    monkeypatch.setattr(drawing._telemetry, "error", telemetry)
-    lines, texts = drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="valid RIGHT")
-    assert lines == tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in f.neck_lines)
-    assert tuple(row["text"] for row in texts) == ("<MOD-DIAM>", "9.5 ")
-    telemetry.assert_not_called()
+    if outside_ulps > 2:
+        reason = "shelf is not RIGHT" if which.startswith("shelf") else "ADVANCE escaped the RIGHT bay"
+        with pytest.raises(RuntimeError, match=reason) as refusal:
+            drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="inclusive bay")
+        if which.startswith("advance"):
+            assert "advance_m=" in str(refusal.value)
+            assert "inclusive_bay_m=" in str(refusal.value)
+            assert "raw_boundary_deltas_m=" in str(refusal.value)
+    else:
+        lines, texts = drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="inclusive bay")
+        assert len(lines) == 3
+        assert len(texts) == 2
+    _assert_neck_bay_native_read_counts(f.arrow_data)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf], ids=["nan", "positive-infinity", "negative-infinity"])
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_native_inclusive_bay_comparison_refuses_nonfinite_inputs(bad, side) -> None:
+    assert not drawing._neck_native_ge(bad, 0.17753) if side == "left" else not drawing._neck_native_ge(0.17753, bad)
+
+
+@pytest.mark.parametrize("case", ["left", "right-overflow", "both"])
+def test_native_right_shelf_refusal_keeps_compact_independent_bounds(neck_dimension_fakes, case) -> None:
+    f = neck_dimension_fakes
+    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
+    right = f.foreign_lines[0][0]
+    row = list(f.neck_lines[0])
+    if case in ("left", "both"):
+        row[0] = x - 0.0005
+    if case in ("right-overflow", "both"):
+        row[3] = right + 0.0005
+    f.neck_lines[0] = tuple(row)
+    heads = tuple(segment for raw in f.arrow_rows for segment in drawing.arrowhead_segments(raw))
+    foreign = tuple(drawing.Segment(raw[0], raw[1], raw[3], raw[4]) for raw in f.foreign_lines)
+    with pytest.raises(RuntimeError, match="ordinary native diameter shelf is not RIGHT") as refusal:
+        drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="genuine shelf escape")
+    message = str(refusal.value)
+    assert f"LEFT={case in ('left', 'both')}" in message
+    assert f"RIGHT_OVERFLOW={case in ('right-overflow', 'both')}" in message
+    assert f"shelf_x_m={(row[0], row[3])!r}" in message
+    assert f"authored_x_m={x!r}" in message
+    assert f"right_wall_m={right!r}" in message
+    assert f"raw_min_minus_authored_x_m={row[0] - x!r}" in message
+    assert f"raw_max_minus_wall_m={row[3] - right!r}" in message
+    _assert_neck_bay_native_read_counts(f.arrow_data)
+
+
+@pytest.mark.parametrize("boundary", ["roof", "finish"])
+@pytest.mark.parametrize("outside", [False, True], ids=["exact-open-boundary", "one-ulp-outside"])
+def test_native_bay_roundoff_does_not_relax_open_roof_or_finish_boundaries(
+    neck_dimension_fakes, boundary, outside,
+) -> None:
+    f = neck_dimension_fakes
+    roof = drawing._sheet_y(drawing.JOURNAL_DIA / 2.0)
+    y = roof if boundary == "roof" else drawing.COLLAR_REAR_FINISH[1][1]
+    if outside:
+        y = math.nextafter(y, -math.inf if boundary == "roof" else math.inf)
+    row = list(f.neck_lines[0])
+    row[1] = row[4] = y
+    f.neck_lines[0] = tuple(row)
+    heads = tuple(segment for raw in f.arrow_rows for segment in drawing.arrowhead_segments(raw))
+    foreign = tuple(drawing.Segment(raw[0], raw[1], raw[3], raw[4]) for raw in f.foreign_lines)
+    with pytest.raises(RuntimeError, match="unreadable actual journal-roof/right-wall bay"):
+        drawing._assert_neck_right_advance(f.arrow_data, heads, foreign, label="strict open bay")
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_native_bay_replays_record44_actual_one_and_two_ulp_roundoff(phase) -> None:
+    # Actual 01fe374ab native run, complete structured log record 44. Keep the
+    # observed raw doubles, including the reversed shelf and prefix below it.
+    lines = [
+        (0.19185982739061117, 0.19199513882882896, 0.0, 0.17753, 0.19199513882882896, 0.0),
+        (0.17753, 0.19199513882882896, 0.0, 0.17753, 0.189525, 0.0),
+        (0.17753, 0.170475, 0.0, 0.17753, 0.189525, 0.0),
+    ]
+    texts = [
+        {"text": " "},
+        {"text": "<MOD-DIAM>", "position": (0.1788230555967614, 0.1919951388288289, 0.0),
+         "height": 0.0035, "width": 0.005278437398374081},
+        {"text": "9.5 ", "position": (0.1841014931115508, 0.19204861100548876, 0.0),
+         "height": 0.0035, "width": 0.007758333580568433},
+    ]
+    heads = tuple(drawing.Segment(*row) for row in (
+        (0.17753, 0.170475, 0.177149, 0.174031),
+        (0.177149, 0.174031, 0.17791099999999999, 0.174031),
+        (0.17791099999999999, 0.174031, 0.17753, 0.170475),
+        (0.17753, 0.189525, 0.17791099999999999, 0.185969),
+        (0.17791099999999999, 0.185969, 0.177149, 0.185969),
+        (0.177149, 0.185969, 0.17753, 0.189525),
+    ))
+    foreign = tuple(drawing.Segment(*row) for row in (
+        (0.2506999999999999, 0.2091951388288289, 0.2506999999999999, 0.190400000028),
+        (0.32010000000000016, 0.20241805501282215, 0.32010000000000016, 0.18900000003400003),
+        (0.3114999999999999, 0.22719513882882894, 0.3114999999999999, 0.18952500000000003),
+    ))
+    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0]
+    assert x == 0.17753000000000002
+    assert math.nextafter(x, -math.inf) == lines[0][3]
+    assert math.nextafter(math.nextafter(lines[0][1], -math.inf), -math.inf) == texts[1]["position"][1]
+    data = _native_presentation_data(lines, texts)
+    observed_lines, observed_texts = drawing._assert_neck_right_advance(
+        data, heads, foreign, label=f"record 44 ({phase})",
+    )
+    assert observed_lines == tuple(drawing.Segment(row[0], row[1], row[3], row[4]) for row in lines)
+    assert observed_texts[0]["advance"].ymin == texts[1]["position"][1]
+    _assert_neck_bay_native_read_counts(data)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("which", ["shelf-x", "advance-y"])
+@pytest.mark.parametrize("outside_ulps", [1, 2, 3])
+def test_native_bay_roundoff_policy_runs_through_every_actual_checkpoint(
+    neck_dimension_fakes, phase, which, outside_ulps,
+) -> None:
+    f = neck_dimension_fakes
+    if which == "shelf-x":
+        row = list(f.neck_lines[0])
+        for _ in range(outside_ulps):
+            row[0] = math.nextafter(row[0], -math.inf)
+        f.neck_lines[0] = tuple(row)
+    else:
+        row = f.native_texts[1]
+        px, py, pz = row["position"]
+        for _ in range(outside_ulps):
+            py = math.nextafter(py, -math.inf)
+        row["position"] = (px, py, pz)
+    if outside_ulps > 2:
+        reason = "shelf is not RIGHT" if which == "shelf-x" else "ADVANCE escaped the RIGHT bay"
+        with pytest.raises(RuntimeError, match=reason):
+            _neck_proof(f, phase)
+    else:
+        _neck_proof(f, phase)

@@ -1938,6 +1938,13 @@ The proof has two deliberately distinct stages:
   the shared decoder does; they cannot replace any required real primitive.
   The vertical interval union must connect both actual physical tips to the
   actual shelf root, including reversed endpoints and the intended overlap.
+  Only the inclusive native shelf-X and text-ADVANCE bay bounds admit finite
+  binary roundoff of at most `2 * max(math.ulp(actual), math.ulp(boundary))`,
+  with **zero relative tolerance**. This is not a geometry or placement
+  tolerance: retain the strict open `roof < shelf Y < finish Y` bay, physical
+  arrow/head trim, route intersections and the exact printed **2 mm** rule.
+  Genuine shelf or advance escapes still refuse with actual bounds and signed
+  differences in the exception; no native reread or placement change is made.
 - **After the existing successful PDF export:** read that one actual PDF with
   `_pdf_ink`. Match the actual `9.5` and roughness glyphs to their native text
   owners, and identify the Ø token as a unique complete closed vector ring

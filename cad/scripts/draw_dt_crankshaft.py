@@ -1393,6 +1393,14 @@ def _neck_root_point_contact(
     return True
 
 
+def _neck_native_ge(left: float, right: float) -> bool:
+    """Inclusive native bay boundary only: finite, relative tolerance zero, at most two ULPs."""
+    return (
+        math.isfinite(left) and math.isfinite(right)
+        and (left >= right or right - left <= 2 * max(math.ulp(left), math.ulp(right)))
+    )
+
+
 def _assert_neck_right_advance(
     data: Any, heads: tuple[Segment, ...], foreign_lines: tuple[Segment, ...], *, label: str,
 ) -> tuple[tuple[Segment, ...], tuple[dict[str, Any], ...]]:
@@ -1418,51 +1426,17 @@ def _assert_neck_right_advance(
     if not walls or not roof < shelf.y0 < COLLAR_REAR_FINISH[1][1]:
         raise RuntimeError(f"{label}: unreadable actual journal-roof/right-wall bay")
     right = min(walls)
-    if min(shelf.x0, shelf.x1) < x or max(shelf.x0, shelf.x1) > right:
-        # Held evidence only: do not re-read COM or change this exact predicate.
-        # These native decoders/Segment retain doubles; repr adds no rounding.
-        try:
-            diagnostic = {
-                "authored_line_x_m": x,
-                "shelf_m": (shelf.x0, shelf.y0, shelf.x1, shelf.y1),
-                "ordinary_lines_m": tuple((line.x0, line.y0, line.x1, line.y1) for line in lines),
-                "nonblank_text_advances_m": tuple(
-                    {**row, "advance": (
-                        row["advance"].xmin, row["advance"].ymin,
-                        row["advance"].xmax, row["advance"].ymax,
-                    )}
-                    for row in texts
-                ),
-                "heads_m": tuple(
-                    tuple((line.x0, line.y0, line.x1, line.y1) for line in heads[index:index + 3])
-                    for index in (0, 3)
-                ),
-                "journal_roof_m": roof,
-                "candidate_wall_segments_m": tuple(
-                    (line.x0, line.y0, line.x1, line.y1) for line in foreign_lines
-                    if line.x0 == line.x1 and line.x0 > x
-                    and min(line.y0, line.y1) <= roof <= max(line.y0, line.y1)
-                ),
-                "candidate_wall_xs_m": tuple(walls),
-                "chosen_right_wall_m": right,
-                "LEFT": min(shelf.x0, shelf.x1) < x,
-                "RIGHT_OVERFLOW": max(shelf.x0, shelf.x1) > right,
-                "signed_min_shelf_minus_authored_x_m": min(shelf.x0, shelf.x1) - x,
-                "signed_max_shelf_minus_right_wall_m": max(shelf.x0, shelf.x1) - right,
-                "native_proof_log_labels": (label, "collar-side neck: vertical linear factory"),
-                "native_context": (
-                    "Same-phase arrow proof and existing factory type/SystemValue/ProjectedDimensions logs; "
-                    "owner/scale guards already ran, with no additional reads here."
-                ),
-                "numeric_conversion": (
-                    "_neck_numbers, _layout_audit._floats/line_segment and Segment do not round; "
-                    "native floats and their signed differences are represented with repr."
-                ),
-            }
-            _telemetry.error(f"{label}: RIGHT shelf predicate diagnostic {diagnostic!r}")
-        except Exception:  # noqa: BLE001 - diagnostic failure must not replace the native refusal
-            pass
-        raise RuntimeError(f"{label}: ordinary native diameter shelf is not RIGHT")
+    shelf_min_x, shelf_max_x = min(shelf.x0, shelf.x1), max(shelf.x0, shelf.x1)
+    left = not _neck_native_ge(shelf_min_x, x)
+    right_overflow = not _neck_native_ge(right, shelf_max_x)
+    if left or right_overflow:
+        raise RuntimeError(
+            f"{label}: ordinary native diameter shelf is not RIGHT: "
+            f"shelf_x_m={(shelf_min_x, shelf_max_x)!r}, authored_x_m={x!r}, right_wall_m={right!r}, "
+            f"LEFT={left}, RIGHT_OVERFLOW={right_overflow}, "
+            f"raw_min_minus_authored_x_m={shelf_min_x - x!r}, "
+            f"raw_max_minus_wall_m={shelf_max_x - right!r}"
+        )
     if not any(abs(endpoint - x) <= NECK_GEOMETRY_TOLERANCE_M for endpoint in (shelf.x0, shelf.x1)):
         raise RuntimeError(f"{label}: ordinary native shelf lost its actual vertical root")
     if any(abs(line.x0 - x) > NECK_GEOMETRY_TOLERANCE_M for line in lines if line not in shelves):
@@ -1482,11 +1456,21 @@ def _assert_neck_right_advance(
         raise RuntimeError(f"{label}: ordinary native vertical route does not connect both tips to the shelf")
     for row in texts:
         box = row["advance"]
-        if (
-            box.xmin < x or box.xmax > right or box.ymin < shelf.y0
-            or box.ymax > COLLAR_REAR_FINISH[1][1]
+        if not (
+            _neck_native_ge(box.xmin, x) and _neck_native_ge(right, box.xmax)
+            and _neck_native_ge(box.ymin, shelf.y0)
+            and _neck_native_ge(COLLAR_REAR_FINISH[1][1], box.ymax)
         ):
-            raise RuntimeError(f"{label}: complete nonblank native ADVANCE escaped the RIGHT bay")
+            deltas = (
+                box.xmin - x, box.xmax - right,
+                box.ymin - shelf.y0, box.ymax - COLLAR_REAR_FINISH[1][1],
+            )
+            raise RuntimeError(
+                f"{label}: complete nonblank native ADVANCE escaped the RIGHT bay: "
+                f"text={row['text']!r}, advance_m={(box.xmin, box.ymin, box.xmax, box.ymax)!r}, "
+                f"inclusive_bay_m={(x, shelf.y0, right, COLLAR_REAR_FINISH[1][1])!r}, "
+                f"raw_boundary_deltas_m={deltas!r}"
+            )
     for line in lines:
         for foreign in foreign_lines:
             if _neck_crossing(line, foreign) is not None:
