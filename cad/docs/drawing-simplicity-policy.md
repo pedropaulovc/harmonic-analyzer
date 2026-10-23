@@ -78,10 +78,19 @@ cannot ask for what the authors were told to leave out.
   Their native nominal-major, across-flats and thickness text blocks use the
   shared measured-shelf convention: seed offset mode at the actual arrow
   station, then move the complete text beyond the outside-arrow tail without
-  changing the physical witnesses. Original perpendicular witness coverage is
-  retained as a canonical interval union, not merely its outside endpoints:
-  equivalent fragmentation or ordering is harmless, but a new interior gap
-  fails the same settled proof. Every reported text fragment participates,
+  changing the physical witnesses or dimension-line coverage. Original
+  perpendicular witnesses and axial physical dimension lines are retained as
+  canonical interval unions, including every disjoint component and gap, not
+  merely outside endpoints or maximum reach. Equivalent fragmentation,
+  coalescing, reversal and ordering are harmless; changed coverage or actual
+  transverse bounds fail against the immutable pre-transition measurement.
+  Union gaps use the existing 10 micrometre readback tolerance once, without
+  padding stored endpoints or adopting a later station as the baseline.
+  Physical candidates must lie on the actual arrow support line at both ends.
+  Off-support text strokes remain in the raw record, but an exactly coincident
+  text stroke has no proven native discriminator and is conservatively physical.
+  This is not a general glyph-clearance classifier. Every reported text fragment
+  participates,
   including both fraction parts, all three nominal-major rows, and measured
   empty/whitespace BSTR advances. The shared native bounds reader normalizes all
   six SDK anchor positions and their rotation using measured font rectangles,

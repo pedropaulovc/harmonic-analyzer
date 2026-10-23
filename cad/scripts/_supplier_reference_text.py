@@ -156,12 +156,16 @@ def measure_reference_text(
 
     ``axis`` is 0 for a horizontal dimension, 1 for a vertical dimension. The
     returned record retains all native lines, including fraction bars and
-    offset-text connectors. ``reach`` is only the maximum positive-axis reach
-    of tip-incident dimension lines and arrowheads, not text-format strokes.
+    offset-text connectors. ``reach`` is the maximum positive-axis reach of
+    physical dimension lines and arrowheads, not off-support text-format ink.
     ``witnesses`` contains one primitive ``(station, low, high)`` triple per
-    disjoint perpendicular coverage interval, sorted by station and interval.
-    This is a read, not a rebuild; callers needing settled pre-transition data
-    must rebuild first. :func:`shelve_reference_text` does that itself.
+    disjoint perpendicular coverage interval. ``physical_lines`` retains each
+    disjoint axial union as ``(normal_low, normal_high, axial_low, axial_high)``;
+    actual normal bounds are not snapped to the arrow support line. Both use
+    the existing readback tolerance, without padding their stored endpoints.
+    Exactly coincident text-format ink has no proven native discriminator and
+    is conservatively physical. This is a read, not a rebuild; callers needing
+    settled pre-transition data must rebuild first. The shelf core does that.
     """
     if isinstance(axis, bool) or not isinstance(axis, int) or axis not in (0, 1):
         raise ValueError(f"{label}: reference axis must be 0 or 1")
@@ -209,18 +213,38 @@ def measure_reference_text(
         for run in geometry.segments
     ):
         raise RuntimeError(f"{label}: unreadable supplier reference native line geometry")
+    normal = 1 - axis
+    support = tips[0][normal] + (tips[1][normal] - tips[0][normal]) / 2
     physical = [
         segment
         for segment in geometry.segments
         if segment.role == "dim-line"
         and abs((segment.y1 - segment.y0) if axis == 0 else (segment.x1 - segment.x0))
         <= _POSITION_TOLERANCE_M
-        and any(
-            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
-            for tip in tips
+        and all(
+            abs(endpoint[normal] - support) <= _POSITION_TOLERANCE_M
             for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
         )
     ]
+    # Preserve complete collinear ink, including fragments not incident to a
+    # tip. Text connectors/underlines off the actual support line stay raw ink.
+    intervals = []
+    for segment in physical:
+        start, end = (segment.x0, segment.y0), (segment.x1, segment.y1)
+        intervals.append((
+            min(start[normal], end[normal]), max(start[normal], end[normal]),
+            min(start[axis], end[axis]), max(start[axis], end[axis]),
+        ))
+    physical_lines = []
+    for normal_low, normal_high, low, high in sorted(intervals, key=lambda row: row[2]):
+        if physical_lines and low <= physical_lines[-1][3] + _POSITION_TOLERANCE_M:
+            prior = physical_lines[-1]
+            physical_lines[-1] = (
+                min(prior[0], normal_low), max(prior[1], normal_high),
+                prior[2], max(prior[3], high),
+            )
+        else:
+            physical_lines.append((normal_low, normal_high, low, high))
     # OffsetText connectors can be classified as ext-line too. Only the
     # perpendicular runs on actual arrow stations are physical witnesses.
     witnesses = []
@@ -253,9 +277,14 @@ def measure_reference_text(
         witnesses.extend((tip[axis], low, high) for low, high in coverage)
     if any(
         not any(
-            dist(tip, endpoint) <= _POSITION_TOLERANCE_M
-            for segment in physical
-            for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            dist(
+                (tip[normal], tip[axis]),
+                (
+                    min(max(tip[normal], normal_low), normal_high),
+                    min(max(tip[axis], low), high),
+                ),
+            ) <= _POSITION_TOLERANCE_M
+            for normal_low, normal_high, low, high in physical_lines
         )
         for tip in tips
     ):
@@ -276,6 +305,7 @@ def measure_reference_text(
         axis=axis,
         tips=tips,
         witnesses=tuple(witnesses),
+        physical_lines=tuple(physical_lines),
         reach=reach,
     )
 
@@ -283,8 +313,8 @@ def measure_reference_text(
 def assert_reference_text_stations(
     before: dict[str, Any], after: dict[str, Any], *, label: str
 ) -> None:
-    """Require unchanged native arrow tips and complete physical witness runs."""
-    for key in ("tips", "witnesses"):
+    """Require original tips, complete witnesses and physical dimension-line ink."""
+    for key in ("tips", "witnesses", "physical_lines"):
         if len(before[key]) != len(after[key]) or any(
             dist(old, new) > _POSITION_TOLERANCE_M
             for old, new in zip(before[key], after[key], strict=True)
@@ -401,7 +431,7 @@ def shelve_reference_text(
         rebuild_drawing(adapter, label=f"{label} measured reference text shelves")
 
     stations = {
-        name: {key: geometry[key] for key in ("tips", "witnesses")}
+        name: {key: geometry[key] for key in ("tips", "witnesses", "physical_lines")}
         for name, geometry in before.items()
     }
 

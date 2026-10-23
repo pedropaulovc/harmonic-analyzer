@@ -318,6 +318,19 @@ def _witness_pieces(row, axis, intervals):
     return pieces
 
 
+@pytest.fixture
+def physical_case(witness_case):
+    case = witness_case
+    return SimpleNamespace(
+        record=case.record, axis=case.axis, index=3 if case.axis == 0 else 2
+    )
+
+
+def _physical_pieces(row, axis, intervals):
+    # The existing native fragmentation helper varies its transverse axis.
+    return _witness_pieces(row, 1 - axis, intervals)
+
+
 def _centre_native_fragment(row, *, reference, angle, centre):
     """Encode one known physical text centre using swTextPosition_e anchors."""
     fx, fy = {
@@ -384,6 +397,216 @@ def test_measure_reads_recovered_vertical_head_height(native_reads):
     assert geometry["text"] == _text_box(record)
     assert geometry["text"].height == pytest.approx(0.0035)
     assert geometry["record"] == record
+
+
+def test_measure_reports_actual_physical_lines_and_normal_bounds(native_reads, physical_case):
+    case = physical_case
+    before = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    expected = (
+        ((0.1588138, 0.1588138, 0.092775, 0.137225),)
+        if case.axis == 0
+        else (
+            (0.1029834, 0.1029834, 0.2284155, 0.2347655),
+            (0.1029834, 0.1029834, 0.2352608, 0.2416108),
+        )
+    )
+    assert isinstance(before["physical_lines"], tuple)
+    assert len(before["physical_lines"]) == len(expected)
+    for actual, interval in zip(before["physical_lines"], expected, strict=True):
+        assert isinstance(actual, tuple)
+        assert actual == pytest.approx(interval)
+        assert len(actual) == 4 and all(isfinite(value) for value in actual)
+
+    row = case.record["display"]["lines"][case.index]
+    normal = 1 - case.axis
+    support = row[4 + normal]
+    row[4 + normal] = support + 0.8 * _TOL
+    row[7 + normal] = support + 0.9 * _TOL
+    measured = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    assert measured["physical_lines"][0][:2] == pytest.approx(
+        (support if case.axis == 0 else support + 0.8 * _TOL, support + 0.9 * _TOL)
+    )
+    # Real normal bounds survive axial union; neither snapping to the support
+    # nor averaging the endpoints is a faithful physical measurement.
+    row[4 + normal] = support - 0.9 * _TOL
+    row[7 + normal] = support - 0.8 * _TOL
+    moved = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    assert moved["tips"] == measured["tips"]
+    assert moved["witnesses"] == measured["witnesses"]
+    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+        core.assert_reference_text_stations(measured, moved, label=_LABEL)
+
+
+def test_stations_reject_actual_100um_free_tail_mutation(native_reads, physical_case):
+    case = physical_case
+    display = _static(case.record)
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    healthy = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    core.assert_reference_text_stations(original, healthy, label=_LABEL)
+    # Move only the negative/free tail end, not the arrow tip, witnesses or
+    # positive reach. Deliberately do not read the new field before refusal:
+    # the old production core must expose DidNotRaise, not a missing-field error.
+    row = case.record["display"]["lines"][case.index]
+    row[7 + case.axis] -= 0.0001
+    moved = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    for key in ("tips", "witnesses", "reach"):
+        assert moved[key] == original[key]
+    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+        core.assert_reference_text_stations(original, moved, label=_LABEL)
+
+
+@pytest.mark.parametrize(
+    "intervals",
+    (
+        ((0.0, 0.25), (0.25, 0.7), (0.7, 1.0)),
+        ((0.8, 0.3), (1.0, 0.6), (0.4, 0.0), (0.8, 0.3), (0.2, 0.25)),
+    ),
+    ids=("touching-splits", "reversed-overlaps-duplicates-nesting"),
+)
+def test_physical_union_accepts_equivalent_native_fragmentation(
+    native_reads, physical_case, intervals
+):
+    case = physical_case
+    lines = case.record["display"]["lines"]
+    original = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    lines[case.index:case.index + 1] = _physical_pieces(
+        lines[case.index], case.axis, intervals
+    )
+    lines.reverse()
+    case.record["display"]["arrows"].reverse()
+    fragmented = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    assert fragmented["physical_lines"] == original["physical_lines"]
+    core.assert_reference_text_stations(original, fragmented, label=_LABEL)
+    # Coalesce the entire horizontal coverage: both tips are now INSIDE the
+    # segment rather than native endpoints. Vertical coverage keeps its gap.
+    retained = copy.deepcopy(case.record)
+    lines[:] = [
+        row for row in lines
+        if abs(row[4 + (1 - case.axis)] - original["tips"][0][1 - case.axis]) > _TOL
+        or abs(row[7 + (1 - case.axis)] - original["tips"][0][1 - case.axis]) > _TOL
+    ]
+    template = retained["display"]["lines"][-1]
+    for normal_low, normal_high, low, high in original["physical_lines"]:
+        row = list(template)
+        row[4 + case.axis], row[7 + case.axis] = high, low
+        row[4 + (1 - case.axis)] = normal_high
+        row[7 + (1 - case.axis)] = normal_low
+        lines.append(row)
+    coalesced = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    assert coalesced["physical_lines"] == original["physical_lines"]
+    core.assert_reference_text_stations(original, coalesced, label=_LABEL)
+
+
+@pytest.mark.parametrize("defect", ("missing-component", "interior-gap", "moved-gap"))
+def test_physical_union_retains_disjoint_coverage_and_refuses_loss(
+    native_reads, physical_case, defect
+):
+    case = physical_case
+    lines = case.record["display"]["lines"]
+    row = list(lines[case.index])
+    intervals = ((0.0, 0.25), (0.4, 0.6), (0.8, 1.0))
+    lines[case.index:case.index + 1] = _physical_pieces(row, case.axis, intervals)
+    original = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    low, high = sorted((row[4 + case.axis], row[7 + case.axis]))
+    support = row[4 + (1 - case.axis)]
+    assert len(original["physical_lines"]) == (3 if case.axis == 0 else 4)
+    for actual, (start, end) in zip(original["physical_lines"][:3], intervals, strict=True):
+        assert actual == pytest.approx(
+            (support, support, low + start * (high - low), low + end * (high - low))
+        )
+    changed = {
+        "missing-component": ((0.0, 0.25), (0.8, 1.0)),
+        "interior-gap": ((0.0, 0.25), (0.4, 0.46), (0.54, 0.6), (0.8, 1.0)),
+        "moved-gap": ((0.0, 0.3), (0.45, 0.6), (0.8, 1.0)),
+    }[defect]
+    lines[case.index:case.index + 3] = _physical_pieces(row, case.axis, changed)
+    after = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    for key in ("tips", "witnesses", "reach"):
+        assert after[key] == original[key]
+    assert after["physical_lines"][0][2] == original["physical_lines"][0][2]
+    assert after["physical_lines"][-1][3] == original["physical_lines"][-1][3]
+    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+        core.assert_reference_text_stations(original, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("factor", (0.999, 1.0, 1.001), ids=("below", "at", "above"))
+def test_physical_union_gap_uses_single_existing_tolerance(native_reads, physical_case, factor):
+    case = physical_case
+    # Put the split at zero so the exact boundary is not perturbed by
+    # subtracting two large native sheet coordinates.
+    display = _Display(case.record, case.axis)
+    row = case.record["display"]["lines"][case.index]
+    midpoint = (row[4 + case.axis] + row[7 + case.axis]) / 2
+    display.shift_stations(case.axis, -midpoint)
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    lines = case.record["display"]["lines"]
+    pieces = _physical_pieces(lines[case.index], case.axis, ((0.0, 0.5), (0.5, 1.0)))
+    pieces[0][7 + case.axis] = 0.0
+    pieces[1][4 + case.axis] = factor * _TOL
+    lines[case.index:case.index + 1] = pieces
+    after = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    if factor <= 1.0:
+        assert after["physical_lines"] == original["physical_lines"]
+        core.assert_reference_text_stations(original, after, label=_LABEL)
+    else:
+        assert len(after["physical_lines"]) == len(original["physical_lines"]) + 1
+        with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+            core.assert_reference_text_stations(original, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("factor", (0.999, 1.0, 1.001), ids=("below", "at", "above"))
+def test_physical_station_distance_uses_existing_tolerance(factor):
+    original = dict(
+        tips=((0.0, 0.0), (0.01, 0.0)),
+        witnesses=((0.0, -0.01, 0.01), (0.01, -0.01, 0.01)),
+        physical_lines=((0.0, 0.0, 0.0, 0.02),),
+    )
+    after = dict(original, physical_lines=((0.0, 0.0, -factor * _TOL, 0.02),))
+    if factor <= 1.0:
+        core.assert_reference_text_stations(original, after, label=_LABEL)
+    else:
+        with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+            core.assert_reference_text_stations(original, after, label=_LABEL)
+
+
+def test_physical_lines_exclude_true_off_support_strokes_but_keep_raw_record(
+    native_reads, physical_case
+):
+    case = physical_case
+    original = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    normal = 1 - case.axis
+    row = case.record["display"]["lines"][case.index]
+    underline, connector = list(row), list(row)
+    underline[4 + normal] += 2 * _TOL
+    underline[7 + normal] += 2 * _TOL
+    # One endpoint on support is insufficient, even for a tiny diagonal.
+    connector[7 + normal] += 2 * _TOL
+    case.record["display"]["lines"].extend((underline, connector))
+    after = core.measure_reference_text(
+        None, _static(case.record), axis=case.axis, label=_LABEL
+    )
+    assert after["record"] == case.record
+    assert after["record"]["display"]["lines"][-2:] == [underline, connector]
+    assert after["physical_lines"] == original["physical_lines"]
+    core.assert_reference_text_stations(original, after, label=_LABEL)
 
 
 def test_measure_keeps_offset_ink_in_record_but_out_of_witnesses(native_reads):
@@ -906,6 +1129,7 @@ def test_stations_reject_drift_beyond_tolerance(key):
     original = dict(
         tips=((0.1, 0.2), (0.1, 0.204)),
         witnesses=((0.2, 0.099, 0.11), (0.204, 0.099, 0.11)),
+        physical_lines=((0.1, 0.1, 0.2, 0.204),),
     )
     core.assert_reference_text_stations(original, copy.deepcopy(original), label=_LABEL)
     settled = copy.deepcopy(original)
@@ -935,8 +1159,12 @@ def test_stations_reject_witness_run_shortening(native_reads):
 
 
 def test_stations_reject_lost_station():
-    before = dict(tips=((0.1, 0.2), (0.1, 0.204)), witnesses=((0.2, 0.0, 0.1), (0.204, 0.0, 0.1)))
-    after = dict(tips=before["tips"][:1], witnesses=before["witnesses"])
+    before = dict(
+        tips=((0.1, 0.2), (0.1, 0.204)),
+        witnesses=((0.2, 0.0, 0.1), (0.204, 0.0, 0.1)),
+        physical_lines=((0.1, 0.1, 0.2, 0.204),),
+    )
+    after = dict(before, tips=before["tips"][:1])
     with pytest.raises(RuntimeError, match="tips moved"):
         core.assert_reference_text_stations(before, after, label=_LABEL)
 
@@ -1128,6 +1356,103 @@ def test_shelve_refuses_gap_created_by_native_shelf(native_reads, witness_case):
             axes={display.name: case.axis},
             label=_LABEL,
         )
+
+
+@pytest.mark.parametrize("phase", ("seed", "enable", "shelf"))
+def test_shelve_refuses_physical_tail_mutation_during_each_transition(
+    native_reads, physical_case, phase
+):
+    case = physical_case
+
+    class TailMovingDisplay(_Display):
+        def move_tail(self):
+            self.record["display"]["lines"][case.index][7 + self.axis] -= 0.0001
+
+        def SetPosition2(self, x, y, z):
+            stage = "shelf" if self.OffsetText else "seed"
+            result = super().SetPosition2(x, y, z)
+            if stage == phase:
+                self.move_tail()
+            return result
+
+        @property
+        def OffsetText(self):
+            return _Display.OffsetText.fget(self)
+
+        @OffsetText.setter
+        def OffsetText(self, enabled):
+            _Display.OffsetText.fset(self, enabled)
+            if enabled and phase == "enable":
+                self.move_tail()
+
+    display = TailMovingDisplay(
+        case.record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
+    )
+    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+        core.shelve_reference_text(
+            None, reacquire=lambda: {display.name: display},
+            axes={display.name: case.axis}, label=_LABEL,
+        )
+
+
+@pytest.mark.parametrize("late_delta", (0.0001, 0.6 * _TOL), ids=("100um", "cumulative"))
+def test_retained_physical_proof_uses_original_baseline_after_fragmentation(
+    native_reads, physical_case, late_delta
+):
+    case = physical_case
+    lines = case.record["display"]["lines"]
+    row = list(lines[case.index])
+    lines[case.index:case.index + 1] = _physical_pieces(
+        row, case.axis, ((0.0, 0.3), (0.6, 1.0))
+    )
+    display = _Display(
+        case.record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
+    )
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    frozen_original = copy.deepcopy(original)
+    move = display.SetPosition2
+
+    def settles_with_small_tail_readback(x, y, z):
+        was_offset = display.OffsetText
+        result = move(x, y, z)
+        if was_offset:
+            # Accepted once against the original, NOT a new station baseline.
+            display.record["display"]["lines"][case.index][4 + case.axis] -= 0.6 * _TOL
+        return result
+
+    display.SetPosition2 = settles_with_small_tail_readback
+    found = {display.name: display}
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: dict(found), axes={display.name: case.axis}, label=_LABEL
+    )
+    proof()
+    settled = copy.deepcopy(display.record)
+    fresh = copy.copy(display)
+    fresh.record = copy.deepcopy(settled)
+    found[display.name] = fresh
+    fresh_lines = fresh.record["display"]["lines"]
+    for index in (case.index + 1, case.index):
+        fresh_lines[index:index + 1] = _physical_pieces(
+            fresh_lines[index], case.axis,
+            ((1.0, 0.5), (0.5, 0.0), (0.2, 0.7), (0.2, 0.7)),
+        )
+    fresh_lines.reverse()
+    fresh.record["display"]["arrows"].reverse()
+    equivalent = copy.deepcopy(fresh.record)
+    proof()
+    assert fresh.record == equivalent
+    assert original == frozen_original
+    # Fresh reads still compare to the pre-seed baseline. In the cumulative
+    # case both successive changes are individually within tolerance, but
+    # their total displacement is not.
+    fresh.record = copy.deepcopy(settled)
+    fresh.record["display"]["lines"][case.index][4 + case.axis] -= late_delta
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+            proof()
+    fresh.record = copy.deepcopy(equivalent)
+    proof()
+    assert original == frozen_original
 
 
 def test_shelve_and_proof_preserve_original_disjoint_coverage(native_reads, witness_case):
