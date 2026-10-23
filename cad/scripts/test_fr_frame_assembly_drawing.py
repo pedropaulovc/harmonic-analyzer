@@ -1620,9 +1620,18 @@ def test_native_bom_or_neighbour_collision_refuses_set_screw_placement(change, f
     assert failure in drawing._frame_bom_balloon_failures(**state)
 
 
-@pytest.mark.parametrize("bottom", [0.314, 0.303])
+@pytest.mark.parametrize(
+    ("bottom", "balloon_y", "clears"),
+    [
+        (0.314, 0.297, True),
+        (0.303, 0.297, False),  # Rebuilt BOM grew down into the settled ring.
+        (0.314, 0.309, False),  # Balloon drifted up although the table did not move.
+        (0.305001, 0.297, True),  # 3.001 mm of air around the complete outer ring.
+        (0.304999, 0.297, False),  # 2.999 mm must not meet the 3 mm floor.
+    ],
+)
 def test_final_native_clearance_guard_reads_rebuilt_table_and_both_leaders(
-    monkeypatch, bottom
+    monkeypatch, bottom, balloon_y, clears
 ) -> None:
     from contextlib import nullcontext
 
@@ -1649,13 +1658,15 @@ def test_final_native_clearance_guard_reads_rebuilt_table_and_both_leaders(
 
     def rendered(actual_note, **_kwargs):
         reads.append(actual_note.name)
-        return state["circle" if actual_note is screw else "cap_circle"]
+        if actual_note is screw:
+            return (state["circle"][0], balloon_y, state["circle"][2])
+        return state["cap_circle"]
 
     monkeypatch.setattr(drawing, "rendered_balloon_circle", rendered)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
-    if bottom == 0.314:
+    if clears:
         drawing._assert_frame_bom_balloon_clearance(adapter, object(), landings, proof)
     else:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="bom_rule_clearance"):
             drawing._assert_frame_bom_balloon_clearance(adapter, object(), landings, proof)
     assert "set" in reads and "cap" in reads

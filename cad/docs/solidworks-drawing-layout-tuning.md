@@ -633,6 +633,26 @@ Keep the full Numbers and the view's actual scale. Read `INote::GetExtent`
 after insertion to prove at least 4 mm of final air, as well as sheet and
 title-block containment; a readable source string does not prove a readable PDF.
 
+**FR's set-screw balloon must follow that same rebuilt BOM boundary.**
+The full-sheet inspection at `ebb3c20596a66f93c01fa2084eca7b3602ea32dd`
+confirmed #1843: the BOM's bottom rule passed through balloon 10's ring and
+number. The recipe's measured placement and clearance helpers existed but
+were not consumed by `_place_package`. After ordinary reattachment, apply
+`_place_frame_set_screw_balloon`: keep its right-hand lane and real screw tip,
+placing the complete ring 4 mm below the native table bottom or lower to
+retain a short leader. Include its short-leader proof with the other balloon
+settlement proofs, not just an insertion-time check.
+
+`_assert_frame_bom_balloon_clearance` must run after placement and again after
+the final rebuild. It requires at least 3 mm between the BOM rule and the
+ring's outer edge, separation from the neighbouring cap balloon, and clear
+leader routes. A rebuilt table growing down or a ring drifting up refuses
+export. The regression also brackets that unchanged floor at 3.001/2.999 mm;
+these are offline geometry cases, not a claim of native pixel resolution.
+Do not rescale the view, alter its explode or move the attachment to create
+clearance. All ten item identities and the geometric inset proof stay intact;
+the next farm export and full-sheet inspection must establish the final ink.
+
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when
 `GetTextInBoxStyleAtIndex` is `swTextInBoxStyleNone`). `_layout_geometry`

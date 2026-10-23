@@ -2098,6 +2098,14 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     proof = _reattach_frame_balloons(
         adapter, exploded, [landing.note for landing in landings], balloon_items
     )
+    # The ring layout does not know the BOM's rebuilt row heights. Keep item 10
+    # below its actual bottom rule without changing the native screw attachment.
+    set_screw_proof = _place_frame_set_screw_balloon(adapter, exploded, table, landings)
+    proof = _FrameBalloonProof(
+        rebound=proof.rebound, bound=proof.bound,
+        short=(*proof.short, set_screw_proof),
+    )
+    _assert_frame_bom_balloon_clearance(adapter, table, landings, set_screw_proof)
     _add_note_block(
         adapter,
         f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
@@ -2138,6 +2146,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
+        _assert_frame_bom_balloon_clearance(adapter, table, landings, set_screw_proof)
         _assert_inset_dimension_settled(adapter, inset)
 
     return settled
