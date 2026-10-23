@@ -1659,7 +1659,8 @@ def test_shelve_refuses_physical_tail_mutation_during_each_transition(
     # including mode and raw fragments, rather than only the stripped vectors.
     assert fields["before"]["raw_record_available"] is True
     assert fields["before"]["offset_text"] is False
-    assert fields["after"]["offset_text"] is (phase != "seed")
+    # Seed mutations are first measured after the mode-enable batch too.
+    assert fields["after"]["offset_text"] is True
     assert fields["before"]["raw"]["lines"] != fields["after"]["raw"]["lines"]
 
 
