@@ -1669,9 +1669,51 @@ def _place_purchased_note(
 
 
 def _assert_note_arrow(current: Any, landing: tuple, record: dict) -> None:
-    """One real standard straight leader and finite native twelve-double arrow."""
+    """Prove full-precision native ink; the audit dump rounds coordinates to 0.1 um."""
+    current = _early_bound(current, "IAnnotation")
     points = tuple(float(value) for value in current.GetLeaderPointsAtIndex(0) or ())
-    arrows = record["display"].get("arrows") or ()
+    raw_data = current.GetDisplayData()
+    if raw_data is None:
+        raise RuntimeError("Purchased Screw Note: native annotation display data is null")
+    data = _early_bound(raw_data, "IDisplayData")
+    arrow_count, line_count = data.GetArrowHeadCount(), data.GetLineCount()
+    display = record["display"]
+    if (
+        type(arrow_count) is not int or type(line_count) is not int
+        or arrow_count != 1 or line_count < 1
+        or arrow_count != len(display.get("arrows") or ())
+        or line_count != len(display.get("lines") or ())
+    ):
+        raise RuntimeError(
+            "Purchased Screw Note: actual native arrow/line counts changed; "
+            f"native={(arrow_count, line_count)!r}, "
+            f"reported={(len(display.get('arrows') or ()), len(display.get('lines') or ()))!r}"
+        )
+    # SDK GetArrowHeadAtIndex2 returns all 12 doubles; GetLineAtIndex2
+    # returns [color, lineType, unused, unused, startXYZ, endXYZ] (10).
+    # Do not feed the shared collector's round(..., 7) into a 1e-8 proof.
+    arrows = []
+    for index in range(arrow_count):
+        raw_arrow = data.GetArrowHeadAtIndex2(index)
+        if raw_arrow is None:
+            raise RuntimeError(f"Purchased Screw Note: native arrow row {index} is null")
+        arrows.append(tuple(float(value) for value in raw_arrow))
+    lines = []
+    for index in range(line_count):
+        raw_line = data.GetLineAtIndex2(index)
+        if raw_line is None:
+            raise RuntimeError(f"Purchased Screw Note: native line row {index} is null")
+        line = tuple(float(value) for value in raw_line)
+        if len(line) != 10 or not all(map(math.isfinite, line)):
+            raise RuntimeError(
+                f"Purchased Screw Note: native line {index} needs exactly ten finite doubles; "
+                f"length={len(line)}, row={line[:10]!r}"
+            )
+        lines.append(line)
+    # This fresh local note record also feeds the whole leader/arrow ink and
+    # physical-body guards. Keep their endpoints unrounded, not just the tip
+    # predicate below. The shared report collector remains unchanged.
+    display["arrows"], display["lines"] = arrows, lines
     count, style = int(current.GetLeaderCount()), int(current.GetLeaderStyle())
     # SDK IAnnotation.GetLeaderStyle -> swLeaderStyle_e: attachment-mode
     # bitmasks swAttachLeaderTop/Center/Bottom/Nearest do not change shape.
@@ -1716,7 +1758,10 @@ def _assert_note_arrow(current: Any, landing: tuple, record: dict) -> None:
         )
         for line in record["display"].get("lines") or ()
     ):
-        raise RuntimeError("Purchased Screw Note: actual full straight leader missing from native annotation dump")
+        raise RuntimeError(
+            "Purchased Screw Note: actual full straight leader missing from native annotation display data; "
+            f"expected_tip={landing!r}, native_lines={lines[:2]!r}"
+        )
 
 
 def _assert_note_wrap(adapter: Any, note: Any, *, landing: tuple, frame: dict) -> None:

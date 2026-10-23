@@ -2994,6 +2994,16 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
             arrows=[] if state.note_ink_missing else [list(arrow) for _ in range(state.note_arrow_count)],
         ))
     state.note_annotation.paper_record = note_record
+    def note_display_data():
+        # Native doubles are independent of the audit dump's serialization.
+        display = state.note_annotation.paper_record()["display"]
+        return SimpleNamespace(
+            GetArrowHeadCount=lambda: len(display.get("arrows") or ()),
+            GetArrowHeadAtIndex2=lambda index: display["arrows"][index],
+            GetLineCount=lambda: len(display.get("lines") or ()),
+            GetLineAtIndex2=lambda index: display["lines"][index],
+        )
+    state.note_annotation.GetDisplayData = note_display_data
     state.note = SimpleNamespace(
         GetAnnotation=lambda: state.note_annotation, GetText=lambda: state.note_text,
         PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
@@ -3550,6 +3560,148 @@ def test_cold_tail_cannot_keep_box_but_drop_native_minimum_acceptance_wording(mo
         )
     assert state.closes == [state.path.name]
     assert state.adapter.currentModel is state.previous
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("fault", ("none", "native_arrow_tip", "native_line_tip"))
+def test_native_note_precision_cannot_be_replaced_by_rounded_paper(
+    monkeypatch, tmp_path, phase, fault,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    if fault == "none":
+        # Actual 59cfa710b native origin, not its seven-decimal audit value.
+        delta = 0.186285034189251 - 0.186285
+        state.front.origin_offset = (
+            state.front.origin_offset[0], state.front.origin_offset[1] + delta,
+        )
+        for index, arrow in enumerate(state.arrows):
+            state.arrows[index] = (arrow[0], arrow[1] + delta, *arrow[2:])
+        for row in state.head_record["display"]["arrows"]:
+            row[1] += delta
+        for row in state.head_record["display"]["lines"]:
+            row[5] += delta
+            row[8] += delta
+        for row in state.head_record["display"]["texts"]:
+            row["pos"][1] += delta
+        state.landing = drawing._purchased_head_target(state.adapter, state.front)[1]
+        state.adapter.currentModel = state.saved
+        state.note_check, state.note_frame = drawing._place_purchased_note(
+            state.adapter, state.front, state.note, state.paper_displays,
+        )
+        state.paper["wrap"] = state.note_frame
+        state.adapter.currentModel = state.previous
+    else:
+        original_record = state.note_annotation.paper_record
+        def wrong_native_tip():
+            record = original_record()
+            if fault == "native_arrow_tip":
+                record["display"]["arrows"][0][1] += 2e-8
+            else:
+                record["display"]["lines"][0][8] += 2e-8
+            return record
+        state.note_annotation.paper_record = wrong_native_tip
+    original_dump = drawing._dump_annotation
+    def rounded_dump(reader, annotation):
+        record = original_dump(reader, annotation)
+        if annotation is state.note_annotation:
+            for kind in ("arrows", "lines"):
+                record["display"][kind] = [
+                    [round(float(value), 7) for value in row]
+                    for row in record["display"].get(kind) or ()
+                ]
+        return record
+    monkeypatch.setattr(drawing, "_dump_annotation", rounded_dump)
+    expected = drawing._purchased_head_target(state.adapter, state.front)[1]
+    reported = drawing._paper_annotation(
+        state.adapter, state.note_annotation, label="Purchased Screw Note",
+    )["display"]
+    reported_errors = (
+        math.dist(reported["arrows"][0][:2], expected),
+        math.dist(reported["lines"][0][7:9], expected),
+    )
+    if fault == "none":
+        assert all(error > 1e-8 for error in reported_errors)
+    else:
+        assert all(error <= 1e-8 for error in reported_errors)
+    def verify():
+        if phase == "saved":
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+        else:
+            state.adapter.currentModel = state.saved
+            state.note_check()
+            drawing._assert_paper_layout(
+                state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+                state.paper_displays, purchased_text=state.note_text,
+            )
+    if fault == "none":
+        verify()
+    else:
+        with pytest.raises(RuntimeError):
+            verify()
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("fault", (
+    "display_null", "arrow_count_null", "arrow_count_fractional", "arrow_count_boolean",
+    "arrow_count_mismatch", "line_count_zero", "line_count_mismatch",
+    "arrow_null", "line_null", "line_short", "line_long", "line_nonfinite",
+    "arrow_read_error", "line_read_error",
+))
+def test_note_native_primitive_read_failures_cannot_hide_behind_complete_report(
+    monkeypatch, tmp_path, phase, fault,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    original_data = state.note_annotation.GetDisplayData
+    def bad_data():
+        data = original_data()
+        if fault == "display_null":
+            return None
+        if fault.startswith("arrow_count"):
+            value = {
+                "arrow_count_null": None, "arrow_count_fractional": 1.5,
+                "arrow_count_boolean": True, "arrow_count_mismatch": 2,
+            }[fault]
+            data.GetArrowHeadCount = lambda: value
+        elif fault in ("line_count_zero", "line_count_mismatch"):
+            data.GetLineCount = lambda: 0 if fault == "line_count_zero" else 2
+        elif fault == "arrow_null":
+            data.GetArrowHeadAtIndex2 = lambda _index: None
+        elif fault == "line_null":
+            data.GetLineAtIndex2 = lambda _index: None
+        elif fault in ("line_short", "line_long", "line_nonfinite"):
+            original_line = data.GetLineAtIndex2
+            def bad_line(index):
+                line = list(original_line(index))
+                if fault == "line_short":
+                    line.pop()
+                elif fault == "line_long":
+                    line.append(0.0)
+                else:
+                    line[5] = math.nan
+                return line
+            data.GetLineAtIndex2 = bad_line
+        else:
+            def refuse(_index):
+                raise RuntimeError("native primitive read refused")
+            if fault == "arrow_read_error":
+                data.GetArrowHeadAtIndex2 = refuse
+            else:
+                data.GetLineAtIndex2 = refuse
+        return data
+    state.note_annotation.GetDisplayData = bad_data
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+        else:
+            state.note_check()
 
 
 @pytest.mark.parametrize("phase", ("settled", "saved"))
