@@ -740,9 +740,6 @@ def test_thread_is_called_out_on_the_main_view() -> None:
 def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
     """A reference-only, moved, banded or re-placed control is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     assert draw.EXPECTED_CONTROLS["CutLength"] == (
         pytest.approx(0.410),
         pytest.approx(-0.0008),
@@ -767,7 +764,7 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
             GetMaxValue=lambda value=upper: value,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, value=dimension: value,
@@ -798,7 +795,6 @@ def test_drawing_requires_every_control(monkeypatch, fault, target) -> None:
 
     def verify() -> None:
         trim_drawing.verify_machining_controls(
-            None,
             annotations,
             expected=draw.EXPECTED_CONTROLS,
             tolerance_types=spec.DIMENSION_TOLERANCE_TYPES,

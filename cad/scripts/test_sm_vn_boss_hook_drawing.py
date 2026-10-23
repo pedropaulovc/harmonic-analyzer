@@ -39,9 +39,6 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
 def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
     """General is toleranced, unlike None; neither replaces a real driving size."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     annotations = []
     for name, nominal, band in (
         (
@@ -66,7 +63,7 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
             GetMaxValue=lambda band=band: band,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -95,7 +92,7 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
     elif fault == "missing":
         annotations.pop()
     if fault is None:
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
     else:
         with pytest.raises(RuntimeError):
-            drawing._verify_controls(None, annotations)
+            drawing._verify_controls(annotations)
