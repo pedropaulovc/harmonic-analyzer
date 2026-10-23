@@ -9,6 +9,7 @@ import pytest
 
 import _config
 import build_dt_crank_handle_ferrule as part
+import dt_crank_handle_ferrule_notes as notes
 import dt_crank_handle_ferrule_spec as spec
 import draw_dt_crank_handle_ferrule as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -139,21 +140,35 @@ def test_ring_matches_the_photographed_brass_collar() -> None:
     assert part.MATERIAL == "Brass"
 
 
-def test_note_names_the_mating_tenon() -> None:
+def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
     row = _config.parts("dt-crank-handle")
-    assert spec.HANDLE_NUMBER == row["number"]
-    assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in spec.DRAWING_NOTES
-    assert len(spec.DRAWING_NOTES.splitlines()) == 4
-    # Machinist review of crank-v4-16: name the bore operation. The band's
-    # reason stays off this full four-line block (Codex P1 on #1139,
-    # c81d97280); drawing-guidelines.md rule 7 would allow a short one.
-    # The OD is stock, skimmed at assembly.
-    flat = " ".join(spec.DRAWING_NOTES.split())
-    # The operation, not the machine (machinist review of crank-v4-22).
-    assert flat.startswith("BORE THRU.") and "LATHE" not in flat
-    assert "BAND" not in flat
-    assert "OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>12.5 WITH MHA-DT-08 AFTER CURE." in flat
-    assert "TURNED TO SUIT THIS BORE" in spec.DRAWING_NOTES
+    assert notes.HANDLE_NUMBER == row["number"]
+    # MHA-DT-34 machinist ENFORCE (r1-r3): the bore's matched fit and the OD's
+    # skim sit on their own callouts, not in a general note; THRU rides on the
+    # bore, and bonding the ring on is the assembly's business.
+    assert notes.BORE_FIT_CALLOUT.splitlines() == [
+        "THRU; MHA-DT-08 TENON",
+        "TURNED TO SUIT, 0.05-0.15",
+        "DIAMETRAL CLEARANCE",
+    ]
+    assert notes.OUTER_DIA_CALLOUT.splitlines() == [
+        "STOCK;",
+        "SKIM TO <MOD-DIAM>12.5",
+        "WITH MHA-DT-08",
+        "AFTER CURE",
+    ]
+    for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
+        assert "EPOXY" not in callout and "LATHE" not in callout
+    # The prose lives in the notes module, which the mating parts never import.
+    for name in ("DRAWING_NOTES", "HANDLE_NUMBER", "SEAT_MOUTH_CHAMFER_CALLOUT"):
+        assert not hasattr(spec, name), name
+    for module in (part, drawing):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "Manufacturing Notes" not in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"BoreDia": BORE_FIT_CALLOUT,' in drawing_source
+    assert '"OuterDia": OUTER_DIA_CALLOUT,' in drawing_source
+    assert "MACHINIST_REVIEW = MachinistReviewMode.ENFORCE" in drawing_source
 
 
 def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
@@ -162,20 +177,24 @@ def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
     # Owner ruling A on #1661: the MHA-DT-08 tenon root is R0.3 MAX, so the
     # bore's mouth at the seat face is chamfered 45 degrees, its shortest leg
     # no smaller than the root, for the ring to seat on the shoulder.  Its
-    # callout names the end and the root it clears (rule 4); the R it quotes
-    # is MHA-DT-08's own, which this spec cannot import.
+    # callout names the end, the root its minimum clears and what its maximum
+    # keeps (rule 4; r2-r3 finding 4); the R it quotes is MHA-DT-08's own,
+    # which the ferrule's modules cannot import.
     assert (spec.SEAT_MOUTH_CHAMFER, spec.SEAT_MOUTH_CHAMFER_TOL) == (0.35, 0.05)
-    assert spec.HANDLE_ROOT_R_MAX == handle.INSIDE_CORNER_R_MAX
+    assert notes.HANDLE_ROOT_R_MAX == handle.INSIDE_CORNER_R_MAX
     assert spec.SEAT_MOUTH_CHAMFER_MIN >= handle.INSIDE_CORNER_R_MAX
-    assert spec.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines() == [
-        "X 45 DEG SEAT END",
-        "CLEARS MHA-DT-08",
-        "TENON ROOT R0.3",
+    assert notes.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines() == [
+        "X 45 DEG SEAT END;",
+        "MIN CLEARS MHA-DT-08",
+        "TENON ROOT R0.3;",
+        "MAX KEEPS 3.5 BONDED",
+        "ON THE 4.2 MIN TENON",
+        "AFTER ITS 0.25 BREAK",
     ]
-    # The callout carries the chamfer; the notes do not repeat it.
-    flat = " ".join(spec.DRAWING_NOTES.split())
-    for fragment in ("45 DEG", "CHAMFER", "TENON ROOT"):
-        assert fragment not in flat, fragment
+    # The stack it quotes holds at the printed maximum: the shortest tenon,
+    # less its end break and the largest chamfer, keeps the bonded floor.
+    assert 4.2 - 0.25 - spec.SEAT_MOUTH_CHAMFER_MAX >= spec.TENON_GLUE_LENGTH_FLOOR
+    assert handle.TENON_GLUE_LENGTH_MIN == pytest.approx(4.2 - 0.25 - 0.4)
     # Modelled in the revolve profile at 45 degrees by equation, before the
     # INSTALLED split, so the skimmed ring keeps it too.
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -185,7 +204,7 @@ def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
         "create_configuration {INSTALLED_CONFIG}"
     )
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '{"SeatMouthChamfer": SEAT_MOUTH_CHAMFER_CALLOUT}' in drawing_source
+    assert '"SeatMouthChamfer": SEAT_MOUTH_CHAMFER_CALLOUT,' in drawing_source
     assert 'location="below"' in drawing_source
 
 
@@ -215,10 +234,19 @@ def test_registry_row_is_the_title_block_source() -> None:
     assert int(row["quantity"]) == 1
 
 
+def _block(name: str, value: str, callout: str) -> tuple[float, float, float, float]:
+    """Value plus callout rows (5.55 pitch, ~2.75 per character), centred on
+    the keep point: (left, right, bottom, top)."""
+    x, y = drawing.SECTION_KEEP[name]
+    rows = [value, *callout.replace("<MOD-DIAM>", "Ø").splitlines()]
+    half_width = max(len(row) for row in rows) * 0.00275 / 2.0
+    half_height = len(rows) * 0.00555 / 2.0
+    return x - half_width, x + half_width, y - half_height, y + half_height
+
+
 def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     for x, y in (
         *drawing.SECTION_KEEP.values(),
-        drawing.MANUFACTURING_NOTES_POS,
         drawing.ISO_NOTE_POS,
         drawing.CAPTION_XY,
     ):
@@ -227,16 +255,38 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
         assert not (x > 0.216 and y < 0.070)
     assert drawing.END_CENTER[0] + drawing.OUTER_R < drawing.SECTION_KEEP["OuterDia"][0] - 0.010
     assert drawing.SECTION_KEEP["BoreDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]
-    # The chamfer's value and callout rows (5.55 pitch, ~2.75 per character,
-    # centred on the keep point) stand 3 clear of the seat face, of the bore
-    # edge's extension line and of the isometric note.
-    x, y = drawing.SECTION_KEEP["SeatMouthChamfer"]
-    rows = [
+    section_left = drawing.SECTION_CENTER[0] - drawing.HALF_LENGTH
+    bore_bottom_y = 2.0 * drawing.SECTION_CENTER[1] - drawing.BORE_TOP_Y
+    # The chamfer's block stands 3 clear of the seat face, of the bore edge's
+    # extension line and of the isometric note.
+    left, right, bottom, top = _block(
+        "SeatMouthChamfer",
         f"{spec.SEAT_MOUTH_CHAMFER:.2f} ±{spec.SEAT_MOUTH_CHAMFER_TOL:.2f}",
-        *spec.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines(),
-    ]
-    half_width = max(len(row) for row in rows) * 0.00275 / 2.0
-    half_height = len(rows) * 0.00555 / 2.0
-    assert x - half_width >= drawing.SEAT_FACE_X + 0.003
-    assert y - half_height >= drawing.BORE_TOP_Y + 0.003
-    assert x + half_width <= drawing.ISO_NOTE_POS[0] - 0.003
+        notes.SEAT_MOUTH_CHAMFER_CALLOUT,
+    )
+    assert left >= drawing.SEAT_FACE_X + 0.003
+    assert bottom >= drawing.BORE_TOP_Y + 0.003
+    assert right <= drawing.ISO_NOTE_POS[0] - 0.003
+    chamfer_bottom, chamfer_right = bottom, right
+    # The bore's block stands between its extension lines, right of the seat
+    # face, under the chamfer's block and clear of the isometric note.
+    left, right, bottom, top = _block(
+        "BoreDia", f"Ø{spec.BORE_DIA:.2f} ±0.1", notes.BORE_FIT_CALLOUT
+    )
+    assert left >= drawing.SEAT_FACE_X + 0.003
+    assert bottom >= bore_bottom_y + 0.003
+    assert top <= drawing.BORE_TOP_Y - 0.003
+    assert top <= chamfer_bottom - 0.003
+    assert right <= drawing.ISO_NOTE_POS[0] - 0.003
+    # The Ø7.70's dimension line stands right of the chamfer's block and the
+    # dimension line under it, so the two never cross (ENFORCE iteration 1).
+    assert drawing.SECTION_KEEP["BoreDia"][0] >= chamfer_right + 0.004
+    # The OD's block stands between its extension lines, left of the section
+    # and right of the end view.
+    left, right, bottom, top = _block(
+        "OuterDia", f"(Ø{spec.OUTER_DIA:.2f})", notes.OUTER_DIA_CALLOUT
+    )
+    assert right <= section_left - 0.003
+    assert left >= drawing.END_CENTER[0] + drawing.OUTER_R + 0.003
+    assert bottom >= drawing.SECTION_CENTER[1] - drawing.OUTER_R + 0.003
+    assert top <= drawing.SECTION_CENTER[1] + drawing.OUTER_R - 0.003

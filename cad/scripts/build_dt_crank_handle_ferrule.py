@@ -55,7 +55,6 @@ from dt_crank_handle_ferrule_spec import (
     BORE_DIA,
     BORE_DIA_TOL,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     INSTALLED_CONFIG,
     INSTALLED_OUTER_DIA,
@@ -260,10 +259,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        {"Isometric View Note": ISOMETRIC_VIEW_NOTE},
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     # The drive train places INSTALLED while the part saves on its default;
