@@ -85,13 +85,17 @@ cannot ask for what the authors were told to leave out.
   selected existing layout.
   The portrait footer's anchors and reserved boxes translate together above
   the existing 66 mm title block; other consumers retain their default positions.
-  Only the six portrait sheets reposition the existing bottom zone-3 note inside
-  the right half of its original column cell, preserving its `<ZONEC>` link,
-  resolved zone, grid and font. Its original sheet y/z are requested unchanged;
+  Only the six portrait sheets jointly reposition their existing bottom zone-3
+  and zone-4 notes in their original native column cells. Zone 3's complete box
+  stays in its cell's right half; zone 4's complete box is centred in the strip
+  from its cell's left edge plus 0.6 mm to the native left margin minus 0.6 mm.
+  Both fresh native boxes must fit their original 0.6 mm cell insets and target
+  lanes before either move. Their `<ZONEC>` links, resolved zones, grid and all
+  fonts stay unchanged. Original sheet y/z are requested unchanged for both;
   all three returned coordinates use the existing 0.0001 mm readback bound,
-  including after rebuild and at final validation. The other seven column
-  anchors remain exactly unchanged. The license watermark is not altered;
-  native bounds and the complete exported footer still require inspection.
+  including after rebuild and at final validation. The other six column anchors
+  remain exactly unchanged. The license watermark is not altered or obscured;
+  fresh native bounds and all six complete exported footers still require inspection.
   The shared clamp and these six screws align orthographic projected model origins
   after fitting, before reference annotation, without changing selected scales
   or relaxing their cells.

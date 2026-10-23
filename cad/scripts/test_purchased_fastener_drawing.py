@@ -1407,13 +1407,13 @@ class _ZoneTextFormat:
 
 @pytest.fixture
 def portrait_zone_native(monkeypatch):
-    """08a's eight column notes, with live position-dependent <ZONEC> text.
+    """Eight native-shaped column notes with live position-dependent links.
 
-    The 52-note native receipt's indices 42..49 supply these exact anchors and
-    complete GetExtent boxes, including asymmetric padding and native z noise.
-    That receipt did not capture font fields: the full native-shaped formats
-    below are preservation controls, not claimed measured template font values.
-    No license/PDF box is represented as a native note.
+    Historical 08a indices 42..49 supply the anchors and zone-3/neighbour
+    extents, not current zone-4 bounds. Bottom 4's asymmetric box is a synthetic
+    guard control: its fresh runtime GetExtent and six new PDFs remain required.
+    The full formats below are preservation controls, not measured font values.
+    License/foreign notes are added only as explicit untouched controls.
     """
     import math
 
@@ -1421,8 +1421,7 @@ def portrait_zone_native(monkeypatch):
     # note, not a second spelling of bottom 3 and never a move candidate.
     records = (
         ("DetailItem398", (0.034925, 0.009488, 0.0),
-         (0.03266429220056183, 0.0016490252734925326, -1.6416314313625982e-16,
-          0.03715867828768041, 0.009600631427625406, -2.1968891213823e-16)),
+         (0.032525, 0.0015, -1e-16, 0.037125, 0.0097, -2e-16)),
         ("DetailItem399", (0.034925, 0.4285879999999999, 0.0),
          (0.03266429220056183, 0.4206640973956244, -3.090129753153126e-15,
           0.03715867828768041, 0.4284428425464065, -3.1444484402202708e-15)),
@@ -1450,7 +1449,7 @@ def portrait_zone_native(monkeypatch):
         zoom=None, zooms=[], restores=0, extent_reads=[],
         properties=(0.0, 0.0, 1.0, 1.0, 0.0, 0.2794, 0.4318, 1.0),
         margins=[0.0127] * 4, distribution=(1, 4, 4), region=1,
-        column_override=None,
+        events=[],
     )
 
     class NativeNote:
@@ -1484,8 +1483,6 @@ def portrait_zone_native(monkeypatch):
                 return self.text_override
             if self._link != "<ZONEC>":
                 return "3"
-            if state.column_override is not None and self.name == "DetailItem400":
-                return state.column_override
             x = self.anchor[0]
             if not math.isfinite(x):
                 return "3"  # Let the finite-position guard diagnose bad geometry.
@@ -1544,6 +1541,7 @@ def portrait_zone_native(monkeypatch):
 
         def SetPosition2(self, x, y, z):
             assert not state.frozen, "settled zone proof moved an annotation"
+            assert len(state.extent_reads) >= 2, "measure both boxes before either write"
             assert all(math.isfinite(value) for value in (x, y, z))
             self.moves.append((x, y, z))
             if self.setter_result is True and not self.ignore_move:
@@ -1581,6 +1579,8 @@ def portrait_zone_native(monkeypatch):
     state.notes = [NativeNote(*record) for record in records]
     state.bottom = state.notes[2]
     state.top = state.notes[3]
+    state.four = state.notes[0]
+    state.owned = (state.bottom, state.four)
     state.make_note = NativeNote
     state.draw = NativeDrawing()
     state.sheet = SimpleNamespace(
@@ -1590,10 +1590,14 @@ def portrait_zone_native(monkeypatch):
         GetZoneSizeRegion=lambda: state.region,
     )
     state.adapter = SimpleNamespace(currentModel=state.draw)
-    state.align = lambda: purchased._align_portrait_bottom_zone_three(
+    state.align = lambda: purchased._align_portrait_bottom_zones(
         state.adapter, state.draw, state.sheet, label="portrait native zone"
     )
     monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        purchased._telemetry, "event",
+        lambda event, **fields: state.events.append((event, fields)),
+    )
     return state
 
 
@@ -1673,7 +1677,7 @@ def test_note_text_style_propagates_native_read_errors(monkeypatch):
     assert exc.value is failure
 
 
-def test_portrait_zone_three_centres_complete_native_box_in_same_cell_right_half(
+def test_portrait_bottom_zones_centre_both_complete_boxes_in_original_cells(
     portrait_zone_native,
 ):
     case = portrait_zone_native
@@ -1700,15 +1704,36 @@ def test_portrait_zone_three_centres_complete_native_box_in_same_cell_right_half
     after = _zone_snapshot(target)
     assert after[:4] == before[target.name][:4]
     assert after[6:] == before[target.name][6:]
+    four = case.four
+    four_before = before[four.name]
+    strip = (0.0006, case.margins[3] - 0.0006)
+    assert (four.extent[0] + four.extent[3]) / 2 == pytest.approx(sum(strip) / 2)
+    assert strip[0] < four.extent[0] < four.extent[3] < strip[1]
+    assert four.moves == [(
+        four_before[4][0] + sum(strip) / 2
+        - (four_before[5][0] + four_before[5][3]) / 2,
+        *four_before[4][1:],
+    )]
+    four_after = _zone_snapshot(four)
+    assert four_after[:4] == four_before[:4]
+    assert four_after[6:] == four_before[6:]
+    assert four.anchor[1:] == four_before[4][1:]
+    assert (four.extent[1], four.extent[2], four.extent[4], four.extent[5]) == (
+        four_before[5][1], four_before[5][2], four_before[5][4], four_before[5][5],
+    )
     for note in case.notes:
-        if note is not target:
+        if note not in case.owned:
             assert _zone_snapshot(note) == before[note.name]
             assert note.moves == []
     assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
     assert case.rebuilds >= 1
     assert case.extent_reads[0][2] == before[target.name][5]
-    assert case.extent_reads[-1][2] == target.extent
-    assert len({zoom for _name, zoom, _box in case.extent_reads}) == 1
+    assert case.extent_reads[1][2] == before[four.name][5]
+    assert case.extent_reads[-2][2] == target.extent
+    assert case.extent_reads[-1][2] == four.extent
+    for note in case.owned:
+        assert len({zoom for name, zoom, _box in case.extent_reads
+                    if name == note.name}) == 1
 
     # The returned proof may reread native state/zoom, never move, reformat,
     # rebuild or repair it. It must still succeed when every mutator refuses.
@@ -1720,12 +1745,13 @@ def test_portrait_zone_three_centres_complete_native_box_in_same_cell_right_half
     assert tuple(_zone_snapshot(note) for note in case.notes) == settled
     assert case.rebuilds == rebuilds
     assert len(target.moves) == 1
+    assert len(four.moves) == 1
     assert case.zoom is None and case.restores == len(case.zooms)
 
 
 @pytest.fixture
 def portrait_zone_native_block_lever(portrait_zone_native):
-    """Shared block/lever before geometry from the frozen 6eafd root receipt."""
+    """Frozen 6eafd block/lever zone-3 geometry; zone 4 remains synthetic."""
     case = portrait_zone_native
     case.properties = (
         12.0, 13.0, 2.0, 1.0, 0.0, 0.2794, 0.43179999999999996, 0.0,
@@ -1805,15 +1831,21 @@ def test_portrait_zone_three_accepts_measured_block_lever_one_ulp_roundtrip(
     assert after[:4] == before[target.name][:4]
     assert after[6:] == before[target.name][6:]
     for note in case.notes:
-        if note is not target:
+        if note not in case.owned:
             assert _zone_snapshot(note) == before[note.name]
             assert note.moves == []
+    assert len(case.four.moves) == 1
+    assert case.four.anchor == case.four.moves[0]
+    assert case.four.anchor[1:] == before[case.four.name][4][1:]
+    assert case.four.GetText() == "4"
     assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
     assert target.moves == [requested]
     assert case.rebuilds == 1
     assert case.extent_reads[0][2] == before[target.name][5]
-    assert case.extent_reads[-1][2] == box
-    assert len({zoom for _name, zoom, _box in case.extent_reads}) == 1
+    assert case.extent_reads[-2][2] == box
+    for note in case.owned:
+        assert len({zoom for name, zoom, _box in case.extent_reads
+                    if name == note.name}) == 1
     assert case.zoom is None and case.restores == len(case.zooms)
 
 
@@ -1847,7 +1879,8 @@ def test_portrait_zone_three_refuses_just_outside_existing_xyz_bound(
         with pytest.raises(RuntimeError, match="position readback changed"):
             verify()
     assert case.bottom.moves == [requested]
-    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert len(case.four.moves) == 1
+    assert all(not note.moves for note in case.notes if note not in case.owned)
     assert case.rebuilds == 1
     assert case.zoom is None and case.restores == len(case.zooms)
 
@@ -1857,11 +1890,11 @@ def test_portrait_zone_three_refuses_just_outside_existing_xyz_bound(
 @pytest.mark.parametrize(
     "name",
     (
-        "DetailItem398", "DetailItem399", "DetailItem401", "DetailItem402",
+        "DetailItem399", "DetailItem401", "DetailItem402",
         "DetailItem403", "DetailItem404", "DetailItem405",
     ),
 )
-def test_portrait_zone_three_refuses_one_ulp_drift_of_every_untouched_column(
+def test_portrait_bottom_zones_refuse_one_ulp_drift_of_every_six_untouched_columns(
     portrait_zone_native_block_lever, phase, axis, name,
 ):
     import math
@@ -1891,7 +1924,8 @@ def test_portrait_zone_three_refuses_one_ulp_drift_of_every_untouched_column(
     assert after[6:] == before[6:]
     assert after[4][axis] == math.nextafter(before[4][axis], math.inf)
     assert case.bottom.moves == [(0.12228901179941004, 0.009488, 0.0)]
-    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert len(case.four.moves) == 1
+    assert all(not note.moves for note in case.notes if note not in case.owned)
     assert case.rebuilds == 1
     assert case.zoom is None and case.restores == len(case.zooms)
 
@@ -1930,12 +1964,13 @@ def test_note_text_style_refuses_missing_native_format(monkeypatch):
         purchased._note_text_style(annotation)
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize(
     "defect,message",
     (
-        ("duplicate-bottom-three", "duplicate column inventory"),
-        ("missing-bottom-three", "incomplete column inventory"),
-        ("missing-top-three", "incomplete column inventory"),
+        ("duplicate-target", "duplicate column inventory"),
+        ("missing-target", "incomplete column inventory"),
+        ("missing-top", "incomplete column inventory"),
         ("top-only", "incomplete column inventory"),
         ("wrong-owner", "column inventory identity"),
         ("wrong-token", "incomplete column inventory"),
@@ -1943,25 +1978,26 @@ def test_note_text_style_refuses_missing_native_format(monkeypatch):
         ("duplicate-native-name", "column inventory identity"),
         ("bottom-in-top-band", "duplicate column inventory"),
         ("top-in-drawing-field", "native border band"),
-        ("misaligned-top-three", "does not match native grid"),
+        ("misaligned-top", "does not match native grid"),
         ("nonfinite-anchor-x", "nonfinite native zone position"),
         ("nonfinite-anchor-y", "nonfinite native zone position"),
         ("nonfinite-anchor-z", "nonfinite native zone position"),
         ("short-anchor", "invalid native zone position"),
     ),
 )
-def test_portrait_zone_three_refuses_unproven_native_inventory_before_writing(
-    portrait_zone_native, defect, message,
+def test_portrait_bottom_zones_refuse_unproven_native_inventory_before_writing(
+    portrait_zone_native, owned, defect, message,
 ):
     case = portrait_zone_native
-    target = case.bottom
+    target = getattr(case, owned)
+    top = case.top if owned == "bottom" else case.notes[1]
     original = target.anchor
-    if defect == "duplicate-bottom-three":
-        case.notes.append(case.make_note("DuplicateZone3", target.anchor, target.extent))
-    elif defect == "missing-bottom-three":
+    if defect == "duplicate-target":
+        case.notes.append(case.make_note("DuplicateZone", target.anchor, target.extent))
+    elif defect == "missing-target":
         case.notes.remove(target)
-    elif defect == "missing-top-three":
-        case.notes.remove(case.top)
+    elif defect == "missing-top":
+        case.notes.remove(top)
     elif defect == "top-only":
         case.notes[:] = case.notes[1::2]
     elif defect == "wrong-owner":
@@ -1971,13 +2007,13 @@ def test_portrait_zone_three_refuses_unproven_native_inventory_before_writing(
     elif defect == "wrong-resolved-column":
         target.text_override = "2"
     elif defect == "duplicate-native-name":
-        case.top.name = target.name
+        top.name = target.name
     elif defect == "bottom-in-top-band":
-        target.anchor = case.top.anchor
+        target.anchor = top.anchor
     elif defect == "top-in-drawing-field":
-        case.top.anchor = (case.top.anchor[0], 0.200, 0.0)
-    elif defect == "misaligned-top-three":
-        case.top.anchor = (case.top.anchor[0] + 0.001, case.top.anchor[1], 0.0)
+        top.anchor = (top.anchor[0], 0.200, 0.0)
+    elif defect == "misaligned-top":
+        top.anchor = (top.anchor[0] + 0.001, top.anchor[1], 0.0)
     elif defect.startswith("nonfinite-anchor-"):
         axis = "xyz".index(defect[-1])
         target.anchor = tuple(
@@ -1991,64 +2027,73 @@ def test_portrait_zone_three_refuses_unproven_native_inventory_before_writing(
     assert all(not note.moves for note in case.notes)
     assert case.rebuilds == 0
     assert case.zoom is None
+    assert not case.events
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize(
     "result", (False, None, 1, "True", pytest.param(object(), id="truthy-object"))
 )
-def test_portrait_zone_three_requires_native_setposition2_strict_bool(
-    portrait_zone_native, result,
+def test_portrait_bottom_zones_require_native_setposition2_strict_bool(
+    portrait_zone_native, owned, result,
 ):
     case = portrait_zone_native
-    original = _zone_snapshot(case.bottom)
-    case.bottom.setter_result = result
+    target = getattr(case, owned)
+    original = _zone_snapshot(target)
+    target.setter_result = result
     with pytest.raises(RuntimeError, match="SetPosition2 refused"):
         case.align()
-    assert len(case.bottom.moves) == 1
-    assert _zone_snapshot(case.bottom) == original
+    assert len(target.moves) == 1
+    assert _zone_snapshot(target) == original
     assert case.rebuilds == 0
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize(
     "defect", ("ignored", "clamped-x", "clamped-y", "clamped-z", "nan", "short")
 )
-def test_portrait_zone_three_checks_finite_three_axis_position_readback(
-    portrait_zone_native, defect,
+def test_portrait_bottom_zones_check_finite_three_axis_position_readback(
+    portrait_zone_native, owned, defect,
 ):
     case = portrait_zone_native
+    target = getattr(case, owned)
     if defect == "ignored":
-        case.bottom.ignore_move = True
+        target.ignore_move = True
     elif defect.startswith("clamped-"):
         axis = "xyz".index(defect[-1])
-        case.bottom.position_offset = tuple(
+        target.position_offset = tuple(
             2e-7 if index == axis else 0.0 for index in range(3)
         )
-    elif defect == "nan":
-        case.on_move = lambda: setattr(
-            case.bottom, "anchor", (float("nan"), 0.009488, 0.0)
-        )
-    elif defect == "short":
-        case.on_move = lambda: setattr(case.bottom, "anchor", case.bottom.anchor[:2])
+    else:
+        def corrupt_readback():
+            if target.moves:
+                target.anchor = (
+                    (float("nan"), 0.009488, 0.0) if defect == "nan"
+                    else target.anchor[:2]
+                )
+        case.on_move = corrupt_readback
     with pytest.raises(RuntimeError, match="position readback"):
         case.align()
-    assert len(case.bottom.moves) == 1
+    assert len(target.moves) == 1
     assert case.rebuilds == 0
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize(
     "field", tuple(name for name, _value in _ZONE_FONT_VALUES)
 )
 @pytest.mark.parametrize("phase", ("rebuild", "final"))
-def test_portrait_zone_three_preserves_every_native_format_field(
-    portrait_zone_native, field, phase,
+def test_portrait_bottom_zones_preserve_every_native_format_field(
+    portrait_zone_native, owned, field, phase,
 ):
     case = portrait_zone_native
+    target = getattr(case, owned)
     # An extra format with different values makes index-0-only snapshots fail.
-    case.bottom.formats.append(_ZoneTextFormat(TypeFaceName="Arial Narrow"))
-    case.bottom.document_defaults.append(True)
+    target.formats.append(_ZoneTextFormat(TypeFaceName="Arial Narrow"))
+    target.document_defaults.append(True)
 
     def mutate():
-        text_format = case.bottom.formats[1]
+        text_format = target.formats[1]
         if field == "IsHeightSpecifiedInPts":
             text_format.height_in_points = not text_format.height_in_points
             return
@@ -2069,10 +2114,11 @@ def test_portrait_zone_three_preserves_every_native_format_field(
         mutate()
         with pytest.raises(RuntimeError, match="style or identity changed"):
             verify()
-    assert len(case.bottom.moves) == 1
+    assert all(len(note.moves) == 1 for note in case.owned)
     assert case.rebuilds == 1
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize("phase", ("rebuild", "final"))
 @pytest.mark.parametrize(
     "defect,message",
@@ -2101,29 +2147,29 @@ def test_portrait_zone_three_preserves_every_native_format_field(
         ("zone-region", "grid changed"),
     ),
 )
-def test_portrait_zone_three_rechecks_native_identity_grid_and_membership_readonly(
-    portrait_zone_native, phase, defect, message,
+def test_portrait_bottom_zones_recheck_native_identity_grid_and_membership_readonly(
+    portrait_zone_native, owned, phase, defect, message,
 ):
     case = portrait_zone_native
 
     def mutate():
-        target = case.bottom
+        target = getattr(case, owned)
         if defect == "missing-target":
             case.notes.remove(target)
         elif defect == "missing-other":
             case.notes.remove(case.top)
         elif defect == "duplicate-target":
             case.notes.append(case.make_note(
-                "DuplicateZoneThree", target.anchor, target.extent
+                "DuplicateZone", target.anchor, target.extent
             ))
         elif defect == "token":
             target._link = "3"
         elif defect == "owner":
             target.OwnerType = 1
         elif defect == "resolved-column":
-            case.column_override = "2"
+            target.text_override = "2"
         elif defect == "name":
-            target.name = "ForeignZoneThree"
+            target.name = "ForeignZone"
         elif defect == "extra-format":
             target.formats.append(_ZoneTextFormat())
             target.document_defaults.append(False)
@@ -2142,16 +2188,17 @@ def test_portrait_zone_three_rechecks_native_identity_grid_and_membership_readon
                 for index, value in enumerate(target.anchor)
             )
         elif defect == "other-bottom-position":
-            other = case.notes[0]
+            other = case.notes[4]
             other.anchor = (other.anchor[0] + 0.001, *other.anchor[1:])
         elif defect == "other-top-position":
             case.top.anchor = (case.top.anchor[0] + 0.001, *case.top.anchor[1:])
         elif defect == "other-top-style":
             case.top.formats[0].Italic = True
         elif defect == "column-membership":
-            # The actual token resolver changes to 2 because the anchor now
-            # crosses the original boundary; no canned value masks that drift.
-            target.anchor = (0.1397 + 0.001, *target.anchor[1:])
+            # Live resolution crosses the original cell boundary; no canned
+            # value masks that drift. Zone 4 enters 3; zone 3 enters 2.
+            boundary = 0.1397 if owned == "bottom" else 0.06985
+            target.anchor = (boundary + 0.001, *target.anchor[1:])
         elif defect == "sheet-width":
             values = list(case.properties)
             values[5] += 0.001
@@ -2173,8 +2220,8 @@ def test_portrait_zone_three_rechecks_native_identity_grid_and_membership_readon
         mutate()
         with pytest.raises(RuntimeError, match=message):
             verify()
-    assert len(case.bottom.moves) == 1
-    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert all(not note.moves for note in case.notes if note not in case.owned)
     assert case.rebuilds == 1
     assert case.zoom is None
 
@@ -2228,24 +2275,30 @@ def test_portrait_zone_three_rejects_full_native_padding_escape_not_anchor_fit(
     assert case.bottom.GetText() == "3"
     assert case.bottom.anchor[1:] == original_anchor[1:]
     assert case.zoom is None
-    if phase == "before" and edge != "right-half":
-        assert case.bottom.moves == []
+    if phase == "before":
+        assert all(not note.moves for note in case.notes)
         assert case.rebuilds == 0
     else:
         assert len(case.bottom.moves) == 1
         assert case.rebuilds == 1
+    assert [fields["phase"] for _event, fields in case.events] == (
+        ["before", "before", "after", "after"] if phase == "final"
+        else ["before", "before"]
+    )
 
 
 
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
 @pytest.mark.parametrize("phase", ("before", "rebuild", "final"))
 @pytest.mark.parametrize("defect", ("nan", "infinite-z", "short", "inverted"))
-def test_portrait_zone_three_refuses_unreadable_complete_native_extent(
-    portrait_zone_native, phase, defect,
+def test_portrait_bottom_zones_refuse_unreadable_complete_native_extent(
+    portrait_zone_native, owned, phase, defect,
 ):
     case = portrait_zone_native
+    target = getattr(case, owned)
 
     def mutate():
-        box = list(case.bottom.extent)
+        box = list(target.extent)
         if defect == "nan":
             box[0] = float("nan")
         elif defect == "infinite-z":
@@ -2256,7 +2309,7 @@ def test_portrait_zone_three_refuses_unreadable_complete_native_extent(
             box.pop()
         else:
             box[3] = box[0] - 0.001
-        case.bottom.extent = tuple(box)
+        target.extent = tuple(box)
 
     expected = "empty or inverted native extent" if defect == "inverted" else (
         "invalid native extent"
@@ -2265,25 +2318,25 @@ def test_portrait_zone_three_refuses_unreadable_complete_native_extent(
         mutate()
         with pytest.raises(RuntimeError, match=expected):
             case.align()
-        assert case.bottom.moves == [] and case.rebuilds == 0
+        assert all(not note.moves for note in case.notes) and case.rebuilds == 0
     elif phase == "rebuild":
         case.on_rebuild = mutate
         with pytest.raises(RuntimeError, match=expected):
             case.align()
-        assert len(case.bottom.moves) == 1 and case.rebuilds == 1
+        assert all(len(note.moves) == 1 for note in case.owned) and case.rebuilds == 1
     else:
         verify = case.align()
         case.frozen = True
         mutate()
         with pytest.raises(RuntimeError, match=expected):
             verify()
-        assert len(case.bottom.moves) == 1 and case.rebuilds == 1
+        assert all(len(note.moves) == 1 for note in case.owned) and case.rebuilds == 1
     assert case.zoom is None
     assert case.restores == len(case.zooms)
 
 
 @pytest.mark.parametrize("region", (0, 1), ids=("margin-grid", "whole-sheet-grid"))
-def test_portrait_zone_three_derives_cell_from_native_grid_not_fixed_offset(
+def test_portrait_bottom_zones_derive_cells_and_strip_from_native_grid(
     portrait_zone_native, region,
 ):
     case = portrait_zone_native
@@ -2312,6 +2365,17 @@ def test_portrait_zone_three_derives_cell_from_native_grid_not_fixed_offset(
     right = (original_anchor[0] + case.notes[4].anchor[0]) / 2
     expected_centre = ((left + right) / 2 + right) / 2
 
+    if region == 0:
+        # The original margin-grid cell starts at the left margin: there is
+        # no same-cell strip before that margin, so neither move is allowed.
+        with pytest.raises(RuntimeError, match="infeasible native target lane"):
+            case.align()
+        assert all(not note.moves for note in case.notes)
+        assert case.rebuilds == 0
+        assert tuple(note.name for note in case.notes) == tuple(before)
+        assert all(_zone_snapshot(note) == before[note.name] for note in case.notes)
+        return
+
     verify = case.align()
     box = case.bottom.extent
     assert (box[0] + box[3]) / 2 == pytest.approx(expected_centre)
@@ -2319,12 +2383,363 @@ def test_portrait_zone_three_derives_cell_from_native_grid_not_fixed_offset(
     assert case.bottom.anchor[1:] == original_anchor[1:]
     assert case.bottom.GetText() == "3"
     assert len(case.bottom.moves) == 1
+    strip = (grid_left + 0.0006, case.margins[3] - 0.0006)
+    box_four = case.four.extent
+    assert (box_four[0] + box_four[3]) / 2 == pytest.approx(sum(strip) / 2)
+    assert strip[0] < box_four[0] < box_four[3] < strip[1]
+    assert len(case.four.moves) == 1
     for note in case.notes:
-        if note is not case.bottom:
+        if note not in case.owned:
             assert _zone_snapshot(note) == before[note.name]
             assert not note.moves
     case.frozen = True
     verify()
+
+
+@pytest.mark.parametrize("phase", ("immediate", "rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_four_accepts_one_ulp_xyz_roundtrip_without_moving_six_others(
+    portrait_zone_native, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native
+    target = case.four
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    box = target.extent
+    strip_centre = (0.0006 + case.margins[3] - 0.0006) / 2
+    requested = (
+        target.anchor[0] + strip_centre - (box[0] + box[3]) / 2,
+        *target.anchor[1:],
+    )
+    roundtrip = tuple(
+        math.nextafter(value, direction * math.inf) if index == axis else value
+        for index, value in enumerate(requested)
+    )
+
+    def native_roundtrip():
+        if target.moves:
+            target.translate(roundtrip)
+
+    if phase == "immediate":
+        case.on_move = native_roundtrip
+    elif phase == "rebuild":
+        case.on_rebuild = native_roundtrip
+    verify = case.align()
+    assert target.moves == [requested]
+    assert requested[1:] == before[target.name][4][1:]
+    if phase == "final":
+        assert target.anchor == requested
+        native_roundtrip()
+    case.frozen = True
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+    assert target.anchor == roundtrip
+    assert all(abs(actual - wanted) <= 1e-7
+               for actual, wanted in zip(roundtrip, requested, strict=True))
+    assert 0.0006 < target.extent[0] < target.extent[3] < case.margins[3] - 0.0006
+    assert 0.0006 < target.extent[1] < target.extent[4] < case.margins[1] - 0.0006
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+            assert not note.moves
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert case.rebuilds == 1
+    for note in case.owned:
+        assert len({zoom for name, zoom, _extent in case.extent_reads
+                    if name == note.name}) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("immediate", "rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_four_refuses_just_outside_existing_xyz_bound(
+    portrait_zone_native, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native
+    target = case.four
+    original = target.anchor
+    box = target.extent
+    strip_centre = (0.0006 + case.margins[3] - 0.0006) / 2
+    requested = (
+        original[0] + strip_centre - (box[0] + box[3]) / 2, *original[1:],
+    )
+
+    def mutate():
+        if target.moves:
+            position = list(requested)
+            position[axis] = math.nextafter(
+                requested[axis] + direction * 1e-7, direction * math.inf,
+            )
+            assert abs(position[axis] - requested[axis]) > 1e-7
+            target.translate(tuple(position))
+
+    if phase == "immediate":
+        case.on_move = mutate
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+    if phase == "final":
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            verify()
+    else:
+        with pytest.raises(RuntimeError, match="position readback"):
+            case.align()
+    assert target.moves == [requested]
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert all(not note.moves for note in case.notes if note not in case.owned)
+    assert case.rebuilds == (0 if phase == "immediate" else 1)
+    assert [fields["phase"] for event, fields in case.events
+            if event == "drawing.purchased_bottom_zone_four.state"] == (
+        ["before", "after"] if phase == "final" else ["before"]
+    )
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("cell-left", "leaves its original cell"),
+        ("cell-right", "leaves its original cell"),
+        ("bottom", "leaves its original cell"),
+        ("top", "leaves its original cell"),
+        ("too-wide-for-strip", "leaves its original cell"),
+        ("empty-strip", "infeasible native target lane"),
+        ("strip-outside-cell", "infeasible native target lane"),
+    ),
+)
+def test_portrait_zone_four_full_native_preflight_refuses_before_either_write(
+    portrait_zone_native, defect, message,
+):
+    case = portrait_zone_native
+    box = list(case.four.extent)
+    if defect == "cell-left":
+        box[0] = 0.0006 - 0.000001
+    elif defect == "cell-right":
+        box[3] = 0.06985 - 0.0006 + 0.000001
+    elif defect == "bottom":
+        box[1] = 0.0006 - 0.000001
+    elif defect == "top":
+        box[4] = case.margins[1] - 0.0006 + 0.000001
+    elif defect == "too-wide-for-strip":
+        # It fits the original full cell; only the proposed complete box fails.
+        box[0], box[3] = 0.025, 0.037
+    elif defect == "empty-strip":
+        case.margins[3] = 0.001
+    else:
+        case.margins[3] = 0.080
+    case.four.extent = tuple(box)
+    before = tuple(_zone_snapshot(note) for note in case.notes)
+    with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+        case.align()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == before
+    assert all(not note.moves for note in case.notes)
+    assert case.rebuilds == 0
+    assert [name for name, _zoom, _extent in case.extent_reads] == [
+        case.bottom.name, case.four.name,
+    ]
+    assert [fields["phase"] for _event, fields in case.events] == ["before", "before"]
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize(
+    "edge", ("cell-left", "cell-right", "bottom", "top", "strip-left", "strip-right")
+)
+def test_portrait_zone_four_rechecks_fresh_full_box_not_merely_its_anchor(
+    portrait_zone_native, phase, edge,
+):
+    case = portrait_zone_native
+    requested = None
+
+    def mutate():
+        box = list(case.four.extent)
+        if edge in ("cell-left", "strip-left"):
+            box[0] = 0.0006 - 0.000001
+        elif edge == "cell-right":
+            box[3] = 0.06985 - 0.0006 + 0.000001
+        elif edge == "bottom":
+            box[1] = 0.0006 - 0.000001
+        elif edge == "top":
+            box[4] = case.margins[1] - 0.0006 + 0.000001
+        else:
+            # Still in the original cell, but beyond the native-derived strip.
+            box[3] = case.margins[3] - 0.0006 + 0.000001
+        case.four.extent = tuple(box)
+
+    message = "native left strip" if edge == "strip-right" else "original cell"
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+            case.align()
+    else:
+        verify = case.align()
+        requested = case.four.anchor
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+            verify()
+    assert case.four.anchor == case.four.moves[0]
+    if requested is not None:
+        assert case.four.anchor == requested
+    assert case.four.GetText() == "4"
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert case.rebuilds == 1
+    assert [fields["phase"] for _event, fields in case.events] == (
+        ["before", "before", "after", "after"] if phase == "final"
+        else ["before", "before"]
+    )
+    reads = [extent for name, _zoom, extent in case.extent_reads
+             if name == case.four.name]
+    assert reads[-1] == case.four.extent
+    assert reads[0] != reads[-1]
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("left_margin", (0.009, 0.017, 0.025))
+def test_portrait_zone_four_uses_native_margin_and_asymmetric_full_box(
+    portrait_zone_native, left_margin,
+):
+    case = portrait_zone_native
+    case.margins[3] = left_margin
+    # Synthetic native font padding changes the anchor/box-centre relationship.
+    box = list(case.four.extent)
+    box[0], box[3] = case.four.anchor[0] - 0.001, case.four.anchor[0] + 0.003
+    case.four.extent = tuple(box)
+    original = case.four.anchor
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    verify = case.align()
+    wanted_centre = (0.0006 + left_margin - 0.0006) / 2
+    expected = original[0] + wanted_centre - (box[0] + box[3]) / 2
+    assert case.four.moves == [(expected, *original[1:])]
+    assert (case.four.extent[0] + case.four.extent[3]) / 2 == pytest.approx(wanted_centre)
+    assert 0.0006 < case.four.extent[0] < case.four.extent[3] < left_margin - 0.0006
+    assert case.four.anchor[1:] == original[1:]
+    assert case.four.GetText() == "4"
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+    case.frozen = True
+    verify()
+
+
+def test_portrait_bottom_zones_emit_distinct_actual_states_with_joint_inventory(
+    portrait_zone_native,
+):
+    import json
+
+    case = portrait_zone_native
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    verify = case.align()
+    after = {note.name: _zone_snapshot(note) for note in case.notes}
+    case.frozen = True
+    verify()
+    assert [(event, fields["phase"]) for event, fields in case.events] == [
+        (event, phase)
+        for phase in ("before", "after", "final")
+        for event in (
+            "drawing.purchased_bottom_zone_three.state",
+            "drawing.purchased_bottom_zone_four.state",
+        )
+    ]
+    for event, fields in case.events:
+        state = json.loads(fields["state"])
+        zone = "3" if "three" in event else "4"
+        note = case.bottom if zone == "3" else case.four
+        snapshot = before if fields["phase"] == "before" else after
+        assert state["zone"] == zone
+        assert state["grid"] == [
+            list(case.properties), list(case.margins), list(case.distribution), case.region,
+        ]
+        cell = (0.06985, 0.0, 0.1397, 0.0127) if zone == "3" else (
+            0.0, 0.0, 0.06985, 0.0127,
+        )
+        assert state["cell"] == pytest.approx(cell)
+        assert state["inset"] == pytest.approx((
+            cell[0] + 0.0006, 0.0006, cell[2] - 0.0006, cell[3] - 0.0006,
+        ))
+        assert state["target_lane"] == pytest.approx(
+            (0.104775, 0.0006, 0.1391, 0.0121) if zone == "3" else
+            (0.0006, 0.0006, 0.0121, 0.0121)
+        )
+        extent = snapshot[note.name][5]
+        assert state["extent"] == [extent[0], extent[1], extent[3], extent[4]]
+        assert {(row["side"], row["value"]) for row in state["columns"]} == {
+            (side, str(value)) for side in ("bottom", "top") for value in range(1, 5)
+        }
+        assert len(state["columns"]) == 8
+        for row in state["columns"]:
+            identity = row["identity"]
+            original = snapshot[identity[0]]
+            assert row["position"] == list(original[4])
+            assert identity == json.loads(json.dumps((
+                original[0], original[3], original[1], original[2], original[6],
+                original[7], original[8], original[9], original[10],
+            )))
+            if fields["phase"] != "before" and identity[0] not in {
+                owned.name for owned in case.owned
+            }:
+                assert row["position"] == list(before[identity[0]][4])
+
+
+@pytest.mark.parametrize("phase", ("success", "before", "rebuild", "final"))
+def test_portrait_bottom_zones_never_modify_foreign_or_license_controls(
+    portrait_zone_native, phase,
+):
+    case = portrait_zone_native
+    foreign = case.make_note(
+        "UnlinkedFour", case.four.anchor, case.four.extent, link="4",
+    )
+    foreign.OwnerType = 1
+    foreign.text_override = "4"
+    license_note = case.make_note(
+        "LicenseControl", (0.020, 0.008, 0.0),
+        (0.015, 0.001, 0.0, 0.250, 0.010, 0.0), link="license-control",
+    )
+    license_note.text_override = "unchanged license control"
+    license_note.formats = [_ZoneTextFormat(Italic=True, CharHeight=0.002)]
+    controls = (foreign, license_note)
+    case.notes.extend(controls)
+    before = tuple(_zone_snapshot(note) for note in controls)
+
+    def infeasible():
+        box = list(case.four.extent)
+        box[4] = case.margins[1]
+        case.four.extent = tuple(box)
+
+    if phase == "before":
+        infeasible()
+        with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+            case.align()
+        assert all(not note.moves for note in case.notes)
+    elif phase == "rebuild":
+        case.on_rebuild = infeasible
+        with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        if phase == "final":
+            infeasible()
+            with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+                verify()
+        else:
+            verify()
+    assert tuple(_zone_snapshot(note) for note in controls) == before
+    assert all(not note.moves for note in controls)
+    assert all(name not in {note.name for note in controls}
+               for name, _zoom, _extent in case.extent_reads)
 
 
 @pytest.mark.parametrize(
@@ -10811,18 +11226,41 @@ def test_purchased_title_consumer_rejects_finalizer_number_drift_before_export(
 
 
 @pytest.fixture
-def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
+def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
     """Real screw annotation, source readback and shelving over native-shaped data."""
     import _supplier_reference_text as core
     import _supplier_screw_dimensions as screws
     import _supplier_screw_reference_text as consumer
+    from _supplier_screw_reference_names import FEATURE_BY_PLANE
+
+    carriage = getattr(request, "param", None) == "carriage"
+    if carriage:
+        import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as spec
+
+        dimension = next(
+            row for row in spec.SUPPLIER_REFERENCE_DIMENSIONS
+            if row[0] == "SupplierDriveWidth"
+        )
+        name, millimetres, orientation = dimension
+        formats = {name: spec.SUPPLIER_REFERENCE_FORMATS[name]}
+        units = {name: spec.SUPPLIER_REFERENCE_UNITS[name]}
+        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
+        sides = {name: spec.SUPPLIER_REFERENCE_SIDES[name]}
+        value, rendered = millimetres / 1000.0, "3"
+    else:
+        name, value, orientation = "HeadHeight", 0.0039624, "vertical"
+        dimension = (name, value * 1000.0, orientation)
+        formats, units, sides, plane = {name: (3, "length", None, "MIN")}, {}, {}, "Front"
+        rendered = "0.156"
+    axis = 0 if orientation == "horizontal" else 1
+    feature_name = FEATURE_BY_PLANE[plane]
 
     source = tmp_path / "stock.SLDPRT"
     model = _Model(source)
     model.GetConfigurationByName = lambda name: (
         model if name in {"Default", "Other"} else None
     )
-    view = _View("*Front", source, (0.103, 0.235))
+    view = _View(f"*{plane}", source, (0.103, 0.235))
     view.GetName2 = lambda: "Drawing View1"
     view.ReferencedDocument = model
     source_points = tuple(SimpleNamespace(native_identity=object()) for _ in range(2))
@@ -10836,22 +11274,21 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
         GetSketchPoints2=lambda: source_points,
         GetSketchSegments=lambda: (),
     )
-    value = 0.0039624  # Exact .156 inch, not a substituted display value.
-    full_name = "HeadHeight@SupplierReference@stock.SLDPRT"
+    full_name = f"{name}@{feature_name}@stock.SLDPRT"
     source_dimension = SimpleNamespace(FullName=full_name, SystemValue=value)
     source_display = SimpleNamespace(GetDimension2=lambda _index: source_dimension)
     source_feature = SimpleNamespace(
-        Name="SupplierReference",
+        Name=feature_name,
         GetTypeName2=lambda: "ProfileFeature",
         GetSpecificFeature2=lambda: source_sketch,
         GetFirstDisplayDimension=lambda: source_display,
         GetNextDisplayDimension=lambda _display: None,
     )
     model.Parameter = lambda name: (
-        source_dimension if name == "HeadHeight@SupplierReference" else None
+        source_dimension if name == full_name.rsplit("@", 1)[0] else None
     )
     model.FeatureByName = lambda name: (
-        source_feature if name == "SupplierReference" else None
+        source_feature if name == feature_name else None
     )
 
     def same(left, right):
@@ -10872,12 +11309,13 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
         source_dimension=source_dimension, source_display=source_display,
         source_points=source_points, drawing_points=drawing_points,
         consumer=consumer, core=core, checks=[], rebuilds=[], captures=[],
-        dimensions=(("HeadHeight", value * 1000, "vertical"),),
-        formats={"HeadHeight": (3, "length", None, "MIN")},
+        dimensions=(dimension,), formats=formats, units=units, sides=sides,
+        name=name, axis=axis, plane=plane, style_calls=[], writes=[], redraws=0,
+        set_status=0, style_effect=None, style_drift=None, rebuild_drift=None,
     )
 
     def native_display(previous=None):
-        case = _supplier_native(monkeypatch, value=value, kind=12)
+        case = _supplier_native(monkeypatch, value=value, kind=11 if axis == 0 else 12)
         case.stale = False
         case.native.FullName = full_name
         case.native.drawing_dimension = True
@@ -10895,13 +11333,34 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
             copy.deepcopy(previous.annotation.record)
             if previous is not None else _clamp_recovered_head_height()
         )
-        case.annotation.record["name"] = "HeadHeight"
-        if previous is None:
+        case.annotation.record["name"] = name
+        if previous is None and carriage:
+            # Synthetic horizontal metric geometry over the recovered primitives,
+            # not after-fix native/PDF evidence. Preserve every line and witness.
+            data = case.annotation.record["display"]
+            delta = value * 0.125 - (data["arrows"][1][1] - data["arrows"][0][1])
+            for index in (1, 3):
+                data["lines"][index][5] += delta
+                data["lines"][index][8] += delta
+            data["arrows"][1][1] += delta
+            for row in data["lines"]:
+                row[4], row[5] = row[5], row[4]
+                row[7], row[8] = row[8], row[7]
+            for row in data["arrows"]:
+                row[0], row[1] = row[1], row[0]
+                row[3], row[4] = row[4], row[3]
+            x, y, z = case.annotation.record["pos"]
+            case.annotation.record["pos"] = (y, x, z)
+            for row in data["texts"]:
+                x, y, z = row["pos"]
+                row["pos"] = (y, x, z)
+                row["t"] = rendered
+        if previous is None and not carriage:
             case.annotation.record["display"]["texts"].append({
                 "t": "MIN", "pos": (0.099, 0.226635, 0.0000125),
                 "h": 0.0035, "w": 0.008, "ref": 1, "ang": 0.0,
             })
-        else:
+        if previous is not None:
             vars(case.state).update(vars(previous.state))
             case.text.update(previous.text)
             case.native.SystemValue = previous.native.SystemValue
@@ -10912,6 +11371,43 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
             previous.display.OffsetText if previous is not None else False
         )
         case.annotation.position = tuple(case.annotation.record["pos"])
+        case.broken_mode = previous.broken_mode if previous is not None else -1
+        case.use_doc_broken = previous.use_doc_broken if previous is not None else True
+
+        def broken_line(use_doc, mode):
+            assert not case.stale, "stale display received broken-line setter"
+            state.style_calls.append(("set", id(case.display), use_doc, mode))
+            state.writes.append("broken-line")
+            if type(state.set_status) is int and state.set_status == 1:
+                case.broken_mode, case.use_doc_broken = -1, True
+            elif type(state.set_status) is int and state.set_status == 0:
+                if state.style_effect != "ignored":
+                    case.broken_mode, case.use_doc_broken = mode, use_doc
+                if state.style_effect == "wrong-mode":
+                    case.broken_mode = 2
+                elif state.style_effect == "noninteger-mode":
+                    case.broken_mode = 3.0
+                elif state.style_effect == "doc-default":
+                    case.use_doc_broken = True
+                elif state.style_effect == "nonboolean-doc-default":
+                    case.use_doc_broken = 0
+                if state.style_drift:
+                    mutate(state.style_drift, case)
+            return state.set_status
+
+        def read_mode():
+            assert not case.stale, "stale display supplied broken-line readback"
+            state.style_calls.append(("mode", id(case.display)))
+            return case.broken_mode
+
+        def read_doc_default():
+            assert not case.stale, "stale display supplied document-default readback"
+            state.style_calls.append(("doc", id(case.display)))
+            return case.use_doc_broken
+
+        case.display.SetBrokenLeader2 = broken_line
+        case.display.GetBrokenLeader2 = read_mode
+        case.display.GetUseDocBrokenLeader = read_doc_default
 
         def annotation():
             assert not case.stale, "creation/rebuild display handle was reused"
@@ -10923,45 +11419,113 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
 
         def move(x, y, z):
             assert not case.stale, "stale annotation was moved"
+            state.writes.append("position")
             dx, dy = x - case.annotation.position[0], y - case.annotation.position[1]
             data = case.annotation.record["display"]
             for row in data["texts"]:
                 px, py, pz = row["pos"]
                 row["pos"] = (px + dx, py + dy, pz)
             if not case.display.OffsetText:
-                # A vertical native dimension's transverse line station follows
-                # its annotation until OffsetText decouples text from the line.
+                # The native transverse line follows its annotation until
+                # OffsetText decouples text from its physical stations.
+                shift = dx if axis == 1 else dy
                 for row in data["lines"]:
-                    row[4] += dx
-                    row[7] += dx
+                    row[5 - axis] += shift
+                    row[8 - axis] += shift
                 for row in data["arrows"]:
-                    row[0] += dx
+                    row[1 - axis] += shift
             case.annotation.position = (x, y, z)
             case.annotation.record["pos"] = (x, y, z)
             return True
 
         def text(index, content):
             assert not case.stale, "stale dimension text was edited"
+            state.writes.append("text")
             case.text[index] = content
             rows = case.annotation.record["display"]["texts"]
-            rows[0]["t"] = f"{case.text.get(1, '')}0.156{case.text.get(2, '')}"
-            rows[1]["t"] = case.text.get(4, "")
+            rows[0]["t"] = f"{case.text.get(1, '')}{rendered}{case.text.get(2, '')}"
+            if not carriage:
+                rows[1]["t"] = case.text.get(4, "")
 
         case.display.GetAnnotation = annotation
         case.display.GetDimension2 = dimension
         case.display.SetText = text
         case.annotation.GetPosition = lambda: case.annotation.position
         case.annotation.SetPosition2 = move
+        for method in ("SetUnits2", "SetPrecision3"):
+            original = getattr(case.display, method)
+
+            def write_format(*args, original=original, method=method):
+                assert not case.stale, "stale display format was edited"
+                state.writes.append(method)
+                return original(*args)
+
+            setattr(case.display, method, write_format)
         return case
+
+    def mutate(drift, case=None):
+        case = state.current if case is None else case
+        data = case.annotation.record["display"]
+        if drift == "mode":
+            case.broken_mode = 1
+        elif drift == "doc-default":
+            case.use_doc_broken = True
+        elif drift == "source":
+            view._source = model._path = source.with_name("other.SLDPRT")
+        elif drift == "configuration":
+            view.ReferencedConfiguration = "Other"
+        elif drift == "attachment":
+            case.annotation.entities = (
+                SimpleNamespace(native_identity=object()), case.annotation.entities[1],
+            )
+        elif drift == "value":
+            case.native.SystemValue += 0.0001
+        elif drift == "format":
+            case.state.precision += 1
+        elif drift == "full-ref":
+            case.text[2] = ""
+        elif drift == "tips":
+            for row in data["lines"]:
+                row[4 + axis] += 0.0001
+                row[7 + axis] += 0.0001
+            for row in data["arrows"]:
+                row[axis] += 0.0001
+        elif drift == "witnesses":
+            # Extend an actual witness endpoint without changing its arrow tip,
+            # axis station, attachment, or the other witness's endpoint.
+            data["lines"][0][5 - axis] += 0.0001
+        elif drift == "transverse":
+            point = list(case.annotation.position)
+            point[1 - axis] += 0.0001
+            case.annotation.position = tuple(point)
+        elif drift == "axis-clearance":
+            for row in data["texts"]:
+                point = list(row["pos"])
+                point[axis] -= 0.020
+                row["pos"] = tuple(point)
+        else:
+            raise AssertionError(f"unknown native drift: {drift}")
+
+    def replace():
+        previous = state.current
+        state.current = native_display(previous)
+        previous.stale = True
+
+    def redraw():
+        state.redraws += 1
+        state.writes.append("redraw")
+
+    adapter.currentModel = SimpleNamespace(GraphicsRedraw2=redraw)
 
     state.current = state.creation = native_display()
     view.GetAnnotations = lambda: (state.current.annotation,)
 
     def rebuild(_adapter, *, label):
-        previous = state.current
-        state.current = native_display(previous)
-        previous.stale = True
+        replace()
         state.rebuilds.append(label)
+        state.writes.append("rebuild")
+        if state.rebuild_drift and label.endswith(state.rebuild_drift[0]):
+            mutate(state.rebuild_drift[1])
 
     def capture(_adapter, _label, _message, **context):
         state.captures.append(context)
@@ -10971,7 +11535,7 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
     # projection/import creation, native display-data acquisition and rebuilds.
     # Binding validation, feature membership, attachment correspondence, value/
     # format readback, measurement, station preservation and shelving stay real.
-    for module in (screws, core):
+    for module in (screws, core, consumer):
         monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "iter_views", lambda actual: iter(actual.views))
@@ -10994,6 +11558,7 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(screws._seat_forensics, "capture_com_failure", capture)
     monkeypatch.setattr(core, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(consumer, "rebuild_drawing", rebuild)
     monkeypatch.setattr(
         core, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
     )
@@ -11012,6 +11577,7 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
             tuple(point.native_identity for point in case.annotation.entities),
             source_dimension.FullName, source_dimension.SystemValue,
             len(state.rebuilds),
+            case.broken_mode, case.use_doc_broken, state.redraws, len(state.writes),
         )
 
     def settle():
@@ -11020,6 +11586,18 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path):
 
     state.snapshot = snapshot
     state.settle = settle
+    state.mutate = mutate
+    state.replace = replace
+
+    def run(**kwargs):
+        return consumer.annotate_supplier_screw_with_shelves(
+            adapter, {f"*{plane}": view}, dimensions=state.dimensions,
+            formats=state.formats, units=state.units, sides=state.sides,
+            planes={name: plane}, settled_checks=state.checks,
+            label="purchased screw", **kwargs,
+        )
+
+    state.run = run
     return state
 
 
@@ -11057,6 +11635,9 @@ def test_screw_reference_shelf_consumer_preserves_native_state_and_refuses_late_
     assert returned["HeadHeight"] is not state.creation.display
     assert state.creation.stale and state.creation.display.OffsetText is False
     assert case.display.OffsetText is True
+    assert state.style_calls == []
+    assert state.redraws == 0
+    assert len(state.rebuilds) == 4
     after = state.core.measure_reference_text(
         state.adapter, returned["HeadHeight"], axis=1, label="HeadHeight"
     )
@@ -11132,6 +11713,245 @@ def test_screw_reference_shelf_consumer_preserves_native_state_and_refuses_late_
         for check in state.checks:
             with pytest.raises(RuntimeError, match=message):
                 check()
+    assert state.snapshot() == mutated
+
+
+@pytest.mark.parametrize("options", ({}, {"broken_lines": ()}))
+def test_screw_reference_shelf_empty_style_default_adds_no_native_calls(
+    screw_reference_shelf_native_consumer, options,
+):
+    state = screw_reference_shelf_native_consumer
+    returned = state.run(**options)
+    assert returned == {"HeadHeight": state.current.display}
+    assert state.style_calls == []
+    assert state.redraws == 0
+    assert state.rebuilds == [
+        "purchased screw reference text measured",
+        "purchased screw reference offset anchors",
+        "purchased screw reference native offset mode",
+        "purchased screw measured reference text shelves",
+    ]
+    settled = state.snapshot()
+    state.settle()
+    assert state.snapshot() == settled
+    assert state.style_calls == []
+
+
+def test_screw_reference_shelf_rejects_unknown_broken_line_before_native_access():
+    from _supplier_screw_reference_text import annotate_supplier_screw_with_shelves
+
+    class NoNativeAccess:
+        def __getattr__(self, name):
+            raise AssertionError(f"unknown broken-line selection touched native {name}")
+
+    with pytest.raises(ValueError, match="broken lines must name actual references"):
+        annotate_supplier_screw_with_shelves(
+            NoNativeAccess(), {"*Front": NoNativeAccess()},
+            dimensions=(("HeadHeight", 3.9624, "vertical"),),
+            formats={"HeadHeight": (3, "length", None, "MIN")},
+            settled_checks=[], label="purchased screw",
+            broken_lines=("SupplierDriveWidth",),
+        )
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("replace_final_wrapper", (False, True))
+def test_carriage_broken_line_preserves_exact_native_reference_and_readonly_proofs(
+    screw_reference_shelf_native_consumer, replace_final_wrapper,
+):
+    state = screw_reference_shelf_native_consumer
+    before = state.core.measure_reference_text(
+        state.adapter, state.current.display, axis=state.axis, label=state.name
+    )
+    original_position = state.current.annotation.position
+    returned = state.run(broken_lines=(state.name,))
+    case = state.current
+    assert returned == {"SupplierDriveWidth": case.display}
+    assert case.display is not state.creation.display
+    assert state.creation.stale
+    assert (case.broken_mode, case.use_doc_broken) == (3, False)
+    setters = [row for row in state.style_calls if row[0] == "set"]
+    modes = [row for row in state.style_calls if row[0] == "mode"]
+    defaults = [row for row in state.style_calls if row[0] == "doc"]
+    assert len(setters) == 1 and setters[0][2:] == (False, 3)
+    assert len(modes) == len(defaults) == 6
+    assert modes[0][1] != setters[0][1]  # Readback is post-rebuild, never the setter wrapper.
+    assert state.redraws == 1
+    assert state.rebuilds == [
+        "purchased screw original reference line stations",
+        "purchased screw local broken reference lines",
+        "purchased screw reference text measured",
+        "purchased screw reference offset anchors",
+        "purchased screw reference native offset mode",
+        "purchased screw measured reference text shelves",
+    ]
+    after = state.core.measure_reference_text(
+        state.adapter, case.display, axis=state.axis, label=state.name
+    )
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert all(len(witness) == 3 for witness in after["witnesses"])
+    assert case.annotation.position[1] == original_position[1]
+    assert after["text"].xmin - after["reach"] >= state.core.CLEAR_GAP_M
+    assert case.display.OffsetText is True
+    assert tuple(row["t"] for row in after["record"]["display"]["texts"]) == ("(3 mm)",)
+    assert tuple(row["h"] for row in after["record"]["display"]["texts"]) == (
+        tuple(row["h"] for row in before["record"]["display"]["texts"])
+    )
+    assert case.native.SystemValue == state.source_dimension.SystemValue == 0.003
+    assert case.native.FullName == state.source_dimension.FullName == (
+        "SupplierDriveWidth@SupplierTopReference@stock.SLDPRT"
+    )
+    assert case.text == {1: "(", 2: " mm)", 4: ""}
+    assert (case.state.unit, case.state.precision, case.state.fraction) == (0, 0, 1)
+    assert tuple(point.native_identity for point in case.annotation.entities) == (
+        tuple(point.native_identity for point in state.drawing_points)
+    )
+    if replace_final_wrapper:
+        state.replace()
+        assert case.stale and state.current.display is not returned[state.name]
+    settled = state.snapshot()
+    state.settle()
+    assert state.snapshot() == settled  # No setters, formatting, rebuild or redraw.
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+    assert len([row for row in state.style_calls if row[0] == "mode"]) == 8
+    assert len([row for row in state.style_calls if row[0] == "doc"]) == 8
+    assert state.style_calls[-1][1] == id(state.current.display)
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("status", (1, -1, False, True, 0.0, None, "0"))
+def test_carriage_broken_line_refuses_fallback_failure_and_noninteger_status(
+    screw_reference_shelf_native_consumer, status,
+):
+    state = screw_reference_shelf_native_consumer
+    state.set_status = status
+    with pytest.raises(RuntimeError, match="failed to break supplier reference line"):
+        state.run(broken_lines=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["set"]
+    assert state.redraws == 0
+    assert len(state.rebuilds) == 1
+    if type(status) is int and status == 1:
+        assert state.current.use_doc_broken is True
+        assert state.current.broken_mode == -1  # SDK invalid-value/default fallback.
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "effect",
+    ("ignored", "wrong-mode", "noninteger-mode", "doc-default", "nonboolean-doc-default"),
+)
+def test_carriage_broken_line_refuses_unapplied_or_mismatched_local_style(
+    screw_reference_shelf_native_consumer, effect,
+):
+    state = screw_reference_shelf_native_consumer
+    state.style_effect = effect
+    with pytest.raises(RuntimeError, match="local broken supplier reference line did not persist"):
+        state.run(broken_lines=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["set", "mode", "doc"]
+    assert state.redraws == 1
+    assert len(state.rebuilds) == 2
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("source", "changed source/configuration/orientation"),
+        ("configuration", "changed source/configuration/orientation"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+    ),
+)
+def test_carriage_broken_line_refuses_style_transition_source_or_station_drift(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.style_drift = drift
+    with pytest.raises(RuntimeError, match=message):
+        state.run(broken_lines=(state.name,))
+    assert len(state.rebuilds) == 2
+    assert state.redraws == 1
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "reference text measured",
+        "reference offset anchors",
+        "reference native offset mode",
+        "measured reference text shelves",
+    ),
+)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("mode", "local broken supplier reference line did not persist"),
+        ("doc-default", "local broken supplier reference line did not persist"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+    ),
+)
+def test_carriage_broken_line_and_original_stations_survive_every_core_reacquire(
+    screw_reference_shelf_native_consumer, phase, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.rebuild_drift = (phase, drift)
+    with pytest.raises(RuntimeError, match=message):
+        state.run(broken_lines=(state.name,))
+    assert state.rebuilds[-1].endswith(phase)
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("mode", "local broken supplier reference line did not persist"),
+        ("doc-default", "local broken supplier reference line did not persist"),
+        ("source", "changed source/configuration/orientation"),
+        ("configuration", "changed source/configuration/orientation"),
+        ("attachment", "attachment changed source sketch"),
+        ("value", "!= exact expected"),
+        ("format", "native supplier presentation differs from its source"),
+        ("full-ref", "native supplier presentation differs from its source"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+    ),
+)
+def test_carriage_broken_line_every_final_proof_refuses_fresh_wrapper_drift_readonly(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    returned = state.run(broken_lines=(state.name,))
+    state.replace()
+    assert state.current.display is not returned[state.name]
+    state.mutate(drift)
+    mutated = state.snapshot()
+    assert len(state.checks) == 2
+    for check in state.checks:
+        with pytest.raises(RuntimeError, match=message):
+            check()
+        assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("transverse", "supplier reference transverse position moved"),
+        ("axis-clearance", "supplier reference text crowds its native line"),
+    ),
+)
+def test_carriage_broken_line_retains_generic_transverse_and_axis_clearance_guards(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.run(broken_lines=(state.name,))
+    state.replace()
+    state.mutate(drift)
+    mutated = state.snapshot()
+    with pytest.raises(RuntimeError, match=message):
+        state.checks[-1]()
     assert state.snapshot() == mutated
 
 

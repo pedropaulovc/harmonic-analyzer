@@ -602,20 +602,20 @@ def _note_text_style(
     return tuple(formats)
 
 
-def _align_portrait_bottom_zone_three(
+def _align_portrait_bottom_zones(
     adapter: Any, draw: Any, sheet: Any, *, label: str
 ) -> Callable[[], None]:
-    """Move only this sheet's bottom ``<ZONEC>`` 3 within its original cell.
+    """Jointly place bottom ``<ZONEC>`` 3/4 in their original native cells.
 
-    The native neighbours define the cell; the complete native box is centred
-    in its right half. Keep the authored Y/Z and all formats, and return a
-    read-only proof for the final rebuild. The template, grid and immutable
-    license watermark are not edited; inherited zone-4/license contact is not
-    this drawing-local zone-3 repair.
+    Keep 3's complete box in its cell's right half; centre 4's complete box
+    in the strip between its cell's left inset and the native left margin.
+    Measure and prove both targets before either write. One original inventory
+    then guards both intentional X moves and the six exact untouched anchors,
+    including at final rebuild. No template, font, grid or license is edited.
     """
     drawing = _early_bound(draw, "IDrawingDoc")
     sheet = _early_bound(sheet, "ISheet")
-    prefix = f"{label}: bottom zone 3"
+    prefix = f"{label}: bottom zones 3/4"
     tolerance = _NUMBER_HEIGHT_TOL
     clearance = 0.0006
 
@@ -766,71 +766,155 @@ def _align_portrait_bottom_zone_three(
         )
     ):
         raise RuntimeError(f"{prefix}: column inventory does not match native grid")
-    cell = (
-        (centres[0] + centres[1]) / 2.0,
-        0.0,
-        (centres[1] + centres[2]) / 2.0,
-        bottom,
-    )
-    inset = (cell[0] + clearance, clearance, cell[2] - clearance, bottom - clearance)
-    middle = (cell[0] + cell[2]) / 2.0
-    centre = (middle, bottom / 2.0)
-    half = max((cell[2] - cell[0]) / 2.0, bottom)
-    key = "bottom", "3"
-    _note, annotation, anchor, _identity = original[key]
+    cells = {
+        ("bottom", "3"): (
+            (centres[0] + centres[1]) / 2.0,
+            0.0,
+            (centres[1] + centres[2]) / 2.0,
+            bottom,
+        ),
+        ("bottom", "4"): (
+            grid_left,
+            0.0,
+            (centres[0] + centres[1]) / 2.0,
+            bottom,
+        ),
+    }
+    insets = {
+        key: (cell[0] + clearance, clearance, cell[2] - clearance, bottom - clearance)
+        for key, cell in cells.items()
+    }
+    middle = (cells["bottom", "3"][0] + cells["bottom", "3"][2]) / 2.0
+    lanes = {
+        ("bottom", "3"): (
+            middle, clearance, insets["bottom", "3"][2], bottom - clearance
+        ),
+        ("bottom", "4"): (
+            insets["bottom", "4"][0], clearance, left - clearance, bottom - clearance
+        ),
+    }
+
+    def zone_prefix(key: tuple[str, str]) -> str:
+        return f"{label}: bottom zone {key[1]}"
 
     def measure(
-        current: dict[tuple[str, str], tuple[Any, ...]], phase: str
-    ) -> tuple[float, ...]:
-        with _zoomed_on(adapter, centre, half):
-            box = _box(current[key][0].GetExtent(), label=prefix, kind="note")
+        current: dict[tuple[str, str], tuple[Any, ...]],
+    ) -> dict[tuple[str, str], tuple[float, ...]]:
+        boxes = {}
+        for key, cell in cells.items():
+            # Reuse this note's original-cell zoom before, after and at final.
+            centre = ((cell[0] + cell[2]) / 2.0, bottom / 2.0)
+            half = max((cell[2] - cell[0]) / 2.0, bottom)
+            with _zoomed_on(adapter, centre, half):
+                boxes[key] = _box(
+                    current[key][0].GetExtent(), label=zone_prefix(key), kind="note"
+                )
+        return boxes
+
+    def emit(
+        current: dict[tuple[str, str], tuple[Any, ...]],
+        boxes: dict[tuple[str, str], tuple[float, ...]],
+        phase: str,
+    ) -> None:
+        for key, event in (
+            (("bottom", "3"), "drawing.purchased_bottom_zone_three.state"),
+            (("bottom", "4"), "drawing.purchased_bottom_zone_four.state"),
+        ):
+            _telemetry.event(
+                event,
+                label=label,
+                phase=phase,
+                state=json.dumps(
+                    {
+                        "zone": key[1],
+                        "grid": grid,
+                        "cell": cells[key],
+                        "inset": insets[key],
+                        "target_lane": lanes[key],
+                        "extent": boxes[key],
+                        "columns": [
+                            {
+                                "side": side,
+                                "value": value,
+                                "position": record[2],
+                                "identity": record[3],
+                            }
+                            for (side, value), record in sorted(current.items())
+                        ],
+                    },
+                    sort_keys=True,
+                ),
+            )
+
+    def inside_cell(key: tuple[str, str], box: tuple[float, ...]) -> None:
+        inset = insets[key]
         if not (
             inset[0] < box[0] < box[2] < inset[2]
             and inset[1] < box[1] < box[3] < inset[3]
         ):
-            raise RuntimeError(f"{prefix}: leaves its original cell: {box!r}, {inset!r}")
-        _telemetry.event(
-            "drawing.purchased_bottom_zone_three.state",
-            label=label,
-            phase=phase,
-            state=json.dumps(
-                {
-                    "grid": grid,
-                    "cell": cell,
-                    "inset": inset,
-                    "extent": box,
-                    "columns": [
-                        {
-                            "side": side,
-                            "value": value,
-                            "position": record[2],
-                            "identity": record[3],
-                        }
-                        for (side, value), record in sorted(current.items())
-                    ],
-                },
-                sort_keys=True,
-            ),
-        )
-        return box
+            raise RuntimeError(
+                f"{zone_prefix(key)}: leaves its original cell: {box!r}, {inset!r}"
+            )
 
-    before = measure(original, "before")
-    right_half_centre = (middle + cell[2]) / 2.0
-    target = (
-        anchor[0] + right_half_centre - (before[0] + before[2]) / 2.0,
-        anchor[1],
-        anchor[2],
-    )
-    if not all(map(math.isfinite, target)):
-        raise RuntimeError(f"{prefix}: nonfinite requested position: {target!r}")
-    if annotation.SetPosition2(*target) is not True:
-        raise RuntimeError(f"{prefix}: SetPosition2 refused {target!r}")
-    readback = numbers(annotation.GetPosition(), 3, field="position readback")
-    if any(
-        abs(actual - wanted) > tolerance
-        for actual, wanted in zip(readback, target, strict=True)
-    ):
-        raise RuntimeError(f"{prefix}: position readback {readback!r} != {target!r}")
+    def inside_lane(key: tuple[str, str], box: tuple[float, ...]) -> None:
+        lane = lanes[key]
+        if not (
+            lane[0] < box[0] < box[2] < lane[2]
+            and lane[1] < box[1] < box[3] < lane[3]
+        ):
+            destination = "cell's right half" if key[1] == "3" else "native left strip"
+            raise RuntimeError(
+                f"{zone_prefix(key)}: full native box leaves its {destination}: "
+                f"{box!r}, {lane!r}"
+            )
+
+    before = measure(original)
+    emit(original, before, "before")
+    targets = {}
+    for key, box in before.items():
+        inside_cell(key, box)
+        lane = lanes[key]
+        inset = insets[key]
+        if not (
+            inset[0] <= lane[0] < lane[2] <= inset[2]
+            and inset[1] <= lane[1] < lane[3] <= inset[3]
+        ):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: infeasible native target lane: {lane!r}"
+            )
+        anchor = original[key][2]
+        lane_centre = (lane[0] + lane[2]) / 2.0
+        if key[1] == "3":
+            # Preserve the original right-half complete-box centring algorithm.
+            lane_centre = (middle + cells[key][2]) / 2.0
+        target = (
+            anchor[0] + lane_centre - (box[0] + box[2]) / 2.0,
+            anchor[1],
+            anchor[2],
+        )
+        if not all(map(math.isfinite, target)):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: nonfinite requested position: {target!r}"
+            )
+        delta = target[0] - anchor[0]
+        translated = (box[0] + delta, box[1], box[2] + delta, box[3])
+        inside_cell(key, translated)
+        inside_lane(key, translated)
+        targets[key] = target
+
+    # Both full native boxes have feasible targets before the first mutation.
+    for key, target in targets.items():
+        annotation = original[key][1]
+        if annotation.SetPosition2(*target) is not True:
+            raise RuntimeError(f"{zone_prefix(key)}: SetPosition2 refused {target!r}")
+        readback = numbers(annotation.GetPosition(), 3, field="position readback")
+        if any(
+            abs(actual - wanted) > tolerance
+            for actual, wanted in zip(readback, target, strict=True)
+        ):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: position readback {readback!r} != {target!r}"
+            )
     _rebuild(draw, phase=f"{prefix} placement")
 
     def prove(phase: str) -> None:
@@ -842,25 +926,26 @@ def _align_portrait_bottom_zone_three(
             original_record = original[column]
             if record[3] != original_record[3]:
                 raise RuntimeError(f"{prefix}: style or identity changed for {column!r}")
-            if column == key:
-                # Original Y/Z are requested unchanged; native doubles still
-                # round-trip through the same three-axis readback contract.
+            if column in targets:
+                # Original Y/Z are requested unchanged for both owned notes.
+                # All three native doubles retain the existing readback bound.
                 if any(
                     abs(actual - wanted) > tolerance
-                    for actual, wanted in zip(record[2], target, strict=True)
+                    for actual, wanted in zip(record[2], targets[column], strict=True)
                 ):
                     raise RuntimeError(
-                        f"{prefix}: position readback changed: {record[2]!r}"
+                        f"{zone_prefix(column)}: position readback changed: {record[2]!r}"
                     )
             elif record[2] != original_record[2]:
                 raise RuntimeError(
                     f"{prefix}: other column position changed for {column!r}"
                 )
-        box = measure(current, phase)
-        if box[0] <= middle:
-            raise RuntimeError(
-                f"{prefix}: full native box leaves its cell's right half: {box!r}"
-            )
+        boxes = measure(current)
+        for key, box in boxes.items():
+            inside_cell(key, box)
+            inside_lane(key, box)
+        # No after/final state is published if either owned guard failed.
+        emit(current, boxes, phase)
 
     prove("after")
 
@@ -2400,7 +2485,7 @@ async def _build_reference_sheet(
         if view_layout == "portrait_reference":
             final_checks = (
                 *final_checks,
-                _align_portrait_bottom_zone_three(adapter, draw, sheet, label=label),
+                _align_portrait_bottom_zones(adapter, draw, sheet, label=label),
             )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
