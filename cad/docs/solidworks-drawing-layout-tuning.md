@@ -272,9 +272,10 @@ the generated tree flags. Match every hidden owner to one exact view leaf using
 the existing part-file/source-parent proof; reject unknown, duplicate or
 unreadable identities. Ordinary-view visibility and the exact installed-set
 comparison remain unchanged. Do not guess root names or reapply hiding.
-Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText`;
-raw dispatch can materialize that zero-argument member as a string. Keep the
-exact caption text and uniqueness checks rather than guessing callable forms.
+Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText` or
+`IsBomBalloon`; raw dispatch can materialize those zero-argument members as a
+string or Boolean. Keep exact caption/uniqueness and balloon-count/native-identity
+checks rather than guessing callable forms.
 
 `INote.GetExtent` also encloses an attached leader; it is not a text-only box.
 For capture-label ink checks, use native `IDisplayData` text runs with positive

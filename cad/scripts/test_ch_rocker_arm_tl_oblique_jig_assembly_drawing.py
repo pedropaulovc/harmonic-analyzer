@@ -4509,6 +4509,76 @@ def test_capture_measured_locator_outline_keeps_bounded_field_and_caption_cleara
     settled[-1]()
 
 
+@pytest.mark.parametrize("balloon_state", ("valid", "missing", "extra", "foreign-identity"))
+def test_capture_native_balloon_inventory_binds_raw_boolean_and_keeps_exact_identity(
+    native_property_package, monkeypatch, balloon_state,
+) -> None:
+    package = native_property_package
+    _scales, settled = drawing._place_package(package.adapter)
+    exploded = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[0]
+    native_notes = list(exploded.notes)
+    nonballoon = next((note for note in native_notes if not note.IsBomBalloon()), None)
+    if nonballoon is None:
+        nonballoon = SimpleNamespace(IsBomBalloon=lambda: False)
+        native_notes.append(nonballoon)
+    target_index = next(
+        index for index, note in enumerate(native_notes) if note.IsBomBalloon()
+    )
+    target = native_notes[target_index]
+    foreign = SimpleNamespace(**vars(target))
+
+    class RawNote:
+        def __init__(self, native_note):
+            self.native_note = native_note
+            self.IsBomBalloon = native_note.IsBomBalloon()
+
+    original_early_bound = drawing._early_bound
+    original_is_same = package.adapter.swApp.IsSame
+
+    def native(value):
+        return value.native_note if isinstance(value, RawNote) else value
+
+    def early_bound(value, interface):
+        if isinstance(value, RawNote):
+            assert interface == "INote"
+            return value.native_note
+        return original_early_bound(value, interface)
+
+    def is_same(a, b):
+        # Model IUnknown identity for both operands, delegating the underlying
+        # objects to the existing identity-aware fixture (never value equality).
+        return original_is_same(native(a), native(b))
+
+    monkeypatch.setattr(drawing, "_early_bound", early_bound)
+    monkeypatch.setattr(package.adapter.swApp, "IsSame", is_same)
+    raw_target, raw_foreign = RawNote(target), RawNote(foreign)
+    assert raw_target.IsBomBalloon is True
+    assert callable(drawing._early_bound(raw_target, "INote").IsBomBalloon)
+    assert drawing._early_bound(raw_target, "INote").IsBomBalloon() is True
+    raw_nonballoon = RawNote(nonballoon)
+    assert raw_nonballoon.IsBomBalloon is False
+    assert callable(drawing._early_bound(raw_nonballoon, "INote").IsBomBalloon)
+    assert drawing._early_bound(raw_nonballoon, "INote").IsBomBalloon() is False
+    assert is_same(raw_target, target) == is_same(target, raw_target) == 1
+    assert is_same(raw_foreign, target) == is_same(target, raw_foreign) == 0
+    if balloon_state == "missing":
+        del native_notes[target_index]
+    elif balloon_state == "extra":
+        native_notes.append(foreign)
+    elif balloon_state == "foreign-identity":
+        native_notes[target_index] = foreign
+    owned = tuple(RawNote(note) for note in native_notes)
+    assert {note.IsBomBalloon for note in owned} == {True, False}
+    monkeypatch.setattr(exploded, "GetNotes", lambda: owned)
+    if balloon_state == "valid":
+        settled[-1]()
+    else:
+        with pytest.raises(
+            RuntimeError, match="native exploded balloons differ from proved landings",
+        ):
+            settled[-1]()
+
+
 @pytest.mark.parametrize("caption_state", ("valid", "wrong-text", "duplicate", "missing"))
 def test_capture_locator_caption_binds_materialized_raw_text_before_exact_proof(
     native_property_package, monkeypatch, caption_state,

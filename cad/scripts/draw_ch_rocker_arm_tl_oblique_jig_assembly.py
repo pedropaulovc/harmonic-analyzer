@@ -3281,7 +3281,7 @@ def _assert_capture_sheet(
         refuse_layout("jig capture: reading-label leaders cross")
     if landings:
         _assert_capture_coverage(landings, cluster.stems)
-        native_balloons = tuple(note for note in (views[0].GetNotes() or ()) if note.IsBomBalloon())
+        native_balloons = tuple(note for note in (views[0].GetNotes() or ()) if _early_bound(note, "INote").IsBomBalloon())
         if len(native_balloons) != len(landings) or any(
             not any(int(adapter.swApp.IsSame(note, landing.note)) == 1 for landing in landings)
             for note in native_balloons
