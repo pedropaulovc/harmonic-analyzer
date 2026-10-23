@@ -9934,7 +9934,8 @@ def _washer_paint_native(monkeypatch, case):
         record["pos"][:2] = xy
     case.paint = {label: SimpleNamespace(record=record, settled_offset=False,
                                         offset_shift=0.0, clamp=False, reject=False,
-                                        refuse_mode=False)
+                                        refuse_mode=False, offset_path_templates=None,
+                                        offset_path_indices=None)
                   for label, record in records.items()}
 
     class DisplayData:
@@ -9997,16 +9998,56 @@ def _washer_paint_native(monkeypatch, case):
         state.use_doc_broken, state.broken = use_doc, broken
         return 0
 
+    def sync_offset_path(paint, enabled):
+        """Unit transport only: paint the two owned paths, never adopt raw rows."""
+        graphics = paint.record["display"]
+        lines = graphics["lines"]
+        if not enabled:
+            if paint.offset_path_indices is not None:
+                for index in sorted(paint.offset_path_indices, reverse=True):
+                    del lines[index]
+                paint.offset_path_indices = None
+            paint.settled_offset = False
+            return
+        if paint.offset_path_indices is None:
+            # Four physical rows are the explicit fresh fixture shape. Retained
+            # True paint is not ours to select, classify, or silently duplicate.
+            if len(lines) != 4:
+                return
+            templates = paint.offset_path_templates
+            if templates is None:
+                # R48 has no captured offset path. Reuse its native primitive
+                # header for derived fake paint, not a new native observation.
+                templates = (lines[0], lines[0])
+            assert len(templates) == 2
+            paint.offset_path_indices = (len(lines), len(lines) + 1)
+            lines.extend(copy.deepcopy(row) for row in templates)
+        # These fixtures' native texts have unrotated lower-left anchors. The
+        # lowest actual fragment supplies its baseline and complete advance;
+        # do not estimate glyph ink or call the production path classifier.
+        baseline = min(graphics["texts"], key=lambda text: text["pos"][1])
+        start = baseline["pos"]
+        tips = graphics["arrows"]
+        midpoint = [
+            tips[0][coordinate] + (tips[1][coordinate] - tips[0][coordinate]) / 2
+            for coordinate in range(3)
+        ]
+        connector, underline = (lines[index] for index in paint.offset_path_indices)
+        connector[4:7], connector[7:10] = midpoint, list(start)
+        underline[4:7] = list(start)
+        underline[7:10] = [start[0] + baseline["w"], start[1], start[2]]
+
     def position(label, x, y, _z):
         item = case.imports[label]
         paint = case.paint[label]
         if paint.reject:
             return False
         if paint.clamp:
-            return True  # Native can report success but constrain the position.
+            return True  # Refuse the entire requested native XY position.
         record = paint.record
         dx, dy = x - record["pos"][0], y - record["pos"][1]
         if label == thick and not item.display.OffsetText:
+            sync_offset_path(paint, False)
             # Linear OffsetText=False moves the physical dimension station.
             for index, row in enumerate(record["display"]["lines"]):
                 row[7] += dx
@@ -10018,6 +10059,8 @@ def _washer_paint_native(monkeypatch, case):
             text["pos"][0] += dx
             text["pos"][1] += dy
         record["pos"][:2] = (x, y)
+        if label == thick:
+            sync_offset_path(paint, item.display.OffsetText)
         return True
 
     for label in records:
@@ -10048,6 +10091,7 @@ def _washer_paint_native(monkeypatch, case):
             for text in paint.record["display"]["texts"]:
                 text["pos"][0] += paint.offset_shift
             paint.settled_offset = True
+        sync_offset_path(paint, display.OffsetText)
 
     def record(_reader, annotation):
         label = next(label for label, item in case.imports.items()

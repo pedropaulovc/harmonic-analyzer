@@ -823,34 +823,53 @@ def _retained_washer_layout(monkeypatch, scope):
     # These retained captures have exactly one complete offset text path after
     # their four physical runs. Prove its raw endpoints before deriving the
     # pre-offset paint; no arbitrary physical primitive may be discarded.
+    from decimal import Decimal
+
+    coordinate_tolerance = Decimal("0.0000001")
     assert len(lines) == 6
-    raw_tips = tuple(tuple(arrow[:2]) for arrow in record["display"]["arrows"])
+    raw_tips = tuple(
+        tuple(Decimal(str(value)) for value in arrow[:2])
+        for arrow in record["display"]["arrows"]
+    )
     assert len(raw_tips) == 2
     support = raw_tips[0][0]
     assert raw_tips[1][0] == support
     assert raw_tips[0][1] != raw_tips[1][1]
     midpoint = (support, sum(tip[1] for tip in raw_tips) / 2)
-    baseline = (min(text["pos"][0] for text in texts),
-                min(text["pos"][1] for text in texts))
-    advance = (max(text["pos"][0] + text["w"] for text in texts), baseline[1])
+    baseline = (min(Decimal(str(text["pos"][0])) for text in texts),
+                min(Decimal(str(text["pos"][1])) for text in texts))
+    advance = (
+        max(Decimal(str(text["pos"][0])) + Decimal(str(text["w"])) for text in texts),
+        baseline[1],
+    )
     # Select by the independently recorded topology across every raw row,
     # including reversed endpoints. Duplicate/ambiguous paths are not seeds.
     for start, end, expected in ((midpoint, baseline, 4), (baseline, advance, 5)):
         matches = [
             index for index, row in enumerate(lines)
             if any(
-                tuple(row[first:first + 2]) == pytest.approx(start, abs=1e-7, rel=0)
-                and tuple(row[last:last + 2]) == pytest.approx(end, abs=1e-7, rel=0)
+                all(
+                    abs(Decimal(str(row[first + coordinate])) - start[coordinate])
+                    <= coordinate_tolerance
+                    for coordinate in (0, 1)
+                )
+                and all(
+                    abs(Decimal(str(row[last + coordinate])) - end[coordinate])
+                    <= coordinate_tolerance
+                    for coordinate in (0, 1)
+                )
                 for first, last in ((4, 7), (7, 4))
             )
         ]
         assert matches == [expected]
+    case.paint[thick].offset_path_templates = copy.deepcopy(lines[4:])
+    case.paint[thick].offset_path_indices = None
     del lines[4:]
     # Like the saved fixture's explicit authoring reset, this False mode is
     # DERIVED unit-test input, not an observed native False. Its anchor comes
     # directly from raw arrows, not the production measurement/classifier.
     # Seeding from the retained transverse anchor would move physical ink.
-    record["pos"][0] = support
+    record["pos"][0] = record["display"]["arrows"][0][0]
     display.OffsetText = False
     case.paint[thick].settled_offset = False
     fresh = measure_reference_text(case.adapter, display, axis=1, label=thick)
