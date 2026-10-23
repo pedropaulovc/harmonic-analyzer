@@ -190,8 +190,8 @@ def _require_part_band_profile(
 def _scope_nodes(scope: ast.AST) -> Iterator[ast.AST]:
     """Walk one scope, including expressions executed by nested definitions.
 
-    Defaults/decorators execute in the enclosing scope; a nested function's
-    parameters and body belong to its independent local scope.
+    Defaults, decorators and eager annotations execute in the enclosing scope;
+    a nested function's parameter bindings and body have independent locals.
     """
     yield scope
     for child in ast.iter_child_nodes(scope):
@@ -201,6 +201,14 @@ def _scope_nodes(scope: ast.AST) -> Iterator[ast.AST]:
                 expressions = [*child.args.defaults, *child.args.kw_defaults]
                 if not isinstance(child, ast.Lambda):
                     expressions.extend(child.decorator_list)
+                    expressions.append(child.returns)
+                    arguments = [
+                        *child.args.posonlyargs, *child.args.args, *child.args.kwonlyargs,
+                        child.args.vararg, child.args.kwarg,
+                    ]
+                    expressions.extend(
+                        argument.annotation for argument in arguments if argument is not None
+                    )
             else:
                 expressions = [*child.bases, *child.keywords, *child.decorator_list]
             for expression in expressions:
@@ -281,9 +289,10 @@ def _require_attribute_reads(scope: ast.AST, name: str) -> None:
     for node in ast.walk(scope):
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id == name:
             parent = parents[node]
-            assert isinstance(parent, ast.Attribute) and parent.value is node, (
-                f"{name}: row escapes the bounded field projection"
-            )
+            assert (
+                isinstance(parent, ast.Attribute) and parent.value is node
+                and not parent.attr.startswith("_")
+            ), f"{name}: row escapes the bounded public-field projection"
 
 
 def _require_tuple_reads(scope: ast.AST, name: str, row_name: str) -> None:
@@ -380,6 +389,25 @@ def _require_import(
     assert len(imports) == 1, f"{name}: needs one direct import from {module}"
     nodes = list(ast.walk(tree))
     assert _bindings(nodes, name) == imports, f"{name}: import is shadowed/rebound"
+    if member in (None, "GEOMETRIC_CONTROLS"):
+        module_imports = [
+            alias for node in nodes if isinstance(node, ast.Import)
+            for alias in node.names if alias.name == module
+        ]
+        control_imports = [
+            alias for node in nodes if isinstance(node, ast.ImportFrom)
+            and node.level == 0 and node.module == module
+            for alias in node.names if alias.name == "GEOMETRIC_CONTROLS"
+        ]
+        assert (
+            module_imports == imports and not control_imports
+            if member is None else control_imports == imports and not module_imports
+        ), "part controls need one import route, not unchecked alternate aliases"
+        assert not any(
+            isinstance(node, ast.ImportFrom) and node.module == module
+            and any(alias.name.startswith("_") for alias in node.names)
+            for node in nodes
+        ), "part module namespace cannot escape through private imports"
     assert not any(
         isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names)
         for node in nodes
@@ -391,6 +419,7 @@ def _require_import(
         parents = {child: parent for parent in nodes for child in ast.iter_child_nodes(parent)}
         assert all(
             isinstance(parents[node], ast.Attribute) and parents[node].value is node
+            and not parents[node].attr.startswith("_")
             for node in nodes if isinstance(node, ast.Name) and node.id == name
         ), f"{name}: module alias escapes the proven ownership chain"
 
@@ -436,7 +465,7 @@ def _require_part_control_projection(
         ancestors.append(node)
     scope = next(
         node for node in ancestors
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module, ast.Lambda))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module, ast.Lambda))
     )
     assert isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)), "typed FCF needs a function scope"
     loops = [node for node in ancestors[:ancestors.index(scope)] if isinstance(node, ast.For)]
@@ -655,6 +684,20 @@ def test_typed_projection_allows_unrelated_spec_text_methods() -> None:
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = [row for row in controls]"),
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    mutate(controls)"),
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = part_spec.GEOMETRIC_CONTROLS[0]"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec.__dict__.update(GEOMETRIC_CONTROLS=local_controls)"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport sample_spec as alternate\nalternate.GEOMETRIC_CONTROLS = local_controls"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom sample_spec import GEOMETRIC_CONTROLS as alternate"),
+    ("control = controls[index]", "control = controls[index]\n        state = control.__dict__\n        state['tolerance'] = '9.9'"),
+    (
+        "    controls = part_spec.GEOMETRIC_CONTROLS",
+        "    controls = part_spec.GEOMETRIC_CONTROLS\n"
+        "    def prepare(_: (controls := local_controls)): pass",
+    ),
+    (
+        "        add_feature_control_frame(characteristic=control.characteristic, tolerance=control.tolerance)",
+        "        class Local:\n            control = fake_control\n"
+        "            add_feature_control_frame(characteristic=control.characteristic, tolerance=control.tolerance)",
+    ),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec.GEOMETRIC_CONTROLS.append(fake_control)"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec = local_spec"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport other as part_spec"),
