@@ -9,7 +9,26 @@ ch-rocker-arm-tl-oblique-carrier:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "start from 1/2 in plate; face to 12.0 drawing thickness and saw/mill to 520 x 130; drill and ream the four pivot-pin holes; chamfer each pin hole's underside edge 0.3 min x 45 deg; centre-drill the HUB and CL spots; drill and tap the CR, riser and feed-lever holes; break edges"
+  process: >-
+    start from 1/2 in plate; face to 12.0 drawing thickness and saw/mill to
+    520 x 130; drill and ream the four pivot-pin holes; chamfer each pin hole's
+    underside edge 0.3 min x 45 deg; centre-drill the HUB and CL spots; drill and
+    tap the CR, riser and feed-lever holes; break edges. Before assembly, inspect
+    ALL FOUR pivot bores A1, B1, A2 and B2 individually against the carrier's
+    actual bottom seating face. Support that clean face on equal-height clean
+    parallels on a granite surface plate, without rocking or distorting clamps.
+    Use a straight adjustable expanding test arbor seated over the bore's
+    straight cylindrical land, not either mouth chamfer, to eliminate fit play;
+    a loose H7/h6 pivot pin is not an axis gauge. Check the height-gauge indicator
+    travel against a square normal to the surface plate. Indicate the arbor
+    laterally at two heights exactly 10.50 mm apart: the change must be at most
+    0.05 mm in every azimuth. Measure two orthogonal lateral changes and use their
+    vector resultant, sqrt(dx^2 + dy^2), for the maximum departure; do not allow
+    0.05 separately in each direction. Reverse and reseat the arbor to bound its
+    straightness and seating error, and include these and setup repeatability
+    within the 0.05 maximum rather than adding allowances. Record a result for
+    each bore before installing the carrier on the two pivot pins; the carrier
+    remains supported by those pins only, with no skid.
   machinist_exceptions:
     - id: "RV-01"
       kind: "minor"
