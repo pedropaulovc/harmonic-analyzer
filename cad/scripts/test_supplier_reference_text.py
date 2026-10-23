@@ -471,6 +471,115 @@ def test_stations_reject_actual_100um_free_tail_mutation(native_reads, physical_
 
 
 @pytest.mark.parametrize(
+    "axial_gap_half", (4.0e-6, 4.9e-6), ids=("radial-inside", "radial-outside")
+)
+def test_measure_tip_incidence_uses_actual_fragments_not_gap_closed_union(
+    native_reads, physical_case, axial_gap_half
+):
+    case = physical_case
+    record = case.record
+    original = core.measure_reference_text(
+        None, _static(record), axis=case.axis, label=_LABEL
+    )
+    tip = original["tips"][0]
+    axis, normal = case.axis, 1 - case.axis
+    lines = record["display"]["lines"]
+    tail = list(lines[case.index])
+    low = min(tail[4 + axis], tail[7 + axis])
+    # Horizontal RD1 also has an unbroken inter-tip run, which must not
+    # accidentally supply healthy ink at the tested tip. Replace that run
+    # with the positive-side fragment, keeping the other tip's ink intact.
+    high = (
+        max(lines[4][4 + axis], lines[4][7 + axis])
+        if axis == 0 else tip[axis] + 0.0001
+    )
+    pieces = []
+    for start, end in (
+        (low, tip[axis] - axial_gap_half),
+        (tip[axis] + axial_gap_half, high),
+    ):
+        piece = list(tail)
+        piece[4 + axis], piece[7 + axis] = start, end
+        piece[4 + normal] = piece[7 + normal] = tip[normal] + 9e-6
+        pieces.append(piece)
+    lines[case.index:case.index + (2 if axis == 0 else 1)] = pieces
+    retained = copy.deepcopy(record)
+    # Both fragments pass support selection and their axial gap closes at
+    # the existing 10 um union tolerance. Nevertheless, the nearest ACTUAL
+    # endpoint is sqrt(9**2 + 4.9**2) > 10 um in the negative case; the
+    # gap-closed rectangle's 9 um distance is not native line incidence.
+    assert 2 * axial_gap_half <= _TOL
+    assert original["tips"] == tuple(
+        sorted(tuple(arrow[:2]) for arrow in record["display"]["arrows"])
+    )
+    if axial_gap_half == 4.9e-6:
+        with pytest.raises(RuntimeError, match="lost.*native.*(?:witness|line)"):
+            core.measure_reference_text(None, _static(record), axis=axis, label=_LABEL)
+    else:
+        measured = core.measure_reference_text(
+            None, _static(record), axis=axis, label=_LABEL
+        )
+        assert measured["tips"] == original["tips"]
+        assert measured["witnesses"] == original["witnesses"]
+        assert measured["reach"] == original["reach"]
+        assert measured["physical_lines"][0] == pytest.approx(
+            (
+                tip[normal] if axis == 0 else tip[normal] + 9e-6,
+                tip[normal] + 9e-6,
+                low,
+                original["physical_lines"][0][3] if axis == 0 else high,
+            )
+        )
+        assert measured["record"] == retained
+    assert record == retained
+
+
+@pytest.mark.parametrize("factor", (0.999, 1.0, 1.001), ids=("below", "at", "above"))
+def test_measure_actual_tip_distance_uses_exact_existing_radial_tolerance(
+    native_reads, physical_case, factor
+):
+    case = physical_case
+    axis, normal = case.axis, 1 - case.axis
+    display = _Display(case.record, axis)
+    # Translate the actual native tip to zero on BOTH axes before constructing
+    # the 6-8-10 um radial boundary, avoiding large-sheet subtraction noise.
+    tip = tuple(case.record["display"]["arrows"][0][:2])
+    display.shift_stations(0, -tip[0])
+    display.shift_stations(1, -tip[1])
+    original = core.measure_reference_text(None, display, axis=axis, label=_LABEL)
+    assert original["tips"][0] == (0.0, 0.0)
+    lines = case.record["display"]["lines"]
+    tail = list(lines[case.index])
+    low = min(tail[4 + axis], tail[7 + axis])
+    high = (
+        max(lines[4][4 + axis], lines[4][7 + axis])
+        if axis == 0 else 0.0001
+    )
+    pieces = []
+    for nearest, farthest in ((-8e-6 * factor, low), (8e-6 * factor, high)):
+        piece = list(tail)
+        # Start each segment at its nearest endpoint: the segment-distance
+        # projection clamps to zero without subtracting its far endpoint.
+        piece[4 + axis], piece[7 + axis] = nearest, farthest
+        piece[4 + normal] = piece[7 + normal] = 6e-6 * factor
+        pieces.append(piece)
+    lines[case.index:case.index + (2 if axis == 0 else 1)] = pieces
+    retained = copy.deepcopy(case.record)
+    if factor > 1.0:
+        with pytest.raises(RuntimeError, match="lost.*native.*(?:witness|line)"):
+            core.measure_reference_text(None, display, axis=axis, label=_LABEL)
+    else:
+        measured = core.measure_reference_text(None, display, axis=axis, label=_LABEL)
+        for key in ("tips", "witnesses", "reach"):
+            assert measured[key] == original[key]
+        # This 16 um gap is genuinely disjoint; successful native incidence
+        # must come from an actual fragment, never from union gap closing.
+        assert len(measured["physical_lines"]) == len(original["physical_lines"]) + 1
+        assert measured["record"] == retained
+    assert case.record == retained
+
+
+@pytest.mark.parametrize(
     "intervals",
     (
         ((0.0, 0.25), (0.25, 0.7), (0.7, 1.0)),

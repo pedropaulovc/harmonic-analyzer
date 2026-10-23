@@ -25,7 +25,7 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _layout_audit import TextItem, _rotated_hull, annotation_geometry, calibrate_sheet_advance
-from _layout_geometry import Box, union_boxes
+from _layout_geometry import Box, point_segment_distance, union_boxes
 import _telemetry
 
 # The existing shared-clamp native station/readback contract, not a new allowance.
@@ -275,16 +275,12 @@ def measure_reference_text(
             else:
                 coverage.append((low, high))
         witnesses.extend((tip[axis], low, high) for low, high in coverage)
+    # A tolerance-closed station union cannot supply missing native tip ink.
+    # Prove radial support against each actual finite segment, not its union.
     if any(
         not any(
-            dist(
-                (tip[normal], tip[axis]),
-                (
-                    min(max(tip[normal], normal_low), normal_high),
-                    min(max(tip[axis], low), high),
-                ),
-            ) <= _POSITION_TOLERANCE_M
-            for normal_low, normal_high, low, high in physical_lines
+            point_segment_distance(tip, segment) <= _POSITION_TOLERANCE_M
+            for segment in physical
         )
         for tip in tips
     ):
