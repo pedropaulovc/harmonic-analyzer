@@ -584,7 +584,10 @@ def _assert_pin_axis_geometry(source_model: Any) -> dict[str, float]:
             raise RuntimeError(f"{key}: expected two actual straight-land rim stations")
         land = abs(stations[1] - stations[0]) * 1000.0
         if land + 1e-8 < part_spec.PIN_AXIS_MEASUREMENT_SPAN:
-            raise RuntimeError(f"{key}: native straight land {land:g} is below 10.50 MIN")
+            raise RuntimeError(
+                f"{key}: native straight land {land:g} is below "
+                f"{part_spec.PIN_STRAIGHT_LAND_MIN_CALLOUT}"
+            )
         lands[key] = land
     return lands
 

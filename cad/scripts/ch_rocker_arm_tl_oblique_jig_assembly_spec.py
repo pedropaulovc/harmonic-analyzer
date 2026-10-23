@@ -1887,6 +1887,59 @@ PIN_TIP_MIN_RECESS_CALLOUT = (
 TOP_FULL_SECTION_SHANK_OVERLAP_MIN = 2.0
 TOP_CARRIER_BACKED_BEARING_STRIP_MIN = 2.0
 
+# Complete attached inspection ink; the drawing owns only picks and placement.
+CAPTURE_READING_CALLOUTS = {
+    "lower_rim": (
+        f"C2 LOWER RIM / FLOOR\n{retention.PIN_LOWER_GAP[0]:.2f}-"
+        f"{retention.PIN_LOWER_GAP[1]:.2f}"
+    ),
+    "upper_rim": (
+        f"C2 UPPER RIM / ROOF\n{retention.PIN_UPPER_GAP[0]:.2f}-"
+        f"{retention.PIN_UPPER_GAP[1]:.2f}"
+    ),
+    "chamber_excess": (
+        f"C2 CHAMBER MINUS FLANGE\n{retention.CAP_CHAMBER_EXCESS[0]:.2f}-"
+        f"{retention.CAP_CHAMBER_EXCESS[1]:.2f}\nEXCESS, NOT A THIRD GAP"
+    ),
+    "mouth": (
+        "C4 MOUTH / FLAT LAND\nFULL SHANK PAST MOUTH\n"
+        f"{TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN, BOTH SIDES"
+    ),
+    "carrier_backing": (
+        "C4 COMMON SHANK / LAND\nSOLID CARRIER BACKING\n"
+        f"{TOP_CARRIER_BACKED_BEARING_STRIP_MIN:.1f} MIN, BOTH SIDES"
+    ),
+    "running_gap": (
+        f"C4A CARRIER / RETAINER\n{retention.TOP_RUNNING_GAP[0]:.2f}-"
+        f"{retention.TOP_RUNNING_GAP[1]:.2f}"
+    ),
+    "pin_end": (
+        "C5A FLAT PIN END\nAXIAL TAKE-UP "
+        f"{retention.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX"
+    ),
+    "cross_hole": "C4A UPPER CROSS-HOLE EDGE\nHOLD CLEVIS UP FOR FIT",
+    "clevis": (
+        "C5B HEAD / SHANK REGIONS\n"
+        f"{retention.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN TO CARRIER"
+    ),
+    "cotter": (
+        "C5B COTTER EYE / PRONGS\n"
+        f"{retention.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN\nSEE C5B-C5C MOTION CHECKS"
+    ),
+    "cap_land": (
+        "C3A CAP / BLOCK LAND\n"
+        f"{retention.CAP_BASE_SEATING_GAP_MAX:.2f} MAX"
+    ),
+    "underhead": (
+        "C3A UNDERHEAD FOOTPRINT\n"
+        f"{retention.CAP_HEAD_SEATING_GAP_MAX:.2f} MAX"
+    ),
+}
+CAPTURE_READING_CALLOUTS["carrier_backing_pin_end"] = (
+    CAPTURE_READING_CALLOUTS["carrier_backing"]
+    + "\nC5A CARRIER FACE\nREAD TO FLAT PIN END"
+)
+
 TOP_CAPTURE_STEPS = (
     "C4. C4-C5 POINTS: A-A, SHEET 4. STOP/ISOLATE THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER. "
     "FOR THE MATCHED SET, MEASURE ACTUAL RELIEVED RETAINER BORE MOUTHS, "
