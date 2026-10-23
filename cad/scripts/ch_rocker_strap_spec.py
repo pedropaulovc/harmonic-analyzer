@@ -44,6 +44,7 @@ __all__ = [
     "BOT_END_Y",
     "CENTER_Y",
     "CURVE_RADIUS",
+    "DRAWING_REFERENCE_PRECISION",
     "HOLE_DIA",
     "HUB_NUMBER",
     "NUMBER",
@@ -76,6 +77,12 @@ HOLE_DIA = HUB_DIA
 # one-place radii left a 0.79 worst-case wall under the hole).
 BOTTOM_EDGE_BELOW_PIVOT = PIVOT_MID_Y
 BOTTOM_EDGE_BAND = (TOP_EDGE_BAND[1], -TOP_EDGE_BAND[0])  # (upper, lower)
+
+# The sheet's one pure reference dimension: the parenthesised overall length
+# across both tip corners, a band-free restatement of the two 146.25 offsets.
+# One place, a noncritical overall size (drawing-guidelines.md): 292.51 next
+# to 146.25 + 146.25 would read as an arithmetic error.
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"OverallLength": 1}
 
 # The two vertices the spec does not export, from the same construction as
 # build_ch_rocker_arm: each arc's end on its circle, and the tip land's outer
