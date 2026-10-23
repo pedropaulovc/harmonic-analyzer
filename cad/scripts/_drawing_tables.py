@@ -1353,6 +1353,7 @@ def insert_bom_table(
                 description_column,
                 text,
                 label=f"{label} BOM description",
+                configuration=configuration,
             )
         if remaining:
             raise RuntimeError(
@@ -1414,9 +1415,62 @@ def _set_bom_cell_text(
     text: str,
     *,
     label: str,
+    configuration: str | None = None,
 ) -> None:
     """Write and verify one physical BOM cell."""
+    before = table.DisplayedText2(row, column, True)
     table.SetText2(row, column, True, text)
     applied = str(table.DisplayedText2(row, column, True) or "")
     if applied != text:
-        raise RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
+        error = RuntimeError(f"{label} did not persist: {applied!r} != {text!r}")
+        error.add_note(
+            _bom_cell_evidence(table, row, column, before, configuration)
+        )
+        raise error
+
+
+def _bom_cell_evidence(
+    table: Any, row: int, column: int, before: Any, configuration: str | None
+) -> str:
+    """Bounded read-only evidence for a refused cell write; never replaces it."""
+    evidence: dict[str, Any] = {"before": before}
+
+    def read(key: str, call: Any) -> Any:
+        try:
+            evidence[key] = call()
+        except Exception as error:  # Evidence only: keep the original refusal.
+            evidence[key] = f"{type(error).__name__}: {str(error)[:160]}"
+        return evidence[key]
+
+    read("type", lambda: table.GetColumnType3(column, True))
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty", "GetComponents2"
+    )
+    read("property", lambda: annotation.GetColumnCustomProperty(column))
+    components = read(
+        "components",
+        lambda: tuple(annotation.GetComponents2(row, configuration or "") or ())[:2],
+    )
+    for index, component in enumerate(components if isinstance(components, tuple) else ()):
+        component = _early_bound(component, "IComponent2")
+        member = read(f"c{index}.configuration", lambda: str(component.ReferencedConfiguration))
+        model = read(f"c{index}.model", component.GetModelDoc2)
+        if model is None or isinstance(model, str):
+            continue
+        model = _early_bound(model, "IModelDoc2")
+        read(f"c{index}.path", lambda: str(model.GetPathName())[-96:])
+        read(f"c{index}.read_only", model.IsOpenedReadOnly)
+        read(f"c{index}.dirty", model.GetSaveFlag)
+        read(f"c{index}.prp_member", lambda: model.GetCustomInfoValue(member, "Description"))
+        read(f"c{index}.prp_file", lambda: model.GetCustomInfoValue("", "Description"))
+        native = read(f"c{index}.config", lambda: model.GetConfigurationByName(member))
+        if native is not None and not isinstance(native, str):
+            native = _early_bound(native, "IConfiguration")
+            read(f"c{index}.bom_description", lambda: str(native.Description))
+            read(f"c{index}.use_bom_description", lambda: native.UseDescriptionInBOM)
+    evidence.pop("components", None)
+    evidence.pop("c0.model", None)
+    evidence.pop("c1.model", None)
+    evidence.pop("c0.config", None)
+    evidence.pop("c1.config", None)
+    return f"cell row {row} column {column} evidence: {repr(evidence)[:1500]}"
