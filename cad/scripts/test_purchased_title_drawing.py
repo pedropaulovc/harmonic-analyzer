@@ -102,6 +102,7 @@ class _Display:
 class _Annotation:
     def __init__(self, note):
         self.note = note
+        self.OwnerType = 2  # swDrawingTemplate ownership, retained by the native census.
         self._format = _Format()
         self.use_doc = True
         self.setter_result = True
@@ -168,6 +169,9 @@ class _Note:
     def PropertyLinkedText(self):
         return self._link
 
+    def GetName(self):
+        return f"Note:{self._link}"
+
     def GetText(self):
         return self._text
 
@@ -203,6 +207,7 @@ class _Drawing:
                 segment for note in notes for segment in _rules(note.cell)
             )
         ))
+        self.sheet.SheetFormatVisible = True
         self.sheet_view = SimpleNamespace(GetFirstNote2=lambda: notes[0] if notes else None)
         self.relink()
 

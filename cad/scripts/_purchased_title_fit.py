@@ -104,6 +104,58 @@ def _ruled_cell(sheet: Any, anchor: tuple[float, ...]) -> tuple[float, ...]:
         raise RuntimeError("cannot identify the purchased note's native ruled cell") from exc
 
 
+def _record_title_note_inventory(
+    adapter: Any, sheet: Any, notes: list[Any], material_note: Any, *, label: str,
+) -> None:
+    """Retain same-zoom native format-note evidence before title candidate writes."""
+    annotation = _early_bound(material_note.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError(f"{label}: Material note has no annotation for label inventory")
+    anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(anchor) != 3 or not all(map(math.isfinite, anchor)):
+        raise RuntimeError(f"{label}: invalid Material inventory anchor {anchor!r}")
+    cell = _ruled_cell(sheet, anchor)
+    centre = ((cell[0] + cell[2]) / 2, (cell[1] + cell[3]) / 2)
+    half = max(cell[2] - cell[0], cell[3] - cell[1]) / 2 + 0.002
+    _telemetry.event(
+        "drawing.purchased_title_fit.note_inventory",
+        label=label, phase="begin", count=len(notes), cell=cell,
+        centre_m=centre, half_m=half, sheet_format_visible=sheet.SheetFormatVisible,
+    )
+    with _zoomed_on(adapter, centre, half):
+        for index, note in enumerate(notes):
+            try:
+                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+                if annotation is None:
+                    raise RuntimeError("native format note has no annotation")
+                text = str(note.GetText() or "")
+                _telemetry.event(
+                    "drawing.purchased_title_fit.note_inventory",
+                    label=label, phase="note", index=index,
+                    note_name=str(note.GetName()),
+                    owner_type=int(annotation.OwnerType),
+                    linked_text=str(note.PropertyLinkedText or ""),
+                    text=text,
+                    position_m=tuple(float(value) for value in (annotation.GetPosition() or ())),
+                    extent_m=(
+                        tuple(float(value) for value in (note.GetExtent() or ()))
+                        if text.strip() else None
+                    ),
+                    extent_unavailable=None if text.strip() else "empty note",
+                )
+            except Exception as exc:
+                _telemetry.event(
+                    "drawing.purchased_title_fit.note_inventory",
+                    label=label, phase="read-error", index=index,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+                raise
+    _telemetry.event(
+        "drawing.purchased_title_fit.note_inventory",
+        label=label, phase="end", count=len(notes),
+    )
+
+
 def _fit_title_note(
     adapter: Any, draw: Any, sheet: Any, note: Any, *, label: str, minimum: float,
     material_property: str = "Material Specification",
@@ -288,12 +340,15 @@ def fit_purchased_title_block(
     if sheet is None or sheet_view is None:
         raise RuntimeError("purchased drawing has no native sheet or sheet view")
     found: dict[str, list[Any]] = {expression: [] for expression in fields}
+    inventory_notes = [] if material_alignment == "centered" else None
     note = sheet_view.GetFirstNote2()
     while note is not None:
         note = _early_bound(note, "INote")
         expression = source_property_expression(str(note.PropertyLinkedText))
         if expression in found:
             found[expression].append(note)
+        if inventory_notes is not None:
+            inventory_notes.append(note)
         note = note.GetNext()
     counts = {expression: len(notes) for expression, notes in found.items()}
     if any(count != 1 for count in counts.values()):
@@ -302,6 +357,11 @@ def fit_purchased_title_block(
     if str(name.GetText()) != spec.artifact_stem:
         raise RuntimeError(
             f"purchased Name value {name.GetText()!r} is not source identity {spec.artifact_stem!r}"
+        )
+    if inventory_notes is not None:
+        _record_title_note_inventory(
+            adapter, sheet, inventory_notes, found[property_link(material_property)][0],
+            label=f"{spec.artifact_stem} Material",
         )
     checks = tuple(
         _fit_title_note(
