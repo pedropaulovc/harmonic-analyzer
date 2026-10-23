@@ -105,8 +105,6 @@ from _drawing_view_display import set_hidden_lines_removed
 from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
-from _simplified_bom import child_bom_identity
-from _simplified_names import SIMPLIFIED_SUFFIX, is_simplified
 import _telemetry
 from _column_clamp_interface import BAR_DEPTH
 import pd_latch_hook_geometry as hook_geometry
@@ -2540,102 +2538,6 @@ def _assert_bom_balloon_configuration(view: Any, *, label: str) -> None:
         )
 
 
-# Release-manager ruling, 2026-10-23 (PR #1895): the 1:3 exploded platen view
-# keeps the policy "Default Simplified" (its explode is that configuration's
-# own). It alone is exempt from configuration equality, and only with the
-# member-identity proof below plus the settled item readback.
-EXPLODED_BALLOON_CONFIGURATION = SIMPLIFIED_VIEW_CONFIGURATION
-
-
-def _bom_member_identity(configuration: Any) -> tuple[int, str, bool, str, bool]:
-    configuration = _early_bound(configuration, "IConfiguration")
-    return (
-        int(configuration.BOMPartNoSource),
-        str(configuration.AlternateName or ""),
-        bool(configuration.UseAlternateNameInBOM),
-        str(configuration.Description or ""),
-        bool(configuration.UseDescriptionInBOM),
-    )
-
-
-def _prove_exploded_balloon_members(adapter: Any, view: Any, *, label: str) -> int:
-    """Every shown simplified member prints its Default counterpart's BOM row.
-
-    Reads the view's actual configuration, then each shown occurrence's member:
-    its Number must equal the parent configuration's and the BOM row's, and its
-    BOM identity must be the parent's inherited one (``child_bom_identity``).
-    """
-    actual = str(_early_bound(view, "IView").ReferencedConfiguration)
-    if actual != EXPLODED_BALLOON_CONFIGURATION:
-        raise RuntimeError(
-            f"{label}: exploded view configuration {actual!r}, expected "
-            f"{EXPLODED_BALLOON_CONFIGURATION!r}"
-        )
-    proven = 0
-    for leaf in _view_component_leaves(adapter, view, label=label):
-        if not leaf.visible:
-            continue
-        component = _early_bound(leaf.component, "IComponent2")
-        member = str(component.ReferencedConfiguration or "")
-        # A part without a simplified child shows its Default member itself:
-        # its row and Number are still proven, its identity is the BOM's own.
-        simplified = is_simplified(member)
-        parent = member.removesuffix(SIMPLIFIED_SUFFIX) if simplified else member
-        stem, _member = component_identity(component)
-        keys = [
-            key
-            for key, (identity_stem, identity_member) in BOM_COMPONENT_IDENTITIES.items()
-            if identity_stem.casefold() == stem
-            and identity_member in (None, parent)
-        ]
-        if len(keys) != 1:
-            raise RuntimeError(
-                f"{label}: {leaf.path or leaf.name!r} ({stem}, {parent!r}) matches "
-                f"BOM rows {keys}"
-            )
-        native = component.GetModelDoc2()
-        if native is None:
-            raise RuntimeError(f"{label}: {leaf.path or leaf.name!r} is not resolved")
-        native = _early_bound(native, "IModelDoc2")
-        numbers = tuple(
-            str(
-                native.GetCustomInfoValue(name, "Number")
-                or native.GetCustomInfoValue("", "Number")
-                or ""
-            ).strip()
-            for name in (member, parent)
-        )
-        if numbers != (BOM_PART_NUMBERS[keys[0]],) * 2:
-            raise RuntimeError(
-                f"{label}: {leaf.path or leaf.name!r} Numbers {numbers} "
-                f"(member, Default counterpart), BOM row {BOM_PART_NUMBERS[keys[0]]!r}"
-            )
-        if not simplified:
-            continue
-        configurations = []
-        for name in (member, parent):
-            raw = native.GetConfigurationByName(name)
-            if raw is None:
-                raise RuntimeError(f"{label}: {stem} has no configuration {name!r}")
-            configurations.append(_early_bound(raw, "IConfiguration"))
-        grandparent = configurations[1].GetParent()
-        expected = child_bom_identity(
-            _bom_member_identity(configurations[1]),
-            parent,
-            None if grandparent is None
-            else str(_early_bound(grandparent, "IConfiguration").Name),
-        )
-        if _bom_member_identity(configurations[0]) != expected:
-            raise RuntimeError(
-                f"{label}: {stem} {member!r} BOM identity "
-                f"{_bom_member_identity(configurations[0])} is not {parent!r}'s {expected}"
-            )
-        proven += 1
-    if not proven:
-        raise RuntimeError(f"{label}: exploded view shows no simplified member to prove")
-    return proven
-
-
 def _assert_bom_balloon_items(
     landings: Sequence[BalloonLanding], items: dict[str, str],
 ) -> None:
@@ -3154,10 +3056,9 @@ def _balloon_assembled_sheet(
 
 def _place_exploded_sheet(
     adapter: Any, table: Any, items: dict[str, str], notes: StepNotes,
-) -> tuple[list[Any], Any]:
+) -> list[Any]:
     """The builder's PAPER_DRIVE_EXPLODED, only the platen-and-support
-    families shown, each ballooned once; their steps left of it. Returns the
-    landings and the view, whose member proof re-runs after the final rebuild."""
+    families shown, each ballooned once; their steps left of it."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     label = "platen and support exploded"
     view = place_view(
@@ -3180,12 +3081,7 @@ def _place_exploded_sheet(
     shift = ring_fit_shift(outline, EXPLODED_RING_LIMITS, name=label)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     _link_view_to_bom(view, table, label=label)
-    if configuration != EXPLODED_BALLOON_CONFIGURATION:
-        raise RuntimeError(
-            f"{label}: policy configuration {configuration!r}, expected "
-            f"{EXPLODED_BALLOON_CONFIGURATION!r}"
-        )
-    _prove_exploded_balloon_members(adapter, view, label="paper-drive platen BOM coverage")
+    _assert_bom_balloon_configuration(view, label="paper-drive platen BOM coverage")
     landings = add_component_bom_balloons(
         adapter,
         view,
@@ -3204,7 +3100,7 @@ def _place_exploded_sheet(
         notes.exploded_caption_xy,
         label="exploded-view caption",
     )
-    return landings, view
+    return landings
 
 
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
@@ -3269,8 +3165,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings, table, items, pieces, bom_snapshot = _place_bom_sheet(adapter, counts)
     _place_pivot_view(adapter, items)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
-    exploded_landings, exploded = _place_exploded_sheet(adapter, table, items, notes)
-    landings += exploded_landings
+    landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
@@ -3286,9 +3181,6 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             lambda: assert_balloon_landings(adapter, landings),
             lambda: _assert_bom_balloon_items(landings, items),
-            lambda: _prove_exploded_balloon_members(
-                adapter, exploded, label="settled paper-drive platen BOM coverage"
-            ),
             lambda: _assert_bom_pieces(
                 pieces, header_count=int(table.GetHeaderCount()),
                 total_rows=len(BOM_PART_NUMBERS) + 1,
