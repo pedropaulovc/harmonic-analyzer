@@ -100,12 +100,15 @@ LENGTH_FIT_CALLOUT = "\n".join(
     )
 )
 
-# drawing-guidelines.md rule 7: part-specific facts only. Marking, height
-# setting and the match-cut sequence are MHA-FR-00 steps 1-4 (rule 24).
-DRAWING_NOTES = "\n".join(
+# drawing-guidelines.md rule 7 (flag it where it applies): each station's
+# match-drill mate rides on the cross-hole callout itself, so the sheet needs
+# no free note. Marking, height setting and the match-cut sequence are
+# MHA-FR-00 steps 1-4 (rule 24).
+CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "MATCH-DRILL AT ASSEMBLY: UPPER STATION",
-        "WITH MHA-FR-02, LOWER WITH MHA-FR-01.",
+        "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS",
+        "AT ASSEMBLY: UPPER STA WITH MHA-FR-02,",
+        "LOWER STA WITH MHA-FR-01",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"

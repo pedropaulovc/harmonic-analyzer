@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the tube-frame column.
 
 The SLDPRT remains authoritative. This recipe supplies the regular open tube's
-orthographic views, diameter/cut-length/cross-hole dimensions, and manufacturing
-notes;
+orthographic views, diameter/cut-length/cross-hole dimensions, and their
+fit-up callouts;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
@@ -57,6 +57,7 @@ from _session import run_build
 import _telemetry
 from fr_tube_frame_spec import (
     COLUMN_LENGTH,
+    CROSS_HOLE_CALLOUT as CROSS_HOLE_CALLOUT_TEXT,
     CROSS_HOLE_DIAMETER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -111,9 +112,7 @@ LENGTH_KEEP = {
     ),
     "TopChamfer": (LENGTH_CENTER[0] + 0.040, LENGTH_CENTER[1] + 0.120),
 }
-CROSS_HOLE_CALLOUT = {
-    "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
-}
+CROSS_HOLE_CALLOUT = {"CrossHoleDia": CROSS_HOLE_CALLOUT_TEXT}
 # The cut length is set at assembly: the supply size rides above the (1018.8)
 # reference and the cut-to-fit stack below it (rule 19), so the requirement
 # is flagged on the length itself rather than in the note block.
@@ -234,7 +233,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
             "Length View Note",
@@ -245,7 +243,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
             "Length View Note",
@@ -418,9 +415,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.135, 0.198
-    )
     add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)

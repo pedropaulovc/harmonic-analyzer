@@ -59,7 +59,6 @@ from fr_tube_frame_spec import (
     COLUMN_LENGTH,
     CROSS_HOLE_DIAMETER,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     END_VIEW_NOTE,
     INNER_DIA,
@@ -249,7 +248,6 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         PART_NAME,
         {
-            "Manufacturing Notes": DRAWING_NOTES,
             "End View Note": END_VIEW_NOTE,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Length View Note": LENGTH_VIEW_NOTE,
