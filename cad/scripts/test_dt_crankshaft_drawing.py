@@ -1379,7 +1379,8 @@ def test_opposite_neck_factory_measures_native_full_width_with_symbol_only(
     identity, state, preexisting = _create_neck_dimension(f)
     assert identity is f.native and state == right_state
     assert preexisting[0] == (
-        f.right_native, f.right_native.FullName, 0.009525, right_state, f.right_annotation,
+        f.right_native, before["FullName"], before["SystemValue"],
+        before["DrivenState"], f.right_annotation,
     )
     assert preexisting[1] == f.preexisting[1]
     assert f.native.SystemValue == pytest.approx(0.009525, abs=1e-12)
