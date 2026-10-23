@@ -119,6 +119,15 @@ DRAWING_NOTES = (
     "CUT UPPER END PER SHEET 2."
 )
 
+
+def cut_end_chamfer_callout(angle_radians: float) -> str:
+    """Format the rework leader using the measured native chamfer angle."""
+    return (
+        f"{CUT_END_CHAMFER_MAX:.{CUT_END_CHAMFER_PLACES}f} MAX "
+        f"X {math.degrees(angle_radians):g}° {DIMENSION_CALLOUTS['CutEndChamfer']}"
+    )
+
+
 # REWORK carries the native fabrication controls and their title-block band.
 # MHA-CH-06-TL-00, steps HD1-HD3 on sheet 10, qualifies the actual installed
 # setup against that band; it does not substitute a different cut-length range.
