@@ -88,6 +88,7 @@ from _hole_spec import blind_cut_dia_mm
 from _paths import CAD_ROOT
 from _layout_audit import display_box
 from _layout_geometry import Box, Segment, segment_box_overlap_length
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 import _telemetry
 from _surface_finish import surface_finish_by_key
@@ -122,6 +123,9 @@ from pd_support_bar_drawing_spec import (
     SURFACE_FINISHES,
     TOP_FINISH_REASON,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pd_support_bar"]
@@ -219,12 +223,15 @@ FACE_CAPTION_TOP = (0.150, FACE_BOTTOM - 4.0 * ROW_STEP - 0.008)
 # line, so the line hugs the bar to keep the text inside the border (r5
 # audit: outside-border). Naming the MHA-SH-02 taps makes it four lines of
 # at most 11 characters: about 18-47 mm by 97-117 mm, under its lower
-# extension line (122 mm) and left of detail C's letter (51 mm).
+# extension line (122 mm) and left of detail C's letter (51 mm). The long
+# rows stand 6 and 7 mm apart, not 8: 8 mm stepping put the 440.50 line a
+# hairline over detail C's counterbore-width text, whose upper limit then
+# read as part of the 440.50 dimension (machinist review, 2026-10-23).
 BACK_KEEP = {
     "ClampStation1": (RIGHT_END + 0.019, BACK_BOTTOM - 0.010),
     "ClampStation2": (RIGHT_END + 0.019, BACK_BOTTOM - 0.018),
-    "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.026),
-    "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.034),
+    "ClampStation3": (RIGHT_END - 0.150, BACK_BOTTOM - 0.024),
+    "ClampStation4": (RIGHT_END - 0.170, BACK_BOTTOM - 0.031),
     "Height": (RIGHT_END + 0.022, BACK_TOP + 0.016),
     "ClampRowHeight": (LEFT_END - 0.010, BACK_BOTTOM - 0.008),
 }
@@ -656,9 +663,11 @@ def _slot_section_keep(adapter: Any, section: Any) -> dict[str, tuple[float, flo
 
 
 def _assert_slot_callout_clear(
-    adapter: Any, annotations: list[Any], section: Any
+    adapter: Any, annotations: list[Any], section: Any, back_annotations: list[Any]
 ) -> None:
-    """Prove detail C's native width text and leader clear section B-B."""
+    """Prove detail C's native width text and leader clear section B-B, and its
+    text has air under the front view's 440.50 line (machinist review: its
+    upper limit hung a hairline under that line and read as part of it)."""
     matches = [
         annotation
         for annotation in annotations
@@ -676,8 +685,18 @@ def _assert_slot_callout_clear(
     others = {"section B-B": outline}
     require_clear(ink.label, ink.text, others)
     require_leader_clear(ink, others)
+    text = _native_text_box(adapter, matches[0], label="slot counterbore width")
+    station = _dimension_annotation(adapter, back_annotations, "ClampStation4")
+    station_lines = dimension_segments(station)
+    air = min(distance_to_box(line, text) for line in station_lines)
+    if air < CLEAR_GAP_M:
+        raise RuntimeError(
+            f"slot counterbore width text {text!r} is {air:.4f} m from the "
+            f"440.50 station's lines {station_lines!r}"
+        )
     _telemetry.info(
         f"slot counterbore width clearance: text={ink.text!r}, "
+        f"native text={text!r}, 440.50 air={air:.4f}, "
         f"segments={ink.leader!r}, section B-B outline={outline!r}"
     )
 
@@ -1417,7 +1436,9 @@ async def build(adapter: Any) -> dict[str, str]:
         slot_section_annotations,
         back_annotations,
     )
-    _assert_slot_callout_clear(adapter, detail_annotations, slot_section)
+    _assert_slot_callout_clear(
+        adapter, detail_annotations, slot_section, back_annotations
+    )
     _assert_slot_marker_clear(
         adapter, slot_section, slot_section_line, back_annotations
     )
