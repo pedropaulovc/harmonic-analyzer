@@ -14,6 +14,11 @@ isometric; and a note block naming the item, its supplier and SKU.
 The thread is bought, not cut: it is not modelled, and a leadered callout on
 the main view names it over the full length.
 
+The supplier inset is captured while the source is clean, then imported,
+formatted and jointly placed exactly once at the before-save checkpoint,
+after manufacturing and finalizer rebuilds. Later checkpoints only verify
+the native result; finished-PDF text is checked after native handles close.
+
 Run with SolidWorks open::
 
     uv run python cad\\scripts\\draw_ch_rocker_arm_tl_vn_oblique_leadscrew.py ch-rocker-arm-tl-vn-oblique-leadscrew
@@ -22,13 +27,15 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from dataclasses import replace
+from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
+
+import pypdfium2 as pdfium
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
@@ -39,8 +46,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _com import _bind, _early_bound, _read_member
-from _dimensions import _feature_display_dimensions
+from _com import _early_bound, _read_member
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -63,6 +69,7 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _layout_audit import _display_segments, display_box
 from _layout_geometry import Box, segment_box_distance
+from _pdf_ink import POINT_M
 from _rebuild import active_configuration_name
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
@@ -1161,9 +1168,9 @@ def _supplier_stock_source_scope(
     """Keep source proxies local to Stock while operating in the original drawing.
 
     Entry requires the existing drawing sheet-edit context, never template edit.
-    The immediate annotation phase enters clean; settled checks may enter with
-    existing presentation dirtiness. Activation alone must never change that
-    flag. Only the annotation/check body may leave presentation dirtiness, never
+    Early capture requires a clean source; late authoring and strict checks may
+    enter with existing presentation dirtiness. Activation alone must never
+    change that flag. Only the body may leave presentation dirtiness, never
     saved source changes. No source feature/sketch/point proxy is retained here
     or by the supplier callbacks across restoration of the captured original
     configuration. Layout readers run outside this scope against that original.
@@ -1268,198 +1275,15 @@ def _supplier_stock_source_scope(
                 raise failure
 
 
-def _log_supplier_stock_presentation_failure(adapter: Any, error: RuntimeError) -> None:
-    """Read the refused guard's exact objects before leaving the Stock scope.
-
-    These are post-refusal observations, not cached predicate results. Never
-    reacquire a drawing view/display, activate a document, rebuild or repair it.
-    Expected presentation comes from the actual guard frame, not a second
-    formatter. No native object or traceback is put into the scalar report.
-    """
-    guard = settled = None
-    traceback = error.__traceback__
-    while traceback is not None:
-        frame = traceback.tb_frame
-        owner = frame.f_globals.get("__name__")
-        if owner == "_supplier_dimensions" and (
-            frame.f_code.co_name == "assert_supplier_reference_dimension"
-        ):
-            guard = frame.f_locals
-        elif owner == "_supplier_screw_dimensions" and (
-            frame.f_code.co_name == "assert_supplier_screw"
-        ):
-            settled = frame.f_locals
-        traceback = traceback.tb_next
-    if guard is None or settled is None:
-        return  # An earlier identity/inventory refusal has its own diagnostics.
-
-    def read_error(member: str, failure: Exception) -> dict[str, str]:
-        try:
-            message = str(failure)
-        except Exception:
-            message = "<exception message could not be read>"
-        return {"member": member, "error_type": type(failure).__name__, "message": message}
-
-    def scalar(member: str, read: Callable[[], Any]) -> Any:
-        try:
-            value = read()
-            if value is None:
-                raise RuntimeError("native scalar getter returned null")
-            return json.loads(json.dumps(value, allow_nan=False))
-        except Exception as failure:
-            return read_error(member, failure)
-
-    def native(row: dict, key: str, interface: str, read: Callable[[], Any]) -> Any:
-        try:
-            value = _early_bound(read(), interface)
-            if value is None:
-                raise RuntimeError("native object getter returned null")
-            row[key] = {"present": True, "interface": interface}
-            return value
-        except Exception as failure:
-            row[key] = read_error(key, failure)
-            return None
-
-    def same(left: Any, right: Any) -> int:
-        if left is None or right is None:
-            raise RuntimeError("native comparison operand is unavailable")
-        return int(adapter.swApp.IsSame(left, right))
-
-    def presentation(display: Any) -> dict[str, Any]:
-        # Every presentation getter used by the strict guard, including its
-        # conditional exact-fraction branch; each failure is independent.
-        fields = {
-            member: scalar(
-                f"IDisplayDimension.{member}",
-                lambda member=member: (
-                    getattr(display, member)
-                    if member in ("ShowParenthesis", "ShowDimensionValue", "Type2")
-                    else getattr(display, member)()
-                ),
-            )
-            for member in (
-                "GetUseDocUnits", "GetUnits", "GetPrimaryPrecision2",
-                "GetFractionBase", "ShowParenthesis", "GetOverride",
-                "ShowDimensionValue", "GetFractionValue", "GetRoundToFraction",
-                "GetUseDocPrecision", "GetPrimaryTolPrecision2",
-                "GetAlternatePrecision2", "GetAlternateTolPrecision2", "Type2",
-            )
-        }
-        for part in (1, 2, 4):
-            fields[f"GetText({part})"] = scalar(
-                f"IDisplayDimension.GetText({part})",
-                lambda part=part: display.GetText(part),
-            )
-        dimension = native(fields, "dimension", "IDimension", lambda: display.GetDimension2(0))
-        fields["FullName"] = scalar("IDimension.FullName", lambda: dimension.FullName)
-        fields["GetSystemValue3"] = scalar(
-            "IDimension.GetSystemValue3",
-            lambda: dimension.GetSystemValue3(3, guard["configuration"]),
-        )
-        tolerance = native(
-            fields, "tolerance", "IDimensionTolerance", lambda: dimension.Tolerance,
-        )
-        fields["tolerance"].update({
-            member: scalar(
-                f"IDimensionTolerance.{member}",
-                lambda member=member: (
-                    tolerance.Type if member == "Type" else getattr(tolerance, member)()
-                ),
-            )
-            for member in ("Type", "GetMinValue", "GetMaxValue")
-        })
-        return fields
-
-    view, display = settled["view"], guard["display"]
-    report: dict[str, Any] = {
-        "observation": "post-refusal exact guard display and settled view; no reacquisition",
-        "failure": read_error("assert_supplier_reference_dimension", error),
-        "guard_inputs": {
-            key: guard[key] for key in (
-                "label", "units", "precision", "expected_mm", "expected_degrees",
-                "presentation", "fraction_denominator", "callout", "configuration",
-            )
-        },
-        "expected": {
-            "GetUseDocUnits": False, "GetUnits": guard["unit"],
-            "GetPrimaryPrecision2": guard["precision"],
-            "GetFractionBase": guard["fraction"], "ShowParenthesis": False,
-            "GetOverride": False, "ShowDimensionValue": True,
-            "GetText(1)": guard["prefix"], "GetText(2)": guard["suffix"],
-            "GetText(4)": guard["callout"] or "",
-        },
-        "source_displays": [],
-    }
-    if guard["fraction_denominator"] is not None:
-        report["expected"].update({
-            "GetFractionValue": guard["fraction_denominator"], "GetRoundToFraction": False,
-        })
-    model = native(report, "source_document", "IModelDoc2", lambda: view.ReferencedDocument)
-    drawing = native(
-        report, "drawing_document", "IModelDoc2", lambda: adapter.currentModel,
-    )
-    report["context"] = {
-        "view_name": scalar("IView.GetName2", lambda: view.GetName2()),
-        "view_source_path": scalar("IView.GetReferencedModelName", lambda: view.GetReferencedModelName()),
-        "view_configuration": scalar("IView.ReferencedConfiguration", lambda: view.ReferencedConfiguration),
-        "view_orientation": scalar("IView.GetOrientationName", lambda: view.GetOrientationName()),
-        "source_path": scalar("IModelDoc2.GetPathName", lambda: model.GetPathName()),
-        "source_document_units": scalar("IModelDoc2.GetUnits(source)", lambda: model.GetUnits()),
-        "source_active_configuration": scalar(
-            "IModelDoc2.ConfigurationManager.ActiveConfiguration.Name",
-            lambda: active_configuration_name(adapter, model),
-        ),
-        "drawing_path": scalar("IModelDoc2.GetPathName", lambda: drawing.GetPathName()),
-        "drawing_document_units": scalar("IModelDoc2.GetUnits(drawing)", lambda: drawing.GetUnits()),
-    }
-    report["actual"] = presentation(display)
-    report["differing_fields"] = [
-        key for key, expected in report["expected"].items()
-        if not isinstance(report["actual"][key], dict) and report["actual"][key] != expected
-    ]
-    parameter = native(
-        report, "source_parameter", "IDimension", lambda: model.Parameter(guard["label"]),
-    )
-    report["source_parameter"]["dimension_is_same"] = scalar(
-        "ISldWorks.IsSame", lambda: same(settled["native"], parameter),
-    )
-    report["source_parameter"]["FullName"] = scalar(
-        "IDimension.FullName", lambda: parameter.FullName,
-    )
-    feature = native(
-        report, "source_feature", "IFeature",
-        lambda: _early_bound(model, "IPartDoc").FeatureByName(settled["feature"]),
-    )
-    report["source_feature"]["Name"] = scalar("IFeature.Name", lambda: feature.Name)
-    try:
-        for raw in _feature_display_dimensions(feature):
-            source_display = _bind(raw, "IDisplayDimension")
-            dimension = _early_bound(source_display.GetDimension2(0), "IDimension")
-            if same(dimension, parameter) == 1:
-                row = presentation(source_display)
-                row["imported_dimension_is_same"] = scalar(
-                    "ISldWorks.IsSame",
-                    lambda: same(dimension, settled["native"]),
-                )
-                report["source_displays"].append(row)
-    except Exception as failure:
-        report["source_display_read_error"] = read_error(
-            "IFeature display dimension inventory", failure,
-        )
-    _telemetry.info(
-        "supplier_stock_presentation_failure: "
-        + json.dumps(report, sort_keys=True, allow_nan=False)
-    )
+class _SupplierStockAuthoringState(Enum):
+    PENDING = auto()
+    AUTHORING = auto()
+    AUTHORED = auto()
+    FAILED = auto()
 
 
-def _add_supplier_stock_inset(adapter: Any):
-    """Jointly place the actual native frame and complete supplier diagram ink.
-
-    Capture precedes formatting while the source is clean. Hidden-owner,
-    zero-body and per-segment correspondence proofs remain independent of the
-    measured frame/curve offset. Measured glyph shelves and one feasible joint
-    translation retain strict native-frame, complete-ink and caption bounds.
-    """
+def _prepare_supplier_stock_inset(adapter: Any) -> Callable[[], Callable[[], None]]:
+    """Capture clean source geometry now; return the once-only late author."""
     view = _early_bound(
         place_view(
             adapter,
@@ -1525,8 +1349,37 @@ def _add_supplier_stock_inset(adapter: Any):
         f"supplier stock captured: source_curve_bounds_m={curve_bounds!r}; "
         f"native_outline_m={native_outline!r}; curve_frame_offset_m={captured_offset!r}"
     )
+    state = _SupplierStockAuthoringState.PENDING
+
+    def author() -> Callable[[], None]:
+        nonlocal state
+        if state is not _SupplierStockAuthoringState.PENDING:
+            raise RuntimeError(f"supplier stock authoring already consumed: {state.name}")
+        state = _SupplierStockAuthoringState.AUTHORING
+        try:
+            check = _author_supplier_stock_inset(
+                adapter, view, captures["*Front"], reference_bounds,
+            )
+        except BaseException:
+            state = _SupplierStockAuthoringState.FAILED
+            raise
+        state = _SupplierStockAuthoringState.AUTHORED
+        return check
+
+    return author
+
+
+def _author_supplier_stock_inset(
+    adapter: Any, view: Any, capture: Any,
+    reference_bounds: Callable[..., tuple[float, float, float, float]],
+) -> Callable[[], None]:
+    """Import/format once and jointly place the unchanged native frame and ink."""
+    draw = _early_bound(adapter.currentModel, "IDrawingDoc")
+    curve_bounds = reference_bounds(allow_presentation_dirty=True)
     checks = []
-    with _supplier_stock_source_scope(adapter, view, capture=captures["*Front"]):
+    with _supplier_stock_source_scope(
+        adapter, view, capture=capture, allow_presentation_dirty=True,
+    ):
         displays = annotate_supplier_screw(
             adapter,
             {"*Front": view},
@@ -1704,22 +1557,10 @@ def _add_supplier_stock_inset(adapter: Any):
 
     def settled() -> None:
         with _supplier_stock_source_scope(
-            adapter, view, capture=captures["*Front"], allow_presentation_dirty=True,
+            adapter, view, capture=capture, allow_presentation_dirty=True,
         ):
             for check_source in checks:
-                try:
-                    check_source()
-                except RuntimeError as error:
-                    try:
-                        _log_supplier_stock_presentation_failure(adapter, error)
-                    except Exception as diagnostic_error:
-                        # A getter, inventory or log failure cannot replace the
-                        # original strict refusal or skip source restoration.
-                        error.add_note(
-                            "supplier presentation diagnostic also failed: "
-                            f"{type(diagnostic_error).__name__}"
-                        )
-                    raise
+                check_source()
         if (
             str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
             or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE
@@ -1729,6 +1570,61 @@ def _add_supplier_stock_inset(adapter: Any):
         placed_readback("settled")
 
     return settled
+
+
+def _assert_supplier_stock_pdf(path: Path) -> None:
+    """Prove the exact three printed stock sizes/callouts in their own field.
+
+    Native strict checks own the diameter symbol: SolidWorks can export it as
+    vector ink rather than text. Only the explicit diameter glyph variants
+    below (or that vector-only case) are accepted, never alternate values,
+    units or callouts. All other comparison normalization is whitespace-only.
+    """
+    with closing(pdfium.PdfDocument(str(path))) as document:
+        if len(document) != 1:
+            raise RuntimeError(
+                f"supplier stock PDF requires one physical page; got {len(document)}; "
+                "raw_stock_text=<not extracted>"
+            )
+        with closing(document[0]) as page, closing(page.get_textpage()) as text_page:
+            left, bottom, right, top = (
+                coordinate / POINT_M for coordinate in SUPPLIER_STOCK_FIELD
+            )
+            raw = text_page.get_text_bounded(
+                left=left, bottom=bottom, right=right, top=top,
+            )
+
+    remaining = "".join(raw.split())
+
+    def consume(tokens: tuple[str, ...], label: str) -> None:
+        nonlocal remaining
+        matches = [(token, remaining.count(token)) for token in tokens]
+        if sum(count for _token, count in matches) != 1:
+            raise RuntimeError(
+                f"supplier stock PDF differs for {label}; expected={tokens!r}; "
+                f"raw_stock_text={raw!r}"
+            )
+        token = next(token for token, count in matches if count)
+        remaining = remaining.replace(token, "", 1)
+
+    for name, value, _orientation in supplier.SUPPLIER_REFERENCE_DIMENSIONS:
+        precision, presentation, denominator, callout = supplier.SUPPLIER_REFERENCE_FORMATS[name]
+        units = supplier.SUPPLIER_REFERENCE_UNITS[name]
+        if denominator is not None or units != "mm":
+            raise RuntimeError(f"{name}: unsupported supplier PDF format; raw_stock_text={raw!r}")
+        size = f"{value:.{precision}f}{units}"
+        marks = ("", "Ø", "⌀", "∅") if presentation == "diameter" else ("",)
+        consume(tuple(f"({mark}{size})" for mark in marks), f"{name} size")
+        consume(("".join(callout.split()),), f"{name} callout")
+
+    # The unchanged caption can be in the extraction too; nothing else may
+    # impersonate a valid token by adding a prefix/suffix or a fourth gauge.
+    remaining = remaining.replace("".join(SUPPLIER_STOCK_CAPTION.split()), "", 1)
+    if remaining:
+        raise RuntimeError(
+            f"supplier stock PDF contains unexpected field text {remaining!r}; "
+            f"raw_stock_text={raw!r}"
+        )
 
 
 def _assert_installed_source_state(
@@ -1834,7 +1730,7 @@ async def _build_read_only_source(
     for view in (main, iso):
         set_hidden_lines_removed(adapter, view)
     # Capture while source geometry is clean, before any native text formatting.
-    supplier_stock_check = _add_supplier_stock_inset(adapter)
+    author_supplier_stock = _prepare_supplier_stock_inset(adapter)
     annotations = curate_view_dimensions(
         adapter,
         main,
@@ -1877,20 +1773,43 @@ async def _build_read_only_source(
     callout = str(_early_bound(thread, "INote").GetText() or "")
     if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
         raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
-    return await finalize_drawing(
+    supplier_stock_check: Callable[[], None] | None = None
+
+    def checkpoint(stage: str) -> None:
+        nonlocal supplier_stock_check
+        if stage == "before_drawing_save":
+            supplier_stock_check = author_supplier_stock()
+            supplier_stock_check()
+        elif stage in (
+            "after_drawing_save", "after_pdf_save", "before_drawing_close",
+        ):
+            if supplier_stock_check is None:
+                raise RuntimeError(f"supplier stock was not authored before {stage}")
+            supplier_stock_check()
+        # An after-event observes an attempted operation, not a successful save.
+        # The finalizer preserves any primary operation failure independently.
+        if stage != "after_drawing_close":
+            _assert_installed_source_state(
+                adapter, source_model, installed_configuration, stage=stage,
+            )
+
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title=PDF_TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(
-            supplier_stock_check,
             lambda: _assert_installed_source_state(
                 adapter, source_model, installed_configuration,
                 stage="settled before drawing save",
             ),
         ),
+        checkpoint=checkpoint,
     )
+    # finalize_drawing has closed the drawing. Only PDF/file readers belong here.
+    _assert_supplier_stock_pdf(OUTPUTS.pdf)
+    return artifacts
 
 
 if __name__ == "__main__":
