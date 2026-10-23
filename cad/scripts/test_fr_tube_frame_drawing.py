@@ -40,3 +40,11 @@ def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:
     assert fr_tube_frame_spec.OUTER_DIA == INNER_DIAMETER
     assert fr_tube_frame_spec.OUTER_DIA < MOUTH_INNER_DIAMETER
     assert fr_tube_frame_spec.TOP_END_CHAMFER > INNER_CORNER_R
+
+
+def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
+    assert fr_tube_frame_spec.SUPPLY_LENGTH_MIN == 1030.0
+    assert fr_tube_frame_spec.SUPPLY_LENGTH_MIN > fr_tube_frame_spec.COLUMN_LENGTH
+    assert fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT == "SUPPLY 1030 MIN"
+    assert "CUT TO FIT AT ASSEMBLY" in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
+    assert len(fr_tube_frame_spec.DRAWING_NOTES.splitlines()) <= 4

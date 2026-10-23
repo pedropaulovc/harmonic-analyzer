@@ -8,6 +8,8 @@ math and keeps exactly ``DRAWING_DIMENSIONS``.
 
 from __future__ import annotations
 
+import math
+
 from fr_frame_attachment_spec import (
     BASE_SCREW_Y,
     COLUMN_BOTTOM_Y,
@@ -74,24 +76,36 @@ if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
 TOP_END_CALLOUT = "MHA-FR-VN-54 CAP MUST SEAT FULLY BY HAND"
+# Which edge the 0.5 break is on: the imported chamfer dimension's arrows sit
+# on the top face's extension lines, so the suffix names the edge (MR r1/r3).
+TOP_END_CHAMFER_SUFFIX = " X 45 DEG TOP END OD"
 
-# Part-specific assembly acceptance that native dimensions cannot express.
+# The tube is the frame's height adjuster: MHA-FR-00 step 1 rough-cuts it
+# oversize and step 4 final match-cuts it to the actual base/top/cap stack
+# (drawing-guidelines.md rule 19). The sheet flags that on the length itself
+# with a supply size (MR fleet: the cut-to-fit lived only in a note and no
+# blank length was given). 10 mm over the nominal cut leaves both saw ends
+# room to square and the match-cut room to absorb the stack, rounded up to a
+# 5 mm saw mark.
+SUPPLY_LENGTH_ALLOWANCE = 10.0
+SUPPLY_LENGTH_MIN = math.ceil((COLUMN_LENGTH + SUPPLY_LENGTH_ALLOWANCE) / 5.0) * 5.0
+if not SUPPLY_LENGTH_MIN > COLUMN_LENGTH:
+    raise AssertionError("the supplied tube is shorter than its cut length")
+LENGTH_SUPPLY_CALLOUT = f"SUPPLY {SUPPLY_LENGTH_MIN:.0f} MIN"
+LENGTH_FIT_CALLOUT = "\n".join(
+    (
+        "CUT TO FIT AT ASSEMBLY",
+        "MHA-FR-01/MHA-FR-02/",
+        "MHA-FR-VN-54 STACK",
+    )
+)
+
+# drawing-guidelines.md rule 7: part-specific facts only. Marking, height
+# setting and the match-cut sequence are MHA-FR-00 steps 1-4 (rule 24).
 DRAWING_NOTES = "\n".join(
     (
-        "QUANTITY PER FRAME ASSEMBLY MHA-FR-00.",
-        "MATCH-MARK EACH COLUMN,",
-        "CORNER AND ORIENTATION.",
-        "SET TOP CROSS-BORE AXIS HEIGHT",
-        "PER FRAME ASSEMBLY MHA-FR-00;",
-        "MAINTAIN HEIGHT DURING FIT.",
-        "FINAL MATCH-CUT EACH IDENTIFIED TUBE",
-        "TO ACTUAL BASE/TOP/CAP STACK:",
-        "INTACT MHA-FR-VN-54 CAPS FULLY SEATED,",
-        "SKIRTS CLEAR OF RECESS FLOORS.",
-        "MATCH-DRILL UPPER STATION AT",
-        "SET HEIGHT WITH TOP MHA-FR-02;",
-        "LOWER STATION WITH BASE MHA-FR-01.",
-        "RETAIN MATCH MARKS.",
+        "MATCH-DRILL AT ASSEMBLY: UPPER STATION",
+        "WITH MHA-FR-02, LOWER WITH MHA-FR-01.",
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 2:1"

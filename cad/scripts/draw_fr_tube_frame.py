@@ -51,6 +51,7 @@ from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -59,10 +60,16 @@ from fr_tube_frame_spec import (
     CROSS_HOLE_DIAMETER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    LENGTH_FIT_CALLOUT,
+    LENGTH_SUPPLY_CALLOUT,
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
     TOP_END_CHAMFER,
+    TOP_END_CHAMFER_SUFFIX,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_tube_frame"]
@@ -107,6 +114,11 @@ LENGTH_KEEP = {
 CROSS_HOLE_CALLOUT = {
     "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
 }
+# The cut length is set at assembly: the supply size rides above the (1018.8)
+# reference and the cut-to-fit stack below it (rule 19), so the requirement
+# is flagged on the length itself rather than in the note block.
+LENGTH_SUPPLY = {"Length": LENGTH_SUPPLY_CALLOUT}
+LENGTH_FIT = {"Length": LENGTH_FIT_CALLOUT}
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
 
@@ -282,6 +294,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     dimensions = [outer_diameter, *length_annotations]
     set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
+    set_dimension_callouts(adapter, dimensions, LENGTH_SUPPLY, location="above")
+    set_dimension_callouts(adapter, dimensions, LENGTH_FIT, location="below")
     hole_text = model_point_in_view(
         adapter,
         length,
@@ -389,7 +403,7 @@ async def build(adapter: Any) -> dict[str, str]:
     cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
     chamfer.SetText(3, cap_acceptance)
     chamfer.SetText(4, "")
-    chamfer_suffix = " X 45 DEG"
+    chamfer_suffix = TOP_END_CHAMFER_SUFFIX
     chamfer.SetText(2, chamfer_suffix)
     chamfer.ShowDimensionValue = True
     if (
@@ -404,17 +418,17 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    # Both end rims receive native centre marks; the length view exposes both
-    # cross-drilled stations through visible hidden geometry.
-
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.135, 0.198
     )
     add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
-    for view in (length, end):
-        set_hidden_lines_visible(adapter, view)
+    # The end view's hidden lines carry the cross-hole through both walls
+    # (rule 9); the length view shows both stations as visible circles, so
+    # dashed bore lines there would say nothing (MR r2): hidden lines removed.
+    set_hidden_lines_removed(adapter, length)
+    set_hidden_lines_visible(adapter, end)
 
     return await finalize_drawing(
         adapter,
