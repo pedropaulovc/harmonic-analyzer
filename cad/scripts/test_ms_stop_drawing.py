@@ -105,12 +105,14 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     assert spec.PLATE_HOLE_POSITION_TOLERANCE_MM == 0.1
     assert all(block_point[:2] == plate_point[:2] for block_point, plate_point
                in zip(spec.BLOCK_PLATE_HOLE_POINTS, spec.PLATE_HOLE_POINTS, strict=True))
-    assert len(spec.BLOCK_DRAWING_NOTES.splitlines()) <= 4
-    assert len(spec.PLATE_DRAWING_NOTES.splitlines()) <= 4
-    assert "BLIND" not in spec.PLATE_DRAWING_NOTES
-    assert "BOTTOMING" not in spec.PLATE_DRAWING_NOTES
+    # Rule 7: the pair is flagged at both match-drill callouts, not in a loose note.
+    assert not hasattr(spec, "BLOCK_DRAWING_NOTES") and not hasattr(spec, "PLATE_DRAWING_NOTES")
+    assert spec.MATCHED_PAIR_NOTE == "MATCHED PAIR; NOT INTERCHANGEABLE"
+    assert block_drawing.COVER_HOLE_PROCESS.splitlines()[-1] == spec.MATCHED_PAIR_NOTE
+    assert plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"].splitlines()[-1] == spec.MATCHED_PAIR_NOTE
     assert spec.BLOCK_MATING_FACE_NOTE == "STOP-PLATE MATING FACE"
-    assert f"BLIND DEPTHS FROM {spec.BLOCK_MATING_FACE_NOTE}." in spec.BLOCK_DRAWING_NOTES
+    for module in (block, plate, block_drawing, plate_drawing):
+        assert '"Manufacturing Notes"' not in Path(module.__file__).read_text(encoding="utf-8")
     assert "PilotDrillDiameter" in spec.PLATE_DRAWING_DIMENSIONS["PilotDrillReference"]
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
@@ -148,14 +150,13 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    loose = {"BlockLength", "BlockHeight"} if builder is block else {"PlateHeight", "RoofChamferSize"}
+    loose = {"BlockLength", "BlockHeight", "RoofChamferSize"} if builder is block else {"PlateHeight", "RoofChamferSize"}
     assert {name for name, places in precision.items() if places == 1} == loose
     assert all(places == (
         0 if builder is plate and name == "RoofChamferAngle"
         else 1 if name in loose else 2
     ) for name, places in precision.items())
     assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
-    assert not any(character.isdigit() for character in spec.BLOCK_DRAWING_NOTES + spec.PLATE_DRAWING_NOTES)
 
 
 @pytest.mark.parametrize("module", [spec, block_drawing, plate_drawing])
@@ -362,6 +363,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
         monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
+    labelled = []
+    monkeypatch.setattr(drawing, "_label_locating_edges", lambda adapter, view: labelled.append(view))
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
     callouts = []
 
@@ -389,7 +392,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     if drawing is block_drawing:
         assert not set(bands) & spec.PLATE_LOCATION_DIMENSIONS
         assert bands == {
-            name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")
+            **{name: spec.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
+            "RoofChamferSize": spec.ROOF_CHAMFER_BAND_MM,
         }
     else:
         assert {name: bands[name] for name in spec.PLATE_LOCATION_DIMENSIONS} == {
@@ -400,6 +404,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     # third-angle right view is unrotated *Left (+Z right, +Y up); its
     # third-angle underside must retain -X and send +Z down, not up.
     front, right = views["*Back"], views["*Left"]
+    assert labelled == [front]
     assert front.Position[1] == right.Position[1]
     center = model_center
     east = (center[0] + 0.001, center[1], center[2])
@@ -431,8 +436,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
-        assert callout_positions["two cover clearance holes"] == (0.265, 0.150)
-        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.265, 0.182)
+        assert callout_positions["two cover clearance holes"] == drawing.CLEARANCE_CALLOUT_XY
+        assert drawing.FRONT_KEEP["PilotDrillDiameter"] == (0.285, 0.178)
         assert callout_positions["two cover clearance holes"][0] > front_map.apply(
             (0.0, center[1], center[2])
         )[0]
@@ -511,9 +516,8 @@ def test_match_drilling_does_not_eliminate_absolute_end_ligament_limits() -> Non
         + spec.PLATE_SCREW_MAJOR_DIA / 2.0
     ) < 1.5
     assert spec.MATCH_DRILL_MASTER == "MS-STOP-PLATE"
-    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == (
-        "DIMENSIONED END AND THUMBSCREW-SIDE DATUM EDGES ALIGNED"
-    )
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT == "LOCATING ENDS AND EDGES FLUSH"
+    assert (spec.LOCATING_END_NOTE, spec.LOCATING_EDGE_NOTE) == ("LOCATING END", "LOCATING EDGE")
 
 
 @pytest.mark.parametrize("master_band", [0.0, 0.1, 0.2, 0.51])
@@ -692,7 +696,7 @@ def test_plate_chamfer_keeps_native_size_and_angle_with_quantity_prefixes(monkey
         "RoofChamferSize": 1, "RoofChamferAngle": 0,
     }
     assert spec.BLOCK_DRAWING_PRECISION["RoofChamfers"] == {
-        "RoofChamferSize": 2, "RoofChamferAngle": 2,
+        "RoofChamferSize": 1, "RoofChamferAngle": 2,
     }
 
 
@@ -721,9 +725,12 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     assert pilot.splitlines() == [
         "LAYOUT ON THIS PLATE; PILOT",
         f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
-        "CLAMPED WITH DIMENSIONED END AND",
-        "THUMBSCREW-SIDE DATUM EDGES ALIGNED",
+        "CLAMPED, LOCATING ENDS AND EDGES FLUSH",
+        "MATCHED PAIR; NOT INTERCHANGEABLE",
     ]
+    station = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
+    for name in spec.PLATE_LOCATION_DIMENSIONS:
+        assert plate_drawing.DIMENSION_CALLOUTS[name] == station
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
     )
@@ -1073,6 +1080,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     monkeypatch.setattr(block, "window_width_reference", reference)
     monkeypatch.setattr(block, "roof_reference", roof_reference)
     monkeypatch.setattr(block, "save_part_and_images", save)
+    monkeypatch.setattr(block, "_roof_chamfer_max_limit", lambda adapter: bands.append("chamfer MAX"))
     monkeypatch.setattr(block, "SketchDims", lambda: SimpleNamespace(apply=lambda *a: []))
     for name in (
         "add_line_chain", "define_rectilinear_chain", "ensure_fully_defined",
@@ -1105,4 +1113,73 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     assert "ReferenceWindowWidth" in hidden
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
-    assert "BLIND DEPTHS FROM STOP-PLATE MATING FACE." in properties[0]["Manufacturing Notes"]
+    assert "Manufacturing Notes" not in properties[0]
+    assert "chamfer MAX" in bands
+
+
+def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:
+    adapter = _window_reference_seat(monkeypatch)
+    monkeypatch.setattr(stop_geom, "ensure_fully_defined", lambda *a: asyncio.sleep(0))
+    equations = dict(asyncio.run(stop_geom.roof_reference(adapter)))
+    assert adapter.lines == {"line": ((0.0, spec.WINDOW_Y_MAX), (0.0, spec.BLOCK_HEIGHT))}
+    assert adapter._sketch_entities["line"].ConstructionGeometry
+    thickness, station = adapter.dimensions
+    assert (thickness.Name, thickness.value_mm) == ("RoofThickness", spec.ROOF_THICKNESS)
+    assert (station.Name, station.kind, station.value_mm) == (
+        "RoofWindowStation", "vertical_distance", spec.WINDOW_Y_MAX,
+    )
+    assert equations == {
+        "RoofThickness@RoofThicknessReference": '"RoofThickness"',
+        "RoofWindowStation@RoofThicknessReference": '"BlockHeight" - "RoofThickness"',
+    }
+
+
+@pytest.mark.parametrize("refusal", [None, "nominal", "type", "values"])
+def test_block_chamfer_is_a_single_max_limit_at_its_nominal(monkeypatch, refusal) -> None:
+    class Tolerance:
+        def __init__(self):
+            self.Type, self.values = 0, (0.0, 0.0)
+
+        def SetValues(self, low, high):  # noqa: N802 - native method
+            if refusal != "values":
+                self.values = (low, high)
+            return True
+
+        def GetMinValue(self):  # noqa: N802 - native method
+            return self.values[0]
+
+        def GetMaxValue(self):  # noqa: N802 - native method
+            return self.values[1]
+
+    tolerance = Tolerance()
+    nominal = 1.2 if refusal == "nominal" else spec.ROOF_END_CHAMFER
+    dimension = SimpleNamespace(SystemValue=nominal / 1000.0, Tolerance=tolerance)
+    monkeypatch.setattr(block, "_named_dimension", lambda adapter, feature, name: (None, dimension))
+    monkeypatch.setattr(block, "_early_bound", lambda value, interface: value)
+    if refusal == "type":
+        type(tolerance).Type = property(lambda self: 0, lambda self, value: None)
+    if refusal:
+        with pytest.raises(RuntimeError, match="RoofChamferSize"):
+            block._roof_chamfer_max_limit(object())
+    else:
+        block._roof_chamfer_max_limit(object())
+        assert tolerance.Type == spec.ROOF_CHAMFER_TOL_TYPE == 6
+        assert tolerance.values == pytest.approx((-0.001, 0.0))
+    # 1.0 MAX can never cut through the thinnest printed roof.
+    assert spec.ROOF_END_CHAMFER < spec.ROOF_THICKNESS_MIN
+
+
+def test_tight_bands_name_their_mates_and_walls_state_shortfalls() -> None:
+    import _config
+
+    stick_number = _config.parts("ms-stick")["number"]
+    callouts = block_drawing.DIMENSION_CALLOUTS
+    for name in ("WindowWidth", "WindowHeight"):
+        assert f"MS-STICK {stick_number}" in callouts[name]
+    assert callouts["WindowWidth"].splitlines()[-1] == f"BACK WALL {spec.WINDOW_BACK_WALL_MIN:.2f} MIN"
+    assert callouts["RoofThickness"] == f"WALL {spec.ROOF_THICKNESS_MIN:.2f} MIN"
+    assert 1.5 <= spec.WINDOW_BACK_WALL_MIN < 2.0 and 1.5 <= spec.ROOF_THICKNESS_MIN < 2.0
+    thickness = plate_drawing.DIMENSION_CALLOUTS["PlateThickness"]
+    assert "SCREW REACH" in thickness
+    assert _config.parts("ms-stop-block")["number"] in thickness
+    assert spec.MATCH_DRILL_DATUM_ALIGNMENT in block_drawing.COVER_HOLE_PROCESS

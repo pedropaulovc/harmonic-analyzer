@@ -105,7 +105,6 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature, names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(adapter, PART_NAME, {
-        "Manufacturing Notes": spec.PLATE_DRAWING_NOTES,
         "Isometric View Note": spec.ISOMETRIC_VIEW_NOTE,
     })
     hide_location_references(adapter, ("PlateLocationReference", "PilotDrillReference"))
