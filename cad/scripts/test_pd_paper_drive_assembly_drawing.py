@@ -2290,7 +2290,6 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
 
 
 _PD_NATIVE_PART_WIDTH = 0.046824451973134076
-_PD_MODEL_PROPERTIES = ("Description", "Number")
 
 
 def _pd_bom_fixture(monkeypatch, *, native_columns=False):
@@ -2568,6 +2567,15 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
             row.insert(insertion, name if row is cells[0] else "")
         return True
 
+    def delete_column(index, include_hidden):
+        physical = raw_index(index, include_hidden)
+        if physical is None or columns[physical] is state.quantity:
+            return False
+        columns.pop(physical)
+        for row in cells:
+            row.pop(physical)
+        return True
+
     def hide_column(index, hidden):
         if type(index) is not int:
             raise IndexError(index)
@@ -2634,9 +2642,10 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
         if physical is None:
             raise IndexError(index)
         column = columns[physical]
-        if row and column.kind == 204 and column.property_name in _PD_MODEL_PROPERTIES:
-            # Native PD 2026-10-23: a linked cell edit writes the property into
-            # each part's active configuration; the cell re-reads its member's.
+        if row and column.kind == 204 and column.property_name:
+            # Native PD 2026-10-23: a property-bound cell edit (even a bogus
+            # property) writes into each part's active configuration; the
+            # cell then re-reads its member's configuration.
             group = native_rows[row - 1]
             for native in {id(c.GetModelDoc2()): c.GetModelDoc2() for c in group}.values():
                 native.properties[(native.active_configuration, column.property_name)] = text
@@ -2687,7 +2696,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     table.RowHidden.side_effect = row_hidden
     table.IsCellTextEditable.return_value = True
     table.SetText2.side_effect = set_text
-    table.GetAllCustomProperties.side_effect = lambda: _PD_MODEL_PROPERTIES
+    table.DeleteColumn2.side_effect = delete_column
     table.SetColumnWidth.side_effect = set_width
     table.GetHeaderCount.return_value = 1
     table.GetRowHeight.side_effect = row_height
@@ -3502,29 +3511,39 @@ def test_default_bom_descriptions_do_not_write_back_to_simplified_members(monkey
     configuration = drawing.BOM_CONFIGURATION
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
     table = scene.insert()
-    assert table.GetColumnCustomProperty(2) == (
-        _drawing_tables._DETACHED_DESCRIPTION_PROPERTY
-    )
+    assert table.GetColumnCustomProperty(2) == ""
     assert table.GetColumnTitle2(2, False) == "DESCRIPTION"
+    assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
+        (202, False), (204, False), (204, False), (203, False), (201, True)
+    )
     assert _pd_description_writes(scene) == set()
     assert {
         key: scene.cells[row][2] for row, key in enumerate(scene.state.row_keys, 1)
     } == drawing.BOM_DESCRIPTIONS
 
 
-def test_default_bom_refuses_linked_description_write_back(monkeypatch):
-    # Negative control: without the detach the native write-back is refused.
+def _rebind_to_bogus_property(_adapter, table, column, *, label):
+    # Native run 20261023T192129678Z: rebinding to a nonexistent property kept
+    # the write-back ($PRP:"HARMONIC BOM DESCRIPTION TEXT").
+    assert table.SetColumnCustomProperty(column, "HARMONIC BOM DESCRIPTION TEXT")
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    (lambda *_, **__: None, _rebind_to_bogus_property),
+    ids=("linked", "rebound"),
+)
+def test_default_bom_refuses_property_bound_description_write_back(monkeypatch, replacement):
+    # Negative controls: any property-bound column writes back and is refused.
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
     monkeypatch.setattr(
-        _drawing_tables, "_detach_bom_description_column", lambda *_, **__: None
+        _drawing_tables, "_replace_linked_bom_description_column", replacement
     )
     with pytest.raises(RuntimeError, match="BOM description did not persist: ''"):
         scene.insert()
     writes = _pd_description_writes(scene)
     assert writes
-    assert all(
-        name.endswith(" Simplified") and prop == "Description" for name, prop in writes
-    )
+    assert all(name.endswith(" Simplified") for name, _prop in writes)
 
 
 def test_view_configuration_bom_keeps_linked_description_column(monkeypatch):
@@ -3534,36 +3553,33 @@ def test_view_configuration_bom_keeps_linked_description_column(monkeypatch):
     assert scene.state.configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
 
 
-def test_default_bom_refuses_detached_description_without_row_text(monkeypatch):
+def test_default_bom_refuses_plain_description_without_row_text(monkeypatch):
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
-    monkeypatch.setattr(
-        drawing,
-        "BOM_DESCRIPTIONS",
-        {key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"},
-    )
-
-    def insert():
-        return _drawing_tables.insert_bom_table(
+    descriptions = {
+        key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"
+    }
+    with pytest.raises(RuntimeError, match="DESCRIPTION column left 1 of 43 rows blank"):
+        _drawing_tables.insert_bom_table(
             scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
             expected_components=tuple(drawing.BOM_PART_NUMBERS),
-            descriptions=drawing.BOM_DESCRIPTIONS,
+            descriptions=descriptions,
             component_identities=drawing.BOM_COMPONENT_IDENTITIES,
             part_number_property="Number", configuration_grouping="same-name",
             configuration=drawing.BOM_CONFIGURATION, label="paper-drive",
         )
 
-    with pytest.raises(RuntimeError, match="DESCRIPTION column left 1 of 43 rows blank"):
-        insert()
 
-
-def test_detached_description_name_must_not_be_a_model_property(monkeypatch):
+@pytest.mark.parametrize("fault", ("insert", "delete"))
+def test_default_bom_refuses_unreplaced_description_column(monkeypatch, fault):
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
-    scene.table.GetAllCustomProperties.side_effect = lambda: (
-        "Description", _drawing_tables._DETACHED_DESCRIPTION_PROPERTY.title(),
+    method = {"insert": "InsertColumn2", "delete": "DeleteColumn2"}[fault]
+    native = getattr(scene.table, method).side_effect
+    getattr(scene.table, method).side_effect = lambda *args: (
+        False if "DESCRIPTION" in args or args == (2, True) else native(*args)
     )
-    with pytest.raises(RuntimeError, match="detached DESCRIPTION name is a real custom property"):
+    with pytest.raises(RuntimeError, match="DESCRIPTION column could not be"):
         scene.insert()
-    assert scene.table.GetColumnCustomProperty(2) == "Description"
+    assert _pd_description_writes(scene) == set()
 
 
 def test_default_bom_hides_native_column_without_materializing_latent_quantity(monkeypatch):
