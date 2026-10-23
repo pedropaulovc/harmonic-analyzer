@@ -173,7 +173,9 @@ def _supplier_eye_torus(
         return None
     face = _early_bound(raw_face, "IFace2")
     owner = face.GetFeature()
-    if owner is None or int(adapter.swApp.IsSame(owner, expected_feature)) != 1:
+    if owner is None or _supplier_native_same(
+        adapter.swApp, owner, expected_feature, "supplier physical eye source Wire",
+    ) != 1:
         return None
     raw_surface = face.GetSurface()
     if raw_surface is None:
@@ -221,7 +223,9 @@ def _supplier_eye_circle(
     native_view = silhouette.GetView()
     if (
         native_view is None
-        or int(adapter.swApp.IsSame(native_view, view)) != 1
+        or _supplier_native_same(
+            adapter.swApp, native_view, view, "supplier physical eye silhouette view",
+        ) != 1
         or str(native_view.ReferencedConfiguration) != finished_configuration
     ):
         return None
@@ -296,7 +300,9 @@ def _supplier_references(
                         "counter eye ID coordinate selection expected at most one "
                         f"parent view; actual duplicate parent view at index={index}"
                     )
-                same = int(adapter.swApp.IsSame(entity, front))
+                same = _supplier_native_same(
+                    adapter.swApp, entity, front, "counter eye ID coordinate selection parent view",
+                )
                 if same != 1:
                     raise RuntimeError(
                         "counter eye ID coordinate selection parent view expected "
@@ -348,6 +354,7 @@ def _supplier_references(
         except Exception as clear_error:
             if failure is None:
                 raise
+            failure.add_note(f"supplier physical-eye selection cleanup also failed: {clear_error}")
             raise failure from clear_error
     if display is None:
         raise RuntimeError("cannot dimension the counter eye ID silhouette")
@@ -554,7 +561,10 @@ def _capture_supplier_stock(adapter, source_model, finished_configuration) -> Su
                     f"supplier nominal stock dimension owner expected={SUPPLIER_STOCK_FEATURE!r}; "
                     f"actual FullName={str(native.FullName)!r}"
                 )
-            same = int(adapter.swApp.IsSame(native, feature.Parameter(owner[0])))
+            same = _supplier_native_same(
+                adapter.swApp, native, feature.Parameter(owner[0]),
+                f"{owner[0]}: supplier nominal stock source dimension",
+            )
             if same != 1:
                 raise RuntimeError(
                     f"{owner[0]}: supplier nominal stock source dimension expected IsSame=1; actual={same}"
@@ -668,7 +678,6 @@ def _supplier_stock_bounds(adapter, stock, source_model, capture: SupplierStockC
     count = len(tuple(_early_bound(raw_sketch, "ISketch").GetSketchSegments() or ()))
     if count != 0:
         raise RuntimeError(f"supplier nominal stock full view drawing-sketch segment count: expected=0; actual={count}")
-    stock.UpdateViewDisplayGeometry()
     bounds = native_sketch_view_bounds(adapter, stock, capture.geometry, label="supplier nominal stock")
     ratio = STOCK_SCALE[0] / STOCK_SCALE[1]
     expected_spans = (
@@ -834,12 +843,68 @@ def _supplier_stock_profile_instances(adapter, stock, source_model, capture):
     return sketch, extension, tuple(instances)
 
 
+@dataclass(frozen=True)
+class SupplierStockProfileSnapshot:
+    """Pre-write source identities and immutable drawing curve/appearance values."""
+
+    view: Any
+    view_name: str
+    source_sketch: Any
+    profiles: tuple[tuple[Any, tuple, tuple], ...]
+
+
+def _verify_supplier_stock_profile(adapter, source_model, capture, expected):
+    """Reacquire nine black instances without refreshing, rebuilding or repairing."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
+        raise RuntimeError("cannot inspect the supplier black profile sheet")
+    views = [
+        _early_bound(raw, "IView") for raw in iter_views(adapter)
+        if view_name(adapter, raw) == expected.view_name
+    ]
+    if len(views) != 1:
+        raise RuntimeError(f"supplier black profile requires one original view; actual={len(views)}")
+    stock = views[0]
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    _supplier_profile_native_identity(app, stock, expected.view, 1, "supplier black profile original view")
+    current_sketch, _extension, current = _supplier_stock_profile_instances(
+        adapter, stock, source_model, capture,
+    )
+    _supplier_profile_native_identity(
+        app, current_sketch, expected.source_sketch, 1,
+        "settled supplier black profile authoritative source sketch",
+    )
+    for source, mapped, curve, appearance in current:
+        label = f"settled supplier black profile source [{capture.configuration}; {capture.source_path}]"
+        native_results = tuple(
+            _supplier_native_same(app, source, before[0], label) for before in expected.profiles
+        )
+        matches = [
+            before for before, same in zip(expected.profiles, native_results, strict=True) if same == 1
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: IsSame expected exactly one native=1; "
+                f"actual={native_results!r} (tuple of int)"
+            )
+        if matches[0][1:] != (curve, appearance):
+            raise RuntimeError("supplier black profile changed native geometry or Width/Style/Layer")
+        color = mapped.Color
+        if type(color) is not int or color != _STOCK_PROFILE_BLACK:
+            raise RuntimeError(f"settled supplier black profile color expected=0; actual={color!r}")
+
+
 def _blacken_supplier_stock_profile(adapter, stock, source_model, capture):
     """Change only the nine mapped STOCK-instance colors, before native save."""
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     drawing = _early_bound(draw, "IDrawingDoc")
     stock = _early_bound(stock, "IView")
+    stock.UpdateViewDisplayGeometry()
     sketch, extension, instances = _supplier_stock_profile_instances(adapter, stock, source_model, capture)
+    expected = SupplierStockProfileSnapshot(
+        stock, view_name(adapter, stock), sketch,
+        tuple((source, curve, appearance) for source, _mapped, curve, appearance in instances),
+    )
     app = _early_bound(adapter.swApp, "ISldWorks")
     if drawing.ActivateView(view_name(adapter, stock)) is not True:
         raise RuntimeError("cannot activate supplier stock view for its black profile")
@@ -924,31 +989,9 @@ def _blacken_supplier_stock_profile(adapter, stock, source_model, capture):
     rebuilt = draw.EditRebuild3()
     if rebuilt is not True:
         raise RuntimeError(f"cannot rebuild the black supplier stock profile: EditRebuild3={rebuilt!r}")
-    # Fresh source/mapped handles after the drawing rebuild, never after SaveAs3.
-    current_sketch, _extension, current = _supplier_stock_profile_instances(
-        adapter, stock, source_model, capture,
-    )
-    _supplier_profile_native_identity(
-        app, current_sketch, sketch, 1, "settled supplier black profile authoritative source sketch",
-    )
-    for source, mapped, curve, appearance in current:
-        label = f"settled supplier black profile source [{capture.configuration}; {capture.source_path}]"
-        native_results = tuple(
-            _supplier_native_same(app, source, before[0], label) for before in instances
-        )
-        matches = [
-            before for before, same in zip(instances, native_results, strict=True) if same == 1
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"{label}: IsSame expected exactly one native=1; "
-                f"actual={native_results!r} (tuple of int)"
-            )
-        if matches[0][2:] != (curve, appearance):
-            raise RuntimeError("supplier black profile changed native geometry or Width/Style/Layer")
-        color = mapped.Color
-        if type(color) is not int or color != _STOCK_PROFILE_BLACK:
-            raise RuntimeError(f"settled supplier black profile color expected=0; actual={color!r}")
+    stock.UpdateViewDisplayGeometry()
+    _verify_supplier_stock_profile(adapter, source_model, capture, expected)
+    return expected
 
 
 def _supplier_stock_diagram(adapter: Any, source_model: Any, capture: SupplierStockCapture):
@@ -981,7 +1024,6 @@ def _supplier_stock_diagram(adapter: Any, source_model: Any, capture: SupplierSt
     # Correspondence proves source membership, not visibility through an
     # invented IFeature.Visible receipt. Showing uses the established per-view
     # override above; actual target-config geometry was captured before drawing.
-    _supplier_stock_bounds(adapter, stock, source_model, capture)
     midpoint = (
         0.0,
         (SUPPLIER_STOCK_AXIS_MM[0][1] + SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
@@ -1044,7 +1086,7 @@ def _supplier_stock_diagram(adapter: Any, source_model: Any, capture: SupplierSt
                 raise RuntimeError(f"{name}: complete native supplier annotation did not retain its placement")
     # Apply the instance-only presentation after centering and dimension curation
     # have rebuilt the drawing, then return to sheet context for the notes below.
-    _blacken_supplier_stock_profile(adapter, stock, source_model, capture)
+    profile = _blacken_supplier_stock_profile(adapter, stock, source_model, capture)
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
@@ -1070,7 +1112,7 @@ def _supplier_stock_diagram(adapter: Any, source_model: Any, capture: SupplierSt
         if note is None:
             raise RuntimeError("cannot label the supplier nominal stock envelope")
         notes.append((_early_bound(note, "INote"), text, text))
-    return stock, refs, notes
+    return stock, refs, notes, profile
 
 
 @dataclass(frozen=True)
@@ -1389,7 +1431,6 @@ def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet, source_mode
                     raise RuntimeError(f"counter anchor {sheet_name}: native source ink leaves its cell: {bounds!r}")
                 assert_supplier_annotations_fit(adapter, view, cell, label=f"counter anchor {sheet_name}")
             else:
-                view.UpdateViewDisplayGeometry()
                 assert_supplier_view_fits(adapter, view, cell, label=f"counter anchor {sheet_name}")
 
 
@@ -1486,7 +1527,9 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
         raise RuntimeError("cannot activate counter anchor supplier stock sheet")
-    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter, source_model, stock_capture)
+    stock, stock_refs, stock_notes, stock_profile = _supplier_stock_diagram(
+        adapter, source_model, stock_capture,
+    )
     set_hidden_lines_removed(adapter, stock)
     view_contracts = {
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
@@ -1496,6 +1539,20 @@ async def build(adapter: Any) -> dict[str, str]:
     notes_by_sheet = {SHEET_NAMES[0]: finished_notes, SHEET_NAMES[1]: stock_notes}
     settled_reference_identities = None
     saved_supplier_references = None
+
+    def verify_settled_supplier_layout():
+        # These explicit pre-save refreshes precede ALL reusable read-only proofs.
+        for sheet_name, (names, _configuration) in view_contracts.items():
+            if drawing.ActivateSheet(sheet_name) is not True:
+                raise RuntimeError(f"cannot refresh supplier ink on {sheet_name}")
+            views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
+            for name in names:
+                if name not in views:
+                    raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
+                views[name].UpdateViewDisplayGeometry()
+        _verify_supplier_layout(
+            adapter, view_contracts, notes_by_sheet, source_model, stock_capture,
+        )
 
     def verify_settled_supplier_references():
         nonlocal settled_reference_identities
@@ -1532,6 +1589,8 @@ async def build(adapter: Any) -> dict[str, str]:
                 if saved_supplier_references is None or observed != saved_supplier_references:
                     raise RuntimeError("supplier exact saved dimension keys changed after native drawing save")
                 _verify_supplier_references(adapter, saved_supplier_references, view_contracts)
+            _verify_supplier_stock_profile(adapter, source_model, stock_capture, stock_profile)
+            _verify_source_state(adapter, source_model, finished_configuration)
             if event != "before_drawing_close" and drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
                 raise RuntimeError("cannot restore finished counter anchor sheet after saved-eye inspection")
         except BaseException as exc:
@@ -1567,12 +1626,11 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(annotations),
-            # The layout check owns pre-save view refreshes; the attachment
-            # verifier is also safe to call after the native save.
-            lambda: _verify_supplier_layout(
-                adapter, view_contracts, notes_by_sheet, source_model, stock_capture,
-            ),
+            verify_settled_supplier_layout,
             verify_settled_supplier_references,
+            lambda: _verify_supplier_stock_profile(
+                adapter, source_model, stock_capture, stock_profile,
+            ),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
         checkpoint=verify_after_native_save,

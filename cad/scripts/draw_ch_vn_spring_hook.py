@@ -343,10 +343,15 @@ def _supplier_annotation(app, display, view):
 
 
 def _supplier_eye_circle(
-    adapter: Any, view: Any, raw: Any,
+    adapter: Any, view: Any, raw: Any, finished_configuration: str,
 ) -> tuple[float, ...] | None:
     """Read an exact model-XY circle on the authoritative source eye torus."""
-    if raw is None:
+    configuration = view.ReferencedConfiguration
+    if (
+        type(finished_configuration) is not str or not finished_configuration
+        or type(configuration) is not str or configuration != finished_configuration
+        or raw is None
+    ):
         return None
     silhouette = _early_bound(raw, "ISilhouetteEdge")
     raw_curve = silhouette.GetCurve()
@@ -365,7 +370,15 @@ def _supplier_eye_circle(
         return None
     native_view = silhouette.GetView()
     app = _early_bound(adapter.swApp, "ISldWorks")
-    if native_view is None or _native_equality(app, _early_bound(native_view, "IView"), view) != 1:
+    if native_view is None:
+        return None
+    native_view = _early_bound(native_view, "IView")
+    if _native_equality(app, native_view, view) != 1:
+        return None
+    native_configuration = native_view.ReferencedConfiguration
+    if (
+        type(native_configuration) is not str or native_configuration != finished_configuration
+    ):
         return None
     raw_document = view.ReferencedDocument
     if raw_document is None:
@@ -411,13 +424,21 @@ def _supplier_eye_circle(
     return circle
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
-    """Physical unchanged eye sizes plus an associative nominal-major carrier."""
+def _supplier_references(
+    adapter: Any, front: Any, finished_configuration: str,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Prove the current finished-source eye before each physical diameter."""
+    configuration = front.ReferencedConfiguration
+    if (
+        type(finished_configuration) is not str or not finished_configuration
+        or type(configuration) is not str or configuration != finished_configuration
+    ):
+        raise RuntimeError("spring anchor supplier eye lost its finished source configuration")
     eye = {}
     refs = []
     visible = visible_view_entities(front, 4, label="spring anchor supplier contours")
     for raw in visible:
-        circle = _supplier_eye_circle(adapter, front, raw)
+        circle = _supplier_eye_circle(adapter, front, raw, finished_configuration)
         if circle is None:
             continue
         for name, diameter in SUPPLIER_EYE_MM.items():
@@ -429,15 +450,44 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
     ):
         if name not in eye:
             raise RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
+        primary = None
         try:
             _select_view_entity(
                 adapter, front, "SILHOUETTE", None, label=name, entity=eye[name]
             )
+            selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+            count = selection.GetSelectedObjectCount2(-1)
+            if type(count) is not int or count != 1:
+                raise RuntimeError(
+                    f"{name}: final spring eye selection expected count=1; actual count={count!r}"
+                )
+            kind = selection.GetSelectedObjectType3(1, -1)
+            if type(kind) is not int or kind != 46:  # swSelSILHOUETTES
+                raise RuntimeError(
+                    f"{name}: final spring eye selection expected type=46; actual type={kind!r}"
+                )
+            current = selection.GetSelectedObject6(1, -1)
+            if current is None:
+                raise RuntimeError(f"{name}: final spring eye selection has no physical silhouette")
+            circle = _supplier_eye_circle(adapter, front, current, finished_configuration)
+            if circle is None or abs(circle[6] * 2000.0 - SUPPLIER_EYE_MM[name]) >= 1e-5:
+                raise RuntimeError(f"{name}: final spring eye selection lost its exact physical source contour")
             display = adapter.currentModel.AddDiameterDimension2(*text_xy, 0.0)
+            if display is None:
+                raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
+        except BaseException as error:
+            primary = error
+            raise
         finally:
-            adapter.currentModel.ClearSelection2(True)
-        if display is None:
-            raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
+            try:
+                adapter.currentModel.ClearSelection2(True)
+            except BaseException as cleanup_error:
+                if primary is None:
+                    raise
+                primary.add_note(
+                    f"{name}: spring eye selection cleanup also failed: "
+                    f"{type(cleanup_error).__name__}: {cleanup_error}"
+                )
         contract = dict(
             label=name, expected_mm=SUPPLIER_EYE_MM[name], units="in",
             precision=SUPPLIER_REFERENCE_PRECISION[name], presentation="diameter",
@@ -601,11 +651,12 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
             else:
                 # Never retain the silhouette or mapped face beyond this read.
                 entities = tuple(annotation.GetAttachedEntities3() or ())
-                kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
+                kinds = tuple(annotation.GetAttachedEntityTypes() or ())
+                count = annotation.GetAttachedEntityCount3()
                 if (
-                    int(annotation.GetAttachedEntityCount3()) != 1
+                    type(count) is not int or count != 1
                     or len(entities) != 1
-                    or kinds != (46,)
+                    or len(kinds) != 1 or type(kinds[0]) is not int or kinds[0] != 46
                     or entities[0] is None
                     or annotation.IsDangling()
                 ):
@@ -613,7 +664,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                         f"{contract['label']}: supplier eye must retain one live physical "
                         f"silhouette; entities={len(entities)}, kinds={kinds}"
                     )
-                circle = _supplier_eye_circle(adapter, view, entities[0])
+                circle = _supplier_eye_circle(adapter, view, entities[0], configuration)
                 diameter = SUPPLIER_EYE_MM[contract["label"]]
                 if circle is None or abs(circle[6] * 2000.0 - diameter) >= 1e-5:
                     raise RuntimeError(
@@ -852,7 +903,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     _place_chamfer_angle_text(adapter, annotations)
-    refs = _supplier_references(adapter, front)
+    refs = _supplier_references(adapter, front, finished_configuration)
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
         raise RuntimeError("cannot enter finished spring anchor sheet context for labels")

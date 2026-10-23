@@ -1080,7 +1080,42 @@ The existing frozen-`652d` three-helper semantic limits still apply;
 this increment does not turn them into thirteen byte-identical helpers.
 Main accepts existing CH native/still-open, whole-v44 and **actual-XHIGH**
 three-SHIP paper evidence under this unchanged-input carry. Historical
-MEDIUM reviews stay nonqualifying; no CH native or paper rerun is made.
+MEDIUM reviews stay nonqualifying; that carry alone authorized no rerun.
+
+## Whole-PR XHIGH correction boundary
+
+Independent actual `codex-gpt-6-1-sol-xhigh` reviewed the entire five-file
+`1c4d8a0328bf3b85319e1da2b578e5f716f5b998` to
+`b9640b80870aacc7c7e710deb235835c430cfd72` delta and enclosing functions.
+It completed ten independent inline angles, deduplication without
+verification and a fresh gap sweep. Six distinct findings requested changes:
+
+1. SM's nine-black-instance proof ended before later HLV-to-HLR and final
+   pre-save regeneration.
+2. CH did not prove the actual current count/type/physical contour before
+   diameter creation.
+3. Four SM physical/source equality checks used lossy `int(IsSame(...))`.
+4. CH discovery lacked the expected finished-configuration readback.
+5. CH selection cleanup could replace the primary native exception.
+6. SM repeated an unchanged full native bounds/refresh pass.
+
+These are source-contract findings, not claims that the SDK actually
+returned a malformed type or that a native regeneration lost color.
+They require pure fresh-profile observation at the last pre-save settle
+and after-save/PDF/close boundaries, exact integer identity handling,
+before-creation CH selection/configuration proof, primary-error-preserving
+cleanup, and removal of only the redundant projection pass. No source
+configuration activation or post-save geometry mutation is permitted.
+
+Main authorized one final changed-source **CH and SM** normal native batch
+after correction closure and final source gates. New CH precreation guards
+are not claimed to have executed in historical `652d`. The actual `76a775`
+XHIGH paper qualification is retained, but may carry to a new CH output
+only after complete page, text and review-context equivalence is proved.
+No unchanged review reroll, new waiver or automatic paper equivalence is
+claimed. The independent same-family code-review route is explicitly
+authorized because Claude is quota-exhausted; it is not cross-vendor or
+mutation-verified review.
 
 ## Evidence boundary
 

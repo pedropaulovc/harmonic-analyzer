@@ -1,6 +1,7 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
 from dataclasses import FrozenInstanceError, replace
+import asyncio
 import math
 from types import SimpleNamespace
 
@@ -408,7 +409,8 @@ def test_source_wire_requires_one_native_owned_eye_torus(supplier_eye_scene, fau
         scene.source_face.GetFeature = lambda: None
     elif fault == "identity-error":
         scene.adapter.swApp.IsSame = lambda *_args: -1
-    with pytest.raises(RuntimeError, match="requires one authoritative source Wire eye torus"):
+    message = "unknown native IsSame" if fault == "identity-error" else "requires one authoritative source Wire eye torus"
+    with pytest.raises(RuntimeError, match=message):
         drawing._supplier_references(scene.adapter, scene.front, "Finished")
     assert not scene.projections and not scene.picks and not scene.dimensions
 
@@ -542,7 +544,8 @@ def test_parent_view_requires_positive_native_identity_not_name_or_unknown(
     scene.state.count = 2
     with pytest.raises(
         RuntimeError,
-        match=f"expected IsSame=1; actual IsSame={same_result} at index=1",
+        match=(f"expected IsSame=1; actual IsSame={same_result} at index=1"
+               if same_result == 0 else "unknown native IsSame"),
     ):
         drawing._supplier_references(scene.adapter, scene.front, "Finished")
     assert scene.reselections == scene.dimensions == []
@@ -757,6 +760,7 @@ def test_cleanup_failure_cannot_replace_the_original_native_failure(supplier_eye
     with pytest.raises(OSError) as caught:
         drawing._supplier_references(scene.adapter, scene.front, "Finished")
     assert caught.value is error and error.__cause__ is cleanup_error
+    assert any("selection cleanup also failed" in note for note in error.__notes__)
     assert scene.dimensions == []
 
 
@@ -1120,9 +1124,11 @@ class _StockSourceCurve(SimpleNamespace):
         raise AttributeError(name)
 
 
-@pytest.fixture
-def stock_source_scene(monkeypatch, tmp_path):
-    """Exercise real capture/analytic projection with offline COM boundaries."""
+def _make_stock_source_scene(
+    monkeypatch, tmp_path, *, source=None, stock=None, model=None, adapter=None,
+    source_path=None, finished_configuration="OriginalFinished",
+):
+    """Real capture/profile oracle with replaceable offline native boundaries."""
     calls, scalar_reads, body_reads, correspondences = [], [], [], []
 
     def bind(value, kind):
@@ -1137,10 +1143,10 @@ def stock_source_scene(monkeypatch, tmp_path):
     monkeypatch.setattr(projection, "double_array", tuple)
     monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "bstr_array", tuple)
-    source_path = tmp_path / "anchor.SLDPRT"
+    source_path = tmp_path / "anchor.SLDPRT" if source_path is None else source_path
     monkeypatch.setattr(drawing, "SOURCE", source_path)
     state = SimpleNamespace(
-        active="OriginalFinished", changed_visibility=False, target_seen=False,
+        active=finished_configuration, changed_visibility=False, target_seen=False,
         selected=None, selected_count=1, selected_kind=24, select_result=True,
         after_select=None, after_color=None, after_drawing_rebuild=None,
     )
@@ -1187,7 +1193,7 @@ def stock_source_scene(monkeypatch, tmp_path):
 
     def source_segments():
         calls.append(("segments", state.active))
-        assert state.active in ("OriginalFinished", drawing.SUPPLIER_STOCK_CONFIGURATION)
+        assert state.active in (finished_configuration, drawing.SUPPLIER_STOCK_CONFIGURATION)
         return tuple(segments)
 
     sketch = SimpleNamespace(
@@ -1256,19 +1262,24 @@ def stock_source_scene(monkeypatch, tmp_path):
     def forbid(*_args, **_kwargs):
         pytest.fail("source capture/settled stock ink must never save the part")
 
-    source = SimpleNamespace(
+    existing_feature = getattr(source, "FeatureByName", lambda _name: None)
+    source_fields = dict(
         GetType=lambda: 1, GetPathName=lambda: str(source_path.resolve()),
         GetConfigurationByName=lambda name: configuration if name == configuration.Name else None,
-        FeatureByName=lambda name: features.get(name), GetBodies2=bodies,
+        FeatureByName=lambda name: features.get(name) or existing_feature(name), GetBodies2=bodies,
         ShowConfiguration2=show, EditRebuild3=rebuild, Save3=forbid, SaveAs3=forbid,
     )
+    if source is None:
+        source = SimpleNamespace(**source_fields)
+    else:
+        vars(source).update(source_fields)
     monkeypatch.setattr(
         drawing, "active_configuration_name",
         lambda _adapter, actual: state.active if actual is source else pytest.fail("wrong active source"),
     )
 
     def blank(actual_adapter, names):
-        assert actual_adapter.currentModel is source and state.active == "OriginalFinished"
+        assert actual_adapter.currentModel is source and state.active == finished_configuration
         calls.append(("blank", names))
         for name in names:
             features[name].Visible = 1
@@ -1281,7 +1292,9 @@ def stock_source_scene(monkeypatch, tmp_path):
         assert drawing_object is not None
         return reverse.get(id(drawing_object))
 
-    source.Extension = SimpleNamespace(GetCorresponding2=normalize)
+    if getattr(source, "Extension", None) is None:
+        source.Extension = SimpleNamespace()
+    source.Extension.GetCorresponding2 = normalize
 
     def make_instance(source, native_id=None):
         instance = _StockSourceCurve(
@@ -1330,8 +1343,8 @@ def stock_source_scene(monkeypatch, tmp_path):
         correspondences.append(segment)
         return mapped.get(id(segment))
 
-    stock = _StockView(
-        Name="stock", ReferencedDocument=source,
+    stock_fields = dict(
+        Name=getattr(stock, "Name", "stock"), ReferencedDocument=source,
         ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
         GetReferencedModelName=lambda: str(source_path.resolve()), Type=7,
         GetBaseView=lambda: None, IsCropped=lambda: False, IsBroken=lambda: False,
@@ -1340,11 +1353,17 @@ def stock_source_scene(monkeypatch, tmp_path):
         ScaleDecimal=2.0, GetDisplayMode2=lambda: 2, Position=drawing.STOCK_CENTER,
         projection_scale=2.0, angle=0.0,
         GetSketch=lambda: SimpleNamespace(GetSketchSegments=lambda: ()),
-        GetFirstDisplayDimension6=lambda: None, GetAnnotations=lambda: (),
+        GetFirstDisplayDimension6=getattr(stock, "GetFirstDisplayDimension6", lambda: None),
+        GetAnnotations=getattr(stock, "GetAnnotations", lambda: ()),
         UpdateViewDisplayGeometry=lambda: calls.append("view-update"),
         GetCorresponding=corresponding,
         GetOutline=lambda: pytest.fail("stock geometry must not use a cached view outline"),
     )
+    if stock is None:
+        stock = _StockView(**stock_fields)
+    else:
+        vars(stock).update(stock_fields)
+        stock.ModelToViewTransform = _StockTransform(2.0, *stock.Position)
     utility = SimpleNamespace(CreatePoint=lambda xyz: _StockMathPoint(xyz))
     def clear(all_selections):
         assert all_selections is True
@@ -1380,7 +1399,7 @@ def stock_source_scene(monkeypatch, tmp_path):
         selected_view_reads.append((index, mark))
         return stock
 
-    model = SimpleNamespace(
+    model_fields = dict(
         EditRebuild3=drawing_rebuild, ClearSelection2=clear, ActivateView=activate,
         ActiveDrawingView=None, SetLineColor=set_color,
         SelectionManager=SimpleNamespace(
@@ -1395,16 +1414,26 @@ def stock_source_scene(monkeypatch, tmp_path):
             GetCorresponding2=lambda *_args: pytest.fail("reverse correspondence must use the source PART"),
         ),
     )
-    adapter = SimpleNamespace(
-        currentModel=source,
-        swApp=SimpleNamespace(
-            IsSame=lambda first, second: int(
-                getattr(first, "native_id", first) is getattr(second, "native_id", second)
-            ),
-            GetMathUtility=lambda: utility,
-        ),
-    )
+    if model is None:
+        model = SimpleNamespace(**model_fields)
+    else:
+        existing_extension = getattr(model, "Extension", None)
+        vars(model).update(model_fields)
+        if existing_extension is not None:
+            model.Extension = existing_extension
+    if not hasattr(model, "ActivateSheet"):
+        model.ActivateSheet = lambda name: setattr(state, "sheet", name) or True
+    if adapter is None:
+        adapter = SimpleNamespace(currentModel=source, swApp=SimpleNamespace())
+    if not hasattr(adapter, "swApp"):
+        adapter.swApp = SimpleNamespace()
+    if not hasattr(adapter.swApp, "IsSame"):
+        adapter.swApp.IsSame = lambda first, second: int(
+            getattr(first, "native_id", first) is getattr(second, "native_id", second)
+        )
+    adapter.swApp.GetMathUtility = lambda: utility
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (stock,))
     return SimpleNamespace(
         adapter=adapter, source=source, stock=stock, state=state, feature=feature,
         thread=thread, configuration=configuration, sketch=sketch, segments=segments,
@@ -1414,6 +1443,11 @@ def stock_source_scene(monkeypatch, tmp_path):
         mapped=mapped, selections=selections, colors=colors, make_instance=make_instance,
         reverse=reverse, reverse_reads=reverse_reads, selected_view_reads=selected_view_reads,
     )
+
+
+@pytest.fixture
+def stock_source_scene(monkeypatch, tmp_path):
+    return _make_stock_source_scene(monkeypatch, tmp_path)
 
 
 def _stock_capture(scene):
@@ -2395,7 +2429,12 @@ def test_black_stock_profile_changes_only_all_nine_exact_drawing_instance_colors
     }
     spare = scene.make_instance(scene.circles[0])
     calls_before = len(scene.calls)
-    assert _blacken_stock(scene, capture) is None
+    expected = _blacken_stock(scene, capture)
+    assert type(expected) is drawing.SupplierStockProfileSnapshot
+    assert expected.view is scene.stock and expected.source_sketch is scene.sketch
+    assert tuple(row[0] for row in expected.profiles) == tuple(scene.segments)
+    with pytest.raises(FrozenInstanceError):
+        expected.profiles = ()
     instances = [scene.mapped[id(source)] for source in scene.segments]
     assert [entry[0] for entry in scene.selections] == instances
     assert scene.colors == instances
@@ -2435,7 +2474,7 @@ def test_black_profile_accepts_distinct_selected_handles_only_through_canonical_
         scene.state.selected = selected
 
     scene.state.after_select = selected
-    assert _blacken_stock(scene, capture) is None
+    assert type(_blacken_stock(scene, capture)) is drawing.SupplierStockProfileSnapshot
     assert scene.colors == selected_handles and len(selected_handles) == 9
     for mapped, selected, source in pairs:
         for handle in (mapped, selected):
@@ -3160,7 +3199,7 @@ def test_black_profile_rebuild_accepts_fresh_source_wrappers_only_with_same_nati
         original_sketch.GetSketchSegments = stale
 
     scene.state.after_drawing_rebuild = refresh
-    assert _blacken_stock(scene, capture) is None
+    assert type(_blacken_stock(scene, capture)) is drawing.SupplierStockProfileSnapshot
     assert all(all(current is not previous for previous in original_sources) for current in scene.segments)
     assert len(scene.colors) == 9 and all(mapped.Color == 0 for mapped in scene.mapped.values())
     assert scene.state.active == "OriginalFinished" and scene.state.selected is None
@@ -3267,7 +3306,8 @@ def stock_diagram_scene(stock_source_scene, monkeypatch):
 def test_supplier_diagram_uses_supported_complete_annotation_curation_without_changing_source(stock_diagram_scene):
     scene = stock_diagram_scene
     values = dict(scene.values)
-    stock, refs, notes = drawing._supplier_stock_diagram(scene.adapter, scene.source, scene.capture)
+    stock, refs, notes, profile = drawing._supplier_stock_diagram(scene.adapter, scene.source, scene.capture)
+    assert type(profile) is drawing.SupplierStockProfileSnapshot
     assert stock is scene.stock and len(refs) == 4 and len(notes) == 2
     assert dict(scene.placed) == {
         "SupplierNominalEyeOD": (0.200, 0.250),
@@ -3474,3 +3514,406 @@ def test_complete_eye_native_rows_clear_actual_header_and_entire_wire_callout(an
         label = dict(rows)["NOMINAL EYE ENVELOPE"]
         assert label[0] - header[2] == pytest.approx(38.8138)
         assert label[1] - wire_rows[-1][3] == pytest.approx(11.5)
+
+
+@pytest.mark.parametrize("boundary", ("wire", "silhouette-view", "parent-view"))
+@pytest.mark.parametrize("actual", (0, 1, 2, True, False, "1", 1.0, 1.9, None, -1))
+def test_physical_eye_identity_boundaries_require_exact_native_same_one(
+    supplier_eye_scene, boundary, actual,
+):
+    scene = supplier_eye_scene
+    native_same = scene.adapter.swApp.IsSame
+    pair = {
+        "wire": (scene.owner, scene.owner),
+        "silhouette-view": (scene.front, scene.front),
+        "parent-view": (scene.front, scene.front),
+    }[boundary]
+    if boundary == "parent-view":
+        scene.state.entries = [(12, scene.front), (46, scene.eye)]
+        scene.state.count = 2
+    scene.adapter.swApp.IsSame = lambda first, second: (
+        actual if first is pair[0] and second is pair[1] else native_same(first, second)
+    )
+    if type(actual) is int and actual == 1:
+        assert drawing._supplier_references(scene.adapter, scene.front, "Finished")
+        assert len(scene.dimensions) == 1
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._supplier_references(scene.adapter, scene.front, "Finished")
+        assert scene.dimensions == [] and scene.reselections == []
+    assert not scene.state.selected
+
+
+@pytest.mark.parametrize("actual", (0, 1, 2, True, False, "1", 1.0, 1.9, None, -1))
+def test_source_dimension_identity_requires_exact_native_same_one(stock_source_scene, actual):
+    scene = stock_source_scene
+    native = scene.dimensions["SupplierNominalEyeOD"]
+    native_same = scene.adapter.swApp.IsSame
+    scene.adapter.swApp.IsSame = lambda first, second: (
+        actual if first is native and second is native else native_same(first, second)
+    )
+    if type(actual) is int and actual == 1:
+        assert type(_stock_capture(scene)) is drawing.SupplierStockCapture
+    else:
+        with pytest.raises(RuntimeError):
+            _stock_capture(scene)
+    assert scene.state.active == "OriginalFinished"
+    assert scene.feature.Visible == scene.thread.Visible == 1
+
+
+def _replace_stock_profile_wrappers(scene):
+    """Replace both frames, retaining only affirmative SOURCE native identities."""
+    previous_sketch = scene.feature.GetSpecificFeature2()
+    fresh_sketch = SimpleNamespace(**vars(previous_sketch))
+    fresh_sketch.native_id = getattr(previous_sketch, "native_id", previous_sketch)
+    sources, mapped = [], {}
+
+    def obsolete(*_args):
+        pytest.fail("profile observer read an obsolete native geometry handle")
+
+    for previous in tuple(scene.segments):
+        current = _StockSourceCurve(**vars(previous))
+        current.native_id = getattr(previous, "native_id", previous)
+        current.GetSketch = lambda: fresh_sketch
+        old_instance = scene.mapped[id(previous)]
+        instance = scene.make_instance(current)
+        instance.Color = old_instance.Color
+        instance.Width, instance.Style, instance.Layer = old_instance.Width, old_instance.Style, old_instance.Layer
+        scene.reverse[id(instance.GetSketch())] = fresh_sketch
+        sources.append(current)
+        mapped[id(current)] = instance
+        previous.GetType = previous.GetLength = previous.GetSketch = obsolete
+        old_instance.GetType = old_instance.GetLength = old_instance.GetSketch = obsolete
+    scene.feature.GetSpecificFeature2 = lambda: fresh_sketch
+    scene.segments[:] = list(reversed(sources))
+    scene.mapped.clear()
+    scene.mapped.update(mapped)
+    previous_sketch.GetSketchSegments = obsolete
+
+
+def _mutate_stock_profile(scene, fault, index=0):
+    source = scene.segments[index]
+    mapped = scene.mapped[id(source)]
+    if fault == "missing-instance":
+        scene.mapped[id(source)] = None
+    elif fault == "missing-source":
+        scene.segments.pop(index)
+    elif fault == "extra-source":
+        scene.segments.append(source)
+    elif fault == "foreign-source":
+        foreign = _StockSourceCurve(**vars(source))
+        scene.segments[index] = foreign
+        instance = scene.make_instance(foreign)
+        instance.Color = 0
+        scene.mapped[id(foreign)] = instance
+    elif fault == "foreign-instance":
+        scene.reverse[id(mapped)] = scene.segments[(index + 1) % 9]
+    elif fault == "foreign-owner":
+        scene.reverse[id(mapped.GetSketch())] = SimpleNamespace(**vars(source.GetSketch()))
+    elif fault == "foreign-view":
+        scene.stock = _StockView(**vars(scene.stock))
+    elif fault == "geometry":
+        if mapped.GetType() == 1:
+            mapped.radius += 0.001
+        else:
+            mapped.end.X += 0.001
+    elif fault in ("Width", "Style", "Layer"):
+        setattr(mapped, fault, "FOREIGN" if fault == "Layer" else 99)
+    else:
+        mapped.Color = {"color": 0x808080, "bool-color": False, "null-color": None}[fault]
+
+
+def _forbid_stock_profile_mutations(scene):
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("read-only stock observer refreshed/rebuilt/selected/styled/activated configuration")
+
+    scene.stock.UpdateViewDisplayGeometry = forbidden
+    scene.source.ShowConfiguration2 = scene.source.EditRebuild3 = scene.source.ForceRebuild3 = forbidden
+    scene.model.EditRebuild3 = scene.model.ForceRebuild3 = scene.model.SetLineColor = forbidden
+    scene.model.ActivateView = scene.model.ClearSelection2 = forbidden
+    for mapped in scene.mapped.values():
+        if mapped is not None:
+            mapped.Select4 = forbidden
+
+
+@pytest.mark.parametrize("fault", (
+    None, "missing-instance", "missing-source", "extra-source", "foreign-source",
+    "foreign-instance", "foreign-owner", "foreign-view", "geometry",
+    "Width", "Style", "Layer", "color", "bool-color", "null-color",
+))
+def test_reusable_stock_validator_reacquires_source_identity_without_geometry_writes(
+    stock_source_scene, monkeypatch, fault,
+):
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    expected = _blacken_stock(scene, capture)
+    old_drawing = tuple(scene.mapped.values())
+    native_same = scene.adapter.swApp.IsSame
+    _replace_stock_profile_wrappers(scene)
+
+    def same(first, second):
+        assert not any(first is old or second is old for old in old_drawing)
+        return native_same(first, second)
+
+    scene.adapter.swApp.IsSame = same
+    if fault is not None:
+        _mutate_stock_profile(scene, fault)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (scene.stock,))
+    _forbid_stock_profile_mutations(scene)
+    if fault is None:
+        drawing._verify_supplier_stock_profile(scene.adapter, scene.source, capture, expected)
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_supplier_stock_profile(scene.adapter, scene.source, capture, expected)
+    assert len(scene.colors) == 9 and scene.state.active == "OriginalFinished"
+    assert scene.feature.Visible == scene.thread.Visible == 1
+
+
+@pytest.fixture
+def supplier_stock_build_scene(stock_diagram_scene, monkeypatch):
+    """Real build/capture/diagram/profile/attachment/checkpoints; no native-seat claim."""
+    scene = stock_diagram_scene
+    scene.source_path.touch()
+    state, model = scene.state, scene.model
+    state.sheet, state.saved, state.phase = "FINISHED", False, "build"
+    state.events, state.profile_fault, state.fault_phase = [], None, None
+    state.observed = []
+    sheet = SimpleNamespace(
+        GetName=lambda: state.sheet,
+        GetProperties2=lambda: (0, 0, 0, 0, 0, 0.4318, 0.2794),
+    )
+    model.ActivateSheet = lambda name: setattr(state, "sheet", name) or True
+    model.GetCurrentSheet = lambda: sheet
+    model.GetPathName = lambda: str(drawing.OUTPUTS.slddrw.resolve()) if state.saved else ""
+    model.GetTitle = lambda: f"opaque drawing token [{state.sheet}]"
+    front = SimpleNamespace(
+        Name="finished-front", ReferencedDocument=scene.source, ReferencedConfiguration="OriginalFinished",
+    )
+    iso = SimpleNamespace(
+        Name="finished-iso", ReferencedDocument=scene.source, ReferencedConfiguration="OriginalFinished",
+        GetAnnotations=lambda: (), UpdateViewDisplayGeometry=lambda: None,
+    )
+    surface = SimpleNamespace(
+        IsTorus=lambda: True,
+        TorusParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                     anchor.eye_mean_radius_mm / 1000.0, anchor.wire_dia_mm / 2000.0),
+    )
+    wire = SimpleNamespace(Name="Wire")
+    face = SimpleNamespace(GetFeature=lambda: wire, GetSurface=lambda: surface)
+    old_feature = scene.source.FeatureByName
+    scene.source.FeatureByName = lambda name: wire if name == "Wire" else old_feature(name)
+    scene.source.Extension.GetCorrespondingEntity2 = lambda raw: face if raw is face else None
+    eye = SimpleNamespace(
+        GetView=lambda: front, GetFace=lambda: face,
+        GetCurve=lambda: SimpleNamespace(IsCircle=lambda: True, CircleParams=(
+            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, drawing.SUPPLIER_EYE_ID_MM / 2000.0,
+        )),
+    )
+    finished_displays, controls, finished_refs = [], [], []
+    for name, feature in (("EyeID", "native"), ("SupplierThreadMajor", drawing.SUPPLIER_THREAD_FEATURE)):
+        native = SimpleNamespace(FullName=f"{name}@{feature}", Tolerance=SimpleNamespace(Type=0))
+        display = SimpleNamespace(GetDimension2=lambda _index, native=native: native)
+        finished_displays.append(display)
+        finished_refs.append((native.FullName, {"label": name}))
+    for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
+        native = SimpleNamespace(
+            FullName=f"{name}@machining", Name=name, SystemValue=nominal, DrivenState=2,
+            Tolerance=SimpleNamespace(
+                Type=drawing.DIMENSION_TOLERANCE_TYPES[name],
+                GetMinValue=lambda lower=lower: lower, GetMaxValue=lambda upper=upper: upper,
+            ),
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native, GetText=lambda _index: "",
+            GetPrimaryPrecision2=lambda name=name: drawing.DIMENSION_PRECISION[name],
+        )
+        finished_displays.append(display)
+        controls.append(SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display,
+        ))
+    for view, displays in (
+        (front, finished_displays),
+        (scene.stock, [annotation.GetSpecificAnnotation() for annotation in scene.annotations]),
+    ):
+        annotations = []
+        for index, display in enumerate(displays):
+            native = display.GetDimension2(0)
+            native.Tolerance = getattr(native, "Tolerance", SimpleNamespace(Type=0))
+            native.DrivenState = getattr(native, "DrivenState", 1)
+            annotation = display.GetAnnotation() if hasattr(display, "GetAnnotation") else SimpleNamespace()
+            annotation.Owner, annotation.OwnerType = view, 0
+            annotation.GetType = lambda: 4
+            annotation.GetSpecificAnnotation = lambda display=display: display
+            annotation.GetAttachedEntities3 = lambda: (eye,)
+            annotation.GetAttachedEntityTypes = lambda: (46,)
+            annotation.GetAttachedEntityCount3 = lambda: 1
+            annotation.IsDangling = lambda: False
+            display.GetAnnotation = lambda annotation=annotation: annotation
+            following = displays[index + 1] if index + 1 < len(displays) else None
+            display.GetNext5 = lambda following=following: following
+            annotations.append(annotation)
+        view.GetFirstDisplayDimension6 = lambda displays=displays: displays[0]
+        view.GetAnnotations = lambda annotations=annotations: tuple(annotations)
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "assert_supplier_annotations_fit", lambda *_args, **_kwargs: None)
+
+    def note(text, x, y):
+        return SimpleNamespace(
+            GetAnnotation=lambda: SimpleNamespace(OwnerType=1), PropertyLinkedText=text, GetText=lambda: text,
+            GetExtent=lambda: (x, y - 0.003, 0.0, x + 0.010, y + 0.003, 0.0),
+        )
+
+    monkeypatch.setattr(drawing, "add_note", lambda _adapter, text, x, y: note(text, x, y))
+    monkeypatch.setattr(drawing, "add_property_linked_note", lambda _adapter, name, x, y, **_kwargs: note(
+        drawing.property_link(name), x, y,
+    ))
+    monkeypatch.setattr(drawing, "read_required_properties", lambda _source, names, **_kwargs: {
+        name: drawing.property_link(name) for name in names
+    })
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: controls)
+    monkeypatch.setattr(drawing, "_supplier_references", lambda *_args: finished_refs)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter:
+                        (front, iso) if state.sheet == "FINISHED" else (scene.stock,))
+    monkeypatch.setattr(drawing, "place_view", lambda _adapter, _path, orientation, *_args, **_kwargs:
+                        (front if orientation == "*Front" else iso) if state.sheet == "FINISHED" else scene.stock)
+    for name in ("check", "create_blank_drawing_sheets", "stamp_drawing_summary",
+                 "set_dimension_precision", "set_dimension_callouts"):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+
+    async def open_model(_path):
+        scene.adapter.currentModel = scene.source
+        return {"success": True}
+
+    def new_drawing(*_args, **_kwargs):
+        scene.adapter.currentModel = model
+        return model, sheet
+
+    def mutate_at(phase):
+        if state.fault_phase == phase:
+            _mutate_stock_profile(scene, state.profile_fault)
+        state.events.append(phase)
+
+    def hlr(_adapter, view):
+        if view is scene.stock and scene.colors:
+            mutate_at("last-hlr")
+
+    stock_refresh = scene.stock.UpdateViewDisplayGeometry
+
+    def refresh_stock():
+        assert not state.saved
+        stock_refresh()
+        if state.phase == "final-settle":
+            mutate_at("final-refresh")
+
+    scene.stock.UpdateViewDisplayGeometry = refresh_stock
+    front.UpdateViewDisplayGeometry = lambda: None
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", hlr)
+    scene.adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        state.phase = "final-settle"
+        # Shared finalizer's final geometry flush/rebuild precedes recipe checks.
+        for view in (front, iso, scene.stock):
+            view.UpdateViewDisplayGeometry()
+        model.EditRebuild3()
+        mutate_at("final-rebuild")
+        for verify in settled_checks:
+            verify()
+        state.events.append("settled")
+        state.saved = True
+        _forbid_stock_profile_mutations(scene)
+        front.UpdateViewDisplayGeometry = iso.UpdateViewDisplayGeometry = scene.stock.UpdateViewDisplayGeometry
+        for phase in ("after_drawing_save", "after_pdf_save", "before_drawing_close"):
+            _replace_stock_profile_wrappers(scene)
+            mutate_at(phase)
+            _forbid_stock_profile_mutations(scene)
+            checkpoint(phase)
+            state.observed.append(phase)
+        return {"drawing": "saved", "pdf": "saved"}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    scene.front, scene.iso, scene.controls = front, iso, controls
+    return scene
+
+
+@pytest.mark.parametrize("phase", (
+    "last-hlr", "final-rebuild", "final-refresh",
+    "after_drawing_save", "after_pdf_save", "before_drawing_close",
+))
+@pytest.mark.parametrize("fault", (
+    "missing-instance", "missing-source", "extra-source", "foreign-source",
+    "foreign-instance", "foreign-owner", "geometry", "Width", "Style", "Layer",
+    "color", "bool-color", "null-color",
+))
+def test_real_build_refuses_profile_drift_at_last_settle_and_saved_observer_boundaries(
+    supplier_stock_build_scene, phase, fault,
+):
+    scene = supplier_stock_build_scene
+    scene.state.profile_fault, scene.state.fault_phase = fault, phase
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(scene.adapter))
+    assert phase in scene.state.events
+    assert len(scene.colors) == 9
+    assert scene.state.saved is (phase in (
+        "after_drawing_save", "after_pdf_save", "before_drawing_close",
+    ))
+    assert scene.state.active == "OriginalFinished"
+    assert scene.feature.Visible == scene.thread.Visible == 1
+
+
+def test_real_build_revalidates_fresh_black_profiles_through_all_observer_boundaries(supplier_stock_build_scene):
+    scene = supplier_stock_build_scene
+    result = asyncio.run(drawing.build(scene.adapter))
+    assert result == {"drawing": "saved", "pdf": "saved"}
+    assert scene.state.observed == ["after_drawing_save", "after_pdf_save", "before_drawing_close"]
+    assert "final-refresh" in scene.state.events and "final-rebuild" in scene.state.events
+    assert all(segment.Color == 0 for segment in scene.mapped.values())
+    assert len(scene.colors) == 9 and scene.state.active == "OriginalFinished"
+
+
+@pytest.mark.parametrize("phase", ("final-refresh", "after_drawing_save", "after_pdf_save"))
+@pytest.mark.parametrize("segment_index", range(9))
+def test_real_build_reads_black_on_every_fresh_profile_at_late_boundaries(
+    supplier_stock_build_scene, monkeypatch, phase, segment_index,
+):
+    scene = supplier_stock_build_scene
+    mutate = _mutate_stock_profile
+
+    def mutate_index(actual_scene, fault, index=0):
+        mutate(actual_scene, fault, segment_index)
+
+    monkeypatch.setitem(globals(), "_mutate_stock_profile", mutate_index)
+    scene.state.profile_fault, scene.state.fault_phase = "color", phase
+    with pytest.raises(RuntimeError, match="settled supplier black profile color expected=0"):
+        asyncio.run(drawing.build(scene.adapter))
+    assert phase in scene.state.events and len(scene.colors) == 9
+
+
+@pytest.mark.parametrize("phase", ("final-refresh", "after_drawing_save", "after_pdf_save"))
+@pytest.mark.parametrize("binding", ("view", "view-configuration", "source-path", "current-configuration"))
+def test_real_build_rejects_late_profile_binding_changes_without_configuration_repair(
+    supplier_stock_build_scene, monkeypatch, phase, binding,
+):
+    scene = supplier_stock_build_scene
+
+    def change_binding(actual_scene, _fault, index=0):
+        if binding == "view":
+            actual_scene.stock = _StockView(**vars(actual_scene.stock))
+        elif binding == "view-configuration":
+            actual_scene.stock.ReferencedConfiguration = "OriginalFinished"
+        elif binding == "source-path":
+            actual_scene.source.GetPathName = lambda: "C:/foreign-source.SLDPRT"
+        else:
+            actual_scene.state.active = drawing.SUPPLIER_STOCK_CONFIGURATION
+
+    monkeypatch.setitem(globals(), "_mutate_stock_profile", change_binding)
+    scene.state.profile_fault, scene.state.fault_phase = "binding", phase
+    with pytest.raises(RuntimeError):
+        asyncio.run(drawing.build(scene.adapter))
+    assert phase in scene.state.events and len(scene.colors) == 9
+    assert scene.state.active == (
+        drawing.SUPPLIER_STOCK_CONFIGURATION if binding == "current-configuration" else "OriginalFinished"
+    )
