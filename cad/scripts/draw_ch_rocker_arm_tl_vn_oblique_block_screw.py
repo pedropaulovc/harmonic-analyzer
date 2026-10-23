@@ -6,12 +6,14 @@ import argparse
 import math
 import sys
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_title_fit import fit_purchased_title_block
 from _com import _early_bound
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
@@ -38,6 +40,7 @@ def _assert_supplier_minimums(displays: dict[str, Any]) -> None:
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    view_layout = "supplier_top"
     proofs: list[Callable[[], None]] = []
     callback_count = 0
 
@@ -46,6 +49,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callback_count += 1
         if callback_count != 1:
             raise RuntimeError("91251A188: repeated supplier dimension callback")
+        shelf_stations: dict[str, dict[str, Any]] = {}
         displays = annotate_supplier_screw(
             adapter,
             views,
@@ -54,6 +58,8 @@ async def build(adapter: Any) -> dict[str, str]:
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            layout=view_layout,
+            shelf_stations=shelf_stations,
         )
         _assert_supplier_minimums(displays)
 
@@ -64,6 +70,8 @@ async def build(adapter: Any) -> dict[str, str]:
                 dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
                 formats=supplier.SUPPLIER_REFERENCE_FORMATS,
                 planes=supplier.SUPPLIER_REFERENCE_PLANES,
+                layout=view_layout,
+                shelf_stations=shelf_stations,
             )
             _assert_supplier_minimums(fresh)
 
@@ -79,6 +87,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        title_block_setup=partial(
+            fit_purchased_title_block, spec=SPEC, material_property="Material"
+        ),
+        view_layout=view_layout,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=supplier_screw_margins(
             supplier.SUPPLIER_REFERENCE_DIMENSIONS,
