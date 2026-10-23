@@ -1561,9 +1561,9 @@ Read the result back before importing dimensions
 The current MHA-MG-01 is the 2026-10-20 approved simple L bracket: its true
 semicircular nose and parallel sides replace the old collar and tapered arm.
 Use current-main axis-to-seat **100.3975878**, not the superseded 55.1876
-sketch; preserve the 3.175 stock mounting grip at its native `.XXX` ±0.13.
-The foot's right face merges flush with the centred 12.50 neck; its ordinary
-`.XX` ±0.51 band retains full 1.5D engagement without a local tight tolerance.
+sketch; preserve the 3.175 stock mounting grip with explicit native ±0.13.
+The foot's right face merges flush with the centred nominal12.50 neck, printed
+12.5 at ordinary `.X` ±0.8; the fitted installation retains full1.5D engagement.
 Native mounting dimensions stay attached to their witness sketch, imported
 on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
 the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
@@ -1622,17 +1622,21 @@ specifies installation depth: the flat tip reaches through the far face,
 with no shoulder or added relief groove. Full engaged overlap excludes `q`
 at each female mouth, incomplete male thread at both ends, and an ADDITIVE
 `q` male tip loss: the print does not explicitly define a chamfer/die-lead
-union. The single fitted-projection interval guarantees **10.307234843** full
-overlap, above1.5D = 9.525 with the ordinary12.50±0.51 receiver. Root-runout
-clearance is0.815 and minimum tip projection0.740. Rod length variation moves
+union. The single fitted-projection interval gives **10.017234843** full
+overlap, above1.5D = 9.525 with the ordinary12.5±0.8 receiver. Root-runout
+clearance is0.525 and minimum tip projection0.740. Rod length variation moves
 the fitted free tip; it does not define a second fixed-position joint proof.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
-The radius/location±0.05 bands preserve the thin nose material; keep those
-native dimensions without restoring user-removed functional qualifiers or
-adding an unapproved review exception. The3.175 mounting foot retains its
-ordinary`.XXX`±0.13: worst #2-56 full engagement3.305 exceeds3.2766 with only
-0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that joint.
+The owner chose **“Keep geometry; explain controls” on2026-10-22**, superseding
+the earlier removal of structural qualifiers. Keep all three radius/location
+±0.05 bands and import their source-owned `RETAINS TAP WALL` below-text. This
+is material retention, not an invented outside-profile fit; package RV-03
+records that specific acceptance. The foot prints explicit **3.175±0.13** with
+`MHA-MG-VN-53` / `SCREW GRIP` below it: full engagement3.305 exceeds3.2766,
+with0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that
+joint. One-place overall foot length/width change precision, not model geometry;
+their own printed-size intervals must not loosen receiver/rib/depth bands.
 The blued material is generic low-carbon steel, matching the existing native
 Plain Carbon Steel assignment. The generic-steel qualification below owns
 the fitted-band load-demand screen and its unverified material assumptions.
@@ -1945,8 +1949,9 @@ wrong selected identity remains fatal; never author a detached note.
 The user clarified that this bracket is a straightforward tapped through hole.
 Keep the ordinary end view and real native1/4-20 UNC THRU ALL callout; no A-A,
 cutting arrows, orphan section marks or section-thread display/ink machinery
-belongs in the production recipe. Its12.50 neck and3.175 foot dimensions remain
-native, without redundant FULL THREAD ENGAGEMENT or SCREW GRIP qualifiers.
+belongs in the production recipe. Its nominal12.50 neck now prints12.5; the
+native3.175 foot carries explicit±0.13 and the real screw-grip reference. The
+prior no-qualifier direction was superseded by the2026-10-22 owner choice above.
 Inside corners follow the actual title-blockR1.0 MAX default, not a bespoke
 R0.25 inside restriction. The nominal root uses tangentR0.60 inside andR0.25
 outside arcs across the0.85 offset, with no flat ledge; verify the actual native
@@ -1965,7 +1970,7 @@ checks; retain its measured two-edge attachments, native name and ordinary band.
 Do not rediscover that annotation through an imported-model dimension name
 reader. R32 passed its constructor checks but failed that later rediscovery;
 the exact native legacy-reader behavior was not captured.
-For the unqualified12.50 thickness, jog its text beyond the outermost actual
+For the12.5 thickness, jog its text beyond the outermost actual
 native vertical witness plus4mm and above the front outline. R33 reported an
 own-line crossing at the former qualified text's Xstation; the exact crossing
 segment was not captured. Keep the native line/arrow/neighbor checks strict.
@@ -1988,6 +1993,16 @@ Offline historical-witness and simulated mode-transition controls cover both
 rows, including a stale-target crossing and strict rejection. They are not a
 replay of the uncaptured R2 primitive or proof that a new native sheet clears;
 the combined native drawing run and whole-sheet audit remain required.
+
+The retained structural text is authored with native below-value compartments
+on the part, then asserted verbatim after model-item import; the drawing never
+rewrites it. All three head bands enter the existing native ink guards. For
+the now three-row foot callout, settle `OffsetText` first, keep its full width
+4mm left of the overall-reference witness and its bottom4mm above its own
+settled leader extent. Guard own-line crossings against each native text run:
+the blank space between value and below-text is not glyph ink. Keep the full
+union for neighbour, silhouette and sheet containment. This remains the same
+single sheet and four views; native redraw and machinist review decide fit.
 
 The overall seat-to-nose span is a native drawing reference, not a second
 manufacturing tolerance: select the actual mounting-seat edge and nose arc,
@@ -2046,14 +2061,14 @@ title-block keep-out, including a shoulder that outlasts the text after reflow.
 
 Keep nominal model travel separate from published operating capacity.
 `operating_clamp_radius_band` uses the fitted tip-projection frame. With
-knife-to-bracket-centre $C=55$, neck $N=12.50\pm0.51$, projection
+knife-to-bracket-centre $C=55$, neck $N=12.5\pm0.8$, projection
 $P=1.25\pm0.51$, rod $L=167.5\pm0.8$ and thread $T=18.00\pm0.51$,
 the free tip is $K=C-N/2-P+L$. The ordinary HEX and actual tap-entry locations
 keep the station inside the body; its derived full-height17 bound therefore
 covers either bore end without inventing symmetric±8.5. The minimum radius
-is $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.775$.
+is $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.920$.
 Rod length cancels at runout. The maximum is
-$K_{\min}-D_{\max}/2-17=193.260$, with short rod, thick neck and greatest
+$K_{\min}-D_{\max}/2-17=193.115$, with short rod, thick neck and greatest
 projection acting together. Built165 and nominal part geometry do not move.
 These are not new printed stock limits or all-machine clearance claims.
 
@@ -2089,12 +2104,17 @@ The user explicitly retained generic low-carbon steel with the blued finish,
 not a named certified grade. `mg_magnifying_bracket_arm_check.py` supplies the
 load-demand screen consumed by `error_budget.py` in JSON and human-readable
 reports. Its factor-three simultaneous bending/torsion demand uses the fitted
-maximum gravity arm of 161.565 mm, derived from the same length/neck/projection
+maximum gravity arm of 161.710 mm, derived from the same length/neck/projection
 bands above, not the nominal 160 mm arm. Joint moments use the actual relocated
 screw-row centroid projected to the seat plane. Assumed E200 GPa/G79 GPa serve
 compliance calculations only; verified yield and verified yield safety factor
 remain unavailable. This is a calculated procurement demand, not a material-data
 acceptance gate, native proof or demonstrated safety factor.
+The section uses minimum accepted11.7×10.9, with maximum accepted axial
+reach101.01 to the seat and arm span97.965 after minimum3.045 grip. The
+prying screen charges the mounting-location band and the foot's own width
+interval. X/Y load stations remain the nominal A1 pose; none of this certifies
+every manufactured geometry or the receiver's actual contact footprint.
 
 Keep a mounting-face caption beside the view it describes, clear of its
 native hole leader and coordinate witnesses. Distribute short controls

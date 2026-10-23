@@ -12,6 +12,7 @@ import magnifying_bracket_joint_layout as joint
 import mg_lever_thread_joint as thread
 import mg_magnifying_bracket_arm_check as arm
 import mg_magnifying_lever_geom as lever
+import mg_magnifying_bracket_spec as bracket_spec
 import sh_vn_music_wire_lever_geom as wire
 import spring_force_model
 
@@ -28,11 +29,25 @@ def _spring_compliance_along_wire() -> float:
 
 def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
     assert arm.NECK == joint.BRACKET_ORIGIN
-    assert arm.ARM_SPAN == joint.SIDE_PLATE_Z[0]
-    assert arm.ARM_B == thread.NECK_THICKNESS
-    assert arm.ARM_H == 2.0 * thread.NOSE_R
+    assert arm.ARM_SPAN == pytest.approx(97.965)
+    assert arm.ARM_SPAN > joint.SIDE_PLATE_Z[0]
+    assert arm.ARM_B == thread.NECK_THICKNESS - thread.NECK_THICKNESS_TOL == 11.7
+    assert arm.ARM_H == 2.0 * (thread.NOSE_R - thread.NOSE_R_TOL) == 10.9
     assert arm.NECK[2] == wire.HOOK_Z == wire.DRUM_END_Z
     assert arm.HOOK == (wire.HOOK_X, wire.HOOK_Y, wire.HOOK_Z)
+
+
+def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
+    for width, radius, seat, grip, nose_location in itertools.product(
+        (11.7, 13.3), (5.45, 5.55), (99.89, 100.91),
+        (3.045, 3.305), (-0.10, 0.10),
+    ):
+        height = 2.0 * radius
+        assert arm.I_VERTICAL <= width * height**3 / 12.0 + 1e-9
+        assert arm.I_LATERAL <= height * width**3 / 12.0 + 1e-9
+        assert arm.ARM_SPAN >= seat - grip + nose_location - 1e-9
+    assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 1
+    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(101.01)
 
 
 def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:
@@ -53,9 +68,9 @@ def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> 
         )
     ]
     farthest_tip = max(free_tip_offsets)
-    assert farthest_tip == pytest.approx(161.565)
+    assert farthest_tip == pytest.approx(161.710)
     assert arm.LEVER_GROUP_ARM_X == pytest.approx(farthest_tip)
-    # The former fixed-tip arm misses an accepted fitted rod by 1.565 mm.
+    # The former fixed-tip arm misses an accepted fitted rod by 1.710 mm.
     assert farthest_tip > thread.ROD_LENGTH - thread.NECK_THICKNESS / 2.0 - lever.THREAD_PROJECTION
     assert arm.joint_load(0.0, 1.0) == pytest.approx((0.0, -1.0, -farthest_tip))
 
@@ -103,17 +118,19 @@ def test_joint_moments_use_actual_force_stations_about_the_moved_row(case) -> No
     assert actual_mz == pytest.approx(expected_mz)
     assert actual_mz < 0.0
     if case == "peak":
-        dz = arm.NECK[2] - arm.JOINT[2]
-        assert arm.JOINT_MX == pytest.approx(-dz * (wire_fy - weight))
-        assert arm.JOINT_MY == pytest.approx(dz * wire_fx)
+        assert arm.AXIS_TO_SEAT_MAX > abs(arm.NECK[2] - arm.JOINT[2])
+        assert arm.JOINT_MX == pytest.approx(arm.AXIS_TO_SEAT_MAX * (wire_fy - weight))
+        assert arm.JOINT_MY == pytest.approx(-arm.AXIS_TO_SEAT_MAX * wire_fx)
 
 
 def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_shear() -> None:
     lower, upper = (
         joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
     )
-    nearest_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
-    assert nearest_edge == pytest.approx(5.64)
+    nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
+    assert nominal_edge == pytest.approx(5.64)
+    nearest_edge = nominal_edge - joint.POSITION_BAND
+    assert nearest_edge == pytest.approx(5.59)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)

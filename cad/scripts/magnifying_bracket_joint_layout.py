@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
+from _printed_tolerance import printed_deviations
+from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL
 import sm_summing_lever_spec as lever
 
 SCREW_SKU = "91794A078"
@@ -33,6 +35,14 @@ SEAT_PLANE_Z = -73.11241221957347
 SIDE_PLATE_THICKNESS = 3.175
 SIDE_PLATE_HEIGHT = 12.7
 SIDE_PLATE_MACHINE_X = (-8.0, 46.25)  # user-approved +5 free end; mounts/neck stay fixed
+# Physical acceptance follows the printed rounded size, not the hidden nominal.
+SIDE_PLATE_LENGTH_DEVIATIONS = printed_deviations(
+    SIDE_PLATE_MACHINE_X[1] - SIDE_PLATE_MACHINE_X[0],
+    DRAWING_PRECISION["FlangeProfile"]["FlangeWidth"],
+)
+SIDE_PLATE_HEIGHT_DEVIATIONS = printed_deviations(
+    SIDE_PLATE_HEIGHT, DRAWING_PRECISION["Flange"]["FlangeHeight"],
+)
 SIDE_PLATE_X = tuple(x - BRACKET_ORIGIN[0] for x in SIDE_PLATE_MACHINE_X)
 SIDE_PLATE_Y = (-SIDE_PLATE_HEIGHT / 2.0, SIDE_PLATE_HEIGHT / 2.0)
 SIDE_PLATE_FRONT_Z = SEAT_PLANE_Z - SIDE_PLATE_THICKNESS
@@ -66,8 +76,8 @@ SCREW_POSITIONS = tuple(
 GRIP = SIDE_PLATE_THICKNESS
 ENGAGEMENT = SCREW_LENGTH - GRIP
 HEAD_PROTRUSION = SCREW_HEAD_HEIGHT
-# The flange prints 3.175 unbanded: the title block's .XXX band holds the grip.
-FLANGE_THICKNESS_BAND = 0.13
+# Explicit native 3.175 +/-0.13 preserves the accepted screw-grip interval.
+FLANGE_THICKNESS_BAND = FOOT_GRIP_TOL
 
 # The receiver continues from the uniform 5 mm entry rib into the connected
 # 7 mm coefficient plate. Neither usable thread nor the drill point is required
@@ -120,14 +130,16 @@ DRILL_WANDER_DEG = 0.3
 DRILL_WANDER_MAX = math.tan(math.radians(DRILL_WANDER_DEG)) * (
     DRILL_DEPTH_MAX + DRILL_POINT_DEPTH_MAX
 )
-COUNTERBORE_END_WALL_MIN = (
-    min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]
-    - POSITION_BAND - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
-)
+COUNTERBORE_END_WALL_MIN = min(
+    min(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0] - POSITION_BAND,
+    SIDE_PLATE_MACHINE_X[1] - SIDE_PLATE_MACHINE_X[0]
+    + SIDE_PLATE_LENGTH_DEVIATIONS[0]
+    - (max(SCREW_MACHINE_X) - SIDE_PLATE_MACHINE_X[0]) - POSITION_BAND,
+) - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
 # Charge BOTH real flange edges: the relocated row is no longer centred.
 COUNTERBORE_HEIGHT_WALL_MIN = min(
     min(
-        SIDE_PLATE_HEIGHT - LINEAR_BAND
+        SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
         - (y - SIDE_PLATE_Y[0]) - POSITION_BAND,
         y - SIDE_PLATE_Y[0] - POSITION_BAND,
     )

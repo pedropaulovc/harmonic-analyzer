@@ -151,7 +151,7 @@ flowchart LR
     e5["bar-pin / hook arms ±0.10<br/>0.8 / 0.6 %/mm"]:::part -.-> lever
     e6["spring rate ±1.25 %<br/><b>matched, 1 %/%</b>"]:::part -.-> spring
     e7["hole position (2.667 %/mm)<br/>knife term at each input's actual setup"]:::part -.-> summing
-    e8["common-mode gain: calibrated out<br/>component range 83.775 / 165 / 193.260 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
+    e8["common-mode gain: calibrated out<br/>component range 83.920 / 165 / 193.115 mm<br/>setup capped at built 165 mm<br/><b>capacity from READOUT.md</b>"]:::free -.-> mag
     e9["reading ±0.075 mm<br/>crank index ±8°<br/>terms from current report"]:::setup -.-> op
 
     classDef part fill:#fde2e2,stroke:#c0392b
@@ -456,7 +456,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
    gain, including the magnifier setting, so the magnifier is reset per trial to bring the
    k = 0 term to the full stroke. Its finite range is the conservative component
    band from `mg_magnifying_lever_geom.operating_clamp_radius_band()`: currently
-   **83.775 / 165.0 / 193.260 mm** minimum / built / maximum knife-to-clamp-axis
+   **83.920 / 165.0 / 193.115 mm** minimum / built / maximum knife-to-clamp-axis
    radii, with this procedure capped at the built **165 mm**. It runs on the
    wire's moment arm, not station radius: the output fixture's hook is toward
    the knife and the wire leans toward the wheel. Read capacity from the
@@ -666,20 +666,20 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   **Nominal model travel** is `clamp_radius_band(block_depth)`, for visualization
   and export only. **Published component operating bounds** come from the
   no-argument `operating_clamp_radius_band()`, currently
-  **83.775 / 165.0 / 193.260 mm** from knife to clamp/bottom-rod axis.
+  **83.920 / 165.0 / 193.115 mm** from knife to clamp/bottom-rod axis.
   **As-made fit-up** may admit more travel after inspection, but that extra
   travel is not advertised as capacity. No physical model pose or part
   geometry changes with this conservative capacity policy.
 
   Installation is located by fitted tip projection $P=1.25\pm0.51$, not a
   fixed nominal free-tip coordinate. With knife-to-bracket-centre $C=55$,
-  thickness $N=12.50\pm0.51$, rod $L=167.5\pm0.8$ and thread
+  thickness $N=12.5\pm0.8$, rod $L=167.5\pm0.8$ and thread
   $T=18.00\pm0.51$, the free tip is $K=C-N/2-P+L$. Use the **full 17 mm
   one-sided calculated body bound** from the actual interior tap axis, never
   ±8.5 mm symmetry. The nearer operating bound is
-  $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.775$ mm;
+  $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.920$ mm;
   overall rod length cancels. At the far end,
-  $R_{\max}=K_{\min}-D_{\max}/2-17=193.260$ mm. The shortest rod,
+  $R_{\max}=K_{\min}-D_{\max}/2-17=193.115$ mm. The shortest rod,
   thickest neck and largest projection reduce that available plain length
   together. Nominal X149.50 runout and a fixed nominal free-tip coordinate
   earn no capacity credit. These are conservative **component intervals**,
@@ -689,12 +689,17 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   envelope inspection or a guarantee for unconstrained as-supplied form.
 
   The bracket-arm load screen uses the same fitted frame for gravity:
-  $a_{\max}=L_{\max}-N_{\min}/2-P_{\min}=161.565$ mm from the neck,
+  $a_{\max}=L_{\max}-N_{\min}/2-P_{\min}=161.710$ mm from the neck,
   rather than the nominal fixed-tip 160 mm. It conservatively applies the
   whole lever-group weight at that station; the built hook, wire direction,
   neck and relocated mounting row retain their actual machine coordinates.
   Joint moments use that actual row's centroid projected to the seat plane,
   including its −0.71 mm relocation rather than the old nominal row.
+  Section calculations use minimum accepted **11.7 × 10.9 mm**, not nominal
+  12.5 × 11.0; the longest printed seat distance, independent head locations
+  and shortest grip bound the arm span at **97.965 mm**. The force directions
+  and X/Y load stations remain the nominal A1 installation, not an
+  all-geometric-variation or native articulation certificate.
   Its material report remains a load-demand estimate with assumed elastic
   moduli, not a certified strength or safety factor for generic low-carbon steel.
 

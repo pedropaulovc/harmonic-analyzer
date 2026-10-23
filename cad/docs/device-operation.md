@@ -113,7 +113,7 @@ Full procedure with the numbers: `READOUT.md` in the release bundle (or
 ### Model travel, published capacity and as-made fit-up
 
 `mg_magnifying_lever_geom.operating_clamp_radius_band()` is the source for the
-current **83.775 / 165.0 / 193.260 mm** minimum / built / maximum distances from
+current **83.920 / 165.0 / 193.115 mm** minimum / built / maximum distances from
 the knife axis to the clamp's bottom-rod/tap axis. The built pose and actual
 part geometry have not moved. The component upper bound is not the setup
 limit: `READOUT.md` still caps this procedure at the built 165 mm station.
@@ -124,13 +124,13 @@ This comes from ordinary HEX size and default drawn angles over the full
 height, not a separate printed receiving limit or unconstrained supplied stock.
 The fitted **tip projection**, not the free tip's nominal coordinate, locates
 the rod in the bracket. Let $C=55$ mm be knife-to-neck-centre distance,
-$N=12.50\pm0.51$ neck thickness, $P=1.25\pm0.51$ installed projection,
+$N=12.5\pm0.8$ neck thickness, $P=1.25\pm0.51$ installed projection,
 $L=167.5\pm0.8$ rod length and $T=18.00\pm0.51$ thread length. In the
 knife frame the free tip is $K=C-N/2-P+L$. The conservative near stop is
-$\max(C-N_{\min}/2-P_{\min}+T_{\max},\,C+N_{\max}/2)+17=83.775$ mm.
+$\max(C-N_{\min}/2-P_{\min}+T_{\max},\,C+N_{\max}/2)+17=83.920$ mm.
 Rod length cancels at that end. At the free end the entire bore must remain
 on cylindrical plain stock beyond the hemisphere, so
-$K_{\min}-D_{\max}/2-17=193.260$ mm. The shortest rod, thickest neck and
+$K_{\min}-D_{\max}/2-17=193.115$ mm. The shortest rod, thickest neck and
 greatest projection act together at this upper bound. These are component
 interval bounds, **not a native all-machine clearance or articulation proof**.
 
@@ -156,9 +156,9 @@ stricter than the component's maximum available travel.
 
 | Setting | Knife axis to clamp/bottom-rod axis | Use |
 |---|---:|---|
-| Conservative component minimum | 83.775 mm | Entire clamp clears thread runout and the bracket. |
+| Conservative component minimum | 83.920 mm | Entire clamp clears thread runout and the bracket. |
 | Built station / procedure maximum | 165.0 mm | Current readout setup cap; nominal CAD pose is unchanged. |
-| Conservative component maximum | 193.260 mm | Entire bore remains on plain stock before the free hemisphere; not extra advertised readout capacity. |
+| Conservative component maximum | 193.115 mm | Entire bore remains on plain stock before the free hemisphere; not extra advertised readout capacity. |
 
 The generated report's `nominal_design_errors` gives the value of each
 correction step for perfect parts at this operating-band setup. Use that

@@ -38,6 +38,88 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
     assert spec.ROOT_R <= 1.0
 
 
+def test_model_precision_and_functional_bands_have_one_authority() -> None:
+    assert spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 1
+    assert spec.DRAWING_PRECISION["FlangeProfile"] == {"FlangeWidth": 1, "FlangeDepth": 3}
+    assert spec.DRAWING_PRECISION["Flange"]["FlangeHeight"] == 1
+    assert joint.NECK_THICKNESS == 12.5
+    assert joint.NECK_THICKNESS_TOL == printed_band_mm(1) == 0.8
+    assert joint.NOSE_R_TOL == joint.HOLE_LOCATION_TOL == spec.HEAD_MATERIAL_TOL == 0.05
+    assert mounting.FLANGE_THICKNESS_BAND == spec.FOOT_GRIP_TOL == 0.13
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    assert any(
+        isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        and node.func.id == "set_dimension_symmetric_tolerance"
+        and len(node.args) == 4
+        and isinstance(node.args[1], ast.Constant) and node.args[1].value == "FlangeProfile"
+        and isinstance(node.args[2], ast.Constant) and node.args[2].value == "FlangeDepth"
+        and isinstance(node.args[3], ast.Name) and node.args[3].id == "FOOT_GRIP_TOL"
+        for node in ast.walk(tree)
+    )
+
+
+def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry() -> None:
+    assert mounting.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
+    assert mounting.SIDE_PLATE_HEIGHT == 12.7
+    assert mounting.SIDE_PLATE_LENGTH_DEVIATIONS == pytest.approx((-0.85, 0.75))
+    assert mounting.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
+    assert mounting.LINEAR_BAND == 0.51  # receiver/depth authority is unchanged
+    assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
+    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.64)
+    assert mounting.GRIP_MIN == pytest.approx(3.045)
+    assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(3.305)
+
+
+@pytest.mark.parametrize("ignored", (False, True))
+def test_structural_reasons_are_authored_on_native_source_dimensions(monkeypatch, ignored) -> None:
+    writes, displays = [], {}
+    expected = {
+        (feature, name): text
+        for feature, callouts in spec.DIMENSION_CALLOUTS.items()
+        for name, text in callouts.items()
+    }
+    for key in expected:
+        values = {}
+
+        def set_text(which, text, *, key=key, values=values):
+            writes.append((key, which, text))
+            if not ignored:
+                values[which] = text
+
+        displays[key] = SimpleNamespace(SetText=set_text, GetText=lambda which, values=values: values.get(which, ""))
+    monkeypatch.setattr(part, "_named_dimension", lambda _a, feature, name: (displays[feature, name], object()))
+    if ignored:
+        with pytest.raises(RuntimeError, match="did not persist"):
+            part._author_dimension_callouts(object())
+    else:
+        part._author_dimension_callouts(object())
+        assert writes == [(key, 4, text) for key, text in expected.items()]
+        assert all(text == "RETAINS TAP WALL" for key, text in expected.items() if key[1] != "FlangeDepth")
+        assert expected["FlangeProfile", "FlangeDepth"] == "MHA-MG-VN-53\nSCREW GRIP"
+
+
+@pytest.mark.parametrize("fault", (None, "missing", "duplicate", "changed"))
+def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault) -> None:
+    annotations = []
+    for callouts in spec.DIMENSION_CALLOUTS.values():
+        for name, text in callouts.items():
+            if fault == "missing" and name == "NoseR":
+                continue
+            value = "invented outside fit" if fault == "changed" and name == "NoseR" else text.replace("\n", "\r\n")
+            item = SimpleNamespace(name=name, GetText=lambda which, value=value: value if which == 4 else "")
+            item.GetSpecificAnnotation = lambda item=item: item
+            annotations.append(item)
+    if fault == "duplicate":
+        annotations.append(annotations[0])
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
+    if fault:
+        with pytest.raises(RuntimeError, match="structural callout"):
+            drawing._assert_dimension_callouts(object(), annotations)
+    else:
+        drawing._assert_dimension_callouts(object(), annotations)
+
+
 def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
     assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
     assert mounting.SIDE_PLATE_Y == (-6.35, 6.35)
@@ -195,6 +277,19 @@ def test_native_text_layout_never_substitutes_nominal_boxes_for_missing_readback
     monkeypatch.setattr(drawing, "annotation_display", lambda *_a: (display, errors))
     with pytest.raises(RuntimeError, match="native"):
         drawing._dimension_layout_ink(adapter, annotation, label="mouth")
+
+
+def test_native_below_text_keeps_real_glyph_runs_separate_from_interrow_whitespace() -> None:
+    boxes = drawing._dimension_text_boxes({
+        "texts": [
+            _native_text("3.175 ±0.13", .100, .200, .027),
+            _native_text("MHA-MG-VN-53", .100, .210, .032),
+        ],
+    }, label="source-owned grip callout")
+    between_rows = Segment(.100, .207, .132, .207)
+    combined = drawing.union_boxes(boxes)
+    assert segment_box_overlap_length(between_rows, combined) > 0.0
+    assert all(segment_box_overlap_length(between_rows, box) == 0.0 for box in boxes)
 
 
 def _tap_name_adapter(monkeypatch, *, count=1, fault=None, definition=None, resolved=None, native_class=" - 2B"):
@@ -613,15 +708,30 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     shoulder below is a deliberate stale-geometry control, NOT its native trace.
     """
     rows = {
-        "NeckThickness": [("12.50", .1070212, .185, .0142236)],
-        "FlangeDepth": [("3.175", .1667191, .123, .0116375)],
+        "NeckThickness": [("12.5", .1070212, .185, .012)],
+        "FlangeDepth": [
+            ("3.175 ±0.13", .1667191, .123, .027),
+            ("MHA-MG-VN-53", .1667191, .118, .032),
+            ("SCREW GRIP", .1667191, .113, .025),
+        ],
         "MountingX0": [("9.00 ±0.05", .0327281, .0532219, .0245438)],
         "MountingX1": [("22.70 ±0.05", .0464351, .0432219, .0271299)],
         "MountingY0": [(f"{row_mm:.2f} ±0.05", .0177281, .0772219, .0245438)],
         "SeatToAxis": [("100.40", .1875951, .1622219, .0168097)],
-        "FlangeWidth": [("49.25", .0718882, .0952219, .0142236)],
+        "FlangeWidth": [("54.2", .0718882, .0952219, .0142236)],
         "NeckToFootSide": [("0.85", .247, .096, .010)],
-        "TapFromSide": [("5.50 ±0.05", .2277281, .2372219, .0245438)],
+        "NoseR": [
+            ("R5.50 ±0.05", .266, .229, .028),
+            ("RETAINS TAP WALL", .266, .224, .039),
+        ],
+        "TapFromTip": [
+            ("5.50 ±0.05", .165, .246, .025),
+            ("RETAINS TAP WALL", .165, .241, .039),
+        ],
+        "TapFromSide": [
+            ("5.50 ±0.05", .2277281, .2372219, .0245438),
+            ("RETAINS TAP WALL", .2277281, .2322219, .039),
+        ],
         "OverallHeight": [("(105.90)", .162, .1822219, .022)],
     }
     lines = {
@@ -634,6 +744,8 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
         "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
         "OverallHeight": [(.228, .1120512, .173, .1120512), (.228, .2179488, .173, .2179488), (.174, .1120512, .174, .181), (.174, .2179488, .174, .189)],
+        "NoseR": [(.228, .218, .264, .230)],
+        "TapFromTip": [(.2335, .217, .2335, .239), (.165, .239, .234, .239)],
         "TapFromSide": [
             (.2335, .2134488, .2335, .2382219),
             (.228, .2185015, .228, .2382219),
@@ -653,7 +765,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
     def rebuild(_adapter, *, label):
         if label == "settle bracket linear text modes" and fault != "unsettled_modes":
-            assert all(items[name].OffsetText for name in ("NeckThickness", "MountingY0", "TapFromSide"))
+            assert all(items[name].OffsetText for name in ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromSide"))
             state.modes_settled = True
 
     def native_display(_adapter, item):
@@ -718,6 +830,8 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         # Its measured witness now bounds that lane too, not a fixed nudge.
         assert segment_box_overlap_length(Segment(.174, .1120512, .174, .181), Box(.1667191, .123, .1783566, .1265)) > 0.0
         assert ink["FlangeDepth"].text[2] <= .174 - .004 + 1e-8
+        assert items["FlangeDepth"].OffsetText
+        assert ink["FlangeDepth"].text[1] > max(max(line[1], line[3]) for line in lines["FlangeDepth"])
         assert ink["MountingX0"].text[2] < .054375
         assert ink["MountingX1"].text[0] > .072075
         assert ink["MountingY0"].text[1] == pytest.approx(mode_shoulder_y + .0022)

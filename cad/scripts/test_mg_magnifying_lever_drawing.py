@@ -268,6 +268,10 @@ def test_native_tip_projection_guarantees_full_overlap_independently_of_part_len
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN >= joint.REQUIRED_FULL_ENGAGEMENT
     assert installed.THREAD_PROJECTION - installed.THREAD_PROJECTION_TOL > 0.0
     assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(min(overlaps))
+    assert joint.NECK_THICKNESS_TOL == 0.8
+    assert installed.INSTALLED_FULL_ENGAGEMENT_MIN == pytest.approx(10.017234843104717)
+    assert installed.INSTALLED_ROOT_CLEARANCE_MIN == pytest.approx(0.525)
+    assert geom.operating_clamp_radius_band() == pytest.approx((83.920, 165.0, 193.115))
 
 
 def test_tip_chamfer_loss_is_additive_to_the_incomplete_thread_limit() -> None:

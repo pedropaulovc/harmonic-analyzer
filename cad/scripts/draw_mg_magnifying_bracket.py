@@ -3,7 +3,7 @@ r"""Native manufacturing sheet for the simple threaded L bracket.
 Model sizes import from the saved SLDPRT. The ordinary end view and associative
 1/4-20 UNC THRU callout define the simple tapped hole; no section is needed.
 Its fit class, inside corners and ordinary edge breaks follow the title block.
-The native 12.50 neck and 3.175 foot thicknesses remain controlling dimensions.
+The native neck prints 12.5; explicit 3.175 +/-0.13 retains the screw-grip stack.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from _session import run_build
 import _telemetry
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, SIDE_PLATE_X, SIDE_PLATE_Y, SIDE_PLATE_Z
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
-from mg_magnifying_bracket_spec import DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_EDGE_PRECISION, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -96,15 +96,24 @@ def _project_side_view(adapter: Any, front: Any, side: Any) -> None:
         raise RuntimeError("threaded bracket end view axis is not aligned")
 
 
-def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> CalloutInk:
-    """Use native text runs, not the longest line (a horizontal size is not a leader)."""
-    display, errors = annotation_display(adapter, annotation)
-    texts = display.get("texts", ())
-    if errors or not texts or not display.get("lines"):
-        raise RuntimeError(f"{label}: missing native text/line layout: {errors}")
-    if any(len(row) != 10 or not all(math.isfinite(value) for value in row) for row in display["lines"]):
-        raise RuntimeError(f"{label}: invalid native dimension lines")
+def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Import the source-owned reasons verbatim; never write through the drawing."""
+    for callouts in DIMENSION_CALLOUTS.values():
+        for name, text in callouts.items():
+            matches = [item for item in annotations if dimension_name(adapter, item) == name]
+            if len(matches) != 1:
+                raise RuntimeError(f"{name}: expected one imported structural callout")
+            display = _early_bound(_early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}: imported structural callout differs from the model")
+
+
+def _dimension_text_boxes(display: dict[str, Any], *, label: str) -> tuple[Box, ...]:
+    """Decode individual native runs: a dimension line may pass BETWEEN rows."""
     boxes = []
+    texts = display.get("texts", ())
+    if not texts:
+        raise RuntimeError(f"{label}: missing native text extent")
     for row in texts:
         values = (*row.get("pos", ()), row.get("h", 0.0), row.get("w", 0.0), row.get("ang", math.nan))
         if len(row.get("pos", ())) != 3 or not all(math.isfinite(value) for value in values) or row.get("h", 0.0) <= 0.0 or row.get("w", 0.0) <= 0.0 or row.get("ref") not in range(6) or not row.get("t"):
@@ -119,7 +128,17 @@ def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> Callo
         if box is None:
             raise RuntimeError(f"{label}: native text has no decoded extent")
         boxes.append(box)
-    box = union_boxes(boxes)
+    return tuple(boxes)
+
+
+def _dimension_layout_ink(adapter: Any, annotation: Any, *, label: str) -> CalloutInk:
+    """Use native text runs, not the longest line (a horizontal size is not a leader)."""
+    display, errors = annotation_display(adapter, annotation)
+    if errors or not display.get("lines"):
+        raise RuntimeError(f"{label}: missing native text/line layout: {errors}")
+    if any(len(row) != 10 or not all(math.isfinite(value) for value in row) for row in display["lines"]):
+        raise RuntimeError(f"{label}: invalid native dimension lines")
+    box = union_boxes(_dimension_text_boxes(display, label=label))
     if box is None:
         raise RuntimeError(f"{label}: native text has no decoded extent")
     # These are native layout envelopes, not exported PDF glyph proof.
@@ -299,7 +318,7 @@ def _layout_linear_annotations(
     adapter: Any, front: Any, bottom: Any, annotations: list[Any], *, lateral_location: Any, overall_reference: Any,
 ) -> None:
     """Place reviewed text from native witnesses, then guard neighbours."""
-    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide", "NeckToFootSide", "OverallHeight")
+    names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "NoseR", "TapFromTip", "TapFromSide", "NeckToFootSide", "OverallHeight")
     # Retain drawing-created dimensions instead of rediscovering them through
     # the imported-model name reader that failed on the lateral dimension.
     by_name = {"NeckToFootSide": lateral_location, "OverallHeight": overall_reference}
@@ -332,7 +351,7 @@ def _layout_linear_annotations(
     initial = {name: _dimension_layout_ink(adapter, item, label=name) for name, item in by_name.items()}
     capture("before_text_modes", [(name, by_name[name], ink) for name, ink in initial.items()])
     placed_names = ("NeckThickness", "FlangeDepth", "MountingX0", "MountingX1", "MountingY0", "TapFromSide")
-    offset_names = ("NeckThickness", "MountingY0", "TapFromSide")
+    offset_names = ("NeckThickness", "FlangeDepth", "MountingY0", "TapFromSide")
     for name in placed_names:
         display = _early_bound(_early_bound(by_name[name], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
         display.CenterText = False
@@ -361,7 +380,10 @@ def _layout_linear_annotations(
     front_outline = tuple(float(v) for v in _early_bound(front, "IView").GetOutline())
     targets = {
         "NeckThickness": (max(line.x0 for line in verticals("NeckThickness")) + 0.004, front_outline[3] + 0.004),
-        "FlangeDepth": (min(seat_line, min(line.x0 for line in verticals("OverallHeight"))) - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]), before["FlangeDepth"].text[1]),
+        "FlangeDepth": (
+            min(seat_line, min(line.x0 for line in verticals("OverallHeight"))) - 0.004 - (before["FlangeDepth"].text[2] - before["FlangeDepth"].text[0]),
+            max(max(line.y0, line.y1) for line in before["FlangeDepth"].leader) + 0.004,
+        ),
         "MountingX0": (left_foot - 0.004 - (before["MountingX0"].text[2] - before["MountingX0"].text[0]), before["MountingX0"].text[1]),
         "MountingX1": (last_hole + 0.004, before["MountingX1"].text[1]),
         "MountingY0": (
@@ -396,10 +418,15 @@ def _layout_linear_annotations(
         annotation = by_name[name]
         ink = next(value for item, value in settled if item is annotation)
         require_inside(name, ink.text, region)
-        inner = Box(ink.text[0] + 0.00015, ink.text[1] + 0.00015, ink.text[2] - 0.00015, ink.text[3] - 0.00015)
-        # Own underline may touch the text baseline, never cross glyph ink.
-        if any(segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), inner) > 1e-7 for line in ink.leader):
-            raise RuntimeError(f"{name}: own native line/arrow crosses its text")
+        native_display, errors = annotation_display(adapter, annotation)
+        if errors:
+            raise RuntimeError(f"{name}: native text read failed: {errors}")
+        # Below-value reasons enlarge the union, but whitespace between native
+        # runs is not glyph ink. Guard each real run without exempting a line.
+        for box in _dimension_text_boxes(native_display, label=name):
+            inner = Box(box.xmin + 0.00015, box.ymin + 0.00015, box.xmax - 0.00015, box.ymax - 0.00015)
+            if any(segment_box_overlap_length(Segment(line.x0, line.y0, line.x1, line.y1), inner) > 1e-7 for line in ink.leader):
+                raise RuntimeError(f"{name}: own native line/arrow crosses its text")
         expanded = Box(ink.text[0] - 0.002, ink.text[1] - 0.002, ink.text[2] + 0.002, ink.text[3] + 0.002)
         for other, other_ink in settled:
             if other is annotation:
@@ -468,6 +495,9 @@ async def build(adapter: Any) -> dict[str, str]:
         imported[label] = annotations
     mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="plate-tap mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations", dimensions_by_feature={"TapCoordinates": DRAWING_DIMENSIONS["TapCoordinates"]})
+    _assert_dimension_callouts(adapter, [
+        *imported["front"], *imported["thread-axis end"], *annotations,
+    ])
     rim = _mounting_rims(bottom)[1]
     mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)
     edges = scan_view_edges(side, label="bracket through thread")

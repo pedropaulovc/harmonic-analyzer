@@ -13,6 +13,7 @@ import math
 import _config
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import angular_band_deg, printed_band_mm
+from mg_magnifying_bracket_spec import DRAWING_PRECISION, HEAD_MATERIAL_TOL
 
 THREAD = "1/4-20"
 THREAD_MAJOR = 6.35
@@ -20,12 +21,12 @@ PITCH = 25.4 / 20.0
 ROD_DIA = 6.35
 # Acceptance on selected 1/4-inch brass stock, not a supplier tolerance claim.
 ROD_DIA_BAND = (0.0, -0.05)  # upper, lower
-NECK_THICKNESS = 12.50
-NECK_THICKNESS_TOL = printed_band_mm(2)  # 12.50 uses the ordinary .XX band.
+NECK_THICKNESS = 12.50  # nominal geometry unchanged; the sheet prints 12.5
+NECK_THICKNESS_TOL = printed_band_mm(DRAWING_PRECISION["Neck"]["NeckThickness"])
 NECK_HALF_X = NECK_THICKNESS / 2.0
 NOSE_R = 5.50
-NOSE_R_TOL = 0.05
-HOLE_LOCATION_TOL = 0.05  # locations from a real neck side and nose tip
+NOSE_R_TOL = HEAD_MATERIAL_TOL
+HOLE_LOCATION_TOL = HEAD_MATERIAL_TOL  # material from the real side and nose tip
 MOUTH_CHAMFER = 0.20
 # The title-block ceiling owns the native primary distance, not both legs.
 # Keep the modeled 0.20; remove only the unsupported positive lower limit.

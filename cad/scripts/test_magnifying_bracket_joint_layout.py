@@ -180,6 +180,8 @@ def _joint_with_values(**values):
 @pytest.mark.parametrize("values,failure", [
     ({"SCREW_LENGTH": 7.85}, "1.5D full engagement"),
     ({"FLANGE_THICKNESS_BAND": 0.20}, "1.5D full engagement"),
+    ({"SIDE_PLATE_HEIGHT_DEVIATIONS": (-8.0, 8.0)}, "rule 17"),
+    ({"SIDE_PLATE_LENGTH_DEVIATIONS": (-40.0, 40.0)}, "rule 17"),
     ({"THREAD_DEPTH": 4.85}, "bottoms"),
     ({"SIDE_PLATE_HEIGHT": 8.0}, r"rule 17 \(walls and webs\) wall"),
     ({"COUNTERBORE_DIA": 3.70}, "head float"),

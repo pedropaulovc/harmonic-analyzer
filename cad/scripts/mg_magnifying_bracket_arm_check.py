@@ -1,4 +1,4 @@
-"""Worst-case static check of the MHA-MG-01 arm under the A1 pose (#1559).
+"""Tolerance-bounded static arm-section screen at the A1 force stations (#1559).
 
 Pure data, import-time asserts. The bracket reaches from the current mounting
 seat to the drum's wire lane (z -173.51). This module bounds the plain
@@ -11,6 +11,11 @@ threaded neck, cantilever and relocated two-screw mounting row:
   through the wheel's rim/drum ratio;
 * the two #2-56 screws seating the flange on MHA-SM-03's front face:
   the prying tension increment against preload, and the shank shear.
+
+Section stiffness uses minimum accepted neck dimensions; span uses the longest
+printed seat distance, shortest grip and independent head-axis location stack.
+Load directions and X/Y force stations remain the nominal installed A1 pose,
+not an all-geometric-variation or native articulation certificate.
 
 Wire-1 tension source: the pen side hangs on wire 2 from the magnifying
 wheel's rim (build_pn_pen_assembly: the pen rod slides in the hanger's U
@@ -38,21 +43,30 @@ import math
 import pn_pen_carriage_geom
 import pn_pen_rod_spec
 import sh_vn_music_wire_lever_geom
+from _printed_tolerance import printed_deviations
+from mg_magnifying_bracket_spec import DRAWING_PRECISION
 from mg_lever_thread_joint import (
     NECK_THICKNESS,
     NECK_THICKNESS_TOL,
     NOSE_R,
+    NOSE_R_TOL,
+    HOLE_LOCATION_TOL,
     ROD_DIA as LEVER_ROD_DIA,
     ROD_LENGTH_TOL,
 )
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
+    BRACKET_HOLE_POINTS,
     SCREW_MACHINE_X,
     SCREW_POSITIONS,
     SCREW_MAJOR_DIA,
     SEAT_PLANE_Z,
     SIDE_PLATE_Y,
     SIDE_PLATE_Z,
+    GRIP_MIN,
+    POSITION_BAND,
+    SIDE_PLATE_HEIGHT,
+    SIDE_PLATE_HEIGHT_DEVIATIONS,
 )
 from mg_magnifying_clamp_geom import BLOCK_HEIGHT as CLAMP_HEIGHT
 from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
@@ -141,17 +155,22 @@ def joint_load(tension: float, weight: float) -> tuple[float, float, float]:
 
 
 # --- arm section -----------------------------------------------------------------
-ARM_B = NECK_THICKNESS
-ARM_H = 2.0 * NOSE_R
+ARM_B = NECK_THICKNESS - NECK_THICKNESS_TOL
+ARM_H = 2.0 * (NOSE_R - NOSE_R_TOL)
 I_VERTICAL = ARM_B * ARM_H**3 / 12.0
 I_LATERAL = ARM_H * ARM_B**3 / 12.0
 _ratio = ARM_H / ARM_B
 J_TORSION = (
     ARM_B * ARM_H**3 * (1.0 / 3.0 - 0.21 * _ratio * (1.0 - _ratio**4 / 12.0))
 )  # rectangular-section approximation (Roark)
-# The full axis-to-front-face span is conservative; no stiff collar shell is
-# subtracted from the cantilever now that the plain neck carries the thread.
-ARM_SPAN = SIDE_PLATE_Z[0]
+# The printed seat-to-profile-axis distance and two independent nose/axis
+# controls bound the longest thread-axis-to-seat reach without moving the model.
+AXIS_TO_SEAT_MAX = (
+    SIDE_PLATE_Z[1]
+    + printed_deviations(SIDE_PLATE_Z[1], DRAWING_PRECISION["NeckProfile"]["SeatToAxis"])[1]
+    + NOSE_R_TOL + HOLE_LOCATION_TOL
+)
+ARM_SPAN = AXIS_TO_SEAT_MAX - GRIP_MIN
 
 
 def hook_deflection_along_wire(span: float, tension: float, weight: float) -> float:
@@ -200,11 +219,10 @@ JOINT = (
     SEAT_PLANE_Z,
 )
 # Moments of the neck load about the screw row's centre.
-_RX, _RY, _RZ = (
-    c - j for c, j in zip(NECK, JOINT, strict=True)
-)
-JOINT_MX = -_RZ * _FY  # prying about X (the row lies along X): both screws load
-JOINT_MY = _RZ * _FX  # prying about Y: the screws load differentially
+_RX = NECK[0] - JOINT[0]
+_RY = NECK[1] - JOINT[1]
+JOINT_MX = AXIS_TO_SEAT_MAX * _FY  # longest accepted axial prying reach
+JOINT_MY = -AXIS_TO_SEAT_MAX * _FX
 JOINT_MZ = _MZ + _RX * _FY - _RY * _FX  # in-plane torque about the seat normal
 # Conservative preload: 0.10 N m hand torque on a #2-56, K = 0.25 (dry, small
 # screw, generous) -> F = T / (K d).
@@ -230,12 +248,15 @@ SCREW_SHEAR_STRESS = JOINT_SHEAR_DEMAND_N / (
 # McMaster's 70 ksi (483 MPa) minimum tensile, shear ultimate 0.6 x = 290 MPa,
 # allowable a third of that.
 SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2
-# Prying about X uses the nearer actual flange edge, conservatively allowing
-# tipping either way. The body stays put when the mounting row moves down.
-# About Y, the row's pitch remains the lever arm.
+# Charge the independent mounting location and the foot's own printed width,
+# rather than the receiver's unrelated .XX depth/thickness band.
 JOINT_PRYING_ARM_Y = min(
-    JOINT[1] - (BRACKET_ORIGIN[1] + SIDE_PLATE_Y[0]),
-    BRACKET_ORIGIN[1] + SIDE_PLATE_Y[1] - JOINT[1],
+    min(
+        point[1] - SIDE_PLATE_Y[0] - POSITION_BAND,
+        SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - (point[1] - SIDE_PLATE_Y[0]) - POSITION_BAND,
+    )
+    for point in BRACKET_HOLE_POINTS
 )
 JOINT_TENSION_INCREMENT_N = (
     abs(JOINT_MX) / (2.0 * JOINT_PRYING_ARM_Y) + abs(JOINT_MY) / SCREW_PITCH_X
