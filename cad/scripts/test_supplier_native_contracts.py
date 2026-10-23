@@ -226,7 +226,6 @@ def _nut_carrier(monkeypatch, *, defect=None):
     import _supplier_screw_dimensions as screws
 
     monkeypatch.setattr(nuts, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(nuts, "_bind", lambda value, _interface: value)
     monkeypatch.setattr(screws, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(screws, "_bind", lambda value, _interface: value)
     source_points = tuple(
