@@ -2,17 +2,15 @@ r"""Build the oblique trammel's pivot pin (MHA-CH-06-TL-23; shop tooling).
 
 A stepped turned pin (``ch_rocker_arm_tl_oblique_pivot_pin_spec``). Layout:
 
-* ``PinProfile``: one Right-plane half-profile (sketch u -> model -Z, v ->
-  radius; the cam-pin idiom), revolved 360 degrees, so every size imports
-  into the *Right view where the pin lies as it is turned. Bottom to top:
-  the Ø10 k5 bearing section with its lead chamfer, the Ø12.70 collar and
-  the Ø10 h6 carrier section with its lead chamfer. The two equal-nominal
-  fit diameters are two independent model dimensions, each with its own
-  band; the lengths read from the top end (rule 11).
-* ``SeatFillet`` / ``CarrierFillet``: R0.2 MAX at the collar's two
-  shoulder corners.
-* ``PinAxis``: a hidden reference axis on the turned axis (the Right and Top
-  planes' intersection), which the jig assembly mates the carrier on.
+* ``PinProfile`` is a single native Right-plane half-profile revolved about
+  +Z: unchanged bearing fit, narrow lower boss, integral captive flange,
+  raised carrier seat and the extended h6 carrier journal.
+* ``CrossHole`` is a real transverse through cut, located from the retained
+  native top-face endpoint. ``CrossEndStation`` measures that physical span;
+  only the end offset and diameter are equation drivers.
+* ``SeatFillet`` / ``CarrierFillet`` retain R0.2 MAX seating corners.
+* Hidden ``PinAxis``, ``CrossPinAxis``, ``CarrierSeat`` and
+  ``FlangeLowerFace`` provide stable assembly mate references.
 
 Run (SolidWorks already open)::
 
@@ -40,6 +38,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _saved_part_guard import require_saved_drawing_properties
@@ -51,6 +50,7 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _visibility import blank_reference_geometry
 from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
     AXIS_NAME,
     BEARING_DIA,
@@ -64,14 +64,28 @@ from ch_rocker_arm_tl_oblique_pivot_pin_spec import (
     COLLAR_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    GEOMETRIC_CONTROLS,
     FIT_DIA,
     FIT_PLACES,
     ISOMETRIC_VIEW_NOTE,
     LEAD_CHAMFER,
     OVERALL_LENGTH,
+    PART_DATUMS,
     RADIUS_TOL_TYPE,
     SHOULDER_FILLET_RADIUS,
-    TOP_TO_COLLAR_SEAT,
+    CARRIER_SEAT_PLANE,
+    CROSS_HOLE_DIA,
+    CROSS_HOLE_FROM_END,
+    CROSS_HOLE_STATION,
+    CROSS_PIN_AXIS_NAME,
+    FLANGE_BOTTOM_STATION,
+    FLANGE_DIA,
+    FLANGE_DIA_BAND,
+    FLANGE_LOWER_PLANE,
+    FLANGE_THICK,
+    FLANGE_TOP_STATION,
+    LOWER_BOSS_HEIGHT,
+    UPPER_BOSS_HEIGHT,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-pin"
@@ -94,13 +108,14 @@ def _chamfer_ring(radius: float) -> float:
     return 2.0 * math.pi * (radius - LEAD_CHAMFER / 3.0) * LEAD_CHAMFER**2 / 2.0
 
 
-# The two R0.2 fillets add about 0.5 mm^3 to ~2700 mm^3, inside the 0.5 % gate.
+# The shoulder fillets' sub-mm³ correction stays inside the volume gate.
 V_TOTAL = (
     math.pi
     * (
         BEARING_R**2 * BEARING_LENGTH
         + COLLAR_R**2 * COLLAR_HEIGHT
         + FIT_R**2 * CARRIER_LENGTH
+        + ((FLANGE_DIA / 2.0) ** 2 - COLLAR_R**2) * FLANGE_THICK
     )
     - _chamfer_ring(BEARING_R)
     - _chamfer_ring(FIT_R)
@@ -108,7 +123,7 @@ V_TOTAL = (
 
 
 def _max_limit(adapter, feature: str, dimension_name: str) -> None:
-    """A shoulder radius as a single MAX limit: the print shows the model value."""
+    """One native MAX limit: the print shows the model value."""
     _, dimension = _named_dimension(adapter, feature, dimension_name)
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = RADIUS_TOL_TYPE
@@ -118,8 +133,99 @@ def _max_limit(adapter, feature: str, dimension_name: str) -> None:
         )
 
 
+def _require_cross_hole_geometry(adapter) -> None:
+    """The actual-end reference and both drivers must remain equation-neutral."""
+    for name, expected in (
+        ("CrossEndStation", OVERALL_LENGTH),
+        ("CrossHoleFromEnd", CROSS_HOLE_FROM_END),
+        ("CrossHoleDia", CROSS_HOLE_DIA),
+    ):
+        _, dimension = _named_dimension(adapter, "CrossHoleProfile", name)
+        if name == "CrossEndStation" and int(dimension.DrivenState) != 1:
+            raise RuntimeError(
+                "CrossEndStation@CrossHoleProfile must measure the physical "
+                "pin end as a driven reference, not an independent driver"
+            )
+        actual = float(dimension.SystemValue) * 1000.0
+        # Numerical neutrality across equation-manager units, not a shop band.
+        if not math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{name}@CrossHoleProfile measures {actual:.12g} mm, "
+                f"expected unchanged {expected:.12g} mm"
+            )
+
+
+async def _cross_hole_profile(adapter, pin_top_face) -> list[tuple[str, str]]:
+    """Locate the clevis hole from the actual turned end, not a second driver."""
+    cross = SketchDims()
+    check("create_sketch cross hole", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    end_line = check(
+        "cross hole top end reference",
+        await adapter.add_centerline(0.0, 0.0, -OVERALL_LENGTH, 0.0),
+    )
+    circle = check(
+        "cross hole circle",
+        await adapter.add_circle(
+            -CROSS_HOLE_STATION, 0.0, CROSS_HOLE_DIA / 2.0
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    # Retain/re-register the native PinProfile line, as WingAxisReference does
+    # for TL-22. Two coincident endpoints fully define this construction line;
+    # an additional horizontal relation would duplicate the physical axis.
+    physical_end = adapter._register_sketch_entity("Line", pin_top_face)
+    check(
+        "cross end reference origin",
+        await adapter.add_sketch_constraint(
+            f"{end_line}.start", "origin", "coincident"
+        ),
+    )
+    check(
+        "cross end reference actual turned face",
+        await adapter.add_sketch_constraint(
+            f"{end_line}.end", f"{physical_end}.end", "coincident"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{end_line}.start", f"{end_line}.end", "horizontal_distance",
+        OVERALL_LENGTH, "cross hole top end station",
+    )
+    cross.record("CrossEndStation")  # Already-defined physical span: no equation.
+    check(
+        "cross hole on pin centre",
+        await adapter.add_sketch_constraint(
+            f"{circle}.center", f"{end_line}.end", "horizontal_points"
+        ),
+    )
+    await dimension_between(
+        adapter, f"{circle}.center", f"{end_line}.end", "horizontal_distance",
+        CROSS_HOLE_FROM_END, "cross hole from end",
+    )
+    cross.record("CrossHoleFromEnd", '"CrossHoleFromEnd"')
+    check(
+        "cross hole diameter",
+        await adapter.add_sketch_dimension(
+            circle, None, "diameter", CROSS_HOLE_DIA
+        ),
+    )
+    cross.record("CrossHoleDia", '"CrossHoleDia"')
+    await ensure_fully_defined(adapter, "clevis cross hole")
+    check("exit_sketch cross hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrossHoleProfile")
+    jobs = cross.apply(adapter, "CrossHoleProfile")
+    _require_cross_hole_geometry(adapter)
+    return jobs
+
+
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import RevolveParameters
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -130,10 +236,15 @@ async def build(adapter) -> dict[str, str]:
         ("FitDia", FIT_DIA),
         ("CollarDia", COLLAR_DIA),
         ("BearingLength", BEARING_LENGTH),
-        ("CollarHeight", COLLAR_HEIGHT),
+        ("UpperBossHeight", UPPER_BOSS_HEIGHT),
         ("CarrierLength", CARRIER_LENGTH),
         ("LeadChamfer", LEAD_CHAMFER),
         ("FilletR", SHOULDER_FILLET_RADIUS),
+        ("FlangeDia", FLANGE_DIA),
+        ("FlangeThick", FLANGE_THICK),
+        ("LowerBossHeight", LOWER_BOSS_HEIGHT),
+        ("CrossHoleDia", CROSS_HOLE_DIA),
+        ("CrossHoleFromEnd", CROSS_HOLE_FROM_END),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -154,6 +265,10 @@ async def build(adapter) -> dict[str, str]:
             (-LEAD_CHAMFER, BEARING_R),
             (-COLLAR_STATION, BEARING_R),
             (-COLLAR_STATION, COLLAR_R),
+            (-FLANGE_BOTTOM_STATION, COLLAR_R),
+            (-FLANGE_BOTTOM_STATION, FLANGE_DIA / 2.0),
+            (-FLANGE_TOP_STATION, FLANGE_DIA / 2.0),
+            (-FLANGE_TOP_STATION, COLLAR_R),
             (-CARRIER_STATION, COLLAR_R),
             (-CARRIER_STATION, FIT_R),
             (-(OVERALL_LENGTH - LEAD_CHAMFER), FIT_R),
@@ -167,6 +282,10 @@ async def build(adapter) -> dict[str, str]:
         bottom_chamfer,
         bearing_od,
         collar_seat,
+        lower_boss_od,
+        flange_lower,
+        flange_od,
+        flange_upper,
         collar_od,
         collar_top,
         carrier_od,
@@ -189,6 +308,14 @@ async def build(adapter) -> dict[str, str]:
         ("bottom face vertical", bottom_face, None, "vertical"),
         ("bearing OD horizontal", bearing_od, None, "horizontal"),
         ("collar seat vertical", collar_seat, None, "vertical"),
+        ("lower boss OD horizontal", lower_boss_od, None, "horizontal"),
+        ("flange lower face vertical", flange_lower, None, "vertical"),
+        ("flange OD horizontal", flange_od, None, "horizontal"),
+        ("flange upper face vertical", flange_upper, None, "vertical"),
+        (
+            "narrow bosses same diameter",
+            f"{lower_boss_od}.start", f"{collar_od}.start", "horizontal_points",
+        ),
         ("collar OD horizontal", collar_od, None, "horizontal"),
         ("collar top vertical", collar_top, None, "vertical"),
         ("carrier OD horizontal", carrier_od, None, "horizontal"),
@@ -220,6 +347,22 @@ async def build(adapter) -> dict[str, str]:
         "carrier section diameter",
     )
     pin.record("CarrierDia", '"FitDia"')
+    await add_diametric_linear_dimension(
+        adapter, axis, flange_od,
+        (-(FLANGE_BOTTOM_STATION + FLANGE_THICK / 2.0), FLANGE_DIA / 2.0 + 4.0),
+        "captive flange diameter",
+    )
+    pin.record("FlangeDia", '"FlangeDia"')
+    for line, name, value in (
+        (lower_boss_od, "LowerBossHeight", LOWER_BOSS_HEIGHT),
+        (flange_od, "FlangeThick", FLANGE_THICK),
+        (collar_od, "UpperBossHeight", UPPER_BOSS_HEIGHT),
+    ):
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "horizontal_distance",
+            value, name,
+        )
+        pin.record(name, f'"{name}"')
     # Lengths from the top end, faced in the turning chucking (rule 11).
     await dimension_between(
         adapter,
@@ -230,24 +373,31 @@ async def build(adapter) -> dict[str, str]:
         "top end to the collar top",
     )
     pin.record("CarrierLength", '"CarrierLength"')
+    # Journal length is a shop control, not the difference of a loose overall
+    # and four collar dimensions. The overall below is a genuine reference.
     await dimension_between(
-        adapter,
-        f"{collar_seat}.start",
-        f"{top_face}.end",
-        "horizontal_distance",
-        TOP_TO_COLLAR_SEAT,
-        "top end to the collar seat",
+        adapter, f"{bottom_face}.start", f"{collar_seat}.start",
+        "horizontal_distance", BEARING_LENGTH, "bearing journal length",
     )
-    pin.record("CollarSeatStation", '"CollarHeight" + "CarrierLength"')
-    await dimension_between(
-        adapter,
-        f"{axis_line}.start",
-        f"{axis_line}.end",
-        "horizontal_distance",
-        OVERALL_LENGTH,
-        "overall length",
+    pin.record("BearingLength", '"BearingLength"')
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [axis_line], 0)
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    display, status = extension.AddSpecificDimension(
+        -OVERALL_LENGTH / 2000.0, 0.025, 0.0,
+        11,  # swDimensionType_e.swHorLinearDimension
+        0,
     )
-    pin.record("PinLength", '"BearingLength" + "CollarHeight" + "CarrierLength"')
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"pin overall reference: AddSpecificDimension failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    overall = _early_bound(display.GetDimension2(0), "IDimension")
+    overall.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(overall.DrivenState) != 1:
+        raise RuntimeError("pin overall reference did not become driven")
+    pin.record("PinLength")
     for chamfer, name in ((bottom_chamfer, "Bottom"), (top_chamfer, "Top")):
         await dimension_between(
             adapter,
@@ -268,6 +418,7 @@ async def build(adapter) -> dict[str, str]:
         )
         pin.record(f"{name}ChamferDepth", '"LeadChamfer"')
     await ensure_fully_defined(adapter, "pin profile")
+    pin_top_face = adapter._sketch_entities[top_face]
     check("exit_sketch pin profile", await adapter.exit_sketch())
     name_last_feature(adapter, "PinProfile")
     drive_jobs += pin.apply(adapter, "PinProfile")
@@ -296,12 +447,63 @@ async def build(adapter) -> dict[str, str]:
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
     name_last_feature(adapter, AXIS_NAME)
 
+
+    for name, station, expression in (
+        (
+            CARRIER_SEAT_PLANE, CARRIER_STATION,
+            '"BearingLength" + "LowerBossHeight" + "FlangeThick" + "UpperBossHeight"',
+        ),
+        (
+            FLANGE_LOWER_PLANE, FLANGE_BOTTOM_STATION,
+            '"BearingLength" + "LowerBossHeight"',
+        ),
+    ):
+        check(
+            f"create_plane {name}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Front Plane", offset=station
+                )
+            ),
+        )
+        name_last_feature(adapter, name)
+        drive_jobs.append((name_dimensions(adapter, name, [f"{name}Offset"])[0], expression))
+        blank_reference_geometry(adapter, ((name, "PLANE"),))
+    await name_bore_axis(
+        adapter, "Front Plane", CROSS_HOLE_STATION, "Top Plane", 0.0,
+        "clevis cross pin",
+        drive_a='"BearingLength" + "LowerBossHeight" + "FlangeThick" + "UpperBossHeight" + "CarrierLength" - "CrossHoleFromEnd"',
+        drive_jobs=drive_jobs,
+    )
+    name_last_feature(adapter, CROSS_PIN_AXIS_NAME)
+
+    # Right-plane circle normal to X, located from the retained turned end.
+    drive_jobs += await _cross_hole_profile(adapter, pin_top_face)
+    check(
+        "cut cross hole through pin",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=FIT_DIA * 2.0, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "CrossHole")
+    # Intersection volume of the perpendicular cylinders, integrated across
+    # the drilled diameter (Simpson's rule); no fictitious cylindrical length.
+    n = 2000
+    step = CROSS_HOLE_DIA / n
+    removed = 0.0
+    for index in range(n + 1):
+        y = -CROSS_HOLE_DIA / 2.0 + index * step
+        area = 4.0 * math.sqrt(max(0.0, (CROSS_HOLE_DIA / 2.0) ** 2 - y * y)) * math.sqrt(FIT_R**2 - y * y)
+        weight = 1 if index in (0, n) else (4 if index % 2 else 2)
+        removed += weight * area
+    finished_volume = V_TOTAL - removed * step / 3.0
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
+    _require_cross_hole_geometry(adapter)
     await volume_check(
-        adapter, "driven pivot pin (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+        adapter, "driven pivot pin (equations neutral)", finished_volume, 0.005 * V_TOTAL
     )
 
     await apply_material(adapter, MATERIAL)
@@ -321,17 +523,39 @@ async def build(adapter) -> dict[str, str]:
         *deviations(CARRIER_BAND),
         places=FIT_PLACES,
     )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinProfile", "FlangeDia", *deviations(FLANGE_DIA_BAND)
+    )
+    # The Ø5 cross hole carries no native band: the title block's DRILLED
+    # HOLES row tolerances its plain two-place "DRILL THRU" callout (spec).
+    # The fitted boss nominal is reference-only; its callout, not a loose
+    # title-block stack, controls the actual floor gap with no bearing preload.
+    for name in ("LowerBossHeight", "PinLength"):
+        display, dimension = _named_dimension(adapter, "PinProfile", name)
+        tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+        tolerance.Type = 0
+        display.SetText(1, "(")
+        display.SetText(2, ")")
+        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")"):
+            raise RuntimeError(f"{name} reference display did not persist")
     for feature, dimension in (
+        ("PinProfile", "TopChamfer"),
+        ("PinProfile", "TopChamferDepth"),
         ("SeatFillet", "SeatFilletR"),
         ("CarrierFillet", "CarrierFilletR"),
     ):
         _max_limit(adapter, feature, dimension)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, datums=PART_DATUMS, controls=GEOMETRIC_CONTROLS)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

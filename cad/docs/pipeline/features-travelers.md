@@ -117,6 +117,23 @@ the sourced profile control is retained in each arc feature's `note` and its
 acceptance identity remains explicitly `unknown`, never silently omitted or
 replaced with a size band.
 
+Pivot-cap fitted-head acceptance uses the consumer's required, cited `note`
+field, not private schema keys. The unchanged printed counterbore callouts
+retain the actual seated highest-head recess of 0.50–0.60 normal to the actual
+cap top and the 2.00 minimum whole-floor thickness, including full-width edge
+openings. Their citations include `fitted_counterbore_acceptance` as well as
+the printed limits. The 8.40 model cut remains `depth_ref`, not a toleranced
+machining depth. The wire-channel note retains normal-to-actual-top,
+whole-groove-floor applicability alongside the numeric width/depth bands. Each
+register note carries the boss root-radius maximum, cited to
+`REGISTER_ROOT_RADIUS_MAX`, the value charged to the register assembly and
+engagement proof; the native root stays sharp.
+Installed `prechips==0.2.0` accepts these authored note requirements but does
+not select text notes for automated tolerance inspection or its traveler
+tolerance table. Schema validation therefore proves representation and
+provenance, not fitted-head or every-point floor acceptance; the part's
+native/spec geometry and actual-fit guards remain separate and unchanged.
+
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
 source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal
 and body envelopes; the bank-derived south endpoint remains nominal cut-to-fit

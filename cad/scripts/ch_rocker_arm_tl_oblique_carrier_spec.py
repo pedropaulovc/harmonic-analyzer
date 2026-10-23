@@ -61,9 +61,9 @@ pair sets R800 or R816 on the MHA-CH-13 strap); the sensitivities stay here:
   0.008-0.023 unmounted, can open or close the pin spacing by up to 0.023, so
   up to 0.041 on R (``trammel.RADIUS_FROM_BEARING_PLAY``).
 
-Datums. X runs from the HUB spot's axis, which the 260.0 places from the left
-end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from the
-A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
+Position chains. X runs from the HUB spot's axis, which the 260.0 places from
+the left end (A1 by an ordinary 225.07, B1 from A1 by the spacing); Y runs from
+the A1-B1 pin line, the reamed pair's own axes, placed 45.00 from the -Y edge.
 A2/B2 chain from A1/B1, never from an edge.
 
 Pin-hole chamfer (``PIN_CHAMFER``, jig-r3 interference). Each pivot pin's
@@ -82,7 +82,14 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Flatness: title block; the plate sits on the pin collars, so no face locates.
+Each pin-hole axis is inspected against the underside-plane normal in every
+azimuth before assembly. PIN_AXIS_CALLOUT belongs to the native 4X REAM
+dimension: its resultant lateral shift per normal height bounds the actual
+vector angle by atan(0.05/10.50), not each projected component independently.
+Section A-A measures the actual straight land as a native reference (11.7
+nominal); PIN_LAND_CALLOUT separately requires 10.50 MIN of straight land.
+The process row gives the surface-plate, fitted-arbor and indicator setup.
+No geometric frame, reamed fit or chamfer geometry changes.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -101,6 +108,7 @@ import math
 
 import _config
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
+import ch_rocker_arm_tl_oblique_retention_spec as retention
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 from _fit_deviations import deviations
 from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
@@ -148,6 +156,10 @@ PIN_HOLE_CALLOUT = (
     f"4X REAM THRU ({PIN_CLEARANCE_MIN:.3f}-{PIN_CLEARANCE_MAX:.3f}\n"
     f"DIAMETRAL CLEARANCE ON\n{PIN_MATE})"
 )
+# Source-visible aliases of the shared retention proof's actual inspection
+# limits, not independent tolerances or extra bore geometry.
+PIN_AXIS_DEVIATION_MAX = retention.CARRIER_AXIS_DEVIATION_MAX
+PIN_AXIS_MEASUREMENT_SPAN = retention.CARRIER_AXIS_MEASUREMENT_SPAN
 # Rule 4: each pin band names what it sets and on which part (jig-r3 review);
 # the error sensitivities stay in the docstring.
 STRAP_NUMBER = "MHA-CH-13"
@@ -165,6 +177,10 @@ PIN_CHAMFER = 0.3
 PIN_CHAMFER_BAND = (0.1, 0.0)
 PIN_CHAMFER_TOL_TYPE = 5  # swTolType_e.swTolMIN: prints "0.3 MIN"
 PIN_CHAMFER_PLACES = 1
+# The modeled straight wall ends at the underside chamfer, not at an invented
+# 10.50 station. Section A-A displays this derived length as reference only.
+PIN_STRAIGHT_LAND = THICKNESS - PIN_CHAMFER
+DRAWING_REFERENCE_PRECISION = {"PinStraightLand": 1}
 # Against the hole edge the fillet's arc stands R (2 - sqrt 2) proud of a 45°
 # chamfer's leg, so the MIN leg reaches it with 0.1 to spare; the chamfered
 # mouth at its largest stays inside the collar.
@@ -362,8 +378,20 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 # Each spot has its own leader and callout (jig-r3: a "2X" with one leader
 # read as one spot).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
+# The full orientation acceptance is on the actual reamed diameter, never on
+# a separate leader note. "Resultant" controls the lateral vector magnitude;
+# normal height makes its bound exactly atan(deviation/span), in any azimuth.
+CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
+PIN_AXIS_CALLOUT = (
+    "AXES TO UNDERSIDE NORMAL:\n"
+    "RESULTANT LATERAL SHIFT:\n"
+    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX PER {PIN_AXIS_MEASUREMENT_SPAN:.2f}\n"
+    "NORMAL HEIGHT, ALL AZIMUTHS\n"
+    f"CLEARS {CAP_NUMBER} CAP"
+)
+PIN_LAND_CALLOUT = f"4X STRAIGHT\nLAND\n{PIN_AXIS_MEASUREMENT_SPAN:.2f} MIN"
 CALLOUTS_BELOW = {
-    "PinHoleDia": PIN_HOLE_CALLOUT,
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT}\n{PIN_AXIS_CALLOUT}",
     "PinSpacing": SPACING_CALLOUT,
     "A2DX": DX_CALLOUT,
     "B2DX": DX_CALLOUT,

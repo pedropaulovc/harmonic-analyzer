@@ -1,0 +1,38 @@
+ch-rocker-arm-tl-oblique-pivot-cap:
+  title: Rocker Oblique Pivot Capture Cap
+  number: MHA-CH-06-TL-30
+  material: low-carbon steel
+  material_specification: low-carbon steel flat, 5/8 x 2-1/2 in
+  finish: as machined; light oil
+  quantity: 2
+  tolerance_class: machined_block
+  process: >-
+    Machine from 5/8 x 2-1/2-in steel flat at least 3-1/2 in long, retaining
+    underside material for the integral registers: finished body height is
+    11.60 mm, with nominal overall height 12.60 mm including the bosses.
+    Mill the underside block-seating plane
+    around the two bosses rather than facing them away. Locate their native
+    signed X/Y coordinates (-2.500,-24.000) and (+2.500,+24.000) mm from the
+    actual flange-pocket axis. Finish each boss to diameter 6.00 +/-0.10 mm
+    and projection 1.000 mm below the seating plane at the printed ordinary
+    three-place tolerance. Chamfer only each free-end edge to the title-block
+    edge-break MAX;
+    leave the root unrelieved, with no undercut. The bosses are part of the
+    original stock, not fitted pins. Mill the centered outline, underside
+    flange chamber, through journal aperture and cap-bolt clearance pattern.
+    Locate the pocket and aperture centres from the same -X/-Y stock corner
+    at their printed ordinary coordinates. Locate every cap-bolt coordinate
+    from the actual flange-pocket axis at the block seating face. Recess the
+    four NAS1352N5H12 screw heads and open each head recess over its full
+    width to the nearest X edge at the same depth. Below each head seat,
+    machine one cylindrical through bore that also clears the sourced
+    underhead fillet, with no intermediate entry shelf. Mill the
+    separate shallow X-pair channels for twisted wire and bent tails. Fit the
+    chamber depth to the actual MHA-CH-06-TL-23 flange, including local face
+    variation, with all screws fully seated. The complete opposing-stop
+    chamber excess is 0.20-0.30 mm; the normally seated flange rim has
+    0.10-0.15 mm lower clearance without bearing preload. Safety-wire each
+    X pair in the tightening direction through the sourced radial head holes,
+    with the formed side wraps and twisted bridge wholly below the cap plane.
+    Never route wire over a head top. Heads, single wire, twists and tails
+    remain wholly below the cap plane. Renew locking wire after removal.
