@@ -517,11 +517,11 @@ def test_cli_incomplete_adapter_inputs_return_three_with_evidence(source_fixture
     json_path, md_path = tmp_path / "incomplete.json", tmp_path / "incomplete.md"
     code = impact.main(["--repo", str(repo), "--base", sha, "--head", sha,
                         "--json", str(json_path), "--markdown", str(md_path)])
-    report = json.loads(json_path.read_text())
+    report = json.loads(json_path.read_text(encoding="utf-8"))
     assert code == 3
     assert not report["complete"] and "error" not in report
     assert "SolidworksMCP-python" in report["unavailable_inputs"]["part:impact_leaf"]["head"]
-    assert "Unavailable inputs" in md_path.read_text()
+    assert "Unavailable inputs" in md_path.read_text(encoding="utf-8")
 
 
 def test_malformed_parts_registry_is_a_tool_error_not_zero_impact(source_fixture, tmp_path):

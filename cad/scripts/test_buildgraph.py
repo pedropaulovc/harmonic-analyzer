@@ -3107,9 +3107,11 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
         drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
-        spec = (SCRIPTS_DIR / f"{stem}_spec.py").resolve()
+        spec_module = export_features._spec_module_name(stem, SCRIPTS_DIR)
+        spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
         assert {drawing, spec} <= sources, stem
         assert {Path(path).resolve() for path in module_deps_of(drawing)} <= sources, stem
+        assert {Path(path).resolve() for path in module_deps_of(spec)} <= sources, stem
         assert {
             path.name for path in sources if path.name.startswith("draw_")
         } == {drawing.name}, stem

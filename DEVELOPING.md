@@ -1703,7 +1703,8 @@ conditional assembly explode-base keys are listed but not evaluated. The isolate
 worker uses the default machinist-review profile and records it: a farm configured
 with a different reviewer has different review keys. Revision workers explicitly
 enable Python UTF-8 mode, so default-encoding reads use UTF-8 independently of the
-host locale.
+host locale. JSON and Markdown reports are UTF-8; consumers must decode them
+explicitly rather than relying on the Windows locale.
 
 Exit 0 means source-input enumeration completed; 3 means required source inputs
 were unavailable; 2 means a tool error. Error reports preserve multiline diagnostic
