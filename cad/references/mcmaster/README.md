@@ -1215,9 +1215,10 @@ Catalog specifications checked on September 10, 2026:
   The purchased note's name is captured independently from the original native
   annotation after saving. Native `ITextFormat.LineLength` wraps the unchanged
   property-linked text without inserted line breaks or font compression. Its
-  straight leader retains the exact trimmed head-top landing; actual complete
-  text and published native strokes must clear the measured neighbouring ink,
-  views and border, including a fresh exact-name cold readback.
+  straight leader retains the exact trimmed sheet-left head-top extremum,
+  derived from the actual view projection. The left text field must clear the
+  complete shoulder-length text, witnesses and arrows as well as neighbouring
+  ink, views and border, including a fresh exact-name cold readback.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

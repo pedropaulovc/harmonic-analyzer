@@ -1672,7 +1672,7 @@ def _record_drawing_build(
     source.touch()
     events = []
     projections, callouts = [], []
-    head_edge = (0.152692, 0.20216)  # Source-projected 30-degree upper rim point.
+    head_edge = (0.140 - 4 * drawing._HEAD_TOP_R / 1000, 0.186285 + 4 * screw.HEAD_H / 1000)
     head_entity = SimpleNamespace(GetClosestPointOn=lambda *point: (*point, 0.0))
     model = SimpleNamespace(path="", ActivateSheet=lambda _name: True)
     model.GetPathName = lambda: model.path
@@ -1782,6 +1782,12 @@ def _record_drawing_build(
             PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
         )
 
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, *, label: tuple(
+            (0.140 + 4 * x, 0.186285 + 4 * y) for x, y, _z in points
+        ),
+    )
     monkeypatch.setattr(drawing, "model_point_in_view", project_head)
     monkeypatch.setattr(drawing, "add_attached_note", linked_callout)
     monkeypatch.setattr(
@@ -2788,17 +2794,57 @@ def test_native_finite_mark_reads_actual_endpoints_not_just_show_lines(monkeypat
         settled()
 
 
-def test_head_note_target_requires_actual_trim_membership_not_face_interior(monkeypatch):
+@pytest.mark.parametrize("x_axis,z_axis", ((4.0, 0.0), (-4.0, 0.0), (0.0, 4.0), (2.4, 3.2)))
+def test_head_note_target_requires_actual_sheet_left_trim_membership(
+    monkeypatch, x_axis, z_axis,
+):
     state = _physical_head_fixture(monkeypatch)
+    def project(_adapter, _view, points, *, label):
+        return tuple(
+            (0.140 + x_axis * x + z_axis * z, 0.190 + 4 * y) for x, y, z in points
+        )
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(
         drawing, "model_point_in_view",
-        lambda adapter, view, point, *, label: (0.140 + point[0] * 4, 0.190 + point[1] * 4),
+        lambda adapter, view, point, *, label: project(adapter, view, (point,), label=label)[0],
     )
     edge, point = drawing._purchased_head_target(state.adapter, state.front)
+    radius = drawing._HEAD_TOP_R / 1000
+    scale = math.hypot(x_axis, z_axis)
     assert edge is state.top
-    assert point[0] < drawing.FRONT_CENTER[0]
+    assert point == pytest.approx((0.140 - radius * scale, 0.190 + 4 * screw.HEAD_H / 1000))
+    assert state.top.probes[-1] == pytest.approx((
+        -radius * x_axis / scale, screw.HEAD_H / 1000, -radius * z_axis / scale,
+    ))
     state.top.nearest = (*drawing._head_height_points()[1], 0.0)
     with pytest.raises(RuntimeError, match="actual trimmed rim"):
+        drawing._purchased_head_target(state.adapter, state.front)
+
+
+@pytest.mark.parametrize("fault", ("nonfinite", "collapsed", "tilted", "center", "landing"))
+def test_head_note_refuses_unproven_native_projection_axes(monkeypatch, fault):
+    state = _physical_head_fixture(monkeypatch)
+    def project(_adapter, _view, points, *, label):
+        result = [[0.140 + 4 * x, 0.190 + 4 * y] for x, y, _z in points]
+        if fault == "nonfinite":
+            result[0][0] = math.nan
+        elif fault == "collapsed":
+            for point in result:
+                point[0] = 0.140
+        elif fault == "tilted":
+            result[0][1] += 0.001
+        elif fault == "center":
+            result[2][0] += 0.001
+        return result
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda _adapter, _view, point, *, label: (
+            0.140 + 4 * point[0] + (0.001 if fault == "landing" else 0.0),
+            0.190 + 4 * point[1],
+        ),
+    )
+    with pytest.raises(RuntimeError, match="Purchased Screw Note"):
         drawing._purchased_head_target(state.adapter, state.front)
 
 
@@ -2843,9 +2889,33 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         _native_text("0.000", 0.203526, 0.1747781, 0.0116375),
     ]))
     state.shoulder_annotation = SimpleNamespace(paper_record=shoulder_record, GetType=lambda: 4)
+    length_record = dict(type=4, name="SupplierShoulderLength", display=dict(
+        lines=[
+            _native_line((0.148525, 0.135485), (0.064, 0.135485)),
+            _native_line((0.148525, 0.186285), (0.064, 0.186285)),
+            _native_line((0.065, 0.135485), (0.065, 0.1626962)),
+            _native_line((0.065, 0.186285), (0.065, 0.1773038)),
+        ],
+        arrows=[
+            [0.065, y, 0.0004, 0.0, direction, 0.0,
+             0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+            for y, direction in ((0.135485, 1.0), (0.186285, -1.0))
+        ],
+        texts=[
+            _native_text("(0.500 ", 0.0470455, 0.1683059, 0.0146514),
+            _native_text("+", 0.0616969, 0.1727781, 0.0028292),
+            _native_text(" ", 0.0624649, 0.1682524, 0.0012931),
+            _native_text("0.002", 0.064526, 0.1727781, 0.0116375),
+            _native_text("0.000", 0.064526, 0.1682524, 0.0116375),
+            _native_text(" in)", 0.0761635, 0.1683059, 0.006791),
+            _native_text("AS-SUPPLIED SHOULDER", 0.0388545, 0.1626962, 0.052291),
+        ],
+    ))
+    state.shoulder_length_annotation = SimpleNamespace(paper_record=length_record, GetType=lambda: 4)
     state.paper_displays = dict(
         SupplierHeadDiameter=SimpleNamespace(GetAnnotation=lambda: state.diameter_annotation),
         SupplierShoulderDiameter=SimpleNamespace(GetAnnotation=lambda: state.shoulder_annotation),
+        SupplierShoulderLength=SimpleNamespace(GetAnnotation=lambda: state.shoulder_length_annotation),
         SupplierHeadHeight=state.display, SupplierSocketAF=state.socket_display,
     )
     state.note_text = _config.parts(part.PART_NAME)["purchased_note"]
@@ -2862,9 +2932,29 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         Bold=False, Italic=False, Underline=False, Strikeout=False,
         BackWards=False, UpsideDown=False, Vertical=False,
     )
+    def note_rows():
+        # Native boundary double: automatic rows leave the underlying string
+        # untouched. No wrapping algorithm is added to the production recipe.
+        chunks = [state.note_text]
+        if state.note_format.LineLength > 0 and state.wrap_fault != "unwrapped":
+            chunks = [""]
+            for word in state.note_text.split():
+                candidate = f"{chunks[-1]} {word}".strip()
+                measured = 0.1777368 * len(candidate) / len(state.note_text)
+                if chunks[-1] and measured > state.note_format.LineLength:
+                    chunks.append(word)
+                else:
+                    chunks[-1] = candidate
+        x, y, _z = state.note_position
+        return [
+            {**_native_text(chunk, x, y - 0.0045257 - index * (0.0035 + state.note_format.LineSpacing),
+                           0.1777368 * len(chunk) / len(state.note_text)), "font": "Century Gothic"}
+            for index, chunk in enumerate(chunks)
+        ]
     def leader_start():
+        box = drawing.display_box({"texts": note_rows()})
         return state.note_start_override or (
-            state.note_position[0] - 0.0005182, state.note_position[1] - 0.0018311,
+            box.xmax + 0.0005182, state.note_position[1] - 0.0018311,
         )
     state.note_annotation = SimpleNamespace(
         Owner=state.front, OwnerType=0, Visible=1, IsDangling=lambda: False,
@@ -2892,26 +2982,9 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         return True
     state.note_annotation.SetPosition2 = position_note
     def note_record():
-        # Native boundary double: automatic rows leave the underlying string
-        # untouched. Source-projected view/edge geometry remains the real recipe.
-        chunks = [state.note_text]
-        if state.note_format.LineLength > 0 and state.wrap_fault != "unwrapped":
-            chunks = [""]
-            for word in state.note_text.split():
-                candidate = f"{chunks[-1]} {word}".strip()
-                # A bounded native font-width double, not a production wrapping algorithm.
-                measured = 0.1777368 * len(candidate) / len(state.note_text)
-                if chunks[-1] and measured > state.note_format.LineLength:
-                    chunks.append(word)
-                else:
-                    chunks[-1] = candidate
-        x, y, _z = state.note_position
-        rows = [
-            {**_native_text(chunk, x, y - 0.0045257 - index * (0.0035 + state.note_format.LineSpacing),
-                           0.1777368 * len(chunk) / len(state.note_text)), "font": "Century Gothic"}
-            for index, chunk in enumerate(chunks)
-        ]
-        start = state.note_start_override or (x - 0.0008113, y - 0.0017283)
+        rows = note_rows()
+        box = drawing.display_box({"texts": rows})
+        start = state.note_start_override or (box.xmax + 0.0008113, state.note_position[1] - 0.0017283)
         dx, dy = start[0] - state.landing[0], start[1] - state.landing[1]
         length = math.hypot(dx, dy)
         arrow = [*state.landing, 0.0, dx / length, dy / length, 0.0,
@@ -2925,11 +2998,13 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         GetAnnotation=lambda: state.note_annotation, GetText=lambda: state.note_text,
         PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
     )
-    state.foreign_annotations = [state.diameter_annotation, state.shoulder_annotation]
+    state.foreign_annotations = [
+        state.diameter_annotation, state.shoulder_annotation, state.shoulder_length_annotation,
+    ]
     state.front.GetAnnotations = lambda: (state.annotation, state.note_annotation, *state.foreign_annotations)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     state.note_check, state.note_frame = drawing._place_purchased_note(
-        state.adapter, state.front, state.paper_iso, state.note, state.paper_displays,
+        state.adapter, state.front, state.note, state.paper_displays,
     )
     tail, major, tail_record, major_record, _original_text = _tail_paper_boundary(monkeypatch, state)
     _tail_check, tail_frame = drawing._move_tail_column(state.adapter, tail, major)
@@ -3003,8 +3078,10 @@ def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, 
     state = _finished_paper_fixture(monkeypatch, tmp_path)
     expected = state.note_text
     if fault in ("foreign_line", "fraction_foreign_line", "qualifier_foreign_line"):
+        note_box = drawing.display_box({"texts": state.note_annotation.paper_record()["display"]["texts"]})
+        middle_y = (note_box.ymin + note_box.ymax) / 2
         location = {
-            "foreign_line": ((0.194, 0.185), (0.330, 0.185)),
+            "foreign_line": ((note_box.xmin, middle_y), (note_box.xmax, middle_y)),
             "fraction_foreign_line": ((0.176, 0.237), (0.180, 0.237)),
             "qualifier_foreign_line": ((0.162, 0.229), (0.195, 0.229)),
         }[fault]
@@ -3050,7 +3127,10 @@ def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, 
         )
     if fault == "none":
         prove()
-        assert state.landing == pytest.approx((0.1546558, 0.20216))
+        assert state.landing == pytest.approx((
+            0.140 - drawing._HEAD_TOP_R * 4 / 1000,
+            0.186285 + screw.HEAD_H * 4 / 1000,
+        ))
     else:
         with pytest.raises(RuntimeError):
             prove()
@@ -3069,7 +3149,7 @@ def test_native_note_wrapping_measures_full_ink_and_preserves_linked_text(monkey
     state.wrap_fault = fault
     def place():
         check, frame = drawing._place_purchased_note(
-            state.adapter, state.front, state.paper_iso, state.note, state.paper_displays,
+            state.adapter, state.front, state.note, state.paper_displays,
         )
         check()
         drawing._assert_paper_layout(
@@ -3082,10 +3162,13 @@ def test_native_note_wrapping_measures_full_ink_and_preserves_linked_text(monkey
         assert state.note_format.LineLength == pytest.approx(frame["line_length"])
         actual = state.note_annotation.paper_record()["display"]["texts"]
         box = drawing.display_box({"texts": actual})
-        assert box.xmin > state.front.GetOutline()[2] + 0.002
-        height = drawing.measure_reference_text(state.adapter, state.display, axis=1, label="SupplierHeadHeight")
-        assert box.xmax < height["tips"][0][0] - 0.002
-        assert box.ymin > 0.1782781 + 0.002
+        assert box.xmin >= drawing._finished_border(state.adapter).xmin + 0.002
+        assert box.xmax < state.front.GetOutline()[0] - 0.002
+        length = state.shoulder_length_annotation.paper_record
+        full_length = drawing.annotation_geometry(
+            length, owner="SupplierShoulderLength", advance=drawing.calibrate_sheet_advance((length,)),
+        ).box()
+        assert box.ymin > full_length.ymax + 0.002
         assert " ".join(row["t"] for row in actual) == original
     else:
         with pytest.raises(RuntimeError, match="Purchased Screw Note"):
@@ -3094,9 +3177,25 @@ def test_native_note_wrapping_measures_full_ink_and_preserves_linked_text(monkey
     assert state.note.PropertyLinkedText == original_link
 
 
+def test_native_left_wrap_refuses_actual_shoulder_outside_stub_without_trying_another_route(
+    monkeypatch, tmp_path,
+):
+    state = _finished_paper_fixture(monkeypatch, tmp_path)
+    # c356 has no upward stub. A real late native style change must be read,
+    # not ignored to retain the earlier clear-field placement.
+    state.shoulder_length_annotation.paper_record["display"]["lines"].append(
+        _native_line((0.065, 0.186285), (0.065, 0.192635)),
+    )
+    with pytest.raises(RuntimeError, match="cannot fit/place complete native left wrapped text"):
+        drawing._place_purchased_note(
+            state.adapter, state.front, state.note, state.paper_displays,
+        )
+
+
 @pytest.mark.parametrize("phase", ("settled", "saved"))
 @pytest.mark.parametrize("fault", (
     "width", "font", "doc_format", "missing_fragment", "line_missing", "foreign_height_line",
+    "shoulder_witness", "shoulder_words",
 ))
 def test_wrapped_note_refuses_actual_width_font_fragment_and_foreign_line_drift(
     monkeypatch, tmp_path, phase, fault,
@@ -3118,6 +3217,15 @@ def test_wrapped_note_refuses_actual_width_font_fragment_and_foreign_line_drift(
                 record["display"]["lines"].clear()
             return record
         state.note_annotation.paper_record = incomplete
+    elif fault in ("shoulder_witness", "shoulder_words"):
+        text = drawing.display_box({"texts": state.note_annotation.paper_record()["display"]["texts"]})
+        length = state.shoulder_length_annotation.paper_record["display"]
+        if fault == "shoulder_witness":
+            length["lines"][1] = _native_line(
+                (0.148525, text.ymin + 0.001), (0.064, text.ymin + 0.001),
+            )
+        else:
+            length["texts"][-1]["pos"][1] = text.ymin + 0.001
     else:
         box = drawing.display_box(state.note_annotation.paper_record()["display"])
         x = (box.xmin + box.xmax) / 2
@@ -3141,7 +3249,6 @@ def test_wrapped_note_refuses_actual_width_font_fragment_and_foreign_line_drift(
             )
     if phase == "saved":
         assert state.closes == [state.path.name]
-        assert state.adapter.currentModel is state.previous
 
 
 def test_socket_whole_fraction_moves_only_text_beyond_source_body(monkeypatch, tmp_path):

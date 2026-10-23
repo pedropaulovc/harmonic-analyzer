@@ -2753,6 +2753,7 @@ def test_stud_actual_headheight_shelf_and_complete_note_clearance_preserve_physi
     arrows = deepcopy(case.paper_data["arrows"])
     lines = deepcopy(case.paper_data["lines"])
     attached = tuple(case.annotation.attached)
+    original_note_attachment, = case.note_annotation.GetAttachedEntities3()
     before = bolt_drawing._assert_supplier_references(
         case.adapter, case.identities, case.configurations,
     )
@@ -2776,7 +2777,8 @@ def test_stud_actual_headheight_shelf_and_complete_note_clearance_preserve_physi
     assert note.ymax == pytest.approx(0.2438591)
     assert case.note_annotation.position[:2] == pytest.approx((0.130, 0.2448848))
     assert landing == case.note_landing
-    assert case.note_annotation.attached is case.top
+    actual_note_attachment, = case.note_annotation.GetAttachedEntities3()
+    assert actual_note_attachment is original_note_attachment
     assert tuple(case.annotation.attached) == attached
     assert case.paper_data["arrows"] == arrows
     assert case.paper_data["lines"] == lines

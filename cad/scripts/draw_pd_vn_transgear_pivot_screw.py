@@ -146,11 +146,10 @@ CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
 # The reference length's four lines stand wholly left of its dimension line
 # (73 mm wide), so neither its arrows nor its extension lines strike them.
 CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
-# The native straight leader departs down-right from the actual upper trimmed
-# rim, outside its chamfer. Native automatic wrapping fits the measured field.
+# The native straight leader departs down-left from the actual sheet-left
+# upper trimmed rim. Native automatic wrapping fits the measured left field.
 _HEAD_TOP_R = HEAD_DIA / 2 - HEAD_CHAMFER
-HEAD_PICK_MM = (_HEAD_TOP_R, HEAD_H, 0.0)
-PURCHASED_NOTE_XY = (0.238, 0.235)  # Creation only; measured placement follows.
+PURCHASED_NOTE_XY = (0.025, 0.198)  # Creation only; measured placement follows.
 # Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.360, 0.165)
@@ -1321,16 +1320,52 @@ def _assert_socket_source(adapter: Any, top: Any, display: Any) -> None:
         raise RuntimeError("SupplierSocketAF: saved complete native text crowds actual Top")
 
 
+def _head_sheet_left_point(
+    adapter: Any, front: Any,
+) -> tuple[tuple[float, float, float], tuple[float, float]]:
+    """Derive the circular rim's sheet-left extremum from the actual projection."""
+    radius, y = _HEAD_TOP_R / 1000, HEAD_H / 1000
+    samples = model_points_in_view(
+        adapter, front,
+        ((radius, y, 0.0), (-radius, y, 0.0), (0.0, y, radius), (0.0, y, -radius)),
+        label="physical head-top projected radial axes",
+    )
+    if (
+        len(samples) != 4 or any(len(point) != 2 for point in samples)
+        or not all(math.isfinite(value) for point in samples for value in point)
+    ):
+        raise RuntimeError("Purchased Screw Note: unreadable actual head-top radial projection")
+    x_axis = samples[0][0] - samples[1][0]
+    z_axis = samples[2][0] - samples[3][0]
+    span = math.hypot(x_axis, z_axis)
+    center_x = (samples[0][0] + samples[1][0]) / 2
+    if (
+        span <= 1e-8
+        or abs(center_x - (samples[2][0] + samples[3][0]) / 2) > 1e-8
+        or max(point[1] for point in samples) - min(point[1] for point in samples) > 1e-8
+    ):
+        raise RuntimeError("Purchased Screw Note: actual head-top projection is not edge-on")
+    point = (-radius * x_axis / span, y, -radius * z_axis / span)
+    landing = model_point_in_view(adapter, front, point, label="purchased physical head-top rim")
+    if (
+        len(landing) != 2 or not all(map(math.isfinite, landing))
+        or abs(landing[0] - (center_x - span / 2)) > 1e-8
+        or abs(landing[1] - samples[0][1]) > 1e-8
+    ):
+        raise RuntimeError("Purchased Screw Note: actual sheet-left extremum projection changed")
+    return point, landing
+
+
 def _purchased_head_target(adapter: Any, front: Any) -> tuple[Any, tuple[float, float]]:
-    """Resolve and prove the new landing on the exact existing head-top trimmed edge."""
+    """Prove the actual sheet-left landing on the exact existing head-top EDGE."""
     edge = _head_height_entities(adapter, front)[1]
-    point = tuple(value / 1000 for value in HEAD_PICK_MM)
+    point, landing = _head_sheet_left_point(adapter, front)
     nearest = tuple(float(value) for value in (
         _early_bound(edge, "IEdge").GetClosestPointOn(point[0], point[1], point[2]) or ()
     )[:3])
     if len(nearest) != 3 or not all(map(math.isfinite, nearest)) or math.dist(nearest, point) > 1e-8:
         raise RuntimeError("Purchased Screw Note: head-top landing is not on the actual trimmed rim")
-    return edge, model_point_in_view(adapter, front, point, label="purchased physical head-top rim")
+    return edge, landing
 
 
 def _assert_text_shelf(adapter: Any, display: Any, *, axis: int, label: str) -> dict[str, Any]:
@@ -1577,77 +1612,55 @@ def _note_font(annotation: Any) -> tuple[Any, tuple]:
 
 
 def _place_purchased_note(
-    adapter: Any, front: Any, iso: Any, note: Any, displays: dict[str, Any],
+    adapter: Any, front: Any, note: Any, displays: dict[str, Any],
 ) -> Any:
-    """Native word wrapping and one straight leader, sized from actual clear paper."""
+    """One left-field native wrap/straight route, never a runtime layout search."""
     _edge, landing = _purchased_head_target(adapter, front)
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    before = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
-    text = display_box({"texts": before["display"]["texts"]})
     shoulder = _paper_annotation(
-        adapter, displays["SupplierShoulderDiameter"].GetAnnotation(), label="SupplierShoulderDiameter",
+        adapter, displays["SupplierShoulderLength"].GetAnnotation(), label="SupplierShoulderLength",
     )
-    shoulder_text = display_box({"texts": shoulder["display"]["texts"]})
+    shoulder_geometry = annotation_geometry(
+        shoulder, owner="SupplierShoulderLength", advance=calibrate_sheet_advance((shoulder,)),
+    )
+    shoulder_ink = shoulder_geometry.box() if shoulder_geometry is not None else None
     front_box = Box(*(float(value) for value in _early_bound(front, "IView").GetOutline()))
-    iso_box = Box(*(float(value) for value in _early_bound(iso, "IView").GetOutline()))
-    corner = model_point_in_view(
-        adapter, front, (HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
-        label="actual head right chamfer station",
-    )
-    leaders = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+    border = _finished_border(adapter)
+    gap = _PAPER_GAP_M + 0.0002
+    left, right = border.xmin + gap, front_box.xmin - gap
+    width = right - left
     if (
-        text is None or shoulder_text is None or len(leaders) != 6
-        or not all(map(math.isfinite, (*leaders, *landing, *corner,
-                                      front_box.xmax, iso_box.xmin, shoulder_text.ymax)))
-        or corner[0] <= landing[0] or corner[1] >= landing[1]
+        shoulder_ink is None
+        or not all(map(math.isfinite, (*landing, left, right, width, shoulder_ink.ymax)))
+        or width <= 0
     ):
-        raise RuntimeError("Purchased Screw Note: unreadable actual straight-note corridor")
-    low = shoulder_text.ymax + _PAPER_GAP_M + 0.0002
-    slope = (landing[1] - corner[1]) / (corner[0] - landing[0])
-    height = _assert_text_shelf(
-        adapter, displays["SupplierHeadHeight"], axis=1, label="SupplierHeadHeight",
-    )
-    # Reserve the physical height column, including a middle run that can
-    # become visible when its text is shelved. Never wrap through that line.
-    left_limit = front_box.xmax + _PAPER_GAP_M + 0.0002
-    right = min(
-        height["tips"][0][0], iso_box.xmin, _finished_border(adapter).xmax,
-    ) - _PAPER_GAP_M - 0.0002
-    width = right - left_limit
-    if low >= landing[1] or not math.isfinite(width) or width <= 0:
-        raise RuntimeError("Purchased Screw Note: no measured native wrapping corridor")
+        raise RuntimeError("Purchased Screw Note: no measured native left wrapping field")
+    # Include ALL actual source-band ink: the upper witness, arrow and any
+    # actual outside stub, not a presumed dimension-line/text-only envelope.
+    low = shoulder_ink.ymax + gap
+    if low >= landing[1]:
+        raise RuntimeError("Purchased Screw Note: actual shoulder ink blocks the left field")
     native, font = _note_font(annotation)
-    frame = dict(line_length=width, font=font)
+    frame = dict(line_length=width, font=font, left=left, low=low)
     native.LineLength = width
     if not annotation.SetTextFormat(0, False, native):
         raise RuntimeError("Purchased Screw Note: native word wrapping was refused")
     rebuild_drawing(adapter, label="native purchased-note automatic wrapping")
     wrapped = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
     ink = display_box({"texts": wrapped["display"]["texts"]})
-    leaders = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
     position = tuple(float(value) for value in annotation.GetPosition())
     if (
-        ink is None or len(position) != 3 or len(leaders) != 6
-        or not all(map(math.isfinite, (*position, *leaders)))
-    ):
-        raise RuntimeError("Purchased Screw Note: unreadable native wrapped text/leader")
-    dy = low - ink.ymin
-    start_y = leaders[1] + dy
-    start_x = landing[0] + (landing[1] - start_y) / (0.55 * slope)
-    left = max(left_limit, start_x + ink.xmin - leaders[0])
-    frame.update(left=left, low=low)
-    if (
-        start_y >= landing[1] or left + ink.width > right + 1e-5
+        ink is None or len(position) != 3 or not all(map(math.isfinite, position))
+        or ink.width > width + 1e-5 or ink.ymax + low - ink.ymin >= landing[1]
         or not annotation.SetPosition2(
-            position[0] + left - ink.xmin, position[1] + dy, position[2],
+            position[0] + left - ink.xmin, position[1] + low - ink.ymin, position[2],
         )
     ):
         raise RuntimeError(
-            "Purchased Screw Note: cannot fit/place complete native wrapped text; "
-            f"ink={ink!r}, field={(left_limit, right, low)!r}, "
-            f"target_left={left!r}, leader={leaders!r}, landing={landing!r}"
+            "Purchased Screw Note: cannot fit/place complete native left wrapped text; "
+            f"ink={ink!r}, field={(left, right, low)!r}, landing={landing!r}"
         )
-    rebuild_drawing(adapter, label="measured straight purchased-note placement")
+    rebuild_drawing(adapter, label="measured left straight purchased-note placement")
 
     def settled() -> None:
         _assert_note_wrap(adapter, note, landing=landing, frame=frame)
@@ -1706,6 +1719,12 @@ def _assert_note_wrap(adapter: Any, note: Any, *, landing: tuple, frame: dict) -
         )
     record = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
     _assert_note_arrow(annotation, landing, record)
+    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+    if (
+        len(points) != 6 or not all(map(math.isfinite, points))
+        or points[0] >= landing[0] or points[1] >= landing[1]
+    ):
+        raise RuntimeError("Purchased Screw Note: actual straight leader left its down-left field")
     rows = record["display"]["texts"]
     text = display_box({"texts": rows})
     ordered = sorted(rows, key=lambda row: (-float(row["pos"][1]), float(row["pos"][0])))
@@ -1821,12 +1840,14 @@ def _assert_paper_layout(
             for first in note_ink.segments for second in geometry.segments
         ) or text is not None and any(segment_box_distance(run, text) < _PAPER_GAP_M for run in note_ink.segments):
             raise RuntimeError("Purchased Screw Note: complete leader crosses foreign native ink")
+    left_point, _left_projection = _head_sheet_left_point(adapter, front)
+    radial_x, radial_z = left_point[0] * 1000 / _HEAD_TOP_R, left_point[2] * 1000 / _HEAD_TOP_R
     head = model_points_in_view(
         adapter, front,
-        ((x / 1000, y / 1000, 0.0) for x, y in (
-            (-HEAD_DIA / 2, 0), (HEAD_DIA / 2, 0),
-            (HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER), (_HEAD_TOP_R, HEAD_H),
-            (-_HEAD_TOP_R, HEAD_H), (-HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER),
+        ((radial_x * radius / 1000, y / 1000, radial_z * radius / 1000) for radius, y in (
+            (HEAD_DIA / 2, 0), (-HEAD_DIA / 2, 0),
+            (-HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER), (-_HEAD_TOP_R, HEAD_H),
+            (_HEAD_TOP_R, HEAD_H), (HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER),
         )), label="actual source head silhouette stations",
     )
     outline = [Segment(*first, *second) for first, second in zip(head, (*head[1:], head[0]), strict=True)]
@@ -1964,7 +1985,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _clear_socket_text(adapter, top, shelf_displays()["SupplierSocketAF"])
     note_check, note_frame = _place_purchased_note(
-        adapter, front, iso, note, _assert_supplier_references(adapter, identities, configurations),
+        adapter, front, note, _assert_supplier_references(adapter, identities, configurations),
     )
 
     def settled_paper() -> None:
