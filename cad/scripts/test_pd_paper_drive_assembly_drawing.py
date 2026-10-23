@@ -3526,6 +3526,7 @@ def _rebind_to_bogus_property(_adapter, table, column, *, label):
     # Native run 20261023T192129678Z: rebinding to a nonexistent property kept
     # the write-back ($PRP:"HARMONIC BOM DESCRIPTION TEXT").
     assert table.SetColumnCustomProperty(column, "HARMONIC BOM DESCRIPTION TEXT")
+    assert table.SetColumnTitle2(column, "DESCRIPTION", True)
 
 
 @pytest.mark.parametrize(

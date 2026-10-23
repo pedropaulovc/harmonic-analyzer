@@ -718,7 +718,11 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
                 or (not hidden and width == 0.0)
             ):
                 raise RuntimeError(
-                    f"{label} BOM invalid column visibility/width at physical index {index}"
+                    f"{label} BOM invalid column visibility/width at physical index "
+                    f"{index}: hidden={hidden!r} width={width!r} "
+                    f"visibility_index={visibility(index)} ColumnCount={visible} "
+                    f"TotalColumnCount={declared} kinds="
+                    f"{[physical_type[0] for physical_type in typed_prefix]}"
                 )
             physical.append((kind, hidden))
             metadata.append(
@@ -1234,6 +1238,17 @@ def insert_bom_table(
         expected_rows=1 + len(expected_components),
         grouping_requested=grouping_values[configuration_grouping],
     )
+    if descriptions and explicit_configuration:
+        # Structural edits only while every real column is still visible.
+        headers = [
+            str(table.DisplayedText2(0, index, True) or "").strip().upper()
+            for index in range(int(table.ColumnCount))
+        ]
+        if headers.count("DESCRIPTION") != 1:
+            raise RuntimeError(f"{label} BOM header has no unique DESCRIPTION: {headers!r}")
+        _replace_linked_bom_description_column(
+            adapter, table, headers.index("DESCRIPTION"), label=label
+        )
     if part_number_property is not None:
         _bind_bom_number_property(
             adapter,
@@ -1333,10 +1348,6 @@ def insert_bom_table(
         description_column = header.index("DESCRIPTION")
         part_column = header.index("PART NUMBER")
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
-        if explicit_configuration:
-            _replace_linked_bom_description_column(
-                adapter, table, description_column, label=label
-            )
         described = 0
         for row in range(1, rows):
             part = (
