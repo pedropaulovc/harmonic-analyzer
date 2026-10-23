@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-import json
 import math
 import sys
 from typing import Any
@@ -616,9 +615,10 @@ def _supplier_stock_bounds(adapter, stock, source_model, capture: SupplierStockC
     raw_source = stock.ReferencedDocument
     if raw_source is None:
         raise RuntimeError("supplier nominal stock view expected referenced source part; actual=None")
-    same = int(adapter.swApp.IsSame(raw_source, source_model))
-    if same != 1:
-        raise RuntimeError(f"supplier nominal stock view source identity expected IsSame=1; actual={same}")
+    _supplier_profile_native_identity(
+        _early_bound(adapter.swApp, "ISldWorks"), raw_source, source_model, 1,
+        f"supplier nominal stock view source identity [{capture.configuration}; {capture.source_path}]",
+    )
     source = _early_bound(raw_source, "IModelDoc2")
     for field, actual, expected in (
         ("source document type", int(source.GetType()), 1),
@@ -734,15 +734,65 @@ def _supplier_profile_appearance(segment, label):
     return appearance
 
 
+def _supplier_profile_native_identity(app, first, second, expected, label):
+    """Require the installed native SAME1/NOT SAME0 codes, never coercion."""
+    if first is None or second is None:
+        raise RuntimeError(f"{label}: IsSame expected native={expected}; actual=None (NoneType)")
+    actual = app.IsSame(first, second)
+    if type(actual) is not int or actual != expected:
+        raise RuntimeError(
+            f"{label}: IsSame expected native={expected}; actual={actual!r} ({type(actual).__name__})"
+        )
+
+
+def _supplier_profile_source_identity(app, extension, segment, source, sketch, label):
+    """Reverse a drawing segment AND its owner through the source PART."""
+    _supplier_profile_native_identity(app, segment, segment, 1, f"{label} drawing self")
+    _supplier_profile_native_identity(app, segment, source, 0, f"{label} drawing/source distinct")
+    owner = segment.GetSketch()
+    if owner is None:
+        raise RuntimeError(f"{label}: drawing GetSketch expected ISketch; actual=None (NoneType)")
+    owner = _early_bound(owner, "ISketch")
+    for name, drawing_object, expected, interface in (
+        ("segment", segment, source, "ISketchSegment"),
+        ("owner sketch", owner, sketch, "ISketch"),
+    ):
+        try:
+            normalized = extension.GetCorresponding2(drawing_object)
+        except BaseException as error:
+            error.add_note(f"{label}: source PART Extension.GetCorresponding2({name}) failed")
+            raise
+        if normalized is None:
+            raise RuntimeError(
+                f"{label}: source PART Extension.GetCorresponding2({name}) "
+                "expected source object; actual=None (NoneType)"
+            )
+        normalized = _early_bound(normalized, interface)
+        _supplier_profile_native_identity(
+            app, normalized, expected, 1,
+            f"{label} source PART GetCorresponding2({name})",
+        )
+
+
 def _supplier_stock_profile_instances(adapter, stock, source_model, capture):
     """Resolve all nine exact source curves into this one proved stock view."""
     _supplier_stock_bounds(adapter, stock, source_model, capture)
-    feature = _early_bound(
-        _early_bound(source_model, "IPartDoc").FeatureByName(SUPPLIER_STOCK_FEATURE), "IFeature",
-    )
-    if feature is None or feature.Name != SUPPLIER_STOCK_FEATURE or feature.GetTypeName2() != "ProfileFeature":
+    raw_feature = _early_bound(source_model, "IPartDoc").FeatureByName(SUPPLIER_STOCK_FEATURE)
+    if raw_feature is None:
+        raise RuntimeError("supplier nominal stock profile owner expected feature; actual=None")
+    feature = _early_bound(raw_feature, "IFeature")
+    if feature.Name != SUPPLIER_STOCK_FEATURE or feature.GetTypeName2() != "ProfileFeature":
         raise RuntimeError("supplier nominal stock profile owner changed")
-    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    raw_sketch = feature.GetSpecificFeature2()
+    if raw_sketch is None:
+        raise RuntimeError("supplier nominal stock GetSpecificFeature2 expected source sketch; actual=None")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    _supplier_profile_native_identity(app, sketch, sketch, 1, "supplier stock authoritative sketch self")
+    raw_extension = _early_bound(source_model, "IModelDoc2").Extension
+    if raw_extension is None:
+        raise RuntimeError("supplier nominal stock source PART Extension expected; actual=None")
+    extension = _early_bound(raw_extension, "IModelDocExtension")
     # Re-read actual source geometry, without activating or saving that part.
     _assert_supplier_stock_geometry(
         capture_native_sketch_geometry(sketch, label="supplier nominal stock black profile")
@@ -751,240 +801,37 @@ def _supplier_stock_profile_instances(adapter, stock, source_model, capture):
     if len(sources) != 9:
         raise RuntimeError(f"supplier nominal stock source inventory expected=9 segments; actual={len(sources)}")
     instances = []
-    app = _early_bound(adapter.swApp, "ISldWorks")
     for index, raw in enumerate(sources):
-        label = f"supplier nominal stock profile segment {index}"
+        label = (
+            f"supplier nominal stock profile segment {index} "
+            f"[{capture.configuration}; {capture.source_path}]"
+        )
+        if raw is None:
+            raise RuntimeError(f"{label}: source inventory expected ISketchSegment; actual=None")
         source = _early_bound(raw, "ISketchSegment")
+        _supplier_profile_native_identity(app, source, source, 1, f"{label} source self")
+        owner = source.GetSketch()
+        _supplier_profile_native_identity(app, owner, owner, 1, f"{label} source owner self")
+        _supplier_profile_native_identity(app, owner, sketch, 1, f"{label} authoritative source owner")
         curve = _supplier_profile_curve(source, label)
         mapped = stock.GetCorresponding(source)
         if mapped is None:
             raise RuntimeError(f"{label}: missing drawing correspondence")
         mapped = _early_bound(mapped, "ISketchSegment")
-        if _supplier_native_same(app, source, mapped, label) != 0:
-            raise RuntimeError(f"{label}: correspondence is the source, not a drawing instance")
+        _supplier_profile_source_identity(app, extension, mapped, source, sketch, f"{label} mapped")
         for previous_source, previous_mapped, _curve, _appearance in instances:
-            if (
-                _supplier_native_same(app, source, previous_source, label) != 0
-                or _supplier_native_same(app, mapped, previous_mapped, label) != 0
-            ):
-                raise RuntimeError(f"{label}: duplicate native source or drawing instance")
+            _supplier_profile_native_identity(
+                app, source, previous_source, 0, f"{label} duplicate native source inventory",
+            )
+            _supplier_profile_native_identity(
+                app, mapped, previous_mapped, 0, f"{label} duplicate native drawing inventory",
+            )
         if _supplier_profile_curve(mapped, label) != curve:
             raise RuntimeError(f"{label}: drawing correspondence changed native curve geometry")
         instances.append((source, mapped, curve, _supplier_profile_appearance(mapped, label)))
     if sorted(curve[0] for _source, _mapped, curve, _appearance in instances) != [0] * 6 + [1] * 3:
         raise RuntimeError("supplier nominal stock requires exactly three circles and six lines")
-    return tuple(instances)
-
-
-def _report_supplier_selection_identity(
-    adapter, draw, drawing, stock, source_model, capture, instances,
-    index, selected, selection, data, select_result, count, kind, error,
-):
-    """Temporary, read-only failure receipt; remove after actual native root proof.
-
-    Only the nine already acquired pairs are inspected. Raw IsSame results,
-    ordered GetID pairs, names and geometry are observations, NEVER acceptance
-    or alternate selection routes. GetID is sketch/kind-local, not persistent
-    and not assumed to survive source-to-drawing correspondence.
-    """
-    selected_none = selected is None  # Capture before binding or calling selected.
-    context, rows = {}, []
-
-    def render(value, depth=0):
-        if type(value) in (tuple, list) and depth < 4:
-            items = [render(item, depth + 1) for item in value[:16]]
-            return items + (["<truncated after 16 values>"] if len(value) > 16 else [])
-        if type(value) is float and not math.isfinite(value):
-            return repr(value)
-        if value is None or type(value) in (bool, int, float, str):
-            return value
-        return repr(value)[:512]
-
-    def probe(fields, name, getter, *required):
-        try:
-            if any(value is None for value in required):
-                fields[name] = {
-                    "value": None, "python_type": "builtins.NoneType",
-                    "error": "not queried: null or unavailable prerequisite",
-                }
-                return None
-            value = getter()
-            value_type = f"{type(value).__module__}.{type(value).__qualname__}"
-            fields[name] = {"value": render(value), "python_type": value_type, "error": None}
-            return value
-        except BaseException as failure:
-            try:
-                message = str(failure)
-            except BaseException:
-                message = "<exception text unavailable>"
-            fields[name] = {
-                "value": None, "python_type": "builtins.NoneType",
-                "error": f"{type(failure).__name__}: {message}",
-            }
-            return None
-
-    def bind(fields, name, raw, interface):
-        return probe(fields, name, lambda: _early_bound(raw, interface), raw)
-
-    probe(context, "selectedNone", lambda: selected_none)
-    probe(context, "original_error", lambda: str(error))
-    probe(context, "original_error_type", lambda: type(error).__name__)
-    for name, value in (
-        ("expected_index", index), ("Select4", select_result),
-        ("selection_count", count), ("selection_type", kind),
-        ("capture.source_path", capture.source_path),
-        ("capture.configuration", capture.configuration),
-        ("capture.configuration_id", capture.configuration_id),
-        ("spec.source_path", SOURCE.resolve().as_posix()),
-        ("spec.configuration", SUPPLIER_STOCK_CONFIGURATION),
-    ):
-        probe(context, name, lambda value=value: value)
-    app = bind(context, "app", adapter.swApp, "ISldWorks")
-
-    def same(fields, name, first, second):
-        # Deliberately NOT _supplier_native_same: preserve raw 0/1/2/3/types.
-        return probe(fields, name, lambda: app.IsSame(first, second), app, first, second)
-
-    def both(fields, name, first, second):
-        same(fields, f"{name}.forward", first, second)
-        same(fields, f"{name}.reverse", second, first)
-
-    source = bind(context, "source", source_model, "IModelDoc2")
-    probe(context, "drawing.GetPathName", lambda: draw.GetPathName(), draw)
-    probe(context, "source.GetPathName", lambda: source.GetPathName(), source)
-    part = bind(context, "source.part", source_model, "IPartDoc")
-    feature_raw = probe(
-        context, "source.profile_feature",
-        lambda: part.FeatureByName(SUPPLIER_STOCK_FEATURE), part,
-    )
-    feature = bind(context, "source.profile_feature.typed", feature_raw, "IFeature")
-    sketch_raw = probe(
-        context, "source.authoritative_sketch.raw",
-        lambda: feature.GetSpecificFeature2(), feature,
-    )
-    authoritative = bind(context, "source.authoritative_sketch", sketch_raw, "ISketch")
-    same(context, "source.authoritative_sketch.self", authoritative, authoritative)
-    extension_raw = probe(context, "drawing.Extension", lambda: draw.Extension, draw)
-    extension = bind(context, "drawing.Extension.typed", extension_raw, "IModelDocExtension")
-    manager_raw = probe(context, "source.ConfigurationManager", lambda: source.ConfigurationManager, source)
-    manager = bind(context, "source.ConfigurationManager.typed", manager_raw, "IConfigurationManager")
-    active_raw = probe(context, "source.active_configuration.raw", lambda: manager.ActiveConfiguration, manager)
-    expected_raw = probe(
-        context, "source.expected_configuration.raw",
-        lambda: source.GetConfigurationByName(capture.configuration), source,
-    )
-    for name, raw in (("active", active_raw), ("expected", expected_raw)):
-        configuration = bind(context, f"source.{name}_configuration", raw, "IConfiguration")
-        probe(context, f"source.{name}_configuration.Name", lambda: configuration.Name, configuration)
-        probe(context, f"source.{name}_configuration.GetID", lambda: configuration.GetID(), configuration)
-    both(context, "source.active_to_expected_configuration", active_raw, expected_raw)
-
-    def view_control(name, raw):
-        view = bind(context, name, raw, "IView")
-        same(context, f"{name}.self", view, view)
-        both(context, f"{name}.to_expected", view, stock)
-        probe(context, f"{name}.GetName2", lambda: view.GetName2(), view)
-        probe(context, f"{name}.GetReferencedModelName", lambda: view.GetReferencedModelName(), view)
-        probe(context, f"{name}.ReferencedConfiguration", lambda: view.ReferencedConfiguration, view)
-        referenced = probe(context, f"{name}.ReferencedDocument", lambda: view.ReferencedDocument, view)
-        same(context, f"{name}.ReferencedDocument.self", referenced, referenced)
-        both(context, f"{name}.ReferencedDocument.to_source", referenced, source_model)
-        referenced_model = bind(context, f"{name}.ReferencedDocument.typed", referenced, "IModelDoc2")
-        probe(
-            context, f"{name}.ReferencedDocument.GetPathName",
-            lambda: referenced_model.GetPathName(), referenced_model,
-        )
-
-    active_view = probe(context, "active_view.raw", lambda: drawing.ActiveDrawingView, drawing)
-    data_view = probe(context, "data_view.raw", lambda: data.View, data)
-    # A missing selected entity must not cause ANY selected-specific API call.
-    selected_view = probe(
-        context, "selected_view.raw",
-        lambda: selection.GetSelectedObjectsDrawingView2(1, -1), selection, selected,
-    )
-    for name, raw in (
-        ("stock_view", stock), ("active_view", active_view),
-        ("data_view", data_view), ("selected_view", selected_view),
-    ):
-        view_control(name, raw)
-
-    def owner_control(fields, name, segment, drawing_context):
-        owner = probe(fields, f"{name}.GetSketch", lambda: segment.GetSketch(), segment)
-        same(fields, f"{name}.owner.self", owner, owner)
-        both(fields, f"{name}.owner.to_authoritative", owner, authoritative)
-        if drawing_context:
-            reverse = probe(
-                fields, f"{name}.owner.GetCorresponding2",
-                lambda: extension.GetCorresponding2(owner), extension, owner,
-            )
-            same(fields, f"{name}.owner.reverse.self", reverse, reverse)
-            both(fields, f"{name}.owner.reverse.to_authoritative", reverse, authoritative)
-
-    def segment_control(fields, name, segment, drawing_context):
-        probe(fields, f"{name}.GetType", lambda: segment.GetType(), segment)
-        pair = probe(fields, f"{name}.GetID", lambda: segment.GetID(), segment)
-        for offset in (0, 1):
-            probe(fields, f"{name}.GetID[{offset}]", lambda offset=offset: pair[offset], pair)
-        same(fields, f"{name}.self", segment, segment)
-        owner_control(fields, name, segment, drawing_context)
-
-    typed_selected = bind(context, "selected.typed", selected, "ISketchSegment")
-    segment_control(context, "selected.raw", selected, True)
-    segment_control(context, "selected.typed", typed_selected, True)
-    both(context, "selected.raw_to_typed", selected, typed_selected)
-    for row_index, (source_segment, mapped, _curve, _appearance) in enumerate(instances):
-        row = {}
-        probe(row, "index", lambda: row_index)
-        probe(row, "expected", lambda: row_index == index)
-        segment_control(row, "source", source_segment, False)
-        segment_control(row, "mapped", mapped, True)
-        both(row, "source_to_mapped", source_segment, mapped)
-        both(row, "selected.raw_to_source", selected, source_segment)
-        both(row, "selected.raw_to_mapped", selected, mapped)
-        both(row, "selected.typed_to_source", typed_selected, source_segment)
-        both(row, "selected.typed_to_mapped", typed_selected, mapped)
-        rows.append(row)
-
-    def finite(fields, name, getter, *required):
-        value = probe(fields, name, getter, *required)
-        probe(fields, f"{name}.finite", lambda: math.isfinite(value), value)
-
-    def geometry(name, segment, expected_kind):
-        probe(context, f"{name}.ConstructionGeometry", lambda: segment.ConstructionGeometry, segment)
-        finite(context, f"{name}.GetLength", lambda: segment.GetLength(), segment)
-        interface = "ISketchLine" if expected_kind == 0 else "ISketchArc"
-        native = bind(context, f"{name}.{interface}", segment, interface)
-        if expected_kind == 0:
-            points = (("start", "GetStartPoint2"), ("end", "GetEndPoint2"))
-        else:
-            probe(context, f"{name}.IsCircle", lambda: native.IsCircle(), native)
-            finite(context, f"{name}.GetRadius", lambda: native.GetRadius(), native)
-            points = (("center", "GetCenterPoint2"),)
-        for point_name, getter in points:
-            point_raw = probe(context, f"{name}.{getter}", lambda: getattr(native, getter)(), native)
-            point = bind(context, f"{name}.{point_name}", point_raw, "ISketchPoint")
-            for coordinate in ("X", "Y", "Z"):
-                finite(
-                    context, f"{name}.{point_name}.{coordinate}",
-                    lambda coordinate=coordinate: getattr(point, coordinate), point,
-                )
-
-    source_segment, mapped, curve, _appearance = instances[index]
-    probe(context, "candidate.acquired_curve", lambda: curve)
-    for name, segment in (
-        ("candidate.source", source_segment), ("candidate.mapped", mapped),
-        ("candidate.selected.raw", selected), ("candidate.selected.typed", typed_selected),
-    ):
-        geometry(name, segment, curve[0])
-    # Separate bounded lines keep all nine rows readable in the actual task log.
-    for section, fields in (("context", context), *(("row", row) for row in rows)):
-        try:
-            _telemetry.warn(
-                "supplier stock selection identity REPORTING ONLY / NO MUTATING PROBES: "
-                + json.dumps({"section": section, "fields": fields})
-            )
-        except BaseException:
-            pass  # Emission must never replace the original identity refusal.
+    return sketch, extension, tuple(instances)
 
 
 def _blacken_supplier_stock_profile(adapter, stock, source_model, capture):
@@ -992,44 +839,70 @@ def _blacken_supplier_stock_profile(adapter, stock, source_model, capture):
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     drawing = _early_bound(draw, "IDrawingDoc")
     stock = _early_bound(stock, "IView")
-    instances = _supplier_stock_profile_instances(adapter, stock, source_model, capture)
+    sketch, extension, instances = _supplier_stock_profile_instances(adapter, stock, source_model, capture)
     app = _early_bound(adapter.swApp, "ISldWorks")
     if drawing.ActivateView(view_name(adapter, stock)) is not True:
         raise RuntimeError("cannot activate supplier stock view for its black profile")
-    if _supplier_native_same(app, drawing.ActiveDrawingView, stock, "supplier stock active view") != 1:
-        raise RuntimeError("supplier black profile activated a foreign drawing view")
+    _supplier_profile_native_identity(
+        app, drawing.ActiveDrawingView, stock, 1, "supplier stock active view",
+    )
     primary = None
     try:
         selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
-        for index, (_source, mapped, curve, appearance) in enumerate(instances):
-            label = "supplier nominal stock black profile"
+        for index, (source, mapped, curve, appearance) in enumerate(instances):
+            label = (
+                f"supplier nominal stock black profile segment {index} "
+                f"[{capture.configuration}; {capture.source_path}]"
+            )
             draw.ClearSelection2(True)
-            data = _early_bound(selection.CreateSelectData(), "ISelectData")
+            raw_data = selection.CreateSelectData()
+            if raw_data is None:
+                raise RuntimeError(f"{label}: CreateSelectData expected ISelectData; actual=None")
+            data = _early_bound(raw_data, "ISelectData")
             data.View = stock
-            if _supplier_native_same(app, data.View, stock, label) != 1:
-                raise RuntimeError(f"{label}: selection data lost its exact drawing view")
+            _supplier_profile_native_identity(app, data.View, stock, 1, f"{label} selection data view")
             # ISketchSegment.Select4 applies to circles too; no point/type fallback.
             select_result = mapped.Select4(False, data)
             if select_result is not True:
                 raise RuntimeError(f"{label}: native Select4 refused the mapped curve")
             count = selection.GetSelectedObjectCount2(-1)
+            if type(count) is not int or count != 1:
+                raise RuntimeError(
+                    f"{label}: expected one native EXTSKETCHSEGMENT; "
+                    f"count={count!r} ({type(count).__name__})"
+                )
             kind = selection.GetSelectedObjectType3(1, -1)
-            if type(count) is not int or count != 1 or type(kind) is not int or kind != _SW_SEL_EXT_SKETCH_SEGS:
-                raise RuntimeError(f"{label}: expected one native EXTSKETCHSEGMENT; count={count!r}, type={kind!r}")
+            if type(kind) is not int or kind != _SW_SEL_EXT_SKETCH_SEGS:
+                raise RuntimeError(
+                    f"{label}: expected one native EXTSKETCHSEGMENT type=24; "
+                    f"type={kind!r} ({type(kind).__name__})"
+                )
             selected = selection.GetSelectedObject6(1, -1)
-            try:
-                if selected is None or _supplier_native_same(app, selected, mapped, label) != 1:
-                    raise RuntimeError(f"{label}: selection is not the exact mapped native curve")
-            except BaseException as identity_error:
-                try:
-                    _report_supplier_selection_identity(
-                        adapter, draw, drawing, stock, source_model, capture, instances,
-                        index, selected, selection, data, select_result, count, kind, identity_error,
-                    )
-                except BaseException:
-                    pass  # A broken reporter must not mask this exact refusal.
-                raise
+            if selected is None:
+                raise RuntimeError(f"{label}: selected GetSelectedObject6 expected segment; actual=None")
+            selected_view = selection.GetSelectedObjectsDrawingView2(1, -1)
+            _supplier_profile_native_identity(
+                app, selected_view, stock, 1,
+                f"{label} selected-object drawing view",
+            )
+            selected_view = _early_bound(selected_view, "IView")
+            selected_source, _path = _supplier_reference_source(selected_view, capture.configuration, label)
+            _supplier_profile_native_identity(
+                app, selected_source, source_model, 1, f"{label} selected-view source",
+            )
+            selected_path = str(selected_view.GetReferencedModelName()).replace("\\", "/")
+            if selected_path.casefold() != capture.source_path.casefold():
+                raise RuntimeError(
+                    f"{label}: selected-view model path expected={capture.source_path!r}; actual={selected_path!r}"
+                )
+            _supplier_profile_native_identity(
+                app, drawing.ActiveDrawingView, stock, 1, f"{label} active view",
+            )
+            _supplier_profile_native_identity(app, data.View, stock, 1, f"{label} selection data view")
             selected = _early_bound(selected, "ISketchSegment")
+            # Drawing handles need not be SAME across acquisition and selection.
+            # Both must instead normalize to this exact source segment and owner.
+            _supplier_profile_source_identity(app, extension, selected, source, sketch, f"{label} selected")
             if _supplier_profile_curve(selected, label) != curve or _supplier_profile_appearance(selected, label) != appearance:
                 raise RuntimeError(f"{label}: selected native geometry or appearance changed")
             drawing.SetLineColor(_STOCK_PROFILE_BLACK)  # VOID: success is readback, not truthiness.
@@ -1052,14 +925,27 @@ def _blacken_supplier_stock_profile(adapter, stock, source_model, capture):
     if rebuilt is not True:
         raise RuntimeError(f"cannot rebuild the black supplier stock profile: EditRebuild3={rebuilt!r}")
     # Fresh source/mapped handles after the drawing rebuild, never after SaveAs3.
-    current = _supplier_stock_profile_instances(adapter, stock, source_model, capture)
-    for _source, mapped, curve, appearance in current:
+    current_sketch, _extension, current = _supplier_stock_profile_instances(
+        adapter, stock, source_model, capture,
+    )
+    _supplier_profile_native_identity(
+        app, current_sketch, sketch, 1, "settled supplier black profile authoritative source sketch",
+    )
+    for source, mapped, curve, appearance in current:
+        label = f"settled supplier black profile source [{capture.configuration}; {capture.source_path}]"
+        native_results = tuple(
+            _supplier_native_same(app, source, before[0], label) for before in instances
+        )
         matches = [
-            before for before in instances
-            if _supplier_native_same(app, before[1], mapped, "settled supplier black profile") == 1
+            before for before, same in zip(instances, native_results, strict=True) if same == 1
         ]
-        if len(matches) != 1 or matches[0][2:] != (curve, appearance):
-            raise RuntimeError("supplier black profile changed its native instance, geometry or Width/Style/Layer")
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: IsSame expected exactly one native=1; "
+                f"actual={native_results!r} (tuple of int)"
+            )
+        if matches[0][2:] != (curve, appearance):
+            raise RuntimeError("supplier black profile changed native geometry or Width/Style/Layer")
         color = mapped.Color
         if type(color) is not int or color != _STOCK_PROFILE_BLACK:
             raise RuntimeError(f"settled supplier black profile color expected=0; actual={color!r}")
@@ -1209,7 +1095,9 @@ def _supplier_native_same(app, first, second, label):
         raise RuntimeError(f"{label}: missing native identity")
     same = app.IsSame(first, second)
     if type(same) is not int or same not in (0, 1):
-        raise RuntimeError(f"{label}: unknown native IsSame={same!r}")
+        raise RuntimeError(
+            f"{label}: unknown native IsSame={same!r} ({type(same).__name__}); expected native=0 or 1"
+        )
     return same
 
 

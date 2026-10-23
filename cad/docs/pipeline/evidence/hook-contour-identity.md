@@ -975,11 +975,112 @@ The complete context and thirteen-helper matrices are retained under
 Main/coordinator explicitly retain the historical all-page CH native and
 actual-XHIGH paper proof within these source-impact boundaries.
 
-SM still requires the one approved changed-source normal diagnostic leaf
-to distinguish the original selected-null versus native-identity-zero
-refusal. The canonical intake is not that root fix and does not authorize
-a fallback, relaxed physical eye predicate, final SM output claim or
-extra unchanged native retry. Dispatch remains coordinator-only.
+The one approved changed-source SM diagnostic has now run at `bc799e0b`
+and still failed before save or export; the complete actual readbacks and
+their corrected native-enum interpretation are recorded below.
+Canonical intake and diagnosis are not a root fix, successful output or
+permission for an unchanged native retry. Dispatch remains coordinator-only.
+No additional CH execution is claimed.
+
+## Actual `bc799e0b` SM selection and source-frame readback
+
+Source `bc799e0b9b9dffed68d79315d420f24740dd64ea` ran as
+`20261023T120921149Z-f7085ef295974ef7a481d3a87509276b`, actual build
+`20261023T120956.462236Z-73c61a14450245059d805ec614c86dad`.
+The part leaf succeeded; the drawing failed on worker `swmaker00000f@15`,
+attempt `20261023T121327Z-1-edd1d47c`, at the unchanged
+`selection is not the exact mapped native curve` guard.
+All four drawing exports are missing and the original worker explicitly
+reports no forensic artifacts. This is not final native or paper proof.
+
+The full original task log is
+`C:/ha-release-manager-20261023/runs/repair-fleet/hook1853-bc799e0b-SM-original-worker-task.log`,
+90,897 bytes, SHA-256
+`c73f89611e089acc9d87277a3aab2f2b3e23aedcd2708bb07846a72059e9839e`.
+The adjacent
+`hook1853-bc799e0b-SM-original-diagnostic-all-typed-identity-records.json`
+preserves ten complete records: one context and nine source rows, not ten
+curves. Every field retains its original value, Python type and error.
+Collection reports two terminal leaf results and zero collection errors.
+
+At index zero, `Select4` returned true, selection count was exactly one,
+type was 24, and the selected object was not null. Raw and typed selected
+wrappers compare SAME=1 in both directions and self-controls are 1.
+Stock, active, select-data and selected-object views all compare SAME=1
+to the expected view; their referenced document is the exact source and
+configuration is `SupplierNominalStock`. All nine selected-to-source and
+selected-to-mapped comparisons, in both directions, are integer 0.
+The matching first-circle geometry and `(kind, GetID)` are not native
+identity or an accepting substitute.
+
+### Native equality correction, not a blind code change
+
+An early owner/scout report incorrectly labelled 0 UNKNOWN and 2 DIFFERENT.
+That interpretation is withdrawn, including corresponding labels in
+historical diagnostic handoff keys; original numeric records are untouched.
+Static `PEReader`/`MetadataReader` inspection of the installed
+`SolidWorks.Interop.swconst.dll` constant table establishes
+`swObjectNotSame=0`, `swObjectSame=1`, `swObjectUnsupported=2`, all Int32.
+The assembly is version `33.3.0.92`, SHA-256
+`f6863a54a193ea1700a66341bf4f2bc3c2308702ded7a2f83763b576d20b928b`.
+This was file-metadata inspection, with no assembly loading, COM activation
+or SOLIDWORKS execution; it is not an inspection of a new farm assembly.
+The indexed official SOLIDWORKS 2026 enum agrees. Exact local metadata and
+the reader are retained in
+`C:/temp/ha-hook-contour-identity-evidence-20261023/canonical-1869-intake/installed-object-equality-static-metadata.json`.
+The existing recipe helpers correctly accept only integer 0/1 and reject
+unsupported 2 and noninteger results. No 0-to-2 distinctness rewrite is made.
+
+Thus the nine selected/mapped comparisons prove NOT SAME, not UNKNOWN.
+The active source is `Default`, ID 0, while the captured and view source
+configuration is `SupplierNominalStock`, ID 1. Configuration `IsSame`
+returned UNSUPPORTED=2 in both directions; the names and IDs independently
+differ, but neither observation establishes configuration causality.
+No source configuration mutation is introduced into read-only guards.
+
+### Required source-part normalization
+
+The provisional diagnostic called `GetCorresponding2` on the **drawing**
+extension. Its null owner returns did not exercise the documented inverse
+on the underlying **source-part** extension. The downloaded
+`Get_Corresponding_Entities_Between_Parts_and_Views_Example_VB.md`,
+`ViewToPart` non-topological branch, explicitly uses
+`swModelPart.Extension.GetCorresponding2(inputObject)`.
+`IView.GetCorresponding` explicitly supports sketch and sketch-segment
+objects and names `IModelDocExtension.GetCorresponding2` as its inverse.
+
+The strict repair uses that source-part receiver as the primary identity
+frame for both drawing segments and their owning sketches. Mapped and
+selected segments must each positively compare SAME=1 to the exact
+authoritative source segment, and both canonical owners must compare
+SAME=1 to the exact source feature's sketch. Null, foreign, unsupported or
+failed correspondence refuses; there is no GetID, geometry, name or radius
+fallback. Fresh post-rebuild inventory, unique identities, six lines,
+three circles, construction state, geometry, Width/Style/Layer and all
+nine black colors remain required. This documented design is not an
+assertion that the unexecuted native bridge already works.
+
+### Finite new-main source boundary
+
+One actual fetch, retained as `artifact://5783`, observed main
+`1c4d8a0328bf3b85319e1da2b578e5f716f5b998` after `c23`.
+Its exact argv, C-only working directory, exit zero and uncaptured
+wall-clock boundary are retained in
+`C:/temp/ha-hook-contour-identity-evidence-20261023/strict-source-normalization-admission-pin.json`.
+The fetch was not replayed to invent timestamps. Main/coordinator adopt
+that observed commit as the finite new SM transaction pin, not a moving
+main chase. It was integrated by a non-rewriting, conflict-free merge.
+
+The complete immutable thirteen-file `c23` to `1c4` manifest is retained
+at `artifact://5790:275-430`. None of Hook's five owned files, thirteen
+inventoried helpers or fifteen machinist context/harness inputs changes.
+New physical-axial, serialized-note and measured-text-shelf modules are
+used by PD pivot and SM knife-stud recipes, not by these Hook callers.
+The existing frozen-`652d` three-helper semantic limits still apply;
+this increment does not turn them into thirteen byte-identical helpers.
+Main accepts existing CH native/still-open, whole-v44 and **actual-XHIGH**
+three-SHIP paper evidence under this unchanged-input carry. Historical
+MEDIUM reviews stay nonqualifying; no CH native or paper rerun is made.
 
 ## Evidence boundary
 
