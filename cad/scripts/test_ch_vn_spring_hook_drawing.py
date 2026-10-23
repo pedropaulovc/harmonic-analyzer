@@ -8,6 +8,7 @@ import pytest
 
 import _config
 import _purchased_fastener_drawing as purchased_drawing
+import _drawing_common as drawing_common
 import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
 import draw_sm_vn_boss_hook as boss_drawing
@@ -550,13 +551,15 @@ def test_finished_view_creation_fits_recorded_native_cell(
 
 
 def _settled_eye_scene(monkeypatch, module):
-    """Model fresh post-rebuild attachments, without retaining any native handle."""
+    """Model fresh geometry while retaining only stable native annotation identity."""
     monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(module, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
-    state = SimpleNamespace(sheet="FINISHED")
+    state = SimpleNamespace(sheet="FINISHED", saved=False)
     model = SimpleNamespace(
         ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
         ActiveDrawingView=None, GetEditSheet=lambda: True,
+        GetType=lambda: 3,
+        GetPathName=lambda: str(module.OUTPUTS.slddrw.resolve()) if state.saved else "",
     )
     model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
     owner = SimpleNamespace(Name="Wire")
@@ -568,6 +571,8 @@ def _settled_eye_scene(monkeypatch, module):
         currentModel=model,
         swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
     )
+    adapter.swApp.ActiveDoc = model
+    adapter.swApp.GetOpenDocumentByName = lambda _path: adapter.currentModel
     supplier = anchor if module is drawing else module._SUPPLIER_ANCHOR
     surface = SimpleNamespace(
         IsTorus=lambda: True,
@@ -587,6 +592,7 @@ def _settled_eye_scene(monkeypatch, module):
 
     source.Extension = SimpleNamespace(GetCorrespondingEntity2=corresponding_entity)
     views, refs_by_sheet, contracts, annotations, contours = {}, {}, {}, {}, {}
+    display_lists, native_dimensions = {}, {}
     diameters = spec.SUPPLIER_EYE_MM if module is drawing else {"EyeID": module.SUPPLIER_EYE_ID_MM}
 
     def contour(diameter, attached_face=face):
@@ -626,20 +632,30 @@ def _settled_eye_scene(monkeypatch, module):
             annotation = SimpleNamespace(
                 entities=[contours[name]] if name in contours else [],
                 kinds=[46] if name in contours else [], IsDangling=lambda: False,
+                GetType=lambda: 4, OwnerType=0,
             )
             annotation.GetAttachedEntities3 = lambda annotation=annotation: tuple(annotation.entities)
             annotation.GetAttachedEntityTypes = lambda annotation=annotation: tuple(annotation.kinds)
             annotation.GetAttachedEntityCount3 = lambda annotation=annotation: len(annotation.entities)
             annotations[name] = annotation
-            displays.append(SimpleNamespace(
+            display = SimpleNamespace(
                 GetDimension2=lambda _index, native=native: native,
                 GetAnnotation=lambda annotation=annotation: annotation,
-            ))
+            )
+            annotation.GetSpecificAnnotation = lambda display=display: display
+            displays.append(display)
+            native_dimensions[name] = native
             refs.append((key, {"label": name, "expected_mm": diameters.get(name, 1.0)}))
         if sheet == "FINISHED":
             for name in module.FRONT_KEEP:
                 native = SimpleNamespace(FullName=f"{name}@control@anchor.SLDPRT")
-                displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
+                annotation = SimpleNamespace(GetType=lambda: 4, OwnerType=0)
+                display = SimpleNamespace(
+                    GetDimension2=lambda _index, native=native: native,
+                    GetAnnotation=lambda annotation=annotation: annotation,
+                )
+                annotation.GetSpecificAnnotation = lambda display=display: display
+                displays.append(display)
         for index, display in enumerate(displays):
             following = displays[index + 1] if index + 1 < len(displays) else None
             display.GetNext5 = lambda following=following: following
@@ -651,6 +667,12 @@ def _settled_eye_scene(monkeypatch, module):
             GetFirstDisplayDimension6=lambda displays=displays: displays[0],
         )
         views[sheet], refs_by_sheet[sheet] = view, refs
+        display_lists[sheet] = displays
+        for display in displays:
+            display.GetAnnotation().Owner = view
+        view.GetAnnotations = lambda displays=displays: tuple(
+            display.GetAnnotation() for display in displays
+        )
         contracts[sheet] = ((view.Name,), configuration)
     monkeypatch.setattr(module, "iter_views", lambda _adapter: (views[state.sheet],))
     monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.Name)
@@ -665,7 +687,190 @@ def _settled_eye_scene(monkeypatch, module):
         face=face, surface=surface, contour=contour, diameters=diameters, state=state,
         drawing_owner=drawing_owner, drawing_surface=drawing_surface,
         mapped_faces=mapped_faces, mapping_calls=mapping_calls,
+        display_lists=display_lists, native_dimensions=native_dimensions,
     )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        None, "missing", "duplicate", "foreign-annotation", "foreign-owner",
+        "sheet-owner", "missing-owner", "foreign-view", "renamed-view",
+        "foreign-source", "missing-source", "source-config", "stock-config",
+        "source-path", "foreign-drawing", "output-path", "unsaved-path",
+        "relative-path", "document-type", "annotation-type", "missing-display",
+        "foreign-display", "foreign-returned-annotation", "empty-key", "duplicate-key",
+        "incomplete-snapshot", "missing-drawing", "foreign-active-document",
+        "missing-open-document", "duplicate-view", "changed-contract-config",
+        "cross-sheet-duplicate-key",
+    ),
+)
+def test_channel_saved_keys_require_original_native_annotation_and_binding(monkeypatch, fault):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    original_refs = {sheet: list(refs) for sheet, refs in scene.refs.items()}
+    model, front = scene.adapter.currentModel, scene.views["FINISHED"]
+    annotation = scene.annotations["EyeOD"]
+    scene.state.saved = True
+    scene.native_dimensions["EyeOD"].FullName = "opaque saved key / OD !"
+    scene.native_dimensions["EyeID"].FullName = "another actual saved key / ID !"
+    actual_annotations = tuple(front.GetAnnotations())
+    if fault == "missing":
+        front.GetAnnotations = lambda: tuple(item for item in actual_annotations if item is not annotation)
+    elif fault == "duplicate":
+        front.GetAnnotations = lambda: (*actual_annotations, annotation)
+    elif fault == "foreign-annotation":
+        foreign = SimpleNamespace(**vars(annotation))
+        front.GetAnnotations = lambda: tuple(foreign if item is annotation else item for item in actual_annotations)
+    elif fault == "foreign-owner":
+        annotation.Owner = SimpleNamespace(**vars(front))
+    elif fault == "sheet-owner":
+        annotation.OwnerType = 1
+    elif fault == "missing-owner":
+        annotation.Owner = None
+    elif fault == "foreign-view":
+        scene.views["FINISHED"] = SimpleNamespace(**vars(front))
+    elif fault == "renamed-view":
+        front.Name = "different-view"
+    elif fault == "foreign-source":
+        front.ReferencedDocument = SimpleNamespace(**vars(scene.source))
+    elif fault == "missing-source":
+        front.ReferencedDocument = None
+    elif fault == "source-config":
+        front.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "stock-config":
+        scene.views["SUPPLIER-STOCK"].ReferencedConfiguration = "Default"
+    elif fault == "source-path":
+        scene.source.GetPathName = lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT")
+    elif fault == "foreign-drawing":
+        foreign = SimpleNamespace(**vars(model))
+        scene.adapter.currentModel = foreign
+        scene.adapter.swApp.ActiveDoc = foreign
+    elif fault == "missing-drawing":
+        scene.adapter.currentModel = None
+    elif fault == "foreign-active-document":
+        scene.adapter.swApp.ActiveDoc = SimpleNamespace(**vars(model))
+    elif fault == "missing-open-document":
+        scene.adapter.swApp.GetOpenDocumentByName = lambda _path: None
+    elif fault == "duplicate-view":
+        monkeypatch.setattr(
+            drawing, "iter_views", lambda _adapter: (scene.views[scene.state.sheet],) * 2,
+        )
+    elif fault == "changed-contract-config":
+        front.ReferencedConfiguration = "ChangedConfiguration"
+        scene.contracts["FINISHED"] = (scene.contracts["FINISHED"][0], "ChangedConfiguration")
+    elif fault == "output-path":
+        model.GetPathName = lambda: str(drawing.OUTPUTS.slddrw.parent / "foreign.SLDDRW")
+    elif fault == "unsaved-path":
+        model.GetPathName = lambda: ""
+    elif fault == "relative-path":
+        model.GetPathName = lambda: drawing.OUTPUTS.slddrw.name
+    elif fault == "document-type":
+        model.GetType = lambda: 1
+    elif fault == "annotation-type":
+        annotation.GetType = lambda: 6
+    elif fault == "missing-display":
+        annotation.GetSpecificAnnotation = lambda: None
+    elif fault == "foreign-display":
+        annotation.GetSpecificAnnotation = lambda: scene.annotations["EyeID"].GetSpecificAnnotation()
+    elif fault == "foreign-returned-annotation":
+        annotation.GetSpecificAnnotation().GetAnnotation = lambda: scene.annotations["EyeID"]
+    elif fault == "empty-key":
+        scene.native_dimensions["EyeOD"].FullName = ""
+    elif fault == "duplicate-key":
+        scene.native_dimensions["EyeOD"].FullName = scene.native_dimensions["EyeID"].FullName
+    elif fault == "cross-sheet-duplicate-key":
+        scene.native_dimensions["EyeOD"].FullName = scene.native_dimensions["SupplierStockThread"].FullName
+    elif fault == "incomplete-snapshot":
+        prior = prior[:-1]
+    if fault is not None:
+        with pytest.raises(RuntimeError):
+            drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+        assert scene.refs == original_refs
+        return
+    # No relaxed old-key verifier: the pre-save FullName keys still refuse.
+    with pytest.raises(RuntimeError, match="supplier dimension disappeared"):
+        drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    captured = drawing._capture_saved_supplier_references(
+        scene.adapter, scene.refs, scene.contracts, prior,
+    )
+    assert len(drawing._verify_supplier_references(scene.adapter, captured, scene.contracts)) == 6
+    assert [key for key, contract in captured["FINISHED"] if contract["label"] in drawing.SUPPLIER_EYE_MM] == [
+        "opaque saved key / OD !", "another actual saved key / ID !",
+    ]
+    assert scene.refs == original_refs
+    assert captured is not scene.refs
+
+
+@pytest.mark.parametrize("identity", ("annotation", "view", "source", "drawing", "display"))
+@pytest.mark.parametrize("state", (0, -1, 2, True, 1.0, "1", None))
+def test_channel_saved_identity_requires_exact_native_integer_equality(monkeypatch, identity, state):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    target = {
+        "annotation": scene.annotations["EyeOD"],
+        "view": scene.views["FINISHED"],
+        "source": scene.source,
+        "drawing": scene.adapter.currentModel,
+        "display": scene.annotations["EyeOD"].GetSpecificAnnotation(),
+    }[identity]
+    scene.adapter.swApp.IsSame = lambda left, right: (
+        state if left is target and right is target else int(left is right)
+    )
+    with pytest.raises(RuntimeError):
+        drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+
+
+@pytest.mark.parametrize("member", ("document-path", "source-path", "annotations", "specific", "annotation-type"))
+def test_channel_saved_metadata_errors_refuse_without_best_effort_acceptance(monkeypatch, member):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    error = OSError(f"native metadata disconnected: {member}")
+
+    def failed():
+        raise error
+
+    target, name = {
+        "document-path": (scene.adapter.currentModel, "GetPathName"),
+        "source-path": (scene.source, "GetPathName"),
+        "annotations": (scene.views["FINISHED"], "GetAnnotations"),
+        "specific": (scene.annotations["EyeOD"], "GetSpecificAnnotation"),
+        "annotation-type": (scene.annotations["EyeOD"], "GetType"),
+    }[member]
+    setattr(target, name, failed)
+    with pytest.raises(OSError) as caught:
+        drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+    assert caught.value is error
+
+
+def test_channel_saved_capture_uses_native_identity_not_python_wrappers(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    front = scene.views["FINISHED"]
+    original = scene.annotations["EyeOD"]
+    wrapped_view, wrapped_source = SimpleNamespace(**vars(front)), SimpleNamespace(**vars(scene.source))
+    wrapped_annotation = SimpleNamespace(**vars(original))
+    wrapped_view.ReferencedDocument = wrapped_source
+    wrapped_annotation.Owner = wrapped_view
+    annotations = tuple(front.GetAnnotations())
+    wrapped_view.GetAnnotations = lambda: tuple(
+        wrapped_annotation if item is original else item for item in annotations
+    )
+    original.GetSpecificAnnotation().GetAnnotation = lambda: wrapped_annotation
+    scene.views["FINISHED"] = wrapped_view
+    aliases = {id(wrapped_view): id(front), id(wrapped_source): id(scene.source), id(wrapped_annotation): id(original)}
+    scene.adapter.swApp.IsSame = lambda left, right: int(
+        aliases.get(id(left), id(left)) == aliases.get(id(right), id(right))
+    )
+    scene.native_dimensions["EyeOD"].FullName = "actual wrapper-independent native key"
+    captured = drawing._capture_saved_supplier_references(
+        scene.adapter, scene.refs, scene.contracts, prior,
+    )
+    assert len(drawing._verify_supplier_references(scene.adapter, captured, scene.contracts)) == 6
+    assert captured["FINISHED"][0][0] == "actual wrapper-independent native key"
 
 
 @pytest.mark.parametrize("face_context", ("drawing-proxy", "source-face"))
@@ -862,7 +1067,9 @@ def test_settled_eye_reacquires_physical_owner_without_old_handles(monkeypatch, 
 @pytest.mark.parametrize("module", (drawing, boss_drawing))
 @pytest.mark.parametrize(
     "drift", (None, "foreign-feature", "wrong-torus", "wrong-circle",
-              "lost-imported-control", "changed-imported-control"),
+              "lost-imported-control", "changed-imported-control",
+              "pdf-key", "close-key", "pdf-circle", "close-circle",
+              "pdf-owner", "close-source", "pdf-output-path"),
 )
 def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypatch, tmp_path, module, drift):
     """Execute the real build and its supplied finalizer callbacks, not extracted AST."""
@@ -872,8 +1079,14 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
     scene = _settled_eye_scene(monkeypatch, module)
     source = scene.source
     front, stock = scene.views["FINISHED"], scene.views["SUPPLIER-STOCK"]
-    iso = SimpleNamespace(Name="finished-iso", ReferencedConfiguration="Default")
-    stock_iso = SimpleNamespace(Name="stock-iso", ReferencedConfiguration=module.SUPPLIER_STOCK_CONFIGURATION)
+    iso = SimpleNamespace(
+        Name="finished-iso", ReferencedConfiguration="Default", ReferencedDocument=source,
+        GetAnnotations=lambda: (),
+    )
+    stock_iso = SimpleNamespace(
+        Name="stock-iso", ReferencedConfiguration=module.SUPPLIER_STOCK_CONFIGURATION,
+        ReferencedDocument=source, GetAnnotations=lambda: (),
+    )
     model = scene.adapter.currentModel
     stock_capture, capture_calls = (
         _supplier_stock_capture_scene(monkeypatch, scene.adapter, source)
@@ -967,6 +1180,11 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         assert len(scene.mapping_calls) == observations_before_save
         assert scene.state.sheet == sheet_before_save
         saved.append("native-save")
+        scene.state.saved = True
+        # Actual native FullName strings are deliberately opaque for physical
+        # dimensions; only original annotation identity may associate them.
+        for index, name in enumerate(scene.diameters):
+            scene.native_dimensions[name].FullName = f"saved-native-key-{index}!"
         fresh_surface = SimpleNamespace(
             IsTorus=lambda: True, TorusParams=scene.surface.TorusParams,
         )
@@ -1000,8 +1218,25 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         checkpoint("after_drawing_save")
         assert scene.state.sheet == "FINISHED"
         observations_after_save = len(scene.mapping_calls)
+        if drift == "pdf-key":
+            scene.native_dimensions["EyeID"].FullName = "unexpected later PDF key"
+        elif drift == "pdf-circle":
+            scene.annotations["EyeID"].entities = [scene.contour(scene.diameters["EyeID"] + 1.0, fresh_face)]
+        elif drift == "pdf-owner":
+            scene.annotations["EyeID"].Owner = iso
+        elif drift == "pdf-output-path":
+            model.GetPathName = lambda: str(module.OUTPUTS.slddrw.parent / "foreign.SLDDRW")
         checkpoint("after_pdf_save")
-        assert len(scene.mapping_calls) == observations_after_save
+        assert len(scene.mapping_calls) > observations_after_save
+        assert scene.state.sheet == "FINISHED"
+        if drift == "close-key":
+            scene.native_dimensions["EyeID"].FullName = "unexpected later close key"
+        elif drift == "close-circle":
+            scene.annotations["EyeID"].entities = [scene.contour(scene.diameters["EyeID"] + 1.0, fresh_face)]
+        elif drift == "close-source":
+            front.ReferencedDocument = SimpleNamespace(**vars(source))
+        checkpoint("before_drawing_close")
+        assert scene.state.sheet == "FINISHED"
         saved.append("pdf-export")
         return {"drawing": "saved"}
 
@@ -1249,7 +1484,16 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         "_verify_controls", "_verify_supplier_references", "_verify_source_state",
     ):
         monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module, "_verify_supplier_references", lambda *_args, **_kwargs: ())
+    snapshot = (object(),)
+    monkeypatch.setattr(module, "_verify_supplier_references", lambda *_args, **_kwargs: snapshot)
+
+    def capture_saved(native_adapter, refs_by_sheet, _view_contracts, prior):
+        assert native_adapter is adapter
+        assert state.saved
+        assert prior is snapshot
+        return {sheet_name: list(refs) for sheet_name, refs in refs_by_sheet.items()}
+
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", capture_saved)
     monkeypatch.setattr(module, "read_required_properties", read_properties)
     monkeypatch.setattr(module, "new_project_drawing", new_drawing)
     monkeypatch.setattr(module, "place_view", place_view)
@@ -1282,6 +1526,77 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         placements=placements, notes=linked_notes, stock_notes=stock_notes,
         property_reads=property_reads, refreshed=refreshed,
     )
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("operation", ("drawing_save", "pdf_save"))
+def test_build_save_failure_keeps_primary_error_when_identity_observer_refuses(
+    monkeypatch, tmp_path, module, operation,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    primary = OSError(f"original native {operation} failure")
+    secondary = RuntimeError("original annotation identity capture refused")
+    capture = module._capture_saved_supplier_references
+    scene.state.failed_save = False
+
+    def failing_capture(*args):
+        if scene.state.failed_save:
+            raise secondary
+        return capture(*args)
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        scene.state.saved = True
+        if operation == "pdf_save":
+            checkpoint("after_drawing_save")
+        scene.state.failed_save = True
+        # The production checkpoint emits after_* on failure and keeps the
+        # actual SaveAs exception primary even when the read-only audit refuses.
+        with drawing_common._drawing_checkpoint(checkpoint, operation):
+            raise primary
+
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", failing_capture)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    with pytest.raises(OSError) as caught:
+        asyncio.run(module.build(scene.adapter))
+    assert caught.value is primary
+    assert primary.__notes__ == [
+        f"after_{operation} checkpoint also failed: RuntimeError: {secondary}",
+    ]
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_build_does_not_publish_identity_snapshot_after_failed_strict_presave_checks(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    primary = RuntimeError("last strict supplier dimension lost its physical contour")
+    observed_priors = []
+
+    def strict_refusal(*_args):
+        raise primary
+
+    def inspect_unpublished(_adapter, _refs, _views, prior):
+        observed_priors.append(prior)
+        raise RuntimeError("no successfully verified original snapshot")
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        with pytest.raises(RuntimeError) as caught:
+            for verify in settled_checks:
+                verify()
+        assert caught.value is primary
+        with pytest.raises(RuntimeError, match="no successfully verified original snapshot"):
+            checkpoint("after_drawing_save")
+        raise primary
+
+    monkeypatch.setattr(module, "_verify_supplier_references", strict_refusal)
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", inspect_unpublished)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(module.build(scene.adapter))
+    assert caught.value is primary
+    assert observed_priors == [None]
 
 
 @pytest.mark.parametrize(

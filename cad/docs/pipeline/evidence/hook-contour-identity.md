@@ -585,6 +585,69 @@ failure bundle was uploaded. SM reached the save context but has no
 qualified saved attachment or cold-reopen proof. No current PDF comparison,
 automated machinist qualification or merge readiness follows from this run.
 
+## Proved SM save-name boundary and strict current-key capture
+
+Source `55fdad6508e7e2a29ec7e066dbb76cd87891244e` passed its once-final
+588 focused tests, F821, 149 adapter methods and 109 native-binding contracts.
+Run `20261023T030147610Z-159245d71cba4e8f829a36d80179c7e0`, build
+`20261023T030215.410862Z-e331ab8d744b4976b98fc69d65da8895`, then failed
+both normal drawing leaves at the still-open native-save observer. The
+complete packet is `hook-contour-proof/stock-iso-keyreceipt-55fdad650-native-handoff.json`,
+SHA-256 `74c28e70a1763849fd5826dfca7976c05bceaf048224218a8768b70fc96fb3bf`.
+The single SM raw/semantic receipt is
+`hook1853-55fdad650-saved-key-receipt-raw-copy-0.json`, 3389 bytes, SHA-256
+`48d13123bbdc085e99e7331065a1ea8e356999c04835d941a6c5107b337eae53`.
+Exact fields and proof limits are retained in
+`hook-contour-proof/root-readback-55fdad650.json`.
+
+SM's old key was `RD1@Drawing View1@Draw103.Drawing`. The original annotation
+now reports `RD1@Drawing View1@sm-vn-boss-hook.Drawing`; its sole matching
+entry among all five expected-view annotations has native original-annotation
+`IsSame == 1`. Its owner is native drawing-view type 0 with owner-view
+`IsSame == 1`. Current drawing, view and source each compare `IsSame == 1`
+with their pre-save objects, and the referenced configuration remains exact
+`Default`. The source path is unchanged. The drawing path changes from empty
+to the actual worker output `cad/out/slddrw/sm-vn-boss-hook.SLDDRW`, while
+the title changes from `Draw103 - FINISHED` to `sm-vn-boss-hook - FINISHED`.
+Thus the missing dictionary entry is a frozen pre-save FullName across a
+native SaveAs retitle, not deletion of this original annotation. This is
+native identity evidence, not a promise that a parsed suffix is stable.
+
+CH independently reaches `EyeOD: settled supplier dimension disappeared`
+after native save. The former STOCK isometric/caption refusal is no longer
+its failing boundary, but this attempt contains no detailed CH saved-key
+identity receipt. SM's values do **not** establish CH's cause or survival.
+CH must independently prove all current native identities and physical
+geometry at runtime.
+
+The permanent recipe-local cutover retains the original exact keys through
+all pre-save checks. At the native-save boundary it finds each original
+annotation only by a **unique native `IsSame == 1` in its exact expected
+view**. Before reading the current FullName it requires the same native
+drawing, view, source and annotation owner, exact source path/configuration,
+drawing-view owner type 0, typed display-dimension correspondence and the
+actual expected native output drawing path. Missing, duplicate, unrelated,
+wrong-owner or unknown-identity objects refuse. It does not strip a suffix,
+parse a replacement name, alias the old key or use radius/geometry as a
+dimension-identity proxy.
+
+Only those proven current exact keys feed the unchanged complete reference
+verifier, including one live type-46 attachment, the finite exact physical
+circle, source-part correspondence, authoritative Wire/torus, tolerance and
+nominal-model contracts. PDF-save and pre-close observations require the
+same captured keys to remain stable and recheck current native identities
+and physical attachment. These observers do not refresh geometry, rebuild
+or activate a source configuration; restoring FINISHED is UI sheet state.
+The temporary failure-only collector is superseded by this strict capture.
+
+The shared callback still runs when an operation unwinds a failure, so a
+callback alone never proves SaveAs success and cannot replace the primary
+save error. All eight exports remain absent from this failed attempt, with
+no uploaded failure assets. Still-open final attachment, actual complete
+PDF ink, released-v44 comparison, automated machinist SHIP and exact-source
+Claude HIGH remain separate required gates. No cold-reopen persistence
+claim follows.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate

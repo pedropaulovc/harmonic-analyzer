@@ -18,6 +18,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -166,6 +168,118 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
     )
 
 
+def _native_equality(app, left, right):
+    """Refuse unknown COM equality states instead of coercing them to true."""
+    if left is None or right is None:
+        raise RuntimeError("supplier reference native identity is missing")
+    value = app.IsSame(left, right)
+    if type(value) is not int or value not in (0, 1):
+        raise RuntimeError(f"supplier reference has unknown native IsSame state {value!r}")
+    return value
+
+
+def _native_path(value, *, label):
+    if not isinstance(value, str) or not value or not Path(value).is_absolute():
+        raise RuntimeError(f"{label}: native document path is missing or not absolute")
+    return value.replace("\\", "/").casefold()
+
+
+@dataclass(frozen=True)
+class _SupplierViewIdentity:
+    name: str
+    configuration: str
+    source_path: str
+    view: Any
+    source: Any
+
+
+@dataclass(frozen=True)
+class _SupplierReferenceSnapshot:
+    sheet: str
+    key: str
+    contract: tuple[tuple[str, Any], ...]
+    annotation: Any
+    owner: Any
+    drawing: Any
+    drawing_path: str
+    views: tuple[_SupplierViewIdentity, ...]
+
+
+def _supplier_views(adapter, names, configuration):
+    views = {}
+    for raw in iter_views(adapter):
+        view = _early_bound(raw, "IView")
+        name = view_name(adapter, view)
+        if not isinstance(name, str) or not name or name in views:
+            raise RuntimeError("supplier view names are missing or duplicate")
+        views[name] = view
+    identities = []
+    for name in names:
+        if name not in views:
+            raise RuntimeError(f"{name}: supplier view disappeared")
+        view = views[name]
+        if view.ReferencedConfiguration != configuration:
+            raise RuntimeError(f"{name}: supplier view lost its source configuration")
+        raw_source = view.ReferencedDocument
+        if raw_source is None:
+            raise RuntimeError(f"{name}: supplier view lost its source document")
+        source = _early_bound(raw_source, "IModelDoc2")
+        path = _native_path(source.GetPathName(), label=name)
+        if path != SOURCE.resolve().as_posix().casefold():
+            raise RuntimeError(f"{name}: supplier view source path changed")
+        identities.append(_SupplierViewIdentity(name, configuration, path, view, source))
+    return tuple(identities)
+
+
+def _supplier_displays(view):
+    displays = {}
+    raw = view.GetFirstDisplayDimension6()
+    while raw is not None:
+        display = _early_bound(raw, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        key = native.FullName
+        if not isinstance(key, str) or not key or key in displays:
+            raise RuntimeError(f"duplicate or missing native supplier dimension {key!r}")
+        displays[key] = display
+        raw = display.GetNext5()
+    return displays
+
+
+def _supplier_annotation(app, display, view):
+    raw_annotation = display.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError("supplier dimension has no native annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    kind, owner_type = annotation.GetType(), annotation.OwnerType
+    raw_owner = annotation.Owner
+    if type(kind) is not int or kind != 4 or type(owner_type) is not int or owner_type != 0 or raw_owner is None:
+        raise RuntimeError("supplier dimension must be a typed view-owned display dimension")
+    owner = _early_bound(raw_owner, "IView")
+    raw_specific = annotation.GetSpecificAnnotation()
+    if raw_specific is None:
+        raise RuntimeError("supplier annotation has no typed display dimension")
+    specific = _early_bound(raw_specific, "IDisplayDimension")
+    if (
+        _native_equality(app, owner, view) != 1
+        or _native_equality(app, specific, display) != 1
+    ):
+        raise RuntimeError("supplier annotation lost its exact native display or view owner")
+    raw_source, raw_owner_source = view.ReferencedDocument, owner.ReferencedDocument
+    if (
+        owner.ReferencedConfiguration != view.ReferencedConfiguration
+        or raw_source is None or raw_owner_source is None
+    ):
+        raise RuntimeError("supplier annotation owner source configuration changed")
+    owner_source = _early_bound(raw_owner_source, "IModelDoc2")
+    if (
+        _native_path(owner_source.GetPathName(), label="supplier owner")
+        != SOURCE.resolve().as_posix().casefold()
+        or _native_equality(app, owner_source, _early_bound(raw_source, "IModelDoc2")) != 1
+    ):
+        raise RuntimeError("supplier annotation owner source binding changed")
+    return annotation, owner
+
+
 def _supplier_eye_circle(
     adapter: Any, view: Any, raw: Any,
 ) -> tuple[float, ...] | None:
@@ -188,7 +302,8 @@ def _supplier_eye_circle(
     ):
         return None
     native_view = silhouette.GetView()
-    if native_view is None or view_name(adapter, native_view) != view_name(adapter, view):
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    if native_view is None or _native_equality(app, _early_bound(native_view, "IView"), view) != 1:
         return None
     raw_document = view.ReferencedDocument
     if raw_document is None:
@@ -213,7 +328,7 @@ def _supplier_eye_circle(
         return None
     face = _early_bound(raw_source_face, "IFace2")
     owner = face.GetFeature()
-    if owner is None or int(adapter.swApp.IsSame(owner, expected_feature)) != 1:
+    if owner is None or _native_equality(app, owner, expected_feature) != 1:
         return None
     raw_surface = face.GetSurface()
     if raw_surface is None:
@@ -382,36 +497,32 @@ def _supplier_stock_sheet(adapter):
 
 
 def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Read geometry and attachments without refreshing or repairing the views."""
-    if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
+    """Strictly prove current exact keys, then freeze only native identities."""
+    if sum(len(refs) for refs in refs_by_sheet.values()) != 6 or set(refs_by_sheet) != set(view_contracts):
         raise RuntimeError("spring anchor must retain all six supplier dimensions")
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing_path = model.GetPathName()
+    document_type = model.GetType()
+    if not isinstance(drawing_path, str) or type(document_type) is not int or document_type != 3:
+        raise RuntimeError("supplier references require the current native drawing")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    drawing = _early_bound(model, "IDrawingDoc")
+    verified = []
     for sheet_name, refs in refs_by_sheet.items():
         if drawing.ActivateSheet(sheet_name) is not True:
             raise RuntimeError(f"cannot inspect settled references on {sheet_name}")
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
         names, configuration = view_contracts[sheet_name]
-        for name in names:
-            if name not in views or str(views[name].ReferencedConfiguration) != configuration:
-                raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
-        view = views[names[0]]
-        displays = {}
-        display = view.GetFirstDisplayDimension6()
-        while display is not None:
-            display = _early_bound(display, "IDisplayDimension")
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            key = str(native.FullName)
-            if key in displays:
-                raise RuntimeError(f"{sheet_name}: duplicate native dimension {key}")
-            displays[key] = display
-            display = display.GetNext5()
+        identities = _supplier_views(adapter, names, configuration)
+        view = identities[0].view
+        displays = _supplier_displays(view)
         expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
-        if len(displays) != expected_count:
+        if len(displays) != expected_count or len({key for key, _contract in refs}) != len(refs):
             raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
         for key, contract in refs:
             if key not in displays:
                 raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
             display = displays[key]
+            annotation, owner = _supplier_annotation(app, display, view)
             assert_supplier_reference_dimension(adapter, display, **contract)
             native = _early_bound(display.GetDimension2(0), "IDimension")
             if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
@@ -426,7 +537,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                 if contract["label"] in ("SupplierStockShank", "SupplierStockOverall") and int(native.DrivenState) != 1:
                     raise RuntimeError(f"{contract['label']}: source station span is no longer driven")
             else:
-                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                # Never retain the silhouette or mapped face beyond this read.
                 entities = tuple(annotation.GetAttachedEntities3() or ())
                 kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
                 if (
@@ -447,6 +558,111 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                         f"{contract['label']}: supplier eye lost its exact physical source contour; "
                         f"circle={circle!r}, expected_diameter_mm={diameter}"
                     )
+            verified.append((
+                sheet_name, key, tuple(contract.items()), annotation, owner,
+                model, drawing_path, identities,
+            ))
+    # Publish no frozen snapshot until every sheet's strict geometry passed.
+    snapshots = tuple(_SupplierReferenceSnapshot(*identity) for identity in verified)
+    for index, original in enumerate(snapshots):
+        for other in snapshots[:index]:
+            if _native_equality(app, original.annotation, other.annotation) != 0:
+                raise RuntimeError("supplier original annotations must be provably distinct")
+    return snapshots
+
+
+def _capture_saved_supplier_references(adapter, refs_by_sheet, view_contracts, prior):
+    """Capture actual saved keys ONLY through the original native annotations.
+
+    This is a still-open identity observation, not a save-success receipt or
+    cold persistence proof. Metadata failures refuse; names never supply aliases.
+    """
+    expected = tuple(
+        (sheet, key, tuple(contract.items()))
+        for sheet, refs in refs_by_sheet.items() for key, contract in refs
+    )
+    if (
+        not prior or len(prior) != 6
+        or tuple((item.sheet, item.key, item.contract) for item in prior) != expected
+        or set(refs_by_sheet) != set(view_contracts)
+    ):
+        raise RuntimeError("saved supplier capture requires the complete verified original references")
+    if adapter.currentModel is None:
+        raise RuntimeError("saved supplier current native drawing is missing")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing = _early_bound(model, "IDrawingDoc")
+    document_type = model.GetType()
+    if (
+        type(document_type) is not int or document_type != 3
+        or _native_path(model.GetPathName(), label="saved supplier drawing")
+        != OUTPUTS.slddrw.resolve().as_posix().casefold()
+    ):
+        raise RuntimeError("saved supplier drawing is not the actual native output path")
+    for raw in (app.ActiveDoc, app.GetOpenDocumentByName(str(OUTPUTS.slddrw.resolve()))):
+        if raw is None or _native_equality(app, _early_bound(raw, "IModelDoc2"), model) != 1:
+            raise RuntimeError("saved supplier output is not the current native drawing")
+    captured = {}
+    captured_keys = set()
+    for sheet, refs in refs_by_sheet.items():
+        if drawing.ActivateSheet(sheet) is not True:
+            raise RuntimeError(f"{sheet}: cannot inspect saved supplier identities")
+        names, configuration = view_contracts[sheet]
+        current_views = _supplier_views(adapter, names, configuration)
+        view = current_views[0].view
+        raw_annotations = view.GetAnnotations()
+        if not isinstance(raw_annotations, (tuple, list)):
+            raise RuntimeError(f"{sheet}: saved supplier annotation census is unavailable")
+        candidates = tuple(_early_bound(raw, "IAnnotation") for raw in raw_annotations)
+        saved_refs = []
+        for original in (item for item in prior if item.sheet == sheet):
+            if _native_equality(app, model, original.drawing) != 1 or len(current_views) != len(original.views):
+                raise RuntimeError(f"{sheet}: original native drawing or view census changed")
+            for actual, old in zip(current_views, original.views):
+                if (
+                    (actual.name, actual.configuration, actual.source_path)
+                    != (old.name, old.configuration, old.source_path)
+                    or _native_equality(app, actual.view, old.view) != 1
+                    or _native_equality(app, actual.source, old.source) != 1
+                ):
+                    raise RuntimeError(f"{sheet}: original supplier view/source binding changed")
+            matches = [
+                annotation for annotation in candidates
+                if _native_equality(app, annotation, original.annotation) == 1
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{dict(original.contract)['label']}: original annotation census must be exactly one")
+            annotation = matches[0]
+            raw_display = annotation.GetSpecificAnnotation()
+            if raw_display is None:
+                raise RuntimeError(f"{sheet}: original supplier display dimension is missing")
+            display = _early_bound(raw_display, "IDisplayDimension")
+            returned, owner = _supplier_annotation(app, display, view)
+            if _native_equality(app, returned, annotation) != 1:
+                raise RuntimeError(f"{sheet}: original supplier display annotation changed")
+            raw_native = display.GetDimension2(0)
+            if raw_native is None:
+                raise RuntimeError(f"{sheet}: original supplier native dimension is missing")
+            key = _early_bound(raw_native, "IDimension").FullName
+            if not isinstance(key, str) or not key or key in captured_keys:
+                raise RuntimeError(f"{sheet}: saved supplier native key is missing or duplicate")
+            original_annotation = _early_bound(original.annotation, "IAnnotation")
+            original_owner_type = original_annotation.OwnerType
+            original_owner = original_annotation.Owner
+            if (
+                type(original_owner_type) is not int or original_owner_type != 0
+                or original_owner is None
+                or _native_equality(app, _early_bound(original_owner, "IView"), original.owner) != 1
+                or _native_equality(app, owner, original.owner) != 1
+                or _native_equality(app, original.owner, view) != 1
+            ):
+                raise RuntimeError(f"{sheet}: original supplier annotation owner changed")
+            captured_keys.add(key)
+            saved_refs.append((key, dict(original.contract)))
+        if len(saved_refs) != len(refs) or len({key for key, _contract in saved_refs}) != len(refs):
+            raise RuntimeError(f"{sheet}: saved supplier annotation coverage changed")
+        captured[sheet] = saved_refs
+    return captured
 
 
 def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
@@ -603,13 +819,35 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
     notes_by_sheet = {SHEET_NAMES[0]: finished_notes, SHEET_NAMES[1]: stock_notes}
+    pre_save_identities = None
+    saved_refs_by_sheet = None
+
+    def verify_settled_references():
+        nonlocal pre_save_identities
+        _verify_source_state(adapter, source_model, finished_configuration)
+        pre_save_identities = _verify_supplier_references(adapter, refs_by_sheet, view_contracts)
 
     def verify_after_native_save(event):
-        if event != "after_drawing_save":
+        nonlocal saved_refs_by_sheet
+        if event not in ("after_drawing_save", "after_pdf_save", "before_drawing_close"):
             return
-        # SaveAs3 can regenerate a silhouette. Inspect the still-open document
-        # without rebuilding/refreshing it; this is not cold-reopen disk proof.
-        _verify_supplier_references(adapter, refs_by_sheet, view_contracts)
+        # Checkpoints also run on failed operations: this neither asserts save
+        # success nor replaces the shared finalizer's original save exception.
+        current_refs = _capture_saved_supplier_references(
+            adapter, refs_by_sheet, view_contracts, pre_save_identities,
+        )
+        if event == "after_drawing_save":
+            if saved_refs_by_sheet is not None:
+                raise RuntimeError("supplier native-save identities were already captured")
+        elif saved_refs_by_sheet is None or current_refs != saved_refs_by_sheet:
+            raise RuntimeError("saved supplier exact native keys changed after the drawing save")
+        _verify_supplier_references(
+            adapter,
+            current_refs if event == "after_drawing_save" else saved_refs_by_sheet,
+            view_contracts,
+        )
+        if event == "after_drawing_save":
+            saved_refs_by_sheet = current_refs
         if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
             raise RuntimeError("cannot restore finished spring anchor sheet after saved-eye inspection")
 
@@ -626,8 +864,7 @@ async def build(adapter: Any) -> dict[str, str]:
             # The existing layout check refreshes every view before the final
             # attachment readback; the shared verifier stays geometry-read-only.
             lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),
-            lambda: _verify_supplier_references(adapter, refs_by_sheet, view_contracts),
-            lambda: _verify_source_state(adapter, source_model, finished_configuration),
+            verify_settled_references,
         ),
         checkpoint=verify_after_native_save,
     )

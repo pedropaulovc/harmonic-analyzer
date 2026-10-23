@@ -1,7 +1,6 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
 from dataclasses import FrozenInstanceError, replace
-import json
 import math
 from types import SimpleNamespace
 
@@ -922,18 +921,17 @@ def _settled_supplier_scene(scene, monkeypatch):
     monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
     state = scene.state
     scene.model.ActivateSheet = lambda name: setattr(state, "sheet", name) or True
-    iso = SimpleNamespace(Name="finished-iso", ReferencedConfiguration="Finished")
+    document_state = SimpleNamespace(path="")
+    scene.model.GetPathName = lambda: document_state.path
+    iso = SimpleNamespace(
+        Name="finished-iso", ReferencedConfiguration="Finished", ReferencedDocument=scene.source,
+    )
     stock = SimpleNamespace(
         Name="stock-front", ReferencedConfiguration=drawing.SUPPLIER_STOCK_CONFIGURATION,
+        ReferencedDocument=scene.source,
     )
-    refs_by_sheet, contracts, displays_by_sheet = {}, {}, {}
+    refs_by_sheet, contracts, displays_by_sheet, annotations_by_sheet = {}, {}, {}, {}
     attachment = SimpleNamespace(entities=[scene.eye], kinds=[46], dangling=False, count=1)
-    annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: tuple(attachment.entities),
-        GetAttachedEntityTypes=lambda: tuple(attachment.kinds),
-        GetAttachedEntityCount3=lambda: attachment.count,
-        IsDangling=lambda: attachment.dangling,
-    )
     for sheet_name, view, names, configuration in (
         ("FINISHED", scene.front, ("EyeID", "SupplierThreadMajor"), "Finished"),
         ("SUPPLIER-STOCK", stock,
@@ -948,16 +946,27 @@ def _settled_supplier_scene(scene, monkeypatch):
             )
             key = f"{name}@{feature}@eye.SLDPRT"
             native = SimpleNamespace(FullName=key, Tolerance=SimpleNamespace(Type=0), DrivenState=1)
-            display = SimpleNamespace(
-                GetDimension2=lambda _index, native=native: native,
-                GetAnnotation=lambda: annotation,
-            )
+            display = SimpleNamespace(GetDimension2=lambda _index, native=native: native)
             displays.append(display)
             refs.append((key, {"label": name}))
         if sheet_name == "FINISHED":
             for name in drawing.FRONT_KEEP:
                 native = SimpleNamespace(FullName=f"{name}@machining@eye.SLDPRT")
                 displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
+        annotations = []
+        for display in displays:
+            annotation = SimpleNamespace(
+                _interfaces={"IAnnotation"}, Owner=view, OwnerType=0, GetType=lambda: 4,
+                GetSpecificAnnotation=lambda display=display: display,
+                GetAttachedEntities3=lambda: tuple(attachment.entities),
+                GetAttachedEntityTypes=lambda: tuple(attachment.kinds),
+                GetAttachedEntityCount3=lambda: attachment.count,
+                IsDangling=lambda: attachment.dangling,
+            )
+            display.GetAnnotation = lambda annotation=annotation: annotation
+            annotations.append(annotation)
+        annotations_by_sheet[sheet_name] = annotations
+        view.GetAnnotations = lambda annotations=annotations: tuple(annotations)
         for index, display in enumerate(displays):
             following = displays[index + 1] if index + 1 < len(displays) else None
             display.GetNext5 = lambda following=following: following
@@ -988,6 +997,7 @@ def _settled_supplier_scene(scene, monkeypatch):
     return SimpleNamespace(
         refs=refs_by_sheet, contracts=contracts, attachment=attachment,
         displays=displays_by_sheet, stock=stock, iso=iso,
+        annotations=annotations_by_sheet, document_state=document_state,
     )
 
 
@@ -1801,254 +1811,133 @@ def test_scalar_stock_refusal_identifies_configuration_name_actual_and_expected(
 
 
 def _saved_key_scene(scene, monkeypatch):
-    """Identity-only save-renaming controls; not evidence of native SM behavior."""
+    """Exercise native-shaped identity capture, not proof of a real saved seat."""
     settled = _settled_supplier_scene(scene, monkeypatch)
-    document_state = SimpleNamespace(title="UnsavedDrawing", path="")
-    scene.model.GetTitle = lambda: document_state.title
-    scene.model.GetPathName = lambda: document_state.path
-    scene.source.GetTitle = lambda: "eye.SLDPRT"
-    annotations = {}
-    for sheet_name, view in (("FINISHED", scene.front), ("SUPPLIER-STOCK", settled.stock)):
-        view.ReferencedDocument = scene.source
-        rows = []
-        for display in settled.displays[sheet_name]:
-            annotation = SimpleNamespace(
-                Owner=view, OwnerType=0, GetType=lambda: 4,
-                GetSpecificAnnotation=lambda display=display: display,
-                GetAttachedEntities3=lambda: tuple(settled.attachment.entities),
-                GetAttachedEntityTypes=lambda: tuple(settled.attachment.kinds),
-                GetAttachedEntityCount3=lambda: settled.attachment.count,
-                IsDangling=lambda: settled.attachment.dangling,
-            )
-            display.GetAnnotation = lambda annotation=annotation: annotation
-            rows.append(annotation)
-        annotations[sheet_name] = rows
-        view.GetAnnotations = lambda rows=rows: tuple(rows)
+    output = scene.source_path.parent / "sm-vn-boss-hook.SLDDRW"
+    monkeypatch.setattr(drawing, "OUTPUTS", replace(drawing.OUTPUTS, slddrw=output))
     prior = drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
     return SimpleNamespace(
-        settled=settled, prior=prior, document_state=document_state,
-        annotations=annotations, original=annotations["FINISHED"][0],
+        settled=settled, prior=prior, document_state=settled.document_state, output=output,
+        annotations=settled.annotations, original=settled.annotations["FINISHED"][0],
         eye_display=settled.displays["FINISHED"][0],
     )
 
 
-def _missing_key_receipt(scene, saved):
-    with pytest.raises(RuntimeError) as caught:
-        drawing._verify_supplier_references(
-            scene.adapter, saved.settled.refs, saved.settled.contracts, prior=saved.prior,
-        )
-    assert str(caught.value) == "EyeID: settled supplier dimension disappeared"
-    marker = "SM_SUPPLIER_SAVED_KEY_RECEIPT "
-    assert len(caught.value.__notes__) == 1 and caught.value.__notes__[0].startswith(marker)
-    return caught.value, json.loads(caught.value.__notes__[0][len(marker):])
+def _save_supplier_keys(saved):
+    """Simulate native getters changing; production never transforms an old key."""
+    saved.document_state.path = str(saved.output.resolve())
+    for refs in saved.settled.displays.values():
+        for display in refs:
+            native = display.GetDimension2(0)
+            native.FullName += "@actual-saved-container"
+    # No common spelling or suffix grammar connects this fresh physical key to
+    # its old key. Only the original native annotation can identify it.
+    saved.eye_display.GetDimension2(0).FullName = "native-saved-physical-key"
 
 
-def test_missing_exact_saved_key_refuses_even_if_original_annotation_identity_survives(
+def _capture_saved(scene, saved):
+    return drawing._capture_saved_supplier_references(
+        scene.adapter, saved.settled.refs, saved.settled.contracts, saved.prior,
+    )
+
+
+def test_saved_capture_accepts_only_current_exact_key_of_original_annotation(
     supplier_eye_scene, monkeypatch,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
-    old_key = saved.prior[0].expected_key
-    native = saved.eye_display.GetDimension2(0)
-    native.FullName = "D1@finished-front@sm-vn-boss-hook.SLDDRW"
-    saved.document_state.title = "sm-vn-boss-hook.SLDDRW"
-    saved.document_state.path = "D:/out/sm-vn-boss-hook.SLDDRW"
-    # A non-dimension annotation stays in this view's complete receipt without
-    # being cast to IDisplayDimension.
+    old_refs = {sheet: list(refs) for sheet, refs in saved.settled.refs.items()}
+    old_keys = tuple(item.expected_key for item in saved.prior)
+    _save_supplier_keys(saved)
     note = SimpleNamespace(
-        Owner=scene.front, OwnerType=0, GetType=lambda: 6,
-        GetSpecificAnnotation=lambda: pytest.fail("cast a note to a display dimension"),
+        _interfaces={"IAnnotation"}, GetType=lambda: 6,
+        GetSpecificAnnotation=lambda: pytest.fail("cast an unrelated note to IDisplayDimension"),
     )
     saved.annotations["FINISHED"].append(note)
     mappings = len(scene.mappings)
-    scene.eye.GetCurve = lambda: pytest.fail("receipt inspected stale silhouette geometry")
-    _error, receipt = _missing_key_receipt(scene, saved)
-    assert receipt["expected_key"] == old_key
-    assert old_key not in receipt["current_dimension_keys"]
-    assert receipt["current_dimension_keys"] == [
-        str(display.GetDimension2(0).FullName) for display in saved.settled.displays["FINISHED"]
-    ]
-    assert receipt["pre_save"]["drawing_title"] == "UnsavedDrawing"
-    assert receipt["pre_save"]["drawing_path"] == ""
-    assert receipt["current"]["drawing_title"] == "sm-vn-boss-hook.SLDDRW"
-    assert receipt["current"]["drawing_path"] == "D:/out/sm-vn-boss-hook.SLDDRW"
-    assert receipt["current"]["drawing_IsSame"] == receipt["current"]["source_IsSame"] == 1
-    assert receipt["current"]["view_IsSame"] == 1
-    assert receipt["original_annotation_current_full_name"] == native.FullName
-    assert receipt["annotation_count"] == len(saved.annotations["FINISHED"]) == 6
-    assert len(receipt["annotations"]) == 6
-    row = receipt["annotations"][0]
-    assert row["dimension_full_name"] == native.FullName
-    assert row["owner_type"] == 0
-    assert row["owner_view_name"] == scene.front.Name
-    assert row["owner_view_configuration"] == "Finished"
-    assert row["owner_source_path"] == str(scene.source_path.resolve())
-    assert row["owner_source_title"] == "eye.SLDPRT"
-    assert row["owner_view_IsSame"] == row["original_annotation_IsSame"] == 1
-    assert receipt["annotations"][-1]["dimension_full_name"] == {
-        "annotation_type": 6, "dimension_full_name": None,
-    }
-    assert receipt["save_success_proven"] is False
-    assert len(scene.mappings) == mappings
-
-
-def test_missing_saved_key_receipt_distinguishes_replacement_from_original_annotation(
-    supplier_eye_scene, monkeypatch,
-):
-    scene = supplier_eye_scene
-    saved = _saved_key_scene(scene, monkeypatch)
-    saved.eye_display.GetDimension2(0).FullName = "DifferentDimension@other"
-    replacement = SimpleNamespace(
-        Owner=scene.front, OwnerType=0, GetType=lambda: 4,
-        GetSpecificAnnotation=lambda: saved.eye_display,
-    )
-    saved.annotations["FINISHED"][0] = replacement
-
-    def deleted_proxy():
-        raise OSError("original annotation proxy no longer resolves")
-
-    saved.original.GetSpecificAnnotation = deleted_proxy
-    _error, receipt = _missing_key_receipt(scene, saved)
-    assert receipt["annotations"][0]["original_annotation_IsSame"] == 0
-    assert receipt["original_annotation_current_full_name"] == {
-        "error_type": "OSError", "message": "original annotation proxy no longer resolves",
-    }
-    assert receipt["annotations"][0]["dimension_full_name"] == "DifferentDimension@other"
-
-
-@pytest.mark.parametrize("field", ("source-title", "annotation-kind", "owner-type", "native-identity", "annotations"))
-def test_saved_key_receipt_records_per_field_read_failure_without_replacing_refusal(
-    supplier_eye_scene, monkeypatch, field,
-):
-    scene = supplier_eye_scene
-    saved = _saved_key_scene(scene, monkeypatch)
-    saved.eye_display.GetDimension2(0).FullName = "renamed@native"
-
-    def failed(*_args):
-        raise OSError(f"{field} unavailable")
-
-    if field == "source-title":
-        scene.source.GetTitle = failed
-    elif field == "annotation-kind":
-        saved.original.GetType = failed
-    elif field == "owner-type":
-        saved.original.OwnerType = object()
-    elif field == "annotations":
-        scene.front.GetAnnotations = failed
-    else:
-        same = scene.adapter.swApp.IsSame
-
-        def identity(first, second):
-            if first is saved.original:
-                return failed()
-            return same(first, second)
-
-        scene.adapter.swApp.IsSame = identity
-    _error, receipt = _missing_key_receipt(scene, saved)
-    if field == "source-title":
-        assert receipt["current"]["source_title"]["error_type"] == "OSError"
-        assert receipt["annotations"][0]["owner_source_title"]["error_type"] == "OSError"
-    elif field == "annotation-kind":
-        assert receipt["annotations"][0]["dimension_full_name"]["error_type"] == "OSError"
-        assert receipt["annotations"][1]["owner_view_name"] == scene.front.Name
-    elif field == "owner-type":
-        assert receipt["annotations"][0]["owner_type"]["error_type"] == "TypeError"
-        assert receipt["annotations"][0]["dimension_full_name"] == "renamed@native"
-    elif field == "annotations":
-        assert receipt["annotations"]["error_type"] == "OSError"
-        assert receipt["current_dimension_keys"][0] == "renamed@native"
-    else:
-        assert receipt["annotations"][0]["original_annotation_IsSame"]["error_type"] == "OSError"
-        assert receipt["current"]["drawing_IsSame"] == 1
-
-
-@pytest.mark.parametrize("failure", ("capture", "serialization"))
-def test_saved_key_receipt_failure_preserves_the_original_missing_key_exception(
-    supplier_eye_scene, monkeypatch, failure,
-):
-    scene = supplier_eye_scene
-    saved = _saved_key_scene(scene, monkeypatch)
-    saved.eye_display.GetDimension2(0).FullName = "renamed@native"
-
-    def failed(*_args, **_kwargs):
-        raise OSError("bounded identity receipt unavailable")
-
-    if failure == "capture":
-        monkeypatch.setattr(drawing, "_supplier_saved_key_receipt", failed)
-    else:
-        monkeypatch.setattr(drawing.json, "dumps", failed)
-    with pytest.raises(RuntimeError) as caught:
-        drawing._verify_supplier_references(
-            scene.adapter, saved.settled.refs, saved.settled.contracts, prior=saved.prior,
-        )
-    assert str(caught.value) == "EyeID: settled supplier dimension disappeared"
-    assert caught.value.__notes__ == [
-        "SM_SUPPLIER_SAVED_KEY_RECEIPT capture failed: OSError: bounded identity receipt unavailable",
-    ]
-
-
-def test_passing_saved_reference_checks_never_run_the_failure_receipt(supplier_eye_scene, monkeypatch):
-    scene = supplier_eye_scene
-    saved = _saved_key_scene(scene, monkeypatch)
-    monkeypatch.setattr(
-        drawing, "_supplier_saved_key_receipt",
-        lambda *_args: pytest.fail("passing strict check ran a failure receipt"),
-    )
-    snapshots = drawing._verify_supplier_references(
-        scene.adapter, saved.settled.refs, saved.settled.contracts, prior=saved.prior,
-    )
-    assert type(snapshots) is tuple and len(snapshots) == 6
-    assert snapshots[0].annotation is saved.original
-    assert snapshots[0].view is scene.front and snapshots[0].drawing_document is scene.model
-    assert snapshots[0].source_document is scene.source
+    captured = _capture_saved(scene, saved)
+    assert len(scene.mappings) == mappings, "identity capture must not read stale geometry"
+    assert captured is not saved.settled.refs and captured["FINISHED"] is not old_refs["FINISHED"]
+    assert captured["FINISHED"][0][0] == "native-saved-physical-key"
+    assert captured["FINISHED"][0][1] is saved.settled.refs["FINISHED"][0][1]
+    assert saved.settled.refs == old_refs
+    assert tuple(item.expected_key for item in saved.prior) == old_keys
+    assert saved.prior[0].drawing_path == ""
+    assert saved.prior[0].annotation is saved.original
+    assert saved.prior[0].view is scene.front and saved.prior[0].drawing_document is scene.model
+    assert saved.prior[0].source_document is scene.source
     with pytest.raises(FrozenInstanceError):
-        snapshots[0].expected_key = "changed"
+        saved.prior[0].expected_key = "changed"
+    # The old strict keys remain strict even after a successful identity capture.
+    with pytest.raises(RuntimeError, match="settled supplier dimension disappeared"):
+        drawing._verify_supplier_references(scene.adapter, saved.settled.refs, saved.settled.contracts)
+    current = drawing._verify_supplier_references(scene.adapter, captured, saved.settled.contracts)
+    assert len(current) == 6 and current[0].expected_key == "native-saved-physical-key"
+    assert len(scene.mappings) == mappings + 1
+    assert scene.picks == scene.projections == scene.visible_queries == []
 
 
-def test_identity_metadata_capture_cannot_turn_successful_strict_check_into_refusal(
-    supplier_eye_scene, monkeypatch,
+@pytest.mark.parametrize("equality", (0, -1, 2, True, "1", 1.0))
+def test_saved_capture_refuses_wrong_or_unknown_original_annotation_identity(
+    supplier_eye_scene, monkeypatch, equality,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
-
-    def title_error():
-        raise OSError("document title temporarily unavailable")
-
-    scene.model.GetTitle = title_error
-    snapshots = drawing._verify_supplier_references(scene.adapter, saved.settled.refs, saved.settled.contracts)
-    assert len(snapshots) == 6
-    assert dict(snapshots[0].metadata)["drawing_title"] == (
-        "read_error: OSError: document title temporarily unavailable"
+    _save_supplier_keys(saved)
+    same = scene.adapter.swApp.IsSame
+    scene.adapter.swApp.IsSame = lambda first, second: (
+        equality if first is saved.original and second is saved.original else same(first, second)
     )
+    with pytest.raises(RuntimeError):
+        _capture_saved(scene, saved)
 
 
-def test_saved_key_receipt_freezes_failed_key_inventory_before_later_native_identity_reads(
-    supplier_eye_scene, monkeypatch,
+@pytest.mark.parametrize("fault", (
+    "missing", "duplicate", "foreign-same-key", "non-dimension", "missing-display",
+    "wrong-display-interface", "foreign-display-annotation", "missing-native", "empty-key", "duplicate-key",
+))
+def test_saved_capture_requires_one_typed_original_current_annotation(
+    supplier_eye_scene, monkeypatch, fault,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
-    native = saved.eye_display.GetDimension2(0)
-    native.FullName = "first-native-key@after-save"
+    _save_supplier_keys(saved)
+    if fault == "missing":
+        saved.annotations["FINISHED"].remove(saved.original)
+    elif fault == "duplicate":
+        saved.annotations["FINISHED"].append(saved.original)
+    elif fault == "foreign-same-key":
+        replacement = SimpleNamespace(
+            _interfaces={"IAnnotation"}, Owner=scene.front, OwnerType=0, GetType=lambda: 4,
+            GetSpecificAnnotation=lambda: saved.eye_display,
+        )
+        saved.annotations["FINISHED"][0] = replacement
+    elif fault == "non-dimension":
+        saved.original.GetType = lambda: 6
+        saved.original.GetSpecificAnnotation = lambda: pytest.fail("cast a note to a dimension")
+    elif fault == "missing-display":
+        saved.original.GetSpecificAnnotation = lambda: None
+    elif fault == "wrong-display-interface":
+        saved.original.GetSpecificAnnotation = lambda: SimpleNamespace(_interfaces={"INote"})
+    elif fault == "foreign-display-annotation":
+        saved.eye_display.GetAnnotation = lambda: SimpleNamespace(_interfaces={"IAnnotation"})
+    elif fault == "missing-native":
+        saved.eye_display.GetDimension2 = lambda _index: None
+    elif fault == "empty-key":
+        saved.eye_display.GetDimension2(0).FullName = ""
+    else:
+        saved.eye_display.GetDimension2(0).FullName = saved.settled.displays["FINISHED"][1].GetDimension2(0).FullName
+    with pytest.raises((RuntimeError, TypeError)):
+        _capture_saved(scene, saved)
 
-    def annotations():
-        native.FullName = "later-native-key@receipt-read"
-        return tuple(saved.annotations["FINISHED"])
 
-    scene.front.GetAnnotations = annotations
-    saved.settled.stock.GetAnnotations = lambda: pytest.fail("receipt enumerated another view")
-    _error, receipt = _missing_key_receipt(scene, saved)
-    assert receipt["pre_save"]["dimension_key"] == saved.prior[0].expected_key
-    assert receipt["current_dimension_keys"][0] == "first-native-key@after-save"
-    assert receipt["annotations"][0]["dimension_full_name"] == "later-native-key@receipt-read"
-
-
-@pytest.mark.parametrize("owner_type", (1, 3))
-def test_saved_key_receipt_never_treats_sheet_or_part_owner_as_drawing_view(
+@pytest.mark.parametrize("owner_type", (1, 3, False, "0"))
+def test_saved_capture_never_interprets_sheet_or_part_owner_as_view(
     supplier_eye_scene, monkeypatch, owner_type,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
-    saved.eye_display.GetDimension2(0).FullName = "renamed@native"
+    _save_supplier_keys(saved)
 
     class ForeignOwner:
         def __getattribute__(self, name):
@@ -2064,46 +1953,288 @@ def test_saved_key_receipt_never_treats_sheet_or_part_owner_as_drawing_view(
         return bind(value, interface)
 
     monkeypatch.setattr(drawing, "_early_bound", typed)
-    _error, receipt = _missing_key_receipt(scene, saved)
-    row = receipt["annotations"][0]
-    assert row["owner_type"] == owner_type and row["owner_present"] is True
-    assert all(row[field] is None for field in (
-        "owner_view_name", "owner_view_configuration", "owner_source_path",
-        "owner_source_title", "owner_view_IsSame",
-    ))
-    assert row["original_annotation_IsSame"] == 1
-    assert len(receipt["annotations"]) == len(saved.annotations["FINISHED"])
+    with pytest.raises(RuntimeError, match="drawing-view owner 0"):
+        _capture_saved(scene, saved)
 
 
-def test_saved_key_receipt_records_drawing_view_owner_bind_failure_per_field(
+@pytest.mark.parametrize("fault", (
+    "wrong-output", "alias-output", "missing-output", "drawing-identity", "view-identity",
+    "duplicate-view", "missing-view", "source-identity", "wrong-source-path", "alias-source-path",
+    "missing-source", "wrong-configuration", "foreign-owner", "missing-owner", "unknown-owner",
+    "unknown-drawing", "unknown-view", "unknown-source",
+))
+def test_saved_capture_refuses_foreign_binding_metadata_or_output(
+    supplier_eye_scene, monkeypatch, fault,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    _save_supplier_keys(saved)
+    if fault == "wrong-output":
+        saved.document_state.path = str(saved.output.with_name("foreign.SLDDRW"))
+    elif fault == "alias-output":
+        saved.document_state.path = str(saved.output.parent / "alias" / ".." / saved.output.name)
+    elif fault == "missing-output":
+        saved.document_state.path = ""
+    elif fault == "drawing-identity":
+        scene.adapter.currentModel = SimpleNamespace(
+            GetPathName=lambda: saved.document_state.path, ActivateSheet=scene.model.ActivateSheet,
+        )
+    elif fault in ("view-identity", "duplicate-view", "missing-view"):
+        foreign = SimpleNamespace(
+            Name=scene.front.Name, ReferencedDocument=scene.source, ReferencedConfiguration="Finished",
+            GetAnnotations=scene.front.GetAnnotations,
+        )
+        views = drawing.iter_views
+
+        def current_views(adapter):
+            if scene.state.sheet != "FINISHED":
+                return views(adapter)
+            return (
+                (foreign, saved.settled.iso) if fault == "view-identity"
+                else (scene.front, foreign, saved.settled.iso) if fault == "duplicate-view"
+                else (saved.settled.iso,)
+            )
+
+        monkeypatch.setattr(drawing, "iter_views", current_views)
+    elif fault == "source-identity":
+        scene.front.ReferencedDocument = SimpleNamespace(GetPathName=scene.source.GetPathName)
+    elif fault == "wrong-source-path":
+        scene.source.GetPathName = lambda: str(scene.source_path.with_name("foreign.SLDPRT"))
+    elif fault == "alias-source-path":
+        scene.source.GetPathName = lambda: str(
+            scene.source_path.parent / "alias" / ".." / scene.source_path.name
+        )
+    elif fault == "missing-source":
+        scene.front.ReferencedDocument = None
+    elif fault == "wrong-configuration":
+        scene.front.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "foreign-owner":
+        saved.original.Owner = SimpleNamespace(
+            Name=scene.front.Name, ReferencedDocument=scene.source, ReferencedConfiguration="Finished",
+        )
+    elif fault == "missing-owner":
+        saved.original.Owner = None
+    else:
+        target = {
+            "unknown-owner": scene.front, "unknown-drawing": scene.model,
+            "unknown-view": scene.front, "unknown-source": scene.source,
+        }[fault]
+        same = scene.adapter.swApp.IsSame
+        scene.adapter.swApp.IsSame = lambda first, second: (
+            -1 if first is target and second is target else same(first, second)
+        )
+    with pytest.raises(RuntimeError):
+        _capture_saved(scene, saved)
+
+
+@pytest.mark.parametrize("stage", ("pre-save", "post-save"))
+@pytest.mark.parametrize("getter", ("drawing-path", "source-path", "annotation-kind", "annotations", "identity"))
+def test_native_identity_metadata_read_failures_refuse_instead_of_best_effort_acceptance(
+    supplier_eye_scene, monkeypatch, stage, getter,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    error = OSError(f"{getter} unavailable")
+
+    def failed(*_args):
+        raise error
+
+    if getter == "drawing-path":
+        scene.model.GetPathName = failed
+    elif getter == "source-path":
+        scene.source.GetPathName = failed
+    elif getter == "annotation-kind":
+        saved.original.GetType = failed
+    elif getter == "annotations":
+        if stage == "pre-save":
+            # Pre-save identity uses the exact strictly verified display, not
+            # an independent annotation enumeration.
+            saved.eye_display.GetAnnotation = failed
+        else:
+            scene.front.GetAnnotations = failed
+    else:
+        scene.adapter.swApp.IsSame = failed
+    if stage == "post-save":
+        _save_supplier_keys(saved)
+    with pytest.raises(OSError) as caught:
+        if stage == "pre-save":
+            drawing._verify_supplier_references(scene.adapter, saved.settled.refs, saved.settled.contracts)
+        else:
+            _capture_saved(scene, saved)
+    assert caught.value is error
+
+
+def test_failed_capture_keeps_original_references_and_frozen_snapshot_unchanged(
     supplier_eye_scene, monkeypatch,
 ):
     scene = supplier_eye_scene
     saved = _saved_key_scene(scene, monkeypatch)
-    saved.eye_display.GetDimension2(0).FullName = "renamed@native"
-    bind = drawing._early_bound
+    refs = {sheet: tuple((key, dict(contract)) for key, contract in rows)
+            for sheet, rows in saved.settled.refs.items()}
+    before = tuple(vars(item).copy() for item in saved.prior)
+    _save_supplier_keys(saved)
+    # Fail on the final sheet after earlier current keys were already captured.
+    saved.annotations["SUPPLIER-STOCK"].pop()
+    with pytest.raises(RuntimeError, match="one current original supplier annotation"):
+        _capture_saved(scene, saved)
+    assert refs == {sheet: tuple(rows) for sheet, rows in saved.settled.refs.items()}
+    for original, frozen in zip(saved.prior, before, strict=True):
+        assert vars(original) == frozen
 
-    def typed(value, interface):
-        if value is scene.front and interface == "IView":
-            # iter_views also binds this view. Fail only the later owner cast
-            # after the receipt starts reading the complete annotation array.
-            if scene.state.reading_receipt_owners:
-                raise OSError("drawing view owner bind failed")
-        return bind(value, interface)
 
-    scene.state.reading_receipt_owners = False
+def test_original_snapshots_are_never_captured_before_complete_strict_geometry_checks(
+    supplier_eye_scene, monkeypatch,
+):
+    scene = supplier_eye_scene
+    settled = _settled_supplier_scene(scene, monkeypatch)
+    settled.displays["SUPPLIER-STOCK"][-1].GetDimension2(0).Tolerance.Type = 1
+    monkeypatch.setattr(
+        drawing, "_capture_supplier_reference_identity",
+        lambda *_args: pytest.fail("captured identities before complete strict supplier checks"),
+    )
+    with pytest.raises(RuntimeError, match="tolerance band"):
+        drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
 
-    def annotations():
-        scene.state.reading_receipt_owners = True
-        return tuple(saved.annotations["FINISHED"])
 
-    scene.front.GetAnnotations = annotations
-    monkeypatch.setattr(drawing, "_early_bound", typed)
-    _error, receipt = _missing_key_receipt(scene, saved)
-    row = receipt["annotations"][0]
-    assert row["owner_type"] == 0 and row["owner_present"] is True
-    assert row["owner_view_error"] == {
-        "error_type": "OSError", "message": "drawing view owner bind failed",
-    }
-    assert row["owner_view_name"] is None and row["original_annotation_IsSame"] == 1
-    assert len(receipt["annotations"]) == len(saved.annotations["FINISHED"])
+def test_saved_identity_success_cannot_bypass_current_physical_geometry(
+    supplier_eye_scene, monkeypatch,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    _save_supplier_keys(saved)
+    captured = _capture_saved(scene, saved)
+    saved.settled.attachment.entities = [scene.outer]
+    with pytest.raises(RuntimeError, match="exact physical source contour"):
+        drawing._verify_supplier_references(scene.adapter, captured, saved.settled.contracts)
+
+
+def test_identity_capture_cannot_advance_unsaved_drawing_to_new_key_contract(
+    supplier_eye_scene, monkeypatch,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    with pytest.raises(RuntimeError, match="not the native output"):
+        _capture_saved(scene, saved)
+    current = drawing._verify_supplier_references(scene.adapter, saved.settled.refs, saved.settled.contracts)
+    assert tuple(item.expected_key for item in current) == tuple(item.expected_key for item in saved.prior)
+
+
+@pytest.mark.parametrize("duplicate", (False, True))
+def test_current_annotation_matching_uses_native_identity_not_python_wrapper_identity(
+    supplier_eye_scene, monkeypatch, duplicate,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    _save_supplier_keys(saved)
+    current = SimpleNamespace(**vars(saved.original))
+    saved.eye_display.GetAnnotation = lambda: current
+    saved.annotations["FINISHED"][0] = current
+    if duplicate:
+        saved.annotations["FINISHED"].append(SimpleNamespace(**vars(current)))
+    native_matches = [saved.original, *saved.annotations["FINISHED"][:1]]
+    if duplicate:
+        native_matches.append(saved.annotations["FINISHED"][-1])
+    same = scene.adapter.swApp.IsSame
+
+    def native_same(first, second):
+        if any(first is value for value in native_matches) and any(
+            second is value for value in native_matches
+        ):
+            return 1
+        return same(first, second)
+
+    scene.adapter.swApp.IsSame = native_same
+    assert current is not saved.original
+    if duplicate:
+        with pytest.raises(RuntimeError, match="one current original supplier annotation; actual=2"):
+            _capture_saved(scene, saved)
+    else:
+        captured = _capture_saved(scene, saved)
+        assert captured["FINISHED"][0][0] == "native-saved-physical-key"
+        drawing._verify_supplier_references(scene.adapter, captured, saved.settled.contracts)
+
+
+@pytest.mark.parametrize("fault", ("identity", "unknown", "configuration", "source-path", "source-identity"))
+def test_native_owner_proof_rejects_foreign_or_inconsistent_same_name_view(
+    supplier_eye_scene, monkeypatch, fault,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    _save_supplier_keys(saved)
+    owner = SimpleNamespace(
+        Name=scene.front.Name, ReferencedConfiguration="Finished", ReferencedDocument=scene.source,
+    )
+    saved.original.Owner = owner
+    same = scene.adapter.swApp.IsSame
+
+    def native_same(first, second):
+        if first is owner and second is scene.front:
+            return 0 if fault == "identity" else -1 if fault == "unknown" else 1
+        return same(first, second)
+
+    scene.adapter.swApp.IsSame = native_same
+    if fault == "configuration":
+        owner.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+    elif fault in ("source-path", "source-identity"):
+        owner.ReferencedDocument = SimpleNamespace(
+            GetPathName=(
+                (lambda: str(scene.source_path.with_name("foreign.SLDPRT")))
+                if fault == "source-path" else scene.source.GetPathName
+            ),
+        )
+    with pytest.raises(RuntimeError):
+        _capture_saved(scene, saved)
+
+
+@pytest.mark.parametrize("fault", ("missing-original", "duplicate-original", "foreign-original-key", "foreign-label"))
+def test_saved_capture_requires_complete_original_reference_contract(
+    supplier_eye_scene, monkeypatch, fault,
+):
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    _save_supplier_keys(saved)
+    if fault == "missing-original":
+        saved.prior = saved.prior[:-1]
+    elif fault == "duplicate-original":
+        saved.prior = (*saved.prior[:-1], saved.prior[0])
+    elif fault == "foreign-original-key":
+        saved.prior = (replace(saved.prior[0], expected_key="foreign-original"), *saved.prior[1:])
+    else:
+        saved.prior = (replace(saved.prior[0], label="ForeignLabel"), *saved.prior[1:])
+    with pytest.raises(RuntimeError):
+        _capture_saved(scene, saved)
+
+
+def test_failed_identity_capture_cannot_replace_original_native_save_error(
+    supplier_eye_scene, monkeypatch,
+):
+    from _drawing_common import _drawing_checkpoint
+
+    scene = supplier_eye_scene
+    saved = _saved_key_scene(scene, monkeypatch)
+    save_error = OSError("native SaveAs3 failed before output path changed")
+    old_keys = tuple(item.expected_key for item in saved.prior)
+
+    def observe(event):
+        if event == "after_drawing_save":
+            _capture_saved(scene, saved)
+
+    with pytest.raises(OSError) as caught:
+        with _drawing_checkpoint(observe, "drawing_save"):
+            raise save_error
+    assert caught.value is save_error
+    assert any("after_drawing_save checkpoint also failed" in note for note in save_error.__notes__)
+    assert any("not the native output" in note for note in save_error.__notes__)
+    assert tuple(item.expected_key for item in saved.prior) == old_keys
+    assert saved.document_state.path == ""
+
+
+def test_pre_save_identity_snapshot_refuses_shared_native_annotation_for_two_references(
+    supplier_eye_scene, monkeypatch,
+):
+    scene = supplier_eye_scene
+    settled = _settled_supplier_scene(scene, monkeypatch)
+    eye_annotation = settled.annotations["FINISHED"][0]
+    settled.displays["FINISHED"][1].GetAnnotation = lambda: eye_annotation
+    with pytest.raises(RuntimeError, match="distinct native annotations"):
+        drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
