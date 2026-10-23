@@ -541,13 +541,16 @@ def test_section_a_a_group_stays_inside_the_border() -> None:
 
 def test_section_a_a_finishes_stand_on_their_faces_clear_of_the_caption() -> None:
     """A-A looks south (top face at its head, 0.12635; underside at its foot,
-    0.11365): the seat's symbol (Ra 3.2, ~7 mm tall) over the strip and the
-    (0.25) text, the base slide's (Ra 1.6 under SLIDING FACE, ~10.1 mm tall)
-    under it, clear of the strip and of the caption lowered under it."""
+    0.11365): the seat's symbol (Ra 3.2, ~7 mm tall) over the strip right of
+    the PlateThk text, the (0.25) text over its upper arrowhead, the base
+    slide's (Ra 1.6 under SLIDING FACE, ~10.1 mm tall) under the strip, clear
+    of it and of the caption lowered under it."""
     head, foot = 0.12635, 0.11365
     relief_text_bottom = drawing.SECTION_KEEP["PivotBearingReliefDepth"][1] - 0.0015
     assert relief_text_bottom - (head + 0.0039) >= 0.002  # upper arrowhead
-    assert drawing.SEAT_FINISH_XY[1] - 0.0007 - (relief_text_bottom + 0.003) >= 0.002
+    seat_x, seat_y = drawing.SEAT_FINISH_XY
+    assert seat_y - head >= 0.005
+    assert seat_x - 0.0022 > _plate_thickness_text_box()[2] + 0.002  # vee
     slide_top = drawing.BASE_SLIDE_FINISH_XY[1] + 0.0101
     assert foot - slide_top >= 0.004
     # The caption's top centre: SECTION A-A over SCALE 2:1, ~15 mm tall.
@@ -699,6 +702,17 @@ def _face_labels() -> dict[str, tuple[tuple[float, float], tuple]]:
         x, y = tip[0] + offset[0], tip[1] + offset[1]
         labels[f"{key} {text}"] = (tip, (x, y - 0.0036, x + _FACE_LABEL_WIDTHS[text], y))
     return labels
+
+
+def _a_a_top_face_box() -> tuple[float, float, float, float]:
+    """A-A's TOP FACE label as the layout audit boxes it: text to tip."""
+    tip, text = _face_labels()["A-A TOP FACE"]
+    return (
+        min(text[0], tip[0]),
+        min(text[1], tip[1]),
+        max(text[2], tip[0]),
+        max(text[3], tip[1]),
+    )
 
 
 def _cc_face_label_boxes() -> dict[str, tuple[float, float, float, float]]:
@@ -1694,7 +1708,7 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
     # y 0.12635, floor 0.5 mm under it).  The leader leaves the top row's
     # right end and falls to the left-hand piece's floor: at the top face it
     # passes through the relief's opening (x 0.3615..0.36565), not the hatch;
-    # it stays right of the TOP FACE label and left of the seat's Ra vee.
+    # it passes between the seat's Ra text and the TOP FACE label's box.
     scale = 2.0 / 1000.0
     head = 0.12635
     floor = head - spec.PIVOT_BEARING_RELIEF_DEPTH * scale
@@ -1711,16 +1725,16 @@ def test_relief_fit_note_stands_over_section_a_a_clear_of_its_neighbours() -> No
 
     assert 0.372 - relief * scale < tip[0] < 0.372 - bore * scale
     assert 0.372 - relief * scale < x_at(head) < 0.372 - bore * scale
-    label_tip, label = _face_labels()["A-A TOP FACE"]
-    assert min(x_at(label[1]), x_at(label[3])) > label[2] + 0.002
-    assert x_at(label_tip[1]) > label_tip[0] + 0.002
-    seat_vee_left = drawing.SEAT_FINISH_XY[0] - 0.0027
-    seat_foot = drawing.SEAT_FINISH_XY[1] - 0.0007
-    assert max(start[0], tip[0], x_at(seat_foot)) < seat_vee_left - 0.005
-    # Positive control: the right-hand piece's floor (the north-looking
-    # route) would run its leader into the seat's symbol.
-    tip = tip_at(1)
-    assert x_at(seat_foot) > seat_vee_left
+    seat_text_right = drawing.SEAT_FINISH_XY[0] + 0.0164  # r2: Ra 3.2 ends +16.4 mm
+    for row in (drawing.SEAT_FINISH_XY[1], drawing.SEAT_FINISH_XY[1] + 0.0061):
+        assert x_at(row) > seat_text_right + 0.005
+    # The layout audit boxes each note from its text to its tip (r2: the
+    # TOP FACE label on the left-hand piece lay inside this note's box).
+    note_box = (x, tip[1], max(right, tip[0]), y)
+    assert not _boxes_overlap(note_box, _a_a_top_face_box())
+    old_tip = (0.372 - 2 * 6.8 / 1000.0, head)
+    old_box = (old_tip[0] - 0.024, head, old_tip[0], head + 0.0086)
+    assert _boxes_overlap(note_box, old_box)
 
 
 def test_both_sections_name_their_faces() -> None:
@@ -1740,13 +1754,15 @@ def test_both_sections_name_their_faces() -> None:
     # back through the letters (r6: two leader-through-own-text).
     for name, (tip, text) in labels.items():
         assert tip[0] < text[0] - 0.0015 or tip[0] > text[2] + 0.0015, name
-    # A-A's label over its strip, on the left-hand piece's top face outboard
-    # of the relief, between the PlateThk text and the relief note.
+    # A-A's label over the right-hand piece's top face outboard of the
+    # relief, right of the relief note's text-to-tip box, over (0.25).
     tip, top = labels["A-A TOP FACE"]
-    assert 0.3402 < tip[0] < 0.372 - spec.PIVOT_BEARING_RELIEF_DIAMETER / 1000.0
+    relief_edge = 0.372 + spec.PIVOT_BEARING_RELIEF_DIAMETER / 1000.0
+    assert relief_edge < tip[0] < 0.3899  # r2: right-hand piece ends 0.3899
     assert top[1] > tip[1] + 0.004  # strip head
-    assert top[0] - _plate_thickness_text_box()[2] > 0.00357  # PlateThk text
-    assert top[3] < 0.148 - 0.002  # the relief note's bottom row (r2)
+    assert top[1] > 0.1352 + 0.004  # (0.25) text top (r2)
+    assert top[0] > 0.3637 + 0.002  # relief note's tip (r2)
+    assert top[2] < 0.4149  # border less the audit's 4 mm
     # C-C's UNDERSIDE: its tip on the solid underside left of the
     # counterbore, its text clear of the native label by more than the
     # audit's separation (3.57 mm; r8 advisory at 2.26).
@@ -1806,32 +1822,57 @@ def test_sections_turn_to_look_south_top_face_up(monkeypatch, defect) -> None:
 
 
 @pytest.mark.parametrize("ignored", [False, True])
-def test_reversed_pivot_section_is_moved_back_onto_its_station(monkeypatch, ignored):
+def test_reversed_pivot_section_is_cropped_and_moved_back(monkeypatch, ignored):
     """Run 20261023T181910549Z: reversed, A-A kept its underside at 0.12635
-    and grew 12.7 mm upward, so one PlateThk witness missed its level.  The
-    view is moved until the underside reads PIVOT_SECTION_UNDERSIDE_Y; a
-    move SolidWorks ignores is refused."""
-    state = {"y": 0.12635}
+    and grew 12.7 mm upward; run 20261023T182942818Z: its outline was the
+    whole plate south of the cut, 28.2 mm past the border.  The view is
+    cropped to its strip, then moved until the bore axis at the underside
+    reads PIVOT_SECTION_BORE_XY; a move SolidWorks ignores is refused."""
+    state = {"origin": (0.3725, 0.12635)}
+    fences = []
 
     def move(position, _snap):
         if not ignored:
-            state["y"] += position[1] - 0.120
+            ox, oy = state["origin"]
+            state["origin"] = (ox + position[0] - 0.365, oy + position[1] - 0.120)
         return True
 
-    view = types.SimpleNamespace(Position=(0.365, 0.120), SetViewPosition=move)
+    def project(_adapter, _view, point, **_kwargs):
+        ox, oy = state["origin"]
+        return (ox + 2 * point[0], oy + 2 * point[1])
+
+    view = types.SimpleNamespace(
+        Position=(0.365, 0.120), SetViewPosition=move, GetOutline=lambda: ()
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
     monkeypatch.setattr(drawing, "double_array", list)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
     monkeypatch.setattr(
-        drawing, "model_point_in_view", lambda *_args, **_kwargs: (0.372, state["y"])
+        drawing,
+        "_crop_section_to_fence",
+        lambda _adapter, _view, fence, *, label: fences.append((label, fence)),
     )
-    assert drawing.PIVOT_SECTION_UNDERSIDE_Y == pytest.approx(0.11365)
+    assert drawing.PIVOT_SECTION_BORE_XY == pytest.approx((0.372, 0.11365))
     if ignored:
         with pytest.raises(RuntimeError, match="landed at"):
-            drawing._place_pivot_section(object(), view)
-    else:
-        drawing._place_pivot_section(object(), view)
-        assert state["y"] == pytest.approx(drawing.PIVOT_SECTION_UNDERSIDE_Y)
+            drawing._crop_and_place_pivot_section(object(), view)
+        return
+    drawing._crop_and_place_pivot_section(object(), view)
+    assert state["origin"] == pytest.approx(drawing.PIVOT_SECTION_BORE_XY)
+    [(label, fence)] = fences
+    margin = drawing.PIVOT_CROP_MARGIN_MM * 2 / 1000.0
+    east = drawing.plate_edge_mm(0.0, -1)
+    west = drawing.plate_edge_mm(0.0, 1)
+    assert label == "A-A"
+    assert fence == pytest.approx(
+        (
+            0.3725 + 2 * east / 1000.0 - margin,
+            0.12635 - margin,
+            0.3725 + 2 * west / 1000.0 + margin,
+            0.12635 + 2 * spec.PLATE_THICKNESS / 1000.0 + margin,
+        )
+    )
 
 
 @pytest.mark.parametrize(

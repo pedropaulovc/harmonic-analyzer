@@ -79,7 +79,12 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 import build_dt_cone_swing_platform as _part
-from diagnostics.drawing_layout_audit import collect_document, describe_sheet
+from diagnostics.drawing_layout_audit import (
+    _display_data,
+    _display_lines,
+    collect_document,
+    describe_sheet,
+)
 from dt_cone_swing_platform_drawing_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -163,12 +168,13 @@ SECTION_CENTER = _shifted(0.335, 0.105)
 # drew the top face at its foot, opposite to C-C), so the top seat stands up
 # and the base slide down.  The layout audit boxes an Ra symbol 39 mm right
 # of its anchor, so neither anchor takes SECTION_SHIFT's extra 10 mm past the
-# border (0.4189).  The seat's symbol stands over the right-hand piece, over
-# the (0.25) text (~0.133..0.136) and clear of the relief note's leader; its
+# border (0.4189).  The seat's symbol stands over the left-hand piece, right
+# of the PlateThk text and left of the relief note's leader (x >= 0.357; the
+# symbol has no audit box to collide with that note's text-to-tip box); its
 # leader drops right to that piece's top face.  The base slide's stands
 # under the bore's gap and the right-hand piece, its leader rising left
 # (smart side) to the left-hand piece's underside, clear of its text.
-SEAT_FINISH_XY = (0.375, 0.139)
+SEAT_FINISH_XY = (0.337, 0.134)
 BASE_SLIDE_FINISH_XY = (0.370, 0.099)
 # A-A's native caption, top centre, lowered 8 mm under the base-slide symbol
 # into the open band above the title block (top 0.066).
@@ -376,12 +382,14 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
 # left-hand piece (relief_floor_tip_xy), now at A-A's head: rule 7, a
 # matched fit is flagged at the feature (machinist review r1: under section
 # C-C it read as C-C's).  The note's right end (~0.357) stands over the
-# left-hand floor, so the leader falls nearly straight, right of the TOP
-# FACE label and left of the seat's Ra symbol (x >= 0.372); to the
-# right-hand piece's floor it would cross y 0.135 at ~0.373, on that symbol.
+# left-hand floor, so the leader falls nearly straight, between the seat's
+# Ra symbol (x <= ~0.353) and the TOP FACE label on the right-hand piece.
+# The layout audit boxes the note from its text to its tip (r2 of this fix:
+# 0.2999..0.3633 x 0.1259..0.1654), so no other note may stand over the
+# strip left of the tip.
 # r3 put the top row on the 213.56 text (bottom ~0.169, right end ~0.3025):
 # the note's top stands under it, its bottom row (~0.141) over the PlateThk
-# text and A-A's TOP FACE label.
+# text.
 # r11 left 2.68 mm to the 213.56 text; 1.2 mm lower clears the 3.57 mm
 # text-separation threshold while preserving the relief-floor leader route.
 RELIEF_NOTE_XY = (0.300, 0.1653)
@@ -465,15 +473,15 @@ HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
 # without running back through the letters (r6: two leader-through-own-text
 # with tips over the text's span).  The layout audit boxes a note with its
 # leader, text to tip.  Positions are measured on r3..r8's renders; the tip
-# is projected on the face.  A-A's TOP FACE stands over its strip, in the
-# field between the PlateThk text (right end 0.3298) and the relief note's
-# leader, under the note (bottom ~0.148); C-C's UNDERSIDE names the face
+# is projected on the face.  A-A's TOP FACE stands over the right-hand piece,
+# right of the relief note's text-to-tip box (x <= 0.3637) and over the
+# (0.25) text (top ~0.1352); C-C's UNDERSIDE names the face
 # its callout's FROM UNDERSIDE names.  No field right of C-C's strip
 # holds a 22 mm label short of the hold-down callout and the title block.
 FACE_LABELS = (
-    # Over A-A's strip, ending 2 mm left of its tip on the left-hand piece's
-    # top face, 1.55 mm (model) outboard of the relief's edge.
-    ("A-A", TOP_FACE_LABEL, (-6.8, 6.8), PLATE_THICKNESS, "min", (-0.024, 0.0086)),
+    # Over A-A's strip, starting 2 mm right of its tip on the right-hand
+    # piece's top face (model 5.25..8.95 outboard of the relief).
+    ("A-A", TOP_FACE_LABEL, (-6.8, 7.5), PLATE_THICKNESS, "max", (0.002, 0.01815)),
     # Under C-C's strip, left of its native label: the tip on the left
     # piece's underside (0.1463, 0.0352), the text 0.1198..0.1445 x
     # 0.0288..0.0324, 2.0 mm right of detail B's outline (0.1179) and 4.0 mm
@@ -909,38 +917,58 @@ def _look_section_south(
     )
 
 
-# A-A's underside on the sheet: the strip's foot, centred on SECTION_CENTER's
-# y as when the section looked north (the PlateThk witness check reads this
-# level and the top face's, 2 x 6.35 mm above it).  Reversed, SolidWorks kept
-# the cut-plane origin (the underside) at its old sheet y, 0.12635, and drew
-# the strip upward from there, 12.7 mm higher (run 20261023T181910549Z:
-# relief floor at 0.13855).
-PIVOT_SECTION_UNDERSIDE_Y = SECTION_SHIFT[1] + 0.09865
+# A-A's bore axis at the underside on the sheet: the strip's foot, centred on
+# SECTION_CENTER's y as when the section looked north (the PlateThk witness
+# check reads this level and the top face's, 2 x 6.35 mm above it), and the
+# axis where it stood then.  Reversed, SolidWorks kept the cut-plane origin
+# (the underside) at its old sheet y, 0.12635, and drew the strip upward from
+# there, 12.7 mm higher (run 20261023T181910549Z: relief floor at 0.13855).
+PIVOT_SECTION_BORE_XY = (0.372, SECTION_SHIFT[1] + 0.09865)
+# Looking south, A-A's outline is the whole plate south of the cut, 131 mm
+# across at 2:1 (run 20261023T182942818Z: 28.2 mm past the border), as C-C's
+# was (r9), so it is cropped to its strip the same way.
+PIVOT_CROP_MARGIN_MM = HOLDDOWN_CROP_MARGIN_MM
 
 
-def _place_pivot_section(adapter: Any, section: Any) -> None:
-    """Move A-A so its underside stands at PIVOT_SECTION_UNDERSIDE_Y, the
-    strip centred on SECTION_CENTER's y as before the reversal."""
+def _crop_and_place_pivot_section(adapter: Any, section: Any) -> None:
+    """Crop A-A to its strip, then move its bore axis at the underside onto
+    PIVOT_SECTION_BORE_XY."""
     native = _early_bound(section, "IView")
+    corners = [
+        model_point_in_view(
+            adapter,
+            section,
+            (plate_edge_mm(0.0, side) / 1000.0, y_mm / 1000.0, 0.0),
+            label=f"A-A strip corner {side:+d}",
+        )
+        for side, y_mm in ((-1, 0.0), (1, PLATE_THICKNESS))
+    ]
+    margin = PIVOT_CROP_MARGIN_MM * 2.0 / 1000.0
+    xs = [float(corner[0]) for corner in corners]
+    ys = [float(corner[1]) for corner in corners]
+    fence = (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+    _crop_section_to_fence(adapter, section, fence, label="A-A")
+    target = PIVOT_SECTION_BORE_XY
     for _attempt in range(3):
         origin = model_point_in_view(
             adapter, section, (0.0, 0.0, 0.0), label="A-A underside at the bore"
         )
-        error = PIVOT_SECTION_UNDERSIDE_Y - float(origin[1])
-        if abs(error) < 0.00005:
+        error = (target[0] - float(origin[0]), target[1] - float(origin[1]))
+        if max(abs(error[0]), abs(error[1])) < 0.00005:
             break
         position = tuple(float(value) for value in native.Position)
-        if not native.SetViewPosition(
-            double_array([position[0], position[1] + error]), False
-        ):
+        moved = [position[0] + error[0], position[1] + error[1]]
+        if not native.SetViewPosition(double_array(moved), False):
             raise RuntimeError("failed to move section A-A onto its strip station")
         rebuild_drawing(adapter, label="place section A-A strip")
     else:
         raise RuntimeError(
-            f"section A-A underside landed at y {origin[1]}, "
-            f"requested {PIVOT_SECTION_UNDERSIDE_Y}"
+            f"section A-A bore axis landed at {tuple(origin[:2])}, requested {target}"
         )
-    print(f"section A-A underside at bore axis: {tuple(float(v) for v in origin[:2])}")
+    print(
+        f"section A-A bore axis at the underside: {tuple(float(v) for v in origin[:2])} "
+        f"outline={tuple(float(value) for value in native.GetOutline())}"
+    )
 
 
 def _look_holddown_section_south(
@@ -982,27 +1010,22 @@ def _holddown_strip_corners(
     return (float(low[0]), float(low[1])), (float(high[0]), float(high[1]))
 
 
-def _crop_and_place_holddown_section(adapter: Any, section: Any) -> None:
-    """Crop section C-C to its strip, then move the strip onto
-    HOLDDOWN_STRIP_LOWER_LEFT.
+def _crop_section_to_fence(
+    adapter: Any, section: Any, fence: tuple[float, float, float, float], *, label: str
+) -> None:
+    """Crop a section view to a sheet rectangle (left, foot, right, head).
 
-    The fence is a rectangle HOLDDOWN_CROP_MARGIN_MM (model) outside the
-    strip, sketched direct to the database in the view's own sketch and
+    The fence is sketched direct to the database in the view's own sketch and
     handed to ``IView.Crop2`` with no boundary drawn (the rocker-arm
     support's VIEW B crop).  The crop is proved by the outline still holding
-    the fence and shrinking; the move by the projected strip landing on its
-    target.
+    the fence and shrinking.
     """
+    left, foot, right, head = fence
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     native = _early_bound(section, "IView")
-    scale = HOLDDOWN_SECTION_SCALE[0] / HOLDDOWN_SECTION_SCALE[1] / 1000.0
-    margin = HOLDDOWN_CROP_MARGIN_MM * scale
-    low, high = _holddown_strip_corners(adapter, native)
-    left, right = min(low[0], high[0]) - margin, max(low[0], high[0]) + margin
-    foot, head = min(low[1], high[1]) - margin, max(low[1], high[1]) + margin
     if not ddoc.ActivateView(view_name(adapter, section)):
-        raise RuntimeError("failed to activate section C-C for its crop")
+        raise RuntimeError(f"failed to activate section {label} for its crop")
     draw.ClearSelection2(True)
     before = tuple(float(value) for value in native.GetOutline())
     sketch = _early_bound(native.GetSketch(), "ISketch")
@@ -1025,23 +1048,27 @@ def _crop_and_place_holddown_section(adapter: Any, section: Any) -> None:
     finally:
         sketch_manager.AddToDB = previous_add_to_db
     if len(segments) != 4:
-        raise RuntimeError(f"section C-C crop fence has {len(segments)} segments, not 4")
+        raise RuntimeError(
+            f"section {label} crop fence has {len(segments)} segments, not 4"
+        )
     for segment in segments:
         if not _early_bound(segment, "ISketchSegment").Select4(True, None):
-            raise RuntimeError("failed to select the section C-C crop fence")
+            raise RuntimeError(f"failed to select the section {label} crop fence")
     selected = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
     status = int(native.Crop2(False, True, 0))
-    print(f"section C-C Crop2 status {status} with {selected} entities selected")
+    print(f"section {label} Crop2 status {status} with {selected} entities selected")
     if status != 1:
-        raise RuntimeError(f"failed to crop section C-C to its strip: Crop2 status {status}")
+        raise RuntimeError(
+            f"failed to crop section {label} to its strip: Crop2 status {status}"
+        )
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     native.UpdateViewDisplayGeometry()
     if not bool(native.IsCropped()):
-        raise RuntimeError("section C-C did not retain its crop")
+        raise RuntimeError(f"section {label} did not retain its crop")
     after = tuple(float(value) for value in native.GetOutline())
-    print(f"section C-C outline: before crop {before}, after {after}")
+    print(f"section {label} outline: before crop {before}, after {after}")
     # The outline pads past the fence (r9: +19.9 mm across a 55.6 mm fence,
     # +11.7 mm up a 14.7 mm one; the carrier's and nameplate's crops read
     # the same), so the proof is the carrier section's: the outline still
@@ -1056,9 +1083,26 @@ def _crop_and_place_holddown_section(adapter: Any, section: Any) -> None:
         or after[2] - after[0] > (right - left) + 0.03
     ):
         raise RuntimeError(
-            f"section C-C crop is not its strip fence "
+            f"section {label} crop is not its strip fence "
             f"{(left, foot, right, head)}: outline {before} -> {after}"
         )
+
+
+def _crop_and_place_holddown_section(adapter: Any, section: Any) -> None:
+    """Crop section C-C to its strip, then move the strip onto
+    HOLDDOWN_STRIP_LOWER_LEFT.
+
+    The fence is a rectangle HOLDDOWN_CROP_MARGIN_MM (model) outside the
+    strip (:func:`_crop_section_to_fence`); the move is proved by the
+    projected strip landing on its target.
+    """
+    native = _early_bound(section, "IView")
+    scale = HOLDDOWN_SECTION_SCALE[0] / HOLDDOWN_SECTION_SCALE[1] / 1000.0
+    margin = HOLDDOWN_CROP_MARGIN_MM * scale
+    low, high = _holddown_strip_corners(adapter, native)
+    left, right = min(low[0], high[0]) - margin, max(low[0], high[0]) + margin
+    foot, head = min(low[1], high[1]) - margin, max(low[1], high[1]) + margin
+    _crop_section_to_fence(adapter, section, (left, foot, right, head), label="C-C")
     target = HOLDDOWN_STRIP_LOWER_LEFT
     for _attempt in range(3):
         low, high = _holddown_strip_corners(adapter, native)
@@ -1949,7 +1993,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _look_section_south(adapter, profile, section, cut, z_mm=0.0, label="A-A")
-    _place_pivot_section(adapter, section)
+    _crop_and_place_pivot_section(adapter, section)
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(
@@ -2056,14 +2100,32 @@ async def build(adapter: Any) -> dict[str, str]:
     for annotation in section_annotations:
         if dimension_name(adapter, annotation) == "PlateThk":
             display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+            # The witnesses run from the faces' native origin, right of the
+            # strip (x415 before SECTION_SHIFT when A-A looked north), to the
+            # dimension line.  Read where they start now -- cropped, the origin
+            # need not stay there -- and widen each gap so they start 1.2 mm
+            # right of the cut edge (x339), without changing the model
+            # dimension or hiding either witness.
+            starts = [
+                max(segment.x0, segment.x1)
+                for segment in _display_lines(
+                    adapter, _display_data(adapter, annotation)
+                )
+                if abs(segment.y0 - segment.y1) < 1e-8
+                and any(
+                    abs(segment.y0 - SECTION_SHIFT[1] - level) < 0.0001
+                    for level in (0.09865, 0.11135)
+                )
+            ]
+            if len(starts) != 2 or abs(starts[0] - starts[1]) > 0.0001:
+                raise RuntimeError(f"plate thickness witnesses read {starts}")
+            widen = max(starts) - (SECTION_SHIFT[0] + 0.309)
+            print(f"PlateThk witness starts {starts}: widening gaps by {widen}")
             for witness_index in (0, 1):
                 ok, _use_doc, old_gap = display.GetWitnessLineGap(witness_index, False, 0.0)
                 if ok is not True:
                     raise RuntimeError("plate thickness witness gap could not be read")
-                # Measured native witness origin is x415; the actual cut edge
-                # is x310.2. Leave a visible 1.2 mm gap at x309, without
-                # changing the model dimension or hiding either witness.
-                gap = float(old_gap) + 0.106
+                gap = float(old_gap) + widen
                 if display.SetWitnessLineGap(witness_index, False, gap) is not True:
                     raise RuntimeError("plate thickness witness gap was refused")
                 ok, use_doc, actual_gap = display.GetWitnessLineGap(witness_index, False, 0.0)
@@ -2144,11 +2206,9 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="plan hole callout rows")
     # The section shows the top seat at its head and the base slide at its
     # foot.  Arrows land mid-face so neither symbol reads as controlling a
-    # corner, hole wall or outer edge: the seat on the right-hand piece's top
-    # face (outboard of the relief), the slide on the left-hand piece's.
-    seat_edge = _horizontal_section_edge(
-        section, 6.35, label="top seat", prefer_right=True
-    )
+    # corner, hole wall or outer edge: both on the left-hand piece, the
+    # longest edge of each face.
+    seat_edge = _horizontal_section_edge(section, 6.35, label="top seat")
     add_surface_finish(
         adapter,
         section,
