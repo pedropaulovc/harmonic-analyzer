@@ -661,6 +661,26 @@ Keep the full Numbers and the view's actual scale. Read `INote::GetExtent`
 after insertion to prove at least 4 mm of final air, as well as sheet and
 title-block containment; a readable source string does not prove a readable PDF.
 
+**FR's set-screw balloon must follow that same rebuilt BOM boundary.**
+The full-sheet inspection at `ebb3c20596a66f93c01fa2084eca7b3602ea32dd`
+confirmed #1843: the BOM's bottom rule passed through balloon 10's ring and
+number. The recipe's measured placement and clearance helpers existed but
+were not consumed by `_place_package`. After ordinary reattachment, apply
+`_place_frame_set_screw_balloon`: keep its right-hand lane and real screw tip,
+placing the complete ring 4 mm below the native table bottom or lower to
+retain a short leader. Include its short-leader proof with the other balloon
+settlement proofs, not just an insertion-time check.
+
+`_assert_frame_bom_balloon_clearance` must run after placement and again after
+the final rebuild. It requires at least 3 mm between the BOM rule and the
+ring's outer edge, separation from the neighbouring cap balloon, and clear
+leader routes. A rebuilt table growing down or a ring drifting up refuses
+export. The regression also brackets that unchanged floor at 3.001/2.999 mm;
+these are offline geometry cases, not a claim of native pixel resolution.
+Do not rescale the view, alter its explode or move the attachment to create
+clearance. All ten item identities and the geometric inset proof stay intact;
+the next farm export and full-sheet inspection must establish the final ink.
+
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when
 `GetTextInBoxStyleAtIndex` is `swTextInBoxStyleNone`). `_layout_geometry`
@@ -1356,6 +1376,71 @@ why. Every datum and dimension of summing-lever's pattern definition (A, B,
 acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
+
+For FR-00's nameplate inset in section B-B, model geometry alone was not
+attachment evidence. Farm run
+`20261022T204612817Z-cd964f67d895402c96f536ac40ba51d8`
+(`C:/src/farm-runs/fix1667`) selected `fr-nameplate-1` at machine
+x=163/163, y=52.300, z=25 mm and `fr-harmonic-base-1` at x=167/167,
+y=50.006, z=25 mm. The initial dimension read 4 mm and not dangling, but
+the final rebuild returned dangling with attached types `()`.
+Changing the component provider to `IDrawingComponent.Component` did not
+fix that loss. Do not suppress the final guard or retry unchanged.
+
+The API distinguishes
+[`IComponent2.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IComponent2~GetCorrespondingEntity.html)
+(component context) from
+[`IView.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks.IView~GetCorrespondingEntity.html)
+(drawing-view context). The FR recipe explicitly maps each ray-identified
+component edge into B-B, then reverse-maps both entities into the same source
+part with `IModelDocExtension.GetCorrespondingEntity2` and requires
+`IsSame == 1`. Missing or unknown correspondence refuses; changing the
+selection API is not a fallback. Share one drawing-component snapshot for
+both targets and retain the batched body rays: walking every engraved edge
+took 783 s, versus about 21 s for the ray path.
+
+Before retaining a component edge across these rebuilds, obtain its
+`IEntity.GetSafeEntity()` result; ordinary entity pointers are transient.
+Check `IEntity.IsSafe` before every section mapping. The documented safe entity
+retains model topology through rebuilds within this SolidWorks session, but is
+invalid if its source entity is deleted. Keep the ray's explicit `IComponent2`
+alongside it to identify the source part and occurrence; do not recover that
+ownership through `IEntity.GetComponent`. Missing or unsafe handles refuse
+rather than rematching similarly shaped geometry. This session-local proof
+does not promise identity across close/reopen.
+
+After creation rebuild and final rebuild, reacquire the section edges from
+their model identities and use `assert_dimension_measures` to prove exactly
+those two native attachments, not dangling, and the spec-owned 4 mm value.
+Require native edge/linear types and membership in B-B's display-dimension
+inventory too. Correspondence, selected view/instance and reference failures
+stay in `drawing.inset_*` telemetry. Offline lifecycle regressions are not
+native proof: require the farm's rebuilt/saved dimension, its ordinary PDF
+colour and the complete-sheet comparison, not a nominal note or detached
+sketch that merely prints the right number.
+
+The bounded diagnostic at source `c0e403c5b1255e5839a572d839f25514d2447b6b`,
+based on production `61a6fb0b53dc962955351559f8820de1f4662f01`, retained
+its evidence under the `fr-inset-safe-context-diagnostic` failure namespace
+(attempt `20261023T063410Z-1-e8160cfb`, receipt timestamp `20261023T063641Z`).
+For both references, the component-mapped input's `GetComponent` was already
+null **before** `GetSafeEntity`; the safe handle did not lose an owner.
+`IView.GetCorrespondingEntity` supplied the full drawing instance. Both mapped
+variants matched the original-main screen control by `IsSame == 1`, including
+their source-part reverse correspondences, before and after rebuild.
+
+All three native dimensions retained two exact attachments, measured
+`4.000000010000034` mm, belonged to B-B and printed black after rebuild.
+Nevertheless, `IAnnotation.GetAttachedEntityTypes` returned `[]` for **all**
+three, including the working screen control. That empty legacy summary made
+the diagnostic receipt's composite `passes` flags false; it was not evidence
+of missing attachments. The production guard therefore reads each actual
+`GetAttachedEntities3` object's `IEntity.GetType` and requires two edges.
+The summary remains diagnostic telemetry only. Exact attachment identities,
+`IsDangling`, native linear type, measured value and section ownership remain
+required. No screen-control code or expensive diagnostic probing belongs in
+the production recipe; a full production finalization/export still requires
+its own farm proof.
 
 **l. A datum named by a frame's datum identifier.**
 Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take

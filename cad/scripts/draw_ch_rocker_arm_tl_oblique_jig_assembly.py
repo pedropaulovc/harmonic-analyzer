@@ -2541,8 +2541,7 @@ def _capture_local_point(stem: str, world: Sequence[float]) -> tuple[float, floa
 
 def capture_readings() -> tuple[CaptureReading, ...]:
     r, pin, washer = spec.retention, spec.pivot_pin, spec.pivot_retainer
-    def band(limits):
-        return f"{limits[0]:.2f}-{limits[1]:.2f}"
+    callouts = spec.CAPTURE_READING_CALLOUTS
     rim = r.PIN_STOP_FACE_MEASUREMENT_DIAMETER / 2.0
     mouth = washer.BORE_DIA / 2.0
     land = (mouth + washer.EDGE_BREAK_MAX + washer.OUTER_DIA / 2.0) / 2.0
@@ -2563,38 +2562,37 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     ))
     return (
         CaptureReading(2, spec.PIVOT_PIN, (-rim, 0.0, pin.FLANGE_BOTTOM_STATION),
-                       f"C2 LOWER RIM / FLOOR\n{band(r.PIN_LOWER_GAP)}", (0.224, 0.143)),
+                       callouts["lower_rim"], (0.224, 0.143)),
         CaptureReading(2, spec.PIVOT_PIN, (-rim, 0.0, pin.FLANGE_TOP_STATION),
-                       f"C2 UPPER RIM / ROOF\n{band(r.PIN_UPPER_GAP)}", (0.224, 0.155)),
+                       callouts["upper_rim"], (0.224, 0.155)),
         CaptureReading(2, spec.PIVOT_CAP, roof,
-                       f"C2 CHAMBER MINUS FLANGE\n{band(r.CAP_CHAMBER_EXCESS)}\nEXCESS, NOT A THIRD GAP", (0.365, 0.128)),
+                       callouts["chamber_excess"], (0.365, 0.128)),
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
-                         f"C4 MOUTH / FLAT LAND\nFULL SHANK PAST MOUTH\n{spec.TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN, BOTH SIDES", (x, 0.199),
+                         callouts["mouth"], (x, 0.199),
                          pick_local_mm=(side * mouth, 0.0, top / 2.0))
           for side, x in ((-1.0, 0.224), (1.0, 0.365))),
         *(CaptureReading(2, spec.CARRIER, carrier_face(side),
-                         f"C4 COMMON SHANK / LAND\nSOLID CARRIER BACKING\n{spec.TOP_CARRIER_BACKED_BEARING_STRIP_MIN:.1f} MIN, BOTH SIDES"
-                         + ("\nC5A CARRIER FACE\nREAD TO FLAT PIN END" if side > 0.0 else ""),
+                         callouts["carrier_backing_pin_end" if side > 0.0 else "carrier_backing"],
                          (x, 0.184))
           for side, x in ((-1.0, 0.224), (1.0, 0.365))),
         CaptureReading(2, spec.PIVOT_RETAINER, (land, 0.0, 0.0),
-                       f"C4A CARRIER / RETAINER\n{band(r.TOP_RUNNING_GAP)}", (0.365, 0.157)),
+                       callouts["running_gap"], (0.365, 0.157)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
-                       f"C5A FLAT PIN END\nAXIAL TAKE-UP {r.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX", (0.305, 0.214)),
+                       callouts["pin_end"], (0.305, 0.214)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
-                       "C4A UPPER CROSS-HOLE EDGE\nHOLD CLEVIS UP FOR FIT", (0.224, 0.216),
+                       callouts["cross_hole"], (0.224, 0.216),
                        pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),
         CaptureReading(2, spec.PIVOT_CLEVIS_PIN,
                        (-spec.clevis_pin.CLEVIS_HEAD_HEIGHT, 0.0,
                         -spec.clevis_pin.CLEVIS_HEAD_DIA / 2.0),
-                       f"C5B HEAD / SHANK REGIONS\n{r.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN TO CARRIER", (0.224, 0.190)),
+                       callouts["clevis"], (0.224, 0.190)),
         CaptureReading(1, spec.PIVOT_COTTER,
                        (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
-                       f"C5B COTTER EYE / PRONGS\n{r.TOP_SECONDARY_CLEARANCE_MIN:.2f} MIN\nSEE C5B-C5C MOTION CHECKS", (0.288, 0.205)),
+                       callouts["cotter"], (0.288, 0.205)),
         CaptureReading(3, spec.PIVOT_CAP, (0.0, bolt_y, 0.0),
-                       f"C3A CAP / BLOCK LAND\n{r.CAP_BASE_SEATING_GAP_MAX:.2f} MAX", (0.279, 0.2235)),
+                       callouts["cap_land"], (0.279, 0.2235)),
         CaptureReading(3, spec.PIVOT_CAP_SCREW, (spec.cap_screw.DIMS.head_dia * 0.35, 0.0, 0.0),
-                       f"C3A UNDERHEAD FOOTPRINT\n{r.CAP_HEAD_SEATING_GAP_MAX:.2f} MAX", (0.282, 0.232)),
+                       callouts["underhead"], (0.282, 0.232)),
     )
 
 
