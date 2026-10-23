@@ -181,7 +181,9 @@ async def _size_lead_in(adapter) -> None:
     # swSetValue_InAllConfigurations (2); only the finished configuration exists yet.
     status = dimension.SetSystemValue3(CHAMFER_WIDTH_MM / 1000, 2, null_variant())
     if int(status) != 0:  # swSetValueReturnStatus_e.swSetValue_Successful
-        raise RuntimeError(f"ChamferWidth@StockDeburrProfile: lead-in rejected ({status})")
+        raise RuntimeError(
+            f"ChamferWidth@StockDeburrProfile: lead-in rejected ({status})"
+        )
     await force_rebuild(adapter)
     faults = _hard_faults(adapter, adapter.currentModel)
     if faults:

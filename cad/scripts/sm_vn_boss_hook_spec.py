@@ -36,7 +36,11 @@ DRAWING_DIMENSIONS = {
     "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
 }
 DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 1, "ChamferAngle": 0}
-DIMENSION_TOLERANCE_TYPES = {"FinishedOverall": 11, "ChamferWidth": 11, "ChamferAngle": 11}
+DIMENSION_TOLERANCE_TYPES = {
+    "FinishedOverall": 11,
+    "ChamferWidth": 11,
+    "ChamferAngle": 11,
+}
 DRAWING_NOTES = (
     "FINISHED OVERALL TO EYE CROWN IS THE ACCEPTANCE SIZE.\n"
     "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."

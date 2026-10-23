@@ -218,12 +218,25 @@ def test_sheet_prints_only_replacement_sizes_while_the_part_keeps_its_gauges() -
 # 20261023T181332674Z), the state machinist review returned FIX on. Metres.
 def _native_record(name, pos, lines, texts, arrows):
     return {
-        "type": 4, "name": name, "pos": [*pos, 0.0],
+        "type": 4,
+        "name": name,
+        "pos": [*pos, 0.0],
         "display": {
-            "lines": [[0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0] for x0, y0, x1, y1 in lines],
+            "lines": [
+                [0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0]
+                for x0, y0, x1, y1 in lines
+            ],
             "texts": [
-                {"t": t, "pos": [x, y, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0,
-                 "font": "Century Gothic", "ls": 0.001, "w": w}
+                {
+                    "t": t,
+                    "pos": [x, y, 0.0],
+                    "h": 0.0035,
+                    "ref": 1,
+                    "ang": 0.0,
+                    "font": "Century Gothic",
+                    "ls": 0.001,
+                    "w": w,
+                }
                 for t, x, y, w in texts
             ],
             "arrows": [
@@ -236,33 +249,55 @@ def _native_record(name, pos, lines, texts, arrows):
 
 B344192 = {
     "SupplierThickness": _native_record(
-        "SupplierThickness", (0.1008, 0.1335),
-        [(0.1305, 0.133373, 0.0998, 0.133373), (0.1305, 0.133627, 0.0998, 0.133627),
-         (0.1008, 0.133373, 0.1008, 0.127023), (0.1008, 0.133627, 0.1008, 0.139977)],
+        "SupplierThickness",
+        (0.1008, 0.1335),
+        [
+            (0.1305, 0.133373, 0.0998, 0.133373),
+            (0.1305, 0.133627, 0.0998, 0.133627),
+            (0.1008, 0.133373, 0.1008, 0.127023),
+            (0.1008, 0.133627, 0.1008, 0.139977),
+        ],
         [(" (0.005 in) ", 0.0894323, 0.1307219, 0.0227354)],
         [(0.1008, 0.133373, 0.0, -1.0), (0.1008, 0.133627, 0.0, 1.0)],
     ),
     "SupplierFreeHeight": _native_record(
-        "SupplierFreeHeight", (0.1622, 0.1335),
-        [(0.1198, 0.13223, 0.1632, 0.13223), (0.1198, 0.13477, 0.1632, 0.13477),
-         (0.1622, 0.13223, 0.1622, 0.12588), (0.1622, 0.13477, 0.1622, 0.14112)],
+        "SupplierFreeHeight",
+        (0.1622, 0.1335),
+        [
+            (0.1198, 0.13223, 0.1632, 0.13223),
+            (0.1198, 0.13477, 0.1632, 0.13477),
+            (0.1622, 0.13223, 0.1622, 0.12588),
+            (0.1622, 0.13477, 0.1622, 0.14112),
+        ],
         [(" (0.050 in) ", 0.1508323, 0.1307219, 0.0227354)],
         [(0.1622, 0.13223, 0.0, -1.0), (0.1622, 0.13477, 0.0, 1.0)],
     ),
     "SupplierID": _native_record(
-        "SupplierID", (0.1008, 0.227),
-        [(0.122362, 0.223517, 0.124141, 0.224195), (0.140638, 0.230483, 0.122362, 0.223517)],
-        [(" (", 0.0790469, 0.2242486, 0.0030139),
-         ("<MOD-DIAM>", 0.0820608, 0.2241951, 0.0052784),
-         ("0.385 \u00b10.010 in) ", 0.0873392, 0.2242486, 0.0352139)],
+        "SupplierID",
+        (0.1008, 0.227),
+        [
+            (0.122362, 0.223517, 0.124141, 0.224195),
+            (0.140638, 0.230483, 0.122362, 0.223517),
+        ],
+        [
+            (" (", 0.0790469, 0.2242486, 0.0030139),
+            ("<MOD-DIAM>", 0.0820608, 0.2241951, 0.0052784),
+            ("0.385 \u00b10.010 in) ", 0.0873392, 0.2242486, 0.0352139),
+        ],
         [(0.1223622, 0.2235173, -0.9344335, -0.3561377)],
     ),
     "SupplierOD": _native_record(
-        "SupplierOD", (0.1622, 0.227),
-        [(0.143367, 0.222477, 0.138859, 0.224195), (0.119633, 0.231523, 0.143367, 0.222477)],
-        [(" (", 0.1404469, 0.2242486, 0.0030139),
-         ("<MOD-DIAM>", 0.1434608, 0.2241951, 0.0052784),
-         ("0.500 \u00b10.010 in) ", 0.1487392, 0.2242486, 0.0352139)],
+        "SupplierOD",
+        (0.1622, 0.227),
+        [
+            (0.143367, 0.222477, 0.138859, 0.224195),
+            (0.119633, 0.231523, 0.143367, 0.222477),
+        ],
+        [
+            (" (", 0.1404469, 0.2242486, 0.0030139),
+            ("<MOD-DIAM>", 0.1434608, 0.2241951, 0.0052784),
+            ("0.500 \u00b10.010 in) ", 0.1487392, 0.2242486, 0.0352139),
+        ],
         [(0.1433673, 0.2224771, 0.9344335, -0.3561377)],
     ),
 }
@@ -271,13 +306,20 @@ B344192_PLAN = (0.1315 - 0.0127, 0.227 - 0.0127, 0.1315 + 0.0127, 0.227 + 0.0127
 
 
 def _segments(name):
-    return [((line[4], line[5]), (line[7], line[8])) for line in B344192[name]["display"]["lines"]]
+    return [
+        ((line[4], line[5]), (line[7], line[8]))
+        for line in B344192[name]["display"]["lines"]
+    ]
 
 
 def _cell_x(key):
     from _supplier_spring_drawing import supplier_state_cells
 
-    cell = next(cell for name, _, cell in supplier_state_cells(0.05, maximum=False) if name == key)
+    cell = next(
+        cell
+        for name, _, cell in supplier_state_cells(0.05, maximum=False)
+        if name == key
+    )
     return cell[0], cell[2]
 
 
@@ -287,7 +329,9 @@ def _moved(box, dx):
     return Box(box.xmin + dx, box.ymin, box.xmax + dx, box.ymax)
 
 
-def test_build_places_the_size_texts_after_the_shared_disc_dimensions(monkeypatch) -> None:
+def test_build_places_the_size_texts_after_the_shared_disc_dimensions(
+    monkeypatch,
+) -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
 
     seen = {}
@@ -329,7 +373,10 @@ def test_b344192_struck_height_text_shelves_clear_of_its_own_lines(name) -> None
     geometry = supplier_top_text_geometry(B344192[name], horizontal=False)
     with pytest.raises(RuntimeError, match="from its own native lines"):
         drawing.assert_height_text_clear(geometry, side, label=name)
-    shifted = {**geometry, "text": _moved(geometry["text"], drawing.height_text_shift(geometry, side))}
+    shifted = {
+        **geometry,
+        "text": _moved(geometry["text"], drawing.height_text_shift(geometry, side)),
+    }
     drawing.assert_height_text_clear(shifted, side, label=name)
     left, right = _cell_x("free_front")
     assert left < shifted["text"].xmin and shifted["text"].xmax < right
@@ -366,10 +413,14 @@ def test_plan_leaders_refuse_lines_through_the_centre() -> None:
     centre_y = 0.227
     near_side = {
         # Text shelf, then one leader to the rim nearest the text.
-        "SupplierID": [((0.0716, centre_y), (0.1151, centre_y)),
-                       ((0.1151, centre_y), (0.1315 - 0.0127 * spec.ID / spec.OD, centre_y))],
-        "SupplierOD": [((0.1914, centre_y), (0.1479, centre_y)),
-                       ((0.1479, centre_y), (0.1315 + 0.0127, centre_y))],
+        "SupplierID": [
+            ((0.0716, centre_y), (0.1151, centre_y)),
+            ((0.1151, centre_y), (0.1315 - 0.0127 * spec.ID / spec.OD, centre_y)),
+        ],
+        "SupplierOD": [
+            ((0.1914, centre_y), (0.1479, centre_y)),
+            ((0.1479, centre_y), (0.1315 + 0.0127, centre_y)),
+        ],
     }
     drawing.assert_plan_leaders(near_side, B344192_PLAN, label="near side")
 
@@ -378,7 +429,9 @@ def test_settled_heights_refuse_a_moved_native_station() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
     from _supplier_screw_layout import supplier_top_text_geometry
 
-    geometry = supplier_top_text_geometry(B344192["SupplierThickness"], horizontal=False)
+    geometry = supplier_top_text_geometry(
+        B344192["SupplierThickness"], horizontal=False
+    )
     assert drawing.stations_match(geometry, geometry)
     tips = tuple((x + 1e-4, y) for x, y in geometry["tips"])
     assert not drawing.stations_match(geometry, {**geometry, "tips": tips})
@@ -401,31 +454,51 @@ def _diameter_texts(x, value):
 
 R86053 = {
     "SupplierThickness": _native_record(
-        "SupplierThickness", (0.0862323, 0.1335),
-        [(0.1305, 0.133373, 0.0998, 0.133373), (0.1305, 0.133627, 0.0998, 0.133627),
-         (0.1008, 0.133373, 0.1008, 0.127023), (0.1008, 0.133627, 0.1008, 0.139977),
-         (0.1008, 0.1335, 0.0976, 0.130722), (0.0976, 0.130722, 0.074865, 0.130722)],
+        "SupplierThickness",
+        (0.0862323, 0.1335),
+        [
+            (0.1305, 0.133373, 0.0998, 0.133373),
+            (0.1305, 0.133627, 0.0998, 0.133627),
+            (0.1008, 0.133373, 0.1008, 0.127023),
+            (0.1008, 0.133627, 0.1008, 0.139977),
+            (0.1008, 0.1335, 0.0976, 0.130722),
+            (0.0976, 0.130722, 0.074865, 0.130722),
+        ],
         [(" (0.005 in) ", 0.0748646, 0.1307219, 0.0227354)],
         [(0.1008, 0.133373, 0.0, -1.0), (0.1008, 0.133627, 0.0, 1.0)],
     ),
     "SupplierFreeHeight": _native_record(
-        "SupplierFreeHeight", (0.1767677, 0.1335),
-        [(0.1198, 0.13223, 0.1632, 0.13223), (0.1198, 0.13477, 0.1632, 0.13477),
-         (0.1622, 0.13223, 0.1622, 0.12588), (0.1622, 0.13477, 0.1622, 0.14112),
-         (0.1622, 0.1335, 0.1654, 0.130722), (0.1654, 0.130722, 0.188135, 0.130722)],
+        "SupplierFreeHeight",
+        (0.1767677, 0.1335),
+        [
+            (0.1198, 0.13223, 0.1632, 0.13223),
+            (0.1198, 0.13477, 0.1632, 0.13477),
+            (0.1622, 0.13223, 0.1622, 0.12588),
+            (0.1622, 0.13477, 0.1622, 0.14112),
+            (0.1622, 0.1335, 0.1654, 0.130722),
+            (0.1654, 0.130722, 0.188135, 0.130722),
+        ],
         [(" (0.050 in) ", 0.1654, 0.1307219, 0.0227354)],
         [(0.1622, 0.13223, 0.0, -1.0), (0.1622, 0.13477, 0.0, 1.0)],
     ),
     "SupplierID": _native_record(
-        "SupplierID", (0.0932934, 0.227),
-        [(0.1218905, 0.2251869, 0.116634, 0.224195), (0.116634, 0.224195, 0.07154, 0.224195)],
+        "SupplierID",
+        (0.0932934, 0.227),
+        [
+            (0.1218905, 0.2251869, 0.116634, 0.224195),
+            (0.116634, 0.224195, 0.07154, 0.224195),
+        ],
         _diameter_texts(0.0715403, "0.385 \u00b10.010 in) "),
         [(0.1218905, 0.2251869, -0.9826622, -0.1854051)],
     ),
     "SupplierOD": _native_record(
-        "SupplierOD", (0.1697066, 0.227),
-        [(0.1442, 0.227, 0.190346, 0.218293),
-         (0.1439798, 0.2246454, 0.146366, 0.224195), (0.146366, 0.224195, 0.19146, 0.224195)],
+        "SupplierOD",
+        (0.1697066, 0.227),
+        [
+            (0.1442, 0.227, 0.190346, 0.218293),
+            (0.1439798, 0.2246454, 0.146366, 0.224195),
+            (0.146366, 0.224195, 0.19146, 0.224195),
+        ],
         _diameter_texts(0.1479535, "0.500 \u00b10.010 in) "),
         [(0.1439798, 0.2246454, 0.9826622, -0.1854051)],
     ),
@@ -445,7 +518,9 @@ def test_86053_stray_od_line_is_refused_by_both_settled_guards() -> None:
 
     struck = drawing.lines_through_own_text(R86053)
     assert len(struck) == 1 and "SupplierOD" in struck[0]
-    assert drawing.stray_leader_lines(R86053["SupplierOD"]) == [(0.1442, 0.227, 0.190346, 0.218293)]
+    assert drawing.stray_leader_lines(R86053["SupplierOD"]) == [
+        (0.1442, 0.227, 0.190346, 0.218293)
+    ]
     assert drawing.stray_leader_lines(R86053["SupplierID"]) == []
 
 
@@ -469,7 +544,7 @@ def test_diameters_turn_the_arc_extension_off_before_the_text_move() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
 
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("def place_size_texts("):]
+    body = source[source.index("def place_size_texts(") :]
     off = body.index("ArcExtensionLineOrOppositeSide = False")
     assert body.index("set_near_side_diameter(") < off < body.index("rebuild_drawing(")
 

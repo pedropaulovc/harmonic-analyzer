@@ -39,7 +39,9 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
 from _layout_audit import (
-    annotation_geometry, calibrate_sheet_advance, find_arrows_near_text,
+    annotation_geometry,
+    calibrate_sheet_advance,
+    find_arrows_near_text,
     find_lines_through_own_text,
 )
 from _layout_geometry import ARROW_TEXT_CLEARANCE_M, SheetGeometry, segment_box_distance
@@ -162,14 +164,18 @@ def _verify_control_ink(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"unreadable settled cutting-control ink: {errors}")
     advance = calibrate_sheet_advance(records)
     geometries = tuple(
-        annotation_geometry(record, owner="front", advance=advance) for record in records
+        annotation_geometry(record, owner="front", advance=advance)
+        for record in records
     )
     if any(geometry is None or not geometry.text_boxes for geometry in geometries):
         raise RuntimeError("a settled cutting control prints no readable text")
     sheet = SheetGeometry("FINISHED", 0.0, 0.0, None, annotations=geometries)
     struck = [
         finding.format()
-        for finding in (*find_lines_through_own_text(sheet), *find_arrows_near_text(sheet))
+        for finding in (
+            *find_lines_through_own_text(sheet),
+            *find_arrows_near_text(sheet),
+        )
     ]
     struck += [
         f"{geometry.label}: own arrowhead {arrow.format_mm()} within "
@@ -181,7 +187,9 @@ def _verify_control_ink(adapter: Any, annotations: list[Any]) -> None:
         if segment_box_distance(arrow, box) < ARROW_TEXT_CLEARANCE_M
     ]
     if struck:
-        raise RuntimeError("cutting-control text is struck by line ink:\n" + "\n".join(struck))
+        raise RuntimeError(
+            "cutting-control text is struck by line ink:\n" + "\n".join(struck)
+        )
 
 
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:

@@ -443,8 +443,10 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
     # The part still authors these; ITEM and a standard oval head imply them.
     authored = {name for name, _, _ in screw.SUPPLIER_REFERENCE_DIMENSIONS}
     assert authored - set(drawing.PRINTED_REFERENCES) == {
-        "SupplierHeadAngle", "SupplierCrownHeight",
-        "SupplierStockLength", "SupplierNominalThreadMajor",
+        "SupplierHeadAngle",
+        "SupplierCrownHeight",
+        "SupplierStockLength",
+        "SupplierNominalThreadMajor",
     }
     planes = drawing._printed(screw.SUPPLIER_REFERENCE_PLANES)
     sides = drawing._printed(screw.SUPPLIER_REFERENCE_SIDES)
@@ -457,12 +459,12 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
     left, _bottom, right, _top = margins["*Top"]
     assert left == right
     formats = drawing._printed(screw.SUPPLIER_REFERENCE_FORMATS)
-    assert formats == {"SupplierHeadDiameter": screw.SUPPLIER_REFERENCE_FORMATS["SupplierHeadDiameter"]}
+    assert formats == {
+        "SupplierHeadDiameter": screw.SUPPLIER_REFERENCE_FORMATS["SupplierHeadDiameter"]
+    }
     assert "supplier_top" in drawing.build.__code__.co_consts
     monkeypatch.setattr(
         drawing, "PRINTED_REFERENCES", ("SupplierStockLength", "SupplierMissing")
     )
     with pytest.raises(ValueError, match="SupplierMissing"):
         drawing._printed_rows()
-
-

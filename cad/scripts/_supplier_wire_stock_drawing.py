@@ -56,7 +56,8 @@ def _construction_curves_as_outline(adapter) -> Callable[[], None]:
     extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
     option = constant("swDetailingNoOptionSpecified")
     settings = tuple(
-        (name, constant(name), constant(value)) for name, value in _CONSTRUCTION_LINE_FONT
+        (name, constant(name), constant(value))
+        for name, value in _CONSTRUCTION_LINE_FONT
     )
 
     def readback() -> None:
@@ -100,7 +101,8 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
     """Show/import the saved supplier circle, label it, return final readback."""
     line_font = _construction_curves_as_outline(adapter)
     view = _early_bound(
-        place_view(adapter, str(source), "*Top", *STOCK_CENTER, scale=STOCK_SCALE), "IView",
+        place_view(adapter, str(source), "*Top", *STOCK_CENTER, scale=STOCK_SCALE),
+        "IView",
     )
     view.ReferencedConfiguration = SUPPLIER_REFERENCE_CONFIGURATION
     if str(view.ReferencedConfiguration) != SUPPLIER_REFERENCE_CONFIGURATION:
@@ -110,7 +112,9 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
     set_hidden_lines_removed(adapter, view)
     rebuild_drawing(adapter, label="supplier wire section configuration")
     annotations = curate_view_dimensions(
-        adapter, view, keep={SUPPLIER_REFERENCE_DIMENSION: STOCK_TEXT},
+        adapter,
+        view,
+        keep={SUPPLIER_REFERENCE_DIMENSION: STOCK_TEXT},
         view_label="supplier wire section",
         dimensions_by_feature=SUPPLIER_REFERENCE_DIMENSIONS,
     )
@@ -120,7 +124,9 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
     at = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="supplier circle centre")
     position = tuple(float(value) for value in view.Position)
     if not view.SetViewPosition(
-        double_array([position[index] + STOCK_CENTER[index] - at[index] for index in range(2)]),
+        double_array(
+            [position[index] + STOCK_CENTER[index] - at[index] for index in range(2)]
+        ),
         False,
     ):
         raise RuntimeError("cannot centre supplier wire section")
@@ -131,8 +137,10 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
         raise RuntimeError("cannot position native supplier wire diameter")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     options = {
-        "label": "9666K56 supplier nominal wire diameter", "units": "in",
-        "precision": SUPPLIER_DIAMETER_PRECISION, "expected_mm": DIA,
+        "label": "9666K56 supplier nominal wire diameter",
+        "units": "in",
+        "precision": SUPPLIER_DIAMETER_PRECISION,
+        "expected_mm": DIA,
         "presentation": "diameter",
         "configuration": SUPPLIER_REFERENCE_CONFIGURATION,
     }
@@ -165,22 +173,31 @@ def add_wire_section(adapter, source) -> Callable[[], None]:
                 or int(final.Type2) != 6):
             raise RuntimeError("wire diameter lost its true native circle identity")
         assert_supplier_configuration_value(
-            final, SUPPLIER_REFERENCE_CONFIGURATION, DIA, label="supplier wire circle",
+            final,
+            SUPPLIER_REFERENCE_CONFIGURATION,
+            DIA,
+            label="supplier wire circle",
         )
         if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
             raise RuntimeError("supplier wire diameter acquired an unprovided band")
         assert_supplier_reference_dimension(adapter, final, **options)
         if view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
             raise RuntimeError("supplier wire section regained a centre mark")
-        assert_supplier_view_fits(adapter, view, STOCK_FIELD, label="supplier wire section")
+        assert_supplier_view_fits(
+            adapter, view, STOCK_FIELD, label="supplier wire section"
+        )
         if str(label.GetText() or "").replace("\r", "") != STOCK_LABEL:
             raise RuntimeError("wire section label changed")
         box = _box(label.GetExtent(), label="wire section label", kind="note")
         outline = _box(view.GetOutline(), label="supplier wire section")
         if not _inside(box, STOCK_FIELD) or (
-            box[0] < outline[2] and outline[0] < box[2]
-            and box[1] < outline[3] and outline[1] < box[3]
+            box[0] < outline[2]
+            and outline[0] < box[2]
+            and box[1] < outline[3]
+            and outline[1] < box[3]
         ):
-            raise RuntimeError(f"wire section label leaves its field or overlaps the view: {box!r}")
+            raise RuntimeError(
+                f"wire section label leaves its field or overlaps the view: {box!r}"
+            )
 
     return settled
