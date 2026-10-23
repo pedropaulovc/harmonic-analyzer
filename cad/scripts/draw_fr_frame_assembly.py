@@ -17,7 +17,7 @@ from pathlib import Path
 import sys
 from typing import Any, Callable, Sequence
 
-from solidworks_mcp.adapters.com_variant import dispatch_array
+from solidworks_mcp.adapters.com_variant import dispatch_array, double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -36,6 +36,7 @@ from _drawing_balloons import (
     BalloonLanding,
     _balloon_item_number,
     _spread_balloons,
+    _view_component_leaves,
     add_component_bom_balloons,
     assert_balloon_landings,
     drawing_viewport_pixel_size,
@@ -49,12 +50,25 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
-from _drawing_edge_dimensions import add_edge_dimension
+from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import _edge_endpoint_key
 from _drawing_leaders import distance_to_point, segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
+from _drawing_ray_pick import (
+    _EDGE_HIT,
+    _HIT_WIDTH,
+    _ORIGIN_MARGIN_M,
+    _RAY_OFFSET_M,
+    _RAY_OPTIONS,
+    _RAY_RADIUS_M,
+    _SW_SOLID_BODY,
+    _direction_to_part,
+    _to_model,
+    _to_part,
+)
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from _drawing_scan import _HIT_ZOOM_HALF, _zoomed_on
+from _drawing_scan import _zoomed_on
+from _drawing_selection import _select_view_entity
 from _drawing_sections import create_section_view
 from _drawing_sheet_region import sheet_drawable_region
 from _drawing_tables import insert_bom_table
@@ -106,11 +120,13 @@ PNG = OUTPUTS.png
 # B-B looks down on both edges and dimensions the inset between them; step 9
 # points to that dimension instead of repeating its value.
 NAMEPLATE_END_INSET = DECK_HALF_X - NAMEPLATE_MOUNT_POS[0]
-# Machine z stations each inset pick tries in turn: on both edges, clear of
-# the plate's corner screw heads (z +/-42) and the deck's centre line (z 0).
+# Machine z stations each inset edge's ray is cast at, in turn: on both
+# edges, clear of the plate's corner screw heads (z +/-42) and the deck's
+# centre line (z 0). The first station whose ray meets an edge chooses it; the
+# dimension's pick points project from the first station.
 NAMEPLATE_INSET_PICK_Z_M = (0.025, 0.020, 0.030, 0.015, 0.035)
-# How far (model mm) a picked edge's ends may lie from the target machine x.
-# r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
+# How far (model mm) the chosen edge's ends may read from the target machine
+# x. r6 (run 20261015T051440407Z) dimensioned a line 1.334 mm off its target.
 NAMEPLATE_INSET_PICK_TOLERANCE_MM = 0.05
 # swSelectType_e.swSelEDGES
 _SW_SEL_EDGES = 1
@@ -391,6 +407,11 @@ def _checked_linear_dimension(
         raise RuntimeError(
             f"{label} measured {measured_mm:g}, expected {expected_mm:g} mm"
         )
+    dangling, types = _dimension_attachment(display)
+    if dangling:
+        # A dangling dimension measures and prints (in the dangling colour)
+        # without being attached to anything the sheet draws.
+        raise RuntimeError(f"{label} is dangling (attached entity types {types})")
     if int(display.SetPrecision3(1, -1, -1, -1)) < 0:
         raise RuntimeError(f"failed to set {label} precision")
     if int(display.GetPrimaryPrecision2()) != 1:
@@ -707,28 +728,109 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
     return sections[0], sections[1]
 
 
-def _read_inset_pick(
-    adapter: Any, view: Any, sheet_xy: Sequence[float]
-) -> tuple[Any, str, tuple[float, float] | None]:
-    """Pick the edge drawn at ``sheet_xy`` and read back where it lies.
+@_telemetry.traced("drawing.inset_edge_rays")
+def _inset_edge_rays(
+    adapter: Any,
+    view: Any,
+    *,
+    leaves: Sequence[Any],
+    stem: str,
+    target_mm: float,
+    stations_m: Sequence[float],
+) -> tuple[str, Any, list[tuple[Any, float] | None]]:
+    """Find the highest model edge at each machine-x/z station by ray.
 
-    Returns the edge, its owner (or why there is none) and its two ends'
-    machine x in mm; edge and x are ``None`` when the pick is not a readable
-    component edge. The pick runs zoomed onto the station (``_HIT_ZOOM_HALF``),
-    so its aperture is hundredths of a millimetre instead of the fit zoom's
-    few sheet millimetres, which span both edges' neighbours at 1:3.
+    One ``IModelDocExtension::RayIntersections`` call per solid body of the
+    stem's one shown drawing component avoids walking the engraved plate's
+    thousands of edges (783 s on run 20261022T162906839Z; the ray path took
+    about 21 s). The returned edges still need mapping into drawing-view
+    context. Their ``IEntity.GetComponent`` returned null in the bounded
+    native diagnostic, before AND after ``GetSafeEntity``; return the explicit
+    drawing component separately rather than trying to recover it from an edge.
+    ``IView.GetCorrespondingEntity`` supplies the actual section-owned edge.
+
+    Each ray points down machine -y through ``(target x, z)`` from above the
+    body. Return the instance name, its component and, per station, the
+    highest edge hit as ``(component edge, machine y)`` or ``None``. Section views need this path:
+    ``GetVisibleComponents`` and ``GetVisibleEntities2`` returned no entities
+    in runs 20261015T024651004Z and 20261015T042140629Z.
+    """
+    model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
+    shown = [
+        leaf for leaf in leaves
+        if leaf.visible and leaf.component is not None and stem in leaf.identities
+    ]
+    if len(shown) != 1:
+        raise RuntimeError(
+            f"nameplate inset: {len(shown)} shown {stem} instances, expected one"
+        )
+    component = _early_bound(shown[0].component, "IComponent2")
+    name = shown[0].path or str(component.Name2)
+    result = adapter._attempt(
+        lambda: component.GetBodies3(_SW_SOLID_BODY), default=None
+    )
+    bodies = (
+        tuple(result[0] or ()) if isinstance(result, tuple) and len(result) == 2 else ()
+    )
+    if not bodies:
+        raise RuntimeError(f"nameplate inset: {name!r} resolves no solid body")
+    values = _component_transform(component)
+    down = _direction_to_part(values, (0.0, -1.0, 0.0))
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    found: list[tuple[float, Any] | None] = [None] * len(stations_m)
+    for body in bodies:
+        bound = _early_bound(body, "IBody2")
+        # Start above the body: its extreme point along machine +y, plus margin.
+        extreme = tuple(bound.GetExtremePoint(*_direction_to_part(values, (0.0, 1.0, 0.0))) or ())
+        if len(extreme) != 4 or not extreme[0]:
+            raise RuntimeError(f"nameplate inset: {name!r} body has no extreme point")
+        top_m = _to_model(values, extreme[1:4])[1] + _ORIGIN_MARGIN_M
+        starts: list[float] = []
+        vectors: list[float] = []
+        for z_m in stations_m:
+            starts.extend(_to_part(values, (target_mm / 1000.0, top_m, z_m)))
+            vectors.extend(down)
+        extension.RayIntersections(
+            dispatch_array([body]),
+            double_array(starts),
+            double_array(vectors),
+            _RAY_OPTIONS,
+            _RAY_RADIUS_M,
+            _RAY_OFFSET_M,
+            True,
+        )
+        raw = tuple(model.GetRayIntersectionsPoints() or ())
+        topology = tuple(model.GetRayIntersectionsTopology() or ())
+        if len(raw) % _HIT_WIDTH or len(topology) != len(raw) // _HIT_WIDTH:
+            raise RuntimeError(
+                f"nameplate inset: ray readback on {name} is malformed: "
+                f"{len(raw)} doubles, {len(topology)} entities"
+            )
+        for k in range(0, len(raw), _HIT_WIDTH):
+            ray = int(raw[k + 1])
+            if not int(raw[k + 2]) & _EDGE_HIT:
+                continue
+            hit_y = _to_model(values, raw[k + 3 : k + 6])[1]
+            if found[ray] is not None and found[ray][0] >= hit_y:
+                continue
+            edge = adapter._attempt(
+                lambda e=topology[k // _HIT_WIDTH]: component.GetCorrespondingEntity(e),
+                default=None,
+            )
+            if edge is not None:
+                found[ray] = (hit_y, edge)
+    return name, component, [None if row is None else (row[1], row[0]) for row in found]
+
+
+def _read_selected_inset_edge(
+    adapter: Any,
+) -> tuple[Any, str, tuple[float, float] | None]:
+    """Read the current selection back: edge, owner and its ends' machine x (mm).
+
+    Edge and x are ``None`` when the selection is not a readable component
+    edge; the owner string then says why.
     """
     draw = adapter.currentModel
-    name = view_name(adapter, view)
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
-        raise RuntimeError(f"failed to activate drawing view {name!r}")
-    draw.ClearSelection2(True)
-    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
-        selected = draw.Extension.SelectByID2(
-            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
-        )
-    if not selected:
-        return None, "no edge", None
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     index = int(manager.GetSelectedObjectCount2(-1))
     kind = int(manager.GetSelectedObjectType3(index, -1))
@@ -750,115 +852,261 @@ def _read_inset_pick(
     return edge, owner, (start[0] * 1000.0, end[0] * 1000.0)
 
 
+@dataclass(frozen=True)
+class _InsetEdgeReference:
+    """Keep safe model topology and explicit occurrence ownership across rebuilds."""
+
+    label: str
+    model_edge: Any
+    view_edge: Any
+    instance: str
+    component: Any
+
+
+@dataclass(frozen=True)
+class _InsetDimensionProof:
+    view: Any
+    display: Any
+    references: tuple[_InsetEdgeReference, _InsetEdgeReference]
+
+
+@_telemetry.traced("drawing.inset_correspondence", label_param="label")
+def _inset_section_edge(
+    adapter: Any, view: Any, model_edge: Any, *, component: Any, label: str
+) -> Any:
+    """Map model topology into the section, and prove its source identity.
+
+    ``IComponent2.GetCorrespondingEntity`` only provides component context.
+    The separate ``IView.GetCorrespondingEntity`` mapping is what gives the
+    drawing a view-owned reference, not a currently selectable model edge.
+    Reverse both objects into the same source part before comparing them.
+    """
+    model_entity = _early_bound(model_edge, "IEntity")
+    if not bool(model_entity.IsSafe):
+        _telemetry.event(
+            "drawing.inset_correspondence", label=label, model_safe=False,
+            expected_view=view_name(adapter, view),
+        )
+        raise RuntimeError(f"nameplate inset {label}: retained model edge is not safe across rebuilds")
+    section_edge = _early_bound(view, "IView").GetCorrespondingEntity(model_edge)
+    source = (
+        None if component is None
+        else _early_bound(component, "IComponent2").GetModelDoc2()
+    )
+    canonical = returned = None
+    if section_edge is not None and source is not None:
+        extension = _early_bound(
+            _early_bound(source, "IModelDoc2").Extension, "IModelDocExtension"
+        )
+        canonical = extension.GetCorrespondingEntity2(model_edge)
+        returned = extension.GetCorrespondingEntity2(section_edge)
+    same = (
+        -1 if canonical is None or returned is None
+        else int(adapter.swApp.IsSame(canonical, returned))
+    )
+    _telemetry.event(
+        "drawing.inset_correspondence",
+        label=label,
+        mapped=section_edge is not None,
+        source_available=source is not None,
+        source_identity=same,
+        canonical_available=canonical is not None,
+        returned_available=returned is not None,
+        model_safe=True,
+        expected_view=view_name(adapter, view),
+        expected_instance="" if component is None else str(component.Name2),
+    )
+    if section_edge is None or same != 1:  # swObjectSame; unknown also refuses.
+        raise RuntimeError(
+            f"nameplate inset {label}: no source-verified section edge "
+            f"(mapped={section_edge is not None}, source identity={same})"
+        )
+    return section_edge
+
+
+@_telemetry.traced("drawing.inset_edge", label_param="label")
 def _pick_inset_edge(
     adapter: Any,
     view: Any,
     *,
+    leaves: Sequence[Any],
     label: str,
+    stem: str,
     target_mm: float,
-    stations: Sequence[tuple[float, Sequence[float]]],
-) -> Any:
-    """Return ``label``'s edge from the first ``(z, sheet_xy)`` station on target.
+    stations_m: Sequence[float],
+) -> _InsetEdgeReference:
+    """Find the edge geometrically, map it into the section, and prove the pick.
 
-    Every pick is read back and logged with the machine x it found, hit or
-    miss, so a wrong line explains itself; a miss moves the pick along z to
-    the next station. Fails naming every reading when none lies within
-    ``NAMEPLATE_INSET_PICK_TOLERANCE_MM`` of ``target_mm`` at both ends.
+    The first ray-hit station chooses the model edge. Its corresponding
+    section entity must select as that exact edge in that exact view, and
+    both read-back endpoints must have the intended machine x. No screen
+    coordinate or engraved-body edge enumeration participates.
     """
-    readings = []
-    for z_m, sheet_xy in stations:
-        edge, owner, xs = _read_inset_pick(adapter, view, sheet_xy)
-        hit = xs is not None and all(
-            abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
-        )
-        reading = (
-            f"z {z_m * 1000.0:g} mm sheet ({sheet_xy[0]:.5f}, {sheet_xy[1]:.5f}): "
-            f"{owner}"
-            + ("" if xs is None else f" at machine x {xs[0]:.3f}/{xs[1]:.3f} mm")
-        )
-        _telemetry.info(
-            f"nameplate inset pick {label} {reading} "
-            f"(target x {target_mm:g} mm) -> {'hit' if hit else 'miss'}"
-        )
-        if hit:
-            return edge
-        readings.append(reading)
-    raise RuntimeError(
-        f"nameplate inset {label}: no pick lies at machine x {target_mm:g} mm; "
-        f"read {'; '.join(readings)}"
+    name, component, rays = _inset_edge_rays(
+        adapter, view, leaves=leaves, stem=stem, target_mm=target_mm, stations_m=stations_m
     )
+    chosen = next(
+        ((z_m, row) for z_m, row in zip(stations_m, rays) if row is not None), None
+    )
+    if chosen is None:
+        raise RuntimeError(
+            f"nameplate inset {label}: no ray down machine -y through x "
+            f"{target_mm:g} mm at z {tuple(z * 1000.0 for z in stations_m)} mm "
+            f"meets an edge of {name}"
+        )
+    z_m, (edge, y_m) = chosen
+    # Retain safe topology across rebuilds and the explicit component alongside
+    # it: neither the original model edge nor its safe handle supplies GetComponent.
+    edge = _early_bound(edge, "IEntity").GetSafeEntity()
+    if edge is None:
+        raise RuntimeError(f"nameplate inset {label}: failed to retain a safe model edge")
+    section_edge = _inset_section_edge(
+        adapter, view, edge, component=component, label=label,
+    )
+    _select_view_entity(adapter, view, "EDGE", None, label=label, entity=section_edge)
+    manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    picked_view = manager.GetSelectedObjectsDrawingView2(1, -1)
+    selected, owner, xs = _read_selected_inset_edge(adapter)
+    same_entity = selected is not None and int(adapter.swApp.IsSame(selected, section_edge)) == 1
+    same_view = picked_view is not None and int(adapter.swApp.IsSame(picked_view, view)) == 1
+    same_owner = owner.rsplit("/", 1)[-1] == name.rsplit("/", 1)[-1]
+    hit = same_entity and same_view and same_owner and xs is not None and all(
+        abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
+    )
+    reading = (
+        f"{name} y {y_m * 1000.0:.3f} z {z_m * 1000.0:g} mm: {owner}"
+        + ("" if xs is None else f" at machine x {xs[0]:.3f}/{xs[1]:.3f} mm")
+    )
+    _telemetry.info(
+        f"nameplate inset edge {label} {reading} "
+        f"(target x {target_mm:g} mm) -> {'hit' if hit else 'miss'}"
+    )
+    _telemetry.event(
+        "drawing.inset_edge",
+        label=label,
+        instance=name,
+        owner=owner,
+        expected_view=view_name(adapter, view),
+        selected_view="" if picked_view is None else view_name(adapter, picked_view),
+        machine_y_mm=y_m * 1000.0,
+        station_z_mm=z_m * 1000.0,
+        rays=len(rays),
+        machine_x_mm=xs,
+        hit=hit,
+        same_entity=same_entity,
+        same_view=same_view,
+        same_owner=same_owner,
+    )
+    if not hit:
+        raise RuntimeError(
+            f"nameplate inset {label}: selected edge reads {reading}, not the section's "
+            f"named edge at machine x {target_mm:g} mm "
+            f"(entity={same_entity}, view={same_view}, owner={same_owner})"
+        )
+    return _InsetEdgeReference(label, edge, selected, name, component)
 
 
-def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
-    """Dimension step 9's nameplate inset from the deck end in plan section B-B.
+@_telemetry.traced("drawing.nameplate_inset")
+def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> _InsetDimensionProof:
+    """Dimension step 9's inset with source-verified, section-owned edges.
 
-    Both edges are picked at their projected sheet stations: on this assembly
-    section the API lists nothing. ``IView::GetVisibleComponents`` returned no
-    component (r4, run 20261015T024651004Z), and ``GetVisibleEntities2`` gave
-    no edge for the drawing-component tree's shown plate (r5, run
-    20261015T042140629Z), while the sheet prints both edges. Each pick is read
-    back to its machine x (:func:`_pick_inset_edge`) and the dimension is made
-    between the verified edges; the measured value is still checked against
-    ``NAMEPLATE_END_INSET``.
+    The model rays identify the two real edges without screen hit-testing.
+    Their section correspondences, native dimension attachments and measured
+    value are proved after the creation rebuild and again after finalization.
     """
     targets = (
-        ("nameplate lower edge", NAMEPLATE_MOUNT_POS[0]),
-        ("deck end", DECK_HALF_X),
+        ("nameplate lower edge", "fr-nameplate", NAMEPLATE_MOUNT_POS[0]),
+        ("deck end", "fr-harmonic-base", DECK_HALF_X),
     )
-    y_m = NAMEPLATE_MOUNT_POS[1] / 1000.0
-    projected = model_points_in_view(
+    y_mm = NAMEPLATE_MOUNT_POS[1]
+    plate_line, deck_line = model_points_in_view(
         adapter,
         section,
         [
-            *(
-                (x_mm / 1000.0, y_m, z_m)
-                for _, x_mm in targets
-                for z_m in NAMEPLATE_INSET_PICK_Z_M
-            ),
-            *((x_mm / 1000.0, y_m, NAMEPLATE_INSET_TEXT_Z_M) for _, x_mm in targets),
+            (x_mm / 1000.0, y_mm / 1000.0, NAMEPLATE_INSET_TEXT_Z_M)
+            for _, _, x_mm in targets
         ],
-        label="nameplate inset stations",
-        names=[
-            *(
-                f"{name} z {z_m * 1000.0:g}"
-                for name, _ in targets
-                for z_m in NAMEPLATE_INSET_PICK_Z_M
-            ),
-            *(f"{name} text line" for name, _ in targets),
-        ],
+        label="nameplate inset text line",
+        names=[f"{name} text line" for name, _, _ in targets],
     )
-    count = len(NAMEPLATE_INSET_PICK_Z_M)
-    station_rows = [
-        list(zip(NAMEPLATE_INSET_PICK_Z_M, projected[i * count : (i + 1) * count]))
-        for i in range(len(targets))
-    ]
-    plate_xy, deck_xy = (rows[0][1] for rows in station_rows)
-    plate_line, deck_line = projected[len(targets) * count :]
     gap = math.hypot(deck_line[0] - plate_line[0], deck_line[1] - plate_line[1])
     if gap <= 0.0:
         raise RuntimeError("nameplate inset edges coincide on the sheet")
-    edges = tuple(
+    leaves = _view_component_leaves(adapter, section, label="nameplate inset")
+    references = tuple(
         _pick_inset_edge(
-            adapter, section, label=name, target_mm=target_mm, stations=rows
+            adapter,
+            section,
+            leaves=leaves,
+            label=name,
+            stem=stem,
+            target_mm=target_mm,
+            stations_m=NAMEPLATE_INSET_PICK_Z_M,
         )
-        for (name, target_mm), rows in zip(targets, station_rows)
+        for name, stem, target_mm in targets
     )
     text_xy = tuple(
         deck + (deck - plate) / gap * NAMEPLATE_INSET_TEXT_OFFSET_M
         for plate, deck in zip(plate_line, deck_line)
     )
-    display = add_edge_dimension(
-        adapter,
-        section,
-        p0=plate_xy,
-        p1=deck_xy,
-        text_xy=(text_xy[0], text_xy[1]),
-        label="nameplate end inset",
-        entities=edges,
+    display = _add_inset_dimension(
+        adapter, section, tuple(ref.view_edge for ref in references),
+        text_xy=(text_xy[0], text_xy[1]), label="nameplate end inset",
     )
-    return _checked_linear_dimension(
+    display = _checked_linear_dimension(
         adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
     )
+    proof = _InsetDimensionProof(section, display, references)
+    _assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
+    return proof
+
+
+def _dimension_attachment(display: Any) -> tuple[bool, tuple[int, ...]]:
+    """``(dangling, attached entity types)`` of a display dimension."""
+    annotation = _early_bound(
+        _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
+    )
+    return (
+        bool(annotation.IsDangling()),
+        tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ())),
+    )
+
+
+@_telemetry.traced("drawing.add_inset_dimension", label_param="label")
+def _add_inset_dimension(
+    adapter: Any, view: Any, edges: Sequence[Any], *, text_xy: tuple[float, float], label: str
+) -> Any:
+    """Create one native dimension from the two already mapped section edges.
+
+    Selection-API retries cannot repair a missing drawing correspondence.
+    Only section-owned entities enter this path; the caller checks the actual
+    attachments after rebuilding, not the transient initial ``IsDangling``.
+    """
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for index, edge in enumerate(edges):
+        selection_data = manager.CreateSelectData()
+        selection_data.View = view
+        if not _early_bound(edge, "IEntity").Select4(index > 0, selection_data):
+            raise RuntimeError(f"{label}: failed to select section edge {index}")
+        count = int(manager.GetSelectedObjectCount2(-1))
+        selected = manager.GetSelectedObject6(index + 1, -1)
+        picked_view = manager.GetSelectedObjectsDrawingView2(index + 1, -1)
+        if (
+            count != index + 1 or selected is None or picked_view is None
+            or int(adapter.swApp.IsSame(selected, edge)) != 1
+            or int(adapter.swApp.IsSame(picked_view, view)) != 1
+        ):
+            raise RuntimeError(f"{label}: section edge {index} selection changed identity or view")
+    display = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: added no native dimension")
+    return display
 
 
 def _component_stem(component: Any) -> str:
@@ -1800,7 +2048,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _, top_section = _create_joint_sections(adapter, front)
-    _add_nameplate_inset_dimension(adapter, top_section)
+    inset = _add_nameplate_inset_dimension(adapter, top_section)
 
     _add_note_block(
         adapter,
@@ -1850,6 +2098,14 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     proof = _reattach_frame_balloons(
         adapter, exploded, [landing.note for landing in landings], balloon_items
     )
+    # The ring layout does not know the BOM's rebuilt row heights. Keep item 10
+    # below its actual bottom rule without changing the native screw attachment.
+    set_screw_proof = _place_frame_set_screw_balloon(adapter, exploded, table, landings)
+    proof = _FrameBalloonProof(
+        rebound=proof.rebound, bound=proof.bound,
+        short=(*proof.short, set_screw_proof),
+    )
+    _assert_frame_bom_balloon_clearance(adapter, table, landings, set_screw_proof)
     _add_note_block(
         adapter,
         f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
@@ -1887,7 +2143,81 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         (0.300, 0.074),
         label="assembly isometric caption",
     )
-    return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
+
+    def settled() -> None:
+        _assert_frame_balloons_settled(adapter, landings, proof)
+        _assert_frame_bom_balloon_clearance(adapter, table, landings, set_screw_proof)
+        _assert_inset_dimension_settled(adapter, inset)
+
+    return settled
+
+
+@_telemetry.traced("drawing.inset_dimension_settled")
+def _assert_inset_dimension_settled(
+    adapter: Any, proof: _InsetDimensionProof, *, phase: str = "final rebuild"
+) -> None:
+    """Prove the rebuilt section still owns the dimension and both real edges.
+
+    Runs 20261022T194220151Z and 20261022T204612817Z initially read
+    ``IsDangling=False`` and 4 mm, then lost every attached entity on rebuild.
+    Reacquire each section edge from its session-safe model entity before
+    comparing the annotation's native attachments. Ordinary cached topology
+    pointers and the measured value alone cannot establish surviving references.
+    """
+    display = _early_bound(proof.display, "IDisplayDimension")
+    view = _early_bound(proof.view, "IView")
+    dangling, types = _dimension_attachment(display)
+    expected_view = view_name(adapter, view)
+    expected_instances = tuple(ref.instance for ref in proof.references)
+    _telemetry.event(
+        "drawing.inset_dimension_settled", phase=phase, dangling=dangling, types=types,
+        expected_view=expected_view, expected_instances=expected_instances,
+    )
+    if dangling:
+        raise RuntimeError(
+            f"nameplate end inset dangles after the {phase} (attached entity types {types})"
+        )
+    try:
+        edges = tuple(
+            _inset_section_edge(
+                adapter, view, ref.model_edge, component=ref.component, label=ref.label,
+            )
+            for ref in proof.references
+        )
+        measured_mm = assert_dimension_measures(
+            adapter, display, expected_mm=NAMEPLATE_END_INSET,
+            label=f"nameplate end inset after {phase}", entities=edges,
+        )
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        # On the native screen positive control and both mapped variants,
+        # GetAttachedEntityTypes was empty despite two exact live attachments.
+        # Query the actual attached objects, not that legacy summary array.
+        attached_types = tuple(
+            int(_early_bound(entity, "IEntity").GetType())
+            for entity in (annotation.GetAttachedEntities3() or ())
+        )
+        kind = int(display.Type2)
+        # swLinearDimension / swHorLinearDimension / swVertLinearDimension.
+        if attached_types != (_SW_SEL_EDGES, _SW_SEL_EDGES) or kind not in (2, 11, 12):
+            raise RuntimeError(
+                f"nameplate end inset lost its edge/linear type: {attached_types}, {kind}"
+            )
+        inventory = tuple(view.GetDisplayDimensions() or ())
+        if sum(int(adapter.swApp.IsSame(item, display)) == 1 for item in inventory) != 1:
+            raise RuntimeError("nameplate end inset is not owned by its section view")
+    except RuntimeError as exc:
+        _telemetry.event(
+            "drawing.inset_dimension", phase=phase, dangling=dangling, types=types,
+            expected_view=expected_view, expected_instances=expected_instances,
+            reference_failure=str(exc),
+        )
+        raise
+    _telemetry.event(
+        "drawing.inset_dimension", phase=phase, dangling=dangling, types=types,
+        expected_view=expected_view, expected_instances=expected_instances,
+        attached_entity_types=attached_types,
+        measured_mm=measured_mm, dimension_type=kind, section_owned=True,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:

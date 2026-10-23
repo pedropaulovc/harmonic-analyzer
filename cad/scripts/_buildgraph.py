@@ -2376,8 +2376,12 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "ch_rocker_hub_spec",
         # Edge-break row takes the tap mouths off the carrier taps' engagement.
         "ch_rocker_arm_tl_oblique_carrier_spec",
+        # Edge-break row must stay within the pin flange's analysed capture limit.
+        "ch_rocker_arm_tl_oblique_pivot_pin_spec",
         # Edge-break row supplies the fitted retainer's maximum mouth break.
         "ch_rocker_arm_tl_oblique_pivot_retainer_spec",
+        # Edge-break row reduces the cap registers' straight capture engagement.
+        "ch_rocker_arm_tl_oblique_retention_spec",
         # Edge-break row sizes the nut and pillow-block screws' full engagement.
         "ch_rocker_arm_tl_vn_oblique_leadscrew_spec",
         "dt_crankshaft_spec",

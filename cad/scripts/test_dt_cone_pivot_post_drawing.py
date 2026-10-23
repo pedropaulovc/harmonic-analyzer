@@ -617,7 +617,7 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
             _config.CONFIG_DIR, "dt_cone_pivot_post", "part"
         )
     }
-    assert set(exceptions) == {"RV-01", "RV-02"}
+    assert set(exceptions) == {"RV-01"}
     exception = exceptions["RV-01"]
     assert exception.kind == "accept"
     assert "crank-bore diametral angularity frame" in exception.where
