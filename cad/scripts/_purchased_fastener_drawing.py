@@ -1353,14 +1353,17 @@ def add_purchased_footer(
     item: str,
     notes: str = "",
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     label: str,
     supplier_data: Sequence[str] = (),
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
     Returns (note, linked text, resolved text, reserved box) for the native
-    readback.  ``cut_to_suit`` says the part is cut at assembly (its note says
-    where); otherwise the general line says it is used as supplied.
+    readback.  When ``general_text`` is None, ``cut_to_suit`` says the part is
+    cut at assembly (its note says where); otherwise the default general line
+    says it is used as supplied. A literal override uses the same reserved
+    single-line space and native text/extent checks.
     """
     item = check_item(item, label=label)
     lines = note_lines(notes, label=label)
@@ -1393,7 +1396,7 @@ def add_purchased_footer(
         placed.append(
             (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
-    general = _GENERAL_TEXT[cut_to_suit]
+    general = _GENERAL_TEXT[cut_to_suit] if general_text is None else general_text
     note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y)
     placed.append(
         (
@@ -1652,6 +1655,7 @@ async def _build_reference_sheet(
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     source_checkpoint: Callable[[str], None] | None = None,
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
@@ -1890,6 +1894,8 @@ async def _build_reference_sheet(
                     adapter, draw, layout=spec.layout, number=properties["Number"]
                 ),
             )
+        if title_block_setup is not None:
+            final_checks = (*final_checks, title_block_setup(adapter))
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:

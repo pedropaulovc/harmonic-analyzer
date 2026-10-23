@@ -59,10 +59,21 @@ colocation alone is not a printed-callout drift check.
 `faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit
 unknowns. Each `fields` entry is `(value, sources)`: a string source names a
-symbol in `<stem>_spec`, while `(module, NAME)` cites a symbol in another module.
+symbol in the part's feature spec (normally `<stem>_spec`), while `(module, NAME)`
+cites a symbol in another module.
 Shared-helper sources name their defining module, such as
 `("_drawing_hole_callout", "add_native_hole_callout")`; the lifecycle-only
 `_drawing_common` module is not the authority for helpers extracted from it.
+
+A configured shared producer may declare one literal `FEATURE_SPEC_MODULE` in
+its drawing to name the actual saved/default member's spec instead. For example,
+`sh_vn_clamping_kit_hardware` names `sh_vn_clamping_kit_hold_down_stud_spec`,
+whose `CONFIGURATION` must match the registry's `default_configuration`
+(`HoldDownStud`). Do not invent an aggregate spec or re-export member facts to
+match the producer stem. The feature source closure includes the drawing, the
+selected spec and both transitive Python dependency closures without importing
+them; config reads from those sources remain feature-leaf inputs.
+
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
 `model_sources` and `precision_sources` cite the shared frame and displayed
@@ -116,6 +127,23 @@ The consumer schema does not expose unequally disposed surface-profile fields:
 the sourced profile control is retained in each arc feature's `note` and its
 acceptance identity remains explicitly `unknown`, never silently omitted or
 replaced with a size band.
+
+Pivot-cap fitted-head acceptance uses the consumer's required, cited `note`
+field, not private schema keys. The unchanged printed counterbore callouts
+retain the actual seated highest-head recess of 0.50–0.60 normal to the actual
+cap top and the 2.00 minimum whole-floor thickness, including full-width edge
+openings. Their citations include `fitted_counterbore_acceptance` as well as
+the printed limits. The 8.40 model cut remains `depth_ref`, not a toleranced
+machining depth. The wire-channel note retains normal-to-actual-top,
+whole-groove-floor applicability alongside the numeric width/depth bands. Each
+register note carries the boss root-radius maximum, cited to
+`REGISTER_ROOT_RADIUS_MAX`, the value charged to the register assembly and
+engagement proof; the native root stays sharp.
+Installed `prechips==0.2.0` accepts these authored note requirements but does
+not select text notes for automated tolerance inspection or its traveler
+tolerance table. Schema validation therefore proves representation and
+provenance, not fitted-head or every-point floor acceptance; the part's
+native/spec geometry and actual-fit guards remain separate and unchanged.
 
 Turned-feature `z_mm` intervals describe nominal geometry along the feature's
 source-frame Z axis, not an acceptance band. Shaft grooves overlay the journal

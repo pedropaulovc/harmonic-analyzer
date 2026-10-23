@@ -142,6 +142,7 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_oblique_feed_lever ch_rocker_arm_tl_oblique_hub_pin "
     "ch_rocker_arm_tl_oblique_end_bracket ch_rocker_arm_tl_oblique_nut_bracket "
     "ch_rocker_arm_tl_oblique_pivot_block ch_rocker_arm_tl_oblique_pivot_pin ch_rocker_arm_tl_oblique_riser "
+    "ch_rocker_arm_tl_oblique_pivot_cap ch_rocker_arm_tl_oblique_pivot_retainer "
     "ch_rocker_arm_tl_vn_oblique_rail ch_rocker_arm_tl_vn_oblique_carriage ch_rocker_arm_tl_vn_oblique_bearing "
     "ch_rocker_arm_tl_vn_oblique_cl_dowel ch_rocker_arm_tl_vn_oblique_leadscrew "
     "ch_rocker_arm_tl_vn_oblique_leadscrew_nut ch_rocker_arm_tl_vn_oblique_pillow_block "
@@ -151,7 +152,9 @@ _INSERTED_SOURCES = {
     "ch_rocker_arm_tl_vn_oblique_kp08_screw ch_rocker_arm_tl_vn_oblique_nut_screw "
     "ch_rocker_arm_tl_vn_oblique_riser_screw ch_rocker_arm_tl_vn_oblique_clamp_screw "
     "ch_rocker_arm_tl_vn_oblique_lever_screw ch_rocker_arm_tl_vn_oblique_block_washer "
-    "ch_rocker_arm_tl_vn_oblique_lever_washer",
+    "ch_rocker_arm_tl_vn_oblique_lever_washer ch_rocker_arm_tl_vn_oblique_pivot_cap_screw "
+    "ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin ch_rocker_arm_tl_vn_oblique_pivot_cotter "
+    "ch_rocker_arm_tl_vn_oblique_pivot_lock_wire",
     "ha_harmonic_analyzer": "fr_frame dt_drive_train ch_channel sm_summing mg_magnifier pn_pen "
     "pd_paper_drive ms_measuring_stick",
 }
@@ -245,10 +248,107 @@ def test_arm_plate_locating_pin_has_real_assembly_dependents() -> None:
     assert set(dependents_of(stem)) == {"pd_paper_drive", "ha_harmonic_analyzer"}
 
 
+def test_positive_pivot_components_are_first_class_jig_only_targets() -> None:
+    import json
+
+    import _config
+    from _assembly_contract import assembly_contract
+    from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+    from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+
+    identities = {
+        "ch_rocker_arm_tl_oblique_pivot_cap": ("MHA-CH-06-TL-30", 2),
+        "ch_rocker_arm_tl_oblique_pivot_retainer": ("MHA-CH-06-TL-31", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_cap_screw": ("MHA-CH-06-TL-VN-73", 8),
+        "ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin": ("MHA-CH-06-TL-VN-74", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_cotter": ("MHA-CH-06-TL-VN-75", 2),
+        "ch_rocker_arm_tl_vn_oblique_pivot_lock_wire": ("MHA-CH-06-TL-VN-76", 4),
+    }
+    jig = "ch_rocker_arm_tl_oblique_jig"
+    contract = assembly_contract(jig.replace("_", "-"))
+    source_rows = json.loads(
+        (bg.CONFIG_DIR / "current-identity-map.json").read_text(encoding="utf-8")
+    )["parts_and_assemblies"]
+    for stem, (number, quantity) in identities.items():
+        dashed = stem.replace("_", "-")
+        assert stem in part_stems(), f"{stem}: missing native part producer"
+        assert script_for(stem).name == f"build_{stem}.py"
+        assert script_for(stem).is_file()
+        assert set(dependents_of(stem)) == {jig}
+        assert stem in references_of(jig)
+        assert all(stem not in references_of(machine) for machine in bg.MACHINE_ASSEMBLIES)
+        assert dashed in contract.allowed_free_stems
+        assert dashed in contract.required_free_stems
+        drawing = DRAWINGS_BY_NAME[stem]
+        assert (drawing.part, drawing.artifact_stem) == (stem, dashed)
+        assert drawing.source_kind == "part"
+        assert drawing.script_name == f"draw_{stem}.py" and drawing.script.is_file()
+        assert drawing.layout is DrawingLayout.LANDSCAPE
+        row = _config.parts(dashed)
+        assert (row["number"], int(row["quantity"])) == (number, quantity)
+        mapped = [
+            (source, identity)
+            for source in source_rows
+            for identity in source["new_identities"]
+            if identity["stem"] == dashed
+        ]
+        assert len(mapped) == 1
+        source, identity = mapped[0]
+        assert identity["number"] == number
+        assert source["old_stem"] == dashed and source["old_number"] is None
+        assert source["introduced"] == "2026-10-20"
+        if "_vn_" in stem:
+            assert identity["parent"] == jig.replace("_", "-")
+        assert drawing.script_name in PRECISION_MIGRATED_DRAWINGS
+
+
+def test_positive_capture_interference_contract_has_only_exact_thread_pairs() -> None:
+    import math
+
+    import _interference_contracts as interference
+    import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
+    import ch_rocker_arm_tl_oblique_retention_spec as retention
+    from _hole_spec import TAP_DRILL_MM
+
+    jig = "ch-rocker-arm-tl-oblique"
+    vendor = "ch-rocker-arm-tl-vn-oblique"
+    major, tap, engagement = interference.JIG_PIVOT_CAP_SCREW_THREAD
+    assert major == hardware.SCREW_MAJOR_DIA
+    assert tap == TAP_DRILL_MM[hardware.SCREW_THREAD]
+    assert engagement == pytest.approx(
+        hardware.SCREW_LENGTH - (retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH)
+    )
+    expected_limit = 1.10 * math.pi * (major**2 - tap**2) * engagement / 4.0
+    expected = {
+        frozenset(
+            (f"{vendor}-pivot-cap-screw-{index}", f"{jig}-pivot-block-{block}")
+        ): pytest.approx(expected_limit)
+        for index in range(1, 9)
+        for block in ((index - 1) // 4 + 1,)
+    }
+    new_stems = (
+        f"{jig}-pivot-cap",
+        f"{jig}-pivot-retainer",
+        f"{vendor}-pivot-cap-screw",
+        f"{vendor}-pivot-clevis-pin",
+        f"{vendor}-pivot-cotter",
+        f"{vendor}-pivot-lock-wire",
+    )
+    actual = {
+        pair: limit
+        for pair, limit in interference.allowed_interference_pairs(f"{jig}-jig").items()
+        if any(name.rsplit("-", 1)[0] in new_stems for name in pair)
+    }
+    # Nominal contact and tangency are not reasons to mask a cap, wire, pin,
+    # retainer or cotter collision.
+    assert actual == expected
+
+
 @pytest.mark.parametrize(
     ("stem", "number"),
     [
         ("pd_chain_sprocket", "MHA-PD-01"),
+        ("ch_rocker_arm_tl_vn_oblique_nut_washer", "MHA-CH-06-TL-VN-72"),
     ],
 )
 def test_retired_orphan_families_are_not_allocated(stem, number) -> None:
@@ -3004,12 +3104,20 @@ def test_features_source_closures_preserve_draw_and_spec_config_reads():
     import export_features
 
     globs = {"machine/*", "tolerances/*", "parts/*", "title_block", "**", bg.ASSEMBLY_CONTRACTS_TOKEN}
+    # Shared configured producers cite the saved/default member's real spec,
+    # not a synthetic aggregate spec. Keep this oracle independent of the resolver.
+    member_specs = {
+        "sh_vn_clamping_kit_hardware": "sh_vn_clamping_kit_hold_down_stud_spec",
+    }
     for stem in export_features.SUPPORTED_PARTS:
         sources = {path.resolve() for path in export_features.source_paths(stem)}
         drawing = (SCRIPTS_DIR / f"draw_{stem}.py").resolve()
-        spec = (SCRIPTS_DIR / f"{stem}_spec.py").resolve()
+        spec_module = member_specs.get(stem, f"{stem}_spec")
+        spec = (SCRIPTS_DIR / f"{spec_module}.py").resolve()
+        assert spec.is_file(), stem
         assert {drawing, spec} <= sources, stem
-        assert {Path(path).resolve() for path in module_deps_of(drawing)} <= sources, stem
+        for root in (drawing, spec):
+            assert {Path(path).resolve() for path in module_deps_of(root)} <= sources, (stem, root)
         assert {
             path.name for path in sources if path.name.startswith("draw_")
         } == {drawing.name}, stem
