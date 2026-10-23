@@ -9,6 +9,9 @@ them through the real ``_telemetry`` spine. Native bank-retention metrology is
 isolated separately in ``_patch_com_seam``; saved-solid validation belongs to the
 native farm gate, not these telemetry tests. Wall-clock timing is scaled
 (``HARMONIC_MOCK_SCALE``, default 0.01 = 1/100th real time).
+Shared vendor occurrences carry native file/member identities and semantic
+references so their production inventory gate runs too; these identity reads
+have no calibrated timing in the historical logs and add no mock delay.
 
 This pins the two span-shape fixes this module exists to prove:
 
@@ -166,11 +169,18 @@ class MockComponent:
     def __init__(self, name: str, model: "MockModel") -> None:
         self._name = name
         self._model = model
+        self.ComponentReference = ""
+        self.ReferencedConfiguration = "Default"
+        self._path = f"{name}.SLDPRT"
 
-    # _read_member calls these (callable -> invoked); the per-comp cost lives here.
+    # Name2 is a COM property; keep its calibrated per-component read cost.
+    @property
     def Name2(self) -> str:
         _sleep(T_NAME2)
         return self._name
+
+    def GetPathName(self) -> str:
+        return self._path
 
     def IsFixed(self) -> bool:
         _sleep(T_IS_FIXED)
@@ -185,7 +195,7 @@ class MockComponent:
         # Faithful to a freed-DOF model: in the free pose the train reads
         # under-constrained; a fully-defined assembly reads fully constrained.
         # Fixed (-1) comps never reach here (IsFixed short-circuits).
-        if getattr(self._model, "_free_pose", False):
+        if getattr(self._model, "_free_pose", False) and not self.ComponentReference:
             return _assembly.UNDER_CONSTRAINED  # 2 -> the free DOF is real
         return _assembly.FULLY_CONSTRAINED  # 3 -> fully defined, gate passes
 
@@ -235,6 +245,23 @@ class MockModel:
         for j in range(1, len(self._comps)):
             if stems:
                 self._comps[j]._name = f"{stems[(j - 1) % len(stems)]}-{j + 1}"
+        # Shared members replace existing occurrences, preserving the calibrated
+        # component count and the grounded seed/first required free-family cycle.
+        # They remain constrained when the operational DOF is free.
+        shared = [
+            (role, number)
+            for role, count in verify._shared_reference_counts(name).get("", {}).items()
+            for number in range(1, count + 1)
+        ]
+        for index, (role, number) in enumerate(
+            shared, start=len(self._comps) - len(shared)
+        ):
+            component = self._comps[index]
+            stem, configuration = verify.REFERENCE_IDENTITIES[role]
+            component._name = f"{stem}-{index + 1}"
+            component.ComponentReference = f"{role}:{number}"
+            component.ReferencedConfiguration = configuration
+            component._path = f"{stem}.SLDPRT"
         self.InterferenceDetectionManager = MockIDM()
         self.Extension = types.SimpleNamespace(NeedsRebuild2=0)
         # Whether this model is in its freed-DOF pose (non-fixed components read
@@ -611,6 +638,24 @@ def test_free_dof_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp
     this pins the park-driver removal."""
     spans, report = _run_soundness(["dt-drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
+    # The shared-identity gate must run its real inventory walk, not bypass it
+    # at the mock seam or introduce a span for each occurrence.
+    assert "dt-drive-train:shared-component-references" in report.passed
+    (reference_gate,) = [
+        span
+        for span in _by_name(spans, "gate")
+        if span.attributes["label"] == "dt-drive-train:shared-component-references"
+    ]
+    (binding,) = [
+        span
+        for span in spans
+        if span.parent and span.parent.span_id == reference_gate.context.span_id
+    ]
+    assert binding.name == "assembly.component_reference_names"
+    assert binding.status.status_code.name == "OK"
+    assert not any(
+        span.parent and span.parent.span_id == binding.context.span_id for span in spans
+    )
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
     # crank spin + cone-platform swing + pinion swing + lift-rod/cam spin (PR8)
