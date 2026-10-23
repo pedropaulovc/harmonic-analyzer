@@ -1329,6 +1329,38 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+For FR-00's nameplate inset in section B-B, model geometry alone was not
+attachment evidence. Farm run
+`20261022T204612817Z-cd964f67d895402c96f536ac40ba51d8`
+(`C:/src/farm-runs/fix1667`) selected `fr-nameplate-1` at machine
+x=163/163, y=52.300, z=25 mm and `fr-harmonic-base-1` at x=167/167,
+y=50.006, z=25 mm. The initial dimension read 4 mm and not dangling, but
+the final rebuild returned dangling with attached types `()`.
+Changing the component provider to `IDrawingComponent.Component` did not
+fix that loss. Do not suppress the final guard or retry unchanged.
+
+The API distinguishes
+[`IComponent2.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IComponent2~GetCorrespondingEntity.html)
+(component context) from
+[`IView.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks.IView~GetCorrespondingEntity.html)
+(drawing-view context). The FR recipe explicitly maps each ray-identified
+component edge into B-B, then reverse-maps both entities into the same source
+part with `IModelDocExtension.GetCorrespondingEntity2` and requires
+`IsSame == 1`. Missing or unknown correspondence refuses; changing the
+selection API is not a fallback. Share one drawing-component snapshot for
+both targets and retain the batched body rays: walking every engraved edge
+took 783 s, versus about 21 s for the ray path.
+
+After creation rebuild and final rebuild, reacquire the section edges from
+their model identities and use `assert_dimension_measures` to prove exactly
+those two native attachments, not dangling, and the spec-owned 4 mm value.
+Require native edge/linear types and membership in B-B's display-dimension
+inventory too. Correspondence, selected view/instance and reference failures
+stay in `drawing.inset_*` telemetry. Offline lifecycle regressions are not
+native proof: require the farm's rebuilt/saved dimension, its ordinary PDF
+colour and the complete-sheet comparison, not a nominal note or detached
+sketch that merely prints the right number.
+
 **l. A datum named by a frame's datum identifier.**
 Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take
 `GetDatumIdentifier` as proof. On the knife mount (farm run

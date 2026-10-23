@@ -50,6 +50,7 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
 )
 from _drawing_dimensions import set_arc_endpoints_to_center, set_reference_dimension
+from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import _edge_endpoint_key
 from _drawing_leaders import distance_to_point, segments_cross
 from _drawing_projection import model_point_in_view, model_points_in_view
@@ -727,40 +728,36 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
     return sections[0], sections[1]
 
 
+@_telemetry.traced("drawing.inset_edge_rays")
 def _inset_edge_rays(
     adapter: Any,
     view: Any,
     *,
+    leaves: Sequence[Any],
     stem: str,
     target_mm: float,
     stations_m: Sequence[float],
 ) -> tuple[str, list[tuple[Any, float] | None]]:
-    """The edge of ``stem`` the plan section draws on machine x ``target_mm``, per station.
+    """Find the highest model edge at each machine-x/z station by ray.
 
     One ``IModelDocExtension::RayIntersections`` call per solid body of the
-    stem's one shown instance. The instance is the view's own drawing
-    component (``_view_component_leaves``), not the referenced assembly's:
-    an edge mapped through the assembly's component measured 4.0 and then
-    DANGLED once the sheet rebuilt (runs 20261022T180853435Z and
-    20261022T194220151Z, printed in the dangling colour), while the balloons
-    the same view tree anchors through their drawing component hold. (On
-    this section ``IView::GetVisibleComponents`` returns no component, r4
-    run 20261015T024651004Z, and ``GetVisibleEntities2`` no edge, r5 run
-    20261015T042140629Z.) Each station casts a ray down machine -y through
-    ``(target x, z)`` from above the body, so the first edge it reports is
-    the highest level edge on that x: the outline the section draws there
-    (the plate's top face over its underside, the deck end's chamfer over the
-    foot of its end face). Enumerating the body's edges instead is what the
-    engraved nameplate made a 13 min, telemetry-silent walk (runs
-    20261022T162906839Z and 20261022T165432297Z, the second killed by the
-    900 s op timeout on w4). Returns the instance name and, per station, the
-    nearest edge hit as ``(edge in the instance's context, machine y)`` or
-    ``None``.
+    stem's one shown drawing component avoids walking the engraved plate's
+    thousands of edges (783 s on run 20261022T162906839Z; the ray path took
+    about 21 s). The returned edges are in COMPONENT context, not drawing-view
+    context, even when the component came from ``IDrawingComponent.Component``.
+    Run 20261022T204612817Z proved their x coordinates but lost both dimension
+    references on rebuild. The caller must map the chosen edge with
+    ``IView.GetCorrespondingEntity`` before selecting it.
+
+    Each ray points down machine -y through ``(target x, z)`` from above the
+    body. Return the instance name and, per station, the highest edge hit as
+    ``(component edge, machine y)`` or ``None``. Section views need this path:
+    ``GetVisibleComponents`` and ``GetVisibleEntities2`` returned no entities
+    in runs 20261015T024651004Z and 20261015T042140629Z.
     """
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     shown = [
-        leaf
-        for leaf in _view_component_leaves(adapter, view, label="nameplate inset")
+        leaf for leaf in leaves
         if leaf.visible and leaf.component is not None and stem in leaf.identities
     ]
     if len(shown) != 1:
@@ -855,27 +852,86 @@ def _read_selected_inset_edge(
     return edge, owner, (start[0] * 1000.0, end[0] * 1000.0)
 
 
+@dataclass(frozen=True)
+class _InsetEdgeReference:
+    """Keep the model identity so a rebuilt section can reacquire its edge."""
+
+    label: str
+    model_edge: Any
+    view_edge: Any
+    instance: str
+
+
+@dataclass(frozen=True)
+class _InsetDimensionProof:
+    view: Any
+    display: Any
+    references: tuple[_InsetEdgeReference, _InsetEdgeReference]
+
+
+@_telemetry.traced("drawing.inset_correspondence", label_param="label")
+def _inset_section_edge(adapter: Any, view: Any, model_edge: Any, *, label: str) -> Any:
+    """Map model topology into the section, and prove its source identity.
+
+    ``IComponent2.GetCorrespondingEntity`` only provides component context.
+    The separate ``IView.GetCorrespondingEntity`` mapping is what gives the
+    drawing a view-owned reference, not a currently selectable model edge.
+    Reverse both objects into the same source part before comparing them.
+    """
+    section_edge = _early_bound(view, "IView").GetCorrespondingEntity(model_edge)
+    component = _early_bound(model_edge, "IEntity").GetComponent()
+    source = (
+        None if component is None
+        else _early_bound(component, "IComponent2").GetModelDoc2()
+    )
+    canonical = returned = None
+    if section_edge is not None and source is not None:
+        extension = _early_bound(
+            _early_bound(source, "IModelDoc2").Extension, "IModelDocExtension"
+        )
+        canonical = extension.GetCorrespondingEntity2(model_edge)
+        returned = extension.GetCorrespondingEntity2(section_edge)
+    same = (
+        -1 if canonical is None or returned is None
+        else int(adapter.swApp.IsSame(canonical, returned))
+    )
+    _telemetry.event(
+        "drawing.inset_correspondence",
+        label=label,
+        mapped=section_edge is not None,
+        source_available=source is not None,
+        source_identity=same,
+        expected_view=view_name(adapter, view),
+        expected_instance="" if component is None else str(component.Name2),
+    )
+    if section_edge is None or same != 1:  # swObjectSame; unknown also refuses.
+        raise RuntimeError(
+            f"nameplate inset {label}: no source-verified section edge "
+            f"(mapped={section_edge is not None}, source identity={same})"
+        )
+    return section_edge
+
+
+@_telemetry.traced("drawing.inset_edge", label_param="label")
 def _pick_inset_edge(
     adapter: Any,
     view: Any,
     *,
+    leaves: Sequence[Any],
     label: str,
     stem: str,
     target_mm: float,
     stations_m: Sequence[float],
-) -> Any:
-    """Select ``label``'s edge in ``view`` from the model's geometry and prove it.
+) -> _InsetEdgeReference:
+    """Find the edge geometrically, map it into the section, and prove the pick.
 
-    :func:`_inset_edge_rays` casts one ray per station down machine -y
-    through the target x; the first station whose ray reports an edge
-    chooses that edge. It is selected through the view by entity, never by a
-    sheet coordinate, and the selection is read back to its owner and both
-    ends' machine x before it is used: a read-back off target (a corner's
-    edge along y, a chamfer's slant) fails the sheet naming it, as does a
-    target x no station's ray meets an edge on.
+    The first ray-hit station chooses the model edge. Its corresponding
+    section entity must select as that exact edge in that exact view, and
+    both read-back endpoints must have the intended machine x. No screen
+    coordinate or engraved-body edge enumeration participates.
     """
     name, rays = _inset_edge_rays(
-        adapter, view, stem=stem, target_mm=target_mm, stations_m=stations_m
+        adapter, view, leaves=leaves, stem=stem, target_mm=target_mm, stations_m=stations_m
     )
     chosen = next(
         ((z_m, row) for z_m, row in zip(stations_m, rays) if row is not None), None
@@ -887,9 +943,15 @@ def _pick_inset_edge(
             f"meets an edge of {name}"
         )
     z_m, (edge, y_m) = chosen
-    _select_view_entity(adapter, view, "EDGE", None, label=label, entity=edge)
+    section_edge = _inset_section_edge(adapter, view, edge, label=label)
+    _select_view_entity(adapter, view, "EDGE", None, label=label, entity=section_edge)
+    manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    picked_view = manager.GetSelectedObjectsDrawingView2(1, -1)
     selected, owner, xs = _read_selected_inset_edge(adapter)
-    hit = xs is not None and all(
+    same_entity = selected is not None and int(adapter.swApp.IsSame(selected, section_edge)) == 1
+    same_view = picked_view is not None and int(adapter.swApp.IsSame(picked_view, view)) == 1
+    same_owner = owner.rsplit("/", 1)[-1] == name.rsplit("/", 1)[-1]
+    hit = same_entity and same_view and same_owner and xs is not None and all(
         abs(x - target_mm) <= NAMEPLATE_INSET_PICK_TOLERANCE_MM for x in xs
     )
     reading = (
@@ -905,29 +967,33 @@ def _pick_inset_edge(
         label=label,
         instance=name,
         owner=owner,
+        expected_view=view_name(adapter, view),
+        selected_view="" if picked_view is None else view_name(adapter, picked_view),
         machine_y_mm=y_m * 1000.0,
         station_z_mm=z_m * 1000.0,
         rays=len(rays),
         machine_x_mm=xs,
         hit=hit,
+        same_entity=same_entity,
+        same_view=same_view,
+        same_owner=same_owner,
     )
     if not hit:
         raise RuntimeError(
-            f"nameplate inset {label}: selected edge reads {reading}, not machine x "
-            f"{target_mm:g} mm"
+            f"nameplate inset {label}: selected edge reads {reading}, not the section's "
+            f"named edge at machine x {target_mm:g} mm "
+            f"(entity={same_entity}, view={same_view}, owner={same_owner})"
         )
-    return selected
+    return _InsetEdgeReference(label, edge, selected, name)
 
 
-def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
-    """Dimension step 9's nameplate inset from the deck end in plan section B-B.
+@_telemetry.traced("drawing.nameplate_inset")
+def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> _InsetDimensionProof:
+    """Dimension step 9's inset with source-verified, section-owned edges.
 
-    Both edges come from the model's geometry (:func:`_pick_inset_edge`): the
-    plate's lower edge and the deck end, each the first edge a ray down the
-    plan section's line of sight meets on its machine x, selected through the
-    view by entity and read back to its machine x before the dimension is
-    made between them. The measured value is still checked
-    against ``NAMEPLATE_END_INSET``.
+    The model rays identify the two real edges without screen hit-testing.
+    Their section correspondences, native dimension attachments and measured
+    value are proved after the creation rebuild and again after finalization.
     """
     targets = (
         ("nameplate lower edge", "fr-nameplate", NAMEPLATE_MOUNT_POS[0]),
@@ -947,10 +1013,12 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
     gap = math.hypot(deck_line[0] - plate_line[0], deck_line[1] - plate_line[1])
     if gap <= 0.0:
         raise RuntimeError("nameplate inset edges coincide on the sheet")
-    edges = tuple(
+    leaves = _view_component_leaves(adapter, section, label="nameplate inset")
+    references = tuple(
         _pick_inset_edge(
             adapter,
             section,
+            leaves=leaves,
             label=name,
             stem=stem,
             target_mm=target_mm,
@@ -963,11 +1031,15 @@ def _add_nameplate_inset_dimension(adapter: Any, section: Any) -> Any:
         for plate, deck in zip(plate_line, deck_line)
     )
     display = _add_inset_dimension(
-        adapter, section, edges, text_xy=(text_xy[0], text_xy[1]), label="nameplate end inset"
+        adapter, section, tuple(ref.view_edge for ref in references),
+        text_xy=(text_xy[0], text_xy[1]), label="nameplate end inset",
     )
-    return _checked_linear_dimension(
+    display = _checked_linear_dimension(
         adapter, display, expected_mm=NAMEPLATE_END_INSET, label="nameplate end inset"
     )
+    proof = _InsetDimensionProof(section, display, references)
+    _assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
+    return proof
 
 
 def _dimension_attachment(display: Any) -> tuple[bool, tuple[int, ...]]:
@@ -981,69 +1053,41 @@ def _dimension_attachment(display: Any) -> tuple[bool, tuple[int, ...]]:
     )
 
 
+@_telemetry.traced("drawing.add_inset_dimension", label_param="label")
 def _add_inset_dimension(
     adapter: Any, view: Any, edges: Sequence[Any], *, text_xy: tuple[float, float], label: str
 ) -> Any:
-    """Dimension between ``edges`` found in the model, attached in ``view``.
+    """Create one native dimension from the two already mapped section edges.
 
-    The ray gives each edge in its component's context, not as the view
-    draws it. Run 20261022T180853435Z selected both with
-    ``IEntity::Select4`` under the view's ``ISelectData`` and the dimension
-    came out DANGLING: measured 4.0, drawn in SolidWorks' dangling colour,
-    attached to nothing the sheet owns. So the edges are selected through
-    ``IView::SelectEntity`` first, the way a listed edge is ballooned, and the
-    dimension's ``IAnnotation::IsDangling`` is read before it is kept; a
-    dangling dimension is deleted and the ``Select4`` selection tried, each
-    attempt recorded on ``drawing.inset_dimension``, and the sheet fails
-    when neither attaches.
+    Selection-API retries cannot repair a missing drawing correspondence.
+    Only section-owned entities enter this path; the caller checks the actual
+    attachments after rebuilding, not the transient initial ``IsDangling``.
     """
     draw = adapter.currentModel
-    bound_view = _early_bound(view, "IView")
     name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    draw.ClearSelection2(True)
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-
-    def by_view(edge: Any, append: bool) -> bool:
-        return bool(bound_view.SelectEntity(edge, append))
-
-    def by_entity(edge: Any, append: bool) -> bool:
+    for index, edge in enumerate(edges):
         selection_data = manager.CreateSelectData()
         selection_data.View = view
-        return bool(_early_bound(edge, "IEntity").Select4(append, selection_data))
-
-    attempts = []
-    for variant, select in (("view.SelectEntity", by_view), ("entity.Select4", by_entity)):
-        if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
-            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
-        draw.ClearSelection2(True)
-        for index, edge in enumerate(edges):
-            if not select(edge, index > 0):
-                raise RuntimeError(f"{label}: {variant} failed to select edge {index}")
-            count = int(manager.GetSelectedObjectCount2(-1))
-            if count != index + 1:
-                raise RuntimeError(
-                    f"{label}: {variant} edge {index} changed the selection count to {count}"
-                )
-        display = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
-        draw.ClearSelection2(True)
-        if display is None:
-            raise RuntimeError(f"{label}: {variant} added no dimension")
-        dangling, types = _dimension_attachment(display)
-        attempts.append(f"{variant}: dangling={dangling} types={types}")
-        _telemetry.event(
-            "drawing.inset_dimension", label=label, variant=variant, dangling=dangling, types=types
-        )
-        if not dangling:
-            return display
-        _telemetry.warn(f"{label}: {variant} dimension dangles (types {types}); deleting it")
-        annotation = _early_bound(
-            _early_bound(display, "IDisplayDimension").GetAnnotation(), "IAnnotation"
-        )
-        draw.ClearSelection2(True)
-        if not annotation.Select2(False, 0):
-            raise RuntimeError(f"{label}: failed to select the dangling {variant} dimension")
-        draw.EditDelete()
-        draw.ClearSelection2(True)
-    raise RuntimeError(f"{label}: every selection left the dimension dangling: {'; '.join(attempts)}")
+        if not _early_bound(edge, "IEntity").Select4(index > 0, selection_data):
+            raise RuntimeError(f"{label}: failed to select section edge {index}")
+        count = int(manager.GetSelectedObjectCount2(-1))
+        selected = manager.GetSelectedObject6(index + 1, -1)
+        picked_view = manager.GetSelectedObjectsDrawingView2(index + 1, -1)
+        if (
+            count != index + 1 or selected is None or picked_view is None
+            or int(adapter.swApp.IsSame(selected, edge)) != 1
+            or int(adapter.swApp.IsSame(picked_view, view)) != 1
+        ):
+            raise RuntimeError(f"{label}: section edge {index} selection changed identity or view")
+    display = draw.AddDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: added no native dimension")
+    return display
 
 
 def _component_stem(component: Any) -> str:
@@ -2075,25 +2119,64 @@ def _place_package(adapter: Any) -> Callable[[], None]:
 
     def settled() -> None:
         _assert_frame_balloons_settled(adapter, landings, proof)
-        _assert_inset_dimension_settled(inset)
+        _assert_inset_dimension_settled(adapter, inset)
 
     return settled
 
 
-def _assert_inset_dimension_settled(display: Any) -> None:
-    """After the last rebuild, the inset dimension must still be attached.
+@_telemetry.traced("drawing.inset_dimension_settled")
+def _assert_inset_dimension_settled(
+    adapter: Any, proof: _InsetDimensionProof, *, phase: str = "final rebuild"
+) -> None:
+    """Prove the rebuilt section still owns the dimension and both real edges.
 
-    ``IsDangling`` read False straight after ``AddDimension2`` on run
-    20261022T194220151Z, and the printed dimension was dangling anyway: the
-    references die when the section regenerates, so the proof is this one,
-    after the final rebuild.
+    Runs 20261022T194220151Z and 20261022T204612817Z initially read
+    ``IsDangling=False`` and 4 mm, then lost every attached entity on rebuild.
+    Reacquire each section edge from its model identity before comparing the
+    annotation's native attachments; neither cached wrappers nor value alone
+    establish a surviving associative reference.
     """
+    display = _early_bound(proof.display, "IDisplayDimension")
+    view = _early_bound(proof.view, "IView")
     dangling, types = _dimension_attachment(display)
+    expected_view = view_name(adapter, view)
+    expected_instances = tuple(ref.instance for ref in proof.references)
+    _telemetry.event(
+        "drawing.inset_dimension_settled", phase=phase, dangling=dangling, types=types,
+        expected_view=expected_view, expected_instances=expected_instances,
+    )
     if dangling:
         raise RuntimeError(
-            f"nameplate end inset dangles after the final rebuild (attached entity types {types})"
+            f"nameplate end inset dangles after the {phase} (attached entity types {types})"
         )
-    _telemetry.event("drawing.inset_dimension_settled", dangling=dangling, types=types)
+    try:
+        edges = tuple(
+            _inset_section_edge(adapter, view, ref.model_edge, label=ref.label)
+            for ref in proof.references
+        )
+        measured_mm = assert_dimension_measures(
+            adapter, display, expected_mm=NAMEPLATE_END_INSET,
+            label=f"nameplate end inset after {phase}", entities=edges,
+        )
+        kind = int(display.Type2)
+        # swLinearDimension / swHorLinearDimension / swVertLinearDimension.
+        if types != (_SW_SEL_EDGES, _SW_SEL_EDGES) or kind not in (2, 11, 12):
+            raise RuntimeError(f"nameplate end inset lost its edge/linear type: {types}, {kind}")
+        inventory = tuple(view.GetDisplayDimensions() or ())
+        if sum(int(adapter.swApp.IsSame(item, display)) == 1 for item in inventory) != 1:
+            raise RuntimeError("nameplate end inset is not owned by its section view")
+    except RuntimeError as exc:
+        _telemetry.event(
+            "drawing.inset_dimension", phase=phase, dangling=dangling, types=types,
+            expected_view=expected_view, expected_instances=expected_instances,
+            reference_failure=str(exc),
+        )
+        raise
+    _telemetry.event(
+        "drawing.inset_dimension", phase=phase, dangling=dangling, types=types,
+        expected_view=expected_view, expected_instances=expected_instances,
+        measured_mm=measured_mm, dimension_type=kind, section_owned=True,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
