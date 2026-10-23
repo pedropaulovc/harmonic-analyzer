@@ -711,10 +711,12 @@ def _assert_source(
             )
             dimension_row["feature_owner"]["name"] = scalar("IFeature.Name", lambda: owner.Name)
             dimension_row["feature_owner"]["is_same"] = both(owner, source_feature)
-        except Exception as failure:
-            # An unexpected diagnostic implementation/binding error is evidence,
-            # never permission to replace the original attachment refusal.
-            batch["read_error"] = read_error("failure_native_readback", failure)
+        except BaseException as failure:
+            # Optional diagnostic reads must not replace the attachment refusal.
+            try:
+                batch["read_error"] = read_error("failure_native_readback", failure)
+            except BaseException:
+                pass  # Even formatting this supplemental error is best-effort.
         finally:
             # Drop every private COM reference before serialization or delivery,
             # including when a reader fails. Nothing is retained in the context.
@@ -727,8 +729,11 @@ def _assert_source(
                 f"supplier_source_attachment_failure {name}@{feature}: "
                 + json.dumps(context, sort_keys=True, allow_nan=False)
             )
-        except Exception as failure:
-            context["diagnostic_log_error"] = read_error("supplier_source_attachment_failure logging", failure)
+        except BaseException as failure:
+            try:
+                context["diagnostic_log_error"] = read_error("supplier_source_attachment_failure logging", failure)
+            except BaseException:
+                pass  # Preserve the original refusal if diagnostic formatting fails.
         try:
             # Preserve the refused partial drawing, even if its native dimensions
             # are non-dangling. A forensic snapshot is not source/layout approval.

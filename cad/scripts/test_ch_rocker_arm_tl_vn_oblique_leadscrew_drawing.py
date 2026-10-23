@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -3713,6 +3714,161 @@ def test_supplier_attachment_diagnostic_delivery_failure_preserves_original_refu
         assert capture["attachment_context"]["diagnostic_log_error"]["error_type"] == "OSError"
     else:
         assert len(state.warnings) == 1
+
+
+@pytest.mark.parametrize("edge", ["readback", "logging"])
+@pytest.mark.parametrize("format_failure", [None, KeyboardInterrupt, ValueError])
+def test_supplier_attachment_secondary_interrupt_preserves_primary_refusal_identity(
+    supplier_attachment_state, monkeypatch, edge, format_failure,
+) -> None:
+    """Only failure-only diagnostics may swallow a secondary interrupt."""
+    state = supplier_attachment_state
+    reached = []
+    formatting = []
+    original_errors = []
+
+    class SecondaryInterrupt(KeyboardInterrupt):
+        def __str__(self):
+            formatting.append(self)
+            if format_failure is not None:
+                raise format_failure("secondary exception formatting failed")
+            return "optional diagnostic interrupted"
+
+    secondary = SecondaryInterrupt()
+
+    def interrupt():
+        reached.append(edge)
+        original_errors.append(sys.exception())
+        assert state.returned_proof["proven"] is False
+        raise secondary
+
+    if edge == "readback":
+        class InterruptedView:
+            @property
+            def ModelToViewTransform(self):
+                interrupt()
+
+            def __getattr__(self, name):
+                return getattr(state.view, name)
+
+        diagnostic_view = InterruptedView()
+        original_early_bound = supplier_dimensions._early_bound
+
+        def early_bound(value, interface):
+            if value is state.view and interface == "IView":
+                # This binding belongs to failure-only native readback, after
+                # the real correspondence predicate has returned its refusal.
+                assert state.returned_proof["proven"] is False
+                assert isinstance(sys.exception(), RuntimeError)
+                return diagnostic_view
+            return original_early_bound(value, interface)
+
+        monkeypatch.setattr(supplier_dimensions, "_early_bound", early_bound)
+    else:
+        def interrupted_log(message):
+            assert message.startswith("supplier_source_attachment_failure ")
+            interrupt()
+
+        monkeypatch.setattr(supplier_dimensions._telemetry, "info", interrupted_log)
+
+    with pytest.raises(RuntimeError) as refused:
+        state.verify()
+
+    assert reached == [edge]
+    assert formatting == [secondary]
+    assert len(original_errors) == 1
+    assert original_errors[0] is refused.value
+    assert str(refused.value) == (
+        "SupplierStockLength: nominal supplier attachment changed source sketch"
+    )
+    assert len(state.captures) == 1
+    capture = state.captures[0]
+    assert capture["exception"] is original_errors[0]
+    context = capture["attachment_context"]
+    assert context["attachment_error"]["message"] == str(refused.value)
+    assert context["attachment_correspondence"]["proven"] is False
+    assert "_failure_native_objects" not in context["attachment_correspondence"]
+    assert state.private_cache == {}
+    assert state.source_sketch.inventory_reads == {11: 1, 10: 0}
+    assert set(state.mapping_reads.values()) == {1}
+    assert state.attachment_reads == ["entities", "types"]
+    error_container, error_field = (
+        (context["failure_native_readback"], "read_error")
+        if edge == "readback" else (context, "diagnostic_log_error")
+    )
+    if format_failure is KeyboardInterrupt:
+        # No fallback text is required when even best-effort formatting aborts.
+        assert error_field not in error_container
+    else:
+        assert error_container[error_field]["error_type"] == "SecondaryInterrupt"
+    if edge == "logging":
+        assert context["failure_native_readback"]["native_dimension"]["driven_state"] == 2
+    json.dumps(context, allow_nan=False)
+
+
+@pytest.mark.parametrize("edge", ["annotation_attachments", "source_sketch"])
+def test_supplier_attachment_primary_interrupt_propagates_without_diagnostics(
+    supplier_attachment_state, monkeypatch, edge,
+) -> None:
+    state = supplier_attachment_state
+    primary = KeyboardInterrupt("native attachment operation interrupted")
+    reached = []
+
+    def interrupted_native_getter():
+        reached.append(edge)
+        raise primary
+
+    if edge == "annotation_attachments":
+        monkeypatch.setattr(
+            state.display.GetAnnotation(), "GetAttachedEntities3",
+            interrupted_native_getter,
+        )
+    else:
+        source_feature = supplier_dimensions._assert_dimension_source()
+        monkeypatch.setattr(
+            source_feature, "GetSpecificFeature2", interrupted_native_getter,
+        )
+
+    with pytest.raises(KeyboardInterrupt) as interrupted:
+        state.verify()
+
+    assert interrupted.value is primary
+    assert reached == [edge]
+    assert state.captures == []
+    assert state.messages == []
+    assert state.warnings == []
+    assert state.reads == []
+    assert state.source_sketch.inventory_reads == {11: 0, 10: 0}
+    assert state.mapping_reads == {}
+    assert not hasattr(state, "returned_proof")
+
+
+def test_supplier_attachment_success_logging_interrupt_still_propagates(
+    supplier_attachment_state, monkeypatch,
+) -> None:
+    state = supplier_attachment_state
+    state.attached = (state.mapped_points[0], state.mapped_points[5])
+    primary = KeyboardInterrupt("success proof logging interrupted")
+    reached = []
+
+    def interrupted_log(message):
+        reached.append(message)
+        raise primary
+
+    monkeypatch.setattr(supplier_dimensions._telemetry, "info", interrupted_log)
+    with pytest.raises(KeyboardInterrupt) as interrupted:
+        state.verify()
+
+    assert interrupted.value is primary
+    assert len(reached) == 1
+    assert reached[0].startswith("supplier_source_attachment_proof ")
+    assert state.returned_proof["proven"] is True
+    assert "_failure_native_objects" not in state.returned_proof
+    assert state.private_cache is None
+    assert state.reads == []
+    assert state.captures == []
+    assert state.messages == []
+    assert state.warnings == []
 
 
 def test_supplier_attachment_success_does_not_read_failure_diagnostics(
