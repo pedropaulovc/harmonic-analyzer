@@ -79,15 +79,22 @@ cannot ask for what the authors were told to leave out.
   selected existing layout.
   The portrait footer's anchors and reserved boxes translate together above
   the existing 66 mm title block; other consumers retain their default positions.
+  Only the six portrait sheets reposition the existing bottom zone-3 note inside
+  the right half of its original column cell, preserving its `<ZONEC>` link,
+  resolved zone, grid, font and sheet y/z. The license watermark is not altered;
+  native bounds and the complete exported footer still require inspection.
   The shared clamp and these six screws align orthographic projected model origins
   after fitting, before reference annotation, without changing selected scales
   or relaxing their cells.
   The existing linked title-cell fitter owns PART, the actual Material property
   and DWG. NO. together; it is not combined with the separate Number fitter.
-  Only these six Material notes use measured complete native-box vertical centering
-  in the actual ruled cell; x/z, source text, spacing and font face stay unchanged.
-  They retain the original font when it fits, with the same 2 mm floor and 0.6 mm
-  clearance. Other title consumers retain fixed alignment by default.
+  Only these six Material notes use `label_right`: the complete native value box
+  is centred in the actual ruled cell's region to the right of its measured
+  static MATERIAL label. Both complete boxes retain 0.6 mm cell/foreign-text
+  clearance; the label's identity, anchor and full native style stay unchanged.
+  The value retains its original font when it fits, with the same 2 mm floor
+  and all non-height style/source content preserved. Other title consumers
+  retain fixed alignment by default.
   Scale selection still tries the existing standard scales against complete
   native outlines, without subtracting fixed sheet-space padding. The shared clamp
   and these six screws shelve short reference text only when its measured extent

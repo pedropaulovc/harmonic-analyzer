@@ -1179,6 +1179,794 @@ def test_purchased_footer_rejects_nonfinite_offset_before_native_notes(
     assert "Installation Notes" not in document.properties
 
 
+# Exact maintenance census fields: 17 font members, with document-default
+# ownership captured separately by the zone guard (18 style values per format).
+_ZONE_FONT_VALUES = (
+    ("TypeFaceName", "Arial"),
+    ("CharHeight", 0.00635),
+    ("CharHeightInPts", 18.0),
+    ("IsHeightSpecifiedInPts", False),
+    ("Bold", False),
+    ("Italic", False),
+    ("Underline", False),
+    ("Strikeout", False),
+    ("WidthFactor", 1.0),
+    ("CharSpacingFactor", 1.0),
+    ("LineSpacing", 1.0),
+    ("LineLength", 0.0),
+    ("Escapement", 0),
+    ("ObliqueAngle", 0.0),
+    ("BackWards", False),
+    ("UpsideDown", False),
+    ("Vertical", False),
+)
+
+
+class _ZoneTextFormat:
+    """Native properties and the one method; no callable/property fallback."""
+
+    def __init__(self, **changes):
+        values = dict(_ZONE_FONT_VALUES)
+        values.update(changes)
+        self.height_in_points = values.pop("IsHeightSpecifiedInPts")
+        self.height_mode_reads = 0
+        for name, value in values.items():
+            setattr(self, name, value)
+
+    def IsHeightSpecifiedInPts(self):
+        self.height_mode_reads += 1
+        return self.height_in_points
+
+
+@pytest.fixture
+def portrait_zone_native(monkeypatch):
+    """08a's eight column notes, with live position-dependent <ZONEC> text.
+
+    The 52-note native receipt's indices 42..49 supply these exact anchors and
+    complete GetExtent boxes, including asymmetric padding and native z noise.
+    That receipt did not capture font fields: the full native-shaped formats
+    below are preservation controls, not claimed measured template font values.
+    No license/PDF box is represented as a native note.
+    """
+    import math
+
+    # name, original anchor, complete native extent. Top 3 is an independent
+    # note, not a second spelling of bottom 3 and never a move candidate.
+    records = (
+        ("DetailItem398", (0.034925, 0.009488, 0.0),
+         (0.03266429220056183, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.03715867828768041, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem399", (0.034925, 0.4285879999999999, 0.0),
+         (0.03266429220056183, 0.4206640973956244, -3.090129753153126e-15,
+          0.03715867828768041, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem400", (0.104775, 0.009488, 0.0),
+         (0.10250013755425047, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.10699452364136905, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem401", (0.10477499999999998, 0.4285879999999999, 0.0),
+         (0.10250013755425047, 0.4206640973956244, -3.090129753153126e-15,
+          0.10699452364136905, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem402", (0.17462499999999997, 0.009488, 0.0),
+         (0.1723359829079391, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.1768303689950577, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem403", (0.17462499999999997, 0.42858799999999997, 0.0),
+         (0.1723359829079391, 0.4206640973956244, -3.090129753153126e-15,
+          0.1768303689950577, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem404", (0.244475, 0.009488000000000002, 0.0),
+         (0.24217182826162775, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.24666621434874636, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem405", (0.244475, 0.42858799999999997, 0.0),
+         (0.24217182826162775, 0.4206640973956244, -3.090129753153126e-15,
+          0.24666621434874636, 0.4284428425464065, -3.1444484402202708e-15)),
+    )
+    state = SimpleNamespace(
+        notes=[], frozen=False, rebuilds=0, on_rebuild=None, on_move=None,
+        zoom=None, zooms=[], restores=0, extent_reads=[],
+        properties=(0.0, 0.0, 1.0, 1.0, 0.0, 0.2794, 0.4318, 1.0),
+        margins=[0.0127] * 4, distribution=(1, 4, 4), region=1,
+        column_override=None,
+    )
+
+    class NativeNote:
+        def __init__(self, name, anchor, extent, *, link="<ZONEC>"):
+            self.name = name
+            self.anchor = tuple(anchor)
+            self.extent = tuple(extent)
+            self._link = link
+            self.OwnerType = 2
+            self.Angle = 0.0
+            self.horizontal = 2
+            self.vertical = 2
+            self.formats = [_ZoneTextFormat()]
+            self.document_defaults = [False]
+            self.moves = []
+            self.setter_result = True
+            self.ignore_move = False
+            self.position_offset = (0.0, 0.0, 0.0)
+            self.text_override = None
+
+        @property
+        def PropertyLinkedText(self):
+            return self._link
+
+        @PropertyLinkedText.setter
+        def PropertyLinkedText(self, _value):
+            raise AssertionError("the zone source token must never be rewritten")
+
+        def GetText(self):
+            if self.text_override is not None:
+                return self.text_override
+            if self._link != "<ZONEC>":
+                return "3"
+            if state.column_override is not None and self.name == "DetailItem400":
+                return state.column_override
+            x = self.anchor[0]
+            if not math.isfinite(x):
+                return "3"  # Let the finite-position guard diagnose bad geometry.
+            left, right = (
+                (state.margins[3], state.properties[5] - state.margins[2])
+                if state.region == 0 else (0.0, state.properties[5])
+            )
+            column = int((x - left) / ((right - left) / 4))
+            return str(4 - min(3, max(0, column)))
+
+        def GetName(self):
+            return self.name
+
+        def GetAnnotation(self):
+            return self
+
+        def GetNext(self):
+            index = state.notes.index(self)
+            return state.notes[index + 1] if index + 1 < len(state.notes) else None
+
+        def GetPosition(self):
+            return self.anchor
+
+        def GetExtent(self):
+            assert state.zoom is not None, "native bounds require the isolated zoom"
+            state.extent_reads.append((self.name, state.zoom, self.extent))
+            return self.extent
+
+        def GetTextFormatCount(self):
+            return len(self.formats)
+
+        def GetTextFormat(self, index):
+            return self.formats[index]
+
+        def GetUseDocTextFormat(self, index):
+            return self.document_defaults[index]
+
+        def GetTextJustification(self):
+            return self.horizontal
+
+        def GetTextVerticalJustification(self):
+            return self.vertical
+
+        def SetTextFormat(self, *_args):
+            raise AssertionError("local zone placement must not reformat any note")
+
+        def translate(self, position):
+            delta = tuple(
+                actual - old
+                for actual, old in zip(position, self.anchor, strict=True)
+            )
+            self.extent = tuple(
+                value + delta[index % 3] for index, value in enumerate(self.extent)
+            )
+            self.anchor = tuple(position)
+
+        def SetPosition2(self, x, y, z):
+            assert not state.frozen, "settled zone proof moved an annotation"
+            assert all(math.isfinite(value) for value in (x, y, z))
+            self.moves.append((x, y, z))
+            if self.setter_result is True and not self.ignore_move:
+                self.translate(tuple(
+                    value + offset for value, offset in
+                    zip((x, y, z), self.position_offset, strict=True)
+                ))
+                if state.on_move is not None:
+                    state.on_move()
+            return self.setter_result
+
+    class NativeDrawing:
+        def GetFirstView(self):
+            return SimpleNamespace(
+                GetFirstNote2=lambda: state.notes[0] if state.notes else None
+            )
+
+        def EditRebuild3(self):
+            assert not state.frozen, "settled zone proof rebuilt the drawing"
+            state.rebuilds += 1
+            if state.on_rebuild is not None:
+                state.on_rebuild()
+            return True
+
+        def ViewZoomTo2(self, *box):
+            assert state.zoom is None
+            state.zoom = tuple(box)
+            state.zooms.append(state.zoom)
+            # Native VT_VOID: successful zoom returns None.
+
+        def ViewZoomtofit2(self):
+            state.zoom = None
+            state.restores += 1
+
+    state.notes = [NativeNote(*record) for record in records]
+    state.bottom = state.notes[2]
+    state.top = state.notes[3]
+    state.make_note = NativeNote
+    state.draw = NativeDrawing()
+    state.sheet = SimpleNamespace(
+        GetProperties2=lambda: state.properties,
+        GetZoneMargin=lambda code: state.margins[code],
+        GetZoneSizeDistribution=lambda: state.distribution,
+        GetZoneSizeRegion=lambda: state.region,
+    )
+    state.adapter = SimpleNamespace(currentModel=state.draw)
+    state.align = lambda: purchased._align_portrait_bottom_zone_three(
+        state.adapter, state.draw, state.sheet, label="portrait native zone"
+    )
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    return state
+
+
+def _zone_snapshot(note):
+    return (
+        note.GetName(), note.PropertyLinkedText, note.GetText(), note.OwnerType,
+        note.GetPosition(), note.extent, purchased._note_text_style(note),
+        tuple(note.document_defaults), note.Angle,
+        note.GetTextJustification(), note.GetTextVerticalJustification(),
+    )
+
+
+def test_note_text_style_reads_all_native_members_and_all_formats(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    first = _ZoneTextFormat()
+    second = _ZoneTextFormat(
+        TypeFaceName="Arial Narrow", CharHeight=0.002, CharHeightInPts=5.669291,
+        IsHeightSpecifiedInPts=True, Bold=True, Italic=True, Underline=True,
+        Strikeout=True, WidthFactor=0.9, CharSpacingFactor=1.1, LineSpacing=1.2,
+        LineLength=0.025, Escapement=15, ObliqueAngle=0.1, BackWards=True,
+        UpsideDown=True, Vertical=True,
+    )
+    requested = []
+
+    def get_format(index):
+        requested.append(index)
+        return (first, second)[index]
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 2, GetTextFormat=get_format
+    )
+    actual = purchased._note_text_style(annotation)
+    expected_second = tuple(
+        (name, second.height_in_points if name == "IsHeightSpecifiedInPts"
+         else getattr(second, name))
+        for name, _value in _ZONE_FONT_VALUES
+    )
+    assert actual == (_ZONE_FONT_VALUES, expected_second)
+    assert requested == [0, 1]
+    assert first.height_mode_reads == second.height_mode_reads == 1
+    assert type(actual) is tuple
+    assert all(type(row) is tuple and all(type(pair) is tuple for pair in row)
+               for row in actual)
+    second.Bold = False
+    assert dict(actual[1])["Bold"] is True  # Snapshot, not live native wrappers.
+
+
+@pytest.mark.parametrize("field", tuple(name for name, _value in _ZONE_FONT_VALUES))
+def test_note_text_style_refuses_nonprimitive_members_without_fallback(
+    monkeypatch, field
+):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    text_format = _ZoneTextFormat()
+    if field == "IsHeightSpecifiedInPts":
+        text_format.height_in_points = object()
+    else:
+        setattr(text_format, field, object())
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=lambda _index: text_format
+    )
+    with pytest.raises(TypeError, match=field):
+        purchased._note_text_style(annotation)
+
+
+def test_note_text_style_propagates_native_read_errors(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    failure = RuntimeError("native format access failed")
+
+    def refuse(_index):
+        raise failure
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=refuse
+    )
+    with pytest.raises(RuntimeError) as exc:
+        purchased._note_text_style(annotation)
+    assert exc.value is failure
+
+
+def test_portrait_zone_three_centres_complete_native_box_in_same_cell_right_half(
+    portrait_zone_native,
+):
+    case = portrait_zone_native
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    grid = (case.properties, tuple(case.margins), case.distribution, case.region)
+    verify = case.align()
+    target = case.bottom
+    left = (before["DetailItem398"][4][0] + before[target.name][4][0]) / 2
+    right = (before[target.name][4][0] + before["DetailItem402"][4][0]) / 2
+    midpoint = (left + right) / 2
+    box = target.extent
+    assert (left, right) == pytest.approx((0.06985, 0.1397))
+    assert (box[0] + box[3]) / 2 == pytest.approx((midpoint + right) / 2)
+    assert midpoint + 0.0006 < box[0] < box[3] < right - 0.0006
+    assert target.anchor[0] == pytest.approx(0.12226516940219024)
+    assert target.anchor[1:] == before[target.name][4][1:]
+    assert (box[1], box[2], box[4], box[5]) == (
+        before[target.name][5][1], before[target.name][5][2],
+        before[target.name][5][4], before[target.name][5][5],
+    )
+    assert box[1] >= 0.0006 and box[4] <= case.margins[3] - 0.0006
+    assert len(target.moves) == 1
+    assert target.PropertyLinkedText == "<ZONEC>" and target.GetText() == "3"
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    for note in case.notes:
+        if note is not target:
+            assert _zone_snapshot(note) == before[note.name]
+            assert note.moves == []
+    assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
+    assert case.rebuilds >= 1
+    assert case.extent_reads[0][2] == before[target.name][5]
+    assert case.extent_reads[-1][2] == target.extent
+    assert len({zoom for _name, zoom, _box in case.extent_reads}) == 1
+
+    # The returned proof may reread native state/zoom, never move, reformat,
+    # rebuild or repair it. It must still succeed when every mutator refuses.
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    rebuilds = case.rebuilds
+    case.frozen = True
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+    assert case.rebuilds == rebuilds
+    assert len(target.moves) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("count", (0, -1, True, 1.0, "1", None))
+def test_note_text_style_refuses_invalid_native_format_count(monkeypatch, count):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+
+    def unexpected_format(_index):
+        raise AssertionError("invalid count must refuse before native format access")
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: count, GetTextFormat=unexpected_format
+    )
+    with pytest.raises(RuntimeError, match="native format count"):
+        purchased._note_text_style(annotation)
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf"), -float("inf")))
+def test_note_text_style_refuses_nonfinite_primitive_values(monkeypatch, value):
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1,
+        GetTextFormat=lambda _index: _ZoneTextFormat(WidthFactor=value),
+    )
+    with pytest.raises(ValueError, match="WidthFactor.*nonfinite"):
+        purchased._note_text_style(annotation)
+
+
+def test_note_text_style_refuses_missing_native_format(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=lambda _index: None
+    )
+    with pytest.raises(RuntimeError, match="missing native text format 0"):
+        purchased._note_text_style(annotation)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("duplicate-bottom-three", "duplicate column inventory"),
+        ("missing-bottom-three", "incomplete column inventory"),
+        ("missing-top-three", "incomplete column inventory"),
+        ("top-only", "incomplete column inventory"),
+        ("wrong-owner", "column inventory identity"),
+        ("wrong-token", "incomplete column inventory"),
+        ("wrong-resolved-column", "duplicate column inventory"),
+        ("duplicate-native-name", "column inventory identity"),
+        ("bottom-in-top-band", "duplicate column inventory"),
+        ("top-in-drawing-field", "native border band"),
+        ("misaligned-top-three", "does not match native grid"),
+        ("nonfinite-anchor-x", "nonfinite native zone position"),
+        ("nonfinite-anchor-y", "nonfinite native zone position"),
+        ("nonfinite-anchor-z", "nonfinite native zone position"),
+        ("short-anchor", "invalid native zone position"),
+    ),
+)
+def test_portrait_zone_three_refuses_unproven_native_inventory_before_writing(
+    portrait_zone_native, defect, message,
+):
+    case = portrait_zone_native
+    target = case.bottom
+    original = target.anchor
+    if defect == "duplicate-bottom-three":
+        case.notes.append(case.make_note("DuplicateZone3", target.anchor, target.extent))
+    elif defect == "missing-bottom-three":
+        case.notes.remove(target)
+    elif defect == "missing-top-three":
+        case.notes.remove(case.top)
+    elif defect == "top-only":
+        case.notes[:] = case.notes[1::2]
+    elif defect == "wrong-owner":
+        target.OwnerType = 1
+    elif defect == "wrong-token":
+        target._link = "<ZONEC>3"
+    elif defect == "wrong-resolved-column":
+        target.text_override = "2"
+    elif defect == "duplicate-native-name":
+        case.top.name = target.name
+    elif defect == "bottom-in-top-band":
+        target.anchor = case.top.anchor
+    elif defect == "top-in-drawing-field":
+        case.top.anchor = (case.top.anchor[0], 0.200, 0.0)
+    elif defect == "misaligned-top-three":
+        case.top.anchor = (case.top.anchor[0] + 0.001, case.top.anchor[1], 0.0)
+    elif defect.startswith("nonfinite-anchor-"):
+        axis = "xyz".index(defect[-1])
+        target.anchor = tuple(
+            float("nan") if index == axis else value
+            for index, value in enumerate(original)
+        )
+    elif defect == "short-anchor":
+        target.anchor = original[:2]
+    with pytest.raises(RuntimeError, match=message):
+        case.align()
+    assert all(not note.moves for note in case.notes)
+    assert case.rebuilds == 0
+    assert case.zoom is None
+
+
+@pytest.mark.parametrize(
+    "result", (False, None, 1, "True", pytest.param(object(), id="truthy-object"))
+)
+def test_portrait_zone_three_requires_native_setposition2_strict_bool(
+    portrait_zone_native, result,
+):
+    case = portrait_zone_native
+    original = _zone_snapshot(case.bottom)
+    case.bottom.setter_result = result
+    with pytest.raises(RuntimeError, match="SetPosition2 refused"):
+        case.align()
+    assert len(case.bottom.moves) == 1
+    assert _zone_snapshot(case.bottom) == original
+    assert case.rebuilds == 0
+
+
+@pytest.mark.parametrize(
+    "defect", ("ignored", "clamped-x", "clamped-y", "clamped-z", "nan", "short")
+)
+def test_portrait_zone_three_checks_finite_three_axis_position_readback(
+    portrait_zone_native, defect,
+):
+    case = portrait_zone_native
+    if defect == "ignored":
+        case.bottom.ignore_move = True
+    elif defect.startswith("clamped-"):
+        axis = "xyz".index(defect[-1])
+        case.bottom.position_offset = tuple(
+            2e-7 if index == axis else 0.0 for index in range(3)
+        )
+    elif defect == "nan":
+        case.on_move = lambda: setattr(
+            case.bottom, "anchor", (float("nan"), 0.009488, 0.0)
+        )
+    elif defect == "short":
+        case.on_move = lambda: setattr(case.bottom, "anchor", case.bottom.anchor[:2])
+    with pytest.raises(RuntimeError, match="position readback"):
+        case.align()
+    assert len(case.bottom.moves) == 1
+    assert case.rebuilds == 0
+
+
+@pytest.mark.parametrize(
+    "field", tuple(name for name, _value in _ZONE_FONT_VALUES)
+)
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+def test_portrait_zone_three_preserves_every_native_format_field(
+    portrait_zone_native, field, phase,
+):
+    case = portrait_zone_native
+    # An extra format with different values makes index-0-only snapshots fail.
+    case.bottom.formats.append(_ZoneTextFormat(TypeFaceName="Arial Narrow"))
+    case.bottom.document_defaults.append(True)
+
+    def mutate():
+        text_format = case.bottom.formats[1]
+        if field == "IsHeightSpecifiedInPts":
+            text_format.height_in_points = not text_format.height_in_points
+            return
+        old = getattr(text_format, field)
+        changed = (
+            not old if type(old) is bool else
+            old + " changed" if type(old) is str else old + 0.125
+        )
+        setattr(text_format, field, changed)
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="style or identity changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="style or identity changed"):
+            verify()
+    assert len(case.bottom.moves) == 1
+    assert case.rebuilds == 1
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("missing-target", "incomplete column inventory"),
+        ("missing-other", "incomplete column inventory"),
+        ("duplicate-target", "duplicate column inventory"),
+        ("token", "incomplete column inventory"),
+        ("owner", "column inventory identity"),
+        ("resolved-column", "duplicate column inventory"),
+        ("name", "style or identity changed"),
+        ("extra-format", "style or identity changed"),
+        ("document-default", "style or identity changed"),
+        ("angle", "style or identity changed"),
+        ("horizontal", "style or identity changed"),
+        ("vertical", "style or identity changed"),
+        ("target-y", "position readback changed"),
+        ("target-z", "position readback changed"),
+        ("other-bottom-position", "other column position changed"),
+        ("other-top-position", "other column position changed"),
+        ("other-top-style", "style or identity changed"),
+        ("column-membership", "duplicate column inventory"),
+        ("sheet-width", "grid changed"),
+        ("zone-margin", "grid changed"),
+        ("zone-distribution", "grid changed"),
+        ("zone-region", "grid changed"),
+    ),
+)
+def test_portrait_zone_three_rechecks_native_identity_grid_and_membership_readonly(
+    portrait_zone_native, phase, defect, message,
+):
+    case = portrait_zone_native
+
+    def mutate():
+        target = case.bottom
+        if defect == "missing-target":
+            case.notes.remove(target)
+        elif defect == "missing-other":
+            case.notes.remove(case.top)
+        elif defect == "duplicate-target":
+            case.notes.append(case.make_note(
+                "DuplicateZoneThree", target.anchor, target.extent
+            ))
+        elif defect == "token":
+            target._link = "3"
+        elif defect == "owner":
+            target.OwnerType = 1
+        elif defect == "resolved-column":
+            case.column_override = "2"
+        elif defect == "name":
+            target.name = "ForeignZoneThree"
+        elif defect == "extra-format":
+            target.formats.append(_ZoneTextFormat())
+            target.document_defaults.append(False)
+        elif defect == "document-default":
+            target.document_defaults[0] = not target.document_defaults[0]
+        elif defect == "angle":
+            target.Angle += 0.1
+        elif defect == "horizontal":
+            target.horizontal = 1
+        elif defect == "vertical":
+            target.vertical = 1
+        elif defect in ("target-y", "target-z"):
+            axis = 1 if defect == "target-y" else 2
+            target.anchor = tuple(
+                value + 2e-7 if index == axis else value
+                for index, value in enumerate(target.anchor)
+            )
+        elif defect == "other-bottom-position":
+            other = case.notes[0]
+            other.anchor = (other.anchor[0] + 0.001, *other.anchor[1:])
+        elif defect == "other-top-position":
+            case.top.anchor = (case.top.anchor[0] + 0.001, *case.top.anchor[1:])
+        elif defect == "other-top-style":
+            case.top.formats[0].Italic = True
+        elif defect == "column-membership":
+            # The actual token resolver changes to 2 because the anchor now
+            # crosses the original boundary; no canned value masks that drift.
+            target.anchor = (0.1397 + 0.001, *target.anchor[1:])
+        elif defect == "sheet-width":
+            values = list(case.properties)
+            values[5] += 0.001
+            case.properties = tuple(values)
+        elif defect == "zone-margin":
+            case.margins[1] += 0.001
+        elif defect == "zone-distribution":
+            case.distribution = (1, 5, 4)
+        elif defect == "zone-region":
+            case.region = 0
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=message):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=message):
+            verify()
+    assert len(case.bottom.moves) == 1
+    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert case.rebuilds == 1
+    assert case.zoom is None
+
+
+@pytest.mark.parametrize("phase", ("before", "rebuild", "final"))
+@pytest.mark.parametrize("edge", ("left", "right", "bottom", "top", "right-half"))
+def test_portrait_zone_three_rejects_full_native_padding_escape_not_anchor_fit(
+    portrait_zone_native, phase, edge,
+):
+    case = portrait_zone_native
+    original_anchor = case.bottom.anchor
+
+    def mutate():
+        box = list(case.bottom.extent)
+        # Each failure keeps a plausible anchor and the live resolved value 3.
+        # Only one complete native extent edge violates the intended inset.
+        if edge == "left":
+            box[0] = 0.06985 + 0.0006 - 0.000001
+        elif edge == "right":
+            box[3] = 0.1397 - 0.0006 + 0.000001
+        elif edge == "bottom":
+            box[1] = 0.0006 - 0.000001
+        elif edge == "top":
+            box[4] = case.margins[1] - 0.0006 + 0.000001
+        else:
+            # Before placement a full box may legitimately straddle the
+            # original centre. Make it too wide for the right-half target;
+            # afterwards leave it within the full cell, but outside its half.
+            box[0], box[3] = (
+                (0.080, 0.12955) if phase == "before" else (0.100, 0.130)
+            )
+        case.bottom.extent = tuple(box)
+
+    expected = "right half" if edge == "right-half" and phase != "before" else (
+        "leaves its original cell"
+    )
+    if phase == "before":
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            verify()
+    assert case.bottom.GetText() == "3"
+    assert case.bottom.anchor[1:] == original_anchor[1:]
+    assert case.zoom is None
+    if phase == "before" and edge != "right-half":
+        assert case.bottom.moves == []
+        assert case.rebuilds == 0
+    else:
+        assert len(case.bottom.moves) == 1
+        assert case.rebuilds == 1
+
+
+
+@pytest.mark.parametrize("phase", ("before", "rebuild", "final"))
+@pytest.mark.parametrize("defect", ("nan", "infinite-z", "short", "inverted"))
+def test_portrait_zone_three_refuses_unreadable_complete_native_extent(
+    portrait_zone_native, phase, defect,
+):
+    case = portrait_zone_native
+
+    def mutate():
+        box = list(case.bottom.extent)
+        if defect == "nan":
+            box[0] = float("nan")
+        elif defect == "infinite-z":
+            # Native z noise is retained and validated, not silently discarded
+            # before deciding whether GetExtent supplied a usable native box.
+            box[2] = float("inf")
+        elif defect == "short":
+            box.pop()
+        else:
+            box[3] = box[0] - 0.001
+        case.bottom.extent = tuple(box)
+
+    expected = "empty or inverted native extent" if defect == "inverted" else (
+        "invalid native extent"
+    )
+    if phase == "before":
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+        assert case.bottom.moves == [] and case.rebuilds == 0
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+        assert len(case.bottom.moves) == 1 and case.rebuilds == 1
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            verify()
+        assert len(case.bottom.moves) == 1 and case.rebuilds == 1
+    assert case.zoom is None
+    assert case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("region", (0, 1), ids=("margin-grid", "whole-sheet-grid"))
+def test_portrait_zone_three_derives_cell_from_native_grid_not_fixed_offset(
+    portrait_zone_native, region,
+):
+    case = portrait_zone_native
+    # A different native pitch forces a different displacement. Preserve each
+    # measured glyph's padding/size and only move its original grid station.
+    case.properties = (*case.properties[:5], 0.300, *case.properties[6:])
+    case.region = region
+    grid_left, grid_right = (
+        (case.margins[3], case.properties[5] - case.margins[2])
+        if region == 0 else (0.0, case.properties[5])
+    )
+    pitch = (grid_right - grid_left) / 4
+    for index, note in enumerate(case.notes):
+        note.translate((
+            grid_left + (index // 2 + 0.5) * pitch, *note.anchor[1:]
+        ))
+    # An unlinked literal 3 at the same station is not the source-owned zone.
+    decoy = case.make_note(
+        "UnlinkedThree", case.bottom.anchor, case.bottom.extent, link="3"
+    )
+    decoy.OwnerType = 1
+    case.notes.append(decoy)
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    original_anchor = case.bottom.anchor
+    left = (case.notes[0].anchor[0] + original_anchor[0]) / 2
+    right = (original_anchor[0] + case.notes[4].anchor[0]) / 2
+    expected_centre = ((left + right) / 2 + right) / 2
+
+    verify = case.align()
+    box = case.bottom.extent
+    assert (box[0] + box[3]) / 2 == pytest.approx(expected_centre)
+    assert (left + right) / 2 < box[0] < box[3] < right - 0.0006
+    assert case.bottom.anchor[1:] == original_anchor[1:]
+    assert case.bottom.GetText() == "3"
+    assert len(case.bottom.moves) == 1
+    for note in case.notes:
+        if note is not case.bottom:
+            assert _zone_snapshot(note) == before[note.name]
+            assert not note.moves
+    case.frozen = True
+    verify()
+
+
 @pytest.mark.parametrize(
     "layout,offset,expected",
     [

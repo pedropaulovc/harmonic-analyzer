@@ -544,6 +544,333 @@ def _rebuild(draw: Any, *, phase: str) -> None:
         raise RuntimeError(f"purchased drawing rebuild failed: {phase}")
 
 
+def _note_text_style(
+    annotation: Any,
+) -> tuple[tuple[tuple[str, str | bool | int | float], ...], ...]:
+    """Snapshot every native format using the template-maintenance font fields.
+
+    ``IsHeightSpecifiedInPts`` is a method; the other fields are properties.
+    Keep the native primitive values, not mutable COM format objects, and let
+    native read failures propagate rather than manufacturing a partial style.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("note style: missing native annotation")
+    count = annotation.GetTextFormatCount()
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"note style: invalid native format count {count!r}")
+    formats = []
+    for index in range(count):
+        text_format = _early_bound(annotation.GetTextFormat(index), "ITextFormat")
+        if text_format is None:
+            raise RuntimeError(f"note style: missing native text format {index}")
+        fields = []
+        # Exact _FONT_FIELDS from maintain_drawing_templates, in census order.
+        for name in (
+            "TypeFaceName",
+            "CharHeight",
+            "CharHeightInPts",
+            "IsHeightSpecifiedInPts",
+            "Bold",
+            "Italic",
+            "Underline",
+            "Strikeout",
+            "WidthFactor",
+            "CharSpacingFactor",
+            "LineSpacing",
+            "LineLength",
+            "Escapement",
+            "ObliqueAngle",
+            "BackWards",
+            "UpsideDown",
+            "Vertical",
+        ):
+            value = (
+                text_format.IsHeightSpecifiedInPts()
+                if name == "IsHeightSpecifiedInPts"
+                else getattr(text_format, name)
+            )
+            if type(value) not in (str, bool, int, float):
+                raise TypeError(
+                    f"ITextFormat.{name} returned {type(value).__name__}, "
+                    "expected a primitive font value"
+                )
+            if type(value) is float and not math.isfinite(value):
+                raise ValueError(f"ITextFormat.{name} returned nonfinite {value!r}")
+            fields.append((name, value))
+        formats.append(tuple(fields))
+    return tuple(formats)
+
+
+def _align_portrait_bottom_zone_three(
+    adapter: Any, draw: Any, sheet: Any, *, label: str
+) -> Callable[[], None]:
+    """Move only this sheet's bottom ``<ZONEC>`` 3 within its original cell.
+
+    The native neighbours define the cell; the complete native box is centred
+    in its right half. Keep the authored Y/Z and all formats, and return a
+    read-only proof for the final rebuild. The template, grid and immutable
+    license watermark are not edited; inherited zone-4/license contact is not
+    this drawing-local zone-3 repair.
+    """
+    drawing = _early_bound(draw, "IDrawingDoc")
+    sheet = _early_bound(sheet, "ISheet")
+    prefix = f"{label}: bottom zone 3"
+    tolerance = _NUMBER_HEIGHT_TOL
+    clearance = 0.0006
+
+    def numbers(value: Any, count: int, *, field: str) -> tuple[float, ...]:
+        if not isinstance(value, (tuple, list)) or len(value) != count:
+            raise RuntimeError(f"{prefix}: invalid native {field}: {value!r}")
+        if any(type(item) not in (int, float) for item in value):
+            raise RuntimeError(f"{prefix}: nonnumeric native {field}: {value!r}")
+        result = tuple(float(item) for item in value)
+        if not all(map(math.isfinite, result)):
+            raise RuntimeError(f"{prefix}: nonfinite native {field}: {value!r}")
+        return result
+
+    def grid_state() -> tuple[Any, ...]:
+        properties = numbers(sheet.GetProperties2(), 8, field="sheet properties")
+        margins = numbers(
+            tuple(sheet.GetZoneMargin(index) for index in range(4)),
+            4,
+            field="zone margins",
+        )
+        distribution = sheet.GetZoneSizeDistribution()
+        region = sheet.GetZoneSizeRegion()
+        if (
+            not isinstance(distribution, tuple)
+            or len(distribution) != 3
+            or any(type(value) is not int for value in distribution)
+            or distribution[0] != 1  # swZoneSizeDistribution_EvenlySized
+            or distribution[1] <= 0
+            or distribution[2] != 4
+            or type(region) is not int
+            or region not in (0, 1)  # swRegionTypeMargins / swRegionTypeSheet
+        ):
+            raise RuntimeError(
+                f"{prefix}: invalid native zone grid: {distribution!r}, {region!r}"
+            )
+        width, height = properties[5:7]
+        top, bottom, right, left = margins
+        if (
+            not 0.0 < width < height
+            or min(margins) <= 0.0
+            or left + right >= width
+            or top + bottom >= height
+        ):
+            raise RuntimeError(f"{prefix}: invalid native border band: {margins!r}")
+        return properties, margins, distribution, region
+
+    def columns(grid: tuple[Any, ...]) -> dict[tuple[str, str], tuple[Any, ...]]:
+        properties, margins, _distribution, _region = grid
+        width, height = properties[5:7]
+        top, bottom, _right, _left = margins
+        view = _early_bound(drawing.GetFirstView(), "IView")
+        if view is None:
+            raise RuntimeError(f"{prefix}: missing first sheet view")
+        result = {}
+        names = set()
+        raw_note = view.GetFirstNote2()
+        while raw_note is not None:
+            note = _early_bound(raw_note, "INote")
+            if note.PropertyLinkedText == "<ZONEC>":
+                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+                if annotation is None:
+                    raise RuntimeError(f"{prefix}: missing native zone annotation")
+                name = note.GetName()
+                owner = annotation.OwnerType
+                text = note.GetText()
+                position = numbers(annotation.GetPosition(), 3, field="zone position")
+                if (
+                    type(name) is not str
+                    or not name
+                    or name in names
+                    or type(owner) is not int
+                    or owner != 2  # swAnnotationOwner_DrawingTemplate
+                    or type(text) is not str
+                    or text not in ("1", "2", "3", "4")
+                    or not 0.0 < position[0] < width
+                ):
+                    raise RuntimeError(f"{prefix}: invalid column inventory identity")
+                if 0.0 < position[1] < bottom:
+                    side = "bottom"
+                elif height - top < position[1] < height:
+                    side = "top"
+                else:
+                    raise RuntimeError(
+                        f"{prefix}: column inventory leaves its native border band"
+                    )
+                key = side, text
+                if key in result:
+                    raise RuntimeError(f"{prefix}: duplicate column inventory {key!r}")
+                style = _note_text_style(annotation)
+                use_doc = tuple(
+                    annotation.GetUseDocTextFormat(index) for index in range(len(style))
+                )
+                angle = note.Angle
+                horizontal = note.GetTextJustification()
+                vertical = note.GetTextVerticalJustification()
+                if (
+                    any(type(value) is not bool for value in use_doc)
+                    or type(angle) not in (int, float)
+                    or not math.isfinite(angle)
+                    or type(horizontal) is not int
+                    or type(vertical) is not int
+                ):
+                    raise RuntimeError(f"{prefix}: invalid native zone text style")
+                identity = (
+                    name,
+                    owner,
+                    note.PropertyLinkedText,
+                    text,
+                    style,
+                    use_doc,
+                    angle,
+                    horizontal,
+                    vertical,
+                )
+                result[key] = note, annotation, position, identity
+                names.add(name)
+            raw_note = note.GetNext()
+        expected = {
+            (side, str(value))
+            for side in ("bottom", "top")
+            for value in range(1, 5)
+        }
+        if set(result) != expected:
+            raise RuntimeError(
+                f"{prefix}: incomplete column inventory: {tuple(sorted(result))!r}"
+            )
+        return result
+
+    grid = grid_state()
+    original = columns(grid)
+    properties, margins, _distribution, region = grid
+    width, _height = properties[5:7]
+    _top, bottom, right, left = margins
+    centres = [original["bottom", str(value)][2][0] for value in (4, 3, 2, 1)]
+    pitch = (centres[2] - centres[0]) / 2.0
+    grid_left, grid_right = (left, width - right) if region == 0 else (0.0, width)
+    if pitch <= 0.0 or any(
+        abs(actual - expected) > tolerance
+        for actual, expected in (
+            (centres[1], centres[0] + pitch),
+            (centres[3], centres[0] + 3.0 * pitch),
+            (centres[0] - pitch / 2.0, grid_left),
+            (centres[3] + pitch / 2.0, grid_right),
+            *(
+                (original["top", str(value)][2][0], centre)
+                for value, centre in zip((4, 3, 2, 1), centres, strict=True)
+            ),
+        )
+    ):
+        raise RuntimeError(f"{prefix}: column inventory does not match native grid")
+    cell = (
+        (centres[0] + centres[1]) / 2.0,
+        0.0,
+        (centres[1] + centres[2]) / 2.0,
+        bottom,
+    )
+    inset = (cell[0] + clearance, clearance, cell[2] - clearance, bottom - clearance)
+    middle = (cell[0] + cell[2]) / 2.0
+    centre = (middle, bottom / 2.0)
+    half = max((cell[2] - cell[0]) / 2.0, bottom)
+    key = "bottom", "3"
+    _note, annotation, anchor, _identity = original[key]
+
+    def measure(
+        current: dict[tuple[str, str], tuple[Any, ...]], phase: str
+    ) -> tuple[float, ...]:
+        with _zoomed_on(adapter, centre, half):
+            box = _box(current[key][0].GetExtent(), label=prefix, kind="note")
+        if not (
+            inset[0] < box[0] < box[2] < inset[2]
+            and inset[1] < box[1] < box[3] < inset[3]
+        ):
+            raise RuntimeError(f"{prefix}: leaves its original cell: {box!r}, {inset!r}")
+        _telemetry.event(
+            "drawing.purchased_bottom_zone_three.state",
+            label=label,
+            phase=phase,
+            state=json.dumps(
+                {
+                    "grid": grid,
+                    "cell": cell,
+                    "inset": inset,
+                    "extent": box,
+                    "columns": [
+                        {
+                            "side": side,
+                            "value": value,
+                            "position": record[2],
+                            "identity": record[3],
+                        }
+                        for (side, value), record in sorted(current.items())
+                    ],
+                },
+                sort_keys=True,
+            ),
+        )
+        return box
+
+    before = measure(original, "before")
+    right_half_centre = (middle + cell[2]) / 2.0
+    target = (
+        anchor[0] + right_half_centre - (before[0] + before[2]) / 2.0,
+        anchor[1],
+        anchor[2],
+    )
+    if not all(map(math.isfinite, target)):
+        raise RuntimeError(f"{prefix}: nonfinite requested position: {target!r}")
+    if annotation.SetPosition2(*target) is not True:
+        raise RuntimeError(f"{prefix}: SetPosition2 refused {target!r}")
+    readback = numbers(annotation.GetPosition(), 3, field="position readback")
+    if any(
+        abs(actual - wanted) > tolerance
+        for actual, wanted in zip(readback, target, strict=True)
+    ):
+        raise RuntimeError(f"{prefix}: position readback {readback!r} != {target!r}")
+    _rebuild(draw, phase=f"{prefix} placement")
+
+    def prove(phase: str) -> None:
+        fresh_grid = grid_state()
+        if fresh_grid != grid:
+            raise RuntimeError(f"{prefix}: grid changed: {fresh_grid!r} != {grid!r}")
+        current = columns(fresh_grid)
+        for column, record in current.items():
+            original_record = original[column]
+            if record[3] != original_record[3]:
+                raise RuntimeError(f"{prefix}: style or identity changed for {column!r}")
+            if column == key:
+                if (
+                    record[2][1:] != anchor[1:]
+                    or any(
+                        abs(actual - wanted) > tolerance
+                        for actual, wanted in zip(record[2], target, strict=True)
+                    )
+                ):
+                    raise RuntimeError(
+                        f"{prefix}: position readback changed: {record[2]!r}"
+                    )
+            elif record[2] != original_record[2]:
+                raise RuntimeError(
+                    f"{prefix}: other column position changed for {column!r}"
+                )
+        box = measure(current, phase)
+        if box[0] <= middle:
+            raise RuntimeError(
+                f"{prefix}: full native box leaves its cell's right half: {box!r}"
+            )
+
+    prove("after")
+
+    def settled() -> None:
+        prove("final")
+
+    return settled
+
+
 def note_lines(notes: str, *, label: str) -> tuple[str, ...]:
     """The footer note's lines, held to rule 7's budget beside the general line."""
     lines = tuple(line for line in notes.strip().splitlines() if line.strip())
@@ -2068,6 +2395,11 @@ async def _build_reference_sheet(
                     f"{label}: title block setup must synchronously return a settled check"
                 )
             final_checks = (*final_checks, title_check)
+        if view_layout == "portrait_reference":
+            final_checks = (
+                *final_checks,
+                _align_portrait_bottom_zone_three(adapter, draw, sheet, label=label),
+            )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:

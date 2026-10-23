@@ -18,15 +18,47 @@ import _purchased_fastener_drawing as purchased
 import _purchased_title_fit as title
 
 
-class _Format:
-    """Detached native format: edits do not persist until SetTextFormat succeeds."""
+_STYLE_FIELDS = (
+    "TypeFaceName", "CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts",
+    "Bold", "Italic", "Underline", "Strikeout", "WidthFactor",
+    "CharSpacingFactor", "LineSpacing", "LineLength", "Escapement",
+    "ObliqueAngle", "BackWards", "UpsideDown", "Vertical",
+)
 
-    __slots__ = ("CharHeight", "LineLength", "TypeFaceName")
+
+class _Format:
+    """Detached ITextFormat: 16 native properties and one height-mode method.
+
+    These are the exact maintenance census fields; document-format authority is
+    an additional IAnnotation getter, not an invented eighteenth font member.
+    This fake does not rasterize fonts or predict native point-size rounding.
+    """
+
+    __slots__ = tuple(name for name in _STYLE_FIELDS if name != "IsHeightSpecifiedInPts") + (
+        "_points_mode",
+    )
 
     def __init__(self, height=0.004, length=0.006, face="Arial"):
         self.CharHeight = height
+        self.CharHeightInPts = round(height / 0.0002645833333333333)
         self.LineLength = length
         self.TypeFaceName = face
+        self.Bold = False
+        self.Italic = False
+        self.Underline = False
+        self.Strikeout = False
+        self.WidthFactor = 1.0
+        self.CharSpacingFactor = 1.0
+        self.LineSpacing = 0.001
+        self.Escapement = 0
+        self.ObliqueAngle = 0.0
+        self.BackWards = False
+        self.UpsideDown = False
+        self.Vertical = False
+        self._points_mode = False
+
+    def IsHeightSpecifiedInPts(self):
+        return self._points_mode
 
 
 class _Line:
@@ -104,6 +136,10 @@ class _Annotation:
         self.note = note
         self.OwnerType = 2  # swDrawingTemplate ownership, retained by the native census.
         self._format = _Format()
+        self.extra_formats = []
+        self.extra_use_doc = []
+        self.format_count_reads = 0
+        self.format_read_errors = {}
         self.use_doc = True
         self.setter_result = True
         self.ignore_setter = False
@@ -126,9 +162,15 @@ class _Annotation:
             self.note.refresh()
         return self.position_result
 
+    def GetTextFormatCount(self):
+        self.format_count_reads += 1
+        return 1 + len(self.extra_formats)
+
     def GetTextFormat(self, index):
-        assert index == 0
-        return copy.copy(self._format)
+        if index in self.format_read_errors:
+            raise self.format_read_errors[index]
+        formats = (self._format, *self.extra_formats)
+        return copy.copy(formats[index]) if 0 <= index < len(formats) else None
 
     def SetTextFormat(self, index, use_doc, text_format):
         assert index == 0 and use_doc is False
@@ -143,8 +185,7 @@ class _Annotation:
         return self.setter_result
 
     def GetUseDocTextFormat(self, index):
-        assert index == 0
-        return self.use_doc
+        return (self.use_doc, *self.extra_use_doc)[index]
 
     def GetDisplayData(self):
         return _Display(self.note)
@@ -154,6 +195,14 @@ class _Note:
     def __init__(self, expression, text, cell, *, material=False):
         self._link = expression
         self._text = text
+        self.name = f"Note:{expression}"
+        self.Angle = 0.0
+        self.horizontal_justification = 1  # swTextJustificationLeft
+        self.vertical_justification = 0  # swTextAlignmentTop
+        self.justification_reads = 0
+        self.extent_reads = []
+        self.extent_epochs = []
+        self.draw = None
         self.cell = cell
         self.anchor = (cell[0] + 0.002, cell[3] - 0.002, 0.0)
         self.material = material
@@ -170,7 +219,7 @@ class _Note:
         return self._link
 
     def GetName(self):
-        return f"Note:{self._link}"
+        return self.name
 
     def GetText(self):
         return self._text
@@ -181,7 +230,17 @@ class _Note:
     def GetNext(self):
         return self.next
 
+    def GetTextJustification(self):
+        self.justification_reads += 1
+        return self.horizontal_justification
+
+    def GetTextVerticalJustification(self):
+        self.justification_reads += 1
+        return self.vertical_justification
+
     def GetExtent(self):
+        self.extent_reads.append(self.extent)
+        self.extent_epochs.append(self.draw.rebuilds if self.draw is not None else -1)
         return self.extent
 
     def refresh(self):
@@ -202,10 +261,10 @@ class _Drawing:
         self.notes = notes
         self.rebuilds = 0
         self.rebuild_result = True
+        self.rebuild_actions = {}
+        self.rules = tuple(segment for note in notes for segment in _rules(note.cell))
         self.sheet = SimpleNamespace(GetTemplateSketch=lambda: SimpleNamespace(
-            GetSketchSegments=lambda: tuple(
-                segment for note in notes for segment in _rules(note.cell)
-            )
+            GetSketchSegments=lambda: self.rules,
         ))
         self.sheet.SheetFormatVisible = True
         self.sheet_view = SimpleNamespace(GetFirstNote2=lambda: notes[0] if notes else None)
@@ -213,6 +272,7 @@ class _Drawing:
 
     def relink(self):
         for index, note in enumerate(self.notes):
+            note.draw = self
             note.next = self.notes[index + 1] if index + 1 < len(self.notes) else None
 
     def GetCurrentSheet(self):
@@ -223,6 +283,9 @@ class _Drawing:
 
     def EditRebuild3(self):
         self.rebuilds += 1
+        action = self.rebuild_actions.pop(self.rebuilds, None)
+        if action is not None:
+            action()
         for note in self.notes:
             note.refresh()
         return self.rebuild_result
@@ -260,9 +323,11 @@ def native_title(monkeypatch):
     return make
 
 
-# Exact pre-repair Material geometry from rolling-main-post-v44-20261021.
-# Only these native boxes/anchor/font are captured evidence; their deterministic
-# scaling/translation below is an offline geometric model, not after-fix proof.
+# Captured geometry from rolling-main-post-v44-20261021: b57f582e original
+# and 2 mm floor candidates, e2736a7d settled value, and 08a546b3 static header.
+# The 08a pre-format value height (3.284359 mm) is NOT the post-format height.
+# Interpolation between captured font candidates and translation after setters
+# are offline models, not repaired-native/PDF evidence or a font rasterizer.
 _MATERIAL_CELL = (
     0.05834624965960972, 0.026063800868219113,
     0.15771712966333695, 0.03358693677109888,
@@ -271,40 +336,47 @@ _MATERIAL_ANCHOR = (0.060871386, 0.029527135, 0.0)
 _MATERIAL_HEIGHT = 0.00238125
 _MATERIAL_BOXES = (
     pytest.param(
-        (0.060840635746728294, 0.026195287749293993,
-         0.07605240404159115, 0.02965250781630828),
-        id="bracket-5",
+        ((0.060840635746728294, 0.026195287749293993,
+          0.07605240404159115, 0.02965250781630828),
+         (0.060840635746728294, 0.026541009755995423,
+          0.07363234999468116, 0.02965250781630828)),
+        id="b57-five-family",
     ),
     pytest.param(
-        (0.060767717978353196, 0.026166222624836796,
-         0.07616662488156331, 0.029672904394874737),
-        id="block",
+        ((0.060767717978353196, 0.026166222624836796,
+          0.07616662488156331, 0.029672904394874737),
+         (0.060767717978353196, 0.026623615899189573,
+          0.07372719408501517, 0.029672904394874737)),
+        id="b57-block",
     ),
+)
+_HEADER_ANCHOR = (0.0612717868804293, 0.0327876061983514, 0.0)
+_HEADER_BOX = (
+    0.0611863577534297, 0.0303439518297111,
+    0.0705208519343683, 0.0329368668799719,
+)
+_E273_ANCHOR = (0.060871386498226154, 0.0314286057150094, 0.0)
+_E273_BOX = (
+    0.060840635746728294, 0.02809675878615185,
+    0.07605240404159115, 0.03155397885316614,
 )
 
 
-class _MeasuredMaterialFormat(_Format):
-    __slots__ = ("LineSpacing", "CharSpacingFactor")
-
-    def __init__(self):
-        super().__init__(height=_MATERIAL_HEIGHT)
-        self.LineSpacing = 0.001
-        self.CharSpacingFactor = 1.0
-
-    def IsHeightSpecifiedInPts(self):
-        return False
-
-
 class _MeasuredMaterialDisplay(_Display):
+    def GetTextCount(self):
+        return 0 if self.note.empty_display else self.note.rows * self.note.fragments
+
+    def GetTextAtIndex(self, index):
+        return self.note._text[index::self.GetTextCount()]
+
     def GetTextPositionAtIndex(self, index):
         if self.note.unreadable_display:
             return None
-        # Synthetic baselines derive from the same complete geometric box:
-        # position writes translate them; format height changes scale them.
-        left, bottom, _, _, top, _ = self.note.extent
+        left, bottom, _, right, top, _ = self.note.extent
+        row, fragment = divmod(index, self.note.fragments)
         return (
-            left,
-            top - (index + 1) * (top - bottom) / (self.note.rows + 1),
+            left + fragment * (right - left) / self.note.fragments,
+            top - (row + 1) * (top - bottom) / (self.note.rows + 1),
             self.note.anchor[2],
         )
 
@@ -315,46 +387,43 @@ class _MeasuredMaterialDisplay(_Display):
 class _MeasuredMaterialAnnotation(_Annotation):
     def __init__(self, note):
         super().__init__(note)
-        self._format = _MeasuredMaterialFormat()
+        self._format = _Format(height=_MATERIAL_HEIGHT, length=0.0, face="Century Gothic")
 
     def GetDisplayData(self):
         return _MeasuredMaterialDisplay(self.note)
 
 
 class _MeasuredMaterialNote(_Note):
-    def __init__(self, expression, box):
+    def __init__(self, expression, box, floor_box, *, header=False):
         self.reference_box = box
-        self.extent_reads = []
-        self.horizontal_justification = 1  # swTextJustificationLeft
-        self.vertical_justification = 0  # swTextAlignmentTop
-        super().__init__(expression, "ALLOY STEEL", _MATERIAL_CELL, material=True)
-        self.anchor = _MATERIAL_ANCHOR
+        self.floor_box = floor_box
+        self.reference_anchor = _HEADER_ANCHOR if header else _MATERIAL_ANCHOR
+        self.fragments = 1
+        super().__init__(
+            expression, "MATERIAL" if header else "Alloy Steel",
+            _MATERIAL_CELL, material=not header,
+        )
+        self.anchor = self.reference_anchor
+        self.name = "DetailItem279" if header else "DetailItem244"
         self.annotation = _MeasuredMaterialAnnotation(self)
         self.refresh()
 
-    def GetTextJustification(self):
-        return self.horizontal_justification
-
-    def GetTextVerticalJustification(self):
-        return self.vertical_justification
-
-    def GetExtent(self):
-        self.extent_reads.append(self.extent)
-        return self.extent
-
     def refresh(self):
-        scale = self.annotation._format.CharHeight / _MATERIAL_HEIGHT
+        # Preserve the actual floor ink: scaling the original box by 2/2.38125
+        # would invent a smaller 2.904 mm box instead of native 3.111498 mm.
+        fraction = (self.annotation._format.CharHeight - 0.002) / (
+            _MATERIAL_HEIGHT - 0.002
+        )
+        box = tuple(
+            floor + fraction * (original - floor)
+            for original, floor in zip(self.reference_box, self.floor_box, strict=True)
+        )
         x, y, z = self.anchor
-        dx, dy = self.extent_shift
-        left, bottom, right, top = self.reference_box
+        dx = x - self.reference_anchor[0] + self.extent_shift[0]
+        dy = y - self.reference_anchor[1] + self.extent_shift[1]
         self.rows = self.forced_rows or 1
         self.extent = (
-            x + (left - _MATERIAL_ANCHOR[0]) * scale + dx,
-            y + (bottom - _MATERIAL_ANCHOR[1]) * scale + dy,
-            z,
-            x + (right - _MATERIAL_ANCHOR[0]) * scale + dx,
-            y + (top - _MATERIAL_ANCHOR[1]) * scale + dy,
-            z,
+            box[0] + dx, box[1] + dy, z, box[2] + dx, box[3] + dy, z,
         )
 
 
@@ -362,26 +431,45 @@ class _MeasuredMaterialNote(_Note):
 def measured_material_title(native_title, request):
     def make(selected="Material Specification"):
         scene = native_title(selected)
-        material = _MeasuredMaterialNote(title.property_link(selected), request.param)
+        initial, floor = request.param
+        material = _MeasuredMaterialNote(title.property_link(selected), initial, floor)
+        header = _MeasuredMaterialNote("MATERIAL", _HEADER_BOX, _HEADER_BOX, header=True)
         scene.notes[1] = material
-        scene.material = material
-        scene.initial_material_box = request.param
+        scene.notes.append(header)
+        scene.material, scene.header = material, header
+        scene.initial_material_box = initial
+        scene.draw.rules = tuple(
+            segment for note in scene.notes for segment in _rules(note.cell)
+        )
         scene.draw.relink()
         return scene
 
     return make
 
 
+def _styles(annotation):
+    """Independent test snapshot; never delegates preservation to the fitter."""
+    return tuple(
+        tuple(
+            (name, fmt.IsHeightSpecifiedInPts() if name == "IsHeightSpecifiedInPts"
+             else getattr(fmt, name))
+            for name in _STYLE_FIELDS
+        )
+        for fmt in (annotation.GetTextFormat(index)
+                    for index in range(annotation.GetTextFormatCount()))
+    )
+
+
 def _material_readback(note):
     annotation = note.GetAnnotation()
-    fmt = annotation.GetTextFormat(0)
     display = annotation.GetDisplayData()
     return (
-        note.PropertyLinkedText, note.GetText(), annotation.GetPosition(),
-        fmt.CharHeight, fmt.LineLength, fmt.TypeFaceName, fmt.LineSpacing,
-        fmt.CharSpacingFactor, fmt.IsHeightSpecifiedInPts(),
+        note.GetName(), annotation.OwnerType, note.PropertyLinkedText, note.GetText(),
+        annotation.GetPosition(), _styles(annotation), note.Angle,
         note.GetTextJustification(), note.GetTextVerticalJustification(),
-        annotation.GetUseDocTextFormat(0), note.GetExtent(),
+        tuple(annotation.GetUseDocTextFormat(index)
+              for index in range(annotation.GetTextFormatCount())),
+        note.GetExtent(),
         tuple(display.GetTextPositionAtIndex(index)
               for index in range(display.GetTextCount())),
     )
@@ -392,16 +480,34 @@ def _material_limit():
     return left + 0.0006, bottom + 0.0006, right - 0.0006, top - 0.0006
 
 
-def _assert_material_inset(note):
+def _right_region(header):
+    return (header.GetExtent()[3] + 0.0006, *_material_limit()[1:])
+
+
+def _assert_inside(note, region):
     left, bottom, _, right, top, _ = note.GetExtent()
-    xmin, ymin, xmax, ymax = _material_limit()
+    xmin, ymin, xmax, ymax = region
     assert xmin <= left <= right <= xmax
     assert ymin <= bottom <= top <= ymax
-    assert note.GetAnnotation().GetDisplayData().GetTextCount() == 1
+
+
+def _fit_label_right(scene):
+    return title.fit_purchased_title_block(
+        scene.adapter, spec=scene.spec, material_property=scene.selected,
+        material_alignment="label_right",
+    )
+
+
+def _fit_material_only(scene):
+    return title._fit_title_note(
+        scene.adapter, scene.draw, scene.draw.sheet, scene.material,
+        label="Material", minimum=0.002, material_property=scene.selected,
+        alignment="label_right", label_note=scene.header,
+    )
 
 
 def _assert_readonly_material_proof(scene, settled):
-    state = _material_readback(scene.material)
+    state = tuple(_material_readback(note) for note in (scene.material, scene.header))
     annotations = [note.GetAnnotation() for note in scene.notes]
     before = (
         scene.draw.rebuilds,
@@ -411,7 +517,7 @@ def _assert_readonly_material_proof(scene, settled):
     try:
         settled()
     finally:
-        assert _material_readback(scene.material) == state
+        assert tuple(_material_readback(note) for note in (scene.material, scene.header)) == state
         assert (
             scene.draw.rebuilds,
             [len(annotation.formats) for annotation in annotations],
@@ -420,10 +526,9 @@ def _assert_readonly_material_proof(scene, settled):
 
 
 @pytest.mark.parametrize(
-    "alignment", (None, False, True, 0, 1, "", "center", "Centered", (), {}),
+    "alignment", (None, False, True, 0, 1, "", "centered", "center", "Label_right", (), {}),
 )
 def test_public_title_refuses_invalid_material_alignment_before_native_access(alignment):
-    # There is deliberately no native document or source spec to access.
     with pytest.raises(ValueError, match="material_alignment"):
         title.fit_purchased_title_block(
             object(), spec=object(), material_alignment=alignment,
@@ -431,9 +536,8 @@ def test_public_title_refuses_invalid_material_alignment_before_native_access(al
 
 
 @pytest.mark.parametrize("selected", ("Material Specification", "Material"))
-def test_public_title_default_alignment_is_exactly_fixed(measured_material_title, selected):
-    default = measured_material_title(selected)
-    explicit = measured_material_title(selected)
+def test_public_title_default_alignment_is_exactly_fixed_without_label(native_title, selected):
+    default, explicit = native_title(selected), native_title(selected)
     default_settled = title.fit_purchased_title_block(
         default.adapter, spec=default.spec, material_property=selected,
     )
@@ -444,210 +548,528 @@ def test_public_title_default_alignment_is_exactly_fixed(measured_material_title
     assert [_snapshot(note) for note in default.notes] == [
         _snapshot(note) for note in explicit.notes
     ]
-    assert _material_readback(default.material) == _material_readback(explicit.material)
     for scene, settled in ((default, default_settled), (explicit, explicit_settled)):
-        assert scene.material.GetAnnotation().GetPosition() == _MATERIAL_ANCHOR
-        assert scene.material.GetAnnotation().GetTextFormat(0).CharHeight == 0.002
-        assert all(not note.GetAnnotation().positions for note in scene.notes)
-        _assert_material_inset(scene.material)
-        _assert_readonly_material_proof(scene, settled)
+        _assert_native_fit(scene)
+        scene.draw.EditRebuild3()
+        settled()
+        assert all(not note.annotation.positions for note in scene.notes)
+        assert all(note.annotation.format_count_reads == 0 for note in scene.notes)
+        assert all(note.justification_reads == 0 for note in scene.notes)
 
 
 @pytest.mark.parametrize("selected", ("Material Specification", "Material"))
-def test_public_title_centers_only_selected_material_at_original_native_font(
-    measured_material_title, selected,
+@pytest.mark.parametrize("fragments", (1, 3), ids=("whole-run", "same-baseline-fragments"))
+def test_label_right_centres_complete_native_value_retaining_original_font(
+    measured_material_title, selected, fragments,
 ):
     scene = measured_material_title(selected)
-    note = scene.material
+    note, header = scene.material, scene.header
+    note.fragments = fragments
     other = "Material" if selected == "Material Specification" else "Material Specification"
     alias = _Note(title.property_link(other), "UNSELECTED SOURCE VALUE",
                   (0.200, 0.010, 0.260, 0.025), material=True)
     alias.annotation._format.CharHeight = 0.001
     alias.refresh()
-    scene.notes.insert(0, alias)  # Enumeration order cannot select the alias.
+    scene.notes.insert(0, alias)
     scene.draw.relink()
     untouched_alias = _snapshot(alias)
-    fixed_anchors = [item.GetAnnotation().GetPosition() for item in (scene.name, scene.number)]
+    fixed_anchors = [item.anchor for item in (scene.name, scene.number)]
     original = _material_readback(note)
+    header_before = _material_readback(header)
     initial = scene.initial_material_box
     assert title._box(note.GetExtent(), label="Material", kind="note") == initial
-    assert initial[1] < _material_limit()[1]  # The actual strict bottom-inset failure.
-    initial_row = note.GetAnnotation().GetDisplayData().GetTextPositionAtIndex(0)
+    assert initial[1] < _material_limit()[1]
+    assert header_before[0:4] == ("DetailItem279", 2, "MATERIAL", "MATERIAL")
+    assert title._ruled_cell(scene.draw.sheet, header.anchor) == _MATERIAL_CELL
+    assert title._ruled_cell(scene.draw.sheet, note.anchor) == _MATERIAL_CELL
     note.extent_reads.clear()
+    header.extent_reads.clear()
 
-    settled = title.fit_purchased_title_block(
-        scene.adapter, spec=scene.spec, material_property=selected,
-        material_alignment="centered",
-    )
-    fitter_measurements = tuple(note.extent_reads)
+    settled = _fit_label_right(scene)
+
+    xmin, ymin, xmax, ymax = _right_region(header)
     left, bottom, right, top = initial
-    dy = (_MATERIAL_CELL[1] + _MATERIAL_CELL[3] - bottom - top) / 2
-    expected_anchor = (_MATERIAL_ANCHOR[0], _MATERIAL_ANCHOR[1] + dy, _MATERIAL_ANCHOR[2])
-    expected_box = (left, bottom + dy, 0.0, right, top + dy, 0.0)
+    dx = (xmin + xmax - left - right) / 2
+    dy = (ymin + ymax - bottom - top) / 2
+    expected_anchor = (_MATERIAL_ANCHOR[0] + dx, _MATERIAL_ANCHOR[1] + dy, 0.0)
+    expected_box = (left + dx, bottom + dy, 0.0, right + dx, top + dy, 0.0)
     annotation = note.GetAnnotation()
-    actual = _material_readback(note)
     assert annotation.GetPosition() == pytest.approx(expected_anchor, abs=1e-12)
-    assert annotation.GetPosition()[::2] == _MATERIAL_ANCHOR[::2]
+    assert dx > 0.04 and dy > 0.001  # Both approved sheet axes actually move.
+    assert note.anchor[2] == _MATERIAL_ANCHOR[2]
     assert note.GetExtent() == pytest.approx(expected_box, abs=1e-12)
-    assert fitter_measurements[0] == pytest.approx(
-        (left, bottom, 0.0, right, top, 0.0), abs=1e-12,
-    )
-    assert any(
-        measurement == pytest.approx(expected_box, abs=1e-12)
-        for measurement in fitter_measurements[1:]
-    )
-    row = annotation.GetDisplayData().GetTextPositionAtIndex(0)
-    assert row == pytest.approx((initial_row[0], initial_row[1] + dy, initial_row[2]), abs=1e-12)
-    assert actual[:2] == original[:2]  # Exact source link and resolved full value.
-    assert actual[3:11] == original[3:11]  # Font/length/spacing/mode/justification.
-    assert annotation.GetTextFormat(0).CharHeight == _MATERIAL_HEIGHT
+    assert _styles(annotation) == original[5]
+    assert annotation._format.CharHeight == _MATERIAL_HEIGHT
+    assert annotation._format.LineLength == 0.0
+    assert note.PropertyLinkedText == original[2] and note.GetText() == original[3]
+    assert note.Angle == original[6]
+    assert (note.GetTextJustification(), note.GetTextVerticalJustification()) == original[7:9]
+    assert annotation.GetUseDocTextFormat(0) is False
     assert len(annotation.formats) == len(annotation.positions) == 1
-    assert annotation.formats[0].CharHeight == _MATERIAL_HEIGHT
     assert annotation.positions[0] == pytest.approx(expected_anchor, abs=1e-12)
-    _assert_material_inset(note)
-    _, inset_bottom, _, inset_top = _material_limit()
-    assert bottom + dy - inset_bottom == pytest.approx(inset_top - top - dy, abs=1e-12)
-    assert [item.GetAnnotation().GetPosition() for item in (scene.name, scene.number)] == fixed_anchors
-    assert all(not item.GetAnnotation().positions for item in (scene.name, scene.number, alias))
+    assert note.GetExtent()[0] - xmin == pytest.approx(xmax - note.GetExtent()[3], abs=1e-12)
+    assert note.GetExtent()[1] - ymin == pytest.approx(ymax - note.GetExtent()[4], abs=1e-12)
+    assert note.GetExtent()[0] - header.GetExtent()[3] > 0.030
+    _assert_inside(note, _right_region(header))
+    _assert_inside(header, _material_limit())
+    assert _material_readback(header) == header_before
+    assert not header.annotation.formats and not header.annotation.positions
+    assert [item.anchor for item in (scene.name, scene.number)] == fixed_anchors
+    assert all(not item.annotation.positions for item in (scene.name, scene.number, alias))
     assert _snapshot(alias) == untouched_alias
+    assert len(note.extent_reads) >= 3 and len(header.extent_reads) >= 3
+    assert scene.draw.rebuilds in note.extent_epochs
+    assert scene.draw.rebuilds in header.extent_epochs
     scene.draw.EditRebuild3()
+    note.extent_epochs.clear()
+    header.extent_epochs.clear()
     _assert_readonly_material_proof(scene, settled)
+    assert scene.draw.rebuilds in note.extent_epochs
+    assert scene.draw.rebuilds in header.extent_epochs
 
 
-def test_public_title_centering_refuses_oversized_complete_glyph_box_at_material_floor(
+def test_e273_settled_value_still_requires_horizontal_foreign_header_clearance(
     measured_material_title,
 ):
     scene = measured_material_title("Material")
     note = scene.material
-    left, bottom, right, top = note.reference_box
-    # Adversarial glyph geometry, not a fabricated passing native capture:
-    # its complete height exceeds the real inset even at the 2 mm floor.
-    middle = (bottom + top) / 2
-    note.reference_box = (left, middle - 1.5 * (top - bottom),
-                          right, middle + 1.5 * (top - bottom))
-    scene.draw.EditRebuild3()
-    with pytest.raises(RuntimeError, match="cannot fit.*readable floor"):
-        title.fit_purchased_title_block(
-            scene.adapter, spec=scene.spec, material_property="Material",
-            material_alignment="centered",
-        )
-    annotation = note.GetAnnotation()
-    heights = [fmt.CharHeight for fmt in annotation.formats]
-    assert heights[0] == _MATERIAL_HEIGHT
-    assert heights[-1] == 0.002
-    assert all(height >= 0.002 for height in heights)
-    assert all(earlier > later for earlier, later in zip(heights, heights[1:]))
-    assert len(annotation.positions) == len(heights)
-    assert all(position[::2] == _MATERIAL_ANCHOR[::2] for position in annotation.positions)
-    assert annotation.GetDisplayData().GetTextCount() == 1
-    _, ymin, _, _, ymax, _ = note.GetExtent()
-    assert ymax - ymin == pytest.approx(
-        3 * (top - bottom) * 0.002 / _MATERIAL_HEIGHT, abs=1e-12,
-    )
-    assert ymax - ymin > _material_limit()[3] - _material_limit()[1]
+    note.reference_anchor = note.anchor = _E273_ANCHOR
+    note.reference_box = _E273_BOX
+    # Only this original-font candidate is used; no claim of a captured e273 floor.
+    note.floor_box = _E273_BOX
+    note.refresh()
+    assert title.note_fits_cell(_E273_BOX, 1, _material_limit())
+    assert _E273_BOX[0] < _HEADER_BOX[2] and _E273_BOX[3] > _HEADER_BOX[1]
+    settled = _fit_label_right(scene)
+    assert note.anchor[0] > _E273_ANCHOR[0] + 0.04
+    assert note.anchor[1:] == pytest.approx(_E273_ANCHOR[1:], abs=1e-12)
+    assert note.annotation._format.CharHeight == _MATERIAL_HEIGHT
+    _assert_inside(note, _right_region(scene.header))
+    _assert_readonly_material_proof(scene, settled)
 
 
-@pytest.mark.parametrize("x_shift", (-0.003, 0.100), ids=("left", "right"))
-def test_public_title_centering_keeps_wrong_x_strictly_outside(
-    measured_material_title, x_shift,
+def test_b57_floor_ink_cannot_be_replaced_with_a_smaller_y_only_fixture(
+    measured_material_title,
 ):
     scene = measured_material_title("Material")
     note = scene.material
-    note.extent_shift = (x_shift, 0.0)
-    scene.draw.EditRebuild3()
+    note.annotation._format.CharHeight = 0.002
+    note.refresh()
+    box = title._box(note.GetExtent(), label="captured floor", kind="note")
+    assert box == pytest.approx(note.floor_box, abs=1e-12)
+    assert any(
+        box[3] - box[1] == pytest.approx(height, abs=1e-12)
+        for height in (0.003111498060312857, 0.003049288495685164)
+    )
+    below_header_height = _HEADER_BOX[1] - 0.0006 - _material_limit()[1]
+    assert below_header_height == pytest.approx(0.003080150961491987, abs=1e-12)
+    if box[3] - box[1] > below_header_height:
+        assert box[3] - box[1] - below_header_height > 0.000031
+    assert not title.note_fits_cell(box, 1, _material_limit())
     with pytest.raises(RuntimeError, match="cannot fit.*readable floor"):
-        title.fit_purchased_title_block(
-            scene.adapter, spec=scene.spec, material_property="Material",
-            material_alignment="centered",
+        title._fit_title_note(
+            scene.adapter, scene.draw, scene.draw.sheet, note,
+            label="Material", minimum=0.002, material_property="Material",
         )
-    annotation = note.GetAnnotation()
-    assert annotation.GetTextFormat(0).CharHeight == 0.002
-    assert min(fmt.CharHeight for fmt in annotation.formats) >= 0.002
-    assert len(annotation.positions) == len(annotation.formats)
-    assert all(position[::2] == _MATERIAL_ANCHOR[::2] for position in annotation.positions)
-    left, bottom, _, right, top, _ = note.GetExtent()
-    xmin, ymin, xmax, ymax = _material_limit()
-    assert ymin <= bottom <= top <= ymax  # Y was genuinely repaired.
-    assert left < xmin if x_shift < 0 else right > xmax
-    assert annotation.GetPosition()[::2] == _MATERIAL_ANCHOR[::2]
+    assert not note.annotation.positions
 
 
 @pytest.mark.parametrize("result", (False, None, 1))
-def test_public_title_centering_requires_boolean_position_setter_success(
-    measured_material_title, result,
-):
+def test_label_right_requires_boolean_position_setter_success(measured_material_title, result):
     scene = measured_material_title("Material")
-    annotation = scene.material.GetAnnotation()
-    annotation.position_result = result
-    with pytest.raises(RuntimeError, match="position|anchor|centering"):
-        title.fit_purchased_title_block(
-            scene.adapter, spec=scene.spec, material_property="Material",
-            material_alignment="centered",
-        )
-    assert annotation.GetPosition() == _MATERIAL_ANCHOR
-    assert len(annotation.positions) == len(annotation.formats) == 1
-    assert annotation.GetTextFormat(0).CharHeight == _MATERIAL_HEIGHT
+    scene.material.annotation.position_result = result
+    with pytest.raises(RuntimeError, match="position|anchor"):
+        _fit_label_right(scene)
+    assert scene.material.anchor == _MATERIAL_ANCHOR
+    assert len(scene.material.annotation.positions) == 1
+    assert scene.material.annotation._format.CharHeight == _MATERIAL_HEIGHT
 
 
 @pytest.mark.parametrize("fault", ("ignored", "clamped-y", "clamped-x", "clamped-z"))
-def test_public_title_centering_refuses_unpersisted_requested_position(
-    measured_material_title, fault,
-):
+def test_label_right_refuses_unpersisted_requested_position(measured_material_title, fault):
     scene = measured_material_title("Material")
-    annotation = scene.material.GetAnnotation()
+    annotation = scene.material.annotation
     if fault == "ignored":
         annotation.ignore_position_setter = True
     else:
         axis = {"clamped-x": 0, "clamped-y": 1, "clamped-z": 2}[fault]
         annotation.position_offset = tuple(0.00001 if index == axis else 0.0 for index in range(3))
-    with pytest.raises(RuntimeError, match="position|anchor|centering|did not persist"):
-        title.fit_purchased_title_block(
-            scene.adapter, spec=scene.spec, material_property="Material",
-            material_alignment="centered",
-        )
-    assert len(annotation.positions) == len(annotation.formats) == 1
+    with pytest.raises(RuntimeError, match="position|anchor|did not persist"):
+        _fit_label_right(scene)
+    assert len(annotation.positions) == 1
     assert math.dist(annotation.GetPosition(), annotation.positions[0]) > 1e-7
-    assert annotation.GetTextFormat(0).CharHeight == _MATERIAL_HEIGHT
+
+
+@pytest.mark.parametrize("anchor", ((0.06, 0.03), (0.06, math.nan, 0), (math.inf, 0.03, 0)))
+@pytest.mark.parametrize("field", ("material", "header"))
+def test_label_right_refuses_unreadable_native_anchors(measured_material_title, field, anchor):
+    scene = measured_material_title("Material")
+    getattr(scene, field).anchor = anchor
+    with pytest.raises(RuntimeError, match="anchor|position|ruled cell"):
+        _fit_material_only(scene)
+    assert not scene.material.annotation.positions
 
 
 @pytest.mark.parametrize(
-    "fault", ("anchor-x", "anchor-y", "anchor-z", "height", "face", "doc",
-              "link", "value", "rows", "left", "right", "bottom", "top"),
+    "fault", ("missing", "duplicate", "wrong-owner", "linked-literal", "raw-prefix",
+              "resolved-case", "foreign-cell", "header-outside-inset"),
 )
-def test_public_title_centered_final_proof_refuses_later_native_drift(
+def test_label_right_requires_unique_exact_format_owned_material_header(
     measured_material_title, fault,
 ):
     scene = measured_material_title("Material")
-    settled = title.fit_purchased_title_block(
-        scene.adapter, spec=scene.spec, material_property="Material",
-        material_alignment="centered",
-    )
+    header = scene.header
+    if fault == "missing":
+        scene.notes.remove(header)
+    elif fault == "duplicate":
+        duplicate = _MeasuredMaterialNote("MATERIAL", _HEADER_BOX, _HEADER_BOX, header=True)
+        duplicate.name = "DetailItem999"
+        scene.notes.append(duplicate)
+    elif fault == "wrong-owner":
+        header.annotation.OwnerType = 1
+    elif fault == "linked-literal":
+        header._link = '$PRPSHEET:"MATERIAL"'
+    elif fault == "raw-prefix":
+        header._link = " MATERIAL"
+    elif fault == "resolved-case":
+        header._text = "Material"
+    elif fault == "foreign-cell":
+        header.anchor = (0.202, 0.020, 0.0)
+        scene.draw.rules += _rules((0.200, 0.010, 0.260, 0.025))
+        header.refresh()
+    else:
+        header.extent_shift = (0.0, 0.001)
+        header.refresh()
+    scene.draw.relink()
+    before = _material_readback(header)
+    with pytest.raises(RuntimeError):
+        _fit_label_right(scene)
+    assert _material_readback(header) == before
+    assert not header.annotation.formats and not header.annotation.positions
+    assert not scene.material.annotation.positions
+
+
+def test_private_label_right_requires_its_explicit_native_label_note(measured_material_title):
+    scene = measured_material_title("Material")
+    with pytest.raises(RuntimeError, match="label|MATERIAL"):
+        title._fit_title_note(
+            scene.adapter, scene.draw, scene.draw.sheet, scene.material,
+            label="Material", minimum=0.002, material_property="Material",
+            alignment="label_right",
+        )
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("fault", ("height", "width", "wrap"))
+def test_label_right_refuses_complete_glyph_overflow_and_wrapping_at_original_floor(
+    measured_material_title, fault,
+):
+    scene = measured_material_title("Material")
     note = scene.material
-    annotation = note.GetAnnotation()
-    if fault.startswith("anchor-"):
+    if fault == "wrap":
+        note.forced_rows = 2
+    else:
+        # Both complete captured candidates are enlarged, not just display-run
+        # baselines: a tiny first fragment must not hide the rest of the ink.
+        def oversized(box):
+            left, bottom, right, top = box
+            return (left, top - 0.010, right, top) if fault == "height" else (
+                left, bottom, left + 0.110, top,
+            )
+        note.reference_box = oversized(note.reference_box)
+        note.floor_box = oversized(note.floor_box)
+        note.fragments = 3
+    note.refresh()
+    with pytest.raises(RuntimeError, match="cannot fit.*readable floor"):
+        _fit_label_right(scene)
+    heights = [fmt.CharHeight for fmt in note.annotation.formats]
+    assert heights[0] == _MATERIAL_HEIGHT and heights[-1] == 0.002
+    assert all(height >= 0.002 for height in heights)
+    assert all(earlier > later for earlier, later in zip(heights, heights[1:]))
+    assert all(position[2] == _MATERIAL_ANCHOR[2] for position in note.annotation.positions)
+    assert note.GetText() == "Alloy Steel"
+    assert not scene.header.annotation.formats and not scene.header.annotation.positions
+
+
+def test_label_right_shrinks_only_when_complete_value_needs_unchanged_floor(
+    measured_material_title,
+):
+    scene = measured_material_title("Material")
+    note = scene.material
+    left, bottom, right, top = note.reference_box
+    note.reference_box = (left, top - 0.007, right, top)
+    note.refresh()
+    before = _styles(note.annotation)
+    settled = _fit_label_right(scene)
+    heights = [fmt.CharHeight for fmt in note.annotation.formats]
+    assert heights[0] == _MATERIAL_HEIGHT
+    assert 0.002 <= heights[-1] < heights[0]
+    assert all(earlier > later for earlier, later in zip(heights, heights[1:]))
+    after = _styles(note.annotation)
+    assert tuple((name, value) for name, value in after[0]
+                 if name not in ("CharHeight", "CharHeightInPts")) == tuple(
+        (name, value) for name, value in before[0]
+        if name not in ("CharHeight", "CharHeightInPts")
+    )
+    _assert_inside(note, _right_region(scene.header))
+    _assert_readonly_material_proof(scene, settled)
+
+
+def test_label_right_refuses_a_native_header_leaving_no_right_value_region(measured_material_title):
+    scene = measured_material_title("Material")
+    left, bottom, _, top = scene.header.reference_box
+    wide = (left, bottom, _material_limit()[2] - 0.0001, top)
+    scene.header.reference_box = scene.header.floor_box = wide
+    scene.header.refresh()
+    _assert_inside(scene.header, _material_limit())
+    with pytest.raises(RuntimeError):
+        _fit_label_right(scene)
+    assert not scene.material.annotation.positions
+
+
+def _change_style(fmt, field):
+    if field == "IsHeightSpecifiedInPts":
+        fmt._points_mode = not fmt.IsHeightSpecifiedInPts()
+        return
+    value = getattr(fmt, field)
+    changed = not value if type(value) is bool else (
+        value + "-changed" if type(value) is str else value + (
+            1 if type(value) is int else 0.00001
+        )
+    )
+    setattr(fmt, field, changed)
+
+
+@pytest.mark.parametrize("field", _STYLE_FIELDS)
+@pytest.mark.parametrize("target,index", (("header", 0), ("header", 1), ("material", 0), ("material", 1)))
+def test_label_right_final_proof_preserves_every_native_format_field(
+    measured_material_title, target, index, field,
+):
+    scene = measured_material_title("Material")
+    for note in (scene.header, scene.material):
+        note.annotation.extra_formats = [_Format(height=0.0019, face="Arial Narrow")]
+        note.annotation.extra_use_doc = [False]
+    settled = _fit_label_right(scene)
+    note = getattr(scene, target)
+    fmt = note.annotation._format if index == 0 else note.annotation.extra_formats[index - 1]
+    _change_style(fmt, field)
+    scene.draw.EditRebuild3()
+    with pytest.raises(RuntimeError):
+        _assert_readonly_material_proof(scene, settled)
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+@pytest.mark.parametrize(
+    "fault", ("raw", "text", "owner", "anchor-x", "anchor-y", "anchor-z",
+              "angle", "horizontal", "vertical", "doc", "extra-doc",
+              "format-count", "left", "right", "bottom", "top"),
+)
+def test_label_right_final_readonly_proof_refuses_native_identity_and_geometry_drift(
+    measured_material_title, target, fault,
+):
+    scene = measured_material_title("Material")
+    for note in (scene.header, scene.material):
+        note.annotation.extra_formats = [_Format(height=0.0019)]
+        note.annotation.extra_use_doc = [False]
+    settled = _fit_label_right(scene)
+    note = getattr(scene, target)
+    if fault == "raw":
+        note._link += " "
+    elif fault == "text":
+        note._text += " "
+    elif fault == "owner":
+        note.annotation.OwnerType = 1
+    elif fault.startswith("anchor-"):
         axis = {"anchor-x": 0, "anchor-y": 1, "anchor-z": 2}[fault]
         note.anchor = tuple(value + (0.00001 if index == axis else 0.0)
                             for index, value in enumerate(note.anchor))
-    elif fault == "height":
-        annotation._format.CharHeight -= 0.00001
-    elif fault == "face":
-        annotation._format.TypeFaceName = "Courier New"
+    elif fault == "angle":
+        note.Angle = 0.01
+    elif fault == "horizontal":
+        note.horizontal_justification = 2
+    elif fault == "vertical":
+        note.vertical_justification = 1
     elif fault == "doc":
-        annotation.use_doc = True
-    elif fault == "link":
-        note._link = note.PropertyLinkedText.replace("$PRPSHEET:", "$PRP:")
-    elif fault == "value":
-        note._text += " "
-    elif fault == "rows":
-        note.forced_rows = 2
+        note.annotation.use_doc = not note.annotation.use_doc
+    elif fault == "extra-doc":
+        note.annotation.extra_use_doc[0] = True
+    elif fault == "format-count":
+        note.annotation.extra_formats.append(_Format())
+        note.annotation.extra_use_doc.append(False)
     else:
         note.extent_shift = {
-            "left": (-0.003, 0.0), "right": (0.100, 0.0),
-            "bottom": (0.0, -0.003), "top": (0.0, 0.003),
+            "left": (-0.100, 0.0), "right": (0.100, 0.0),
+            "bottom": (0.0, -0.010), "top": (0.0, 0.010),
         }[fault]
     scene.draw.EditRebuild3()
-    with pytest.raises(RuntimeError, match="source property expression|did not persist"):
+    with pytest.raises(RuntimeError):
         _assert_readonly_material_proof(scene, settled)
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+@pytest.mark.parametrize("stage", ("format-rebuild", "position-rebuild"))
+@pytest.mark.parametrize("fault", ("box", "style", "anchor", "text"))
+def test_label_right_rereads_both_native_notes_after_each_candidate_rebuild(
+    measured_material_title, target, stage, fault,
+):
+    scene = measured_material_title("Material")
+    note = getattr(scene, target)
+
+    def drift():
+        if fault == "box":
+            note.extent_shift = (0.100, 0.0)
+        elif fault == "style":
+            note.annotation._format.Italic = True
+        elif fault == "anchor":
+            x, y, z = note.anchor
+            note.anchor = (x, y, z + 0.00001)
+        else:
+            note._text += " "
+
+    # The private path isolates the actual candidate, not Name/Number rebuilds.
+    scene.draw.rebuild_actions[1 if stage == "format-rebuild" else 2] = drift
+    with pytest.raises(RuntimeError):
+        _fit_material_only(scene)
+    assert scene.draw.rebuilds >= (1 if stage == "format-rebuild" else 2)
+    assert not scene.header.annotation.formats and not scene.header.annotation.positions
+
+
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "renamed", "split-cell"))
+def test_label_right_final_proof_rechecks_native_label_membership_and_original_grid(
+    measured_material_title, fault,
+):
+    scene = measured_material_title("Material")
+    settled = _fit_label_right(scene)
+    if fault == "missing":
+        scene.notes.remove(scene.header)
+    elif fault == "duplicate":
+        duplicate = _MeasuredMaterialNote("MATERIAL", _HEADER_BOX, _HEADER_BOX, header=True)
+        duplicate.name = "DetailItem999"
+        scene.notes.append(duplicate)
+    elif fault == "renamed":
+        scene.header.name = "DetailItem999"
+    else:
+        _, bottom, _, top = _MATERIAL_CELL
+        scene.draw.rules += (_Line(0.080, bottom, 0.080, top),)
+    scene.draw.relink()
+    scene.draw.EditRebuild3()
+    with pytest.raises(RuntimeError):
+        _assert_readonly_material_proof(scene, settled)
+
+
+def test_label_right_final_proof_uses_fresh_header_extent_even_inside_original_cell(
+    measured_material_title,
+):
+    scene = measured_material_title("Material")
+    settled = _fit_label_right(scene)
+    scene.header.extent_shift = (0.040, 0.0)
+    scene.draw.EditRebuild3()
+    _assert_inside(scene.header, _material_limit())
+    _assert_inside(scene.material, _material_limit())
+    assert scene.header.GetExtent()[3] > scene.material.GetExtent()[0]
+    with pytest.raises(RuntimeError):
+        _assert_readonly_material_proof(scene, settled)
+
+
+def test_label_right_refuses_native_rows_changing_during_position_rebuild(
+    measured_material_title,
+):
+    scene = measured_material_title("Material")
+    scene.draw.rebuild_actions[2] = lambda: setattr(scene.material, "forced_rows", 2)
+    with pytest.raises(RuntimeError, match="row|placement"):
+        _fit_material_only(scene)
+    assert len(scene.material.annotation.positions) == 1
+    assert scene.material.rows == 2
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+def test_label_right_after_position_rebuild_refuses_fresh_gap_violation_without_shrinking(
+    measured_material_title, target,
+):
+    scene = measured_material_title("Material")
+    note = getattr(scene, target)
+    original_style = _styles(note.annotation)
+    shift = (0.040, 0.0) if target == "header" else (-0.036, 0.0)
+    scene.draw.rebuild_actions[2] = lambda: setattr(note, "extent_shift", shift)
+    with pytest.raises(RuntimeError):
+        _fit_material_only(scene)
+    # Neither note leaves the original cell; no identity, style, row or anchor
+    # guard can explain this refusal. The freshly measured foreign-header gap
+    # is the failing invariant, before another font step or corrective move.
+    _assert_inside(scene.header, _material_limit())
+    _assert_inside(scene.material, _material_limit())
+    assert scene.material.GetExtent()[0] < _right_region(scene.header)[0]
+    assert scene.material.rows == 1
+    assert scene.header.anchor == _HEADER_ANCHOR
+    assert scene.material.anchor == scene.material.annotation.positions[0]
+    assert _styles(note.annotation) == original_style
+    assert len(scene.material.annotation.formats) == 1
+    assert len(scene.material.annotation.positions) == 1
+    assert scene.draw.rebuilds == 2
+
+
+@pytest.mark.parametrize("result", (False, None, 1))
+def test_label_right_requires_boolean_format_setter_success(measured_material_title, result):
+    scene = measured_material_title("Material")
+    scene.material.annotation.setter_result = result
+    with pytest.raises(RuntimeError, match="format setter refused"):
+        _fit_material_only(scene)
+    assert scene.material.annotation.use_doc is True
+    assert not scene.material.annotation.positions
+
+
+def test_label_right_refuses_ignored_format_setter_even_when_height_already_fits(
+    measured_material_title,
+):
+    scene = measured_material_title("Material")
+    scene.material.annotation.ignore_setter = True
+    with pytest.raises(RuntimeError):
+        _fit_material_only(scene)
+    assert scene.material.annotation.use_doc is True
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+@pytest.mark.parametrize(
+    "extent", (None, (), (0.06, 0.03, 0.07),
+               (0.06, math.nan, 0.0, 0.07, 0.03, 0.0),
+               (0.07, 0.02, 0.0, 0.06, 0.03, 0.0)),
+    ids=("unavailable", "empty", "incomplete", "nonfinite", "reversed"),
+)
+def test_label_right_requires_complete_finite_native_glyph_extents(
+    measured_material_title, target, extent,
+):
+    scene = measured_material_title("Material")
+    getattr(scene, target).extent = extent
+    with pytest.raises(RuntimeError):
+        _fit_material_only(scene)
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+@pytest.mark.parametrize("invalid", (None, object(), lambda: 1.0))
+def test_label_right_does_not_coerce_or_call_nonprimitive_native_style_properties(
+    measured_material_title, target, invalid,
+):
+    scene = measured_material_title("Material")
+    getattr(scene, target).annotation._format.WidthFactor = invalid
+    with pytest.raises((RuntimeError, TypeError)):
+        _fit_material_only(scene)
+    assert not scene.material.annotation.positions
+
+
+@pytest.mark.parametrize("target", ("header", "material"))
+def test_label_right_propagates_native_errors_in_later_text_formats(
+    measured_material_title, target,
+):
+    scene = measured_material_title("Material")
+    annotation = getattr(scene, target).annotation
+    annotation.extra_formats = [_Format(height=0.0019)]
+    annotation.extra_use_doc = [False]
+    annotation.format_read_errors[1] = OSError("native text format unavailable")
+    with pytest.raises(OSError, match="native text format unavailable"):
+        _fit_material_only(scene)
+    assert not scene.material.annotation.positions
 
 
 def _snapshot(note):
