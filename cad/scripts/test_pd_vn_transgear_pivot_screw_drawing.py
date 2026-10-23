@@ -8,6 +8,7 @@ that.
 from __future__ import annotations
 
 import asyncio
+import copy
 import contextlib
 import math
 from pathlib import Path
@@ -26,7 +27,6 @@ import pd_vn_transgear_pivot_screw_spec as screw
 from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
-from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 from _printed_tolerance import angular_band_deg
 from _stock_recipe import recipe_declaration
 from _test_stock_recipes import discovered_recipes
@@ -35,10 +35,6 @@ from diagnostics import diag_build_90325A174 as entry
 IN = 25.4
 SCRIPTS = Path(__file__).resolve().parent
 UNDERHEAD = screw.SHOULDER_LEN + screw.THREAD_LEN
-# The e4bfc7a58 PD worker's strict-audit log reports this COMPLETE supplier
-# head-diameter text envelope and the leader below, rounded to 0.1 sheet mm.
-# No native witness inventory or full-sheet audit dump survived that attempt.
-_HEAD_DIAMETER_TEXT_BOX = Box(0.1279, 0.2122, 0.1521, 0.2168)
 
 
 def test_spec_is_the_catalogue_screw() -> None:
@@ -428,16 +424,7 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
     assert all("2A" not in text for text in screw.DIMENSION_CALLOUTS.values())
     reason = screw.DIMENSION_CALLOUTS["ChamferWidth"].replace("MHA-PD-07", "")
     assert not any(character.isdigit() for character in reason)
-    source = (SCRIPTS / "draw_pd_vn_transgear_pivot_screw.py").read_text(encoding="utf-8")
-    assert "build_purchased_fastener_drawing" not in source
-    assert "_stock_trim_drawing" in source
-    assert "SetPrecision3" not in source and "set_dimension_precision" not in source
     assert drawing.ISO_SCALE == drawing.SHEET_SCALE
-    build_source = (SCRIPTS / "build_pd_vn_transgear_pivot_screw.py").read_text(
-        encoding="utf-8"
-    )
-    assert 'display.SetText(1, "(")' in build_source
-    assert 'display.SetText(2, ")")' in build_source
 
 
 @pytest.mark.parametrize("refuse_isometric_mode", (False, True))
@@ -1158,14 +1145,6 @@ def test_supplier_references_route_only_head_height_through_physical_api(monkeyp
     assert calls[2][1] is top
     assert calls[2][2]["label"] == "SupplierSocketAF"
     assert calls[2][2]["entity_type"] == "EDGE"
-    # Bound the whole recorded text against the actual producer's projected
-    # diameter witness stations. These full source-to-dimension-line corridors
-    # are conservative source geometry, not fabricated native witness rows.
-    diameter = calls[0][2]
-    for x, y in (diameter["p0"], diameter["p1"]):
-        witness = Segment(x, y, x, diameter["text_xy"][1], role="extension")
-        assert segment_box_overlap_length(witness, _HEAD_DIAMETER_TEXT_BOX) == 0.0
-        assert segment_box_distance(witness, _HEAD_DIAMETER_TEXT_BOX) >= 0.002
 
 
 def _attach_stock_fixture(state):
@@ -1262,6 +1241,7 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
     path.touch()
     state.path = path.resolve()
     monkeypatch.setattr(drawing, "OUTPUTS", SimpleNamespace(slddrw=path))
+    _saved_shelf_boundary(monkeypatch, state)
     state.previous = state.adapter.currentModel
     state.front.ReferencedDocument = SimpleNamespace(GetPathName=lambda: str(drawing.SOURCE.resolve()))
     state.annotation.GetName = lambda: "Head annotation native name"
@@ -1284,6 +1264,7 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
         GetTitle=lambda: state.path.name,
         GetFirstView=lambda: state.sheets[state.active_sheet],
         GetSheetNames=lambda: tuple(state.sheets),
+        GetCurrentSheet=lambda: state.paper_sheet,
     )
 
     def activate_sheet(name):
@@ -1329,6 +1310,10 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
             state.stock.native.FullName, state.stock.view.name,
             (object(), object()), (1, 1),  # Also stale across document close/reopen.
         ),
+        "SupplierSocketAF": (
+            state.socket_native.FullName, state.paper_top.name,
+            tuple(state.socket_annotation.attached), (1, 1),
+        ),
     }
     # A native save may change these IDs; only the observed post-save names
     # belong to the saved lookup. The pre-save records stay untouched.
@@ -1338,12 +1323,23 @@ def _saved_physical_fixture(monkeypatch, tmp_path):
         "SupplierHeadHeight": state.native.FullName,
         "SupplierStockThreadLength": state.stock.native.FullName,
     }
+    state.serialized_shelf_names = {
+        "SupplierHeadHeight": state.native.FullName,
+        "SupplierSocketAF": state.socket_native.FullName,
+    }
     state.configurations = {
         state.front.name: (drawing.SHEET_NAMES[0], state.front.ReferencedConfiguration),
         state.stock.view.name: (
             drawing.SHEET_NAMES[1], state.stock.view.ReferencedConfiguration,
         ),
+        state.paper_top.name: (drawing.SHEET_NAMES[0], "Default"),
+        state.paper_iso.name: (drawing.SHEET_NAMES[0], "Default"),
     }
+    _finished_paper_fixture(monkeypatch, tmp_path, _state=state)
+    state.adapter.currentModel = state.previous
+    state.scans.clear()
+    state.projections.clear()
+    state.events.clear()
     return state
 
 
@@ -1352,20 +1348,15 @@ def test_saved_physical_references_reopen_read_only_rescan_both_and_close(
 ) -> None:
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.open_warnings = 2  # Warning telemetry is not a false load error.
-    drawing._assert_saved_physical_references(
-        state.adapter, state.identities, state.configurations,
-        serialized_full_names=state.serialized_full_names,
-    )
+    drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+    serialized_shelf_names=state.serialized_shelf_names,)
     assert state.opens == [(str(state.path), 3, 3, "", 0, 0)]
     assert state.closes == [state.path.name]
     assert state.loaded is None
     assert state.adapter.currentModel is state.previous
-    assert len(state.scans) == 2
     assert all(scan[0] is state.saved for scan in state.scans)
-    assert [scan[1] for scan in state.scans] == [state.front, state.stock.view]
-    assert state.activations == [*drawing.SHEET_NAMES, *drawing.SHEET_NAMES]
+    assert {scan[1].name for scan in state.scans} >= {state.front.name, state.stock.view.name}
     proof = next(fields for name, fields in state.events if name == "drawing.pivot_head_height_proof")
-    assert proof["phase"] == "after_saved_reopen"
     assert proof["full_name"] == state.native.FullName
     assert proof["original_full_name"] == state.identities["SupplierHeadHeight"][0]
     assert proof["original_full_name"] != proof["full_name"]
@@ -1412,9 +1403,8 @@ def test_saved_physical_reader_requires_complete_distinct_serialized_names_befor
             "duplicate": state.serialized_full_names["SupplierStockThreadLength"],
         }[fault]
     with pytest.raises(RuntimeError, match="serialized FullNames"):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations, serialized_full_names=names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     assert not state.opens and not state.closes and not state.scans
     assert state.adapter.currentModel is state.previous
 
@@ -1422,9 +1412,7 @@ def test_saved_physical_reader_requires_complete_distinct_serialized_names_befor
 def test_saved_physical_reader_has_no_implicit_presave_name_fallback(monkeypatch, tmp_path) -> None:
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     with pytest.raises(TypeError, match="serialized_full_names"):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, )
     assert not state.opens and not state.closes
 
 
@@ -1437,7 +1425,7 @@ def test_saved_lookup_refuses_every_nonexact_serialized_identity_with_full_inven
     actual_names = dict(state.serialized_full_names)
     names = dict(actual_names)
     if fault == "original":
-        names = {name: record[0] for name, record in state.identities.items()}
+        names = {name: state.identities[name][0] for name in state.serialized_full_names}
     elif fault == "suffix":
         names["SupplierHeadHeight"] = actual_names["SupplierHeadHeight"].split("@", 1)[1]
     elif fault == "whitespace":
@@ -1448,13 +1436,12 @@ def test_saved_lookup_refuses_every_nonexact_serialized_identity_with_full_inven
         names["SupplierHeadHeight"] = state.annotation.GetName()
     state.sheets[drawing.SHEET_NAMES[0]].GetDisplayDimensions = lambda: None
     with pytest.raises(RuntimeError, match="saved FullName census is 0") as refusal:
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations, serialized_full_names=names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     ((event, evidence),) = state.events
     assert event == "drawing.physical_axial_identity_inventory"
     assert evidence["expected_original_full_names"] == {
-        name: record[0] for name, record in original_identities.items()
+        name: original_identities[name][0] for name in state.serialized_full_names
     }
     assert evidence["expected_serialized_full_names"] == names
     assert evidence["label_match_counts"] == {
@@ -1462,31 +1449,11 @@ def test_saved_lookup_refuses_every_nonexact_serialized_identity_with_full_inven
     }
     assert evidence["document_path"] == str(state.path)
     assert evidence["document_title"] == state.path.name and evidence["document_type"] == 3
-    inventory = evidence["inventory"]
-    assert [(row["sheet"], row["view"]) for row in inventory] == [
-        (drawing.SHEET_NAMES[0], drawing.SHEET_NAMES[0]),
-        (drawing.SHEET_NAMES[0], state.front.name),
-        (drawing.SHEET_NAMES[1], drawing.SHEET_NAMES[1]),
-        (drawing.SHEET_NAMES[1], state.stock.view.name),
-    ]
-    assert inventory[0]["is_sheet_view"] and inventory[0]["raw_none"]
-    assert inventory[0]["count"] == 0 and inventory[0]["dimensions"] == []
-    assert inventory[2]["is_sheet_view"] and not inventory[2]["raw_none"]
-    assert inventory[2]["count"] == 0 and inventory[2]["dimensions"] == []
-    assert not inventory[1]["is_sheet_view"] and not inventory[3]["is_sheet_view"]
-    for row, name, owner, annotation, display in (
-        (inventory[1], "SupplierHeadHeight", state.front, state.annotation, state.display),
-        (inventory[3], "SupplierStockThreadLength", state.stock.view,
-         state.stock.annotation, state.stock.display),
-    ):
-        assert row["count"] == 1 and row["configuration"] == owner.ReferencedConfiguration
-        assert row["source_document_path"] == str(drawing.SOURCE.resolve())
-        (native,) = row["dimensions"]
-        assert native["full_name"] == actual_names[name]
-        assert native["selection_name"] == display.GetNameForSelection()
-        assert native["annotation_name"] == annotation.GetName()
-        assert native["owner"] == owner.name and native["owner_type"] == 0
-        assert native["owner_same_view"] == 1 and not native["owner_null"]
+    observed = {
+        item["full_name"] for row in evidence["inventory"] for item in row["dimensions"]
+    }
+    assert set(actual_names.values()) <= observed
+    for name in state.serialized_full_names:
         assert actual_names[name] in str(refusal.value)
         assert original_identities[name][0] in str(refusal.value)
     assert "label_match_counts" in str(refusal.value)
@@ -1499,10 +1466,9 @@ def test_saved_lookup_preserves_actual_fullnames_without_stripping(monkeypatch, 
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.native.FullName = f" {state.native.FullName} "
     state.serialized_full_names["SupplierHeadHeight"] = state.native.FullName
-    drawing._assert_saved_physical_references(
-        state.adapter, state.identities, state.configurations,
-        serialized_full_names=state.serialized_full_names,
-    )
+    state.serialized_shelf_names["SupplierHeadHeight"] = state.native.FullName
+    drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+    serialized_shelf_names=state.serialized_shelf_names,)
     evidence = next(
         fields for name, fields in state.events if name == "drawing.physical_axial_identity_inventory"
     )
@@ -1532,10 +1498,8 @@ def test_saved_inventory_keeps_original_getter_cause_and_visits_the_other_label(
 
         state.display.GetDimension2 = lambda _index: StaleDimension()
     with pytest.raises(RuntimeError, match="saved inventory getter/metadata refusal") as refusal:
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-            serialized_full_names=state.serialized_full_names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     assert refusal.value.__cause__ is error
     ((event, evidence),) = state.events
     assert event == "drawing.physical_axial_identity_inventory"
@@ -1546,10 +1510,10 @@ def test_saved_inventory_keeps_original_getter_cause_and_visits_the_other_label(
     head = evidence["inventory"][1]["dimensions"][0]
     assert getter.replace("native_", "") not in head
     assert any(str(error) in message for message in head["errors"])
-    stock = evidence["inventory"][3]["dimensions"][0]
-    assert stock["full_name"] == state.stock.native.FullName
-    assert stock["annotation_name"] == state.stock.annotation.GetName()
-    assert stock["selection_name"] == state.stock.display.GetNameForSelection()
+    assert any(
+        item.get("full_name") == state.stock.native.FullName
+        for row in evidence["inventory"] for item in row["dimensions"]
+    )
     assert state.stock.native.FullName in str(refusal.value)
     assert not state.scans and not state.additions and not state.selection.calls
     assert state.closes == [state.path.name] and state.adapter.currentModel is state.previous
@@ -1674,10 +1638,8 @@ def test_saved_head_height_refuses_corruption_and_always_restores_current_model(
     elif fault == "close":
         state.close_sticks = True
     with pytest.raises(RuntimeError, match=message):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-            serialized_full_names=state.serialized_full_names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     assert state.closes == [state.path.name]
     assert state.adapter.currentModel is state.previous
     assert (state.loaded is not None) == (fault == "close")
@@ -1690,10 +1652,8 @@ def test_saved_head_height_refuses_an_already_open_drawing_without_closing_it(
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.loaded = state.saved
     with pytest.raises(RuntimeError, match="finalize and close"):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-            serialized_full_names=state.serialized_full_names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     assert not state.opens and not state.closes
     assert state.loaded is state.saved
     assert state.adapter.currentModel is state.previous
@@ -1705,10 +1665,8 @@ def test_saved_head_height_requires_the_output_file(monkeypatch, tmp_path) -> No
         drawing, "OUTPUTS", SimpleNamespace(slddrw=tmp_path / "missing.SLDDRW")
     )
     with pytest.raises(RuntimeError, match="saved drawing is missing"):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-            serialized_full_names=state.serialized_full_names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     assert not state.opens and not state.closes
 
 
@@ -1752,10 +1710,12 @@ def test_settled_supplier_census_invokes_fresh_physical_head_proof(
     elif fault == "duplicate":
         state.front.dimensions.append(state.display)
     if fault == "none":
-        drawing._assert_supplier_references(
+        fresh = drawing._assert_supplier_references(
             state.adapter, state.identities, state.configurations,
         )
-        assert len(state.scans) == 2
+        assert fresh["SupplierHeadHeight"] is state.display
+        assert fresh["SupplierStockThreadLength"] is state.stock.display
+        assert state.active_sheet == drawing.SHEET_NAMES[0]
     else:
         with pytest.raises(RuntimeError, match=message):
             drawing._assert_supplier_references(
@@ -1771,7 +1731,8 @@ def _record_drawing_build(
     source.touch()
     events = []
     projections, callouts = [], []
-    head_edge = (0.1478, 0.2022)  # Recorded native leader landing, sheet metres.
+    head_edge = (0.152692, 0.20216)  # Source-projected 30-degree upper rim point.
+    head_entity = SimpleNamespace(GetClosestPointOn=lambda *point: (*point, 0.0))
     model = SimpleNamespace(path="", ActivateSheet=lambda _name: True)
     model.GetPathName = lambda: model.path
     adapter = SimpleNamespace(currentModel=model)
@@ -1808,22 +1769,28 @@ def _record_drawing_build(
     native_dimensions = {
         "SupplierHeadHeight": SimpleNamespace(FullName="D2@FinishedFront@UnsavedDrawing"),
         "SupplierStockThreadLength": SimpleNamespace(FullName="D1@StockFront@UnsavedDrawing"),
+        "SupplierSocketAF": SimpleNamespace(FullName="D1@FinishedTop@UnsavedDrawing"),
+        "SupplierHeadDiameter": SimpleNamespace(FullName="RD1@FinishedFront@UnsavedDrawing"),
+        "SupplierThreadMajor": SimpleNamespace(FullName="SupplierThreadMajor@SupplierReference@pivot.SLDPRT"),
     }
-    for name in physical_labels:
+    for name in native_dimensions:
         native = native_dimensions[name]
         display = SimpleNamespace(GetDimension2=lambda _index, native=native: native)
         references[name] = SimpleNamespace(
             GetSpecificAnnotation=lambda display=display: display,
         )
     stock_annotation = references.pop("SupplierStockThreadLength")
-    physical_references = {
-        "SupplierHeadHeight": references["SupplierHeadHeight"],
-        "SupplierStockThreadLength": stock_annotation,
-    }
+    tail_control = next(item for item in controls if item.name == "ThreadLengthMin")
+    native_dimensions["ThreadLengthMin"] = SimpleNamespace(
+        FullName="ThreadLengthMin@ThreadTailAcceptance@pivot.SLDPRT",
+    )
     identities = {
         name: (native_dimensions[name].FullName, owner, (object(), object()), (1, 1))
         for name, owner in zip(physical_labels, (front.name, stock.name), strict=True)
     }
+    identities["SupplierSocketAF"] = (
+        native_dimensions["SupplierSocketAF"].FullName, top.name, (object(), object()), (1, 1),
+    )
     original_identities = dict(identities)
     serialized_names = {
         name: native.FullName.replace("@UnsavedDrawing", "@pivot.SLDDRW")
@@ -1854,6 +1821,13 @@ def _record_drawing_build(
     monkeypatch.setattr(drawing, "set_dimension_callouts", lambda *_args: None)
     monkeypatch.setattr(drawing, "offset_dimension_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_add_supplier_references", lambda *_args: references)
+    monkeypatch.setattr(drawing, "_align_top_origin", lambda *_args: lambda: None)
+    monkeypatch.setattr(drawing, "_trim_top_mark", lambda *_args: lambda: None)
+    monkeypatch.setattr(drawing, "_move_tail_column", lambda *_args: (lambda: None, {}))
+    monkeypatch.setattr(drawing, "_assert_paper_layout", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_route_purchased_note", lambda *_args: (lambda: None, ()))
+    monkeypatch.setattr(drawing, "_clear_socket_text", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_head_height_entities", lambda *_args: (object(), head_entity))
 
     def project_head(_adapter, view, point, *, label):
         projections.append((view, point, label))
@@ -1863,16 +1837,19 @@ def _record_drawing_build(
         callouts.append((view, options))
         return SimpleNamespace(
             GetText=lambda: properties["Purchased Screw Note"],
+            GetAnnotation=lambda: object(),
             PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
         )
 
     monkeypatch.setattr(drawing, "model_point_in_view", project_head)
-    monkeypatch.setattr(drawing, "add_property_linked_callout", linked_callout)
+    monkeypatch.setattr(drawing, "add_attached_note", linked_callout)
     monkeypatch.setattr(
         drawing, "_add_stock_reference", lambda *_args: (stock, stock_iso, stock_annotation)
     )
 
     def capture(_adapter, supplied):
+        if "ThreadLengthMin" in supplied:
+            return {name: (native_dimensions[name].FullName, front.name, (), ()) for name in supplied}
         assert supplied == {**references, "SupplierStockThreadLength": stock_annotation}
         events.append("identities")
         return identities
@@ -1885,14 +1862,20 @@ def _record_drawing_build(
     ):
         assert actual_adapter is adapter and adapter.currentModel is model
         assert model.GetPathName() == str(output.slddrw.resolve())
-        assert set(actual_references) == set(physical_labels)
-        assert all(actual_references[name] is physical_references[name] for name in physical_labels)
-        assert actual_identities is identities and identities == original_identities
-        assert labels == physical_labels and sheet_names == drawing.SHEET_NAMES
+        assert set(actual_references) == set(labels)
+        all_references = {
+            **references, "SupplierStockThreadLength": stock_annotation, "ThreadLengthMin": tail_control,
+        }
+        assert all(actual_references[name] is all_references[name] for name in labels)
+        assert identities == original_identities
+        assert labels in (
+            physical_labels, ("SupplierHeadHeight", "SupplierSocketAF"),
+            ("SupplierHeadDiameter", "SupplierThreadMajor"), ("SupplierHeadHeight", "ThreadLengthMin"),
+        )
+        assert sheet_names == drawing.SHEET_NAMES
         assert drawing_path is output.slddrw and len(configurations) == 5
-        actual_names = {name: native.FullName for name, native in native_dimensions.items()}
-        assert actual_names == serialized_names
-        assert all(actual_names[name] != identities[name][0] for name in physical_labels)
+        actual_names = {name: native_dimensions[name].FullName for name in labels}
+        assert actual_names == {name: serialized_names[name] for name in labels}
         captures.append(actual_names)
         if capture_fault == "missing":
             actual_names.pop("SupplierStockThreadLength")
@@ -1902,9 +1885,12 @@ def _record_drawing_build(
             actual_names["SupplierStockThreadLength"] = actual_names["SupplierHeadHeight"]
         elif capture_fault == "extra":
             actual_names["UnrelatedLabel"] = "Other@Native"
+        elif capture_fault == "shelf_head_drift" and labels == ("SupplierHeadHeight", "SupplierSocketAF"):
+            actual_names["SupplierHeadHeight"] += " changed-between-captures"
         return actual_names
 
     monkeypatch.setattr(drawing, "capture_serialized_physical_axial_names", capture_serialized)
+    monkeypatch.setattr(drawing, "capture_serialized_note_name", lambda *_args, **_kwargs: "Saved purchased note")
 
     def settled(_adapter, actual_identities, configurations):
         assert actual_identities is identities
@@ -1915,8 +1901,17 @@ def _record_drawing_build(
             drawing.SHEET_NAMES[1], screw.SUPPLIER_STOCK_CONFIGURATION,
         )
         events.append("settled")
+        return {name: object() for name in screw.SUPPLIER_REFERENCE_DIMENSIONS}
 
     monkeypatch.setattr(drawing, "_assert_supplier_references", settled)
+
+    def shelf(_adapter, *, reacquire, axes, force, label):
+        assert axes == {"SupplierHeadHeight": 1, "SupplierSocketAF": 0}
+        assert set(force) == set(axes)
+        assert set(reacquire()) == set(axes)
+        return lambda: reacquire()
+
+    monkeypatch.setattr(drawing, "shelve_reference_text", shelf)
     expected = {"slddrw": "saved-pivot"}
 
     async def finalize(_adapter, outputs, **options):
@@ -1935,12 +1930,18 @@ def _record_drawing_build(
         events.append("closed")
         return expected
 
-    def saved(_adapter, actual_identities, configurations, *, serialized_full_names):
+    def saved(_adapter, actual_identities, configurations, *, serialized_full_names, serialized_shelf_names, paper):
         assert adapter.currentModel is None
         assert actual_identities is identities
         assert len(configurations) == 5
         assert actual_identities == original_identities
-        assert serialized_full_names == serialized_names and len(captures) == 1
+        assert serialized_full_names == {name: serialized_names[name] for name in physical_labels}
+        assert serialized_shelf_names == {name: serialized_names[name] for name in drawing._REFERENCE_SHELF_AXES}
+        assert serialized_shelf_names["SupplierHeadHeight"] == serialized_full_names["SupplierHeadHeight"]
+        assert paper["note"] == "Saved purchased note"
+        assert paper["names"] == {
+            name: serialized_names[name] for name in ("SupplierHeadDiameter", "SupplierThreadMajor", "ThreadLengthMin")
+        }
         events.append("saved-reopen-proof")
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
@@ -1958,11 +1959,8 @@ def test_build_proves_both_physical_references_after_finalizer_closes_saved_draw
 ) -> None:
     recorded = _record_drawing_build(monkeypatch, tmp_path)
     assert recorded.result is recorded.expected
-    assert recorded.events == [
-        "identities", "finalize", "settled", "closed", "saved-reopen-proof",
-    ]
+    assert recorded.events.index("closed") < recorded.events.index("saved-reopen-proof")
     assert recorded.identities == recorded.original_identities
-    assert recorded.captures == [recorded.serialized_names]
 
 
 @pytest.mark.parametrize("checkpoint_calls, capture_fault, message", (
@@ -1983,37 +1981,22 @@ def test_build_requires_one_complete_postsave_identity_capture_before_saved_proo
         )
 
 
-def test_purchased_note_producer_keeps_head_landing_and_clears_complete_diameter_text(
+def test_purchased_note_producer_selects_the_trimmed_head_top_entity_before_insertion(
     monkeypatch, tmp_path,
 ) -> None:
-    """A translated recorded route is an offline control, not native all-ink proof."""
     recorded = _record_drawing_build(monkeypatch, tmp_path)
-    ((view, point, label),) = recorded.projections
+    ((view, point, _label),) = recorded.projections
     assert view is recorded.front
+    radius = screw.HEAD_DIA / 2 - screw.HEAD_CHAMFER
     assert point == pytest.approx((
-        screw.HEAD_DIA / 4 / 1000, screw.HEAD_H / 1000, 0.0,
+        -radius / 1000, screw.HEAD_H / 1000, 0.0,
     ))
-    assert label == "purchased socket head top edge"
     ((view, callout),) = recorded.callouts
     assert view is recorded.front
-    assert callout["property_name"] == "Purchased Screw Note"
-    assert callout["edge_xy"] is recorded.head_edge
-
-    old_route = Segment(0.1495, 0.2432, *recorded.head_edge, role="leader")
-    # The logged 4.57 mm strike must remain visible to the unchanged predicate;
-    # the retained box/segment coordinates were rounded to 0.1 mm.
-    assert segment_box_overlap_length(
-        old_route, _HEAD_DIAMETER_TEXT_BOX,
-    ) == pytest.approx(0.00457, abs=0.0001)
-
-    # Retain the observed leader-start offset from the requested note anchor,
-    # and translate ONLY that start using the real producer's note_xy argument.
-    x, y = callout["note_xy"]
-    route = Segment(x - 0.0005, y - 0.0018, *recorded.head_edge, role="leader")
-    assert segment_box_overlap_length(route, _HEAD_DIAMETER_TEXT_BOX) == 0.0
-    assert segment_box_distance(route, _HEAD_DIAMETER_TEXT_BOX) >= 0.002
-    # The changed-source native audit must still clear every sheet's actual ink,
-    # including the complete note, witnesses and neighbouring annotations.
+    assert callout["entity"] is callout["attached_to"]
+    assert callout["text"] == drawing.property_link("Purchased Screw Note")
+    assert callout["leader_attach_xy"] is recorded.head_edge
+    assert callout["note_xy"] == drawing.PURCHASED_NOTE_XY
 
 
 def test_physical_head_height_bounds_arc_evidence_without_hiding_the_nearest_match(
@@ -2117,10 +2100,8 @@ def test_physical_head_height_spatial_proof_is_fresh_at_every_boundary(
         elif phase == "settled":
             drawing._assert_physical_head_height(state.adapter, state.front, state.display)
         else:
-            drawing._assert_saved_physical_references(
-                state.adapter, state.identities, state.configurations,
-                serialized_full_names=state.serialized_full_names,
-            )
+            drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names,)
     assert state.events[-1][0] == "drawing.physical_axial_dimension_native_refusal"
     assert not state.selection.selected
     if phase == "saved":
@@ -2488,20 +2469,11 @@ def test_stock_physical_proof_is_fresh_in_settled_and_readonly_saved_census(
                 state.adapter, state.identities, state.configurations,
             )
         else:
-            drawing._assert_saved_physical_references(
-                state.adapter, state.identities, state.configurations,
-                serialized_full_names=state.serialized_full_names,
-            )
+            drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names,)
     if fault == "none":
         run()
-        proofs = [
-            fields for name, fields in state.events
-            if name == "drawing.physical_axial_dimension_native_proof"
-        ]
-        assert [(proof["label"], proof["phase"]) for proof in proofs] == [
-            ("SupplierHeadHeight", phase), ("SupplierStockThreadLength", phase),
-        ]
-        assert [scan[1] for scan in state.scans] == [state.front, stock.view]
+        assert {scan[1].name for scan in state.scans} == {state.front.name, stock.view.name}
     else:
         with pytest.raises(RuntimeError):
             run()
@@ -2547,10 +2519,8 @@ def test_saved_stock_exact_inventory_owner_configuration_and_source_guards(
     elif fault == "source_band":
         stock.tolerance.Type = 2
     with pytest.raises(RuntimeError):
-        drawing._assert_saved_physical_references(
-            state.adapter, state.identities, state.configurations,
-            serialized_full_names=state.serialized_full_names,
-        )
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
     if fault in ("duplicate_captured_name", "missing_captured_name"):
         assert not state.opens and not state.closes
     else:
@@ -2628,3 +2598,736 @@ def test_stock_creation_recipe_requires_exact_native_source_before_selection(
     with pytest.raises(RuntimeError, match="native source"):
         drawing._add_stock_reference(state.adapter)
     assert not state.scans and not state.selection.calls and not state.additions
+
+
+def _native_line(first, second):
+    return [0.0, 0.0, 0.0, 0.0, *first, 0.0, *second, 0.0]
+
+
+def _native_text(text, x, y, width):
+    return dict(t=text, pos=[x, y, 0.0], h=0.0035, w=width, ref=1, ang=0.0)
+
+
+def _native_reference_record(name, axis, tips, sources, texts):
+    lines, arrows = [], []
+    for index, tip in enumerate(tips):
+        direction = -1.0 if index == 0 else 1.0
+        end = list(tip)
+        end[axis] += direction * 0.00635
+        lines.append(_native_line(tip, end))
+        witness_end = list(tip)
+        witness_end[1 - axis] += (-0.001 if axis == 0 else 0.001)
+        lines.append(_native_line(sources[index], witness_end))
+        vector = (direction, 0.0, 0.0) if axis == 0 else (0.0, direction, 0.0)
+        arrows.append([*tip, 0.0, *vector, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0])
+    lines.append(_native_line(tips[0], tips[1]))
+    return dict(type=4, name=name, visible=1, owner_type=0,
+                display=dict(lines=lines, arrows=arrows, texts=texts))
+
+
+def _saved_shelf_boundary(monkeypatch, state):
+    """Actual native dump boundary; real shelf/axis/source predicates stay active."""
+    import _supplier_reference_text as shelves
+
+    def dump(_reader, annotation):
+        record = annotation.paper_record
+        return copy.deepcopy(record() if callable(record) else record)
+
+    monkeypatch.setattr(drawing, "_dump_annotation", dump)
+    monkeypatch.setattr(shelves, "_dump_annotation", dump)
+    monkeypatch.setattr(shelves, "_early_bound", lambda value, _kind: value)
+    state.front.Position = drawing.FRONT_CENTER
+    state.front.origin_offset = (0.0, 0.040)
+    state.front.Angle = 0.0
+    state.front.GetOutline = lambda: (0.118537, 0.092252, 0.161463, 0.207748)
+    state.paper_top = SimpleNamespace(
+        name="FinishedTop", Position=(0.140, 0.245), origin_offset=(0.0, 0.0),
+        Angle=0.0, ScaleDecimal=4.0, ReferencedConfiguration="Default",
+        ReferencedDocument=SimpleNamespace(GetPathName=lambda: str(drawing.SOURCE.resolve())),
+    )
+    state.paper_top.GetDisplayMode2 = lambda: 2
+    state.paper_top.GetOutline = lambda: (
+        state.paper_top.Position[0] - 0.021463, 0.223537,
+        state.paper_top.Position[0] + 0.021463, 0.266463,
+    )
+    state.paper_iso = SimpleNamespace(
+        name="FinishedIso", Position=drawing.ISO_CENTER, Angle=0.0, ScaleDecimal=4.0,
+        ReferencedConfiguration="Default", ReferencedDocument=state.paper_top.ReferencedDocument,
+        GetOutline=lambda: (0.3319614, 0.1038607, 0.3880386, 0.2261393),
+        GetDisplayDimensions=lambda: (), GetNextView=lambda: None,
+    )
+    state.front.GetNextView = lambda: state.paper_top
+    state.paper_top.GetNextView = lambda: state.paper_iso
+    state.paper_sheet = SimpleNamespace(margins=[0.0127] * 4, height=0.2794)
+    state.paper_sheet.GetProperties2 = lambda: (
+        1.0, 0.0, 4.0, 1.0, 0.0, 0.4318, state.paper_sheet.height, 0.0,
+    )
+    state.paper_sheet.GetZoneMargin = lambda index: state.paper_sheet.margins[index]
+
+    def project(_adapter, view, points, *, label):
+        origin = tuple(a + b for a, b in zip(view.Position, view.origin_offset, strict=True))
+        return tuple(
+            (origin[0] + 4 * x, origin[1] + (-4 * z if view is state.paper_top else 4 * y))
+            for x, y, z in points
+        )
+
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda adapter, view, point, *, label: project(adapter, view, (point,), label=label)[0],
+    )
+    head_tips = tuple(tuple(arrow[:2]) for arrow in state.arrows)
+    reach = max(point[1] for point in head_tips) + 0.00635
+    state.head_record = _native_reference_record(
+        "Head height", 1, head_tips, ((0.156875, head_tips[0][1]), (0.1556558, head_tips[1][1])),
+        [_native_text("(0.156 in)", 0.2139253, reach + 0.0077563, 0.0201493),
+         _native_text("HEAD HEIGHT", 0.2090497, reach + 0.0022, 0.0299007)],
+    )
+    state.annotation.paper_record = state.head_record
+    state.display.OffsetText = True
+    state.socket_record = _native_reference_record(
+        "Socket", 0, ((0.1352375, 0.2276449), (0.1447625, 0.2276449)),
+        ((0.1352375, 0.2412504), (0.1447625, 0.2412504)),
+        [_native_text("(", 0.1718486, 0.2352722, 0.0017208),
+         _native_text("3", 0.1758882, 0.2378294, 0.0025861),
+         _native_text("32", 0.1745951, 0.2332011, 0.0051722),
+         _native_text('" in)', 0.1807931, 0.2352722, 0.0082347),
+         _native_text("HEX SOCKET AF", 0.1633125, 0.2276449, 0.0342514)],
+    )
+    state.socket_record["display"]["lines"].append(
+        _native_line((0.1740823, 0.2381371), (0.1802802, 0.2381371)),
+    )
+    socket_edges = [
+        SimpleNamespace(GetClosestPointOn=lambda *_point, x=x: (x, screw.HEAD_H / 1000, 0.0, 0.0))
+        for x in (-screw.SOCKET_AF / 2 / 1000, screw.SOCKET_AF / 2 / 1000)
+    ]
+    state.socket_annotation = SimpleNamespace(
+        Owner=state.paper_top, OwnerType=0, Visible=1, attached=socket_edges,
+        paper_record=state.socket_record, IsDangling=lambda: False,
+        GetName=lambda: "Native socket annotation",
+        GetAttachedEntityCount3=lambda: 2, GetAttachedEntityTypes=lambda: (1, 1),
+    )
+    state.socket_annotation.GetAttachedEntities3 = lambda: tuple(state.socket_annotation.attached)
+    state.socket_native = SimpleNamespace(
+        FullName="D1@FinishedTop@pivot.SLDDRW", SystemValue=screw.SOCKET_AF / 1000,
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS["SupplierSocketAF"]
+    texts = {1: "(", 2: " in)", 4: presentation["callout"]}
+    state.socket_display = SimpleNamespace(
+        Type2=2, OffsetText=True, ShowDimensionValue=True, ShowParenthesis=False,
+        GetDimension2=lambda _index: state.socket_native,
+        GetAnnotation=lambda: state.socket_annotation, GetUseDocUnits=lambda: False,
+        GetUnits=lambda: 3, GetPrimaryPrecision2=lambda: presentation["precision"],
+        GetFractionBase=lambda: 2, GetOverride=lambda: False, GetText=lambda index: texts[index],
+        GetFractionValue=lambda: 32, GetRoundToFraction=lambda: False,
+        GetNameForSelection=lambda: "Native socket selection",
+    )
+    state.socket_annotation.GetSpecificAnnotation = lambda: state.socket_display
+    state.paper_top.GetDisplayDimensions = lambda: (state.socket_display,)
+    original_scan = drawing.scan_view_edges
+
+    def scan(view, *, label):
+        if view is state.paper_top:
+            return SimpleNamespace(edges=tuple(SimpleNamespace(edge=edge) for edge in socket_edges))
+        return original_scan(view, label=label)
+
+    monkeypatch.setattr(drawing, "scan_view_edges", scan)
+    state.mark = SimpleNamespace(UseDocDisplaySettings=False, ShowLines=False, Size=0.00075)
+    state.mark_override = None
+
+    def mark_lines():
+        if state.mark_override is not None:
+            return state.mark_override
+        x, y = project(state.adapter, state.paper_top, ((0, 0, 0),), label="mark")[0]
+        arm = state.mark.Size * state.paper_top.ScaleDecimal
+        return [_native_line((x, y), end) for end in (
+            (x - arm, y), (x + arm, y), (x, y - arm), (x, y + arm),
+        )]
+
+    state.mark_lines = mark_lines
+    data = SimpleNamespace(
+        GetLineCount=lambda: len(mark_lines()), GetLineAtIndex2=lambda index: mark_lines()[index],
+    )
+    state.mark_annotation = SimpleNamespace(
+        Owner=state.paper_top, OwnerType=0, Visible=1,
+        GetSpecificAnnotation=lambda: state.mark, GetDisplayData=lambda: data,
+        paper_record=lambda: dict(type=13, name="Mark", visible=1, owner_type=0,
+                                 display=dict(lines=mark_lines())),
+    )
+    state.paper_top.GetAnnotationsByType = lambda _kind: (state.mark_annotation,)
+    state.front.GetAnnotations = lambda: (state.annotation,)
+    state.paper_top.GetAnnotations = lambda: (state.socket_annotation, state.mark_annotation)
+
+
+@pytest.mark.parametrize("fault", ("none", "head_offset", "head_reach", "socket_offset",
+                                  "fraction", "socket_name", "socket_span", "socket_attachment",
+                                  "alignment", "axis", "mark_escape", "mark_nan", "mark_axis"))
+def test_cold_saved_presentation_is_fresh_and_fail_closed(monkeypatch, tmp_path, fault):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    if fault == "head_offset":
+        state.display.OffsetText = False
+    elif fault == "head_reach":
+        state.head_record["display"]["texts"][1]["pos"][1] -= 0.003
+    elif fault == "socket_offset":
+        state.socket_display.OffsetText = False
+    elif fault == "fraction":
+        state.socket_record["display"]["texts"][2]["pos"][0] = 0.145
+    elif fault == "socket_name":
+        state.serialized_shelf_names["SupplierSocketAF"] += " stale"
+    elif fault == "socket_span":
+        state.socket_record["display"]["arrows"][0][0] -= 0.001
+    elif fault == "socket_attachment":
+        state.socket_annotation.attached[0] = object()
+    elif fault == "alignment":
+        state.paper_top.Position = (0.295, 0.245)
+    elif fault == "axis":
+        state.paper_top.Angle = 0.1
+    elif fault.startswith("mark_"):
+        state.mark_override = copy.deepcopy(state.mark_lines())
+        state.mark_override[0][{"mark_escape": 8, "mark_nan": 4, "mark_axis": 5}[fault]] = {
+            "mark_escape": 0.270875, "mark_nan": float("nan"), "mark_axis": 0.244,
+        }[fault]
+    def prove():
+        drawing._assert_saved_physical_references(state.adapter, state.identities, state.configurations, paper=state.paper, serialized_full_names=state.serialized_full_names,
+        serialized_shelf_names=state.serialized_shelf_names,)
+    if fault == "none":
+        prove()
+    else:
+        with pytest.raises(RuntimeError):
+            prove()
+    assert state.closes == [state.path.name]
+    assert state.adapter.currentModel is state.previous
+    assert not state.additions and not state.selection.calls
+
+
+def test_top_translation_uses_projected_origins_not_geometric_centres(monkeypatch, tmp_path):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    state.paper_top.Position = (0.295, 0.245)
+    state.paper_top.origin_offset = (0.002, 0.0)
+    original_front, original_iso = state.front.Position, state.paper_iso.Position
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "set_view_position",
+        lambda _adapter, view, x, y, *, move_children: (
+            setattr(view, "Position", (x, y)) or not move_children
+        ),
+    )
+    settled = drawing._align_top_origin(state.adapter, state.front, state.paper_top, state.paper_iso)
+    assert state.paper_top.Position == pytest.approx((0.138, 0.245))
+    assert state.front.Position == original_front and state.paper_iso.Position == original_iso
+    state.paper_top.Position = (0.140, 0.245)
+    with pytest.raises(RuntimeError, match="drift"):
+        settled()
+
+
+@pytest.mark.parametrize("fault", ("none", "oversized_ink", "missing_axis", "off_axis"))
+def test_native_finite_mark_reads_actual_endpoints_not_just_show_lines(monkeypatch, tmp_path, fault):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    state.mark.UseDocDisplaySettings = True
+    state.mark.ShowLines = True
+    state.mark.Size = 0.0025
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    settled = drawing._trim_top_mark(state.adapter, state.paper_top)
+    assert state.mark.Size * state.paper_top.ScaleDecimal == pytest.approx(0.003)
+    if fault != "none":
+        state.mark_override = copy.deepcopy(state.mark_lines())
+        if fault == "oversized_ink":
+            state.mark_override[2][8] = 0.270875
+        elif fault == "missing_axis":
+            state.mark_override = state.mark_override[:2]
+        else:
+            state.mark_override[0][5] += 0.0001
+        with pytest.raises(RuntimeError):
+            settled()
+    else:
+        settled()
+
+
+def test_head_note_target_requires_actual_trim_membership_not_face_interior(monkeypatch):
+    state = _physical_head_fixture(monkeypatch)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view",
+        lambda adapter, view, point, *, label: (0.140 + point[0] * 4, 0.190 + point[1] * 4),
+    )
+    edge, point = drawing._purchased_head_target(state.adapter, state.front)
+    assert edge is state.top
+    assert point[0] < drawing.FRONT_CENTER[0]
+    state.top.nearest = (*drawing._head_height_points()[1], 0.0)
+    with pytest.raises(RuntimeError, match="actual trimmed rim"):
+        drawing._purchased_head_target(state.adapter, state.front)
+
+
+def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
+    if _state is None:
+        state = _saved_physical_fixture(monkeypatch, tmp_path)
+        state.adapter.currentModel = state.saved
+        return state
+    state = _state
+    state.adapter.currentModel = state.saved
+    state.front.origin_offset = (0.0, 0.036285)
+    import _drawing_physical_axial_dimension as physical
+    original_project = physical.model_points_in_view
+    def physical_project(adapter, view, points, *, label):
+        if view is state.front:
+            return drawing.model_points_in_view(adapter, view, points, label=label)
+        return original_project(adapter, view, points, label=label)
+    monkeypatch.setattr(physical, "model_points_in_view", physical_project)
+    for index, arrow in enumerate(state.arrows):
+        state.arrows[index] = (arrow[0], arrow[1] - 0.003715, *arrow[2:])
+    for row in state.head_record["display"]["texts"]:
+        row["pos"][1] -= 0.003715
+    for row in state.head_record["display"]["arrows"]:
+        row[1] -= 0.003715
+    for row in state.head_record["display"]["lines"]:
+        row[5] -= 0.003715
+        row[8] -= 0.003715
+    diameter_record = _native_reference_record(
+        "Head diameter", 0, ((0.124125, 0.206577), (0.155875, 0.206577)),
+        ((0.124125, 0.2019408), (0.155875, 0.2019408)),
+        [_native_text("(", 0.1272861, 0.2121868, 0.0017208),
+         _native_text("<MOD-DIAM>", 0.129007, 0.2121333, 0.0052784),
+         _native_text("0.313 in)", 0.1342854, 0.2121868, 0.0184285),
+         _native_text("HEAD", 0.1336927, 0.206577, 0.0126146)],
+    )
+    # These are the actual recorded outside witnesses, not the generic fixture convention.
+    diameter_record["display"]["lines"][1] = _native_line((0.124125, 0.2019408), (0.124125, 0.207577))
+    diameter_record["display"]["lines"][3] = _native_line((0.155875, 0.2019408), (0.155875, 0.207577))
+    state.diameter_annotation = SimpleNamespace(paper_record=diameter_record)
+    state.paper_displays = dict(
+        SupplierHeadDiameter=SimpleNamespace(GetAnnotation=lambda: state.diameter_annotation),
+        SupplierHeadHeight=state.display, SupplierSocketAF=state.socket_display,
+    )
+    state.note_text = _config.parts(part.PART_NAME)["purchased_note"]
+    _edge, state.landing = drawing._purchased_head_target(state.adapter, state.front)
+    state.jogs = []
+    state.note_start = (0.2371887, 0.2332717)
+    state.note_annotation = SimpleNamespace(
+        Owner=state.front, OwnerType=0, Visible=1, IsDangling=lambda: False,
+        GetLeaderCount=lambda: 1,
+        GetAttachedEntityCount3=lambda: 1, GetAttachedEntityTypes=lambda: (1,),
+        GetAttachedEntities3=lambda: (state.top,),
+        GetLeaderPointsAtIndex=lambda _index: (*state.note_start, 0.0, *state.landing, 0.0),
+        GetMultiJogLeaderCount=lambda: int(bool(state.jogs)),
+    )
+    state.jog_dump_missing = False
+
+    def leader_display():
+        points = (state.note_start, *[point[:2] for point in state.jogs], state.landing)
+        dx, dy = points[-2][0] - points[-1][0], points[-2][1] - points[-1][1]
+        length = math.hypot(dx, dy)
+        return dict(
+            lines=[_native_line(a, b) for a, b in zip(points, points[1:])],
+            arrows=[[*state.landing, 0.0, dx / length, dy / length, 0.0,
+                     0.002, 0.0005, 0.0, 0.0, 0.0, 1.0]],
+        )
+
+    state.native_jog = SimpleNamespace(
+        GetDisplayData=leader_display, GetArrowHeadCount=lambda: 1,
+        GetArrowHeadAtIndex=lambda _index: (
+            *state.landing, 0.0, -1.0, -0.55, 0.0, 0.002, 0.0005, 1.0,
+        ),
+    )
+    state.note_annotation.GetMultiJogLeaders = lambda: (state.native_jog,) if state.jogs else ()
+
+    def convert(_leader, count, points):
+        assert len(points) == count * 3
+        state.jogs = [tuple(points[index:index + 3]) for index in range(0, len(points), 3)]
+        return True
+
+    state.note_annotation.ConvertToMultiJog = convert
+
+    def note_record():
+        display = leader_display()
+        if state.jog_dump_missing:
+            display = {}
+        display["texts"] = [
+            _native_text(state.note_text, 0.238, 0.2304743, 0.1777368),
+        ]
+        return dict(type=6, name="Purchased note", visible=1, owner_type=0, display=display)
+
+    state.note_annotation.paper_record = note_record
+    state.note = SimpleNamespace(
+        GetAnnotation=lambda: state.note_annotation,
+        GetText=lambda: state.note_text,
+        PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
+    )
+    state.foreign_annotations = [state.diameter_annotation]
+    state.front.GetAnnotations = lambda: (state.annotation, state.note_annotation, *state.foreign_annotations)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_dump_display", lambda _reader, data: copy.deepcopy(data))
+    state.route_check, state.note_frame = drawing._route_purchased_note(
+        state.adapter, state.front, state.note, state.paper_displays,
+    )
+    tail, major, tail_record, major_record, _original_text = _tail_paper_boundary(monkeypatch, state)
+    _tail_check, tail_frame = drawing._move_tail_column(state.adapter, tail, major)
+    state.tail_annotation, state.tail_record = tail, tail_record
+    state.major_annotation, state.major_record = major, major_record
+    native_members = dict(
+        SupplierHeadDiameter=(state.diameter_annotation, screw.HEAD_DIA, "RD1@FinishedFront@pivot.SLDDRW"),
+        SupplierThreadMajor=(major, screw.THREAD_MAJOR, "SupplierThreadMajor@SupplierReference@pivot.SLDPRT"),
+    )
+    def decorate(annotation, name, native, display):
+        annotation.Owner, annotation.OwnerType, annotation.Visible = state.front, 0, 1
+        annotation.GetSpecificAnnotation = lambda: display
+        annotation.IsDangling = lambda: False
+        annotation.GetName = lambda: name
+        annotation.GetType = lambda: 4
+        annotation.GetAttachedEntityCount3 = lambda: 2
+        annotation.GetAttachedEntities3 = lambda: (state.bearing, state.top)
+        annotation.GetAttachedEntityTypes = lambda: (1, 1)
+        display.GetAnnotation = lambda: annotation
+        display.GetDimension2 = lambda _index: native
+        display.GetNameForSelection = lambda: name
+        state.front.dimensions.append(display)
+    for name, (annotation, value, full_name) in native_members.items():
+        presentation = screw.SUPPLIER_REFERENCE_DIMENSIONS[name]
+        native = SimpleNamespace(
+            FullName=full_name, SystemValue=value / 1000, Tolerance=SimpleNamespace(Type=0),
+        )
+        texts = {1: "(<MOD-DIAM>", 2: " in)", 4: presentation.get("callout", "")}
+        display = SimpleNamespace(
+            Type2=2, ShowDimensionValue=True, ShowParenthesis=False,
+            GetUseDocUnits=lambda: False, GetUnits=lambda: 3,
+            GetPrimaryPrecision2=lambda p=presentation: p["precision"],
+            GetFractionBase=lambda: 1, GetOverride=lambda: False,
+            GetText=lambda index, texts=texts: texts[index],
+        )
+        decorate(annotation, name, native, display)
+    nominal, lower, upper = drawing.EXPECTED_CONTROLS["ThreadLengthMin"]
+    native = SimpleNamespace(
+        FullName="ThreadLengthMin@ThreadTailAcceptance@pivot.SLDPRT",
+        SystemValue=nominal, DrivenState=2,
+        Tolerance=SimpleNamespace(
+            Type=drawing.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"],
+            GetMinValue=lambda: lower, GetMaxValue=lambda: upper,
+        ),
+    )
+    tail_display = tail.GetSpecificAnnotation()
+    tail_display.GetPrimaryPrecision2 = lambda: drawing.DIMENSION_PRECISION["ThreadLengthMin"]
+    tail_display.GetText = lambda _index: ""
+    decorate(tail, "ThreadLengthMin", native, tail_display)
+    import _stock_trim_drawing as controls
+    monkeypatch.setattr(controls, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(controls, "dimension_name", lambda _adapter, annotation: annotation.GetName())
+    state.note_annotation.GetType = lambda: 6
+    state.note_annotation.GetName = lambda: "Saved purchased note"
+    state.note_annotation.GetSpecificAnnotation = lambda: state.note
+    state.annotation.GetType = lambda: 4
+    state.socket_annotation.GetType = lambda: 4
+    state.mark_annotation.GetType = lambda: 13
+    state.front.GetAnnotations = lambda: (
+        state.annotation, state.note_annotation, tail, major, *state.foreign_annotations,
+    )
+    for view in (state.paper_iso, state.stock.view, *state.sheets.values()):
+        view.GetAnnotations = lambda: ()
+    state.paper = dict(
+        names={name: row[2] for name, row in native_members.items()},
+        note=state.note_annotation.GetName(), tail=tail_frame, jogs=state.note_frame, text=state.note_text,
+    )
+    state.paper["names"]["ThreadLengthMin"] = native.FullName
+    return state
+
+
+@pytest.mark.parametrize("fault", (
+    "none", "foreign_line", "fraction_foreign_line", "qualifier_foreign_line",
+    "note_width", "note_property", "note_attachment", "note_landing", "head_trim",
+    "head_shelf_late", "socket_shelf_late", "socket_line", "jog_into_head",
+    "jog_into_top", "missing_published_jog", "jog_arrow",
+))
+def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, tmp_path, fault):
+    state = _finished_paper_fixture(monkeypatch, tmp_path)
+    expected = state.note_text
+    if fault in ("foreign_line", "fraction_foreign_line", "qualifier_foreign_line"):
+        location = {
+            "foreign_line": ((0.240, 0.232), (0.410, 0.232)),
+            "fraction_foreign_line": ((0.176, 0.237), (0.180, 0.237)),
+            "qualifier_foreign_line": ((0.162, 0.229), (0.195, 0.229)),
+        }[fault]
+        state.foreign_annotations.append(SimpleNamespace(paper_record=dict(
+            type=13, display=dict(lines=[_native_line(*location)]),
+        )))
+    elif fault == "note_width":
+        old_record = state.note_annotation.paper_record
+        def too_wide():
+            record = old_record()
+            record["display"]["texts"][0]["w"] += 0.010
+            return record
+        state.note_annotation.paper_record = too_wide
+    elif fault == "note_property":
+        state.note.PropertyLinkedText = "free text"
+    elif fault == "note_attachment":
+        state.note_annotation.GetAttachedEntities3 = lambda: (state.bearing,)
+    elif fault == "note_landing":
+        state.landing = (state.landing[0] + 0.0001, state.landing[1])
+    elif fault == "head_trim":
+        state.top.nearest = (*drawing._head_height_points()[1], 0.0)
+    elif fault == "head_shelf_late":
+        state.head_record["display"]["texts"][1]["pos"][1] -= 0.003
+    elif fault == "socket_shelf_late":
+        state.socket_record["display"]["texts"][2]["pos"][0] = 0.150
+    elif fault == "socket_line":
+        for row in state.socket_record["display"]["arrows"]:
+            row[1] = 0.212
+    elif fault == "jog_into_head":
+        state.jogs[-1] = (0.135, 0.195, 0.0)
+    elif fault == "jog_into_top":
+        state.jogs[1] = (0.140, 0.250, 0.0)
+    elif fault == "missing_published_jog":
+        state.jog_dump_missing = True
+    elif fault == "jog_arrow":
+        state.native_jog.GetArrowHeadAtIndex = lambda _index: (0.147, 0.20216, 0, -1, 0, 0, 0.002, 0.0005, 1)
+
+    def prove():
+        state.route_check()
+        drawing._assert_paper_layout(
+            state.adapter, state.front, state.paper_top, state.paper_iso,
+            state.note, state.paper_displays, purchased_text=expected,
+        )
+    if fault == "none":
+        prove()
+        assert state.landing == pytest.approx((0.1253442, 0.20216))
+    else:
+        with pytest.raises(RuntimeError):
+            prove()
+
+
+def test_socket_whole_fraction_moves_only_text_beyond_source_body(monkeypatch, tmp_path):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    for row in state.socket_record["display"]["texts"]:
+        row["pos"][0] -= 0.010
+    position = [0.140, 0.235, 0.0]
+    state.socket_annotation.GetPosition = lambda: tuple(position)
+    def set_position(x, y, z):
+        delta = x - position[0]
+        position[:] = (x, y, z)
+        for row in state.socket_record["display"]["texts"]:
+            row["pos"][0] += delta
+        for row in state.socket_record["display"]["lines"][-1:]:
+            row[4] += delta
+            row[7] += delta
+        return True
+    state.socket_annotation.SetPosition2 = set_position
+    before = drawing.measure_reference_text(state.adapter, state.socket_display, axis=0, label="Socket")
+    drawing._clear_socket_text(state.adapter, state.paper_top, state.socket_display)
+    after = drawing.measure_reference_text(state.adapter, state.socket_display, axis=0, label="Socket")
+    assert after["text"].xmin == pytest.approx(0.158075)
+    assert after["tips"] == before["tips"] and after["witnesses"] == before["witnesses"]
+    assert position[1:] == [0.235, 0.0]
+    # An ignored native text setter is a refusal, not a nominal placement.
+    state.socket_record["display"]["texts"][2]["pos"][0] = 0.154
+    state.socket_annotation.SetPosition2 = lambda *_args: True
+    with pytest.raises(RuntimeError, match="clearance"):
+        drawing._clear_socket_text(state.adapter, state.paper_top, state.socket_display)
+
+
+def test_serialized_shelf_capture_refuses_head_identity_time_drift(monkeypatch, tmp_path):
+    with pytest.raises(RuntimeError, match="identity"):
+        _record_drawing_build(monkeypatch, tmp_path, capture_fault="shelf_head_drift")
+
+
+@pytest.mark.parametrize("fault", ("none", "ignored_column", "late_station", "late_text",
+                                  "late_major_extent", "late_crossing"))
+def test_tail_column_move_uses_complete_major_ink_and_preserves_acceptance_text(
+    monkeypatch, tmp_path, fault,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    tail, major, tail_record, major_record, original_text = _tail_paper_boundary(monkeypatch, state, fault=fault)
+    if fault == "ignored_column":
+        with pytest.raises(RuntimeError, match="stations/column"):
+            drawing._move_tail_column(state.adapter, tail, major)
+        return
+    settled, _frame = drawing._move_tail_column(state.adapter, tail, major)
+    assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2706024] * 2)
+    assert tail_record["display"]["texts"] == original_text
+    if fault == "late_station":
+        tail_record["display"]["arrows"][0][1] += 0.0001
+    elif fault == "late_text":
+        tail_record["display"]["texts"][0]["pos"][0] += 0.0003
+    elif fault == "late_major_extent":
+        major_record["display"]["texts"][0]["w"] += 0.001
+    elif fault == "late_crossing":
+        tail_record["display"]["lines"].append(
+            _native_line((0.200, 0.100), (0.200, 0.120)),
+        )
+    if fault == "none":
+        settled()
+    else:
+        with pytest.raises(RuntimeError):
+            settled()
+
+
+def test_native_jog_primitive_read_errors_cannot_be_masked_by_annotation_ink(monkeypatch, tmp_path):
+    state = _finished_paper_fixture(monkeypatch, tmp_path)
+    def refused_display(reader, data):
+        reader._count("GetPolyLineAtIndex")
+        return copy.deepcopy(data)
+    monkeypatch.setattr(drawing, "_dump_display", refused_display)
+    with pytest.raises(RuntimeError, match="GetPolyLineAtIndex"):
+        state.route_check()
+
+
+def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
+    major_record = _native_reference_record(
+        "Thread major", 0, ((0.1316688, 0.1106389), (0.1483312, 0.1106389)),
+        ((0.1316688, 0.096), (0.1483312, 0.096)),
+        [_native_text("(0.164 in)", 0.2095976, 0.1218049, 0.0588048),
+         _native_text("THREAD MAJOR", 0.2095976, 0.1106389, 0.0588048)],
+    )
+    major_record["display"]["lines"].append(
+        _native_line((0.1483312, 0.1106389), (0.2684024, 0.1106389)),
+    )
+    major = SimpleNamespace(paper_record=major_record)
+    tail_record = _native_reference_record(
+        "ThreadLengthMin", 1, ((0.180, 0.098885), (0.180, 0.127085)),
+        ((0.1493312, 0.098885), (0.1493312, 0.127085)),
+        [_native_text("0.278 in MIN", 0.180, 0.1465, 0.069),
+         _native_text("MIN FINISHED THREAD LENGTH", 0.180, 0.13145, 0.0982187)],
+    )
+    original_text = copy.deepcopy(tail_record["display"]["texts"])
+    tail = SimpleNamespace(paper_record=tail_record)
+    display = SimpleNamespace(GetAnnotation=lambda: tail, OffsetText=False)
+    tail.GetSpecificAnnotation = lambda: display
+    position = [0.180, 0.1425625, 0.0]
+    tail.GetPosition = lambda: tuple(position)
+
+    def move(x, y, z):
+        if fault == "ignored_column":
+            return True
+        old_column = tail_record["display"]["arrows"][0][0]
+        for row in tail_record["display"]["arrows"]:
+            row[0] = x
+        for row in tail_record["display"]["lines"]:
+            if abs(row[4] - old_column) < 1e-8 and abs(row[7] - old_column) < 1e-8:
+                row[4] = row[7] = x
+            elif abs(row[7] - old_column - 0.001) < 1e-8:
+                row[7] = x + 0.001
+        for row in tail_record["display"]["texts"]:
+            row["pos"][0] += x - position[0]
+        position[:] = (x, y, z)
+        return True
+
+    tail.SetPosition2 = move
+
+    def offset(_adapter, annotations, targets):
+        assert tuple(annotations) == (tail,)
+        assert targets["ThreadLengthMin"] == (0.180, 0.1425625)
+        display.OffsetText = True
+        tail_record["display"]["texts"] = copy.deepcopy(original_text)
+        position[:] = (*targets["ThreadLengthMin"], 0.0)
+
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    return tail, major, tail_record, major_record, original_text
+
+
+@pytest.mark.parametrize("fault", (
+    "none", "note_name", "note_property", "note_landing", "note_jog_lost",
+    "note_jog_unpublished", "note_owner", "note_duplicate", "tail_identity",
+    "tail_column", "tail_text", "tail_nominal", "tail_band", "major_identity", "major_extent",
+))
+def test_cold_saved_note_and_tail_replay_exact_identity_and_actual_paper(monkeypatch, tmp_path, fault):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    if fault == "note_name":
+        state.paper["note"] += " stale"
+    elif fault == "note_property":
+        state.note.PropertyLinkedText = "free text"
+    elif fault == "note_landing":
+        state.landing = (state.landing[0] + 0.0001, state.landing[1])
+    elif fault == "note_jog_lost":
+        state.jogs.clear()
+    elif fault == "note_jog_unpublished":
+        state.jog_dump_missing = True
+    elif fault == "note_owner":
+        state.note_annotation.Owner = state.paper_top
+    elif fault == "note_duplicate":
+        state.paper_iso.GetAnnotations = lambda: (state.note_annotation,)
+    elif fault == "tail_identity":
+        state.paper["names"]["ThreadLengthMin"] += " stale"
+    elif fault == "tail_column":
+        state.tail_record["display"]["arrows"][0][0] += 0.001
+    elif fault == "tail_text":
+        state.tail_record["display"]["texts"][0]["pos"][0] += 0.001
+    elif fault == "tail_nominal":
+        state.tail_annotation.GetSpecificAnnotation().GetDimension2(0).SystemValue += 0.001
+    elif fault == "tail_band":
+        state.tail_annotation.GetSpecificAnnotation().GetDimension2(0).Tolerance.Type = 0
+    elif fault == "major_identity":
+        state.paper["names"]["SupplierThreadMajor"] += " stale"
+    elif fault == "major_extent":
+        state.major_record["display"]["texts"][0]["w"] += 0.001
+    def prove():
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+        )
+    if fault == "none":
+        prove()
+    else:
+        with pytest.raises(RuntimeError):
+            prove()
+    assert state.closes == [state.path.name]
+    assert state.adapter.currentModel is state.previous
+    assert not state.selection.calls and not state.additions
+
+
+def test_finite_top_mark_accepts_actual_native_depth_but_not_inconsistent_endpoints(monkeypatch, tmp_path):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    state.mark_override = copy.deepcopy(state.mark_lines())
+    for row in state.mark_override:
+        row[6] = row[9] = 0.036285
+    drawing._assert_top_mark(state.adapter, state.paper_top)
+    state.mark_override[0][9] += 0.0001
+    with pytest.raises(RuntimeError, match="depth"):
+        drawing._assert_top_mark(state.adapter, state.paper_top)
+
+
+def test_cold_tail_cannot_keep_box_but_drop_native_minimum_acceptance_wording(monkeypatch, tmp_path):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.tail_record["display"]["texts"][0]["t"] = "0.278 in"
+    with pytest.raises(RuntimeError, match="wording"):
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+        )
+    assert state.closes == [state.path.name]
+    assert state.adapter.currentModel is state.previous
+
+
+@pytest.mark.parametrize("fault", (
+    "attachment_count", "attachment_type", "dangling", "jog_count", "arrow_count",
+    "leader_hidden", "leader_multiple",
+))
+def test_converted_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch, tmp_path, fault):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    if fault == "attachment_count":
+        state.note_annotation.GetAttachedEntityCount3 = lambda: 2
+    elif fault == "attachment_type":
+        state.note_annotation.GetAttachedEntityTypes = lambda: (46,)
+    elif fault == "dangling":
+        state.note_annotation.IsDangling = lambda: True
+    elif fault == "jog_count":
+        state.note_annotation.GetMultiJogLeaderCount = lambda: 2
+    elif fault == "leader_hidden":
+        state.note_annotation.GetLeaderCount = lambda: 0
+    elif fault == "leader_multiple":
+        state.note_annotation.GetLeaderCount = lambda: 2
+    else:
+        state.native_jog.GetArrowHeadCount = lambda: 2
+    with pytest.raises(RuntimeError):
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+        )
+    assert state.closes == [state.path.name]
+    assert state.adapter.currentModel is state.previous

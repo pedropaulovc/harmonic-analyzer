@@ -4,6 +4,12 @@ Keep original identities for settled checks. Capture the actual serialized
 FullNames from those same annotations only after successful saves/audit, at
 ``before_drawing_close``; cold reopening must find those exact names before
 running the independent saved physical and presentation proofs.
+
+The finished sheet aligns actual projected origins without rotating the part.
+Its two forced text shelves preserve native physical stations; the purchased
+note names the exact trimmed head-top rim. Finite native centre-mark ink and
+fresh complete-text/foreign-line checks remain required after final rebuilds.
+These local readbacks do not replace coordinator PDF and machinist qualification.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name, place_view, set_view_position, view_name,
 )
@@ -27,13 +34,16 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_leader_notes import add_property_linked_callout
+from _drawing_layout_audit import _Reader, _dump_annotation, _dump_display
+from _drawing_serialized_note_identity import capture_serialized_note_name
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_physical_axial_dimension import (
     add_native_physical_axial_dimension,
@@ -45,11 +55,19 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _mcmaster_90325a174 import TIP_CHAMFER
+from _layout_audit import (
+    _segment_crossing, _segment_enters_box, annotation_geometry, calibrate_sheet_advance, display_box,
+)
+from _layout_geometry import Box, Segment, point_segment_distance, segment_box_distance
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
+)
+from _supplier_reference_text import (
+    measure_reference_text,
+    shelve_reference_text,
 )
 from pd_vn_transgear_pivot_screw_spec import (
     CHAMFER_ANGLE,
@@ -129,17 +147,21 @@ CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
 # The reference length's four lines stand wholly left of its dimension line
 # (73 mm wide), so neither its arrows nor its extension lines strike them.
 CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
-# The purchased-screw note flags the unmodified head and shoulder. Keep its
-# head-top landing fixed; place the note farther into the right field so its
-# straight leader bypasses the complete head-diameter text envelope.
-HEAD_PICK_MM = (HEAD_DIA / 4, HEAD_H, 0.0)
-PURCHASED_NOTE_XY = (0.190, 0.245)
+# The note names the actual left extremum of the upper trimmed rim. A native
+# measured multi-jog route exits above the head chamfer, below the left HD
+# witness, then passes between the settled head-height shelf and socket line.
+_HEAD_TOP_R = HEAD_DIA / 2 - HEAD_CHAMFER
+HEAD_PICK_MM = (-_HEAD_TOP_R, HEAD_H, 0.0)
+PURCHASED_NOTE_XY = (0.238, 0.235)
 # Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.360, 0.165)
 STOCK_CENTER = (0.180, 0.155)
 STOCK_ISO_CENTER = (0.325, 0.165)
 TOP_CENTER = (0.295, 0.245)
+_REFERENCE_SHELF_AXES = {"SupplierHeadHeight": 1, "SupplierSocketAF": 0}
+_PAPER_GAP_M = 0.002
+_MARK_ARM_M = 0.003
 # The cutting controls verify_machining_controls re-reads. CutLength, the
 # fit-up length, still drives the facing cut but prints as a reference.
 EXPECTED_CONTROLS = {
@@ -351,7 +373,7 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
         (
             "SupplierSocketAF", top,
             (-SOCKET_AF / 2, HEAD_H, 0.0), (SOCKET_AF / 2, HEAD_H, 0.0),
-            (TOP_CENTER[0], 0.212), "horizontal", "EDGE",
+            (TOP_CENTER[0], TOP_CENTER[1] - 0.010), "horizontal", "EDGE",
         ),
     ):
         picks = model_points_in_view(
@@ -359,6 +381,8 @@ def _add_supplier_references(adapter: Any, front: Any, top: Any) -> dict[str, An
             [tuple(value / 1000 for value in point) for point in (first, second)],
             label=name,
         )
+        if name == "SupplierSocketAF":
+            text_xy = (sum(point[0] for point in picks) / 2, text_xy[1])
         display = add_edge_dimension(
             adapter, view, p0=picks[0], p1=picks[1], text_xy=text_xy,
             label=name, orientation=orientation, entity_type=entity_type,
@@ -605,15 +629,18 @@ def _supplier_reference_identities(adapter: Any, references: dict[str, Any]) -> 
     return identities
 
 
-def _assert_supplier_references(adapter: Any, identities: dict, configurations: dict) -> None:
+def _assert_supplier_references(adapter: Any, identities: dict, configurations: dict) -> dict[str, Any]:
     """Fresh post-rebuild value/precision/band/identity/count/configuration checks."""
     if set(identities) != set(SUPPLIER_REFERENCE_DIMENSIONS):
         raise RuntimeError("supplier reference coverage is incomplete")
     required = {record[0]: name for name, record in identities.items()}
     counts = {name: 0 for name in identities}
+    displays = {}
     found_views = set()
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name in SHEET_NAMES:
+    # Complete the census on FINISHED: native text must not be read from an
+    # inactive finished sheet after the source-stock visit.
+    for sheet_name in reversed(SHEET_NAMES):
         if not drawing.ActivateSheet(sheet_name):
             raise RuntimeError(f"cannot activate settled sheet {sheet_name}")
         sheet_view = _early_bound(drawing.GetFirstView(), "IView")
@@ -673,15 +700,19 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                 ):
                     raise RuntimeError(f"{name}: native source attachment changed")
                 _assert_supplier_tolerance(display, name)
+                displays[name] = display
             view = view.GetNextView()
     if found_views != set(configurations) or any(count != 1 for count in counts.values()):
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
+    return displays
 
 
 @_telemetry.traced("drawing.pivot_physical_references_saved")
 def _assert_saved_physical_references(
     adapter: Any, identities: dict, configurations: dict, *,
     serialized_full_names: dict[str, str],
+    serialized_shelf_names: dict[str, str],
+    paper: dict[str, Any],
 ) -> None:
     """Cold-read exact serialized names, then prove BOTH physical sizes afresh."""
     names = ("SupplierHeadHeight", "SupplierStockThreadLength")
@@ -694,6 +725,12 @@ def _assert_saved_physical_references(
             "physical references: missing, extra, empty or duplicate serialized FullNames; "
             f"expected labels={names!r}, serialized_full_names={serialized_full_names!r}"
         )
+    if (
+        set(serialized_shelf_names) != set(_REFERENCE_SHELF_AXES)
+        or any(not isinstance(value, str) or not value for value in serialized_shelf_names.values())
+        or len(set(serialized_shelf_names.values())) != 2
+    ):
+        raise RuntimeError("reference shelves: missing, extra, empty or duplicate serialized FullNames")
     required = {serialized_full_names[name]: name for name in names}
     path = OUTPUTS.slddrw.resolve()
     if not path.is_file():
@@ -727,6 +764,9 @@ def _assert_saved_physical_references(
             raise RuntimeError("SupplierHeadHeight: saved sheet census changed")
         expected_original_full_names = {name: identities[name][0] for name in names}
         matches = {name: [] for name in names}
+        shelf_required = {full_name: name for name, full_name in serialized_shelf_names.items()}
+        shelf_matches = {name: [] for name in _REFERENCE_SHELF_AXES}
+        saved_views = {}
         inventory = []
         inventory_errors = []
         document = {}
@@ -757,6 +797,8 @@ def _assert_saved_physical_references(
                 inventory.append(record)
                 try:
                     record["view"] = view_name(adapter, view)
+                    if not is_sheet_view:
+                        saved_views.setdefault(record["view"], []).append((sheet_name, view))
                     record["configuration"] = view.ReferencedConfiguration
                     source = view.ReferencedDocument
                     record["source_document_null"] = source is None
@@ -796,6 +838,9 @@ def _assert_saved_physical_references(
                         name = required.get(full_name)
                         if name is not None:
                             matches[name].append((sheet_name, view, display))
+                        shelf_name = shelf_required.get(full_name)
+                        if shelf_name is not None:
+                            shelf_matches[shelf_name].append((sheet_name, view, display))
                     except Exception as error:
                         item.setdefault("errors", []).append(f"{type(error).__name__}: {error}")
                         inventory_errors.append(error)
@@ -883,6 +928,9 @@ def _assert_saved_physical_references(
                 adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name],
             )
             _assert_supplier_tolerance(display, name)
+            if name == "SupplierHeadHeight":
+                # Fresh saved display only; no live shelf closure crosses close.
+                _assert_text_shelf(adapter, display, axis=1, label=name)
             actual_circles = tuple(
                 tuple(float(value) for value in _early_bound(
                     _early_bound(edge, "IEdge").GetCurve(), "ICurve"
@@ -905,6 +953,53 @@ def _assert_saved_physical_references(
                     "drawing.pivot_stock_length_proof", measured_stock_thread_length_mm=measured,
                     **common,
                 )
+        if any(len(found) != 1 for found in shelf_matches.values()):
+            raise RuntimeError("reference shelves: saved exact FullName census changed")
+        if serialized_shelf_names["SupplierHeadHeight"] != serialized_full_names["SupplierHeadHeight"]:
+            raise RuntimeError("reference shelves: saved physical head identity disagrees")
+        if set(saved_views) != set(configurations) or any(len(found) != 1 for found in saved_views.values()):
+            raise RuntimeError("saved paper: actual view census changed")
+        fresh_views = {}
+        for owner, found in saved_views.items():
+            sheet_name, view = found[0]
+            if (sheet_name, str(view.ReferencedConfiguration)) != configurations[owner]:
+                raise RuntimeError("saved paper: native view configuration changed")
+            source = view.ReferencedDocument
+            source_path = "" if source is None else str(_early_bound(source, "IModelDoc2").GetPathName() or "")
+            if not source_path or not Path(source_path).is_absolute() or Path(source_path).resolve() != SOURCE.resolve():
+                raise RuntimeError("saved paper: native source document changed")
+            fresh_views[owner] = view
+        if not drawing.ActivateSheet(SHEET_NAMES[0]):
+            raise RuntimeError("saved paper: cannot activate finished sheet")
+        for name, axis in _REFERENCE_SHELF_AXES.items():
+            sheet_name, view, display = shelf_matches[name][0]
+            annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+            if (
+                sheet_name != SHEET_NAMES[0] or view_name(adapter, view) != identities[name][1]
+                or int(annotation.OwnerType) != 0 or int(app.IsSame(annotation.Owner, view)) != 1
+                or bool(annotation.IsDangling())
+            ):
+                raise RuntimeError(f"{name}: saved shelf owner/attachment changed")
+            assert_supplier_reference_dimension(
+                adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name],
+            )
+            _assert_supplier_tolerance(display, name)
+            _assert_text_shelf(adapter, display, axis=axis, label=name)
+        top = fresh_views[identities["SupplierSocketAF"][1]]
+        front = fresh_views[identities["SupplierHeadHeight"][1]]
+        pictorials = [
+            view for owner, view in fresh_views.items()
+            if configurations[owner][0] == SHEET_NAMES[0]
+            and owner not in (identities["SupplierSocketAF"][1], identities["SupplierHeadHeight"][1])
+        ]
+        if len(pictorials) != 1:
+            raise RuntimeError("saved paper: finished pictorial census changed")
+        _assert_socket_source(adapter, top, shelf_matches["SupplierSocketAF"][0][2])
+        _assert_top_origin(adapter, front, top, pictorials[0])
+        _assert_top_mark(adapter, top)
+        _assert_saved_paper(
+            adapter, front, top, pictorials[0], shelf_matches=shelf_matches, paper=paper,
+        )
     finally:
         try:
             reopened = app.GetOpenDocumentByName(path_string)
@@ -923,6 +1018,635 @@ def _assert_saved_physical_references(
                     raise RuntimeError("SupplierHeadHeight: reopened saved drawing did not close")
         finally:
             adapter.currentModel = previous
+
+def _assert_saved_paper(adapter: Any, front: Any, top: Any, iso: Any, *, shelf_matches: dict, paper: dict) -> None:
+    """Fresh cold native paper proof using only exact serialized IDs and scalars."""
+    labels = {"SupplierHeadDiameter", "SupplierThreadMajor", "ThreadLengthMin"}
+    names = paper["names"]
+    if set(names) != labels or len(set(names.values())) != len(labels) or any(
+        not isinstance(value, str) or not value for value in names.values()
+    ) or not isinstance(paper["note"], str) or not paper["note"]:
+        raise RuntimeError("saved paper: incomplete exact serialized identity")
+    found = {name: [] for name in labels}
+    for raw in front.GetDisplayDimensions() or ():
+        display = _early_bound(raw, "IDisplayDimension")
+        full_name = _early_bound(display.GetDimension2(0), "IDimension").FullName
+        for name, expected in names.items():
+            if full_name == expected:
+                found[name].append(display)
+    if any(len(matches) != 1 for matches in found.values()):
+        raise RuntimeError("saved paper: exact serialized dimension census changed")
+    fresh = {name: matches[0] for name, matches in found.items()}
+    for name, display in fresh.items():
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if int(annotation.OwnerType) != 0 or int(adapter.swApp.IsSame(annotation.Owner, front)) != 1 or annotation.IsDangling():
+            raise RuntimeError(f"{name}: saved paper native owner/attachment changed")
+        if name != "ThreadLengthMin":
+            assert_supplier_reference_dimension(adapter, display, label=name, **SUPPLIER_REFERENCE_DIMENSIONS[name])
+            _assert_supplier_tolerance(display, name)
+    model = _early_bound(adapter.currentModel, "IDrawingDoc")
+    notes = []
+    for sheet_name in SHEET_NAMES:
+        if not model.ActivateSheet(sheet_name):
+            raise RuntimeError("saved paper: cannot activate native note census sheet")
+        view = model.GetFirstView()
+        while view is not None:
+            view = _early_bound(view, "IView")
+            for raw in view.GetAnnotations() or ():
+                annotation = _early_bound(raw, "IAnnotation")
+                if int(annotation.GetType()) == 6 and annotation.GetName() == paper["note"]:
+                    notes.append((sheet_name, view, annotation))
+            view = view.GetNextView()
+    if not model.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("saved paper: cannot activate finished sheet for native text reads")
+    if len(notes) != 1:
+        raise RuntimeError("saved paper: exact serialized purchased note census changed")
+    sheet_name, owner, annotation = notes[0]
+    if (
+        sheet_name != SHEET_NAMES[0] or int(adapter.swApp.IsSame(owner, front)) != 1
+        or int(annotation.OwnerType) != 0 or int(adapter.swApp.IsSame(annotation.Owner, front)) != 1
+    ):
+        raise RuntimeError("saved paper: exact purchased note owner changed")
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    landing = _purchased_head_target(adapter, front)[1]
+    _assert_note_route(adapter, note, landing=landing, jogs=paper["jogs"])
+    tail = fresh["ThreadLengthMin"].GetAnnotation()
+    verify_machining_controls(
+        adapter, [tail], expected={"ThreadLengthMin": EXPECTED_CONTROLS["ThreadLengthMin"]},
+        tolerance_types=DIMENSION_TOLERANCE_TYPES, precision=DIMENSION_PRECISION,
+    )
+    _assert_tail_layout(adapter, tail, fresh["SupplierThreadMajor"].GetAnnotation(), frame=paper["tail"])
+    _assert_paper_layout(
+        adapter, front, top, iso, note,
+        {**fresh, **{name: matches[0][2] for name, matches in shelf_matches.items()}},
+        purchased_text=paper["text"],
+    )
+
+
+
+def _paper_annotation(adapter: Any, annotation: Any, *, label: str) -> dict[str, Any]:
+    """Complete native fragments and strokes, never INote's leader-inclusive extent."""
+    reader = _Reader(adapter)
+    record = _dump_annotation(reader, annotation)
+    if record is not None and int(record.get("type", 0)) == 6:
+        native = _early_bound(annotation, "IAnnotation")
+        jogs = tuple(native.GetMultiJogLeaders() or ())
+        if len(jogs) != int(native.GetMultiJogLeaderCount()):
+            raise RuntimeError(f"{label}: native multi-jog inventory changed")
+        for jog in jogs:
+            data = _dump_display(reader, _early_bound(jog, "IMultiJogLeader").GetDisplayData())
+            jog_record = dict(type=6, display=data)
+            actual = annotation_geometry(jog_record, owner=label, advance=calibrate_sheet_advance((jog_record,)))
+            # The unchanged full-sheet collector reads this annotation's display,
+            # not IMultiJogLeader. Refuse if any real jog ink would be absent there.
+            native_record = dict(type=6, display=record["display"])
+            published = annotation_geometry(
+                native_record, owner=label, advance=calibrate_sheet_advance((native_record,)),
+            )
+            if not actual.segments or any(
+                not all(math.isfinite(value) for value in (run.x0, run.y0, run.x1, run.y1))
+                or not any(
+                    point_segment_distance((run.x0, run.y0), candidate) <= 1e-7
+                    and point_segment_distance((run.x1, run.y1), candidate) <= 1e-7
+                    for candidate in published.segments
+                )
+                for run in actual.segments
+            ):
+                raise RuntimeError(f"{label}: actual multi-jog strokes missing from native annotation dump")
+    errors = reader.take_errors()
+    if record is None or errors:
+        raise RuntimeError(f"{label}: unreadable native paper geometry: {errors}")
+    for row in (record.get("display") or {}).get("texts") or ():
+        if (
+            len(row.get("pos") or ()) != 3
+            or not all(math.isfinite(float(value)) for value in row["pos"])
+            or any(
+                row.get(key) is None or not math.isfinite(float(row[key]))
+                or float(row[key]) <= 0
+                for key in ("w", "h")
+            )
+            or row.get("ang") is None or not math.isfinite(float(row["ang"]))
+        ):
+            raise RuntimeError(f"{label}: incomplete native text fragment")
+    geometry = annotation_geometry(record, owner=label, advance=calibrate_sheet_advance((record,)))
+    if geometry is None or any(
+        not all(math.isfinite(value) for value in (run.x0, run.y0, run.x1, run.y1))
+        for run in geometry.segments
+    ):
+        raise RuntimeError(f"{label}: non-finite or absent native paper geometry")
+    return record
+
+
+def _finished_border(adapter: Any) -> Box:
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
+    properties = tuple(float(value) for value in sheet.GetProperties2())
+    margins = tuple(float(sheet.GetZoneMargin(index)) for index in range(4))
+    if (
+        len(properties) != 8 or not all(map(math.isfinite, (*properties, *margins)))
+        or properties[4] != 0 or any(value < 0 for value in margins)
+    ):
+        raise RuntimeError("finished sheet: invalid native third-angle border")
+    top, bottom, right, left = margins  # swZoneMargin_e
+    border = Box(left, bottom, properties[5] - right, properties[6] - top)
+    if border.width <= 0 or border.height <= 0:
+        raise RuntimeError("finished sheet: empty native inner border")
+    return border
+
+
+def _align_top_origin(adapter: Any, front: Any, top: Any, iso: Any) -> Any:
+    """Translate only Top.X by the measured model-origin projection difference."""
+    views = tuple(_early_bound(view, "IView") for view in (front, top, iso))
+    before = []
+    for view in views:
+        state = (tuple(float(value) for value in view.Position),
+                 float(view.ScaleDecimal), float(view.Angle))
+        if len(state[0]) != 2 or not all(map(math.isfinite, (*state[0], *state[1:]))):
+            raise RuntimeError("Top alignment: unreadable native view placement")
+        before.append(state)
+    front_origin = model_point_in_view(adapter, front, (0.0, 0.0, 0.0), label="Front model origin")
+    top_origin = model_point_in_view(adapter, top, (0.0, 0.0, 0.0), label="Top model origin")
+    target = (before[1][0][0] + front_origin[0] - top_origin[0], before[1][0][1])
+    if not set_view_position(adapter, top, *target, move_children=False):
+        raise RuntimeError("Top alignment: native view translation failed")
+    rebuild_drawing(adapter, label="align pivot Top model origin")
+
+    def settled() -> None:
+        for index, view in enumerate(views):
+            position, scale, angle = before[index]
+            expected = target if index == 1 else position
+            actual = tuple(float(value) for value in view.Position)
+            if (
+                len(actual) != 2 or not all(map(math.isfinite, actual))
+                or math.dist(actual, expected) > 1e-8
+                or not math.isclose(float(view.ScaleDecimal), scale, abs_tol=1e-12, rel_tol=0)
+                or not math.isclose(float(view.Angle), angle, abs_tol=1e-12, rel_tol=0)
+            ):
+                raise RuntimeError("Top alignment: native position, scale or rotation drift")
+        _assert_top_origin(adapter, front, top, iso)
+
+    settled()
+    return settled
+
+
+def _trim_top_mark(adapter: Any, top: Any) -> Any:
+    """Keep the real native mark, with finite measured ink on the projected axis."""
+    top = _early_bound(top, "IView")
+    marks = tuple(top.GetAnnotationsByType(13) or ())  # swCenterMark
+    scale = float(top.ScaleDecimal)
+    if len(marks) != 1 or not math.isfinite(scale) or scale <= 0:
+        raise RuntimeError("Top centre mark: expected one native mark and positive actual scale")
+    mark = _early_bound(_early_bound(marks[0], "IAnnotation").GetSpecificAnnotation(), "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = False
+    mark.Size = _MARK_ARM_M / scale
+    rebuild_drawing(adapter, label="finite pivot Top centre mark")
+
+    _assert_top_mark(adapter, top)
+    return lambda: _assert_top_mark(adapter, top)
+
+
+def _assert_top_origin(adapter: Any, front: Any, top: Any, iso: Any) -> None:
+    """Read-only origin/axis/outline proof, usable with fresh cold-saved views."""
+    origins = []
+    for view in (front, top):
+        origin, x_axis = model_points_in_view(
+            adapter, view, ((0.0, 0.0, 0.0), (0.001, 0.0, 0.0)), label="native projection axis",
+        )
+        if (
+            not all(math.isfinite(value) for point in (origin, x_axis) for value in point)
+            or abs(x_axis[0] - origin[0] - 0.004) > 1e-8
+            or abs(x_axis[1] - origin[1]) > 1e-8
+        ):
+            raise RuntimeError("Top alignment: actual model X axis is not horizontal at native scale")
+        origins.append(origin)
+    if abs(origins[0][0] - origins[1][0]) > 1e-8 or origins[1][1] <= origins[0][1]:
+        raise RuntimeError("Top alignment: projected model origins are not third-angle aligned")
+    z_axis = model_point_in_view(adapter, top, (0.0, 0.0, 0.001), label="native Top Z axis")
+    if (
+        not all(map(math.isfinite, z_axis)) or abs(z_axis[0] - origins[1][0]) > 1e-8
+        or abs(z_axis[1] - origins[1][1] + 0.004) > 1e-8
+    ):
+        raise RuntimeError("Top alignment: actual Top model Z axis changed")
+    border = _finished_border(adapter)
+    for view in (front, top, iso):
+        view = _early_bound(view, "IView")
+        box = Box(*(float(value) for value in view.GetOutline()))
+        if (
+            not all(map(math.isfinite, (box.xmin, box.ymin, box.xmax, box.ymax)))
+            or box.width <= 0 or box.height <= 0
+            or not math.isclose(float(view.ScaleDecimal), 4.0, abs_tol=1e-12, rel_tol=0)
+            or not math.isclose(float(view.Angle), 0.0, abs_tol=1e-12, rel_tol=0)
+            or box.xmin < border.xmin or box.xmax > border.xmax
+            or box.ymin < border.ymin or box.ymax > border.ymax
+        ):
+            raise RuntimeError("Top alignment: actual view outline/scale/rotation changed")
+
+
+def _assert_top_mark(adapter: Any, top: Any) -> None:
+    top = _early_bound(top, "IView")
+    current = tuple(top.GetAnnotationsByType(13) or ())
+    scale = float(top.ScaleDecimal)
+    if len(current) != 1 or not math.isfinite(scale) or scale <= 0:
+        raise RuntimeError("Top centre mark: native mark census/scale changed")
+    annotation = _early_bound(current[0], "IAnnotation")
+    native = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
+    if (
+        bool(native.UseDocDisplaySettings) or bool(native.ShowLines)
+        or not math.isclose(float(native.Size), _MARK_ARM_M / scale, rel_tol=0, abs_tol=1e-8)
+        or int(annotation.Visible) != 1 or int(annotation.OwnerType) != 0
+        or int(adapter.swApp.IsSame(annotation.Owner, top)) != 1
+    ):
+        raise RuntimeError("Top centre mark: finite native settings/owner did not persist")
+    origin = model_point_in_view(adapter, top, (0.0, HEAD_H / 1000, 0.0), label="Top head axis")
+    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
+    lines = [
+        tuple(float(value) for value in data.GetLineAtIndex2(index))
+        for index in range(int(data.GetLineCount()))
+    ]
+    if not lines or any(
+        len(line) != 10 or not all(map(math.isfinite, line)) for line in lines
+    ) or not all(map(math.isfinite, origin)):
+        raise RuntimeError("Top centre mark: unreadable finite native line endpoints")
+    border = _finished_border(adapter)
+    endpoints, axes = [], set()
+    depth = lines[0][6]  # Native Top display depth need not be drawing-world zero.
+    for line in lines:
+        first, second = line[4:7], line[7:10]
+        if abs(first[2] - depth) > 1e-8 or abs(second[2] - depth) > 1e-8:
+            raise RuntimeError("Top centre mark: native line endpoints disagree on display depth")
+        horizontal = abs(first[1] - origin[1]) <= 1e-8 and abs(second[1] - origin[1]) <= 1e-8
+        vertical = abs(first[0] - origin[0]) <= 1e-8 and abs(second[0] - origin[0]) <= 1e-8
+        if horizontal == vertical or math.dist(first, second) <= 1e-8:
+            raise RuntimeError("Top centre mark: line is not on the actual projected axis")
+        axes.add(0 if horizontal else 1)
+        for x, y, _z in (first, second):
+            if (
+                not border.xmin <= x <= border.xmax or not border.ymin <= y <= border.ymax
+                or max(abs(x - origin[0]), abs(y - origin[1])) > _MARK_ARM_M + 1e-5
+            ):
+                raise RuntimeError("Top centre mark: actual finite ink escapes border/arm")
+            endpoints.append((x, y))
+    bounds = Box.from_points(endpoints)
+    if axes != {0, 1} or bounds is None or any(
+        not math.isclose(actual, expected, abs_tol=1e-5, rel_tol=0)
+        for actual, expected in zip(
+            (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax),
+            (origin[0] - _MARK_ARM_M, origin[1] - _MARK_ARM_M,
+             origin[0] + _MARK_ARM_M, origin[1] + _MARK_ARM_M), strict=True,
+        )
+    ):
+        raise RuntimeError("Top centre mark: actual cross is not centred and finite")
+
+
+def _assert_socket_source(adapter: Any, top: Any, display: Any) -> None:
+    """Cold fresh exact native EDGE bijection at the two source socket stations."""
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 2 or len(attached) != 2
+        or tuple(annotation.GetAttachedEntityTypes() or ()) != (1, 1)
+        or bool(annotation.IsDangling()) or any(edge is None for edge in attached)
+        or int(adapter.swApp.IsSame(attached[0], attached[1])) != 0
+    ):
+        raise RuntimeError("SupplierSocketAF: saved exact EDGE attachment pair changed")
+    scan = scan_view_edges(top, label="saved physical socket flats")
+    resolved = []
+    for x in (-SOCKET_AF / 2, SOCKET_AF / 2):
+        point = (x / 1000, HEAD_H / 1000, 0.0)
+        matches = []
+        for candidate in scan.edges:
+            nearest = tuple(float(value) for value in (
+                _early_bound(candidate.edge, "IEdge").GetClosestPointOn(point[0], point[1], point[2]) or ()
+            )[:3])
+            if len(nearest) == 3 and all(map(math.isfinite, nearest)) and math.dist(nearest, point) <= 1e-8:
+                if not any(int(adapter.swApp.IsSame(candidate.edge, edge)) == 1 for edge in matches):
+                    matches.append(candidate.edge)
+        if len(matches) != 1:
+            raise RuntimeError("SupplierSocketAF: saved exact trimmed socket station changed")
+        resolved.append(matches[0])
+    if int(adapter.swApp.IsSame(resolved[0], resolved[1])) != 0 or any(
+        sum(int(adapter.swApp.IsSame(edge, actual)) == 1 for actual in attached) != 1
+        for edge in resolved
+    ):
+        raise RuntimeError("SupplierSocketAF: saved physical EDGE attachment bijection changed")
+    physical = measure_reference_text(adapter, display, axis=0, label="SupplierSocketAF")
+    expected = sorted(model_points_in_view(
+        adapter, top,
+        ((x / 1000, HEAD_H / 1000, 0.0) for x in (-SOCKET_AF / 2, SOCKET_AF / 2)),
+        label="actual socket width stations",
+    ))
+    if int(display.Type2) != 2 or any(
+        abs(tip[0] - point[0]) > 1e-8 for tip, point in zip(physical["tips"], expected, strict=True)
+    ) or abs(physical["tips"][1][0] - physical["tips"][0][0] - SOCKET_AF * _SHEET_PER_MODEL_MM) > 1e-8:
+        raise RuntimeError("SupplierSocketAF: saved actual horizontal native span changed")
+    outer = model_point_in_view(
+        adapter, top, (HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
+        label="saved Top actual outer perimeter",
+    )
+    if not all(map(math.isfinite, outer)) or physical["text"].xmin < outer[0] + _PAPER_GAP_M:
+        raise RuntimeError("SupplierSocketAF: saved complete native text crowds actual Top")
+
+
+def _purchased_head_target(adapter: Any, front: Any) -> tuple[Any, tuple[float, float]]:
+    """Resolve and prove the new landing on the exact existing head-top trimmed edge."""
+    edge = _head_height_entities(adapter, front)[1]
+    point = tuple(value / 1000 for value in HEAD_PICK_MM)
+    nearest = tuple(float(value) for value in (
+        _early_bound(edge, "IEdge").GetClosestPointOn(point[0], point[1], point[2]) or ()
+    )[:3])
+    if len(nearest) != 3 or not all(map(math.isfinite, nearest)) or math.dist(nearest, point) > 1e-8:
+        raise RuntimeError("Purchased Screw Note: head-top landing is not on the actual trimmed rim")
+    return edge, model_point_in_view(adapter, front, point, label="purchased physical head-top rim")
+
+
+def _assert_text_shelf(adapter: Any, display: Any, *, axis: int, label: str) -> dict[str, Any]:
+    actual = measure_reference_text(adapter, display, axis=axis, label=label)
+    text = actual["text"]
+    low = text.xmin if axis == 0 else text.ymin
+    if _early_bound(display, "IDisplayDimension").OffsetText is not True or low < actual["reach"] + _PAPER_GAP_M:
+        raise RuntimeError(f"{label}: complete native text crowds physical arrow reach")
+    return actual
+
+
+def _clear_socket_text(adapter: Any, top: Any, display: Any) -> None:
+    """Keep the forced +X shelf wholly beside the actual source head perimeter."""
+    before = _assert_text_shelf(adapter, display, axis=0, label="SupplierSocketAF")
+    outer = model_point_in_view(
+        adapter, top, (HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
+        label="Top source outer head right station",
+    )
+    if not all(map(math.isfinite, outer)):
+        raise RuntimeError("SupplierSocketAF: non-finite actual source perimeter")
+    target = outer[0] + _PAPER_GAP_M + 0.0002
+    if before["text"].xmin < target:
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if len(position) != 3 or not all(map(math.isfinite, position)) or not annotation.SetPosition2(
+            position[0] + target - before["text"].xmin, position[1], position[2],
+        ):
+            raise RuntimeError("SupplierSocketAF: cannot clear complete native text beside Top")
+        rebuild_drawing(adapter, label="socket full fraction and qualifier clear actual Top")
+    after = _assert_text_shelf(adapter, display, axis=0, label="SupplierSocketAF")
+    if after["text"].xmin < outer[0] + _PAPER_GAP_M or any(
+        math.dist(old, new) > 1e-8
+        for key in ("tips", "witnesses")
+        for old, new in zip(before[key], after[key], strict=True)
+    ):
+        raise RuntimeError("SupplierSocketAF: full native text/body clearance or physical stations changed")
+
+
+def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
+    """Move only the native tail column beyond measured major ink; retain its text."""
+    rebuild_drawing(adapter, label="measure pivot tail and thread-major ink")
+    tail = _early_bound(tail, "IAnnotation")
+    display = _early_bound(tail.GetSpecificAnnotation(), "IDisplayDimension")
+    before = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
+    original = tuple(float(value) for value in tail.GetPosition())
+    major_record = _paper_annotation(adapter, major, label="SupplierThreadMajor")
+    reach = display_box(major_record["display"])
+    if (
+        reach is None or not math.isfinite(reach.xmax)
+        or len(original) != 3 or not all(map(math.isfinite, original))
+        or display.OffsetText is not False
+    ):
+        raise RuntimeError("ThreadLengthMin: unavailable native column/major bounds")
+    column = reach.xmax + _PAPER_GAP_M + 0.0002
+    if not tail.SetPosition2(column, original[1], original[2]):
+        raise RuntimeError("ThreadLengthMin: cannot move physical column")
+    rebuild_drawing(adapter, label="pivot tail measured column")
+    offset_dimension_text(adapter, (tail,), {"ThreadLengthMin": original[:2]})
+
+    frame = dict(
+        tips=before["tips"], text=before["text"], column=column,
+        words=tuple(sorted(str(row["t"]) for row in before["record"]["display"]["texts"])),
+    )
+    def settled() -> None:
+        _assert_tail_layout(adapter, tail, major, frame=frame)
+    settled()
+    return settled, frame
+
+
+def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str, Any]) -> None:
+    """Read-only replay over fresh native annotations and scalar pre-move stations."""
+    display = _early_bound(_early_bound(tail, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    actual = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
+    column = frame["column"]
+    if display.OffsetText is not True or any(
+        abs(old[1] - new[1]) > 1e-8 or abs(new[0] - column) > 1e-8
+        for old, new in zip(frame["tips"], actual["tips"], strict=True)
+    ):
+        raise RuntimeError("ThreadLengthMin: native physical stations/column changed")
+    if max(
+        abs(getattr(frame["text"], key) - getattr(actual["text"], key))
+        for key in ("xmin", "ymin", "xmax", "ymax")
+    ) > 0.0002:
+        raise RuntimeError("ThreadLengthMin: complete acceptance text moved")
+    if tuple(sorted(str(row["t"]) for row in actual["record"]["display"]["texts"])) != frame["words"]:
+        raise RuntimeError("ThreadLengthMin: complete native acceptance wording changed")
+    current_major = _paper_annotation(adapter, major, label="SupplierThreadMajor")
+    full = display_box(current_major["display"])
+    if full is None or column < full.xmax + _PAPER_GAP_M:
+        raise RuntimeError("ThreadLengthMin: physical column crowds complete thread-major ink")
+    major_ink = annotation_geometry(
+        current_major, owner="SupplierThreadMajor", advance=calibrate_sheet_advance((current_major,)),
+    )
+    tail_ink = annotation_geometry(
+        actual["record"], owner="ThreadLengthMin", advance=calibrate_sheet_advance((actual["record"],)),
+    )
+    if any(
+        _segment_crossing(first, second) is not None
+        for first in major_ink.segments for second in tail_ink.segments
+    ) or any(
+        segment_box_distance(run, display_box({"texts": current_major["display"]["texts"]})) <= 1e-8
+        for run in tail_ink.segments
+    ):
+        raise RuntimeError("ThreadLengthMin: native ink crosses thread-major line/text")
+
+
+def _route_purchased_note(
+    adapter: Any, front: Any, note: Any, displays: dict[str, Any],
+) -> Any:
+    """Route the real attached note through measured whitespace, never a free sketch."""
+    _edge, landing = _purchased_head_target(adapter, front)
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    diameter = _paper_annotation(adapter, displays["SupplierHeadDiameter"].GetAnnotation(), label="SupplierHeadDiameter")
+    extent = display_box(diameter["display"])
+    height = _assert_text_shelf(adapter, displays["SupplierHeadHeight"], axis=1, label="SupplierHeadHeight")
+    socket = _assert_text_shelf(adapter, displays["SupplierSocketAF"], axis=0, label="SupplierSocketAF")
+    head_corner = model_point_in_view(
+        adapter, front, (-HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
+        label="actual head left chamfer station",
+    )
+    leaders = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+    if extent is None or len(leaders) < 6 or not all(map(math.isfinite, leaders)):
+        raise RuntimeError("Purchased Screw Note: unavailable native route anchors")
+    left = extent.xmin - _PAPER_GAP_M - 0.0002
+    slope = (landing[1] - head_corner[1]) / (landing[0] - head_corner[0])
+    low = height["text"].ymax + _PAPER_GAP_M + 0.0002
+    high = socket["tips"][0][1] - _PAPER_GAP_M - 0.0002
+    if not 0 < slope or not low < high or not left < head_corner[0]:
+        raise RuntimeError("Purchased Screw Note: no measured head/socket route corridor")
+    across = (low + high) / 2
+    # The shallow down-left departure stays ABOVE the actual 45-degree chamfer.
+    jogs = ((leaders[0], across, 0.0), (left, across, 0.0),
+            (left, landing[1] - (landing[0] - left) * slope * 0.55, 0.0))
+    if not annotation.ConvertToMultiJog(0, len(jogs), double_array([
+        value for point in jogs for value in point
+    ])):
+        raise RuntimeError("Purchased Screw Note: native multi-jog conversion failed")
+    rebuild_drawing(adapter, label="purchased head note measured native route")
+
+    def settled() -> None:
+        _assert_note_route(adapter, note, landing=landing, jogs=jogs)
+    settled()
+    return settled, jogs
+
+
+def _assert_note_arrow(current: Any, landing: tuple) -> None:
+    """One displayed native leader plus its actual converted leader and arrow."""
+    native_jogs = tuple(current.GetMultiJogLeaders() or ())
+    if (
+        int(current.GetLeaderCount()) != 1
+        or int(current.GetMultiJogLeaderCount()) != 1 or len(native_jogs) != 1
+    ):
+        raise RuntimeError("Purchased Screw Note: one actual multi-jog leader did not persist")
+    jog = _early_bound(native_jogs[0], "IMultiJogLeader")
+    arrow = tuple(float(value) for value in jog.GetArrowHeadAtIndex(0) or ())
+    if (
+        int(jog.GetArrowHeadCount()) != 1 or len(arrow) != 9
+        or not all(map(math.isfinite, arrow)) or math.dist(arrow[:2], landing) > 1e-8
+    ):
+        raise RuntimeError("Purchased Screw Note: actual multi-jog arrow lost its head-top landing")
+
+
+def _assert_note_route(adapter: Any, note: Any, *, landing: tuple, jogs: tuple) -> None:
+    """Read fresh native jogs/arrow and prove the shared full audit sees all ink."""
+    current = _early_bound(note.GetAnnotation(), "IAnnotation")
+    _assert_note_arrow(current, landing)
+    record = _paper_annotation(adapter, current, label="Purchased Screw Note")
+    geometry = annotation_geometry(record, owner="Purchased Screw Note", advance=calibrate_sheet_advance((record,)))
+    endpoints = [(run.x0, run.y0) for run in geometry.segments] + [
+        (run.x1, run.y1) for run in geometry.segments
+    ]
+    if any(not any(math.dist(point[:2], actual) <= 1e-5 for actual in endpoints) for point in jogs):
+        raise RuntimeError("Purchased Screw Note: native jog points did not settle")
+
+
+def _assert_paper_layout(
+    adapter: Any, front: Any, top: Any, iso: Any, note: Any, displays: dict[str, Any],
+    *, purchased_text: str,
+) -> None:
+    """Fresh owned-defect guards over complete actual native paper geometry."""
+    border = _finished_border(adapter)
+    edge, landing = _purchased_head_target(adapter, front)
+    note = _early_bound(note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if (
+        int(annotation.GetAttachedEntityCount3()) != 1 or len(attached) != 1
+        or tuple(annotation.GetAttachedEntityTypes() or ()) != (1,)
+        or attached[0] is None or int(adapter.swApp.IsSame(attached[0], edge)) != 1
+        or bool(annotation.IsDangling())
+    ):
+        raise RuntimeError("Purchased Screw Note: exact native head-top EDGE attachment changed")
+    _assert_note_arrow(annotation, landing)
+    if (
+        int(annotation.OwnerType) != 0 or int(adapter.swApp.IsSame(annotation.Owner, front)) != 1
+        or str(note.PropertyLinkedText or "") != property_link("Purchased Screw Note")
+        or str(note.GetText() or "").replace("\r", "") != purchased_text.replace("\r", "")
+    ):
+        raise RuntimeError("Purchased Screw Note: native target/owner/property text changed")
+    owned = {"Purchased Screw Note": _paper_annotation(adapter, annotation, label="Purchased Screw Note")}
+    for name, axis in _REFERENCE_SHELF_AXES.items():
+        owned[name] = _assert_text_shelf(adapter, displays[name], axis=axis, label=name)["record"]
+    foreign = []
+    for view in (front, top):
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            item = _early_bound(raw, "IAnnotation")
+            if any(
+                int(adapter.swApp.IsSame(item, target)) == 1
+                for target in (
+                    annotation, *(displays[name].GetAnnotation() for name in _REFERENCE_SHELF_AXES)
+                )
+            ):
+                continue
+            foreign.append(_paper_annotation(adapter, item, label="neighbouring finished annotation"))
+    records = [*owned.items(), *((f"neighbour {index}", record) for index, record in enumerate(foreign))]
+    for name, record in owned.items():
+        text = display_box({"texts": record["display"].get("texts") or ()})
+        if text is None or (
+            text.xmin < border.xmin or text.ymin < border.ymin
+            or text.xmax > border.xmax or text.ymax > border.ymax
+        ):
+            raise RuntimeError(f"{name}: complete native text escapes inner border")
+        for other_name, other in records:
+            if other_name == name:
+                continue
+            other_text = display_box({"texts": other["display"].get("texts") or ()})
+            geometry = annotation_geometry(other, owner=other_name, advance=calibrate_sheet_advance((other,)))
+            if (
+                other_text is not None and text.gap(other_text) < _PAPER_GAP_M
+            ) or any(segment_box_distance(run, text) < _PAPER_GAP_M for run in geometry.segments):
+                raise RuntimeError(f"{name}: complete native text crowds foreign text/line ({other_name})")
+    note_text = display_box({"texts": owned["Purchased Screw Note"]["display"]["texts"]})
+    for view in (front, top, iso):
+        box = Box(*(float(value) for value in _early_bound(view, "IView").GetOutline()))
+        if note_text.gap(box) < _PAPER_GAP_M:
+            raise RuntimeError("Purchased Screw Note: complete native text crowds a finished view")
+    top_points = model_points_in_view(
+        adapter, top,
+        ((x / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, z / 1000)
+         for x, z in ((-HEAD_DIA / 2, 0), (HEAD_DIA / 2, 0),
+                      (0, -HEAD_DIA / 2), (0, HEAD_DIA / 2))),
+        label="Top actual head perimeter",
+    )
+    body = Box.from_points(list(top_points))
+    socket = measure_reference_text(adapter, displays["SupplierSocketAF"], axis=0, label="SupplierSocketAF")
+    diameter = _paper_annotation(adapter, displays["SupplierHeadDiameter"].GetAnnotation(), label="SupplierHeadDiameter")
+    diameter_text = display_box({"texts": diameter["display"]["texts"]})
+    if (
+        body is None or diameter_text is None
+        or not all(math.isfinite(value) for point in top_points for value in point)
+        or socket["text"].gap(body) < _PAPER_GAP_M
+        or not diameter_text.ymax + _PAPER_GAP_M <= socket["tips"][0][1] <= body.ymin - 0.001
+    ):
+        raise RuntimeError("SupplierSocketAF: actual dimension line/text left the clear projected gap")
+    note_record = owned["Purchased Screw Note"]
+    note_ink = annotation_geometry(
+        note_record, owner="Purchased Screw Note", advance=calibrate_sheet_advance((note_record,)),
+    )
+    # The complete native leader/arrow must not cross ANY foreign native ink.
+    for other_name, other in records:
+        if other_name == "Purchased Screw Note":
+            continue
+        geometry = annotation_geometry(other, owner=other_name, advance=calibrate_sheet_advance((other,)))
+        text = display_box({"texts": other["display"].get("texts") or ()})
+        if any(
+            _segment_crossing(first, second) is not None
+            for first in note_ink.segments for second in geometry.segments
+        ) or text is not None and any(segment_box_distance(run, text) < _PAPER_GAP_M for run in note_ink.segments):
+            raise RuntimeError("Purchased Screw Note: complete leader crosses foreign native ink")
+    head = model_points_in_view(
+        adapter, front,
+        ((x / 1000, y / 1000, 0.0) for x, y in (
+            (-HEAD_DIA / 2, 0), (HEAD_DIA / 2, 0),
+            (HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER), (_HEAD_TOP_R, HEAD_H),
+            (-_HEAD_TOP_R, HEAD_H), (-HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER),
+        )), label="actual source head silhouette stations",
+    )
+    outline = [Segment(*first, *second) for first, second in zip(head, (*head[1:], head[0]), strict=True)]
+    for run in note_ink.segments:
+        midpoint = ((run.x0 + run.x1) / 2, (run.y0 + run.y1) / 2)
+        crosses = [
+            (edge.x1 - edge.x0) * (midpoint[1] - edge.y0)
+            - (edge.y1 - edge.y0) * (midpoint[0] - edge.x0) for edge in outline
+        ]
+        if min(crosses) > 1e-12 or any(
+            (point := _segment_crossing(run, edge)) is not None and math.dist(point, landing) > 1e-8
+            for edge in outline
+        ) or _segment_enters_box(run, body):
+            raise RuntimeError("Purchased Screw Note: actual leader enters projected head/Top body")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -963,6 +1687,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Force drawing-quality cosmetic threads on the finished projections.
     for view in (front, iso, top):
         set_hidden_lines_removed(adapter, view)
+    alignment_check = _align_top_origin(adapter, front, top, iso)
+    centre_mark_check = _trim_top_mark(adapter, top)
     # The consumed deburr sketch, the trim sketch and the hidden thread-tail
     # acceptance sketch all lie on the Front plane, so the main view carries
     # every control.
@@ -1000,22 +1726,24 @@ async def build(adapter: Any) -> dict[str, str]:
         {"ChamferWidth": CHAMFER_TEXT_XY, "CutLength": CUT_LENGTH_TEXT_XY},
     )
     supplier_refs = _add_supplier_references(adapter, front, top)
-    head_edge = model_point_in_view(
-        adapter,
-        front,
-        tuple(value / 1000 for value in HEAD_PICK_MM),
-        label="purchased socket head top edge",
+    tail_check, tail_frame = _move_tail_column(
+        adapter, by_name["ThreadLengthMin"], supplier_refs["SupplierThreadMajor"],
     )
+    head_entity, head_edge = _purchased_head_target(adapter, front)
     note = _early_bound(
-        add_property_linked_callout(
+        add_attached_note(
             adapter,
             front,
-            property_name="Purchased Screw Note",
-            edge_xy=head_edge,
+            text=property_link("Purchased Screw Note"),
+            entity=head_entity,
+            attached_to=head_entity,
+            leader_attach_xy=head_edge,
+            label="Purchased Screw Note",
             note_xy=PURCHASED_NOTE_XY,
         ),
         "INote",
     )
+    original_note_annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     printed = str(note.GetText() or "").replace("\r", "")
     if str(note.PropertyLinkedText or "") != property_link(
         "Purchased Screw Note"
@@ -1031,9 +1759,49 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     if properties["Supplier Reference Title"].replace("\r", "") != SUPPLIER_STOCK_TITLE:
         raise RuntimeError("source-stock title does not identify the original screw")
+
+    def shelf_displays() -> dict[str, Any]:
+        fresh = _assert_supplier_references(adapter, identities, configurations)
+        return {name: fresh[name] for name in _REFERENCE_SHELF_AXES}
+
+    shelf_check = shelve_reference_text(
+        adapter, reacquire=shelf_displays, axes=_REFERENCE_SHELF_AXES,
+        force=tuple(_REFERENCE_SHELF_AXES), label="pivot purchased references",
+    )
+    _clear_socket_text(adapter, top, shelf_displays()["SupplierSocketAF"])
+    note_route_check, note_frame = _route_purchased_note(
+        adapter, front, note, _assert_supplier_references(adapter, identities, configurations),
+    )
+
+    def settled_paper() -> None:
+        fresh = _assert_supplier_references(adapter, identities, configurations)
+        alignment_check()
+        centre_mark_check()
+        tail_check()
+        note_route_check()
+        verify_machining_controls(
+            adapter, [by_name[name] for name in EXPECTED_CONTROLS],
+            expected=EXPECTED_CONTROLS, tolerance_types=DIMENSION_TOLERANCE_TYPES,
+            precision=DIMENSION_PRECISION,
+        )
+        _verify_reference_length(adapter, by_name["CutLength"])
+        _assert_paper_layout(
+            adapter, front, top, iso, note, fresh,
+            purchased_text=properties["Purchased Screw Note"],
+        )
+
     physical_labels = ("SupplierHeadHeight", "SupplierStockThreadLength")
     serialized_full_names: dict[str, str] = {}
+    serialized_shelf_names: dict[str, str] = {}
     capture_called = False
+    paper_refs = {
+        "SupplierHeadDiameter": supplier_refs["SupplierHeadDiameter"],
+        "SupplierThreadMajor": supplier_refs["SupplierThreadMajor"],
+        "ThreadLengthMin": by_name["ThreadLengthMin"],
+        "SupplierHeadHeight": supplier_refs["SupplierHeadHeight"],
+    }
+    paper_identities = _supplier_reference_identities(adapter, paper_refs)
+    paper = dict(tail=tail_frame, jogs=note_frame, text=properties["Purchased Screw Note"])
 
     def checkpoint(stage: str) -> None:
         nonlocal capture_called
@@ -1056,6 +1824,42 @@ async def build(adapter: Any) -> dict[str, str]:
                 f"physical references: serialized identity capture is incomplete: {captured!r}"
             )
         serialized_full_names.update(captured)
+        shelf_labels = tuple(_REFERENCE_SHELF_AXES)
+        shelves = capture_serialized_physical_axial_names(
+            adapter, {name: supplier_refs[name] for name in shelf_labels}, identities,
+            configurations, labels=shelf_labels, drawing_path=OUTPUTS.slddrw,
+            sheet_names=SHEET_NAMES,
+        )
+        if (
+            set(shelves) != set(shelf_labels)
+            or any(not isinstance(value, str) or not value for value in shelves.values())
+            or len(set(shelves.values())) != 2
+            or shelves["SupplierHeadHeight"] != captured["SupplierHeadHeight"]
+        ):
+            raise RuntimeError("reference shelves: serialized identity capture is incomplete")
+        serialized_shelf_names.update(shelves)
+        extra = {}
+        for labels in (
+            ("SupplierHeadDiameter", "SupplierThreadMajor"), ("SupplierHeadHeight", "ThreadLengthMin"),
+        ):
+            fresh_names = capture_serialized_physical_axial_names(
+                adapter, {name: paper_refs[name] for name in labels}, paper_identities,
+                configurations, labels=labels, drawing_path=OUTPUTS.slddrw, sheet_names=SHEET_NAMES,
+            )
+            if set(fresh_names) != set(labels) or len(set(fresh_names.values())) != 2 or any(
+                not isinstance(value, str) or not value for value in fresh_names.values()
+            ):
+                raise RuntimeError("saved paper: incomplete serialized dimension identity capture")
+            extra.update(fresh_names)
+        if extra.pop("SupplierHeadHeight") != captured["SupplierHeadHeight"]:
+            raise RuntimeError("saved paper: physical head identity changed between exact captures")
+        paper["names"] = extra
+        paper["note"] = capture_serialized_note_name(
+            adapter, original_note_annotation, front, drawing_path=OUTPUTS.slddrw, source_path=SOURCE,
+            sheet_names=SHEET_NAMES, sheet_name=SHEET_NAMES[0],
+            configuration=configurations[view_name(adapter, front)][1],
+            label="Purchased Screw Note",
+        )
 
     result = await finalize_drawing(
         adapter,
@@ -1064,13 +1868,14 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
-        settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
+        settled_checks=(shelf_check, settled_paper),
         checkpoint=checkpoint,
     )
     if not capture_called:
         raise RuntimeError("physical references: before_drawing_close identity checkpoint was never called")
     _assert_saved_physical_references(
         adapter, identities, configurations, serialized_full_names=serialized_full_names,
+        serialized_shelf_names=serialized_shelf_names, paper=paper,
     )
     return result
 

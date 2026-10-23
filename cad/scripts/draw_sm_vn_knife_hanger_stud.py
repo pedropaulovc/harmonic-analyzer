@@ -1,10 +1,18 @@
-"""Create MHA-SM-VN-52's modified-stock cut and inspection drawing."""
+"""Create MHA-SM-VN-52's cut and inspection drawing.
+
+The head-height value and label use the immutable measured +Y text-only shelf;
+the complete property-linked head note rises only enough to clear that shelf.
+Physical source stations, manufacturing controls and both stock views stay put.
+Settled checks retain the original note entity/landing, and the closed read-only
+SLDDRW receives fresh exact-name physical, native text and adjacent-ink proofs.
+"""
 
 from __future__ import annotations
 
 import argparse
 import math
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,18 +23,21 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 import _telemetry
 from _check import check
 from _com import _early_bound
-from _drawing_attachment import _is_same_attachment
+from _drawing_attachment import _assert_attached_to, _is_same_attachment
+from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M, require_inside, sheet_region
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_leader_notes import add_property_linked_callout
 from _drawing_notes import add_property_linked_note, property_link
 from _drawing_physical_axial_dimension import (
@@ -36,15 +47,19 @@ from _drawing_physical_axial_dimension import (
 )
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_serialized_note_identity import capture_serialized_note_name
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _mcmaster_92314a253 import DIMS as _SUPPLIER_DIMS
+from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_geometry import Box, segment_box_distance
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
+from _supplier_reference_text import measure_reference_text, shelve_reference_text
 from sm_vn_knife_hanger_stud_spec import (
     CHAMFER_ANGLE,
     CATALOG_LENGTH,
@@ -657,15 +672,17 @@ def _supplier_reference_identities(adapter: Any, references: dict[str, Any]) -> 
     return identities
 
 
-def _assert_supplier_references(adapter: Any, identities: dict, configurations: dict) -> None:
+def _assert_supplier_references(adapter: Any, identities: dict, configurations: dict) -> dict[str, Any]:
     """Fresh post-rebuild census, exact values, native attachment and stock separation."""
     if set(identities) != set(SUPPLIER_REFERENCE_DIMENSIONS):
         raise RuntimeError("supplier reference coverage is incomplete")
     required = {record[0]: name for name, record in identities.items()}
     counts = {name: 0 for name in identities}
     found_views = set()
+    displays = {}
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name in SHEET_NAMES:
+    # Finish on FINISHED: fresh head display data must belong to the active sheet.
+    for sheet_name in reversed(SHEET_NAMES):
         if not drawing.ActivateSheet(sheet_name):
             raise RuntimeError(f"cannot activate settled sheet {sheet_name}")
         sheet_view = _early_bound(drawing.GetFirstView(), "IView")
@@ -704,6 +721,7 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
                         raise RuntimeError(f"unexpected source-stock dimension {full_name}")
                     continue
                 counts[name] += 1
+                displays[name] = display
                 _full_name, expected_owner, entities, kinds = identities[name]
                 annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
                 if owner != expected_owner or view_name(adapter, annotation.Owner) != owner:
@@ -729,12 +747,253 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
             view = view.GetNextView()
     if found_views != set(configurations) or any(count != 1 for count in counts.values()):
         raise RuntimeError(f"settled supplier view/dimension census changed: {counts}")
+    return displays
+
+
+def _purchased_note_geometry(
+    adapter: Any, front: Any, note: Any, *, text: str,
+    landing: tuple[float, ...] | None = None,
+) -> tuple[dict, Box, tuple[float, ...]]:
+    """Read every native text fragment and the original physical head-top landing."""
+    label = "Purchased Screw Note"
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if (
+        str(note.PropertyLinkedText or "") != property_link(label)
+        or str(note.GetText() or "").replace("\r", "") != text.replace("\r", "")
+        or int(annotation.OwnerType) != 0
+        or annotation.Owner is None
+        or int(adapter.swApp.IsSame(annotation.Owner, front)) != 1
+        or int(annotation.Visible) != 1
+    ):
+        raise RuntimeError(f"{label}: linked head note did not persist")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    if len(attached) != 1 or attached[0] is None:
+        raise RuntimeError(f"{label}: physical head-top attachment is missing")
+    _assert_attached_to(
+        adapter, annotation, attached[0], entity_type="EDGE", what=label, label=label,
+    )
+    # Resolve the actual attached edge, not an assumed outer/crown radius. The
+    # coordinate pick projects more than one physical top boundary to this Y.
+    raw_source = _early_bound(front, "IView").ReferencedDocument
+    source_path = (
+        str(_early_bound(raw_source, "IModelDoc2").GetPathName() or "")
+        if raw_source is not None else ""
+    )
+    if (
+        not source_path or not Path(source_path).is_absolute()
+        or Path(source_path).resolve() != SOURCE.resolve()
+    ):
+        raise RuntimeError(f"{label}: actual physical head-top source document changed")
+    scan = scan_view_edges(front, label=f"{label} physical head top")
+    matches = [
+        item for item in scan.circles
+        if int(adapter.swApp.IsSame(item.edge, attached[0])) == 1
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: actual attached head-top edge is not unique in its source view")
+    circle = tuple(float(value) for value in matches[0].circle)
+    axis_length = math.hypot(*circle[3:6])
+    if (
+        len(circle) != 7 or not all(map(math.isfinite, circle)) or circle[6] <= 0
+        or max(abs(circle[0]), abs(circle[1] - HEAD_TOP_Y), abs(circle[2])) > 1e-5
+        or axis_length <= 0
+        or max(abs(circle[3] / axis_length), abs(circle[5] / axis_length),
+               abs(abs(circle[4] / axis_length) - 1.0)) > 1e-6
+    ):
+        raise RuntimeError(f"{label}: attachment is not an actual physical head-top boundary")
+    points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6 or len(points) % 3 or not all(map(math.isfinite, points)):
+        raise RuntimeError(f"{label}: unreadable native leader landing")
+    actual_landing = points[-3:]
+    expected_xy = model_point_in_view(
+        adapter, front, tuple(value / 1000 for value in HEAD_PICK_MM),
+        label="purchased hex head top edge",
+    )
+    if (
+        len(expected_xy) != 2 or not all(map(math.isfinite, expected_xy))
+        or math.dist(actual_landing[:2], expected_xy) > 1e-5
+        or (landing is not None and math.dist(actual_landing, landing) > 1e-8)
+    ):
+        raise RuntimeError(f"{label}: original physical head-top landing moved")
+    reader = _Reader(adapter)
+    record = _dump_annotation(reader, annotation)
+    errors = reader.take_errors()
+    rows = (record or {}).get("display", {}).get("texts") or ()
+    if (
+        errors or not record or record.get("type") != 6 or not rows
+        or len(record.get("pos") or ()) != 3
+        or not all(math.isfinite(float(value)) for value in record["pos"])
+        or any(
+            len(row.get("pos") or ()) != 3
+            or not all(math.isfinite(float(value)) for value in row["pos"])
+            or row.get("ang") is None or not math.isfinite(float(row["ang"]))
+            or any(not math.isfinite(float(row.get(key) or 0))
+                   or float(row.get(key) or 0) <= 0 for key in ("w", "h"))
+            for row in rows
+        )
+    ):
+        raise RuntimeError(f"{label}: unreadable complete native note text: {errors}")
+    # GetExtent includes the leader; only actual measured text fragments locate
+    # the complete note. Never estimate widths from the linked string.
+    box = display_box({"texts": rows})
+    if box is None or not all(map(math.isfinite, (box.xmin, box.ymin, box.xmax, box.ymax))):
+        raise RuntimeError(f"{label}: unreadable complete native note box")
+    record["physical_top_circle_mm"] = circle
+    record["physical_source"] = (
+        str(SOURCE.resolve()), view_name(adapter, front), str(front.ReferencedConfiguration),
+    )
+    return record, box, actual_landing
+
+
+def _assert_head_height_paper(
+    adapter: Any, front: Any, display: Any, *, purchased_note: dict,
+) -> Any:
+    """Read-only live/cold paper proof, independent of the strict physical proof."""
+    label = "SupplierHeadHeight"
+    if display.OffsetText is not True:
+        raise RuntimeError(f"{label}: native text-only offset mode did not persist")
+    shelf = measure_reference_text(adapter, display, axis=1, label=label)
+    if shelf["text"].ymin < shelf["reach"] + CLEAR_GAP_M:
+        raise RuntimeError(f"{label}: complete native text crowds its physical arrow reach")
+    candidates = [
+        _early_bound(raw, "IAnnotation") for raw in front.GetAnnotations() or ()
+        if int(_early_bound(raw, "IAnnotation").GetType()) == 6
+        and str(_early_bound(raw, "IAnnotation").GetName()) == purchased_note["name"]
+    ]
+    if len(candidates) != 1:
+        raise RuntimeError("Purchased Screw Note: exact native note census changed")
+    annotation = candidates[0]
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    record, text, _landing = _purchased_note_geometry(
+        adapter, front, note, text=purchased_note["text"], landing=purchased_note["landing"],
+    )
+    if (
+        tuple(record["physical_source"]) != tuple(purchased_note["source"])
+        or math.dist(record["physical_top_circle_mm"], purchased_note["circle_mm"]) > 1e-5
+    ):
+        raise RuntimeError("Purchased Screw Note: original physical head-top source descriptor changed")
+    if text.ymin < shelf["text"].ymax + CLEAR_GAP_M:
+        raise RuntimeError("Purchased Screw Note: complete native text crowds head-height shelf")
+    region = sheet_region(adapter)
+    targets = {"Purchased Screw Note": text, label: shelf["text"]}
+    for name, box in targets.items():
+        require_inside(name, (box.xmin, box.ymin, box.xmax, box.ymax), region)
+    # Keep all native lines, including fraction bars/connectors. A dimension's
+    # own fraction strokes may cross its font union; only FOREIGN ink is tested.
+    own = [
+        (record, "Purchased Screw Note", "Purchased Screw Note"),
+        (shelf["record"], label, label),
+    ]
+    # Their complete native ink must also remain within the real zone frame.
+    for dumped, owner, _target in own:
+        ink = display_box(dumped["display"])
+        if ink is None:
+            raise RuntimeError(f"{owner}: unreadable complete native ink")
+        require_inside(owner, (ink.xmin, ink.ymin, ink.xmax, ink.ymax), region)
+    reader = _Reader(adapter)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    view = _early_bound(drawing.GetFirstView(), "IView")
+    is_sheet_view = True
+    while view is not None:
+        view = _early_bound(view, "IView")
+        for raw in view.GetAnnotations() or ():
+            other = _early_bound(raw, "IAnnotation")
+            if int(other.OwnerType) == 2 or int(other.Visible) != 1:
+                continue
+            if any(int(adapter.swApp.IsSame(other, native)) == 1 for native in (
+                annotation, display.GetAnnotation(),
+            )):
+                continue
+            dumped = _dump_annotation(reader, other)
+            if dumped is None:
+                raise RuntimeError("head-height paper: unreadable foreign native annotation")
+            own.append((dumped, str(other.GetName()), None))
+        if not is_sheet_view and int(adapter.swApp.IsSame(view, front)) != 1:
+            outline = tuple(float(value) for value in view.GetOutline() or ())
+            if len(outline) != 4 or not all(map(math.isfinite, outline)):
+                raise RuntimeError("head-height paper: unreadable neighbouring view outline")
+            if any(box.gap(Box(*outline)) < CLEAR_GAP_M for box in targets.values()):
+                raise RuntimeError("head-height paper: complete text crowds another view")
+        view = view.GetNextView()
+        is_sheet_view = False
+    if reader.take_errors():
+        raise RuntimeError("head-height paper: unreadable foreign native ink")
+    for dumped, owner, own_target in own:
+        rows = (dumped.get("display") or {}).get("texts", ())
+        if any(
+            len(row.get("pos") or ()) != 3
+            or not all(math.isfinite(float(value)) for value in row["pos"])
+            or row.get("ang") is None or not math.isfinite(float(row["ang"]))
+            or any(not math.isfinite(float(row.get(key) or 0))
+                   or float(row.get(key) or 0) <= 0 for key in ("w", "h"))
+            for row in rows
+        ):
+            raise RuntimeError(f"head-height paper: unreadable complete native text for {owner}")
+        geometry = annotation_geometry(dumped, owner=owner, advance=calibrate_sheet_advance((dumped,)))
+        if geometry is None:
+            raise RuntimeError(f"head-height paper: unreadable native ink for {owner}")
+        other_text = display_box({"texts": (dumped.get("display") or {}).get("texts", ())})
+        for name, box in targets.items():
+            if own_target == name:
+                continue
+            if (
+                (other_text is not None and box.gap(other_text) < CLEAR_GAP_M)
+                or any(
+                    not all(map(math.isfinite, (run.x0, run.y0, run.x1, run.y1)))
+                    or segment_box_distance(run, box) < CLEAR_GAP_M
+                    for run in geometry.segments
+                )
+            ):
+                raise RuntimeError(f"{name}: complete native text crowds foreign ink {owner}")
+    return annotation
+
+
+def _place_purchased_note_above_shelf(
+    adapter: Any, front: Any, display: Any, note: Any, *, text: str,
+    reacquire: Callable[[], dict[str, Any]],
+) -> tuple[Callable[[], None], dict]:
+    """Raise only the full note's text, retaining its native edge and landing."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    original_record, box, landing = _purchased_note_geometry(adapter, front, note, text=text)
+    original_entity = tuple(annotation.GetAttachedEntities3())[0]
+    original_position = tuple(float(value) for value in annotation.GetPosition())
+    if len(original_position) != 3 or not all(map(math.isfinite, original_position)):
+        raise RuntimeError("Purchased Screw Note: unreadable native note position")
+    shelf = measure_reference_text(adapter, display, axis=1, label="SupplierHeadHeight")
+    dy = max(0.0, shelf["text"].ymax + CLEAR_GAP_M + PLACE_SETTLE_M - box.ymin)
+    target = (original_position[0], original_position[1] + dy, original_position[2])
+    if not annotation.SetPosition2(target[0], target[1], target[2]):
+        raise RuntimeError("Purchased Screw Note: cannot raise complete native note text")
+    rebuild_drawing(adapter, label="purchased head note above measured head-height shelf")
+    actual = tuple(float(value) for value in annotation.GetPosition())
+    if len(actual) != 3 or not all(map(math.isfinite, actual)) or math.dist(actual, target) > 1e-5:
+        raise RuntimeError("Purchased Screw Note: native text move did not settle")
+    saved = {
+        "name": str(annotation.GetName()), "text": text, "landing": landing,
+        "circle_mm": original_record["physical_top_circle_mm"],
+        "source": original_record["physical_source"],
+    }
+    if not saved["name"]:
+        raise RuntimeError("Purchased Screw Note: native annotation has no exact name")
+
+    def settled() -> None:
+        fresh = reacquire()["SupplierHeadHeight"]
+        current = _assert_head_height_paper(adapter, front, fresh, purchased_note=saved)
+        if int(adapter.swApp.IsSame(current, annotation)) != 1:
+            raise RuntimeError("Purchased Screw Note: original native annotation changed")
+        _assert_attached_to(
+            adapter, current, original_entity, entity_type="EDGE",
+            what="Purchased Screw Note", label="Purchased Screw Note",
+        )
+
+    settled()
+    return settled, saved
 
 
 @_telemetry.traced("drawing.stud_physical_references_saved")
 def _assert_saved_physical_references(
     adapter: Any, identities: dict, configurations: dict, *,
-    serialized_full_names: dict[str, str],
+    serialized_full_names: dict[str, str], purchased_note: dict,
 ) -> None:
     """Audit only the finalized, closed SLDDRW, read-only; never rebuild or repair."""
     label = "SupplierHeadHeight"
@@ -943,6 +1202,7 @@ def _assert_saved_physical_references(
             # either dimension's old COM attachment handles across close/reopen.
             if name == "SupplierHeadHeight":
                 measured = _assert_physical_head_height(adapter, front, display, phase="saved")
+                _assert_head_height_paper(adapter, front, display, purchased_note=purchased_note)
             else:
                 measured = _assert_physical_stock_length(adapter, front, display, phase="saved")
             assert_supplier_reference_dimension(
@@ -1071,6 +1331,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "INote",
     )
     printed = str(note.GetText() or "").replace("\r", "")
+    purchased_note_annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     if str(note.PropertyLinkedText or "") != property_link(
         "Purchased Screw Note"
     ) or printed != properties["Purchased Screw Note"].replace("\r", ""):
@@ -1085,6 +1346,19 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     if properties["Supplier Reference Title"].replace("\r", "") != SUPPLIER_STOCK_TITLE:
         raise RuntimeError("source-stock title does not identify the original screw")
+
+    def reacquire_head_height() -> dict[str, Any]:
+        displays = _assert_supplier_references(adapter, identities, configurations)
+        return {"SupplierHeadHeight": displays["SupplierHeadHeight"]}
+
+    shelf_check = shelve_reference_text(
+        adapter, reacquire=reacquire_head_height, axes={"SupplierHeadHeight": 1},
+        force=("SupplierHeadHeight",), label="knife-hanger physical head height",
+    )
+    note_check, purchased_note = _place_purchased_note_above_shelf(
+        adapter, front, reacquire_head_height()["SupplierHeadHeight"], note,
+        text=properties["Purchased Screw Note"], reacquire=reacquire_head_height,
+    )
     serialized_full_names: dict[str, str] = {}
     capture_attempted = False
 
@@ -1096,6 +1370,12 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError("physical serialized identity checkpoint was called more than once")
         capture_attempted = True
         labels = ("SupplierHeadHeight", "SupplierStockLength")
+        purchased_note["name"] = capture_serialized_note_name(
+            adapter, purchased_note_annotation, front,
+            drawing_path=Path(OUTPUTS.slddrw), source_path=SOURCE,
+            sheet_names=SHEET_NAMES, sheet_name=SHEET_NAMES[0],
+            configuration=purchased_note["source"][2], label="Purchased Screw Note",
+        )
         serialized_full_names.update(capture_serialized_physical_axial_names(
             adapter, {name: supplier_refs[name] for name in labels}, identities, configurations,
             labels=labels, drawing_path=OUTPUTS.slddrw, sheet_names=SHEET_NAMES,
@@ -1108,13 +1388,14 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
-        settled_checks=(lambda: _assert_supplier_references(adapter, identities, configurations),),
+        settled_checks=(shelf_check, note_check),
         checkpoint=checkpoint,
     )
     if not capture_attempted:
         raise RuntimeError("physical serialized identity checkpoint before_drawing_close was not called")
     _assert_saved_physical_references(
         adapter, identities, configurations, serialized_full_names=serialized_full_names,
+        purchased_note=purchased_note,
     )
     return artifacts
 

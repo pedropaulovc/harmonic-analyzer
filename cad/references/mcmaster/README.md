@@ -917,6 +917,14 @@ Catalog specifications checked on September 10, 2026:
   The cold read matches those exact names, not guessed or normalized pre-save
   strings, and repeats every physical/source/configuration proof. Missing,
   stale or ambiguous native identity refuses with actual boundary inventories.
+  The head-height caption uses the shared measured native text-only shelf;
+  moving its text must preserve the physical arrows and complete witness runs.
+  Fresh settled and cold-saved reads retain the stricter physical/source proof.
+  The complete caption and adjacent purchased-note text still require independent
+  full-sheet PDF-ink clearance; a native axial or shelf proof is not paper approval.
+  A separate after-save native `IsSame` census captures the purchased note's
+  actual annotation `GetName`. Cold paper checks retain its original physical
+  top-boundary descriptor and landing, not identity inferred from linked text.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1125,9 +1133,18 @@ Catalog specifications checked on September 10, 2026:
   existing saves and before close, using a unique fresh native `IsSame` census.
   Reopening requires those exact serialized FullNames, not a suffix-stripped
   or geometry-only substitute. Boundary and failure inventories preserve the
-  original and observed names without claiming that a rename occurred.
-  The purchased-head note's leader runs to its original head-top target from
-  the right-hand open field, clear of the complete diameter-reference text.
+  original and observed names; capture never assumes a FullName survives saving.
+  Head-height and socket-AF captions use the shared measured native text-only
+  shelves, retaining the physical arrows and complete witness runs. The socket
+  shelf has its own exact serialized identity and cold-saved presentation checks;
+  it is not a vertical-axial proof. The purchased-head note remains attached to
+  the physical head-top rim. Its complete text, leader, aligned end view and finite
+  native centre mark require fresh full-sheet clearance, not a native-value-only
+  approval.
+  The purchased note's name is captured independently from the original native
+  annotation after saving. A multi-jog route is accepted only when its actual
+  strokes and arrow remain visible to the unchanged shared audit and survive
+  cold reopening with the exact saved note identity and physical landing.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through

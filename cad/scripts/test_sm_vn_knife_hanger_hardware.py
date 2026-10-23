@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import contextlib
+from copy import deepcopy
 from dataclasses import replace
 import math
 from pathlib import Path
@@ -18,9 +19,13 @@ import pytest
 
 import _config
 import _drawing_edge_dimensions as edge_dimensions
+import _drawing_annotation_extent as annotation_extent
+import _drawing_layout_audit as native_layout
 import _drawing_physical_axial_dimension as physical_axial_dimension
+import _drawing_serialized_note_identity as serialized_note_identity
 import _supplier_dimensions as supplier_dimensions
 import _mcmaster_92314a253 as bolt_catalogue
+import _supplier_reference_text as reference_text
 import _stock_trim_drawing as trim_drawing
 import build_sm_summing_assembly as asm
 import build_sm_vn_knife_hanger_stud as bolt_part
@@ -938,6 +943,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     projected = []
     finalization = []
     case = _settled_stud_height_case(monkeypatch)
+    _stud_paper_fixture(case, monkeypatch)
     case.front.name = "*Front"
     case.views[1].name = "*Isometric"
     references = case.references
@@ -965,13 +971,16 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         finalization.append("captured")
         return result
 
-    def saved_reader(_adapter, identities, _configurations, *, serialized_full_names):
+    def saved_reader(_adapter, identities, _configurations, *, serialized_full_names, purchased_note):
         assert identities == original_identities
         assert serialized_full_names == {
             "SupplierHeadHeight": case.native.FullName,
             "SupplierStockLength": case.stock_case.native.FullName,
         }
         assert all(serialized_full_names[name] != identities[name][0] for name in serialized_full_names)
+        assert purchased_note["text"] == properties["Purchased Screw Note"]
+        assert purchased_note["landing"] == case.note_landing
+        assert purchased_note["name"] == case.note_name != "DetailItem347"
         finalization.append("saved physical proof")
 
     async def open_model(_path):
@@ -988,6 +997,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
         for display in case.displays.values():
             native = display.GetDimension2(0)
             native.FullName = f"{native.FullName}@SERIALIZED"
+        case.note_name = "DetailItem347@ACTUAL-SERIALIZED"
         checkpoint("after_native_save")
         checkpoint("after_pdf_save")
         finalization.append("saved and strict-audited")
@@ -1040,7 +1050,7 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
 
     def project(_adapter, view, xyz, *, label):
         projected.append((view.name, xyz, label))
-        return (0.1, 0.2)
+        return case.paper_project(_adapter, view, xyz, label=label)
 
     def callout(_adapter, view, *, property_name, edge_xy, note_xy):
         printed.append((view.name, property_name, edge_xy, note_xy))
@@ -1050,7 +1060,9 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
             link = bolt_drawing.property_link("Wrong Property")
         if fault == "text":
             text += " WRONG"
-        return SimpleNamespace(PropertyLinkedText=link, GetText=lambda: text)
+        case.note.PropertyLinkedText = link
+        case.note.text = text
+        return case.note
 
     for name in (
         "check",
@@ -1137,11 +1149,13 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     # Every control on the main view; the chamfer text leaves on a leader.
     assert curated == [("*Front", bolt_drawing.FRONT_KEEP)]
     assert offsets == [{"ChamferWidth": bolt_drawing.CHAMFER_TEXT_XY}]
-    (head,) = projected
-    assert head[0] == "*Front"
-    assert head[1] == pytest.approx((bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0))
+    assert projected
+    assert all(head[0] == "*Front" for head in projected)
+    assert all(head[1] == pytest.approx(
+        (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0)
+    ) for head in projected)
     assert printed == [
-        ("*Front", "Purchased Screw Note", (0.1, 0.2), bolt_drawing.PURCHASED_NOTE_XY)
+        ("*Front", "Purchased Screw Note", (0.11396875, 0.2205528), bolt_drawing.PURCHASED_NOTE_XY)
     ]
 
 
@@ -1447,8 +1461,8 @@ def _stud_height_case(monkeypatch):
     def project(_adapter, view, points, *, label):
         case.projections.append((view, points, label))
         return [
-            (point[0] * view.ScaleDecimal + 0.1,
-             point[1] * view.ScaleDecimal + 0.1)
+            (point[0] * view.ScaleDecimal + getattr(view, "origin", (0.1, 0.1))[0],
+             point[1] * view.ScaleDecimal + getattr(view, "origin", (0.1, 0.1))[1])
             for point in points
         ]
 
@@ -1795,7 +1809,7 @@ def _corrupt_stud_native_proof(case, monkeypatch, fault):
     elif fault == "zero":
         change_arrow(0, 4, 0.0)
     elif fault == "same_sign":
-        change_arrow(1, 4, 1.0)
+        change_arrow(1, 4, case.arrows[0][4])
     elif fault == "different_x":
         change_arrow(0, 0, case.arrows[0][0] + 0.001)
     elif fault == "tip_z":
@@ -1868,6 +1882,7 @@ def test_stud_native_spatial_proof_refuses_corruption_at_every_consumer(
             bolt_drawing._assert_saved_physical_references(
                 case.adapter, case.identities, case.configurations,
                 serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
             )
     if phase == "saved":
         assert case.close_calls == ["finished-stud.SLDDRW"]
@@ -1992,8 +2007,489 @@ def test_stud_settled_supplier_census_rescans_physical_head_height(monkeypatch, 
             )
 
 
-def _saved_stud_height_case(monkeypatch, tmp_path):
+def _stud_paper_fixture(case, monkeypatch):
+    """Actual c356 FINISHED primitives through the real native dump/shelf boundary."""
+    monkeypatch.setattr(native_layout, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(serialized_note_identity, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(serialized_note_identity, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(reference_text, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(annotation_extent, "_early_bound", lambda value, _kind: value)
+    case.front.origin = (0.110, 0.1208028)
+    case.front.GetOutline = lambda: (0.0964745, 0.1138592, 0.1235255, 0.2261408)
+    case.views[1].GetOutline = lambda: (0.3223184, 0.0811521, 0.3576816, 0.1888479)
+    case.views[1].GetAnnotations = lambda: ()
+    case.views[3].GetAnnotations = lambda: ()
+    case.stock_case.front.GetAnnotations = lambda: (case.stock_case.annotation,)
+    case.stock_case.annotation.GetType = lambda: 4
+    stock_caption = case.model.GetViews()[1][0].GetAnnotations()[0]
+    stock_caption.GetName = lambda: "Supplier Reference Title"
+    case.adapter._attempt = lambda fn: fn()
+    case.sheet = SimpleNamespace(
+        GetProperties2=lambda: (12, 0, 2, 1, 0, 0.4318, 0.2794, 0),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    case.model.GetCurrentSheet = lambda: case.sheet
+    case.rebuilds = []
+    case.model.EditRebuild3 = lambda: case.rebuilds.append(case.sheet_index) or True
+
+    def project(_adapter, view, point, *, label):
+        ox, oy = getattr(view, "origin", (0.1, 0.1))
+        return (point[0] * view.ScaleDecimal + ox, point[1] * view.ScaleDecimal + oy)
+
+    monkeypatch.setattr(bolt_drawing, "model_point_in_view", project)
+    case.paper_project = project
+
+    def row(text, x, y, width, z=0.0):
+        return {"t": text, "pos": [x, y, z], "w": width, "h": 0.0035,
+                "ref": 1, "ang": 0.0, "font": "Century Gothic", "ls": 0.001}
+
+    def data(native):
+        result = SimpleNamespace()
+        for key, count, getter in (
+            ("lines", "GetLineCount", "GetLineAtIndex2"),
+            ("arrows", "GetArrowHeadCount", "GetArrowHeadAtIndex2"),
+            ("arcs", "GetArcCount", "GetArcAtIndex2"),
+            ("polylines", "GetPolyLineCount", "GetPolylineAtIndex2"),
+            ("polygons", "GetPolygonCount", "GetPolygonAtIndex"),
+            ("triangles", "GetTriangleCount", "GetTriangleAtIndex"),
+            ("ellipses", "GetEllipseCount", "GetEllipseAtIndex2"),
+        ):
+            setattr(result, count, lambda key=key: len(native.get(key, ())))
+            setattr(result, getter, lambda index, key=key: native[key][index])
+        result.GetLineAtIndex3 = result.GetLineAtIndex2
+        result.GetTextCount = lambda: len(native.get("texts", ()))
+        for method, key in (
+            ("GetTextAtIndex", "t"), ("GetTextPositionAtIndex", "pos"),
+            ("GetTextHeightAtIndex", "h"), ("GetTextRefPositionAtIndex", "ref"),
+            ("GetTextAngleAtIndex", "ang"), ("GetTextFontAtIndex", "font"),
+            ("GetTextLineSpacingAtIndex", "ls"), ("GetTextInBoxWidthAtIndex", "w"),
+        ):
+            setattr(result, method, lambda index, key=key: native["texts"][index][key])
+        return result
+
+    def install(annotation, native, kind, position):
+        annotation.position = list(position)
+        annotation.native = native
+        annotation.GetPosition = lambda: tuple(annotation.position)
+        annotation.GetType = lambda: kind
+        annotation.Visible = 1
+        annotation.Layer = ""
+        annotation.GetLeaderCount = lambda: 0
+        annotation.GetDisplayData = lambda: data(native)
+
+        def move(x, y, z):
+            dx, dy = x - annotation.position[0], y - annotation.position[1]
+            for item in native.get("texts", ()):
+                item["pos"][0] += dx
+                item["pos"][1] += dy
+            annotation.position[:] = (x, y, z)
+            return True
+
+        annotation.SetPosition2 = move
+
+    case.paper_install = install
+    case.paper_row = row
+    case.paper_data = {
+        "lines": [
+            [0, 0, 0, 0, 0.1189375, 0.2142028, 0, 0.219, 0.2142028, 0],
+            [0, 0, 0, 0, 0.1149688, 0.2205528, 0, 0.219, 0.2205528, 0],
+            [0, 0, 0, 0, 0.218, 0.2142028, 0, 0.218, 0.2078528, 0],
+            [0, 0, 0, 0, 0.218, 0.2205528, 0, 0.218, 0.2269028, 0],
+        ],
+        "arrows": [
+            [0.218, y, 0, 0, sign, 0, 0.003556, 0.000762, 0, 0, 0, 1]
+            for y, sign in ((0.2142028, -1), (0.2205528, 1))
+        ],
+        "texts": [
+            row("(0.125 in)", 0.2079253, 0.216, 0.0201493),
+            row("HEAD HEIGHT", 0.2030497, 0.2104437, 0.0299007),
+        ],
+    }
+    case.arrows = case.paper_data["arrows"]
+    install(case.annotation, case.paper_data, 4, (0.218, 0.216, 0))
+    case.display.OffsetText = False
+    case.display.IsHoleCallout = lambda: False
+    for name, rows in (
+        ("SupplierHeadAF", [
+            row("(", 0.1014104, 0.2552722, 0.0017208),
+            row("5", 0.10545, 0.2578294, 0.0025861),
+            row("16", 0.1041569, 0.2532011, 0.0051722),
+            row('" in)', 0.1103549, 0.2552722, 0.0082347),
+            row("HEAD AF", 0.1001903, 0.2476449, 0.0196194),
+        ]),
+        ("SupplierThreadMajor", [row("THREAD MAJOR NOMINAL", 0.140, 0.186, 0.060)]),
+    ):
+        display = case.displays[name]
+        install(display.GetAnnotation(), {"texts": rows}, 4, (0.110, 0.255, 0))
+        display.IsHoleCallout = lambda: False
+    case.note_text = _config.parts(bolt_part.PART_NAME)["purchased_note"]
+    z = 0.0068741
+    case.note_data = {
+        "texts": [row(case.note_text, 0.130, 0.2354743, 0.141191, z)],
+        "lines": [[0, 0, 0, 0, 0.1291411, 0.238506, z, 0.1139687, 0.2205528, z]],
+        "arrows": [[0.1139687, 0.2205528, z, 0.6454763, 0.7637803, 0,
+                    0.003556, 0.000762, 1, 0, 0, 1]],
+    }
+    case.note_name = "DetailItem347"
+    note_annotation = SimpleNamespace(
+        OwnerType=0, Owner=case.front, attached=case.top, dangling=False,
+        GetName=lambda: case.note_name,
+    )
+    install(note_annotation, case.note_data, 6, (0.130, 0.240, z))
+    move_note_text = note_annotation.SetPosition2
+
+    def move_note(x, y, z):
+        dx, dy = x - note_annotation.position[0], y - note_annotation.position[1]
+        result = move_note_text(x, y, z)
+        case.note_data["lines"][0][4] += dx
+        case.note_data["lines"][0][5] += dy
+        return result
+
+    note_annotation.SetPosition2 = move_note
+    note_annotation.GetAttachedEntityCount3 = lambda: 1
+    note_annotation.GetAttachedEntityTypes = lambda: (1,)
+    note_annotation.GetAttachedEntities3 = lambda: (note_annotation.attached,)
+    note_annotation.IsDangling = lambda: note_annotation.dangling
+    note_annotation.GetLeaderCount = lambda: 1
+    note_annotation.GetLeaderPointsAtIndex = lambda _index: (
+        note_annotation.position[0] - 0.0005098,
+        note_annotation.position[1] - 0.0017837, z, *case.note_landing,
+    )
+    case.note_landing = (0.1139687, 0.2205528, z)
+    case.note = SimpleNamespace(
+        PropertyLinkedText=bolt_drawing.property_link("Purchased Screw Note"),
+        text=case.note_text, GetAnnotation=lambda: case.note_annotation,
+        # Deliberately includes the leader: this MUST NOT drive text placement.
+        GetExtent=lambda: (0.1139143, 0.2207167, 0, 0.271182, 0.240256, 0),
+        IsBomBalloon=lambda: False,
+    )
+    case.note.GetText = lambda: case.note.text
+    note_annotation.GetSpecificAnnotation = lambda: case.note
+    case.note_annotation = note_annotation
+    case.foreign_annotations = []
+    case.front.GetAnnotations = lambda: (
+        *(display.GetAnnotation() for name, display in case.displays.items()
+          if name != "SupplierStockLength"),
+        case.note_annotation, *case.foreign_annotations,
+    )
+    return case
+
+
+def _shelve_stud_paper(case):
+    def reacquire():
+        displays = bolt_drawing._assert_supplier_references(
+            case.adapter, case.identities, case.configurations,
+        )
+        return {"SupplierHeadHeight": displays["SupplierHeadHeight"]}
+
+    case.shelf_check = bolt_drawing.shelve_reference_text(
+        case.adapter, reacquire=reacquire, axes={"SupplierHeadHeight": 1},
+        force=("SupplierHeadHeight",), label="knife-hanger physical head height",
+    )
+    case.note_check, case.purchased_note_proof = bolt_drawing._place_purchased_note_above_shelf(
+        case.adapter, case.front, case.display, case.note, text=case.note_text, reacquire=reacquire,
+    )
+
+
+def test_stud_actual_headheight_shelf_and_complete_note_clearance_preserve_physical_source(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    arrows = deepcopy(case.paper_data["arrows"])
+    lines = deepcopy(case.paper_data["lines"])
+    attached = tuple(case.annotation.attached)
+    before = bolt_drawing._assert_supplier_references(
+        case.adapter, case.identities, case.configurations,
+    )
+    assert set(before) == set(bolt.SUPPLIER_REFERENCE_DIMENSIONS)
+    assert before["SupplierHeadHeight"] is case.display
+    assert case.sheet_index == 0
+    initial = reference_text.measure_reference_text(
+        case.adapter, case.display, axis=1, label="SupplierHeadHeight",
+    )
+    assert initial["text"].ymin < arrows[0][1] < initial["text"].ymax
+    _shelve_stud_paper(case)
+    shelf = reference_text.measure_reference_text(
+        case.adapter, case.display, axis=1, label="SupplierHeadHeight",
+    )
+    _record, note, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert shelf["text"].ymin == pytest.approx(0.2291028)
+    assert shelf["text"].ymax == pytest.approx(0.2381591)
+    assert note.ymin == pytest.approx(0.2403591)
+    assert note.ymax == pytest.approx(0.2438591)
+    assert case.note_annotation.position[:2] == pytest.approx((0.130, 0.2448848))
+    assert landing == case.note_landing
+    assert case.note_annotation.attached is case.top
+    assert tuple(case.annotation.attached) == attached
+    assert case.paper_data["arrows"] == arrows
+    assert case.paper_data["lines"] == lines
+    assert case.display.GetText(1) == "("
+    assert case.native.SystemValue == pytest.approx(bolt.HEAD_H / 1000)
+    assert bolt_drawing._assert_physical_head_height(
+        case.adapter, case.front, case.display,
+    ) == pytest.approx(bolt.HEAD_H)
+    case.shelf_check()
+    case.note_check()
+
+
+def test_stud_shelf_reacquires_replaced_native_display_on_active_finished_sheet(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    _shelve_stud_paper(case)
+    fresh = SimpleNamespace(**vars(case.display))
+    case.displays["SupplierHeadHeight"] = fresh
+    assert bolt_drawing._assert_supplier_references(
+        case.adapter, case.identities, case.configurations,
+    )["SupplierHeadHeight"] is fresh
+    assert case.sheet_index == 0
+    case.shelf_check()
+    fresh.OffsetText = False
+    with pytest.raises(RuntimeError, match="offset|crowds"):
+        case.shelf_check()
+
+
+@pytest.mark.parametrize("phase", ["native_offset_rebuild", "settled"])
+@pytest.mark.parametrize(
+    "fault", ["full_name", "duplicate", "missing", "owner", "attachment", "value", "band", "config"],
+)
+def test_stud_shelf_retains_exact_source_census_at_transition_and_late_readback(
+    monkeypatch, phase, fault,
+):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def corrupt():
+        if fault == "full_name":
+            case.native.FullName += "@STALE"
+        elif fault == "duplicate":
+            original = case.front.GetDisplayDimensions
+            case.front.GetDisplayDimensions = lambda: (*original(), case.display)
+        elif fault == "missing":
+            case.displays.pop("SupplierHeadHeight")
+        elif fault == "owner":
+            case.annotation.Owner = case.views[1]
+        elif fault == "attachment":
+            case.annotation.attached[1] = case.rear
+        elif fault == "value":
+            case.native.SystemValue += 0.00001
+        elif fault == "band":
+            case.native.Tolerance.Type = 2
+        else:
+            case.front.ReferencedConfiguration = "FOREIGN"
+
+    if phase == "native_offset_rebuild":
+        original = case.model.EditRebuild3
+        mutated = False
+
+        def rebuild():
+            nonlocal mutated
+            if case.display.OffsetText is True and not mutated:
+                mutated = True
+                corrupt()
+            return original()
+
+        case.model.EditRebuild3 = rebuild
+        with pytest.raises(RuntimeError):
+            _shelve_stud_paper(case)
+        assert mutated
+    else:
+        _shelve_stud_paper(case)
+        corrupt()
+        with pytest.raises(RuntimeError):
+            case.shelf_check()
+
+
+@pytest.mark.parametrize("fault", ["shelf_move", "note_move", "shelf_width", "note_width", "note_angle"])
+def test_stud_actual_boundary_refuses_silent_native_moves_and_unmeasured_complete_text(
+    monkeypatch, fault,
+):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    if fault == "shelf_move":
+        case.annotation.SetPosition2 = lambda *_xyz: True
+    elif fault == "note_move":
+        case.note_annotation.SetPosition2 = lambda *_xyz: True
+    elif fault == "shelf_width":
+        case.paper_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_width":
+        case.note_data["texts"][-1]["w"] = 0.0
+    else:
+        case.note_data["texts"][-1]["ang"] = math.nan
+    with pytest.raises(RuntimeError):
+        _shelve_stud_paper(case)
+
+
+_STUD_PAPER_FAULTS = (
+    "offset", "shelf_last_fragment", "note_last_fragment", "note_property", "note_text",
+    "note_landing", "note_attachment", "note_dangling", "note_owner", "note_visible",
+    "note_missing", "note_duplicate", "foreign_line", "foreign_text", "border", "other_view",
+    "shelf_width", "note_width", "note_position", "note_line",
+)
+
+
+def _corrupt_stud_paper(case, fault):
+    if fault == "offset":
+        case.display.OffsetText = False
+    elif fault == "shelf_width":
+        case.paper_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_width":
+        case.note_data["texts"][-1]["w"] = 0.0
+    elif fault == "note_position":
+        case.note_annotation.position[0] = math.nan
+    elif fault == "note_line":
+        case.note_data["lines"][0] = [0, 0, 0, 0, 0.210, 0.232, 0, 0.240, 0.232, 0]
+    elif fault == "shelf_last_fragment":
+        case.paper_data["texts"][-1]["pos"][1] = 0.225
+    elif fault == "note_last_fragment":
+        case.note_data["texts"].append(
+            case.paper_row("HEAD UNMODIFIED", 0.210, 0.233, 0.045, 0.0068741)
+        )
+    elif fault == "note_property":
+        case.note.PropertyLinkedText = bolt_drawing.property_link("Wrong Property")
+    elif fault == "note_text":
+        case.note.text += " WRONG"
+    elif fault == "note_landing":
+        case.note_landing = (case.note_landing[0] + 0.001, *case.note_landing[1:])
+    elif fault == "note_attachment":
+        case.note_annotation.attached = case.bearing
+    elif fault == "note_dangling":
+        case.note_annotation.dangling = True
+    elif fault == "note_owner":
+        case.note_annotation.Owner = case.views[1]
+    elif fault == "note_visible":
+        case.note_annotation.Visible = 0
+    elif fault == "note_missing":
+        case.note_annotation.GetName = lambda: "DetailItem347@STALE"
+    elif fault == "note_duplicate":
+        case.foreign_annotations.append(case.note_annotation)
+    elif fault in ("foreign_line", "foreign_text"):
+        annotation = SimpleNamespace(
+            Owner=case.front, OwnerType=0, GetName=lambda: "foreign annotation",
+        )
+        native = (
+            {"lines": [[0, 0, 0, 0, 0.200, 0.232, 0, 0.245, 0.232, 0]]}
+            if fault == "foreign_line"
+            else {"texts": [case.paper_row("FOREIGN", 0.220, 0.241, 0.030)]}
+        )
+        case.paper_install(annotation, native, 7, (0.220, 0.232, 0))
+        case.foreign_annotations.append(annotation)
+    elif fault == "border":
+        case.note_data["texts"][-1]["pos"][0] = 0.400
+    elif fault == "other_view":
+        case.views[1].GetOutline = lambda: (0.210, 0.228, 0.260, 0.246)
+    else:
+        raise AssertionError(f"unknown actual-paper fault {fault}")
+
+
+@pytest.mark.parametrize("fault", _STUD_PAPER_FAULTS)
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+def test_stud_full_actual_paper_proof_refuses_late_complete_text_and_adjacent_ink_drift(
+    monkeypatch, tmp_path, fault, phase,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    _corrupt_stud_paper(case, fault)
+    rebuilds = tuple(case.rebuilds)
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    assert tuple(case.rebuilds) == rebuilds
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_saved_paper_uses_only_fresh_native_reads_not_live_shelf_closures(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+
+    def stale():
+        raise AssertionError("closed live-COM proof must never be called")
+
+    case.shelf_check = case.note_check = stale
+    case.annotation.SetPosition2 = case.note_annotation.SetPosition2 = stale
+    case.model.EditRebuild3 = stale
+    bolt_drawing._assert_saved_physical_references(
+        case.adapter, case.identities, case.configurations,
+        serialized_full_names=case.serialized_full_names,
+        purchased_note=case.purchased_note_proof,
+    )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+def test_stud_note_keeps_actual_original_crown_boundary_without_changing_height_outer_rim(
+    monkeypatch, tmp_path, phase,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path, note_on_crown=True)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        case.note_annotation.attached = case.crown_item.edge
+        _shelve_stud_paper(case)
+    assert case.purchased_note_proof["circle_mm"] == case.crown_item.circle
+    assert case.purchased_note_proof["circle_mm"][6] != bolt.HEAD_AF / 2
+    assert case.annotation.attached[1] is case.top
+    if phase == "saved":
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+    else:
+        case.note_check()
+        # An equally valid OTHER physical top boundary is not this original
+        # note's entity/descriptor, even though its projected landing is shared.
+        case.note_annotation.attached = case.top
+        with pytest.raises(RuntimeError, match="original physical head-top source descriptor"):
+            case.note_check()
+
+
+def test_stud_note_cold_read_requires_exact_actual_serialized_annotation_name(monkeypatch, tmp_path):
+    case = _saved_stud_height_case(monkeypatch, tmp_path)
+    assert case.purchased_note_proof["name"] == case.note_name != "DetailItem347"
+    stale = dict(case.purchased_note_proof, name="DetailItem347")
+    with pytest.raises(RuntimeError, match="exact native note census"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names, purchased_note=stale,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+@pytest.mark.parametrize("note_on_crown", [False, True])
+def test_stud_cold_note_rejects_another_valid_top_boundary_with_the_same_projected_landing(
+    monkeypatch, tmp_path, note_on_crown,
+):
+    case = _saved_stud_height_case(monkeypatch, tmp_path, note_on_crown=note_on_crown)
+    case.note_annotation.attached = case.top if note_on_crown else case.crown_item.edge
+    with pytest.raises(RuntimeError, match="original physical head-top source descriptor"):
+        bolt_drawing._assert_saved_physical_references(
+            case.adapter, case.identities, case.configurations,
+            serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
+        )
+    assert case.close_calls == ["finished-stud.SLDDRW"]
+    assert case.adapter.currentModel is case.previous_model
+
+
+def _saved_stud_height_case(monkeypatch, tmp_path, *, note_on_crown=False):
     case = _settled_stud_height_case(monkeypatch)
+    _stud_paper_fixture(case, monkeypatch)
+    if note_on_crown:
+        case.note_annotation.attached = case.crown_item.edge
+    _shelve_stud_paper(case)
+    case.scans.clear()
+    case.events.clear()
     path = tmp_path / "finished-stud.SLDDRW"
     path.touch()
     case.path = str(path.resolve())
@@ -2034,6 +2530,13 @@ def _saved_stud_height_case(monkeypatch, tmp_path):
     for name in ("SupplierHeadHeight", "SupplierStockLength"):
         native = case.displays[name].GetDimension2(0)
         native.FullName = f"{native.FullName}@finished-stud"
+    case.note_name = "DetailItem347@ACTUAL-SERIALIZED"
+    case.purchased_note_proof["name"] = bolt_drawing.capture_serialized_note_name(
+        case.adapter, case.note_annotation, case.front,
+        drawing_path=path, source_path=bolt_drawing.SOURCE,
+        sheet_names=bolt_drawing.SHEET_NAMES, sheet_name=bolt_drawing.SHEET_NAMES[0],
+        configuration=case.purchased_note_proof["source"][2], label="Purchased Screw Note",
+    )
     case.serialized_full_names = bolt_drawing.capture_serialized_physical_axial_names(
         case.adapter,
         {name: case.references[name] for name in ("SupplierHeadHeight", "SupplierStockLength")},
@@ -2062,14 +2565,14 @@ def test_stud_saved_reopen_proves_fresh_geometry_native_full_name_and_supplier_f
     bolt_drawing._assert_saved_physical_references(
         case.adapter, case.identities, case.configurations,
         serialized_full_names=case.serialized_full_names,
+        purchased_note=case.purchased_note_proof,
     )
     assert case.open_calls == [(case.path, 3, 3, "", 0, 0)]
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
     assert not case.loaded
-    assert len(case.scans) == 2
     assert all(record[0] is case.model for record in case.scans)
-    assert [record[1] for record in case.scans] == [case.front, case.stock_case.front]
+    assert {id(record[1]) for record in case.scans} == {id(case.front), id(case.stock_case.front)}
     receipt = next(
         fields for _name, fields in case.events if fields.get("phase") == "after_saved_reopen"
     )
@@ -2113,6 +2616,7 @@ def test_stud_saved_reader_requires_complete_distinct_serialized_mapping_before_
     with pytest.raises(RuntimeError, match="serialized native FullNames"):
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+            purchased_note=case.purchased_note_proof,
         )
     assert not case.open_calls and not case.close_calls and not case.scans
     assert case.adapter.currentModel is case.previous_model
@@ -2143,6 +2647,7 @@ def test_stud_saved_reader_matches_only_the_actual_serialized_full_names(
     with pytest.raises(RuntimeError, match="label_match_counts"):
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations, serialized_full_names=serialized,
+            purchased_note=case.purchased_note_proof,
         )
     receipt = next(
         fields for event, fields in case.events
@@ -2167,6 +2672,7 @@ def test_stud_saved_missing_both_names_emits_full_actual_native_inventory_before
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     receipt = next(
         fields for event, fields in case.events
@@ -2243,6 +2749,7 @@ def test_stud_saved_inventory_visits_unexpected_actual_sheets_before_sheet_censu
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     receipt = next(
         fields for event, fields in case.events
@@ -2291,6 +2798,7 @@ def test_stud_saved_inventory_continues_after_getter_failure_and_chains_original
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert failure.value.__cause__ is cause
     receipt = next(
@@ -2389,6 +2897,7 @@ def test_stud_saved_reopen_refuses_corruption_and_restores_adapter_even_on_failu
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
@@ -2414,6 +2923,7 @@ def test_stud_saved_proof_requires_existing_closed_finalized_file(
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert not case.open_calls
     assert not case.close_calls
@@ -2559,6 +3069,7 @@ def test_stud_saved_proof_requires_the_opened_document_to_be_registered_by_exact
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
@@ -2583,6 +3094,7 @@ def test_stud_saved_proof_refuses_adapter_current_model_drift_before_geometry_re
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert case.close_calls == ["finished-stud.SLDDRW"]
     assert case.adapter.currentModel is case.previous_model
@@ -2992,6 +3504,7 @@ def test_stud_stock_native_proof_is_required_at_every_consumer(
             bolt_drawing._assert_saved_physical_references(
                 case.adapter, case.identities, case.configurations,
                 serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
             )
     if phase == "saved":
         assert case.close_calls == ["finished-stud.SLDDRW"]
@@ -3050,6 +3563,7 @@ def test_stud_stock_settled_and_saved_census_resolve_fresh_physical_stations(
             bolt_drawing._assert_saved_physical_references(
                 case.adapter, case.identities, case.configurations,
                 serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
             )
         else:
             bolt_drawing._assert_supplier_references(
@@ -3102,7 +3616,7 @@ def test_stud_stock_settled_census_requires_both_native_physical_proofs(monkeypa
     assert {(fields["label"], fields["phase"]) for fields in proofs} == {
         ("SupplierHeadHeight", "settled"), ("SupplierStockLength", "settled"),
     }
-    assert [record[1] for record in case.scans] == [case.front, case.stock_case.front]
+    assert {id(record[1]) for record in case.scans} == {id(case.front), id(case.stock_case.front)}
 
 
 @pytest.mark.parametrize("name", ["SupplierHeadHeight", "SupplierStockLength"])
@@ -3136,6 +3650,7 @@ def test_stud_saved_physical_census_requires_each_exact_sheet_and_source_configu
         bolt_drawing._assert_saved_physical_references(
             case.adapter, case.identities, case.configurations,
             serialized_full_names=case.serialized_full_names,
+            purchased_note=case.purchased_note_proof,
         )
     assert case.adapter.currentModel is case.previous_model
     if fault == "moved_sheet":
@@ -3240,6 +3755,7 @@ def test_stud_stock_requires_observed_native_source_document_at_every_consumer(
             bolt_drawing._assert_saved_physical_references(
                 case.adapter, case.identities, case.configurations,
                 serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
             )
     assert not any(record[1] is stock.front for record in case.scans)
     assert not case.creations
@@ -3281,6 +3797,7 @@ def test_stud_physical_census_refuses_missing_native_dimension_before_full_name_
             bolt_drawing._assert_saved_physical_references(
                 case.adapter, case.identities, case.configurations,
                 serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
             )
         else:
             bolt_drawing._assert_supplier_references(
