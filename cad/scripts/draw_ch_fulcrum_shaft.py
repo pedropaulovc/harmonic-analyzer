@@ -23,6 +23,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -38,6 +39,9 @@ from ch_fulcrum_shaft_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_fulcrum_shaft"]
 PART_STEM = SPEC.artifact_stem

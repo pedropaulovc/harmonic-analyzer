@@ -82,6 +82,7 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
 from _fr_frame_balloon_anchors import FRAME_BALLOON_ANCHORS
+from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
 import _telemetry
@@ -101,6 +102,9 @@ from fr_vn_frame_cross_screw_spec import (
     THREAD as CROSS_SCREW_THREAD,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["fr_frame_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem

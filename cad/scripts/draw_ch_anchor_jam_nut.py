@@ -18,6 +18,7 @@ import argparse
 import sys
 from typing import Any
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _check import check
 from _com import _early_bound
@@ -58,6 +59,9 @@ from ch_anchor_jam_nut_spec import (
     THREAD,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_anchor_jam_nut"]
 PART_STEM = SPEC.artifact_stem

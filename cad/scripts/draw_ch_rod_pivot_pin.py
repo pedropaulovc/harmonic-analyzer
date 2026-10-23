@@ -49,6 +49,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -60,6 +61,9 @@ from ch_rod_pivot_pin_notes import (
 )
 from ch_rod_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rod_pivot_pin"]
 PART_STEM = SPEC.artifact_stem

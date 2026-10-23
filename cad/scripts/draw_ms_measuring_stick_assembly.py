@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import _config
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
@@ -69,6 +70,9 @@ from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_measuring_stick_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem

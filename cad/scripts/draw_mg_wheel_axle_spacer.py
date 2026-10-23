@@ -11,6 +11,7 @@ import argparse
 import sys
 from typing import Any
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _check import check
 from _paths import CAD_ROOT
@@ -41,6 +42,9 @@ from mg_wheel_axle_spacer_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_axle_spacer"]
 PART_STEM = SPEC.artifact_stem

@@ -67,6 +67,7 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -108,6 +109,9 @@ from mg_magnifying_clamp_spec import (
     THUMB_TAP_PROCESS,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_clamp"]
 PART_STEM = SPEC.artifact_stem

@@ -17,6 +17,7 @@ from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _check import check
 from _com import _early_bound
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _drawing_common import (
@@ -39,6 +40,9 @@ from pd_platen_rack_spec import (
     DRAWING_REFERENCE_DIMENSIONS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_platen_rack"]
 PART_STEM = SPEC.artifact_stem
