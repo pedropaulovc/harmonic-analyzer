@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -11,7 +12,8 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
-from _supplier_nut_drawing import add_supplier_nut_dimensions
+from _supplier_nut_drawing import add_supplier_nut_dimensions, assert_saved_supplier_nut_nominal
+from _supplier_nut_installation_flag import add_supplier_nut_installation_flag
 from _supplier_screw_layout import supplier_screw_margins
 import sm_vn_boss_hook_jam_nut_spec as supplier
 
@@ -25,13 +27,16 @@ SUPPLIER_MARGINS = supplier_screw_margins(
     supplier.SUPPLIER_REFERENCE_DIMENSIONS,
     sides={"ThreadNominalMajor": "bottom"},
 )
-SUPPLIER_MARGINS["*Right"] = (0.007, 0.018, 0.007, 0.0)
+# Match Front's vertical fit budget to preserve projected alignment.
+SUPPLIER_MARGINS["*Right"] = (
+    0.007, SUPPLIER_MARGINS["*Front"][1], 0.007, SUPPLIER_MARGINS["*Front"][3],
+)
 
 
 def _supplier_dimensions(
     adapter: Any, views_by_orientation: dict[str, Any]
 ) -> Callable[[], None]:
-    return add_supplier_nut_dimensions(
+    dimensions_check = add_supplier_nut_dimensions(
         adapter,
         views_by_orientation,
         across_flats_mm=supplier.ACROSS_FLATS,
@@ -43,18 +48,43 @@ def _supplier_dimensions(
         reference_dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
         reference_starts=supplier.SUPPLIER_REFERENCE_STARTS,
     )
+    # JAM_NUT_POS seats this local z=0 face on the MHA-SM-03 boss top.
+    flag_check = add_supplier_nut_installation_flag(
+        adapter, views_by_orientation["*Right"], artifact_stem=SPEC.artifact_stem,
+        bearing_point_mm=(supplier.ACROSS_FLATS / 2.0, 0.0, 0.0),
+    )
+
+    def assert_settled() -> None:
+        dimensions_check()
+        flag_check()
+
+    return assert_settled
 
 
 async def build(adapter: Any) -> dict[str, str]:
     authored_checks: list[Callable[[], None]] = []
+    source_configuration: str | None = None
 
     def supplier_dimensions(target: Any, views: dict[str, Any]) -> None:
+        nonlocal source_configuration
+        source_configuration = views["*Front"].ReferencedConfiguration
+        if not isinstance(source_configuration, str) or not source_configuration.strip():
+            raise RuntimeError("supplier nut has no authored source configuration")
         authored_checks.append(_supplier_dimensions(target, views))
 
     def assert_settled() -> None:
         if len(authored_checks) != 1:
             raise RuntimeError("supplier nut annotations must be authored exactly once")
         authored_checks[0]()
+
+    def assert_saved(target: Any, path: Path) -> None:
+        if source_configuration is None:
+            raise RuntimeError("supplier nut saved check has no authored source binding")
+        authored_checks.clear()  # Release closed drawing wrappers before reopening.
+        assert_saved_supplier_nut_nominal(
+            target, path, nominal_major_mm=supplier.SUPPLIER_NOMINAL_MAJOR_MM,
+            source_path=SPEC.source, configuration=source_configuration,
+        )
 
     # Every purchased view is hidden-lines-removed (rule 9), which also clears
     # the dashed bore the r6/r7 reviews flagged in the TOP/RIGHT views.
@@ -65,6 +95,7 @@ async def build(adapter: Any) -> dict[str, str]:
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_settled,),
+        saved_check=assert_saved,
     )
 
 

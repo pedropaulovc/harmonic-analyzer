@@ -69,6 +69,109 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Purchased nuts additionally prove one exact centred construction chord and
+  its two distinct endpoints. Source endpoints must exhaust the model sketch's
+  point inventory; both drawing attachments must match different members of
+  that inventory mapped through `IView.GetCorresponding`. Complete mapping,
+  native self-comparison and known-negative comparisons remain mandatory.
+  Raw drawing/model point inequality is not a failed correspondence.
+  Their native nominal-major, across-flats and thickness text blocks use the
+  shared measured-shelf convention: seed offset mode at the actual arrow
+  station, then move the complete text beyond the outside-arrow tail without
+  changing the physical witnesses or dimension-line coverage. Original
+  perpendicular witnesses and axial physical dimension lines are retained as
+  canonical interval unions, including every disjoint component and gap, not
+  merely outside endpoints or maximum reach. Equivalent fragmentation,
+  coalescing, reversal and ordering are harmless; changed coverage or actual
+  transverse bounds fail against the immutable pre-transition measurement.
+  Union gaps use the existing 10 micrometre readback tolerance once, without
+  padding stored endpoints or adopting a later station as the baseline.
+  Physical candidates must lie on the actual arrow support line at both ends.
+  Each arrow tip must also lie within the existing radial 10 micrometre bound
+  of an actual finite physical segment; a gap-closed union cannot supply
+  synthetic tip support. Off-support text strokes remain in the raw record.
+  Native `OffsetText` can add a connector and underline exactly on the arrow
+  support line. Only a positive live Boolean `OffsetText` read permits the
+  narrow observed distinction: one unique pair of distinct raw primitives
+  joins the arrow midpoint to a validated lower-left, unrotated horizontal
+  fragment on the lowest validated native font baseline, then spans its complete
+  measured advance. Only when no existing fragment candidate matches may all
+  validated lower-left, unrotated fragments form one complete advance run:
+  their X intervals must adjoin within the existing tolerance, without duplicate
+  starts, larger gaps or overlaps, and share positive vertical overlap. The
+  candidate uses every fragment and the global font bottom; sorting it does not
+  remove or reorder the raw record. The same unique-pair endpoints, actual
+  junction, full lengths and direct
+  agreement with that global baseline use the existing tolerance once, without
+  stacked allowances. The baseline must clear the remaining physical reach
+  by the existing clearance.
+  Exclude only those two matched primitives, never their spatial intervals
+  from overlapping physical runs. Getter failures propagate; non-Boolean mode,
+  incomplete, duplicated, competing or unsupported paths are not a text escape.
+  Every other on-support candidate remains conservatively physical against
+  the original baseline. This is not a general glyph-clearance classifier.
+  A station refusal retains a bounded JSON note of already-read original and
+  actual vectors, native offset mode, text fragments, lines and arrows, with
+  explicit truncation counts. The initial settled check can include both raw
+  measurements; later read-only proofs retain only original station vectors,
+  so unavailable original raw data is identified rather than reconstructed.
+  Diagnostics add no native reads, change no predicate, and re-raise the original
+  failure object even if formatting or attaching either diagnostic note raises
+  a secondary `BaseException`. This shield applies only after a primary failure;
+  normal measurement and native getter failures still propagate.
+  Every reported text fragment participates,
+  including both fraction parts, all three nominal-major rows, and measured
+  empty/whitespace BSTR advances. The shared native bounds reader normalizes all
+  six SDK anchor positions and their rotation using measured font rectangles,
+  without the visible-ink filter or estimated glyph widths. Each fragment must
+  have readable string data, positive finite dimensions, a finite position and
+  angle, and a known reference before forming the union; blank text never
+  excuses malformed geometry or removes a fragment from the measured inventory.
+  Native station/extent proof is not exact glyph or foreign-line clearance
+  proof; retain every line, including fraction bars, and inspect the actual
+  PDF ink, whole sheet and automated machinist result after regeneration.
+  A consumer's read-only native path audit can use `audit_records`: after all
+  strict station and shelf checks, the core passes that checkpoint's same
+  freshly measured record mapping once, without a second annotation dump.
+  The audit must not mutate native state or records; failures propagate.
+  Initial and later proofs each collect their own records, never a cached
+  snapshot from before a rebuild or save.
+  Front and Right reserve the same vertical annotation margins before fitting,
+  so their physical projection centres remain aligned without moving a fitted
+  view or changing its shared scale; per-view horizontal budgets remain intact.
+  Separately opted-in purchased recipes align projected model origins before
+  supplier annotation capture: only Top X and Right Y move. Each native view's
+  independent scale and refreshed cell containment must survive unchanged;
+  the operation does not refit views. Other recipes retain the default-off
+  alignment behavior.
+  The boss-hook and pen-hanger jam nuts share `_supplier_nut_installation_flag`,
+  passing their artifact identity and assembly-derived bearing point in final
+  model millimetres. The boss nut's z=0 face seats on MHA-SM-03; the hanger jam
+  nut's z=THICKNESS face contacts the outboard z=0 face of MHA-PN-VN-54.
+  Each key attaches to that face's visible physical boundary, not a nominal
+  construction carrier. A native attached leader and its single linked
+  legend are re-proved after the final rebuild. Every reported key text
+  fragment must have three finite position coordinates, a finite angle and
+  positive finite dimensions before forming its aggregate bounds; a valid
+  fragment cannot hide unreadable later ink. This flag does not establish
+  full-thread engagement or waive the physical shortfall review.
+  Numeric border zones owned by the drawing template are not installation-key
+  candidates. Sheet- or foreign-view duplicates still fail; the whole-inventory
+  linked-legend and instruction uniqueness checks remain unchanged.
+  The five nut stems additionally enforce `text-clearance`, `text-on-line`,
+  `dim-line-through-own-text`, `text-on-view` and `arrow-near-text`.
+  `extension-through-own-text` remains reported rather than newly enforced:
+  its merged-row bounds can cross a legitimate fraction bar while individual
+  PDF glyphs clear it. Retain the raw finding and inspect those glyphs; this
+  does not waive genuine witness or tail collisions or machinist review.
+  After native export closes each purchased-nut drawing, its normal drawing
+  leaf reopens that exact SLDDRW read-only, reacquires Front and its nominal
+  dimension, and repeats the native owner, value and distinct mapped-endpoint
+  proof. The source path and original authoring Front configuration must
+  survive unchanged; this proves binding persistence, not independent catalogue
+  configuration correctness. The reader closes only its own newly opened
+  drawing without saving, verifies unchanged drawing bytes, and remains within
+  the purchased wrapper's source-file preservation guard.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;

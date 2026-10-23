@@ -3827,6 +3827,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_spring_reference.py",
         SCRIPTS_DIR / "test_supplier_reference_geometry.py",
         SCRIPTS_DIR / "test_supplier_reference_text.py",
+        SCRIPTS_DIR / "test_supplier_nut_saved_readback.py",
         SCRIPTS_DIR / "test_drawing_physical_axial_dimension.py",
         SCRIPTS_DIR / "test_drawing_serialized_note_identity.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
@@ -3961,6 +3962,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             # Supplier native regressions read captured paint and shelf facts.
             str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
             str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
+            str((SCRIPTS_DIR / "testdata" / "supplier_reference_text_native_offset.json").resolve()),
             # Migrated/enrolled revision and label contracts read plans at runtime.
             *(
                 str(_process_plans.plan_path(stem).resolve())

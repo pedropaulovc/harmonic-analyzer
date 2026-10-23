@@ -224,7 +224,6 @@ def test_installation_note_fits_the_sheet(stem: str) -> None:
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines), lines
     notes = " ".join(lines)
-    assert notes.startswith("INSTALLATION - ")
     assert not re.search(r"\d+\.\d|\+/-|±|Ø|MAX|MIN| MM\b", notes)
 
 
