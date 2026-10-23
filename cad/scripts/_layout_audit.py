@@ -3925,10 +3925,48 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
 # "view-edges-missing": the recorded front/right PDFs used the ambiguous
 # 0.18 mm family, outside the retained calibration and selected template
 # edge bands. Keep this exemption until fleet evidence supports enforcement.
+# Keep every raw supplier-reference finding in the report. Stacked fractions
+# can trigger extension-through-own-text through their merged PDF row even
+# when the individual printed glyphs clear the fraction bar.
+_SUPPLIER_REFERENCE_ENFORCED_KINDS = frozenset(
+    {
+        "text-clearance",
+        "text-on-line",
+        "dim-line-through-own-text",
+        "text-on-view",
+        "arrow-near-text",
+    }
+)
+
+# The six oblique-jig screws additionally enforce their portrait frame and
+# title-block boundaries. text-on-view / arrow-near-text cover foreign owners,
+# not text over its own body. Keep every raw finding in the report.
+_PURCHASED_SCREW_ENFORCED_KINDS = _SUPPLIER_REFERENCE_ENFORCED_KINDS | frozenset(
+    {"keep-out", "outside-border"}
+)
+
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"}),
         "sm-knife-mount": GATING_KINDS - {"view-edges-missing"},
+        "mg-vn-wheel-axle-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-adjust-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-hanger-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "pn-vn-pen-hanger-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        "sm-vn-boss-hook-jam-nut": _SUPPLIER_REFERENCE_ENFORCED_KINDS,
+        # Carriage alone: source 0c61a8f5's complete five-dimension inventory
+        # has no fractions, and its four native extension findings were
+        # corroborated against individual printed spans, including the
+        # multiline ThreadDiameter. This is not a decimal-text exemption or
+        # a claim that every fraction/decimal row is reliable; the five
+        # imperial screws retain raw extension findings without REPORT refusal.
+        "ch-rocker-arm-tl-vn-oblique-carriage-screw": _PURCHASED_SCREW_ENFORCED_KINDS
+        | {"extension-through-own-text"},
+        "ch-rocker-arm-tl-vn-oblique-block-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-bracket-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-rail-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-clamp-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
+        "ch-rocker-arm-tl-vn-oblique-lever-screw": _PURCHASED_SCREW_ENFORCED_KINDS,
     }
 )
 

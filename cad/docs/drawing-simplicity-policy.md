@@ -69,23 +69,85 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Original perpendicular witness coverage is
+  retained as a canonical interval union, not merely its outside endpoints:
+  equivalent fragmentation or ordering is harmless, but a new interior gap
+  fails the same settled proof. Every reported text fragment participates,
+  including both fraction parts, all three nominal-major rows, and measured
+  empty/whitespace BSTR advances. The shared native bounds reader normalizes all
+  six SDK anchor positions and their rotation using measured font rectangles,
+  without the visible-ink filter or estimated glyph widths. Each fragment must
+  have readable string data, positive finite dimensions, a finite position and
+  angle, and a known reference before forming the union; blank text never
+  excuses malformed geometry or removes a fragment from the measured inventory.
+  Native station/extent proof is not exact glyph or foreign-line clearance
+  proof; retain every line, including fraction bars, and inspect the actual
+  PDF ink, whole sheet and automated machinist result after regeneration.
+  A consumer's read-only native path audit can use `audit_records`: after all
+  strict station and shelf checks, the core passes that checkpoint's same
+  freshly measured record mapping once, without a second annotation dump.
+  The audit must not mutate native state or records; failures propagate.
+  Initial and later proofs each collect their own records, never a cached
+  snapshot from before a rebuild or save.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
   a pre-fit allowance is not evidence that native ink fits.
-  The clamp screw selects the purchased sheet's `tall_top` layout: a 96 mm
-  outer Top cell retains the existing 46 mm annotation reserve, leaving
-  50 mm for the measured native outline. The bottom-row cells' tops and
-  the Isometric's bottom lower 32 mm; other sheets keep `standard`.
+  The shared clamp screw retains `tall_top`: its 96 mm outer Top cell less
+  the unchanged 46 mm annotation reserve leaves 50 mm for the native outline.
+  The six oblique-jig carriage, block, bracket, rail, clamp and lever screws
+  instead use the existing ANSI B portrait sheet and `portrait_reference`.
+  Their 88.4 mm outer Top cell less its unchanged 52 mm reserve leaves
+  36.4 mm for native geometry. With their empty installation/data footer,
+  Front retains 127 mm of geometry height, rather than the rejected landscape
+  `tall_top` allocation's 27 mm. Longer footer content must still raise the
+  existing caption floor and pass actual containment. Other sheets keep their
+  selected existing layout.
+  The portrait footer's anchors and reserved boxes translate together above
+  the existing 66 mm title block; other consumers retain their default positions.
+  Only the six portrait sheets jointly reposition their existing bottom zone-3
+  and zone-4 notes in their original native column cells. Zone 3's complete box
+  stays in its cell's right half; zone 4's complete box is centred in the strip
+  from its cell's left edge plus 0.6 mm to the native left margin minus 0.6 mm.
+  Both fresh native boxes must fit their original 0.6 mm cell insets and target
+  lanes before either move. Their `<ZONEC>` links, resolved zones, grid and all
+  fonts stay unchanged. Original sheet y/z are requested unchanged for both;
+  all three returned coordinates use the existing 0.0001 mm readback bound,
+  including after rebuild and at final validation. The other six column anchors
+  remain exactly unchanged. The license watermark is not altered or obscured;
+  fresh native bounds and all six complete exported footers still require inspection.
+  The shared clamp and these six screws align orthographic projected model origins
+  after fitting, before reference annotation, without changing selected scales
+  or relaxing their cells.
+  The carriage's local aligned-text line break must retain the original native
+  arrow/witness stations; post-style geometry never replaces that authority.
+  A station refusal records the already-held before/after annotation, arrow and
+  line arrays in native index order, plus setter/readback state. Indices are
+  not entity identities. These audit coordinates retain their existing 0.1 um
+  precision, not unrounded native doubles. Diagnostic failure cannot mask the
+  original strict exception, and emitted data is not a clearance/fix verdict.
+  The existing linked title-cell fitter owns PART, the actual Material property
+  and DWG. NO. together; it is not combined with the separate Number fitter.
+  Only these six Material notes use `label_right`: the complete native value box
+  is centred in the actual ruled cell's region to the right of its measured
+  static MATERIAL label. Both complete boxes retain 0.6 mm cell/foreign-text
+  clearance; the label's identity, anchor and full native style stay unchanged.
+  The value retains its original font and native height-unit mode when it fits,
+  with the same 2 mm floor. Only a genuine existing-ladder reduction may select
+  metre-height mode, after a successful native setter and strict height/mode
+  readback; the complete accepted style is then frozen. All other style and
+  source content remain unchanged. Other title consumers retain fixed alignment
+  by default. Native title-state refusals report changed
+  fields with expected/observed values and the existing comparison tolerance;
+  diagnostic output never relaxes the protected state or fitting guards.
   Scale selection still tries the existing standard scales against complete
-  native outlines,
-  without subtracting fixed sheet-space padding. Short clamp-reference text
-  is shelved only when its measured extent cannot clear the native arrow
-  span; the measured arrow/witness stations stay fixed and final native
-  paths, text and cell containment remain checked. Missing, duplicate, foreign
-  or wrong-view native references refuse with expected and observed inventories.
-  This layout contract is not a substitute for the rendered comparison with
-  the supplier drawing.
+  native outlines, without subtracting fixed sheet-space padding. The shared clamp
+  and these six screws shelve short reference text only when its measured extent
+  cannot clear the native arrow span; measured arrow/witness stations stay fixed.
+  Final native paths, text and cell containment remain checked. Missing, duplicate,
+  foreign or wrong-view native references refuse with expected and observed inventories.
+  Neither the larger field nor a pre-fit budget proves printed readability:
+  every changed sheet still needs the rendered supplier comparison.
 - **Roughness grades (rule 6)** are the `_surface_finish` constants:
   `MACHINED_UM` (1.6) on `shaft_in_bushing` journals and bores,
   `cam_follower_contact` faces, the amplitude-bar slide, the knife edge and
@@ -109,9 +171,12 @@ cannot ask for what the authors were told to leave out.
   gate 3 in the root `AGENTS.md`).
   Purchased drawings may opt into a recipe-local title-block setup after the
   source links resolve, returning final-rebuild checks through the existing
-  `settled_checks` contract. Only the TL-VN-73/74/75/76 captured-pivot purchases
-  opt into `_purchased_title_fit`: it fits their existing linked Name, Material
-  and DWG. NO. notes inside their actual native ruled cells on one row.
+  `settled_checks` contract. The TL-VN-73/74/75/76 captured-pivot purchases and
+  the six oblique-jig screws opt into `_purchased_title_fit`: it fits their
+  existing linked Name, authoritative Material field and DWG. NO. notes inside
+  their actual native ruled cells. The captured-pivot recipes retain
+  `Material Specification`; the six oblique-jig recipes use their actual
+  `Material` property, without adding or swapping source-property aliases.
   Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
   an unfit complete value refuses export, never truncates it.
   `SetTextFormat` can remove a leading native `<FONT size=15PTS>` tag. The
@@ -119,7 +184,7 @@ cannot ask for what the authors were told to leave out.
   exact `$PRPSHEET` expression and still requires the full resolved value.
   Font, anchor and whole-cell bounds remain independently checked after the
   final rebuild. No saved template, purchase identity, grade or reference-view
-  scale changes. These four registry Material Specifications contain the
+  scale changes. The four captured-pivot registry Material Specifications contain the
   physical material/condition and applicable standard, not duplicated catalogue
   prose. PASSIVATED and ZINC CLEAR remain in Finish; the complete CBS screw
   description is in ITEM. Supplier, SKU, clevis 3/16 x 1-1/4 and wire .032 stay

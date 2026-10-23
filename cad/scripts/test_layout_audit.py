@@ -5273,3 +5273,643 @@ def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
         "read_failed": ["before"],
     }
     assert all(isinstance(value, (str, bool, int, float, list)) for value in attrs.values())
+
+
+# --------------------------------------------------------------------------
+# The five purchased nuts: REPORT fails each nut's leaf on the five kinds its
+# sheets read reliably, proved on real audit geometry, while the native
+# fraction row's raw extension-through-own-text stays reported only.
+# --------------------------------------------------------------------------
+
+NUT_STEMS = (
+    "pn-vn-pen-hanger-jam-nut",
+    "mg-vn-wheel-axle-nut",
+    "pn-vn-pen-adjust-nut",
+    "pn-vn-pen-hanger-nut",
+    "sm-vn-boss-hook-jam-nut",
+)
+
+
+def test_the_five_purchased_nuts_are_registered_drawings():
+    """The enforcement map is keyed by ``DrawingSpec.artifact_stem`` (the
+    hyphenated layout-report name), not by the underscore task name
+    ``DRAWINGS_BY_NAME`` uses; every stem the nut cases below enforce is a
+    registered drawing, so none of them enforces a key no leaf ever runs."""
+    from _drawing_registry import DRAWINGS
+
+    by_stem = {drawing.artifact_stem: drawing for drawing in DRAWINGS}
+    assert len(set(NUT_STEMS)) == 5
+    assert set(NUT_STEMS) <= set(by_stem)
+    assert {by_stem[stem].name for stem in NUT_STEMS} == {stem.replace("-", "_") for stem in NUT_STEMS}
+
+
+def _nut_dim_line_case(fixed):
+    """A dimension line arrowed at both tips (x 95.0 and 115.0, the two-arrow
+    baseline every dimension consumer records), along y 151.7 through its
+    own "12.0" (row y 150.0-153.5): the arrowed control of
+    test_an_arrowless_dimensions_line_through_its_own_text_gates with its
+    right tip arrowed too. Fixed by dropping line and arrows 0.5 mm under
+    the row."""
+    y = 0.1495 if fixed else 0.1517
+    dim = _dim("Suppressed", "12.0", 0.1000, 0.1500, lines=[(0.0950, y, 0.1150, y)])
+    dim["display"]["arrows"] = [
+        [0.0950, y, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0],
+        [0.1150, y, 0.0, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, -1.0],
+    ]
+    return _dump(views=[_view("v", (0.05, 0.05, 0.25, 0.25), [dim])])
+
+
+def _nut_text_on_line_case(fixed):
+    """Retain the recorded nut row and cross it with a foreign dimension.
+
+    The compound rocker note fixture also intersects its foreign view, so
+    clearing only its extension line cannot prove a clean five-kind leaf.
+    This nut case retains every recorded primitive instead of hiding that
+    unrelated rocker defect or weakening the text-on-view guard.
+    """
+    foreign, span = _nut_jam_foreign_line(0.2 if fixed else 0.16594)
+    return _nut_jam_rd1_dump(foreign=foreign, foreign_span=span)
+
+
+def _nut_text_on_view_case(fixed, *, own_view=False):
+    """knife-mount's Ra 0.8 (test_text_beside_a_view_is_measured_against_its
+    _printed_edges_not_its_padded_outline): View1's note printed over View2's
+    printed edges; fixed as the note 1.5 mm clear of View2's first edge.
+    ``own_view`` hands the same over-the-edges box to View2 itself."""
+    extent = (0.1805, 0.1194, 0.2044, 0.1259) if fixed else (0.1845, 0.1394, 0.2084, 0.1459)
+    note = _note("Ra", "Ra 0.8", extent)
+    outline = (0.200412, 0.105046, 0.239588, 0.174954)
+    if own_view:
+        views = [_view("View1", (0.085, 0.105, 0.145, 0.175)), _view("View2", outline, [note])]
+    else:
+        views = [_view("View1", (0.085, 0.105, 0.145, 0.175), [note]), _view("View2", outline)]
+    return _dump(views=views, strokes=_box_edges(0.2059, 0.1070, 0.2380, 0.1730))
+
+
+def _nut_arrow_case(fixed, *, own_text=False):
+    """287c fixture 2 (test_an_arrowhead_near_foreign_text_gates): the 5.56's
+    lower outside arrow 0.4 mm from the foot finish's "Ra 3.2"; fixed by the
+    note 50 mm left, clear of every arrow. ``own_text`` prints the 5.56's own
+    text in the note's box instead, with no note."""
+    box = (62.35, 85.94, 73.70, 89.49) if fixed else (112.35, 85.94, 123.70, 89.49)
+    if own_text:
+        heel, heel_span = _vertical_dim("HeelReliefHt", "5.56", 124.25, 93.90, 102.11, box)
+        items = [(heel, heel_span)]
+    else:
+        items = [
+            _vertical_dim("HeelReliefHt", "5.56", 124.25, 93.90, 102.11, (125.5, 96.2, 131.5, 99.7)),
+            _text_note("foot", "Ra 3.2", box),
+        ]
+    view = _view("v", _mm(20.0, 20.0, 300.0, 270.0), [annotation for annotation, _span in items])
+    return _dump(views=[view], spans=[span for _annotation, span in items], print_rest=False)
+
+
+# (build, kind, a, b): bad geometry at build(False), moved clear at build(True).
+_NUT_KIND_CASES = [
+    pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="text-clearance"),
+    pytest.param(_nut_text_on_line_case, "text-on-line", "RD1", "Foreign", id="text-on-line"),
+    pytest.param(_nut_dim_line_case, "dim-line-through-own-text", "Suppressed", "Suppressed", id="dim-line-through-own-text"),
+    pytest.param(_nut_text_on_view_case, "text-on-view", "note Ra", "view View2", id="text-on-view"),
+    pytest.param(_nut_arrow_case, "arrow-near-text", "HeelReliefHt", "foot", id="arrow-near-text"),
+]
+
+
+def _nut_hits(records, kind, a, b):
+    return [r for r in records if r["kind"] == kind and a in r["a"] and b in r["b"]]
+
+
+def _nut_report(path):
+    import json
+
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("stem", NUT_STEMS)
+@pytest.mark.parametrize(("build", "kind", "a", "b"), _NUT_KIND_CASES)
+def test_each_purchased_nut_fails_its_leaf_on_the_five_reliable_kinds(monkeypatch, tmp_path, stem, build, kind, a, b):
+    """Every nut's drawing task fails under REPORT on each of the five kinds
+    its sheets read reliably, naming the finding the written report records;
+    the same sheet with the defect moved clear passes and loses the finding.
+    Other drawings (a neutral stem, frame-assembly's own entry) still only
+    report the kind, which GATE alone would fail them on."""
+    from _layout_audit import audit_report, enforced
+
+    bad = build(False)
+    live = _patch_collect(monkeypatch, [bad])
+    report = tmp_path / f"{stem}.json"
+    with pytest.raises(RuntimeError, match=rf"(?s)failed for {stem} \(report mode\).*\[{kind}\]") as raised:
+        _run(live, LayoutAuditMode.REPORT, report, stem=stem)
+    [record] = _nut_hits(_nut_report(report)["findings"], kind, a, b)
+    assert record["stem"] == stem
+    assert record["severity"] == "gating"
+    assert record["detail"] in str(raised.value)
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [bad])
+    failing = [f for f in enforced(LayoutAuditMode.REPORT, gating, stem=stem) if f.kind == kind]
+    assert [(f.a, f.b) for f in failing] == [(record["a"], record["b"])]
+    for other in ("fixture", "fr-frame-assembly"):
+        _run(live, LayoutAuditMode.REPORT, tmp_path / f"{other}.json", stem=other)
+        assert [f for f in enforced(LayoutAuditMode.REPORT, gating, stem=other) if f.kind == kind] == []
+        assert [(f.a, f.b) for f in enforced(LayoutAuditMode.GATE, gating, stem=other) if f.kind == kind] == [
+            (record["a"], record["b"])
+        ]
+
+    clear = build(True)
+    _run(_patch_collect(monkeypatch, [clear]), LayoutAuditMode.REPORT, report, stem=stem)
+    assert _nut_hits(_nut_report(report)["findings"], kind, a, b) == []
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [clear])
+    assert [f for f in enforced(LayoutAuditMode.GATE, gating, stem=stem) if f.kind == kind] == []
+
+
+def test_text_on_view_and_arrow_near_text_are_foreign_owner_kinds_for_the_nuts():
+    """text-on-view and arrow-near-text read another owner: the same
+    over-the-edges box owned by View2 itself, and the 5.56's own text where
+    the foot note stood, are neither finding. The nut cases above prove
+    foreign-view and foreign-text coverage only, not a nut's text printed
+    over its own body."""
+    own_view = audit_dump(_nut_text_on_view_case(False, own_view=True))
+    assert [f for f in own_view if f.kind == "text-on-view"] == []
+    own_text = audit_dump(_nut_arrow_case(False, own_text=True))
+    assert [f for f in own_text if f.kind == "arrow-near-text"] == []
+    assert [f.a for f in own_text if "HeelReliefHt" in f.a and f.kind.endswith("-through-own-text")] == []
+
+
+# pn-vn-pen-hanger-jam-nut Front view RD1 (the across-flats "(1/4" in)" row)
+# as farm run 20261022T183536971Z-d534525e684044cbab825aa8784c5349 of source
+# 8c0e04a4 (rolling-main-post-v44) dumped it: reports/layout-audit/
+# pn-vn-pen-hanger-jam-nut.json sheets[0].views[0].annotations[1] (the record
+# test_supplier_reference_text's _nut_rd1 preserves) and the five PDF text
+# spans pdfium read for it (ink.spans[4:9]). Five native runs (the fraction's
+# numerator and denominator are their own runs), six lines (lines[0] is the
+# fraction bar), two outside arrows with 6.35 mm tails. That sheet's other
+# annotations (ThreadNominalMajor, the Right view's RD1) are not replayed:
+# this fixture is the fraction row alone.
+_NUT_JAM_Z = -0.0059531
+
+
+def _nut_jam_line(x0, y0, x1, y1):
+    return [0.0, 0.0, 0.0, 0.0, x0, y0, _NUT_JAM_Z, x1, y1, _NUT_JAM_Z]
+
+
+def _nut_jam_text(text, x, y, width):
+    return {
+        "t": text, "pos": [x, y, _NUT_JAM_Z], "h": 0.0035, "ref": 1, "ang": 0.0,
+        "font": "Century Gothic", "ls": 0.001, "w": width,
+    }
+
+
+NUT_JAM_RD1 = {
+    "type": 4,
+    "name": "RD1",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.115, 0.1661689, _NUT_JAM_Z],
+    "layer": "",
+    "display": {
+        "lines": [
+            _nut_jam_line(0.1099372, 0.169306, 0.113549, 0.169306),  # the fraction bar
+            _nut_jam_line(0.099125, 0.1444154, 0.099125, 0.1598138),
+            _nut_jam_line(0.130875, 0.1444154, 0.130875, 0.1598138),
+            _nut_jam_line(0.099125, 0.1588138, 0.092775, 0.1588138),
+            _nut_jam_line(0.099125, 0.1588138, 0.130875, 0.1588138),
+            _nut_jam_line(0.130875, 0.1588138, 0.137225, 0.1588138),
+        ],
+        "arrows": [
+            [0.099125, 0.1588138, _NUT_JAM_Z, -1.0, -0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.130875, 0.1588138, _NUT_JAM_Z, 1.0, 0.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [
+            _nut_jam_text("(", 0.1077035, 0.1664411, 0.0017208),
+            _nut_jam_text("1", 0.11045, 0.1689983, 0.0025861),
+            _nut_jam_text("4", 0.11045, 0.16437, 0.0025861),
+            _nut_jam_text('" in)', 0.1140618, 0.1664411, 0.0082347),
+            _nut_jam_text("ACROSS FLATS", 0.0988757, 0.1588138, 0.0322486),
+        ],
+    },
+    "dim": {"hole_callout": False},
+}
+# pdfium glyph boxes, ink-keyed as the collector stores them (no spaces).
+NUT_JAM_RD1_SPANS = [
+    ["(", 0.1083098, 0.1664883, 0.1091445, 0.1710057],
+    ["1", 0.1111129, 0.1700115, 0.1119718, 0.1734135],
+    ["4", 0.1105667, 0.1653833, 0.1129101, 0.1688693],
+    ['"in)', 0.1141691, 0.1664883, 0.12169, 0.1710057],
+    ["ACROSSFLATS", 0.0989876, 0.1597477, 0.1308258, 0.163313],
+]
+NUT_JAM_FRONT_OUTLINE = (0.093537, 0.1103311, 0.136463, 0.1581689)
+
+
+def _nut_jam_rd1_dump(*, foreign=None, foreign_span=None):
+    """RD1 alone on its Front view, printed as the run's five actual PDF
+    boxes; ``foreign`` adds one more annotation to the view, printing as
+    ``foreign_span``."""
+    annotations = [NUT_JAM_RD1] + ([foreign] if foreign is not None else [])
+    dump = _dump(views=[_view("Drawing View1", NUT_JAM_FRONT_OUTLINE, annotations)])
+    spans = [*NUT_JAM_RD1_SPANS] + ([foreign_span] if foreign_span is not None else [])
+    # Bypass _dump's idealized _printed: only the run's actual PDF boxes belong here.
+    return {
+        **dump,
+        "stem": "pn-vn-pen-hanger-jam-nut",
+        "sheet": "Sheet1",
+        "ink": {"spans": [list(span) for span in spans]},
+    }
+
+
+@pytest.mark.parametrize("stem", NUT_STEMS)
+def test_the_jam_nuts_native_fraction_bar_is_reported_raw_and_fails_no_nut(monkeypatch, tmp_path, stem):
+    """The run's own audit read RD1's fraction bar (lines[0], y 169.306 mm) as
+    "extension line of dim RD1 '1' runs 3.61mm through its own text
+    [108.3,166.5]..[121.7,171.0]mm": the printed-row grouping hands the
+    numerator run the parenthesis row's box, which the bar crosses, though
+    the bar prints 0.71 mm under the "1" glyphs and 0.44 mm over the "4"
+    glyphs. That one raw finding is the audit's fraction-row grouping, not a
+    bar strike on a glyph; nothing here is said of the run's other sheets,
+    annotations or physical primitives, or of the real faults the old
+    source had. The record is not waived: it survives in the written report
+    as a gating raw finding (GATE would fail on it), but no nut's leaf fails
+    on it under REPORT, so the bar stays in the native record with no
+    tolerance, allowlist or parser change."""
+    from _layout_audit import audit_report, enforced
+
+    bar = NUT_JAM_RD1["display"]["lines"][0]
+    numerator, denominator = NUT_JAM_RD1_SPANS[1], NUT_JAM_RD1_SPANS[2]
+    assert bar[5] == bar[8] == 0.169306
+    assert (numerator[2] - bar[5]) * 1000 == pytest.approx(0.7055, abs=1e-3)
+    assert (bar[5] - denominator[4]) * 1000 == pytest.approx(0.4367, abs=1e-3)
+
+    dump = _nut_jam_rd1_dump()
+    assert len(dump["views"][0]["annotations"][0]["display"]["lines"]) == 6
+    assert len(dump["views"][0]["annotations"][0]["display"]["texts"]) == 5
+    report = tmp_path / f"{stem}.json"
+    _run(_patch_collect(monkeypatch, [dump]), LayoutAuditMode.REPORT, report, stem=stem)
+    [raw] = [r for r in _nut_report(report)["findings"] if r["kind"] == "extension-through-own-text"]
+    assert raw["a"] == raw["b"] == "dim RD1 '1'"
+    assert raw["severity"] == "gating"
+    assert "(109.9,169.3)->(113.5,169.3)mm" in raw["detail"]
+    assert "[108.3,166.5]..[121.7,171.0]mm" in raw["detail"]
+    assert raw["overlap_mm"] == pytest.approx(3.6118, abs=1e-3)
+    assert raw["at_mm"] == pytest.approx([111.7431, 169.306], abs=1e-3)
+
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [dump])
+    assert [f.a for f in enforced(LayoutAuditMode.GATE, gating, stem=stem) if f.kind == "extension-through-own-text"] == [
+        "dim RD1 '1'"
+    ]
+    assert enforced(LayoutAuditMode.REPORT, gating, stem=stem) == []
+
+
+# The actual printed rows a foreign line can cross on RD1: the denominator
+# "4" (ink.spans[6]) and "ACROSS FLATS" (ink.spans[8]); y is the glyph box's
+# mid-height, inside that span alone (the "4"'s lower half prints 0.55 mm
+# under the "(" and "\" in)" boxes, "ACROSS FLATS" 2.1 mm under the "4").
+_NUT_JAM_ROWS = [
+    pytest.param(2, 0.16594, id="denominator-4"),
+    pytest.param(4, 0.1615304, id="across-flats"),
+]
+
+
+def _nut_jam_foreign_line(y):
+    """An arrowless foreign dimension whose one line runs x 90..150 mm at
+    ``y``, its "9.5" printed far off at (220, 240) mm with its own PDF box
+    so nothing of it reads unmatched or unclaimed."""
+    dim = _dim("Foreign", "9.5", 0.22, 0.24, lines=[(0.09, y, 0.15, y)])
+    return dim, ["9.5", 0.22, 0.24, 0.22 + 0.6 * 0.0035 * 3, 0.2435]
+
+
+@pytest.mark.parametrize("stem", NUT_STEMS)
+@pytest.mark.parametrize(("span_index", "y"), _NUT_JAM_ROWS)
+def test_each_purchased_nut_fails_its_leaf_on_a_foreign_line_through_the_jam_nuts_printed_row(
+    monkeypatch, tmp_path, stem, span_index, y
+):
+    """A foreign line through one of RD1's actual printed rows is text-on-line
+    on the real record, and REPORT fails every nut's leaf on it while the
+    fraction bar's raw extension-through-own-text stays reported, unenforced.
+    The same line moved to y 200 mm, clear of all five glyph boxes, leaves
+    the sheet with no text-on-line and passes the leaf."""
+    from _layout_audit import audit_report, enforced
+
+    target = NUT_JAM_RD1_SPANS[span_index]
+    assert target[2] < y < target[4]
+    assert [s for s in NUT_JAM_RD1_SPANS if s[2] < y < s[4]] == [target]
+    foreign, span = _nut_jam_foreign_line(y)
+    bad = _nut_jam_rd1_dump(foreign=foreign, foreign_span=span)
+    report = tmp_path / f"{stem}.json"
+    with pytest.raises(RuntimeError, match=rf"(?s)failed for {stem} \(report mode\).*\[text-on-line\]") as raised:
+        _run(_patch_collect(monkeypatch, [bad]), LayoutAuditMode.REPORT, report, stem=stem)
+    records = _nut_report(report)["findings"]
+    [record] = [r for r in records if r["kind"] == "text-on-line"]
+    assert record["a"].startswith("dim RD1 ") and record["b"] == "dim Foreign '9.5'"
+    assert "crossed by \"dim Foreign '9.5'\"'s line (90.0," in record["detail"]
+    assert record["at_mm"][1] == pytest.approx(y * 1000, abs=1e-3)
+    # The audited row box holds the target glyphs (the fraction rows may be
+    # grouped wider, as the bar finding shows), so the line's run through it
+    # is at least the glyphs' width and its midpoint lies inside RD1's print.
+    rd1_x = (min(s[1] for s in NUT_JAM_RD1_SPANS), max(s[3] for s in NUT_JAM_RD1_SPANS))
+    assert rd1_x[0] * 1000 <= record["at_mm"][0] <= rd1_x[1] * 1000
+    assert record["overlap_mm"] >= (target[3] - target[1]) * 1000 - 0.2
+    assert record["detail"] in str(raised.value)
+    assert [r["a"] for r in records if r["kind"] == "extension-through-own-text"] == ["dim RD1 '1'"]
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [bad])
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, gating, stem=stem)] == ["text-on-line"]
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, gating, stem="fixture")] == []
+
+    foreign, span = _nut_jam_foreign_line(0.2)
+    clear = _nut_jam_rd1_dump(foreign=foreign, foreign_span=span)
+    _run(_patch_collect(monkeypatch, [clear]), LayoutAuditMode.REPORT, report, stem=stem)
+    records = _nut_report(report)["findings"]
+    assert [r for r in records if r["kind"] == "text-on-line"] == []
+    assert [r["a"] for r in records if r["kind"] == "extension-through-own-text"] == ["dim RD1 '1'"]
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [clear])
+    assert enforced(LayoutAuditMode.REPORT, gating, stem=stem) == []
+
+
+# --------------------------------------------------------------------------
+# Six oblique-jig purchased screws: seven REPORT kinds, plus carriage's
+# narrowly evidenced extension-through-own-text. Nut5 above stays unchanged.
+# --------------------------------------------------------------------------
+
+SIX_SCREW_STEMS = (
+    "ch-rocker-arm-tl-vn-oblique-carriage-screw",
+    "ch-rocker-arm-tl-vn-oblique-block-screw",
+    "ch-rocker-arm-tl-vn-oblique-bracket-screw",
+    "ch-rocker-arm-tl-vn-oblique-rail-screw",
+    "ch-rocker-arm-tl-vn-oblique-clamp-screw",
+    "ch-rocker-arm-tl-vn-oblique-lever-screw",
+)
+
+# Frozen from source 0c61a8f5 / SDK 56697, farm run
+# D:/farm-runs/rolling-main-post-v44-20261021/focused-native/fit1851-0c61a8f5/
+# 20261022T180504847Z-587ecc497c2440cc9b422fbe10d5ff96.out/reports/layout-audit/
+# ch-rocker-arm-tl-vn-oblique-carriage-screw.json:
+# sheets[0].views[0].annotations[0:2], its Front outline, and the actual
+# ink.spans "(20mm)" / "(4mm)". Preserve all four lines and two arrows per
+# dimension; these are not nominal font boxes or manufactured Finding objects.
+#
+# The complete source inventory was SupplierLength "(20 mm)",
+# SupplierHeadHeight "(4 mm)", SupplierThreadDiameter "(" / "<MOD-DIAM>" /
+# "4 mm)" / "M4 x 0.7", SupplierHeadDiameter " (" / "<MOD-DIAM>" / "7 mm) ",
+# and SupplierDriveWidth "(3 mm)". None contained slash/Unicode fractions or
+# stacked fraction bars. The four native extension findings were individually
+# corroborated against actual printed spans, including multiline ThreadDiameter;
+# this does not assert that decimal formatting alone makes the finder reliable.
+# Only Length and HeadHeight are replayed here, not that whole sheet/inventory.
+# v44's lack of supplier type-4 dimensions is NOT an applicable clear baseline.
+# Fresh portrait five-field native glyph/audit proof is still required: these
+# policy fixtures cannot certify the rebuilt portrait sheet or own-body clearance.
+_SIX_SCREW_NATIVE_Z = 0.00005
+_SIX_SCREW_NATIVE_FRONT = (0.107662, 0.1048337, 0.122338, 0.1281663)
+
+
+def _six_screw_native_line(x0, y0, x1, y1):
+    return [0.0, 0.0, 0.0, 0.0, x0, y0, _SIX_SCREW_NATIVE_Z, x1, y1, _SIX_SCREW_NATIVE_Z]
+
+
+def _six_screw_native_text(text, x, y, width):
+    return {
+        "t": text, "pos": [x, y, _SIX_SCREW_NATIVE_Z], "h": 0.0035, "ref": 1,
+        "ang": 0.0, "font": "Century Gothic", "ls": 0.001, "w": width,
+    }
+
+
+_SIX_SCREW_NATIVE_LENGTH = {
+    "type": 4, "name": "SupplierLength", "visible": 1, "owner_type": 0,
+    "pos": [0.128338, 0.1155783, _SIX_SCREW_NATIVE_Z], "layer": "",
+    "display": {
+        "lines": [
+            _six_screw_native_line(0.117, 0.1205783, 0.129338, 0.1205783),
+            _six_screw_native_line(0.117, 0.1105783, 0.129338, 0.1105783),
+            _six_screw_native_line(0.128338, 0.1205783, 0.128338, 0.1269283),
+            _six_screw_native_line(0.128338, 0.1105783, 0.128338, 0.1042283),
+        ],
+        "arrows": [
+            [0.128338, 0.1205783, _SIX_SCREW_NATIVE_Z, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.128338, 0.1105783, _SIX_SCREW_NATIVE_Z, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [_six_screw_native_text(" (20 mm) ", 0.1177165, 0.1128002, 0.0212431)],
+    },
+    "dim": {"hole_callout": False},
+}
+_SIX_SCREW_NATIVE_LENGTH_SPAN = ["(20mm)", 0.1196154, 0.1128474, 0.1370606, 0.1173647]
+_SIX_SCREW_NATIVE_HEAD_HEIGHT = {
+    "type": 4, "name": "SupplierHeadHeight", "visible": 1, "owner_type": 0,
+    "pos": [0.101662, 0.1215783, _SIX_SCREW_NATIVE_Z], "layer": "",
+    "display": {
+        "lines": [
+            _six_screw_native_line(0.11575, 0.1205783, 0.100662, 0.1205783),
+            _six_screw_native_line(0.11575, 0.1225783, 0.100662, 0.1225783),
+            _six_screw_native_line(0.101662, 0.1205783, 0.101662, 0.1142283),
+            _six_screw_native_line(0.101662, 0.1225783, 0.101662, 0.1289283),
+        ],
+        "arrows": [
+            [0.101662, 0.1205783, _SIX_SCREW_NATIVE_Z, -0.0, -1.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            [0.101662, 0.1225783, _SIX_SCREW_NATIVE_Z, 0.0, 1.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [_six_screw_native_text(" (4 mm) ", 0.0923335, 0.1188002, 0.0186569)],
+    },
+    "dim": {"hole_callout": False},
+}
+_SIX_SCREW_NATIVE_HEAD_HEIGHT_SPAN = ["(4mm)", 0.0942324, 0.1188474, 0.1090917, 0.1233647]
+
+
+def _six_screw_native_dump(annotation, span, *, foreign=None, foreign_span=None):
+    annotations = [annotation] + ([foreign] if foreign is not None else [])
+    spans = [span] + ([foreign_span] if foreign_span is not None else [])
+    return {
+        **_dump(views=[_view("Drawing View1", _SIX_SCREW_NATIVE_FRONT, annotations)]),
+        "stem": SIX_SCREW_STEMS[0],
+        "sheet": "Sheet1",
+        # A report retains spans, not PDF strokes: no invented model edges.
+        "ink": {"spans": [list(item) for item in spans]},
+    }
+
+
+def _six_screw_text_on_line_case(fixed):
+    """The safe native Length record, crossed only by a controlled foreign
+    arrowless dimension at y115 mm; moving that foreign line to y200 mm
+    clears the actual "(20mm)" span. Do not reuse Nut RD1 here: its raw
+    fraction-bar extension would correctly refuse carriage's clear control."""
+    foreign, foreign_span = _nut_jam_foreign_line(0.2 if fixed else 0.115)
+    return _six_screw_native_dump(
+        _SIX_SCREW_NATIVE_LENGTH, _SIX_SCREW_NATIVE_LENGTH_SPAN,
+        foreign=foreign, foreign_span=foreign_span,
+    )
+
+
+def _six_screw_portrait_boundary(kind, fixed):
+    """Plausible two-arrow dimension on the actual portrait template, not
+    a landscape frame with its dimensions transposed only in the assertion.
+    title_block is [xmin, ymin, xmax, ymax], not margins or an XYWH tuple."""
+    if kind == "keep-out":
+        x, y = 0.070, 0.080 if fixed else 0.040
+    else:
+        x, y = 0.250 if fixed else 0.264, 0.200
+    line_y = y - 0.003
+    dim = _dim("Stray", "20.0", x, y, lines=[(x - 0.002, line_y, x + 0.012, line_y)])
+    dim["display"]["arrows"] = [
+        [x - 0.002, line_y, 0.0, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [x + 0.012, line_y, 0.0, -1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ]
+    return {
+        **_dump(
+            views=[_view("Front", (0.070, 0.090, 0.100, 0.120), [dim])],
+            spans=[["20.0", x, y, x + 0.0084, y + 0.0035]], print_rest=False,
+        ),
+        "width": 0.2794,
+        "height": 0.4318,
+        "title_block": [0.0636, 0.0, 0.2794, 0.066],
+    }
+
+
+def _six_screw_title_case(fixed):
+    return _six_screw_portrait_boundary("keep-out", fixed)
+
+
+def _six_screw_border_case(fixed):
+    return _six_screw_portrait_boundary("outside-border", fixed)
+
+
+# Reuse the already-proven neutral geometry for four common predicates, not
+# the nut fraction case for text-on-line. The view/arrow fixtures intentionally
+# concern FOREIGN view/text owners; they do not prove own-body ink clearance.
+_SIX_SCREW_KIND_CASES = [
+    pytest.param(_rocker_chamfer, "text-clearance", "RimChamferSize", "Rail", id="text-clearance"),
+    pytest.param(_six_screw_text_on_line_case, "text-on-line", "SupplierLength", "Foreign", id="text-on-line"),
+    pytest.param(_nut_dim_line_case, "dim-line-through-own-text", "Suppressed", "Suppressed", id="dim-line-through-own-text"),
+    pytest.param(_nut_text_on_view_case, "text-on-view", "note Ra", "view View2", id="foreign-text-on-view"),
+    pytest.param(_nut_arrow_case, "arrow-near-text", "HeelReliefHt", "foot", id="foreign-arrow-near-text"),
+    pytest.param(_six_screw_title_case, "keep-out", "Stray", "title-block", id="portrait-title-block"),
+    pytest.param(_six_screw_border_case, "outside-border", "Stray", "right border", id="portrait-right-border"),
+]
+
+
+@pytest.mark.parametrize("stem", SIX_SCREW_STEMS)
+@pytest.mark.parametrize(("build", "kind", "a", "b"), _SIX_SCREW_KIND_CASES)
+def test_each_six_screw_fails_its_leaf_on_the_seven_selected_kinds(monkeypatch, tmp_path, stem, build, kind, a, b):
+    """Real audit/report/refusal for all 42 stem/kind pairs; clearing only
+    the intended defect loses that finding and permits the same REPORT leaf."""
+    import json
+
+    from _layout_audit import audit_report, enforced
+
+    bad = build(False)
+    live = _patch_collect(monkeypatch, [bad])
+    report = tmp_path / f"{stem}.json"
+    with pytest.raises(RuntimeError, match=rf"(?s)failed for {stem} \(report mode\).*\[{kind}\]") as raised:
+        _run(live, LayoutAuditMode.REPORT, report, stem=stem)
+    content, gating = audit_report(stem, LayoutAuditMode.REPORT, [bad])
+    records = _nut_report(report)["findings"]
+    # JSON turns native segment tuples into arrays; retain every finding/field.
+    assert records == json.loads(json.dumps(content["findings"]))
+    [record] = _nut_hits(records, kind, a, b)
+    assert record["stem"] == stem and record["severity"] == "gating"
+    assert record["detail"] in str(raised.value)
+    assert [(f.a, f.b) for f in enforced(LayoutAuditMode.REPORT, gating, stem=stem) if f.kind == kind] == [
+        (record["a"], record["b"])
+    ]
+    for other in ("fixture", "fr-frame-assembly", NUT_STEMS[0]):
+        # Nut5 intentionally enforce the five common reliable kinds already,
+        # but not these new portrait boundaries. Neutral/frame still report all.
+        nut_common = other in NUT_STEMS and kind not in {"keep-out", "outside-border"}
+        if nut_common:
+            with pytest.raises(RuntimeError, match=rf"\[{kind}\]"):
+                _run(live, LayoutAuditMode.REPORT, tmp_path / f"{other}.json", stem=other)
+        else:
+            _run(live, LayoutAuditMode.REPORT, tmp_path / f"{other}.json", stem=other)
+        [other_record] = _nut_hits(_nut_report(tmp_path / f"{other}.json")["findings"], kind, a, b)
+        assert other_record["severity"] == "gating"
+        assert bool([f for f in enforced(LayoutAuditMode.REPORT, gating, stem=other) if f.kind == kind]) == nut_common
+        assert [(f.a, f.b) for f in enforced(LayoutAuditMode.GATE, gating, stem=other) if f.kind == kind] == [
+            (record["a"], record["b"])
+        ]
+
+    clear = build(True)
+    _run(_patch_collect(monkeypatch, [clear]), LayoutAuditMode.REPORT, report, stem=stem)
+    assert _nut_hits(_nut_report(report)["findings"], kind, a, b) == []
+    _content, gating = audit_report(stem, LayoutAuditMode.REPORT, [clear])
+    assert [f for f in enforced(LayoutAuditMode.GATE, gating, stem=stem) if f.kind == kind] == []
+
+
+def _six_screw_head_height_case(fixed):
+    from copy import deepcopy
+
+    dim = deepcopy(_SIX_SCREW_NATIVE_HEAD_HEIGHT)
+    span = list(_SIX_SCREW_NATIVE_HEAD_HEIGHT_SPAN)
+    if fixed:
+        # Move only the native text/annotation anchor and its actual PDF
+        # span 30 mm left; every physical witness, tail and arrow stays put.
+        dim["pos"][0] -= 0.030
+        dim["display"]["texts"][0]["pos"][0] -= 0.030
+        span[1] -= 0.030
+        span[3] -= 0.030
+    return _six_screw_native_dump(dim, span)
+
+
+@pytest.mark.parametrize("stem", SIX_SCREW_STEMS)
+def test_six_screw_native_head_height_keeps_both_contacts_but_only_carriage_enforces_extension(
+    monkeypatch, tmp_path, stem
+):
+    """The actual H record has BOTH a witness and a dimension-tail strike.
+    Do not delete its tail to fake an extension-only leaf: the five imperial
+    screws still fail the common dim-line kind. Only carriage additionally
+    selects the raw extension kind under REPORT. The moved-text-only control
+    clears both contacts with all native physical primitives preserved."""
+    from _layout_audit import audit_report, enforced
+
+    bad = _six_screw_head_height_case(False)
+    dim = bad["views"][0]["annotations"][0]
+    span = bad["ink"]["spans"][0]
+    assert len(dim["display"]["lines"]) == 4 and len(dim["display"]["arrows"]) == 2
+    for line in dim["display"]["lines"][:2]:
+        assert span[2] < line[5] == line[8] < span[4]
+        assert max(min(line[4], line[7]), span[1]) < min(max(line[4], line[7]), span[3])
+    report = tmp_path / f"{stem}.json"
+    with pytest.raises(RuntimeError, match=r"\[dim-line-through-own-text\]") as raised:
+        _run(_patch_collect(monkeypatch, [bad]), LayoutAuditMode.REPORT, report, stem=stem)
+    content, gating = audit_report(stem, LayoutAuditMode.REPORT, [bad])
+    assert _nut_report(report)["findings"] == content["findings"]
+    [raw] = [r for r in content["findings"] if r["kind"] == "extension-through-own-text"]
+    assert raw["a"] == raw["b"] == "dim SupplierHeadHeight '(4 mm)'"
+    assert raw["severity"] == "gating"
+    assert raw["overlap_mm"] == pytest.approx(8.2297, abs=1e-3)
+    assert raw["at_mm"] == pytest.approx([104.77685, 120.5783], abs=1e-3)
+    assert "[94.2,118.8]..[109.1,123.4]mm" in raw["detail"]
+    [tail] = [r for r in content["findings"] if r["kind"] == "dim-line-through-own-text"]
+    assert tail["overlap_mm"] == pytest.approx(1.5309, abs=1e-3)
+    assert tail["detail"] in str(raised.value)
+    selected = [f for f in enforced(LayoutAuditMode.REPORT, gating, stem=stem) if f.kind == raw["kind"]]
+    assert [f.a for f in selected] == ([raw["a"]] if stem == SIX_SCREW_STEMS[0] else [])
+    assert (raw["detail"] in str(raised.value)) == (stem == SIX_SCREW_STEMS[0])
+    assert [f.a for f in enforced(LayoutAuditMode.GATE, gating, stem=stem) if f.kind == raw["kind"]] == [raw["a"]]
+    for other in ("fixture", "fr-frame-assembly", *NUT_STEMS):
+        assert [f for f in enforced(LayoutAuditMode.REPORT, gating, stem=other) if f.kind == raw["kind"]] == []
+
+    clear = _six_screw_head_height_case(True)
+    moved = clear["views"][0]["annotations"][0]
+    assert moved["display"]["lines"] == dim["display"]["lines"]
+    assert moved["display"]["arrows"] == dim["display"]["arrows"]
+    assert moved["display"]["texts"][0]["pos"][0] == pytest.approx(dim["display"]["texts"][0]["pos"][0] - 0.030)
+    _run(_patch_collect(monkeypatch, [clear]), LayoutAuditMode.REPORT, report, stem=stem)
+    assert [r for r in _nut_report(report)["findings"] if r["kind"].endswith("-through-own-text")] == []
+
+
+@pytest.mark.parametrize("stem", SIX_SCREW_STEMS[1:])
+def test_six_screw_imperial_stems_keep_the_native_nut_fraction_bar_raw_and_gate_it(monkeypatch, tmp_path, stem):
+    """Replay only the already-frozen native jam-nut RD1 fraction row, not
+    an invented imperial screw or a claim about all fraction layouts. Its
+    known row-grouping artifact stays raw/gating under each imperial screw
+    stem; REPORT passes, while a real GATE leaf fails on that same record."""
+    from _layout_audit import audit_report, enforced
+
+    dump = _nut_jam_rd1_dump()
+    live = _patch_collect(monkeypatch, [dump])
+    report = tmp_path / f"{stem}.json"
+    _run(live, LayoutAuditMode.REPORT, report, stem=stem)
+    content, gating = audit_report(stem, LayoutAuditMode.REPORT, [dump])
+    assert _nut_report(report)["findings"] == content["findings"]
+    [raw] = [r for r in content["findings"] if r["kind"] == "extension-through-own-text"]
+    assert raw["a"] == raw["b"] == "dim RD1 '1'"
+    assert raw["severity"] == "gating"
+    assert raw["overlap_mm"] == pytest.approx(3.6118, abs=1e-3)
+    assert enforced(LayoutAuditMode.REPORT, gating, stem=stem) == []
+    with pytest.raises(RuntimeError, match=r"\[extension-through-own-text\]") as raised:
+        _run(live, LayoutAuditMode.GATE, report, stem=stem)
+    assert raw["detail"] in str(raised.value)
+    assert _nut_report(report)["findings"] == content["findings"]
