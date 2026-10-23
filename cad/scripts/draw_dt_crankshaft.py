@@ -67,6 +67,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_selection import _select_view_entity
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _layout_audit import arrowhead_segments
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
@@ -1128,6 +1129,10 @@ def _assert_preexisting_neck_inventory(
     try:
         if len(current) != len(preexisting):
             raise RuntimeError(f"{label}: preexisting dimension inventory missing/extra entries")
+        by_name: dict[str, list[tuple[int, Any, float, int]]] = {}
+        for index, (_owner, _display, native) in enumerate(current):
+            native, name, actual_value, actual_state = _neck_dimension_record(native, label=label)
+            by_name.setdefault(name, []).append((index, native, actual_value, actual_state))
         matched = set()
         for reference, captured_name, value, state, _annotation in preexisting:
             # SaveAs may update the native reference's title component. Match
@@ -1136,18 +1141,15 @@ def _assert_preexisting_neck_inventory(
             if not isinstance(live_name, str) or not live_name:
                 raise RuntimeError(f"{label}: preexisting dimension {captured_name!r} lost its FullName")
             matches = [
-                index for index, (_owner, _display, native) in enumerate(current)
-                if native.FullName == live_name
-                and int(adapter.swApp.IsSame(native, reference)) == 1
+                (index, actual_value, actual_state)
+                for index, native, actual_value, actual_state in by_name.get(live_name, ())
+                if int(adapter.swApp.IsSame(native, reference)) == 1
                 and int(adapter.swApp.IsSame(reference, native)) == 1
             ]
-            if len(matches) != 1 or matches[0] in matched:
+            if len(matches) != 1 or matches[0][0] in matched:
                 raise RuntimeError(f"{label}: expected one preserved preexisting dimension {captured_name!r}")
-            index = matches[0]
+            index, actual_value, actual_state = matches[0]
             matched.add(index)
-            _native, _name, actual_value, actual_state = _neck_dimension_record(
-                current[index][2], label=label,
-            )
             if actual_value != value or actual_state != state:
                 raise RuntimeError(
                     f"{label}: preexisting dimension {captured_name!r} changed value/state "
@@ -1260,18 +1262,12 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
         width, height = values[6:8]
         if width <= 0.0 or height <= 0.0:
             raise RuntimeError(f"{label}: native arrowhead width/height must be positive")
-        # SDK width is along dir, height across it; dir points tip-to-base.
-        # Match _layout_audit.arrowhead_segments, including nonunit native dir.
-        ux, uy = dx / length, dy / length
-        base = (tip[0] + ux * width, tip[1] + uy * width)
-        vertices = (
-            tip,
-            (base[0] - uy * height / 2.0, base[1] + ux * height / 2.0),
-            (base[0] + uy * height / 2.0, base[1] - ux * height / 2.0),
-        )
+        segments = arrowhead_segments(values)
         bounds = (
-            min(point[0] for point in vertices), min(point[1] for point in vertices),
-            max(point[0] for point in vertices), max(point[1] for point in vertices),
+            min(min(segment.x0, segment.x1) for segment in segments),
+            min(min(segment.y0, segment.y1) for segment in segments),
+            max(max(segment.x0, segment.x1) for segment in segments),
+            max(max(segment.y0, segment.y1) for segment in segments),
         )
         if bounds[0] < x0 or bounds[2] > x1:
             raise RuntimeError(

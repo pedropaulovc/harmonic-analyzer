@@ -1832,6 +1832,98 @@ def test_full_preexisting_inventory_is_captured_strictly_before_factory(neck_dim
     f.model.AddVerticalDimension2.assert_not_called()
 
 
+@pytest.mark.parametrize("count", [1, 8, 32])
+def test_preexisting_inventory_reads_each_current_and_live_reference_name_once_per_checkpoint(
+    count,
+) -> None:
+    class NativeDimension:
+        def __init__(self, key):
+            self.key = key
+            self.name = f"Dim{key}@FRONT@Drawing1"
+            self.name_reads = 0
+            self.SystemValue = key / 1000.0
+            self.DrivenState = 0
+
+        @property
+        def FullName(self):
+            self.name_reads += 1
+            return self.name
+
+    references = [NativeDimension(index) for index in range(count)]
+    natives = [NativeDimension(index) for index in range(count)]
+    owner = object()
+    annotations = [SimpleNamespace(Owner=owner, OwnerType=0) for _ in references]
+    preexisting = tuple(
+        (reference, reference.name, reference.SystemValue, reference.DrivenState, annotation)
+        for reference, annotation in zip(references, annotations)
+    )
+    current = [
+        (annotation, object(), native) for annotation, native in zip(annotations, natives)
+    ]
+    adapter = SimpleNamespace(swApp=SimpleNamespace(
+        IsSame=Mock(side_effect=lambda left, right: int(left.key == right.key)),
+    ))
+    titles = ("Drawing1", "Drawing1", "dt-crankshaft.SLDDRW", "Renamed.SLDDRW")
+    for checkpoint, (phase, title) in enumerate(zip(_NECK_PHASES, titles), 1):
+        for native in (*references, *natives):
+            native.name = f"Dim{native.key}@FRONT@{title}"
+        drawing._assert_preexisting_neck_inventory(
+            adapter, current, preexisting, label=phase,
+        )
+        assert [native.name_reads for native in natives] == [checkpoint] * count
+        assert [reference.name_reads for reference in references] == [checkpoint] * count
+        assert adapter.swApp.IsSame.call_count == 2 * count * checkpoint
+
+
+@pytest.mark.parametrize(
+    "failure", [None, "duplicate-native", "forward-zero", "reverse-zero"],
+    ids=["distinct-identities-same-name", "duplicate-native", "forward-zero", "reverse-zero"],
+)
+def test_preexisting_name_index_retains_duplicate_rows_and_bidirectional_identity(failure) -> None:
+    owner = object()
+    annotations = [SimpleNamespace(Owner=owner, OwnerType=0) for _ in range(2)]
+    references = [
+        SimpleNamespace(
+            key=index, FullName="Shared@FRONT@Drawing1", SystemValue=index / 1000.0, DrivenState=0,
+        )
+        for index in range(2)
+    ]
+    natives = [SimpleNamespace(**vars(reference)) for reference in references]
+    if failure == "duplicate-native":
+        natives[1] = natives[0]
+
+    def same(left, right):
+        if failure == "forward-zero" and left is natives[0] and right is references[0]:
+            return 0
+        if failure == "reverse-zero" and left is references[0] and right is natives[0]:
+            return 0
+        return int(left.key == right.key)
+
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=Mock(side_effect=same)))
+    current = [
+        (annotation, object(), native) for annotation, native in zip(annotations, natives)
+    ]
+    preexisting = tuple(
+        (reference, reference.FullName, reference.SystemValue, reference.DrivenState, annotation)
+        for reference, annotation in zip(references, annotations)
+    )
+    if failure is None:
+        drawing._assert_preexisting_neck_inventory(
+            adapter, current, preexisting, label="duplicate names",
+        )
+        for native, reference in zip(natives, references):
+            adapter.swApp.IsSame.assert_any_call(native, reference)
+            adapter.swApp.IsSame.assert_any_call(reference, native)
+    else:
+        with pytest.raises(RuntimeError, match="expected one preserved preexisting dimension") as exc:
+            drawing._assert_preexisting_neck_inventory(
+                adapter, current, preexisting, label="duplicate names",
+            )
+        assert "expected_native_rows=" in str(exc.value)
+        assert "current_native_rows=" in str(exc.value)
+        assert isinstance(exc.value.__cause__, RuntimeError)
+
+
 @pytest.mark.parametrize("phase", _NECK_PHASES)
 def test_neck_and_all_preexisting_references_follow_live_saved_full_names(neck_dimension_fakes, phase) -> None:
     f = neck_dimension_fakes
@@ -2129,6 +2221,41 @@ def test_neck_head_envelope_uses_native_width_along_small_actual_direction(
     f.arrow_rows[0] = tuple(row)
     with pytest.raises(RuntimeError, match="complete native arrowhead X envelope"):
         drawing._assert_neck_arrow_landing(f.display, label="native small direction")
+
+
+@pytest.mark.parametrize("boundary", ["left", "right"])
+@pytest.mark.parametrize(
+    "clearance", [5e-9, -5e-9], ids=["tiny-inside", "tiny-outside"],
+)
+def test_neck_head_trim_reuses_raw_shared_segments_without_dump_quantization(
+    neck_dimension_fakes, monkeypatch, boundary, clearance,
+) -> None:
+    f = neck_dimension_fakes
+    for index, native in enumerate(f.arrow_rows):
+        row = list(native)
+        row[0] = (
+            drawing.COLLAR_REAR_X + row[7] / 2.0 + clearance
+            if boundary == "left"
+            else drawing.JOURNAL_START_X - row[7] / 2.0 - clearance
+        )
+        f.arrow_rows[index] = tuple(row)
+    shared_geometry = Mock(wraps=drawing.arrowhead_segments)
+    monkeypatch.setattr(drawing, "arrowhead_segments", shared_geometry)
+    telemetry = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", telemetry)
+    if clearance < 0.0:
+        with pytest.raises(RuntimeError, match="complete native arrowhead X envelope"):
+            drawing._assert_neck_arrow_landing(f.display, label="raw trim")
+        assert shared_geometry.call_count == 1
+    else:
+        drawing._assert_neck_arrow_landing(f.display, label="raw trim")
+        assert shared_geometry.call_count == 2
+        message = telemetry.call_args.args[0]
+        actual_clearance = float(message.split("min_physical_x_clearance_mm=")[1])
+        assert actual_clearance == pytest.approx(clearance * 1000.0, abs=1e-10)
+        assert actual_clearance > 0.0
+    for index, actual in enumerate(shared_geometry.call_args_list):
+        assert actual.args == (f.arrow_rows[index],)
 
 
 @pytest.mark.parametrize("phase", _NECK_PHASES)
