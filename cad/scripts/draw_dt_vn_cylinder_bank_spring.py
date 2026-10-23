@@ -14,20 +14,21 @@ moves only presentation: the heights take native offset text shelved beyond
 their own lines (the R48 washer pattern), and the diameters take one
 near-side arrow with their text a text height clear of the OD rim.
 
-Native run 86053b8e then printed a stray SupplierOD line: from the OD rim at
-the text's height, parallel to its leader and through its own "(". The same
-line is in the main renders of the sibling 9714K24 and 9715K43 ODs, so it is
-not the text move. [INFERENCE: SolidWorks's arc extension of the circle's
-closed arc.] The diameters turn ``ArcExtensionLineOrOppositeSide`` off, and
-the settled check refuses any size line through its own text (the layout
-audit's ``find_lines_through_own_text``) and any diameter line that is not
-on its one leader chain from the arrow.
+Native run 86053b8e then printed a stray SupplierOD line: from the OD rim's
+0 deg point (centre height), parallel to its leader and through its own "(".
+The same line is in the main renders of the sibling 9714K24 and 9715K43 ODs,
+so the text move did not make it, and ``ArcExtensionLineOrOppositeSide``
+False stuck but changed nothing (run 27c25caf). No documented display switch
+names it, so the leaf resolves it by presentation: it tries the bounded
+``PLAN_PLACEMENTS`` in order, re-reading native ink after each rebuild, and
+keeps the first that every guard passes. A guard failure refuses the sheet.
 """
 
 from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from functools import partial
 import math
 from types import SimpleNamespace
@@ -40,8 +41,11 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_leaders import (
+    COLLINEAR_TOLERANCE,
     assert_leaders_clear,
     dimension_segments,
+    distance_to_box,
+    distance_to_line,
     set_near_side_diameter,
 )
 from _layout_audit import (
@@ -61,6 +65,7 @@ from _supplier_screw_layout import supplier_top_text_geometry
 from _supplier_spring_drawing import (
     build_supplier_spring_drawing,
     reacquire_supplier_dimensions,
+    supplier_state_cells,
 )
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
@@ -89,6 +94,50 @@ TEXT_SIDES = {
     "free_top": {ID_NAME: -1, OD_NAME: 1},
 }
 _STATION_FIELDS = ("tips", "witnesses", "physical_lines")
+# Line ends this close are joined; lines this close to a common line print as
+# one stroke (_drawing_leaders.COLLINEAR_TOLERANCE).
+_JOIN_M = 1e-5
+# A diameter's text is seated when a further move would be under this.
+_SEATED_M = 1e-5
+_SEAT_PASSES = 3
+# The shoulder sits on the text's baseline: 0.05 mm under it on run 86053.
+_SHOULDER_REACH_M = 0.0005
+# The outer TOP cell the shared finalizer checks the settled ink against; it
+# does not depend on the caption band.
+FREE_TOP_CELL = next(
+    cell
+    for key, _, cell in supplier_state_cells(0.0, maximum=False)
+    if key == "free_top"
+)
+
+
+@dataclass(frozen=True)
+class PlanPlacement:
+    """One presentation of the two plan diameters.
+
+    ``sides``: -1 text left of the plan, +1 right. ``level``: diameters whose
+    shoulder sits at the centre height, so the leader lands on the rim's 0 or
+    180 deg point and runs horizontal along the shoulder.
+    """
+
+    label: str
+    sides: Mapping[str, int]
+    level: frozenset[str] = frozenset()
+
+
+# Tried in order; the first whose settled native ink passes every guard wins.
+PLAN_PLACEMENTS = (
+    PlanPlacement("as placed", TEXT_SIDES["free_top"]),
+    PlanPlacement(
+        "OD leader level at 0 deg", TEXT_SIDES["free_top"], frozenset({OD_NAME})
+    ),
+    PlanPlacement("sides swapped", {ID_NAME: 1, OD_NAME: -1}),
+    PlanPlacement(
+        "sides swapped, OD leader level at 180 deg",
+        {ID_NAME: 1, OD_NAME: -1},
+        frozenset({OD_NAME}),
+    ),
+)
 
 
 def height_text_shift(geometry: Mapping[str, Any], side: int) -> float:
@@ -206,11 +255,11 @@ def _size_displays(adapter: Any, views: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _move_text(
-    display: Any, record: Mapping[str, Any], dx: float, *, label: str
+    display: Any, record: Mapping[str, Any], dx: float, dy: float = 0.0, *, label: str
 ) -> None:
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     x, y = (float(value) for value in record["pos"][:2])
-    if not annotation.SetPosition2(x + dx, y, 0.0):
+    if not annotation.SetPosition2(x + dx, y + dy, 0.0):
         raise RuntimeError(f"{label}: text placement was rejected")
 
 
@@ -227,68 +276,228 @@ def lines_through_own_text(records: Mapping[str, Mapping[str, Any]]) -> list[str
     return [finding.detail for finding in find_lines_through_own_text(sheet)]
 
 
-def stray_leader_lines(record: Mapping[str, Any]) -> list[tuple[float, ...]]:
-    """A one-arrow diameter's lines that are not its chain from the arrow tip."""
-    data = record["display"]
-    arrows = data.get("arrows") or ()
+def _segments(record: Mapping[str, Any]) -> list[tuple[tuple[float, float], ...]]:
+    return [
+        ((float(line[4]), float(line[5])), (float(line[7]), float(line[8])))
+        for line in record["display"].get("lines") or ()
+    ]
+
+
+def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
+    """A one-arrow diameter's lines as (longest simple path from the arrow tip, rest)."""
+    arrows = record["display"].get("arrows") or ()
     if len(arrows) != 1:
         raise RuntimeError(
             f"{record.get('name')}: near-side diameter has {len(arrows)} arrows"
         )
-    lines = [
-        (float(line[4]), float(line[5]), float(line[7]), float(line[8]))
-        for line in data.get("lines") or ()
+    segments = _segments(record)
+    best: list[int] = []
+
+    def walk(point: tuple[float, float], used: list[int]) -> None:
+        nonlocal best
+        if len(used) > len(best):
+            best = list(used)
+        for index, (a, b) in enumerate(segments):
+            if index in used:
+                continue
+            if math.dist(a, point) <= _JOIN_M:
+                walk(b, [*used, index])
+            elif math.dist(b, point) <= _JOIN_M:
+                walk(a, [*used, index])
+
+    walk((float(arrows[0][0]), float(arrows[0][1])), [])
+    chain = [segments[index] for index in best]
+    rest = [segment for index, segment in enumerate(segments) if index not in best]
+    return chain, rest
+
+
+def within_chain(segment: tuple, chain: list) -> bool:
+    """Collinear with chain strokes, and inside their extent: it prints as them."""
+    along = [
+        stroke
+        for stroke in chain
+        if math.dist(*stroke) > COLLINEAR_TOLERANCE
+        and all(distance_to_line(stroke, end) <= COLLINEAR_TOLERANCE for end in segment)
     ]
-    reached = [(float(arrows[0][0]), float(arrows[0][1]))]
-    chained = True
-    while chained:
-        chained = False
-        for line in list(lines):
-            ends = ((line[0], line[1]), (line[2], line[3]))
-            if any(math.dist(end, point) <= 1e-5 for end in ends for point in reached):
-                lines.remove(line)
-                reached.extend(ends)
-                chained = True
-    return lines
+    if not along:
+        return False
+    (x0, y0), (x1, y1) = along[0]
+    length = math.dist((x0, y0), (x1, y1))
+    ux, uy = (x1 - x0) / length, (y1 - y0) / length
+
+    def at(point: tuple[float, float]) -> float:
+        return (point[0] - x0) * ux + (point[1] - y0) * uy
+
+    stations = [at(end) for stroke in along for end in stroke]
+    low, high = min(stations), max(stations)
+    return all(
+        low - COLLINEAR_TOLERANCE <= at(end) <= high + COLLINEAR_TOLERANCE
+        for end in segment
+    )
 
 
-def _assert_size_texts(
+def stray_leader_lines(record: Mapping[str, Any]) -> list[tuple[float, ...]]:
+    """A one-arrow diameter's lines off its leader chain, as (x0, y0, x1, y1)."""
+    chain, rest = leader_chain(record)
+    return [
+        (*segment[0], *segment[1])
+        for segment in rest
+        if not within_chain(segment, chain)
+    ]
+
+
+def shoulder_y(record: Mapping[str, Any]) -> float:
+    """The y of a diameter's horizontal shoulder: the longest level chain stroke."""
+    chain, _rest = leader_chain(record)
+    level = [stroke for stroke in chain if abs(stroke[0][1] - stroke[1][1]) <= 1e-7]
+    if not level:
+        raise RuntimeError(f"{record.get('name')}: leader has no horizontal shoulder")
+    return max(level, key=lambda stroke: math.dist(*stroke))[0][1]
+
+
+def diameter_seat_move(
+    record: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+    side: int,
+    *,
+    level: bool,
+) -> tuple[float, float]:
+    """(dx, dy) seating a diameter's text a text height beside the plan, either
+    at its native station height or with its shoulder on the centre height."""
+    text = display_box({"texts": record["display"]["texts"]})
+    centre_y = (plan[1] + plan[3]) / 2.0
+    current = shoulder_y(record) if level else float(record["pos"][1])
+    return diameter_text_shift(text, plan, side), centre_y - current
+
+
+def assert_diameter_ink(
+    record: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+    side: int,
+    *,
+    label: str,
+) -> None:
+    """Text clear of the rim, every line on the leader, leader to text, in cell."""
+    text = display_box({"texts": record["display"]["texts"]})
+    assert_diameter_text_clear(text, plan, side, label=label)
+    stray = stray_leader_lines(record)
+    if stray:
+        raise RuntimeError(f"{label}: lines off its leader chain {stray!r}")
+    chain, _rest = leader_chain(record)
+    box = (text.xmin, text.ymin, text.xmax, text.ymax)
+    if (
+        not chain
+        or min(distance_to_box(stroke, box) for stroke in chain) > _SHOULDER_REACH_M
+    ):
+        raise RuntimeError(f"{label}: leader does not reach its text")
+    ink = display_box(record["display"])
+    x0, y0, x1, y1 = FREE_TOP_CELL
+    if not (x0 <= ink.xmin and ink.xmax <= x1 and y0 <= ink.ymin and ink.ymax <= y1):
+        raise RuntimeError(
+            f"{label}: ink {ink!r} leaves the TOP cell {FREE_TOP_CELL!r}"
+        )
+
+
+def _assert_heights(
     adapter: Any,
     displays: Mapping[str, Any],
-    plan: tuple[float, float, float, float],
     stations: Mapping[str, Mapping[str, Any]],
 ) -> None:
     records = {
         name: _text_record(adapter, displays[name], label=name)
-        for sides in TEXT_SIDES.values()
-        for name in sides
+        for name in TEXT_SIDES["free_front"]
     }
     for name, side in TEXT_SIDES["free_front"].items():
-        display = displays[name]
         geometry = supplier_top_text_geometry(records[name], horizontal=False)
-        if display.OffsetText is not True or not stations_match(
+        if displays[name].OffsetText is not True or not stations_match(
             stations[name], geometry
         ):
             raise RuntimeError(f"{name}: offset text moved its native lines")
         assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
-    groups = {}
-    for name, side in TEXT_SIDES["free_top"].items():
-        text = display_box({"texts": records[name]["display"]["texts"]})
-        assert_diameter_text_clear(
-            text, plan, side, label=f"{supplier_spec.SKU} {name}"
-        )
-        if displays[name].ArcExtensionLineOrOppositeSide is not False:
-            raise RuntimeError(f"{name}: arc extension line came back")
-        stray = stray_leader_lines(records[name])
-        if stray:
-            raise RuntimeError(f"{name}: lines off its leader chain {stray!r}")
-        groups[name] = dimension_segments(displays[name].GetAnnotation())
-    assert_plan_leaders(groups, plan, label=f"{supplier_spec.SKU} plan diameters")
     struck = lines_through_own_text(records)
     if struck:
         raise RuntimeError(
             f"{supplier_spec.SKU}: size text struck by its own line: {struck}"
         )
+
+
+def _assert_diameters(
+    adapter: Any,
+    displays: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+    placement: PlanPlacement,
+) -> None:
+    records = {
+        name: _text_record(adapter, displays[name], label=name)
+        for name in placement.sides
+    }
+    for name, side in placement.sides.items():
+        assert_diameter_ink(
+            records[name], plan, side, label=f"{supplier_spec.SKU} {name}"
+        )
+    assert_plan_leaders(
+        {name: dimension_segments(displays[name].GetAnnotation()) for name in records},
+        plan,
+        label=f"{supplier_spec.SKU} plan diameters",
+    )
+    struck = lines_through_own_text(records)
+    if struck:
+        raise RuntimeError(
+            f"{supplier_spec.SKU}: size text struck by its own line: {struck}"
+        )
+
+
+def _seat_diameters(
+    adapter: Any,
+    displays: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+    placement: PlanPlacement,
+) -> None:
+    """Move both texts to the placement, re-reading after each rebuild."""
+    for _ in range(_SEAT_PASSES):
+        moves = {}
+        for name, side in placement.sides.items():
+            record = _text_record(adapter, displays[name], label=name)
+            moves[name] = (
+                record,
+                diameter_seat_move(record, plan, side, level=name in placement.level),
+            )
+        if all(
+            abs(dx) <= _SEATED_M and abs(dy) <= _SEATED_M
+            for _record, (dx, dy) in moves.values()
+        ):
+            return
+        for name, (record, (dx, dy)) in moves.items():
+            _move_text(displays[name], record, dx, dy, label=name)
+        rebuild_drawing(adapter, label=f"cylinder bank spring plan: {placement.label}")
+    raise RuntimeError(f"text did not settle in {_SEAT_PASSES} moves")
+
+
+def choose_plan_placement(
+    adapter: Any,
+    displays: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+) -> PlanPlacement:
+    """The first ``PLAN_PLACEMENTS`` entry whose settled ink passes every guard."""
+    rejected = []
+    for placement in PLAN_PLACEMENTS:
+        try:
+            _seat_diameters(adapter, displays, plan, placement)
+            _assert_diameters(adapter, displays, plan, placement)
+        except RuntimeError as error:
+            rejected.append(f"{placement.label}: {error}")
+            _telemetry.info(
+                f"{supplier_spec.SKU}: plan placement rejected -- {rejected[-1]}"
+            )
+            continue
+        _telemetry.info(
+            f"{supplier_spec.SKU}: plan placement {placement.label!r} won "
+            f"after {len(rejected)} rejected"
+        )
+        return placement
+    raise RuntimeError(
+        f"{supplier_spec.SKU}: no plan diameter placement passes its guards: {rejected}"
+    )
 
 
 def place_size_texts(
@@ -303,9 +512,6 @@ def place_size_texts(
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
         )
-        displays[name].ArcExtensionLineOrOppositeSide = False
-        if displays[name].ArcExtensionLineOrOppositeSide is not False:
-            raise RuntimeError(f"{name}: arc extension line was not turned off")
     # Pin each height's dimension line at its own station before offset mode;
     # from then on SetPosition2 moves only the text (R48 washer sequence).
     anchors = {}
@@ -331,12 +537,7 @@ def place_size_texts(
         geometry = supplier_top_text_geometry(record, horizontal=False)
         shifts[name] = height_text_shift(geometry, side)
         _move_text(displays[name], record, shifts[name], label=name)
-    for name, side in TEXT_SIDES["free_top"].items():
-        record = _text_record(adapter, displays[name], label=name)
-        text = display_box({"texts": record["display"]["texts"]})
-        shifts[name] = diameter_text_shift(text, plan, side)
-        _move_text(displays[name], record, shifts[name], label=name)
-    rebuild_drawing(adapter, label="cylinder bank spring size text shelves")
+    rebuild_drawing(adapter, label="cylinder bank spring height text shelves")
     stations = {
         name: supplier_top_text_geometry(
             _text_record(adapter, displays[name], label=name), horizontal=False
@@ -344,12 +545,16 @@ def place_size_texts(
         for name in TEXT_SIDES["free_front"]
     }
     _telemetry.info(
-        f"{supplier_spec.SKU}: size texts moved "
+        f"{supplier_spec.SKU}: height texts moved "
         + ", ".join(f"{name} {dx * 1000:+.2f} mm" for name, dx in shifts.items())
     )
+    _assert_heights(adapter, displays, stations)
+    placement = choose_plan_placement(adapter, displays, plan)
 
     def settled() -> None:
-        _assert_size_texts(adapter, _size_displays(adapter, views), plan, stations)
+        current = _size_displays(adapter, views)
+        _assert_heights(adapter, current, stations)
+        _assert_diameters(adapter, current, plan, placement)
 
     settled()
     return settled

@@ -438,16 +438,19 @@ def test_settled_heights_refuse_a_moved_native_station() -> None:
 
 
 # Native size records of farm run 20261023T190403512Z-86053b8e (head 1325aeba):
-# the placed state. SupplierOD's first line is the stray: OD rim at the text's
-# height, parallel to its leader, through its own "(".
+# the placed state. SupplierOD's first line is the stray: from the OD rim's
+# 0 deg point (0.1442, 0.227), parallel to its leader, through its own "(".
+# Pass 2 (run 20261023T200224785Z-27c25caf, head 2308c23d, cyl-pass2.task.log)
+# refused the identical stray, (0.1442, 0.227, 0.1903462, 0.2182933), with
+# ArcExtensionLineOrOppositeSide False read back.
 _DIAMETER_TEXT_ROWS = ((" (", 0.0030139), ("<MOD-DIAM>", 0.0052784))
 
 
-def _diameter_texts(x, value):
+def _diameter_texts(x, value, y=0.2242486):
     """The three native runs of a "(Ø... in)" text, laid end to end from ``x``."""
     rows = []
     for text, width in (*_DIAMETER_TEXT_ROWS, (value, 0.0352139)):
-        rows.append((text, x, 0.2242486, width))
+        rows.append((text, x, y, width))
         x += width
     return rows
 
@@ -540,13 +543,170 @@ def test_own_text_guard_catches_the_b344192_struck_heights() -> None:
     assert any("SupplierFreeHeight" in detail for detail in struck)
 
 
-def test_diameters_turn_the_arc_extension_off_before_the_text_move() -> None:
+def test_pass2_stray_is_the_86053_line_and_still_off_chain() -> None:
     import draw_dt_vn_cylinder_bank_spring as drawing
 
+    (stray,) = drawing.stray_leader_lines(R86053["SupplierOD"])
+    assert stray == pytest.approx((0.1442, 0.227, 0.1903462, 0.2182933), abs=1e-6)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("def place_size_texts(") :]
-    off = body.index("ArcExtensionLineOrOppositeSide = False")
-    assert body.index("set_near_side_diameter(") < off < body.index("rebuild_drawing(")
+    assert "ArcExtensionLineOrOppositeSide =" not in source
+
+
+# Candidate (a) at 2:1, built from the 86053 OD: shoulder moved up 2.805 mm to
+# the centre height, so the arrow lands on the rim's 0 deg point and its leg
+# runs level into the shoulder. SYNTHETIC: the stray is the 86053 stray (same
+# start, same 46.96 mm length) turned level with the leader, as the run's
+# "parallel to its leader" observation predicts; only a native run proves it.
+_LEVEL = 0.227
+_STRAY_LENGTH = math.hypot(0.190346 - 0.1442, 0.218293 - 0.227)
+
+
+def _level_od(stray):
+    return _native_record(
+        "SupplierOD",
+        (0.1697066, 0.229805),
+        [
+            stray,
+            (0.1442, _LEVEL, 0.146366, _LEVEL),
+            (0.146366, _LEVEL, 0.19146, _LEVEL),
+        ],
+        _diameter_texts(0.1479535, "0.500 \u00b10.010 in) ", y=0.2270536),
+        [(0.1442, _LEVEL, 1.0, 0.0)],
+    )
+
+
+LEVEL_STRAY = (0.1442, _LEVEL, 0.1442 + _STRAY_LENGTH, _LEVEL)
+
+
+def test_a_level_stray_inside_the_leader_ink_is_on_chain() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    od = _level_od(LEVEL_STRAY)
+    assert drawing.stray_leader_lines(od) == []
+    assert drawing.shoulder_y(od) == pytest.approx(_LEVEL)
+    records = {**_without_stray(R86053), "SupplierOD": od}
+    assert drawing.lines_through_own_text(records) == []
+    drawing.assert_diameter_ink(od, B344192_PLAN, 1, label="level OD")
+
+
+@pytest.mark.parametrize(
+    "stray",
+    [
+        # Collinear but past the shoulder's end.
+        (0.1442, _LEVEL, 0.1935, _LEVEL),
+        # Parallel, 0.5 mm off the leader: a second stroke.
+        (0.1442, _LEVEL + 0.0005, 0.19116, _LEVEL + 0.0005),
+        # The 86053 slope from the same 0 deg point, now sharing the arrow tip.
+        (0.1442, _LEVEL, 0.190346, 0.218293),
+    ],
+    ids=["overruns", "offset", "branch"],
+)
+def test_level_candidate_still_refuses_lines_that_print_apart(stray) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    with pytest.raises(RuntimeError, match="off its leader chain"):
+        drawing.assert_diameter_ink(_level_od(stray), B344192_PLAN, 1, label="level OD")
+
+
+def test_seat_move_levels_the_shoulder_on_the_plan_centre() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    od = R86053["SupplierOD"]
+    dx, dy = drawing.diameter_seat_move(od, B344192_PLAN, 1, level=True)
+    assert dy == pytest.approx(0.227 - 0.224195)
+    assert abs(dx) < 1e-4  # pass 2 already seated it a text height off the rim
+    assert drawing.diameter_seat_move(od, B344192_PLAN, 1, level=False)[1] == 0.0
+    dx, _ = drawing.diameter_seat_move(od, B344192_PLAN, -1, level=False)
+    text = drawing.display_box({"texts": od["display"]["texts"]})
+    drawing.assert_diameter_text_clear(
+        _moved(text, dx), B344192_PLAN, -1, label="OD left"
+    )
+
+
+def test_diameter_ink_refuses_a_leader_short_of_its_text_or_leaving_the_cell() -> None:
+    import copy
+
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    clean = _without_stray(R86053)["SupplierOD"]
+    drawing.assert_diameter_ink(clean, B344192_PLAN, 1, label="OD")
+    short = copy.deepcopy(clean)
+    del short["display"]["lines"][1]
+    with pytest.raises(RuntimeError, match="does not reach its text"):
+        drawing.assert_diameter_ink(short, B344192_PLAN, 1, label="OD")
+    wide = copy.deepcopy(clean)
+    wide["display"]["lines"][1][7] = drawing.FREE_TOP_CELL[2] + 0.001
+    with pytest.raises(RuntimeError, match="leaves the TOP cell"):
+        drawing.assert_diameter_ink(wide, B344192_PLAN, 1, label="OD")
+
+
+def test_free_top_cell_is_the_finalizers_outer_cell_for_any_caption() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+    from _supplier_spring_drawing import supplier_state_cells
+
+    for caption_y in (0.03, 0.05, 0.08):
+        cells = {
+            key: cell for key, _, cell in supplier_state_cells(caption_y, maximum=False)
+        }
+        assert cells["free_top"] == drawing.FREE_TOP_CELL
+
+
+def test_plan_placements_are_tried_in_the_agreed_order() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    od, id_ = drawing.OD_NAME, drawing.ID_NAME
+    assert [
+        (p.label, dict(p.sides), set(p.level)) for p in drawing.PLAN_PLACEMENTS
+    ] == [
+        ("as placed", {id_: -1, od: 1}, set()),
+        ("OD leader level at 0 deg", {id_: -1, od: 1}, {od}),
+        ("sides swapped", {id_: 1, od: -1}, set()),
+        ("sides swapped, OD leader level at 180 deg", {id_: 1, od: -1}, {od}),
+    ]
+
+
+def _scripted_placement(monkeypatch, verdicts):
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    seated, checked = [], []
+    monkeypatch.setattr(
+        drawing,
+        "_seat_diameters",
+        lambda _a, _d, _p, placement: seated.append(placement.label),
+    )
+
+    def check(_adapter, _displays, _plan, placement):
+        checked.append(placement.label)
+        if not verdicts[placement.label]:
+            raise RuntimeError("lines off its leader chain")
+
+    monkeypatch.setattr(drawing, "_assert_diameters", check)
+    return drawing, seated, checked
+
+
+def test_the_first_placement_whose_guards_pass_wins(monkeypatch) -> None:
+    import draw_dt_vn_cylinder_bank_spring as module
+
+    labels = [placement.label for placement in module.PLAN_PLACEMENTS]
+    drawing, seated, checked = _scripted_placement(
+        monkeypatch, dict(zip(labels, (False, False, True, True)))
+    )
+    won = drawing.choose_plan_placement(object(), {}, B344192_PLAN)
+    assert won.label == "sides swapped"
+    assert seated == checked == labels[:3]
+
+
+def test_no_passing_placement_refuses_the_sheet(monkeypatch) -> None:
+    import draw_dt_vn_cylinder_bank_spring as module
+
+    labels = [placement.label for placement in module.PLAN_PLACEMENTS]
+    drawing, _seated, checked = _scripted_placement(
+        monkeypatch, dict.fromkeys(labels, False)
+    )
+    with pytest.raises(RuntimeError, match="no plan diameter placement") as refused:
+        drawing.choose_plan_placement(object(), {}, B344192_PLAN)
+    assert checked == labels
+    assert all(label in str(refused.value) for label in labels)
 
 
 def test_installation_note_fits_the_sheet() -> None:
