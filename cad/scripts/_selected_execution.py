@@ -92,6 +92,15 @@ def _workspace_path(workspace: Path, value: str) -> str:
     return PurePosixPath(*candidate.parts[len(root_parts):]).as_posix()
 
 
+def _path_identity(value: str) -> str:
+    """OS path-comparison key only; serialized resolved spelling is unchanged.
+
+    Like containment, this uses normcase, not a per-directory sensitivity probe.
+    Windows case-sensitive directories are conservatively treated as insensitive.
+    """
+    return os.path.normcase(value).replace("\\", "/")
+
+
 def task_record(workspace: Path, task: Task) -> dict[str, Any]:
     """Comparable projection of a TaskControl-processed canonical Task.
 
@@ -337,13 +346,13 @@ class SelectedTaskLoader(TaskLoader2):
         selected_targets: dict[str, str] = {}
         for task in tasks:
             for target in task.targets:
-                path = _workspace_path(self.workspace, target)
+                path = _path_identity(_workspace_path(self.workspace, target))
                 if path in selected_targets or owners.get(path) != task.name:
                     raise SelectedExecutionError(f"canonical target ownership differs for {path!r}")
                 selected_targets[path] = task.name
         for task in tasks:
             for dependency in task.file_dep:
-                path = _workspace_path(self.workspace, dependency)
+                path = _path_identity(_workspace_path(self.workspace, dependency))
                 owner = owners.get(path)
                 if owner is not None and (
                     owner not in self.names or selected_targets.get(path) != owner
@@ -397,6 +406,11 @@ class SelectedTaskLoader(TaskLoader2):
                     expected = dict(self.records[task.name])
                     expected["actions"] = [action["callable"] for action in expected["actions"]]
                     actual = task_record(self.workspace, task)
+                    # Compare only path fields by OS identity across cold/warm
+                    # filesystem states; never rewrite the trusted graph records.
+                    for field in ("file_dependencies", "targets"):
+                        expected[field] = sorted(_path_identity(path) for path in expected[field])
+                        actual[field] = sorted(_path_identity(path) for path in actual[field])
                     if actual != expected:
                         differing = sorted(key for key in expected if expected[key] != actual[key])
                         raise SelectedExecutionError(

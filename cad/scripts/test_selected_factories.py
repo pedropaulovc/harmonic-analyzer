@@ -11,6 +11,8 @@ from dataclasses import FrozenInstanceError, dataclass
 from enum import Enum
 import importlib.util
 import inspect
+import ntpath
+import posixpath
 from pathlib import Path
 from types import MappingProxyType, ModuleType, SimpleNamespace
 from threading import Barrier
@@ -21,7 +23,7 @@ from doit.action import PythonAction
 from doit.control import TaskControl
 from doit.loader import generate_tasks, load_tasks
 from doit.task import Task
-from cad.scripts._selected_execution import SelectedExecutionError, _workspace_path
+from cad.scripts._selected_execution import SelectedExecutionError, _path_identity, _workspace_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -480,7 +482,7 @@ def _case_assembly_keeps_trackers_wrappers_and_doit_reserved_arguments(dodo, ord
 
 def _case_target_ownership_matches_every_normal_declared_target(target_owners, ordinary):
     expected = {
-        _workspace_path(REPO_ROOT, target): name
+        _path_identity(_workspace_path(REPO_ROOT, target)): name
         for name, task in ordinary.tasks.items()
         for target in task.targets
     }
@@ -512,7 +514,7 @@ def _case_target_ownership_exposes_producer_omitted_before_taskcontrol(dodo, ord
         owner_index[relative]
         for dep in selected.file_dep
         if Path(dep).is_relative_to(REPO_ROOT)
-        and (relative := _workspace_path(REPO_ROOT, dep)) in owner_index
+        and (relative := _path_identity(_workspace_path(REPO_ROOT, dep))) in owner_index
     } - {name}
     assert omitted, "the regression requires real implicit producer edges"
     assert omitted <= set(ordinary.tasks[name].task_dep)
@@ -564,7 +566,7 @@ def _case_enrolled_traveler_keeps_normal_loader_conversion_and_lazy_kernel(dodo,
     assert selected[f"prechips:{stem}"].task_dep == [f"package:features:{stem}"]
     owners = dodo.canonical_target_owners()
     for target in selected[f"prechips:{stem}"].targets:
-        assert owners[_workspace_path(REPO_ROOT, target)] == f"prechips:{stem}"
+        assert owners[_path_identity(_workspace_path(REPO_ROOT, target))] == f"prechips:{stem}"
 
 
 def _case_requested_order_and_iterable_are_preserved_without_dependency_expansion(dodo, ordinary):
@@ -638,7 +640,7 @@ def _case_selected_drawing_keeps_authoritative_model_and_exact_identity(dodo, ta
     assert expected <= selected.file_dep
     owners = target_owners
     assert {
-        owners[_workspace_path(REPO_ROOT, path)] for path in expected
+        owners[_path_identity(_workspace_path(REPO_ROOT, path))] for path in expected
     } == {f"{source_kind}:{spec.part}"}
     assert selected.actions[0].py_callable is dodo._cached_drawing_action
     assert selected.actions[0].py_callable._farm_leaf_action is True
@@ -652,7 +654,7 @@ def _case_queried_ownership_matches_complete_normal_oracle(dodo, ordinary, targe
         for task in ordinary.tasks.values()
         for dependency in task.file_dep
         if Path(dependency).is_relative_to(REPO_ROOT)
-        and _workspace_path(REPO_ROOT, dependency) in target_owners
+        and _path_identity(_workspace_path(REPO_ROOT, dependency)) in target_owners
     }
     queries.update(implicit_inputs)
     assert implicit_inputs, "queried ownership must cover real inferred producer inputs"
@@ -668,7 +670,7 @@ def _case_queried_ownership_matches_complete_normal_oracle(dodo, ordinary, targe
             for path in (*task.targets, *task.file_dep)
             if Path(path).is_relative_to(REPO_ROOT)
         }
-        normalized = {_workspace_path(REPO_ROOT, path) for path in selected_paths}
+        normalized = {_path_identity(_workspace_path(REPO_ROOT, path)) for path in selected_paths}
         expected = {path: owner for path, owner in target_owners.items() if path in normalized}
         assert dodo.canonical_target_owners(selected_paths) == expected, family
 
@@ -702,7 +704,7 @@ def _case_part_ownership_avoids_heavy_enrollment(dodo, ordinary, target_owners, 
     monkeypatch.setattr(Path, "glob", clean_report_glob)
     monkeypatch.setattr(dodo, "_ownership_namespace_has_aliases", lambda *_args, **_kwargs: False)
     actual = dodo.canonical_target_owners([query])
-    key = _workspace_path(REPO_ROOT, query)
+    key = _path_identity(_workspace_path(REPO_ROOT, query))
     assert actual == {key: target_owners[key]}
 
 
@@ -779,7 +781,7 @@ def _case_nested_feature_junction_cannot_hide_an_omitted_producer(dodo, monkeypa
         dodo, "_canonical_targets",
         lambda name: [str(target)] if name == "package:features:ownership_probe" else original_targets(name),
     )
-    key = _workspace_path(REPO_ROOT, str(relocated))
+    key = _path_identity(_workspace_path(REPO_ROOT, str(relocated)))
     assert dodo.canonical_target_owners([str(relocated)]) == {
         key: "package:features:ownership_probe",
     }
@@ -858,6 +860,33 @@ def _case_declared_target_outside_workspace_is_refused(
 def _case_ownership_queries_refuse_escaping_paths(dodo):
     with pytest.raises(SelectedExecutionError, match="escapes selected workspace"):
         dodo.canonical_target_owners([str(REPO_ROOT.parent / "outside-selected-target")])
+
+
+def _case_case_aliased_ownership_uses_os_identity(dodo, monkeypatch, tmp_path, case_sensitive):
+    normcase = posixpath.normcase if case_sensitive else ntpath.normcase
+    monkeypatch.setattr(dodo.os.path, "normcase", normcase)
+    monkeypatch.setattr(dodo, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(dodo, "CAD_OUT", tmp_path / "cad" / "out")
+    monkeypatch.setattr(dodo, "REPORTS", tmp_path / "reports")
+    monkeypatch.setattr(dodo, "part_stems", lambda: ["upper", "lower"])
+    upper = dodo.CAD_OUT / "Part.x"
+    lower = dodo.CAD_OUT / "part.x"
+    assert not upper.exists() and not lower.exists()
+    declared = {"part:upper": [str(upper)], "part:lower": []}
+    monkeypatch.setattr(dodo, "_canonical_targets", lambda name: declared.get(name, []))
+
+    # A query's case alias must find its genuine producer on Windows.
+    assert dodo.canonical_target_owners([str(lower)]) == (
+        {} if case_sensitive else {"cad/out/part.x": "part:upper"}
+    )
+    declared["part:lower"] = [str(lower)]
+    if case_sensitive:
+        assert dodo.canonical_target_owners([str(upper), str(lower)]) == {
+            "cad/out/Part.x": "part:upper", "cad/out/part.x": "part:lower",
+        }
+    else:
+        with pytest.raises(ValueError, match="duplicate canonical target"):
+            dodo.canonical_target_owners([str(upper), str(lower)])
 
 
 _PORTFOLIO_FAILURES = (Exception, pytest.fail.Exception)
@@ -989,6 +1018,8 @@ def test_selected_factories_portfolio(
         (_case_alias_scan_covers_exact_declared_target_depth, {}),
         (_case_declared_target_outside_workspace_is_refused, {}),
         (_case_ownership_queries_refuse_escaping_paths, {}),
+        (_case_case_aliased_ownership_uses_os_identity, {'case_sensitive': False}),
+        (_case_case_aliased_ownership_uses_os_identity, {'case_sensitive': True}),
     ]
     _run_portfolio(cases, shared, tmp_path)
 

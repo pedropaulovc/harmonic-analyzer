@@ -5158,17 +5158,18 @@ def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str
     Heavy feature, traveler and review enrollment is evaluated only when its
     canonical namespace or an existing alias can own a queried path. Drawing
     output metadata is always consulted, including relocated outputs/collisions.
+    Returned keys use OS path identity, not serialized path spelling.
     """
-    from cad.scripts._selected_execution import _workspace_path
+    from cad.scripts._selected_execution import _path_identity, _workspace_path
 
     workspace = REPO_ROOT.resolve(strict=False)
     requested = None if paths is None else {
-        _workspace_path(workspace, str(path)) for path in paths
+        _path_identity(_workspace_path(workspace, str(path))) for path in paths
     }
     owners: dict[str, str] = {}
 
     def normalized(target: str | Path) -> str:
-        return _workspace_path(workspace, str(target))
+        return _path_identity(_workspace_path(workspace, str(target)))
 
     def queried_namespace(directory: Path) -> bool:
         if requested is None:

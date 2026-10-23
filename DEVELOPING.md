@@ -634,6 +634,12 @@ has inferred task dependencies from file dependencies. It compares task names,
 task/file dependencies, targets and Python callable identities against the trusted
 graph, and checks live target ownership so an existing output cannot hide an
 omitted producer.
+Path ownership and comparison of file dependencies and targets use OS-normalized
+path identity; serialized paths and graph hashes retain their original spelling.
+On Windows this uses `normcase`, not per-directory case-sensitivity detection, so
+case-sensitive directories may conservatively reject distinct output claims.
+Task names, callable names and action arguments remain case-sensitive.
+
 The selective loader first imports `dodo` under the caller's working directory.
 It then validates that the provider's `REPO_ROOT` matches its workspace and
 changes to that workspace before loading doit configuration or invoking the

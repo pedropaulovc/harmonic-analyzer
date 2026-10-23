@@ -6,7 +6,9 @@ import copy
 import functools
 import hashlib
 import json
+import ntpath
 import os
+import posixpath
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -167,7 +169,7 @@ def case(tmp_path, monkeypatch):
     def target_owners(paths=None):
         case.ownership_queries.append(None if paths is None else set(paths))
         return {
-            selected._workspace_path(case.workspace, path): name
+            selected._path_identity(selected._workspace_path(case.workspace, path)): name
             for path, name in {
                 "child.native": _CHILD, "child.execution": _CHILD,
                 "root.native": _ROOT, "root.execution": _ROOT,
@@ -688,29 +690,96 @@ def test_ownership_index_errors_refuse_before_actions_with_separate_timing(
     assert not any(marker["phase"] == "control_validation" for marker in markers)
 
 
-@pytest.mark.parametrize("warm_target", [False, True])
-def test_ownership_and_records_share_existing_target_case_normalization(
-    case, monkeypatch, warm_target,
+@pytest.mark.parametrize("export_warm", [False, True])
+@pytest.mark.parametrize("execute_warm", [False, True])
+def test_windows_path_comparison_preserves_records_across_filesystem_states(
+    case, monkeypatch, export_warm, execute_warm,
 ):
-    if warm_target:
-        Path("root.native").write_text("preexisting output with on-disk spelling")
+    monkeypatch.setattr(selected.os.path, "normcase", ntpath.normcase)
+    native_paths = [Path("root.native"), Path("child.native")]
+
+    def set_outputs(warm):
+        for path in native_paths:
+            if warm:
+                path.write_text("preexisting output with on-disk spelling")
+            else:
+                path.unlink(missing_ok=True)
+
     resolve = Path.resolve
 
     def on_disk_case(path, *args, **kwargs):
         resolved = resolve(path, *args, **kwargs)
-        if path.name == "root.native" and path.exists():
-            return resolved.with_name("ROOT.NATIVE")
+        if path.name in {"root.native", "child.native"} and path.exists():
+            return resolved.with_name(path.name.upper())
         return resolved
 
     monkeypatch.setattr(Path, "resolve", on_disk_case)
+    set_outputs(export_warm)
     case.graph = _graph(case)
     case.identity = _write_graph(case, case.graph)
-    case.requested.clear()
-    case.events.clear()
+    graph_bytes = case.graph_path.read_bytes()
     root = next(record for record in case.graph["tasks"] if record["name"] == _ROOT)
-    assert ("ROOT.NATIVE" if warm_target else "root.native") in root["targets"]
-    assert _run(case) == 0
+    assert ("ROOT.NATIVE" if export_warm else "root.native") in root["targets"]
+    assert ("CHILD.NATIVE" if export_warm else "child.native") in root["file_dependencies"]
+
+    set_outputs(execute_warm)
+    task_loader = _loader(case)
+    records = copy.deepcopy(task_loader.records)
+    case.events.clear()
+    main = DoitMain(task_loader=task_loader, config_filenames=())
+    assert main.run(["run", "-n", "0", _ROOT]) == 0
     assert ("action", _ROOT) in case.events
+    assert task_loader.records == records
+    assert case.graph_path.read_bytes() == graph_bytes
+
+
+@pytest.mark.parametrize("field", ["file_dependencies", "targets"])
+@pytest.mark.parametrize("normcase", [ntpath.normcase, posixpath.normcase], ids=["windows", "posix"])
+def test_only_os_equivalent_record_paths_compare_equal(case, monkeypatch, field, normcase):
+    monkeypatch.setattr(selected.os.path, "normcase", normcase)
+    root = next(record for record in case.graph["tasks"] if record["name"] == _ROOT)
+    root[field] = sorted(path.upper() for path in root[field])
+    case.identity = _write_graph(case, case.graph)
+    case.events.clear()
+
+    equivalent = normcase("Part.x") == normcase("part.x")
+    assert _run(case) == (0 if equivalent else 3)
+    if not equivalent:
+        assert not case.events
+
+
+def test_windows_case_alias_cannot_hide_an_omitted_implicit_producer(case, monkeypatch, capsys):
+    monkeypatch.setattr(selected.os.path, "normcase", ntpath.normcase)
+    make_tasks = case.make_tasks
+
+    def aliased_consumer(names):
+        tasks = make_tasks(names)
+        for task in tasks:
+            if task.name == _ROOT:
+                task.file_dep = {"recipe.py", "CHILD.NATIVE"}
+        return tasks
+
+    case.module.canonical_tasks = aliased_consumer
+    root = next(record for record in case.graph["tasks"] if record["name"] == _ROOT)
+    root["dependencies"] = []
+    root["file_dependencies"] = ["CHILD.NATIVE", "recipe.py"]
+    case.graph["tasks"] = [root]
+    case.identity = _write_graph(case, case.graph)
+    case.events.clear()
+
+    assert _run(case) == 3
+    assert not case.events
+    assert "omits implicit producer" in capsys.readouterr().err
+
+
+def test_windows_path_identity_does_not_fold_callable_names(case, monkeypatch):
+    monkeypatch.setattr(selected.os.path, "normcase", ntpath.normcase)
+    root = next(record for record in case.graph["tasks"] if record["name"] == _ROOT)
+    root["actions"][0]["callable"] = root["actions"][0]["callable"].upper()
+    case.identity = _write_graph(case, case.graph)
+
+    assert _run(case) == 3
+    assert not case.events
 
 
 def test_path_resolution_errors_use_selected_refusal_before_actions(case, monkeypatch, capsys):
