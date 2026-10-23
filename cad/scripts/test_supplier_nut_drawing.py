@@ -541,9 +541,14 @@ class NativeShelfInk:
     """Bounded native display primitives, not an exact printed-glyph model.
 
     Text offsets are per-fragment measurements. The authored annotation origin
-    deliberately differs from the physical arrow station for multiline text.
-    False-mode positioning translates the physical dimension; enabling offset
-    anchors its station to that origin, while true-mode positioning moves text.
+    deliberately differs from the physical arrow station and bottom baseline.
+    The false-mode seed at that station is idempotent; enabling offset anchors
+    there, while true-mode positioning moves the entire native text block.
+
+    The observed positive-side OffsetText path joins the actual arrow midpoint
+    to the lowest native fragment's lower-left baseline, then underlines its
+    complete measured advance. The annotation origin is not that junction.
+    Captures do not include OffsetText state: the live bool belongs to this fake.
     """
 
     def __init__(self, case, display, *, kind, span=None):
@@ -551,7 +556,16 @@ class NativeShelfInk:
         self.display = display
         self.kind = kind
         self.origin = [0.04 if kind != "height" else 0.10, 0.035, 0.0]
-        self.station = 0.031 if kind == "nominal" else 0.035
+        # Actual27f AF and thickness origin-minus-bottom-baseline deltas from
+        # nut-native-offset-text-captured-regression-source.json; the nominal
+        # three-row fake retains its original 4 mm origin/station separation.
+        baseline_delta = {
+            "nominal": 0.035 - 0.031,
+            "flats": 0.1661689 - 0.1588138,
+            "height": 0.1083311 - 0.105553,
+        }[kind]
+        self.station = self.origin[1] - baseline_delta
+        self.fragment_baseline_offset = self.station - self.origin[1]
         self.left, self.right = (self.origin[0] - 0.003, self.origin[0] + 0.003)
         if span is not None:
             self.left, self.right = self.origin[0] - span / 2, self.origin[0] + span / 2
@@ -562,21 +576,22 @@ class NativeShelfInk:
         self.failure = None
         self.writes = []
         self.seeded = False
-        # x/y relative to text origin, measured width and height in metres.
+        # Measured x from annotation origin, y from the bottom native baseline;
+        # its original transverse offset survives every normal text move.
         self.fragments = {
             "nominal": [
-                ["(", -0.013, 0.000, 0.0015, 0.003],
-                ["⌀", -0.011, 0.000, 0.003, 0.003],
-                [f"{case.spec.SUPPLIER_NOMINAL_MAJOR_MM / 25.4:.3f} in)", -0.008, 0.000, 0.0242, 0.003],
-                [f"{case.spec.THREAD.removeprefix('#')} THREAD", -0.014, -0.004, 0.030, 0.003],
-                ["NOMINAL MAJOR", -0.020, -0.008, 0.040075, 0.003],
+                ["(", -0.013, 0.008, 0.0015, 0.003],
+                ["⌀", -0.011, 0.008, 0.003, 0.003],
+                [f"{case.spec.SUPPLIER_NOMINAL_MAJOR_MM / 25.4:.3f} in)", -0.008, 0.008, 0.0242, 0.003],
+                [f"{case.spec.THREAD.removeprefix('#')} THREAD", -0.014, 0.004, 0.030, 0.003],
+                ["NOMINAL MAJOR", -0.020, 0.000, 0.040075, 0.003],
             ],
             "flats": [
-                ["(", -0.008, 0.000, 0.0015, 0.003],
-                ["1", -0.006, 0.0015, 0.002, 0.002],
-                [str(case.spec.SUPPLIER_FRACTION_DENOMINATOR), -0.006, -0.0015, 0.004, 0.002],
-                [" in)", -0.001, 0.000, 0.006, 0.003],
-                ["ACROSS FLATS", -0.018, -0.006, 0.036, 0.003],
+                ["(", -0.008, 0.006, 0.0015, 0.003],
+                ["1", -0.006, 0.0075, 0.002, 0.002],
+                [str(case.spec.SUPPLIER_FRACTION_DENOMINATOR), -0.006, 0.0045, 0.004, 0.002],
+                [" in)", -0.001, 0.006, 0.006, 0.003],
+                ["ACROSS FLATS", -0.018, 0.000, 0.036, 0.003],
             ],
             "height": [[f"({case.spec.THICKNESS / 25.4:.3f} in)", -0.010, 0.000, 0.020, 0.003]],
         }[kind]
@@ -606,8 +621,6 @@ class NativeShelfInk:
         if not self.offset:
             if self.failure == "seed-ignored":
                 return True
-            self.station += y - self.origin[1]
-            self.witness_end += y - self.origin[1]
             self.seeded = True
         self.origin[:] = [x, y, z]
         return True
@@ -622,9 +635,12 @@ class NativeShelfInk:
         self.offset = value
 
     def text_boxes(self):
-        return [(self.origin[0] + x, self.origin[1] + y,
-                 self.origin[0] + x + width, self.origin[1] + y + height)
-                for _text, x, y, width, height in self.fragments]
+        boxes = []
+        for index in range(self.GetTextCount()):
+            x, y, _z = self.GetTextPositionAtIndex(index)
+            boxes.append((x, y, x + self.GetTextInBoxWidthAtIndex(index),
+                          y + self.GetTextHeightAtIndex(index)))
+        return boxes
 
     def physical_lines(self):
         y = self.station
@@ -639,11 +655,20 @@ class NativeShelfInk:
     def lines(self):
         rows = self.physical_lines()
         if self.offset:
-            rows += [(self.right + self.tail, self.station,
-                      self.origin[0], self.origin[1])]
+            bottom = min(range(self.GetTextCount()),
+                         key=lambda index: self.GetTextPositionAtIndex(index)[1])
+            x, y, _z = self.GetTextPositionAtIndex(bottom)
+            arrows = [self.GetArrowHeadAtIndex2(index)
+                      for index in range(self.GetArrowHeadCount())]
+            midpoint = tuple(sum(arrow[axis] for arrow in arrows) / len(arrows)
+                             for axis in (0, 1))
+            # Keep both raw primitives even during the oblique intermediate
+            # anchor state; only the final baseline returns to arrow support.
+            rows += [(*midpoint, x, y),
+                     (x, y, x + self.GetTextInBoxWidthAtIndex(bottom), y)]
         if self.kind == "flats":
-            rows += [(self.origin[0] - 0.0065, self.origin[1] + 0.001,
-                      self.origin[0] - 0.0015, self.origin[1] + 0.001)]
+            rows += [(self.origin[0] - 0.0065, self.origin[1] + 0.007,
+                      self.origin[0] - 0.0015, self.origin[1] + 0.007)]
         return rows
 
     def GetTextCount(self):
@@ -654,7 +679,8 @@ class NativeShelfInk:
 
     def GetTextPositionAtIndex(self, index):
         _text, x, y, _width, _height = self.fragments[index]
-        return (self.origin[0] + x, self.origin[1] + y, 0.0)
+        return (self.origin[0] + x,
+                self.origin[1] + self.fragment_baseline_offset + y, 0.0)
 
     def GetTextHeightAtIndex(self, index):
         return self.fragments[index][4]
@@ -663,7 +689,7 @@ class NativeShelfInk:
         return self.fragments[index][3]
 
     def GetTextRefPositionAtIndex(self, _index):
-        return 0
+        return 1
 
     def GetTextAngleAtIndex(self, _index):
         return 0.0
@@ -722,6 +748,8 @@ class ShelfDisplay:
 def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stations(
     monkeypatch, native_nut, spec,
 ):
+    import _supplier_reference_text as reference_text
+
     case = native_nut(spec)
     source_before = tuple((point.native_identity, point.X, point.Y, point.Z)
                           for point in case.source)
@@ -730,6 +758,7 @@ def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stati
     settled, physical, callbacks = _author_public(monkeypatch, case)
     assert set(case.shelf_ink) == {NOMINAL_NAME, "AcrossFlats@drawing", "Height@drawing"}
     assert case.shelf_before[NOMINAL_NAME][0][1] != 0.031
+    displays = {NOMINAL_NAME: case.display, **physical}
     for name, ink in case.shelf_ink.items():
         origin, lines, boxes = case.shelf_before[name]
         assert ink.offset is True
@@ -738,6 +767,54 @@ def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stati
         for actual, expected in zip(ink.physical_lines(), lines, strict=True):
             assert actual == pytest.approx(expected), name
         assert len(ink.text_boxes()) == len(boxes)
+        measured = reference_text.measure_reference_text(
+            case.adapter, displays[name], axis=0, label=name,
+        )
+        data = measured["record"]["display"]
+        raw_lines = [(row[4], row[5], row[7], row[8]) for row in data["lines"]]
+        for actual, expected in zip(raw_lines[:len(lines)], lines, strict=True):
+            assert actual == pytest.approx(expected), name
+        # The production classifier must retain the complete ORIGINAL station
+        # union, not freeze the new connector/underline as physical dimension ink.
+        station = lines[3][1]
+        assert len(measured["physical_lines"]) == 1
+        assert measured["physical_lines"][0] == pytest.approx(
+            (station, station, lines[2][0], lines[4][2])
+        ), name
+        assert measured["reach"] == pytest.approx(lines[4][2]), name
+        for actual, expected in zip(measured["tips"], (
+            (lines[3][0], station), (lines[3][2], station),
+        ), strict=True):
+            assert actual == pytest.approx(expected), name
+        for actual, expected in zip(measured["witnesses"], (
+            (lines[0][0], lines[0][1], lines[0][3]),
+            (lines[1][0], lines[1][1], lines[1][3]),
+        ), strict=True):
+            assert actual == pytest.approx(expected), name
+        for fragment, box in zip(data["texts"], ink.text_boxes(), strict=True):
+            assert fragment["ref"] == 1 and fragment["ang"] == 0.0
+            assert fragment["pos"][:2] == pytest.approx(box[:2])
+            assert (fragment["w"], fragment["h"]) == pytest.approx(
+                (box[2] - box[0], box[3] - box[1])
+            )
+        bottom = min(data["texts"], key=lambda fragment: fragment["pos"][1])
+        x, y = bottom["pos"][:2]
+        assert y == pytest.approx(station), name
+        assert x >= measured["reach"] + 0.002, name
+        assert len(raw_lines) == len(lines) + 2 + (ink.kind == "flats")
+        assert raw_lines[len(lines)] == pytest.approx(
+            ((lines[3][0] + lines[3][2]) / 2, station, x, y)
+        ), name
+        assert raw_lines[len(lines) + 1] == pytest.approx(
+            (x, y, x + bottom["w"], y)
+        ), name
+        bounds = measured["text"]
+        assert (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax) == pytest.approx((
+            min(box[0] for box in ink.text_boxes()),
+            min(box[1] for box in ink.text_boxes()),
+            max(box[2] for box in ink.text_boxes()),
+            max(box[3] for box in ink.text_boxes()),
+        )), name
         # Every measured fragment, not just the numerical row, clears both
         # witness runs and the outside arrow's complete physical line reach.
         physical_reach = ink.right + ink.tail
@@ -755,6 +832,8 @@ def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stati
     assert max(fragment[3] for fragment in nominal.fragments) == 0.040075
     assert any(fragment[0] == "NOMINAL MAJOR" for fragment in nominal.fragments)
     assert any(fragment[0] == "⌀" for fragment in nominal.fragments)
+    assert len({box[1] for box in nominal.text_boxes()}) == 3
+    assert min(box[1] for box in nominal.text_boxes()) != nominal.origin[1]
     assert tuple((point.native_identity, point.X, point.Y, point.Z)
                  for point in case.source) == source_before
     assert tuple(point.native_identity for point in case.attachments) == attachment_before
@@ -774,6 +853,39 @@ def test_public_nut_shelves_complete_native_blocks_without_moving_physical_stati
         getattr(left, "context", None) != getattr(right, "context", None)
         for left, right in case.comparisons
     ), "presentation must not reintroduce model/drawing endpoint comparisons"
+
+
+@pytest.mark.parametrize("spec", CONSUMERS)
+def test_public_nut_keeps_unrecognized_tail_to_annotation_origin_extension_physical(
+    monkeypatch, native_nut, spec,
+):
+    case = native_nut(spec)
+    legacy_state = {}
+
+    def use_legacy_coincident_path(ink):
+        # This is explicitly the OLD unknown coincident-origin scenario, not
+        # the healthy captured off-support annotation-origin geometry.
+        ink.origin[1] = ink.station
+        legacy_state["physical"] = tuple(ink.physical_lines())
+        legacy_state["transverse"] = ink.origin[1]
+
+        def unrecognized_lines():
+            rows = ink.physical_lines()
+            if ink.offset:
+                # No midpoint start and no native-baseline/full-width pair.
+                rows += [(ink.right + ink.tail, ink.station,
+                          ink.origin[0], ink.origin[1])]
+            return rows
+
+        ink.lines = unrecognized_lines
+
+    with pytest.raises(RuntimeError, match="physical_lines moved"):
+        _author_public(monkeypatch, case, shelf_failure=use_legacy_coincident_path)
+    ink = case.shelf_ink[NOMINAL_NAME]
+    assert ink.offset is True
+    assert ink.origin[0] > case.shelf_before[NOMINAL_NAME][0][0]
+    assert ink.origin[1] == legacy_state["transverse"] == ink.station
+    assert tuple(ink.physical_lines()) == legacy_state["physical"]
 
 
 @pytest.mark.parametrize("failure", [
