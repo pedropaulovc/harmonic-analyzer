@@ -1964,10 +1964,21 @@ def test_supplier_stock_shelves_use_complete_pitch_height_and_length_below_row(
     assert pitch["text"].height == pytest.approx(0.010)
     assert length["text"].height == pytest.approx(0.009)
     length_line = state.annotations["SupplierStockLength"].line_anchor[1]
-    assert length_line - pitch["text"].ymax == pytest.approx(draw.SUPPLIER_STOCK_PLACE_AIR)
+    assert length_line - pitch["text"].ymax == pytest.approx(
+        draw.SUPPLIER_STOCK_PLACE_AIR + 0.001
+    )
     assert length["text"].ymin - length_line == pytest.approx(draw.SUPPLIER_STOCK_PLACE_AIR)
     assert diameter["text"].xmin - state.view.reference_bounds()[2] == pytest.approx(
         draw.SUPPLIER_STOCK_GAUGE_GAP + draw.SUPPLIER_STOCK_PLACE_AIR
+    )
+    # The actual bb179 PDF glyph top exceeded its native cap box by 1.065 mm.
+    # Keep that printed envelope, including the 0.13 mm line's half width,
+    # outside the unchanged 3 mm cross-dimension air; do not lower the gauge.
+    actual_pitch_glyph_top = pitch["text"].ymax + 0.001065
+    assert length_line - 0.000065 - actual_pitch_glyph_top >= draw.SUPPLIER_STOCK_TEXT_GAP
+    pitch_line = state.annotations["SupplierThreadPitch"].line_anchor[1]
+    assert pitch_line - state.view.reference_bounds()[3] == pytest.approx(
+        draw.SUPPLIER_STOCK_GAUGE_GAP
     )
 
 
