@@ -1354,10 +1354,12 @@ took 783 s, versus about 21 s for the ray path.
 Before retaining a component edge across these rebuilds, obtain its
 `IEntity.GetSafeEntity()` result; ordinary entity pointers are transient.
 Check `IEntity.IsSafe` before every section mapping. The documented safe entity
-retains the same component-context identity through rebuilds within this
-SolidWorks session, but is invalid if its source entity is deleted. Missing
-or unsafe handles refuse rather than rematching a similarly shaped edge.
-This session-local proof does not promise identity across close/reopen.
+retains model topology through rebuilds within this SolidWorks session, but is
+invalid if its source entity is deleted. Keep the ray's explicit `IComponent2`
+alongside it to identify the source part and occurrence; do not recover that
+ownership through `IEntity.GetComponent`. Missing or unsafe handles refuse
+rather than rematching similarly shaped geometry. This session-local proof
+does not promise identity across close/reopen.
 
 After creation rebuild and final rebuild, reacquire the section edges from
 their model identities and use `assert_dimension_measures` to prove exactly
@@ -1368,6 +1370,29 @@ stay in `drawing.inset_*` telemetry. Offline lifecycle regressions are not
 native proof: require the farm's rebuilt/saved dimension, its ordinary PDF
 colour and the complete-sheet comparison, not a nominal note or detached
 sketch that merely prints the right number.
+
+The bounded diagnostic at source `c0e403c5b1255e5839a572d839f25514d2447b6b`,
+based on production `61a6fb0b53dc962955351559f8820de1f4662f01`, retained
+its evidence under the `fr-inset-safe-context-diagnostic` failure namespace
+(attempt `20261023T063410Z-1-e8160cfb`, receipt timestamp `20261023T063641Z`).
+For both references, the component-mapped input's `GetComponent` was already
+null **before** `GetSafeEntity`; the safe handle did not lose an owner.
+`IView.GetCorrespondingEntity` supplied the full drawing instance. Both mapped
+variants matched the original-main screen control by `IsSame == 1`, including
+their source-part reverse correspondences, before and after rebuild.
+
+All three native dimensions retained two exact attachments, measured
+`4.000000010000034` mm, belonged to B-B and printed black after rebuild.
+Nevertheless, `IAnnotation.GetAttachedEntityTypes` returned `[]` for **all**
+three, including the working screen control. That empty legacy summary made
+the diagnostic receipt's composite `passes` flags false; it was not evidence
+of missing attachments. The production guard therefore reads each actual
+`GetAttachedEntities3` object's `IEntity.GetType` and requires two edges.
+The summary remains diagnostic telemetry only. Exact attachment identities,
+`IsDangling`, native linear type, measured value and section ownership remain
+required. No screen-control code or expensive diagnostic probing belongs in
+the production recipe; a full production finalization/export still requires
+its own farm proof.
 
 **l. A datum named by a frame's datum identifier.**
 Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take

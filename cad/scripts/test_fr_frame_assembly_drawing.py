@@ -724,7 +724,7 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     def pick(_adapter, view, *, leaves, label, stem, target_mm, stations_m):
         picks[label] = (view, stem, target_mm, stations_m, leaves)
         return drawing._InsetEdgeReference(
-            label, f"model {label}", f"edge {label}", f"{stem}-1"
+            label, f"model {label}", f"edge {label}", f"{stem}-1", f"component {stem}"
         )
 
     def add(_adapter, view, edges, *, text_xy, label):
@@ -793,18 +793,21 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
     """Script model hits and distinct mapped/selected section entities."""
     logged, selected, events, mapped = [], [], [], []
     section_edge = readback[0] if readback else None
+    source_component = object()
     raw_entities, safe_entities, safe_reads = {}, {}, []
     for row in rays:
         if row is None or row[0] in raw_entities:
             continue
         name = row[0]
-        safe_entities[name] = SimpleNamespace(IsSafe=True, name=f"safe {name}")
+        safe_entities[name] = SimpleNamespace(
+            IsSafe=True, name=f"safe {name}", GetComponent=lambda: None,
+        )
 
         def retain(name=name):
             safe_reads.append(name)
             return safe_entities[name]
 
-        raw_entities[name] = SimpleNamespace(GetSafeEntity=retain)
+        raw_entities[name] = SimpleNamespace(GetSafeEntity=retain, GetComponent=lambda: None)
 
     def bound(value, kind):
         if kind == "IEntity" and isinstance(value, str):
@@ -812,10 +815,11 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
         return value
 
     def cast(_adapter, _view, *, leaves, stem, target_mm, stations_m):
-        return "fr-frame-1/fr-nameplate-1", list(rays)
+        return "fr-frame-1/fr-nameplate-1", source_component, list(rays)
 
-    def map_edge(_adapter, view, edge, *, label):
-        mapped.append((view, edge, label))
+    def map_edge(_adapter, view, edge, *, component, label):
+        assert component is source_component
+        mapped.append((view, edge, component, label))
         return section_edge
 
     def select(_adapter, view, kind, xy, *, label, entity=None):
@@ -834,6 +838,7 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
     )
     adapter = SimpleNamespace(
         raw_entities=raw_entities, safe_entities=safe_entities, safe_reads=safe_reads,
+        source_component=source_component,
         swApp=SimpleNamespace(IsSame=lambda a, b: int(a == b)),
         currentModel=SimpleNamespace(SelectionManager=SimpleNamespace(
             GetSelectedObjectsDrawingView2=lambda _index, _mark: selected_view,
@@ -861,11 +866,14 @@ def test_the_first_station_whose_ray_meets_an_edge_chooses_it(monkeypatch) -> No
         stations_m=INSET_STATIONS,
     )
     assert edge == drawing._InsetEdgeReference(
-        "plate", adapter.safe_entities["edge at 20"], "selected", "fr-frame-1/fr-nameplate-1"
+        "plate", adapter.safe_entities["edge at 20"], "selected", "fr-frame-1/fr-nameplate-1",
+        adapter.source_component,
     )
-    assert mapped == [("B-B", adapter.safe_entities["edge at 20"], "plate")]
+    assert mapped == [("B-B", adapter.safe_entities["edge at 20"], adapter.source_component, "plate")]
     assert adapter.safe_reads == ["edge at 20"]  # Only the chosen model edge is retained.
     assert edge.model_edge is not adapter.raw_entities["edge at 20"]
+    assert adapter.raw_entities["edge at 20"].GetComponent() is None
+    assert edge.model_edge.GetComponent() is None  # Safe acquisition did not cause the absent owner.
     assert selected == [("B-B", "EDGE", None, "plate", "selected")]
     assert len(logged) == 1
     assert "fr-frame-1/fr-nameplate-1 y 52.300 z 20 mm" in logged[0]
@@ -1062,12 +1070,13 @@ def test_inset_rays_go_down_machine_y_through_each_station_and_keep_the_highest_
     model = _RayModel([other, plate, ghost], hits)
     adapter, view = _ray_adapter(monkeypatch, model)
 
-    name, rays = drawing._inset_edge_rays(
+    name, component, rays = drawing._inset_edge_rays(
         adapter, view, leaves=model.leaves(), stem="fr-nameplate",
         target_mm=163.0, stations_m=INSET_STATIONS,
     )
 
     assert name == "fr-frame-1/fr-nameplate-1"
+    assert component is plate  # Ownership is explicit; model edges need not expose GetComponent.
     assert rays == [
         ("fr-nameplate-1:top", pytest.approx(0.0523)),
         None,
@@ -1212,7 +1221,7 @@ def _inset_correspondence_harness(monkeypatch):
     calls, events = [], []
     part = SimpleNamespace()
     component = SimpleNamespace(Name2="fr-nameplate-1", GetModelDoc2=lambda: part)
-    model_edge = SimpleNamespace(GetComponent=lambda: component, IsSafe=True)
+    model_edge = SimpleNamespace(GetComponent=lambda: None, IsSafe=True)
 
     def reverse(edge):
         calls.append(("reverse", edge))
@@ -1225,6 +1234,7 @@ def _inset_correspondence_harness(monkeypatch):
     part.Extension = SimpleNamespace(GetCorrespondingEntity2=reverse)
     view = SimpleNamespace(GetCorrespondingEntity=corresponding)
     adapter = SimpleNamespace(
+        source_component=component,
         swApp=SimpleNamespace(IsSame=lambda *_args: state["same"]),
     )
     monkeypatch.setattr(
@@ -1233,11 +1243,14 @@ def _inset_correspondence_harness(monkeypatch):
     return adapter, view, model_edge, section_edge, part, state, calls, events
 
 
-def test_model_hit_is_mapped_to_the_section_and_roundtrips_to_its_source(monkeypatch):
+def test_ownerless_model_hit_uses_explicit_component_for_source_roundtrip(monkeypatch):
     adapter, view, model_edge, section_edge, _part, _state, calls, events = (
         _inset_correspondence_harness(monkeypatch)
     )
-    assert drawing._inset_section_edge(adapter, view, model_edge, label="plate") is section_edge
+    assert model_edge.GetComponent() is None  # Observed before AND after GetSafeEntity on the farm.
+    assert drawing._inset_section_edge(
+        adapter, view, model_edge, component=adapter.source_component, label="plate",
+    ) is section_edge
     assert calls == [
         ("section", model_edge), ("reverse", model_edge), ("reverse", section_edge),
     ]
@@ -1245,17 +1258,23 @@ def test_model_hit_is_mapped_to_the_section_and_roundtrips_to_its_source(monkeyp
     assert events[-1][1]["expected_instance"] == "fr-nameplate-1"
     assert events[-1][1]["expected_view"] == "B-B"
     assert events[-1][1]["model_safe"] is True
+    assert events[-1][1]["canonical_available"] is True
+    assert events[-1][1]["returned_available"] is True
 
 
 def test_a_retained_model_entity_that_is_no_longer_safe_refuses_rebuild_mapping(monkeypatch):
     adapter, view, model_edge, _section, _part, _state, calls, events = (
         _inset_correspondence_harness(monkeypatch)
     )
-    drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+    drawing._inset_section_edge(
+        adapter, view, model_edge, component=adapter.source_component, label="plate",
+    )
     calls.clear()
     model_edge.IsSafe = False  # Deleted topology cannot supply a surviving reference.
     with pytest.raises(RuntimeError, match="not safe across rebuilds"):
-        drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+        drawing._inset_section_edge(
+            adapter, view, model_edge, component=adapter.source_component, label="plate",
+        )
     assert calls == []  # Do not dereference invalid topology in the mapping APIs.
     assert events[-1][1]["model_safe"] is False
 
@@ -1278,10 +1297,18 @@ def test_missing_or_unproven_section_correspondence_fails_without_a_fallback(mon
     elif change == "unknown":
         state["same"] = -1
     else:
-        model_edge.GetComponent().GetModelDoc2 = lambda: None
+        adapter.source_component.GetModelDoc2 = lambda: None
     with pytest.raises(RuntimeError, match="no source-verified section edge"):
-        drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+        drawing._inset_section_edge(
+            adapter, view, model_edge, component=adapter.source_component, label="plate",
+        )
     assert events[-1][1]["source_identity"] != 1
+
+
+def _typed_inset_edge(kind=1):
+    edge = SimpleNamespace(kind=kind)
+    edge.GetType = lambda: edge.kind
+    return edge
 
 
 def _settled_inset_harness(monkeypatch):
@@ -1291,10 +1318,11 @@ def _settled_inset_harness(monkeypatch):
     monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "view_name", lambda *_args: "B-B")
     model_edges = (object(), object())
-    initial_edges = (object(), object())
+    initial_edges = (_typed_inset_edge(), _typed_inset_edge())
+    components = (object(), object())
     state = {
         "edges": initial_edges, "attached": initial_edges, "dangling": False,
-        "types": (1, 1), "inventory": (), "equality_unknown": False,
+        "types": (), "inventory": (), "equality_unknown": False,
     }
     native = SimpleNamespace(SystemValue=0.004)
     annotation = SimpleNamespace(
@@ -1309,10 +1337,10 @@ def _settled_inset_harness(monkeypatch):
     state["inventory"] = (display,)
     view = SimpleNamespace(GetDisplayDimensions=lambda: state["inventory"])
     references = tuple(
-        drawing._InsetEdgeReference(label, source, entity, instance)
-        for label, source, entity, instance in zip(
+        drawing._InsetEdgeReference(label, source, entity, instance, component)
+        for label, source, entity, instance, component in zip(
             ("plate", "deck"), model_edges, initial_edges,
-            ("fr-nameplate-1", "fr-harmonic-base-1"),
+            ("fr-nameplate-1", "fr-harmonic-base-1"), components,
         )
     )
     proof = drawing._InsetDimensionProof(view, display, references)
@@ -1321,8 +1349,9 @@ def _settled_inset_harness(monkeypatch):
     ))
     mapped, events = [], []
 
-    def map_edge(_adapter, actual_view, source, *, label):
+    def map_edge(_adapter, actual_view, source, *, component, label):
         assert actual_view is view
+        assert component is components[model_edges.index(source)]
         mapped.append(source)
         return state["edges"][model_edges.index(source)]
 
@@ -1338,13 +1367,15 @@ def test_settled_inset_reacquires_both_section_refs_and_checks_the_native_dimens
     drawing._assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
     # Section regeneration replaces the view wrappers; the native attachment
     # array can reverse its order. The model identities remain authoritative.
-    regenerated = (object(), object())
+    regenerated = (_typed_inset_edge(), _typed_inset_edge())
     state.update(edges=regenerated, attached=regenerated[::-1])
     drawing._assert_inset_dimension_settled(adapter, proof)
     assert mapped == [*model_edges, *model_edges]
     assert events[-1][1]["measured_mm"] == pytest.approx(4.0)
     assert events[-1][1]["section_owned"] is True
     assert events[-1][1]["expected_instances"] == ("fr-nameplate-1", "fr-harmonic-base-1")
+    assert events[-1][1]["types"] == ()  # Native summary is empty even on the screen control.
+    assert events[-1][1]["attached_entity_types"] == (1, 1)
 
 
 def test_initial_nondangling_read_does_not_admit_references_lost_on_rebuild(monkeypatch):
@@ -1392,7 +1423,8 @@ def test_rebuilt_inset_requires_real_named_refs_value_type_and_section_owner(mon
     elif change == "type":
         proof.display.Type2 = 3  # swAngularDimension: cannot be read as a length.
     elif change == "entity_types":
-        state["types"] = (0, 0)
+        state["edges"][0].kind = 2  # A real face, despite a dimension that still measures 4 mm.
+        state["types"] = (1, 1)  # A plausible legacy summary cannot override the actual entity type.
     else:
         state["inventory"] = ()
     with pytest.raises(RuntimeError, match=error):
