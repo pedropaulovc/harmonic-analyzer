@@ -36,6 +36,11 @@ _REQUIRED_RECIPE_INPUTS = _ROOT_REGRESSIONS | {
     "cad/scripts/_selected_execution.py",
     "cad/scripts/_buildgraph.py",
     "cad/scripts/_local_check.py",
+    "cad/scripts/test_supplier_native_contracts.py",
+    "cad/scripts/test_supplier_native_repair.py",
+    "cad/scripts/test_supplier_top_text_shelves.py",
+    "cad/scripts/test_supplier_washer_native_paint.json",
+    "cad/scripts/testdata/supplier_top_r44.json",
 }
 
 # Test files that deliberately run in no check:* gate, each with its reason.

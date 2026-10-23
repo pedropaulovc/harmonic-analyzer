@@ -3827,6 +3827,10 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_spring_reference.py",
         SCRIPTS_DIR / "test_supplier_reference_geometry.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
+        # Native supplier I/O doubles and recorded ink replays stay COM-free.
+        SCRIPTS_DIR / "test_supplier_native_contracts.py",
+        SCRIPTS_DIR / "test_supplier_native_repair.py",
+        SCRIPTS_DIR / "test_supplier_top_text_shelves.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.
@@ -3952,6 +3956,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            # Supplier replays read native paint records, not Python imports.
+            str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
+            str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
             # Migrated/enrolled revision and label contracts read plans at runtime.

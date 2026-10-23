@@ -1642,6 +1642,13 @@ the offset leader. The block screw's thread-length lane is left of the part,
 opposite its overall length. Recorded R44 paint-data replays cover the observed
 collisions and refusal paths; they do not qualify a fresh native export.
 
+The COM-free `test_supplier_native_contracts.py`, `test_supplier_native_repair.py`
+and `test_supplier_top_text_shelves.py` suites are enrolled in `check:recipe`.
+That gate also tracks their runtime-read washer paint and R44 shelf JSON
+fixtures, so changing recorded ink invalidates its offline stamp. The enrollment
+guard requires both the test modules and those fixture inputs; no exemption
+replaces their actual execution. These checks do not qualify a native export.
+
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never
 measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
