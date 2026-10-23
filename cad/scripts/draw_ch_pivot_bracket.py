@@ -48,6 +48,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -75,6 +76,9 @@ from ch_pivot_bracket_spec import (
 )
 
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
 SPEC = DRAWINGS_BY_NAME["ch_pivot_bracket"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
@@ -88,6 +92,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 PIVOT_SHAFT_NUMBER = str(_config.parts("ch-pivot-shaft")["number"])
 THRUST_WASHER_NUMBER = str(_config.parts("ch-vn-rocker-thrust-washer")["number"])
+HOLD_DOWN_SCREW_NUMBER = str(_config.parts("ch-vn-bracket-hold-down-screw")["number"])
 
 # 35 mm tall: 2:1 keeps the bore and the tap legible and lets the right view
 # stand at the sheet scale, level with the elevation, clear of the title block
@@ -152,9 +157,12 @@ def _right_y(model_y: float) -> float:
 # R MAX text stands off it, in sheet metres along the view's +Z and +Y: up
 # into the open corner and out past the foot end, so the radial leader runs
 # diagonally down to the arc over nothing but the corner's own air. Placed
-# off the corner the build PROJECTS, so the view's real frame governs.
+# off the corner the build PROJECTS, so the view's real frame governs. The
+# text stands high and far enough out that its three callout lines (naming
+# the screw head the limit clears) end above the foot top and left of the
+# ear, right of the bore callout.
 CORNER_MODEL_MM = (0.0, FOOT_H, EAR_T / 2.0)
-CORNER_TEXT_OFFSET = (0.022, 0.020)
+CORNER_TEXT_OFFSET = (0.030, 0.030)
 _CORNER_FRAME_TOL_M = 2.5e-4
 
 # The elevation carries every height off the seat -- the one face a machinist
@@ -220,12 +228,16 @@ TOP_KEEP = {
 # ear's faces bear on the bank's thrust washers, and the tap's station from
 # the inboard face puts the apex screw's cup on the pivot shaft's flat
 # (ch_pivot_bracket_spec, rocker_bank_layout). The foot length and the
-# hold-down station ride the title block.
+# hold-down station ride the title block. The foot-to-ear corner's R MAX,
+# tighter than the title block's inside corners, names what it serves: the
+# hold-down screw's head seats on the foot top beside the ear's outboard face
+# (ch_pivot_bracket_drawing_spec.CORNER_R_MAX), so a larger round lifts it.
 DIMENSION_CALLOUTS = {
     "ShaftBoreDia": f"REAM THRU\nSLIP FIT ON\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
     "HoleDia": "DRILL THRU",
     "EarThick": f"THRUST FACES ON {THRUST_WASHER_NUMBER}",
     "SetScrewLocation": f"SET SCREW ON FLAT OF\nPIVOT SHAFT {PIVOT_SHAFT_NUMBER}",
+    "CornerRadius": f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{HOLD_DOWN_SCREW_NUMBER}",
 }
 # The right view prints the one dimension it exists for.
 RIGHT_KEEP_NAMES = ("CornerRadius",)
