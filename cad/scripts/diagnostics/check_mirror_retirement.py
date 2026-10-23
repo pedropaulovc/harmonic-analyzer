@@ -942,12 +942,16 @@ for i, gy in enumerate(p.GUIDE_Y):
         f"platen-guide y{gy:.0f}",
         **_SOLV,
     )
+# The sealed golden dump predates the 22.5 x 9.8 plate on a 1.2 lip (PR #1897):
+# x stays the hole pattern on the station (station ± 11, unchanged), y the
+# rail edges the dump recorded; the current placement is the assembly's
+# LOCK_PLATE_Y, proved by its own native build.
 for i, x_c in enumerate(p.LOCK_STATION_X):
     station = p.PLATE_X0 + p.PLATE_WIDTH - x_c
     expect(
         PD,
         f"pd-guide-lock-{2 * i + 1}",
-        [station + p.LOCK_HOLE_PATTERN_X, p.LOCK_PLATE_Y[1][1], p.LOCK_Z0],
+        [station + p.LOCK_HOLE_PATTERN_X, p.GUIDE_Y[1] + p.GUIDE_HEIGHT, p.LOCK_Z0],
         _rz(180.0),
         f"guide-lock top x{x_c:.0f}",
         **_SOLV,
@@ -955,7 +959,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     expect(
         PD,
         f"pd-guide-lock-{2 * i + 2}",
-        [station - p.LOCK_HOLE_PATTERN_X, p.LOCK_PLATE_Y[0][0], p.LOCK_Z0],
+        [station - p.LOCK_HOLE_PATTERN_X, p.GUIDE_Y[0], p.LOCK_Z0],
         IDENTITY,
         f"guide-lock bottom x{x_c:.0f}",
         **_SOLV,
