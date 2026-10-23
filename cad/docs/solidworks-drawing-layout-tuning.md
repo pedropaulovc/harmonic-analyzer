@@ -1351,6 +1351,14 @@ selection API is not a fallback. Share one drawing-component snapshot for
 both targets and retain the batched body rays: walking every engraved edge
 took 783 s, versus about 21 s for the ray path.
 
+Before retaining a component edge across these rebuilds, obtain its
+`IEntity.GetSafeEntity()` result; ordinary entity pointers are transient.
+Check `IEntity.IsSafe` before every section mapping. The documented safe entity
+retains the same component-context identity through rebuilds within this
+SolidWorks session, but is invalid if its source entity is deleted. Missing
+or unsafe handles refuse rather than rematching a similarly shaped edge.
+This session-local proof does not promise identity across close/reopen.
+
 After creation rebuild and final rebuild, reacquire the section edges from
 their model identities and use `assert_dimension_measures` to prove exactly
 those two native attachments, not dangling, and the spec-owned 4 mm value.

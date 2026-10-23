@@ -854,7 +854,7 @@ def _read_selected_inset_edge(
 
 @dataclass(frozen=True)
 class _InsetEdgeReference:
-    """Keep the model identity so a rebuilt section can reacquire its edge."""
+    """Keep a session-safe model entity so rebuilds can reacquire its view edge."""
 
     label: str
     model_edge: Any
@@ -878,8 +878,15 @@ def _inset_section_edge(adapter: Any, view: Any, model_edge: Any, *, label: str)
     drawing a view-owned reference, not a currently selectable model edge.
     Reverse both objects into the same source part before comparing them.
     """
+    model_entity = _early_bound(model_edge, "IEntity")
+    if not bool(model_entity.IsSafe):
+        _telemetry.event(
+            "drawing.inset_correspondence", label=label, model_safe=False,
+            expected_view=view_name(adapter, view),
+        )
+        raise RuntimeError(f"nameplate inset {label}: retained model edge is not safe across rebuilds")
     section_edge = _early_bound(view, "IView").GetCorrespondingEntity(model_edge)
-    component = _early_bound(model_edge, "IEntity").GetComponent()
+    component = model_entity.GetComponent()
     source = (
         None if component is None
         else _early_bound(component, "IComponent2").GetModelDoc2()
@@ -901,6 +908,7 @@ def _inset_section_edge(adapter: Any, view: Any, model_edge: Any, *, label: str)
         mapped=section_edge is not None,
         source_available=source is not None,
         source_identity=same,
+        model_safe=True,
         expected_view=view_name(adapter, view),
         expected_instance="" if component is None else str(component.Name2),
     )
@@ -943,6 +951,11 @@ def _pick_inset_edge(
             f"meets an edge of {name}"
         )
     z_m, (edge, y_m) = chosen
+    # Ordinary IEntity pointers are transient across rebuilds. GetSafeEntity
+    # preserves this exact component occurrence for this document session.
+    edge = _early_bound(edge, "IEntity").GetSafeEntity()
+    if edge is None:
+        raise RuntimeError(f"nameplate inset {label}: failed to retain a safe model edge")
     section_edge = _inset_section_edge(adapter, view, edge, label=label)
     _select_view_entity(adapter, view, "EDGE", None, label=label, entity=section_edge)
     manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
@@ -2132,9 +2145,9 @@ def _assert_inset_dimension_settled(
 
     Runs 20261022T194220151Z and 20261022T204612817Z initially read
     ``IsDangling=False`` and 4 mm, then lost every attached entity on rebuild.
-    Reacquire each section edge from its model identity before comparing the
-    annotation's native attachments; neither cached wrappers nor value alone
-    establish a surviving associative reference.
+    Reacquire each section edge from its session-safe model entity before
+    comparing the annotation's native attachments. Ordinary cached topology
+    pointers and the measured value alone cannot establish surviving references.
     """
     display = _early_bound(proof.display, "IDisplayDimension")
     view = _early_bound(proof.view, "IView")
