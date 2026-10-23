@@ -9097,14 +9097,20 @@ def clamp_supplier_annotation_replay(
     def recaptured(name):
         """Replace a settled native display in both actual inventories."""
         old = settled[name]
-        replacement = copy.copy(old)
+        # SimpleNamespace's copy reduction reruns Display.__init__ on Python 3.14.
+        # Allocate a fresh wrapper without reauthoring its settled native state.
+        replacement = SimpleNamespace.__new__(Display)
+        SimpleNamespace.__init__(replacement, **vars(old))
         replacement.record = copy.deepcopy(old.record)
-        replacement.annotation = copy.copy(old.annotation)
+        replacement.annotation = SimpleNamespace(**vars(old.annotation))
         replacement.annotation.record = replacement.record
         replacement.annotation.GetPosition = replacement.GetPosition
         replacement.annotation.SetPosition2 = replacement.SetPosition2
         replacement.annotation.GetSpecificAnnotation = lambda: replacement
         replacement.GetAnnotation = lambda: replacement.annotation
+        assert replacement is not old
+        assert replacement.annotation is not old.annotation
+        assert replacement.GetDimension2(0) is old.GetDimension2(0)
         case.displays[name] = replacement
         owner = next(
             owner
