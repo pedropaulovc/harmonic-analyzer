@@ -150,7 +150,8 @@ def supplier_disc_spring_dimensions(
     dimensions, not a wave/bow reconstruction or the installed annulus/cone.
     Working-height/deflection planes and nominal mating-shaft circles are
     separate application gauges, not an invented loaded spring or bore.
-    The optional ID flag links an existing installation requirement, not a new size.
+    The optional ID flag links an existing installation requirement, not a new size;
+    its taller native text lane sits 2 mm farther inward without moving the source.
     """
     references = []
     placements = {}
@@ -177,6 +178,11 @@ def supplier_disc_spring_dimensions(
         "ID": (x0 - 0.026, y1 - 0.004),
         "OD": (x1 + 0.026, y0 + 0.004),
     }
+    if id_callout is not None:
+        # f4's complete rocker ID ink exceeded the unchanged top cell by
+        # 0.9217 mm. Lower only this flagged lane another 2 mm; the settled
+        # native route/whole-ink guards still decide whether it really fits.
+        placements["free_top"]["ID"] = (x0 - 0.026, y1 - 0.006)
 
     application = set(spec.SUPPLIER_APPLICATION_DIMENSIONS)
     if "SHAFT_DIA" in application:
