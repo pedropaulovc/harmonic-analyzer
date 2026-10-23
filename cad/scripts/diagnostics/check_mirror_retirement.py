@@ -947,7 +947,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     expect(
         PD,
         f"pd-guide-lock-{2 * i + 1}",
-        [station + p.LOCK_WIDTH / 2.0, p.GUIDE_Y[1] + p.GUIDE_HEIGHT, p.LOCK_Z0],
+        [station + p.LOCK_HOLE_PATTERN_X, p.LOCK_PLATE_Y[1][1], p.LOCK_Z0],
         _rz(180.0),
         f"guide-lock top x{x_c:.0f}",
         **_SOLV,
@@ -955,7 +955,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     expect(
         PD,
         f"pd-guide-lock-{2 * i + 2}",
-        [station - p.LOCK_WIDTH / 2.0, p.GUIDE_Y[0], p.LOCK_Z0],
+        [station - p.LOCK_HOLE_PATTERN_X, p.LOCK_PLATE_Y[0][0], p.LOCK_Z0],
         IDENTITY,
         f"guide-lock bottom x{x_c:.0f}",
         **_SOLV,
