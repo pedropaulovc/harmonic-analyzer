@@ -27,6 +27,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -39,6 +40,8 @@ from dt_cylinder_end_disc_spec import (
     WASHER_THICK,
 )
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["dt_cylinder_end_disc"]
 PART_STEM = SPEC.artifact_stem
@@ -65,10 +68,15 @@ SECTION_LINE = (
     (FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
     (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
 )
+# The 2.8 thickness text and its two-line datum callout sit right of the
+# 2.8-wide extension-line pair on the extended dimension line: centred over
+# the lines, their overshoot struck 'AND' in the callout (machinist review,
+# 2026-10-23). The ~62 mm block clears the right line by ~6 mm and stays
+# above the isometric.
 SECTION_KEEP = {
     "DiscDia": (0.195, 0.175),
     "BoreDia": (0.270, 0.175),
-    "DiscThick": (0.225, 0.255),
+    "DiscThick": (0.265, 0.255),
 }
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
