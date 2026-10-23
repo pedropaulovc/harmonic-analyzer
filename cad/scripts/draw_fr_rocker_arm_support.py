@@ -69,6 +69,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -92,6 +93,9 @@ from build_fr_rocker_arm_support import (
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB_PLACES
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["fr_rocker_arm_support"]
 PART_STEM = SPEC.artifact_stem
@@ -360,6 +364,32 @@ EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
     (150.57, 14.29),
     (29.93, 14.29),
 )
+# The SIZE cells are generated from FootClearanceHoles and are not
+# text-editable, so they print "Ø 7.94 THRU ALL" with no process; the
+# machinist could not tell whether the title block's DRILLED HOLES row or the
+# .XX band governs them (ENFORCE review, rule 12). The header names the
+# process, so each row reads DRILL Ø7.94 THRU ALL; size and depth stay native.
+HOLE_TABLE_SIZE_COLUMN = 3
+HOLE_TABLE_SIZE_HEADING = "DRILL"
+
+
+def _name_hole_table_process(adapter: Any, table: Any) -> None:
+    """Retitle the native SIZE column with the foot holes' process."""
+    column = HOLE_TABLE_SIZE_COLUMN
+    if not table.IsCellTextEditable(0, column):
+        raise RuntimeError("native hole-table SIZE header is not editable")
+    table.SetText2(0, column, False, HOLE_TABLE_SIZE_HEADING)
+    rebuild_drawing(adapter, label="rocker-arm-support hole-table process")
+    heading = str(table.DisplayedText2(0, column, False) or "")
+    if heading.upper() != HOLE_TABLE_SIZE_HEADING:
+        raise RuntimeError(f"hole-table process header did not persist: {heading!r}")
+    sizes = {
+        str(table.DisplayedText2(row, column, False) or "")
+        for row in range(1, int(table.RowCount))
+    }
+    if len(sizes) != 1 or "THRU" not in next(iter(sizes)).upper():
+        raise RuntimeError(f"hole-table DRILL column holds unexpected sizes: {sizes!r}")
+    _telemetry.info(f"hole-table process header {heading!r} over sizes {sizes!r}")
 
 
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
@@ -923,7 +953,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # coordinates are ordinary two-place dimensions under the title block's
     # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
     # feeds, and without one it has no tolerance at all.
-    insert_hole_table(
+    hole_table = insert_hole_table(
         adapter,
         bottom,
         datum_xy=(
@@ -938,6 +968,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    _name_hole_table_process(adapter, hole_table)
     _mirror_right_end_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's edge set
     # stale, so regenerate it before export.
