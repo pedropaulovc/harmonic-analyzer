@@ -18,6 +18,9 @@ The supplier inset is captured while the source is clean, then imported,
 formatted and jointly placed exactly once at the before-save checkpoint,
 after manufacturing and finalizer rebuilds. Later checkpoints only verify
 the native result; finished-PDF text is checked after native handles close.
+The existing source-linked Number alone uses the canonical native title-cell
+fit before finalization; read-only checks retain its complete value, original
+sheet and fitted presentation through rebuild, save, PDF export and close.
 
 Run with SolidWorks open::
 
@@ -79,6 +82,11 @@ from _purchased_fastener_drawing import (
     _open_supplier_source_read_only,
     _source_file_sha256,
     assert_supplier_annotations_fit,
+)
+from _purchased_title_fit import (
+    _fit_title_note,
+    assert_linked_value,
+    source_property_expression,
 )
 from _supplier_spring_drawing import (
     _activate_reference_document,
@@ -1631,6 +1639,53 @@ def _assert_supplier_stock_pdf(path: Path) -> None:
         )
 
 
+def _fit_number_title_note(
+    adapter: Any, *, expected_number: str,
+) -> Callable[[], None]:
+    """Fit only the existing source Number; never edit its link or ruled cell."""
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
+    if sheet is None or sheet_view is None:
+        raise RuntimeError("leadscrew Number has no native sheet or sheet view")
+    sheet_name = str(sheet.GetName() or "")
+    if not sheet_name.strip():
+        raise RuntimeError("leadscrew Number has no native sheet name")
+    expression = property_link("Number")
+    found = []
+    note = sheet_view.GetFirstNote2()
+    while note is not None:
+        note = _early_bound(note, "INote")
+        if source_property_expression(str(note.PropertyLinkedText)) == expression:
+            found.append(note)
+        note = note.GetNext()
+    if len(found) != 1:
+        raise RuntimeError(
+            f"leadscrew Number requires exactly one source-linked note; got {len(found)}"
+        )
+    number = found[0]
+    assert_linked_value(
+        expression, expected_number, str(number.PropertyLinkedText),
+        str(number.GetText()), label="Number",
+    )
+    number_check = _fit_title_note(
+        adapter, draw, sheet, number, label="Number", minimum=0.003,
+    )
+
+    def settled() -> None:
+        current = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+        actual_name = str(current.GetName()) if current is not None else None
+        if actual_name != sheet_name:
+            raise RuntimeError(
+                f"leadscrew Number current sheet changed: "
+                f"{actual_name!r} != {sheet_name!r}"
+            )
+        number_check()
+
+    return settled
+
+
 def _assert_installed_source_state(
     adapter: Any, source_model: Any, installed_configuration: str, *, stage: str
 ) -> None:
@@ -1777,6 +1832,9 @@ async def _build_read_only_source(
     callout = str(_early_bound(thread, "INote").GetText() or "")
     if callout.replace("\r\n", "\n").replace("\r", "\n") != THREAD_CALLOUT:
         raise RuntimeError(f"leadscrew thread callout did not print: {callout!r}")
+    number_check = _fit_number_title_note(
+        adapter, expected_number=properties["Number"],
+    )
     supplier_stock_check: Callable[[], None] | None = None
 
     def checkpoint(stage: str) -> None:
@@ -1790,6 +1848,11 @@ async def _build_read_only_source(
             if supplier_stock_check is None:
                 raise RuntimeError(f"supplier stock was not authored before {stage}")
             supplier_stock_check()
+        if stage in (
+            "before_drawing_save", "after_drawing_save",
+            "after_pdf_save", "before_drawing_close",
+        ):
+            number_check()
         # An after-event observes an attempted operation, not a successful save.
         # The finalizer preserves any primary operation failure independently.
         if stage != "after_drawing_close":
@@ -1804,6 +1867,7 @@ async def _build_read_only_source(
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         settled_checks=(
+            number_check,
             lambda: _assert_installed_source_state(
                 adapter, source_model, installed_configuration,
                 stage="settled before drawing save",
