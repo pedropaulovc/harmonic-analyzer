@@ -188,11 +188,24 @@ def _require_part_band_profile(
 
 
 def _scope_nodes(scope: ast.AST) -> Iterator[ast.AST]:
-    """Walk one lexical scope, not a nested function's independent locals."""
+    """Walk one scope, including expressions executed by nested definitions.
+
+    Defaults/decorators execute in the enclosing scope; a nested function's
+    parameters and body belong to its independent local scope.
+    """
     yield scope
     for child in ast.iter_child_nodes(scope):
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
             yield child
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                expressions = [*child.args.defaults, *child.args.kw_defaults]
+                if not isinstance(child, ast.Lambda):
+                    expressions.extend(child.decorator_list)
+            else:
+                expressions = [*child.bases, *child.keywords, *child.decorator_list]
+            for expression in expressions:
+                if expression is not None:
+                    yield from _scope_nodes(expression)
         else:
             yield from _scope_nodes(child)
 
@@ -241,9 +254,20 @@ def _require_no_member_writes(nodes: Iterable[ast.AST], name: str) -> None:
                 isinstance(node.func, ast.Attribute) and _root_name(node.func) == name
             ), f"{name}: unproven method call on part-owned controls"
             assert not (
-                isinstance(node.func, ast.Name) and node.func.id in {"setattr", "delattr"}
+                (
+                    isinstance(node.func, ast.Name) and node.func.id in {"setattr", "delattr"}
+                    or isinstance(node.func, ast.Attribute)
+                    and node.func.attr in {"__setattr__", "__delattr__"}
+                )
                 and node.args and _root_name(node.args[0]) == name
             ), f"{name}: drawing mutates part-owned controls"
+
+
+def _require_no_closure_rebinding(scope: ast.AST, name: str) -> None:
+    assert not any(
+        isinstance(node, (ast.Global, ast.Nonlocal)) and name in node.names
+        for node in ast.walk(scope)
+    ), f"{name}: nested scope can rebind the ownership chain"
 
 
 def _single_assignment(scope: ast.AST, name: str) -> tuple[ast.stmt, ast.AST]:
@@ -263,10 +287,7 @@ def _single_assignment(scope: ast.AST, name: str) -> tuple[ast.stmt, ast.AST]:
     statement, target, value = definitions[0]
     nodes = list(_scope_nodes(scope))
     assert _bindings(nodes, name) == [target], f"{name}: assignment is shadowed/rebound"
-    assert not any(
-        isinstance(node, (ast.Global, ast.Nonlocal)) and name in node.names
-        for node in ast.walk(scope)
-    ), f"{name}: nested scope can rebind the ownership chain"
+    _require_no_closure_rebinding(scope, name)
     _require_no_member_writes(ast.walk(scope), name)
     return statement, value
 
@@ -351,6 +372,7 @@ def _require_part_control_projection(
     assert loop in scope.body and isinstance(loop.target, ast.Name)
     index_name = loop.target.id
     assert _bindings(_scope_nodes(scope), index_name) == [loop.target], "loop index is shadowed/rebound"
+    _require_no_closure_rebinding(scope, index_name)
     index_range = loop.iter
     assert (
         isinstance(index_range, ast.Call) and isinstance(index_range.func, ast.Name)
@@ -378,7 +400,8 @@ def _require_part_control_projection(
     targets = assignment.targets if isinstance(assignment, ast.Assign) else [assignment.target]
     assert len(targets) == 1
     assert _bindings(_scope_nodes(scope), control_name) == targets, "control is shadowed/rebound"
-    _require_no_member_writes(_scope_nodes(scope), control_name)
+    _require_no_closure_rebinding(scope, control_name)
+    _require_no_member_writes(ast.walk(scope), control_name)
     value = assignment.value
     assert (
         isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name)
@@ -456,9 +479,10 @@ def _scan_drawing_fcf_sources(scripts: Path) -> tuple[int, int]:
     return projected, typed_projected
 
 
-def test_all_drawing_fcf_values_come_from_part_specs() -> None:
+def test_all_drawing_fcf_values_come_from_part_specs(record_property) -> None:
     projected, typed_projected = _scan_drawing_fcf_sources(SCRIPTS)
-    print(f"FCF census: {projected} calls, {typed_projected} typed projections")
+    record_property("fcf_calls", projected)
+    record_property("typed_fcf_projections", typed_projected)
 
 
 _TYPED_SPEC_SOURCE = """
@@ -495,7 +519,10 @@ def draw():
     ),
 ])
 def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
-    source = _TYPED_DRAWING_SOURCE.replace(old, new)
+    source = (
+        re.sub(rf"\b{re.escape(old)}\b", new, _TYPED_DRAWING_SOURCE)
+        if old.isidentifier() else _TYPED_DRAWING_SOURCE.replace(old, new)
+    )
     if "imported_rows" in source:
         source = source.replace("part_spec.GEOMETRIC_CONTROLS", "imported_rows")
     tree = ast.parse(source)
@@ -523,6 +550,8 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
     ("control = controls[index]", "control = fake_control"),
     ("control = controls[index]", "control = controls[index]\n        control = fake_control"),
     ("control = controls[index]", "control = controls[index]\n        control.tolerance = '0.125'"),
+    ("control = controls[index]", "control = controls[index]\n        object.__setattr__(control, 'tolerance', '9.9')"),
+    ("control = controls[index]", "control = controls[index]\n        object.__delattr__(control, 'tolerance')"),
     ("control = controls[index]", "control = controls[index]\n        del control.tolerance"),
     ("control = controls[index]", "control = controls[index]\n        setattr(control, 'tolerance', '0.125')"),
     ("control = controls[index]", "control = controls[index]\n        import other as control"),
@@ -552,6 +581,38 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
         "    controls = part_spec.GEOMETRIC_CONTROLS\n"
         "    def replace():\n        controls[0] = fake_control\n"
         "    replace()",
+    ),
+    (
+        "    controls = part_spec.GEOMETRIC_CONTROLS",
+        "    controls = part_spec.GEOMETRIC_CONTROLS\n"
+        "    def prepare(_=(controls := local_controls)): pass",
+    ),
+    (
+        "    controls = part_spec.GEOMETRIC_CONTROLS",
+        "    controls = part_spec.GEOMETRIC_CONTROLS\n"
+        "    @decorate(controls := local_controls)\n    def prepare(): pass",
+    ),
+    (
+        "    controls = part_spec.GEOMETRIC_CONTROLS",
+        "    controls = part_spec.GEOMETRIC_CONTROLS\n"
+        "    prepare = lambda _=(controls := local_controls): None",
+    ),
+    (
+        "        control = controls[index]",
+        "        control = controls[index]\n"
+        "        def replace():\n            nonlocal control\n            control = fake_control\n"
+        "        replace()",
+    ),
+    (
+        "        control = controls[index]",
+        "        control = controls[index]\n"
+        "        def replace():\n            nonlocal index\n            index = 0\n"
+        "        replace()",
+    ),
+    (
+        "        control = controls[index]",
+        "        control = controls[index]\n"
+        "        def prepare(_=object.__setattr__(control, 'tolerance', '9.9')): pass",
     ),
     (
         "        control = controls[index]\n"
