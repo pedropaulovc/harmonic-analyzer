@@ -1164,6 +1164,284 @@ def test_isometric_scales_independently(monkeypatch, tmp_path):
     assert scales["*Isometric"] == (1, 1)
 
 
+@pytest.fixture
+def orthographic_native_scene(monkeypatch, tmp_path):
+    import math
+    from itertools import product
+
+    import _drawing_projection as projection
+    import sh_vn_clamp_screw_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            self.ArrayData = tuple(coordinates)
+
+        def MultiplyTransform(self, rows):
+            return MathPoint(
+                sum(row[i] * self.ArrayData[i] for i in range(3)) + row[3]
+                for row in rows
+            )
+
+    def invoke(target, _interface, member, *args):
+        value = getattr(target, member)
+        return value(*args) if callable(value) else value
+
+    monkeypatch.setattr(projection, "_com_invoke", invoke)
+    monkeypatch.setattr(projection, "double_array", tuple)
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    utility = SimpleNamespace(CreatePoint=MathPoint)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility)
+    )
+    bases = {
+        "*Front": ((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        "*Top": ((1, 0, 0), (0, 0, 1), (0, -1, 0)),
+        "*Right": ((0, 0, -1), (0, 1, 0), (1, 0, 0)),
+        "*Isometric": (
+            (math.sqrt(0.5), 0, -math.sqrt(0.5)),
+            (1 / math.sqrt(6), math.sqrt(2 / 3), 1 / math.sqrt(6)),
+            (1 / math.sqrt(3), -1 / math.sqrt(3), 1 / math.sqrt(3)),
+        ),
+    }
+    padding_bias = {
+        "*Front": (0.003, -0.004),
+        "*Top": (-0.002, 0.002),
+        "*Right": (0.004, 0.002),
+        "*Isometric": (0.003, -0.002),
+    }
+    # Native Position is a movable view anchor, not the transform's projected
+    # model origin. Distinct frame offsets expose Position-based alignment.
+    origin_offsets = {
+        "*Front": (0.009, -0.006),
+        "*Top": (-0.004, 0.005),
+        "*Right": (0.006, 0.003),
+        "*Isometric": (0.002, -0.007),
+    }
+
+    class NativeView(_View):
+        """Affine native projection, asymmetric padding and refreshed bounds."""
+
+        def __init__(self, name, center, vertices):
+            self.scale_writes = []
+            super().__init__(name, tmp_path / "clamp.SLDPRT", center)
+            self.vertices = vertices
+            self.moves = []
+            self.setter_mode = None
+            self.projection_nan = False
+            self.padding = 0.011176
+            self.UpdateViewDisplayGeometry()
+
+        @property
+        def ScaleRatio(self):
+            return self._ratio
+
+        @ScaleRatio.setter
+        def ScaleRatio(self, value):
+            self._ratio = tuple(value)
+            self.scale_writes.append(self._ratio)
+
+        @property
+        def Position(self):
+            return self._center
+
+        @property
+        def ModelToViewTransform(self):
+            x, y = self._display_position
+            dx, dy = origin_offsets[self._orientation]
+            position = (x + dx, y + dy, 0.0)
+            if self.projection_nan:
+                position = (float("nan"), position[1], position[2])
+            return tuple(
+                (*(value * self._display_ratio for value in axis), translation)
+                for axis, translation in zip(
+                    bases[self._orientation], position, strict=True
+                )
+            )
+
+        def UpdateViewDisplayGeometry(self):
+            self._display_position = self.Position
+            self._display_ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+
+        def GetOutline(self):
+            points = [
+                MathPoint(vertex).MultiplyTransform(self.ModelToViewTransform).ArrayData
+                for vertex in self.vertices
+            ]
+            dx, dy = padding_bias[self._orientation]
+            return (
+                min(point[0] for point in points) + dx - self.padding / 2,
+                min(point[1] for point in points) + dy - self.padding / 2,
+                max(point[0] for point in points) + dx + self.padding / 2,
+                max(point[1] for point in points) + dy + self.padding / 2,
+            )
+
+        def SetViewPosition(self, position, move_children):
+            assert move_children is False
+            self.moves.append(tuple(position))
+            if self.setter_mode == "false":
+                return False
+            if self.setter_mode != "ignored":
+                self._center = tuple(position)
+            return True
+
+    def make_scene(*, width=0.006858):
+        # The 4dcfee clamp's three orthographic size terms, plus the same
+        # 11.176 mm fixed native padding used in the existing fit regression.
+        # Off-centre model coordinates and asymmetric padding make Position
+        # and outline centres unsuitable substitutes for projected origins.
+        size = (width, 0.006858, 0.036145592231561)
+        model_center = (0.004, 0.006, 0.012)
+        vertices = tuple(
+            tuple(
+                center + sign * length / 2
+                for center, sign, length in zip(model_center, signs, size, strict=True)
+            )
+            for signs in product((-1, 1), repeat=3)
+        )
+        outer = purchased.fastener_view_cells(
+            purchased.view_band_bottom("", label="alignment"),
+            layout="tall_top",
+        )
+        margins = supplier_screw_margins(
+            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+        )
+        fitted = purchased.supplier_fit_cells(outer, margins, label="alignment")
+        views = [NativeView(name, center, vertices) for name, center, _bounds in outer]
+        state = SimpleNamespace(
+            adapter=adapter,
+            fitted=fitted,
+            views=views,
+            by_name={view.GetOrientationName(): view for view in views},
+            rebuilds=0,
+            drift=None,
+        )
+
+        def rebuild():
+            state.rebuilds += 1
+            if state.drift == "scale":
+                state.by_name["*Top"].ScaleRatio = (1, 2)
+            elif state.drift == "sheet-scale":
+                state.by_name["*Isometric"].UseSheetScale = 1
+            return True
+
+        state.draw = SimpleNamespace(EditRebuild3=rebuild)
+        state.scales = purchased._fit_views(state.draw, views, fitted)
+        return state
+
+    return make_scene
+
+
+def _alignment_origins(scene):
+    return {
+        view.GetOrientationName(): purchased.model_point_in_view(
+            scene.adapter, view, (0.0, 0.0, 0.0), label="alignment origin"
+        )
+        for view in scene.views
+    }
+
+
+def test_alignment_uses_projected_model_origins_and_keeps_independent_scales(
+    orthographic_native_scene,
+):
+    scene = orthographic_native_scene()
+    before = _alignment_origins(scene)
+    positions = {name: view.Position for name, view in scene.by_name.items()}
+    rebuilds = scene.rebuilds
+    assert scene.scales == {
+        "*Front": (1, 1),
+        "*Top": (1, 1),
+        "*Right": (1, 1),
+        "*Isometric": (2, 1),
+    }
+    assert before["*Top"][0] != pytest.approx(before["*Front"][0])
+    assert before["*Right"][1] != pytest.approx(before["*Front"][1])
+    assert before["*Top"][0] - before["*Front"][0] != pytest.approx(
+        positions["*Top"][0] - positions["*Front"][0]
+    )
+    assert before["*Right"][1] - before["*Front"][1] != pytest.approx(
+        positions["*Right"][1] - positions["*Front"][1]
+    )
+    purchased._align_orthographic_views(
+        scene.adapter,
+        scene.draw,
+        scene.views,
+        scene.fitted,
+        scales=scene.scales,
+        label="alignment",
+    )
+    after = _alignment_origins(scene)
+    assert after["*Front"] == before["*Front"]
+    assert after["*Isometric"] == before["*Isometric"]
+    assert after["*Top"] == pytest.approx((before["*Front"][0], before["*Top"][1]))
+    assert after["*Right"] == pytest.approx((before["*Right"][0], before["*Front"][1]))
+    assert scene.by_name["*Top"].Position == pytest.approx(
+        (
+            positions["*Top"][0] + before["*Front"][0] - before["*Top"][0],
+            positions["*Top"][1],
+        )
+    )
+    assert scene.by_name["*Right"].Position == pytest.approx(
+        (
+            positions["*Right"][0],
+            positions["*Right"][1] + before["*Front"][1] - before["*Right"][1],
+        )
+    )
+    assert scene.by_name["*Front"].Position == positions["*Front"]
+    assert scene.by_name["*Isometric"].Position == positions["*Isometric"]
+    assert scene.rebuilds == rebuilds + 1
+    for view, (name, _center, bounds) in zip(scene.views, scene.fitted, strict=True):
+        assert tuple(view.ScaleRatio) == scene.scales[name]
+        assert view.UseSheetScale == 0
+        assert purchased._inside(view.GetOutline(), bounds)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        ("setter-false", "failed to align purchased view"),
+        ("setter-ignored", "native projected origin failed to align"),
+        ("nonfinite-origin", "invalid projected origin"),
+        ("scale", "alignment changed fitted view scale"),
+        ("sheet-scale", "alignment changed fitted view scale"),
+        ("containment", "aligned native view leaves its fitted cell"),
+    ],
+)
+def test_alignment_refuses_native_failure_without_refitting(
+    orthographic_native_scene, defect, message
+):
+    # A wider but valid fitted body has less than 5 mm of horizontal spare
+    # room. Correct origin alignment must refuse, not silently downscale it.
+    scene = orthographic_native_scene(width=0.112 if defect == "containment" else 0.006858)
+    top = scene.by_name["*Top"]
+    if defect.startswith("setter-"):
+        top.setter_mode = defect.removeprefix("setter-")
+    elif defect == "nonfinite-origin":
+        top.projection_nan = True
+    elif defect in ("scale", "sheet-scale"):
+        scene.drift = defect
+    scale_writes = {name: len(view.scale_writes) for name, view in scene.by_name.items()}
+    with pytest.raises(RuntimeError, match=message):
+        purchased._align_orthographic_views(
+            scene.adapter,
+            scene.draw,
+            scene.views,
+            scene.fitted,
+            scales=scene.scales,
+            label="alignment",
+        )
+    for name, view in scene.by_name.items():
+        # The scale-drift case includes the one native rebuild mutation.
+        assert len(view.scale_writes) == scale_writes[name] + int(
+            defect == "scale" and name == "*Top"
+        )
+    if defect == "containment":
+        bounds = next(bounds for name, _center, bounds in scene.fitted if name == "*Top")
+        assert not purchased._inside(top.GetOutline(), bounds)
+
+
 def test_footer_notes_hold_rule_seven_budget():
     assert purchased.note_lines("A\nB\nC", label="t") == ("A", "B", "C")
     with pytest.raises(ValueError):
