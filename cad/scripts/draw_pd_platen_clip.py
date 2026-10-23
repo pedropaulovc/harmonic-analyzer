@@ -56,6 +56,7 @@ from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_prec
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -81,6 +82,9 @@ from build_pd_platen_clip import (
     SPRING_RAIL_Y0,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_platen_clip"]
 PART_STEM = SPEC.artifact_stem

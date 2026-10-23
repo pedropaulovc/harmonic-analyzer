@@ -26,6 +26,7 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
+from _machinist_review_mode import MachinistReviewMode
 import _telemetry
 from _check import check
 from _drawing_centerline import add_view_centerline
@@ -54,6 +55,9 @@ from ch_rocker_hub_notes import (
     SUPPLY_BORE_CALLOUT,
 )
 from ch_rocker_hub_spec import LAND_DIA, SUPPLY_LENGTH_MIN
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_hub"]
 PART_STEM = SPEC.artifact_stem

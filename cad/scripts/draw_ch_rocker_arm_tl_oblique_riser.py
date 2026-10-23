@@ -29,6 +29,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import limits
 from _section_axis import position_section_caption
@@ -55,6 +56,9 @@ from ch_rocker_arm_tl_oblique_riser_spec import (
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_riser"]
 PART_STEM = SPEC.artifact_stem

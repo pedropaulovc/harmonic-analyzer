@@ -33,12 +33,16 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gtol_face_read import face_geometry
 from _gtol_sphere import SphereFace
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from mg_lever_thread_joint import INCOMPLETE_THREAD_MAX, ROD_DIA, ROD_LENGTH, THREAD_LENGTH, TIP_CHAMFER
 from mg_magnifying_lever_spec import DRAWING_DIMENSIONS, DRAWING_PRECISION, FREE_END_CALLOUT, LEAD_CALLOUT, PRINT_THREAD_CALLOUT, ROD_DIA_CALLOUT, SCREW_SEAT_CALLOUT, SURFACE_FINISHES, THREAD_CALLOUT
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_lever"]
 PART_STEM = SPEC.artifact_stem

@@ -55,6 +55,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import limits
 from _session import run_build
@@ -85,6 +86,9 @@ from ch_rocker_arm_tl_oblique_nut_bracket_spec import (
     SCREW_X,
     SCREW_Z,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_nut_bracket"]
 PART_STEM = SPEC.artifact_stem

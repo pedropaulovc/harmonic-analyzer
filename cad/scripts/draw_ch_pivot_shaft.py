@@ -15,6 +15,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 import _config
+from _machinist_review_mode import MachinistReviewMode
 import _surface_finish
 import ch_pivot_shaft_spec as shaft
 import rocker_bank_layout as bank
@@ -56,6 +57,9 @@ from ch_pivot_shaft_spec import (
 )
 from rocker_bank_layout import PIVOT_SHAFT_LENGTH
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_pivot_shaft"]
 PART_STEM = SPEC.artifact_stem
