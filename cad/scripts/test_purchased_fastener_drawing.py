@@ -9854,6 +9854,12 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
 def _washer_paint_native(monkeypatch, case):
     """Replay R48 native paint; only native I/O is doubled, not placement/math."""
     import _supplier_reference_text as reference_text
+    import _drawing_layout_audit as native_audit
+    from _drawing_leaders import _sw_type_info
+
+    for module in (reference_text, native_audit):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(_sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
 
     washer = case.helper
     thick, outer, bore = washer.THICKNESS, washer.OUTER_DIAMETER, washer.BORE_DIAMETER
@@ -9931,6 +9937,66 @@ def _washer_paint_native(monkeypatch, case):
                                         refuse_mode=False)
                   for label, record in records.items()}
 
+    class DisplayData:
+        """Native getter transport over the independently mutable captured paint."""
+
+        def __init__(self, label):
+            self.label = label
+
+        def graphics(self):
+            return case.paint[self.label].record["display"]
+
+        def GetLineCount(self):
+            return len(self.graphics()["lines"])
+
+        def GetLineAtIndex3(self, index):
+            return self.graphics()["lines"][index]
+
+        def GetArrowHeadCount(self):
+            return len(self.graphics()["arrows"])
+
+        def GetArrowHeadAtIndex2(self, index):
+            return self.graphics()["arrows"][index]
+
+        def GetArcCount(self):
+            return 0
+
+        GetPolyLineCount = GetPolygonCount = GetTriangleCount = GetEllipseCount = GetArcCount
+
+        def GetTextCount(self):
+            return len(self.graphics()["texts"])
+
+        def GetTextAtIndex(self, index):
+            return self.graphics()["texts"][index]["t"]
+
+        def GetTextPositionAtIndex(self, index):
+            return self.graphics()["texts"][index]["pos"]
+
+        def GetTextHeightAtIndex(self, index):
+            return self.graphics()["texts"][index]["h"]
+
+        def GetTextInBoxWidthAtIndex(self, index):
+            return self.graphics()["texts"][index]["w"]
+
+        def GetTextRefPositionAtIndex(self, index):
+            return self.graphics()["texts"][index]["ref"]
+
+        def GetTextAngleAtIndex(self, index):
+            return self.graphics()["texts"][index]["ang"]
+
+        def GetTextFontAtIndex(self, index):
+            return self.graphics()["texts"][index]["font"]
+
+        def GetTextLineSpacingAtIndex(self, index):
+            return self.graphics()["texts"][index]["ls"]
+
+    def second_arrow(state, use_doc, second):
+        state.use_doc_second_arrow, state.second_arrow = use_doc, second
+
+    def broken_leader(state, use_doc, broken):
+        state.use_doc_broken, state.broken = use_doc, broken
+        return 0
+
     def position(label, x, y, _z):
         item = case.imports[label]
         paint = case.paint[label]
@@ -9958,6 +10024,20 @@ def _washer_paint_native(monkeypatch, case):
         item = case.imports[label]
         item.display.OffsetText = False
         item.annotation.SetPosition2 = lambda x, y, z, label=label: position(label, x, y, z)
+        item.annotation.GetPosition = lambda label=label: case.paint[label].record["pos"]
+        item.annotation.GetDisplayData = lambda label=label: DisplayData(label)
+        item.state.use_doc_second_arrow, item.state.second_arrow = False, False
+        item.state.use_doc_broken, item.state.broken = False, 1
+        item.display.SetSecondArrow = (
+            lambda use_doc, second, state=item.state: second_arrow(state, use_doc, second)
+        )
+        item.display.GetUseDocSecondArrow = lambda state=item.state: state.use_doc_second_arrow
+        item.display.GetSecondArrow = lambda state=item.state: state.second_arrow
+        item.display.SetBrokenLeader2 = (
+            lambda use_doc, broken, state=item.state: broken_leader(state, use_doc, broken)
+        )
+        item.display.GetUseDocBrokenLeader = lambda state=item.state: state.use_doc_broken
+        item.display.GetBrokenLeader2 = lambda state=item.state: state.broken
 
     def rebuild(_adapter, **_kwargs):
         paint = case.paint[thick]
@@ -9975,6 +10055,7 @@ def _washer_paint_native(monkeypatch, case):
         return copy.deepcopy(case.paint[label].record)
 
     monkeypatch.setattr(washer, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(reference_text, "rebuild_drawing", rebuild)
     monkeypatch.setattr(reference_text, "_dump_annotation", record)
 
     rims = tuple(case.model.GetBodies2(0, False)[0].GetEdges())
@@ -9999,7 +10080,7 @@ def _washer_paint_native(monkeypatch, case):
     monkeypatch.setattr(washer, "_native_diameter", native_diameter)
     for view in case.views.values():
         displays = [item.display for item in case.imports.values() if item.annotation.Owner is view]
-        view.GetFirstDisplayDimension5 = lambda displays=displays: displays[0]
+        view.GetFirstDisplayDimension5 = lambda displays=displays: displays[0] if displays else None
         for index, display in enumerate(displays):
             display.GetNext5 = lambda index=index, displays=displays: (
                 displays[index + 1] if index + 1 < len(displays) else None
@@ -10093,6 +10174,7 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
         result = SimpleNamespace(
             ReferencedDocument=model, ReferencedConfiguration=f"{orientation[1:]}Config",
             GetReferencedModelName=lambda: "C:/native-washer.SLDPRT",
+            GetOrientationName=lambda: orientation,
             GetOutline=lambda: (x - half_x, y - half_y, x + half_x, y + half_y),
             forward={},
         )
@@ -10119,7 +10201,7 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
                     model.Extension.reverse[id(member)] = None if label == washer.THICKNESS else entity
         return result
 
-    views = {name: view(name) for name in ("*Front", "*Top")}
+    views = {name: view(name) for name in ("*Front", "*Top", "*Right", "*Isometric")}
     sources, imports = {}, {}
     for label, value in values.items():
         feature_name, name = washer.SOURCE_DIMENSIONS[label]
@@ -10188,6 +10270,19 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
 
     def import_annotations(_adapter, _view, *, keep, **_kwargs):
         imported_calls.append(tuple(keep))
+        # Native import inherits the current source ink/primary presentation,
+        # including qualifiers edited after fixture construction. Keep physical
+        # values, bands, tolerance precision, type and all identities independent.
+        for label, (_feature, name) in washer.SOURCE_DIMENSIONS.items():
+            if name not in keep:
+                continue
+            source, imported = sources[label], imports[label]
+            for field in ("unit", "fraction", "denominator", "precision", "rounding"):
+                setattr(imported.state, field, getattr(source.state, field))
+            imported.text.clear()
+            imported.text.update(source.text)
+            imported.display.ShowDimensionValue = source.display.ShowDimensionValue
+            imported.display.ShowParenthesis = source.display.ShowParenthesis
         if defect == "source_import_mutation":
             sources[washer.THICKNESS].state.use_doc = True
         return [imports[label].annotation for label, (_feature, name)

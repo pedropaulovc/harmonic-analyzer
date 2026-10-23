@@ -684,28 +684,35 @@ def test_washer_complete_consumer_replay_clears_limits_and_diameters_without_mov
 ):
     import copy
     from _layout_audit import display_box
-    from _supplier_screw_layout import supplier_top_text_geometry
+    from _supplier_reference_text import measure_reference_text
 
     case = _r48_washer_layout(monkeypatch, axis=axis, banded=banded)
     thick = case.helper.THICKNESS
     diameters = (case.helper.OUTER_DIAMETER, case.helper.BORE_DIAMETER)
     before = _washer_source_state(case)
     before_records = copy.deepcopy({label: paint.record for label, paint in case.paint.items()})
-    before_stations = supplier_top_text_geometry(before_records[thick], horizontal=False)
+    before_stations = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     face = case.views["*Top" if axis == "y" else "*Front"]
-    assert before_stations["text"].xmin < before_stations["right"]
+    assert before_stations["text"].ymin < before_stations["reach"]
     assert all(display_box({"texts": before_records[label]["display"]["texts"]}).xmin
                < face.GetOutline()[2] for label in diameters)
-    # Offset mode changes the full native block only on rebuild. Measuring the
-    # pre-mode box would leave 6 mm of this real-width stack in the witness lane.
+    # Offset mode settles a transverse text shift only on rebuild. Measure the
+    # full settled stack against the physical +Y reach, not its transverse X.
     case.paint[thick].offset_shift = -.006
     diameter_y = {label: case.paint[label].record["pos"][1] for label in diameters}
     settled = case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
     settled()
-    after = supplier_top_text_geometry(case.paint[thick].record, horizontal=False)
+    after = measure_reference_text(
+        case.adapter, case.imports[thick].display, axis=1, label=thick,
+    )
     for field in ("tips", "witnesses", "physical_lines"):
         assert after[field] == before_stations[field]
-    assert after["text"].xmin - after["right"] >= .002
+    assert after["axis"] == before_stations["axis"] == 1
+    assert after["reach"] == before_stations["reach"]
+    assert after["text"].ymin > before_stations["text"].ymin
+    assert after["text"].ymin >= after["reach"] + .002
     for label in diameters:
         assert display_box({"texts": case.paint[label].record["display"]["texts"]}).xmin - face.GetOutline()[2] >= .002
         assert case.paint[label].record["pos"][1] == diameter_y[label]
