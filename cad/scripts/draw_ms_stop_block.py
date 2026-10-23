@@ -107,10 +107,15 @@ COVER_HOLE_PROCESS = (
     f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
     f"{part.MATCHED_PAIR_NOTE}\n"
 )
+# The 4-40 runs from the underside through the floor and opens into the
+# rebate; THRU alone does not say which wall it stops at (rules 1, 12).
+THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
 
 
-def _remove_general_thread_class(display: Any) -> None:
-    """Suppress only the native class token; leave thread/drill variables live."""
+def _remove_general_thread_class(display: Any, *, last_line: str | None = None) -> None:
+    """Suppress only the native class token; leave thread/drill variables live.
+
+    ``last_line`` is appended below the native rows, e.g. where a THRU ends."""
     native = _early_bound(display, "IDisplayDimension")
     if not native.IsHoleCallout():
         raise RuntimeError("general thread class removal requires a native hole callout")
@@ -123,6 +128,8 @@ def _remove_general_thread_class(display: Any) -> None:
     if before.endswith("-"):
         before = before[:-1].rstrip(" \t")
     revised = before + after
+    if last_line:
+        revised = revised.rstrip("\r\n") + "\n" + last_line
     native.SetText(1, revised)  # swDimensionTextPrefix; void return
     if str(native.GetText(5) or "") != revised:
         raise RuntimeError("native tap class-token removal did not persist")
@@ -226,7 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.060, 0.063),
         label="thumbscrew tap through floor",
     )
-    _remove_general_thread_class(thumb_callout)
+    _remove_general_thread_class(thumb_callout, last_line=THUMB_HOLE_END)
     mating_edge = model_point_in_view(
         adapter, right, (
             part.BLOCK_LENGTH / 2000.0,

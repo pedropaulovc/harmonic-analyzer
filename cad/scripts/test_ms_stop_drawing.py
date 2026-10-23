@@ -359,7 +359,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     )
     monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *a, **kw: [])
     if drawing is block_drawing:
-        monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a: None)
+        monkeypatch.setattr(drawing, "_remove_general_thread_class", lambda *a, **kw: None)
         monkeypatch.setattr(drawing, "_assert_reference_dimensions", lambda *a: None)
     else:
         monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
@@ -640,6 +640,15 @@ def test_native_class_suppression_preserves_live_thread_drill_and_depth_variable
         assert f"<{variable}>" in native.prefix
     assert "MATCH-DRILL WITH THE MATE" in native.prefix
     assert native.prefix == definition.replace(f"{separator}<hw-threadclass>", "")
+
+
+def test_thumb_tap_callout_states_where_its_thru_ends() -> None:
+    definition = "<MOD-DIAM><hw-tapdrldia> THRU\n<hw-threaddesc>-<hw-threadclass> THRU"
+    native = _StopDisplay(definition)
+    block_drawing._remove_general_thread_class(native, last_line=block_drawing.THUMB_HOLE_END)
+    rows = native.prefix.splitlines()
+    assert rows[:2] == ["<MOD-DIAM><hw-tapdrldia> THRU", "<hw-threaddesc> THRU"]
+    assert "REBATE" in rows[-1] and "ROOF" in rows[-1]
 
 
 @pytest.mark.parametrize("native", [
