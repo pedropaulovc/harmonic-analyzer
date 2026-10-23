@@ -407,6 +407,118 @@ note success does not prove its later stock-note checks, nor SM note ownership.
 No whole-v44 comparison or automated machinist qualification is available from
 this attempt.
 
+## Complete stock-stage readbacks at f598
+
+Source `f598f3ea81757db61b2ad0924695a62efcfe2dda`, run
+`20261023T012746154Z-6d1e30f802924759bc1b149490d9efb5`, build
+`20261023T012837.633333Z-6e40c6b9e85241eebf7037a5910c8c9e`, again completed
+with two part cache hits and two failed drawings. The immutable complete handoff
+is `hook-contour-proof/iso-stockframe-f598f3ea8-native-handoff.json`; the
+arithmetic and explicit inference limits are retained in
+`hook-contour-proof/root-readback-f598f3ea8.json`.
+
+### CH: a primary stock scale, not another translation
+
+The 1 mm FINISHED-isometric correction passed the earlier native refusal. The
+next settled layout refusal was the primary SUPPLIER-STOCK view at 5:1:
+
+```text
+native outline = (0.11266199801221032, 0.08855998560357987,
+                  0.18733799988553204, 0.26046300056871236) m
+unchanged cell = (0.0127, 0.094, 0.4191, 0.2577) m
+```
+
+Its height is `171.9030149651325 mm`; the cell height is `163.7 mm`. The
+bottom and top overflow by `5.44001439642013 mm` and `2.76300056871236 mm`,
+respectively. No translation can remove their combined `8.20301496513251 mm`
+excess.
+
+Main explicitly approved a STOCK-primary-only 4:1 presentation, a scale already
+listed in the supplier-reference scale catalogue. The actual stock sheet scale
+and title metadata must follow `STOCK_SCALE`; the FINISHED primary remains 5:1,
+and both isometrics and the stock isometric caption remain 3:1. Original-source
+configuration, dimension identities, values, supplier units, fractional
+precision, text heights, dimension anchors and model cells are unchanged.
+
+This approval is not permission to subtract guessed padding, shrink text or
+proportionally scale the old outline as containment evidence. Complete native
+outlines may include sheet-space padding. The changed-source 4:1 native view
+must pass the original settled containment and annotation checks, and its
+whole-page PDF must prove legibility and neighbouring ink clearance.
+
+### SM: the view outline is not the source construction profile
+
+The complete 6195-byte failure-only observation is
+`hook1853-f598f3ea-iso-stock-terminal-raw-copy-0.json`, SHA-256
+`b36047562d6888d4d990eb76b785581b67931b1b94c275bff5a830d6a81c45d4`.
+There is one semantic observation, with no truncated segments or getter errors.
+Its original guard operands were:
+
+| Quantity | X span | Y span |
+| --- | ---: | ---: |
+| `IView.GetOutline()` | 46.354998579 mm | 92.976917890 mm |
+| Existing exact source requirement | 82.225 mm | 152.4 mm |
+| Recorded native segments through the recorded native transforms | 82.225 mm | 152.4 mm |
+
+The exact view had configuration `SupplierNominalStock`, HLR mode 2,
+`ScaleDecimal == 2`, `ScaleRatio == (2, 1)`, and `UseSheetScale == 0`.
+Its actual model-to-view matrix had identity rotation, scale 2 and translation
+`(0.15000000008840228, 0.1983109599263821, 0) m`. The referenced source path
+matched; the view's source and the held source part compared equal natively.
+The named stock configuration existed with ID 1.
+
+The native profile was `SupplierNominalStockProfile`, with
+`IsSuppressed2` in the named stock configuration returning `(False,)`.
+All nine actual segments were construction geometry: three complete circles
+and six lines. The actual model-to-sketch transform was identity. Analytic
+projection of those recorded curves gives:
+
+```text
+(0.1325375000884023, 0.0633734599263821,
+ 0.21476250008840228, 0.21577345992638208) m
+```
+
+The old outline misses the projected profile by `41.585000799 mm` on the right
+and `65.138081129 mm` at the bottom. Native scale and exact source curves rule
+out a half-scale correction or a nominal-geometry replacement.
+
+There is a directly relevant native positive control:
+`draw_dt_vn_post_mount_screw.py` documents a27 PNG and vertex readbacks showing
+correct source-profile ink while `GetOutline()` retained its pre-configuration
+extent. The SDK promises a view bounding box, not complete construction-sketch
+coverage. The current SM receipt proves the mismatch; it does **not** directly
+prove which historical body produced that outline.
+
+The bounded STOCK-only cutover reuses `_supplier_reference_geometry` rather
+than adding a fallback. It captures actual native construction curves through
+the source sketch inverse in the explicitly active stock configuration, binds
+the immutable capture to the held source and exact stock view, and restores the
+original configuration without saving. Zero solid/sheet bodies, an unsuppressed
+error-free owner, exact native inventory and exact stock dimension values are
+preconditions. Current-view projection measures complete line/circle ink, not
+a nominal rectangle. Existing expected spans, lower tolerance, padding upper
+bound, model cells, source binding, full uncropped/unbroken-view checks and
+annotation-ink checks remain strict. FINISHED views retain their original
+native-outline checks. Settled projection never reactivates a source
+configuration or retains live geometry handles.
+
+Two configuration caveats are explicit. First, the diagnostic read the nine
+segments while the source was active in `Default`; that does not prove their
+evaluated geometry in `SupplierNominalStock`. Production capture must close
+that gap. Second, its four named-configuration `GetSystemValue3` BSTR-array
+queries each returned `(0.0,)`. These are observed query results, not a status
+code or proof of zero geometry. The SDK documents both scalar and array forms;
+existing supplier readers document native binding trouble with name arrays
+and use scalar BSTR names. The production path reuses that established scalar
+reader and refuses zero or incorrect expected values. It does not declare
+arrays universally invalid or accept a zero as a substitute.
+
+Neither leaf reached the final after-rebuild or still-open after-native-save
+attachment observers. No PDF, PNG, SLDDRW or layout audit was exported, and no
+failure bundle was uploaded. The changed stock corrections, final native
+attachment survival, whole-v44 comparison, automated machinist review and
+exact-source independent review remain qualification requirements.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate

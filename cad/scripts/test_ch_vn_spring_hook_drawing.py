@@ -12,6 +12,7 @@ import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
 import draw_sm_vn_boss_hook as boss_drawing
 import ch_vn_spring_hook_spec as spec
+import sm_vn_boss_hook_spec as boss_spec
 import spring_mount_geom as mounts
 import sm_summing_lever_spec as lever
 from _hole_spec import TAP_DRILL_MM
@@ -19,6 +20,7 @@ from stock_anchor_geom import ANCHOR_9489T111 as anchor
 import ch_anchor_jam_nut_spec as jam_nut
 from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
 from _hole_spec import THREAD_MAJOR_MM
+from _supplier_reference_geometry import NativeSketchGeometry
 
 
 def _source_properties(names):
@@ -66,6 +68,46 @@ def _stock_note_contracts(module):
             ),
         )
     return [(_note_double(text, text, x, y), text, text) for text, x, y in labels]
+
+
+def _supplier_stock_capture_scene(monkeypatch, adapter, source_model):
+    """Provide immutable stock data to tests of labels and the physical eye."""
+    points, circle_offsets, line_offsets = [], [], []
+    for center, radius_mm in (
+        ((0.0, 0.0), boss_spec.SUPPLIER_NOMINAL_EYE_OD_MM / 2.0),
+        ((0.0, 0.0), boss_spec.SUPPLIER_EYE_ID_MM / 2.0),
+        (boss_spec.SUPPLIER_STOCK_WIRE_CENTER_MM, boss_spec.SUPPLIER_NOMINAL_WIRE_MM / 2.0),
+    ):
+        x, y = (value / 1000.0 for value in center)
+        radius = radius_mm / 1000.0
+        circle_offsets.append(len(points))
+        points.extend(((x, y, 0.0), (x + radius, y, 0.0), (x, y + radius, 0.0)))
+    outline = boss_spec.SUPPLIER_STOCK_SHANK_OUTLINE_MM
+    axis = boss_spec.SUPPLIER_STOCK_AXIS_MM
+    for start, end in (
+        *zip(outline, (*outline[1:], outline[0])),
+        *zip(axis, axis[1:]),
+    ):
+        line_offsets.append(len(points))
+        points.extend((x / 1000.0, y / 1000.0, 0.0) for x, y in (start, end))
+    capture = boss_drawing.SupplierStockCapture(
+        geometry=NativeSketchGeometry(tuple(points), tuple(line_offsets), tuple(circle_offsets)),
+        source_path=boss_drawing.SOURCE.resolve().as_posix(),
+        configuration=boss_spec.SUPPLIER_STOCK_CONFIGURATION,
+        configuration_id=1,
+    )
+    captured_configurations = []
+
+    def capture_before_drawing(native_adapter, native_source, finished_configuration):
+        assert native_adapter is adapter
+        assert native_source is source_model
+        assert native_adapter.currentModel is source_model
+        assert finished_configuration == "Default"
+        captured_configurations.append(finished_configuration)
+        return capture
+
+    monkeypatch.setattr(boss_drawing, "_capture_supplier_stock", capture_before_drawing)
+    return capture, captured_configurations
 
 
 def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
@@ -383,10 +425,9 @@ def test_finished_view_creation_fits_recorded_native_cell(
     def place_view(_adapter, _path, orientation, x, y, *, scale):
         placements.append((orientation, x, y, scale))
         _attribute, baseline_center, baseline_scale, baseline_outline = native_cases[orientation]
-        ratio = scale[0] / scale[1] / (baseline_scale[0] / baseline_scale[1])
+        assert scale == baseline_scale
         outline = tuple(
-            (x, y)[index % 2]
-            + (value - baseline_center[index % 2]) * ratio
+            value + (x, y)[index % 2] - baseline_center[index % 2]
             for index, value in enumerate(baseline_outline)
         )
         if orientation == target_orientation and fault not in (None, "missing"):
@@ -829,6 +870,10 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
     iso = SimpleNamespace(Name="finished-iso", ReferencedConfiguration="Default")
     stock_iso = SimpleNamespace(Name="stock-iso", ReferencedConfiguration=module.SUPPLIER_STOCK_CONFIGURATION)
     model = scene.adapter.currentModel
+    stock_capture, capture_calls = (
+        _supplier_stock_capture_scene(monkeypatch, scene.adapter, source)
+        if module is boss_drawing else (None, [])
+    )
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     imported_controls = []
@@ -856,6 +901,8 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         return {"success": True}
 
     def new_drawing(*_args, **_kwargs):
+        if module is boss_drawing:
+            assert capture_calls == ["Default"]
         scene.adapter.currentModel = model
         return model, object()
 
@@ -895,9 +942,10 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock, stock_iso))
     else:
-        def supplier_stock_diagram(stock_adapter, source_model):
+        def supplier_stock_diagram(stock_adapter, source_model, capture):
             assert stock_adapter is scene.adapter
             assert source_model is source
+            assert capture is stock_capture
             return stock, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)
 
         monkeypatch.setattr(module, "_supplier_stock_diagram", supplier_stock_diagram)
@@ -1070,9 +1118,13 @@ def _note_build_scene(monkeypatch, tmp_path, module):
     state = SimpleNamespace(
         sheet="FINISHED", edit_sheet=True, keep_view_active=False, missing_creation=False,
         target_sheet="FINISHED", mutate_note=lambda _note: None, saved=False,
+        sheet_scales={}, initial_scale=None, finalizer_options=None,
     )
     sheet = SimpleNamespace(
-        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetProperties2=lambda: (
+            0, 0, *state.sheet_scales.get(state.sheet, module.SHEET_SCALE),
+            False, 0.4318, 0.2794,
+        ),
         GetZoneMargin=lambda _side: 0.0127,
     )
     model = SimpleNamespace(
@@ -1097,18 +1149,24 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         refreshed.append(name)
 
     def view(name, configuration):
-        return SimpleNamespace(
+        native_view = SimpleNamespace(
             Name=name, ReferencedConfiguration=configuration,
-            GetOutline=lambda: (0.100, 0.110, 0.170, 0.240),
+            outline=(0.100, 0.110, 0.170, 0.240),
             GetFirstDisplayDimension6=lambda: None, GetAnnotations=lambda: (),
             UpdateViewDisplayGeometry=lambda: refresh(name),
         )
+        native_view.GetOutline = lambda: native_view.outline
+        return native_view
 
     front = view("finished-front", "Default")
     iso = view("finished-iso", "Default")
     stock = view("stock-front", module.SUPPLIER_STOCK_CONFIGURATION)
     stock_iso = view("stock-iso", module.SUPPLIER_STOCK_CONFIGURATION)
     stock_notes = _stock_note_contracts(module)
+    stock_capture, capture_calls = (
+        _supplier_stock_capture_scene(monkeypatch, adapter, source)
+        if module is boss_drawing else (None, [])
+    )
 
     async def open_model(_path):
         adapter.currentModel = source
@@ -1121,13 +1179,20 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         property_reads.append(properties)
         return properties
 
-    def new_drawing(*_args, **_kwargs):
+    def new_drawing(*_args, **kwargs):
+        if module is boss_drawing:
+            assert capture_calls == ["Default"]
+        state.initial_scale = kwargs["scale"]
         adapter.currentModel = model
         return model, sheet
 
     def place_view(_adapter, _path, orientation, x, y, *, scale):
         placements.append((orientation, x, y, scale))
-        native_view = front if orientation == "*Front" else iso
+        native_view = (
+            (front if orientation == "*Front" else iso)
+            if state.sheet == "FINISHED"
+            else (stock if orientation == "*Front" else stock_iso)
+        )
         model.ActiveDrawingView = native_view
         return native_view
 
@@ -1155,11 +1220,14 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         if module is drawing:
             return stock, stock_iso, [], stock_notes
         assert stock_adapter is adapter
-        assert len(source_models) == 1
+        assert len(source_models) == 2
         assert source_models[0] is source
+        assert source_models[1] is stock_capture
         return stock, [], stock_notes
 
     async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        state.finalizer_options = _kwargs
+        state.sheet_scales = dict(_kwargs["sheet_scales"])
         for verify in settled_checks:
             verify()
         checkpoint("before_drawing_save")
@@ -1190,12 +1258,214 @@ def _note_build_scene(monkeypatch, tmp_path, module):
                         (front, iso) if state.sheet == "FINISHED" else
                         (stock, stock_iso) if module is drawing else (stock,))
     monkeypatch.setattr(module, "view_name", lambda _adapter, native_view: native_view.Name)
+    if module is boss_drawing:
+        # These tests own labels/ownership, not the root native-profile oracle.
+        def stock_bounds(stock_adapter, native_stock, source_model, capture):
+            assert stock_adapter is adapter
+            assert native_stock is stock
+            assert source_model is source
+            assert capture is stock_capture
+            native_stock.UpdateViewDisplayGeometry()
+            return native_stock.outline
+
+        monkeypatch.setattr(module, "_supplier_stock_bounds", stock_bounds)
     monkeypatch.setattr(module, "finalize_drawing", finalize)
     return SimpleNamespace(
-        adapter=adapter, state=state, model=model, front=front, stock=stock,
+        adapter=adapter, state=state, model=model, source=source, sheet=sheet,
+        front=front, iso=iso, stock=stock, stock_iso=stock_iso,
         placements=placements, notes=linked_notes, stock_notes=stock_notes,
         property_reads=property_reads, refreshed=refreshed,
     )
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    (
+        "inside", "recorded-5", "recorded-5-at-4",
+        "left-boundary", "bottom-boundary", "right-boundary", "top-boundary",
+        "left", "bottom", "right", "top", "inverted", "nonfinite",
+        "dimension-outside", "dimension-unreadable", "dimension-owner", "hidden-value",
+    ),
+)
+def test_channel_stock_scale_creation_metadata_and_native_candidate_cell(
+    monkeypatch, tmp_path, candidate,
+):
+    """4:1 needs its own native box; this fake candidate is not a fit prediction."""
+    native_stock_builder = drawing._supplier_stock_sheet
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    monkeypatch.setattr(drawing, "_supplier_stock_sheet", native_stock_builder)
+    cell = (0.0127, 0.094, 0.4318 - 0.0127, 0.2794 - 0.0127 - 0.009)
+    assert cell == pytest.approx((0.0127, 0.094, 0.4191, 0.2577), rel=0, abs=1e-15)
+    recorded_5 = (
+        0.11266199801221032, 0.08855998560357987,
+        0.18733799988553204, 0.26046300056871236,
+    )
+    # Even the best translation cannot put 171.903 mm into this 163.7 mm cell.
+    assert recorded_5[3] - recorded_5[1] > cell[3] - cell[1]
+    assert (cell[1] - recorded_5[1], recorded_5[3] - cell[3]) == pytest.approx(
+        (0.00544001439642013, 0.00276300056871236), rel=0, abs=1e-15,
+    )
+    assert (4, 1) in purchased_drawing._SCALES
+    if candidate == "recorded-5":
+        monkeypatch.setattr(drawing, "STOCK_SCALE", (5.0, 1.0))
+    # Independent fake native readback, never a scaled version of recorded_5.
+    outline = (0.120, 0.105, 0.180, 0.246)
+    if candidate in ("recorded-5", "recorded-5-at-4"):
+        outline = recorded_5
+    elif candidate.removesuffix("-boundary") in ("left", "bottom", "right", "top"):
+        index = ("left", "bottom", "right", "top").index(candidate.removesuffix("-boundary"))
+        values = list(outline)
+        values[index] = cell[index] + (
+            0.0 if candidate.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
+        )
+        outline = tuple(values)
+    elif candidate == "inverted":
+        outline = (0.180, 0.105, 0.120, 0.246)
+    elif candidate == "nonfinite":
+        outline = (0.120, 0.105, math.nan, 0.246)
+    scene.stock.outline = outline
+    scene.stock.Position = (0.150, 0.1755)
+    scene.model.EditRebuild3 = lambda: True
+    scene.adapter.swApp = SimpleNamespace(IsSame=lambda first, second: int(first is second))
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(
+        drawing, "_show_hidden_owners",
+        lambda *_args, **_kwargs: (drawing.SUPPLIER_STOCK_FEATURE,),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda *_args, **_kwargs: ((0.150, 0.1755),),
+    )
+    expected_anchors = {
+        "SupplierStockShank": (0.105, 0.150),
+        "SupplierStockThread": (0.210, 0.140),
+        "SupplierStockOverall": (0.065, 0.1755),
+    }
+    expected_precision = {
+        "SupplierStockShank": 2, "SupplierStockThread": 3, "SupplierStockOverall": 2,
+    }
+    expected_callouts = {
+        "SupplierStockShank": "AS-SUPPLIED SHANK",
+        "SupplierStockThread": "AS-SUPPLIED THREAD LENGTH",
+        "SupplierStockOverall": "AS-SUPPLIED OVERALL",
+    }
+    dimensions, displays, annotations = {}, [], []
+    for name, expected_mm in spec.SUPPLIER_STOCK_MM.items():
+        native = SimpleNamespace(
+            FullName=f"{name}@SupplierStockAxis@anchor.SLDPRT",
+            SystemValue=expected_mm / 1000.0,
+        )
+        dimensions[name] = native
+        annotation = SimpleNamespace(
+            name=name, OwnerType=0, Owner=scene.stock, Visible=1, IsDangling=lambda: False,
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native,
+            GetAnnotation=lambda annotation=annotation: annotation,
+            GetOverride=lambda: False, ShowDimensionValue=True,
+        )
+        annotation.GetSpecificAnnotation = lambda display=display: display
+        annotations.append(annotation)
+        displays.append(display)
+    for index, display in enumerate(displays):
+        following = displays[index + 1] if index + 1 < len(displays) else None
+        display.GetNext5 = lambda following=following: following
+    scene.stock.GetFirstDisplayDimension6 = lambda: displays[0]
+    if candidate == "dimension-owner":
+        annotations[0].Owner = scene.front
+    elif candidate == "hidden-value":
+        displays[0].ShowDimensionValue = False
+    presented, created_notes, checked_cells = [], [], []
+
+    def curate_stock(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
+        assert view is scene.stock
+        assert keep == expected_anchors
+        assert dimensions_by_feature == {"SupplierStockAxis": set(expected_anchors)}
+        return annotations
+
+    def supplier_reference(_adapter, display, **contract):
+        name = contract["label"]
+        assert contract == {
+            "label": name, "expected_mm": spec.SUPPLIER_STOCK_MM[name], "units": "in",
+            "precision": expected_precision[name], "callout": expected_callouts[name],
+        }
+        assert display.GetDimension2(0).SystemValue == spec.SUPPLIER_STOCK_MM[name] / 1000.0
+        presented.append(name)
+        return display
+
+    def annotation_ink(_adapter, annotation):
+        x, y = expected_anchors[annotation.name]
+        return {
+            "texts": [{
+                "t": f"({spec.SUPPLIER_STOCK_MM[annotation.name] / 25.4:g} in)",
+                "pos": (x, y, 0.0), "h": 0.003,
+                "w": 1.0 if candidate == "dimension-outside" else 0.022,
+                "ang": 0.0, "ref": 2,
+            }],
+        }, {"refused": True} if candidate == "dimension-unreadable" else {}
+
+    def add_stock_note(_adapter, text, x, y):
+        note = _note_double(text, text, x, y)
+        created_notes.append((note, text, text))
+        return note
+
+    def assert_fits(adapter, view, actual_cell, *, label):
+        expected_cell = cell if scene.state.sheet == "SUPPLIER-STOCK" else (
+            0.0127, 0.0651, 0.4191, 0.2667,
+        )
+        assert actual_cell == pytest.approx(expected_cell, rel=0, abs=1e-15)
+        checked_cells.append(view.Name)
+        purchased_drawing.assert_supplier_view_fits(adapter, view, actual_cell, label=label)
+
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", curate_stock)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", supplier_reference)
+    monkeypatch.setattr(drawing, "add_note", add_stock_note)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    monkeypatch.setattr(purchased_drawing, "annotation_display", annotation_ink)
+    if candidate in ("inside", "left-boundary", "bottom-boundary", "right-boundary", "top-boundary"):
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+        assert checked_cells == ["finished-front", "finished-iso", "stock-front", "stock-iso"]
+    else:
+        message = (
+            "invalid native extent" if candidate == "nonfinite" else
+            "empty or inverted native extent" if candidate == "inverted" else
+            "supplier dimension leaves its cell" if candidate == "dimension-outside" else
+            "unreadable settled native dimension ink" if candidate == "dimension-unreadable" else
+            "unsound supplier annotation owner/value" if candidate in ("dimension-owner", "hidden-value") else
+            "settled supplier view leaves its cell"
+        )
+        with pytest.raises(RuntimeError, match=message):
+            asyncio.run(drawing.build(scene.adapter))
+        assert not scene.state.saved
+    expected_stock_scale = (5.0, 1.0) if candidate == "recorded-5" else (4.0, 1.0)
+    assert scene.placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+        ("*Front", 0.150, 0.1755, expected_stock_scale),
+        ("*Isometric", 0.310, 0.213, (3.0, 1.0)),
+    ]
+    assert scene.state.initial_scale == scene.state.finalizer_options["scale"] == (5.0, 1.0)
+    assert scene.state.finalizer_options["sheet_scales"] == {
+        "FINISHED": (5.0, 1.0), "SUPPLIER-STOCK": expected_stock_scale,
+    }
+    assert scene.model.ActivateSheet("SUPPLIER-STOCK") is True
+    assert tuple(scene.sheet.GetProperties2()[2:4]) == expected_stock_scale
+    assert scene.stock.Position == (0.150, 0.1755)
+    assert scene.stock.ReferencedConfiguration == scene.stock_iso.ReferencedConfiguration == "AsSuppliedStock"
+    assert set(presented) == set(expected_anchors)
+    assert {name: native.SystemValue for name, native in dimensions.items()} == {
+        name: value / 1000.0 for name, value in spec.SUPPLIER_STOCK_MM.items()
+    }
+    expected_notes = _stock_note_contracts(drawing)
+    assert [(link, text) for _note, link, text in created_notes] == [
+        (link, text) for _note, link, text in expected_notes
+    ]
+    for (note, _link, _text), (expected_note, _expected_link, _expected_text) in zip(
+        created_notes, expected_notes,
+    ):
+        assert note.extent == pytest.approx(expected_note.extent, rel=0, abs=1e-15)
+    assert created_notes[-1][1:] == ("ISOMETRIC VIEW SCALE 3:1", "ISOMETRIC VIEW SCALE 3:1")
 
 
 @pytest.mark.parametrize("module", (drawing, boss_drawing))

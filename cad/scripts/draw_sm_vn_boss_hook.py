@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-import json
+from dataclasses import dataclass
 import math
 import sys
 from typing import Any
@@ -14,7 +14,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _bind, _early_bound
+from _dimensions import _feature_display_dimensions
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -33,14 +34,21 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _purchased_fastener_drawing import (
+    _box, _inside, assert_supplier_annotations_fit, assert_supplier_view_fits,
+)
 from _drawing_selection import _select_view_entity
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
+    _measured_supplier_value,
     assert_supplier_reference_dimension, supplier_reference_dimension,
+)
+from _supplier_reference_geometry import (
+    NativeSketchGeometry, capture_native_sketch_geometry, native_sketch_view_bounds,
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
+from _sketch import blank_reference_sketches
 import _stock_trim_drawing as trim_drawing
 import _telemetry
 from stock_anchor_geom import ANCHOR_9490T1 as _SUPPLIER_ANCHOR
@@ -67,6 +75,7 @@ from sm_vn_boss_hook_spec import (
     SUPPLIER_STOCK_OVERALL_MM,
     SUPPLIER_STOCK_SHANK_MM,
     SUPPLIER_STOCK_WIRE_CENTER_MM,
+    SUPPLIER_STOCK_SHANK_OUTLINE_MM,
     SUPPLIER_THREAD,
     SUPPLIER_THREAD_MAJOR_MM,
     SUPPLIER_THREAD_DIMENSIONS,
@@ -359,159 +368,317 @@ def _supplier_references(
     return refs
 
 
-def _supplier_stock_coverage_receipt(
-    adapter: Any, stock: Any, source_model: Any, original: dict[str, Any],
-) -> dict[str, Any]:
-    """Read one failed stock view without refreshing, selecting or changing it."""
-    receipt: dict[str, Any] = {
-        "kind": "sm_stock_profile_coverage_failure",
-        "original_predicate": original,
-        "later_readback": {},
-    }
-    later = receipt["later_readback"]
+@dataclass(frozen=True)
+class SupplierStockCapture:
+    """Target-config model geometry and binding, without native geometry handles."""
 
-    def read(target, field, getter):
-        try:
-            value = getter()
-            # A nonfinite/native-only value is a field error, not lost JSON.
-            json.dumps(value, allow_nan=False)
-            target[field] = {"value": value}
-            return value
-        except Exception as error:
-            target[field] = {
-                "error": {"type": type(error).__name__, "message": str(error)},
-            }
-            return None
+    geometry: NativeSketchGeometry
+    source_path: str
+    configuration: str
+    configuration_id: int
 
-    def native(target, field, getter, interface):
-        try:
-            raw = getter()
-            target[field] = {"present": raw is not None}
-            return None if raw is None else _early_bound(raw, interface)
-        except Exception as error:
-            target[field] = {
-                "error": {"type": type(error).__name__, "message": str(error)},
-            }
-            return None
+    def __post_init__(self):
+        if (
+            type(self.geometry) is not NativeSketchGeometry
+            or type(self.source_path) is not str or not self.source_path
+            or self.configuration != SUPPLIER_STOCK_CONFIGURATION
+            or type(self.configuration_id) is not int
+        ):
+            raise RuntimeError("supplier nominal stock requires immutable geometry and source binding")
 
-    def point(target, field, getter):
-        raw = native(target, field, getter, "ISketchPoint")
-        if raw is not None:
-            read(target[field], "coordinates_m",
-                 lambda: [float(raw.X), float(raw.Y), float(raw.Z)])
 
-    view = later["view"] = {}
-    read(view, "name", lambda: str(stock.GetName2()))
-    read(view, "ReferencedConfiguration", lambda: str(stock.ReferencedConfiguration))
-    read(view, "GetDisplayMode2", lambda: int(stock.GetDisplayMode2()))
-    read(view, "ScaleRatio", lambda: [float(value) for value in stock.ScaleRatio])
-    read(view, "ScaleDecimal", lambda: float(stock.ScaleDecimal))
-    read(view, "UseSheetScale", lambda: int(stock.UseSheetScale))
-    read(view, "Position", lambda: [float(value) for value in stock.Position])
-    transform = native(
-        view, "ModelToViewTransform", lambda: stock.ModelToViewTransform, "IMathTransform",
-    )
-    if transform is not None:
-        read(view["ModelToViewTransform"], "ArrayData",
-             lambda: [float(value) for value in transform.ArrayData])
-    source = native(view, "ReferencedDocument", lambda: stock.ReferencedDocument, "IModelDoc2")
-    document = later["source"] = {
-        "expected_path": SOURCE.resolve().as_posix(),
-        "expected_stock_configuration": SUPPLIER_STOCK_CONFIGURATION,
-    }
-    read(document, "source_model_self_IsSame", lambda: int(adapter.swApp.IsSame(source_model, source_model)))
-    if source is None:
-        return receipt
-    read(document, "view_source_IsSame", lambda: int(adapter.swApp.IsSame(source, source_model)))
-    path = read(document, "path", lambda: str(source.GetPathName()))
-    read(document, "path_matches_expected",
-         lambda: path.replace("\\", "/").casefold() == document["expected_path"].casefold())
-    read(document, "active_configuration", lambda: active_configuration_name(adapter, source))
-    configuration = native(
-        document, "stock_configuration",
-        lambda: source.GetConfigurationByName(SUPPLIER_STOCK_CONFIGURATION), "IConfiguration",
-    )
-    if configuration is not None:
-        read(document["stock_configuration"], "Name", lambda: str(configuration.Name))
-        read(document["stock_configuration"], "GetID", lambda: int(configuration.GetID()))
-    part = native(document, "IPartDoc", lambda: source, "IPartDoc")
-    if part is None:
-        return receipt
-    profile = document["profile"] = {}
-    feature = native(
-        profile, "IFeature", lambda: part.FeatureByName(SUPPLIER_STOCK_FEATURE), "IFeature",
-    )
-    if feature is None:
-        return receipt
-    read(profile, "name", lambda: str(feature.Name))
-    read(profile, "GetTypeName2", lambda: str(feature.GetTypeName2()))
-    read(profile, "Visible_in_source", lambda: int(feature.Visible))
-    read(profile, "suppressed_in_stock_configuration",
-         lambda: list(feature.IsSuppressed2(
-             3, bstr_array([SUPPLIER_STOCK_CONFIGURATION]),
-         )))
-    dimensions = profile["dimensions_in_stock_configuration"] = {}
-    for name in sorted(SUPPLIER_STOCK_DIMENSIONS[SUPPLIER_STOCK_FEATURE]):
-        row = dimensions[name] = {}
-        dimension = native(row, "IDimension", lambda name=name: feature.Parameter(name), "IDimension")
-        if dimension is not None:
-            read(row, "FullName", lambda: str(dimension.FullName))
-            read(row, "GetSystemValue3",
-                 lambda: [float(value) for value in dimension.GetSystemValue3(
-                     3, bstr_array([SUPPLIER_STOCK_CONFIGURATION]),
-                 )])
-    sketch = native(profile, "ISketch", lambda: feature.GetSpecificFeature2(), "ISketch")
-    if sketch is None:
-        return receipt
-    transform = native(
-        profile, "ModelToSketchTransform", lambda: sketch.ModelToSketchTransform, "IMathTransform",
-    )
-    if transform is not None:
-        read(profile["ModelToSketchTransform"], "ArrayData",
-             lambda: [float(value) for value in transform.ArrayData])
-    # Geometry is read in the reported active configuration, never switched.
-    # The named-config dimension/suppression reads above remain independent.
+def _assert_supplier_stock_geometry(geometry: NativeSketchGeometry) -> None:
+    """Match every actual source curve; an equal outer box is not identity."""
+    label = "supplier nominal stock"
+    if len(geometry.circle_offsets) != 3 or len(geometry.line_offsets) != 6:
+        raise RuntimeError(
+            f"{label}: expected exactly three circles and six lines; "
+            f"actual circles={len(geometry.circle_offsets)}, lines={len(geometry.line_offsets)}"
+        )
+
+    def same(first, second):
+        return all(abs(a - b) <= 1e-8 for a, b in zip(first, second, strict=True))
+
+    circles = [
+        ((0.0, 0.0, 0.0), SUPPLIER_NOMINAL_EYE_OD_MM / 2000.0),
+        ((0.0, 0.0, 0.0), SUPPLIER_EYE_ID_MM / 2000.0),
+        ((SUPPLIER_STOCK_WIRE_CENTER_MM[0] / 1000.0,
+          SUPPLIER_STOCK_WIRE_CENTER_MM[1] / 1000.0, 0.0),
+         SUPPLIER_NOMINAL_WIRE_MM / 2000.0),
+    ]
+    for offset in geometry.circle_offsets:
+        center, xpoint, ypoint = geometry.model_points[offset:offset + 3]
+        a = tuple(value - origin for value, origin in zip(xpoint, center, strict=True))
+        b = tuple(value - origin for value, origin in zip(ypoint, center, strict=True))
+        matches = [
+            index for index, (wanted, radius) in enumerate(circles)
+            if same(center, wanted)
+            and abs(math.dist(center, xpoint) - radius) <= 1e-8
+            and abs(math.dist(center, ypoint) - radius) <= 1e-8
+            and abs(a[2]) <= 1e-8 and abs(b[2]) <= 1e-8
+            and abs(sum(x * y for x, y in zip(a, b, strict=True))) <= 1e-12
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: native circle centre/radius/plane changed: "
+                f"expected remaining centre/radius={circles!r}; "
+                f"actual centre={center!r}, basis={a!r}/{b!r}, "
+                f"radii={math.dist(center, xpoint)!r}/{math.dist(center, ypoint)!r}"
+            )
+        circles.pop(matches[0])
+    outline = SUPPLIER_STOCK_SHANK_OUTLINE_MM
+    pairs = [
+        (outline[index], outline[(index + 1) % len(outline)])
+        for index in range(len(outline))
+    ] + list(zip(SUPPLIER_STOCK_AXIS_MM, SUPPLIER_STOCK_AXIS_MM[1:]))
+    lines = [
+        tuple((point[0] / 1000.0, point[1] / 1000.0, 0.0) for point in pair)
+        for pair in pairs
+    ]
+    for offset in geometry.line_offsets:
+        actual = geometry.model_points[offset:offset + 2]
+        matches = [
+            index for index, wanted in enumerate(lines)
+            if (same(actual[0], wanted[0]) and same(actual[1], wanted[1]))
+            or (same(actual[0], wanted[1]) and same(actual[1], wanted[0]))
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{label}: native line inventory/endpoints changed: "
+                f"expected one remaining pair={lines!r}; actual={actual!r}"
+            )
+        lines.pop(matches[0])
+
+
+def _capture_supplier_stock(adapter, source_model, finished_configuration) -> SupplierStockCapture:
+    """Capture solved stock while active, restoring the original source unsaved."""
+    source_path = SOURCE.resolve().as_posix()
+    source_type = int(source_model.GetType())
+    actual_path = str(source_model.GetPathName()).replace("\\", "/")
+    if source_type != 1 or actual_path.casefold() != source_path.casefold():
+        raise RuntimeError(
+            "supplier nominal stock capture requires the exact source part: "
+            f"expected type=1 path={source_path!r}; actual type={source_type} path={actual_path!r}"
+        )
+    _verify_source_state(adapter, source_model, finished_configuration)
+    raw_configuration = source_model.GetConfigurationByName(SUPPLIER_STOCK_CONFIGURATION)
+    if raw_configuration is None:
+        raise RuntimeError(f"supplier nominal stock configuration is missing: expected={SUPPLIER_STOCK_CONFIGURATION!r}")
+    configuration = _early_bound(raw_configuration, "IConfiguration")
+    configuration_name = str(configuration.Name)
+    if configuration_name != SUPPLIER_STOCK_CONFIGURATION:
+        raise RuntimeError(
+            f"supplier nominal stock configuration expected={SUPPLIER_STOCK_CONFIGURATION!r}; "
+            f"actual={configuration_name!r}"
+        )
+    configuration_id = int(configuration.GetID())
+
+    def show(name):
+        before = active_configuration_name(adapter, source_model)
+        if before != name:
+            result = source_model.ShowConfiguration2(name)
+            if result is not True:
+                raise RuntimeError(
+                    f"cannot activate supplier source configuration: expected={name!r}; "
+                    f"before={before!r}, ShowConfiguration2={result!r}"
+                )
+        actual = active_configuration_name(adapter, source_model)
+        if actual != name:
+            raise RuntimeError(f"supplier source configuration expected={name!r}; actual={actual!r}")
+        result = source_model.EditRebuild3()
+        if result is not True:
+            raise RuntimeError(f"cannot rebuild supplier source configuration {name!r}: EditRebuild3={result!r}")
+        actual = active_configuration_name(adapter, source_model)
+        if actual != name:
+            raise RuntimeError(f"supplier source rebuild configuration expected={name!r}; actual={actual!r}")
+
+    primary = None
     try:
-        raw_segments = sketch.GetSketchSegments()
-        segments = tuple(raw_segments) if raw_segments is not None else ()
-        profile["GetSketchSegments"] = {
-            "present": raw_segments is not None, "count": len(segments),
-            "expected_count": 9, "sample_truncated": len(segments) > 9,
+        show(SUPPLIER_STOCK_CONFIGURATION)
+        part = _early_bound(source_model, "IPartDoc")
+        counts = tuple(len(tuple(part.GetBodies2(kind, False) or ())) for kind in (0, 1))
+        if counts != (0, 0):
+            raise RuntimeError(
+                f"supplier nominal stock must have zero solid/sheet bodies: "
+                f"configuration={SUPPLIER_STOCK_CONFIGURATION!r}, expected=(0, 0), actual={counts!r}"
+            )
+        raw_feature = part.FeatureByName(SUPPLIER_STOCK_FEATURE)
+        if raw_feature is None:
+            raise RuntimeError(f"supplier nominal stock profile is missing: expected={SUPPLIER_STOCK_FEATURE!r}")
+        feature = _early_bound(raw_feature, "IFeature")
+        error = feature.GetErrorCode2()
+        suppressed = tuple(feature.IsSuppressed2(3, bstr_array([SUPPLIER_STOCK_CONFIGURATION])) or ())
+        owner_name, owner_type = str(feature.Name), str(feature.GetTypeName2())
+        if owner_name != SUPPLIER_STOCK_FEATURE or owner_type != "ProfileFeature":
+            raise RuntimeError(
+                f"supplier nominal stock owner expected=({SUPPLIER_STOCK_FEATURE!r}, 'ProfileFeature'); "
+                f"actual=({owner_name!r}, {owner_type!r})"
+            )
+        if len(suppressed) != 1 or suppressed[0] is not False:
+            raise RuntimeError(
+                f"supplier nominal stock owner suppression configuration={SUPPLIER_STOCK_CONFIGURATION!r}: "
+                f"expected=(False,), actual={suppressed!r}"
+            )
+        # Warning is undefined when the returned error status is zero.
+        if (
+            not isinstance(error, (tuple, list)) or len(error) != 2
+            or type(error[0]) is not int or error[0] != 0
+        ):
+            raise RuntimeError(
+                f"supplier nominal stock owner expected integer GetErrorCode2 status=0; actual={error!r}"
+            )
+        expected = {
+            "SupplierNominalEyeOD": SUPPLIER_NOMINAL_EYE_OD_MM,
+            "SupplierNominalWire": SUPPLIER_NOMINAL_WIRE_MM,
+            "SupplierStockShank": SUPPLIER_STOCK_SHANK_MM,
+            "SupplierStockOverall": SUPPLIER_STOCK_OVERALL_MM,
         }
-    except Exception as error:
-        profile["GetSketchSegments"] = {
-            "error": {"type": type(error).__name__, "message": str(error)},
-        }
-        return receipt
-    rows = profile["segments"] = []
-    for index, raw in enumerate(segments[:9]):
-        row = {"index": index}
-        rows.append(row)
-        segment = native(row, "ISketchSegment", lambda raw=raw: raw, "ISketchSegment")
-        if segment is None:
-            continue
-        kind = read(row, "GetType", lambda: int(segment.GetType()))
-        read(row, "ConstructionGeometry", lambda: bool(segment.ConstructionGeometry))
-        if kind == 0:  # swSketchLINE: never ask a line for arc-only members.
-            line = native(row, "ISketchLine", lambda: segment, "ISketchLine")
-            if line is not None:
-                point(row, "start", lambda: line.GetStartPoint2())
-                point(row, "end", lambda: line.GetEndPoint2())
-        elif kind == 1:  # swSketchARC: IsCircle distinguishes full circles.
-            arc = native(row, "ISketchArc", lambda: segment, "ISketchArc")
-            if arc is not None:
-                read(row, "IsCircle", lambda: int(arc.IsCircle()))
-                point(row, "centre", lambda: arc.GetCenterPoint2())
-                point(row, "start", lambda: arc.GetStartPoint2())
-                point(row, "end", lambda: arc.GetEndPoint2())
-                read(row, "radius_m", lambda: float(arc.GetRadius()))
-                read(row, "normal", lambda: [float(value) for value in arc.GetNormalVector()])
-        elif kind is not None:
-            row["unexpected_type"] = kind
-    return receipt
+        found = []
+        for raw in _feature_display_dimensions(feature):
+            display = _early_bound(_bind(raw, "IDisplayDimension"), "IDisplayDimension")
+            native = _early_bound(display.GetDimension2(0), "IDimension")
+            owner = str(native.FullName).split("@")
+            if owner[0] not in expected:
+                continue
+            if len(owner) < 2 or owner[1] != SUPPLIER_STOCK_FEATURE:
+                raise RuntimeError(
+                    f"supplier nominal stock dimension owner expected={SUPPLIER_STOCK_FEATURE!r}; "
+                    f"actual FullName={str(native.FullName)!r}"
+                )
+            same = int(adapter.swApp.IsSame(native, feature.Parameter(owner[0])))
+            if same != 1:
+                raise RuntimeError(
+                    f"{owner[0]}: supplier nominal stock source dimension expected IsSame=1; actual={same}"
+                )
+            _measured_supplier_value(
+                display, label=f"{owner[0]} [{SUPPLIER_STOCK_CONFIGURATION}]", expected_mm=expected[owner[0]], expected_degrees=None,
+                presentation="diameter" if owner[0].startswith("SupplierNominal") else "length",
+                configuration=SUPPLIER_STOCK_CONFIGURATION,
+            )
+            found.append(owner[0])
+        if sorted(found) != sorted(expected):
+            raise RuntimeError(
+                f"supplier nominal stock dimension inventory expected={sorted(expected)!r}; actual={found!r}"
+            )
+        geometry = capture_native_sketch_geometry(feature.GetSpecificFeature2(), label="supplier nominal stock")
+        _assert_supplier_stock_geometry(geometry)
+        actual_configuration = active_configuration_name(adapter, source_model)
+        if actual_configuration != SUPPLIER_STOCK_CONFIGURATION:
+            raise RuntimeError(
+                f"supplier nominal stock capture configuration expected={SUPPLIER_STOCK_CONFIGURATION!r}; "
+                f"actual={actual_configuration!r}"
+            )
+        return SupplierStockCapture(geometry, source_path, SUPPLIER_STOCK_CONFIGURATION, configuration_id)
+    except BaseException as error:
+        primary = error
+        raise
+    finally:
+        restoration_errors = []
+        try:
+            show(finished_configuration)
+        except BaseException as restore_error:
+            restoration_errors.append(restore_error)
+        try:
+            part = _early_bound(source_model, "IPartDoc")
+            changed = tuple(
+                name for name in REFERENCE_SKETCHES
+                if int(_early_bound(part.FeatureByName(name), "IFeature").Visible) != 1
+            )
+            if changed:
+                blank_reference_sketches(adapter, changed)
+            _verify_source_state(adapter, source_model, finished_configuration)
+        except BaseException as restore_error:
+            restoration_errors.append(restore_error)
+        if restoration_errors:
+            pending = primary if primary is not None else restoration_errors[0]
+            for restore_error in restoration_errors:
+                if restore_error is not pending:
+                    pending.add_note(f"Supplier source restoration also failed: {restore_error}")
+            if primary is None:
+                raise pending
 
 
-def _supplier_stock_diagram(adapter: Any, source_model: Any):
+def _supplier_stock_bounds(adapter, stock, source_model, capture: SupplierStockCapture):
+    """Measure full native stock ink only in the exact captured view binding."""
+    if type(capture) is not SupplierStockCapture:
+        raise RuntimeError("supplier nominal stock requires an immutable source capture")
+    stock = _early_bound(stock, "IView")
+    raw_source = stock.ReferencedDocument
+    if raw_source is None:
+        raise RuntimeError("supplier nominal stock view expected referenced source part; actual=None")
+    same = int(adapter.swApp.IsSame(raw_source, source_model))
+    if same != 1:
+        raise RuntimeError(f"supplier nominal stock view source identity expected IsSame=1; actual={same}")
+    source = _early_bound(raw_source, "IModelDoc2")
+    for field, actual, expected in (
+        ("source document type", int(source.GetType()), 1),
+        ("capture source path", capture.source_path.casefold(), SOURCE.resolve().as_posix().casefold()),
+        ("source document path", str(source.GetPathName()).replace("\\", "/").casefold(), capture.source_path.casefold()),
+        ("view model path", str(stock.GetReferencedModelName()).replace("\\", "/").casefold(), capture.source_path.casefold()),
+        ("capture configuration", capture.configuration, SUPPLIER_STOCK_CONFIGURATION),
+        ("view configuration", str(stock.ReferencedConfiguration), capture.configuration),
+    ):
+        if actual != expected:
+            raise RuntimeError(f"supplier nominal stock {field}: expected={expected!r}; actual={actual!r}")
+    raw_configuration = source.GetConfigurationByName(capture.configuration)
+    if raw_configuration is None:
+        raise RuntimeError(f"supplier nominal stock configuration expected={capture.configuration!r}; actual=None")
+    configuration = _early_bound(raw_configuration, "IConfiguration")
+    for field, actual, expected in (
+        ("configuration name", str(configuration.Name), capture.configuration),
+        ("configuration ID", int(configuration.GetID()), capture.configuration_id),
+    ):
+        if actual != expected:
+            raise RuntimeError(f"supplier nominal stock {field}: expected={expected!r}; actual={actual!r}")
+    view_type = int(stock.Type)
+    if view_type not in (6, 7):
+        raise RuntimeError(f"supplier nominal stock full native view Type: expected=6 or 7; actual={view_type}")
+    for field, actual, expected in (
+        ("base view present", stock.GetBaseView() is not None, False),
+        ("IsCropped", stock.IsCropped(), False),
+        ("IsBroken", stock.IsBroken(), False),
+        ("IsPerspectiveView", stock.IsPerspectiveView(), False),
+        ("break count", len(tuple(stock.GetBreakLines() or ())), 0),
+        ("broken-out section count", int(stock.GetBreakOutSectionCount()), 0),
+        ("UseSheetScale", int(stock.UseSheetScale), 0),
+        ("ScaleRatio", tuple(float(value) for value in stock.ScaleRatio), STOCK_SCALE),
+        ("GetDisplayMode2", int(stock.GetDisplayMode2()), 2),
+    ):
+        if actual != expected or (type(expected) is bool and type(actual) is not bool):
+            raise RuntimeError(
+                f"supplier nominal stock full native view/scale {field}: expected={expected!r}; actual={actual!r}"
+            )
+    decimal = float(stock.ScaleDecimal)
+    ratio = STOCK_SCALE[0] / STOCK_SCALE[1]
+    if not math.isclose(decimal, ratio, rel_tol=0.0, abs_tol=1e-12):
+        raise RuntimeError(f"supplier nominal stock native view/scale ScaleDecimal: expected={ratio}; actual={decimal!r}")
+    raw_sketch = stock.GetSketch()
+    if raw_sketch is None:
+        raise RuntimeError("supplier nominal stock full view expected drawing sketch; actual=None")
+    count = len(tuple(_early_bound(raw_sketch, "ISketch").GetSketchSegments() or ()))
+    if count != 0:
+        raise RuntimeError(f"supplier nominal stock full view drawing-sketch segment count: expected=0; actual={count}")
+    stock.UpdateViewDisplayGeometry()
+    bounds = native_sketch_view_bounds(adapter, stock, capture.geometry, label="supplier nominal stock")
+    ratio = STOCK_SCALE[0] / STOCK_SCALE[1]
+    expected_spans = (
+        (SUPPLIER_STOCK_WIRE_CENTER_MM[0] + SUPPLIER_NOMINAL_WIRE_MM / 2.0
+         + SUPPLIER_NOMINAL_EYE_OD_MM / 2.0) / 1000.0 * ratio,
+        SUPPLIER_STOCK_OVERALL_MM / 1000.0 * ratio,
+    )
+    for axis, actual, expected in zip(
+        ("x", "y"), (bounds[2] - bounds[0], bounds[3] - bounds[1]), expected_spans, strict=True,
+    ):
+        if not expected - 1e-7 <= actual <= expected + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M:
+            raise RuntimeError(
+                f"revealed supplier diagram native ink does not cover its source profile: axis={axis}, "
+                f"expected=[{expected - 1e-7!r}, {expected + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M!r}], "
+                f"actual={actual!r}, native bounds={bounds!r}"
+            )
+    return bounds
+
+
+def _supplier_stock_diagram(adapter: Any, source_model: Any, capture: SupplierStockCapture):
     """A separate zero-body source profile, never false-sized finished edges."""
     stock = _early_bound(
         place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=STOCK_SCALE),
@@ -519,68 +686,40 @@ def _supplier_stock_diagram(adapter: Any, source_model: Any):
     )
     stock.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
     if str(stock.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
-        raise RuntimeError("supplier stock view references the finished configuration")
+        raise RuntimeError(
+            f"supplier stock view configuration expected={SUPPLIER_STOCK_CONFIGURATION!r}; "
+            f"actual={str(stock.ReferencedConfiguration)!r}"
+        )
     set_hidden_lines_removed(adapter, stock)
-    # Reveal the saved-hidden sketch before the first outline/projection/fit.
+    # Reveal the saved-hidden sketch before the first native projection/fit.
     shown = _show_hidden_owners(
         adapter, stock, (SUPPLIER_STOCK_FEATURE,),
         view_label="counter anchor source diagram before fitting",
     )
     if set(shown) != {SUPPLIER_STOCK_FEATURE}:
-        raise RuntimeError("counter anchor source diagram owner is not saved hidden")
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot rebuild the revealed supplier nominal stock view")
+        raise RuntimeError(
+            f"counter anchor source diagram shown owner expected={[SUPPLIER_STOCK_FEATURE]!r}; actual={shown!r}"
+        )
+    rebuilt = adapter.currentModel.EditRebuild3()
+    if rebuilt is not True:
+        raise RuntimeError(f"cannot rebuild the revealed supplier nominal stock view: EditRebuild3={rebuilt!r}")
     stock.UpdateViewDisplayGeometry()
-    outline = _box(stock.GetOutline(), label="revealed counter anchor source diagram")
-    ratio = STOCK_SCALE[0] / STOCK_SCALE[1]
-    expected_spans = (
-        (
-            SUPPLIER_STOCK_WIRE_CENTER_MM[0]
-            + SUPPLIER_NOMINAL_WIRE_MM / 2.0
-            + SUPPLIER_NOMINAL_EYE_OD_MM / 2.0
-        ) / 1000.0 * ratio,
-        SUPPLIER_STOCK_OVERALL_MM / 1000.0 * ratio,
+    feature = _early_bound(
+        _early_bound(source_model, "IPartDoc").FeatureByName(SUPPLIER_STOCK_FEATURE), "IFeature",
     )
-    for failed_index, (actual, expected) in enumerate(zip(
-        (outline[2] - outline[0], outline[3] - outline[1]), expected_spans, strict=True
-    )):
-        if not expected - 1e-7 <= actual <= expected + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M:
-            error = RuntimeError("revealed supplier diagram outline does not cover its source profile")
-            # Freeze both axes and the first failed index before any census read.
-            original = {
-                "outline_m": outline,
-                "expected_spans_m": expected_spans,
-                "failed_index": failed_index,
-                "shown_owners": tuple(shown),
-                "axes": [
-                    {
-                        "axis": axis, "actual_m": span, "expected_m": wanted,
-                        "minimum_m": wanted - 1e-7,
-                        "maximum_m": wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
-                        "covers_source": wanted - 1e-7 <= span,
-                        "within_padding": span <= wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
-                        "passes": wanted - 1e-7 <= span <= wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
-                        "undersize": span < wanted - 1e-7,
-                        "oversize": span > wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
-                    }
-                    for axis, span, wanted in zip(
-                        ("x", "y"), (outline[2] - outline[0], outline[3] - outline[1]),
-                        expected_spans, strict=True,
-                    )
-                ],
-            }
-            try:
-                receipt = _supplier_stock_coverage_receipt(adapter, stock, source_model, original)
-                error.add_note(
-                    "SM_STOCK_PROFILE_COVERAGE_RECEIPT "
-                    + json.dumps(receipt, allow_nan=False, sort_keys=True, separators=(",", ":"))
-                )
-            except Exception as capture_error:
-                error.add_note(
-                    "SM_STOCK_PROFILE_COVERAGE_RECEIPT capture failed: "
-                    f"{type(capture_error).__name__}: {capture_error}"
-                )
-            raise error
+    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    segments = tuple(sketch.GetSketchSegments() or ())
+    if len(segments) != 9:
+        raise RuntimeError(f"supplier nominal stock source inventory expected=9 segments; actual={len(segments)}")
+    for index, segment in enumerate(segments):
+        if stock.GetCorresponding(segment) is None:
+            raise RuntimeError(
+                f"supplier nominal stock source segment {index} expected drawing correspondence; actual=None"
+            )
+    # Correspondence proves source membership, not visibility through an
+    # invented IFeature.Visible receipt. Showing uses the established per-view
+    # override above; actual target-config geometry was captured before drawing.
+    _supplier_stock_bounds(adapter, stock, source_model, capture)
     midpoint = (
         0.0,
         (SUPPLIER_STOCK_AXIS_MM[0][1] + SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
@@ -594,8 +733,9 @@ def _supplier_stock_diagram(adapter: Any, source_model: Any):
         before[0] + STOCK_CENTER[0] - projected[0],
         before[1] + STOCK_CENTER[1] - projected[1],
     ])
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot position the complete supplier stock envelope")
+    rebuilt = adapter.currentModel.EditRebuild3()
+    if rebuilt is not True:
+        raise RuntimeError(f"cannot position the complete supplier stock envelope: EditRebuild3={rebuilt!r}")
     keep = {
         "SupplierNominalEyeOD": (0.180, 0.244),
         "SupplierNominalWire": (0.255, 0.235),
@@ -728,7 +868,7 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                     )
 
 
-def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
+def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet, source_model, stock_capture):
     """Inspect complete native view/dimension ink and sheet-owned label extents."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     for sheet_name, (names, _configuration) in view_contracts.items():
@@ -779,18 +919,28 @@ def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
             if name not in views:
                 raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
             view = views[name]
-            view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"counter anchor {sheet_name}")
+            if sheet_name == SHEET_NAMES[1]:
+                bounds = _supplier_stock_bounds(adapter, view, source_model, stock_capture)
+                if not _inside(bounds, cell):
+                    raise RuntimeError(f"counter anchor {sheet_name}: native source ink leaves its cell: {bounds!r}")
+                assert_supplier_annotations_fit(adapter, view, cell, label=f"counter anchor {sheet_name}")
+            else:
+                view.UpdateViewDisplayGeometry()
+                assert_supplier_view_fits(adapter, view, cell, label=f"counter anchor {sheet_name}")
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
-    if active_configuration_name(adapter, source_model) != finished_configuration:
-        raise RuntimeError("supplier drawing changed the source part's active configuration")
+    actual = active_configuration_name(adapter, source_model)
+    if actual != finished_configuration:
+        raise RuntimeError(
+            f"supplier drawing source active configuration expected={finished_configuration!r}; actual={actual!r}"
+        )
     part = _early_bound(source_model, "IPartDoc")
     for name in REFERENCE_SKETCHES:
         feature = part.FeatureByName(name)
-        if feature is None or int(_early_bound(feature, "IFeature").Visible) != 1:
-            raise RuntimeError(f"{name}: supplier drawing changed saved-hidden source visibility")
+        state = None if feature is None else int(_early_bound(feature, "IFeature").Visible)
+        if state != 1:
+            raise RuntimeError(f"{name}: saved-hidden source visibility expected=1; actual={state!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -801,6 +951,7 @@ async def build(adapter: Any) -> dict[str, str]:
     finished_configuration = active_configuration_name(adapter, source_model)
     if not finished_configuration or finished_configuration == SUPPLIER_STOCK_CONFIGURATION:
         raise RuntimeError("source counter anchor is not saved in its finished configuration")
+    stock_capture = _capture_supplier_stock(adapter, source_model, finished_configuration)
     required = (
         "Number",
         "Material Specification",
@@ -871,7 +1022,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
         raise RuntimeError("cannot activate counter anchor supplier stock sheet")
-    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter, source_model)
+    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter, source_model, stock_capture)
     set_hidden_lines_removed(adapter, stock)
     view_contracts = {
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
@@ -900,7 +1051,9 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda: _verify_controls(adapter, annotations),
             # The layout check owns pre-save view refreshes; the attachment
             # verifier is also safe to call after the native save.
-            lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),
+            lambda: _verify_supplier_layout(
+                adapter, view_contracts, notes_by_sheet, source_model, stock_capture,
+            ),
             lambda: _verify_supplier_references(adapter, refs_by_sheet, view_contracts),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),

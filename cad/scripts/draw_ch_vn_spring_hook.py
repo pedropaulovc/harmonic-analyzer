@@ -93,7 +93,11 @@ _SUPPLIER_EYE_FEATURE = "Wire"
 # chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-STOCK_SCALE = (5.0, 1.0)
+# The actual 5:1 stock outline is 171.903 mm tall in the unchanged 163.7 mm
+# cell, so translation cannot fit it. Main approved catalogue scale 4:1 for
+# this stock primary only; its actual native bounds and readability still
+# require qualification, never a proportionally reduced 5:1 outline.
+STOCK_SCALE = (4.0, 1.0)
 SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
 STOCK_CENTER = (0.150, 0.1755)
 # a269's settled GetOutline exceeded the unchanged FINISHED cell top by
