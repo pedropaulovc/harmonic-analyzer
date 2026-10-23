@@ -148,15 +148,17 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
 async def back_wall_reference(adapter: Any) -> list[tuple[str, str]]:
     """Direct back wall, from the rebate's back face to the block's back face.
 
-    Right-plane local X is -Z. The chord continues the rebate-width chord at
-    the roof station, so 8.40 and the wall chain from the cover face; the
-    block depth is their sum and prints only as a reference.
+    Right-plane local X is -Z. The chord lies on the top outline edge, above
+    the rebate's back face, so the shown construction line hides under the
+    outline instead of ghosting across the wall. 8.40 and the wall chain
+    from the cover face; the block depth is their sum and prints only as a
+    reference.
     """
     feature = "BackWallReference"
     check(feature, await adapter.create_sketch("Right"))
     # add_line_chain restores AddToDB even when the line is refused.
     (line,) = await add_line_chain(adapter, [
-        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX),
+        (-spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT), (-spec.BLOCK_DEPTH, spec.BLOCK_HEIGHT),
     ], close=False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -166,14 +168,14 @@ async def back_wall_reference(adapter: Any) -> list[tuple[str, str]]:
     await dimension_between(adapter, f"{line}.start", f"{line}.end",
                             "horizontal_distance", spec.BACK_WALL_THICKNESS, feature)
     await anchor_point_to_origin(adapter, f"{line}.start",
-                                 -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX, feature)
+                                 -spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT, feature)
     await ensure_fully_defined(adapter, feature)
     check(feature, await adapter.exit_sketch())
     name_last_feature(adapter, feature)
     # Both anchor coordinates are non-zero: station along -Z, then height.
     names = name_dimensions(adapter, feature, ["BackWall", "BackWallStationZ", "BackWallStationY"])
     return list(zip(names, [
-        '"BlockDepth" - "WindowWidth"', '"WindowWidth"', '"BlockHeight" - "RoofThickness"',
+        '"BlockDepth" - "WindowWidth"', '"WindowWidth"', '"BlockHeight"',
     ], strict=True))
 
 

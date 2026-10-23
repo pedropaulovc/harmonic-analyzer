@@ -20,6 +20,7 @@ import _config
 import _telemetry
 import ms_stop_spec as part
 from _check import check
+from solidworks_mcp.adapters.sw_type_info import constant
 from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
@@ -137,6 +138,29 @@ def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"missing native plate chamfer dimensions: {sorted(remaining)}")
 
 
+# The shown Ø1.85 pilot reference circle read as a tapped-hole symbol inside
+# the opened Ø2.40 hole (machinist review, run 20261023T231957372Z-0d874475).
+# A phantom circle is the convention for a removed, earlier-stage feature.
+# swLineStyles_e.swLinePHANTOM = 2, swLineWeights_e.swLW_THIN = 0.
+CONSTRUCTION_CURVE_FONT = {
+    "swLineFontConstructionCurvesStyle": 2,
+    "swLineFontConstructionCurvesThickness": 0,
+}
+
+
+@_telemetry.traced("drawing.ms_stop_plate_construction_font")
+def _construction_curve_font(drawing: Any) -> None:
+    """Construction curves phantom and thin: the pilot reads as an earlier stage."""
+    extension = _early_bound(drawing.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    for name, value in CONSTRUCTION_CURVE_FONT.items():
+        pref = constant(name)
+        if not extension.SetUserPreferenceInteger(pref, option, value):
+            raise RuntimeError(f"failed to set document line font {name}")
+        if int(extension.GetUserPreferenceInteger(pref, option)) != value:
+            raise RuntimeError(f"document line font {name} readback differs")
+
+
 def _label_locating_edges(adapter: Any, front: Any) -> None:
     """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
     face_z = part.PLATE_Z_MIN / 1000.0
@@ -158,6 +182,7 @@ async def build(adapter: Any) -> dict[str, str]:
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
+    _construction_curve_font(drawing)
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Plate Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",

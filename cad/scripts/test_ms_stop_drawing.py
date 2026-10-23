@@ -313,6 +313,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     source = tmp_path / f"{drawing.PART_STEM}.SLDPRT"
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
+    fonts = []
+    monkeypatch.setattr(drawing, "_construction_curve_font", fonts.append)
     utility = _StopMathUtility()
 
     async def open_model(path):
@@ -624,6 +626,35 @@ class _StopDisplay:
         assert which == 1
         if self.refusal != "prefix":
             self.prefix = text
+
+
+@pytest.mark.parametrize("drawing,style", [(block_drawing, 0), (plate_drawing, 2)])
+@pytest.mark.parametrize("refusal", [None, "set", "readback"])
+def test_construction_curve_font_is_set_and_read_back(monkeypatch, drawing, style, refusal) -> None:
+    # Block: solid thin chords hide in the outline; plate: phantom pilot.
+    assert drawing.CONSTRUCTION_CURVE_FONT == {
+        "swLineFontConstructionCurvesStyle": style,
+        "swLineFontConstructionCurvesThickness": 0,
+    }
+    stored = {}
+
+    def set_pref(pref, option, value):
+        if refusal != "set":
+            stored[pref] = value + (1 if refusal == "readback" else 0)
+        return refusal != "set"
+
+    extension = SimpleNamespace(
+        SetUserPreferenceInteger=set_pref,
+        GetUserPreferenceInteger=lambda pref, option: stored[pref],
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "constant", lambda name: name)
+    if refusal:
+        with pytest.raises(RuntimeError, match="line font"):
+            drawing._construction_curve_font(SimpleNamespace(Extension=extension))
+    else:
+        drawing._construction_curve_font(SimpleNamespace(Extension=extension))
+        assert stored == drawing.CONSTRUCTION_CURVE_FONT
 
 
 @pytest.mark.parametrize("separator", ["-", " ", "", " - "])
@@ -1137,7 +1168,7 @@ def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatc
     equations = dict(asyncio.run(stop_geom.back_wall_reference(adapter)))
     assert adapter.planes == ["Right"]
     assert adapter.lines == {"line": (
-        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX))}
+        (-spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT), (-spec.BLOCK_DEPTH, spec.BLOCK_HEIGHT))}
     assert adapter._sketch_entities["line"].ConstructionGeometry
     wall = adapter.dimensions[0]
     assert (wall.Name, wall.kind, wall.value_mm) == (
@@ -1146,7 +1177,7 @@ def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatc
     assert equations == {
         "BackWall@BackWallReference": '"BlockDepth" - "WindowWidth"',
         "BackWallStationZ@BackWallReference": '"WindowWidth"',
-        "BackWallStationY@BackWallReference": '"BlockHeight" - "RoofThickness"',
+        "BackWallStationY@BackWallReference": '"BlockHeight"',
     }
 
 
