@@ -1,14 +1,23 @@
 """Offline manufacturing boundaries for the trimmed channel-spring anchor."""
 
+import asyncio
 import math
 from types import SimpleNamespace
 
 import pytest
 
 import _config
+import _purchased_fastener_drawing as purchased_drawing
+import _drawing_common as drawing_common
+import _drawing_dimensions as drawing_dimensions
+import _drawing_selection as drawing_selection
+from _layout_audit import arc_segments, arrowhead_segments
+from _layout_geometry import Box, Segment, segment_box_distance
 import _stock_trim_drawing as trim_drawing
 import draw_ch_vn_spring_hook as drawing
+import draw_sm_vn_boss_hook as boss_drawing
 import ch_vn_spring_hook_spec as spec
+import sm_vn_boss_hook_spec as boss_spec
 import spring_mount_geom as mounts
 import sm_summing_lever_spec as lever
 from _hole_spec import TAP_DRILL_MM
@@ -16,6 +25,86 @@ from stock_anchor_geom import ANCHOR_9489T111 as anchor
 import ch_anchor_jam_nut_spec as jam_nut
 from _interference_contracts import CHANNEL_ANCHOR_NUT_THREAD
 from _hole_spec import THREAD_MAJOR_MM
+from test_sm_vn_boss_hook_drawing import _make_stock_source_scene
+
+
+def _source_properties(names):
+    values = {
+        "Supplier": "McMaster-Carr",
+        "Supplier SKUs": "9489T111",
+        "Stock Name": "PURCHASED EYEBOLT — RETAIN THE EYE",
+        "Isometric View Note": "ISOMETRIC VIEW SCALE 3:1",
+        "Manufacturing Notes": "CUT TO FINISHED LENGTH\nRESTORE THE END DEBURR",
+    }
+    return {name: values.get(name, f"source {name}") for name in names}
+
+
+def _note_double(link, text, x=0.016, y=0.060, *, owner_type=1):
+    note = SimpleNamespace(
+        PropertyLinkedText=link, text=text, annotation=SimpleNamespace(OwnerType=owner_type),
+        extent=(x, y - 0.003, 0.0, x + 0.025, y, 0.0),
+    )
+    note.GetAnnotation = lambda: note.annotation
+    note.GetText = lambda: note.text
+    note.annotation.GetType = lambda: 6
+    note.annotation.GetSpecificAnnotation = lambda: note
+    note.GetExtent = lambda: note.extent
+    return note
+
+
+def _stock_note_contracts(module):
+    if module is drawing:
+        labels = (
+            ("AS-SUPPLIED EYEBOLT BODY — SUPPLIER REFERENCE", 0.016, 0.2627),
+            (
+                "SUPPLIED HEX NUT OMITTED FROM THIS BODY VIEW\n"
+                "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
+                0.016, 0.089,
+            ),
+            ("ISOMETRIC VIEW SCALE 3:1", 0.275, 0.153),
+        )
+    else:
+        labels = (
+            ("SUPPLIER NOMINAL STOCK ENVELOPE — AS SUPPLIED", 0.016, 0.2627),
+            (
+                "NOMINAL PROFILE ONLY — INSTALLED VENDOR-CAD EYE UNCHANGED\n"
+                "STOCK REFERENCES ONLY — FINISHED TRIM AND CHAMFER: SHEET 1",
+                0.016, 0.089,
+            ),
+        )
+    return [(_note_double(text, text, x, y), text, text) for text, x, y in labels]
+
+
+def _supplier_stock_profile_scene(monkeypatch, tmp_path, adapter, source, stock, model, saved_state):
+    """Keep the real nine-instance proof in the shared build/callback fixtures."""
+    scene = _make_stock_source_scene(
+        monkeypatch, tmp_path, source=source, stock=stock, model=model, adapter=adapter,
+        source_path=boss_drawing.SOURCE, finished_configuration="Default",
+    )
+    capture_stock = boss_drawing._capture_supplier_stock
+    scene.capture, scene.capture_calls = None, []
+
+    def capture_before_drawing(native_adapter, native_source, finished_configuration):
+        assert native_adapter is adapter and native_source is source
+        assert native_adapter.currentModel is source and finished_configuration == "Default"
+        scene.capture = capture_stock(native_adapter, native_source, finished_configuration)
+        scene.capture_calls.append(finished_configuration)
+        return scene.capture
+
+    def before_save(operation):
+        def guarded(*args, **kwargs):
+            if saved_state.saved:
+                pytest.fail("saved stock-profile observer mutated geometry or source configuration")
+            return operation(*args, **kwargs)
+        return guarded
+
+    source.ShowConfiguration2 = before_save(source.ShowConfiguration2)
+    source.EditRebuild3 = before_save(source.EditRebuild3)
+    stock.UpdateViewDisplayGeometry = before_save(stock.UpdateViewDisplayGeometry)
+    model.EditRebuild3 = before_save(model.EditRebuild3)
+    model.SetLineColor = before_save(model.SetLineColor)
+    monkeypatch.setattr(boss_drawing, "_capture_supplier_stock", capture_before_drawing)
+    return scene
 
 
 def test_cut_end_crosses_the_plate_and_carries_the_jam_nut():
@@ -222,6 +311,309 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
         drawing._verify_controls(annotations)
 
 
+# Recovered 9bb FINISHED native display data. Keep BOTH whole witnesses,
+# BOTH arc fragments and the full arrow polygons, not just one crossing or tip.
+# These fixtures and the measured PDF glyph boxes predict a placement budget;
+# they do not certify regenerated native ink or an exact-head saved drawing.
+_CH_9BB_ANGLE_LINES = (
+    Segment(0.1120414, 0.1039811, 0.1293085, 0.1039811),
+    Segment(0.1094701, 0.1069666, 0.1226235, 0.12012),
+)
+_CH_9BB_ANGLE_ARCS = (
+    (0, 0, -1, -1, 0.1283085, 0.1039811, 0.0005,
+     0.1257565, 0.1142219, 0.0005, 0.1064846, 0.1039811, 0.0005, 0, 0, 1, 1),
+    (0, 0, -1, -1, 0.124, 0.117, 0.0005,
+     0.1219164, 0.1194129, 0.0005, 0.1064846, 0.1039811, 0.0005, 0, 0, 1, 1),
+)
+_CH_9BB_ANGLE_ARROWS = (
+    (0.1283085, 0.1039811, 0.0005, -0.0806729, 0.9967406, 0,
+     0.003556, 0.000762, 0, 0, 0, 1),
+    (0.1219164, 0.1194129, 0.0005, 0.6477577, -0.7618464, 0,
+     0.003556, 0.000762, 0, 0, 0, 1),
+)
+
+
+def _chamfer_angle_scene(monkeypatch, *, fault=None):
+    """Use the real offset helper against native-shaped, observable objects."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing_dimensions, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(
+        drawing_dimensions._sw_type_info, "early_bound_or_flag",
+        lambda value, _kind, *_members: value,
+    )
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    fragments = (
+        *_CH_9BB_ANGLE_LINES,
+        *(segment for raw in _CH_9BB_ANGLE_ARCS for segment in arc_segments(raw)),
+        *(segment for raw in _CH_9BB_ANGLE_ARROWS for segment in arrowhead_segments(raw)),
+    )
+    state = SimpleNamespace(
+        position=(0.190, 0.140, 0.0005), offset=True, stage=None,
+        arc_xy=(0.124, 0.117), geometry=fragments, read_only=False,
+        bad_stage=None, bad_position=None,
+    )
+    events = []
+    controls, native_controls = [], []
+    for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
+        native = SimpleNamespace(
+            Name=name,
+            FullName=f"{name}@OriginalCutControl@original-anchor.SLDPRT",
+            DrivenState=2, SystemValue=nominal,
+            Tolerance=SimpleNamespace(
+                Type=spec.DIMENSION_TOLERANCE_TYPES[name],
+                GetMinValue=lambda lower=lower: lower,
+                GetMaxValue=lambda upper=upper: upper,
+            ),
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native,
+            GetText=lambda _index: "",
+            GetPrimaryPrecision2=lambda name=name: spec.DIMENSION_PRECISION[name],
+        )
+        annotation = SimpleNamespace(
+            name=name, GetSpecificAnnotation=lambda display=display: display,
+        )
+        controls.append(annotation)
+        native_controls.append(native)
+    angle = controls[-1]
+    original_display = angle.GetSpecificAnnotation()
+
+    class AngularDisplay:
+        GetDimension2 = staticmethod(original_display.GetDimension2)
+        GetText = staticmethod(original_display.GetText)
+        GetPrimaryPrecision2 = staticmethod(original_display.GetPrimaryPrecision2)
+
+        @property
+        def OffsetText(self):
+            return state.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            assert not state.read_only, "read-only proof wrote OffsetText"
+            events.append(("offset", value))
+            if (fault, value) not in (("reset-flag", False), ("shelf-flag", True)):
+                state.offset = value
+
+    display = AngularDisplay()
+    angle.GetSpecificAnnotation = lambda: display
+
+    def position(x, y, z):
+        assert not state.read_only, "read-only proof moved an annotation"
+        stage = "shelf" if state.offset is True else "arc"
+        state.stage = stage
+        events.append(("position", state.offset, (x, y, z)))
+        if fault == f"{stage}-setter":
+            return False
+        if fault == f"{stage}-ignored":
+            return True
+        if state.offset is False:
+            dx, dy = x - state.arc_xy[0], y - state.arc_xy[1]
+            state.geometry = tuple(
+                Segment(item.x0 + dx, item.y0 + dy, item.x1 + dx, item.y1 + dy, item.role)
+                for item in state.geometry
+            )
+            state.arc_xy = (x, y)
+        # Native GetPosition reports its display plane's Z=0.0005 even after
+        # SetPosition2(..., 0). Only finite XYZ and the exact XY contract apply.
+        state.position = (x, y, 0.0005)
+        return True
+
+    def read_position():
+        if state.bad_stage == state.stage:
+            return state.bad_position
+        return state.position
+
+    def rebuild():
+        assert not state.read_only, "read-only proof rebuilt drawing geometry"
+        events.append(("rebuild",))
+
+    angle.SetPosition2 = position
+    angle.GetPosition = read_position
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(EditRebuild3=rebuild),
+        _attempt=lambda operation: operation(),
+    )
+    return SimpleNamespace(
+        adapter=adapter, annotations=controls, angle=angle, display=display,
+        native_controls=tuple(native_controls), state=state,
+        fragments=fragments, events=events,
+    )
+
+
+def test_chamfer_shelf_moves_only_original_native_text_and_keeps_controls(monkeypatch):
+    scene = _chamfer_angle_scene(monkeypatch)
+    original_annotations = tuple(scene.annotations)
+    original_dimensions = scene.native_controls
+    original_names = tuple(item.FullName for item in original_dimensions)
+    drawing._verify_controls(scene.annotations)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    drawing._verify_controls(scene.annotations)
+    assert drawing.FRONT_KEEP["ChamferAngle"] == (0.124, 0.117)
+    assert drawing.CHAMFER_ANGLE_TEXT_XY == (0.137, 0.117)
+    assert scene.events == [
+        ("offset", False), ("position", False, (0.124, 0.117, 0.0)),
+        ("offset", True), ("position", True, (0.137, 0.117, 0.0)), ("rebuild",),
+    ]
+    assert scene.state.arc_xy == (0.124, 0.117)
+    assert scene.state.geometry == scene.fragments
+    assert scene.state.position == (0.137, 0.117, 0.0005)
+    assert all(actual is original for actual, original in zip(scene.annotations, original_annotations))
+    assert all(
+        actual.GetSpecificAnnotation().GetDimension2(0) is original
+        for actual, original in zip(scene.annotations, original_dimensions)
+    )
+    assert tuple(item.FullName for item in original_dimensions) == original_names
+    before = list(scene.events)
+    scene.state.read_only = True
+    drawing._verify_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.events == before
+
+
+@pytest.mark.parametrize(
+    "fault", ("reset-flag", "arc-setter", "arc-ignored", "shelf-setter", "shelf-flag", "shelf-ignored"),
+)
+def test_chamfer_shelf_refuses_native_noops_and_false_setters(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch, fault=fault)
+    with pytest.raises(RuntimeError):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    if fault.startswith("arc") or fault == "reset-flag":
+        assert ("offset", True) not in scene.events
+    if fault == "shelf-flag":
+        # An ignored True put leaves whole-annotation mode active. Refuse it
+        # rather than publishing geometry dragged into the proposed text lane.
+        assert scene.state.geometry != scene.fragments
+
+
+@pytest.mark.parametrize("stage", ("arc", "shelf"))
+@pytest.mark.parametrize(
+    "position",
+    (None, (), (0.137, 0.117), (0.137, 0.117, 0, 0),
+     (float("nan"), 0.117, 0.0005), (0.137, float("inf"), 0.0005),
+     (0.137, 0.117, float("nan")), ("0.137", 0.117, 0.0005),
+     (True, 0.117, 0.0005), (0.1371, 0.117, 0.0005)),
+)
+def test_chamfer_shelf_refuses_bad_native_position_arrays(monkeypatch, stage, position):
+    scene = _chamfer_angle_scene(monkeypatch)
+    scene.state.bad_stage, scene.state.bad_position = stage, position
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+
+
+@pytest.mark.parametrize("fault", ("missing", "duplicate", "renamed", "missing-display"))
+def test_chamfer_shelf_requires_one_original_imported_angular_annotation(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch)
+    if fault == "missing":
+        scene.annotations.remove(scene.angle)
+    elif fault == "duplicate":
+        scene.annotations.append(scene.angle)
+    elif fault == "renamed":
+        scene.angle.name = "UnrelatedAngle"
+    else:
+        scene.angle.GetSpecificAnnotation = lambda: None
+    with pytest.raises(RuntimeError):
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert not scene.events
+
+
+@pytest.mark.parametrize("member", ("GetPosition", "OffsetText"))
+def test_chamfer_shelf_preserves_native_getter_errors(monkeypatch, member):
+    scene = _chamfer_angle_scene(monkeypatch)
+    error = OSError(f"native {member} disconnected")
+
+    def fail():
+        raise error
+
+    if member == "GetPosition":
+        scene.angle.GetPosition = fail
+    else:
+        monkeypatch.setattr(type(scene.display), "OffsetText", property(lambda _self: fail(), lambda *_args: None))
+    with pytest.raises(OSError) as caught:
+        drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert caught.value is error
+
+
+@pytest.mark.parametrize("fault", ("offset-false", "truthy-offset", "text-drift"))
+def test_settled_chamfer_text_check_is_read_only_and_refuses_drift(monkeypatch, fault):
+    scene = _chamfer_angle_scene(monkeypatch)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    if fault == "offset-false":
+        scene.state.offset = False
+    elif fault == "truthy-offset":
+        scene.state.offset = 1
+    else:
+        scene.state.position = (0.1371, 0.117, 0.0005)
+    scene.state.read_only = True
+    before = list(scene.events)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._verify_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.events == before
+    assert scene.state.geometry == scene.fragments
+
+
+@pytest.mark.parametrize("shelf_x, qualifies", ((0.1275, False), (0.137, True)))
+def test_chamfer_shelf_budget_uses_whole_recorded_ink_and_neighbors(
+    monkeypatch, shelf_x, qualifies,
+):
+    """Predict text-only translation, NOT regenerated native/PDF acceptance."""
+    monkeypatch.setattr(drawing, "CHAMFER_ANGLE_TEXT_XY", (shelf_x, 0.117))
+    scene = _chamfer_angle_scene(monkeypatch)
+    drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
+    assert scene.state.geometry == scene.fragments
+    arcs = tuple(segment for raw in _CH_9BB_ANGLE_ARCS for segment in arc_segments(raw))
+    arrows = tuple(segment for raw in _CH_9BB_ANGLE_ARROWS for segment in arrowhead_segments(raw))
+    assert len(_CH_9BB_ANGLE_LINES) == 2 and len(arcs) >= 4 and len(arrows) == 6
+    assert max(max(item.x0, item.x1) for item in scene.fragments) == pytest.approx(0.1293085)
+    assert max(max(item.x0, item.x1) for item in arcs) == pytest.approx(0.1283085)
+    assert max(max(item.x0, item.x1) for item in arrows) > 0.1284
+    assert max(max(item.x0, item.x1) for item in arrows[3:]) > 0.1245
+    dx = scene.state.position[0] - 0.124
+    glyphs = Box(0.1205972 + dx, 0.1151558, 0.1273748 + dx, 0.1187211)
+    native_text_height = 0.0035  # GetTextHeightAtIndex, not the PDF's glyph height.
+    max_half_ink = 0.00035 / 2  # Include model 0.35 mm as well as dimension 0.13 mm.
+    actual_fragment_gap = min(segment_box_distance(item, glyphs) for item in scene.fragments) - max_half_ink
+    assert (actual_fragment_gap >= native_text_height) is qualifies
+    if not qualifies:
+        assert actual_fragment_gap < native_text_height
+        return
+    whole_ink_right = max(max(item.x0, item.x1) for item in scene.fragments)
+    conservative_paint_gap = glyphs.xmin - whole_ink_right - max_half_ink
+    assert conservative_paint_gap == pytest.approx(0.0041137)
+    assert conservative_paint_gap > native_text_height
+    # All adjacent native controls' PDF glyph rows, including BOTH full
+    # ChamferWidth explanatory lines and the supplier thread's qualifier.
+    neighbors = (
+        Box(0.0376377, 0.1844058, 0.0463483, 0.1879711),  # FinishedOverall
+        Box(0.1571706, 0.103712, 0.1787735, 0.1072773),  # ChamferWidth value
+        Box(0.1234882, 0.0981558, 0.2125071, 0.1017211),  # MIN row
+        Box(0.1207782, 0.0925995, 0.2153525, 0.0961648),  # MAX row
+        Box(0.1538924, 0.1778521, 0.1547272, 0.1823694),
+        Box(0.1604347, 0.1778521, 0.1781072, 0.1823694),
+        Box(0.1507211, 0.1731291, 0.1814563, 0.1767084),
+        Box(0.1285766, 0.1675728, 0.2036568, 0.1711381),
+        Box(0.016348, 0.0798005, 0.1309902, 0.0828565),
+        Box(0.016348, 0.0755365, 0.1432069, 0.0788565),
+        Box(0.01636, 0.0718005, 0.1233485, 0.0748565),
+    )
+    assert min(glyphs.gap(item) for item in neighbors) > native_text_height
+    neighbor_lines = (
+        Segment(0.099, 0.2604811, 0.041, 0.2604811),
+        Segment(0.116526, 0.1039811, 0.041, 0.1039811),
+        Segment(0.042, 0.2604811, 0.042, 0.1890281),
+        Segment(0.042, 0.1039811, 0.042, 0.1834719),
+        Segment(0.108763, 0.1052594, 0.108763, 0.0906656),
+        Segment(0.1064846, 0.1029811, 0.1064846, 0.0906656),
+        Segment(0.108763, 0.0916656, 0.2154785, 0.0916656),
+        Segment(0.108763, 0.0916656, 0.1064846, 0.0916656),
+        Segment(0.1064846, 0.0916656, 0.1001346, 0.0916656),
+        Segment(0.091237, 0.1435436, 0.091237, 0.1676389),
+        Segment(0.108763, 0.1435436, 0.108763, 0.1676389),
+        Segment(0.091237, 0.1666389, 0.108763, 0.1666389),
+        Segment(0.108763, 0.1666389, 0.203834, 0.1666389),
+    )
+    assert min(segment_box_distance(item, glyphs) for item in neighbor_lines) - max_half_ink > native_text_height
+
+
 def test_nut_thread_interference_literal_matches_the_specs():
     assert CHANNEL_ANCHOR_NUT_THREAD == pytest.approx(
         (
@@ -248,3 +640,2420 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
     low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert f"the {low:.2f} low limit" in entry.reason
     assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
+
+
+@pytest.mark.parametrize(
+    "target_orientation", ("*Front", "*Isometric"), ids=("front-a269", "iso-a06"),
+)
+@pytest.mark.parametrize(
+    "placement,fault",
+    (
+        ("old", None),
+        ("previous-whole-mm", None),
+        ("current", None),
+        ("current", "left-boundary"),
+        ("current", "bottom-boundary"),
+        ("current", "right-boundary"),
+        ("current", "top-boundary"),
+        ("current", "left"),
+        ("current", "bottom"),
+        ("current", "right"),
+        ("current", "top"),
+        ("current", "missing"),
+    ),
+)
+def test_finished_view_creation_fits_recorded_native_cell(
+    monkeypatch, tmp_path, target_orientation, placement, fault,
+):
+    """Replay recorded native boxes, not a new-leaf or printed-edge proof."""
+    native_cases = {
+        "*Front": (
+            "FRONT_CENTER", (0.100, 0.18625), (5.0, 1.0),
+            (
+                0.06266199906333915, 0.10143093577628477,
+                0.13733800093666088, 0.2710690642237152,
+            ),
+        ),
+        "*Isometric": (
+            "FINISHED_ISO_CENTER", (0.310, 0.213), (3.0, 1.0),
+            (
+                0.2872237893868808, 0.15867221871562523,
+                0.3327762106131192, 0.2673277812843747,
+            ),
+        ),
+    }
+    center_attribute, old_center, _recorded_scale, recorded_outline = native_cases[target_orientation]
+    finished_cell = (0.0127, 0.0651, 0.4191, 0.2667)
+    overflow = recorded_outline[3] - finished_cell[3]
+    whole_mm_shift = math.ceil(overflow * 1000) / 1000
+    assert whole_mm_shift == (0.005 if target_orientation == "*Front" else 0.001)
+    assert whole_mm_shift <= recorded_outline[1] - finished_cell[1]
+    if placement != "current":
+        shift = 0.0 if placement == "old" else whole_mm_shift - 0.001
+        monkeypatch.setattr(drawing, center_attribute, (old_center[0], old_center[1] - shift))
+
+    source_path = tmp_path / "anchor.SLDPRT"
+    source_path.touch()
+    monkeypatch.setattr(drawing, "SOURCE", source_path)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(purchased_drawing, "_early_bound", lambda value, _kind: value)
+    state = SimpleNamespace(sheet="FINISHED")
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        GetCurrentSheet=lambda: sheet, GetEditSheet=lambda: True,
+        ActiveDrawingView=None,
+    )
+    model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
+    adapter = SimpleNamespace(currentModel=model, _attempt=lambda operation: operation())
+    views, placements, refreshed, checked_cells = {}, [], [], []
+
+    def make_view(name, outline):
+        view = SimpleNamespace(
+            Name=name, outline=outline,
+            ReferencedConfiguration=(
+                drawing.SUPPLIER_STOCK_CONFIGURATION if name.startswith("stock-") else "Default"
+            ),
+        )
+        view.UpdateViewDisplayGeometry = lambda: refreshed.append(name)
+        view.GetOutline = lambda: view.outline
+        view.GetFirstDisplayDimension6 = lambda: None
+        view.GetAnnotations = lambda: ()
+        return view
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        _attribute, baseline_center, baseline_scale, baseline_outline = native_cases[orientation]
+        assert scale == baseline_scale
+        outline = tuple(
+            value + (x, y)[index % 2] - baseline_center[index % 2]
+            for index, value in enumerate(baseline_outline)
+        )
+        if orientation == target_orientation and fault not in (None, "missing"):
+            edge = fault.removesuffix("-boundary")
+            index = ("left", "bottom", "right", "top").index(edge)
+            values = list(outline)
+            values[index] = finished_cell[index] + (
+                0.0 if fault.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
+            )
+            outline = tuple(values)
+        view = make_view("finished-front" if orientation == "*Front" else "finished-iso", outline)
+        views[orientation] = view
+        model.ActiveDrawingView = view
+        return view
+
+    stock = make_view("stock-front", (0.110, 0.110, 0.190, 0.240))
+    stock_iso = make_view("stock-iso", (0.280, 0.180, 0.340, 0.240))
+
+    def iter_views(_adapter):
+        if state.sheet == "FINISHED":
+            return tuple(
+                view for orientation, view in views.items()
+                if fault != "missing" or orientation != target_orientation
+            )
+        return stock, stock_iso
+
+    def assert_fits(adapter, view, cell, *, label):
+        assert view.Name in refreshed
+        expected = (
+            finished_cell if state.sheet == "FINISHED"
+            else (0.0127, 0.094, 0.4191, 0.2577)
+        )
+        assert cell == pytest.approx(expected, rel=0, abs=1e-15)
+        checked_cells.append((view.Name, cell))
+        purchased_drawing.assert_supplier_view_fits(adapter, view, cell, label=label)
+
+    async def open_model(_path):
+        return {"success": True}
+
+    async def finalize(_adapter, _outputs, *, settled_checks, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        return {"layout": "contained"}
+
+    adapter.open_model = open_model
+    monkeypatch.setattr(drawing, "active_configuration_name", lambda *_args: "Default")
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (model, sheet))
+    for name in (
+        "check", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
+        "_verify_controls", "_verify_supplier_references", "_verify_source_state",
+        "_place_chamfer_angle_text", "_verify_chamfer_angle_text",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "read_required_properties", lambda _model, names, **_kwargs: _source_properties(names),
+    )
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda _adapter, name, x, y, **_kwargs: _note_double(
+            drawing.property_link(name), _source_properties((name,))[name], x, y,
+        ),
+    )
+    monkeypatch.setattr(drawing, "curate_view_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(drawing, "_supplier_references", lambda *_args: [])
+    monkeypatch.setattr(
+        drawing, "_supplier_stock_sheet",
+        lambda *_args: (stock, stock_iso, [], _stock_note_contracts(drawing)),
+    )
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "iter_views", iter_views)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+
+    if placement != "current" or fault in ("left", "bottom", "right", "top", "missing"):
+        message = "view disappeared" if fault == "missing" else "view leaves its cell"
+        with pytest.raises(RuntimeError, match=message):
+            asyncio.run(drawing.build(adapter))
+        return
+
+    assert asyncio.run(drawing.build(adapter)) == {"layout": "contained"}
+    assert placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+    ]
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.203)
+    assert drawing.STOCK_CENTER == (0.150, 0.1755)
+    assert drawing.FRONT_KEEP == {
+        "FinishedOverall": (0.042, 0.18625),
+        "ChamferWidth": (0.168, 0.100),
+        "ChamferAngle": (0.124, 0.117),
+    }
+    expected_outline = [
+        value - (whole_mm_shift if index % 2 else 0)
+        for index, value in enumerate(recorded_outline)
+    ]
+    if fault is not None:
+        index = ("left", "bottom", "right", "top").index(fault.removesuffix("-boundary"))
+        expected_outline[index] = finished_cell[index]
+    actual_outline = views[target_orientation].outline
+    assert actual_outline == pytest.approx(expected_outline, rel=0, abs=1e-15)
+    if target_orientation == "*Isometric" and fault is None:
+        assert (
+            actual_outline[0] - finished_cell[0],
+            actual_outline[1] - finished_cell[1],
+            finished_cell[2] - actual_outline[2],
+            finished_cell[3] - actual_outline[3],
+        ) == pytest.approx(
+            (0.2745237893868808, 0.09257221871562523, 0.0863237893868808, 0.0003722187156253),
+            rel=0, abs=1e-15,
+        )
+    assert [name for name, _cell in checked_cells] == [
+        "finished-front", "finished-iso", "stock-front", "stock-iso",
+    ]
+
+
+def _settled_eye_scene(monkeypatch, module):
+    """Model fresh geometry while retaining only stable native annotation identity."""
+    monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(module, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    state = SimpleNamespace(sheet="FINISHED", saved=False)
+    native_sheet = SimpleNamespace(GetName=lambda: state.sheet)
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        ActiveDrawingView=None, GetEditSheet=lambda: True,
+        GetType=lambda: 3,
+        GetPathName=lambda: str(module.OUTPUTS.slddrw.resolve()) if state.saved else "",
+        GetCurrentSheet=lambda: native_sheet,
+        GetTitle=lambda: {
+            "FINISHED": "opaque drawing window / first # 71",
+            "SUPPLIER-STOCK": "opaque drawing window / second # 24",
+        }[state.sheet],
+    )
+    model.ActivateView = lambda _name: setattr(model, "ActiveDrawingView", None) or False
+    owner = SimpleNamespace(Name="Wire")
+    source = SimpleNamespace(
+        GetPathName=lambda: str(module.SOURCE.resolve()).upper().replace("/", "\\"),
+        FeatureByName=lambda name: owner if name == "Wire" else None,
+    )
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
+    adapter.swApp.ActiveDoc = model
+    adapter.swApp.GetOpenDocumentByName = lambda _path: adapter.currentModel
+    supplier = anchor if module is drawing else module._SUPPLIER_ANCHOR
+    surface = SimpleNamespace(
+        IsTorus=lambda: True,
+        TorusParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                     supplier.eye_mean_radius_mm / 1000, supplier.wire_dia_mm / 2000),
+    )
+    face = SimpleNamespace(GetSurface=lambda: surface, GetFeature=lambda: owner)
+    drawing_owner = SimpleNamespace(Name="Wire")
+    drawing_surface = SimpleNamespace(
+        IsTorus=lambda: True, TorusParams=surface.TorusParams,
+    )
+    mapped_faces, mapping_calls = {}, []
+
+    def corresponding_entity(drawing_face):
+        mapping_calls.append(drawing_face)
+        return mapped_faces.get(id(drawing_face))
+
+    source.Extension = SimpleNamespace(GetCorrespondingEntity2=corresponding_entity)
+    views, refs_by_sheet, contracts, annotations, contours = {}, {}, {}, {}, {}
+    display_lists, native_dimensions = {}, {}
+    diameters = spec.SUPPLIER_EYE_MM if module is drawing else {"EyeID": module.SUPPLIER_EYE_ID_MM}
+
+    def contour(diameter, attached_face=face):
+        source_face = attached_face
+        attached_face = SimpleNamespace(
+            GetFeature=lambda: drawing_owner, GetSurface=lambda: drawing_surface,
+        )
+        mapped_faces[id(attached_face)] = source_face
+        curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(0.0, 0.0, 0.0, 0.0, 0.0, 1.0, diameter / 2000),
+        )
+        return SimpleNamespace(
+            GetCurve=lambda: curve, GetFace=lambda: attached_face,
+            GetView=lambda: views["FINISHED"],
+        )
+
+    contours.update({name: contour(diameter) for name, diameter in diameters.items()})
+    stock_names = (
+        ("SupplierStockThread", "SupplierStockShank", "SupplierStockOverall")
+        if module is drawing else
+        ("SupplierNominalEyeOD", "SupplierNominalWire", "SupplierStockShank", "SupplierStockOverall")
+    )
+    for sheet, names, configuration in (
+        ("FINISHED", (*diameters, "SupplierThreadMajor"), "Default"),
+        ("SUPPLIER-STOCK", stock_names, module.SUPPLIER_STOCK_CONFIGURATION),
+    ):
+        displays, refs = [], []
+        for name in names:
+            feature = (
+                "native-eye" if name in contours else
+                module.SUPPLIER_THREAD_FEATURE if name == "SupplierThreadMajor" else
+                module.SUPPLIER_STOCK_FEATURE
+            )
+            key = f"{name}@{feature}@anchor.SLDPRT"
+            native = SimpleNamespace(FullName=key, Tolerance=SimpleNamespace(Type=0), DrivenState=1)
+            annotation = SimpleNamespace(
+                entities=[contours[name]] if name in contours else [],
+                kinds=[46] if name in contours else [], IsDangling=lambda: False,
+                GetType=lambda: 4, OwnerType=0,
+            )
+            annotation.GetAttachedEntities3 = lambda annotation=annotation: tuple(annotation.entities)
+            annotation.GetAttachedEntityTypes = lambda annotation=annotation: tuple(annotation.kinds)
+            annotation.GetAttachedEntityCount3 = lambda annotation=annotation: len(annotation.entities)
+            annotations[name] = annotation
+            display = SimpleNamespace(
+                GetDimension2=lambda _index, native=native: native,
+                GetAnnotation=lambda annotation=annotation: annotation,
+            )
+            annotation.GetSpecificAnnotation = lambda display=display: display
+            displays.append(display)
+            native_dimensions[name] = native
+            refs.append((key, {"label": name, "expected_mm": diameters.get(name, 1.0)}))
+        if sheet == "FINISHED":
+            for name in module.FRONT_KEEP:
+                native = SimpleNamespace(FullName=f"{name}@control@anchor.SLDPRT")
+                annotation = SimpleNamespace(GetType=lambda: 4, OwnerType=0)
+                display = SimpleNamespace(
+                    GetDimension2=lambda _index, native=native: native,
+                    GetAnnotation=lambda annotation=annotation: annotation,
+                )
+                annotation.GetSpecificAnnotation = lambda display=display: display
+                displays.append(display)
+        for index, display in enumerate(displays):
+            following = displays[index + 1] if index + 1 < len(displays) else None
+            display.GetNext5 = lambda following=following: following
+        view = SimpleNamespace(
+            Name=f"{sheet}-front", ReferencedConfiguration=configuration,
+            ReferencedDocument=source,
+            GetCorrespondingEntity=lambda _face: None,
+            UpdateViewDisplayGeometry=lambda: pytest.fail("geometry-read-only verifier refreshed a view"),
+            GetFirstDisplayDimension6=lambda displays=displays: displays[0],
+        )
+        views[sheet], refs_by_sheet[sheet] = view, refs
+        display_lists[sheet] = displays
+        for display in displays:
+            display.GetAnnotation().Owner = view
+        view.GetAnnotations = lambda displays=displays: tuple(
+            display.GetAnnotation() for display in displays
+        )
+        contracts[sheet] = ((view.Name,), configuration)
+    monkeypatch.setattr(module, "iter_views", lambda _adapter: (views[state.sheet],))
+    monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.Name)
+    if module is drawing:
+        monkeypatch.setattr(
+            module, "visible_view_entities",
+            lambda *_args, **_kwargs: pytest.fail("settled proof must not rescan visible contours"),
+        )
+    return SimpleNamespace(
+        adapter=adapter, refs=refs_by_sheet, contracts=contracts, contours=contours,
+        annotations=annotations, views=views, source=source, owner=owner,
+        face=face, surface=surface, contour=contour, diameters=diameters, state=state,
+        drawing_owner=drawing_owner, drawing_surface=drawing_surface,
+        mapped_faces=mapped_faces, mapping_calls=mapping_calls,
+        display_lists=display_lists, native_dimensions=native_dimensions,
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (
+        None, "missing", "duplicate", "foreign-annotation", "foreign-owner",
+        "sheet-owner", "missing-owner", "foreign-view", "renamed-view",
+        "foreign-source", "missing-source", "source-config", "stock-config",
+        "source-path", "foreign-drawing", "output-path", "unsaved-path",
+        "relative-path", "document-type", "annotation-type", "missing-display",
+        "foreign-display", "foreign-returned-annotation", "empty-key", "duplicate-key",
+        "incomplete-snapshot", "missing-drawing", "foreign-active-document",
+        "missing-open-document", "duplicate-view", "changed-contract-config",
+        "cross-sheet-duplicate-key",
+    ),
+)
+def test_channel_saved_keys_require_original_native_annotation_and_binding(monkeypatch, fault):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    original_refs = {sheet: list(refs) for sheet, refs in scene.refs.items()}
+    model, front = scene.adapter.currentModel, scene.views["FINISHED"]
+    annotation = scene.annotations["EyeOD"]
+    scene.state.saved = True
+    scene.native_dimensions["EyeOD"].FullName = "opaque saved key / OD !"
+    scene.native_dimensions["EyeID"].FullName = "another actual saved key / ID !"
+    actual_annotations = tuple(front.GetAnnotations())
+    if fault == "missing":
+        front.GetAnnotations = lambda: tuple(item for item in actual_annotations if item is not annotation)
+    elif fault == "duplicate":
+        front.GetAnnotations = lambda: (*actual_annotations, annotation)
+    elif fault == "foreign-annotation":
+        foreign = SimpleNamespace(**vars(annotation))
+        front.GetAnnotations = lambda: tuple(foreign if item is annotation else item for item in actual_annotations)
+    elif fault == "foreign-owner":
+        annotation.Owner = SimpleNamespace(**vars(front))
+    elif fault == "sheet-owner":
+        annotation.OwnerType = 1
+    elif fault == "missing-owner":
+        annotation.Owner = None
+    elif fault == "foreign-view":
+        scene.views["FINISHED"] = SimpleNamespace(**vars(front))
+    elif fault == "renamed-view":
+        front.Name = "different-view"
+    elif fault == "foreign-source":
+        front.ReferencedDocument = SimpleNamespace(**vars(scene.source))
+    elif fault == "missing-source":
+        front.ReferencedDocument = None
+    elif fault == "source-config":
+        front.ReferencedConfiguration = drawing.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "stock-config":
+        scene.views["SUPPLIER-STOCK"].ReferencedConfiguration = "Default"
+    elif fault == "source-path":
+        scene.source.GetPathName = lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT")
+    elif fault == "foreign-drawing":
+        foreign = SimpleNamespace(**vars(model))
+        scene.adapter.currentModel = foreign
+        scene.adapter.swApp.ActiveDoc = foreign
+    elif fault == "missing-drawing":
+        scene.adapter.currentModel = None
+    elif fault == "foreign-active-document":
+        scene.adapter.swApp.ActiveDoc = SimpleNamespace(**vars(model))
+    elif fault == "missing-open-document":
+        scene.adapter.swApp.GetOpenDocumentByName = lambda _path: None
+    elif fault == "duplicate-view":
+        monkeypatch.setattr(
+            drawing, "iter_views", lambda _adapter: (scene.views[scene.state.sheet],) * 2,
+        )
+    elif fault == "changed-contract-config":
+        front.ReferencedConfiguration = "ChangedConfiguration"
+        scene.contracts["FINISHED"] = (scene.contracts["FINISHED"][0], "ChangedConfiguration")
+    elif fault == "output-path":
+        model.GetPathName = lambda: str(drawing.OUTPUTS.slddrw.parent / "foreign.SLDDRW")
+    elif fault == "unsaved-path":
+        model.GetPathName = lambda: ""
+    elif fault == "relative-path":
+        model.GetPathName = lambda: drawing.OUTPUTS.slddrw.name
+    elif fault == "document-type":
+        model.GetType = lambda: 1
+    elif fault == "annotation-type":
+        annotation.GetType = lambda: 6
+    elif fault == "missing-display":
+        annotation.GetSpecificAnnotation = lambda: None
+    elif fault == "foreign-display":
+        annotation.GetSpecificAnnotation = lambda: scene.annotations["EyeID"].GetSpecificAnnotation()
+    elif fault == "foreign-returned-annotation":
+        annotation.GetSpecificAnnotation().GetAnnotation = lambda: scene.annotations["EyeID"]
+    elif fault == "empty-key":
+        scene.native_dimensions["EyeOD"].FullName = ""
+    elif fault == "duplicate-key":
+        scene.native_dimensions["EyeOD"].FullName = scene.native_dimensions["EyeID"].FullName
+    elif fault == "cross-sheet-duplicate-key":
+        scene.native_dimensions["EyeOD"].FullName = scene.native_dimensions["SupplierStockThread"].FullName
+    elif fault == "incomplete-snapshot":
+        prior = prior[:-1]
+    if fault is not None:
+        with pytest.raises(RuntimeError):
+            drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+        assert scene.refs == original_refs
+        return
+    # No relaxed old-key verifier: the pre-save FullName keys still refuse.
+    with pytest.raises(RuntimeError, match="supplier dimension disappeared"):
+        drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    captured = drawing._capture_saved_supplier_references(
+        scene.adapter, scene.refs, scene.contracts, prior,
+    )
+    assert len(drawing._verify_supplier_references(scene.adapter, captured, scene.contracts)) == 6
+    assert [key for key, contract in captured["FINISHED"] if contract["label"] in drawing.SUPPLIER_EYE_MM] == [
+        "opaque saved key / OD !", "another actual saved key / ID !",
+    ]
+    assert scene.refs == original_refs
+    assert captured is not scene.refs
+
+
+@pytest.mark.parametrize("identity", ("annotation", "view", "source", "drawing", "display"))
+@pytest.mark.parametrize("state", (0, -1, 2, True, 1.0, "1", None))
+def test_channel_saved_identity_requires_exact_native_integer_equality(monkeypatch, identity, state):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    target = {
+        "annotation": scene.annotations["EyeOD"],
+        "view": scene.views["FINISHED"],
+        "source": scene.source,
+        "drawing": scene.adapter.currentModel,
+        "display": scene.annotations["EyeOD"].GetSpecificAnnotation(),
+    }[identity]
+    scene.adapter.swApp.IsSame = lambda left, right: (
+        state if left is target and right is target else int(left is right)
+    )
+    with pytest.raises(RuntimeError):
+        drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+
+
+@pytest.mark.parametrize("member", ("document-path", "source-path", "annotations", "specific", "annotation-type"))
+def test_channel_saved_metadata_errors_refuse_without_best_effort_acceptance(monkeypatch, member):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    error = OSError(f"native metadata disconnected: {member}")
+
+    def failed():
+        raise error
+
+    target, name = {
+        "document-path": (scene.adapter.currentModel, "GetPathName"),
+        "source-path": (scene.source, "GetPathName"),
+        "annotations": (scene.views["FINISHED"], "GetAnnotations"),
+        "specific": (scene.annotations["EyeOD"], "GetSpecificAnnotation"),
+        "annotation-type": (scene.annotations["EyeOD"], "GetType"),
+    }[member]
+    setattr(target, name, failed)
+    with pytest.raises(OSError) as caught:
+        drawing._capture_saved_supplier_references(scene.adapter, scene.refs, scene.contracts, prior)
+    assert caught.value is error
+
+
+def test_channel_saved_capture_uses_native_identity_not_python_wrappers(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    prior = drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    scene.state.saved = True
+    front = scene.views["FINISHED"]
+    original = scene.annotations["EyeOD"]
+    wrapped_view, wrapped_source = SimpleNamespace(**vars(front)), SimpleNamespace(**vars(scene.source))
+    wrapped_annotation = SimpleNamespace(**vars(original))
+    wrapped_view.ReferencedDocument = wrapped_source
+    wrapped_annotation.Owner = wrapped_view
+    annotations = tuple(front.GetAnnotations())
+    wrapped_view.GetAnnotations = lambda: tuple(
+        wrapped_annotation if item is original else item for item in annotations
+    )
+    original.GetSpecificAnnotation().GetAnnotation = lambda: wrapped_annotation
+    scene.views["FINISHED"] = wrapped_view
+    aliases = {id(wrapped_view): id(front), id(wrapped_source): id(scene.source), id(wrapped_annotation): id(original)}
+    scene.adapter.swApp.IsSame = lambda left, right: int(
+        aliases.get(id(left), id(left)) == aliases.get(id(right), id(right))
+    )
+    scene.native_dimensions["EyeOD"].FullName = "actual wrapper-independent native key"
+    captured = drawing._capture_saved_supplier_references(
+        scene.adapter, scene.refs, scene.contracts, prior,
+    )
+    assert len(drawing._verify_supplier_references(scene.adapter, captured, scene.contracts)) == 6
+    assert captured["FINISHED"][0][0] == "actual wrapper-independent native key"
+
+
+@pytest.mark.parametrize("face_context", ("drawing-proxy", "source-face"))
+@pytest.mark.parametrize(
+    "mapping", ("authoritative", "missing-extension", "unmapped", "foreign-owner", "wrong-sourcepart"),
+)
+def test_channel_eye_requires_mapping_into_the_authoritative_source_part(
+    monkeypatch, face_context, mapping,
+):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    front, eye = scene.views["FINISHED"], scene.contours["EyeID"]
+    drawing_face = eye.GetFace()
+    assert drawing_face.GetFeature().Name == scene.owner.Name == "Wire"
+    assert scene.adapter.swApp.IsSame(drawing_face.GetFeature(), scene.owner) == 0
+    if face_context == "source-face":
+        # Even an apparently authoritative direct face cannot bypass mapping.
+        drawing_face = scene.face
+        eye.GetFace = lambda: drawing_face
+        scene.mapped_faces[id(drawing_face)] = scene.face
+    if mapping == "missing-extension":
+        scene.source.Extension = None
+    elif mapping == "unmapped":
+        scene.mapped_faces.clear()
+    elif mapping == "foreign-owner":
+        foreign_owner = SimpleNamespace(Name="Wire")
+        scene.mapped_faces[id(drawing_face)] = SimpleNamespace(
+            GetFeature=lambda: foreign_owner, GetSurface=lambda: scene.surface,
+        )
+    elif mapping == "wrong-sourcepart":
+        foreign_owner = SimpleNamespace(Name="Wire")
+        foreign_face = SimpleNamespace(
+            GetFeature=lambda: foreign_owner, GetSurface=lambda: scene.surface,
+        )
+        front.ReferencedDocument = SimpleNamespace(
+            GetPathName=lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT"),
+            FeatureByName=lambda _name: foreign_owner,
+            Extension=SimpleNamespace(GetCorrespondingEntity2=lambda _face: foreign_face),
+        )
+    result = drawing._supplier_eye_circle(scene.adapter, front, eye, scene.contracts["FINISHED"][1])
+    if mapping == "authoritative":
+        assert result == eye.GetCurve().CircleParams
+    else:
+        assert result is None
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize(
+    "fault", (None, "missing-curve", "stale-curve", "noncircle", "short-circle",
+              "nan-circle", "infinite-circle", "wrong-center", "wrong-normal",
+              "missing-face", "missing-surface", "nontorus", "short-torus",
+              "nan-torus", "infinite-torus", "bend-torus", "wrong-wire",
+              "wrong-torus-center", "wrong-torus-normal", "foreign-feature",
+              "missing-feature", "missing-owner", "not-same", "wrong-path", "wrong-view"),
+)
+def test_supplier_eye_proves_authoritative_wire_and_torus(monkeypatch, module, fault):
+    scene = _settled_eye_scene(monkeypatch, module)
+    eye = scene.contours["EyeID"]
+    curve = eye.GetCurve()
+    if fault == "missing-curve":
+        eye.GetCurve = lambda: None
+    elif fault == "stale-curve":
+        def stale():
+            raise RuntimeError("disconnected native curve")
+        eye.GetCurve = stale
+    elif fault == "noncircle":
+        curve.IsCircle = lambda: False
+    elif fault == "short-circle":
+        curve.CircleParams = curve.CircleParams[:-1]
+    elif fault in ("nan-circle", "infinite-circle", "wrong-center", "wrong-normal"):
+        values = list(curve.CircleParams)
+        index = 5 if fault == "wrong-normal" else 0
+        values[index] = {"nan-circle": math.nan, "infinite-circle": math.inf,
+                         "wrong-center": 2e-8, "wrong-normal": 0.5}[fault]
+        curve.CircleParams = tuple(values)
+    elif fault == "missing-face":
+        eye.GetFace = lambda: None
+    elif fault == "missing-surface":
+        scene.face.GetSurface = lambda: None
+    elif fault == "nontorus":
+        scene.surface.IsTorus = lambda: False
+    elif fault == "short-torus":
+        scene.surface.TorusParams = scene.surface.TorusParams[:-1]
+    elif fault in ("nan-torus", "infinite-torus", "bend-torus", "wrong-wire",
+                   "wrong-torus-center", "wrong-torus-normal"):
+        values = list(scene.surface.TorusParams)
+        index = {"nan-torus": 6, "infinite-torus": 7, "bend-torus": 6, "wrong-wire": 7,
+                 "wrong-torus-center": 0, "wrong-torus-normal": 5}[fault]
+        values[index] = (
+            math.nan if fault == "nan-torus" else math.inf if fault == "infinite-torus"
+            else values[index] + 1e-4
+        )
+        scene.surface.TorusParams = tuple(values)
+    elif fault == "foreign-feature":
+        # The impostor is visible and has exactly the right circle and torus.
+        scene.face.GetFeature = lambda: SimpleNamespace(Name="Wire")
+    elif fault == "missing-feature":
+        scene.source.FeatureByName = lambda _name: None
+    elif fault == "missing-owner":
+        scene.face.GetFeature = lambda: None
+    elif fault == "not-same":
+        scene.adapter.swApp.IsSame = lambda *_args: 0
+    elif fault == "wrong-path":
+        scene.source.GetPathName = lambda: "D:/unrelated/anchor.SLDPRT"
+    elif fault == "wrong-view":
+        eye.GetView = lambda: SimpleNamespace(Name="unrelated-front")
+    if fault == "stale-curve":
+        with pytest.raises(RuntimeError, match="disconnected native curve"):
+            module._supplier_eye_circle(
+                scene.adapter, scene.views["FINISHED"], eye, scene.contracts["FINISHED"][1],
+            )
+        return
+    result = module._supplier_eye_circle(
+        scene.adapter, scene.views["FINISHED"], eye, scene.contracts["FINISHED"][1],
+    )
+    if fault is None:
+        assert result == curve.CircleParams
+    else:
+        assert result is None
+
+
+@pytest.mark.parametrize(
+    "module,label", ((drawing, "EyeOD"), (drawing, "EyeID"), (boss_drawing, "EyeID")),
+)
+@pytest.mark.parametrize(
+    "fault", (None, "outer", "foreign-visible", "circle-gap", "missing", "null", "extra", "wrong-type",
+              "wrong-configuration", "wrong-view", "dangling", "count-mismatch",
+              "wrong-path", "missing-dimension", "extra-dimension"),
+)
+def test_settled_eye_reacquires_physical_owner_without_old_handles(monkeypatch, module, label, fault):
+    scene = _settled_eye_scene(monkeypatch, module)
+    annotation = scene.annotations[label]
+    if fault == "outer":
+        wrong_diameter = (
+            scene.diameters["EyeID" if label == "EyeOD" else "EyeOD"]
+            if module is drawing else module._SUPPLIER_ANCHOR.eye_od_mm
+        )
+        annotation.entities = [scene.contour(wrong_diameter)]
+    elif fault == "foreign-visible":
+        foreign_face = SimpleNamespace(
+            GetSurface=lambda: scene.surface,
+            GetFeature=lambda: SimpleNamespace(Name="Wire"),
+        )
+        annotation.entities = [scene.contour(scene.diameters[label], foreign_face)]
+    elif fault == "circle-gap":
+        replacement = scene.contour(scene.diameters[label])
+        replacement.GetCurve().IsCircle = lambda: False
+        annotation.entities = [replacement]
+    elif fault == "missing":
+        annotation.entities = []
+    elif fault == "null":
+        annotation.entities = [None]
+    elif fault == "extra":
+        annotation.entities *= 2
+    elif fault == "wrong-type":
+        annotation.kinds = [1]
+    elif fault == "wrong-configuration":
+        scene.views["FINISHED"].ReferencedConfiguration = module.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "wrong-view":
+        scene.contours[label].GetView = lambda: SimpleNamespace(Name="other-view")
+    elif fault == "dangling":
+        annotation.IsDangling = lambda: True
+    elif fault == "count-mismatch":
+        annotation.GetAttachedEntityCount3 = lambda: 2
+    elif fault == "wrong-path":
+        scene.source.GetPathName = lambda: "D:/foreign.SLDPRT"
+    elif fault == "missing-dimension":
+        first = scene.views["FINISHED"].GetFirstDisplayDimension6()
+        first.GetDimension2(0).FullName = "lost@other@anchor.SLDPRT"
+    elif fault == "extra-dimension":
+        first = scene.views["FINISHED"].GetFirstDisplayDimension6()
+        extra = SimpleNamespace(
+            GetDimension2=lambda _index: SimpleNamespace(FullName="Unexpected@owner@anchor.SLDPRT"),
+            GetNext5=lambda: first,
+        )
+        scene.views["FINISHED"].GetFirstDisplayDimension6 = lambda: extra
+    if fault is None:
+        # A rebuild invalidates the old face, but replaces it with a fresh Wire face.
+        old_face = scene.face
+        old_face.GetFeature = lambda: pytest.fail("dereferenced obsolete pre-rebuild face")
+        fresh_face = SimpleNamespace(GetSurface=lambda: scene.surface, GetFeature=lambda: scene.owner)
+        for name, diameter in scene.diameters.items():
+            scene.annotations[name].entities = [scene.contour(diameter, fresh_face)]
+        for old_contour in scene.contours.values():
+            old_contour.GetCurve = lambda: pytest.fail("dereferenced obsolete pre-rebuild contour")
+        module._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+    else:
+        with pytest.raises(RuntimeError):
+            module._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize(
+    "drift", (None, "foreign-feature", "wrong-torus", "wrong-circle",
+              "lost-imported-control", "changed-imported-control",
+              "pdf-key", "close-key", "pdf-circle", "close-circle",
+              "pdf-owner", "close-source", "pdf-output-path"),
+)
+@pytest.mark.parametrize("close_entry", ("FINISHED", "SUPPLIER-STOCK"))
+def test_build_retains_controls_and_refuses_native_save_physical_drift(
+    monkeypatch, tmp_path, module, drift, close_entry,
+):
+    """Execute the real build and its supplied finalizer callbacks, not extracted AST."""
+    source_path = tmp_path / "anchor.SLDPRT"
+    source_path.touch()
+    monkeypatch.setattr(module, "SOURCE", source_path)
+    scene = _settled_eye_scene(monkeypatch, module)
+    source = scene.source
+    front, stock = scene.views["FINISHED"], scene.views["SUPPLIER-STOCK"]
+    iso = SimpleNamespace(
+        Name="finished-iso", ReferencedConfiguration="Default", ReferencedDocument=source,
+        GetAnnotations=lambda: (),
+    )
+    stock_iso = SimpleNamespace(
+        Name="stock-iso", ReferencedConfiguration=module.SUPPLIER_STOCK_CONFIGURATION,
+        ReferencedDocument=source, GetAnnotations=lambda: (),
+    )
+    model = scene.adapter.currentModel
+    stock_scene = (
+        _supplier_stock_profile_scene(
+            monkeypatch, tmp_path, scene.adapter, source, stock, model, scene.state,
+        ) if module is boss_drawing else None
+    )
+
+    def refresh_finished_view():
+        if scene.state.saved:
+            pytest.fail("saved physical-eye observer refreshed a view")
+
+    front.UpdateViewDisplayGeometry = iso.UpdateViewDisplayGeometry = refresh_finished_view
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    imported_controls = []
+    for name, (nominal, lower, upper) in module.EXPECTED_CONTROLS.items():
+        dimension = SimpleNamespace(
+            Name=name, DrivenState=2, SystemValue=nominal,
+            Tolerance=SimpleNamespace(
+                Type=module.DIMENSION_TOLERANCE_TYPES[name],
+                GetMinValue=lambda lower=lower: lower,
+                GetMaxValue=lambda upper=upper: upper,
+            ),
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, dimension=dimension: dimension,
+            GetText=lambda _index: "",
+            GetPrimaryPrecision2=lambda name=name: module.DIMENSION_PRECISION[name],
+        )
+        imported_controls.append(SimpleNamespace(
+            name=name, dimension=dimension,
+            GetSpecificAnnotation=lambda display=display: display,
+        ))
+    presentation_calls = []
+    if module is drawing:
+        def place_chamfer(native_adapter, annotations):
+            assert native_adapter is scene.adapter
+            assert annotations is imported_controls
+            assert not scene.state.saved
+            presentation_calls.append("place")
+
+        def verify_chamfer(native_adapter, annotations):
+            assert native_adapter is scene.adapter
+            assert annotations is imported_controls
+            assert not scene.state.saved
+            presentation_calls.append("settled")
+
+        monkeypatch.setattr(module, "_place_chamfer_angle_text", place_chamfer)
+        monkeypatch.setattr(module, "_verify_chamfer_angle_text", verify_chamfer)
+
+    async def open_model(_path):
+        scene.adapter.currentModel = source
+        return {"success": True}
+
+    def new_drawing(*_args, **_kwargs):
+        if module is boss_drawing:
+            assert stock_scene.capture_calls == ["Default"]
+        scene.adapter.currentModel = model
+        return model, object()
+
+    monkeypatch.setattr(scene.adapter, "open_model", open_model, raising=False)
+    monkeypatch.setattr(module, "check", lambda *_args: None)
+    if module is drawing:
+        monkeypatch.setattr(module, "active_configuration_name", lambda *_args: "Default")
+    monkeypatch.setattr(module, "new_project_drawing", new_drawing)
+    for name in ("create_blank_drawing_sheets", "stamp_drawing_summary",
+                 "set_dimension_precision", "set_dimension_callouts",
+                 "set_hidden_lines_removed", "_verify_supplier_layout", "_verify_source_state"):
+        monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        module, "read_required_properties", lambda _model, names, **_kwargs: _source_properties(names),
+    )
+    monkeypatch.setattr(
+        module, "add_property_linked_note",
+        lambda _adapter, name, x, y, **_kwargs: _note_double(
+            module.property_link(name), _source_properties((name,))[name], x, y,
+        ),
+    )
+    monkeypatch.setattr(module, "curate_view_dimensions", lambda *_args, **_kwargs: imported_controls)
+    monkeypatch.setattr(module, "place_view", lambda _adapter, _path, orientation, *_args, **_kwargs:
+                        front if orientation == "*Front" else iso)
+    def supplier_references(*_args):
+        assert _args[2] == scene.contracts["FINISHED"][1]
+        if drift == "lost-imported-control":
+            imported_controls.pop()
+        elif drift == "changed-imported-control":
+            imported_controls[0].dimension.SystemValue += 0.001
+        return scene.refs["FINISHED"]
+
+    monkeypatch.setattr(module, "_supplier_references", supplier_references)
+    if module is drawing:
+        monkeypatch.setattr(module, "_supplier_stock_sheet", lambda *_args:
+                            (stock, stock_iso, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)))
+        monkeypatch.setattr(module, "iter_views", lambda _adapter:
+                            (front, iso) if scene.state.sheet == "FINISHED" else (stock, stock_iso))
+    else:
+        def supplier_stock_diagram(stock_adapter, source_model, capture):
+            assert stock_adapter is scene.adapter
+            assert source_model is source
+            assert capture is stock_scene.capture
+            profile = module._blacken_supplier_stock_profile(stock_adapter, stock, source_model, capture)
+            return stock, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module), profile
+
+        monkeypatch.setattr(module, "_supplier_stock_diagram", supplier_stock_diagram)
+        monkeypatch.setattr(module, "iter_views", lambda _adapter:
+                            (front, iso) if scene.state.sheet == "FINISHED" else (stock,))
+    saved = []
+    close_calls = []
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        observations_before_save = len(scene.mapping_calls)
+        sheet_before_save = scene.state.sheet
+        checkpoint("before_drawing_save")
+        assert len(scene.mapping_calls) == observations_before_save
+        assert scene.state.sheet == sheet_before_save
+        saved.append("native-save")
+        scene.state.saved = True
+        # Actual native FullName strings are deliberately opaque for physical
+        # dimensions; only original annotation identity may associate them.
+        for index, name in enumerate(scene.diameters):
+            scene.native_dimensions[name].FullName = f"saved-native-key-{index}!"
+        fresh_surface = SimpleNamespace(
+            IsTorus=lambda: True, TorusParams=scene.surface.TorusParams,
+        )
+        fresh_owner = (
+            SimpleNamespace(Name="Wire") if drift == "foreign-feature" else scene.owner
+        )
+        fresh_face = SimpleNamespace(
+            GetSurface=lambda: fresh_surface, GetFeature=lambda: fresh_owner,
+        )
+        if drift == "wrong-torus":
+            values = list(fresh_surface.TorusParams)
+            values[6] += 0.001
+            fresh_surface.TorusParams = tuple(values)
+        for name, diameter in scene.diameters.items():
+            replacement = scene.contour(diameter, fresh_face)
+            if drift == "wrong-circle" and name == "EyeID":
+                values = list(replacement.GetCurve().CircleParams)
+                values[6] += 0.001
+                replacement.GetCurve().CircleParams = tuple(values)
+            scene.annotations[name].entities = [replacement]
+        scene.face.GetFeature = lambda: pytest.fail("read pre-save source face")
+        for old_contour in scene.contours.values():
+            old_contour.GetCurve = lambda: pytest.fail("read pre-save contour")
+
+        def unexpected_mutation(*_args):
+            pytest.fail("native-save observer mutated geometry or source configuration")
+
+        model.EditRebuild3 = unexpected_mutation
+        model.ForceRebuild3 = unexpected_mutation
+        source.ShowConfiguration2 = unexpected_mutation
+        checkpoint("after_drawing_save")
+        assert scene.state.sheet == "FINISHED"
+        observations_after_save = len(scene.mapping_calls)
+        if drift == "pdf-key":
+            scene.native_dimensions["EyeID"].FullName = "unexpected later PDF key"
+        elif drift == "pdf-circle":
+            scene.annotations["EyeID"].entities = [scene.contour(scene.diameters["EyeID"] + 1.0, fresh_face)]
+        elif drift == "pdf-owner":
+            scene.annotations["EyeID"].Owner = iso
+        elif drift == "pdf-output-path":
+            model.GetPathName = lambda: str(module.OUTPUTS.slddrw.parent / "foreign.SLDDRW")
+        checkpoint("after_pdf_save")
+        assert len(scene.mapping_calls) > observations_after_save
+        assert scene.state.sheet == "FINISHED"
+        if drift == "close-key":
+            scene.native_dimensions["EyeID"].FullName = "unexpected later close key"
+        elif drift == "close-circle":
+            scene.annotations["EyeID"].entities = [scene.contour(scene.diameters["EyeID"] + 1.0, fresh_face)]
+        elif drift == "close-source":
+            front.ReferencedDocument = SimpleNamespace(**vars(source))
+        model.ActivateSheet(close_entry)
+        close_title = model.GetTitle()
+
+        def close_one(title):
+            assert not close_calls
+            assert title == close_title == model.GetTitle()
+            close_calls.append(title)
+            scene.adapter.currentModel = None
+
+        scene.adapter.swApp.CloseDoc = close_one
+        with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
+            scene.adapter.swApp.CloseDoc(close_title)
+        assert scene.state.sheet == close_entry
+        assert close_calls == [close_title]
+        saved.append("pdf-export")
+        return {"drawing": "saved"}
+
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    if drift is None:
+        assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+        assert saved == ["native-save", "pdf-export"]
+        assert presentation_calls == (["place", "settled"] if module is drawing else [])
+        assert len(close_calls) == 1
+    else:
+        with pytest.raises(RuntimeError):
+            asyncio.run(module.build(scene.adapter))
+        assert saved == ([] if drift in ("lost-imported-control", "changed-imported-control")
+                         else ["native-save"])
+        assert close_calls == []
+        if drift in ("close-key", "close-circle", "close-source"):
+            assert scene.state.sheet == close_entry
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("geometry", ("circle", "torus"))
+def test_supplier_origin_boundary_preserves_recipe_contract(monkeypatch, module, geometry):
+    scene = _settled_eye_scene(monkeypatch, module)
+    eye = scene.contours["EyeID"]
+    target = eye.GetCurve() if geometry == "circle" else scene.surface
+    attribute = "CircleParams" if geometry == "circle" else "TorusParams"
+    values = list(getattr(target, attribute))
+    values[0] = 1e-8
+    setattr(target, attribute, tuple(values))
+    result = module._supplier_eye_circle(
+        scene.adapter, scene.views["FINISHED"], eye, scene.contracts["FINISHED"][1],
+    )
+    if module is drawing:
+        assert result == eye.GetCurve().CircleParams
+    else:
+        assert result is None
+
+
+@pytest.mark.parametrize("label", ("EyeOD", "EyeID"))
+@pytest.mark.parametrize("saved", (False, True))
+@pytest.mark.parametrize(
+    "member,value",
+    (
+        ("count", None), ("count", True), ("count", "1"), ("count", 1.0),
+        ("kind", None), ("kind", True), ("kind", "46"), ("kind", 46.0),
+    ),
+)
+def test_channel_settled_and_saved_eye_attachments_require_native_integer_types(
+    monkeypatch, label, saved, member, value,
+):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    scene.state.saved = saved
+    annotation = scene.annotations[label]
+    if member == "count":
+        annotation.GetAttachedEntityCount3 = lambda: value
+    else:
+        annotation.kinds = [value]
+    with pytest.raises(RuntimeError, match=f"{label}: supplier eye must retain one live physical silhouette"):
+        drawing._verify_supplier_references(scene.adapter, scene.refs, scene.contracts)
+
+
+def _channel_creation_scene(monkeypatch):
+    """Keep requested candidates separate from the manager's current contours."""
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    front, model = scene.views["FINISHED"], scene.adapter.currentModel
+    configuration = "Finished source / slot # 8"
+    front.ReferencedConfiguration = configuration
+    scene.contracts["FINISHED"] = ((front.Name,), configuration)
+    scene.source.ShowConfiguration2 = lambda _name: pytest.fail("eye guard activated a source configuration")
+    current_contours = {
+        name: scene.contour(diameter) for name, diameter in scene.diameters.items()
+    }
+    creation = SimpleNamespace(
+        requested=[], current=None, count=0, kind=46, created=[], cleared=[],
+        after_select=lambda _label: None,
+    )
+    selection = SimpleNamespace(
+        GetSelectedObjectCount2=lambda _mark: creation.count,
+        GetSelectedObjectType3=lambda _index, _mark: creation.kind,
+        GetSelectedObject6=lambda _index, _mark: creation.current,
+        CreateSelectData=lambda: SimpleNamespace(),
+    )
+    model.SelectionManager = selection
+
+    def select(_adapter, view, kind, point, *, entity, label):
+        assert view is front and kind == "SILHOUETTE" and point is None
+        assert entity is scene.contours[label]
+        creation.requested.append((label, entity))
+        creation.current, creation.count, creation.kind = current_contours[label], 1, 46
+        creation.after_select(label)
+        # A successful selector's returned wrapper is not selection-manager proof.
+        return entity
+
+    def dimension(*_args):
+        label = creation.requested[-1][0]
+        creation.created.append((label, creation.current))
+        return SimpleNamespace(
+            GetDimension2=lambda _index: SimpleNamespace(FullName=f"{label}@native-eye@anchor.SLDPRT"),
+        )
+
+    def clear(all_selections):
+        creation.cleared.append(all_selections)
+        creation.current, creation.count = None, 0
+
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kwargs: tuple(scene.contours.values()))
+    monkeypatch.setattr(drawing, "_select_view_entity", select)
+    monkeypatch.setattr(model, "AddDiameterDimension2", dimension, raising=False)
+    monkeypatch.setattr(model, "ClearSelection2", clear, raising=False)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", lambda _adapter, display, **_kwargs: display)
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    scene.creation, scene.current_contours, scene.configuration = creation, current_contours, configuration
+    return scene
+
+
+@pytest.mark.parametrize(
+    "fault", (None, "foreign-visible", "wrong-eye-torus", "missing-id", "missing-od", "circle-gap"),
+)
+def test_channel_creation_uses_source_proof_and_returns_only_data(monkeypatch, fault):
+    scene = _channel_creation_scene(monkeypatch)
+    visible = list(scene.contours.values())
+    if fault == "foreign-visible":
+        scene.face.GetFeature = lambda: SimpleNamespace(Name="Wire")
+    elif fault == "wrong-eye-torus":
+        values = list(scene.surface.TorusParams)
+        values[6] += 0.001
+        scene.surface.TorusParams = tuple(values)
+    elif fault == "missing-id":
+        visible = [scene.contours["EyeOD"]]
+    elif fault == "missing-od":
+        visible = [scene.contours["EyeID"]]
+    elif fault == "circle-gap":
+        scene.contours["EyeID"].GetCurve().IsCircle = lambda: False
+    monkeypatch.setattr(drawing, "visible_view_entities", lambda *_args, **_kwargs: visible)
+    if fault is None:
+        refs = drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+        assert scene.creation.requested == [
+            ("EyeOD", scene.contours["EyeOD"]), ("EyeID", scene.contours["EyeID"]),
+        ]
+        assert scene.creation.created == [
+            ("EyeOD", scene.current_contours["EyeOD"]), ("EyeID", scene.current_contours["EyeID"]),
+        ]
+        assert scene.creation.cleared == [True, True]
+        assert len(refs) == 2
+        assert all(len(ref) == 2 and isinstance(ref[0], str) and isinstance(ref[1], dict) for ref in refs)
+        assert {contract["label"]: contract["expected_mm"] for _key, contract in refs} == spec.SUPPLIER_EYE_MM
+    else:
+        missing_label = "EyeID" if fault in ("missing-id", "circle-gap") else "EyeOD"
+        with pytest.raises(
+            RuntimeError,
+            match=f"{missing_label}: unchanged spring eye has no circular silhouette",
+        ):
+            drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+
+
+def test_channel_direct_selection_creates_both_source_bound_current_diameters(monkeypatch):
+    """Exercise the shared direct selector; fake COM is not native qualification."""
+    scene = _channel_creation_scene(monkeypatch)
+    front, model = scene.views["FINISHED"], scene.adapter.currentModel
+    monkeypatch.setattr(drawing, "_select_view_entity", drawing_selection._select_view_entity)
+    monkeypatch.setattr(drawing_selection, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing_selection, "view_name", lambda _adapter, view: view.Name)
+    monkeypatch.setattr(
+        drawing_selection._sw_type_info, "early_bound_or_flag",
+        lambda value, _kind, _member: value,
+    )
+    model.ActivateView = lambda name: name == front.Name
+    selected_contours = tuple(scene.current_contours.values())
+
+    def same(left, right):
+        if any(left is contour for contour in scene.contours.values()) and any(
+            right is contour for contour in selected_contours
+        ):
+            return 2  # Unsupported cross-wrapper identity is not a physical predicate.
+        return int(left is right)
+
+    scene.adapter.swApp.IsSame = same
+    for label, candidate in scene.contours.items():
+        def select2(append, data, label=label, candidate=candidate):
+            assert append is False and data.View is front
+            scene.creation.requested.append((label, candidate))
+            scene.creation.current = scene.current_contours[label]
+            scene.creation.count, scene.creation.kind = 1, 46
+            return True
+        candidate.Select2 = select2
+    refs = drawing._supplier_references(scene.adapter, front, scene.configuration)
+    assert [contract["label"] for _key, contract in refs] == ["EyeOD", "EyeID"]
+    assert scene.creation.created == [
+        ("EyeOD", scene.current_contours["EyeOD"]), ("EyeID", scene.current_contours["EyeID"]),
+    ]
+    for label, current in scene.creation.created:
+        assert current is not scene.contours[label]
+        assert any(face is current.GetFace() for face in scene.mapping_calls)
+    assert scene.creation.cleared == [True, True, True, True]
+
+
+@pytest.mark.parametrize("label", ("EyeOD", "EyeID"))
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "null", "empty", "extra", "edge", "wrong-circle", "outer-circle",
+        "foreign-owner", "foreign-view", "foreign-source", "missing-source",
+        "changed-config", "missing-config", "selected-view-config",
+        "nonfinite-circle", "nonfinite-torus",
+    ),
+)
+def test_channel_current_selection_is_proved_before_its_diameter_creation(monkeypatch, label, fault):
+    scene = _channel_creation_scene(monkeypatch)
+    front = scene.views["FINISHED"]
+
+    def change_current(selected_label):
+        if selected_label != label:
+            return
+        current = scene.creation.current
+        if fault == "null":
+            scene.creation.current = None
+        elif fault == "empty":
+            scene.creation.count = 0
+        elif fault == "extra":
+            scene.creation.count = 2
+        elif fault == "edge":
+            # Even a same-geometry object cannot waive native EDGE type=1.
+            scene.creation.kind = 1
+        elif fault in ("wrong-circle", "outer-circle"):
+            diameter = (
+                scene.diameters["EyeOD"] + 1.0 if fault == "outer-circle"
+                else scene.diameters["EyeID" if label == "EyeOD" else "EyeOD"]
+            )
+            scene.creation.current = scene.contour(diameter)
+        elif fault == "foreign-owner":
+            scene.mapped_faces[id(current.GetFace())] = SimpleNamespace(
+                GetFeature=lambda: SimpleNamespace(Name="Wire"), GetSurface=lambda: scene.surface,
+            )
+        elif fault == "foreign-view":
+            current.GetView = lambda: SimpleNamespace(
+                ReferencedConfiguration=scene.configuration, ReferencedDocument=scene.source,
+            )
+        elif fault == "foreign-source":
+            front.ReferencedDocument = SimpleNamespace(
+                GetPathName=lambda: str(drawing.SOURCE.parent / "foreign.SLDPRT"),
+            )
+        elif fault == "missing-source":
+            front.ReferencedDocument = None
+        elif fault in ("changed-config", "missing-config"):
+            front.ReferencedConfiguration = "SupplierNominalStock" if fault == "changed-config" else None
+        elif fault == "selected-view-config":
+            selected_view = SimpleNamespace(
+                ReferencedConfiguration="SupplierNominalStock", ReferencedDocument=scene.source,
+            )
+            current.GetView = lambda: selected_view
+            scene.adapter.swApp.IsSame = lambda left, right: (
+                1 if left is selected_view and right is front else int(left is right)
+            )
+        elif fault == "nonfinite-circle":
+            values = list(current.GetCurve().CircleParams)
+            values[6] = math.nan
+            current.GetCurve().CircleParams = tuple(values)
+        elif fault == "nonfinite-torus":
+            values = list(scene.surface.TorusParams)
+            values[7] = math.inf
+            scene.surface.TorusParams = tuple(values)
+
+    scene.creation.after_select = change_current
+    with pytest.raises(RuntimeError, match=f"{label}: final spring eye selection"):
+        drawing._supplier_references(scene.adapter, front, scene.configuration)
+    assert scene.creation.requested[-1] == (label, scene.contours[label])
+    # The failed selection creates nothing; an earlier valid OD is not rolled back.
+    assert scene.creation.created == (
+        [] if label == "EyeOD" else [("EyeOD", scene.current_contours["EyeOD"])]
+    )
+    assert scene.creation.cleared == ([True] if label == "EyeOD" else [True, True])
+
+
+@pytest.mark.parametrize(
+    "member,value",
+    (
+        ("count", None), ("count", True), ("count", "1"), ("count", 1.0),
+        ("count", 1.9), ("kind", None), ("kind", True), ("kind", "46"),
+        ("kind", 46.0), ("kind", 46.9),
+    ),
+)
+def test_channel_current_selection_requires_exact_native_integers(monkeypatch, member, value):
+    scene = _channel_creation_scene(monkeypatch)
+    scene.creation.after_select = lambda _label: setattr(scene.creation, member, value)
+    with pytest.raises(RuntimeError, match="final spring eye selection expected"):
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert scene.creation.created == []
+    assert scene.creation.cleared == [True]
+
+
+@pytest.mark.parametrize("identity", ("view", "owner"))
+@pytest.mark.parametrize("value", (None, True, False, "1", 1.0, 1.9, 2))
+def test_channel_current_physical_identity_never_coerces_native_same(monkeypatch, identity, value):
+    scene = _channel_creation_scene(monkeypatch)
+
+    def change_identity(_label):
+        target = scene.views["FINISHED"] if identity == "view" else scene.owner
+        scene.adapter.swApp.IsSame = lambda left, right: (
+            value if left is target and right is target else int(left is right)
+        )
+
+    scene.creation.after_select = change_identity
+    with pytest.raises(RuntimeError, match="unknown native IsSame state"):
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert scene.creation.created == []
+    assert scene.creation.cleared == [True]
+
+
+@pytest.mark.parametrize("configuration", ("SupplierNominalStock", "default", "", None, True, 1))
+def test_channel_wrong_finished_configuration_refuses_before_discovery(monkeypatch, configuration):
+    scene = _channel_creation_scene(monkeypatch)
+    scene.views["FINISHED"].ReferencedConfiguration = configuration
+    monkeypatch.setattr(
+        drawing, "visible_view_entities",
+        lambda *_args, **_kwargs: pytest.fail("wrong finished configuration reached discovery"),
+    )
+    with pytest.raises(RuntimeError, match="finished source configuration"):
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert scene.creation.requested == scene.creation.created == scene.creation.cleared == []
+
+
+@pytest.mark.parametrize("configuration", ("SupplierNominalStock", "", None, True, 1))
+def test_channel_physical_predicate_requires_finished_configuration_before_geometry(monkeypatch, configuration):
+    scene = _channel_creation_scene(monkeypatch)
+    front, eye = scene.views["FINISHED"], scene.contours["EyeOD"]
+    front.ReferencedConfiguration = configuration
+    eye.GetCurve = lambda: pytest.fail("wrong source configuration reached geometry")
+    assert drawing._supplier_eye_circle(scene.adapter, front, eye, scene.configuration) is None
+
+
+@pytest.mark.parametrize("configuration", ("", None, True, 1))
+def test_channel_requires_an_explicit_finished_configuration_contract(monkeypatch, configuration):
+    scene = _channel_creation_scene(monkeypatch)
+    monkeypatch.setattr(
+        drawing, "visible_view_entities",
+        lambda *_args, **_kwargs: pytest.fail("invalid expected configuration reached discovery"),
+    )
+    with pytest.raises(RuntimeError, match="finished source configuration"):
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], configuration)
+    assert scene.creation.requested == scene.creation.created == scene.creation.cleared == []
+
+
+@pytest.mark.parametrize("stage", ("selection", "dimension"))
+def test_channel_creation_keeps_primary_error_when_selection_cleanup_also_fails(monkeypatch, stage):
+    scene = _channel_creation_scene(monkeypatch)
+    primary = OSError(f"original native {stage} disconnected")
+    cleanup = RuntimeError("native ClearSelection2 disconnected")
+
+    def fail_primary(*_args, **_kwargs):
+        raise primary
+
+    def fail_cleanup(_all):
+        raise cleanup
+
+    if stage == "selection":
+        monkeypatch.setattr(drawing, "_select_view_entity", fail_primary)
+    else:
+        scene.adapter.currentModel.AddDiameterDimension2 = fail_primary
+    scene.adapter.currentModel.ClearSelection2 = fail_cleanup
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert caught.value is primary
+    assert any("cleanup also failed: RuntimeError: native ClearSelection2 disconnected" in note
+               for note in primary.__notes__)
+
+
+def test_channel_cleanup_only_failure_propagates_without_creating_another_dimension(monkeypatch):
+    scene = _channel_creation_scene(monkeypatch)
+    cleanup = OSError("native cleanup alone disconnected")
+
+    def fail_cleanup(_all):
+        raise cleanup
+
+    scene.adapter.currentModel.ClearSelection2 = fail_cleanup
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert caught.value is cleanup
+    assert scene.creation.created == [("EyeOD", scene.current_contours["EyeOD"])]
+
+
+def test_channel_null_dimension_keeps_creation_refusal_when_cleanup_also_fails(monkeypatch):
+    scene = _channel_creation_scene(monkeypatch)
+    scene.adapter.currentModel.AddDiameterDimension2 = lambda *_args: None
+
+    def fail_cleanup(_all):
+        raise OSError("native cleanup disconnected")
+
+    scene.adapter.currentModel.ClearSelection2 = fail_cleanup
+    with pytest.raises(RuntimeError, match="EyeOD: cannot dimension the spring eye silhouette") as caught:
+        drawing._supplier_references(scene.adapter, scene.views["FINISHED"], scene.configuration)
+    assert any("cleanup also failed: OSError: native cleanup disconnected" in note
+               for note in caught.value.__notes__)
+
+
+def test_channel_creation_preserves_native_errors_without_rescanning(monkeypatch):
+    scene = _settled_eye_scene(monkeypatch, drawing)
+    eye = scene.contours["EyeOD"]
+    error = OSError("original native eye disconnect")
+    calls, queries = [], []
+
+    def disconnected():
+        calls.append("curve")
+        raise error
+
+    def entities(_view, kind, **_kwargs):
+        queries.append(kind)
+        return [eye, scene.contours["EyeID"]]
+
+    eye.GetCurve = disconnected
+    monkeypatch.setattr(drawing, "visible_view_entities", entities)
+    with pytest.raises(OSError) as caught:
+        drawing._supplier_references(
+            scene.adapter, scene.views["FINISHED"], scene.contracts["FINISHED"][1],
+        )
+    assert caught.value is error
+    assert calls == ["curve"]
+    assert queries == [4]
+
+
+def _note_build_scene(monkeypatch, tmp_path, module):
+    """Exercise real build/layout callbacks with native-shaped notes and views."""
+    source_path = tmp_path / "note-source.SLDPRT"
+    source_path.touch()
+    monkeypatch.setattr(module, "SOURCE", source_path)
+    monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(purchased_drawing, "_early_bound", lambda value, _kind: value)
+    source = SimpleNamespace()
+    state = SimpleNamespace(
+        sheet="FINISHED", edit_sheet=True, keep_view_active=False, missing_creation=False,
+        target_sheet="FINISHED", mutate_note=lambda _note: None, saved=False,
+        sheet_scales={}, initial_scale=None, finalizer_options=None,
+    )
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (
+            0, 0, *state.sheet_scales.get(state.sheet, module.SHEET_SCALE),
+            False, 0.4318, 0.2794,
+        ),
+        GetZoneMargin=lambda _side: 0.0127,
+        GetName=lambda: state.sheet,
+    )
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
+        GetCurrentSheet=lambda: sheet, GetEditSheet=lambda: state.edit_sheet,
+        ActiveDrawingView=None,
+        GetTitle=lambda: {
+            "FINISHED": "opaque note drawing / first # 61",
+            "SUPPLIER-STOCK": "opaque note drawing / second # 87",
+        }[state.sheet],
+    )
+
+    activate_stock_view = None
+    def activate_view(name):
+        if name:
+            assert activate_stock_view is not None
+            return activate_stock_view(name)
+        assert name == ""
+        if not state.keep_view_active:
+            model.ActiveDrawingView = None
+        return False  # Normal native sheet-context return, not a failed transition.
+
+    model.ActivateView = activate_view
+    adapter = SimpleNamespace(
+        currentModel=source, _attempt=lambda operation: operation(),
+        swApp=SimpleNamespace(IsSame=lambda first, second: int(first is second)),
+    )
+    placements, linked_notes, property_reads, refreshed = [], {}, [], []
+
+    def refresh(name):
+        if state.saved:
+            pytest.fail("post-save callback refreshed drawing geometry")
+        refreshed.append(name)
+
+    def view(name, configuration):
+        native_view = SimpleNamespace(
+            Name=name, ReferencedConfiguration=configuration,
+            outline=(0.100, 0.110, 0.170, 0.240),
+            GetFirstDisplayDimension6=lambda: None, GetAnnotations=lambda: (),
+            UpdateViewDisplayGeometry=lambda: refresh(name),
+        )
+        native_view.GetOutline = lambda: native_view.outline
+        return native_view
+
+    front = view("finished-front", "Default")
+    iso = view("finished-iso", "Default")
+    stock = view("stock-front", module.SUPPLIER_STOCK_CONFIGURATION)
+    stock_iso = view("stock-iso", module.SUPPLIER_STOCK_CONFIGURATION)
+    stock_notes = _stock_note_contracts(module)
+    stock_scene = (
+        _supplier_stock_profile_scene(
+            monkeypatch, tmp_path, adapter, source, stock, model, state,
+        ) if module is boss_drawing else None
+    )
+    if stock_scene is not None:
+        activate_stock_view = model.ActivateView
+        model.ActivateView = activate_view
+        stock.UpdateViewDisplayGeometry = lambda: refresh(stock.Name)
+
+    async def open_model(_path):
+        adapter.currentModel = source
+        return {"success": True}
+
+    def read_properties(native_source, names, *, required):
+        assert native_source is source
+        assert tuple(required) == tuple(names)
+        properties = _source_properties(names)
+        property_reads.append(properties)
+        return properties
+
+    def new_drawing(*_args, **kwargs):
+        if module is boss_drawing:
+            assert stock_scene.capture_calls == ["Default"]
+        state.initial_scale = kwargs["scale"]
+        adapter.currentModel = model
+        return model, sheet
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        native_view = (
+            (front if orientation == "*Front" else iso)
+            if state.sheet == "FINISHED"
+            else (stock if orientation == "*Front" else stock_iso)
+        )
+        model.ActiveDrawingView = native_view
+        return native_view
+
+    def references(*_args):
+        model.ActiveDrawingView = front
+        return []
+
+    def linked_note(_adapter, name, x, y, *, char_height):
+        if state.missing_creation and name == "Supplier":
+            return None
+        note = _note_double(
+            module.property_link(name), property_reads[0][name].replace("\n", "\r\n"), x, y,
+            owner_type=0 if model.ActiveDrawingView is not None else 1,
+        )
+        note.position, note.char_height = (x, y), char_height
+        linked_notes[name] = note
+        if state.target_sheet == "FINISHED" and name == "Supplier":
+            state.mutate_note(note)
+        return note
+
+    def supplier_stock(stock_adapter, *source_models):
+        model.ActiveDrawingView = None
+        if state.target_sheet == "SUPPLIER-STOCK" and stock_notes:
+            state.mutate_note(stock_notes[0][0])
+        if module is drawing:
+            return stock, stock_iso, [], stock_notes
+        assert stock_adapter is adapter
+        assert len(source_models) == 2
+        assert source_models[0] is source
+        assert source_models[1] is stock_scene.capture
+        midpoint = (
+            0.0,
+            (module.SUPPLIER_STOCK_AXIS_MM[0][1] + module.SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
+            0.0,
+        )
+        projected = module.model_points_in_view(
+            stock_adapter, stock, [midpoint], label="source stock envelope centre",
+        )[0]
+        before = tuple(stock.Position)
+        stock.Position = (
+            before[0] + module.STOCK_CENTER[0] - projected[0],
+            before[1] + module.STOCK_CENTER[1] - projected[1],
+        )
+        # This supplied SimpleNamespace view has a fixed fake transform, unlike
+        # the production view. Keep its projection consistent with the position.
+        stock.ModelToViewTransform = type(stock.ModelToViewTransform)(
+            stock.projection_scale, *stock.Position, stock.angle,
+        )
+        profile = module._blacken_supplier_stock_profile(
+            stock_adapter, stock, source, stock_scene.capture,
+        )
+        model.ActivateView("")
+        return stock, [], stock_notes, profile
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        state.finalizer_options = _kwargs
+        state.sheet_scales = dict(_kwargs["sheet_scales"])
+        for verify in settled_checks:
+            verify()
+        checkpoint("before_drawing_save")
+        state.saved = True
+        checkpoint("after_drawing_save")
+        checkpoint("after_pdf_save")
+        return {"drawing": "saved"}
+
+    adapter.open_model = open_model
+    if module is drawing:
+        monkeypatch.setattr(module, "active_configuration_name", lambda *_args: "Default")
+    for name in (
+        "check", "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "set_dimension_precision", "set_dimension_callouts",
+        "_verify_controls", "_verify_supplier_references", "_verify_source_state",
+    ):
+        monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    presentation_calls = []
+    if module is drawing:
+        def place_chamfer(native_adapter, annotations):
+            assert native_adapter is adapter and annotations == []
+            assert state.sheet == "FINISHED" and not state.saved
+            presentation_calls.append("place")
+
+        def verify_chamfer(native_adapter, annotations):
+            assert native_adapter is adapter and annotations == []
+            assert not state.saved
+            assert refreshed, "shelf was checked before final layout geometry refresh"
+            presentation_calls.append("settled")
+
+        monkeypatch.setattr(module, "_place_chamfer_angle_text", place_chamfer)
+        monkeypatch.setattr(module, "_verify_chamfer_angle_text", verify_chamfer)
+    snapshot = (object(),)
+    monkeypatch.setattr(module, "_verify_supplier_references", lambda *_args, **_kwargs: snapshot)
+
+    def capture_saved(native_adapter, refs_by_sheet, _view_contracts, prior):
+        assert native_adapter is adapter
+        assert state.saved
+        assert prior is snapshot
+        return {sheet_name: list(refs) for sheet_name, refs in refs_by_sheet.items()}
+
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", capture_saved)
+    monkeypatch.setattr(module, "read_required_properties", read_properties)
+    monkeypatch.setattr(module, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(module, "place_view", place_view)
+    monkeypatch.setattr(module, "curate_view_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(module, "_supplier_references", references)
+    monkeypatch.setattr(module, "add_property_linked_note", linked_note)
+    monkeypatch.setattr(
+        module, "_supplier_stock_sheet" if module is drawing else "_supplier_stock_diagram",
+        supplier_stock,
+    )
+    monkeypatch.setattr(module, "iter_views", lambda _adapter:
+                        (front, iso) if state.sheet == "FINISHED" else
+                        (stock, stock_iso) if module is drawing else (stock,))
+    monkeypatch.setattr(module, "view_name", lambda _adapter, native_view: native_view.Name)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    return SimpleNamespace(
+        adapter=adapter, state=state, model=model, source=source, sheet=sheet,
+        front=front, iso=iso, stock=stock, stock_iso=stock_iso,
+        placements=placements, notes=linked_notes, stock_notes=stock_notes,
+        property_reads=property_reads, refreshed=refreshed,
+        presentation_calls=presentation_calls, stock_scene=stock_scene,
+    )
+
+
+@pytest.mark.parametrize("fault", (None, "placement-refused", "settled-refused"))
+def test_build_places_chamfer_before_save_and_refuses_settled_text_drift(
+    monkeypatch, tmp_path, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    place, verify = drawing._place_chamfer_angle_text, drawing._verify_chamfer_angle_text
+    error = RuntimeError(f"native chamfer shelf {fault}")
+
+    def place_once(adapter, annotations):
+        place(adapter, annotations)
+        if fault == "placement-refused":
+            raise error
+
+    def verify_settled(adapter, annotations):
+        verify(adapter, annotations)
+        assert set(scene.refreshed) == {
+            "finished-front", "finished-iso", "stock-front", "stock-iso",
+        }
+        if fault == "settled-refused":
+            raise error
+
+    monkeypatch.setattr(drawing, "_place_chamfer_angle_text", place_once)
+    monkeypatch.setattr(drawing, "_verify_chamfer_angle_text", verify_settled)
+    if fault is not None:
+        with pytest.raises(RuntimeError) as caught:
+            asyncio.run(drawing.build(scene.adapter))
+        assert caught.value is error
+        assert not scene.state.saved
+    else:
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+    assert scene.presentation_calls == (
+        ["place"] if fault == "placement-refused" else ["place", "settled"]
+    )
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("entry_sheet", ("FINISHED", "SUPPLIER-STOCK"))
+@pytest.mark.parametrize(
+    "check_failure,restore_failure",
+    (
+        (None, None), ("capture", None), ("geometry", None),
+        (None, "false"), (None, "raise"), (None, "noop"), (None, "title"),
+        ("capture", "false"), ("geometry", "raise"), ("geometry", "title"),
+    ),
+)
+def test_close_observer_restores_exact_entry_context_and_preserves_primary_error(
+    monkeypatch, tmp_path, module, entry_sheet, check_failure, restore_failure,
+):
+    """Common's captured opaque title must still identify this one open drawing."""
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    other_sheet = next(name for name in module.SHEET_NAMES if name != entry_sheet)
+    primary = RuntimeError(f"strict close {check_failure} check refused")
+    restoration = OSError("native close-entry sheet activation disconnected")
+    capture, verify = module._capture_saved_supplier_references, module._verify_supplier_references
+    activate = scene.model.ActivateSheet
+    closed, checks = [], []
+    scene.state.closing = scene.state.title_changed = False
+    scene.state.restoring_close = False
+    titles = {
+        "FINISHED": "opaque native title [window A; token 19]",
+        "SUPPLIER-STOCK": "opaque native title [window B; token 62]",
+    }
+    scene.model.GetTitle = lambda: (
+        "unmatched opaque native title [token changed]"
+        if scene.state.title_changed else titles[scene.state.sheet]
+    )
+
+    def activate_sheet(name):
+        if scene.state.closing and scene.state.restoring_close and name == entry_sheet:
+            if restore_failure == "false":
+                return False
+            if restore_failure == "raise":
+                raise restoration
+            if restore_failure == "noop":
+                return True
+        return activate(name)
+
+    def capture_during_close(*args):
+        observed = capture(*args)
+        if scene.state.closing:
+            checks.append("capture")
+            scene.model.ActivateSheet(other_sheet)
+            if check_failure == "capture":
+                scene.state.restoring_close = True
+                raise primary
+        return observed
+
+    def verify_during_close(*args):
+        result = verify(*args)
+        if scene.state.closing:
+            checks.append("geometry")
+            scene.model.ActivateSheet(other_sheet)
+            if restore_failure == "title":
+                scene.state.title_changed = True
+            if check_failure == "geometry":
+                scene.state.restoring_close = True
+                raise primary
+            if module is drawing:
+                scene.state.restoring_close = True
+        return result
+
+    def close_one(title):
+        assert not closed
+        assert scene.adapter.currentModel is scene.model
+        assert title == titles[entry_sheet] == scene.model.GetTitle()
+        closed.append(title)
+        scene.adapter.currentModel = None
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for check in settled_checks:
+            check()
+        scene.state.saved = True
+        checkpoint("after_drawing_save")
+        assert scene.state.sheet == "FINISHED"
+        checkpoint("after_pdf_save")
+        assert scene.state.sheet == "FINISHED"
+        assert scene.model.ActivateSheet(entry_sheet) is True
+        # Match Common: capture the unparsed title before invoking the observer.
+        close_title = scene.model.GetTitle()
+        scene.state.closing = True
+        with drawing_common._drawing_checkpoint(checkpoint, "drawing_close"):
+            scene.adapter.swApp.CloseDoc(close_title)
+        return {"drawing": "closed"}
+
+    scene.adapter.swApp.CloseDoc = close_one
+    scene.model.ActivateSheet = activate_sheet
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", capture_during_close)
+    monkeypatch.setattr(module, "_verify_supplier_references", verify_during_close)
+    if module is boss_drawing:
+        verify_profile = module._verify_supplier_stock_profile
+
+        def profile_during_close(*args):
+            result = verify_profile(*args)
+            if scene.state.closing:
+                # Keep the full nine-instance read, then test final restoration
+                # from the other sheet rather than faulting its allowed activation.
+                scene.model.ActivateSheet(other_sheet)
+                scene.state.restoring_close = True
+            return result
+
+        monkeypatch.setattr(module, "_verify_supplier_stock_profile", profile_during_close)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    if check_failure is None and restore_failure is None:
+        assert asyncio.run(module.build(scene.adapter)) == {"drawing": "closed"}
+        assert closed == [titles[entry_sheet]]
+        assert scene.adapter.currentModel is None
+    else:
+        with pytest.raises((RuntimeError, OSError)) as caught:
+            asyncio.run(module.build(scene.adapter))
+        assert closed == []
+        assert scene.adapter.currentModel is scene.model
+        if check_failure is not None:
+            assert caught.value is primary
+            notes = getattr(primary, "__notes__", [])
+            if restore_failure is None:
+                assert notes == []
+            else:
+                assert len(notes) == 1
+                assert notes[0].startswith(
+                    "before_drawing_close entry-context restoration also failed: ",
+                )
+                if restore_failure == "raise":
+                    assert notes[0].endswith(f"OSError: {restoration}")
+        elif restore_failure == "raise":
+            assert caught.value is restoration
+        elif restore_failure == "title":
+            assert "opaque native drawing title changed" in str(caught.value)
+        else:
+            assert "close-entry sheet" in str(caught.value)
+    assert checks == (["capture"] if check_failure == "capture" else ["capture", "geometry"])
+    if restore_failure in ("false", "raise", "noop"):
+        assert scene.state.sheet == other_sheet
+    else:
+        assert scene.state.sheet == entry_sheet
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("operation", ("drawing_save", "pdf_save"))
+def test_build_save_failure_keeps_primary_error_when_identity_observer_refuses(
+    monkeypatch, tmp_path, module, operation,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    primary = OSError(f"original native {operation} failure")
+    secondary = RuntimeError("original annotation identity capture refused")
+    capture = module._capture_saved_supplier_references
+    scene.state.failed_save = False
+
+    def failing_capture(*args):
+        if scene.state.failed_save:
+            raise secondary
+        return capture(*args)
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        for verify in settled_checks:
+            verify()
+        scene.state.saved = True
+        if operation == "pdf_save":
+            checkpoint("after_drawing_save")
+        scene.state.failed_save = True
+        # The production checkpoint emits after_* on failure and keeps the
+        # actual SaveAs exception primary even when the read-only audit refuses.
+        with drawing_common._drawing_checkpoint(checkpoint, operation):
+            raise primary
+
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", failing_capture)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    with pytest.raises(OSError) as caught:
+        asyncio.run(module.build(scene.adapter))
+    assert caught.value is primary
+    assert primary.__notes__ == [
+        f"after_{operation} checkpoint also failed: RuntimeError: {secondary}",
+    ]
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_build_does_not_publish_identity_snapshot_after_failed_strict_presave_checks(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    primary = RuntimeError("last strict supplier dimension lost its physical contour")
+    observed_priors = []
+
+    def strict_refusal(*_args):
+        raise primary
+
+    def inspect_unpublished(_adapter, _refs, _views, prior):
+        observed_priors.append(prior)
+        raise RuntimeError("no successfully verified original snapshot")
+
+    async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
+        with pytest.raises(RuntimeError) as caught:
+            for verify in settled_checks:
+                verify()
+        assert caught.value is primary
+        with pytest.raises(RuntimeError, match="no successfully verified original snapshot"):
+            checkpoint("after_drawing_save")
+        raise primary
+
+    monkeypatch.setattr(module, "_verify_supplier_references", strict_refusal)
+    monkeypatch.setattr(module, "_capture_saved_supplier_references", inspect_unpublished)
+    monkeypatch.setattr(module, "finalize_drawing", finalize)
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(module.build(scene.adapter))
+    assert caught.value is primary
+    assert observed_priors == [None]
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    (
+        "inside", "recorded-5", "recorded-5-at-4",
+        "left-boundary", "bottom-boundary", "right-boundary", "top-boundary",
+        "left", "bottom", "right", "top", "inverted", "nonfinite",
+        "dimension-outside", "dimension-unreadable", "dimension-owner", "hidden-value",
+    ),
+)
+def test_channel_stock_scale_creation_metadata_and_native_candidate_cell(
+    monkeypatch, tmp_path, candidate,
+):
+    """4:1 needs its own native box; this fake candidate is not a fit prediction."""
+    native_stock_builder = drawing._supplier_stock_sheet
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    monkeypatch.setattr(drawing, "_supplier_stock_sheet", native_stock_builder)
+    cell = (0.0127, 0.094, 0.4318 - 0.0127, 0.2794 - 0.0127 - 0.009)
+    assert cell == pytest.approx((0.0127, 0.094, 0.4191, 0.2577), rel=0, abs=1e-15)
+    recorded_5 = (
+        0.11266199801221032, 0.08855998560357987,
+        0.18733799988553204, 0.26046300056871236,
+    )
+    # Even the best translation cannot put 171.903 mm into this 163.7 mm cell.
+    assert recorded_5[3] - recorded_5[1] > cell[3] - cell[1]
+    assert (cell[1] - recorded_5[1], recorded_5[3] - cell[3]) == pytest.approx(
+        (0.00544001439642013, 0.00276300056871236), rel=0, abs=1e-15,
+    )
+    assert (4, 1) in purchased_drawing._SCALES
+    if candidate == "recorded-5":
+        monkeypatch.setattr(drawing, "STOCK_SCALE", (5.0, 1.0))
+    # Independent fake native readback, never a scaled version of recorded_5.
+    outline = (0.120, 0.105, 0.180, 0.246)
+    if candidate in ("recorded-5", "recorded-5-at-4"):
+        outline = recorded_5
+    elif candidate.removesuffix("-boundary") in ("left", "bottom", "right", "top"):
+        index = ("left", "bottom", "right", "top").index(candidate.removesuffix("-boundary"))
+        values = list(outline)
+        values[index] = cell[index] + (
+            0.0 if candidate.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
+        )
+        outline = tuple(values)
+    elif candidate == "inverted":
+        outline = (0.180, 0.105, 0.120, 0.246)
+    elif candidate == "nonfinite":
+        outline = (0.120, 0.105, math.nan, 0.246)
+    scene.stock.outline = outline
+    scene.stock.Position = (0.150, 0.1755)
+    scene.model.EditRebuild3 = lambda: True
+    scene.adapter.swApp = SimpleNamespace(IsSame=lambda first, second: int(first is second))
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(
+        drawing, "_show_hidden_owners",
+        lambda *_args, **_kwargs: (drawing.SUPPLIER_STOCK_FEATURE,),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda *_args, **_kwargs: ((0.150, 0.1755),),
+    )
+    expected_anchors = {
+        "SupplierStockShank": (0.105, 0.150),
+        "SupplierStockThread": (0.210, 0.140),
+        "SupplierStockOverall": (0.065, 0.1755),
+    }
+    expected_precision = {
+        "SupplierStockShank": 2, "SupplierStockThread": 3, "SupplierStockOverall": 2,
+    }
+    expected_callouts = {
+        "SupplierStockShank": "AS-SUPPLIED SHANK",
+        "SupplierStockThread": "AS-SUPPLIED THREAD LENGTH",
+        "SupplierStockOverall": "AS-SUPPLIED OVERALL",
+    }
+    dimensions, displays, annotations = {}, [], []
+    for name, expected_mm in spec.SUPPLIER_STOCK_MM.items():
+        native = SimpleNamespace(
+            FullName=f"{name}@SupplierStockAxis@anchor.SLDPRT",
+            SystemValue=expected_mm / 1000.0,
+        )
+        dimensions[name] = native
+        annotation = SimpleNamespace(
+            name=name, OwnerType=0, Owner=scene.stock, Visible=1, IsDangling=lambda: False,
+        )
+        display = SimpleNamespace(
+            GetDimension2=lambda _index, native=native: native,
+            GetAnnotation=lambda annotation=annotation: annotation,
+            GetOverride=lambda: False, ShowDimensionValue=True,
+        )
+        annotation.GetSpecificAnnotation = lambda display=display: display
+        annotations.append(annotation)
+        displays.append(display)
+    for index, display in enumerate(displays):
+        following = displays[index + 1] if index + 1 < len(displays) else None
+        display.GetNext5 = lambda following=following: following
+    scene.stock.GetFirstDisplayDimension6 = lambda: displays[0]
+    if candidate == "dimension-owner":
+        annotations[0].Owner = scene.front
+    elif candidate == "hidden-value":
+        displays[0].ShowDimensionValue = False
+    presented, created_notes, checked_cells = [], [], []
+
+    def curate_stock(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
+        assert view is scene.stock
+        assert keep == expected_anchors
+        assert dimensions_by_feature == {"SupplierStockAxis": set(expected_anchors)}
+        return annotations
+
+    def supplier_reference(_adapter, display, **contract):
+        name = contract["label"]
+        assert contract == {
+            "label": name, "expected_mm": spec.SUPPLIER_STOCK_MM[name], "units": "in",
+            "precision": expected_precision[name], "callout": expected_callouts[name],
+        }
+        assert display.GetDimension2(0).SystemValue == spec.SUPPLIER_STOCK_MM[name] / 1000.0
+        presented.append(name)
+        return display
+
+    def annotation_ink(_adapter, annotation):
+        x, y = expected_anchors[annotation.name]
+        return {
+            "texts": [{
+                "t": f"({spec.SUPPLIER_STOCK_MM[annotation.name] / 25.4:g} in)",
+                "pos": (x, y, 0.0), "h": 0.003,
+                "w": 1.0 if candidate == "dimension-outside" else 0.022,
+                "ang": 0.0, "ref": 2,
+            }],
+        }, {"refused": True} if candidate == "dimension-unreadable" else {}
+
+    def add_stock_note(_adapter, text, x, y):
+        note = _note_double(text, text, x, y)
+        created_notes.append((note, text, text))
+        return note
+
+    def assert_fits(adapter, view, actual_cell, *, label):
+        expected_cell = cell if scene.state.sheet == "SUPPLIER-STOCK" else (
+            0.0127, 0.0651, 0.4191, 0.2667,
+        )
+        assert actual_cell == pytest.approx(expected_cell, rel=0, abs=1e-15)
+        checked_cells.append(view.Name)
+        purchased_drawing.assert_supplier_view_fits(adapter, view, actual_cell, label=label)
+
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", curate_stock)
+    monkeypatch.setattr(drawing, "supplier_reference_dimension", supplier_reference)
+    monkeypatch.setattr(drawing, "add_note", add_stock_note)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    monkeypatch.setattr(purchased_drawing, "annotation_display", annotation_ink)
+    if candidate in ("inside", "left-boundary", "bottom-boundary", "right-boundary", "top-boundary"):
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+        assert checked_cells == ["finished-front", "finished-iso", "stock-front", "stock-iso"]
+    else:
+        message = (
+            "invalid native extent" if candidate == "nonfinite" else
+            "empty or inverted native extent" if candidate == "inverted" else
+            "supplier dimension leaves its cell" if candidate == "dimension-outside" else
+            "unreadable settled native dimension ink" if candidate == "dimension-unreadable" else
+            "unsound supplier annotation owner/value" if candidate in ("dimension-owner", "hidden-value") else
+            "settled supplier view leaves its cell"
+        )
+        with pytest.raises(RuntimeError, match=message):
+            asyncio.run(drawing.build(scene.adapter))
+        assert not scene.state.saved
+    expected_stock_scale = (5.0, 1.0) if candidate == "recorded-5" else (4.0, 1.0)
+    assert scene.placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+        ("*Front", 0.150, 0.1755, expected_stock_scale),
+        ("*Isometric", 0.310, 0.203, (3.0, 1.0)),
+    ]
+    assert scene.state.initial_scale == scene.state.finalizer_options["scale"] == (5.0, 1.0)
+    assert scene.state.finalizer_options["sheet_scales"] == {
+        "FINISHED": (5.0, 1.0), "SUPPLIER-STOCK": expected_stock_scale,
+    }
+    assert scene.model.ActivateSheet("SUPPLIER-STOCK") is True
+    assert tuple(scene.sheet.GetProperties2()[2:4]) == expected_stock_scale
+    assert scene.stock.Position == (0.150, 0.1755)
+    assert scene.stock.ReferencedConfiguration == scene.stock_iso.ReferencedConfiguration == "AsSuppliedStock"
+    assert set(presented) == set(expected_anchors)
+    assert {name: native.SystemValue for name, native in dimensions.items()} == {
+        name: value / 1000.0 for name, value in spec.SUPPLIER_STOCK_MM.items()
+    }
+    expected_notes = _stock_note_contracts(drawing)
+    assert [(link, text) for _note, link, text in created_notes] == [
+        (link, text) for _note, link, text in expected_notes
+    ]
+    for (note, _link, _text), (expected_note, _expected_link, _expected_text) in zip(
+        created_notes, expected_notes,
+    ):
+        assert note.extent == pytest.approx(expected_note.extent, rel=0, abs=1e-15)
+    assert created_notes[-1][1:] == ("ISOMETRIC VIEW SCALE 3:1", "ISOMETRIC VIEW SCALE 3:1")
+
+
+@pytest.mark.parametrize(
+    "shift_mm,fault",
+    (
+        (0, None), (9, None), (10, None),
+        (10, "left-boundary"), (10, "bottom-boundary"),
+        (10, "right-boundary"), (10, "top-boundary"),
+        (10, "left"), (10, "bottom"), (10, "right"), (10, "top"),
+        (10, "caption-text"), (10, "caption-owner"),
+    ),
+)
+def test_stock_iso_creation_translates_native_box_and_caption_together(
+    monkeypatch, tmp_path, shift_mm, fault,
+):
+    """Translate c12's actual box only; new native ink/readability remains pending."""
+    native_stock_builder = drawing._supplier_stock_sheet
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    monkeypatch.setattr(drawing, "_supplier_stock_sheet", native_stock_builder)
+    old_center, old_caption = (0.310, 0.213), (0.275, 0.163)
+    recorded_box = (
+        0.2872237893868808, 0.15756259535002917,
+        0.3327762106131192, 0.2673277812843747,
+    )
+    cell = (0.0127, 0.094, 0.4318 - 0.0127, 0.2794 - 0.0127 - 0.009)
+    before_clearances = (
+        recorded_box[0] - cell[0], recorded_box[1] - cell[1],
+        cell[2] - recorded_box[2], cell[3] - recorded_box[3],
+    )
+    assert before_clearances == pytest.approx(
+        (0.2745237893868808, 0.06356259535002917, 0.0863237893868808, -0.0096277812843747),
+        rel=0, abs=1e-15,
+    )
+    assert math.ceil(-before_clearances[3] * 1000) == 10
+    assert recorded_box[3] - 0.009 - cell[3] == pytest.approx(
+        0.0006277812843747, rel=0, abs=1e-15,
+    )
+    if shift_mm != 10:
+        shift = shift_mm / 1000.0
+        monkeypatch.setattr(drawing, "STOCK_ISO_CENTER", (old_center[0], old_center[1] - shift))
+        monkeypatch.setattr(drawing, "STOCK_ISO_CAPTION", (old_caption[0], old_caption[1] - shift))
+    scene.stock.Position = (0.150, 0.1755)
+    scene.model.EditRebuild3 = lambda: True
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(
+        drawing, "_show_hidden_owners",
+        lambda *_args, **_kwargs: (drawing.SUPPLIER_STOCK_FEATURE,),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda *_args, **_kwargs: ((0.150, 0.1755),),
+    )
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    created_notes, fit_labels = [], []
+    fixture_place_view = drawing.place_view
+
+    def place_view(adapter, path, orientation, x, y, *, scale):
+        view = fixture_place_view(adapter, path, orientation, x, y, scale=scale)
+        if scene.state.sheet == "SUPPLIER-STOCK" and orientation == "*Isometric":
+            assert scale == (3.0, 1.0)
+            outline = [
+                value + (x, y)[index % 2] - old_center[index % 2]
+                for index, value in enumerate(recorded_box)
+            ]
+            edge = "" if fault is None else fault.removesuffix("-boundary")
+            if edge in ("left", "bottom", "right", "top"):
+                index = ("left", "bottom", "right", "top").index(edge)
+                outline[index] = cell[index] + (
+                    0.0 if fault.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
+                )
+            view.outline = tuple(outline)
+        return view
+
+    def add_stock_note(_adapter, text, x, y):
+        note = _note_double(text, text, x, y)
+        note.position = (x, y)
+        if text == "ISOMETRIC VIEW SCALE 3:1":
+            if fault == "caption-text":
+                note.text = "ISOMETRIC VIEW SCALE 4:1"
+            elif fault == "caption-owner":
+                note.annotation.OwnerType = 0
+        created_notes.append(note)
+        return note
+
+    def assert_fits(adapter, view, actual_cell, *, label):
+        assert f"view={view.Name!r}" in label
+        assert f"configuration={view.ReferencedConfiguration!r}" in label
+        assert f"cell={actual_cell!r}" in label
+        fit_labels.append(label)
+        purchased_drawing.assert_supplier_view_fits(adapter, view, actual_cell, label=label)
+
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "add_note", add_stock_note)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    accepted = shift_mm == 10 and (fault is None or fault.endswith("-boundary"))
+    if accepted:
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+        assert len(fit_labels) == 4
+    else:
+        caption_failure = fault in ("caption-text", "caption-owner")
+        with pytest.raises(
+            RuntimeError,
+            match="source label changed" if caption_failure else "settled supplier view leaves its cell",
+        ) as failure:
+            asyncio.run(drawing.build(scene.adapter))
+        assert not scene.state.saved
+        if not caption_failure:
+            message = str(failure.value)
+            assert "view='stock-iso'" in message
+            assert "configuration='AsSuppliedStock'" in message
+            assert f"cell={cell!r}" in message
+            assert repr(scene.stock_iso.outline) in message
+    expected_y = 0.203 if shift_mm == 10 else old_center[1] - shift_mm / 1000.0
+    expected_caption_y = 0.153 if shift_mm == 10 else old_caption[1] - shift_mm / 1000.0
+    assert scene.placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+        ("*Front", 0.150, 0.1755, (4.0, 1.0)),
+        ("*Isometric", 0.310, expected_y, (3.0, 1.0)),
+    ]
+    caption = created_notes[-1]
+    assert caption.position == (0.275, expected_caption_y)
+    assert (caption.position[0] - 0.310, caption.position[1] - expected_y) == pytest.approx(
+        (-0.035, -0.050), rel=0, abs=1e-15,
+    )
+    assert caption.PropertyLinkedText == "ISOMETRIC VIEW SCALE 3:1"
+    assert scene.notes["Isometric View Note"].position == (0.275, 0.163)
+    assert scene.notes["Isometric View Note"].GetText() == "ISOMETRIC VIEW SCALE 3:1"
+    assert scene.stock.ReferencedConfiguration == scene.stock_iso.ReferencedConfiguration == "AsSuppliedStock"
+    assert scene.state.finalizer_options["sheet_scales"] == {
+        "FINISHED": (5.0, 1.0), "SUPPLIER-STOCK": (4.0, 1.0),
+    }
+    if shift_mm == 10 and fault is None:
+        box = scene.stock_iso.outline
+        assert (box[0] - cell[0], box[1] - cell[1], cell[2] - box[2], cell[3] - box[3]) == pytest.approx(
+            (0.2745237893868808, 0.05356259535002917, 0.0863237893868808, 0.0003722187156253),
+            rel=0, abs=1e-15,
+        )
+        assert caption.GetText() == "ISOMETRIC VIEW SCALE 3:1"
+        assert caption.annotation.OwnerType == 1
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_finished_source_notes_keep_links_resolved_text_and_sheet_ownership(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+    assert scene.presentation_calls == (["place", "settled"] if module is drawing else [])
+    assert len(scene.property_reads) == 1
+    assert set(scene.notes) == {
+        "Supplier", "Supplier SKUs", "Stock Name", "Isometric View Note", "Manufacturing Notes",
+    }
+    expected_positions = {
+        "Supplier": ((0.016, 0.060), 0.003),
+        "Supplier SKUs": ((0.080, 0.060), 0.003),
+        "Stock Name": ((0.016, 0.049), 0.003),
+        "Isometric View Note": ((0.275, 0.163), None),
+        "Manufacturing Notes": ((0.016, 0.083 if module is drawing else 0.076), 0.003),
+    }
+    for name, note in scene.notes.items():
+        assert note.annotation.OwnerType == 1
+        assert note.PropertyLinkedText == module.property_link(name)
+        assert note.GetText().replace("\r\n", "\n") == scene.property_reads[0][name]
+        assert (note.position, note.char_height) == expected_positions[name]
+    # These are legal sheet labels below the unchanged 65.1 mm geometry cell.
+    assert scene.notes["Supplier"].extent[1] < 0.0651
+    assert scene.placements == [
+        ("*Front", *module.FRONT_CENTER, module.SHEET_SCALE),
+        (
+            "*Isometric",
+            *(module.FINISHED_ISO_CENTER if module is drawing else module.ISO_CENTER),
+            module.ISO_SCALE,
+        ),
+    ]
+    assert scene.state.sheet == "FINISHED"
+    assert scene.state.saved
+    assert set(scene.refreshed) == (
+        {"finished-front", "finished-iso", "stock-front", "stock-iso"}
+        if module is drawing else {"finished-front", "finished-iso", "stock-front"}
+    )
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("edit-template", "active-view", "missing-note"))
+def test_finished_note_creation_requires_checked_sheet_context_and_a_note(
+    monkeypatch, tmp_path, module, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.edit_sheet = fault != "edit-template"
+    scene.state.keep_view_active = fault == "active-view"
+    scene.state.missing_creation = fault == "missing-note"
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.notes
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("sheet_name", ("FINISHED", "SUPPLIER-STOCK"))
+@pytest.mark.parametrize(
+    "fault",
+    (
+        "view-owner", "template-owner", "missing-annotation", "wrong-link", "wrong-resolved",
+        "left", "bottom", "right", "top", "short-extent", "nan-extent", "inverted-extent",
+    ),
+)
+def test_build_refuses_sheet_note_ownership_text_and_actual_border_drift(
+    monkeypatch, tmp_path, module, sheet_name, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.target_sheet = sheet_name
+
+    def mutate(note):
+        if fault in ("view-owner", "template-owner"):
+            note.annotation.OwnerType = 0 if fault == "view-owner" else 2
+        elif fault == "missing-annotation":
+            note.annotation = None
+        elif fault == "wrong-link":
+            note.PropertyLinkedText = '$PRPSHEET:"Foreign Property"'
+        elif fault == "wrong-resolved":
+            note.text += " CHANGED"
+        elif fault == "short-extent":
+            note.extent = note.extent[:-1]
+        else:
+            extent = list(note.extent)
+            if fault == "nan-extent":
+                extent[0] = math.nan
+            elif fault == "inverted-extent":
+                extent[3] = extent[0]
+            else:
+                index, boundary, direction = {
+                    "left": (0, 0.0127, -1),
+                    "bottom": (1, 0.0127, -1),
+                    "right": (3, 0.4191, 1),
+                    "top": (4, 0.2667, 1),
+                }[fault]
+                extent[index] = boundary + direction * 1e-12
+            note.extent = tuple(extent)
+
+    scene.state.mutate_note = mutate
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("literal-instead-of-link", "unresolved-property"))
+def test_finished_notes_require_both_live_links_and_authoritative_resolved_text(
+    monkeypatch, tmp_path, module, fault,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+
+    def mutate(note):
+        if fault == "literal-instead-of-link":
+            note.PropertyLinkedText = note.text
+        else:
+            note.text = note.PropertyLinkedText
+
+    scene.state.mutate_note = mutate
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("fault", ("missing-contract", "null-note"))
+def test_stock_note_mapping_retains_every_literal_contract(monkeypatch, tmp_path, module, fault):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    if fault == "missing-contract":
+        scene.stock_notes.pop()
+    else:
+        _note, link, text = scene.stock_notes[0]
+        scene.stock_notes[0] = (None, link, text)
+    with pytest.raises(RuntimeError):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+def test_sheet_owned_note_still_in_native_view_inventory_is_not_waived(
+    monkeypatch, tmp_path, module,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.front.GetAnnotations = lambda: (scene.notes["Supplier"].annotation,)
+    with pytest.raises(RuntimeError, match="supplier note leaves its cell"):
+        asyncio.run(module.build(scene.adapter))
+    assert scene.notes["Supplier"].annotation.OwnerType == 1
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("fault", (None, "edit-template", "active-view", "missing-note"))
+def test_channel_stock_builder_returns_sheet_owned_literal_triples(monkeypatch, fault):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 5.0, 1.0, False, 0.4318, 0.2794),
+        GetZoneMargin=lambda _side: 0.0127,
+    )
+    stock = SimpleNamespace(Position=drawing.STOCK_CENTER, UpdateViewDisplayGeometry=lambda: None)
+    iso = SimpleNamespace()
+    model = SimpleNamespace(
+        ActiveDrawingView=stock, GetEditSheet=lambda: fault != "edit-template",
+        GetCurrentSheet=lambda: sheet, EditRebuild3=lambda: True,
+    )
+
+    def activate_view(name):
+        assert name == ""
+        if fault != "active-view":
+            model.ActiveDrawingView = None
+        return False
+
+    model.ActivateView = activate_view
+    adapter = SimpleNamespace(currentModel=model, _attempt=lambda operation: operation())
+    placements, created = [], []
+
+    def place_view(_adapter, _path, orientation, x, y, *, scale):
+        placements.append((orientation, x, y, scale))
+        return stock if orientation == "*Front" else iso
+
+    def add_note(_adapter, text, x, y):
+        if fault == "missing-note":
+            return None
+        note = _note_double(text, text, x, y, owner_type=0 if model.ActiveDrawingView else 1)
+        created.append(note)
+        return note
+
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "_show_hidden_owners", lambda *_args, **_kwargs:
+                        (drawing.SUPPLIER_STOCK_FEATURE,))
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_args, **_kwargs:
+                        (drawing.STOCK_CENTER,))
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(drawing, "add_note", add_note)
+    if fault is not None:
+        with pytest.raises(RuntimeError):
+            drawing._supplier_stock_sheet(adapter)
+        assert not created
+        return
+    actual_stock, actual_iso, refs, notes = drawing._supplier_stock_sheet(adapter)
+    assert (actual_stock, actual_iso, refs) == (stock, iso, [])
+    assert [note for note, _link, _text in notes] == created
+    expected = _stock_note_contracts(drawing)
+    assert [(link, text) for _note, link, text in notes] == [
+        (link, text) for _note, link, text in expected
+    ]
+    assert all(note.annotation.OwnerType == 1 for note in created)
+    for (note, _link, _text), (expected_note, _expected_link, _expected_text) in zip(notes, expected):
+        assert note.extent == pytest.approx(expected_note.extent)
+    assert placements == [
+        ("*Front", *drawing.STOCK_CENTER, drawing.STOCK_SCALE),
+        ("*Isometric", *drawing.STOCK_ISO_CENTER, drawing.ISO_SCALE),
+    ]
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.203)
+    assert placements[1] == ("*Isometric", 0.310, 0.203, (3.0, 1.0))
+    assert stock.ReferencedConfiguration == iso.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("sheet_name", ("FINISHED", "SUPPLIER-STOCK"))
+def test_note_ownership_failure_is_reported_before_a_native_view_cell_failure(
+    monkeypatch, tmp_path, module, sheet_name,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    scene.state.target_sheet = sheet_name
+    scene.state.mutate_note = lambda note: setattr(note.annotation, "OwnerType", 0)
+    native_view = scene.front if sheet_name == "FINISHED" else scene.stock
+    native_view.GetOutline = lambda: (0.100, 0.010, 0.170, 0.240)
+    with pytest.raises(RuntimeError, match="actual owner=0"):
+        asyncio.run(module.build(scene.adapter))
+    assert not scene.state.saved
+
+
+@pytest.mark.parametrize("module", (drawing, boss_drawing))
+@pytest.mark.parametrize("newline", ("\n", "\r\n", "\r"), ids=("authored-lf", "native-crlf", "bare-cr-drift"))
+def test_finished_note_line_endings_preserve_authored_lf_without_accepting_bare_cr(
+    monkeypatch, tmp_path, module, newline,
+):
+    scene = _note_build_scene(monkeypatch, tmp_path, module)
+    create_note = module.add_property_linked_note
+
+    def linked_note(adapter, name, x, y, *, char_height):
+        note = create_note(adapter, name, x, y, char_height=char_height)
+        if name == "Manufacturing Notes":
+            authored = scene.property_reads[0][name]
+            assert "\n" in authored and "\r" not in authored
+            note.text = authored.replace("\n", newline)
+        return note
+
+    monkeypatch.setattr(module, "add_property_linked_note", linked_note)
+    if newline == "\r":
+        with pytest.raises(RuntimeError, match="changed or leaves the usable sheet"):
+            asyncio.run(module.build(scene.adapter))
+        assert not scene.state.saved
+    else:
+        assert asyncio.run(module.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+    note = scene.notes["Manufacturing Notes"]
+    assert note.PropertyLinkedText == module.property_link("Manufacturing Notes")
+    assert note.GetText() == scene.property_reads[0]["Manufacturing Notes"].replace("\n", newline)

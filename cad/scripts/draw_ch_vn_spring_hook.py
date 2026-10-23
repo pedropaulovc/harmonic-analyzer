@@ -18,6 +18,8 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -35,13 +37,14 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
-from _drawing_attachment import _is_same_attachment
+from _drawing_dimensions import (
+    offset_dimension_text, set_dimension_callouts, set_dimension_precision,
+)
 from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import (
     _show_hidden_owners, curate_view_dimensions as curate_stock_dimensions,
 )
-from _drawing_notes import add_property_linked_note
+from _drawing_notes import add_property_linked_note, property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_projection import model_points_in_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -56,6 +59,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _session import run_build
 import _stock_trim_drawing as trim_drawing
 import _telemetry
+from stock_anchor_geom import ANCHOR_9489T111 as _SUPPLIER_ANCHOR
 from ch_vn_spring_hook_spec import (
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
@@ -83,6 +87,8 @@ from ch_vn_spring_hook_spec import (
 SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
 SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
+# diag_build_9489T111 names the merged circular-profile eye sweep "Wire".
+_SUPPLIER_EYE_FEATURE = "Wire"
 # The finished part is 31.3 x 12.7 mm since its shank carries the MHA-CH-14
 # jam nut under the coefficient plate: 5:1 keeps the front view inside the
 # counter anchor's 4:1 sheet band, raised so the cut end's deburr dimensions clear
@@ -91,16 +97,32 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 # chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-STOCK_SCALE = (5.0, 1.0)
+# The actual 5:1 stock outline is 171.903 mm tall in the unchanged 163.7 mm
+# cell, so translation cannot fit it. Main approved catalogue scale 4:1 for
+# this stock primary only; its actual native bounds and readability still
+# require qualification, never a proportionally reduced 5:1 outline.
+STOCK_SCALE = (4.0, 1.0)
 SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
 STOCK_CENTER = (0.150, 0.1755)
-FRONT_CENTER = (0.100, 0.18625)
-ISO_CENTER = (0.310, 0.213)
-# The cut end sits about 0.078 below the view centre (half the 31.3 at 5:1);
-# the centre rose 0.00475 with the 1.9 mm longer shank and 0.0015 more with
-# the 0.6 mm the plate's thickest limit added (code review C10), so the end,
-# its deburr dimensions and the notes keep their 28.8-era stations; the
-# eye's top stands ~2 mm under the top border.
+# a269's settled GetOutline exceeded the unchanged FINISHED cell top by
+# 4.3690642237152 mm, with 36.33093577628477 mm of bottom slack. Lower only
+# this view 5 mm: the smallest whole-mm translation containing that recorded
+# native box. GetOutline does not guarantee a tight physical-edge envelope;
+# the translated placement still needs native qualification. Text anchors stay put.
+FRONT_CENTER = (0.100, 0.18125)
+# a06's FINISHED isometric GetOutline exceeds the unchanged cell top by
+# 0.6277812843747 mm, with 93.57221871562523 mm of bottom slack. Lower only
+# that pictorial 1 mm, the smallest whole-mm shift: top/bottom clearance becomes
+# 0.3722187156253/92.57221871562523 mm. Its padded outline is not physical ink;
+# the retained v44 PDF's opaque pictorial-to-caption gap predicts 7.381 mm
+# after this shift, not native/printed acceptance of the new output.
+FINISHED_ISO_CENTER = (0.310, 0.212)
+# c12's actual STOCK isometric exceeded its unchanged cell top by
+# 9.6277812843747 mm. Lower this pictorial and only its caption 10 mm:
+# the minimum whole-mm translation leaves 0.3722187156253 mm top clearance.
+# This preserves their relative composition, not a new native/printed ink proof.
+STOCK_ISO_CENTER = (0.310, 0.203)
+STOCK_ISO_CAPTION = (0.275, 0.153)
 # The deburr's value and callout hang right of the shank, clear of their own
 # extension lines (review r8: centred under the 2.3 mm leg they were struck)
 # and above the notes.
@@ -109,6 +131,12 @@ FRONT_KEEP = {
     "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }
+# 9bb's complete angular witnesses reach X129.3085 mm; its PDF glyph box
+# starts at X120.5972 mm. A text-only +13 mm shelf predicts 4.1137 mm of
+# painted clearance even with the maximum 0.35 mm stroke, above native
+# 3.5 mm text height. Keep FRONT_KEEP's original arc/line anchor; new native
+# routing and whole-sheet ink still require qualification.
+CHAMFER_ANGLE_TEXT_XY = (0.137, 0.117)
 # The deburr band is tighter than the title block on both sides (review r8
 # read it as a plain lead-in): its minimum leg brings the cut end under the
 # #6-32 tap drill so the cut thread starts in the lever's tap, and its
@@ -147,23 +175,271 @@ def _verify_controls(annotations: list[Any]) -> None:
     )
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
-    """Physical unchanged eye sizes plus an associative nominal-major carrier."""
+def _chamfer_angle_annotation(adapter: Any, annotations: list[Any]) -> tuple[Any, Any]:
+    matches = [
+        raw for raw in annotations if dimension_name(adapter, raw) == "ChamferAngle"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("cut end needs exactly one native ChamferAngle")
+    annotation = _early_bound(matches[0], "IAnnotation")
+    raw_display = annotation.GetSpecificAnnotation()
+    if raw_display is None:
+        raise RuntimeError("ChamferAngle: native display dimension is missing")
+    return annotation, _early_bound(raw_display, "IDisplayDimension")
+
+
+def _verify_chamfer_angle_position(
+    annotation: Any, expected_xy: tuple[float, float],
+) -> None:
+    position = annotation.GetPosition()
+    if (
+        not isinstance(position, (tuple, list)) or len(position) != 3
+        or any(type(value) not in (int, float) or not math.isfinite(value) for value in position)
+        or math.dist(position[:2], expected_xy) > 1e-5
+    ):
+        raise RuntimeError(
+            "ChamferAngle: native position did not persist; "
+            f"expected_xy={expected_xy!r}, actual={position!r}, tolerance_m=1e-5"
+        )
+
+
+def _verify_chamfer_angle_text(adapter: Any, annotations: list[Any]) -> None:
+    """Read native shelf only; never repair a settled or saved dimension."""
+    annotation, display = _chamfer_angle_annotation(adapter, annotations)
+    actual_offset = display.OffsetText
+    if actual_offset is not True:
+        raise RuntimeError(
+            "ChamferAngle: native text shelf did not persist; "
+            f"OffsetText={actual_offset!r}"
+        )
+    _verify_chamfer_angle_position(annotation, CHAMFER_ANGLE_TEXT_XY)
+
+
+def _place_chamfer_angle_text(adapter: Any, annotations: list[Any]) -> None:
+    """Leave the model-owned 45-degree arc in place and move only its text."""
+    annotation, display = _chamfer_angle_annotation(adapter, annotations)
+    display.OffsetText = False
+    if display.OffsetText is not False:
+        raise RuntimeError("ChamferAngle: inherited text offset could not be reset")
+    if annotation.SetPosition2(*FRONT_KEEP["ChamferAngle"], 0.0) is not True:
+        raise RuntimeError("ChamferAngle: native arc placement was refused")
+    _verify_chamfer_angle_position(annotation, FRONT_KEEP["ChamferAngle"])
+    offset_dimension_text(
+        adapter, [annotation], {"ChamferAngle": CHAMFER_ANGLE_TEXT_XY},
+    )
+    _verify_chamfer_angle_text(adapter, [annotation])
+
+
+def _native_equality(app, left, right):
+    """Refuse unknown COM equality states instead of coercing them to true."""
+    if left is None or right is None:
+        raise RuntimeError("supplier reference native identity is missing")
+    value = app.IsSame(left, right)
+    if type(value) is not int or value not in (0, 1):
+        raise RuntimeError(f"supplier reference has unknown native IsSame state {value!r}")
+    return value
+
+
+def _native_path(value, *, label):
+    if not isinstance(value, str) or not value or not Path(value).is_absolute():
+        raise RuntimeError(f"{label}: native document path is missing or not absolute")
+    return value.replace("\\", "/").casefold()
+
+
+@dataclass(frozen=True)
+class _SupplierViewIdentity:
+    name: str
+    configuration: str
+    source_path: str
+    view: Any
+    source: Any
+
+
+@dataclass(frozen=True)
+class _SupplierReferenceSnapshot:
+    sheet: str
+    key: str
+    contract: tuple[tuple[str, Any], ...]
+    annotation: Any
+    owner: Any
+    drawing: Any
+    drawing_path: str
+    views: tuple[_SupplierViewIdentity, ...]
+
+
+def _supplier_views(adapter, names, configuration):
+    views = {}
+    for raw in iter_views(adapter):
+        view = _early_bound(raw, "IView")
+        name = view_name(adapter, view)
+        if not isinstance(name, str) or not name or name in views:
+            raise RuntimeError("supplier view names are missing or duplicate")
+        views[name] = view
+    identities = []
+    for name in names:
+        if name not in views:
+            raise RuntimeError(f"{name}: supplier view disappeared")
+        view = views[name]
+        if view.ReferencedConfiguration != configuration:
+            raise RuntimeError(f"{name}: supplier view lost its source configuration")
+        raw_source = view.ReferencedDocument
+        if raw_source is None:
+            raise RuntimeError(f"{name}: supplier view lost its source document")
+        source = _early_bound(raw_source, "IModelDoc2")
+        path = _native_path(source.GetPathName(), label=name)
+        if path != SOURCE.resolve().as_posix().casefold():
+            raise RuntimeError(f"{name}: supplier view source path changed")
+        identities.append(_SupplierViewIdentity(name, configuration, path, view, source))
+    return tuple(identities)
+
+
+def _supplier_displays(view):
+    displays = {}
+    raw = view.GetFirstDisplayDimension6()
+    while raw is not None:
+        display = _early_bound(raw, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        key = native.FullName
+        if not isinstance(key, str) or not key or key in displays:
+            raise RuntimeError(f"duplicate or missing native supplier dimension {key!r}")
+        displays[key] = display
+        raw = display.GetNext5()
+    return displays
+
+
+def _supplier_annotation(app, display, view):
+    raw_annotation = display.GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError("supplier dimension has no native annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    kind, owner_type = annotation.GetType(), annotation.OwnerType
+    raw_owner = annotation.Owner
+    if type(kind) is not int or kind != 4 or type(owner_type) is not int or owner_type != 0 or raw_owner is None:
+        raise RuntimeError("supplier dimension must be a typed view-owned display dimension")
+    owner = _early_bound(raw_owner, "IView")
+    raw_specific = annotation.GetSpecificAnnotation()
+    if raw_specific is None:
+        raise RuntimeError("supplier annotation has no typed display dimension")
+    specific = _early_bound(raw_specific, "IDisplayDimension")
+    if (
+        _native_equality(app, owner, view) != 1
+        or _native_equality(app, specific, display) != 1
+    ):
+        raise RuntimeError("supplier annotation lost its exact native display or view owner")
+    raw_source, raw_owner_source = view.ReferencedDocument, owner.ReferencedDocument
+    if (
+        owner.ReferencedConfiguration != view.ReferencedConfiguration
+        or raw_source is None or raw_owner_source is None
+    ):
+        raise RuntimeError("supplier annotation owner source configuration changed")
+    owner_source = _early_bound(raw_owner_source, "IModelDoc2")
+    if (
+        _native_path(owner_source.GetPathName(), label="supplier owner")
+        != SOURCE.resolve().as_posix().casefold()
+        or _native_equality(app, owner_source, _early_bound(raw_source, "IModelDoc2")) != 1
+    ):
+        raise RuntimeError("supplier annotation owner source binding changed")
+    return annotation, owner
+
+
+def _supplier_eye_circle(
+    adapter: Any, view: Any, raw: Any, finished_configuration: str,
+) -> tuple[float, ...] | None:
+    """Read an exact model-XY circle on the authoritative source eye torus."""
+    configuration = view.ReferencedConfiguration
+    if (
+        type(finished_configuration) is not str or not finished_configuration
+        or type(configuration) is not str or configuration != finished_configuration
+        or raw is None
+    ):
+        return None
+    silhouette = _early_bound(raw, "ISilhouetteEdge")
+    raw_curve = silhouette.GetCurve()
+    if raw_curve is None:
+        return None
+    curve = _early_bound(raw_curve, "ICurve")
+    if not curve.IsCircle():
+        return None
+    circle = tuple(float(value) for value in curve.CircleParams)
+    if not (
+        len(circle) == 7
+        and all(math.isfinite(value) for value in circle)
+        and all(abs(value) <= 1e-8 for value in circle[:3])
+        and abs(abs(circle[5]) - 1.0) <= 1e-8
+    ):
+        return None
+    native_view = silhouette.GetView()
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    if native_view is None:
+        return None
+    native_view = _early_bound(native_view, "IView")
+    if _native_equality(app, native_view, view) != 1:
+        return None
+    native_configuration = native_view.ReferencedConfiguration
+    if (
+        type(native_configuration) is not str or native_configuration != finished_configuration
+    ):
+        return None
+    raw_document = view.ReferencedDocument
+    if raw_document is None:
+        return None
+    document = _early_bound(raw_document, "IModelDoc2")
+    native_path = str(document.GetPathName())
+    if native_path.replace("\\", "/").casefold() != SOURCE.resolve().as_posix().casefold():
+        return None
+    expected_feature = _early_bound(raw_document, "IPartDoc").FeatureByName(_SUPPLIER_EYE_FEATURE)
+    raw_face = silhouette.GetFace()
+    if expected_feature is None or raw_face is None:
+        return None
+    raw_extension = document.Extension
+    if raw_extension is None:
+        return None
+    # A drawing face's feature is a different native object from its source
+    # owner. Map every face into this source part before comparing identity or
+    # reading the torus; neither names nor drawing-context equality prove it.
+    extension = _early_bound(raw_extension, "IModelDocExtension")
+    raw_source_face = extension.GetCorrespondingEntity2(_early_bound(raw_face, "IFace2"))
+    if raw_source_face is None:
+        return None
+    face = _early_bound(raw_source_face, "IFace2")
+    owner = face.GetFeature()
+    if owner is None or _native_equality(app, owner, expected_feature) != 1:
+        return None
+    raw_surface = face.GetSurface()
+    if raw_surface is None:
+        return None
+    surface = _early_bound(raw_surface, "ISurface")
+    if not surface.IsTorus():
+        return None
+    torus = tuple(float(value) for value in surface.TorusParams)
+    if not (
+        len(torus) == 8
+        and all(math.isfinite(value) for value in torus)
+        and all(abs(value) <= 1e-8 for value in torus[:3])
+        and abs(abs(torus[5]) - 1.0) <= 1e-8
+        and abs(torus[6] * 2000.0 - 2.0 * _SUPPLIER_ANCHOR.eye_mean_radius_mm) < 1e-5
+        and abs(torus[7] * 2000.0 - _SUPPLIER_ANCHOR.wire_dia_mm) < 1e-5
+    ):
+        return None
+    return circle
+
+
+def _supplier_references(
+    adapter: Any, front: Any, finished_configuration: str,
+) -> list[tuple[str, dict[str, Any]]]:
+    """Prove the current finished-source eye before each physical diameter."""
+    configuration = front.ReferencedConfiguration
+    if (
+        type(finished_configuration) is not str or not finished_configuration
+        or type(configuration) is not str or configuration != finished_configuration
+    ):
+        raise RuntimeError("spring anchor supplier eye lost its finished source configuration")
     eye = {}
     refs = []
-    for raw in visible_view_entities(front, 4, label="spring anchor supplier contours"):
-        silhouette = _early_bound(raw, "ISilhouetteEdge")
-        raw_curve = silhouette.GetCurve()
-        if raw_curve is None:
-            continue
-        curve = _early_bound(raw_curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        circle = tuple(float(value) for value in curve.CircleParams)
-        if (
-            any(abs(value) > 1e-8 for value in circle[:3])
-            or abs(abs(circle[5]) - 1.0) > 1e-8
-        ):
+    visible = visible_view_entities(front, 4, label="spring anchor supplier contours")
+    for raw in visible:
+        circle = _supplier_eye_circle(adapter, front, raw, finished_configuration)
+        if circle is None:
             continue
         for name, diameter in SUPPLIER_EYE_MM.items():
             if abs(circle[6] * 2000.0 - diameter) < 1e-5:
@@ -174,21 +450,50 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
     ):
         if name not in eye:
             raise RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
+        primary = None
         try:
             _select_view_entity(
                 adapter, front, "SILHOUETTE", None, label=name, entity=eye[name]
             )
+            selection = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+            count = selection.GetSelectedObjectCount2(-1)
+            if type(count) is not int or count != 1:
+                raise RuntimeError(
+                    f"{name}: final spring eye selection expected count=1; actual count={count!r}"
+                )
+            kind = selection.GetSelectedObjectType3(1, -1)
+            if type(kind) is not int or kind != 46:  # swSelSILHOUETTES
+                raise RuntimeError(
+                    f"{name}: final spring eye selection expected type=46; actual type={kind!r}"
+                )
+            current = selection.GetSelectedObject6(1, -1)
+            if current is None:
+                raise RuntimeError(f"{name}: final spring eye selection has no physical silhouette")
+            circle = _supplier_eye_circle(adapter, front, current, finished_configuration)
+            if circle is None or abs(circle[6] * 2000.0 - SUPPLIER_EYE_MM[name]) >= 1e-5:
+                raise RuntimeError(f"{name}: final spring eye selection lost its exact physical source contour")
             display = adapter.currentModel.AddDiameterDimension2(*text_xy, 0.0)
+            if display is None:
+                raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
+        except BaseException as error:
+            primary = error
+            raise
         finally:
-            adapter.currentModel.ClearSelection2(True)
-        if display is None:
-            raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
+            try:
+                adapter.currentModel.ClearSelection2(True)
+            except BaseException as cleanup_error:
+                if primary is None:
+                    raise
+                primary.add_note(
+                    f"{name}: spring eye selection cleanup also failed: "
+                    f"{type(cleanup_error).__name__}: {cleanup_error}"
+                )
         contract = dict(
             label=name, expected_mm=SUPPLIER_EYE_MM[name], units="in",
             precision=SUPPLIER_REFERENCE_PRECISION[name], presentation="diameter",
         )
         display = supplier_reference_dimension(adapter, display, **contract)
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, eye[name]))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     annotations = curate_stock_dimensions(
         adapter, front, keep={"SupplierThreadMajor": (0.166, 0.175)},
         view_label="supplier thread nominal major, not helical geometry",
@@ -204,7 +509,7 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     return refs
 
 
@@ -215,7 +520,7 @@ def _supplier_stock_sheet(adapter):
         "IView",
     )
     iso = _early_bound(
-        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE),
+        place_view(adapter, str(SOURCE), "*Isometric", *STOCK_ISO_CENTER, scale=ISO_SCALE),
         "IView",
     )
     for view in (stock, iso):
@@ -271,7 +576,7 @@ def _supplier_stock_sheet(adapter):
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
@@ -292,54 +597,49 @@ def _supplier_stock_sheet(adapter):
             "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
             0.016, 0.089,
         ),
-        (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", 0.275, 0.163),
+        (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", *STOCK_ISO_CAPTION),
     ):
         note = add_note(adapter, text, x, y)
         if note is None:
             raise RuntimeError("cannot label the original supplier stock body")
-        notes.append((_early_bound(note, "INote"), text))
+        notes.append((_early_bound(note, "INote"), text, text))
     for view in (stock, iso):
         set_hidden_lines_removed(adapter, view)
     return stock, iso, refs, notes
 
 
 def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Resolve source coverage from freshly enumerated post-rebuild dimensions."""
-    if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
+    """Strictly prove current exact keys, then freeze only native identities."""
+    if sum(len(refs) for refs in refs_by_sheet.values()) != 6 or set(refs_by_sheet) != set(view_contracts):
         raise RuntimeError("spring anchor must retain all six supplier dimensions")
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing_path = model.GetPathName()
+    document_type = model.GetType()
+    if not isinstance(drawing_path, str) or type(document_type) is not int or document_type != 3:
+        raise RuntimeError("supplier references require the current native drawing")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    drawing = _early_bound(model, "IDrawingDoc")
+    verified = []
     for sheet_name, refs in refs_by_sheet.items():
         if drawing.ActivateSheet(sheet_name) is not True:
             raise RuntimeError(f"cannot inspect settled references on {sheet_name}")
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
         names, configuration = view_contracts[sheet_name]
-        for name in names:
-            if name not in views or str(views[name].ReferencedConfiguration) != configuration:
-                raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
-        view = views[names[0]]
-        view.UpdateViewDisplayGeometry()
-        displays = {}
-        display = view.GetFirstDisplayDimension6()
-        while display is not None:
-            display = _early_bound(display, "IDisplayDimension")
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            key = str(native.FullName)
-            if key in displays:
-                raise RuntimeError(f"{sheet_name}: duplicate native dimension {key}")
-            displays[key] = display
-            display = display.GetNext5()
+        identities = _supplier_views(adapter, names, configuration)
+        view = identities[0].view
+        displays = _supplier_displays(view)
         expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
-        if len(displays) != expected_count:
+        if len(displays) != expected_count or len({key for key, _contract in refs}) != len(refs):
             raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
-        for key, contract, expected_entity in refs:
+        for key, contract in refs:
             if key not in displays:
                 raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
             display = displays[key]
+            annotation, owner = _supplier_annotation(app, display, view)
             assert_supplier_reference_dimension(adapter, display, **contract)
             native = _early_bound(display.GetDimension2(0), "IDimension")
             if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
                 raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
-            if expected_entity is None:
+            if contract["label"] not in SUPPLIER_EYE_MM:
                 feature = (
                     SUPPLIER_THREAD_FEATURE
                     if contract["label"] == "SupplierThreadMajor" else SUPPLIER_STOCK_FEATURE
@@ -349,16 +649,136 @@ def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
                 if contract["label"] in ("SupplierStockShank", "SupplierStockOverall") and int(native.DrivenState) != 1:
                     raise RuntimeError(f"{contract['label']}: source station span is no longer driven")
             else:
-                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                # Never retain the silhouette or mapped face beyond this read.
                 entities = tuple(annotation.GetAttachedEntities3() or ())
-                kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-                if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                    adapter, entities[0], expected_entity, "SILHOUETTE"
+                kinds = tuple(annotation.GetAttachedEntityTypes() or ())
+                count = annotation.GetAttachedEntityCount3()
+                if (
+                    type(count) is not int or count != 1
+                    or len(entities) != 1
+                    or len(kinds) != 1 or type(kinds[0]) is not int or kinds[0] != 46
+                    or entities[0] is None
+                    or annotation.IsDangling()
                 ):
-                    raise RuntimeError(f"{contract['label']}: supplier eye reference moved to another contour")
+                    raise RuntimeError(
+                        f"{contract['label']}: supplier eye must retain one live physical "
+                        f"silhouette; entities={len(entities)}, kinds={kinds}"
+                    )
+                circle = _supplier_eye_circle(adapter, view, entities[0], configuration)
+                diameter = SUPPLIER_EYE_MM[contract["label"]]
+                if circle is None or abs(circle[6] * 2000.0 - diameter) >= 1e-5:
+                    raise RuntimeError(
+                        f"{contract['label']}: supplier eye lost its exact physical source contour; "
+                        f"circle={circle!r}, expected_diameter_mm={diameter}"
+                    )
+            verified.append((
+                sheet_name, key, tuple(contract.items()), annotation, owner,
+                model, drawing_path, identities,
+            ))
+    # Publish no frozen snapshot until every sheet's strict geometry passed.
+    snapshots = tuple(_SupplierReferenceSnapshot(*identity) for identity in verified)
+    for index, original in enumerate(snapshots):
+        for other in snapshots[:index]:
+            if _native_equality(app, original.annotation, other.annotation) != 0:
+                raise RuntimeError("supplier original annotations must be provably distinct")
+    return snapshots
 
 
-def _verify_supplier_layout(adapter, view_contracts, notes):
+def _capture_saved_supplier_references(adapter, refs_by_sheet, view_contracts, prior):
+    """Capture actual saved keys ONLY through the original native annotations.
+
+    This is a still-open identity observation, not a save-success receipt or
+    cold persistence proof. Metadata failures refuse; names never supply aliases.
+    """
+    expected = tuple(
+        (sheet, key, tuple(contract.items()))
+        for sheet, refs in refs_by_sheet.items() for key, contract in refs
+    )
+    if (
+        not prior or len(prior) != 6
+        or tuple((item.sheet, item.key, item.contract) for item in prior) != expected
+        or set(refs_by_sheet) != set(view_contracts)
+    ):
+        raise RuntimeError("saved supplier capture requires the complete verified original references")
+    if adapter.currentModel is None:
+        raise RuntimeError("saved supplier current native drawing is missing")
+    app = _early_bound(adapter.swApp, "ISldWorks")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing = _early_bound(model, "IDrawingDoc")
+    document_type = model.GetType()
+    if (
+        type(document_type) is not int or document_type != 3
+        or _native_path(model.GetPathName(), label="saved supplier drawing")
+        != OUTPUTS.slddrw.resolve().as_posix().casefold()
+    ):
+        raise RuntimeError("saved supplier drawing is not the actual native output path")
+    for raw in (app.ActiveDoc, app.GetOpenDocumentByName(str(OUTPUTS.slddrw.resolve()))):
+        if raw is None or _native_equality(app, _early_bound(raw, "IModelDoc2"), model) != 1:
+            raise RuntimeError("saved supplier output is not the current native drawing")
+    captured = {}
+    captured_keys = set()
+    for sheet, refs in refs_by_sheet.items():
+        if drawing.ActivateSheet(sheet) is not True:
+            raise RuntimeError(f"{sheet}: cannot inspect saved supplier identities")
+        names, configuration = view_contracts[sheet]
+        current_views = _supplier_views(adapter, names, configuration)
+        view = current_views[0].view
+        raw_annotations = view.GetAnnotations()
+        if not isinstance(raw_annotations, (tuple, list)):
+            raise RuntimeError(f"{sheet}: saved supplier annotation census is unavailable")
+        candidates = tuple(_early_bound(raw, "IAnnotation") for raw in raw_annotations)
+        saved_refs = []
+        for original in (item for item in prior if item.sheet == sheet):
+            if _native_equality(app, model, original.drawing) != 1 or len(current_views) != len(original.views):
+                raise RuntimeError(f"{sheet}: original native drawing or view census changed")
+            for actual, old in zip(current_views, original.views):
+                if (
+                    (actual.name, actual.configuration, actual.source_path)
+                    != (old.name, old.configuration, old.source_path)
+                    or _native_equality(app, actual.view, old.view) != 1
+                    or _native_equality(app, actual.source, old.source) != 1
+                ):
+                    raise RuntimeError(f"{sheet}: original supplier view/source binding changed")
+            matches = [
+                annotation for annotation in candidates
+                if _native_equality(app, annotation, original.annotation) == 1
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{dict(original.contract)['label']}: original annotation census must be exactly one")
+            annotation = matches[0]
+            raw_display = annotation.GetSpecificAnnotation()
+            if raw_display is None:
+                raise RuntimeError(f"{sheet}: original supplier display dimension is missing")
+            display = _early_bound(raw_display, "IDisplayDimension")
+            returned, owner = _supplier_annotation(app, display, view)
+            if _native_equality(app, returned, annotation) != 1:
+                raise RuntimeError(f"{sheet}: original supplier display annotation changed")
+            raw_native = display.GetDimension2(0)
+            if raw_native is None:
+                raise RuntimeError(f"{sheet}: original supplier native dimension is missing")
+            key = _early_bound(raw_native, "IDimension").FullName
+            if not isinstance(key, str) or not key or key in captured_keys:
+                raise RuntimeError(f"{sheet}: saved supplier native key is missing or duplicate")
+            original_annotation = _early_bound(original.annotation, "IAnnotation")
+            original_owner_type = original_annotation.OwnerType
+            original_owner = original_annotation.Owner
+            if (
+                type(original_owner_type) is not int or original_owner_type != 0
+                or original_owner is None
+                or _native_equality(app, _early_bound(original_owner, "IView"), original.owner) != 1
+                or _native_equality(app, owner, original.owner) != 1
+                or _native_equality(app, original.owner, view) != 1
+            ):
+                raise RuntimeError(f"{sheet}: original supplier annotation owner changed")
+            captured_keys.add(key)
+            saved_refs.append((key, dict(original.contract)))
+        if len(saved_refs) != len(refs) or len({key for key, _contract in saved_refs}) != len(refs):
+            raise RuntimeError(f"{sheet}: saved supplier annotation coverage changed")
+        captured[sheet] = saved_refs
+    return captured
+
+
+def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
     """Inspect every view's settled native ink and sheet-owned source labels."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     for sheet_name, (names, _configuration) in view_contracts.items():
@@ -374,22 +794,49 @@ def _verify_supplier_layout(adapter, view_contracts, notes):
             region.xmin, 0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
             region.xmax, region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
         )
+        notes = notes_by_sheet.get(sheet_name)
+        expected_count = 5 if sheet_name == SHEET_NAMES[0] else 3
+        if notes is None or len(notes) != expected_count:
+            raise RuntimeError(
+                f"{sheet_name}: expected {expected_count} sheet notes; "
+                f"actual count={None if notes is None else len(notes)}"
+            )
+        for note, expected_link, expected_text in notes:
+            if note is None:
+                raise RuntimeError(f"{sheet_name}: source label is missing: {expected_link}")
+            raw_annotation = note.GetAnnotation()
+            if raw_annotation is None:
+                raise RuntimeError(f"{sheet_name}: source label has no annotation: {expected_link}")
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            bounds = _box(note.GetExtent(), label=expected_link, kind="note")
+            owner = int(annotation.OwnerType)
+            linked = str(note.PropertyLinkedText)
+            resolved = str(note.GetText()).replace("\r\n", "\n")
+            expected_text = expected_text.replace("\r\n", "\n")
+            if (
+                owner != 1 or not _inside(bounds, border)
+                or linked != expected_link
+                or resolved != expected_text
+            ):
+                raise RuntimeError(
+                    f"{sheet_name}: source label changed or leaves the usable sheet: "
+                    f"expected owner=1, link={expected_link!r}, text={expected_text!r}; "
+                    f"actual owner={owner}, link={linked!r}, text={resolved!r}, "
+                    f"bounds={bounds}, border={border}"
+                )
         views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
         for name in names:
             if name not in views:
                 raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
             view = views[name]
             view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"spring anchor {sheet_name}")
-        if sheet_name == SHEET_NAMES[1]:
-            for note, text in notes:
-                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-                bounds = _box(note.GetExtent(), label=text, kind="note")
-                if (
-                    int(annotation.OwnerType) != 1 or not _inside(bounds, border)
-                    or str(note.GetText()).replace("\r\n", "\n") != text
-                ):
-                    raise RuntimeError(f"original stock label changed or leaves the usable sheet: {text}")
+            assert_supplier_view_fits(
+                adapter, view, cell,
+                label=(
+                    f"spring anchor {sheet_name} view={name!r} "
+                    f"configuration={str(view.ReferencedConfiguration)!r} cell={cell!r}"
+                ),
+            )
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
@@ -421,7 +868,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "Manufacturing Notes",
         "Isometric View Note",
     )
-    read_required_properties(adapter.currentModel, required, required=required)
+    source_properties = read_required_properties(adapter.currentModel, required, required=required)
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -441,7 +888,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *FINISHED_ISO_CENTER, scale=ISO_SCALE)
     for view in (front, iso):
         view = _early_bound(view, "IView")
         view.ReferencedConfiguration = finished_configuration
@@ -455,14 +902,25 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
-    refs = _supplier_references(adapter, front)
-    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
-    add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
-    )
+    _place_chamfer_angle_text(adapter, annotations)
+    refs = _supplier_references(adapter, front, finished_configuration)
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter finished spring anchor sheet context for labels")
+    finished_notes = []
+    for name, x, y, char_height in (
+        ("Supplier", 0.016, 0.060, 0.003),
+        ("Supplier SKUs", 0.080, 0.060, 0.003),
+        ("Stock Name", 0.016, 0.049, 0.003),
+        ("Isometric View Note", 0.275, 0.163, None),
+        ("Manufacturing Notes", 0.016, 0.083, 0.003),
+    ):
+        note = add_property_linked_note(adapter, name, x, y, char_height=char_height)
+        if note is None:
+            raise RuntimeError(f"cannot create finished spring anchor source label: {name}")
+        finished_notes.append(
+            (_early_bound(note, "INote"), property_link(name), source_properties[name])
+        )
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
@@ -473,6 +931,76 @@ async def build(adapter: Any) -> dict[str, str]:
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
         SHEET_NAMES[1]: ((view_name(adapter, stock), view_name(adapter, stock_iso)), SUPPLIER_STOCK_CONFIGURATION),
     }
+    refs_by_sheet = {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}
+    notes_by_sheet = {SHEET_NAMES[0]: finished_notes, SHEET_NAMES[1]: stock_notes}
+    pre_save_identities = None
+    saved_refs_by_sheet = None
+
+    def verify_settled_references():
+        nonlocal pre_save_identities
+        _verify_source_state(adapter, source_model, finished_configuration)
+        pre_save_identities = _verify_supplier_references(adapter, refs_by_sheet, view_contracts)
+
+    def verify_after_native_save(event):
+        nonlocal saved_refs_by_sheet
+        if event not in ("after_drawing_save", "after_pdf_save", "before_drawing_close"):
+            return
+        entry_sheet = entry_title = None
+        primary_error = None
+        try:
+            if event == "before_drawing_close":
+                entry_model = _early_bound(adapter.currentModel, "IModelDoc2")
+                entry_drawing = _early_bound(entry_model, "IDrawingDoc")
+                sheet = _early_bound(entry_drawing.GetCurrentSheet(), "ISheet")
+                name = sheet.GetName()
+                if not isinstance(name, str) or not name:
+                    raise RuntimeError("cannot read the native drawing close-entry sheet")
+                entry_sheet = name
+                entry_title = entry_model.GetTitle()
+                if not isinstance(entry_title, str) or not entry_title:
+                    raise RuntimeError("cannot read the opaque native drawing close-entry title")
+            # Checkpoints also run on failed operations: this neither asserts
+            # save success nor replaces the shared finalizer's save exception.
+            current_refs = _capture_saved_supplier_references(
+                adapter, refs_by_sheet, view_contracts, pre_save_identities,
+            )
+            if event == "after_drawing_save":
+                if saved_refs_by_sheet is not None:
+                    raise RuntimeError("supplier native-save identities were already captured")
+            elif saved_refs_by_sheet is None or current_refs != saved_refs_by_sheet:
+                raise RuntimeError("saved supplier exact native keys changed after the drawing save")
+            _verify_supplier_references(
+                adapter,
+                current_refs if event == "after_drawing_save" else saved_refs_by_sheet,
+                view_contracts,
+            )
+            if event == "after_drawing_save":
+                saved_refs_by_sheet = current_refs
+            if event != "before_drawing_close" and drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
+                raise RuntimeError("cannot restore finished spring anchor sheet after saved-eye inspection")
+        except BaseException as exc:
+            primary_error = exc
+            raise
+        finally:
+            if entry_sheet is not None:
+                try:
+                    # Common has already captured its opaque CloseDoc title.
+                    # Restore the exact entry context, not a chosen UI sheet.
+                    if entry_drawing.ActivateSheet(entry_sheet) is not True:
+                        raise RuntimeError("cannot restore the native drawing close-entry sheet")
+                    restored = _early_bound(entry_drawing.GetCurrentSheet(), "ISheet")
+                    if restored.GetName() != entry_sheet:
+                        raise RuntimeError("native drawing close-entry sheet restoration changed sheets")
+                    if entry_model.GetTitle() != entry_title:
+                        raise RuntimeError("opaque native drawing title changed during the close checkpoint")
+                except BaseException as restoration_error:
+                    if primary_error is None:
+                        raise
+                    primary_error.add_note(
+                        "before_drawing_close entry-context restoration also failed: "
+                        f"{type(restoration_error).__name__}: {restoration_error}"
+                    )
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -483,12 +1011,13 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(annotations),
-            lambda: _verify_supplier_references(
-                adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
-            ),
-            lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
-            lambda: _verify_source_state(adapter, source_model, finished_configuration),
+            # The existing layout check refreshes every view before the final
+            # attachment readback; the shared verifier stays geometry-read-only.
+            lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),
+            lambda: _verify_chamfer_angle_text(adapter, annotations),
+            verify_settled_references,
         ),
+        checkpoint=verify_after_native_save,
     )
 
 
