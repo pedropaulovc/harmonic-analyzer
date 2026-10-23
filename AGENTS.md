@@ -180,9 +180,10 @@ individual PR or stack does not need a successful full `build` before merging.
    **Drawing sheets have a cached machinist-review leaf; an eye pass does not
    replace it.** `check:machinist_review:<stem>` runs in both `build` and `release`
    for every drawing that opts in, on the submitter without a COM seat. It runs
-   three parallel blind reviews, then a judge vets every finding against the
-   sheet; the aggregate of confirmed findings is the verdict. This replaces the
-   hand-run review command as the pipeline gate, with reports at
+   three isolated blind reviews (Claude staggers the initial request, then
+   continues concurrently; Codex starts in parallel), then a judge vets every
+   finding against the sheet; the aggregate of confirmed findings is the verdict.
+   This replaces the hand-run review command as the pipeline gate, with reports at
    `cad/out/reports/machinist-review/<stem>/<stem>.aggregate.{json,md}`.
    Review is opt-in: a drawing script's module-level
    `MACHINIST_REVIEW = MachinistReviewMode.ENFORCE` fails on `FIX` or `ERROR`;

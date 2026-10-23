@@ -461,9 +461,41 @@ class _ClaudeTransportError(RuntimeError):
         self.returncode = returncode
 
 
+def _claude_provider_response(event: Any) -> bool:
+    """Recognize a real provider response, not CLI startup or synthetic errors."""
+    if (
+        not isinstance(event, dict) or event.get("type") != "assistant"
+        or event.get("isApiErrorMessage") or event.get("is_error") or event.get("error")
+    ):
+        return False
+    message = event.get("message")
+    if not isinstance(message, dict):
+        return False
+    model = message.get("model")
+    usage = message.get("usage")
+    if (
+        not isinstance(model, str) or not model or model == "<synthetic>"
+        or not isinstance(usage, dict)
+    ):
+        return False
+    # The first assistant event's output count can still be partial. Readiness
+    # is not completion/accounting: positive input or cache usage suffices.
+    counts = [
+        usage.get(key, 0) for key in (
+            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+            "output_tokens",
+        )
+    ]
+    return (
+        all(type(count) is int and count >= 0 for count in counts)
+        and any(count > 0 for count in counts)
+    )
+
+
 async def _run_claude(
     command: list[str], *, input: str, timeout: float, cwd: str,
     env: dict[str, str] | None,
+    on_first_response: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Wait for this CLI's actual sheets connection before submitting a prompt.
 
@@ -476,6 +508,7 @@ async def _run_claude(
     stderr: list[bytes] = []
     messages: asyncio.Queue[bytes | None] = asyncio.Queue()
     startup_complete = False
+    response_notified = False
     proc: asyncio.subprocess.Process | None = None
     readers: list[asyncio.Task[None]] = []
     failure: Exception | None = None
@@ -484,17 +517,40 @@ async def _run_claude(
 
     async def read_stdout() -> None:
         assert proc is not None and proc.stdout is not None
-        pending = b""
+        pending: list[bytes] = []
+
+        def receive(line: bytes) -> None:
+            nonlocal response_notified
+            if not startup_complete:
+                messages.put_nowait(line)
+            elif on_first_response is not None and not response_notified:
+                try:
+                    event = json.loads(line)
+                except (ValueError, UnicodeDecodeError):
+                    return  # Preserve malformed/diagnostic lines in raw stdout.
+                if _claude_provider_response(event):
+                    response_notified = True
+                    on_first_response()
+
         try:
             while chunk := await proc.stdout.read(65536):
                 stdout.append(chunk)
-                # Review events can contain multi-megabyte images. Only frame
-                # startup controls; afterward retain bytes without a line limit.
-                if not startup_complete:
-                    pending += chunk
-                    while b"\n" in pending:
-                        line, pending = pending.split(b"\n", 1)
-                        messages.put_nowait(line)
+                # Frame only startup controls and the first provider response.
+                # Join fragments once per line: image events have no size limit
+                # and must not incur quadratic copying while awaiting readiness.
+                if startup_complete and (on_first_response is None or response_notified):
+                    pending.clear()
+                    continue
+                parts = chunk.split(b"\n")
+                pending.append(parts[0])
+                for fragment in parts[1:]:
+                    receive(b"".join(pending))
+                    pending = [fragment]
+                    if startup_complete and (on_first_response is None or response_notified):
+                        pending.clear()
+                        break
+            if pending:
+                receive(b"".join(pending))
         finally:
             messages.put_nowait(None)
 
@@ -618,9 +674,13 @@ async def _run_claude(
 def _run_reviewer(
     command: list[str], *, reviewer: str, input: str, timeout: float,
     cwd: str, env: dict[str, str] | None,
+    on_first_response: Callable[[], None] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if reviewer == "claude":
-        return asyncio.run(_run_claude(command, input=input, timeout=timeout, cwd=cwd, env=env))
+        return asyncio.run(_run_claude(
+            command, input=input, timeout=timeout, cwd=cwd, env=env,
+            on_first_response=on_first_response,
+        ))
     return subprocess.run(
         command, input=input, capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd, env=env,
@@ -1838,6 +1898,7 @@ def _review_session(
     judge_findings: Sequence[dict[str, Any]] | None = None,
     precheck_diff: dict[str, Any] | None = None,
     resume_review: Review | None = None,
+    on_first_response: Callable[[], None] | None = None,
 ) -> Review:
     if reviewer not in REVIEWERS:
         raise ValueError(f"unknown reviewer {reviewer!r}; choose one of {REVIEWERS}")
@@ -1942,6 +2003,14 @@ def _review_session(
     success_first_turn: dict[str, Any] = {}
     attempt_records: list[dict[str, Any]] = []
     attempts = 0
+    response_notified = False
+
+    def notify_first_response() -> None:
+        nonlocal response_notified
+        if not response_notified and on_first_response is not None:
+            response_notified = True
+            on_first_response()
+
     # Never retry a resumed turn: a failed turn may already have mutated this
     # conversation. A fresh judge would lose the required precheck continuity.
     for attempt in range(1 if resume_id is not None else retries + 1):
@@ -2067,6 +2136,7 @@ def _review_session(
             proc = _run_reviewer(
                 cmd, reviewer=reviewer, input=prompt, timeout=timeout_s,
                 cwd=str(cwd), env=env,
+                on_first_response=notify_first_response if on_first_response is not None else None,
             )
             attempt_record["exit_code"] = proc.returncode
             stdout, stderr = proc.stdout, proc.stderr
@@ -2241,12 +2311,14 @@ def review_package(
     claude: str | None = None,
     codex: str | None = None,
     prompt_text: str | None = None,
+    on_first_response: Callable[[], None] | None = None,
 ) -> Review:
     """Run one blind review, retaining the original single-session contract."""
     return _review_session(
         package, reviewer=reviewer, model=model, effort=effort,
         report_dir=report_dir, retries=retries, timeout_s=timeout_s,
         claude=claude, codex=codex, prompt_text=prompt_text,
+        on_first_response=on_first_response,
     )
 
 
@@ -2407,7 +2479,7 @@ def aggregate_package(
             for key, value in precheck_attributes.items():
                 precheck_span.set_attribute(key, value)
 
-        def run(run_id: str) -> Review:
+        def run(run_id: str, on_first_response: Callable[[], None] | None = None) -> Review:
             directory = report_dir / package.name / "runs" / run_id
             with _telemetry.span(
                 "machinist_review.run", name=package.name, run_id=run_id
@@ -2419,6 +2491,7 @@ def aggregate_package(
                         snapshot, reviewer=reviewer, model=model, effort=effort,
                         report_dir=directory, retries=retries, timeout_s=timeout_s,
                         claude=claude, codex=codex, prompt_text=prompt_text,
+                        on_first_response=on_first_response,
                     )
                 except Exception as exc:
                     review = _failed_review(
@@ -2437,10 +2510,42 @@ def aggregate_package(
         reviews: list[Review] = []
         if not precheck_info["error"] and not precheck_info["skipped"]:
             with ThreadPoolExecutor(max_workers=runs) as pool:
-                futures = [
-                    pool.submit(contextvars.copy_context().run, run, run_id)
-                    for run_id in run_ids
-                ]
+                if reviewer == "claude" and runs > 1:
+                    response_seen = threading.Event()
+                    followers_released = threading.Event()
+
+                    def first_response() -> None:
+                        response_seen.set()
+                        followers_released.set()
+
+                    waiting_since = time.monotonic()
+                    leader = pool.submit(
+                        contextvars.copy_context().run, run, run_ids[0], first_response,
+                    )
+                    # A failed/exhausted/timed-out leader must not strand the
+                    # remaining reviews. Its existing attempt timeouts still
+                    # bound the wait; terminal completion always opens the gate.
+                    leader.add_done_callback(lambda _future: followers_released.set())
+                    followers_released.wait()
+                    _telemetry.event(
+                        "machinist_review.followers_released",
+                        reason=(
+                            "first_provider_response" if response_seen.is_set()
+                            else "leader_terminal_without_response"
+                        ),
+                        wait_s=round(time.monotonic() - waiting_since, 3),
+                        follower_count=runs - 1,
+                    )
+                    futures = [leader]
+                    futures.extend(
+                        pool.submit(contextvars.copy_context().run, run, run_id)
+                        for run_id in run_ids[1:]
+                    )
+                else:
+                    futures = [
+                        pool.submit(contextvars.copy_context().run, run, run_id)
+                        for run_id in run_ids
+                    ]
                 reviews = [future.result() for future in futures]
 
         summaries = []

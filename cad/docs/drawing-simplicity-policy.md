@@ -282,6 +282,17 @@ both verdicts and the finding diff.
   sessions, without submitting a drawing review. Startup diagnostics remain in
   retained raw stdout; SDK control responses are excluded from reviewer tool
   evidence. Valid drawing findings are not retried.
+- Claude multi-run reviews use **initial-request staggering, then concurrent
+  continuation**: `r1` starts alone; the other isolated runs start after its
+  first real positive-usage provider assistant response, while `r1` continues.
+  Initialization, MCP readiness, diagnostics, synthetic/API errors and zero-usage
+  events do not release the followers; the first assistant event's partial
+  output count is not a completed review. If `r1` terminates before responding,
+  including exhausted retries or timeout, followers still run under the existing
+  partial-failure policy, without claiming a warmed cache. Each run keeps its
+  own neutral cwd and fresh session UUID, the same frozen sheets, rubric, model
+  and effort, and no shared history. Codex runs remain fully parallel. Single-run
+  reviews, the precheck/judge lifecycle and the two-run support rule are unchanged.
 - The authoritative result is `<name>.aggregate.json` and its companion
   `<name>.aggregate.md`, not an individual run's verdict. `FIX` means at least one
   **confirmed** blocker, over-specification or clarity finding raised by two or
