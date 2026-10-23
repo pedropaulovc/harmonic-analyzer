@@ -737,6 +737,7 @@ def _inset_edge_rays(
     stem: str,
     target_mm: float,
     stations_m: Sequence[float],
+    diagnostic_hits: dict[int, tuple[Any, Any, Any]] | None = None,
 ) -> tuple[str, list[tuple[Any, float] | None]]:
     """Find the highest model edge at each machine-x/z station by ray.
 
@@ -819,6 +820,8 @@ def _inset_edge_rays(
             )
             if edge is not None:
                 found[ray] = (hit_y, edge)
+                if diagnostic_hits is not None:
+                    diagnostic_hits[ray] = (topology[k // _HIT_WIDTH], edge, component)
     return name, [None if row is None else (row[1], row[0]) for row in found]
 
 
@@ -2042,6 +2045,10 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _, top_section = _create_joint_sections(adapter, front)
+    # ISOLATED DIAGNOSTIC BRANCH ONLY: always capture and fail before export.
+    from _fr_inset_diagnostic import diagnose_inset
+    diagnose_inset(adapter, top_section, recipe=sys.modules[__name__])
+    raise RuntimeError("inset diagnostic unexpectedly returned without its terminal failure")
     inset = _add_nameplate_inset_dimension(adapter, top_section)
 
     _add_note_block(
