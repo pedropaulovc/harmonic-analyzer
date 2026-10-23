@@ -1396,6 +1396,20 @@ def _clear_socket_text(adapter: Any, top: Any, display: Any) -> None:
         raise RuntimeError("SupplierSocketAF: full native text/body clearance or physical stations changed")
 
 
+def _tail_text_fragments(record: dict[str, Any]) -> tuple:
+    """Measured ink of each acceptance fragment; a union can conceal row drift."""
+    fragments = []
+    for row in record["display"]["texts"]:
+        box = display_box({"texts": (row,)})
+        angle = float(row["ang"])
+        if box is None or not all(map(math.isfinite, (
+            angle, box.xmin, box.ymin, box.xmax, box.ymax,
+        ))):
+            raise RuntimeError("ThreadLengthMin: unreadable native acceptance fragment")
+        fragments.append((str(row["t"]), angle, box.xmin, box.ymin, box.xmax, box.ymax))
+    return tuple(sorted(fragments))
+
+
 def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
     """Move only the native tail column beyond measured major ink; retain its text."""
     rebuild_drawing(adapter, label="measure pivot tail and thread-major ink")
@@ -1420,6 +1434,7 @@ def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
     frame = dict(
         tips=before["tips"], text=before["text"], column=column,
         words=tuple(sorted(str(row["t"]) for row in before["record"]["display"]["texts"])),
+        fragments=_tail_text_fragments(before["record"]),
     )
     def settled() -> None:
         _assert_tail_layout(adapter, tail, major, frame=frame)
@@ -1444,6 +1459,13 @@ def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str,
         raise RuntimeError("ThreadLengthMin: complete acceptance text moved")
     if tuple(sorted(str(row["t"]) for row in actual["record"]["display"]["texts"])) != frame["words"]:
         raise RuntimeError("ThreadLengthMin: complete native acceptance wording changed")
+    fragments = _tail_text_fragments(actual["record"])
+    if len(fragments) != len(frame["fragments"]) or any(
+        old[0] != new[0] or abs(old[1] - new[1]) > 1e-8
+        or max(abs(a - b) for a, b in zip(old[2:], new[2:], strict=True)) > 0.0002
+        for old, new in zip(frame["fragments"], fragments, strict=True)
+    ):
+        raise RuntimeError("ThreadLengthMin: native acceptance fragment placement/format changed")
     current_major = _paper_annotation(adapter, major, label="SupplierThreadMajor")
     full = display_box(current_major["display"])
     if full is None or column < full.xmax + _PAPER_GAP_M:

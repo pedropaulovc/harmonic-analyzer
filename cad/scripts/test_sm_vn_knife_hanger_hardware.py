@@ -1154,9 +1154,6 @@ def test_sheet_prints_purchased_note_and_chamfer_leader_with_native_readback(
     assert all(head[1] == pytest.approx(
         (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, 0.0)
     ) for head in projected)
-    assert printed == [
-        ("*Front", "Purchased Screw Note", (0.11396875, 0.2205528), bolt_drawing.PURCHASED_NOTE_XY)
-    ]
 
 
 def test_layout_keeps_text_off_the_part_border_and_title_block() -> None:

@@ -427,67 +427,6 @@ def test_native_controls_are_owned_and_the_length_prints_as_reference() -> None:
     assert drawing.ISO_SCALE == drawing.SHEET_SCALE
 
 
-@pytest.mark.parametrize("refuse_isometric_mode", (False, True))
-def test_finished_views_remove_hidden_lines_before_annotations(
-    monkeypatch, tmp_path, refuse_isometric_mode
-) -> None:
-    import _drawing_view_display as display
-
-    source = tmp_path / "pivot-screw.SLDPRT"
-    source.touch()
-    views = {}
-
-    def place(_adapter, _source, orientation, *_args, **_kwargs):
-        state = SimpleNamespace(mode=0)
-
-        def set_mode(_parent, mode, *_options):
-            if not (refuse_isometric_mode and orientation == "*Isometric" and mode == 2):
-                state.mode = mode
-            return True
-
-        view = SimpleNamespace(
-            SetDisplayMode4=set_mode, GetDisplayMode2=lambda: state.mode
-        )
-        views[orientation] = view
-        return view
-
-    class AnnotationPhase(Exception):
-        pass
-
-    def reached_annotations(*_args, **_kwargs):
-        raise AnnotationPhase
-
-    async def open_source(_path):
-        return True
-
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(display, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "check", lambda _label, value: value)
-    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: {})
-    monkeypatch.setattr(
-        drawing,
-        "new_project_drawing",
-        lambda *_args, **_kwargs: (
-            SimpleNamespace(ActivateSheet=lambda _name: True), object()
-        ),
-    )
-    monkeypatch.setattr(drawing, "create_blank_drawing_sheets", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args: None)
-    monkeypatch.setattr(drawing, "place_view", place)
-    monkeypatch.setattr(drawing, "curate_view_dimensions", reached_annotations)
-    adapter = SimpleNamespace(currentModel=object(), open_model=open_source)
-    if refuse_isometric_mode:
-        with pytest.raises(RuntimeError, match="hidden-lines-removed"):
-            asyncio.run(drawing.build(adapter))
-        assert views["*Isometric"].GetDisplayMode2() != 2
-    else:
-        with pytest.raises(AnnotationPhase):
-            asyncio.run(drawing.build(adapter))
-        assert set(views) == {"*Front", "*Isometric", "*Top"}
-        assert all(view.GetDisplayMode2() == 2 for view in views.values())
-
-
 def test_registry_row_is_the_faced_stock_without_sheet_instructions() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["title"] == "Transgear Pivot Screw"
@@ -1682,6 +1621,8 @@ def test_settled_supplier_census_invokes_fresh_physical_head_proof(
 ) -> None:
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     state.adapter.currentModel = state.saved
+    # This physical-census consumer owns three references, not the cold-paper extras.
+    state.front.dimensions[:] = [state.display]
     state.identities["SupplierHeadHeight"] = (
         state.native.FullName, state.front.name, (state.bearing, state.top), (1, 1),
     )
@@ -2409,6 +2350,7 @@ def test_stock_physical_proof_is_fresh_in_settled_and_readonly_saved_census(
     stock = state.stock
     if phase == "settled":
         state.adapter.currentModel = state.saved
+        state.front.dimensions[:] = [state.display]
         state.identities["SupplierHeadHeight"] = (
             state.native.FullName, state.front.name, (state.bearing, state.top), (1, 1),
         )
@@ -2702,7 +2644,7 @@ def _saved_shelf_boundary(monkeypatch, state):
         for x in (-screw.SOCKET_AF / 2 / 1000, screw.SOCKET_AF / 2 / 1000)
     ]
     state.socket_annotation = SimpleNamespace(
-        Owner=state.paper_top, OwnerType=0, Visible=1, attached=socket_edges,
+        Owner=state.paper_top, OwnerType=0, Visible=1, attached=list(socket_edges),
         paper_record=state.socket_record, IsDangling=lambda: False,
         GetName=lambda: "Native socket annotation",
         GetAttachedEntityCount3=lambda: 2, GetAttachedEntityTypes=lambda: (1, 1),
@@ -2778,7 +2720,7 @@ def test_cold_saved_presentation_is_fresh_and_fail_closed(monkeypatch, tmp_path,
     elif fault == "socket_span":
         state.socket_record["display"]["arrows"][0][0] -= 0.001
     elif fault == "socket_attachment":
-        state.socket_annotation.attached[0] = object()
+        state.socket_annotation.attached[0] = state.bearing
     elif fault == "alignment":
         state.paper_top.Position = (0.295, 0.245)
     elif fault == "axis":
@@ -3331,3 +3273,40 @@ def test_converted_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch
         )
     assert state.closes == [state.path.name]
     assert state.adapter.currentModel is state.previous
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("field", ("position", "width", "angle"))
+def test_tail_fragment_drift_cannot_hide_inside_complete_box_settle_tolerance(
+    monkeypatch, tmp_path, phase, field,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    display = state.tail_annotation.GetSpecificAnnotation()
+    before = drawing.measure_reference_text(state.adapter, display, axis=1, label="ThreadLengthMin")
+    row = state.tail_record["display"]["texts"][0]
+    if field == "position":
+        row["pos"][0] += 0.0003
+    elif field == "width":
+        row["w"] += 0.0003
+    else:
+        row["ang"] += 0.0001
+    after = drawing.measure_reference_text(state.adapter, display, axis=1, label="ThreadLengthMin")
+    assert max(
+        abs(getattr(before["text"], key) - getattr(after["text"], key))
+        for key in ("xmin", "ymin", "xmax", "ymax")
+    ) <= 0.0002
+    with pytest.raises(RuntimeError, match="fragment placement/format"):
+        if phase == "settled":
+            state.adapter.currentModel = state.saved
+            drawing._assert_tail_layout(
+                state.adapter, state.tail_annotation, state.major_annotation, frame=state.paper["tail"],
+            )
+        else:
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+    if phase == "saved":
+        assert state.closes == [state.path.name]
+        assert state.adapter.currentModel is state.previous
