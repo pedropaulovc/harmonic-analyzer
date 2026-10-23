@@ -12,6 +12,13 @@ All numbers are from the `cad/scripts/build_*.py` sources (mm). Where a part is 
 **casting** but you intend to cut it from bar, that is a *substitution* — flagged, because the
 geometry is casting-shaped, not milling-shaped.
 
+The `dt-arbor-pedestal` and `dt-cone-pivot-post` inside corners take the
+shop-wide **R1.0 MAX** title-block default. Their former duplicate local notes
+and time-limited inside-corner exceptions have been retired; the sharp modeled
+junctions and the post's separate crank-bore angularity authorization are
+unchanged. The cylinder gear's native notch-phase dimension and Detail A define
+its first-root position; no second general note restates that location.
+
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**

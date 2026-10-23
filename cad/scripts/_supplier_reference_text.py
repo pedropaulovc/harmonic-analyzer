@@ -5,9 +5,10 @@ The caller owns the exact native dimension/source/attachment inventory through
 moving the complete measured text block beyond its outside-arrow tail. Widths
 and heights come from native display data, not estimated glyph advances.
 
-Native font boxes are not printed glyph ink: a fraction bar may legitimately
-lie inside their union. Every native fragment and line remains in ``record``;
-this core does not prove clearance from other annotations or the part body.
+Native font boxes are not printed glyph ink: even an empty or whitespace text
+fragment can have measured advance, and a fraction bar may lie inside their
+union. Every native fragment and line remains in ``record``; this core does not
+prove clearance from other annotations or the part body.
 The caller must retain its settled layout checks and the post-export drawing
 layout audit with PDF ink. No font, value, tolerance, source or scale is edited.
 """
@@ -15,6 +16,7 @@ layout audit with PDF ink. No font, value, tolerance, source or scale is edited.
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Mapping
+import json
 from math import cos, dist, isfinite, sin
 from typing import Any
 
@@ -22,7 +24,7 @@ from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
-from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_audit import TextItem, _rotated_hull, annotation_geometry, calibrate_sheet_advance
 from _layout_geometry import Box, union_boxes
 import _telemetry
 
@@ -37,9 +39,10 @@ def measured_native_text_bounds(
 
     ``GetTextRefPositionAtIndex`` uses all six ``swTextPosition_e`` anchors;
     ``GetTextAngleAtIndex`` is CCW radians. Normalize each anchor to its rotated
-    lower-left before the existing display hull, retaining measured metre
-    widths/heights. Each fragment must be readable and its derived box finite
-    BEFORE union; no glyph estimate or lower-left fallback can hide bad ink.
+    lower-left before the existing unfiltered font-rectangle hull, retaining
+    measured metre widths/heights. Each BSTR fragment, including empty/whitespace
+    advance, must have readable geometry and a finite derived box BEFORE union.
+    No glyph estimate or lower-left fallback can hide malformed geometry.
     Raw records are never modified and fragment cardinality/order is preserved.
     """
     if not texts:
@@ -48,6 +51,9 @@ def measured_native_text_bounds(
     for index, raw in enumerate(texts):
         reference = raw.get("ref")
         fragment_label = f"{label} fragment {index} ref={reference!r}"
+        value = raw.get("t")
+        if not isinstance(value, str):
+            raise RuntimeError(f"{fragment_label}: unreadable native text")
         try:
             width, height = (float(raw.get(key) or 0.0) for key in ("w", "h"))
         except (TypeError, ValueError, OverflowError) as error:
@@ -72,26 +78,75 @@ def measured_native_text_bounds(
             4: (-width, 0.0), 5: (-width / 2, -height),
         }[reference]
         cosine, sine = cos(angle), sin(angle)
-        normalized = {
-            **raw, "ref": 1,
-            "pos": (
-                at[0] + cosine * dx - sine * dy,
-                at[1] + sine * dx + cosine * dy,
-                at[2],
-            ),
-        }
-        if not all(map(isfinite, normalized["pos"])):
+        normalized = (
+            at[0] + cosine * dx - sine * dy,
+            at[1] + sine * dx + cosine * dy,
+            at[2],
+        )
+        if not all(map(isfinite, normalized)):
             raise RuntimeError(f"{fragment_label}: non-finite normalized native position")
-        fragment = display_box({"texts": [normalized]})
-        if fragment is None or not all(map(
-            isfinite, (fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax)
-        )):
+        # display_box intentionally excludes blank visible-ink runs. Native
+        # font advances are different: retain every measured rectangle, using
+        # that same hull primitive without its semantic text filter.
+        fragment = _rotated_hull(
+            TextItem(value, normalized[0], normalized[1], height, angle, 1), width
+        )
+        if not all(map(isfinite, (
+            fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax
+        ))):
             raise RuntimeError(f"{fragment_label}: no finite measured native bounds")
         fragments.append(fragment)
     text = union_boxes(fragments)
     if text is None or not all(map(isfinite, (text.xmin, text.ymin, text.xmax, text.ymax))):
         raise RuntimeError(f"{label}: supplier reference text has no finite measured native bounds")
     return text, tuple(fragments)
+
+
+def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> str:
+    """Bound already-read primitives only; never inspect or repr a native object."""
+    def bounded(value: Any, depth: int = 0) -> Any:
+        if value is None or type(value) in (bool, int):
+            return value
+        if type(value) is float:
+            return value if isfinite(value) else {"non_finite": repr(value)}
+        if type(value) is str:
+            if len(value) <= 128:
+                return value
+            return {"prefix": value[:128], "omitted_characters": len(value) - 128}
+        if depth < 3 and type(value) in (tuple, list):
+            return {
+                "items": [bounded(item, depth + 1) for item in value[:16]],
+                "omitted_items": max(0, len(value) - 16),
+            }
+        if depth < 3 and type(value) is dict:
+            fields = list(value.items())
+            return {
+                "fields": {
+                    key[:128] if type(key) is str else "<non-string-key>":
+                    bounded(item, depth + 1)
+                    for key, item in fields[:16]
+                },
+                "omitted_fields": max(0, len(fields) - 16),
+            }
+        return {"unreadable_type": type(value).__name__[:128]}
+
+    texts = (record.get("display") or {}).get("texts") or ()
+    census = {
+        "label": bounded(label),
+        "axis": axis,
+        "annotation": {
+            key: bounded(record.get(key))
+            for key in ("type", "name", "owner_type", "pos", "visible", "layer")
+        },
+        "fragment_count": len(texts),
+        "omitted_fragments": max(0, len(texts) - 16),
+        "fragments": [
+            {"index": index, "raw": bounded(raw),
+             "reference_python_type": type(raw.get("ref")).__name__[:128]}
+            for index, raw in enumerate(texts[:16])
+        ],
+    }
+    return "supplier_reference_native_fontbox_fields " + json.dumps(census, allow_nan=False)
 
 
 def measure_reference_text(
@@ -118,7 +173,17 @@ def measure_reference_text(
         raise RuntimeError(f"{label}: unreadable supplier reference annotation: {errors}")
     data = record.get("display") or {}
     texts = data.get("texts") or ()
-    text, _ = measured_native_text_bounds(texts, label=label)
+    try:
+        text, _ = measured_native_text_bounds(texts, label=label)
+    except RuntimeError as error:
+        try:
+            error.add_note(_fontbox_failure_note(record, axis=axis, label=label))
+        except Exception as diagnostic_error:
+            error.add_note(
+                "supplier reference fontbox field census formatting failed "
+                f"({type(diagnostic_error).__name__}); original failure retained"
+            )
+        raise
     arrows = data.get("arrows") or ()
     if (
         len(arrows) != 2

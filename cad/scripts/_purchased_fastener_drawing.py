@@ -611,7 +611,7 @@ def _cell(
 
 
 def fastener_view_cells(
-    caption_y: float, *, layout: Literal["standard", "tall_top"] = "standard"
+    caption_y: float, *, layout: Literal["standard", "supplier_top", "tall_top"] = "standard"
 ) -> tuple:
     """Third-angle Front/Top/Right with the Isometric upper right.
 
@@ -620,16 +620,19 @@ def fastener_view_cells(
     The Isometric's cell reaches 6 mm lower, its caption ending on the Right
     cell's top, so a 1:1 pictorial of a long part (the 67 mm keeper chain)
     is not shrunk to 1:2, where small round features show their facets.
-    ``tall_top`` gives an annotated axial Top profile 96 mm rather than 64 mm,
-    lowering both bottom-row cells' tops and the Isometric's bottom together
-    while retaining the caption gaps.
+    ``supplier_top`` has 70 mm: two 26 mm annotation lanes leave 18 mm for
+    its native outline. ``tall_top`` gives 96 mm. Both lower the bottom-row
+    cells and Isometric together without changing the standard layout.
     """
-    if layout not in ("standard", "tall_top"):
+    if layout not in ("standard", "supplier_top", "tall_top"):
         raise ValueError(f"unknown purchased fastener view layout: {layout!r}")
     bottom = caption_y + _CAPTION_TO_CELL
-    row_top = 0.150 if layout == "tall_top" else 0.182
-    top_bottom = 0.166 if layout == "tall_top" else 0.198
-    isometric_bottom = 0.160 if layout == "tall_top" else 0.192
+    if layout == "tall_top":
+        row_top, top_bottom, isometric_bottom = 0.150, 0.166, 0.160
+    elif layout == "supplier_top":
+        row_top, top_bottom, isometric_bottom = 0.176, 0.192, 0.186
+    else:
+        row_top, top_bottom, isometric_bottom = 0.182, 0.198, 0.192
     return (
         _cell("*Front", 0.025, bottom, 0.205, row_top),
         _cell("*Top", 0.025, top_bottom, 0.205, 0.262),
@@ -1495,13 +1498,14 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
-    view_layout: Literal["standard", "tall_top"] = "standard",
+    view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
     align_orthographic: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
     saved_check: Callable[[Any, Path], None] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
@@ -1512,8 +1516,11 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.  ``number_fit`` opts a sheet whose registry number overruns the
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
-    ``view_layout="tall_top"`` reallocates space to an annotated axial Top view
-    without changing annotation margins or the standard-scale fitting contract.
+    ``title_block_setup`` formats existing linked title notes and returns their
+    mandatory final-rebuild check, as for purchased-part reference sheets.
+    ``view_layout="supplier_top"`` reserves the supplier screw family's Top
+    annotation lanes; ``"tall_top"`` gives a longer axial Top view. Neither
+    changes annotation margins or the standard-scale fitting contract.
     ``align_orthographic`` aligns Top's projected model-origin X and Right's Y
     with Front after fitting, before supplier annotations capture their origins.
     Supplier hooks import native reference sizes after fitting; explicit margins
@@ -1582,6 +1589,7 @@ async def build_purchased_fastener_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            title_block_setup=title_block_setup,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,
@@ -1715,7 +1723,7 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
-    view_layout: Literal["standard", "tall_top"] = "standard",
+    view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
     align_orthographic: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     supplier_dimensions: SupplierDimensions | None = None,

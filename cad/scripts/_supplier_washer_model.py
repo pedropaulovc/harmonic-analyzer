@@ -199,7 +199,7 @@ class _WasherSourceReadback:
         return self
 
     def __exit__(self, _kind: Any, error: Any, _traceback: Any) -> None:
-        if error is None:
+        if error is None or not isinstance(error, Exception):
             return
         try:
             message = "supplier washer source attachment readback: " + json.dumps(
@@ -316,7 +316,7 @@ def _washer_view_source_context(
 def _assert_washer_view_attachments(
     proof: _WasherSourceReadback, view: Any, extension: Any, sketch: Any,
     mapped_sketch: Any, annotation: Any, inventory: tuple[Any, ...],
-    selected: tuple[int, ...], *, points: bool, visible: bool,
+    selected: tuple[int, ...], *, points: bool,
 ) -> None:
     """A complete native forward bijection, never coordinate/ID matching."""
     interface = "ISketchPoint" if points else "ISketchSegment"
@@ -408,20 +408,22 @@ def _assert_washer_view_attachments(
             ):
                 raise RuntimeError(f"{proof.label}: attachment is not the independently resolved source entity")
     if proof.read("annotation.dangling", annotation.IsDangling) or (
-        visible and int(proof.read("annotation.visible", lambda: annotation.Visible)) != 1
+        int(proof.read("annotation.visible", lambda: annotation.Visible)) != 1
     ):
         raise RuntimeError(f"{proof.label}: unexpected, hidden or dangling source attachments")
 
 
 def assert_supplier_washer_source_attachment(
-    adapter: Any, model: Any, display: Any, *, label: str,
+    adapter: Any, model: Any, display: Any, *, view: Any | None, label: str,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
-    visible: bool = False, view: Any | None = None,
 ) -> None:
     """Independently prove exact source geometry and its actual attachment.
 
-    With an owning view, prove native source/view feature and complete entity
-    correspondence. Omitted/None keeps the direct part-only owner contract.
+    Both contexts require the independently enumerated source IDimension and
+    exact IModelDoc2.Parameter("Dimension@Feature") to have native identity.
+    Explicit view=None proves the authoring part's exact owner and attachments;
+    an actual view additionally proves full source/view lineage, visibility and
+    complete entity correspondence, including circle reverse/roundtrip checks.
     """
     with _WasherSourceReadback(adapter, label) as proof:
         feature_name, dimension_name = SOURCE_DIMENSIONS[label]
@@ -429,19 +431,31 @@ def assert_supplier_washer_source_attachment(
         if raw is None:
             raise RuntimeError(f"{label}: missing source feature {feature_name}")
         feature = _early_bound(raw, "IFeature")
-        if view is None:
-            sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
-        else:
-            source_name = proof.read("source.feature_name", lambda: feature.Name)
-            source_type = proof.read("source.feature_type", feature.GetTypeName2)
-            if source_name != feature_name or source_type != "ProfileFeature":
-                raise RuntimeError(f"{label}: source feature is not its named model witness")
-            sketch = proof.object("source.feature_sketch", feature.GetSpecificFeature2, "ISketch")
+        source_name = proof.read("source.feature_name", lambda: feature.Name)
+        source_type = proof.read("source.feature_type", feature.GetTypeName2)
+        if source_name != feature_name or source_type != "ProfileFeature":
+            raise RuntimeError(f"{label}: source feature is not its named model witness")
+        sketch = proof.object("source.feature_sketch", feature.GetSpecificFeature2, "ISketch")
         source_display, source_native = proof.read(
             "dimension.named_source",
             lambda: _named_dimensions(adapter, feature_name, {dimension_name}, feature=feature),
         )[dimension_name]
         native = proof.object("dimension.imported", lambda: display.GetDimension2(0), "IDimension")
+        source_native = proof.object("dimension.source", lambda: source_native, "IDimension")
+        source_model = proof.object("source.document", lambda: model, "IModelDoc2")
+        parameter_name = proof.read(
+            "dimension.model_parameter_query", lambda: f"{dimension_name}@{feature_name}",
+        )
+        parameter = proof.object(
+            "dimension.model_parameter", lambda: source_model.Parameter(parameter_name), "IDimension",
+        )
+        # IsSame returns a native integer (VT_I4), not a truthy Boolean.
+        # Names and values cannot replace any of these independent controls.
+        imported_source = proof.same("dimension.source_identity", native, source_native)
+        source_parameter = proof.same("dimension.source_parameter_identity", source_native, parameter)
+        imported_parameter = proof.same("dimension.imported_parameter_identity", native, parameter)
+        if imported_source != 1 or source_parameter != 1 or imported_parameter != 1:
+            raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
         full_name = str(proof.read("dimension.imported_full_name", lambda: native.FullName) or "")
         owner = proof.read("dimension.owner", native.GetFeatureOwner)
         if (
@@ -453,7 +467,7 @@ def assert_supplier_washer_source_attachment(
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
         if view is None:
             if (
-                int(proof.read("dimension.owner_source_identity", lambda: adapter.swApp.IsSame(owner, feature))) != 1
+                proof.same("dimension.owner_source_identity", owner, feature) != 1
                 or int(proof.read("dimension.imported_type2", lambda: display.Type2))
                 != int(proof.read("dimension.source_type2", lambda: source_display.Type2))
             ):
@@ -523,19 +537,17 @@ def assert_supplier_washer_source_attachment(
         if view is not None:
             _assert_washer_view_attachments(
                 proof, view, extension, sketch, mapped_sketch, annotation, inventory, selected,
-                points=label == THICKNESS, visible=visible,
+                points=label == THICKNESS,
             )
             return
         attached = list(proof.read("annotation.entities", annotation.GetAttachedEntities3) or ())
         for entity in expected_entities:
             matches = [i for i, item in enumerate(attached)
-                       if item is not None and int(adapter.swApp.IsSame(item, entity)) == 1]
+                       if item is not None and proof.same("attached.source_identity", item, entity) == 1]
             if len(matches) != 1:
                 raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
             attached.pop(matches[0])
-        if attached or proof.read("annotation.dangling", annotation.IsDangling) or (
-            visible and int(proof.read("annotation.visible", lambda: annotation.Visible)) != 1
-        ):
+        if attached or proof.read("annotation.dangling", annotation.IsDangling):
             raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
 
 
@@ -597,7 +609,8 @@ async def author_supplier_washer_references(
     """Append only banded witnesses after the unchanged +Y stock recipe."""
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
-    assert_supplier_washer_body(adapter.currentModel, axis="y", bore_mm=bore_mm,
+    model = adapter.currentModel
+    assert_supplier_washer_body(model, axis="y", bore_mm=bore_mm,
                                outer_mm=outer_mm, thickness_mm=thickness_mm)
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     face_labels = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label in bands)
@@ -631,26 +644,26 @@ async def author_supplier_washer_references(
     _finish_reference(adapter, dims, THICKNESS_FEATURE, (THICKNESS,), values=values, units=units,
                       precision=precision, bands=bands, bore_callout=bore_callout)
     assert_supplier_washer_references(
-        adapter, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
         units=units, precision=precision, bands=bands, bore_callout=bore_callout,
     )
 
 
 @_telemetry.traced("part.assert_supplier_washer_source")
 def assert_supplier_washer_references(
-    adapter: Any, *, axis: Literal["y", "z"], bore_mm: float,
+    adapter: Any, model: Any, *, axis: Literal["y", "z"], bore_mm: float,
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
 ) -> None:
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
-    part = _early_bound(adapter.currentModel, "IPartDoc")
+    part = _early_bound(model, "IPartDoc")
     for label, band in bands.items():
         feature, name = SOURCE_DIMENSIONS[label]
         raw = part.FeatureByName(feature)
         display, _ = _named_dimensions(adapter, feature, {name}, feature=raw)[name]
         assert_supplier_washer_source_attachment(
-            adapter, part, display, label=label, axis=axis, bore_mm=bore_mm,
+            adapter, model, display, view=None, label=label, axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm,
         )
         _assert_supplier_washer_presentation(

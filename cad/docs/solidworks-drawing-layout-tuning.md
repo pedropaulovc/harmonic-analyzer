@@ -123,6 +123,17 @@ caption beyond the face outline and arrow extent with the same 2 mm clearance
 and 0.2 mm settle. Fresh graphics must have no own leader/text intersection or
 arrow/text clearance violation.
 
+The independently enumerated named source dimension must also be the native
+dimension returned by the source model's exact `Parameter("Dimension@Feature")`
+lookup. This positive identity control supplements, rather than replaces, the
+complete source/view feature and entity correspondence proof, its distinctness
+controls and its reverse/round-trip checks. The guard requires an explicit owning
+`view`: part authoring passes `None`; imported drawing references pass their
+actual view. Original-source references are checked before import, after import
+and again during final settled and saved drawing checks. Import persistence
+transfers only the independently validated source's documented `SetUnits2`
+settings; it does not rewrite source or imported values, bands, precision or text.
+
 Only immutable scalar stations, outlines and annotation positions cross into the
 saved washer reader. It reacquires the actual source, configurations, views and
 references from the read-only reopened drawing; it never calls the mutating shelf
@@ -492,10 +503,13 @@ For a round washer, the filing-button convention moves the genuine imported
 OD from the circular face to `*Right` with `move_model_dimension`.
 
 A purchased drawing whose Number overruns the REV divider opts into
-`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52). This measures and fits
-the linked native note locally; do not change the shared template or rename
-the part. Inspect the fresh native witnesses, callouts and Number/REV gap:
-source positions alone are not after-fix evidence.
+`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52 and VN-70). This measures
+and fits the complete linked native Number locally; do not change its identity,
+the shared template or the REV field. Retain the current native font, anchor,
+extent and bounded fit readbacks, including the existing readable-height floor.
+Inspect the fresh native witnesses and callouts, and measure positive clearance
+between the printed Number's glyph ink and the actual divider's stroke envelope:
+historical template dimensions and source positions are not after-fix evidence.
 
 ### Rocker R19 regression and local placement contract
 

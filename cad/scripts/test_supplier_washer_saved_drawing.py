@@ -1,8 +1,9 @@
 """Offline saved-roundtrip controls; these doubles are not native farm evidence.
 
-Only COM transport, the visible-edge enumeration and source-dimension lookup are
-substituted. The saved reader and strict body/rim/value/band/presentation/source
-attachment assertions execute unchanged against independently seeded surfaces.
+Only COM transport, visible-edge enumeration and feature-dimension enumeration
+are substituted. Canonical Parameter lookup and context-specific dimension
+wrappers are seeded independently of drawing imports. The saved reader and
+strict body/rim/value/band/presentation/source assertions execute unchanged.
 """
 
 from __future__ import annotations
@@ -47,12 +48,47 @@ class _Part(_ReadSurface):
     def __getattribute__(self, name):
         if name in {
             "GetPathName", "GetType", "IsOpenedReadOnly", "GetSaveFlag", "GetBodies2", "FeatureByName",
-            "MaterialIdName", "ConfigurationManager",
+            "MaterialIdName", "ConfigurationManager", "Parameter",
         } and not object.__getattribute__(self, "__dict__").get("_alive", True):
             raise AssertionError("stale unloaded source IModelDoc2 used")
         if name in object.__getattribute__(self, "__dict__").get("_read_errors", {}):
             raise object.__getattribute__(self, "__dict__")["_read_errors"][name]
         return object.__getattribute__(self, name)
+
+
+class _Dimension(_ReadSurface):
+    """One native dimension's physical state, with a wrapper-specific owner."""
+
+    def __init__(self, state, owner):
+        super().__init__(state=state, GetFeatureOwner=lambda: owner)
+
+    @property
+    def FullName(self):
+        return self.state.FullName
+
+    @FullName.setter
+    def FullName(self, value):
+        self.state.FullName = value
+
+    @property
+    def SystemValue(self):
+        return self.state.SystemValue
+
+    @SystemValue.setter
+    def SystemValue(self, value):
+        self.state.SystemValue = value
+
+    @property
+    def Tolerance(self):
+        return self.state.Tolerance
+
+
+def _native_clone(native):
+    # Same metadata and even the same owner do not grant native identity.
+    return _ReadSurface(
+        FullName=native.FullName, SystemValue=native.SystemValue,
+        Tolerance=native.Tolerance, GetFeatureOwner=native.GetFeatureOwner,
+    )
 
 
 class _Point:
@@ -405,9 +441,20 @@ class _App:
         self.on_close = None
         self.keep_open = False
         self.open_result = lambda: (self.drawing, 0, 0)
+        # Only deliberately seeded IDimension wrappers share native identity.
+        # Metadata copies, feature clones and entity clones remain distinct.
+        self.dimension_identities = {}
 
     def IsSame(self, first, second):
-        return 1 if first is second else 0
+        if first is second:
+            return 1
+        first_entry = self.dimension_identities.get(id(first))
+        second_entry = self.dimension_identities.get(id(second))
+        return int(
+            first_entry is not None and second_entry is not None
+            and first_entry[0] is first and second_entry[0] is second
+            and first_entry[1] is second_entry[1]
+        )
 
     def GetOpenDocumentByName(self, path):
         return self.loaded.get(path)
@@ -419,6 +466,9 @@ class _App:
             self.on_open()
         # Seal the freshly loaded document/view/display/native/annotation state.
         # Absent mutation methods and guarded properties refuse all reader writes.
+        for native, _identity in self.dimension_identities.values():
+            for surface in (native, native.state, native.Tolerance):
+                object.__setattr__(surface, "_saved_read", True)
         for view in self.drawing.sheets[0][1:]:
             for display in view.displays:
                 for surface in (display, display.native, display.annotation, display.native.Tolerance):
@@ -501,10 +551,18 @@ def saved_washer(request, tmp_path, monkeypatch):
                   for diameter in (VALUES[source.OUTER_DIAMETER], VALUES[source.BORE_DIAMETER])]
     body = SimpleNamespace(GetEdges=lambda: body_edges)
     features = {}
+    canonical_parameters = {}
+    parameter_queries = []
+
+    def parameter(name):
+        parameter_queries.append(name)
+        return canonical_parameters.get(name)
+
     model = _Part(
         GetPathName=lambda: str(path_state.path), GetType=lambda: 1, IsOpenedReadOnly=lambda: True,
         GetSaveFlag=lambda: False, Extension=SimpleNamespace(reverse={}),
         GetBodies2=lambda _kind, _hidden: (body,), FeatureByName=lambda name: features.get(name),
+        Parameter=parameter,
         MaterialIdName="Offline Native DB|Recorded Fixture Alloy|700",
         ConfigurationManager=_ReadSurface(ActiveConfiguration=_ReadSurface(Name="OfflineActiveSourceConfig")),
     )
@@ -519,6 +577,7 @@ def saved_washer(request, tmp_path, monkeypatch):
     adapter = _Adapter(app)
     source_displays = {}
     source_natives = {}
+    native_identities = {}
     source_entities = {}
     for label in VALUES:
         feature_name, native_name = source.SOURCE_DIMENSIONS[label]
@@ -564,10 +623,17 @@ def saved_washer(request, tmp_path, monkeypatch):
         tolerance = _ReadSurface(Type=3 if label in bands else 0, minimum=-0.0001, maximum=0.0001)
         tolerance.GetMinValue = lambda tolerance=tolerance: tolerance.minimum
         tolerance.GetMaxValue = lambda tolerance=tolerance: tolerance.maximum
-        native = _ReadSurface(
-            FullName=f"{native_name}@{feature_name}@washer.SLDPRT", SystemValue=value / 1000.0,
-            Tolerance=tolerance, GetFeatureOwner=lambda feature=features[feature_name]: feature,
+        state = _ReadSurface(
+            FullName=f"{native_name}@{feature_name}@washer.SLDPRT",
+            SystemValue=value / 1000.0, Tolerance=tolerance,
         )
+        native = _Dimension(state, features[feature_name])
+        canonical = _Dimension(state, features[feature_name])
+        identity = native_identities[label] = object()
+        for wrapper in (native, canonical):
+            app.dimension_identities[id(wrapper)] = (wrapper, identity)
+        # Seed the exact part query before creating any imported wrapper.
+        canonical_parameters[f"{native_name}@{feature_name}"] = canonical
         source_natives[label] = native
         source_displays[label] = _Display(label, native, None, source_entities[label], units=0, precision=2)
         features[feature_name].dimensions[native_name] = (source_displays[label], native)
@@ -586,11 +652,13 @@ def saved_washer(request, tmp_path, monkeypatch):
     side_orientation = "*Front" if axis == "y" else "*Top"
     mapped_features = {}
     mapped_entities = {}
+    imported_natives = {}
     for collection in (original, fresh):
         for view in collection.values():
             view.edges = list(body_edges)
             mapped_features[view] = {}
             mapped_entities[view] = {}
+            imported_natives[view] = {}
             for name, feature in features.items():
                 source_sketch = feature.GetSpecificFeature2()
                 mapped_sketch = SimpleNamespace()
@@ -618,10 +686,17 @@ def saved_washer(request, tmp_path, monkeypatch):
                         )
                         mapped.append(member)
                     mapped_entities[view][label] = tuple(mapped)
+            for label, native in source_natives.items():
+                feature_name, _native_name = source.SOURCE_DIMENSIONS[label]
+                owner = (mapped_features[view][feature_name] if label == source.THICKNESS
+                         else features[feature_name])
+                imported = _Dimension(native.state, owner)
+                imported_natives[view][label] = imported
+                app.dimension_identities[id(imported)] = (imported, native_identities[label])
         for label, value in VALUES.items():
             view = collection[side_orientation if label == source.THICKNESS else face_orientation]
             if label in bands:
-                native, attached = source_natives[label], mapped_entities[view][label]
+                native, attached = imported_natives[view][label], mapped_entities[view][label]
             else:
                 tolerance = _ReadSurface(Type=0)
                 native_name = "D1" if label == source.OUTER_DIAMETER else "D2"
@@ -635,12 +710,9 @@ def saved_washer(request, tmp_path, monkeypatch):
             display = _Display(label, native, view, attached, units=0, precision=2)
             display.seed_layout(saved=collection is fresh)
             view.displays.append(display)
-    # Importing can put even the canonical IDimension's owner in the mapped
-    # context. OD/bore retain the direct source feature (the measured PD case).
-    thickness_native = source_natives[source.THICKNESS]
-    thickness_native.GetFeatureOwner = lambda: mapped_features[
-        (fresh if str(drawing_path) in app.loaded else original)[side_orientation]
-    ][source.THICKNESS_FEATURE]
+    # Source and canonical wrappers always retain their original part owner.
+    # Imported thickness wrappers expose each actual view's mapped owner while
+    # IsSame still identifies all deliberately seeded wrappers as one dimension.
     references = tuple(washer._reference(display, view, label, VALUES[label], imported=label in bands)
                        for label in VALUES for view in original.values() for display in view.displays
                        if display.selection_name == f"{label}@saved-washer-view")
@@ -660,6 +732,8 @@ def saved_washer(request, tmp_path, monkeypatch):
         references=references, arguments=arguments, drawing=drawing, path=drawing_path,
         source_path=source_path, path_state=path_state, body_edges=body_edges,
         source_entities=source_entities, source_natives=source_natives,
+        canonical_parameters=canonical_parameters, parameter_queries=parameter_queries,
+        imported_natives=imported_natives,
         source_displays=source_displays, features=features, messages=messages,
         mapped_features=mapped_features, mapped_entities=mapped_entities,
         invalidate=invalidate, face=face_orientation, side=side_orientation,
@@ -831,7 +905,7 @@ def test_native_source_identity_requires_integer_one_not_boolean_true(saved_wash
     original_is_same = case.app.IsSame
 
     def is_same(first, second):
-        if first is native and second is native:
+        if first is _display(case, source.THICKNESS).native and second is native:
             return True
         return original_is_same(first, second)
 
@@ -1038,7 +1112,7 @@ def test_saved_corruption_is_refused_by_real_native_assertions(saved_washer, fau
     elif fault == "extra-dimension":
         case.fresh["*Right"].displays.append(thickness)
     elif fault == "full-name":
-        thickness.native = _ReadSurface(**vars(thickness.native))
+        thickness.native = _native_clone(thickness.native)
         thickness.native.FullName = "DifferentNative@OtherFeature@washer.SLDPRT"
     elif fault == "wrong-value":
         if source.OUTER_DIAMETER in case.arguments["bands"]:
@@ -1111,7 +1185,7 @@ def test_same_named_native_clone_cannot_impersonate_actual_source_dimension(save
     case = saved_washer
     display = _display(case, source.THICKNESS)
     actual_source_native = case.source_natives[source.THICKNESS]
-    display.native = _ReadSurface(**vars(actual_source_native))
+    display.native = _native_clone(actual_source_native)
     assert display.native is not actual_source_native
     assert display.native.FullName == actual_source_native.FullName
     assert display.native.GetFeatureOwner() is actual_source_native.GetFeatureOwner()
@@ -1126,15 +1200,15 @@ def test_same_named_native_clone_cannot_impersonate_actual_source_dimension(save
 def _source_context(case, label=source.THICKNESS):
     view = case.original[case.side if label == source.THICKNESS else case.face]
     return view, _Display(
-        label, case.source_natives[label], view, case.mapped_entities[view][label],
+        label, case.imported_natives[view][label], view, case.mapped_entities[view][label],
         units=0, precision=2,
     )
 
 
-def _check_source(case, display, label=source.THICKNESS, **context):
+def _check_source(case, display, label=source.THICKNESS, *, view):
     source.assert_supplier_washer_source_attachment(
-        case.adapter, case.model, display, label=label, axis=case.arguments["axis"],
-        bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91, visible=True, **context,
+        case.adapter, case.model, display, view=view, label=label, axis=case.arguments["axis"],
+        bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91,
     )
 
 
@@ -1148,7 +1222,14 @@ def test_measured_view_source_context_accepts_complete_native_proof(saved_washer
     assert mapped_feature is not feature
     assert view.GetCorresponding(feature.GetSpecificFeature2()) is not mapped_feature.GetSpecificFeature2()
     assert display.annotation.Owner is view
-    assert display.native is case.source_natives[label]
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[label]
+    canonical = case.canonical_parameters[f"{dimension_name}@{feature_name}"]
+    assert display.native is not case.source_natives[label]
+    assert canonical is not case.source_natives[label] and canonical is not display.native
+    assert case.app.IsSame(display.native, case.source_natives[label]) == 1
+    assert case.app.IsSame(display.native, canonical) == 1
+    assert case.source_natives[label].GetFeatureOwner() is feature
+    assert canonical.GetFeatureOwner() is feature
     for original, mapped in zip(case.source_entities[label], display.annotation.attached, strict=True):
         assert original is not mapped
         assert original.GetSketch() is feature.GetSpecificFeature2()
@@ -1167,7 +1248,10 @@ def test_measured_view_source_context_accepts_complete_native_proof(saved_washer
         display.annotation.GetAttachedEntityTypes = lambda: (
             (25 if label == source.THICKNESS else 24),
         ) * len(display.annotation.attached)
+    query = f"{dimension_name}@{feature_name}"
+    case.parameter_queries.clear()
     _check_source(case, display, label, view=view)
+    assert case.parameter_queries == [query]
     assert case.source_path.read_bytes() == case.source_bytes
     assert case.path.read_bytes() == case.original_bytes
 
@@ -1196,7 +1280,7 @@ def test_view_source_context_refuses_incomplete_native_proof(saved_washer, fault
     annotation = display.annotation
     annotation.GetAttachedEntityTypes = lambda: (point_kind,) * len(annotation.attached)
     if fault == "native-clone":
-        display.native = _ReadSurface(**vars(display.native))
+        display.native = _native_clone(display.native)
     elif fault == "source-missing":
         case.features.pop(source.THICKNESS_FEATURE)
     elif fault in {"source-name", "mapped-name"}:
@@ -1282,7 +1366,10 @@ def test_view_source_context_refuses_incomplete_native_proof(saved_washer, fault
 
 @pytest.mark.parametrize("result", (False, True, 0.0, 1.0, 2, None, "1"),
                          ids=("false", "true", "float-zero", "float-one", "unsupported", "null", "string"))
-@pytest.mark.parametrize("relation", ("native", "feature", "reverse-feature", "source-self", "mapped-self", "owner-view"))
+@pytest.mark.parametrize("relation", (
+    "native", "source-parameter", "imported-parameter", "feature", "reverse-feature",
+    "source-self", "mapped-self", "owner-view",
+))
 def test_view_source_context_requires_real_integer_native_identity(saved_washer, result, relation):
     case = saved_washer
     view, display = _source_context(case)
@@ -1290,13 +1377,22 @@ def test_view_source_context_requires_real_integer_native_identity(saved_washer,
     mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
     original = case.source_entities[source.THICKNESS][0]
     mapped = case.mapped_entities[view][source.THICKNESS][0]
-    entity = {
-        "native": display.native, "feature": mapped_feature, "reverse-feature": feature,
-        "source-self": original, "mapped-self": mapped, "owner-view": view,
+    source_native = case.source_natives[source.THICKNESS]
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[source.THICKNESS]
+    canonical = case.canonical_parameters[f"{dimension_name}@{feature_name}"]
+    first, second = {
+        "native": (display.native, source_native),
+        "source-parameter": (source_native, canonical),
+        "imported-parameter": (display.native, canonical),
+        "feature": (mapped_feature, mapped_feature),
+        "reverse-feature": (feature, feature),
+        "source-self": (original, original),
+        "mapped-self": (mapped, mapped),
+        "owner-view": (view, view),
     }[relation]
     actual_is_same = case.app.IsSame
-    case.app.IsSame = lambda first, second: (
-        result if first is entity and second is entity else actual_is_same(first, second)
+    case.app.IsSame = lambda left, right: (
+        result if left is first and right is second else actual_is_same(left, right)
     )
     with pytest.raises(RuntimeError):
         _check_source(case, display, view=view)
@@ -1371,28 +1467,148 @@ def test_view_circle_proof_checks_complete_inventory_and_reverse_roundtrip(saved
         _check_source(case, display, source.OUTER_DIAMETER, view=view)
 
 
-@pytest.mark.parametrize("context", ({}, {"view": None}), ids=("omitted", "explicit-none"))
 @pytest.mark.parametrize("fault", ("none", "mapped-owner", "mapped-endpoints", "geometry", "construction"))
-def test_part_only_source_guard_retains_direct_source_contract(saved_washer, context, fault):
+def test_part_only_source_guard_retains_direct_source_contract(saved_washer, fault):
     case = saved_washer
-    _, display = _source_context(case)
+    display = case.source_displays[source.THICKNESS]
     feature = case.features[source.THICKNESS_FEATURE]
-    mapped_owner = display.native.GetFeatureOwner()
-    display.native.GetFeatureOwner = lambda: feature
-    display.annotation.attached = case.source_entities[source.THICKNESS]
     if fault == "mapped-owner":
-        display.native.GetFeatureOwner = lambda: mapped_owner
+        display.native.GetFeatureOwner = lambda: case.mapped_features[
+            case.original[case.side]
+        ][source.THICKNESS_FEATURE]
     elif fault == "mapped-endpoints":
-        display.annotation.attached = case.mapped_entities[display.view][source.THICKNESS]
+        display.annotation.attached = case.mapped_entities[case.original[case.side]][source.THICKNESS]
     elif fault == "geometry":
         case.source_entities[source.THICKNESS][1].Y *= 2
     elif fault == "construction":
         feature.GetSpecificFeature2().GetSketchSegments()[0].ConstructionGeometry = False
     if fault == "none":
-        _check_source(case, display, **context)
+        _check_source(case, display, view=None)
     else:
         with pytest.raises(RuntimeError):
-            _check_source(case, display, **context)
+            _check_source(case, display, view=None)
+
+
+def test_source_attachment_refuses_an_omitted_required_view(saved_washer):
+    case = saved_washer
+    case.parameter_queries.clear()
+    with pytest.raises(TypeError):
+        source.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, case.source_displays[source.THICKNESS],
+            label=source.THICKNESS, axis=case.arguments["axis"],
+            bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91,
+        )
+    assert not case.parameter_queries
+
+
+def test_original_source_reference_check_uses_explicit_model_without_adapter_current_model(saved_washer):
+    case = saved_washer
+    case.parameter_queries.clear()
+    source.assert_supplier_washer_references(case.adapter, case.model, **case.arguments)
+    expected = [
+        f"{source.SOURCE_DIMENSIONS[label][1]}@{source.SOURCE_DIMENSIONS[label][0]}"
+        for label in case.arguments["bands"]
+    ]
+    assert case.parameter_queries == expected
+    assert not case.app.open_calls
+    assert not case.app.close_calls
+
+
+@pytest.mark.parametrize("context", ("part", "view", "saved"))
+@pytest.mark.parametrize("fault", ("missing", "metadata-clone", "other-dimension", "matching-source-import-clones"))
+def test_canonical_part_parameter_is_independent_of_named_source_and_import(saved_washer, context, fault):
+    case = saved_washer
+    label = source.THICKNESS
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[label]
+    query = f"{dimension_name}@{feature_name}"
+    canonical = case.canonical_parameters[query]
+    view, display = _source_context(case)
+    if context == "part":
+        view, display = None, case.source_displays[label]
+    elif context == "saved":
+        view, display = case.fresh[case.side], _display(case, label)
+    if fault == "missing":
+        case.canonical_parameters.pop(query)
+    elif fault == "metadata-clone":
+        case.canonical_parameters[query] = _native_clone(canonical)
+        assert case.canonical_parameters[query].FullName == canonical.FullName
+        assert case.canonical_parameters[query].SystemValue == canonical.SystemValue
+    elif fault == "other-dimension":
+        feature, name = source.SOURCE_DIMENSIONS[source.BORE_DIAMETER]
+        case.canonical_parameters[query] = case.canonical_parameters[f"{name}@{feature}"]
+    else:
+        # Enumeration and import can agree on the wrong native dimension. The
+        # independently retained canonical part query must still disprove both.
+        feature = case.features[feature_name]
+        state = _ReadSurface(
+            FullName=canonical.FullName, SystemValue=canonical.SystemValue,
+            Tolerance=canonical.Tolerance,
+        )
+        wrong_source = _Dimension(state, feature)
+        owner = feature if view is None else case.mapped_features[view][feature_name]
+        wrong_import = _Dimension(state, owner)
+        wrong_identity = object()
+        for wrapper in (wrong_source, wrong_import):
+            case.app.dimension_identities[id(wrapper)] = (wrapper, wrong_identity)
+        wrong_display = _Display(
+            label, wrong_source, None, case.source_entities[label], units=0, precision=2,
+        )
+        feature.dimensions[dimension_name] = (wrong_display, wrong_source)
+        display.native = wrong_import
+        assert case.app.IsSame(wrong_import, wrong_source) == 1
+        assert case.app.IsSame(wrong_source, canonical) == 0
+        assert case.canonical_parameters[query] is canonical
+    case.parameter_queries.clear()
+    with pytest.raises(RuntimeError):
+        if context == "saved":
+            case.invalidate()
+            case.proof.saved_check(case.adapter, case.path)
+        else:
+            _check_source(case, display, view=view)
+    assert case.parameter_queries.count(query) == 1
+    if context == "saved":
+        _assert_closed_unchanged(case)
+    else:
+        assert not case.app.open_calls
+        assert not case.app.close_calls
+        assert case.source_path.read_bytes() == case.source_bytes
+        assert case.path.read_bytes() == case.original_bytes
+
+
+@pytest.mark.parametrize("context", ("part", "view", "saved"))
+def test_canonical_parameter_read_error_is_preserved_without_retry(saved_washer, context):
+    case = saved_washer
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[source.THICKNESS]
+    query = f"{dimension_name}@{feature_name}"
+    failure = RuntimeError("native Parameter canonical-read-sentinel")
+    queries = []
+    actual_parameter = case.model.Parameter
+
+    def refuse(name):
+        queries.append(name)
+        if name == query:
+            raise failure
+        return actual_parameter(name)
+
+    case.model.Parameter = refuse
+    view, display = _source_context(case)
+    if context == "part":
+        view, display = None, case.source_displays[source.THICKNESS]
+    with pytest.raises(RuntimeError) as caught:
+        if context == "saved":
+            case.invalidate()
+            case.proof.saved_check(case.adapter, case.path)
+        else:
+            _check_source(case, display, view=view)
+    assert caught.value is failure
+    assert queries.count(query) == 1
+    assert queries[-1] == query
+    if context == "saved":
+        _assert_closed_unchanged(case)
+    else:
+        assert queries == [query]
+        assert not case.app.open_calls
+        assert not case.app.close_calls
 
 
 def test_saved_view_proof_reacquires_mapping_without_changing_native_source(saved_washer, monkeypatch):
@@ -1416,13 +1632,19 @@ def test_saved_view_proof_reacquires_mapping_without_changing_native_source(save
         dimensions = tuple(
             (label, native, native.FullName, native.SystemValue, native.Tolerance.Type,
              native.Tolerance.GetMinValue(), native.Tolerance.GetMaxValue(),
+             native.GetFeatureOwner(), case.source_displays[label].annotation.attached,
+             case.source_displays[label].annotation.IsDangling(),
              case.source_displays[label].GetUnits(),
              case.source_displays[label].GetPrimaryPrecision2(),
              tuple(sorted(case.source_displays[label].text.items())))
             for label, native in case.source_natives.items()
         )
+        canonical = tuple(
+            (name, native, native.GetFeatureOwner(), native.FullName, native.SystemValue)
+            for name, native in case.canonical_parameters.items()
+        )
         rims = tuple(edge.GetCurve().CircleParams for edge in case.body_edges)
-        return features, points, circles, dimensions, rims
+        return features, points, circles, dimensions, canonical, rims
 
     def guard(adapter, model, display, **arguments):
         view = arguments["view"]
@@ -1890,7 +2112,7 @@ def test_source_attachment_diagnostic_preserves_original_exception(
     guard = next(call for call in calls if call[0] == "guard")
     expected_view = case.original[case.side if label == source.THICKNESS else case.face]
     assert guard[4] == dict(label=label, axis=case.arguments["axis"], bore_mm=4.0,
-                           outer_mm=10.0, thickness_mm=0.91, visible=True, view=expected_view)
+                           outer_mm=10.0, thickness_mm=0.91, view=expected_view)
     assert sum(call[0] == "guard" for call in calls) == 1
     if failure_stage != "note":
         assert "original native refusal detail" in original.__notes__
@@ -1909,8 +2131,9 @@ def test_successful_source_attachment_never_emits_failure_diagnostic(saved_washe
 
 
 @pytest.mark.parametrize("failure_stage", ("none", "logging", "note", "both"))
+@pytest.mark.parametrize("relation", ("native", "source-parameter", "imported-parameter"))
 def test_native_source_context_error_survives_receipt_reporting_failures(
-    saved_washer, monkeypatch, failure_stage,
+    saved_washer, monkeypatch, failure_stage, relation,
 ):
     case = saved_washer
     view, display = _source_context(case)
@@ -1926,9 +2149,17 @@ def test_native_source_context_error_survives_receipt_reporting_failures(
         "native IsSame refused the independent dimension identity read",
     )
     actual_is_same = case.app.IsSame
+    native = case.source_natives[source.THICKNESS]
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[source.THICKNESS]
+    canonical = case.canonical_parameters[f"{dimension_name}@{feature_name}"]
+    left, right = {
+        "native": (display.native, native),
+        "source-parameter": (native, canonical),
+        "imported-parameter": (display.native, canonical),
+    }[relation]
 
     def same(first, second):
-        if first is display.native and second is display.native:
+        if first is left and second is right:
             raise failure
         return actual_is_same(first, second)
 
@@ -2001,7 +2232,8 @@ def test_washer_consumer_uses_only_actual_vertical_thickness_and_fresh_handles(
     assert calls == [(case.adapter, {native.FullName: 1}, (native.FullName,))]
     assert len(inventories) >= 5
     assert all(set(found) == {native.FullName} for found in inventories)
-    assert all(found[native.FullName].native is native for found in inventories)
+    assert all(found[native.FullName].native is not native for found in inventories)
+    assert all(case.app.IsSame(found[native.FullName].native, native) == 1 for found in inventories)
     assert len({id(found[native.FullName]) for found in inventories}) >= 4
     current = _authoring_display(case, source.THICKNESS)
     assert current.OffsetText is True
@@ -2029,11 +2261,97 @@ _PLACEMENT_PHASES = (
 )
 
 
+def _corrupt_original_source(case, fault):
+    label = source.THICKNESS
+    if fault == "original-owner":
+        case.source_natives[label].GetFeatureOwner = lambda: case.mapped_features[
+            case.original[case.side]
+        ][source.THICKNESS_FEATURE]
+    elif fault == "original-attachment":
+        case.source_displays[label].annotation.attached = (case.source_entities[label][0],) * 2
+    elif fault == "canonical-parameter":
+        feature_name, dimension_name = source.SOURCE_DIMENSIONS[label]
+        query = f"{dimension_name}@{feature_name}"
+        case.canonical_parameters[query] = _native_clone(case.canonical_parameters[query])
+    else:
+        raise AssertionError(fault)
+
+
+@pytest.mark.parametrize("stage", ("before-import", "after-import"))
+@pytest.mark.parametrize("fault", ("original-owner", "original-attachment", "canonical-parameter"))
+def test_public_authoring_rechecks_original_source_before_and_after_import(
+    saved_washer, monkeypatch, stage, fault,
+):
+    case = saved_washer
+    _reset_authoring_layout(case)
+    imported_views = []
+    if stage == "before-import":
+        _corrupt_original_source(case, fault)
+
+    def curate(_adapter, view, **_kwargs):
+        assert stage == "after-import", "invalid original source reached native import"
+        imported_views.append(view)
+        if len(imported_views) == 1:
+            _corrupt_original_source(case, fault)
+        return [SimpleNamespace(GetSpecificAnnotation=lambda display=display: display)
+                for display in view.displays]
+
+    def forbidden_authoring(*_args, **_kwargs):
+        pytest.fail("original-source refusal must precede rim authoring and placement proof")
+
+    monkeypatch.setattr(washer, "curate_view_dimensions", curate)
+    monkeypatch.setattr(washer, "dimension_name", lambda _adapter, annotation:
+                        source.SOURCE_DIMENSIONS[annotation.GetSpecificAnnotation().label][1])
+    # Downstream sentinels prove the boundary; no source checker or import
+    # unit-transfer assertion is substituted.
+    monkeypatch.setattr(washer, "_native_diameter", forbidden_authoring)
+    monkeypatch.setattr(washer, "_supplier_washer_proof", forbidden_authoring)
+    with pytest.raises(RuntimeError):
+        washer.supplier_washer_dimensions(case.adapter, case.original, **case.arguments)
+    expected_imports = 2 if source.OUTER_DIAMETER in case.arguments["bands"] else 1
+    assert len(imported_views) == (0 if stage == "before-import" else expected_imports)
+    assert not case.rebuilds
+    assert all(not display.placement_calls for view in case.original.values() for display in view.displays)
+    assert not case.app.open_calls
+    assert not case.app.close_calls
+    assert case.path.read_bytes() == case.original_bytes
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("stage", ("settled", "saved"))
+@pytest.mark.parametrize("fault", ("original-owner", "original-attachment", "canonical-parameter"))
+def test_final_proofs_refuse_original_source_corruption_without_repair(saved_washer, stage, fault):
+    case = saved_washer
+    _corrupt_original_source(case, fault)
+    collections = (case.original, case.fresh)
+    writes = tuple(tuple(display.placement_calls) for collection in collections
+                   for view in collection.values() for display in view.displays)
+    count = len(case.rebuilds)
+    with pytest.raises(RuntimeError):
+        if stage == "saved":
+            case.invalidate()
+            case.proof.saved_check(case.adapter, case.path)
+        else:
+            case.proof()
+    assert len(case.rebuilds) == count
+    assert tuple(tuple(display.placement_calls) for collection in collections
+                 for view in collection.values() for display in view.displays) == writes
+    if stage == "saved":
+        _assert_closed_unchanged(case)
+    else:
+        assert not case.app.open_calls
+        assert not case.app.close_calls
+        assert case.path.read_bytes() == case.original_bytes
+        assert case.source_path.read_bytes() == case.source_bytes
+
+
 def _corrupt_placement_source(case, fault):
     thickness = _authoring_display(case, source.THICKNESS)
     face = _authoring_display(case, source.BORE_DIAMETER)
     if fault == "source-format":
         case.source_displays[source.THICKNESS].text[2] = "wrong source unit suffix"
+    elif fault in {"original-owner", "original-attachment", "canonical-parameter"}:
+        _corrupt_original_source(case, fault)
     elif fault == "import-format":
         face.text[1] = "wrong diameter prefix"
     elif fault == "value":
@@ -2053,7 +2371,7 @@ def _corrupt_placement_source(case, fault):
     elif fault == "full-name":
         thickness.native.FullName = thickness.native.FullName.replace("washer.SLDPRT", "other.SLDPRT")
     elif fault == "native-identity":
-        thickness.native = _ReadSurface(**vars(thickness.native))
+        thickness.native = _native_clone(thickness.native)
     elif fault == "inventory":
         case.original[case.face].displays.pop()
     elif fault == "inventory-extra":
@@ -2073,6 +2391,7 @@ def _corrupt_placement_source(case, fault):
     "source-format", "import-format", "value", "band", "attachment", "source-identity",
     "source-path", "configuration", "full-name", "native-identity", "inventory",
     "inventory-extra", "view-inventory", "rim",
+    "original-owner", "original-attachment", "canonical-parameter",
 ))
 def test_every_native_placement_phase_repeats_complete_original_source_proof(
     saved_washer, phase, fault,
@@ -2095,7 +2414,10 @@ def test_every_native_placement_phase_repeats_complete_original_source_proof(
     assert case.source_path.read_bytes() == case.source_bytes
 
 
-@pytest.mark.parametrize("fault", ("source-format", "import-format", "attachment", "inventory"))
+@pytest.mark.parametrize("fault", (
+    "source-format", "import-format", "attachment", "inventory",
+    "original-owner", "original-attachment", "canonical-parameter",
+))
 def test_bad_three_reference_input_is_refused_before_any_native_placement(saved_washer, fault):
     case = saved_washer
     _reset_authoring_layout(case)

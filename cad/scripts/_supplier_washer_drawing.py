@@ -50,6 +50,7 @@ from _supplier_washer_model import (
     assert_supplier_washer_band,
     assert_supplier_washer_body,
     assert_supplier_washer_source_attachment,
+    assert_supplier_washer_references,
 )
 import _telemetry
 
@@ -273,7 +274,7 @@ def assert_supplier_washer_dimensions(
             assert_supplier_washer_source_attachment(
                 adapter, model, display, label=reference.label, axis=axis,
                 bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
-                visible=True, view=reference.view,
+                view=reference.view,
             )
         else:
             _assert_rim(adapter, display, face_rims[reference.label], label=reference.label)
@@ -281,6 +282,13 @@ def assert_supplier_washer_dimensions(
             display, nominal_mm=reference.expected_mm, band=bands.get(reference.label),
             precision=precision[reference.label], label=reference.label,
         )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=next(
+            reference.callout for reference in references if reference.label == BORE_DIAMETER
+        ),
+    )
     return current
 
 
@@ -896,6 +904,19 @@ def supplier_washer_dimensions(
     """Import every banded size; author only bandless OD/ID physical refs."""
     if set(bands) not in ({THICKNESS}, {OUTER_DIAMETER, BORE_DIAMETER, THICKNESS}):
         raise ValueError("unsupported washer supplier band coverage")
+    # The purchased-sheet source checkpoint has already proved this view's
+    # referenced document/path against the original read-only source.
+    model = _early_bound(views["*Front"], "IView").ReferencedDocument
+    if model is None:
+        raise RuntimeError("supplier washer drawing has no referenced source part")
+    assert_supplier_washer_body(
+        model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm, thickness_mm=thickness_mm,
+    )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=bore_callout,
+    )
     face = views["*Top" if axis == "y" else "*Front"]
     side = views["*Front" if axis == "y" else "*Top"]
     bounds = tuple(float(value) for value in face.GetOutline())
@@ -934,6 +955,15 @@ def supplier_washer_dimensions(
             )
             references.append(_reference(display, view, label, values[label], imported=True,
                                          callout=bore_callout if label == BORE_DIAMETER else None))
+            assert_supplier_washer_band(
+                display, nominal_mm=values[label], band=bands[label],
+                precision=precision[label], label=label,
+            )
+    assert_supplier_washer_references(
+        adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
+        thickness_mm=thickness_mm, units=units, precision=precision,
+        bands=bands, bore_callout=bore_callout,
+    )
     unbanded = tuple(label for label in (OUTER_DIAMETER, BORE_DIAMETER) if label not in bands)
     if unbanded:
         edges = scan_view_edges(face, label="supplier washer unbanded face rims")
