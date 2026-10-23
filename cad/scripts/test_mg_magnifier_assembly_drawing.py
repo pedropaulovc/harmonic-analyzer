@@ -22,6 +22,7 @@ import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _printed_tolerance import printed_band_mm
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -102,6 +103,27 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
+
+
+def test_the_press_gauge_band_needs_both_limits_and_names_them() -> None:
+    # Machinist review of e04fd60ab: a tight two-sided band needs a function
+    # for each limit. The wheel-group stack sets both.
+    low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
+    high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
+    assert stack.PRESS_GAUGE_LOW_LIMIT == pytest.approx(38.0484, abs=1e-4)
+    assert stack.PRESS_GAUGE_HIGH_LIMIT == pytest.approx(38.1834, abs=1e-4)
+    assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
+    # Neither limit could relax to the title block's .XX band.
+    xx = printed_band_mm(2)
+    assert stack.PRESS_GAUGE - xx < stack.PRESS_GAUGE_LOW_LIMIT
+    assert stack.PRESS_GAUGE_HIGH_LIMIT < stack.PRESS_GAUGE + xx
+    part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
+    assert part == 3 and "\n" not in text
+    assert text == "MIN: LOCKNUT ON FULL THREAD; MAX: END 2.9 MAX PAST LOCKNUT"
+    # The one-line callout centres over the value: at the 2.7 mm a capital
+    # measured on the e04fd60ab sheet it stays inside the right border.
+    x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
+    assert x + len(text) * 0.0027 / 2.0 < SHEET_RIGHT - 0.005
 
 
 def _circle_box(detail) -> tuple[float, float, float, float]:

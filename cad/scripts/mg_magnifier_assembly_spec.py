@@ -52,6 +52,37 @@ BAR_FRONT_Z = _bar.BAR_FRONT_Z
 
 PRESS_GAUGE = _pin.PRESS_GAUGE
 PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL
+# The wheel-group stack needs BOTH press-gauge limits (mg_wheel_group corners).
+# Low: the shortest gauge whose full thread still runs past the locknut's outer
+# face at the thick-stack corner (LOCKNUT_THREAD_MARGIN) -- 38.048. High: the
+# tightest of three upper limits, at the thin-stack corner: at most
+# THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut (38.183), the first nut
+# clear of the die run-out (38.361) and the step inside the hub (38.807). The
+# printed band must sit inside that window, and the callout names the
+# thread-past-locknut limit as the high side's function, so it must govern.
+PRESS_GAUGE_LOW_LIMIT = PRESS_GAUGE - PRESS_GAUGE_TOL - _group.LOCKNUT_THREAD_MARGIN
+_PRESS_GAUGE_HIGH_LIMITS = {
+    "thread past locknut": _group.THREAD_PAST_LOCKNUT_LIMIT
+    - _group.THREAD_PAST_LOCKNUT_MAX,
+    "nut run-out": _group.NUT_RUNOUT_MARGIN,
+    "step inside hub": _group.STEP_INSIDE_HUB,
+}
+PRESS_GAUGE_HIGH_LIMIT = (
+    PRESS_GAUGE + PRESS_GAUGE_TOL + min(_PRESS_GAUGE_HIGH_LIMITS.values())
+)
+if min(_PRESS_GAUGE_HIGH_LIMITS, key=_PRESS_GAUGE_HIGH_LIMITS.get) != (
+    "thread past locknut"
+):
+    raise AssertionError(
+        "the press gauge's high limit no longer protects the thread end"
+    )
+if not (
+    PRESS_GAUGE_LOW_LIMIT
+    <= PRESS_GAUGE - PRESS_GAUGE_TOL
+    < PRESS_GAUGE + PRESS_GAUGE_TOL
+    <= PRESS_GAUGE_HIGH_LIMIT
+):
+    raise AssertionError("the press-gauge band leaves the wheel-group stack window")
 # The modelled endshake sits mid-band, so its band prints symmetric.
 ENDSHAKE = _group.ENDSHAKE
 ENDSHAKE_TOL = _group.ENDSHAKE_MAX - _group.ENDSHAKE
@@ -120,11 +151,13 @@ INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 # but prints none of the callout (run 20261012T185729782Z). Below ones can wrap.
 SETTING_CALLOUTS = {
     FEATURE: {
-        # The wheel-group stack spends this band to keep the locknut on full
-        # thread (LOCKNUT_THREAD_MARGIN 0.002); state the protected function.
+        # The wheel-group stack needs both gauge limits (PRESS_GAUGE_LOW_LIMIT,
+        # PRESS_GAUGE_HIGH_LIMIT); name what each protects, in the axle
+        # drawing's thread-length wording (mg_wheel_group).
         PRESS_GAUGE_DIMENSION: (
             3,
-            "PRESS GAUGE: KEEPS MHA-MG-VN-52 LOCKNUT ON FULL THREAD",
+            "MIN: LOCKNUT ON FULL THREAD; MAX: END "
+            f"{_group.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT",
         ),
         ENDSHAKE_DIMENSION: (
             4,
