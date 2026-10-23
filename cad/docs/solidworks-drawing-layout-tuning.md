@@ -1797,14 +1797,17 @@ the declared 0.01 mm sheet-space readback tolerance. Merely falling inside
 the neck's rectangular window does not prove either physical landing.
 This replaces the old circle-leader approach-direction assumption.
 
-The unchanged text-anchor candidate is below the neck at its axial midpoint.
-A prior native attempt created a type-2 linear 9.525 mm dimension in false mode
-and passed the insertion proof, including the two physical silhouette tips,
-driven state 1, one decimal place and no explicit tolerance. It then stopped at
-the final-settling full-inventory guard; the extra/missing native identity was
-not printed, so attribution to the later cross-hole callout remains inference.
-**Qualification of the corrected late-authoring order remains pending**,
-including the normal save checkpoints and whole-sheet arrow/text readability.
+Keep the native line at the neck's axial midpoint. The late-authoring source
+proved all four normal native checkpoints, including both actual save
+boundaries, with 9.525 mm, driven state 1, one decimal place, no explicit
+tolerance, two physical flank tips and the complete preexisting inventory.
+Its lower text shoulder nevertheless crossed an existing axial witness line.
+The bounded layout candidate changes only text Y from 0.1515 to 0.1960 m,
+above that witness and the journal, without moving the physical arrow X.
+The nominal shoulder gap above the journal is only an estimate, not ink proof.
+**Qualification of this changed placement remains pending**: inspect the
+actual complete exported sheet for collar, Ra and fit-block clearance and
+retain every native association/value/arrow/inventory/save assertion.
 The discarded type-6 circle factory produced native 19.05 mm under projected
 mode and a type-mismatch under false-mode initialization; its resolver, factory
 and circle-only fixtures are not retained. Accept only exact-source native

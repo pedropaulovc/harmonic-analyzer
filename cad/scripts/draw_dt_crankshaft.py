@@ -286,10 +286,10 @@ DIAMETER_POSITIONS = {
     "CollarDiaDim": (SPIGOT_END_X + 0.002, 0.2065),
     "NeckDiaDim": (JOURNAL_END_X + 0.0006, 0.230),
 }
-# Approach the short neck from below, between its two physical shoulders.
-# This local bay is above the collar/journal outboard baseline rows and
-# left of the shorter rows; it avoids the collar-rear Ra and fit blocks.
-OUTBOARD_NECK_DIAMETER_XY = ((COLLAR_REAR_X + JOURNAL_START_X) / 2.0, 0.1515)
+# Keep the line between the two real shoulders, with text above the journal.
+# Below the neck, its native shoulder crossed the existing axial witness
+# (9bc98ddd6); the changed sheet must still prove Ra/fit/collar ink clearance.
+OUTBOARD_NECK_DIAMETER_XY = ((COLLAR_REAR_X + JOURNAL_START_X) / 2.0, 0.1960)
 OUTBOARD_NECK_ARROW_WINDOW = (
     COLLAR_REAR_X, _sheet_y(-SHAFT_DIA / 2.0),
     JOURNAL_START_X, _sheet_y(SHAFT_DIA / 2.0),

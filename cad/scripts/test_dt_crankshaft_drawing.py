@@ -471,7 +471,8 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     assert spec.NECK_DIA_PLACES == 1
     neck_x, neck_y = drawing.OUTBOARD_NECK_DIAMETER_XY
     assert drawing.COLLAR_REAR_X < neck_x < drawing.JOURNAL_START_X
-    assert neck_y < drawing._sheet_y(-spec.COLLAR_DIA / 2.0)
+    assert drawing._sheet_y(spec.JOURNAL_DIA / 2.0) < neck_y
+    assert neck_y < drawing._sheet_y(spec.COLLAR_DIA / 2.0)
     assert drawing.SIDE_KEEP["JournalOutboardStation"][1] < neck_y
     assert drawing.SIDE_KEEP["CollarRearStation"][1] < neck_y
     for name in ("PinionSeatStation", "JournalInboardStation", "ReliefInboardStation"):
