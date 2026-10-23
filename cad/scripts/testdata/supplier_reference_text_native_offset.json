@@ -751,5 +751,72 @@
         }
       ]
     }
+  ],
+  "multifragment_sources": [
+    {
+      "stem": "sh-vn-clamp-screw",
+      "label": "clamp supplier SupplierHeadDiameter",
+      "dimension_role": "supplier_head_diameter",
+      "source_commit": "4166e48e7d75805cc95cf005c467c1a41cdfbf90",
+      "run_id": "20261023T123836759Z-1f132a1babba46fab4d8b3435fda6679",
+      "build_id": "20261023T123910.437371Z-eeeaf914a6374a759b1e01d5e45067d2",
+      "original_task_log": "C:/ha-release-manager-20261023/runs/repair-fleet/nut1850-4166-SH-diagnostic-terminal-collection/drawing-original-task.log",
+      "original_task_log_sha256": "7deaa51e8ac1be6620419e8f0a7fbd10988d68fd47c911727097622a33344dcf",
+      "original_line": 130,
+      "diagnostic_json_sha256": "57d278fd8621b709f8ce5b2ae5293edae04fe37745e4d083efdad742c4b6ee93",
+      "precision": "Recorded audit primitives0.1micrometre, NOT unrounded live double claim",
+      "method": "Unwrap the actual held raw texts/lines/arrows without changing values, ordering, roles or whitespace. Annotation type 4 follows the passed measure_reference_text native-type guard; no unrecorded annotation position/owner/identity is supplied.",
+      "uncaptured_fields": ["annotation_position", "native_owner", "native_identity"],
+      "before": {
+        "offset_text": false,
+        "raw_annotation": {
+          "type": 4,
+          "display": {
+            "texts": [
+              {"t": " (", "pos": [0.1022861, 0.1227656, -0.0140241], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0030139},
+              {"t": "<MOD-DIAM>", "pos": [0.1053, 0.1227121, -0.0140241], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0052784},
+              {"t": "0.27 in) ", "pos": [0.1105785, 0.1227656, -0.0140241], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0171354}
+            ],
+            "lines": [
+              [0, 0, 0, 0, 0.111571, 0.1115, -0.0140241, 0.111571, 0.1237121, -0.0140241],
+              [0, 0, 0, 0, 0.118429, 0.1115, -0.0140241, 0.118429, 0.1237121, -0.0140241],
+              [0, 0, 0, 0, 0.111571, 0.1227121, -0.0140241, 0.105221, 0.1227121, -0.0140241],
+              [0, 0, 0, 0, 0.111571, 0.1227121, -0.0140241, 0.118429, 0.1227121, -0.0140241],
+              [0, 0, 0, 0, 0.118429, 0.1227121, -0.0140241, 0.124779, 0.1227121, -0.0140241]
+            ],
+            "arrows": [
+              [0.111571, 0.1227121, -0.0140241, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+              [0.118429, 0.1227121, -0.0140241, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1]
+            ]
+          }
+        }
+      },
+      "after": {
+        "offset_text": true,
+        "raw_annotation": {
+          "type": 4,
+          "display": {
+            "texts": [
+              {"t": " (", "pos": [0.126979, 0.1227656, 0], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0030139},
+              {"t": "<MOD-DIAM>", "pos": [0.1299929, 0.1227121, 0], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0052784},
+              {"t": "0.27 in) ", "pos": [0.1352714, 0.1227656, 0], "h": 0.0035, "ref": 1, "ang": 0, "font": "Century Gothic", "ls": 0.001, "w": 0.0171354}
+            ],
+            "lines": [
+              [0, 0, 0, 0, 0.111571, 0.1115, -0.0140241, 0.111571, 0.1237121, -0.0140241],
+              [0, 0, 0, 0, 0.118429, 0.1115, -0.0140241, 0.118429, 0.1237121, -0.0140241],
+              [0, 0, 0, 0, 0.111571, 0.1227121, -0.0140241, 0.105221, 0.1227121, -0.0140241],
+              [0, 0, 0, 0, 0.111571, 0.1227121, -0.0140241, 0.118429, 0.1227121, -0.0140241],
+              [0, 0, 0, 0, 0.118429, 0.1227121, -0.0140241, 0.124779, 0.1227121, -0.0140241],
+              [0, 0, 0, 0, 0.115, 0.1227121, -0.0140241, 0.126979, 0.1227121, 0],
+              [0, 0, 0, 0, 0.126979, 0.1227121, 0, 0.1524068, 0.1227121, 0]
+            ],
+            "arrows": [
+              [0.111571, 0.1227121, -0.0140241, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1],
+              [0.118429, 0.1227121, -0.0140241, 1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1]
+            ]
+          }
+        }
+      }
+    }
   ]
 }
