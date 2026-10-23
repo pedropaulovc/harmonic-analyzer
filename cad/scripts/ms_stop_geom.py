@@ -116,13 +116,17 @@ def author_hole_precision(adapter: Any, feature_name: str) -> None:
 
 @_telemetry.traced("sketch.stop_roof_thickness")
 async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
-    """Direct roof thickness from the finished roof to the rebate roof edge."""
+    """Direct roof thickness on the lip's cover-side face (Z=0).
+
+    The chord lies on the real lip edge, so the shown construction line hides
+    under the outline instead of ghosting through the lip at the rebate wall.
+    """
     feature = "RoofThicknessReference"
     check(feature, await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     line = check(feature, await adapter.add_line(
-        -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX,
-        -spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT,
+        -spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX,
+        -spec.WINDOW_Z_MIN, spec.BLOCK_HEIGHT,
     ))
     set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -133,15 +137,14 @@ async def roof_reference(adapter: Any) -> list[tuple[str, str]]:
     await dimension_between(adapter, f"{line}.start", f"{line}.end",
                             "vertical_distance", spec.ROOF_THICKNESS, feature)
     await anchor_point_to_origin(adapter, f"{line}.start",
-                                 -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX, feature)
+                                 -spec.WINDOW_Z_MIN, spec.WINDOW_Y_MAX, feature)
     await ensure_fully_defined(adapter, feature)
     check(feature, await adapter.exit_sketch())
     name_last_feature(adapter, feature)
-    names = name_dimensions(adapter, feature, [
-        "RoofThickness", "RoofDepthStation", "RoofWindowStation",
-    ])
+    # WINDOW_Z_MIN is 0: the start point's on-axis anchor adds only its station.
+    names = name_dimensions(adapter, feature, ["RoofThickness", "RoofWindowStation"])
     return list(zip(names, [
-        '"RoofThickness"', '"WindowWidth"', '"BlockHeight" - "RoofThickness"',
+        '"RoofThickness"', '"BlockHeight" - "RoofThickness"',
     ], strict=True))
 
 

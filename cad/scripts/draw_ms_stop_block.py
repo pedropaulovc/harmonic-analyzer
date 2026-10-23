@@ -38,15 +38,19 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_property_linked_callout
+from _drawing_leader_notes import add_attached_note, add_property_linked_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_stop_block"]
 PART_STEM = SPEC.artifact_stem
@@ -57,34 +61,45 @@ SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.155, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
 BOTTOM_CENTER = (FRONT_CENTER[0], 0.080)
-# Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end view.
-ISO_CENTER = (0.360, 0.119)
+# Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end
+# view, right of the four-line rebate callout.
+ISO_CENTER = (0.372, 0.119)
 FRONT_KEEP = {
     "BlockLength": (0.155, 0.235), "BlockHeight": (0.085, 0.185),
     "RoofChamferSize": (0.227, 0.240), "RoofChamferAngle": (0.207, 0.220),
-    "PlateLeftFromEnd": (0.155, 0.140),
-    "PlateRightFromEnd": (0.155, 0.122),
+    # Below the LOCATING EDGE label, between the hole-location witnesses.
+    "PlateLeftFromEnd": (0.155, 0.132),
+    "PlateRightFromEnd": (0.155, 0.116),
     "PlateFromHeadFace": (0.100, 0.163),
 }
 RIGHT_KEEP = {
-    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.315, 0.130),
-    "WindowHeight": (0.365, 0.198), "RoofThickness": (0.350, 0.215),
+    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.310, 0.130),
+    "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
 }
 BOTTOM_KEEP = {
     "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.090, 0.080),
 }
+STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS", "WindowWidth": "OPEN REBATE"}
+# The rebate bands exist only for the stick that slides in it; the two
+# worst-case walls between the 1.5 floor and 2.0 target are stated as facts.
+DIMENSION_CALLOUTS = {
+    "RoofChamferSize": "2 CORNERS",
+    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}\nBACK WALL {part.WINDOW_BACK_WALL_MIN:.2f} MIN",
+    "WindowHeight": STICK_FIT,
+    "RoofThickness": f"WALL {part.ROOF_THICKNESS_MIN:.2f} MIN",
+}
+# Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
+LOCATING_END_XY = (0.232, 0.160)
+LOCATING_EDGE_XY = (0.155, 0.145)
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
     f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
-    # Two short lines: one 55-character line ran through the left border.
-    + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
-    + "\n"
+    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
 )
 
 
@@ -141,6 +156,18 @@ def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> N
             raise RuntimeError(f"{name}: imported plate-master reference lost its source display")
     if remaining:
         raise RuntimeError(f"missing plate-master reference dimensions: {sorted(remaining)}")
+
+
+def _label_locating_edges(adapter: Any, front: Any) -> None:
+    """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
+    face_z = part.PLATE_Z_MAX / 1000.0
+    for text, model_xyz, note_xy in (
+        (part.LOCATING_END_NOTE, (0.0, 2.0 / 1000.0, face_z), LOCATING_END_XY),
+        (part.LOCATING_EDGE_NOTE, (part.THUMB_AXIS_X / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
+    ):
+        edge_xy = model_point_in_view(adapter, front, model_xyz, label=text.lower())
+        add_attached_note(adapter, front, text=text, entity_xy=edge_xy,
+                          note_xy=note_xy, label=text.lower())
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -204,6 +231,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, property_name="Mating Face Note",
         edge_xy=mating_edge, note_xy=(0.220, 0.210),
     )
+    _label_locating_edges(adapter, front)
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError("stop tap centre marks failed")
@@ -212,6 +240,7 @@ async def build(adapter: Any) -> dict[str, str]:
         part.BLOCK_DRAWING_PRECISION_BY_NAME,
         bands={
             **{name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
+            "RoofChamferSize": part.ROOF_CHAMFER_BAND_MM,
         },
         angular=frozenset({"RoofChamferAngle"}),
     )

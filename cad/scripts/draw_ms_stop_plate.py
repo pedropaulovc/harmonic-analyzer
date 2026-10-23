@@ -32,14 +32,19 @@ from _drawing_common import (
 )
 from _drawing_dimensions import set_dimension_callouts
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_stop_plate"]
 PART_STEM = SPEC.artifact_stem
@@ -48,26 +53,37 @@ OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs["slddrw"], pdf=SPEC.outputs["pdf"],
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.175, 0.170)
-# Far enough right that the four-line pilot callout ends clear of this view.
-RIGHT_CENTER = (0.345, FRONT_CENTER[1])
+# Far enough right that the pilot callout and the thickness text end clear of it.
+RIGHT_CENTER = (0.360, FRONT_CENTER[1])
 ISO_CENTER = (0.345, 0.090)
 FRONT_KEEP = {
     "PlateLength": (0.175, 0.235), "PlateHeight": (0.105, 0.170),
     "RoofChamferSize": (0.247, 0.225), "RoofChamferAngle": (0.227, 0.205),
-    "PlateLeftFromEnd": (0.175, 0.115),
+    "PlateLeftFromEnd": (0.175, 0.113),
     "PlateRightFromEnd": (0.175, 0.095),
     "PlateFromHeadFace": (0.115, 0.148),
-    # Below the chamfer-size witness line, above the clearance callout.
-    "PilotDrillDiameter": (0.265, 0.182),
+    # Right of the outline and below the chamfer-size dimension line.
+    "PilotDrillDiameter": (0.285, 0.178),
 }
-RIGHT_KEEP = {"PlateThickness": (RIGHT_CENTER[0], 0.225)}
+# Text left of the thin edge view, so neither witness line strikes it.
+RIGHT_KEEP = {"PlateThickness": (0.327, 0.225)}
 DIMENSION_CALLOUTS = {
     "PilotDrillDiameter": (
         "LAYOUT ON THIS PLATE; PILOT\n"
         f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}\n"
-        "CLAMPED WITH " + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
+        f"CLAMPED, {part.MATCH_DRILL_DATUM_ALIGNMENT}"
+    ),
+    # The thickness band sets the plate screws' reach into the blind taps.
+    "PlateThickness": (
+        "SETS SCREW REACH IN\nMS-STOP-BLOCK\n"
+        f"{_config.parts('ms-stop-block')['number']} TAPS"
     ),
 }
+CLEARANCE_CALLOUT_XY = (0.285, 0.140)
+# Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
+# Note positions are the text's upper-left corner.
+LOCATING_END_XY = (0.228, 0.128)
+LOCATING_EDGE_XY = (0.162, 0.132)
 
 
 def _style_pilot_diameter(adapter: Any, annotations: list[Any]) -> None:
@@ -111,6 +127,18 @@ def _style_plate_chamfer(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"missing native plate chamfer dimensions: {sorted(remaining)}")
 
 
+def _label_locating_edges(adapter: Any, front: Any) -> None:
+    """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
+    face_z = part.PLATE_Z_MIN / 1000.0
+    for text, model_xyz, note_xy in (
+        (part.LOCATING_END_NOTE, (0.0, 1.0 / 1000.0, face_z), LOCATING_END_XY),
+        (part.LOCATING_EDGE_NOTE, (part.THUMB_AXIS_X / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
+    ):
+        edge_xy = model_point_in_view(adapter, front, model_xyz, label=text.lower())
+        add_attached_note(adapter, front, text=text, entity_xy=edge_xy,
+                          note_xy=note_xy, label=text.lower())
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop cover missing: {SOURCE}")
@@ -147,8 +175,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # imported pilot. Two adjacent native callouts avoid an unverified note
     # dimension-link format while keeping both 2X quantities and sizes live.
     # Both leaders stay right of the overall-height and hole-location lanes.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=(0.265, 0.150),
-                           label="two cover clearance holes", process="THEN OPEN")
+    # Unclamping first makes the opening this plate's alone, not the block's.
+    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
+                           label="two cover clearance holes", process="REMOVE PLATE; THEN OPEN")
+    _label_locating_edges(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")
     assert_manufacturing_dimensions(

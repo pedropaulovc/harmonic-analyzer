@@ -116,10 +116,12 @@ PLATE_DRAWING_DIMENSIONS = {
     "PilotDrillReference": {"PilotDrillDiameter"},
 }
 # The PLATE is the match-drill master. Its three absolute location bands
-# transfer to the block only when X=0/Y=0 datum edges are aligned; the block's
-# nominal locations are reference-only, never an independent pattern.
+# transfer to the block only when the X=0 ends and Y=0 edges, both labelled on
+# each sheet, are flush; the block's nominal locations are reference-only.
 MATCH_DRILL_MASTER = "MS-STOP-PLATE"
-MATCH_DRILL_DATUM_ALIGNMENT = "DIMENSIONED END AND THUMBSCREW-SIDE DATUM EDGES ALIGNED"
+LOCATING_END_NOTE = "LOCATING END"
+LOCATING_EDGE_NOTE = "LOCATING EDGE"
+MATCH_DRILL_DATUM_ALIGNMENT = "LOCATING ENDS AND EDGES FLUSH"
 PLATE_THICKNESS_TOLERANCE_MM = 0.1
 PLATE_HOLE_POSITION_TOLERANCE_MM = 0.1
 PLATE_LOCATION_DIMENSIONS = frozenset({
@@ -137,16 +139,17 @@ PLATE_DRAWING_PRECISION = {
 # Depth and cover length still need .XX; their .X bands would breach 1.5 mm.
 BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
-# Only the cover's cosmetic corners use .X; the block chamfer retains .XX.
+# The cover's cosmetic corners use .X. The block chamfer is a single .X limit,
+# printed 1.0 MAX: a .X band could cut through the 2.1 roof at its open end.
 # Its native angle prints as 45 degrees, without redundant decimal places.
 PLATE_DRAWING_PRECISION["RoofChamfers"].update(RoofChamferSize=1, RoofChamferAngle=0)
+BLOCK_DRAWING_PRECISION["RoofChamfers"]["RoofChamferSize"] = 1
+ROOF_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX: the nominal is the printed limit
+ROOF_CHAMFER_BAND_MM = (-ROOF_END_CHAMFER, 0.0)  # (lower, upper) deviations
 BLOCK_DRAWING_PRECISION_BY_NAME = {name: places for dims in BLOCK_DRAWING_PRECISION.values() for name, places in dims.items()}
 PLATE_DRAWING_PRECISION_BY_NAME = {name: places for dims in PLATE_DRAWING_PRECISION.values() for name, places in dims.items()}
 BLOCK_MATING_FACE_NOTE = "STOP-PLATE MATING FACE"
-BLOCK_DRAWING_NOTES = (
-    "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE.\n"
-    f"BLIND DEPTHS FROM {BLOCK_MATING_FACE_NOTE}."
-)
+BLOCK_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
 PLATE_DRAWING_NOTES = "KEEP MATCHED PAIR TOGETHER; NOT INTERCHANGEABLE."
 HOLE_CALLOUT_PRECISION = 2
 WINDOW_SIZE_TOLERANCE_MM = (0.0, 0.1)
