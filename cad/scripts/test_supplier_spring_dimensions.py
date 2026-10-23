@@ -1156,6 +1156,92 @@ def test_rocker_four_to_one_diameter_origins_fit_unchanged_top_cell(
     assert y1 + 0.002 + relative_box[3] > field[3]
 
 
+def test_rocker_flag_placement_translates_recorded_full_ink_and_keeps_settled_guards(
+    monkeypatch,
+):
+    """Real placement/guards, recorded failure and predicted translation; no COM proof."""
+    positions = {}
+    for flag in (None, "SEE NOTE 1"):
+        views = _disc_views(rocker)
+        view = views["free_top"]
+        radius = rocker.OD / 2000.0
+        view.source_points = ((-radius, -radius), (radius, radius))
+        view.Position, view.ScaleRatio = (0.1315, 0.227), (4, 1)
+        _readback_environment(monkeypatch, disc, views)
+        checks = []
+        disc.supplier_disc_spring_dimensions(
+            object(), views, spec=rocker, id_callout=flag,
+            reference_bounds=_captured_reference_bounds(views), settled_checks=checks,
+        )
+        for check in checks:
+            check()
+        positions[flag] = {
+            annotation.name: annotation.GetPosition()
+            for member in views.values() for annotation in member.annotations
+        }
+    before, after = positions[None], positions["SEE NOTE 1"]
+    assert before["SupplierID"] == pytest.approx((0.0868564, 0.2416436, 0.0))
+    assert after["SupplierID"] == pytest.approx((0.0868564, 0.2396436, 0.0))
+    assert {name: point for name, point in after.items() if name != "SupplierID"} == {
+        name: point for name, point in before.items() if name != "SupplierID"
+    }
+    annotation = next(item for item in view.annotations if item.name == "SupplierID")
+    assert view.kept_positions["SupplierID"] == after["SupplierID"][:2]
+    assert not annotation.GetSpecificAnnotation().OffsetText
+    assert view.ScaleRatio == (4, 1)
+    assert view.ReferencedConfiguration == refs.SUPPLIER_DIAGRAM_CONFIGURATION
+
+    # Actual f4ffe3ef run 20261023T002838923Z-0416284ff0ad4bc9904fb75ca28c50fa,
+    # supplier-layout-f4ffe3ef-two-terminal-ch_vn_rocker_bank_spring-worker-task.log:
+    # the strict final guard reported this complete value/band/flag ink box.
+    # No rocker PDF or per-run display geometry was exported. Translating the
+    # box is only a candidate calculation, not measured after-fix native ink.
+    recorded = (0.0662627, 0.2311813, 0.1187038, 0.2479217)
+    field = next(
+        cell for key, _center, cell in layout.supplier_state_cells(0.077, maximum=False)
+        if key == "free_top"
+    )
+    assert field == (0.028, 0.207, 0.235, 0.247)
+    assert recorded[3] - field[3] == pytest.approx(0.0009217)
+    predicted = _translated_box(recorded, before["SupplierID"], after["SupplierID"])
+    assert predicted == pytest.approx((0.0662627, 0.2291813, 0.1187038, 0.2459217))
+    assert field[3] - predicted[3] == pytest.approx(0.0010783)
+
+    # Feed the collapsed evidence box at the native extraction boundary, not
+    # invented GetDisplayData rows or a setter-success claim. The production
+    # whole-ink guard must still reject the old full box and any settled snapback.
+    import _layout_audit as audit
+    import _purchased_fastener_drawing as purchased
+
+    case = _supplier_native(monkeypatch, value=rocker.ID / 1000, kind=6)
+    case.native.FullName = "SupplierID@DiscSupplierPlan@Source"
+    case.display.GetNext5 = lambda: None
+    case.view.GetFirstDisplayDimension6 = lambda: case.display
+    case.view.GetAnnotations = lambda: (case.annotation,)
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(
+        purchased, "annotation_display",
+        lambda *_args: ({"texts": [{"t": "SEE NOTE 1"}]}, {}),
+    )
+    evidence = recorded
+    monkeypatch.setattr(audit, "display_box", lambda _geometry: audit.Box(*evidence))
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    for evidence in (recorded, predicted, recorded):
+        if evidence is predicted:
+            layout.assert_supplier_annotations_fit(
+                adapter, case.view, field, label="rocker free_top",
+            )
+        else:
+            with pytest.raises(RuntimeError, match="supplier dimension leaves its cell"):
+                layout.assert_supplier_annotations_fit(
+                    adapter, case.view, field, label="rocker free_top",
+                )
+    annotation.position = before["SupplierID"]
+    with pytest.raises(RuntimeError, match="ID: diameter text moved from its target"):
+        for check in checks:
+            check()
+
+
 @pytest.mark.parametrize("corruption", ["empty", "wrong_space", "centre_tail"])
 def test_final_diameter_route_check_requires_actual_near_rim_sheet_space_ink(
     monkeypatch, corruption
