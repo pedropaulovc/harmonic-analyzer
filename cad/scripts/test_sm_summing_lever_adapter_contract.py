@@ -308,38 +308,47 @@ def test_extracted_sketch_contract_rejects_real_primitive_mutations(mutation: st
 def _source_helpers(names: tuple[str, ...], **bindings):
     """Extract exact helper bodies, substituting only their COM bind/import seam."""
     functions = []
-    for name in dict.fromkeys(("coefficient_underside_root_geometry",) + names):
+    dependencies = ("coefficient_underside_root_geometry",)
+    if "_assert_receiver_profile_walls" in names:
+        dependencies += ("_assert_receiver_plate_backing",)
+    for name in dict.fromkeys(dependencies + names):
         function = copy.deepcopy(next(
             node for node in _tree(RECIPE).body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
         ))
         imports = [node for node in function.body if isinstance(node, ast.ImportFrom)]
-        assert all(node.module == "magnifying_bracket_joint_layout" for node in imports)
+        assert all(node.module in {
+            "magnifying_bracket_joint_layout", "solidworks_mcp.adapters.base",
+        } for node in imports)
         function.body = [node for node in function.body if not isinstance(node, ast.ImportFrom)]
         functions.append(function)
     namespace = {
         "math": math, "_early_bound": lambda value, interface: value,
-        "_telemetry": SimpleNamespace(success=lambda message: None, info=lambda message: None),
+        "_telemetry": SimpleNamespace(
+            success=lambda message: None, info=lambda message: None,
+            traced=lambda name: lambda function: function,
+            annotate=lambda **attributes: None,
+        ),
         "COEFFICIENT_T": spec.COEFFICIENT_T,
         "COEFFICIENT_TOP_Y": spec.COEFFICIENT_TOP_Y,
         "COEFFICIENT_BOTTOM_Y": spec.COEFFICIENT_BOTTOM_Y,
         "COUNTER_WEB_T": spec.COUNTER_WEB_T,
         "RIB_BLEND_R": spec.RIB_BLEND_R, "RIB_REACH": spec.RIB_REACH,
         "CYL_R": spec.CYL_R, "PLATE_L": spec.PLATE_L, "PLATE_W": spec.PLATE_W,
-        "RIB_T": spec.COUNTER_WEB_T, "SUM_H": spec.SUM_H,
-        "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.COUNTER_WEB_T,
+        "RIB_T": spec.RIB_T, "SUM_H": spec.SUM_H,
+        "RIB_OFFSET": spec.PLATE_L / 2.0 - spec.RIB_T,
+        "ExtrusionParameters": SimpleNamespace,
     }
-    # Receiver depth has one authority; never duplicate 9.00 as an input knob.
+    # The coefficient slab, counter web and all ribs retain separate authorities.
     import magnifying_bracket_joint_layout as joint
 
-    namespace["RECEIVER_RIB_OFFSET"] = spec.PLATE_L / 2.0 - joint.RIB_DEPTH
     namespace.update(
-        RECEIVER_RIB_T=joint.RIB_DEPTH,
         RECEIVER_PILOT_WALL_MIN=joint.RECEIVER_PILOT_WALL_MIN,
         LEVER_HOLE_POINTS=joint.LEVER_HOLE_POINTS, TAP_DRILL_DIA=joint.TAP_DRILL_DIA,
         receiver_wall_margin=profile.receiver_wall_margin,
         receiver_pilot_wall_budget=profile.receiver_pilot_wall_budget,
-        receiver_pilot_step_wall_budget=joint.receiver_pilot_step_wall_budget,
+        receiver_pilot_material_wall_budget=joint.receiver_pilot_material_wall_budget,
+        DRILL_DEPTH=joint.DRILL_DEPTH, DRILL_POINT_DEPTH=joint.DRILL_POINT_DEPTH,
     )
     namespace.update(bindings)
     module = ast.Module(body=[
@@ -348,6 +357,90 @@ def _source_helpers(names: tuple[str, ...], **bindings):
     ], type_ignores=[])
     exec(compile(ast.fix_missing_locations(module), str(RECIPE), "exec"), namespace)
     return namespace
+
+
+@pytest.mark.parametrize("rib_t", [spec.RIB_T, 4.75])
+def test_extracted_all_three_rib_operations_share_depth_and_drive_equation(rib_t: float) -> None:
+    extrusions, profiles, gates = [], [], []
+
+    async def sketch(adapter, stem, jobs, *, middle=False):
+        profiles.append((stem, middle))
+
+    async def measured(adapter, label):
+        return 1000.0
+
+    async def rebuild(adapter):
+        return None
+
+    async def gate(adapter, label, expected, tolerance):
+        gates.append((label, expected, tolerance))
+
+    async def middle_extrusion(parameters):
+        extrusions.append(("middle", parameters.depth, parameters.both_directions))
+        return SimpleNamespace(is_success=True)
+
+    namespace = _source_helpers(
+        ("_edge_rib", "_middle_rib"),
+        RIB_T=rib_t, RIB_OFFSET=spec.PLATE_L / 2.0 - rib_t,
+        _rib_profile_sketch=sketch, _measured_volume=measured,
+        force_rebuild=rebuild, volume_check=gate,
+        extrude_at_offset=lambda adapter, depth, offset, *, flip: extrusions.append(
+            ("edge", depth, offset, flip)
+        ),
+        edge_rib_added_area_mm2=profile.edge_rib_added_area_mm2,
+        check=lambda label, result: result,
+        name_last_feature=lambda adapter, name: None,
+        name_dimensions=lambda adapter, owner, names: [f"{name}@{owner}" for name in names],
+        _assert_native_rib_profile=lambda adapter, stem: None,
+    )
+    adapter = SimpleNamespace(create_extrusion=middle_extrusion)
+    jobs = []
+    for flip, stem in ((False, "EdgeRibFront"), (True, "EdgeRibBack")):
+        asyncio.run(namespace["_edge_rib"](adapter, flip, stem, stem, jobs))
+    asyncio.run(namespace["_middle_rib"](adapter, jobs))
+    offset = spec.PLATE_L / 2.0 - rib_t
+    assert extrusions == [
+        ("edge", rib_t, offset, False), ("edge", rib_t, offset, True),
+        ("middle", rib_t, True),
+    ]
+    assert profiles == [("EdgeRibFront", False), ("EdgeRibBack", False), ("MiddleRib", True)]
+    assert jobs == [
+        ("EdgeRibThickness@EdgeRibFront", '"RibT"'),
+        ("EdgeRibThickness@EdgeRibBack", '"RibT"'),
+        ("MiddleRibThickness@MiddleRib", '"RibT"'),
+    ]
+    added = profile.edge_rib_added_area_mm2() * rib_t
+    assert [expected for _, expected, _ in gates] == pytest.approx([1000.0 + added] * 2)
+
+
+def test_extracted_taps_use_relocated_joint_axes_and_preserve_complete_pilot_volume_gate() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    cuts, gates = [], []
+
+    async def mass():
+        return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=1000.0))
+
+    async def gate(adapter, label, expected, tolerance):
+        gates.append((expected, tolerance))
+
+    namespace = _source_helpers(
+        ("_bracket_mounting_taps",), TAP_SPEC=joint.TAP_SPEC,
+        wizard_holes=lambda *args, **kwargs: cuts.append((args, kwargs)),
+        volume_check=gate,
+    )
+    adapter = SimpleNamespace(get_mass_properties=mass)
+    asyncio.run(namespace["_bracket_mounting_taps"](adapter))
+    assert len(cuts) == 1
+    arguments, options = cuts[0]
+    assert arguments[:4] == (adapter, joint.TAP_SPEC, joint.LEVER_HOLE_POINTS, (0.0, 0.0, -1.0))
+    assert all(y == pytest.approx(spec.COEFFICIENT_TOP_Y - 3.25) for _, y, _ in arguments[2])
+    assert options["expect_dia_mm"] == joint.TAP_DRILL_DIA
+    assert joint.DRILL_DEPTH > spec.RIB_T
+    complete_pilot = len(joint.LEVER_HOLE_POINTS) * math.pi * (joint.TAP_DRILL_DIA / 2.0)**2 * (
+        joint.DRILL_DEPTH + joint.DRILL_POINT_DEPTH / 3.0
+    )
+    assert gates == [pytest.approx((1000.0 - complete_pilot, 0.02 * complete_pilot))]
 
 
 class _Dimension:
@@ -492,7 +585,7 @@ def _assert_lower_junction_picks_cover_both_runs(families, namespace) -> None:
     """Sample the actual lower intersection, excluding the three solid ribs."""
     radius, bottom = namespace["CYL_R"], namespace["COEFFICIENT_BOTTOM_Y"]
     starts_ends = (
-        (-namespace["RECEIVER_RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
+        (-namespace["RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
         (namespace["RIB_T"] / 2.0, namespace["RIB_OFFSET"]),
     )
     picks = [point for _, points, _ in families for point in points]
@@ -511,7 +604,7 @@ def test_lower_longitudinal_picks_cover_actual_junction_and_track_geometry_chang
     namespace = _source_helpers(("rib_root_edge_families",))
     for changes in (
         {},
-        {"COEFFICIENT_BOTTOM_Y": -5.0, "CYL_R": 13.0, "RECEIVER_RIB_OFFSET": 65.0, "RIB_OFFSET": 70.0},
+        {"COEFFICIENT_BOTTOM_Y": -5.0, "CYL_R": 13.0, "RIB_OFFSET": 70.0},
     ):
         namespace.update(changes)
         families = namespace["rib_root_edge_families"]()
@@ -538,7 +631,7 @@ def test_lower_longitudinal_picks_cover_actual_junction_and_track_geometry_chang
 @pytest.mark.parametrize("changes", [
     {"COEFFICIENT_BOTTOM_Y": 0.0}, {"COEFFICIENT_BOTTOM_Y": -20.0},
     {"RIB_BLEND_R": 0.0}, {"RIB_BLEND_R": math.nan},
-    {"RECEIVER_RIB_OFFSET": 76.2}, {"RIB_OFFSET": 3.0},
+    {"RIB_OFFSET": 76.2}, {"RIB_OFFSET": 3.0},
 ])
 def test_lower_blend_geometry_fails_closed_outside_tangent_inboard_premises(changes) -> None:
     namespace = _source_helpers((), **changes)
@@ -600,7 +693,7 @@ def _underside_native_faces(namespace):
     center = (math.sqrt((cylinder + radius)**2 - (bottom - radius)**2), bottom - radius)
     tangent = tuple(value * cylinder / (cylinder + radius) for value in center)
     runs = (
-        (-namespace["RECEIVER_RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
+        (-namespace["RIB_OFFSET"], -namespace["RIB_T"] / 2.0),
         (namespace["RIB_T"] / 2.0, namespace["RIB_OFFSET"]),
     )
     boxes = [
@@ -746,7 +839,7 @@ def test_longitudinal_family_has_its_own_increment_bound_without_relaxing_old_ro
     families = namespace["rib_root_edge_families"]()
     new_name, _, length = families[-1]
     expected_length = (
-        namespace["RECEIVER_RIB_OFFSET"] + namespace["RIB_OFFSET"]
+        2.0 * namespace["RIB_OFFSET"]
         - namespace["RIB_T"] + 4.0 * namespace["RIB_BLEND_R"]
     )
     assert length == pytest.approx(expected_length)
@@ -833,21 +926,23 @@ def test_extracted_root_extreme_readback_refuses_missing_or_invalid_exact_geomet
 
 def _receiver_faces(*, invalid=None, perturb: float = 0.0):
     queries = []
-    nx, ny = profile.UPPER.normal_xy
 
-    def closest(x, y, z):
-        queries.append((x * 1000.0, y * 1000.0, z * 1000.0))
-        if invalid is not None:
-            return invalid
-        distance = spec.RIB_WRAP_R - nx * x * 1000.0 - ny * y * 1000.0
-        return x + (nx * distance + perturb) / 1000.0, y + ny * distance / 1000.0, z, 0.0, 0.0
+    def longitudinal_face(branch):
+        nx, ny = branch.normal_xy
 
-    longitudinal = SimpleNamespace(
-        GetSurface=lambda: SimpleNamespace(
-            IsPlane=lambda: True, PlaneParams=(nx, ny, 0.0, 0.0, 0.0, 0.0),
-        ),
-        GetClosestPointOn=closest,
-    )
+        def closest(x, y, z):
+            queries.append((x * 1000.0, y * 1000.0, z * 1000.0))
+            if invalid is not None:
+                return invalid
+            distance = spec.RIB_WRAP_R - nx * x * 1000.0 - ny * y * 1000.0
+            return x + (nx * distance + perturb) / 1000.0, y + ny * distance / 1000.0, z, 0.0, 0.0
+
+        return SimpleNamespace(
+            GetSurface=lambda: SimpleNamespace(
+                IsPlane=lambda: True, PlaneParams=(nx, ny, 0.0, 0.0, 0.0, 0.0),
+            ),
+            GetClosestPointOn=closest,
+        )
 
     def no_cap_query(x, y, z):
         raise AssertionError("entry-cap distance is not a lateral receiver wall")
@@ -858,55 +953,146 @@ def _receiver_faces(*, invalid=None, perturb: float = 0.0):
         ),
         GetClosestPointOn=no_cap_query,
     )
-    return [cap, longitudinal], queries
+    return [cap, longitudinal_face(profile.UPPER), longitudinal_face(profile.LOWER)], queries
+
+
+def _receiver_adapter(rib_faces, *, damage=None):
+    """Finite, independently trimmed plate faces; no infinite-plane stand-in."""
+    import magnifying_bracket_joint_layout as joint
+
+    queries = []
+    inner_z = joint.LEVER_FRONT_LOCAL_Z + spec.RIB_T
+    tip_z = joint.LEVER_FRONT_LOCAL_Z + joint.DRILL_DEPTH + joint.DRILL_POINT_DEPTH
+
+    def plate_face(axis, level, label):
+        normal, origin = [0.0] * 3, [0.0] * 3
+        normal[axis] = 1.0
+        origin[axis] = (level + (0.1 if damage == f"shift_{label}" else 0.0)) / 1000.0
+        values = (*normal, *origin)
+        if damage == "invalid_plane":
+            values = (math.nan, *values[1:])
+        surface = SimpleNamespace(IsPlane=lambda: True, PlaneParams=values)
+
+        def closest(x, y, z):
+            point = [x * 1000.0, y * 1000.0, z * 1000.0]
+            queries.append((label, tuple(point)))
+            if damage == "invalid_point":
+                return (math.nan, 0.0, 0.0, 0.0, 0.0)
+            point[axis] = level
+            z_max = tip_z - 0.1 if damage == "short_backing" else spec.PLATE_L / 2.0
+            point[2] = max(inner_z, min(z_max, point[2]))
+            if damage == "gap" and math.isclose(point[2], (inner_z + tip_z) / 2.0):
+                point[2] += 0.1
+            if axis == 1:
+                x_max = joint.LEVER_HOLE_POINTS[0][0] if damage == "narrow_backing" else spec.PLATE_W
+                point[0] = max(spec.CYL_R, min(x_max, point[0]))
+            return tuple(value / 1000.0 for value in point) + (0.0, 0.0)
+
+        return SimpleNamespace(
+            GetSurface=lambda: None if damage == "missing_surface" else surface,
+            GetClosestPointOn=closest,
+        )
+
+    backing = [
+        plate_face(axis, level, label)
+        for axis, level, label in (
+            (1, spec.COEFFICIENT_TOP_Y, "top"),
+            (1, spec.COEFFICIENT_BOTTOM_Y, "bottom"),
+            (0, spec.PLATE_W, "free_edge"),
+        )
+        if damage != f"missing_{label}"
+    ]
+    features = {
+        "EdgeRibBack": _NativeFeature(faces=rib_faces),
+        "CoefficientsPlate": _NativeFeature(faces=backing),
+    }
+    if damage == "missing_owner":
+        features.pop("CoefficientsPlate")
+    return SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get)), queries
 
 
 @pytest.mark.parametrize("clearance", [1.99, math.nan, math.inf, -math.inf])
 def test_extracted_receiver_rejects_invalid_pilot_longitudinal_budget(clearance) -> None:
     faces, _ = _receiver_faces()
+    adapter, _ = _receiver_adapter(faces)
     namespace = _source_helpers(
         ("_assert_receiver_profile_walls",),
         receiver_pilot_wall_budget=lambda: (
             SimpleNamespace(x_mm=29.7, minimum_mm=clearance, minimum_witness=()),
         ),
     )
-    with pytest.raises(RuntimeError):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    with pytest.raises(RuntimeError, match="printed-pilot longitudinal wall"):
+        namespace["_assert_receiver_profile_walls"](adapter)
 
 
-def test_extracted_receiver_readback_uses_trimmed_longitudinal_faces_at_actual_mid_depth() -> None:
+def test_extracted_receiver_reads_both_trimmed_flanks_at_uniform_rib_mid_depth() -> None:
     import magnifying_bracket_joint_layout as joint
 
     faces, queries = _receiver_faces()
+    adapter, backing_queries = _receiver_adapter(faces)
     namespace = _source_helpers(("_assert_receiver_profile_walls",))
-    namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
-    assert len(queries) == len(joint.LEVER_HOLE_POINTS)
-    for actual, (x, y, _) in zip(queries, joint.LEVER_HOLE_POINTS):
-        assert actual == pytest.approx((x, y, -spec.PLATE_L / 2.0 + joint.RIB_DEPTH / 2.0))
-    # Matching ideal curves are insufficient: actual trimmed-face readback
-    # must agree after subtracting the nominal pilot radius.
+    namespace["_assert_receiver_profile_walls"](adapter)
+    assert len(queries) == 2 * len(joint.LEVER_HOLE_POINTS)
+    for index, (x, y, _) in enumerate(joint.LEVER_HOLE_POINTS):
+        for actual in queries[2 * index:2 * index + 2]:
+            assert actual == pytest.approx((x, y, -spec.PLATE_L / 2.0 + spec.RIB_T / 2.0))
+    assert backing_queries
     bad_faces, _ = _receiver_faces(perturb=0.1)
-    with pytest.raises(RuntimeError):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=bad_faces)))
-    namespace["receiver_pilot_wall_budget"] = lambda: (
-        SimpleNamespace(x_mm=29.7, minimum_mm=joint.RECEIVER_PILOT_WALL_MIN - 0.01, minimum_witness=()),
-    )
-    with pytest.raises(RuntimeError):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    bad_adapter, _ = _receiver_adapter(bad_faces)
+    with pytest.raises(RuntimeError, match="signed profile"):
+        namespace["_assert_receiver_profile_walls"](bad_adapter)
 
 
-@pytest.mark.parametrize("step_wall", [2.0, 2.103])
-def test_extracted_receiver_uses_nominal_pilot_radius_and_checks_step_after_native_faces(step_wall: float) -> None:
+def test_native_backing_witnesses_span_full_nominal_pilot_width_through_point_tip() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    faces, _ = _receiver_faces()
+    adapter, queries = _receiver_adapter(faces)
+    namespace = _source_helpers(("_assert_receiver_plate_backing",))
+    namespace["_assert_receiver_plate_backing"](adapter)
+    assert len(queries) == 18 * len(joint.LEVER_HOLE_POINTS)
+    radius = joint.TAP_DRILL_DIA / 2.0
+    for x, y, entry_z in joint.LEVER_HOLE_POINTS:
+        inner_z = entry_z + spec.RIB_T
+        tip_z = entry_z + joint.DRILL_DEPTH + joint.DRILL_POINT_DEPTH
+        assert tip_z > inner_z
+        for z in (inner_z, (inner_z + tip_z) / 2.0, tip_z):
+            for side in (-1.0, 1.0):
+                for label, level in (("top", spec.COEFFICIENT_TOP_Y), ("bottom", spec.COEFFICIENT_BOTTOM_Y)):
+                    assert any(
+                        actual_label == label and point == pytest.approx((x + side * radius, level, z))
+                        for actual_label, point in queries
+                    )
+                assert any(
+                    label == "free_edge" and point == pytest.approx((spec.PLATE_W, y + side * radius, z))
+                    for label, point in queries
+                )
+
+
+@pytest.mark.parametrize("damage", [
+    "missing_owner", "missing_top", "missing_bottom", "missing_free_edge",
+    "shift_top", "shift_bottom", "shift_free_edge", "short_backing",
+    "gap", "narrow_backing", "invalid_point", "invalid_plane", "missing_surface",
+])
+def test_native_backing_refuses_wrong_planes_or_trimmed_material_beyond_rib(damage) -> None:
+    faces, _ = _receiver_faces()
+    adapter, _ = _receiver_adapter(faces, damage=damage)
+    namespace = _source_helpers(("_assert_receiver_profile_walls",))
+    with pytest.raises(RuntimeError, match="backing"):
+        namespace["_assert_receiver_profile_walls"](adapter)
+
+
+@pytest.mark.parametrize("material_wall", [2.0, 2.103])
+def test_receiver_checks_connected_material_budget_after_nominal_native_readbacks(material_wall: float) -> None:
     import magnifying_bracket_joint_layout as joint
 
     faces, queries = _receiver_faces()
-    step_calls = []
+    adapter, backing_queries = _receiver_adapter(faces)
+    calls, radii = [], []
 
     def pilot_budget():
-        step_calls.append(len(queries))
-        return step_wall
-
-    radii = []
+        calls.append((len(queries), len(backing_queries)))
+        return material_wall
 
     def signed_margin(x, y, radius):
         radii.append(radius)
@@ -915,42 +1101,42 @@ def test_extracted_receiver_uses_nominal_pilot_radius_and_checks_step_after_nati
     namespace = _source_helpers(
         ("_assert_receiver_profile_walls",),
         receiver_wall_margin=signed_margin,
-        receiver_pilot_step_wall_budget=pilot_budget,
+        receiver_pilot_material_wall_budget=pilot_budget,
     )
-    namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+    namespace["_assert_receiver_profile_walls"](adapter)
     assert radii == [joint.TAP_DRILL_DIA / 2.0] * len(joint.LEVER_HOLE_POINTS)
-    assert len(queries) == len(joint.LEVER_HOLE_POINTS)
-    assert step_calls == [len(queries)]
+    assert calls == [(2 * len(joint.LEVER_HOLE_POINTS), 18 * len(joint.LEVER_HOLE_POINTS))]
 
 
-@pytest.mark.parametrize("step_wall", [1.99, 0.0, math.nan, math.inf, -math.inf])
-def test_extracted_receiver_rejects_failed_pilot_step_after_valid_longitudinal_budget(step_wall: float) -> None:
-    import magnifying_bracket_joint_layout as joint
-
-    faces, queries = _receiver_faces()
+@pytest.mark.parametrize("material_wall", [1.99, 0.0, math.nan, math.inf, -math.inf])
+def test_receiver_rejects_failed_connected_material_budget_after_native_backing(material_wall: float) -> None:
+    faces, _ = _receiver_faces()
+    adapter, backing_queries = _receiver_adapter(faces)
     calls = []
 
-    def step_budget():
-        calls.append(len(queries))
-        return step_wall
+    def pilot_budget():
+        calls.append(len(backing_queries))
+        return material_wall
 
     namespace = _source_helpers(
         ("_assert_receiver_profile_walls",),
-        receiver_pilot_step_wall_budget=step_budget,
+        receiver_pilot_material_wall_budget=pilot_budget,
     )
-    with pytest.raises(RuntimeError, match="sharp-step wall"):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
-    assert calls == [len(joint.LEVER_HOLE_POINTS)]
+    with pytest.raises(RuntimeError, match="connected-material wall"):
+        namespace["_assert_receiver_profile_walls"](adapter)
+    assert calls == [len(backing_queries)] and backing_queries
 
 
 @pytest.mark.parametrize("invalid", [(0.0, 0.0, 0.0), (math.nan, 0.0, 0.0, 0.0, 0.0)])
 def test_extracted_receiver_distance_readback_refuses_invalid_points(invalid) -> None:
     faces, _ = _receiver_faces(invalid=invalid)
+    adapter, _ = _receiver_adapter(faces)
     namespace = _source_helpers(("_assert_receiver_profile_walls",))
     with pytest.raises(RuntimeError, match="invalid native trimmed-face closest point"):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces)))
+        namespace["_assert_receiver_profile_walls"](adapter)
+    cap_adapter, _ = _receiver_adapter(faces[:1])
     with pytest.raises(RuntimeError, match="no native longitudinal profile faces"):
-        namespace["_assert_receiver_profile_walls"](_feature_adapter(_NativeFeature(faces=faces[:1])))
+        namespace["_assert_receiver_profile_walls"](cap_adapter)
 
 
 

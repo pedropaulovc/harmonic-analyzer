@@ -1230,28 +1230,28 @@ sections:
         - measured
         - med
       - - Coefficients plate
-        - x −60..−10 (machine −45..+5), top y 8, 5.1 thick, z ±76.2
+        - 'Lever-local X0..44.45, Z±76.20; uniform7.00±0.51 coefficient slab from Y−4.46 to fixedtopY+2.54 (world982.24), not recentered. Three tangent-profile rib extrusions5.00±0.51; endribs retain outerZ±76.20 and innerZ±71.20, middle centeredZ0. Bracket receivers at(16,−0.71,−76.20)/(29.7,−0.71,−76.20), row3.25±0.05 belowactualtop, conventional2-56blind4.95MINfullthread and6.50±0.51pilot+118degreepoint continuing into connectedplate. Spring seats/stations and installation unchanged.'
         - —
-        - calibrated p1; thickness/length legacy (uncontradicted)
-        - scaled + legacy
+        - 'cad/scripts/sm_summing_lever_spec.py, sm_summing_lever_profile.py and magnifying_bracket_joint_layout.py; owner-authorized plate-tap relocation/uniformribs2026-10-22'
+        - source geometry + authorized joint relocation
         - med
       - - Spring holes
-        - 20 × Ø4.5 at x −37.10 (machine x −22.10 = channel-lever tab line), z = z_j − 1.95
+        - '20×#6-32through taps at leverlocalX39.85, Z=−70.62825+j×7.0565 (j0..19), Ø0.15RFS pattern. Purchased9489T111 anchors seat at unchanged coefficienttop and lock withMHA-CH-14 jamnuts atY−4.46.'
         - —
-        - 'derived: installed-spring eye reach √(3.25²−2.55²) = 2.0 through the 5.1 plate; z offset puts the hole under the helix lead'
-        - derived
+        - 'cad/scripts/sm_summing_lever_spec.py and ch_anchor_jam_nut_spec.py'
+        - source geometry + retained spring interface
         - med
       - - Web + boss
-        - twin ribs 3 wide, y 2..12, x 9..80, z taper ±17.18 → ±4.27; boss Ø14 × 12 at x 80 (machine 95)
+        - 'Separate5.08counterweb centeredY0 (top+2.54flush withcoefficienttop); summationtipX−76.20, bossØ19.05×19.05 centeredY0. Allthree5.00ribextrusions shareR15.24wrap, tangentpositiveflanks andR1MAXrunouts atX35.75; negativeXmidribcontour unchanged.'
         - —
-        - p.43 plan
-        - scaled
+        - 'cad/scripts/sm_summing_lever_spec.py and build_sm_summing_lever.py'
+        - source geometry
         - low
       - - Hook hole
-        - Ø3 vertical in the boss top at x 75.5 (machine 90.5)
+        - 'Vertical#10-24through tap in the counter-anchor boss at leverlocalX−76.20, Z0; purchased9490T1anchor and its top jamnut retain their installed pose.'
         - —
-        - 'derived: boss-hook shank seat (real joint ≈ 2.6 tap drill + M3 — modeled at shank size for a zero-volume fit)'
-        - derived
+        - 'cad/scripts/sm_summing_lever_spec.py COUNTER_HOLE_SPEC'
+        - source geometry + retained counter-spring interface
         - low
       - - Knife mount
         - '8-square hardened bar set diamond-wise (edge up), 31.8 long — rides inside the lever tube''s slot tunnel (z ±15.9 vs slot ±16; contact bands outside the slot are geometrically impossible — the diamond flanks clash with the tube lower wall); hardened-steel block 25.4 wide × 29.6 tall × 14 deep with a Ø12 bore, unpainted (2026-09-02 user re-read of ch18 p.42: bore 16 → 12 around the 8.7 × 10.3 hex, since narrowed to 8.080 wide for ≥5° worst-case rock, brass → O1 tool steel 58-60 HRC; earlier bore 25.4 → 16, width 34 → 24 → 25; hex-hanger restoration widens the block to 25.4 for the spread 15.264 dowel span and ≥2.0 worst-case walls) below, clamped to the casting underside 999.7 (knife edge at 979.7, contact ridge 984.834); #10-24 UNC-2B bottoming tap (drill #25 Ø3.797 × 11.24 ±0.05, full thread 9.650 ±0.13; printed native 118° point takes the general ±1° angular band; accepted pilot diameter 3.797–3.897, conservatively charged to Ø3.927 at 117° for built worst-case 2.007766 metal over the bore crown, 1.41 minimum drill runout) on the trunnion axis for MHA-SM-VN-52 Knife-Hanger Bolt (McMaster 92314A253 plain 18-8 hex head #10-24 × 2 in stock, cut at MHA-SM-00 under the head to the measured crossbar-underside-to-washer-top stack plus 8.92 ±0.15 reach, 46.70 nominal; inspected threaded tail ≥10.62 with incomplete tip ≤1 pitch). New MHA-SM-VN-54 matching 18-8 SAE #10 flat washer 96659A104 bears on the whole faced top (no spotface), washer on top 36.50 ±0.51 above the faced underside; Ø6.045 +0.13/0 plain loose clearance is drilled from the underside through the full crossbar height. The bolt reaches 8.9173 nominal (8.77..9.07), with 7.711667 minimum full-thread engagement and 0.45 minimum tip air, and clamps the block with removable medium-strength threadlocker. Ordinary hex-head-on-SAE-washer practice is retained without a special head-bearing-circle inspection. Two unchanged 1/8 × 3/4 dowels MHA-SM-VN-53 (98381A473), pressed to Ø3.175 reamed hole floors 9.5 deep at ±7.632 x from the tap axis (15.264 BASIC span), slip into a Ø3.24 ±0.03 blind round hole (+x) and 3.24 ±0.03 × 3.95 ±0.13 blind slot along x (−x), both 12.0 deep in the crossbar underside; ×2 at z −83.972/+90.148'
@@ -1371,16 +1371,16 @@ sections:
         - stated
         - high
       - - Rod diameter
-        - 'Body Ø6.00 0/−0.03, selected cold-drawn brass stock; bracket-end cylindrical press land Ø6.000 0/−0.006, SELECT OR LAP, starting at least 10.0 mm (10.0 MIN, covering the whole MHA-MG-01 collar) before the actual tip and ending at its tangent hemisphere (R3 REF from selected OD). Stock below the press-land minimum is rejected, not enlarged by lapping.'
-        - ~0.24
-        - 'round brass rod, photo proportion; p.46 “Firmly affixed to the summing lever”; user-ruling light press alone (#1570), derived by mg_lever_press_fit_geom.press_fit_budget'
-        - scaled + engineered fit
-        - low (photo nominal); high (specified fit)
+        - 'Selected 1/4 in brass stock, full plain body Ø6.35 0/−0.05; native acceptance band, not a supplier-tolerance claim. Flat bracket end threaded 1/4-20 UNC-2A; free end remains a tangent hemisphere. Clamp drilled Ø6.50 +0.10/0 gives 0.15..0.30 diametral slip clearance.'
+        - '0.25'
+        - 'round brass rod, photo topology; owner-approved threaded L-bracket Option B, 2026-10-20; cad/scripts/mg_lever_thread_joint.py'
+        - specified stock + engineered joint
+        - high (owner-approved geometry and acceptance bands)
       - - Lever rod length
-        - '165.0 ±0.8 mm tip-to-tip, R3 domes'
-        - '6.5'
-        - 'calibrated ch. 30 front view (p1): rod spans x ≈ −200..−35 at y ≈ 982. M6.4: REFUTES the M2 "~310 from the 4× constraint" — the p.46/48 insets show the CLAMP sliding along the rod (magnification = clamp-radius ratio), not a 310 rod'
-        - scaled + specified stock envelope
+        - '167.5 ±0.8 mm overall from the useful free hemispherical tip to the flat threaded tip. The nominal free tip, knife and bracket station are preserved; only the bracket end grows in the nominal model. Fitted accepted rod length, neck thickness and tip projection put the actual free tip at machine X198.435..201.565, without moving the knife or bracket. Thread length 18.00 ±0.51 includes incomplete root runout, 1.905 MAX at each end. The tip chamfer stays modeled at 0.20, with hidden native primary-distance limits 0..0.25 from the title-block edge maximum and the retained 45 degree entry indication at the general ±1 degree band. The shared proof charges the 0.258882578 projected-leg envelope additionally to tip incompleteness. Full-body quarter-inch stock: no shoulder or added relief groove.'
+        - '6.594'
+        - 'current-main useful axis/knife interfaces retained; owner-approved 2026-10-20 threaded joint; cad/scripts/mg_lever_thread_joint.py'
+        - preserved interface + engineered threaded extension
         - med (photo length); high (specified overall band)
       - - Vertical rod
         - 'Ø5 brass × 132.5 overall (#1559): #4-40 UNC-2A end 7.50 ±0.25 from the shoulder (relief Ø1.85 MAX × 1.50 at the .XX ±0.51 band at the shoulder, both roots R0.2 MAX; 45° tip chamfer to the minor Ø), body 125.0 from the shoulder to a full R2.5 hemisphere, Ra 3.2 thumb-screw seat; screws into MHA-MG-02 and seats on the shoulder (no set screw, bond or lock). Worst-case full-thread engagement 7.25 − 2.01 − 0.635 = 4.605 ≥ 1.5D 4.2675; worst shoulder land 0.5275 ≥ 0.5'
@@ -1389,7 +1389,7 @@ sections:
         - scaled + engineered joint
         - low (photo length); high (specified joint)
       - - Clamp block
-        - 'vertical 7/16 in hex brass (AF 11.1125, across corners 12.832) × 28.65 (#1559): Ø6.2 lever bore through the corners at 19.65 from the bottom face (bore to flat wall 2.34 worst); #4-40 thumb-screw tap from the top on the hex axis into the bore (5.9 thread, 4.58 worst engagement); blind #4-40 rod tap from the bottom on the same axis, thread 8.55 / drill 12.75 (floor 2.02 worst under the lever bore)'
+        - 'Vertical 1/2 in hex brass, nominal across corners14.665; native TOP HEX12.70 at two places, not REF and no explicit tolerance, uses ordinary .XX ±0.51 size12.19–13.21 on all three opposed-flat pairs over full height. Drawn hex/square angles use default±1 degree; unconstrained flats-as-supplied form is not an alternative. No custom2 MIN wall or15 MAX envelope inspection note. Size/angle/full-height drift give16.979159 rounded outward17.00 for calculations only; this is not a printed limit or supplier certificate. Bore-flat minimum1.644216 is below2 target but above1.5 hard floor; blind drill-point floor2.081671. Overall29.50 and bore height19.95 retain .XX ±0.51; no height qualifier. Ø6.50 +0.10/0 through-corner bore. Five native measurements locate bore/both #4-40 axes independently6.35 from the same actual full-height Z flat, plus each #4-40 entry6.35 from its actual diagonal flat; tap/bore transverse entry offset1.02. Full17tan(0.3 degree) run-off feeds actual finite-tip seating/male-female FULL4.392416640≥4.2675, collar3.334893727, plug reach and finite drill-cone checks. Top-to-bore9.55; thumb tap6.30 REF/9.55 drill; bottom rod tap8.55 thread/12.75 drill unchanged. Rod top967.25 and fixture47.55 from tip preserve hook919.7. Nominal geometry/built165 unchanged; fitted-projection component capacity band83.920/165/193.115, not all-machine clearance.'
         - —
         - 'p.48 close-up; owner ruling #1559 (hex block, coaxial thumb screw and rod); cad/scripts/mg_magnifying_clamp_geom.py'
         - scaled + engineered joint
@@ -1407,39 +1407,39 @@ sections:
         - photo topology + engineered walls
         - med (topology/function); low (photo sizes); high (specified stock/walls)
       - - Mounting bracket
-        - '1018 cold-drawn low-carbon steel angle bracket: Ø12 × 10.00 +0/−0.05 collar, bore reamed or honed Ra 0.8 to 0.007–0.014 diametral interference on the measured Ø6.000 0/−0.006 lever land (model Ø5.986, the tightest corner; DIN 7190 smoothing leaves 0.00188 effective, holding 241 N and 724 N·mm against 2.9 N and 70 N·mm; 7 mm nominal straight cylinder, 7.207819 mm whole-contact envelope = longest 7.003 mm cylinder plus the partial R3 dome outside the 5.986 bore), end flush with outer face; the press alone retains it (#1570). Press the collar onto the rod held near its end, not through the unsupported lever as a column. Steel only: brittle gray iron is rejected for the press-fit hoop load. 10-wide forward arm at machine (+40, 979.7, −173.51) (#1559 A1 plumb plane: arm end 103.51, mounting face 100.40 from the bore axis; was 58.30/55.19 at z −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
+        - 'Blued low-carbon-steel simple L, no taper/collar/interference fit. Nominal thread-axis X thickness12.50 centred, printed12.5 at ordinary .X ±0.8; parallelY±5.50 and concentricR5.50 ±0.05 nose, tipZ−5.50; standard1/4-20UNC through tap and native5.50 ±0.05 locating dimensions. Explicit owner choice A — Keep geometry; approve exception after PNG comparison authorizes package RV-03 only for the three existing head radius/location bands under rules4/17, retaining RETAINS TAP WALL without an outside-profile mate; the earlier timeout was not approval. Native foot3.175±0.13 carries MHA-MG-VN-53 / SCREW GRIP. Nominal0.20/45degree mouth breaks retain title-block0.25primary-distance/ordinaryangle bounds for engagement. Machine nose(+40,979.7,−173.51), axis-to-seat100.3975878, seat/threadedleverpose unchanged. Later explicit PR1856comment6367964749 narrows only footYwidth12.70→11.00 centred0 to match neckY±5.50, removing the actual0.85ledge and obsolete lateral dimension rather than hiding it or widening the neck. LocalfootX−48..+6.25/machine−8..46.25 and nominal length54.25 remain; length/width print one place with their own bands. HoleslocalX−39/−25.30 imply9.00/22.70 setbacks; fixedrowlocalY−0.71 now gives4.79±0.05 from actual lower foot edge. Head-clearance-circle ligaments2.79/3.41 and printedØ2.69MAX-hole walls3.395/4.015 use the foot .X±0.8 band; minimum foot-edge pryingarm4.74. Remove vanished axial side-root bridges; applicable insideXroot/freefootR0.25 rounds remain, but only free-endX−48 foot corners may be rounded, never the unchanged upright/head. The SM-facing+Z footback at the100.40origin carries source-owned Ra3.2µm under rule6. Native plane/closest-point head/root checks, real end-view THRU callout, four views and actual iso-scale caption remain required. Standard2B supplies no finished internal-major MAX or manufactured-wall certificate. Native Plain Carbon Steel remains generic; E200/G79GPa are compliance assumptions. Factor-three simultaneous bending/torsion demand uses minimum accepted11.7x10.9 neck section, maximum97.965 span and161.710 fitted gravity arm at nominal A1 X/Y force stations, not a guaranteed material property.'
         - —
         - 'ch30_images/page002_img01.png, eight views front; ch20_images/page001_img01.jpeg, top-right close-up: vertical black angle side plate against the lever front face, two side-by-side slotted heads at the lever mid-plane'
         - scaled + derived
         - high (joint orientation); med (photo-scaled stations)
-      - - Lever collar light-press budget
-        - 'Tight fit 0.014 mm, inherited collar OD 12.00 ±0.51: strength at OD 11.49 gives contact pressure 137.23 MPa, bore hoop 240.13 MPa and von Mises 330.82 MPa < 333 MPa (0.9 × 370 MPa 1018 cold-drawn yield). Whole-contact envelope, independent corners (not one physical part): collar length maximum 10.00 minus selected hemisphere radius minimum 2.997 gives the 7.003 mm longest straight cylinder; the part of the largest hemisphere (radius 3.000) outside the smallest bore (diameter 5.986), sqrt(3.000^2 - 2.993^2) = 0.204819 mm, gives explicit contact maximum 7.207819 mm (coupled tight corner 7.204819 mm). Press force = friction over that envelope plus the normal reaction on the partial dome: at OD 12.51 the contact pressure is 143.66 MPa, friction 0.10–0.15 gives 1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds 18.933819 N, so the total is 1970.804504–2946.739847 N (1.970805–2.946740 kN). The shared code derives the sheet cap by rounding the maximum total upward to 0.1 kN: 3.0 kN MAX.'
+      - - Lever threaded joint and nose wall
+        - 'The assembly native ThreadProjection sets the flat tip1.25±0.51 proud of the far12.5±0.8 neck face, without shoulder/preload. Standard1/4-20UNC-2B tap is THRU ALL. Title-block primary chamfer ceiling0.25 and ordinary±1degree angle give q=0.25tan46degrees=0.258882578. The fitted installation interval gives full overlap10.017234843≥1.5D9.525, root-runout clearance0.525 and minimum tip projection0.740; overall rod length cancels from those checks and moves the fitted free tip. No custom internal-major/root MAX: ASME B1.1 does not specify one, so ordinary2B cannot certify a worst-case finished wall. Nominal major-to-nose wall2.325 and mouth wall2.125 are geometry only; actual finished minimum wall remains unknown. Explicit non-timeout user approval after PNG comparison accepts package RV-03 Retained head wall controls, bounded to the unchangedR5.50±0.05 and two5.50±0.05 head dimensions under rules4/17, not a wall guarantee, foot exception or outside-profile mate. Source-owned RETAINS TAP WALL and foot3.175±0.13 with MHA-MG-VN-53 / SCREW GRIP remain. Foot accepted3.045..3.305 retains full screw engagement3.305 and minimum tip gap0.0075. Later explicit foot-width ruling changes only nominalYwidth12.70→11.00 and its source-driven lower-edge ordinate5.64→4.79; foot54.25x11.00x3.175, machineX−8..46.25, holeaxesX1/14.7/localY−0.71, seat and leverpose remain fixed. Vanished side-root bridges and lateral-offset dimension are deleted, not hidden. Ra3.2µm is required on the actual SM-facing+Z static foot seat; no foot or seat exception is authorized. No A-A or root-envelope inspection; inside corners follow title block and native root/head topology is checked separately.'
         - —
-        - 'cad/scripts/mg_lever_press_fit_geom.press_fit_budget: free-axial Lamé solid-shaft fit, named OD print corners 11.49/12.51, d6 and L7.207819 whole-contact envelope (7 mm nominal straight cylinder plus partial R3 dome), friction plus projected dome axial-normal reaction, brass E97 GPa ν0.34, steel E200 GPa ν0.29; user light-press, +0/−0.05 collar station and inherited OD ±0.51 rulings; the tip land starts 10.0 MIN from the tip, covering the longest collar (machinist review r2)'
-        - engineered fit + elastic budget
-        - high (specified fit; analytic result under the stated elastic/friction assumptions)
+        - 'owner-approved Option B, 2026-10-20; cad/scripts/mg_lever_thread_joint.py and native bracket/lever/assembly dimensions'
+        - engagement intervals verified separately; nose wall nominal only, no standard-thread all-variation guarantee
+        - high (specified dimensional requirements, native verification required)
       - - Bracket flange screws ×2
-        - 'MHA-MG-VN-53, McMaster 91794A078 #2-56 UNC × 5/16 18-8 stainless steel fillister slotted screws: head Ø3.556 × 2.1082, shank Ø2.1844 × 7.9375. Axes +Z into the lever, machine x +1.0/+14.7, y 979.7 (13.7 centres). Heads bear on the 1/8 stock flange''s front face at z −76.2874 (no counterbore; machinist review r1 found the 1.55 ±0.05 counterbore depth rescued a wall) over 2X plain normal #2 Ø2.591 +0.10/0 thru clearance holes at ±0.05 positions matching the lever taps; heads stand 2.1082 proud. Side-plate thickness 3.175 at the title block''s .XXX ±0.13 is the grip, 3.045 minimum, and gives engagement 4.7625 nominal, 3.305 minimum full profile (≥1.5D = 3.2766), including 0.76 conservative stock length allowance, 0.7P tip and 0.25 entry edge break. Lever #2-56 UNC-2B blind full thread remains 4.95 ±0.05 natively, 4.95 MIN printed. Only the -Z receiver rib, EdgeRibBack, extends inward 0.90 to 8.20 deep at the ordinary title-block ±0.51: entry Z -76.20 and axes ((16,0,-76.2),(29.7,0,-76.2)) remain fixed, inner boundary -68.00, opposite end rib 5.08 unchanged. Full-thread containment margin 2.69 minimum. Cylindrical tap drill 6.50 ±0.51 is explicitly symmetric in the native dimension; its native callout prints 6.50 at two places, inheriting the ordinary .XX band without restating it, not an accepted exception; its 118° point and 0.3° wander (0.039659 maximum) stay in the rib with 0.076133 minimum point containment, not a bottom-wall-thickness claim. Screw-tip gap 0.0075 minimum; bottoming tap has 2P lead plus 0.082857 margin. An unbounded MIN drill remains unsafe in the unbacked plate beyond the rib; the spring-anchor pad does not back either receiver. Receiver-row location and wall-floor thresholds are unchanged; sloped rib thread wall 3.15502 and nearest spring-tap web 6.63064 minimum under the native Ø0.15 RFS position frame. Clearance-hole east-end wall 2.6045 and height wall 4.4445 minimum at the printed .XX ±0.51 height band (the Ø3.8 head-clearance circle keeps 2.000 and 3.840). Minimum shank radial float 0.2033 exceeds the √2 × 2 × 0.05 = 0.1414 worst position mismatch. Head clearance to the knife mount awaits the farm interference check (heads now 2.108 proud of the flange).'
+        - 'MHA-MG-VN-53, McMaster91794A078#2-56UNC×5/16 18-8stainlessfillisterslottedscrews: headØ3.556×2.1082, shankØ2.1844×7.9375. Axes+Z into the lever, machinex+1.0/+14.7, y978.99 (13.7centres), lowered0.71 withmatchingbracketclearanceholes andlevertaps; bracketbody/seat/threadedleverpose unchanged. Headsbear on3.175±0.13flangefrontZ−76.2874, no counterbore, over2Xnormal#2Ø2.591+0.10/0throughclearanceholes; headsstand2.1082proud. Grip3.045minimum leaves4.7625nominal/3.305minimumfullprofileengagement≥1.5D3.2766, including0.76conservativestocklengthallowance,0.7Ptip and0.25entryedgebreak. Lever2-56UNC-2Bblindfullthread4.95MINprinted retains4.95±0.05native-onlystackmetadata. Receiveraxes((16,−0.71,−76.2),(29.7,−0.71,−76.2)) are3.25±0.05belowactualcoefficienttop. Allthreeleverribextrusions5.00±0.51; endribinnercapsZ±71.20, outercaps±76.20. The6.50±0.51pilotplus118degreepointcontinues beyondtherib into continuous7.00±0.51plate, not anunbackedcavity. PrintedØ1.78+0.10/0radius0.94 and0.039662deepest0.3degreewander leave2.220338/2.210338top/bottompilotwalls; nofinishedthreadcavityenvelope orstrengthcertificate. Screw-tipgap0.0075minimum; bottomingtap2Pleadplus0.082857reserve. Actualbracketloweredgeordinate5.64±0.05 givesØ3.8headclearancecircle(notcounterbore) walls7.00end/3.64lower/4.55upper underprintedbands. Minimumshankradialfloat0.2033 exceeds√2×2×0.05=0.1414positionmismatch. Ribreach35.75±0.51 versusworstnutinnerX36.45 leaves0.19geometricXgap; nativehead/knifemount,rib/nut,fullsweptclearance andfinalmass/balanceacceptance remainrequired.'
         - —
-        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster 91794A078 product page verified live 2026-10-16 (18-8 stainless fillister slotted, #2-56, 5/16 in long, head Ø0.14 × 0.083 in); owner ruling 2026-10-16 option (i): stainless fillister heads on the flange face, no counterbore (brass 90114A has no #2-56 × 5/16; a 3/8 brass screw through a 3/16 flange kept only a 1.04 shank-shear margin). Joint layout in cad/scripts/magnifying_bracket_joint_layout.py.'
+        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster91794A078verifiedlive2026-10-16 (18-8stainlessfillisterslotted,#2-56,5/16in,headØ0.14×0.083in); ownerruling2026-10-16option(i): heads onflange,no counterbore. Owner-authorized2026-10-22plate-taprelocation/uniform5mmribs; livegeometry andstacksin cad/scripts/magnifying_bracket_joint_layout.py and sm_summing_lever_spec.py. No newnativeverification claimed.'
         - stock + scaled + derived
         - high (stock dimensions and installed stack); med (photo-scaled stations)
   - prose: |2
 
       Notes: round brass rod lever; magnification set by a reeded (knurled) screw
       adjustment that moves the effective fulcrum/attachment point. Geometry
-      constraint used in M2: output/input arm ratio = 4 at maximum setting (rod
-      ends domed; both rods revolves with hemispherical caps).
+      constraint used in M2: output/input arm ratio = 4 at maximum setting.
+      The free rod tip remains domed; the bracket end is now flat and threaded.
 
       KINEMATICS (2026-07-04, engineerguy video 2/4 + 4/4): the rod does NOT
-      spin in the bracket collar — it "extends from the pivoted summing bar"
+      spin about its bracket thread axis — it "extends from the pivoted summing bar"
       and pivots WITH it about the knife-edge ridge line (pre-mirror (15,
       984.834) after the 2026-08-02 rederive's −10.3 summing shift, along Z;
       the ~6 mm tip arc ≈ 1.6° of knife rock); the clamp
       position along the rod is the radius from THAT pivot, which is what the
-      ≤4× adjustment really is. Light-press the bracket collar onto the rod
-      held near its end, without column loading; leave the rod end flush with
-      the outer collar face; the press alone retains it (#1570).
+      ≤4× adjustment really is. Screw the constant-diameter threaded end through
+      the bracket to the native 1.25 tip projection; the full body has no shoulder.
+      No locknut, set screw or adhesive is added to this non-rotating joint.
 
       DEPTH RE-ANCHOR (2026-07-04, ch30 p.4; window re-solved 2026-08-02 with
       the new casting; #1559 A1 2026-10-16): the side view shows the whole
@@ -1452,15 +1452,15 @@ sections:
       sits on the wire's Top plane (no YokePlane offset). The bracket arm
       grows from 52 to 97 to reach it from the summing-lever face. The whole
       lever/clamp/rod/fixture chain rides the summing bar −10.3 (rod at
-      LEVER_ROD_Y 979.7, ridge contact 984.834). The clamp is a vertical 7/16
+      LEVER_ROD_Y 979.7, ridge contact 984.834). The clamp is a vertical 1/2
       hex placed unrotated: its thumb screw (top) and the rod's threaded end
-      (bottom) are coaxial at CLAMP_X on the hex axis. The thumb screw's exact
-      stock reach is derived from McMaster 91882A221; its tip is tangent to
+      (bottom) share the nominal CLAMP_X axis, with direct manufactured relative locations.
+      The thumb screw's stock reach is derived from McMaster 91882A221; its tip is tangent to
       the lever top. The casting underside is y 999.7, and the screw head
       clears it without forcing the output line farther forward. The lever
       clears the front column face (z −124.7) by about 45.8. The vertical rod
-      screws into the clamp and seats on its shoulder at y 960.05 (thread tip
-      y 967.55, bottom dome y 835.05); the fixture screw axis is y 919.7, with
+      screws into the clamp and seats on its shoulder at y959.75 (thread tip
+      y967.25, bottom dome y834.75); the fixture screw axis stays y919.7, with
       the hex body spanning approximately 913.3..926.1. Both thumb screws are
       installed backed out to tip/rod tangency so nominal CAD solids do not
       overlap.

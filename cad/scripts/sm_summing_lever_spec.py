@@ -141,6 +141,7 @@ HOLE_Z_OFFSET = -3.52825
 # at the title block's ordinary .XX band. Its top and underside remain the
 # existing spring-eye and jam-nut seats; there is no separate pad or step.
 # All three positive-X rib branches use one tangent wrap/flank/root profile.
+RIB_T = 5.00  # every edge/middle rib extrusion, ordinary .XX title-block band
 RIB_WRAP_R = 0.6 * MM_PER_IN  # R15.24 around the unchanged R12.70 pivot
 RIB_REACH = HOLE_X - 4.1  # 35.75; clear of the worst nut footprint at X36.45
 RIB_BLEND_R = 1.0  # modeled at the R1.0 MAX internal blend limit

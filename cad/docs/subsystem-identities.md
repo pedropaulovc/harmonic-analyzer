@@ -352,6 +352,10 @@ The package recipes own sheet counts and locations:
   wrapped rows, rather than an estimated row pitch. Its actual native note
   extent must leave at least 4 mm below the table and remain clear of the border
   and title block, including after the final rebuild.
+- [`ha_harmonic_analyzer_assembly_sheet.py`](../scripts/ha_harmonic_analyzer_assembly_sheet.py)
+  identifies MHA-MG-00 as the clamp hardware supplier and MHA-PN-00 as the
+  pen-wire supplier, not MG's same-stock lever wire. Their subassembly BOMs
+  remain the parts/quantity authority; HA adds no duplicate rows or balloons.
 
 Earlier selected-image page indices remain unchanged. Native note extents,
 table growth and view outlines still determine containment; offline wrapping

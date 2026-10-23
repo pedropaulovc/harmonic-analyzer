@@ -15,7 +15,7 @@ shows the 1:2 end profile and top plan and a 1:4 shaded isometric.
 Sheet 2 shows VIEW F at 1:1, a complete 10:1 knife detail D cut from that
 view, and a shaded underside isometric. VIEW F carries the blind bracket
 receivers, the uniform coefficient plate's visible free-end thickness and
-the receiver row's centreline through the hex centre.
+the receiver row's centreline below the unchanged hex centre.
 The ordinary views and native receiver drill/thread-depth callout retain
 the manufacturing definition without auxiliary sections.
 
@@ -83,6 +83,7 @@ from magnifying_bracket_joint_layout import (
     DRILL_DEPTH,
     DRILL_DEPTH_DEVIATIONS,
     LEVER_HOLE_POINTS,
+    RECEIVER_ROW_Y,
     TAP_DRILL_DIA,
     THREAD_DEPTH,
 )
@@ -111,7 +112,6 @@ from sm_summing_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     HEX_DEPTH,
     HEX_H,
-    HEX_W,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -186,12 +186,11 @@ _COSMETIC_THREAD_ANNOTATION = 1  # swAnnotationType_e.swCosmeticThread
 # equal the requested decimal after SolidWorks' document-unit round trip.
 _NATIVE_NOMINAL_TOL_M = 1e-9
 
-# The -Z end rib's ordinary depth is named by
-# build_sm_summing_lever._receiver_model_bands, and the receiver stations by
-# its hidden coordinate sketch, outside the marked-dimension contract.
+# The receiver stations come from the builder's hidden coordinate sketch,
+# outside the marked-dimension contract. One native 3X rib-thickness dimension
+# sizes both end ribs and the middle rib.
 DIMENSIONS_BY_FEATURE: dict[str, set[str]] = {
     **DRAWING_DIMENSIONS,
-    "EdgeRibBack": {"RibDepth"},
     "ReceiverCoordinates": {"ReceiverX0", "ReceiverX1", "ReceiverY0"},
 }
 
@@ -311,6 +310,143 @@ def _boss_face_location_check(adapter: Any, front: Any) -> Callable[[], None]:
 
     check_faces()
     return check_faces
+
+
+def _theoretical_knife_vertex_in_view(
+    adapter: Any, view: Any,
+) -> tuple[Any, tuple[float, float, float]]:
+    """Map the existing height.end used by Detail D's two ridge dimensions.
+
+    The round removed the solid sharp. Do not substitute its crest, circle
+    centre or a new drawing point for this native model-reference endpoint.
+    """
+    label = "theoretical knife vertex"
+    view = _early_bound(view, "IView")
+    model = view.ReferencedDocument
+    if model is None:
+        raise RuntimeError(f"{label}: VIEW F has no source part")
+    raw = _early_bound(model, "IPartDoc").FeatureByName("KnifeEnvelopeReference")
+    if raw is None:
+        raise RuntimeError(f"{label}: missing native KnifeEnvelopeReference")
+    sketch = _early_bound(_early_bound(raw, "IFeature").GetSpecificFeature2(), "ISketch")
+    expected = (_metres((0.0, -HEX_H / 2.0, 0.0)), _metres((0.0, HEX_H / 2.0, 0.0)))
+    matches = []
+    for raw_segment in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw_segment, "ISketchSegment")
+        if segment.GetType() != 0 or segment.ConstructionGeometry is not True:
+            continue
+        line = _early_bound(segment, "ISketchLine")
+        points = (line.GetStartPoint2(), line.GetEndPoint2())
+        if any(point is None for point in points):
+            raise RuntimeError(f"{label}: native construction line has a null endpoint")
+        bound = tuple(_early_bound(point, "ISketchPoint") for point in points)
+        coordinates = tuple(tuple(float(getattr(point, axis)) for axis in "XYZ") for point in bound)
+        if all(
+            all(math.isfinite(value) for value in actual)
+            and math.dist(actual, wanted) <= 1e-10
+            for actual, wanted in zip(coordinates, expected)
+        ):
+            matches.append(bound[1])
+    if len(matches) != 1:
+        raise RuntimeError(f"{label}: expected one native height.end, found {len(matches)}")
+    vertex = matches[0]
+    if adapter.swApp.IsSame(vertex.GetSketch(), sketch) != 1:
+        raise RuntimeError(f"{label}: endpoint does not belong to its source sketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    local = tuple(float(getattr(vertex, axis)) for axis in "XYZ")
+    point = _early_bound(utility.CreatePoint(double_array(local)), "IMathPoint")
+    model_point = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+    xyz = tuple(float(value) for value in model_point.ArrayData)
+    if (
+        len(xyz) != 3 or not all(math.isfinite(value) for value in xyz)
+        or math.dist(xyz, expected[1]) > 1e-10
+    ):
+        raise RuntimeError(f"{label}: source height.end is not the model-space sharp {xyz!r}")
+    mapped = view.GetCorresponding(vertex)
+    if mapped is None:
+        raise RuntimeError(f"{label}: native height.end has no VIEW F correspondence")
+    return _early_bound(mapped, "ISketchPoint"), xyz
+
+
+@_telemetry.traced("drawing.knife_height_location")
+def _knife_height_location_check(adapter: Any, back: Any) -> Callable[[], None]:
+    """One ordinary native VIEW F location from the theoretical ridge to plate top."""
+    _telemetry.annotate(dimensions=1, references=2)
+    label = "coefficient top below theoretical knife vertex"
+    draw = _early_bound(adapter.currentModel, "IModelDoc2")
+    drawing = _early_bound(draw, "IDrawingDoc")
+    view = _early_bound(back, "IView")
+    expected_mm = HEX_H / 2.0 - COEFFICIENT_TOP_Y
+    plate_point = ((RIB_REACH + PLATE_W) / 2.0, COEFFICIENT_TOP_Y, -PLATE_L / 2.0)
+
+    def references() -> tuple[Any, Any]:
+        vertex, xyz = _theoretical_knife_vertex_in_view(adapter, view)
+        plate = scan_view_edges(view, label=label).exact_line_through(
+            plate_point, label="VIEW F coefficient top end edge",
+        )
+        projected = model_points_in_view(
+            adapter, view, (xyz, _metres(plate_point)), label=label,
+        )
+        if tuple(view.ScaleRatio) != (1.0, 1.0) or not math.isclose(
+            projected[0][1] - projected[1][1], expected_mm / 1000.0,
+            rel_tol=0.0, abs_tol=1e-8,
+        ):
+            raise RuntimeError(f"{label}: VIEW F does not project the actual sharp above plate top")
+        return vertex, plate.edge
+
+    vertex, plate = references()
+    if drawing.ActivateView(view_name(adapter, view)) is not True:
+        raise RuntimeError(f"{label}: cannot activate VIEW F")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection = _early_bound(manager.CreateSelectData(), "ISelectData")
+    selection.View = view
+    try:
+        for index, (entity, interface) in enumerate(((vertex, "ISketchPoint"), (plate, "IEntity"))):
+            if (
+                _early_bound(entity, interface).Select4(index > 0, selection) is not True
+                or manager.GetSelectedObjectCount2(-1) != index + 1
+            ):
+                raise RuntimeError(f"{label}: native {interface} selection failed")
+        raw_dimension = draw.AddVerticalDimension2(*KNIFE_HEIGHT_LOCATION_XY, 0.0)
+    finally:
+        draw.ClearSelection2(True)
+    if raw_dimension is None:
+        raise RuntimeError(f"{label}: native vertical dimension was not created")
+    display = _early_bound(raw_dimension, "IDisplayDimension")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+
+    def check_height() -> None:
+        if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
+            raise RuntimeError(f"{label}: cannot activate its native owner sheet")
+        vertex, plate = references()
+        measured = assert_dimension_measures(
+            adapter, display, expected_mm=expected_mm, label=label,
+            entities=(vertex, plate), entity_types=("SKETCHPOINT", "EDGE"),
+        )
+        count = view.GetAnnotationCount()
+        owned = view.GetAnnotations()
+        if (
+            type(count) is not int or not isinstance(owned, (tuple, list)) or len(owned) != count
+            or sum(adapter.swApp.IsSame(item, annotation) == 1 for item in owned) != 1
+            or annotation.OwnerType != 0 or annotation.Visible != 1
+            or adapter.swApp.IsSame(_early_bound(annotation.Owner, "IView"), view) != 1
+        ):
+            raise RuntimeError(f"{label}: native dimension is not visible and owned by VIEW F")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
+        places = display.GetPrimaryPrecision2()
+        if places == -2:
+            extension = _early_bound(draw.Extension, "IModelDocExtension")
+            places = extension.GetUserPreferenceInteger(24, 206)
+        if places != 2 or tolerance.Type != 0:
+            raise RuntimeError(f"{label}: lost ordinary two-place title-block control")
+        _telemetry.success(f"{label}: native sharp/face-attached {measured:.6f} mm at .XX")
+
+    check_height()
+    return check_height
 
 
 def _knife_detail(adapter: Any, back: Any) -> Any:
@@ -1464,25 +1600,22 @@ def _mounting_rims(edges: ViewEdges) -> list[Any]:
     ]
 
 
-# VIEW F's controlled ReceiverY0 locates the bracket row from the plate top.
-# The coefficient top stays fixed above the pivot; both tap centres remain
-# y=0. An owned centreline runs through the taps and hex centre, extending
-# past the free-edge station and hex flats. The separate (2.54) reference
-# repeated ReceiverY0's span and was struck by ReceiverX1's extension line.
-RECEIVER_AXIS_STATION_MM = 37.5
+# VIEW F's controlled ReceiverY0 locates the bracket row from the actual plate
+# top. The coefficient top and knife stay fixed; only the matched tap row
+# moves down. Its owned centreline spans the two taps, not the hex centre.
 RECEIVER_AXIS_OVERRUN_MM = 2.0
 
 
 def _receiver_axis_centerline(adapter: Any, back: Any) -> Any:
-    """Extend VIEW F's receiver-row centreline through the hex centre."""
+    """Extend VIEW F's centreline along the relocated two-tap row only."""
     z_mm = -PLATE_L / 2.0
-    station = RECEIVER_AXIS_STATION_MM
+    stations = [point[0] for point in LEVER_HOLE_POINTS]
     return _owned_centerline(
         adapter,
         back,
         (
-            (station + RECEIVER_AXIS_OVERRUN_MM, 0.0, z_mm),
-            (-(HEX_W / 2.0 + RECEIVER_AXIS_OVERRUN_MM), 0.0, z_mm),
+            (max(stations) + RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
+            (min(stations) - RECEIVER_AXIS_OVERRUN_MM, RECEIVER_ROW_Y, z_mm),
         ),
         label="receiver row centreline",
     )
@@ -1500,6 +1633,10 @@ FRONT_KEEP = {
 # The native 6.985 mm face span uses the ordinary document .XX precision:
 # its text is above the profile and right of RibReach's complete callout.
 BOSS_FACE_LOCATION_XY = (0.284, 0.250)
+# VIEW F's right-hand column is outside the boss's actual X400.0875 mm end.
+# The short 2.594 span hangs its ordinary 2.59 below the view: predicted native
+# text X403.5..415.1375 / Y125.2219..128.7219 mm, clear of the tap callout.
+KNIFE_HEIGHT_LOCATION_XY = (0.4035, 0.128)
 # Detail D at 10:1: the complete envelope fills a 120 mm crop on sheet 2.
 # The ridge pair shares one line above the crop, with each whole callout
 # outside its own model-side span. Back reverses X: RidgeFromLeft prints
@@ -1515,10 +1652,11 @@ DETAIL_KEEP = {
     "FlankToSide": (0.058, 0.184),
     "KnifeRidgeRadius": (0.181, 0.219),
 }
-# Keep the native arc seed; place its text below the detail boundary and
-# height dimension so neither line crosses the text. The leader approaches
-# the lower arc endpoint from below; verify regenerated native ink.
-FLANK_TEXT_XY = (0.051, 0.081)
+# Keep the native arc seed. R3's low shelf routed through the final SEAT T.
+# Above the height's Y201.3401 witness, the whole two-row block clears it by
+# 4.1036 mm and the X74.5999 ridge witness by 4.9138 mm. Any connector from
+# the unchanged arc stays below the text; verify regenerated native/PDF ink.
+FLANK_TEXT_XY = (0.051, 0.211)
 RIDGE_WITNESS_GAP = 0.010
 TOP_KEEP = {
     # The model width is authored at the plan's middle Z. Its native
@@ -1531,8 +1669,6 @@ TOP_KEEP = {
     # line crossed "DRILL", farm r7).  Its two callout lines (BODY END FACES,
     # 9 characters) end 2.9 mm inside the border.
     "PlateLength": (0.405, TOP_CENTER[1]),
-    # Receiver rib's inward depth, beside the -Z end of the plan.
-    "RibDepth": (0.270, 0.1745),
     # The boss's diameter names the web arcs' ends under its value; its
     # four lines stand left of its leader, above the anchor tap's callout.
     "AnchorOuterDia": (0.145, 0.168),
@@ -1556,22 +1692,20 @@ TOP_KEEP = {
     # to target 3.3 mm box clearance. Both stubs are one prism, so the length
     # remains the hidden KnifeStubReference's, along its -X side.
     "KnifeStubLength": (0.2185, 0.1735),
-    # Left of the +Z end rib, above its span: below it the finish symbol and
-    # the 76.20/39.85 row leave no room, and the web's lower arc reaches the
-    # cylinder at x 0.226 there.  The text spans x 0.1979..0.2095, right of
-    # the 76.20 X location's extension line (x 0.1972); the lower arrow
-    # stands 3.8 mm left of the finish symbol's text; the text stands above
-    # the boss Z location's datum-B extension line (y 0.0919).
-    "EdgeRibThickness": (0.2095, 0.1035),
-    # Ordinary mid-rib thickness beside its end, clear of the spring callout.
-    "MiddleRibThickness": (0.2655, 0.1374),
+    # One model-owned 3X thickness sizes all three ribs, above its span.
+    # R2's native text hangs LEFT of this anchor: x 191.1396..209.5 mm
+    # crossed the boss-X witness at x 197.2187. Move the complete native
+    # text/shoulder/arrow column 16 mm left, not toward the diameter above.
+    # The translated native span x 175.1396..193.5 leaves 3.7187 mm to that
+    # witness and 7.6201 mm to MID RIB CENTRE. Confirm regenerated native ink.
+    "EdgeRibThickness": (0.1935, 0.1035),
     # The cylinder's diameter across its band, from the part's hidden
     # CylinderReference line (machinist review r10: in the front view its
     # leader landed on the rib outline that hides it).  Its text stands left
     # of the band, 2.8 mm over the line, which the dimension line covers
     # (farm r11: the dimension line prints that far below its text): right
-    # of the boss's 76.20 extension line (x 0.1972), 3 mm over the 5.08's
-    # text and 2.3 mm clear of the web's lower arc.
+    # of the boss's 76.20 extension line (x 0.1972), above and right of the
+    # relocated 3X 5.00 block, and 2.3 mm clear of the web's lower arc.
     "CylinderDia": (0.209, _top_xy(0.0, -CYLINDER_REFERENCE_Z)[1] + 0.0028),
 }
 # VIEW F at 1:1, model X reversed. All stations, thickness and caption ride
@@ -2153,6 +2287,7 @@ async def build(adapter: Any) -> dict[str, str]:
     check_plate_thickness = _plate_thickness_check(adapter, back, back_annotations)
     _apply_callouts(adapter, back_annotations, label="bracket receiver")
     _receiver_axis_centerline(adapter, back)
+    check_knife_height = _knife_height_location_check(adapter, back)
     # Keep the removed-view identity below the actual end profile.
     add_property_linked_note(adapter, "Back View Note", *BACK_VIEW_NOTE_XY)
     # The existing sheet-2 pictorial now shows the continuous backing from
@@ -2193,7 +2328,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # Recheck after the final rebuild, before either drawing or PDF is saved.
         settled_checks=(
             check_thread_annotations, check_plate_thickness, check_dimension_ownership,
-            check_boss_faces,
+            check_boss_faces, check_knife_height,
         ),
     )
 

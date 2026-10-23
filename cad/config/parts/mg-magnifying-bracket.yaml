@@ -1,24 +1,19 @@
 mg-magnifying-bracket:
   number: MHA-MG-01
-  # The light-press strength budget uses 1018 cold-drawn yield, not brittle
-  # class-30 gray iron. Keep the condition on the print, not just in code,
-  # on one title-block line (machinist review r2: the 35-character
-  # "LOW-CARBON STEEL (1018, COLD-DRAWN)" wrapped).
-  material: AISI 1018 COLD-DRAWN STEEL
-  material_specification: AISI 1018 COLD-DRAWN STEEL
-  finish: machined
+  material: LOW-CARBON STEEL
+  material_specification: LOW-CARBON STEEL
+  finish: blued
   quantity: 1
   tolerance_class: machined_block
-  # No fit_class: the collar is a light PRESS seat for the MHA-MG-03 lever rod
-  # (user ruling; limits and Lamé strength in mg_lever_press_fit_geom), not a
-  # running fit; the screwed seat on the summing lever remains static.
-  process: "machined from 1018 cold-drawn solid stock; collar bore reamed or honed to Ra 0.8 as the matched press seat for the MHA-MG-03 lever rod (0.007-0.014 diametral interference); press the collar onto the rod held near its end; the press alone retains it"
-  # The pressed bore's Ra 0.8 is an owner ruling (#1570 option A), not a
-  # running surface: the matched fit's 0.007 minimum interference holds only
-  # after DIN 7190 smoothing at that finish (mg_lever_press_fit_geom).
+  process: "simple blued low-carbon-steel L; parallel nominal 11.00 neck and concentric R5.50 ±0.05 nose, no taper or collar; nominal 12.50 thread-axis thickness prints 12.5 at ordinary .X ±0.8 with standard 1/4-20 UNC through tap, ordinary 2B title-block fit. The owner's explicit non-timeout choice in this session was Keep geometry; approve exception after PNG comparison: package RV-03 accepts only the three existing head radius/location ±0.05 controls under rules 4/17, retaining source-owned RETAINS TAP WALL below-text without an outside-profile fit mate. The later explicit foot-width ruling reduces local Y width from 12.70 to 11.00, centered at zero to match the unchanged neck, removing the lateral ledge and its obsolete offset dimension. Foot grip is explicit native 3.175 ±0.13 with MHA-MG-VN-53 / SCREW GRIP below-text; its accepted 3.045..3.305 interval retains 3.305 full screw engagement and 0.0075 tip clearance. Overall foot length and width print one place with their own ordinary bands; modeled 54.25 x 11.00 x 3.175, machine X -8..46.25, hole axes X 1/14.70 and lowered local Y -0.71 remain unchanged. The real lower-edge hole ordinate is now 4.79 ±0.05. The SM-facing +Z foot back is the one locating seat and carries source-owned native Ra 3.2; bluing and CAST/MACHINED are not a substitute for that grade. Native source owns precision, bands and functional text; one existing sheet and ordinary end view, no extra view or section. Mouth breaks stay modeled 0.20 at 45 degrees with native primary distance 0..0.25 and ordinary angular band. No internal-major MAX or manufactured nose-wall guarantee is inferred from 2B: nominal major-to-nose wall 2.325 and mouth wall 2.125 are nominal only; the finished head minimum wall is unknown, so neither the 2.0 target nor the 1.5 floor is certified. RV-03 accepts the retained head/control decision, not a manufactured-wall guarantee. Fitted projection gives full overlap 10.017234843 above 1.5D 9.525, root-runout clearance 0.525 and minimum projection 0.740. Arm demand uses minimum accepted 11.7 x 10.9 section, maximum span 97.965 and fitted gravity arm 161.710, with nominal A1 X/Y force stations; the narrowed foot gives a minimum physical prying arm of 4.74 under its own width/location bands. Generic steel has no certified yield margin. No axial side-root bridge remains: applicable inside X-root, outer free-foot edges and only the two free-end foot corners retain nominal R0.25; inside acceptance follows title-block R1.0 MAX. Actual native flush-side/head-corner checks and isometric scale caption are required."
   machinist_exceptions:
-    - id: "RV-01"
+    - id: "RV-02"
       kind: "accept"
-      where: "the Ra 0.8 roughness symbol on the collar bore, (Ø5.986) REAM OR HONE THRU: 0.007-0.014 DIAMETRAL INTERFERENCE ON MHA-MG-03 LEVER, in the collar's end view beside Ø12.00 COLLAR OD"
-      finding: "roughness symbol on a pressed bore that neither runs, slides nor locates (rule 6)"
-      reason: "owner ruling #1570 option A: the bore is reamed or honed to Ra 0.8 because the matched fit's 0.007 minimum diametral interference rests on the DIN 7190 smoothing estimate 0.8 x 4 x (0.8 + 0.8) um = 0.00512 (effective minimum 0.00188), which holds only at Ra 0.8; a rougher bore would smooth the loosest press away (owner-accepted)"
+      where: "the MHA-MG-03 external lever thread in this bracket's through tap, installed by MHA-MG-00 to tip projection"
+      finding: "the unseated lever thread has no mechanical anti-loosening means; projection is set without a shoulder or preload (rule 23, lock threaded joints exposed to operating loads)"
+      reason: "user, 2026-10-20: 'no further thread locking needed because mg-magnifying-lever does not experience rotational forces'. The accepted design has no added lock; it is not a static clamp or a demonstrated vibration-proof joint. Vibration can still change projection or back the lever out. Assembly RV-02 and joint_retention.py U-MHA-MG-03-no-lock record this same joint, with full engagement remaining a separate requirement."
+    - id: "RV-03"
+      kind: "accept"
+      where: "MHA-MG-01 sheet 1, existing thread-axis end view: NoseR R5.50 ±0.05 and TapFromTip/TapFromSide 5.50 ±0.05"
+      finding: "Retained head wall controls: these three head profile/location bands are tighter than the ordinary title-block band to retain tap wall, without an outside-profile fit mate; keeping the existing geometry and these exact controls is an accepted departure from rules 4/17."
+      reason: "User explicitly selected 'A — Keep geometry; approve exception' in this session after the PNG comparison; the earlier timed-out selection was not approval. Acceptance is limited to retaining this existing head geometry and these three unchanged ±0.05 controls with their RETAINS TAP WALL below-text. The finished head minimum wall is unknown: ordinary 1/4-20 UNC 2B supplies no specified finished internal-major MAX here, and diameter 6.35 BASIC is not the actual manufactured envelope. The 2.325 head and 2.125 mouth walls are nominal only; neither a 2.0 minimum nor the 1.5 floor is certified. This creates no outside-profile mate, thread-major limit or manufactured-wall guarantee, and waives no foot-grip, mounting mate-flag, drawing line-clearance, other wall or installed-engagement requirement. The separate RV-02 retention acceptance is unchanged."

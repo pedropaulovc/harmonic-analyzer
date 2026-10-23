@@ -27,6 +27,8 @@ from sh_vn_music_wire_lever_spec import BOM_DESCRIPTION as _WIRE_BOM_DESCRIPTION
 # import (the builder marks the banded ones, DIMENSION_TOLERANCES).
 DRAWING_DIMENSIONS = {FEATURE: {PRESS_GAUGE_DIMENSION, ENDSHAKE_DIMENSION}}
 
+THREAD_PROJECTION_DETAIL_TITLE = "LEVER TIP DETAIL"
+
 # --- Fitter package -----------------------------------------------------------
 DRAWING_NUMBER = _steps.DRAWING_NUMBER
 WHEEL_BAR = "mg-wheel-bar"
@@ -119,9 +121,7 @@ EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
 
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
-# Ends and sides are named by features the fitter can see (the lever's PRESS
-# ZONE on MHA-MG-03, the bracket), not compass words no view defines
-# (machinist review r1).
+# Ends and sides name physical features rather than ambiguous compass words.
 STEP_TEXT = {
     _steps.AXLE_PRESSED_KEY: (
         "PRESS THE MHA-MG-07 WHEEL AXLE INTO THE MHA-MG-08 WHEEL BAR FROM ITS "
@@ -150,16 +150,19 @@ STEP_TEXT = {
         "HOLD THE FIRST NUT; JAM THE SECOND MHA-MG-VN-52 NUT AGAINST IT. RECHECK "
         "THE ENDSHAKE."
     ),
-    "collar-pressed": (
-        "HOLDING THE MHA-MG-03 LEVER NEAR ITS PRESS-ZONE END, PRESS THE "
-        "MHA-MG-01 BRACKET'S COLLAR ONTO THAT END, LEVER END FLUSH WITH THE "
-        "COLLAR'S OUTER FACE. THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
+    _steps.LEVER_THREADED_KEY: (
+        "SCREW THE MHA-MG-03 LEVER INTO THE MHA-MG-01 BRACKET TO THE FLAT LEVER "
+        "TIP PROUD OF FAR BRACKET FACE SETTING "
+        f"(SHEET 1, {THREAD_PROJECTION_DETAIL_TITLE}). "
+        "THE PLAIN ROD HAS NO SHOULDER. NO LOCKNUT, SET SCREW OR ADHESIVE. "
+        "THE TWO MHA-MG-VN-53 SCREWS GO WITH THE LEVER: "
         "MHA-HA-00 DRIVES THEM INTO THE SUMMING LEVER."
     ),
     _steps.CLAMP_SET_KEY: (
-        "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS FREE END, THE END "
-        "NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); TIGHTEN ITS "
-        "MHA-SH-VN-55 THUMB SCREW BY HAND."
+        "SLIDE THE MHA-MG-02 CLAMP ONTO THE LEVER FROM ITS DOMED FREE END, "
+        "THE END NEARER THE BORE UP, TO THE CLAMP STATION (SHEET 1); KEEP ITS "
+        "ENTIRE BORE ON THE PLAIN BODY, CLEAR OF THE AS-MADE RUNOUT AND THREAD; "
+        "TIGHTEN ITS MHA-SH-VN-55 THUMB SCREW BY HAND."
     ),
     # #1559: the rod is retained by its own thread, seated on its shoulder.
     _steps.FIXTURE_SET_KEY: (

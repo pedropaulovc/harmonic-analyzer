@@ -139,11 +139,14 @@ despite a 4.9354 mm printed gap clearing the 3.8733 mm advisory threshold.
 Evidence: `C:/farm-runs/com-perf-mg-clearance-inspection-20261021/actual-clearance-measurements.json`.
 Raising only sequence Y259.5 to Y260.5 predicts 4.8125 mm native gap,
 5.9354 mm printed gap and 5.9047 mm top-border clearance on that seat;
-title clearance stays 4.1210 mm. The existing fit test retains both measured
-seat cases and requires full 4 mm padding for each.
-Text, wrapping, font, scales, geometry and native guards stay unchanged.
-Fresh exact-head native audit and printed-sheet acceptance remain necessary:
-these translations do not certify the Y260.5 output.
+title clearance stays 4.1210 mm. These are historical upstream measurements
+for that package's unchanged text/wrapping/font, not fit-test or native proof
+for the longer threaded-joint sequence and 72-column CHECK block. No
+recipe-specific whole-CHECK native gate is established by these observations;
+the shared REPORT limits are unchanged. Inspect the fresh combined drawing's
+entire native CHECK extent, printed ink, title-block clearance and sequence/
+border/neighbor gaps. Historical translations do not certify its output.
+
 ### TL-00 instruction-sheet source references
 
 The oblique-jig assembly's `ASSEMBLY STEPS` reference at source `a0ba383f2b70`
@@ -935,6 +938,29 @@ dimension: `ArcExtensionLineOrOppositeSide` (radial only,
 Broken)` (`types/IDisplayDimension/SetBrokenLeader2.md`). Re-read the geometry
 from `GetDisplayData` afterwards; the render is not the evidence.
 
+The summing lever's R3 Detail D proves why a successful angular text readback
+is not route acceptance. At request (51, 81) mm, the native connector from
+(58.3221, 166.7272) to (69.6861, 75.4438) mm strikes the final `T` in
+`MHA-SM-02 SEAT` below `4X 122.4° ±0.5°`. The native/PDF evidence is
+`D:/farm-runs/summing-plate-taps-20261022/r3-sm-visual-evidence/`
+(`sm-native-layout-audit.json`, `sm-flank-angle-small-defect.png` and
+`sm-detail-d-complete.png`). Keep the exterior arc seed **(58, 184) mm**
+and use the same native angular shelf at **(51, 211) mm**, a text-only
+**130 mm upward** move. Its entire lower row starts at native Y205.4437 mm,
+4.1036 mm above the height's upper witness; its right edge X69.6861 mm is
+4.9138 mm left of the ridge witness. A smaller left/upper nudge is not a
+whole-neighbor repair: the height's X34.2 mm dimension run crosses that pocket.
+The new shelf is above every point on the retained native arc, so any straight
+connector from that arc ends below both complete printed rows, leaving at least
+0.9338 mm ink air. Do not freeze or rigidly translate the old connector's arc
+attachment. The regression replays both native/PDF rows, the complete neighboring
+blocks and witnesses, the retained arc/arrows, and the entire possible connector
+envelope. The connector crosses the upper height witness rather than the lower
+one, a line/line crossing, not text. These are placement projections: fresh
+native/PDF inspection must prove the actual re-solved route and full-sheet ink.
+The model-owned angle, one-place precision, symmetric band, attachments, all six
+views, and the separate `3X 5.00` / `2.59` placements remain unchanged.
+
 The rocker's abandoned angular-offset attempt is not a reusable placement
 contract. R26's false-offset 109-degree seed did not determine its final
 connector: offset restored the old stubs and landed at 105.690091123 degrees,
@@ -1159,9 +1185,10 @@ temporary and revert when the dimension changes. The drawing-only
 is a separate lane, not the required above/below callouts. No proven
 drawing-only setter preserves these exact callout compartments.
 
-All four MG setting callouts now belong to the assembly model:
+All five MG setting callouts belong to the assembly model:
 `mg_magnifier_assembly_spec.SETTING_CALLOUTS` owns the exact text and native
-compartments for PressGauge, Endshake, ClampStation and FixtureDrop.
+compartments for PressGauge, Endshake, ClampStation, FixtureDrop and
+ThreadProjection.
 `build_mg_magnifier_assembly` authors them beside their reference dimensions,
 strictly reads each compartment back and marks/blanks the chains before its
 normal assembly save, following `build_pd_transgear_arm`'s model-text pattern.
@@ -1171,6 +1198,24 @@ It must reject a stale assembly lacking the text, not stamp it during drawing
 generation. Setting callout wording now re-keys `assembly:mg_magnifier` and
 requires rebuilding that source and its drawing; BOM/step/check prose remains
 drawing-only and must not enter the assembly builder's import closure.
+
+The threaded-joint setting uses its own `LeverThreadSetting` feature and the
+native below-callout compartment for all three rows of `FLAT LEVER TIP /
+PROUD OF FAR / BRACKET FACE`. Author/read it beside the existing 1.25 mm
+reference before blanking that chain; drawing-time text writes would violate
+the same source-clean contract as the original four settings. Keep the sole
+native dimension, far-bracket-face datum, precision and general band unchanged.
+This authority migration requires a new assembly recipe, not new geometry.
+
+Preserve the physical tip camera across standard-view remapping, not an old
+`*Back` string. `_assembly.remap_front_to_machine_front` first shows old
+Back/id2, then makes that orientation Front/id1 with `UpdateStandardViews`.
+Thus the former unobstructed machine−Z tip view is current `*Front`; saved
+`MG BACK` is the old +Z Front, and axle crops still use saved `MG LEFT`.
+Keep per-detail orientation and caption consumers consistent. The source
+camera mapping alone is not native visible-edge, cropped-ink or final-layout
+proof; the same instance/configuration, ownership, physical-boundary and
+whole-ink guards must still pass on the rebuilt source.
 
 The temporary per-operation crop/settings checkpoints and synthetic
 checkpoint-attribution tests are superseded by this native evidence. Keep
@@ -1377,6 +1422,29 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+The summing lever's face-height chain also needs a location from the knife
+ridge to the coefficient top; `19.05`, `5.08` and `6.99` alone do not locate
+that chain from the suspension axis. VIEW F now uses the existing native
+`KnifeEnvelopeReference` **height.end** sketch point at model Y5.134 mm,
+the same endpoint used by Detail D's `RidgeFromLeft` and `RidgeFromRight`.
+Datum A itself stays attached to the physical ridge round; its crest and arc
+centre are not interchangeable with this theoretical sharp. Resolve the unique
+construction height line, verify its native sketch-to-model transform, then
+map that actual endpoint through `IView.GetCorresponding`. Select it with
+`ISketchPoint.Select4` and the visible −Z coefficient-top edge with
+`IEntity.Select4`; `IModelDoc2.AddVerticalDimension2` supplies the measured
+2.594 mm location, displayed as ordinary **2.59** under the existing title block.
+No new model point, profile, tolerance, section or view is added. Missing or
+ambiguous source geometry, null correspondence and failed selection refuse;
+there is no coordinate-only, rounded-crest or cylinder-centre fallback.
+The initial and settled checks prove both exact attachments, native value,
+VIEW F ownership/visibility, projected rise and ordinary two-place precision.
+Its (403.5, 128) mm text request uses the open right/below lane: R2 projection
+predicts X403.5–415.1375, Y125.2219–128.7219 mm text, 3.9625 mm inside the
+right border and right of the tap callout. This is a placement projection;
+fresh native/PDF inspection must prove the complete witnesses, outside arrows,
+shoulder and text remain clear. Shared audit guards remain unchanged.
+
 For FR-00's nameplate inset in section B-B, model geometry alone was not
 attachment evidence. Farm run
 `20261022T204612817Z-cd964f67d895402c96f536ac40ba51d8`
@@ -1524,6 +1592,23 @@ and neighbouring leaders; moving the same centred text up does not widen the
 span. The part-specific offline placement contract bounds that envelope;
 only the regenerated native audit and printed sheet prove the repair.
 
+The summing lever's sheet-1 `3X 5.00` made the same vertical-dimension mistake
+in R2 (`20261022T190921801Z-dbfece22b19a4d68ac2dd248e5168731`): native text/
+shoulder X191.1396–209.5 mm and printed ink X192.5961–208.0575 mm crossed
+the boss-X `76.20` witness at X197.2187 mm. Its existing `TOP_KEEP` curation
+request moves from **(209.5, 103.5) to (193.5, 103.5) mm**: the complete
+native text/shoulder/arrow column moves 16 mm left without a new `OffsetText`
+mode or a detached note. Translation of the recorded native span predicts
+X175.1396–193.5 mm, 3.7187 mm air to the witness and 7.6201 mm to the full
+`MID RIB CENTRE` row. The Ø25.40 block remains above/right, not squeezed by
+an upward nudge; the lower finish symbol and dimension rows stay untouched.
+The existing drawing regression replays both recorded text boxes and the
+moving shoulder/outside-arrow runs against complete neighboring text.
+This is an offline placement projection, not native after-fix acceptance.
+Regenerated native/PDF inspection must prove the complete route and neighbor
+air while retaining the model-owned value, tolerance, attachments, `3X`
+prefix and all six views; geometry and shared audit guards are unchanged.
+
 A genuine diameter hangs the same way and stops READING as one. The output
 fixture's groove root Ø7 is a doubled distance (`AddSpecificDimension`
 `swDiametricLinearDimension`, `Diametric` proven on the part); requested under
@@ -1578,98 +1663,688 @@ in their authored views, non-dangling, with unchanged native definitions.
 The shared finalizer's exact-count contract is unchanged for other recipes.
 
 **q. A standard view placed as-is is not necessarily in projection.**
-Don't: assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
-`*Back` view to carry a face's hole dimensions. `mg-magnifying-bracket` retry09
-(source `8d6d2088a`, launcher `20261012T124257186Z`): `*Top` was the principal
-view with model +Z running DOWN it, but `*Right` arrived with +Y up and +Z to
-the sheet's LEFT, so the collar's circle stood beside an arm running left and
-the blind machinist read a different part (mreview09 blocker 1); the `*Back`
-view under it, mirrored about the flange, carried the counterbore callout and
-the hole coordinates and read as a duplicate "not a projection of anything
-above it". The same sheet located the bore axis twice from two origins — the
-arm's 54.30 from its buried start in the top view and the actual seat's
-55.19 from the axis in the side view (blocker 3).
-Do: turn the view by a MEASURED angle, not an assumed one: project a model
-axis before and after `IView::Angle` (`model_point_in_view` on the origin and
-a point along +Z, the cradle's `_turn`), require +Z down and +Y left within
-1e-6 rad, then pin the view's ORIGIN (not its centre) to the principal view's
-measured origin height through `IView::Position` / `SetViewPosition`, read
-back within 1e-4 m (the latch hook's `_pin_origin`), all BEFORE any import so
-every placed text is in the final frame
-(`draw_mg_magnifying_bracket._project_side_view`). Dimension the mounting
-face on the ALIGNED view that shows it (`*Front` under `*Top`): the
-counterbores open on the face that view cannot see, so the hole callout
-attaches to the THROUGH rims on the visible face (`ViewEdge.circle_at` at
-`SIDE_PLATE_Z[1]`, radius `CLEARANCE_DIA / 2`) and names the entry side in its
-process prefix (`DRILL / COUNTERBORE FROM` / `FACE OPPOSITE MOUNTING FACE`);
-whether `AddHoleCallout2` on
-the through rim resolves the Hole Wizard feature is native evidence, not an
-assumption. Give one axis ONE controlling chain from the actual flange seat,
-not an inner step merely labelled "mounting face". Other face-to-axis values
-are REF, with sufficient precision that their printed step sums consistently,
-and the dimension from the buried start is unmarked. The collar's OD, with no
-band of its own, inherits the title block's `.XX` ±0.51. The named OD print
-corners in `mg_lever_press_fit_geom` are conservative independently: strength
-uses Ø11.49 (330.8 MPa von Mises, below the 333 MPa limit), while maximum
-pressure and press force use Ø12.51. The press force is the friction term over the
-whole conservative contact envelope, not the nominal 7 mm straight cylinder, plus
-the normal reaction on the partial dome. The longest straight cylinder is
-10.00 − 2.997 = 7.003 mm; the part of the R3 hemisphere still outside the smallest
-(5.986) bore adds sqrt(3.000² − 2.993²) = 0.204819 mm, so the explicit maximum is
-7.207819 mm. Friction (μ 0.10–0.15, p 143.66 MPa, d 6.000, L 7.207819 mm) gives
-1951.871–2927.806 N, and the projected dome axial-normal reaction bound adds
-18.933819 N, so the total press force is 1970.804504–2946.739847 N
-(1.970805–2.946740 kN). The two corners are chosen independently on purpose
-(the smallest dome sets the longest cylinder, the largest dome the deepest
-penetration), so this is an envelope, not one physical part; its coupled tight
-corner is 7.204819 mm. The shared note rounds the high total upward to
-**3.0 kN MAX**. The 2.9 kN prints from native 16 are source-specific evidence for
-the old 7.003 mm, friction-only note; they do not prove this 3.0 kN note.
-`test_mg_fixture_installation` checks both corners and the
-ceiling independently. A safe low-OD stress corner does not justify using
-the nominal OD to cap force, nor an unnecessary second OD band.
-For the bracket the actual seat is local Z55.1875877804, not the arm's
-Z58.3 end: the flange's 3.175 stock thickness is a different distance.
-The controlling chain is 55.19 seat-to-axis plus 3.11 arm-past-seat;
-58.30 is the sum, printed as a genuine drawing-native linear REF picked
-on the collar rim's arc centre and the arm end. Identify the mounting plane
-from the installed joint, rather than guessing it from a step's outline.
-The arm's 3.11 extension lies beside the lever across a 5.55 mm X gap.
-Label that short extension `ARM PAST MOUNTING FACE`, not merely 3.11.
-Across the flange, the lower edge is Y=-6.35, the arm spans -3.00..+4.50
-and the far edge is +6.35: 3.35 edge-to-arm plus 7.50 arm width leaves
-1.85, not a contradictory 12.70 chain. The existing 3.35 edge-to-arm and
-3.00 arm-to-bore controls locate the bore axis 6.35 from the flange edge;
-do not duplicate that sum with an optional reference dimension. The required
-short overhang remains labelled `ARM PAST MOUNTING FACE`. A SIDE-view rim
-combined with a BOTTOM edge made an angle, and a subsequent mapped sketch
-centre could not prove its source identity: neither justifies relaxed
-dimension-type or identity guards. The optional REF and its exclusive
-selection code are removed; the complete mounting-coordinate ink guard stays.
+Do not assume `*Right` beside `*Top` makes a third-angle set, or add a mirrored
+`*Back` view merely to carry hole dimensions. Turn by a **measured** angle:
+project the model origin and a point along +Z before and after `IView::Angle`,
+require +Z down and +Y left, then pin the view's origin (not its bounding-box
+centre) to the principal view's measured origin height with `SetViewPosition`.
+Read the result back before importing dimensions
+(`draw_mg_magnifying_bracket._project_side_view`).
 
-The arm's controlling 3.00 locates its Y=-3 face, not the opposite Y=+4.5
-face: label it `NEAR ARM FACE TO BORE AXIS`. Put `VIEW ON MOUNTING FACE`
-below the lower view it describes, rather than in the gap above it where
-it reads as the upper view's title. Read the rebuilt caption, controls and
-manufacturing-note extents to prove the lower placement remains clear.
-The added drill/counterbore process had two standalone rows; it was not
-an inherited five-row Hole Wizard limitation. Combine those into one
-truthful `C'BORE OPP. MOUNTING FACE` row, retaining the native
-hole association, size and tolerance stack.
+The current MHA-MG-01 is the 2026-10-20 approved simple L bracket: its true
+semicircular nose and parallel sides replace the old collar and tapered arm.
+Use current-main axis-to-seat **100.3975878**, not the superseded 55.1876
+sketch; preserve the 3.175 stock mounting grip with explicit native ±0.13.
+The foot's right face merges flush with the centred nominal12.50 neck, printed
+12.5 at ordinary `.X` ±0.8; the fitted installation retains full1.5D engagement.
+Native mounting dimensions stay attached to their witness sketch, imported
+on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
+the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
+lookups bind `IPartDoc`: `IModelDoc2` does not declare `FeatureByName`.
 
-Put the junction's 7.50 width and 3.35 edge location on the bottom view,
-where its footprint is visible, without a second controlling copy in the
-side view. Short inside-arrow spans can overlap their arrowheads even after
-the witness crossings disappear. Instead distribute the controls between
-views and stack outside-arrow dimensions by their rebuilt ink: here the
-3.35 hangs below at x150, the 12.70 above at x166, and the 7.50 is outermost
-at x175. A full diametric chord always passes the bore-axis witness at the
-centre; use the genuine near-side single-arrow style
-(`set_near_side_diameter`) and prove the rebuilt leaders clear of each
-station witness separately. The view-direction caption belongs above the
-bottom outline where neither mounting witnesses nor the hole leader crosses
-it; centre it on `IView::GetOutline` and prove clearance to the neighbouring
-view's printed dimension ink.
+The three native mounting-location dimensions `MountingX0`, `MountingX1`
+and `MountingY0` share the source-owned below-text flag `[1]`. The same flag
+prefixes the existing `MATES MHA-SM-03 TAPPED HOLES` row on the associative
+mounting-hole callout. Include all three imported mounting dimensions in the
+source-callout readback guard; naming the mate only at the drill callout does
+not attach it to the tight locations. The flag changes neither their ±0.05
+bands nor the matched receiver row, and adds no match-drilling instruction.
+
+For a point-only Wizard placement, retain the traversed early-bound `ISketch`
+and read `GetConstrainedStatus()` directly: only native status 3 proves fully
+defined. The named SDK status path returned `source=unavailable`, `raw_status=None`
+on the r2 bracket; that is an unavailable channel, not evidence for either
+underconstraint or permission to proceed. Existing closed-sketch native status
+readbacks are the positive control; do not fabricate a successful fallback.
+
+The through tap's ordinary locations are 5.50 ±0.05 from the physical nose tip
+and neck side. These are not zero datum dimensions and not a GD&T frame.
+The R5.50 nose and location bands do not establish a maximum finished thread
+root. ASME B1.1-2003 §§5.5 and8.3.2 explicitly leave the internal maximum
+major diameter unspecified. The user chose a normal standard through tap, so
+remove the former custom Ø6.45 inspection sketch, callout and false guaranteed
+wall calculation rather than pretending 2B supplies the missing upper bound.
+Nominal standard-major wall is2.325 and nominal mouth wall2.125; those are not
+manufactured worst-case certificates. Actual finished walls remain subject to
+drawing-policy rule17 (2.0 target/1.5 floor). The retained modeled0.20 chamfers
+use hidden native primary-distance limits0..0.25, not an unsupported0.15 minimum.
+The one ceiling comes from structured
+`title_block.edge_break.chamfer_max_mm`; the existing bilateral setter owns
+the deviations, and each builder checks the nominal plus its native lower and
+upper deviations against 0 and 0.25. The bracket prints no angle-only mouth
+note; its title-block edge maximum governs the unchanged native chamfer.
+Do not claim both manufactured legs are capped at0.25. The model's45° feature
+uses `angular_band_deg()` (±1°), giving the conservative projected leg
+envelope `q = 0.25 tan46° = 0.258882578`. `_part_save` already invokes
+`apply_block_tolerances`, which verifies the template-owned native angular
+preference 126 against the configured value and fails on drift.
+The removed1.658 MIN/RV-01 declaration depended on a custom root acceptance
+the user explicitly rejected. It is not a standard-thread guarantee and must
+not survive hidden in metadata, tests or review context. Do not replace it
+with another unasked thread-major limit or local inspection note.
+
+The lever no longer imports or prints its local numeric `TipChamfer` size,
+band or `LIMIT RETAINS FULL ENGAGEMENT` text. One native thread-feature
+callout is printed in the enlarged detail: designation, `45° ENTRY CHAMFER`,
+`MATES MHA-MG-01`, then `BRACKET` on its own fourth row. Its native
+attachment and source text are retained; there is no detached manual copy.
+Hide drawing-local duplicates
+in the front and isometric without changing the source model's callout.
+The hidden native primary-distance cap remains in the part, while the title
+block supplies the edge maximum. Every crop is created with inference off,
+explicitly selected and checked against its persisted native circular fence.
+Final exported-PNG inspection still decides real ink clearance and visibility.
+
+MHA-MG-03 now has one free hemisphere and a flat threaded end. Import the
+small thread/lead dimensions before circularly cropping its enlarged
+independent Front model view, then prove every kept native dimension survives
+the crop (the MHA-MG-04 pattern). The assembly's native ThreadProjection
+specifies installation depth: the flat tip reaches through the far face,
+with no shoulder or added relief groove. Full engaged overlap excludes `q`
+at each female mouth, incomplete male thread at both ends, and an ADDITIVE
+`q` male tip loss: the print does not explicitly define a chamfer/die-lead
+union. The single fitted-projection interval gives **10.017234843** full
+overlap, above1.5D = 9.525 with the ordinary12.5±0.8 receiver. Root-runout
+clearance is0.525 and minimum tip projection0.740. Rod length variation moves
+the fitted free tip; it does not define a second fixed-position joint proof.
+There is no press-fit force/finish/elastic-yield contract or added lock.
+
+After comparing the head-options PNG, the owner explicitly selected
+**“A — Keep geometry; approve exception”** in this session. This later explicit
+reply, not the earlier timed-out selector or annotation-only direction,
+authorizes package-owned **RV-03 — Retained head wall controls**, `kind: accept`,
+in `config/parts/mg-magnifying-bracket.yaml`. Its rules4/17 scope is exactly
+**NoseR R5.50±0.05** and **TapFromTip/TapFromSide5.50±0.05**, retaining the
+existing head geometry, these three bands and their native `RETAINS TAP WALL`
+below-text. The exception is review context, not a new note on the sheet.
+There is no outside-profile fit mate or new finished-thread-major limit.
+The finished head minimum wall remains **unknown**: the6.35 BASIC major is
+not a manufactured maximum, and the nominal2.325 head /2.125 mouth walls
+certify neither the2.0 target nor the1.5 floor. RV-03 accepts only this retained
+head/control decision; it does not waive foot grip, mounting mate flags,
+drawing line clearance, other walls or installed engagement. The separate
+RV-02 retention acceptance is unchanged. The mate-flagged native PDF still
+requires native redraw and Codex machinist review; approval is not print proof.
+
+The foot prints explicit **3.175±0.13** with
+`MHA-MG-VN-53` / `SCREW GRIP` below it: full engagement3.305 exceeds3.2766,
+with0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that
+joint. Foot length/width retain their own one-place printed-size intervals;
+the later owner-approved width cut below changes only nominal Y width and must
+not loosen the grip, receiver, rib or depth bands.
+The blued material is generic low-carbon steel, matching the existing native
+Plain Carbon Steel assignment. The generic-steel qualification below owns
+the fitted-band load-demand screen and its unverified material assumptions.
+
+Keep the assembly's complete thread-projection qualifier attached to that native
+dimension when wrapping or repositioning it. R16 exported successfully while
+the sheet1 qualifier still extended outside the left border: native export
+success is not visual acceptance. Read every native display-text fragment,
+including the below-value qualifier, and require the full wording to survive.
+Fit the union of the existing callout ink and native-position/height/reference/
+angle-backed text boxes inside the current drawable sheet region, then check
+again after rebuild. The repository's text-width estimator is not an exact
+native glyph outline; inspect the final PNG as well. Preserve the native1.25,
+its tolerance and real dimension/source attachments.
+
+Create the independent thread-witness segments with `add_line_chain` so
+`SketchManager.AddToDB` suppresses inference during creation and restores its
+previous state afterward. A bare inferred line in r2 produced a 167.30 native
+tip witness for a requested 167.50, beside the 0.20 chamfer. The final native
+equation failure said its dependent variable was driven/reference; it did not
+name the offending equation, so the edge-snap mechanism remains an inference,
+not an observed relation ID. Before applying equations, verify that all thread
+witness dimensions are driving and have the requested native values. Do not
+apply the pre-equation DrivenState check after equations take ownership.
+
+The dependent MHA-MG-02 clamp uses **1/2 in hex** brass, keeps its bore at
+**19.95** from the bottom seat and its overall height at **29.50**. The hook
+stays at **919.7**; neither `.XX` ±0.51 band tightens. The native TOP
+**HEX 12.70**, at **two places and not REF**, uses the ordinary
+title-block `.XX` ±0.51 size12.19–13.21 on all three opposed-flat pairs over
+the full height. The ordinary drawn angles use the default±1°; do not exempt
+the shape as unconstrained “flats as supplied”. The model-owned `HEX ` prefix
+imports with the actual AF dimension; no separate stock-definition leader is
+needed. The source uses tolerance TypeNONE=0; inactive min/max getters are
+observations, not accepted limits. Read value, both precisions, non-reference
+property, prefix/suffix, actual source endpoints and requested-view ownership
+again after the final rebuild.
+
+There is no bespoke2 MIN wall/floor or15 MAX stock-envelope inspection note.
+The ordinary HEX/profile bands give a conservative full-height body bound:
+
+`D <= (AFmax + 2 Hmax tan(a)) / (cos(30°+a) - sin(a))`
+
+with AFmax13.21, Hmax30.01 and a1° gives16.979159, rounded OUT to17.00
+for calculations only. Adjacent normals, opposite-face angular mismatch and
+full-height drift are spent; exact60° faces or a centred tap are not assumed.
+This is not a supplier certificate or a bound for unconstrained stock.
+The opposite-flat/bore/location/relative-angle corner leaves1.644216 mm:
+below the2 mm target but above Rule17's1.5 mm hard floor. The drill-point
+floor remains2.081671 mm. Neither number becomes a redundant drawing note,
+and no ASME internal-maximum-root certificate is claimed.
+Retain `MHA-MG-04 SHOULDER SEAT: NO CHAMFER OR SPOTFACE AT TAP`; `AT TAP`
+does not constrain unrelated edges. Retain29.50 and .XX±0.51 without a height
+qualifier, and identify MHA-SH-VN-55 at its actual top-tap callout.
+
+Spend17.00tan(0.3°) bore run-off even at central tap/floor targets, rather than
+an unowned nominal half-depth. Intersect actual male/female full-profile
+intervals, excluding the stock screw's **0.47625** tip chamfer and mouth break.
+The finite flat-tip contact includes independent relative-entry error and the
+existing conservative1.3° contact envelope. Plug reach, stop window, the real
+finite118° drill cone, collar clearance and FULL≥1.5D=4.2675 must all pass.
+The rod's 8.55/12.75 depths and FULL4.605 are unchanged, conditional on its
+actual shoulder seating. This is not an alloy/temper strength certificate.
+
+The approved R22 datum change retains five ordinary native measurements,
+with no new FCF or tighter band. `LeverBoreFromZFlat`, `ThumbTapFromZFlat` and
+`RodTapFromZFlat`, all in `LeverBoreLocationProfile`, each measure **6.35**
+from the **same actual full-height +Z stock flat** with the title block's
+.XX ±0.51. The two tap-to-diagonal-flat measurements remain separate 6.35
+controls with the same ordinary band. Do not imply that all five dimensions
+share a datum. The common datum is the converted full-height edge at
+`(corner_radius/2, Y, +AF/2)` owned by the resolved +Z stock face, not a
+computed midplane or independently picked top/bottom boundaries.
+
+This is an explicitly approved **change of manufacturing acceptance**, not an
+equivalent rewording. With `s = bore_radius - 3.25`, the old feasible set was
+`B in [5.84,6.86]`, `T_i - B in [s-1.02,s+1.02]` and
+`D_i in [5.84,6.86]`. The new set independently bounds
+`B, T_thumb, T_rod, D_thumb, D_rod in [5.84,6.86]`. Each tap's absolute
+common-flat interval narrows from the old union [4.82,7.93] to [5.84,6.86].
+For positive `s` the new joint set is not even a strict subset:
+`B=6.86,T=5.84,r=3.30` satisfies the new limits but gives old rim distance
+4.32, above 4.27; conversely `B=6.35,T=7.37,r=3.25` satisfies the old rim
+control but fails the new direct tap interval. The conservative maximum
+tap/bore centre offset falls from **1.07 to 1.02**; do not add a diameter
+half-band to that centre-to-centre location. The tap/tap entry offset maximum
+is also 1.02, rather than the former 2.04.
+
+The native witnesses still select the real Wizard points and externally
+convert the actual stock edge and cut-producing bore circle. Retain the
+four-constraint construction projection: VERTPOINTS26 aligns its start with
+the actual tap; HORIZONTAL4 makes the line horizontal; HORIZPOINTS25 aligns
+its end with the actual bore centre; COINCIDENT9 places that end on the actual
+circle. This geometry remains an association/projection device, **not a
+printed rim acceptance**. Measure the projected local start to the same
+converted flat segment through the existing point-to-flat constructor; the
+bore uses its converted circle centre and that identical flat. Remove the
+obsolete rim dimension names, tolerance metadata and point-pair acceptance
+contracts rather than retaining them as secondary controls.
+
+Provisional seeds choose the positive projection branch, not measurement
+authority. Create endpoints away from the actual bore centre and previous
+witness endpoints: `AddToDB` suppresses inference, not exact-coordinate
+database merging. Preserve fully defined status, actual relation definition
+entities, source identity, ordered point/segment IDs, self/owner controls,
+endpoint distinctness and rebuild checks. The new dimension's attachment
+proof is the actual projected point plus the actual converted flat segment,
+not both line endpoints. The source measurements retain ordinary unboxed,
+nonreference authority through equations/rebuild and hidden-sketch import.
+
+A grouped front-view `3X 6.35` identifies `BORE AND BOTH TAP ENTRY AXES`.
+The spec's explicit group-to-members contract must cover all three source
+measurements. Read back each native value and its appropriate point plus the
+same flat identity before suppressing duplicate displayed values. Three
+printed instances are unnecessary, but a 3X prefix backed only by the bore
+measurement is invalid. The retained projection and point-to-flat primitives
+were exercised separately before this change; their new combination and
+grouped imported attachments still require Main-owned native validation.
+
+All functional bounds use the independent1.02 entry-offset envelope and the
+derived17.00 full-height body bound, with no custom receiving notes.
+Thumb FULL overlap is4.392416640≥4.2675, collar clearance3.334893727 and the
+blind rod-drill floor2.081671434. Plug reach, stop window and finite drill-cone
+clearances remain explicit derived checks in the spec; they are not replaced
+by printed machining instructions. These are arithmetic bounds, not native
+measurements or executed test results. The ordinary worst bore-flat wall is
+1.644216, an admitted miss of the2 mm target, not a breach of the1.5 mm floor.
+
+Keep the three actual witness feature names in the builder's literal
+`REFERENCE_SKETCHES` tuple. `_location_sources` uses that declaration to name
+the actual source map, and `_location_profiles` creates and blanks every
+returned source. The repository hidden-sketch routing scan must resolve those
+computed blanking names and verify drawing curation through
+`_drawing_hidden_sketches`; an unresolved name is an error, not a reason to
+skip the drawing.
+
+The former direct point-to-circle constructor is removed, not retained as a
+fallback. R9 proved exact circle identity and accepted/read-back rim selection,
+then the same native horizontal constructor returnedNone. Its original failure
+reason remains unknown; the prior zero-span hypothesis is not established.
+Do not spend another round on pick variants or present successful selection as
+successful dimension creation.
+
+Relation creation and readback are separate native contracts. Record every
+returned relation kind and its actual definition entities before filtering for
+the requested kind; a non-null AddRelation result is not sufficient identity or
+semantic proof. R12 restored HORIZONTAL4 and exposed returned kind32/USEEDGE
+after a VERTPOINTS26 request, with definitions not two confirmed points.
+USEEDGE is not vertical alignment or a valid enum alias. A mismatched returned
+handle alone also does not prove the mutation had no effect: compare the actual
+owning line/endpoint relation inventory before and after the single mutation.
+Require the exact intended kind, actual source entities and native alignment,
+not a relaxed returned-kind check. Classify actual definition entities before
+identity comparisons; the separate GetEntities/GetEntitiesType inventory is
+not the definition-entity inventory.
+R13 observed only the same suppressed DISTANCE1 on the retrieved start before
+and after requesting26; the required relation was absent there. The old start
+seed exactly matched the already-converted bore centre, contrary to that
+creation contract. Reuse of that particular centre is consistent with the
+inventory but was not directly identity-tested in R13. This is not evidence
+that all cross-sketch point relations are unsupported; the same run successfully
+used26 with an external origin. Correct the creation collision without changing
+the four intended constraints, sources, dimensional bands or final geometry.
+R14 proved independent provisional endpoints and actual creation of26 with
+two point definitions, unsuppressed and correctly aligned. Raw definition-point
+dispatches nevertheless compared as `(0,0)` against the retained start. Its
+expected-start ID was not recorded, so equality of the documented native point
+keys still requires direct readback rather than a pointer-normalization claim.
+R11 regressed the already-passed HORIZONTAL4 check because mandatory runtime
+type information returned `Invalid index`; that optional metadata is not an
+interface-capability contract. Classify each actual definition with native
+[`QueryInterface`](https://learn.microsoft.com/en-us/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface(refiid_void))
+and the pinned SDK interface IID. Only `E_NOINTERFACE` means that interface is
+unsupported; other failures remain unavailable. Reject ambiguous or unsupported
+classification. A generated `_early_bound` wrapper's fallback is not capability
+proof, and capability does not replace the native sketch-entity identity keys.
+Native point IDs/typed keys and definition/interface/self/owner checks are
+mandatory. Keep optional internal inventories and diagnostic coordinate reads
+separate; their unavailability must not add a constraint-acceptance requirement.
+Required alignment/geometry readbacks remain mandatory.
+
+The r5 attempt failed earlier, at the combined selected-count/circle-identity
+guard, before setting or reading a native pick. The r6 positive control then
+stopped on the previously working point/flat path: count2, native types
+`(11,10)`, selected-versus-expected `IsSame=(1,0)`, self controls `(1,1)`.
+Both objects were present; that direct segment comparison cannot distinguish
+a different sketch entity from an interface/dispatch identity difference.
+Do not attribute either failure to the zero-span hypothesis.
+
+The r7 guard exposed an unsupported sketch-to-feature binding: `IFeature.Name`
+read a16-double transform instead of a string. Native owner/type/ID comparison
+and rim selection were never reached. A generated wrapper's declared members
+do not establish that the returned dispatch supports that interface.
+
+For this part recipe's sketch segments, use the native identity documented by
+`ISketchSegment.GetID`: **owning sketch name + segment type + ordered ID pair**.
+`GetSketch` supplies an `ISketch`, not a proven `IFeature` dispatch. Resolve its
+owner through the actual part feature inventory, including child sketches:
+`IFeatureManager.GetFeatures(False)`, profile-feature `GetSpecificFeature2`,
+and native sketch identity with positive self controls. Require exactly one
+matching owner, and read `Name` only from that actual tree `IFeature`.
+Reject unavailable or ambiguous ownership; do not cache across rebuilds.
+IDs alone are not unique across owners or segment types. Require valid native
+identity fields and exact equality wherever actual segments are compared.
+For points, [`ISketchPoint.GetID`](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISketchPoint~GetID.html)
+explicitly defines **point type + owning sketch name + ordered ID pair**:
+the pair is unique only within that sketch and can overlap other element types.
+Use this as the primary native point association and independence contract for
+selection, relation definitions and annotation attachments—not a fallback
+selected only when raw pointer comparison fails. Require unambiguous point
+capability, valid native fields and the same strict self/owner controls.
+Read the keys afresh in each validation phase: these are not persistent IDs
+and must not be carried across rename or rebuild as cached identities.
+For the local construction line, verify its owner/type/IDs and distinct endpoint
+identities; dimension attachment identity must match those endpoints, while
+constraint definition entities must match the real Wizard point and converted
+circle/centre. Keep exact native types/counts, non-null attachments, not-dangling,
+measured value, driven ownership and acceptance-band checks after final rebuild.
+These identity guards log native keys, not removed cross-proxy equality codes.
+Self/owner `IsSame` controls remain mandatory. Log operation stage, count, types,
+availability and actual/expected keys; unavailable native keys never pass.
+Do not substitute coordinate equality or a fixed number for actual constrained geometry.
+
+The actual Wizard entry point is external to the active bore witness sketch:
+native selection reports `swSelEXTSKETCHPOINTS=25`, still an `ISketchPoint`.
+Accept only the documented internal/external point kinds, retaining exact
+Wizard-point identity and the circle's owner/type/ID guard. Annotation
+attachment types use the same `swSelectType_e` enum; do not assume every actual
+sketch-point attachment is type11. Type25 alone does not prove the right point.
+
+Imported drawing sketch points and segments belong to the requested drawing
+view, not the referenced part's sketch inventory. First prove the actual source
+point and flat against a fresh part-feature inventory and the source dimension.
+Map those typed source entities with `IView.GetCorresponding`; independently
+read the imported annotation's actual attachments. Require exclusive native
+point/segment capability, exact part/requested-view annotation ownership,
+matching native dimensions and their full names, and matching source features.
+
+Map the actual dimension's `IFeature` through the requested view, then obtain
+its supported `ISketch` using `IFeature.GetSpecificFeature2`. That sketch must
+match both actual and forward-mapped drawing attachment owners. Compare native
+ordered IDs and segment type only within this proven drawing sketch; model IDs
+need not equal drawing IDs. The dimension feature's sketch is not a substitute
+for the part-inventory source-point owner. Do not cast an arbitrary mapped
+object to `ISketch` or infer identity from coordinates or feature names.
+
+This forward route does not require inverse `GetCorresponding2` success on a
+drawing sketch point. `GetCorrespondingEntity2` remains the separate supported
+face/edge/vertex route. Null, ambiguous or wrong-view results, unknown native
+self/owner identity and malformed keys remain refusals. Reacquire all source
+and drawing proof after rebuilds; never cache correspondence across them.
+
+The native TOP `HEX 12.70` dimension owns ordinary .XX size on the complete
+hex profile. Its prefix is model-owned and source/import/final readbacks keep
+the real dimension and owner; no below-text stock qualifier, property-linked
+envelope note or special section-edge acceptance flag survives.
+Clear height's obsolete below-text explicitly while retaining its numeric
+source/precision. Remove only the native hole-callout thread-class variable
+where the title block already owns 2B. Keep live thread/drill/depth variables
+and reject resolved text that still repeats 2B.
+
+Inspect the actual whole PNG and unchanged native ink audit after simplifying
+the sheet. Removing dead notes is not permission to loosen attachment,
+location, source-identity, precision or layout guards on remaining features.
+
+R21 export completed with the upper 6.35 extension line touching
+the left stroke of the upper A cutting-plane label. Clearance above an arrow
+does not prove clearance from its label: inspect the actual glyph ink against
+the dimension's complete extension segments as well.
+
+R27 proved all three common-flat imports and their final rebuilt owners, but
+its complete three-row qualifier collided with the section label and height
+extension. Keep the cleared vertical witness station; move the common-flat
+text station from `(50, 175.5)` to `(150, 175.5)` mm instead of lifting it back
+through the A stroke. R28 proved this station and the seat note at
+`(260, 116)` mm with no gating native layout errors. The current ordinary
+HEX drawing has one native `12.70 A/F` size, at two places with the default
+band, applying to all three opposed-flat pairs over the full height. It has
+no supplied-stock qualifier, separate receiving-envelope callout or finished
+wall/floor inspection note: those belonged to the superseded acceptance
+scheme. Preserve all five actual native flat-location controls, their values
+and bands. Native final text/leader boxes and whole-sheet inspection, not
+these historical station coordinates, prove the current layout.
+
+Hole-callout variable arrays return concrete variable dispatches. Follow the
+existing precision helper's dynamic metadata read for `VariableName`/`Type`,
+then bind the matching concrete string interface for `String`. Merely wrapping
+a returned variable as the declared base `ICalloutVariable` can invoke an
+incompatible DISPID. Preserve the native2B value before and after print-only
+class removal; the drawing's title block does not change the model fit.
+
+For a drawing-only cosmetic-thread `INote`, preserve the portable source text
+but send a native CRLF payload and compare its literal readback. The observed
+native setter retains CRLF even when sent LF; this is a line-ending boundary,
+not permission to collapse spaces, blank lines or changed thread/mate text.
+Read every independent post-state field before refusal, with per-reader errors
+and precise indexed identity-call labels. Keep owner/attachment/dangling checks.
+
+The 2026-10-22 R2 lever run imported one cosmetic-thread seed and instance,
+but `ICThread.ThreadCallout` was still null. Import counts do not prove a
+native drawing note exists. As in the clamping-kit hardware drawing, select
+that thread's actual annotation in its view, require one `swSelCTHREADS` (39)
+selection and `ISldWorks.IsSame` annotation identity, then invoke the void
+`IDrawingDoc.InsertThreadCallout`. Rebuild and require the same single thread
+annotation before reading its own `ThreadCallout` again. Only that native
+`INote` receives the four-row print text and the existing owner, attachment,
+literal CRLF, placement and readback checks. A null result, changed thread or
+wrong selected identity remains fatal; never author a detached note.
+
+The user clarified that this bracket is a straightforward tapped through hole.
+Keep the ordinary end view and real native1/4-20 UNC THRU ALL callout; no A-A,
+cutting arrows, orphan section marks or section-thread display/ink machinery
+belongs in the production recipe. Its nominal12.50 neck now prints12.5; the
+native3.175 foot carries explicit±0.13 and the real screw-grip reference. The
+prior no-qualifier direction was superseded by the owner choice above.
+Inside corners follow the actual title-blockR1.0 MAX default, not a bespoke
+R0.25 inside restriction. The later explicit owner ruling on PR1856
+(comment6367964749) narrows the foot's **Y width12.70→11.00**, centred at zero
+to match the unchanged neckY±5.50. It does not widen the neck, alter its head
+controls or merely hide the former0.85 dimension. Delete that physical
+lateral-offset dimension and its inventory/precision/attachment machinery.
+The vanished side ledges have no axial root edges: remove theirR0.60 bridge
+fillets. Keep the applicableR0.25 inside X root and free-foot outer rounds,
+but round only the **two free-end corners at localX−48**. The former+6.25
+corner picks now lie on full-length upright edges; rounding them would
+unauthorisedly change the head. The final part gate checks actual flushY planes
+through the root, retained sharp upright corners, the unchanged nativeR5.50
+nose axis/radius/extent, and the actualR0.25 inside-root and both outside-foot
+cylinders with trimmed closest-point readback. These are nominal CAD identity
+checks, not additional manufacturing tolerances.
+Native success still requires enlarged visual inspection of the new root.
+
+R10 (source14975bf5b91a, worker`swmaker00000f@15`,
+attempt`20261023T153059Z-1-35ed5a70`) created the11mm foot and `InsideRoot`,
+then failed native creation of `FootTopEdges` at the two free-foot front/side
+edges. It did **not** reach `FootCorners`, holes, finishPMI or final topology
+checks. The worker log explicitly reports no forensic artefacts; no failed
+Brep was captured. Interacting termination at the newly coplanar side/root
+junction is a source-grounded **inference**, not a measured kernel diagnosis.
+The correction selects all **three raw incident edges**—insideXroot plus
+both free-foot front/side edges—in one constantR0.25 native feature,
+`RootAndFootRounds`, with `propagate=False`. It replaces the two sequential
+features; there is no radius reduction, omitted outside round or fallback.
+This follows the existing multi-edge constant-radius construction pattern in
+`build_dt_cone_gear_shaft` (round and flat step-root edges selected together),
+not a claim that its corner topology is identical. The final guard separately
+reads each resulting cylindrical radius, axis and transverse centre, then a
+trimmed diagonal point; successful construction and its actual corner patches
+still require the next native run and enlarged inspection.
+
+The previous5mm free-end extension remains: machineX−8..46.25,
+localX−48..+6.25, length54.25 and setbacks9.00/22.70. The matched receiver,
+bracket-clearance and screw axes remain localY−0.71 / machineY978.99 and
+machineX1/14.7, with unchanged seat/threaded-lever pose. The receiver row is
+still3.25±0.05 below the coefficient top; the narrowed foot's native lower-edge
+ordinate is now **4.79±0.05**, not5.64. Foot11.0 retains ordinary`.X`±0.8:
+the conservative head-clearance-circle ligaments are **2.79 /3.41** lower/upper,
+and actual printedØ2.69MAX clearance-hole walls are **3.395 /4.015**.
+The minimum foot-edge prying arm becomes **4.74**, charged to the same actual
+width/location intervals. Do not substitute the receiver's unrelated±0.51.
+The fixed-top7.00±0.51 plate backs the receiver pilot beyond the uniform
+5.00±0.51 ribs; retain one native `3X 5.00` rib dimension. No receiver, grip or
+engagement band changes with the foot cut.
+
+The SM-facing **+Z foot back**, the physical origin of100.40, is a static
+locating seat under rule6. Its part-owned `foot_seat` control is **Ra3.2µm**
+(`SEAT_UM`), qualified by the real plane at `SIDE_PLATE_Z[1]`; it is not a
+general all-faces grade, screw-head-bearing-front finish or new exception.
+`mg_magnifying_bracket_finish_spec` keeps this derived face contract outside
+the joint's dimensional-spec import cycle. Author it natively in the part,
+then attach the drawing symbol to a visible edge adjacent to that exact face,
+with controlled-face validation and native attachment/landing readback.
+The title block's `CAST/MACHINED` row and `blued` finish specify no roughness
+grade and do not replace the symbol. RV-02/RV-03 cover neither this seat nor
+the mounting flags or line clearance.
+
+R11c at source70b14d82f0ae natively passed the jointR0.25 construction,
+four cylinder-geometry guards and19trimmed-point probes
+(maximum serialized gap7.800000024e−8mm), plus controlled-seat PMI/drawing
+attachment readback. Cylinder parameter arrays and attached-face identities
+were **not** serialized; distinguish guard execution from a raw binding dump.
+This qualified the local foot/root/head geometry, not installed assembly
+soundness or sheet readability. The actual PDF and all three Codex runs
+confirmed one gating finish defect: `Ra3.2`'s diagonal leader and filled arrow
+strike the `a`. Its native segment ran from(75.475,104.0512) to
+(79.125,112.0512)mm through the actual text; process success and a clear
+annotation-envelope box did not make that readable.
+
+Keep the exact controlled edge and projected landing. Create the symbol
+**10mm to the right** and8mm below that landing, instead of10mm left:
+the right-reading native grade is then away from the diagonal's route.
+Do not drag the attached tip or relax its face/identity/landing guards.
+Before accepting the placement, capture actual native display data and
+refuse any own stroke or decoded arrow through an individual native text
+run. Reuse the linear-callout guard's0.15mm run inset and1e−7m overlap limit;
+these are ink-identity allowances, not new manufacturing or neighbour bands.
+Retain the existing2mm neighbour clearance checks. FrozenR11c primitives
+must fail the guard, while a clear simulated placement is only an offline
+control: the next native sheet and actual PDF must still qualify the new ink.
+
+For the12.5 thickness, jog its text beyond the outermost actual
+native vertical witness plus4mm and above the front outline. R33 reported an
+own-line crossing at the former qualified text's Xstation; the exact crossing
+segment was not captured. Keep the native line/arrow/neighbor checks strict.
+For `TapFromSide`, use the existing `MountingY0` two-axis jog pattern: text
+left4mm beyond the last vertical witness and bottom2.2mm above the measured
+pre-placement leader extent. R35 rejected an X-only jog. Requested positions
+do not prove the new native jog; retain the actual own-ink and neighbor guards.
+
+The 2026-10-22 R2 bracket run also rejected `MountingY0` after changing
+`OffsetText` and rebuilding during its move. Its target came from the old
+pre-offset segments; the failing final box/primitive was not captured, so its
+exact crossing is unknown. Set and rebuild the native `CenterText`/`OffsetText`
+modes first, then derive the existing two-axis jog from the settled native
+text/line geometry. Preserve all own-line, neighbour, silhouette and sheet
+guards. Capture native text runs, raw lines/arrows and decoded boxes/segments
+before modes, after their rebuild and for every final annotation before any
+layout guard can fail. The current4.79 row and historical5.64 row retain the
+same measured-placement algorithm without changing their model authorities.
+Offline historical-witness and simulated mode-transition controls cover both,
+including a stale-target crossing and strict rejection. They are not a
+replay of the uncaptured R2 primitive or proof that a new native sheet clears;
+the combined native drawing run and whole-sheet audit remain required.
+
+The retained structural text is authored with native below-value compartments
+on the part, then asserted verbatim after model-item import; the drawing never
+rewrites it. All three head bands enter the existing native ink guards. For
+the now three-row foot callout, settle `OffsetText` first, keep its full width
+4mm left of the overall-reference witness and its bottom4mm above its own
+settled leader extent. Guard own-line crossings against each native text run:
+the blank space between value and below-text is not glyph ink. Keep the full
+union for neighbour, silhouette and sheet containment. This remains the same
+single sheet and four views; native redraw and machinist review decide fit.
+
+The 2026-10-23 R7 bracket attempt `20261023T062821Z-1-881fad50`
+(source `6e9e4a5e5884`) captured all final native ink before refusing
+`NoseR: neighbouring native line crowds its text`. Its radius text union was
+X245.683–286.317/Y223.4437–232.500mm. The through-tap leader from
+(230.5142,212.8907) to (314.4281,227.6389)mm crossed that union's 2mm
+clearance envelope for 9.2782mm. The same capture also showed the
+`TapFromTip` outward-arrow flank crossing its `RETAINS TAP WALL` row.
+No forensic PDF/image was captured, so these are native envelope measurements,
+not exported glyph proof.
+
+Retain the associative through-tap annotation as the radius lane authority.
+Keep the radius union's X station and put its bottom4mm above that leader's
+measured top (R7 coordinates imply Y231.6389mm, +8.1952mm). Set and rebuild
+`TapFromTip` offset mode before measuring: place its complete union4mm left
+of its own vertical witnesses and4mm above its settled native line/arrow
+extent. The captured X206mm witness and40.634mm text width imply
+X161.366mm instead of165.366mm; the new Y depends on the actual offset-mode
+rebuild, not the old arrow position. Preserve the 2mm neighbour guard,
+individual-run own-ink guards, all functional rows/bands and all four views.
+The regression retains R7's head rows, tap leader and arrow flanks; new
+offset-mode geometry/moves remain simulations until the next native redraw.
+
+The overall seat-to-nose span is a native drawing reference, not a second
+manufacturing tolerance: select the actual mounting-seat edge and nose arc,
+set/read back the maximum arc endpoint, and parenthesize the measured result.
+Its places come from the part spec's `DRAWING_REFERENCE_PRECISION`. Retain its
+constructor annotation just like the lateral dimension. The foot-thickness
+text and witness lane stay left of both the measured overall-reference and
+seat-to-axis vertical stations, so the new reference does not cross that text.
+Do not blank `MountingCoordinates` to remove construction-carrier fragments:
+that known operation also hides the delivered native locating dimensions.
+
+The earlier+10 option intersected the existing hex knife stub and was rejected.
+The knife mount's pre-existing0.6835 nominal axial air gap is not a2mm wall
+policy violation or permission to claim a full articulation clearance proof.
+Validate the isometric caption against actual nativeIView.ScaleRatio and
+inspect the final whole PDF/PNG, including the enlarged root, for clarity.
+
+The LEVER TIP DETAIL retains its model-owned1.25 projection, attached native
+dimension import, actual lever/bracket component and source-configuration
+checks, source immutability, 4:1 view, and persisted native crop readback.
+Use native projected source stations only to place the dimension and crop;
+they do not prove the solids are visible. Inspect the actual exported PNG/PDF
+to confirm both the flat lever tip and far bracket face are clearly visible,
+then require formal machinist review. The user explicitly removed the added
+G7 parser/count-priming/canonical-edge diagnostic subsystem: no substitute
+polyline acceptance contract, retry, copied outline or suppressed warning.
+
+Suppress inference while creating the native crop boundary, restore AddToDB,
+and check IView.GetDetailCircleInfo2 against the requested centre/radius.
+Keep captions outside the complete actual IView.GetOutline and retain ordinary
+whole-dimension text, witness/arrow and sheet/title-block clearance checks.
+Native export success alone is not physical-visibility or layout acceptance.
+
+The lever's single native Detail A thread callout prints four rows: thread,
+entry chamfer, mate ID, then `BRACKET`. Keep the last word wrapped so the mate
+row does not cross the thread-length tip witness; do not restore a detached
+manual copy. The R10 glyph/witness replay is only an offline collision control.
+The current native note's actual font, leader, complete ink and neighbouring
+dimension clearance remain required native export/audit checks.
+
+The MHA-MG-00 sheet 4 final wire CHECK also crossed into the tolerance panel.
+R22 wrapping of only that CHECK cleared the actual glyphs but left a gating
+keep-out for the aggregate note rectangle, whose width came from a preceding
+row. Keep the entire measured CHECK block outside the panel: reflow the widest
+row as well, preserving every word, native font, total row count and insertion
+point. Check both the complete note extent and individual text-run ink against
+the panel, border, preceding steps and finished view in the rebuilt whole
+sheet. A character-count limit alone is not a physical clearance proof; do
+not weaken the audit or exempt this note.
+
+For a long native mounting-hole callout, the existing process-prefix trailing
+newline puts the associative quantity/diameter/extent on its own row; do not
+replace native variables with literal copied text. Check the complete native
+text and line/arrow envelopes against the selected shared template's current
+title-block keep-out, including a shoulder that outlasts the text after reflow.
+
+Keep nominal model travel separate from published operating capacity.
+`operating_clamp_radius_band` uses the fitted tip-projection frame. With
+knife-to-bracket-centre $C=55$, neck $N=12.5\pm0.8$, projection
+$P=1.25\pm0.51$, rod $L=167.5\pm0.8$ and thread $T=18.00\pm0.51$,
+the free tip is $K=C-N/2-P+L$. The ordinary HEX and actual tap-entry locations
+keep the station inside the body; its derived full-height17 bound therefore
+covers either bore end without inventing symmetric±8.5. The minimum radius
+is $\max(C-N_{\min}/2-P_{\min}+T_{\max},C+N_{\max}/2)+17=83.920$.
+Rod length cancels at runout. The maximum is
+$K_{\min}-D_{\max}/2-17=193.115$, with short rod, thick neck and greatest
+projection acting together. Built165 and nominal part geometry do not move.
+These are not new printed stock limits or all-machine clearance claims.
+
+As-made fit-up can inspect and admit more travel, but published capacity does
+not credit it. These fitted component bounds, rather than a fixed free-tip frame, are
+not a positive stop or an all-machine articulation certificate. Keep the entire
+bore clear of the as-made runout/thread and hemisphere. The existing minimum-
+pose/kinematics native gate remains open.
+
+The unseated lever thread is not a static clamp: it has no shoulder or preload,
+and its rotation sets installed projection. Its operational retention audit
+uses the existing adjuster classification and joint-specific
+`U-MHA-MG-03-no-lock` ruling, also declared as RV-02 in the assembly and mating
+part packages. The user's exact2026-10-20 direction was “no further thread
+locking needed because mg-magnifying-lever does not experience rotational
+forces”. The approved implementation has no added lock; that is not native
+test proof of immunity to vibration, projection drift or backout. The former
+custom-root wall declaration is removed; normal standard tapping does not
+establish an upper root limit or an all-standard-variation wall guarantee.
+
+The retention and wall checks are not a brass strength certification. Wire
+force below the lever produces bending even though there is no torque about
+its thread axis. The conservative 10.7 N wire / 1.22 N hanging-weight audit
+puts nominal stress near the basic 1/4-20 root above 120 MPa,
+before any thread-notch factor. The specified generic brass has no guaranteed
+alloy/temper yield minimum; do not claim a yield margin from its CAD material
+or transfer the steel bracket's allowable stress to it. For context, even
+[Wieland C36000 under 1/2 in](https://wieland-chase.com/36000-standard-alloys/)
+has a 25 ksi minimum yield, not the frequently quoted 45 ksi typical value.
+No alloy or temper substitution is authorized by this geometry change.
+
+The user explicitly retained generic low-carbon steel with the blued finish,
+not a named certified grade. `mg_magnifying_bracket_arm_check.py` supplies the
+load-demand screen consumed by `error_budget.py` in JSON and human-readable
+reports. Its factor-three simultaneous bending/torsion demand uses the fitted
+maximum gravity arm of 161.710 mm, derived from the same length/neck/projection
+bands above, not the nominal 160 mm arm. Joint moments use the actual relocated
+screw-row centroid projected to the seat plane. Assumed E200 GPa/G79 GPa serve
+compliance calculations only; verified yield and verified yield safety factor
+remain unavailable. This is a calculated procurement demand, not a material-data
+acceptance gate, native proof or demonstrated safety factor.
+The section uses minimum accepted11.7×10.9, with maximum accepted axial
+reach101.01 to the seat and arm span97.965 after minimum3.045 grip. The
+prying screen charges the mounting-location band and the foot's own width
+interval. X/Y load stations remain the nominal A1 pose; none of this certifies
+every manufactured geometry or the receiver's actual contact footprint.
+
+Keep a mounting-face caption beside the view it describes, clear of its
+native hole leader and coordinate witnesses. Distribute short controls
+between views rather than forcing overlapping inside arrowheads. For each
+new source state, the final native layout audit and rendered sheet—not old
+sheet coordinates or source-only tests—decide whether that placement ships.
 
 The MG-06 hex fixture's principal `*Top` view looks down the rod bore,
 which runs through the hex corners along local Y, not normal to a flat.

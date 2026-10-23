@@ -93,15 +93,62 @@ def test_magnifying_bracket_joint_is_a_two_screw_static_clamp() -> None:
     assert row.receiver == "sm_summing_lever"
     assert row.quantity == 2
     assert row.thread == "#2-56 UNC"
-    assert "counterbore floors" in row.axial_capture
+    assert "flange front face" in row.axial_capture
     assert row.exposure is Exposure.STATIC_CLAMP
     assert row.lock is Lock.NONE
     assert not row.lock_part and not row.exception
     assert "without relative motion" in row.exposure_reason
     assert row.member in jr.THREADED_PARTS
-    assert "mg_magnifying_bracket" in jr.UNTHREADED_PARTS
+    assert "mg_magnifying_bracket" in jr.THREADED_PARTS
     assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
     assert row.member in jr.build_inventory().parts["mg_magnifier"]
+
+
+def test_lever_thread_is_depth_installed_without_invented_shoulder_or_lock() -> None:
+    import mg_magnifier_assembly_steps as steps
+    row = next(joint for joint in jr.JOINTS if joint.id == "mg-magnifier/lever-in-bracket")
+    assert row.member == "mg_magnifying_lever" and row.receiver == "mg_magnifying_bracket"
+    assert row.member in jr.THREADED_PARTS and row.receiver in jr.THREADED_PARTS
+    assert row.installed_at == steps.LEVER_THREADED_KEY
+    assert row.exposure is Exposure.ADJUSTER and row.lock is Lock.NONE
+    assert not row.lock_part
+    assert "ThreadProjection" in row.axial_capture and "no shoulder" in row.axial_capture
+    assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
+    assert jr.RULINGS[row.exception].joint == row.id
+    inventory = Inventory(
+        {row.assembly: frozenset({row.member, row.receiver})},
+        steps={row.assembly: (row.installed_at,)},
+    )
+    arguments = {
+        "threaded": frozenset({row.member, row.receiver}),
+        "unthreaded": frozenset(),
+        "required": {row.id: jr.REQUIRED_JOINTS[row.id]},
+    }
+    assert jr.audit((row,), inventory, **arguments) == []
+    unwaived = dataclasses.replace(row, exception="")
+    assert _kinds(jr.audit((unwaived,), inventory, **arguments)) == {(row.id, Kind.UNLOCKED)}
+
+
+@pytest.mark.parametrize("name,kind", (
+    ("mg_magnifying_bracket", "part"),
+    ("mg_magnifying_lever", "part"),
+    ("mg_magnifier_assembly", "assembly"),
+))
+def test_unseated_lever_exception_reaches_only_its_actual_review_packages(monkeypatch, name, kind) -> None:
+    import machinist_review
+    from machinist_exceptions import load_exceptions
+
+    package = machinist_review.ReviewPackage(name, kind, (Path("native-sheet.png"),))
+    monkeypatch.setattr(machinist_review, "_text_layers", lambda _package: "")
+    exceptions = load_exceptions(machinist_review.CAD_ROOT / "config", name, kind)
+    declaration = next(entry for entry in exceptions if "unseated lever thread" in entry.finding)
+    assert declaration.kind == "accept"
+    prompt = machinist_review._review_prompt(package, 1, prompt_text="")
+    assert f"- {declaration.id} [accept]" in prompt
+    assert declaration.finding in prompt and declaration.reason in prompt
+    assert "vibration" in declaration.reason.lower()
+    unrelated = machinist_review.ReviewPackage("mg_magnifying_clamp", "part", package.sources)
+    assert declaration.finding not in machinist_review._review_prompt(unrelated, 1, prompt_text="")
 
 
 def test_pinion_cam_inch_set_screws_remain_staked_at_fitup() -> None:
@@ -692,3 +739,5 @@ def test_channel_anchors_are_locked_by_their_jam_nuts() -> None:
         text = " ".join((row.axial_capture, row.evidence, row.exposure_reason))
         for banned in ("THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
             assert banned not in text.upper()
+
+

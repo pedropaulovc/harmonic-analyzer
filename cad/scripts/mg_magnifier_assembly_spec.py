@@ -80,10 +80,10 @@ DIMENSION_TOLERANCES = {
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
-# The lever rod lies along machine x at the bracket's height; its west dome
-# tip is the collar station east of the bracket (Ry(180) placement).
+# The nominal machine pose is unchanged. At fit-up the far-face projection
+# controls installation; the free tip may shift within accepted part bands.
 LEVER_AXIS_Y = _bracket.BRACKET_ORIGIN[1]
-LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.COLLAR_LOCAL_X
+LEVER_TIP_X = _bracket.BRACKET_ORIGIN[0] + _lever.BRACKET_LOCAL_X
 CLAMP_STATION = _lever.CLAMP_LOCAL_X
 CLAMP_CENTRE_X = LEVER_TIP_X - CLAMP_STATION
 FIXTURE_AXIS_Y = _fixture.FIXTURE_AXIS_Y
@@ -99,6 +99,18 @@ LEVER_DRAWING_DIMENSIONS = {
 LEVER_DRAWING_PRECISION = {
     LEVER_FEATURE: {CLAMP_STATION_DIMENSION: 1, FIXTURE_DROP_DIMENSION: 1}
 }
+
+# A separate native installation witness: flat tip proud of the far neck face.
+# .XX general tolerance is an assembly setting, not a manufactured shoulder.
+THREAD_FEATURE = "LeverThreadSetting"
+THREAD_PROJECTION_DIMENSION = "ThreadProjection"
+THREADED_TIP_X = LEVER_TIP_X - _lever.ROD_LENGTH
+THREAD_FAR_FACE_X = _bracket.BRACKET_ORIGIN[0] - _lever.NECK_HALF_X
+THREAD_PROJECTION = _lever.THREAD_PROJECTION
+THREAD_DRAWING_DIMENSIONS = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION}}
+THREAD_DRAWING_PRECISION = {THREAD_FEATURE: {THREAD_PROJECTION_DIMENSION: 2}}
+THREAD_PROJECTION_TOL = _lever.THREAD_PROJECTION_TOL
+INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 
 # Native IDisplayDimension.SetText compartments (swDimensionTextParts_e):
 # 3 = swDimensionTextCalloutAbove, 4 = swDimensionTextCalloutBelow. These are
@@ -123,4 +135,11 @@ SETTING_CALLOUTS = {
         CLAMP_STATION_DIMENSION: (3, "CLAMP STATION: SETS MAGNIFICATION"),
         FIXTURE_DROP_DIMENSION: (4, "FIXTURE DROP:\nSETS TRACE HEIGHT"),
     },
+    THREAD_FEATURE: {
+        THREAD_PROJECTION_DIMENSION: (
+            4,
+            "FLAT LEVER TIP\nPROUD OF FAR\nBRACKET FACE",
+        ),
+    },
 }
+

@@ -1,90 +1,105 @@
-r"""Magnifying-lever nominal geometry -- the drawing-FREE constant block shared
-by the part build, its ``_spec`` (drawing contract), ``build_mg_magnifying_bracket``
-(which imports the collar length it carries) and ``build_mg_magnifier_assembly``
-(which imports the knife-axis station).
+"""Drawing-free lever pose, threaded bracket station and clamp travel.
 
-PURE DATA, no SolidWorks/COM and no drawing imports.  Kept SEPARATE from
-``magnifying_lever_spec`` on purpose (the ``column_clamp_front_geom`` precedent):
-the assembly depends -- via ``_buildgraph.module_deps_of`` -- on whatever module
-it imports a constant from, so the drawing contract (notes / marked-dimension
-map) must NOT live here, else a print-note edit would move the assembly's recipe
-digest and force a needless rebuild.  ``_spec`` re-exports these for its
-drawing-side consumers and adds only the drawing data.
-
-The collar PRESS FIT (rod diameter, zone length, bore, bands, budget) is
-``mg_lever_press_fit_geom`` -- CONFIG-free, because this module reads the
-collar and clamp stations from output.yaml and the shared interference contract
-must not drag that config into unrelated closures.  Here the configured collar
-window is asserted to BE that zone, the rod's tip flush with its outer face.
+The nominal free tip and knife retain their current-main machine positions.
+Accepted rods are fitted by tip projection, so their free tips may move.
 """
 
 from __future__ import annotations
 
 import _config
-from mg_lever_press_fit_geom import PRESS_ZONE_LENGTH
+from _printed_tolerance import printed_band_mm
+from mg_lever_thread_joint import (
+    NECK_HALF_X,
+    NECK_THICKNESS,
+    NECK_THICKNESS_TOL,
+    REQUIRED_FULL_ENGAGEMENT,
+    ROD_LENGTH,
+    ROD_LENGTH_TOL,
+    THREAD_LENGTH,
+    THREAD_LENGTH_TOL,
+    INCOMPLETE_THREAD_MAX,
+    installation_full_overlap,
+)
 
-# --- rod nominals (DIMENSIONS.md ch20) ----------------------------------------
-ROD_LENGTH = 165.0  # calibrated p1, x -200..-35 (med; supersedes the 310 "4x" guess)
-
-# --- knife-edge pivot axis (KnifeAxis = Axis2) --------------------------------
-# The lever does NOT spin in the bracket collar: it EXTENDS FROM the pivoted
-# summing bar and pivots WITH it about the knife-edge ridge (engineerguy video
-# 2/4 + 4/4; the tip draws a ~6 mm arc, and the clamp's position along the rod --
-# the radius from this pivot -- is what sets the <=4x magnification). The ridge
-# line runs along Z at machine (pre-mirror) (15, 984.834); in lever-local coords
-# (assembly placement (-200, 979.7, -173.51), rod along +X) that is (215, 5.134).
-# Duplicated literals -- build_mg_magnifier_assembly asserts them against
-# build_sm_summing_assembly's KNIFE/KNIFE_CONTACT_Y and its own placement.
 KNIFE_LOCAL_X = 215.0
 KNIFE_LOCAL_Y = 5.134
-
-# --- clamp travel along the rod = the magnification range ---------------------
-# The sliding clamp (mg_magnifying_clamp_geom.BLOCK_DEPTH along the rod) rides the
-# rod between its free west tip (local 0) and the bracket collar that carries
-# the rod at its east end. Its radius from the knife axis, over the summing
-# lever's spring-hook arm, is the magnification the operator sets (book p. 46:
-# "up to 4x"); the reachable band is what cad/scripts/error_budget.py derives
-# the pen scale and the ordinate-capacity rule from.
-#
-# The stations are OWNED by cad/config/machine/output.yaml (output.magnifier_*)
-# -- the output chain's subsystem file, beside magnify_factor -- and this module
-# is only the read point the part build, build_mg_magnifier_assembly (which
-# derives its bracket/clamp placements from them, so a layout move fails loud
-# there) and the offline error budget share, so none copies a literal.
-# Lever-local x (rod along +X, knife at KNIFE_LOCAL_X).
-COLLAR_LOCAL_X: float = float(
-    _config.machine("output", "magnifier_collar_station_mm")
-)  # bracket collar centre on the rod (machine x +40)
-COLLAR_HALF_LEN: float = float(
-    _config.machine("output", "magnifier_collar_half_len_mm")
-)  # == build_mg_magnifying_bracket.COLLAR_HALF_LEN (asserted)
-CLAMP_LOCAL_X: float = float(
-    _config.machine("output", "magnifier_clamp_station_mm")
-)  # as-built clamp centre (machine x +150, p.46/48 insets)
-
-# --- the press zone's station on this rod -------------------------------------
-# The bracket collar's window in lever-local x. Its length and the rod's tip
-# flush with the collar's outer face are the press contract's assumptions
-# (mg_lever_press_fit_geom.COLLAR_ENGAGEMENT), so a station or collar-length
-# edit in output.yaml that breaks either fails loud here.
-PRESS_ZONE_X = (COLLAR_LOCAL_X - COLLAR_HALF_LEN, COLLAR_LOCAL_X + COLLAR_HALF_LEN)
-if abs((PRESS_ZONE_X[1] - PRESS_ZONE_X[0]) - PRESS_ZONE_LENGTH) > 1e-9:
-    raise AssertionError("the configured collar window is not the press zone's length")
-if abs(ROD_LENGTH - PRESS_ZONE_X[1]) > 1e-9:
-    raise AssertionError("the rod's east tip must end flush with the collar's outer face")
+BRACKET_LOCAL_X = float(_config.machine("output", "magnifier_bracket_station_mm"))
+CLAMP_LOCAL_X = float(_config.machine("output", "magnifier_clamp_station_mm"))
+BRACKET_WINDOW_X = (BRACKET_LOCAL_X - NECK_HALF_X, BRACKET_LOCAL_X + NECK_HALF_X)
+# The fitter controls this nonzero projection, not the free tip's position.
+# Keep its nominal frame here so assembly metadata does not become a geometry
+# dependency (the assembly spec already imports this module).
+THREAD_PROJECTION = ROD_LENGTH - BRACKET_LOCAL_X - NECK_HALF_X
+THREAD_PROJECTION_TOL = printed_band_mm(2)
+INSTALLED_FULL_ENGAGEMENT_MIN = installation_full_overlap(THREAD_PROJECTION, THREAD_PROJECTION_TOL)
+INSTALLED_ROOT_CLEARANCE_MIN = (
+    THREAD_LENGTH - THREAD_LENGTH_TOL
+    - (NECK_THICKNESS + NECK_THICKNESS_TOL)
+    - (THREAD_PROJECTION + THREAD_PROJECTION_TOL)
+    - INCOMPLETE_THREAD_MAX
+)
+if INSTALLED_ROOT_CLEARANCE_MIN < 0.0:
+    raise AssertionError("MG incomplete root runout enters the fitted receiver")
+if INSTALLED_FULL_ENGAGEMENT_MIN < REQUIRED_FULL_ENGAGEMENT:
+    raise AssertionError("MG fitted lever loses 1.5D of FULL thread overlap")
+if THREAD_PROJECTION - THREAD_PROJECTION_TOL < 0.0:
+    raise AssertionError("MG fitted threaded tip must reach the bracket's far face")
 
 
 def clamp_radius_band(block_depth: float) -> tuple[float, float, float]:
-    """(min, as-built, max) knife -> clamp-centre radius, mm, for a clamp of
-    ``block_depth`` along the rod: the block face against the collar face
-    (minimum magnification), the as-built pose, the block flush with the rod
-    tip (maximum -- a mechanical bound; the wire route past the as-built pose
-    is not gated)."""
+    """Nominal geometric plain-body range, working pose and free-end limit.
+
+    This is not an accepted-part operating guarantee or a positive stop.
+    Capacity/setup consumers use operating_clamp_radius_band instead; model
+    visualization can retain these nominal dimensions. The complete bore
+    excludes both the thread runout and the free hemisphere.
+    """
+    from mg_lever_thread_joint import ROD_DIA, THREAD_ROOT_X
+
     half = block_depth / 2.0
-    nearest = COLLAR_LOCAL_X - COLLAR_HALF_LEN - half
-    farthest = half
-    return (
-        KNIFE_LOCAL_X - nearest,
-        KNIFE_LOCAL_X - CLAMP_LOCAL_X,
-        KNIFE_LOCAL_X - farthest,
+    nearest = min(BRACKET_WINDOW_X[0], THREAD_ROOT_X) - half
+    farthest = ROD_DIA / 2.0 + half
+    return (KNIFE_LOCAL_X - nearest, KNIFE_LOCAL_X - CLAMP_LOCAL_X, KNIFE_LOCAL_X - farthest)
+
+
+def operating_clamp_radius_band() -> tuple[float, float, float]:
+    """Conservative component travel for published capacity and setup.
+
+    Station is the actual bottom rod/tap axis at its seat. A complete standard
+    tapped hole with the ordinary policy wall floor puts that point INSIDE
+    the finished body. The derived full-height HEX envelope bounds either
+    bore end from that station without assuming centring. Do not divide it
+    by two or add another locating-error allowance to it.
+
+    The bracket and knife remain fixed relative to one another. The fitter
+    sets the threaded tip's projection from the far face, so overall length,
+    projection and neck thickness move the free tip. Compute both end stops
+    in that same fitted frame; rod length cancels at the thread-root stop.
+    These are component bounds, not an all-machine articulation proof.
+    As-made inspection may admit more travel, but published capacity does
+    not credit it.
+    """
+    from mg_lever_thread_joint import (
+        ROD_DIA,
+        ROD_DIA_BAND,
     )
+    from mg_magnifying_clamp_geom import STOCK_ENVELOPE_MAX, WALL_FLOOR
+
+    if STOCK_ENVELOPE_MAX <= 0.0 or WALL_FLOOR <= 0.0:
+        raise AssertionError("MG travel needs a bounded finished hex with its tap axis inside")
+    knife_to_bracket = KNIFE_LOCAL_X - BRACKET_LOCAL_X
+    thick_min = NECK_THICKNESS - NECK_THICKNESS_TOL
+    thick_max = NECK_THICKNESS + NECK_THICKNESS_TOL
+    projection_min = THREAD_PROJECTION - THREAD_PROJECTION_TOL
+    projection_max = THREAD_PROJECTION + THREAD_PROJECTION_TOL
+    thread_stop = knife_to_bracket - thick_min / 2.0 - projection_min + THREAD_LENGTH + THREAD_LENGTH_TOL
+    bracket_stop = knife_to_bracket + thick_max / 2.0
+    knife_to_free_tip_min = knife_to_bracket - thick_max / 2.0 - projection_max + ROD_LENGTH - ROD_LENGTH_TOL
+    band = (
+        max(thread_stop, bracket_stop) + STOCK_ENVELOPE_MAX,
+        KNIFE_LOCAL_X - CLAMP_LOCAL_X,
+        knife_to_free_tip_min - (ROD_DIA + ROD_DIA_BAND[0]) / 2.0 - STOCK_ENVELOPE_MAX,
+    )
+    if not band[0] <= band[1] <= band[2]:
+        raise AssertionError("MG built clamp station is outside its conservative component travel")
+    return band

@@ -50,6 +50,16 @@ def report(budget):
     return eb.build_report(budget)
 
 
+def test_report_consumes_material_demand_without_inventing_a_generic_steel_allowable(report):
+    material = report["mg_bracket_material_demand"]
+    assert material["required_yield_for_factor_three_MPa"] > 0.0
+    assert material["bending_stress_MPa"] > 0.0
+    assert material["torsion_stress_MPa"] > 0.0
+    assert material["verified_yield_MPa"] is None
+    assert material["verified_yield_safety_factor"] is None
+    assert material["status"].startswith("UNVERIFIED:")
+
+
 def negative(budget: dict, **reserved: dict) -> dict:
     """A deliberately-broken budget for a failure-routing test, at a REDUCED
     draw count: these tests assert WHICH gate trips, not the value, and a full
@@ -360,11 +370,119 @@ def test_sparse_pair_is_gated_on_the_jointly_drawn_worst_coefficient(budget, rep
     assert any(b.startswith("pair expected worst coefficient") for b in bad), bad
 
 
+def test_nominal_consumes_operating_band_not_nominal_model_travel(budget, monkeypatch):
+    """Both real nominal entry points must call the no-argument operating API."""
+    lever = eb.mg_magnifying_lever_geom
+    actual = lever.operating_clamp_radius_band()
+    sentinel = (actual[0] + 1.25, actual[1], actual[2] - 2.0)
+    calls = []
+
+    def operating_band():
+        calls.append(True)
+        return sentinel
+
+    def reject_nominal_band(*args, **kwargs):
+        raise AssertionError("published capacity must not use nominal model travel")
+
+    monkeypatch.setattr(lever, "operating_clamp_radius_band", operating_band)
+    monkeypatch.setattr(lever, "clamp_radius_band", reject_nominal_band)
+    for machine in (eb.nominal(), eb.credited_nominal(budget)):
+        assert (machine.lever_r_min, machine.lever_r_built, machine.lever_r_max) == sentinel
+    assert len(calls) == 2
+
+
+def test_report_and_setup_do_not_credit_optimistic_nominal_minimum(report, nom):
+    """An input fitting nominal travel must still scale to component capacity."""
+    import mg_magnifying_clamp_geom
+
+    lever = eb.mg_magnifying_lever_geom
+    operating = lever.operating_clamp_radius_band()
+    model = lever.clamp_radius_band(mg_magnifying_clamp_geom.BLOCK_DEPTH)
+    assert model[0] < operating[0] < operating[1] < operating[2] < model[2]
+    assert operating[1] == model[1] == lever.KNIFE_LOCAL_X - lever.CLAMP_LOCAL_X
+    mag = report["closed_form"]["mg-magnifier"]
+    assert (
+        mag["lever_radius_min_mm"],
+        mag["lever_radius_built_mm"],
+        mag["lever_radius_max_mm"],
+    ) == operating
+    assert (nom.lever_r_min, nom.lever_r_built, nom.lever_r_max) == operating
+
+    trial = eb.NominalTrial(nom)
+    pen_per_arm = eb.pen_gain_per_arm_mm(nom) * abs(trial.f_full)
+    arm_operating = eb.wire_moment_arm(nom, operating[0])
+    arm_model = eb.wire_moment_arm(nom, model[0])
+    capacity = nom.pen_half / (pen_per_arm * arm_operating)
+    optimistic_capacity = nom.pen_half / (pen_per_arm * arm_model)
+    assert 0.0 < capacity < optimistic_capacity
+    assert mag["ordinate_capacity_full_scale_bars"] == pytest.approx(capacity)
+    assert mag["station_sum_capacity_mm"] == pytest.approx(capacity * nom.d_max)
+    assert mag["pen_mm_per_full_scale_bar_at_min"] == pytest.approx(
+        pen_per_arm * arm_operating
+    )
+    assert mag["pen_mm_per_full_scale_bar_at_built"] == pytest.approx(
+        pen_per_arm * eb.wire_moment_arm(nom, model[1])
+    )
+
+    # Put a real table-derived input strictly between the two capacities. The
+    # nominal helper would admit it unscaled; the published consumer must not.
+    target_peak = 0.5 * (capacity + optimistic_capacity)
+    ones = eb.reference_inputs()["all_ones"]
+    input_scale = trial.ordinate_scale_for(ones, target_peak)
+    assert 0.0 < input_scale < 1.0
+    x = input_scale * ones
+    assert trial.peak_bars(x * nom.d_max) == pytest.approx(target_peak, rel=1e-9)
+    optimistic_nom = dataclasses.replace(
+        nom, lever_r_min=model[0], lever_r_max=model[2]
+    )
+    optimistic = eb.NominalTrial(optimistic_nom).magnifier_setup(x)
+    assert optimistic.ordinate_scale == 1.0
+    assert model[0] < optimistic.lever_r < operating[0]
+    setup = trial.magnifier_setup(x)
+    assert 0.0 < setup.ordinate_scale < 1.0
+    assert setup.lever_r == operating[0]
+    assert setup.wire_arm == pytest.approx(arm_operating)
+    scaled_peak = trial.peak_bars(setup.ordinate_scale * x * nom.d_max)
+    assert scaled_peak == pytest.approx(capacity, rel=1e-9)
+    assert setup.k0_reading_mm == pytest.approx(nom.pen_half, rel=1e-9)
+    assert setup.stroke_fill == 1.0
+    assert trial.peak_bars(1.001 * setup.ordinate_scale * x * nom.d_max) > capacity
+
+
+def test_readout_procedure_publishes_operating_bounds_and_capacity(report, nom):
+    """The fitter gets conservative stations and a rounded-down capacity."""
+    mag = report["closed_form"]["mg-magnifier"]
+    procedure = eb.readout_procedure(report)
+    capacity = mag["ordinate_capacity_full_scale_bars"]
+    limit = math.floor(capacity * 100.0) / 100.0
+    assert limit <= capacity < limit + 0.01
+    assert f"at most **{limit:.2f}** full-scale bars" in procedure
+    assert f"component-only upper bound is {nom.lever_r_max:.3f} mm" in procedure
+    table = procedure.split("| clamp/bottom-rod axis from knife (mm) |", 1)[1]
+    rows = [
+        [float(cell) for cell in line.strip("|").split("|")]
+        for line in table.split("\n\n", 1)[0].splitlines()[2:]
+    ]
+    assert rows[0][0] == pytest.approx(nom.lever_r_min)
+    assert rows[-1][0] == pytest.approx(nom.lever_r_built)
+    arm_min = eb.wire_moment_arm(nom, nom.lever_r_min)
+    for radius, _, _, published_capacity in rows:
+        exact = capacity * arm_min / eb.wire_moment_arm(nom, radius)
+        assert published_capacity <= exact
+        assert exact - published_capacity < 0.01
+    assert "as-made sliding bore clearance" in procedure
+    assert "actual runout/thread boundary" in procedure
+    assert "complete bore stays beyond the free hemisphere" in procedure
+    assert "As-made fit-up may admit more travel" in procedure
+    assert "not native clearance proof" in procedure
+    assert "waive_minimum_pose" in procedure and "#748" in procedure
+
+
 def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
-    """Classify each reference input from its peak and the reachable wire-arm
+    """Classify each reference input from its peak and conservative wire-arm
     capacities, not from which regimes a particular drum happened to realise.
-    Scaling fills the stroke at the collar; a fitted input fills it inside the
-    band; a short input stays full scale at the built-station limit."""
+    Scaling fills the stroke at the component operating minimum; a fitted input
+    fills it inside the band; a short input stays at the built-station limit."""
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
     trial = eb.NominalTrial(nom)
     inputs = eb.reference_inputs()
@@ -737,9 +855,9 @@ def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
 
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
-    """Every broad input is scored at or just above the magnifier's minimum
-    pose (clamp against the collar), which build_mg_magnifier_assembly never
-    builds -- only the as-built station is gated: the report names those
+    """Every broad input is scored at or just above the conservative component
+    minimum, which build_mg_magnifier_assembly never builds -- only the built
+    station is gated: the report names those
     inputs with their stations, the gate fails on them unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
     reproduces sh_vn_music_wire_lever_geom's own numbers at the as-built pose."""
@@ -758,7 +876,7 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     assert len(gate) == 1, bad
     for name in broad:
         assert (
-            f"{name} (clamp {mag['per_input'][name]['lever_r']:.0f} mm from the knife)"
+            f"{name} (clamp {mag['per_input'][name]['lever_r']:.2f} mm from the knife)"
             in gate[0]
         )
     built = eb._minimum_pose_wire_estimate(
@@ -920,8 +1038,7 @@ def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
     f x_i d_max, reads the pen, and looks up TABLE ordinates at those stations.
     READOUT.md says: divide each by f and use the quotient everywhere. Executed
     literally on each scaled broad trial that matches the model and recovers
-    the unscaled coefficients (the Gaussian now fits without scaling). The raw
-    table ordinates ALSO recover them on a
+    the unscaled coefficients. The raw table ordinates ALSO recover them on a
     perfect machine -- the read-vs-set vector absorbs (f - 1) x -- but that
     vector is then (1 - f) of the answer, computed from the answer (circular),
     and a real channel-gain error comes out understated by f. With the

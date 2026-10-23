@@ -622,27 +622,31 @@ Live catalog verification on October 8, 2026:
   Current native **4.95 ±0.05 mm** cosmetic-thread metadata is retained for
   the screw stack, not used as a manufacturing maximum. Printed **4.95 MIN**
   specifies usable full thread without an additional maximum cutting reach.
-  Only the -Z entry rib, `EdgeRibBack`, extends inward to the owner-approved
-  **9.00 mm** depth (inner cap -67.20, unchanged entry -76.20);
-  `EdgeRibFront` remains 5.08. `RibDepth` keeps two decimals and the ordinary
-  ±0.51 band. The 6.50 ±0.51 cylindrical drill and native full-thread
-  metadata are unchanged. The retained native-pilot point and conservative
-  wander charge remain inside the rib with 0.876133 mm minimum axial
-  containment, not a bottom-wall thickness. The separate worst printed
-  **pilot-only** sharp-step budget uses Ø1.78 +0.10/0 and charges the whole
-  deepest wander: about **2.103443 mm** at 9.00, versus only 1.653 mm at the
-  superseded 8.20 depth. `receiver_pilot_step_wall_budget` /
-  `RECEIVER_PILOT_STEP_WALL_MIN` enforce the independent ≥2 mm pilot design
-  floor. `sm_summing_lever_profile.receiver_pilot_wall_budget` /
-  `ReceiverPilotWallBudget` bound longitudinal pilot walls against
-  `RECEIVER_PILOT_WALL_MIN` using the printed pilot radius plus drill wander.
-  Native trimmed-face comparison separately subtracts **TAP_DRILL_DIA/2**.
-  The native model contains pilot and cosmetic threads, not exact physical
-  thread-cutting geometry. The minimum 0.122 mm
-  head-to-counterbore radial float exceeds the 0.10 mm maximum station
-  pitch mismatch at the printed ±0.05 position bands. The minimum end wall
-  is 2.00 mm from the real end-face station datum, without double-counting
-  its general location band.
+  The owner's 2026-10-22 relocation retains that screw/grip stack but lowers
+  the matched mounting row **0.71 mm**. Both lever taps sit at local
+  **Y=−0.71 mm**, **3.25 ±0.05 mm below the actual coefficient top**; matching
+  bracket holes and installed screws follow, without moving the L bracket
+  body, seat or threaded-lever pose. All three lever rib extrusions are now
+  **5.00 ±0.51 mm**, with end-rib inner caps **Z=±71.20 mm** and outer
+  caps retained at **±76.20 mm**. One native **3X 5.00** dimension sizes them.
+  The separate counter-arm leaf remains 5.08 mm.
+  The ordinary **6.50 ±0.51 mm** pilot and 118° point continue into the
+  connected 7 mm coefficient plate, not a special deep receiver rib.
+  `receiver_pilot_material_wall_budget` / `RECEIVER_PILOT_MATERIAL_WALL_MIN`
+  enforce a **≥2 mm pilot-only** material design floor. With printed
+  **Ø1.78 +0.10/0**, the maximum radius is **0.94 mm**; the deepest 0.3°
+  wander is approximately **0.039662 mm**. Actual-top row correlation and the
+  ordinary thickness band leave approximately **2.220338 / 2.210338 mm**
+  top/bottom pilot walls. `sm_summing_lever_profile.receiver_pilot_wall_budget`
+  separately bounds longitudinal rib-profile walls; native trimmed-face
+  comparisons subtract **TAP_DRILL_DIA/2**. The native pilot and cosmetic
+  threads do not prove exact physical thread-cutting geometry or strength.
+  The Ø3.8 head-clearance circle is not a counterbore; its **0.122 mm**
+  minimum radial float exceeds the **0.10 mm** station mismatch. The moved
+  row's **5.64 ±0.05 mm** lower-edge ordinate leaves **3.64 / 4.55 mm**
+  lower/upper head-envelope walls under the retained printed bands; the end
+  wall is **7.00 mm**. Native screw-head/knife-mount and rib/nut clearances
+  remain farm acceptance items.
   Receiver depth bands are authored on owned source-model dimensions across
   the Hole Wizard's full subfeature tree, using the same `GetDimension2(0)`
   traversal as the drawing-mark/tolerance helpers. The two validated model
@@ -1731,6 +1735,14 @@ separate number-only fit; other purchased sheets retain their existing opt-ins.
 The fastener sheets explicitly declare their source `Material` link; purchased
 part sheets retain the fitter's `Material Specification` default. The census
 requires exactly one declared material field, never an alias or optional note.
+
+The COM-free `test_purchased_title_fit.py`, `test_supplier_native_contracts.py`,
+`test_supplier_native_repair.py` and `test_supplier_top_text_shelves.py` suites
+are enrolled in `check:recipe`. That gate also tracks their runtime-read washer
+paint and R44 shelf JSON fixtures, so changing recorded ink invalidates its
+offline stamp. The enrollment guard requires both the test modules and those
+fixture inputs; no exemption replaces their actual execution. These checks do
+not qualify a native export.
 
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never

@@ -1,16 +1,21 @@
-"""Worst-case static check of the MHA-MG-01 arm under the A1 pose (#1559).
+"""Tolerance-bounded static arm-section screen at the A1 force stations (#1559).
 
-Pure data, import-time asserts. The magnifying group moved forward into the
-drum's wire lane (z -173.51), so the bracket arm grew from ~52 to ~97 mm
-between the flange and the collar. This module bounds what that costs:
+Pure data, import-time asserts. The bracket reaches from the current mounting
+seat to the drum's wire lane (z -173.51). This module bounds the plain
+threaded neck, cantilever and relocated two-screw mounting row:
 
-* the load at the collar: the lever group's weight plus wire 1's tension at
+* the load at the neck: the lever group's weight plus wire 1's tension at
   the output-fixture hook, which pulls toward the drum end in the x-y plane;
-* the arm's torsion (moment about Z at the collar: the arm runs along Z) and
+* the arm's torsion (moment about Z at the neck: the arm runs along Z) and
   bending, and the resulting hook deflection along wire 1, pen-equivalent
-  through the wheel's rim/drum ratio, old 52 arm against the new one;
+  through the wheel's rim/drum ratio;
 * the two #2-56 screws seating the flange on MHA-SM-03's front face:
   the prying tension increment against preload, and the shank shear.
+
+Section stiffness uses minimum accepted neck dimensions; span uses the longest
+printed seat distance, shortest grip and independent head-axis location stack.
+Load directions and X/Y force stations remain the nominal installed A1 pose,
+not an all-geometric-variation or native articulation certificate.
 
 Wire-1 tension source: the pen side hangs on wire 2 from the magnifying
 wheel's rim (build_pn_pen_assembly: the pen rod slides in the hanger's U
@@ -38,20 +43,38 @@ import math
 import pn_pen_carriage_geom
 import pn_pen_rod_spec
 import sh_vn_music_wire_lever_geom
-from build_mg_magnifying_bracket import ARM_HALF_X, ARM_Y, COLLAR_OD
+from _printed_tolerance import printed_deviations
+from mg_magnifying_bracket_spec import DRAWING_PRECISION
+from mg_lever_thread_joint import (
+    NECK_THICKNESS,
+    NECK_THICKNESS_TOL,
+    NOSE_R,
+    NOSE_R_TOL,
+    HOLE_LOCATION_TOL,
+    ROD_DIA as LEVER_ROD_DIA,
+    ROD_LENGTH_TOL,
+)
 from magnifying_bracket_joint_layout import (
     BRACKET_ORIGIN,
+    BRACKET_HOLE_POINTS,
     SCREW_MACHINE_X,
+    SCREW_POSITIONS,
     SCREW_MAJOR_DIA,
     SEAT_PLANE_Z,
-    SIDE_PLATE_HEIGHT,
+    SIDE_PLATE_Y,
     SIDE_PLATE_Z,
+    GRIP_MIN,
+    POSITION_BAND,
+    SIDE_PLATE_HEIGHT,
+    SIDE_PLATE_HEIGHT_DEVIATIONS,
 )
-from mg_lever_press_fit_geom import ROD_DIA as LEVER_ROD_DIA
-from mg_lever_press_fit_geom import collar_edge_bending, press_holding
 from mg_magnifying_clamp_geom import BLOCK_HEIGHT as CLAMP_HEIGHT
 from mg_magnifying_clamp_geom import HEX_AF as CLAMP_HEX_AF
-from mg_magnifying_lever_geom import ROD_LENGTH as LEVER_ROD_LENGTH
+from mg_magnifying_lever_geom import (
+    ROD_LENGTH as LEVER_ROD_LENGTH,
+    THREAD_PROJECTION,
+    THREAD_PROJECTION_TOL,
+)
 from mg_magnifying_vertical_rod_geom import ROD_DIA as VROD_DIA
 from mg_magnifying_vertical_rod_geom import ROD_LENGTH as VROD_LENGTH
 from mg_magnifying_wheel_geom import WIRE_RATIO
@@ -62,8 +85,10 @@ G = 9.81e-3  # N per gram
 BRASS_G_PER_MM3 = (
     pn_pen_carriage_geom.BRASS_G_PER_MM3
 )  # 8.5e-3, the denser bound for every part
-E_STEEL = 200_000.0  # N/mm^2, 1018 cold-drawn (low end of 200-205 GPa)
-G_STEEL = 79_000.0  # N/mm^2 (low end of ~80 GPa)
+# Representative low-carbon-steel elastic moduli, not certified material minima.
+# The generic material designation supplies no grade/temper yield guarantee.
+E_STEEL = 200_000.0  # N/mm^2, assumed for the compliance estimate
+G_STEEL = 79_000.0  # N/mm^2, assumed for the compliance estimate
 
 # --- loads ---------------------------------------------------------------------
 _HEX_AREA = math.sqrt(3.0) / 2.0  # hex area per AF^2
@@ -83,18 +108,23 @@ WIRE1_TENSION_SWING_N = WIRE_RATIO * PEN_LOAD_SWING_N  # 7.1 N
 
 _LEVER_G = (
     math.pi / 4.0 * LEVER_ROD_DIA**2 * LEVER_ROD_LENGTH * BRASS_G_PER_MM3
-)  # 39.7 g
-_CLAMP_G = _HEX_AREA * CLAMP_HEX_AF**2 * CLAMP_HEIGHT * BRASS_G_PER_MM3  # 26.0 g
+)  # conservative full-cylinder mass; excludes the dome/chamfer removal
+_CLAMP_G = _HEX_AREA * CLAMP_HEX_AF**2 * CLAMP_HEIGHT * BRASS_G_PER_MM3
 _VROD_G = math.pi / 4.0 * VROD_DIA**2 * VROD_LENGTH * BRASS_G_PER_MM3  # 22.1 g
 _FIXTURE_G = _HEX_AREA * FIXTURE_HEX_AF**2 * FIXTURE_LENGTH * BRASS_G_PER_MM3  # 16.4 g
 _THUMB_SCREWS_G = 2.0 * 3.0  # two 91882A221 knurled #4-40, generous
-LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G  # 110.2 g
-LEVER_GROUP_N = LEVER_GROUP_G * G  # 1.08 N
-# Every gram placed at the farthest station, the lever's free tip (machine x
-# 200, the lever spanning x 35..200 with the collar at x 40): 160 mm.
-LEVER_GROUP_ARM_X = 160.0
+LEVER_GROUP_G = _LEVER_G + _CLAMP_G + _VROD_G + _FIXTURE_G + _THUMB_SCREWS_G
+LEVER_GROUP_N = LEVER_GROUP_G * G
+# Every gram is conservatively placed at the farthest accepted free tip.
+# The fitted projection fixes the threaded end relative to the neck; the
+# longest rod, thinnest neck and smallest projection maximize this gravity arm.
+LEVER_GROUP_ARM_X = (
+    LEVER_ROD_LENGTH + ROD_LENGTH_TOL
+    - (NECK_THICKNESS - NECK_THICKNESS_TOL) / 2.0
+    - (THREAD_PROJECTION - THREAD_PROJECTION_TOL)
+)
 
-COLLAR = BRACKET_ORIGIN
+NECK = BRACKET_ORIGIN
 HOOK = (sh_vn_music_wire_lever_geom.HOOK_X, sh_vn_music_wire_lever_geom.HOOK_Y, sh_vn_music_wire_lever_geom.HOOK_Z)
 _wx, _wy, _wz = (
     e - s
@@ -104,16 +134,16 @@ _wx, _wy, _wz = (
 )
 _wl = math.sqrt(_wx * _wx + _wy * _wy + _wz * _wz)
 WIRE_DIR = (_wx / _wl, _wy / _wl, _wz / _wl)  # (-0.272, -0.962, 0) toward the drum
-if abs(HOOK[2] - COLLAR[2]) > 1e-9 or abs(WIRE_DIR[2]) > 1e-9:
+if abs(HOOK[2] - NECK[2]) > 1e-9 or abs(WIRE_DIR[2]) > 1e-9:
     raise AssertionError(
-        "arm check assumes the A1 plumb plane: hook, wire and collar at one z"
+        "arm check assumes the A1 plumb plane: hook, wire and neck at one z"
     )
-HOOK_DX = HOOK[0] - COLLAR[0]  # 99.98
-HOOK_DY = HOOK[1] - COLLAR[1]  # -60.0
+HOOK_DX = HOOK[0] - NECK[0]
+HOOK_DY = HOOK[1] - NECK[1]
 
 
-def collar_load(tension: float, weight: float) -> tuple[float, float, float]:
-    """(Fx, Fy, Mz) at the collar centre: wire 1 at the hook plus the group's weight."""
+def joint_load(tension: float, weight: float) -> tuple[float, float, float]:
+    """(Fx, Fy, Mz) at the neck axis: wire at the hook plus group weight."""
     fx = tension * WIRE_DIR[0]
     fy = tension * WIRE_DIR[1] - weight
     mz = (
@@ -125,30 +155,33 @@ def collar_load(tension: float, weight: float) -> tuple[float, float, float]:
 
 
 # --- arm section -----------------------------------------------------------------
-ARM_B = 2.0 * ARM_HALF_X  # 10, along X
-ARM_H = ARM_Y[1] - ARM_Y[0]  # 7.5, along Y
-I_VERTICAL = ARM_B * ARM_H**3 / 12.0  # 351.6 mm^4, Y load
-I_LATERAL = ARM_H * ARM_B**3 / 12.0  # 625 mm^4, X load
+ARM_B = NECK_THICKNESS - NECK_THICKNESS_TOL
+ARM_H = 2.0 * (NOSE_R - NOSE_R_TOL)
+I_VERTICAL = ARM_B * ARM_H**3 / 12.0
+I_LATERAL = ARM_H * ARM_B**3 / 12.0
 _ratio = ARM_H / ARM_B
 J_TORSION = (
     ARM_B * ARM_H**3 * (1.0 / 3.0 - 0.21 * _ratio * (1.0 - _ratio**4 / 12.0))
-)  # 759 mm^4 (Roark)
-# Free span: the collar's shell to the flange's free (front) face.
-OLD_FLANGE_FRONT_LOCAL_Z = 52.01  # pre-A1 SIDE_PLATE_Z[0] (BRACKET_ORIGIN z -128.3)
-ARM_SPAN = SIDE_PLATE_Z[0] - COLLAR_OD / 2.0  # 91.22
-OLD_ARM_SPAN = OLD_FLANGE_FRONT_LOCAL_Z - COLLAR_OD / 2.0  # 46.01
+)  # rectangular-section approximation (Roark)
+# The printed seat-to-profile-axis distance and two independent nose/axis
+# controls bound the longest thread-axis-to-seat reach without moving the model.
+AXIS_TO_SEAT_MAX = (
+    SIDE_PLATE_Z[1]
+    + printed_deviations(SIDE_PLATE_Z[1], DRAWING_PRECISION["NeckProfile"]["SeatToAxis"])[1]
+    + NOSE_R_TOL + HOLE_LOCATION_TOL
+)
+ARM_SPAN = AXIS_TO_SEAT_MAX - GRIP_MIN
 
 
 def hook_deflection_along_wire(span: float, tension: float, weight: float) -> float:
     """Hook motion along wire 1 (mm; signed, negative toward the drum).
 
     Twist phi = Mz L / (G J) turns the hook about the arm's axis (Z) through
-    the collar; the cantilever tip moves by F L^3 / (3 E I) in Y and in X and
-    carries the lever rigidly. The collar's bending slope turns the group
-    about X and Y, which moves the hook only by its z offset from the collar:
-    zero in the A1 plane.
+    the neck; the cantilever tip moves by F L^3 / (3 E I) in Y and in X and
+    carries the lever rigidly. Bending slope rotates the group about X and Y,
+    moving the hook only by its z offset from the neck: zero in the A1 plane.
     """
-    fx, fy, mz = collar_load(tension, weight)
+    fx, fy, mz = joint_load(tension, weight)
     phi = mz * span / (G_STEEL * J_TORSION)
     # Rotation phi about +Z: hook offset (dx, dy) moves by phi * (-dy, dx).
     dx = phi * -HOOK_DY + fx * span**3 / (3.0 * E_STEEL * I_LATERAL)
@@ -156,90 +189,81 @@ def hook_deflection_along_wire(span: float, tension: float, weight: float) -> fl
     return -(dx * WIRE_DIR[0] + dy * WIRE_DIR[1])
 
 
-HOOK_OFFSET_NEW = abs(
-    hook_deflection_along_wire(ARM_SPAN, WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
-)  # 0.276 mm
-HOOK_OFFSET_OLD = abs(
-    hook_deflection_along_wire(OLD_ARM_SPAN, WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
-)  # 0.123 mm
-PEN_OFFSET_NEW = WIRE_RATIO * HOOK_OFFSET_NEW  # 1.38 mm, static, zeroed at setup
-PEN_OFFSET_OLD = WIRE_RATIO * HOOK_OFFSET_OLD  # 0.61 mm
 ARM_COMPLIANCE_MM_PER_N = abs(
     hook_deflection_along_wire(ARM_SPAN, 1.0, 0.0)
-)  # 0.0227 along wire 1
-OLD_ARM_COMPLIANCE_MM_PER_N = abs(
-    hook_deflection_along_wire(OLD_ARM_SPAN, 1.0, 0.0)
-)  # 0.0101
-# Pen-equivalent swing as the guide friction reverses: 0.36 (old) -> 0.81 mm
-# here, a fraction (ARM / spring compliance) of what the same load swing
-# already does through the springs. The test bounds that fraction.
-PEN_SWING_NEW = WIRE_RATIO * ARM_COMPLIANCE_MM_PER_N * WIRE1_TENSION_SWING_N
-PEN_SWING_OLD = WIRE_RATIO * OLD_ARM_COMPLIANCE_MM_PER_N * WIRE1_TENSION_SWING_N
+)
+# The test compares this series compliance with the summing springs.
 ARM_SHARE_OF_SPRING_COMPLIANCE_MAX = 0.01
 
 # Peak arm stresses at the flange (the fixed end).
-_FX, _FY, _MZ = collar_load(WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
+_FX, _FY, _MZ = joint_load(WIRE1_TENSION_MAX_N, LEVER_GROUP_N)
 BENDING_STRESS = (
     abs(_FY) * ARM_SPAN * (ARM_H / 2.0) / I_VERTICAL
     + abs(_FX) * ARM_SPAN * (ARM_B / 2.0) / I_LATERAL
-)  # 13.1 N/mm^2
-# Shigley's rectangular-bar maximum shear, a = 10 the long side, b = 7.5.
+)
+# Shigley's rectangular-bar maximum shear with the current section.
 TORSION_STRESS = (
     abs(_MZ) * (3.0 * ARM_B + 1.8 * ARM_H) / (ARM_B**2 * ARM_H**2)
-)  # 10.6 N/mm^2
-STEEL_YIELD = 370.0  # N/mm^2, 1018 cold drawn
+)
+# Conservative simultaneous bending/torsion von Mises bound, with factor three.
+# This is a required material property, NOT a guaranteed generic-steel yield.
+STEEL_YIELD_REQUIRED = 3.0 * math.hypot(BENDING_STRESS, math.sqrt(3.0) * TORSION_STRESS)
 
 # --- flange joint: two #2-56 at machine x 1 and 14.7 on the seat plane ----------
 SCREW_PITCH_X = SCREW_MACHINE_X[1] - SCREW_MACHINE_X[0]  # 13.7
+# The screw origins are on the flange's front face. Project their actual
+# row centroid to the seat plane, where the joint carries shear and prying.
 JOINT = (
-    (SCREW_MACHINE_X[0] + SCREW_MACHINE_X[1]) / 2.0,
-    BRACKET_ORIGIN[1],
+    sum(point[0] for point in SCREW_POSITIONS) / len(SCREW_POSITIONS),
+    sum(point[1] for point in SCREW_POSITIONS) / len(SCREW_POSITIONS),
     SEAT_PLANE_Z,
 )
-# Moments of the collar load about the screw row's centre (r = collar - joint).
-_RX, _RY, _RZ = (
-    c - j for c, j in zip(COLLAR, JOINT, strict=True)
-)  # (32.15, 0, -100.4)
-JOINT_MX = -_RZ * _FY  # prying about X (the row lies along X): both screws load
-JOINT_MY = _RZ * _FX  # prying about Y: the screws load differentially
+# Moments of the neck load about the screw row's centre.
+_RX = NECK[0] - JOINT[0]
+_RY = NECK[1] - JOINT[1]
+JOINT_MX = AXIS_TO_SEAT_MAX * _FY  # longest accepted axial prying reach
+JOINT_MY = -AXIS_TO_SEAT_MAX * _FX
 JOINT_MZ = _MZ + _RX * _FY - _RY * _FX  # in-plane torque about the seat normal
 # Conservative preload: 0.10 N m hand torque on a #2-56, K = 0.25 (dry, small
 # screw, generous) -> F = T / (K d).
 SCREW_PRELOAD_N = 100.0 / (0.25 * SCREW_MAJOR_DIA)  # 183 N
-# In-plane: direct shear plus the torque couple, the worse screw: 132 N.
-# Friction alone carries 55 N at the row (mu 0.15 steel on aluminium), a
-# 0.21 slip margin that is PRE-EXISTING and independent of the arm's length
-# (the torque is the hook's moment about the collar plus the collar's x
-# offset from the row, both in the seat plane). It is not a slip criterion:
-# the torque never reverses sign (wire 1's tension is the pen side's weight,
-# positive even with the guide friction subtracted), so the flange settles
-# once against the screw shanks and then bears. The shank carries it in shear.
+# In-plane direct shear plus the torque couple at the worse screw.
+# Wire tension stays positive even with guide friction subtracted: torque
+# does not reverse, so the flange settles once against the screw shanks.
+# They then carry it in bearing and shear, rather than relying on friction.
 JOINT_SHEAR_DEMAND_N = math.hypot(_FX, _FY) / 2.0 + abs(JOINT_MZ) / SCREW_PITCH_X
-_MZ_MIN_TENSION = collar_load(
+_MIN_FX, _MIN_FY, _MIN_MZ = joint_load(
     WIRE_RATIO * PEN_SIDE_G * G * (1.0 - GUIDE_FRICTION_FRACTION), LEVER_GROUP_N
-)[2]
-_MZ_NO_GROUP = collar_load(WIRE1_TENSION_MAX_N, 0.0)[2]
+)
+JOINT_MZ_MIN_TENSION = _MIN_MZ + _RX * _MIN_FY - _RY * _MIN_FX
+_WIRE_FX, _WIRE_FY, _WIRE_MZ = joint_load(WIRE1_TENSION_MAX_N, 0.0)
+JOINT_MZ_NO_GROUP = _WIRE_MZ + _RX * _WIRE_FY - _RY * _WIRE_FX
 # Shear plane at the seat face, conservatively in the thread: #2-56 basic
 # minor D - 1.299 P = 1.595 mm, 2.00 mm^2.
 SCREW_MINOR_DIA = SCREW_MAJOR_DIA - 1.299 * (25.4 / 56.0)
 SCREW_SHEAR_STRESS = JOINT_SHEAR_DEMAND_N / (
     math.pi / 4.0 * SCREW_MINOR_DIA**2
-)  # 66 N/mm^2
+)
 # 18-8 stainless (config/parts/mg-vn-magnifying-bracket-screw.yaml, AISI 304):
 # McMaster's 70 ksi (483 MPa) minimum tensile, shear ultimate 0.6 x = 290 MPa,
 # allowable a third of that.
 SCREW_SHEAR_ALLOWABLE = 0.6 * 483.0 / 3.0  # 96.6 N/mm^2
-# Prying: the flange tips about its lower (or upper) edge, SIDE_PLATE_HEIGHT/2
-# from the row; about Y, about its far end, the row's pitch the lever arm.
-# Old 52 arm: 61 N per screw, margin 3.0; A1: 111 N, margin 1.65.
+# Charge the independent mounting location and the foot's own printed width,
+# rather than the receiver's unrelated .XX depth/thickness band.
+JOINT_PRYING_ARM_Y = min(
+    min(
+        point[1] - SIDE_PLATE_Y[0] - POSITION_BAND,
+        SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - (point[1] - SIDE_PLATE_Y[0]) - POSITION_BAND,
+    )
+    for point in BRACKET_HOLE_POINTS
+)
 JOINT_TENSION_INCREMENT_N = (
-    abs(JOINT_MX) / (2.0 * SIDE_PLATE_HEIGHT / 2.0) + abs(JOINT_MY) / SCREW_PITCH_X
+    abs(JOINT_MX) / (2.0 * JOINT_PRYING_ARM_Y) + abs(JOINT_MY) / SCREW_PITCH_X
 )
 JOINT_PRELOAD_MARGIN = SCREW_PRELOAD_N / JOINT_TENSION_INCREMENT_N
 
-if max(BENDING_STRESS, TORSION_STRESS * math.sqrt(3.0)) > STEEL_YIELD / 3.0:
-    raise AssertionError("magnifying bracket arm stress exceeds a third of 1018 yield")
-if not (_MZ < 0.0 and _MZ_MIN_TENSION < 0.0 and _MZ_NO_GROUP < 0.0):
+if not (JOINT_MZ < 0.0 and JOINT_MZ_MIN_TENSION < 0.0 and JOINT_MZ_NO_GROUP < 0.0):
     raise AssertionError(
         "magnifying bracket joint torque reverses; the shanks would not stay bearing"
     )
@@ -251,39 +275,18 @@ if SCREW_SHEAR_STRESS > SCREW_SHEAR_ALLOWABLE:
 if JOINT_PRELOAD_MARGIN <= 1.0:
     raise AssertionError("magnifying bracket #2-56 joint separates under prying")
 
-# --- collar press: the lever held by the press alone (#1570, PRESS ONLY) -------
-# The lever rod runs along machine X through the collar. Wire 1 and the group's
-# weight load it in the A1 plane through its axis, so the rod sees axial _FX
-# and the bending _MZ (carried by the collar bore in bearing) but nominally no
-# twist. The twist is bounded by putting the whole wire tension and group
-# weight one lever diameter out of that plane.
-COLLAR_TWIST_OFFSET = LEVER_ROD_DIA
-COLLAR_TORQUE_DEMAND_NMM = (
-    WIRE1_TENSION_MAX_N + LEVER_GROUP_N
-) * COLLAR_TWIST_OFFSET  # 70 N mm
-PRESS_HOLDING = press_holding(abs(_FX), COLLAR_TORQUE_DEMAND_NMM)
-# 241 N against 2.9 N; 724 N mm against 70 N mm at the loosest corner, after
-# DIN 7190 smoothing (effective 0.00188 of the 0.007 minimum).
-PRESS_HOLDING_MARGIN_MIN = 3.0
-if min(PRESS_HOLDING["axial_margin"], PRESS_HOLDING["torque_margin"]) < (
-    PRESS_HOLDING_MARGIN_MIN
-):
-    raise AssertionError(
-        "the collar press alone does not hold the lever 3x at its loosest corner"
-    )
-# The bending _MZ tilts the press pressure along the straight cylinder
-# (6 M / (d L^2) at each edge). At the loosest corner it exceeds the moment
-# that just unloads one edge (890 N mm), so that edge carries the couple in
-# bearing; the pressure stays a positive part of a linear field, whose integral
-# (the friction's normal force) cannot fall below the uniform press's, so the
-# holds above stand. At the tightest, thinnest-wall corner the loaded edge's
-# Lamé von Mises is 399 MPa, past the 1018 collar's 370 yield: a local,
-# self-limiting edge yield the owner accepted (#1570 ruling b) because no
-# stock collar OD brings it under 0.9 x yield (the edge bearing does not fall
-# with OD). The uniform press stays under that limit (330.8 MPa).
-COLLAR_EDGE_BENDING = collar_edge_bending(abs(_MZ))
-COLLAR_EDGE_VON_MISES_MAX_MPA = 400.0  # the accepted edge yield's pinned ceiling
-if COLLAR_EDGE_BENDING["edge_von_mises_tight_mpa"] > COLLAR_EDGE_VON_MISES_MAX_MPA:
-    raise AssertionError(
-        "the collar edge's bending yield grew past its accepted 400 MPa"
-    )
+
+def material_demand_report() -> dict[str, float | str | None]:
+    """Report the load demand, not an unprovided generic-steel strength."""
+    return {
+        "specified_material": "generic low-carbon steel, blued",
+        "bending_stress_MPa": BENDING_STRESS,
+        "torsion_stress_MPa": TORSION_STRESS,
+        "required_yield_for_factor_three_MPa": STEEL_YIELD_REQUIRED,
+        "assumed_elastic_modulus_MPa": E_STEEL,
+        "assumed_shear_modulus_MPa": G_STEEL,
+        "verified_yield_MPa": None,
+        "verified_yield_safety_factor": None,
+        "status": "UNVERIFIED: no material strength data; procurement remains generic low-carbon steel",
+    }
+

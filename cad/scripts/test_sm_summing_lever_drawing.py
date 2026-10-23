@@ -16,6 +16,7 @@ import _drawing_edge_dimensions
 from _drawing_edge_dimensions import assert_dimension_measures
 from _drawing_edges import ViewEdge, ViewEdges
 from _hole_spec import blind_cut_dia_mm
+from _layout_geometry import Box, Segment, segment_box_distance, segment_box_overlap_length
 import build_sm_summing_lever as lever_build
 import draw_sm_summing_lever as drawing
 from _cone_axis_constants import SUMMING_Z
@@ -71,7 +72,7 @@ def test_end_face_edge_rejects_inboard_flange_and_hidden_underside() -> None:
     spec = sm_summing_lever_spec
     z = spec.PLATE_L / 2.0
     top = _line((0.0, 15.24, z), (30.0, 6.0, z))
-    flange = _line((0.0, 15.24, z - 5.08), (30.0, 6.0, z - 5.08))
+    flange = _line((0.0, 15.24, z - spec.RIB_T), (30.0, 6.0, z - spec.RIB_T))
     underside = _line((30.0, spec.COEFFICIENT_BOTTOM_Y, z), (0.0, -15.24, z))
     plate_end = _line(
         (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, z),
@@ -165,8 +166,8 @@ def _native_boss_face_location(monkeypatch, identity):
         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0),
     )
     inboard = _line(
-        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
-        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - 5.08),
+        (spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
+        (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, spec.PLATE_L / 2.0 - spec.RIB_T),
     )
     state = SimpleNamespace(
         edges=[lower, wrong_axis, inboard, plate, upper],
@@ -275,6 +276,284 @@ def test_boss_face_location_reads_document_precision_when_inherited(monkeypatch,
             case.capture()
 
 
+def _native_knife_height(monkeypatch, identity):
+    spec = sm_summing_lever_spec
+    state = SimpleNamespace(
+        selected=[], picks=[], placements=[], value=(spec.HEX_H / 2.0 - spec.COEFFICIENT_TOP_Y) / 1000.0,
+        precision=2, document_precision=2, tolerance=SimpleNamespace(Type=0),
+        activate=True, missing=False, dangling=False, source_y=spec.HEX_H / 2000.0,
+        view_activate=True, refuse_pick=None, extra_pick_after=None, null_dimension=False,
+    )
+    view = SimpleNamespace(ScaleRatio=(1.0, 1.0))
+
+    def selectable(name):
+        entity = SimpleNamespace()
+
+        def select(append, data):
+            assert data.View is view and append == (name == "plate top")
+            state.picks.append(name)
+            if state.refuse_pick == name:
+                return False  # native refusal: call recorded, selection unchanged
+            state.selected.append(entity)
+            if state.extra_pick_after == name:
+                state.selected.append(object())
+            return True
+
+        entity.Select4 = select
+        return entity
+
+    point, edge = selectable("height.end"), selectable("plate top")
+    plate = ViewEdge(
+        edge,
+        ((spec.RIB_REACH, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0),
+         (spec.PLATE_W, spec.COEFFICIENT_TOP_Y, -spec.PLATE_L / 2.0)),
+        None, None,
+    )
+    state.attached = (point, edge)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: state.attached,
+        GetAttachedEntityTypes=lambda: (11, 1), IsDangling=lambda: state.dangling,
+        OwnerType=0, Visible=1, Owner=view,
+    )
+
+    class NativeDimension:
+        SystemValue = property(lambda self: state.value)
+        Tolerance = property(lambda self: state.tolerance)
+
+    display = SimpleNamespace(
+        GetDimension2=lambda _index: NativeDimension(), GetAnnotation=lambda: annotation,
+        GetPrimaryPrecision2=lambda: state.precision,
+    )
+    state.inventory, state.annotation_count = [annotation], 1
+    view.GetAnnotationCount = lambda: state.annotation_count
+    view.GetAnnotations = lambda: state.inventory
+    manager = SimpleNamespace(
+        CreateSelectData=SimpleNamespace, GetSelectedObjectCount2=lambda _mark: len(state.selected),
+    )
+
+    def create(*position):
+        state.placements.append(position)
+        if state.null_dimension or state.selected != [point, edge]:
+            return None
+        return display
+
+    identity.currentModel = SimpleNamespace(
+        ActivateView=lambda _name: state.view_activate, ActivateSheet=lambda _name: state.activate,
+        ClearSelection2=lambda _all: state.selected.clear(), SelectionManager=manager,
+        AddVerticalDimension2=create,
+        Extension=SimpleNamespace(GetUserPreferenceInteger=lambda *_args: state.document_precision),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "VIEW F")
+    monkeypatch.setattr(
+        drawing, "_theoretical_knife_vertex_in_view",
+        lambda *_args: (point, (0.0, state.source_y, 0.0)),
+    )
+    monkeypatch.setattr(
+        drawing, "scan_view_edges",
+        lambda *_args, **_kwargs: ViewEdges(label="VIEW F", edges=() if state.missing else (plate,)),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: [(0.3143625 - x, 0.150 + y) for x, y, _z in points],
+    )
+    return SimpleNamespace(
+        capture=lambda: drawing._knife_height_location_check(identity, view),
+        state=state, point=point, edge=edge, view=view, annotation=annotation,
+    )
+
+
+def test_knife_height_is_a_native_point_to_actual_plate_top_dimension(monkeypatch, identity):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture()
+    check()
+    assert case.state.picks == ["height.end", "plate top"]
+    assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
+    assert case.state.value * 1000.0 == pytest.approx(2.594)
+    case.state.precision = -2
+    check()  # ordinary precision may follow the existing document
+    case.state.document_precision = 3
+    with pytest.raises(RuntimeError, match="two-place"):
+        check()
+
+
+@pytest.mark.parametrize("damage", ["view", "point_refusal", "edge_refusal", "point_count", "edge_count"])
+def test_knife_height_refuses_selection_before_attempting_native_dimension(monkeypatch, identity, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    if damage == "view":
+        case.state.view_activate = False
+    elif damage.endswith("_refusal"):
+        case.state.refuse_pick = "height.end" if damage == "point_refusal" else "plate top"
+    else:
+        case.state.extra_pick_after = "height.end" if damage == "point_count" else "plate top"
+    with pytest.raises(RuntimeError, match="activate VIEW F|selection failed"):
+        case.capture()
+    assert case.state.placements == [], "bad native selection must not reach AddVerticalDimension2"
+    assert case.state.selected == [], "failed insertion must release its native selections"
+    # False-return/no-effect selection also has a wrong count. Those independent
+    # guards legitimately mask one another; this is a pre-creation behavior
+    # contract, not a claim to isolate the return guard from the count guard.
+
+
+def test_knife_height_refuses_missing_native_dimension_before_reading_it(monkeypatch, identity):
+    case = _native_knife_height(monkeypatch, identity)
+    case.state.null_dimension = True
+    with pytest.raises(RuntimeError, match="native vertical dimension was not created"):
+        case.capture()
+    assert case.state.placements == [(*drawing.KNIFE_HEIGHT_LOCATION_XY, 0.0)]
+    assert case.state.selected == []
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("damage", ["missing", "duplicate", "count", "shape"])
+def test_knife_height_refuses_inconsistent_native_view_inventory(monkeypatch, identity, settled, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture() if settled else case.capture
+    if damage == "missing":
+        case.state.inventory = [object()]  # same count, no owned annotation
+    elif damage == "duplicate":
+        case.state.inventory = [case.annotation, case.annotation]
+        case.state.annotation_count = 2
+    elif damage == "count":
+        case.state.annotation_count = 0  # nonempty native array disagrees
+    else:
+        case.state.inventory = None
+    with pytest.raises(RuntimeError, match="not visible and owned by VIEW F"):
+        check()
+
+
+
+@pytest.mark.parametrize("settled", [False, True])
+@pytest.mark.parametrize("damage", ["crest", "plate", "attachment", "value", "band", "precision", "owner", "hidden", "dangling", "sheet"])
+def test_knife_height_refuses_wrong_reference_or_lost_native_authority(monkeypatch, identity, settled, damage):
+    case = _native_knife_height(monkeypatch, identity)
+    check = case.capture() if settled else case.capture
+    if damage == "crest":
+        case.state.source_y -= 0.00002
+    elif damage == "plate":
+        case.state.missing = True
+    elif damage == "attachment":
+        case.state.attached = (object(), case.edge)
+    elif damage == "value":
+        case.state.value += 0.0001
+    elif damage == "band":
+        case.state.tolerance.Type = 2
+    elif damage == "precision":
+        case.state.precision = 3
+    elif damage == "owner":
+        case.annotation.Owner = object()
+    elif damage == "hidden":
+        case.annotation.Visible = 3
+    elif damage == "dangling":
+        case.state.dangling = True
+    else:
+        case.state.activate = False
+    with pytest.raises(RuntimeError):
+        check()
+
+
+@pytest.mark.parametrize("damage", [
+    None, "missing", "duplicate", "crest", "transform", "correspondence", "nonconstruction", "sketch_owner",
+])
+def test_theoretical_vertex_is_the_existing_height_endpoint_not_a_coincident_flank(monkeypatch, identity, damage):
+    state = SimpleNamespace(shift=0.0, mapped=[], correspondence=True)
+    half = sm_summing_lever_spec.HEX_H / 2000.0
+    sketch = SimpleNamespace()
+
+    def point(x, y):
+        return SimpleNamespace(X=x, Y=y, Z=0.0, GetSketch=lambda: sketch)
+
+    start, vertex, coincident_flank = point(0.0, -half), point(0.0, half), point(0.0, half)
+
+    def line(first, last):
+        return SimpleNamespace(
+            GetType=lambda: 0, ConstructionGeometry=True,
+            GetStartPoint2=lambda: first, GetEndPoint2=lambda: last,
+        )
+
+    height = line(start, vertex)
+    sketch.GetSketchSegments = lambda: state.segments
+    state.segments = [line(coincident_flank, point(0.00404, half / 2.0)), height]
+    inverse = object()
+    sketch.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: inverse)
+
+    def create_point(coordinates):
+        def multiply(transform):
+            assert transform is inverse
+            x, y, z = coordinates
+            return SimpleNamespace(ArrayData=(x, y + state.shift, z))
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    identity.swApp.GetMathUtility = lambda: SimpleNamespace(CreatePoint=create_point)
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+
+    def feature_by_name(name):
+        assert name == "KnifeEnvelopeReference"
+        return feature
+
+    mapped = object()
+
+    def correspond(source):
+        state.mapped.append(source)
+        return mapped if state.correspondence else None
+
+    view = SimpleNamespace(
+        ReferencedDocument=SimpleNamespace(FeatureByName=feature_by_name),
+        GetCorresponding=correspond,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    if damage == "missing":
+        state.segments.remove(height)
+    elif damage == "duplicate":
+        state.segments.append(line(start, vertex))
+    elif damage == "crest":
+        vertex.Y -= 0.00002
+    elif damage == "transform":
+        state.shift = -0.00002
+    elif damage == "correspondence":
+        state.correspondence = False
+    elif damage == "nonconstruction":
+        height.ConstructionGeometry = False
+    elif damage == "sketch_owner":
+        vertex.GetSketch = lambda: object()
+    if damage is not None:
+        with pytest.raises(RuntimeError):
+            drawing._theoretical_knife_vertex_in_view(identity, view)
+    else:
+        actual, xyz = drawing._theoretical_knife_vertex_in_view(identity, view)
+        assert actual is mapped and state.mapped == [vertex]
+        assert xyz == pytest.approx((0.0, half, 0.0))
+        spans, _angles = _knife_envelope_model_owners()
+        shared = set(spans["RidgeFromLeft"]) & set(spans["RidgeFromRight"])
+        assert any(math.dist(reference, (0.0, half * 1000.0)) < 1e-9 for reference in shared)
+
+
+def test_knife_height_location_budgets_whole_right_hand_text_and_route():
+    """Projection of R2 VIEW F geometry/ink, not regenerated native proof."""
+    x, y = drawing.KNIFE_HEIGHT_LOCATION_XY
+    # R2 PlateThickness and receiver readbacks establish model origin X314.3625,
+    # Y150 mm; *Back reverses X. The boss's actual right end is X400.0875 mm.
+    spec = sm_summing_lever_spec
+    boss_end = 0.3143625 - spec.TIP_X / 1000.0 + spec.ANCHOR_R / 1000.0
+    assert x - boss_end >= 0.003
+    # Same ordinary four-character native row/shoulder as the measured 7.00.
+    text = Box(x, y - 0.0027781, x + 0.0116375, y + 0.0007219)
+    assert 0.4318 - 0.0127 - text.xmax >= 0.00357
+    neighbors = (
+        Box(0.3289257, 0.1066122, 0.3894868, 0.1213316),  # whole tap callout
+        Box(0.3049167, 0.1731656, 0.3550833, 0.1877781),  # ReceiverX0 and both rows
+        Box(0.2154417, 0.1689437, 0.2645584, 0.178),  # ReceiverX1 and mate row
+        Box(0.2038833, 0.1529437, 0.253, 0.162),  # ReceiverY0 and mate row
+        Box(0.2513625, 0.1302219, 0.263, 0.1337219),  # complete 7.00
+        Box(0.2597443, 0.0796524, 0.3302765, 0.084418),  # VIEW F caption
+        Box(0.3216982, 0.2007008, 0.4074806, 0.2054665),  # pictorial caption
+    )
+    column = Segment(x, text.ymin, x, 0.150 + spec.HEX_H / 2000.0 + 0.00635)
+    assert all(text.gap(neighbor) >= 0.00357 for neighbor in neighbors)
+    assert all(segment_box_distance(column, neighbor) >= 0.00357 for neighbor in neighbors)
+
+
 def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() -> None:
     import build_sm_summing_lever as part
     import magnifying_bracket_joint_layout as joint
@@ -287,11 +566,8 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
     assert joint.THREAD_DEPTH_BAND == 0.05
     assert joint.DRILL_DEPTH_DEVIATIONS == (-0.51, 0.51)  # ordinary .XX width
-    # The -Z rib's depth rides the title block (no native band of its own).
-    assert joint.RIB_DEPTH_BAND == joint.LINEAR_BAND
-    assert not hasattr(joint, "RECEIVER_DIMENSION_BANDS")
     assert "PlateThickness" in drawing.BACK_KEEP
-    assert "RibDepth" in drawing.TOP_KEEP
+    assert "EdgeRibThickness" in drawing.TOP_KEEP
     order = [_call_name(call) for call in _calls_in_order(_builder_function("build"))]
     bands = order.index("_receiver_model_bands")
     coordinates = order.index("_receiver_coordinate_dimensions")
@@ -300,21 +576,38 @@ def test_bracket_receiver_retains_the_blind_native_contract_and_final_proof() ->
     assert "volume_check" in order[coordinates:saved]
 
 
-def test_receiver_upper_stop_keeps_drill_inside_the_proven_rib() -> None:
-    """Thickening downward does not remove the receiver's upper-wall limit."""
+def test_receiver_pilot_continues_from_uniform_rib_into_connected_plate() -> None:
+    """Screen ordinary pilot walls, not finished thread walls or strength."""
     import magnifying_bracket_joint_layout as joint
 
     spec = sm_summing_lever_spec
-    drill_radius_max = (joint.TAP_DRILL_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
-    for x, _y, _z in joint.LEVER_HOLE_POINTS:
+    drill_radius_max = (
+        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2))
+        + joint.DRILLED_DIAMETER_PLUS
+    ) / 2.0
+    wander = math.tan(math.radians(joint.DRILL_WANDER_DEG)) * (
+        joint.DRILL_DEPTH_MAX + drill_radius_max * joint.DRILL_POINT_H
+    )
+    for x, y, _z in joint.LEVER_HOLE_POINTS:
         assert x - joint.POSITION_BAND - drill_radius_max > spec.CYL_R
         assert x + joint.POSITION_BAND + drill_radius_max < spec.RIB_REACH
-    assert joint.DRILL_POINT_RIB_MARGIN_MIN > 0.0
+        assert spec.COEFFICIENT_TOP_Y - y == pytest.approx(3.25)
+    assert spec.RIB_T + joint.LINEAR_BAND < joint.DRILL_DEPTH_MIN
+    assert spec.RIB_T - joint.LINEAR_BAND < joint.THREAD_DEPTH
+    # ReceiverY0 is from the actual top: top-position variation cancels.
     upper_plate_wall = (
-        spec.COEFFICIENT_TOP_Y - joint.LINEAR_BAND - joint.POSITION_BAND
-        - drill_radius_max - joint.DRILL_WANDER_MAX
+        joint.RECEIVER_ROW_FROM_TOP - joint.POSITION_BAND - drill_radius_max - wander
     )
-    assert upper_plate_wall < 1.5
+    lower_plate_wall = (
+        spec.COEFFICIENT_T - joint.LINEAR_BAND - joint.RECEIVER_ROW_FROM_TOP
+        - joint.POSITION_BAND - drill_radius_max - wander
+    )
+    assert upper_plate_wall == pytest.approx(2.220338, abs=1e-6)
+    assert lower_plate_wall == pytest.approx(2.210338, abs=1e-6)
+    assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
+        min(upper_plate_wall, lower_plate_wall),
+    )
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN >= joint.RECEIVER_PILOT_WALL_MIN
 
 
 def test_receiver_rim_scan_uses_back_entry_face() -> None:
@@ -332,19 +625,76 @@ def test_receiver_rim_scan_uses_back_entry_face() -> None:
     assert [call[2] for call in calls] == [(0.0, 0.0, 1.0)] * len(calls)
 
 
-def test_view_f_axis_centreline_extends_beyond_the_receiver_row() -> None:
-    """The receiver row and hex axis share a line spanning both tap centres."""
-    import magnifying_bracket_joint_layout as joint
+@pytest.mark.parametrize("scale,origin", [(1.0, (0.2, 0.1)), (2.0, (0.3, 0.15))])
+def test_view_f_centerline_projects_only_the_actual_relocated_receiver_row(
+    monkeypatch, scale, origin,
+) -> None:
+    """Drive the real owned-line path through projection and sketch readback."""
+    adapter, back = SimpleNamespace(), SimpleNamespace()
+    transform = object()
+    back.GetSketch = lambda: SimpleNamespace(ModelToSketchTransform=transform)
+    projected_points, created_lines, activated = [], [], []
 
-    spec = sm_summing_lever_spec
-    assert all(point[1] == 0.0 for point in joint.LEVER_HOLE_POINTS)
-    station = drawing.RECEIVER_AXIS_STATION_MM
-    overrun = drawing.RECEIVER_AXIS_OVERRUN_MM
-    outer_tap = max(point[0] for point in joint.LEVER_HOLE_POINTS)
-    assert outer_tap + joint.TAP_DRILL_DIA / 2.0 < spec.RIB_REACH
-    assert spec.RIB_REACH < station
-    assert station + overrun < spec.PLATE_W
-    assert overrun > 0.0
+    def project(actual_adapter, view, points, **_kwargs):
+        assert actual_adapter is adapter and view is back
+        projected_points.extend(points)
+        return [
+            (origin[0] - scale * x, origin[1] + scale * y)
+            for x, y, _z in points
+        ]
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = values
+
+        def MultiplyTransform(self, actual_transform):
+            assert actual_transform is transform
+            x, y, z = self.ArrayData
+            return Point((x + 0.03, y - 0.02, z))
+
+    manager = SimpleNamespace(AddToDB=False)
+
+    def create(*coordinates):
+        assert manager.AddToDB is True
+        created_lines.append(coordinates)
+        start, end = coordinates[:3], coordinates[3:]
+        return SimpleNamespace(
+            Color=-1,
+            GetStartPoint2=lambda: SimpleNamespace(**dict(zip("XYZ", start))),
+            GetEndPoint2=lambda: SimpleNamespace(**dict(zip("XYZ", end))),
+        )
+
+    manager.CreateCenterLine = create
+    adapter.currentModel = SimpleNamespace(
+        ActivateView=lambda name: activated.append(name) or True,
+        ClearSelection2=lambda _all: None,
+        SketchManager=manager,
+    )
+    adapter.swApp = SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point))
+    adapter._get_attr_or_call = lambda value, name: (
+        getattr(value, name)() if callable(getattr(value, name)) else getattr(value, name)
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW F")
+    monkeypatch.setattr(drawing, "double_array", lambda values: values)
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    segment = drawing._receiver_axis_centerline(adapter, back)
+    assert activated == ["VIEW F"]
+    assert projected_points == [
+        pytest.approx((0.0317, -0.00071, -0.0762)),
+        pytest.approx((0.0140, -0.00071, -0.0762)),
+    ]
+    assert created_lines == [pytest.approx((
+        origin[0] - scale * 0.0317 + 0.03,
+        origin[1] - scale * 0.00071 - 0.02,
+        0.0,
+        origin[0] - scale * 0.0140 + 0.03,
+        origin[1] - scale * 0.00071 - 0.02,
+        0.0,
+    ))]
+    assert manager.AddToDB is False
+    assert segment.Color == 0
 
 
 
@@ -406,6 +756,65 @@ def test_marked_dimensions_are_all_placed_and_their_callouts_land() -> None:
     assert above | below <= set(keeps)
     for name, _prefix in notes.DIMENSION_PREFIXES:
         assert name in notes.DRAWING_DIMENSIONS
+
+
+def test_one_three_rib_size_leaves_the_distinct_counter_web_top_flush() -> None:
+    spec = sm_summing_lever_spec
+    assert lever_build.RIB_T == spec.RIB_T == 5.00
+    assert spec.COUNTER_WEB_T == 5.08
+    assert spec.COUNTER_WEB_T / 2.0 == spec.COEFFICIENT_TOP_Y == 2.54
+    assert spec.COEFFICIENT_T == 7.0
+    assert notes.DRAWING_DIMENSIONS["EdgeRibFront"] == {"EdgeRibThickness"}
+    assert notes.DIMENSION_PREFIXES[("EdgeRibFront", "EdgeRibThickness")] == "3X "
+    rib_dimensions = {
+        name for names in notes.DRAWING_DIMENSIONS.values() for name in names
+        if name in {"RibDepth", "MiddleRibThickness", "EdgeRibThickness"}
+    }
+    assert rib_dimensions == {"EdgeRibThickness"}
+
+
+def test_three_rib_size_clears_boss_witness_and_complete_neighbors() -> None:
+    """Replay the R2 native/PDF envelopes, not proof of regenerated native ink."""
+    # R2 20261022T190921801Z-dbfece22b19a4d68ac2dd248e5168731,
+    # reports/layout-audit/sm-summing-lever.json, Lever Geometry / Drawing View2.
+    # Native rows/lines are rounded to 0.1 um; PDF spans are measured ink.
+    old_x, old_y = 0.2095, 0.1035
+    x, y = drawing.TOP_KEEP["EdgeRibThickness"]
+    dx = x - old_x
+    assert y == old_y, "keep the rib route below the cylinder-diameter callout"
+    witness = Segment(0.1972187, 0.129, 0.1972187, 0.0685219, "ext-line")
+    native_text = Box(0.1911396, 0.1007219, 0.2095, 0.1042219)
+    printed_text = Box(0.1925961, 0.1016558, 0.2080575, 0.1052211)
+    neighbors = (
+        # Every row of 76.20 / BOSS AXIS AND / MID RIB CENTRE, not its anchor.
+        Box(0.1441812, 0.1137781, 0.1558187, 0.1172781),
+        Box(0.1329934, 0.1082219, 0.1670066, 0.1117219),
+        Box(0.1324806, 0.1026656, 0.1675195, 0.1061656),
+        # Complete native diameter text, including its diameter glyph.
+        Box(0.199249, 0.1071951, 0.2187511, 0.1107486),
+        Box(0.221, 0.0875713, 0.2308437, 0.0900713),  # lower Ra 1.6
+    )
+    # The actual printed height is 3.5653 mm; retain a whole text height of air.
+    clearance = 0.00357
+    for recorded in (native_text, printed_text):
+        assert segment_box_overlap_length(witness, recorded) == pytest.approx(recorded.height)
+        placed = Box(
+            recorded.xmin + dx, recorded.ymin,
+            recorded.xmax + dx, recorded.ymax,
+        )
+        assert segment_box_distance(witness, placed) >= clearance
+        assert all(placed.gap(neighbor) >= clearance for neighbor in neighbors)
+    # TOP_KEEP moves the whole native route: its complete shoulder and both
+    # outside-arrow runs must also clear the neighboring text, not just the X.
+    route = (
+        Segment(native_text.xmin + dx, 0.1007219, x, 0.1007219),
+        Segment(x, 0.1007219, x, 0.0944),
+        Segment(x, 0.0919, x, 0.08555),
+    )
+    assert all(
+        segment_box_distance(segment, neighbor) >= clearance
+        for segment in route for neighbor in neighbors
+    )
 
 
 def test_the_knife_edge_prints_its_ridge_and_flanks_to_the_sides(monkeypatch) -> None:
@@ -622,6 +1031,88 @@ def test_flank_text_refuses_failed_arc_or_shelf_placement(monkeypatch, damage) -
     else:
         with pytest.raises(RuntimeError, match="FlankToSide"):
             drawing._place_flank_text(adapter, [annotation])
+
+
+def test_flank_shelf_clears_recorded_angular_route_and_complete_neighbors() -> None:
+    """R3 native/PDF placement projection, not regenerated native acceptance."""
+    # r3-sm-visual-evidence/sm-native-layout-audit.json, sheet 2 / Detail D.
+    # The source arc stays seeded separately; its connector may re-solve on
+    # that arc. Do not translate or freeze R3's old connector attachment.
+    native_rows = (
+        Box(0.0347931, 0.081, 0.0672070, 0.0845),
+        Box(0.0323139, 0.0754437, 0.0696861, 0.0789437),
+    )
+    printed_rows = (
+        Box(0.0349097, 0.0819339, 0.0670622, 0.0854993),
+        Box(0.0325705, 0.0763776, 0.0696114, 0.079943),
+    )
+    old_connector = Segment(0.0583221, 0.1667272, 0.0696861, 0.0754438)
+    assert segment_box_overlap_length(old_connector, printed_rows[1]) > 0.003
+    x, y = drawing.FLANK_TEXT_XY
+    assert x == 0.051, "retain the measured horizontal shelf/neighbor relationship"
+    dy = y - 0.081
+    native = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in native_rows)
+    printed = tuple(Box(row.xmin, row.ymin + dy, row.xmax, row.ymax + dy) for row in printed_rows)
+    clearance = 0.00357  # one complete recorded printed cap height
+    neighbors = (
+        # Combined complete native/PDF blocks, not just the closest numbers.
+        Box(0.0153583, 0.1388875, 0.0530416, 0.1600555),  # all four height rows
+        Box(0.0251583, 0.2399375, 0.0628416, 0.2611055),  # left ridge, all four rows
+        Box(0.1779316, 0.2399656, 0.2240684, 0.2555774),  # right ridge, all three rows
+        Box(0.1655003, 0.2162219, 0.1964997, 0.2207211),  # complete R0.1
+        Box(0.1908059, 0.0802219, 0.2151941, 0.0847865),  # reference width
+        Box(0.1114999, 0.2011553, 0.1184999, 0.2093401),  # whole A symbol/triangle
+        Box(0.0986641, 0.0548708, 0.1310708, 0.0710741),  # detail caption and scale
+        Box(0.2038833, 0.1529437, 0.253, 0.1629992),  # complete ReceiverY0 block
+        Box(0.2154417, 0.1689437, 0.2645584, 0.1789993),  # complete ReceiverX1 block
+    )
+    neighbor_lines = (
+        Segment(0.0332, 0.0986601, 0.1139999, 0.0986601),
+        Segment(0.0332, 0.2013401, 0.1139999, 0.2013401),
+        Segment(0.0342, 0.0986601, 0.0342, 0.1388875),
+        Segment(0.0342, 0.1611125, 0.0342, 0.2013401),
+        Segment(0.0745999, 0.1766701, 0.0745999, 0.2409375),
+        Segment(0.1149999, 0.2113401, 0.1149999, 0.2409656),
+        Segment(0.0251583, 0.2399375, 0.1149999, 0.2399375),
+        Segment(0.1149999, 0.2399656, 0.2240684, 0.2399656),
+        Segment(0.0745999, 0.0792219, 0.0745999, 0.1746701),
+        Segment(0.1553999, 0.0792219, 0.1553999, 0.1746701),
+        Segment(0.11595, 0.2004674, 0.1639128, 0.2162219),
+    )
+    for row in (*native, *printed):
+        assert row.xmin - 0.0127 >= clearance
+        assert 0.2667 - row.ymax >= clearance
+        assert all(row.gap(neighbor) >= clearance for neighbor in neighbors)
+        assert all(segment_box_distance(line, row) >= clearance for line in neighbor_lines)
+    # The whole recorded exterior arc and both native witness lines remain.
+    # Its bounding rectangle also bounds every possible connector attachment.
+    arc = Box(0.0560269, 0.1657097, 0.0745999, 0.1942428)
+    witnesses = (
+        Segment(0.0737559, 0.1751338, 0.05808, 0.1651734),
+        Segment(0.0745999, 0.1766701, 0.0745999, 0.1952428),
+    )
+    # A length-plus-half-width square conservatively contains either arrow
+    # direction, so the budget does not depend on arrow-vector convention.
+    arrow_reach = 0.003556 + 0.000762 / 2.0
+    arrows = tuple(
+        Box(px - arrow_reach, py - arrow_reach, px + arrow_reach, py + arrow_reach)
+        for px, py in ((0.058924, 0.1657097), (0.0745999, 0.1942428))
+    )
+    for row in (*native, *printed):
+        assert all(row.gap(ink) >= clearance for ink in (arc, *arrows))
+        assert all(segment_box_distance(line, row) >= clearance for line in witnesses)
+    shelf_y = 0.0754438 + dy
+    shoulder = Segment(native[1].xmin, shelf_y, native[1].xmax, shelf_y)
+    connector = Box(
+        min(arc.xmin, shoulder.x1), min(arc.ymin, shelf_y),
+        max(arc.xmax, shoulder.x1), max(arc.ymax, shelf_y),
+    )
+    assert all(connector.gap(neighbor) >= clearance for neighbor in neighbors)
+    assert all(segment_box_distance(shoulder, neighbor) >= clearance for neighbor in neighbors)
+    # Underlining is intentional; neither that shelf nor ANY straight
+    # connector on the unchanged arc may enter either complete printed row.
+    assert all(connector.gap(row) >= 0.0009 for row in printed)
+    assert all(segment_box_distance(shoulder, row) >= 0.0009 for row in printed)
 
 
 @pytest.mark.parametrize("kind", ["width", "ridge"])
@@ -1059,21 +1550,10 @@ def test_notes_are_short_stated_shortfalls() -> None:
 
 
 def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesses(monkeypatch) -> None:
-    import _appearance
     import _com
-    import _custom_properties
     import _dimensions
     import _feature_tree
-    import _part_checks
-    import _part_properties
-    import _part_save
-    import _rebuild
-    import _session
-    import _sketch
-    import _sketch_rectangle
-    import _drawing_marks
     import build_sm_summing_lever as part
-    import pytest
 
     class Dimension:
         def __init__(self, name, owner, nominal, kind=0):
@@ -1118,12 +1598,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
             for current, following in zip(children, children[1:]):
                 current.next_subfeature = following
 
-        def Parameter(self, name):
-            return next(
-                (item.GetDimension2(0) for item in self.displays if item.GetDimension2(0).Name == name),
-                None,
-            )
-
         def GetFirstDisplayDimension(self):
             return self.displays[0] if self.displays else None
 
@@ -1152,9 +1626,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         [drill, thread, thread_b, unrelated, angular],
         [sketch_feature, thread_feature, thread_feature_b],
     )
-    rib_depth = Dimension("D1", "EdgeRibBack", lever_build.RECEIVER_RIB_T)
-    features = {"EdgeRibBack": Feature("EdgeRibBack", [rib_depth])}
-    features["BracketMountingTaps"] = taps
+    features = {"BracketMountingTaps": taps}
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
 
     def invoke(value, interface, member, *args):
@@ -1164,30 +1636,11 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         assert not args
         return attribute
 
-    monkeypatch.setattr(_appearance, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_com, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_custom_properties, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_feature_tree, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_checks, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_properties, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_part_save, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_rebuild, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_session, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_sketch, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(_sketch_rectangle, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(_com, "_com_invoke", invoke)
     monkeypatch.setattr(_dimensions, "_com_invoke", invoke)
     monkeypatch.setattr(_feature_tree, "_com_invoke", invoke)
-    monkeypatch.setattr(_drawing_marks, "_com_invoke", invoke)
-    bands = []
-    monkeypatch.setattr(
-        part, "set_dimension_symmetric_tolerance",
-        lambda adapter, feature, name, band: bands.append((feature, name, band)),
-    )
-    precisions = []
-    monkeypatch.setattr(
-        part, "set_dimension_display_precision", lambda *args: precisions.append(args),
-    )
     held = []
     monkeypatch.setattr(
         part, "_band_held_dimension",
@@ -1195,13 +1648,9 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
             (display.GetDimension2(0) is dimension, dimension, band, label)
         ),
     )
-    monkeypatch.setattr(part, "mark_dimensions_for_drawing", lambda *args: None)
     inventory = []
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
     part._receiver_model_bands(adapter)
-    assert bands == []
-    assert (adapter, "EdgeRibBack", "RibDepth", 2) in precisions
-    assert rib_depth.Name == "RibDepth"
     # Subfeatures are not FeatureByName-reachable and both threads are "D1":
     # band the exact native objects found in the walk, never a by-name lookup.
     assert held == [
@@ -1221,7 +1670,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     # mistaken for parent parameters.
     taps.children = ()
     inventory.clear()
-    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth .*found 0"):
         part._receiver_model_bands(adapter)
     assert inventory and any("D1@Hole Thread22" in row for row in inventory)
@@ -1230,7 +1678,6 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     thread_feature.next_subfeature = None
     sketch_feature.next_subfeature = thread_feature
     thread_feature.displays.append(display(Dimension("D9", thread_feature.Name, 4.95)))
-    rib_depth.Name = "D1"
     with pytest.raises(RuntimeError, match="expected 2 native FullThreadDepth \\(one per owner\\), found 2"):
         part._receiver_model_bands(adapter)
 
@@ -1414,41 +1861,60 @@ def test_bracket_depth_callout_rejects_engineering_band_not_inherited_by_print(
     (
         None, "outer-caps-absent", "missing", "empty", "receiver-entry",
         "receiver-inner", "opposite-inner", "extra", "receiver-depth",
-        "opposite-depth", "missing-depth",
+        "opposite-depth", "missing-depth", "middle-missing", "middle-depth",
+        "middle-missing-depth", "middle-inner", "middle-outer", "middle-one-cap",
     ),
 )
-def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) -> None:
+def test_native_rib_end_planes_preserve_uniform_depths_and_fixed_outer_faces(
+    monkeypatch, damage,
+) -> None:
     def face(z):
         surface = SimpleNamespace(
             IsPlane=lambda: True, PlaneParams=(0.0, 0.0, 1.0, 0.0, 0.0, z / 1000.0),
         )
         return SimpleNamespace(GetSurface=lambda: surface)
 
-    planes = {"EdgeRibBack": [-76.2, -67.2], "EdgeRibFront": [71.12, 76.2]}
-    depths = {"EdgeRibBack": 9.0, "EdgeRibFront": 5.08}
+    planes = {
+        "EdgeRibBack": [-76.2, -71.2],
+        "EdgeRibFront": [71.2, 76.2],
+        "MiddleRib": [-2.5, 2.5],
+    }
+    depths = {name: 5.0 for name in planes}
     if damage == "outer-caps-absent":
-        planes = {"EdgeRibBack": [-67.2], "EdgeRibFront": [71.12]}
+        planes["EdgeRibBack"] = [-71.2]
+        planes["EdgeRibFront"] = [71.2]
     elif damage == "receiver-depth":
-        depths["EdgeRibBack"] = 7.3
+        depths["EdgeRibBack"] = 9.0
     elif damage == "opposite-depth":
-        depths["EdgeRibFront"] = 8.2
+        depths["EdgeRibFront"] = 5.08
+    elif damage == "middle-depth":
+        depths["MiddleRib"] = 5.08
     elif damage == "receiver-entry":
         planes["EdgeRibBack"][0] -= 0.9
     elif damage == "receiver-inner":
-        planes["EdgeRibBack"][1] = -68.9
+        planes["EdgeRibBack"][1] = -67.2
     elif damage == "opposite-inner":
-        planes["EdgeRibFront"][0] = 68.0
+        planes["EdgeRibFront"][0] = 71.12
+    elif damage == "middle-inner":
+        planes["MiddleRib"][0] = -2.54
+    elif damage == "middle-outer":
+        planes["MiddleRib"][1] = 2.54
+    elif damage == "middle-one-cap":
+        planes["MiddleRib"] = [-2.5]
     elif damage == "extra":
         planes["EdgeRibBack"].append(-70.0)
     elif damage == "empty":
         planes["EdgeRibBack"] = []
 
     def feature(name, values):
-        expected_parameter = "RibDepth" if name == "EdgeRibBack" else "EdgeRibThickness"
+        expected_parameter = "MiddleRibThickness" if name == "MiddleRib" else "EdgeRibThickness"
 
         def parameter(parameter_name):
             assert parameter_name == expected_parameter
-            if damage == "missing-depth" and name == "EdgeRibBack":
+            if (
+                damage == "missing-depth" and name == "EdgeRibBack"
+                or damage == "middle-missing-depth" and name == "MiddleRib"
+            ):
                 return None
             return SimpleNamespace(SystemValue=depths[name] / 1000.0)
 
@@ -1460,29 +1926,29 @@ def test_native_rib_end_planes_preserve_both_outer_faces(monkeypatch, damage) ->
     features = {name: feature(name, values) for name, values in planes.items()}
     if damage == "missing":
         del features["EdgeRibBack"]
+    elif damage == "middle-missing":
+        del features["MiddleRib"]
     monkeypatch.setattr(lever_build, "_early_bound", lambda value, _kind: value)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=features.get))
     if damage in (None, "outer-caps-absent"):
         lever_build._assert_edge_rib_end_planes(adapter)
     else:
-        with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront"):
+        with pytest.raises(RuntimeError, match="EdgeRibBack|EdgeRibFront|MiddleRib"):
             lever_build._assert_edge_rib_end_planes(adapter)
 
 
-def test_receiver_pilots_retain_their_profile_wall_margin() -> None:
-    """The blind pilot cylinders stay inside the unchanged G1 rib footprint."""
+def test_receiver_pilots_keep_independent_profile_and_connected_plate_wall_budgets() -> None:
+    """The rib footprint and the beyond-rib plate continuation both matter."""
     import magnifying_bracket_joint_layout as joint
-    from sm_summing_lever_profile import receiver_wall_margin
+    from sm_summing_lever_profile import receiver_pilot_wall_budget
 
-    pilot_radius_max = (
-        max(joint.TAP_DRILL_DIA, round(joint.TAP_DRILL_DIA, 2)) + joint.DRILLED_DIAMETER_PLUS
-    ) / 2.0
-    for x, y, _z in joint.LEVER_HOLE_POINTS:
-        assert receiver_wall_margin(
-            x + joint.POSITION_BAND,
-            y + joint.POSITION_BAND,
-            pilot_radius_max,
-        ) - joint.LINEAR_BAND - joint.DRILL_WANDER_MAX >= joint.RECEIVER_PILOT_WALL_MIN
+    walls = receiver_pilot_wall_budget()
+    assert [wall.x_mm for wall in walls] == [point[0] for point in joint.LEVER_HOLE_POINTS]
+    assert all(wall.minimum_mm >= joint.RECEIVER_PILOT_WALL_MIN for wall in walls)
+    assert joint.receiver_pilot_material_wall_budget() == pytest.approx(
+        joint.RECEIVER_PILOT_MATERIAL_WALL_MIN,
+    )
+    assert joint.RECEIVER_PILOT_MATERIAL_WALL_MIN >= joint.RECEIVER_PILOT_WALL_MIN
 
 
 def _thread_annotation_drawing(monkeypatch, note_count: int = 7):

@@ -9,10 +9,12 @@ is handled by ``part_sketches_shown`` instead.
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import functools
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -495,6 +497,89 @@ _SCRIPTS = Path(hidden_sketches.__file__).resolve().parent
 @functools.cache
 def _tree(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
+
+
+def test_clamp_reference_names_drive_actual_sources(monkeypatch) -> None:
+    """Changing the declaration must rename the actual source-map owners,
+    rather than leave a dead parallel list for the routing scan."""
+    import build_mg_magnifying_clamp as clamp
+
+    names = ("ThumbWitness", "RodWitness", "BoreWitness")
+    monkeypatch.setattr(clamp, "REFERENCE_SKETCHES", names)
+    thumb, rod = object(), object()
+    bore = SimpleNamespace(GetType=lambda: 1)
+    sketch = SimpleNamespace(GetSketchSegments=lambda: (bore,))
+    feature = SimpleNamespace(GetSpecificFeature2=lambda: sketch)
+    requested = []
+
+    def feature_by_name(name):
+        requested.append(name)
+        return feature
+
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureByName=feature_by_name))
+    faces = {"top": object(), "bottom": object(), "zflat": object()}
+    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(clamp, "resolve_faces", lambda *_args: faces)
+    monkeypatch.setattr(clamp, "_stock_edge", lambda face, _ends: face)
+    monkeypatch.setattr(
+        clamp, "_tap_entry_circle",
+        lambda face, _y: thumb if face is faces["top"] else rod,
+    )
+    sources = clamp._location_sources(adapter)
+    assert tuple(sources) == names
+    assert requested == ["LeverBoreProfile"]
+    assert sources == {
+        names[0]: ("Top", thumb, "IEntity", (("ThumbTapFromDiagonalFlat", faces["top"]),)),
+        names[1]: ("Top", rod, "IEntity", (("RodTapFromDiagonalFlat", faces["bottom"]),)),
+        names[2]: ("Right", bore, "ISketchSegment", (("LeverBoreFromZFlat", faces["zflat"]),)),
+    }
+
+
+def test_clamp_blanks_every_location_witness_it_creates(monkeypatch) -> None:
+    """Exercise the production creation/blanking loop without a native seat."""
+    import build_mg_magnifying_clamp as clamp
+
+    created, named, hidden, measured = [], [], [], []
+    center, flat = object(), object()
+    circle = SimpleNamespace(GetCenterPoint2=lambda: center)
+    sources = {
+        name: (plane, circle, interface, ((f"Location{number}", flat),))
+        for number, (name, plane, interface) in enumerate(zip(
+            clamp.REFERENCE_SKETCHES, ("Top", "Top", "Right"),
+            ("IEntity", "IEntity", "ISketchSegment"), strict=True,
+        ))
+    }
+    # An extra actual source must also be created AND hidden, not silently
+    # dropped by a separate enumeration used only for blanking.
+    sources["AdditionalWitness"] = ("Right", circle, "ISketchSegment", ())
+    sketch = SimpleNamespace(GetConstrainedStatus=lambda: 3)
+    model = SimpleNamespace(GetActiveSketch2=lambda: sketch)
+
+    async def create_sketch(plane):
+        created.append(plane)
+        return SimpleNamespace(is_success=True, data=None)
+
+    async def exit_sketch():
+        return SimpleNamespace(is_success=True, data=None)
+
+    adapter = SimpleNamespace(
+        currentModel=model, create_sketch=create_sketch, exit_sketch=exit_sketch,
+    )
+    monkeypatch.setattr(clamp, "_location_sources", lambda _adapter: sources)
+    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(clamp, "_convert_location_source", lambda _adapter, obj, _interface: obj)
+    monkeypatch.setattr(clamp, "_tap_placement_points", lambda _adapter: {})
+    monkeypatch.setattr(
+        clamp, "_measure_location",
+        lambda _adapter, point, edge, name: measured.append((point, edge, name)),
+    )
+    monkeypatch.setattr(clamp, "name_last_feature", lambda _adapter, name: named.append(name))
+    monkeypatch.setattr(clamp, "blank_reference_sketches", lambda _adapter, names: hidden.extend(names))
+    asyncio.run(clamp._location_profiles(adapter))
+    assert created == ["Top", "Top", "Right", "Right"]
+    assert named == list(sources)
+    assert hidden == named
+    assert measured == [(center, flat, f"Location{number}") for number in range(3)]
 
 
 # cd50a8425 made dimensions_by_feature a required keyword; draw_crankshaft

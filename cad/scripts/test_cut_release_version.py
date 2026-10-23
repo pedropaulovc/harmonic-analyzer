@@ -570,6 +570,7 @@ def readout_report(
                 "ordinate_capacity_full_scale_bars": capacity,
                 "lever_radius_min_mm": nom.lever_r_min,
                 "lever_radius_built_mm": nom.lever_r_built,
+                "lever_radius_max_mm": nom.lever_r_max,
                 "wheel_ratio": nom.wheel_ratio,
                 "pen_mm_per_full_scale_bar_at_min": pen_per_bar_at_min,
                 "pen_mm_per_full_scale_bar_at_built": (

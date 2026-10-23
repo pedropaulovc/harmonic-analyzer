@@ -153,6 +153,10 @@ def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
     assert _config.parts("sh-vn-music-wire")["number"] in pen_wire
     assert "PEN WIRE" in pen_wire
     assert "RIM GROOVE" in pen_wire
+    # Shared stock has no extra HA BOM row: each instruction must identify
+    # its supplying assembly. MG's same-stock lever wire is not PN's wire.
+    assert assembly_contract("mg-magnifier").number in clamp
+    assert assembly_contract("pn-pen").number in pen_wire
 
 
 def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:

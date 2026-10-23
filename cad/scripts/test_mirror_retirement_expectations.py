@@ -281,6 +281,38 @@ def test_magnifying_bracket_screw_expectations_follow_live_placement() -> None:
         ]
 
 
+def test_moved_screw_row_stays_coaxial_without_moving_the_installed_bodies() -> None:
+    import build_mg_magnifier_assembly as magnifier
+    import magnifying_bracket_joint_layout as joint
+
+    assert joint.BRACKET_ORIGIN == (40.0, 979.7, -173.51)
+    assert (
+        magnifier.BRACKET_X, magnifier.LEVER_ROD_Y, magnifier.LEVER_ROD_Z,
+    ) == joint.BRACKET_ORIGIN
+    assert magnifier.LEVER_X0 == 200.0
+    assert magnifier.LEVER_X0 - magnifier.KNIFE_LOCAL_X == -15.0
+    assert magnifier.LEVER_ROD_Y + magnifier.KNIFE_LOCAL_Y == pytest.approx(984.834)
+    for screw, clearance, pilot in zip(
+        magnifier.BRACKET_SCREW_POSITIONS,
+        joint.BRACKET_HOLE_POINTS,
+        joint.LEVER_HOLE_POINTS,
+        strict=True,
+    ):
+        assert screw[1] == pytest.approx(978.99)
+        assert screw == pytest.approx(tuple(
+            local + origin
+            for local, origin in zip(clearance, joint.BRACKET_ORIGIN, strict=True)
+        ))
+        assert screw[:2] == pytest.approx((
+            pilot[0] + joint.LEVER_ORIGIN_X,
+            pilot[1] + magnifier.LEVER_ROD_Y,
+        ))
+        assert pilot[2] + magnifier.SUMMING_Z == pytest.approx(joint.SEAT_PLANE_Z)
+        assert screw[2] + joint.SIDE_PLATE_THICKNESS == pytest.approx(
+            joint.SEAT_PLANE_Z,
+        )
+
+
 def test_magnifying_bracket_screws_are_free_and_locked_to_the_bracket() -> None:
     assembly = SCRIPTS / "build_mg_magnifier_assembly.py"
     tree = ast.parse(assembly.read_text(encoding="utf-8"))

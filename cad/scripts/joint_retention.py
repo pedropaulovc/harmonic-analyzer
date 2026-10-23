@@ -247,6 +247,19 @@ RULINGS: dict[str, Ruling] = {
             "the plain 91375A105 cup point goes in bare, nothing added to its thread"
         ),
     ),
+    "U-MHA-MG-03-no-lock": Ruling(
+        joint="mg-magnifier/lever-in-bracket",
+        granted=(
+            "user, 2026-10-20, approved MG threaded-lever redesign: "
+            "'no further thread locking needed because mg-magnifying-lever "
+            "does not experience rotational forces'. This accepts no added "
+            "lock for this joint, not a demonstrated immunity to vibration. "
+            "The lever is installed to projection without a shoulder or preload; "
+            "vibration can still change projection or back the thread out. "
+            "The assembly package declares RV-02; the two mating part packages "
+            "declare the same joint-specific departure."
+        ),
+    ),
 }
 
 
@@ -609,6 +622,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pd_vn_platen_clip_screw",  # #2-56 brass slotted pan head (92446A077, MHA-PD-VN-65), member: 4 into the platen's through taps, clamping the paper clips
         "mg_magnifying_clamp",  # MHA-MG-02 hex: #4-40 top-face thumb tap (receiver of thumb_screw) + #4-40 bottom-face blind tap (receiver of vertical_rod)
         "mg_magnifying_vertical_rod",  # MHA-MG-04: #4-40 UNC-2A turned top end with relief, member into the clamp's bottom tap, seats on its shoulder
+        "mg_magnifying_bracket",  # 1/4-20 UNC-2B through neck; plain flange clearance holes
+        "mg_magnifying_lever",  # quarter-inch brass body, flat UNC-2A threaded end
         "ms_stop_block",  # MHA-MS-02: #4-40 UNC-2B floor tap for the shared thumbscrew + 2x #2-56 cover taps
         "ms_vn_stop_plate_screw",  # #2-56 x 1/4 brass fillister (McMaster 90114A124, MHA-MS-VN-51), member: 2 into ms_stop_block through the cover plate
         "mg_output_fixture",  # #4-40 UNC axial tap from the spigot face into the rod bore (mg_output_fixture_spec.TAP_SPEC), receiver of the 2nd thumb_screw
@@ -686,8 +701,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "sm_vn_knife_hanger_washer",  # new 18-8 SAE washer (McMaster 96659A104), hex-head bearing on the faced crossbar top; no thread
         "pd_latch_hook",  # MHA-PD-14 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "sh_vn_music_wire",  # LeverWire and PenWire members, wrapped/tied, no thread
-        "mg_magnifying_bracket",  # 1018 steel MHA-MG-03 collar light-press seat (press only, #1570); flange has two plain #2 clearance holes (heads on its front face), no thread
-        "mg_magnifying_lever",  # Ø6 domed brass lever; press MHA-MG-01 collar onto its east cylinder while holding the rod near its end; the press alone retains it
         "mg_magnifying_wheel",  # reamed .1890 running bore + two Ø1 wire-tie holes; no thread
         "mg_wheel_drum",  # MHA-MG-10 brass drum pressed on the wheel's spigot; no thread
         "mg_wheel_axle_spacer",  # MHA-MG-11 brass sleeve, drilled clearance on the wheel axle; no thread
@@ -1897,7 +1910,7 @@ JOINTS: tuple[Joint, ...] = (
             "screws react the bracket moment as a shear couple, not operating "
             "spin friction about either screw axis"
         ),
-        axial_capture="fillister heads on the bracket counterbore floors; shanks pass normal #2 clearance into the lever's blind bottoming #2-56 seats",
+        axial_capture="fillister heads on the bracket flange front face; shanks pass normal #2 clearance into the lever's blind bottoming #2-56 seats",
         lock=Lock.NONE,
         evidence=(
             "build_mg_magnifier_assembly.py BRACKET_SCREW_POSITIONS loop, screws locked "
@@ -1936,6 +1949,30 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
+        id="mg-magnifier/lever-in-bracket",
+        assembly="mg_magnifier",
+        member="mg_magnifying_lever",
+        receiver="mg_magnifying_bracket",
+        thread="1/4-20 UNC",
+        quantity=1,
+        installed_at=mg_magnifier_assembly_steps.LEVER_THREADED_KEY,
+        exposure=Exposure.ADJUSTER,
+        exposure_reason=(
+            "rotation of the unseated thread sets the installed ThreadProjection; "
+            "there is no shoulder or preload, so this is not a static clamp. "
+            "The nominal load has no torque about the X thread axis, but the "
+            "knife-rocking assembly exposes it to vibration and possible backoff."
+        ),
+        axial_capture=(
+            "1/4-20 UNC-2A lever end in the steel UNC-2B through neck, installed "
+            "to native ThreadProjection, with at least 1.5D FULL engaged thread; "
+            "the tip reaches the far face and the plain rod has no shoulder"
+        ),
+        lock=Lock.NONE,
+        exception="U-MHA-MG-03-no-lock",
+        evidence="mg_lever_thread_joint.py; mg_magnifier_assembly_spec.THREAD_PROJECTION; mg_magnifier_assembly_sheet.STEP_TEXT",
+    ),
+    Joint(
         id="mg-magnifier/clamp-thumb-screw",
         assembly="mg_magnifier",
         member="sh_vn_thumb_screw",
@@ -1945,13 +1982,13 @@ JOINTS: tuple[Joint, ...] = (
         installed_at=mg_magnifier_assembly_steps.CLAMP_SET_KEY,
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "hand-set operator clamp: pinches the hex clamp onto the Ø6 lever rod at the chosen "
+            "hand-set operator clamp: pinches the hex clamp onto the Ø6.35 lever rod at the chosen "
             "magnification radius; clamp, vertical rod and fixture then ride the lever as one rigid "
             "body (lock mates), the lever rocks about the knife line (machine Z) perpendicular to the "
             "screw axis (machine Y), and the wire pull lies in the plumb plane through the screw axis "
             "(option A1, #1559), so no operating torque acts about the screw axis"
         ),
-        axial_capture="tip bears on the Ø6 lever rod through the top-face #4-40 tap on the hex axis that breaks into the lever bore across the corners (modelled backed-out, tip tangent)",
+        axial_capture="tip bears on the Ø6.35 lever rod through the top-face #4-40 tap on the hex axis that breaks into the lever bore across the corners (modelled backed-out, tip tangent)",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
@@ -2433,6 +2470,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "mg-magnifier/wheel-axle-nut": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "wheel-axle nut locked to the axle"
+    ),
+    "mg-magnifier/lever-in-bracket": Occurrence(
+        "mg_magnifier", "build_mg_magnifier_assembly.py", "bracket affixes the lever"
     ),
     "mg-magnifier/clamp-thumb-screw": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "thumb-screw locked to clamp"

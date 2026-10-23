@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -24,6 +25,12 @@ import dt_pinion_spring_spec
 import dt_vn_post_mount_screw_spec
 import dt_vn_slotted_screw_spec
 from _buildgraph import module_deps_of
+from test_assembly_chain_mesh import (
+    _Adapter as InterferenceAdapter,
+    _Component as InterferenceComponent,
+    _Interference as InterferenceBody,
+    observations as observations,
+)
 
 
 SHEETS = (
@@ -242,6 +249,86 @@ def _annulus_limit(major_d: float, tap_d: float, length: float) -> float:
     return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
 
 
+def _mg_clamp_thumb_limit() -> float:
+    """Independent #4-40 annulus through the actual top-to-bore wall.
+
+    The top grew from 28.95 to 29.50; the 19.95 bore station and Ø6.50
+    bore stayed put. The former 5.75-mm wall is now 6.30 mm. Do not read
+    the runtime allowance or its triple to construct this oracle.
+    """
+    return _annulus_limit(2.8448, 2.261, 29.50 - 19.95 - 6.50 / 2.0)
+
+
+@pytest.mark.parametrize(
+    ("assembly", "screw_number", "excess_mm3", "rejected"),
+    (
+        ("mg-magnifier", 1, -1e-6, False),
+        ("mg-magnifier", 1, 1e-6, True),
+        ("mg-magnifier", 2, -1e-6, True),
+        ("ha-harmonic-analyzer", 1, -1e-6, True),
+    ),
+)
+def test_clamp_thumb_allowance_bounds_the_actual_pair_and_total_volume(
+    observations, assembly, screw_number, excess_mm3, rejected
+) -> None:
+    """Synthetic gate observations, not new native interference evidence."""
+    import mg_magnifying_clamp_geom as clamp
+
+    assert clamp.BLOCK_HEIGHT - clamp.LEVER_BORE_Y - clamp.LEVER_BORE_DIA / 2.0 == (
+        pytest.approx(29.50 - 19.95 - 6.50 / 2.0)
+    )
+    prefix = "mg-magnifier-1/" if assembly == "ha-harmonic-analyzer" else ""
+    components = (
+        InterferenceComponent(f"{prefix}sh-vn-thumb-screw-{screw_number}"),
+        InterferenceComponent(f"{prefix}mg-magnifying-clamp-1"),
+    )
+    # Each body is below the bound even in the excessive-total case. A
+    # per-body gate, stale 5.75-mm bound, or wider exemption must fail here.
+    body_volume = (_mg_clamp_thumb_limit() + excess_mm3) / 2.0
+    adapter = InterferenceAdapter(
+        InterferenceBody(components, body_volume),
+        InterferenceBody(components, body_volume),
+    )
+    if assembly == "ha-harmonic-analyzer":
+        # The root also contains DT's two independently referenced instances
+        # of one shared SKU. Let the real selector binder read their native
+        # parent paths, role references, file and Default member.
+        roots = tuple(
+            SimpleNamespace(
+                Name2=f"{stem}-1",
+                ComponentReference="",
+                ReferencedConfiguration="Default",
+                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDASM",
+            )
+            for stem in ("mg-magnifier", "dt-drive-train")
+        )
+        references = tuple(
+            InterferenceComponent(
+                f"dt-drive-train-1/sh-vn-fillister-screw-90280a108-{index}",
+                "Default",
+                native_stem="sh-vn-fillister-screw-90280a108",
+                component_reference=f"{role}:1",
+            )
+            for index, role in enumerate(("FootScrew", "SwingStopScrew"), 1)
+        )
+        adapter.currentModel.GetComponents = lambda top_level_only: (
+            roots if top_level_only else (*roots, *references, *components)
+        )
+    allowed = _interference_contracts.allowed_interference_pairs(assembly)
+    if rejected:
+        with pytest.raises(RuntimeError, match="interference"):
+            _assembly.check_no_interference(adapter, allowed_pairs=allowed)
+    else:
+        _assembly.check_no_interference(adapter, allowed_pairs=allowed)
+        event, = (
+            attrs for name, attrs in observations.events
+            if name == "interference.bounded_pair"
+        )
+        assert event["body_count"] == 2
+        assert event["limit_mm3"] == pytest.approx(_mg_clamp_thumb_limit())
+    assert adapter.currentModel.manager.releases == 1
+
+
 def _press_fit_shell_limit(
     outer_d: float,
     bore_d: float,
@@ -456,8 +543,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 3.454,
                 4.35,
             ),
-            frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): _annulus_limit(
-                2.8448, 2.261, 5.9
+            frozenset(("sh-vn-thumb-screw-1", "mg-magnifying-clamp-1")): (
+                _mg_clamp_thumb_limit()
             ),
             # #1559: the vertical rod's #4-40 end (2.845 major) in the clamp's
             # bottom tap drill, tip to relief.
@@ -475,9 +562,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("mg-magnifying-lever-1", "mg-magnifying-bracket-1")
             ): _annulus_limit(
-                # Whole-contact envelope, independent corners (see
-                # _interference_contracts._MG_LEVER_PRESS_TRIPLE_MM).
-                6.0, 5.986, 7.2078194326718075
+                # Full-neck cosmetic 1/4-20 major/tap-drill overlap.
+                6.35, 5.105, 12.5
             ),
         },
         "sm-summing": {
@@ -816,7 +902,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         # Exact pair equality also forbids tube/screw and cap/tube exemptions.
         assert set(allowed) == set(expected_threaded) | special_pairs.get(name, set())
         for pair, expected_limit in expected_threaded.items():
-            assert allowed[pair] == pytest.approx(expected_limit)
+            assert allowed[pair] == pytest.approx(expected_limit), (
+                name, sorted(pair), allowed[pair], expected_limit
+            )
         assert all(limit >= 0.0 and math.isfinite(limit) for limit in allowed.values())
 
     drive_train_allowed = _interference_contracts.allowed_interference_pairs(

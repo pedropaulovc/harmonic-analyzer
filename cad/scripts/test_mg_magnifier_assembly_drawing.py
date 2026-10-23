@@ -184,7 +184,7 @@ class _Display:
         return self.parts.get(part, "")
 
 
-@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE, stack.THREAD_FEATURE])
 def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
     callouts = stack.SETTING_CALLOUTS[feature]
     good = [
@@ -199,7 +199,7 @@ def test_each_callout_reads_back_from_its_own_compartment(feature) -> None:
         drawing._assert_callouts(wrong, callouts)
 
 
-@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE])
+@pytest.mark.parametrize("feature", [stack.FEATURE, stack.LEVER_FEATURE, stack.THREAD_FEATURE])
 @pytest.mark.parametrize("failed_readback", [False, True])
 def test_native_setting_text_requires_void_setter_readback(
     monkeypatch, feature, failed_readback
@@ -492,6 +492,993 @@ def test_the_lever_settings_match_the_placed_lever_group() -> None:
     }
 
 
+@pytest.fixture
+def projection_native(monkeypatch):
+    """Synthetic native readbacks, not a claim about the repaired farm render.
+
+    The primary value is inside the sheet while the full qualifier crosses
+    its left border. Exercise the real extent/move/region helpers on one
+    imported annotation, retaining its source and attachment identities.
+    """
+    import _drawing_annotation_extent as extent
+
+    name = stack.THREAD_PROJECTION_DIMENSION
+    events = []
+    source = SimpleNamespace(
+        FullName=f"{name}@{stack.THREAD_FEATURE}@mg-magnifier",
+        SystemValue=stack.THREAD_PROJECTION / 1000.0,
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    endpoints = (object(), object())
+    owner = object()
+    rows = [
+        {"text": "1.25", "position": (-0.002, 0.0, 0.0), "reference": 0,
+         "height": 0.002, "angle": 0.0, "spacing": 1.0},
+        *[
+            {"text": line, "position": (0.0, -0.003 * (index + 1), 0.0),
+             "reference": 5, "height": 0.002, "angle": 0.0, "spacing": 1.0}
+            for index, line in enumerate(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][name][1].splitlines())
+        ],
+    ]
+
+    class Data:
+        def GetTextCount(self):
+            return len(rows)
+
+        def GetTextAtIndex(self, index):
+            return rows[index]["text"]
+
+        def GetTextPositionAtIndex(self, index):
+            return tuple(a + b for a, b in zip(annotation.position, rows[index]["position"]))
+
+        def GetTextHeightAtIndex(self, index):
+            return rows[index]["height"]
+
+        def GetTextRefPositionAtIndex(self, index):
+            return rows[index]["reference"]
+
+        def GetTextAngleAtIndex(self, index):
+            return rows[index]["angle"]
+
+        def GetTextLineSpacingAtIndex(self, index):
+            return rows[index]["spacing"]
+
+        def GetLineCount(self):
+            return 1
+
+        def GetLineAtIndex2(self, _index):
+            x, y, z = annotation.position
+            return (0, 0, 0, 0, x - 0.009, y - 0.012, z, x + 0.009, y - 0.012, z)
+
+    class Display(_Display):
+        def SetText(self, *_args):
+            pytest.fail("drawing must inherit model-owned text without writing the source")
+
+        def GetDisplayData(self):
+            return data
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return source
+
+    class Annotation:
+        position = (0.017, 0.190, 0.0)
+        move_result = True
+        ignore_move = False
+
+        def GetSpecificAnnotation(self):
+            return display
+
+        def GetType(self):
+            return extent._ANNOT_DIM
+
+        def GetPosition(self):
+            return self.position
+
+        def SetPosition2(self, x, y, z):
+            events.append(("move", x, y, z))
+            if not self.ignore_move:
+                self.position = (x, y, z)
+            return self.move_result
+
+    annotation = Annotation()
+    annotation.source = source
+    annotation.endpoints = endpoints
+    annotation.owner = owner
+    part, qualifier = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][name]
+    display = Display({part: qualifier})
+    data = Data()
+    margins = {0: 0.0127, 1: 0.0127, 2: 0.0127, 3: 0.0127}
+    sheet = SimpleNamespace(
+        GetProperties2=lambda: (0, 0, 1, 4, 0, _TEMPLATE.width_m, _TEMPLATE.height_m, 0),
+        GetZoneMargin=lambda side: margins[side],
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet),
+        _attempt=lambda call: call(),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(extent, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(extent._sw_type_info, "early_bound_or_flag", lambda obj, *_a: obj)
+
+    def rebuild(_adapter, *, label):
+        events.append(("rebuild", label))
+
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(extent, "rebuild_drawing", rebuild)
+    return SimpleNamespace(
+        adapter=adapter, annotation=annotation, display=display, data=data,
+        rows=rows, margins=margins, source=source, endpoints=endpoints,
+        owner=owner, events=events,
+    )
+
+
+def test_thread_projection_wrap_preserves_every_word_and_below_compartment(
+    projection_native,
+) -> None:
+    native = projection_native
+    name = stack.THREAD_PROJECTION_DIMENSION
+    callouts = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE]
+    part, qualifier = callouts[name]
+    assert part == 4
+    drawing._assert_callouts([(name, native.display)], callouts)
+    wrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    native.rows[1]["text"] = " ".join(qualifier.split())
+    del native.rows[2:]
+    unwrapped = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert unwrapped[2] - unwrapped[0] > wrapped[2] - wrapped[0]
+
+
+@pytest.mark.parametrize("left_margin", [0.0127, 0.024])
+def test_thread_projection_fits_whole_qualifier_to_live_border_once(
+    projection_native, left_margin,
+) -> None:
+    native = projection_native
+    native.margins[3] = left_margin
+    before = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert native.data.GetTextPositionAtIndex(0)[0] > 0.0127
+    assert before[0] < left_margin
+    original_y = native.annotation.position[1]
+    drawing._fit_thread_projection(native.adapter, native.annotation)
+    after = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert after[0] == pytest.approx(left_margin + drawing.CLEAR_GAP_M)
+    assert after[1:] == pytest.approx(
+        (before[1], before[2] + after[0] - before[0], before[3])
+    )
+    assert native.annotation.position[1] == original_y
+    assert [event[0] for event in native.events] == ["rebuild", "move", "rebuild"]
+    assert native.annotation.source is native.source
+    assert native.annotation.endpoints is native.endpoints
+    assert native.annotation.owner is native.owner
+    assert native.display.GetDimension2(0) is native.source
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0  # existing general .XX band, not rewritten
+    # A dimension already comfortably inside its lane must not be moved.
+    x, y, z = native.annotation.position
+    native.annotation.position = (x + drawing.CLEAR_GAP_M, y, z)
+    native.events.clear()
+    drawing._fit_thread_projection(native.adapter, native.annotation)
+    assert [event[0] for event in native.events] == ["rebuild"]
+
+
+@pytest.mark.parametrize("failure", ["refused", "ignored"])
+def test_thread_projection_refuses_failed_native_move_without_retry(
+    projection_native, failure,
+) -> None:
+    native = projection_native
+    native.annotation.move_result = failure != "refused"
+    native.annotation.ignore_move = failure == "ignored"
+    with pytest.raises(RuntimeError, match="failed to move|crosses the zone frame"):
+        drawing._fit_thread_projection(native.adapter, native.annotation)
+    assert sum(event[0] == "move" for event in native.events) == 1
+
+
+@pytest.mark.parametrize("missing", ["all", "qualifier", "last-word"])
+def test_thread_projection_rejects_stored_but_unrendered_qualifier(
+    projection_native, missing,
+) -> None:
+    native = projection_native
+    if missing == "all":
+        native.rows.clear()
+    elif missing == "qualifier":
+        del native.rows[1:]
+    else:
+        native.rows[-1]["text"] = "BRACKET"
+    # Stored below-text alone is insufficient evidence of printed ink.
+    drawing._assert_callouts(
+        [(stack.THREAD_PROJECTION_DIMENSION, native.display)],
+        stack.SETTING_CALLOUTS[stack.THREAD_FEATURE],
+    )
+    with pytest.raises(RuntimeError, match="invalid native text count|missing rendered qualifier"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+@pytest.mark.parametrize(
+    ("field", "bad"),
+    [("position", (float("nan"), 0.0, 0.0)), ("position", (0.0, 0.0)),
+     ("height", 0.0), ("height", float("inf")), ("reference", 6),
+     ("angle", float("nan")), ("text", None)],
+)
+def test_thread_projection_refuses_malformed_native_qualifier_geometry(
+    projection_native, field, bad,
+) -> None:
+    native = projection_native
+    native.rows[1][field] = bad
+    with pytest.raises(RuntimeError, match="invalid native text"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+def test_thread_projection_checks_multiline_fragment_height(projection_native) -> None:
+    native = projection_native
+    native.rows[1]["text"] = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION][1]
+    native.rows[1]["spacing"] = 2.0
+    del native.rows[2:]
+    # Put the block's anchor well below the native shoulder: its full bottom
+    # must participate, not merely its first line's insertion point.
+    native.rows[1]["position"] = (0.0, -0.020, 0.0)
+    box = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert box[1] == pytest.approx(0.190 - 0.020 - 0.002 * 5)
+    native.rows[1]["spacing"] = 0.0
+    with pytest.raises(RuntimeError, match="invalid native text geometry"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+
+
+def test_base_lever_import_excludes_projection_and_preserves_other_settings(monkeypatch) -> None:
+    annotations = {
+        key: SimpleNamespace(GetSpecificAnnotation=lambda d=_Display({part: text}): d)
+        for key, (part, text) in stack.SETTING_CALLOUTS[stack.LEVER_FEATURE].items()
+    }
+    by_id = {id(annotation): key for key, annotation in annotations.items()}
+    imports, precision, shown = [], [], []
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "model_points_in_view", lambda *_a, **_k: (
+        (0.04, 0.21), (0.06, 0.21), (0.06, 0.19),
+    ))
+    monkeypatch.setattr(drawing, "_add_setting_axes", lambda *_a: None)
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches",
+        lambda _a, _v, features, **_k: shown.append(features),
+    )
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, annotation: by_id[id(annotation)])
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
+
+    def curate(_adapter, view, **kwargs):
+        imports.append((view, kwargs))
+        return list(annotations.values())
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "assert_imported_precision", lambda *args: precision.append(args))
+    view = object()
+    source_steps = []
+    settled = drawing._lever_settings(object(), view, source_steps.append)
+    assert imports == [(view, {
+        "keep": drawing.lever_keep((0.04, 0.21), (0.06, 0.21), (0.06, 0.19)),
+        "view_label": drawing.LEVER_VIEW_LABEL,
+        "dimensions_by_feature": stack.LEVER_DRAWING_DIMENSIONS,
+    })]
+    assert shown == [(stack.LEVER_FEATURE,)]
+    assert stack.THREAD_PROJECTION_DIMENSION not in imports[0][1]["keep"]
+    assert precision[0][2] == stack.LEVER_DRAWING_PRECISION[stack.LEVER_FEATURE]
+    settled()
+    assert source_steps == [
+        "lever settings import and readback", "lever settings settled readback",
+    ]
+    annotations[stack.FIXTURE_DROP_DIMENSION].GetSpecificAnnotation().parts[4] = ""
+    with pytest.raises(RuntimeError, match="below callout"):
+        settled()
+
+
+def _native_crop_fence(centre=(0.100, 0.053), radius=0.020):
+    x, y = centre
+    return [1, -1, x, y, 0, x + radius, y, 0, x + radius, y, 0, 3, 0, 0, 0, 0.0035, 0]
+
+
+@pytest.fixture
+def lever_tip_native(monkeypatch, projection_native):
+    """Execute the real detail construction and guards with native boundary doubles."""
+    import _drawing_dimensions as dimensions
+
+    native = projection_native
+    native.source_steps = []
+    native.source_step = native.source_steps.append
+
+    native.annotations = []
+    native.imports = []
+    native.shown = []
+    native.precision = 2
+    native.cropped = False
+    native.drop_on_crop = False
+    native.arrow_x = None
+    native.line_x = None
+    native.fence = _native_crop_fence()
+    # Retained R24 padding is deliberately independent of the corrected fence.
+    native.outline = [0.0649122, 0.020412, 0.130088, 0.085588]
+    native.projected = []
+    native.caption_extent = [0.0836475, 0.0151, 0.0, 0.132, 0.0293289, 0.0]
+    native.view = SimpleNamespace(
+        name="lever tip detail", GetAnnotations=lambda: native.annotations,
+        ScaleRatio=(4, 1), IsCropped=lambda: native.cropped,
+        UpdateViewDisplayGeometry=lambda: None,
+        GetOutline=lambda: native.outline,
+        GetDetailCircleInfo2=lambda: native.fence,
+        GetOrientationName=lambda: drawing.LEVER_TIP.orientation,
+        ReferencedConfiguration="Default",
+        GetDisplayMode2=lambda: 2,
+        GetFacettedHlrDisplay=lambda: False,
+        Position=(0.100, 0.053),
+        ModelToViewTransform=SimpleNamespace(ArrayData=tuple(float(i) for i in range(16))),
+    )
+    native.base = SimpleNamespace(name="base", GetAnnotations=lambda: [])
+    native.sheet_view = SimpleNamespace(name="sheet", GetAnnotations=lambda: [])
+    native.sheets = [[native.sheet_view, native.base, native.view]]
+    native.adapter.currentModel.GetViews = lambda: native.sheets
+
+    native.adapter.swApp = SimpleNamespace(IsSame=lambda a, b: int(a is b))
+    native.drawing_components = []
+    for stem in sorted(drawing.LEVER_TIP.stems):
+        full = SimpleNamespace(
+            Name2=f"{stem}-1", GetPathName=lambda stem=stem: f"C:/parts/{stem}.SLDPRT",
+            ReferencedConfiguration="Default",
+            source=SimpleNamespace(ConfigurationManager=SimpleNamespace(
+                ActiveConfiguration=SimpleNamespace(Name="Default"),
+            )),
+        )
+        full.GetModelDoc2 = lambda full=full: full.source
+        native.drawing_components.append(SimpleNamespace(Component=full, Visible=True))
+    native.view.GetVisibleDrawingComponents = lambda: native.drawing_components
+    native.annotation.Owner = native.view
+    native.annotation.OwnerType = 0
+    native.annotation.GetAttachedEntities3 = lambda: native.annotation.endpoints
+    native.annotation.GetAttachedEntityTypes = lambda: (11, 11)
+    native.annotation.IsDangling = lambda: False
+    native.display.GetPrimaryPrecision2 = lambda: native.precision
+    native.caption = SimpleNamespace(
+        GetText=lambda: drawing.LEVER_TIP.label_text,
+        GetExtent=lambda: native.caption_extent,
+    )
+    native.neighbour = SimpleNamespace(GetOutline=lambda: (0.035, 0.085, 0.105, 0.215))
+    native.back_extent = [0.0486244, 0.0767929, 0.0, 0.0972344, 0.0815586, 0.0]
+
+    def move_back(x, y, z):
+        dx, dy = x - native.back_extent[0], y - native.back_extent[4]
+        native.events.append(("caption-move", dx, dy, z))
+        for index in (0, 3):
+            native.back_extent[index] += dx
+        for index in (1, 4):
+            native.back_extent[index] += dy
+        return True
+
+    native.back_annotation = SimpleNamespace(
+        GetPosition=lambda: (native.back_extent[0], native.back_extent[4], 0.0),
+        SetPosition2=move_back,
+    )
+    native.back_caption = SimpleNamespace(
+        GetText=lambda: drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW],
+        GetExtent=lambda: native.back_extent,
+        GetAnnotation=lambda: native.back_annotation,
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda _a, view: view.name)
+    name = stack.THREAD_PROJECTION_DIMENSION
+    def identify(_a, ann):
+        return name if ann is native.annotation else ""
+
+    monkeypatch.setattr(drawing, "dimension_name", identify)
+    monkeypatch.setattr(dimensions, "dimension_name", identify)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: native.events.append(("activate",)))
+    monkeypatch.setattr(drawing, "_placed_detail", lambda _a, detail: native.view)
+    monkeypatch.setattr(
+        drawing, "_show_base_view_sketches",
+        lambda _a, _v, features, **_k: native.shown.append(features),
+    )
+
+    def projected(_adapter, view, points, **_kwargs):
+        assert view is native.view
+        native.projected.append(tuple(points))
+        cx, cy = drawing.LEVER_TIP.centre
+        mx = (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000
+        my = stack.LEVER_AXIS_Y / 1000
+        # Current remapped Front reverses X and retains Y. This places the
+        # source dimension; it is not offline evidence of solid visibility.
+        return tuple((cx - 4 * (x - mx), cy + 4 * (y - my)) for x, y, _z in points)
+
+    monkeypatch.setattr(drawing, "model_points_in_view", projected)
+
+    def curate(_adapter, view, **kwargs):
+        assert not native.cropped
+        native.imports.append((view, kwargs))
+        native.annotation.position = (*kwargs["keep"][name], 0.0)
+        native.annotations.append(native.annotation)
+        return [native.annotation]
+
+    def crop(_adapter, view, detail):
+        assert view is native.view and detail is drawing.LEVER_TIP
+        assert native.annotations == [native.annotation]
+        native.events.append(("crop",))
+        native.cropped = True
+        if native.drop_on_crop:
+            native.annotations.clear()
+
+    def label(_adapter, text, x, y):
+        assert text == drawing.LEVER_TIP.label_text
+        assert (x, y) == drawing.LEVER_TIP.label_xy
+        native.events.append(("caption", text))
+        return native.caption
+
+    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing, "_crop", crop)
+    monkeypatch.setattr(drawing, "add_note", label)
+    native.data.GetLineCount = lambda: 3
+
+    def line(index):
+        x, y, _ = native.annotation.position
+        tip, face = projected(native.adapter, native.view, (
+            (stack.THREADED_TIP_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+            (stack.THREAD_FAR_FACE_X / 1000, stack.LEVER_AXIS_Y / 1000, 0.0),
+        ))
+        segments = [
+            (x - 0.010, y - 0.012, face[0], y - 0.012),
+            (tip[0], tip[1], tip[0], y - 0.014),
+            (face[0], face[1], face[0], y - 0.014),
+        ]
+        x0, y0, x1, y1 = segments[index]
+        if native.line_x is not None and index == 1:
+            x0 = native.line_x
+        return (0, 0, 0, 0, x0, y0, 0, x1, y1, 0)
+
+    native.data.GetLineAtIndex2 = line
+    native.data.GetArrowHeadCount = lambda: 2
+    native.data.GetArrowHeadAtIndex2 = lambda index: (
+        native.arrow_x if native.arrow_x is not None else (0.0975, 0.1025)[index],
+        native.annotation.position[1] - 0.012, 0.0,
+        (-1.0, 1.0)[index], 0.0, 0.0, 0.0035, 0.0007, 0.0, 0.0, 0.0, 1.0,
+    )
+    return native
+
+
+def test_projection_detail_imports_once_before_crop_and_rechecks_settled_ink(lever_tip_native):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+    )
+    assert len(native.imports) == 1
+    view, args = native.imports[0]
+    assert view is native.view
+    assert args["dimensions_by_feature"] == stack.THREAD_DRAWING_DIMENSIONS
+    assert set(args["keep"]) == {stack.THREAD_PROJECTION_DIMENSION}
+    assert native.shown == [(stack.THREAD_FEATURE,)]
+    assert native.annotation.source is native.source
+    assert native.annotation.endpoints is native.endpoints
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.source.Tolerance.Type == 0
+    assert "VIEW FROM THE FRONT" in native.caption.GetText()
+    assert native.caption.GetText().count("\n") == 2
+    settled()
+    native.rows[1]["position"] = (-0.100, -0.003, 0.0)
+    moves = sum(event[0] == "move" for event in native.events)
+    with pytest.raises(RuntimeError, match="crosses the zone frame"):
+        settled()
+    assert sum(event[0] == "move" for event in native.events) == moves
+
+
+@pytest.mark.parametrize("failure", ["missing", "duplicate", "hidden", "configuration", "source"])
+def test_projection_detail_keeps_real_component_configuration_after_rebuild(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+    component = native.drawing_components[0]
+    if failure == "missing":
+        native.drawing_components.pop()
+    elif failure == "duplicate":
+        native.drawing_components.append(component)
+    elif failure == "hidden":
+        component.Visible = False
+    elif failure == "configuration":
+        component.Component.ReferencedConfiguration = "Other"
+    else:
+        component.Component.source.ConfigurationManager.ActiveConfiguration.Name = "Other"
+    with pytest.raises(RuntimeError, match="component selection|visible|configuration mismatch"):
+        settled()
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert len(native.imports) == 1 and native.annotation.endpoints is native.endpoints
+
+
+def test_detail_direction_exposes_the_nose_instead_of_the_occluding_flange():
+    import magnifying_bracket_joint_layout as joint
+
+    detail = drawing.LEVER_TIP
+    radius_mm = detail.crop_radius * 1000 * detail.scale[1] / detail.scale[0]
+    x = (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2
+    y = stack.LEVER_AXIS_Y
+    # The entire former Front crop lies inside the nearer flange's footprint.
+    assert joint.SIDE_PLATE_MACHINE_X[0] < x - radius_mm < x + radius_mm < joint.SIDE_PLATE_MACHINE_X[1]
+    assert joint.BRACKET_ORIGIN[1] + joint.SIDE_PLATE_Y[0] < y - radius_mm
+    assert y + radius_mm < joint.BRACKET_ORIGIN[1] + joint.SIDE_PLATE_Y[1]
+    flange_near_z = joint.BRACKET_ORIGIN[2] + joint.SIDE_PLATE_Z[0]
+    assert flange_near_z > assembly.LEVER_ROD_Z + drawing.LEVER_ROD_DIA / 2
+    # Standard Front now captures old Back, without changing the installation.
+    assert detail.orientation == "*Front"
+    assert detail.scale == (4, 1)
+    from mg_lever_thread_joint import NOSE_R
+    assert assembly.LEVER_ROD_Z - NOSE_R < flange_near_z
+    assert drawing.ASSEMBLED_VIEW_CAPTIONS[stack.DRAWING_BACK_VIEW] == "VIEW FROM THE BACK"
+
+
+def test_back_caption_moves_once_using_whole_native_outline_not_crop(lever_tip_native):
+    native = lever_tip_native
+    before = tuple(native.back_extent)
+    box = drawing._projection_note_box(native.back_caption)
+    assert drawing.boxes_clear(box, drawing._crop_box(native.view, drawing.LEVER_TIP))
+    assert not drawing.boxes_clear(box, tuple(native.outline))
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+    )
+    assert drawing.boxes_clear(drawing._projection_note_box(native.back_caption), tuple(native.outline))
+    assert native.back_extent[1] == before[1] and native.back_extent[4] == before[4]
+    assert native.back_caption.GetText() == "VIEW FROM THE BACK"
+    assert native.back_extent[3] == pytest.approx(
+        native.outline[0] - drawing.CLEAR_GAP_M - drawing.PLACE_SETTLE_M
+    )
+    assert native.back_extent[0] >= native.margins[3]
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+    native.outline[0] -= 0.010
+    with pytest.raises(RuntimeError, match="actual native view outline"):
+        settled()
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+
+
+def test_moved_back_caption_must_still_clear_live_border_after_rebuild(lever_tip_native):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+    )
+    native.back_extent[0] -= 0.002
+    native.back_extent[3] -= 0.002
+    with pytest.raises(RuntimeError, match="assembled back caption.*zone frame"):
+        settled()
+    assert sum(event[0] == "caption-move" for event in native.events) == 1
+
+
+def test_back_caption_fit_never_moves_from_an_invalid_native_outline(lever_tip_native):
+    native = lever_tip_native
+    native.outline[0] = float("nan")
+    with pytest.raises(RuntimeError, match="non-finite native view outline"):
+        drawing._fit_projection_back_caption(
+            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
+        )
+    assert not any(event[0] == "caption-move" for event in native.events)
+
+
+@pytest.mark.parametrize("failure", ["refused-move", "ignored-move", "border"])
+def test_back_caption_fit_requires_actual_native_readback(lever_tip_native, failure):
+    native = lever_tip_native
+    if failure == "refused-move":
+        native.back_annotation.SetPosition2 = lambda *_args: False
+    elif failure == "ignored-move":
+        native.back_annotation.SetPosition2 = lambda *_args: True
+    else:
+        native.margins[3] = 0.020
+    with pytest.raises(RuntimeError):
+        drawing._fit_projection_back_caption(
+            native.adapter, native.view, (native.neighbour,), (native.back_caption,),
+        )
+
+
+@pytest.mark.parametrize("fence", [
+    [], _native_crop_fence((0.0975, 0.053), 0.0225),
+    _native_crop_fence(radius=0), _native_crop_fence((float("nan"), 0.053)),
+])
+def test_native_crop_readback_refuses_nominal_only_or_shifted_fence(lever_tip_native, fence):
+    native = lever_tip_native
+    native.fence[:] = fence
+    with pytest.raises(RuntimeError, match="native crop fence"):
+        drawing._crop_box(native.view, drawing.LEVER_TIP)
+
+
+@pytest.mark.parametrize("failure", [
+    "source", "value", "nonfinite-value", "band", "precision", "owner",
+    "dangling", "null-point", "entity-type", "replacement", "bool-identity",
+    "missing", "duplicate",
+])
+def test_projection_detail_refuses_lost_authority_after_rebuild(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+    if failure == "source":
+        native.source.FullName = f"ThreadProjection@OtherChain@{drawing.SOURCE.stem}"
+    elif failure == "value":
+        native.source.SystemValue += 0.0001
+    elif failure == "nonfinite-value":
+        native.source.SystemValue = float("nan")
+    elif failure == "band":
+        native.source.Tolerance.Type = 4
+    elif failure == "precision":
+        native.precision = 1
+    elif failure == "owner":
+        native.annotation.Owner = native.base
+    elif failure == "dangling":
+        native.annotation.IsDangling = lambda: True
+    elif failure == "null-point":
+        native.annotation.endpoints = (None, native.endpoints[1])
+    elif failure == "entity-type":
+        native.annotation.GetAttachedEntityTypes = lambda: (0, 11)
+    elif failure == "replacement":
+        native.annotation.endpoints = (object(), native.endpoints[1])
+    elif failure == "bool-identity":
+        native.adapter.swApp.IsSame = lambda a, b: a is b
+    elif failure == "missing":
+        native.annotations.clear()
+    else:
+        native.base.GetAnnotations = lambda: [native.annotation]
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_projection_detail_refuses_import_lost_to_crop(lever_tip_native):
+    native = lever_tip_native
+    native.drop_on_crop = True
+    with pytest.raises(RuntimeError, match="after crop.*expected one control"):
+        drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+
+
+@pytest.mark.parametrize("failed_reader", ["entities", "types", "owner", "display", "all"])
+def test_projection_source_inventories_independent_reader_failures(
+    monkeypatch, lever_tip_native, failed_reader,
+):
+    native = lever_tip_native
+    events = []
+    messages = []
+    failed = {"entities", "types", "owner"} if failed_reader == "all" else {failed_reader}
+
+    def reader(field, value):
+        events.append(field)
+        if field in failed:
+            raise RuntimeError(f"{field} native failure")
+        return value
+
+    def log(message, **_kwargs):
+        messages.append(message)
+        events.append("log")
+
+    monkeypatch.setattr(drawing._telemetry, "info", log)
+    native.annotation.GetSpecificAnnotation = lambda: reader("display", native.display)
+    native.annotation.GetAttachedEntities3 = lambda: reader("entities", native.endpoints)
+    native.annotation.GetAttachedEntityTypes = lambda: reader("types", (11, 11))
+    native.annotation.IsDangling = lambda: reader("dangling", False)
+    monkeypatch.setattr(
+        type(native.annotation), "Owner",
+        property(lambda _self: reader("owner", native.view)), raising=False,
+    )
+    with pytest.raises(RuntimeError, match="inventory incomplete"):
+        drawing._projection_source(
+            native.adapter, native.view, native.annotation, stage="after crop diagnostic",
+        )
+    assert events[0] == "log"
+    assert "after crop diagnostic" in messages[0]
+    assert all(field in events for field in ("display", "entities", "types", "dangling", "owner"))
+    inventory = messages[-1]
+    assert "'dangling': False" in inventory
+    assert "'owner_type': 0" in inventory
+    for field in failed:
+        assert f"{field} native failure" in inventory
+    if failed_reader == "display":
+        assert "'dimension': 'display'" in inventory
+        assert "'types': (11, 11)" in inventory
+        assert "'entity_count': 2" in inventory
+    else:
+        assert native.source.FullName in inventory
+        assert f"'value': {native.source.SystemValue!r}" in inventory
+        assert "'tolerance_type': 0" in inventory
+
+
+def test_projection_source_collects_all_identity_codes_before_reader_failure(
+    monkeypatch, lever_tip_native,
+):
+    native = lever_tip_native
+    calls, messages = [], []
+
+    def same(point, old):
+        calls.append((point, old))
+        if point is native.endpoints[0] and old is native.endpoints[0]:
+            raise RuntimeError("first endpoint reader failed")
+        return int(point is old)
+
+    native.adapter.swApp.IsSame = same
+    monkeypatch.setattr(drawing._telemetry, "info", lambda message, **_kw: messages.append(message))
+    with pytest.raises(RuntimeError, match="endpoint identity readers failed"):
+        drawing._projection_source(
+            native.adapter, native.view, native.annotation,
+            stage="settled diagnostic", original=native.endpoints,
+        )
+    assert calls == [(point, old) for point in native.endpoints for old in native.endpoints]
+    assert "codes=((None, 0), (0, 1))" in messages[-1]
+    assert "first endpoint reader failed" in messages[-1]
+
+
+@pytest.mark.parametrize("failure", [
+    "arrow-border", "witness-border", "caption-border", "caption-crop",
+    "neighbour-caption", "neighbour-view", "scale", "uncropped", "missing-arrows",
+    "nonfinite-witness", "direction-caption", "nonfinite-outline",
+])
+def test_projection_layout_guards_all_native_ink_and_neighbours(lever_tip_native, failure):
+    native = lever_tip_native
+    settled = drawing._thread_projection_detail(
+        native.adapter, (native.neighbour,), (native.back_caption,), native.source_step,
+    )
+    if failure == "arrow-border":
+        native.arrow_x = 0.012
+    elif failure == "witness-border":
+        native.line_x = 0.012
+    elif failure == "nonfinite-witness":
+        native.line_x = float("nan")
+    elif failure == "direction-caption":
+        native.caption.GetText = lambda: drawing.LEVER_TIP.label_text.replace("FRONT", "BACK")
+    elif failure == "nonfinite-outline":
+        native.outline[0] = float("nan")
+    elif failure == "caption-border":
+        native.caption_extent[1] = 0.012
+    elif failure == "caption-crop":
+        native.caption_extent[4] = 0.036
+    elif failure == "neighbour-caption":
+        native.back_caption.GetExtent = lambda: (0.080, 0.070, 0, 0.130, 0.080, 0)
+    elif failure == "neighbour-view":
+        native.neighbour.GetOutline = lambda: (0.090, 0.070, 0.150, 0.120)
+    elif failure == "scale":
+        native.view.ScaleRatio = (1, 4)
+    elif failure == "uncropped":
+        native.cropped = False
+    else:
+        native.data.GetArrowHeadCount = lambda: 0
+    with pytest.raises(RuntimeError):
+        settled()
+
+
+def test_step_seven_uses_the_actual_detail_and_attached_qualifier():
+    step = notes.STEP_TEXT[steps.LEVER_THREADED_KEY]
+    qualifier = " ".join(stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION][1].split())
+    assert qualifier in step
+    assert drawing.LEVER_TIP.title in step
+    assert "THREAD PROJECTION" not in step
+    assert "NO LOCKNUT, SET SCREW OR ADHESIVE" in step
+    assert "THE PLAIN ROD HAS NO SHOULDER" in step
+    assert "1.25" not in step
+
+
+def test_lever_tip_placement_uses_opposite_native_view_and_isolation(monkeypatch):
+    events = []
+    detail = drawing.LEVER_TIP
+    view = SimpleNamespace(Position=detail.centre)
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        EditRebuild3=lambda: events.append(("rebuild",)) or True,
+    ))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        events.append(("place", source, orientation, (x, y), scale))
+        return view
+
+    def projected(_adapter, actual_view, point, *, label):
+        assert actual_view is view
+        assert point == (
+            (stack.THREADED_TIP_X + stack.THREAD_FAR_FACE_X) / 2000,
+            stack.LEVER_AXIS_Y / 1000, 0.0,
+        )
+        return view.Position[0] + 0.040, view.Position[1] - 0.017
+
+    def move(target, move_relative):
+        assert move_relative is False
+        view.Position = target
+        events.append(("move", target))
+        return True
+
+    view.SetViewPosition = move
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "model_point_in_view", projected)
+    monkeypatch.setattr(
+        drawing, "apply_view_configuration",
+        lambda _a, _v, **kwargs: events.append(("configuration", kwargs["role"])),
+    )
+    monkeypatch.setattr(
+        drawing, "set_hidden_lines_removed", lambda _a, _v: events.append(("HLR",))
+    )
+    monkeypatch.setattr(
+        drawing, "isolate_drawing_view_components",
+        lambda _a, _v, **kwargs: events.append(("isolate", kwargs["visible_stems"])),
+    )
+    assert drawing._placed_detail(adapter, detail) is view
+    assert events[0] == ("place", str(drawing.SOURCE), "*Front", detail.centre, (4, 1))
+    assert view.Position == pytest.approx((0.060, 0.070))
+    assert events[-2:] == [
+        ("HLR",), ("isolate", frozenset({"mg-magnifying-lever", "mg-magnifying-bracket"})),
+    ]
+    assert drawing.PRESSED.orientation == drawing.ENDSHAKE.orientation == stack.DRAWING_LEFT_VIEW
+    half_span_m = stack.THREAD_PROJECTION / 1000 * detail.scale[0] / detail.scale[1] / 2
+    assert half_span_m < detail.crop_radius
+    assert math.hypot(half_span_m, drawing._LEVER_R * 0.004) < detail.crop_radius
+
+
+@pytest.mark.parametrize("detail", (drawing.LEVER_TIP, drawing.PRESSED, drawing.ENDSHAKE))
+@pytest.mark.parametrize("previous_direct", [False, True])
+@pytest.mark.parametrize("status,cropped", [(drawing.CROP_NO_ERROR, True), (0, False)])
+def test_lever_tip_reuses_native_crop_sketch_transform(
+    monkeypatch, status, cropped, previous_direct, detail,
+):
+    events = []
+    transform = object()
+
+    scale = detail.scale[0] / detail.scale[1]
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = values
+
+        def MultiplyTransform(self, actual):
+            assert actual is transform
+            x, y, z = self.ArrayData
+            return Point((x / scale, y / scale, z))
+
+    manager = SimpleNamespace(AddToDB=previous_direct)
+    fence = []
+    authored = []
+
+    def circle(*points):
+        events.append(("circle", points, manager.AddToDB))
+        cx, cy, _cz, rx, ry, _rz = (value * scale for value in points)
+        if not manager.AddToDB:
+            cx -= 0.0025  # R24's witness inference, not a native layout acceptance.
+        fence[:] = _native_crop_fence((cx, cy), math.hypot(rx - cx, ry - cy))
+        segment = SimpleNamespace(
+            Select4=lambda append, data: events.append(("select", append, data)) or True
+        )
+        authored.append(segment)
+        return segment
+
+    manager.CreateCircle = circle
+    sketch = SimpleNamespace(ModelToSketchTransform=transform)
+    view = SimpleNamespace(
+        GetSketch=lambda: sketch,
+        Crop2=lambda *args: events.append(("Crop2", args)) or status,
+        IsCropped=lambda: cropped,
+        UpdateViewDisplayGeometry=lambda: events.append(("refresh",)),
+        GetDetailCircleInfo2=lambda: fence,
+    )
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(
+            SketchManager=manager,
+            ClearSelection2=lambda value: events.append(("clear", value)),
+            EditRebuild3=lambda: events.append(("rebuild",)) or True,
+        ),
+        swApp=SimpleNamespace(GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point)),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    if cropped:
+        drawing._crop(adapter, view, detail)
+    else:
+        with pytest.raises(RuntimeError, match="not cropped"):
+            drawing._crop(adapter, view, detail)
+    cx, cy = detail.centre
+    radius = detail.crop_radius
+    assert events[0] == (
+        "circle", (cx / scale, cy / scale, 0.0, (cx + radius) / scale, cy / scale, 0.0), True,
+    )
+    assert events[1:3] == [("select", False, None), ("Crop2", (False, False, 1))]
+    assert events[-1] == ("refresh",)
+    assert manager.AddToDB is previous_direct
+
+
+@pytest.mark.parametrize("failure", ["creation", "selection"])
+def test_deterministic_crop_restores_database_mode_on_native_refusal(monkeypatch, failure):
+    manager = SimpleNamespace(AddToDB=False)
+    calls = []
+
+    def create(*_args):
+        assert manager.AddToDB is True
+        if failure == "creation":
+            raise RuntimeError("native circle creation refused")
+        return SimpleNamespace(Select4=lambda *_args: False)
+
+    manager.CreateCircle = create
+    view = SimpleNamespace(
+        GetSketch=lambda: SimpleNamespace(ModelToSketchTransform=object()),
+        Crop2=lambda *_args: calls.append("crop"),
+    )
+    utility = SimpleNamespace(CreatePoint=lambda values: SimpleNamespace(
+        MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=values),
+    ))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(SketchManager=manager),
+        swApp=SimpleNamespace(GetMathUtility=lambda: utility),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(drawing, "null_callout", lambda: None)
+    monkeypatch.setattr(drawing, "_activate", lambda *_a, **_k: None)
+    with pytest.raises(RuntimeError, match="circle"):
+        drawing._crop(adapter, view, drawing.LEVER_TIP)
+    assert manager.AddToDB is False
+    assert calls == []
+
+
+def test_assembled_sheet_adds_one_projection_detail_with_existing_neighbours(monkeypatch):
+    views, captions, projection_calls = [], [], []
+    source_steps = []
+    source_step = source_steps.append
+    base_check, stack_check, projection_check = (lambda: None), (lambda: None), (lambda: None)
+    sheet_view = object()
+    adapter = SimpleNamespace(currentModel=SimpleNamespace(
+        GetViews=lambda: [(sheet_view, *views), (object(),)],
+    ))
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
+    monkeypatch.setattr(drawing, "apply_view_configuration", lambda *_a, **_k: None)
+
+    def place(_adapter, source, orientation, x, y, *, scale):
+        assert source == str(drawing.SOURCE) and scale == drawing.SHEET_SCALE
+        view = SimpleNamespace(
+            orientation=orientation, GetAnnotations=lambda: [],
+            GetOutline=lambda: (x - 0.01, y - 0.02, x + 0.01, y + 0.02),
+        )
+        views.append(view)
+        return view
+
+    def stacks(_adapter, callback):
+        assert callback is source_step
+        callback("stack callback")
+        for _ in range(2):
+            label = object()
+            annotation = SimpleNamespace(GetType=lambda: 6, GetSpecificAnnotation=lambda n=label: n)
+            views.append(SimpleNamespace(GetAnnotations=lambda a=annotation: [a]))
+        return stack_check
+
+    def caption(*args, **kwargs):
+        note = object()
+        captions.append(note)
+        return note
+
+    def detail(_adapter, neighbours, notes, callback):
+        assert callback is source_step
+        callback("tip callback")
+        projection_calls.append((neighbours, notes))
+        return projection_check
+
+    monkeypatch.setattr(drawing, "place_view", place)
+    def lever(_adapter, view, callback):
+        assert view is views[0] and callback is source_step
+        callback("lever callback")
+        return base_check
+
+    monkeypatch.setattr(drawing, "_lever_settings", lever)
+    monkeypatch.setattr(drawing, "_stack_dimensions", stacks)
+    monkeypatch.setattr(drawing, "_add_note_block", caption)
+    monkeypatch.setattr(drawing, "_thread_projection_detail", detail)
+    assert drawing._place_assembled_sheet(adapter, source_step) == (base_check, stack_check, projection_check)
+    assert [view.orientation for view in views[:3]] == [
+        stack.DRAWING_BACK_VIEW, stack.DRAWING_LEFT_VIEW, stack.DRAWING_ISOMETRIC_VIEW,
+    ]
+    assert source_steps.index("lever callback") < source_steps.index("stack callback")
+    assert source_steps.index("stack callback") < source_steps.index("tip callback")
+    assert len(projection_calls) == 1
+    neighbours, notes = projection_calls[0]
+    assert neighbours == tuple(views) and len(neighbours) == 5
+    assert notes[:2] == tuple(captions) and len(notes) == 4
+
+
+@pytest.mark.parametrize(
+    "box",
+    [(0.0127 - 1e-10, 0.100, 0.020, 0.110),
+     (0.020, 0.0127 - 1e-10, 0.030, 0.110),
+     (0.020, 0.100, _TEMPLATE.width_m - 0.0127 + 1e-10, 0.110),
+     (0.020, 0.100, 0.030, _TEMPLATE.height_m - 0.0127 + 1e-10)],
+)
+def test_projection_border_guard_has_no_outward_allowance(projection_native, box) -> None:
+    native = projection_native
+    with pytest.raises(RuntimeError, match="crosses the zone frame"):
+        drawing.require_inside(
+            stack.THREAD_PROJECTION_DIMENSION, box, drawing.sheet_region(native.adapter)
+        )
+
+
 def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
     monkeypatch,
 ) -> None:
@@ -575,20 +1562,26 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
     monkeypatch.setattr(
         assembly, "blank_sketch", lambda adapter, feature: blanked.append(feature)
     )
+    monkeypatch.setattr(assembly, "_physical_thread_projection", lambda *_a: (stack.THREADED_TIP_X, stack.THREAD_FAR_FACE_X))
+    monkeypatch.setattr(assembly, "_assert_thread_projection_faces", lambda *_a: None)
 
-    asyncio.run(assembly._author_lever_setting_reference(Adapter()))
+    asyncio.run(assembly._author_lever_setting_reference(Adapter(), lever_name="lever-1", bracket_name="bracket-1"))
 
     tip = (stack.LEVER_TIP_X, stack.LEVER_AXIS_Y)
     clamp = (stack.CLAMP_CENTRE_X, stack.LEVER_AXIS_Y)
     fixture = (stack.CLAMP_CENTRE_X, stack.FIXTURE_AXIS_Y)
-    assert lines == [(*tip, *clamp), (*clamp, *fixture)]
+    threaded_tip = (stack.THREADED_TIP_X, stack.LEVER_AXIS_Y)
+    far_face = (stack.THREAD_FAR_FACE_X, stack.LEVER_AXIS_Y)
+    assert lines == [(*tip, *clamp), (*clamp, *fixture), (*threaded_tip, *far_face)]
     assert ("leg0", None, "horizontal") in relations
     assert ("leg1", None, "vertical") in relations
     assert ("leg0.end", "leg1.start", "coincident") in relations
-    assert anchors == [("leg0.start", *tip)]
+    assert ("leg2", None, "horizontal") in relations
+    assert anchors == [("leg0.start", *tip), ("leg2.start", *threaded_tip)]
     assert lengths == {
         stack.CLAMP_STATION_DIMENSION: ("horizontal_distance", stack.CLAMP_STATION),
         stack.FIXTURE_DROP_DIMENSION: ("vertical_distance", stack.FIXTURE_DROP),
+        stack.THREAD_PROJECTION_DIMENSION: ("horizontal_distance", stack.THREAD_PROJECTION),
     }
     feature = stack.LEVER_FEATURE
     assert equations == {
@@ -604,7 +1597,7 @@ def test_the_lever_chain_is_authored_on_the_front_plane_and_driven_from_globals(
         "LeverFixtureDrop": f"{stack.FIXTURE_DROP}mm",
     }
     assert all(entity.ConstructionGeometry for entity in Adapter._sketch_entities.values())
-    assert blanked == [feature]
+    assert blanked == [feature, stack.THREAD_FEATURE]
 
 
 def test_the_explode_moves_every_shown_family_but_the_wire_in_one_group() -> None:
@@ -800,7 +1793,6 @@ def instruction_note_bounds(monkeypatch):
     checks = SimpleNamespace(GetExtent=lambda: checks_extent)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
-    monkeypatch.setattr(drawing._telemetry, "info", lambda _message: None)
     return SimpleNamespace(
         sequence_extent=sequence_extent,
         checks_extent=checks_extent,
@@ -875,35 +1867,24 @@ def test_instruction_native_bounds_refuse_unreadable_or_degenerate_boxes(
 
 
 def test_the_steps_and_checks_fit_their_column() -> None:
-    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_CHECKS):
-        assert max(len(line) for line in block.splitlines()) <= drawing.STEPS_LINE_WIDTH
+    for block, width in (
+        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
+        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_LINE_WIDTH),
+    ):
+        assert max(len(line) for line in block.splitlines()) <= width
+    steps_bottom = drawing.STEPS_XY[1] - len(
+        drawing.ASSEMBLY_STEPS.splitlines()
+    ) * drawing.NOTE_LINE_PITCH
     checks_bottom = drawing.CHECKS_XY[1] - len(
         drawing.ASSEMBLY_CHECKS.splitlines()
     ) * drawing.NOTE_LINE_PITCH
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
     assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    # Measured 0fb89 and 86bc envelopes/ink, translated from their insertions.
-    # Preserve 4 mm native padding on every known seat, not just PDF air.
-    for (
-        steps_y, checks_y, steps_bottom, steps_top, checks_bottom, checks_top,
-        steps_ink_bottom, checks_ink_top,
-    ) in (
-        (0.258, 0.0844, 0.0953983, 0.2584113, 0.0618495, 0.0846455,
-         0.0960089, 0.0843736),
-        (0.2595, 0.0926, 0.0968088, 0.2597953, 0.0701210, 0.0929963,
-         0.0975090, 0.0925736),
-    ):
-        steps_dy = drawing.STEPS_XY[1] - steps_y
-        checks_dy = drawing.CHECKS_XY[1] - checks_y
-        assert steps_bottom + steps_dy - (checks_top + checks_dy) >= drawing._PAD
-        assert steps_top + steps_dy <= drawing.INNER_BORDER[3] - drawing._PAD
-        assert checks_bottom + checks_dy >= drawing.TITLE_BLOCK[3] + drawing._PAD
-        # Matched PDF ink sets separation, rather than nominal font size.
-        assert (
-            steps_ink_bottom + steps_dy - (checks_ink_top + checks_dy)
-            >= min(0.0038733, 0.0038734)
-        )
+    # Upstream native envelopes used shorter, non-threaded text. They cannot
+    # certify these combined blocks. Check derived spacing here; final native
+    # whole-note/layout checks must establish clearance for this exact text.
+    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
     assert drawing.ASSEMBLY_STEPS.split() == " ".join(
@@ -913,6 +1894,91 @@ def test_the_steps_and_checks_fit_their_column() -> None:
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
             assert number in drawing.ASSEMBLY_STEPS
+
+
+def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
+    monkeypatch,
+) -> None:
+    from _drawing_annotation_extent import boxes_clear
+    from _drawing_layout_check import DrawableRegion
+
+    # Native R22 PDF/layout JSON, run 20261021T114849219Z-97170adcbc744b108a6c2f7a37ddaba5.
+    # The actual five-row note extent overlaps the panel even though each
+    # printed row clears it. Keep this aggregate-box positive control:
+    # acceptance requires the WHOLE note box clear, not a per-row exception.
+    native_extent = (0.0176475, 0.0572536, 0.2187594, 0.0801289)
+    assert not boxes_clear(native_extent, drawing.TITLE_BLOCK, gap=0.0)
+    # A left shift for the existing layout pad would breach the left border.
+    required_shift = native_extent[2] - drawing.TITLE_BLOCK[0] + drawing._PAD
+    assert native_extent[0] - required_shift < drawing.INNER_BORDER[0]
+    # CenturyGothic 13.2286 pt, advances measured from R22 PDF char boxes.
+    # Predict the extent delta using the same native font, not source-copy
+    # wrapping code or a claim that the candidate has already rendered.
+    advances = {
+        " ": 3.664551, "'": 2.619415, ",": 3.664536, ".": 3.664551,
+        "1": 7.329041, ":": 3.664330, "A": 9.789703, "B": 7.593231,
+        "C": 10.754883, "D": 9.842621, "E": 7.090942, "F": 6.416260,
+        "G": 11.535988, "H": 9.035645, "I": 2.989807, "K": 7.818115,
+        "L": 6.111954, "M": 12.157776, "N": 9.789703, "O": 11.496277,
+        "P": 7.831787, "R": 8.030212, "S": 6.588226, "T": 5.635681,
+        "U": 8.665222, "V": 9.287003, "W": 12.700165, "X": 8.056381,
+        "Y": 7.831787,
+    }
+    old_rows = [
+        *drawing._wrapped(notes.ASSEMBLY_CHECKS[:-1], width=80).splitlines(),
+        *drawing._wrapped(notes.ASSEMBLY_CHECKS[-1:], width=72).splitlines(),
+    ]
+    adapter = object()
+    calls = []
+    monkeypatch.setattr(
+        drawing, "_activate_sheet",
+        lambda actual_adapter, name: calls.append(("sheet", actual_adapter, name)),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+
+    def add_note(actual_adapter, text, x, y):
+        calls.append(("note", actual_adapter, x, y))
+        return SimpleNamespace(GetText=lambda: text.replace("\n", "\r\n"))
+
+    monkeypatch.setattr(drawing, "add_note", add_note)
+    note = drawing._add_note_block(
+        adapter, drawing.SHEET_NAMES[3], drawing.ASSEMBLY_CHECKS,
+        drawing.CHECKS_XY, label="assembly checks",
+    )
+    assert calls == [
+        ("sheet", adapter, drawing.SHEET_NAMES[3]),
+        ("note", adapter, *drawing.CHECKS_XY),
+    ]
+    printed_rows = note.GetText().splitlines()
+    assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
+    assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
+    # Keep all five CHECK rows and the original steps column. A changed step
+    # may move the check block only through the existing line-count formula.
+    assert len(printed_rows) == len(old_rows) == 5
+    assert [i for i, row in enumerate(printed_rows) if row.startswith("CHECK:")] == [0, 1, 3]
+    assert drawing.ASSEMBLY_STEPS == drawing._wrapped(
+        notes.ASSEMBLY_STEPS, width=80, heading="ASSEMBLY SEQUENCE"
+    )
+    assert drawing.CHECKS_XY == (
+        drawing.STEPS_XY[0],
+        drawing.STEPS_XY[1]
+        - len(drawing.ASSEMBLY_STEPS.splitlines()) * drawing.NOTE_LINE_PITCH
+        - 2 * drawing._PAD,
+    )
+    points_per_m = 72 / 0.0254
+    old_width = max(sum(advances[c] for c in row) for row in old_rows)
+    new_width = max(sum(advances[c] for c in row) for row in printed_rows)
+    vertical_shift = drawing.CHECKS_XY[1] - 0.0798  # R22 native insertion y
+    predicted_extent = (
+        native_extent[0], native_extent[1] + vertical_shift,
+        native_extent[2] + (new_width - old_width) / points_per_m,
+        native_extent[3] + vertical_shift,
+    )
+    drawing.require_inside(
+        "assembly checks", predicted_extent, DrawableRegion(*drawing.INNER_BORDER)
+    )
+    assert boxes_clear(predicted_extent, drawing.TITLE_BLOCK, gap=drawing._PAD)
+    assert predicted_extent[2] + drawing._PAD < drawing.FINISHED_FIELD[0]
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
@@ -977,7 +2043,7 @@ def test_the_lever_group_takes_1_2_5_centred_with_its_caption_under_it() -> None
 
 def test_the_setting_axis_picks_land_on_the_bare_cylinders_off_the_chain() -> None:
     # r14 (run 20261016T171305106Z), back view at 1:4: the picks stay 5 mm
-    # off the clamp block, the 7/16 hex whose bottom face sits LEVER_BORE_Y
+    # off the clamp block, the 1/2 hex whose bottom face sits LEVER_BORE_Y
     # under the lever axis and whose corners sit HEX_AC/2 either side of the
     # rod axis along the lever (#1559), and off the fixture's top, 5.5 mm
     # over its axis.
@@ -1337,9 +2403,11 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
     from unittest.mock import AsyncMock
 
     import _com
+    import _component_references as references
     from _test_stubbed_build import stub_seat
 
     monkeypatch.setattr(_com, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     table = magnifier_bom.table
     for row in magnifier_bom.cells:
         row.insert(3, "VENDOR SKU" if row is magnifier_bom.cells[0] else "-")
@@ -1365,6 +2433,8 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         keep=(
             "build", "validate_bom_number_property",
             "component_identity", "component_reference_names",
+            "_validate_source", "_source_sha256",
+            "_assert_source_identity", "_source_dirty_tracer",
         ),
     )
     seat._early_bound.side_effect = lambda value, _interface: value
@@ -1390,33 +2460,7 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         drawing, "_assert_bom_clears_reference_field", lambda _table: None
     )
     seat.finalize_drawing.return_value = {"drawing": "offline.SLDDRW"}
-    identity = (
-        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-    )
-    source_components = []
-    for stem in notes.BOM_ORDER:
-        for index in range(notes.QUANTITIES[stem]):
-            source_components.append(SimpleNamespace(
-                Name2=f"{stem}-{index + 1}",
-                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
-                ReferencedConfiguration=(
-                    "LeverWire" if stem == notes.WIRE else "Default"
-                ),
-                ComponentReference="LeverWire:1" if stem == notes.WIRE else "",
-                GetTotalTransform=lambda _presentation: SimpleNamespace(
-                    ArrayData=identity
-                ),
-            ))
-    source_model = SimpleNamespace(
-        ConfigurationManager=SimpleNamespace(
-            ActiveConfiguration=SimpleNamespace(Name="Default")
-        ),
-        GetExplodedViewNames2=lambda configuration: (
-            drawing.EXPLODED_VIEW_NAMES[configuration],
-        ),
-        GetComponents=lambda _top_level: tuple(source_components),
-    )
+    source_model = _ExplodeSource()
     adapter = SimpleNamespace(
         open_model=AsyncMock(), currentModel=source_model
     )
@@ -1708,6 +2752,7 @@ def test_mg_owned_offsets_refuse_same_count_contract_mutations(monkeypatch, muta
 def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     """Native readbacks are fixed independently of the recipe being authored."""
     import _mg_magnifier_explode as author
+    import _component_references as references
     from solidworks_mcp.adapters import com_variant
 
     monkeypatch.setattr(
@@ -1740,6 +2785,7 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
             (-0.16999999, 0.350, -0.400),
         ),
         "stationary-1": ((0.100, 0.200, 0.300),) * 5,
+        "sh-vn-music-wire-73": ((0.075, 0.200, 0.300),) * 5,
     }
     requests = (
         (0.030, ("slider-1", "slider-2"), "X", False),
@@ -1774,6 +2820,12 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     components = {
         name: SimpleNamespace(
             Name2=name,
+            ComponentReference=(
+                "LeverWire:1" if name == "sh-vn-music-wire-73" else ""
+            ),
+            ReferencedConfiguration=(
+                "LeverWire" if name == "sh-vn-music-wire-73" else "Default"
+            ),
             GetPathName=lambda name=name: f"C:/parts/{name.rsplit('-', 1)[0]}.SLDPRT",
             GetTotalTransform=lambda presentation, name=name: transform(
                 name, state.stage if presentation and state.exploded else 0
@@ -1865,6 +2917,7 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
         state.published.append(properties)
 
     monkeypatch.setattr(author, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(com_variant, "null_callout", lambda: None)
     monkeypatch.setattr(
         author, "_global_directions",
@@ -1896,6 +2949,7 @@ def test_actual_mg_author_publishes_final_measured_offsets(monkeypatch, configur
         "slider-1": (0.04200003, -0.02500002, 0.00700004),
         "slider-2": (0.03000001, 0.0, 0.0),
         "stationary-1": (0.0, 0.0, 0.0),
+        "sh-vn-music-wire-73": (0.0, 0.0, 0.0),
     }
     assert set(payload["offsets_m"]) == set(expected)
     for name, vector in expected.items():
@@ -1960,6 +3014,8 @@ class _ExplodeSource:
             SimpleNamespace(
                 Name2=item.name,
                 GetPathName=lambda stem=item.stem: f"C:/parts/{stem}.SLDPRT",
+                ReferencedConfiguration="LeverWire" if item.stem == notes.WIRE else "Default",
+                ComponentReference="LeverWire:1" if item.stem == notes.WIRE else "",
                 GetTotalTransform=lambda _presentation: transform,
             )
             for item in _metadata_instances()
@@ -1982,8 +3038,9 @@ class _ExplodeSource:
     def GetSaveFlag(self):
         return self.dirty
 
-    def GetComponents(self, top_level):
-        assert top_level is True
+    def GetComponents(self, _top_level_only):
+        # This MG source is flat: all immediate children are leaves, so the
+        # recursive and top-level native inventories contain the same handles.
         return self.components
 
     def GetExplodedViewNames2(self, configuration):
@@ -1995,6 +3052,9 @@ class _ExplodeSource:
 
 
 def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypatch):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     offsets = drawing._validate_source(source)
@@ -2009,20 +3069,37 @@ def test_mg_validate_source_reads_both_metadata_maps_without_activation(monkeypa
 
 @pytest.mark.parametrize("configuration", ["Default", "Default Simplified"])
 def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     source.properties.pop(explode.explode_offsets_property(configuration))
     with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
         drawing._validate_source(source)
 
-@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
+@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families", "foreign", "wire member"])
 def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
+    import _component_references as references
+
+    monkeypatch.setattr(references, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     if failure == "active configuration":
         source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
     elif failure == "families":
         source.components.pop()
+    elif failure == "foreign":
+        source.components.append(SimpleNamespace(
+            Name2="foreign-part-1",
+            ComponentReference="",
+            ReferencedConfiguration="Default",
+            GetPathName=lambda: "C:/parts/foreign-part.SLDPRT",
+            GetTotalTransform=source.components[0].GetTotalTransform,
+        ))
+    elif failure == "wire member":
+        wire = next(component for component in source.components if component.ComponentReference == "LeverWire:1")
+        wire.ReferencedConfiguration = "PenWire"
     else:
         base = source.components[0].GetTotalTransform(False).ArrayData
         displaced = list(base)
@@ -2032,6 +3109,8 @@ def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure
         )
     with pytest.raises(RuntimeError):
         drawing._validate_source(source)
+    assert not source.dirty
+    assert source.configuration_switches == []
 
 
 
@@ -2183,6 +3262,7 @@ def test_mg_settings_only_read_inherited_native_callouts(
     for module in (drawing, dimension_helpers):
         monkeypatch.setattr(module, "dimension_name", lambda _adapter, item: item.name)
     monkeypatch.setattr(drawing, "_show_base_view_sketches", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a: None)
     monkeypatch.setattr(
         drawing,
         "curate_view_dimensions",
@@ -2200,11 +3280,12 @@ def test_mg_settings_only_read_inherited_native_callouts(
         lambda _adapter, _detail, keep: [annotations[name] for name in keep],
     )
     adapter = SimpleNamespace(_attempt=lambda action: action())
+    source_steps = []
 
     def import_settings():
         if group == "lever":
-            return drawing._lever_settings(adapter, object(), lambda _phase: None)
-        return drawing._stack_dimensions(adapter, lambda _phase: None)
+            return drawing._lever_settings(adapter, object(), source_steps.append)
+        return drawing._stack_dimensions(adapter, source_steps.append)
 
     if missing:
         with pytest.raises(RuntimeError, match="callout reads ''"):
@@ -2212,6 +3293,390 @@ def test_mg_settings_only_read_inherited_native_callouts(
         return
     settled = import_settings()
     settled()
+    assert source_steps == [
+        f"{group} settings import and readback", f"{group} settings settled readback",
+    ]
     text_parts[name][part] = ""
     with pytest.raises(RuntimeError, match="callout reads ''"):
         settled()
+
+
+def test_tip_camera_preserves_old_back_after_actual_standard_view_remap(monkeypatch):
+    import _assembly
+    import _assembly_named_views
+
+    # Native standard camera rows, before the builder's remap. These are
+    # independent of the drawing's chosen orientation string.
+    old_front = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    old_back = (-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0)
+    old_right = (0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
+    old_iso = (
+        1 / math.sqrt(2), 0.0, -1 / math.sqrt(2),
+        -1 / math.sqrt(6), 2 / math.sqrt(6), -1 / math.sqrt(6),
+        1 / math.sqrt(3), 1 / math.sqrt(3), 1 / math.sqrt(3),
+    )
+
+    class Model:
+        def __init__(self):
+            self.standard = {1: old_front, 2: old_back, 4: old_right, 7: old_iso}
+            self.named = {}
+            self.current = None
+            self.Extension = SimpleNamespace(
+                GetNamedViewRotation=lambda name: self.named[name],
+                UpdateStandardViews=self.update,
+            )
+
+        def GetStandardViewRotation(self, view_id):
+            return self.standard[view_id]
+
+        def ShowNamedView2(self, name, view_id):
+            self.current = self.named[name] if name else self.standard[view_id]
+
+        def NameView(self, name):
+            self.named[name] = self.current
+
+        def update(self, name, view_id):
+            assert name == "" and view_id == 1
+            self.standard[1] = self.current
+            self.standard[2] = tuple(
+                value if index // 3 == 1 else -value
+                for index, value in enumerate(self.current)
+            )
+            return True
+
+    for module in (_assembly, _assembly_named_views):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _iface: value)
+    model = Model()
+    adapter = SimpleNamespace(currentModel=model, _zoom_to_fit=lambda _model: None)
+    # Execute the actual two builder helpers in their canonical order.
+    assembly.name_standard_views(adapter, views=stack.DRAWING_STANDARD_VIEWS, label="MG")
+    assembly.remap_front_to_machine_front(adapter)
+    cameras = {"*Front": model.standard[1], "*Back": model.standard[2], **model.named}
+    tip_rows = cameras[drawing.LEVER_TIP.orientation]
+    assert tip_rows == old_back
+    assert model.current == old_back
+    assert cameras[stack.DRAWING_BACK_VIEW] == old_front
+    assert cameras[drawing.PRESSED.orientation] == old_right
+    assert cameras[drawing.ENDSHAKE.orientation] == old_right
+    assert cameras[stack.DRAWING_ISOMETRIC_VIEW] == old_iso
+    assert is_pictorial_orientation(stack.DRAWING_ISOMETRIC_VIEW)
+    point = (stack.THREADED_TIP_X, stack.LEVER_AXIS_Y, assembly.LEVER_ROD_Z)
+    projected = tuple(
+        sum(point[i] * tip_rows[3 * axis + i] for i in range(3))
+        for axis in range(3)
+    )
+    assert projected == pytest.approx((-point[0], point[1], -point[2]))
+    assert tip_rows[6:] == (0.0, 0.0, -1.0)  # Viewer on the unobstructed -Z side.
+    assert cameras[stack.DRAWING_BACK_VIEW][6:] == (0.0, 0.0, 1.0)
+
+
+@pytest.mark.parametrize("stage", ["import", "settled"])
+@pytest.mark.parametrize("damage", ["missing", "wrong compartment", "changed text"])
+def test_tip_inherited_callout_is_required_without_repair(lever_tip_native, stage, damage):
+    native = lever_tip_native
+    part, text = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE][stack.THREAD_PROJECTION_DIMENSION]
+    if stage == "settled":
+        settled = drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+    native.display.parts.clear()
+    if damage == "wrong compartment":
+        native.display.parts[3] = text
+    elif damage == "changed text":
+        native.display.parts[part] = text + "\nCHANGED"
+    before = dict(native.display.parts)
+    with pytest.raises(RuntimeError, match="below callout reads"):
+        if stage == "import":
+            drawing._thread_projection_detail(native.adapter, (), (), native.source_step)
+        else:
+            settled()
+    assert native.display.parts == before
+    assert native.source.SystemValue == pytest.approx(0.00125)
+    assert native.annotation.endpoints is native.endpoints
+
+
+@pytest.fixture
+def immutable_tip_build(
+    monkeypatch, tmp_path, lever_tip_native, magnifier_bom, instruction_note_bounds,
+):
+    """Run build's real source guards and Tip checks; fake only native I/O.
+
+    No production source/configuration guard or source_step is replaced. The
+    finalizer double runs its supplied settled callbacks before a save marker.
+    """
+    native = lever_tip_native
+    path = tmp_path / drawing.SOURCE.name
+    path.write_bytes(b"released MG source")
+    monkeypatch.setattr(drawing, "SOURCE", path)
+    source = _ExplodeSource()
+    drawing_model = native.adapter.currentModel
+    drawing_model.GraphicsRedraw2 = lambda: None
+    state = SimpleNamespace(
+        source=source, path=path, native=native, saved=False, finalized=False,
+        hook=lambda _stage: None, metadata_reads=[], phases=[], balloon_calls=[],
+        bom_items=dict(magnifier_bom.expected_items),
+    )
+    get_property = source.GetCustomInfoValue
+
+    def property_value(configuration, name):
+        state.metadata_reads.append((configuration, name))
+        return get_property(configuration, name)
+
+    source.GetCustomInfoValue = property_value
+
+    async def open_model(actual_path):
+        assert actual_path == str(path)
+        native.adapter.currentModel = source
+        return SimpleNamespace(is_success=True, data=None, error=None)
+
+    native.adapter.open_model = open_model
+    monkeypatch.setattr(
+        drawing, "read_required_properties",
+        lambda *_a, **_k: {"Number": notes.DRAWING_NUMBER},
+    )
+    monkeypatch.setattr(
+        drawing, "_create_sheets",
+        lambda adapter: setattr(adapter, "currentModel", drawing_model),
+    )
+
+    def assembled(adapter, source_step):
+        return (drawing._thread_projection_detail(adapter, (), (), source_step),)
+
+    monkeypatch.setattr(drawing, "_place_assembled_sheet", assembled)
+    monkeypatch.setattr(
+        drawing._telemetry, "event",
+        lambda name, **fields: state.phases.append((name, fields)),
+    )
+    views = {}
+
+    def place(_adapter, _sheet, _field, *_args, label):
+        view = SimpleNamespace(
+            GetOutline=lambda: (0.100, 0.120, 0.200, 0.230),
+            IsExploded=lambda: label in (drawing.WHEEL_LABEL, drawing.LEVER_LABEL),
+            ReferencedConfiguration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
+        )
+        views[label] = view
+        return view
+
+    monkeypatch.setattr(drawing, "_place_exploded_view", place)
+    monkeypatch.setattr(drawing, "_place_collapsed_view", place)
+    for name in (
+        "assert_full_detail_view", "isolate_drawing_view_components",
+        "_show_tangent_edges", "_assert_bom_clears_reference_field",
+        "_link_view_to_bom", "_move_wire_balloon", "assert_balloon_landings",
+    ):
+        monkeypatch.setattr(drawing, name, lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_fit_ring", lambda _a, _v, ladder, *_args, **_k: ladder[0])
+    monkeypatch.setattr(drawing, "insert_bom_table", lambda *_a, **_k: magnifier_bom.table)
+    items = state.bom_items
+    monkeypatch.setattr(drawing, "_validate_bom", lambda *_a: items)
+
+    def balloons(_adapter, view, **kwargs):
+        state.balloon_calls.append((view, kwargs))
+        return [SimpleNamespace(stem=stem) for stem, _item in kwargs["items"]]
+
+    monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
+    monkeypatch.setattr(
+        drawing, "_add_note_block",
+        lambda *_a, label, **_k: SimpleNamespace(
+            GetExtent=lambda: (
+                instruction_note_bounds.sequence_extent if label == "assembly sequence"
+                else instruction_note_bounds.checks_extent
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        drawing, "_hide_bom_reference", lambda *_a: state.hook("before-finalizer"),
+    )
+
+    async def finalize(_adapter, _outputs, **kwargs):
+        state.finalized = True
+        state.hook("before-settled")
+        for settled in kwargs["settled_checks"]:
+            settled()
+        state.saved = True
+        state.hook("after-save")
+        return {"drawing": "synthetic artifact"}
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    state.views = views
+    return state
+
+
+def test_build_keeps_source_immutable_through_tip_and_finalization(immutable_tip_build):
+    state = immutable_tip_build
+    inherited = dict(state.native.display.parts)
+    expected_sha = drawing._source_sha256(state.path)
+    assert asyncio.run(drawing.build(state.native.adapter)) == {"drawing": "synthetic artifact"}
+    assert state.saved and state.finalized
+    assert state.native.display.parts == inherited
+    assert drawing._source_sha256(state.path) == expected_sha
+    assert not state.source.dirty
+    assert state.source.configuration_switches == []
+    assert state.source.ConfigurationManager.ActiveConfiguration.Name == "Default"
+    owners = tuple(drawing.EXPLODED_VIEW_NAMES)
+    assert state.metadata_reads == [
+        ("", explode.explode_offsets_property(owner)) for owner in (*owners, *owners)
+    ]
+    phases = [fields for name, fields in state.phases if name == "magnifier.source_save_flag"]
+    assert phases and all(not fields["dirty"] for fields in phases)
+    tip_phases = [fields["step"] for fields in phases if fields["step"].startswith("lever tip")]
+    assert tip_phases == [
+        "lever tip view placement, configuration and isolation",
+        "lever tip import, crop and inherited callout readback",
+        "lever tip qualifier and caption placement",
+        "lever tip settled source, callout and whole-ink readback",
+        "lever tip settled source, callout and whole-ink readback",
+    ]
+    # Canonical #1842 restores all real BOM groups, with builder-owned
+    # exploded metadata and the separately collapsed finished wire.
+    assert len(state.balloon_calls) == 3
+    seen = []
+    for (view, kwargs), label, stems in zip(
+        state.balloon_calls,
+        (drawing.WHEEL_LABEL, drawing.LEVER_LABEL, drawing.FINISHED_LABEL),
+        (explode.WHEEL_GROUP_STEMS, explode.LEVER_GROUP_STEMS, frozenset({explode.WIRE_STEM})),
+        strict=True,
+    ):
+        assert view is state.views[label]
+        assert {stem for stem, _item in kwargs["items"]} == {
+            drawing.BOM_ROW_KEYS[stem] for stem in stems
+        }
+        assert kwargs["explode_offsets"] == (
+            {} if label == drawing.FINISHED_LABEL else _metadata_offsets()
+        )
+        seen.extend(kwargs["items"])
+    assert len(seen) == len(set(seen)) == len(notes.BOM_ORDER)
+    assert dict(seen) == state.bom_items
+    assert (drawing.WIRE_ROW, state.bom_items[drawing.WIRE_ROW]) in seen
+
+
+@pytest.mark.parametrize("stage", ["before-finalizer", "before-settled", "after-save"])
+@pytest.mark.parametrize("damage", ["dirty", "bytes"])
+def test_build_refuses_source_changes_at_each_save_boundary(immutable_tip_build, stage, damage):
+    state = immutable_tip_build
+
+    def mutate(actual_stage):
+        if actual_stage != stage:
+            return
+        if damage == "dirty":
+            state.source.dirty = True
+        else:
+            state.path.write_bytes(b"externally changed source")
+
+    state.hook = mutate
+    with pytest.raises(RuntimeError, match="dirtied the source|changed the source"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.saved == (stage == "after-save")
+    assert state.finalized == (stage != "before-finalizer")
+    assert state.source.dirty == (damage == "dirty")
+    assert state.path.read_bytes() == (
+        b"externally changed source" if damage == "bytes" else b"released MG source"
+    )
+
+
+@pytest.mark.parametrize("damage", ["configuration", "displaced", "metadata"])
+def test_build_rechecks_source_configuration_collapse_and_metadata_after_save(
+    immutable_tip_build, damage,
+):
+    state = immutable_tip_build
+
+    def mutate(stage):
+        if stage != "after-save":
+            return
+        if damage == "configuration":
+            state.source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
+        elif damage == "metadata":
+            state.source.properties.clear()
+        else:
+            base = state.source.components[0].GetTotalTransform(False).ArrayData
+            displaced = (*base[:9], 0.01, *base[10:])
+            state.source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
+                ArrayData=displaced if presentation else base,
+            )
+
+    state.hook = mutate
+    with pytest.raises(RuntimeError, match="Default configuration|collapsed|rebuild"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.saved
+    assert state.path.read_bytes() == b"released MG source"
+    assert not state.source.dirty
+
+
+def test_build_secondary_proof_and_logging_interrupts_preserve_primary(immutable_tip_build, monkeypatch):
+    state = immutable_tip_build
+    original = KeyboardInterrupt("primary native interruption")
+    traces = []
+
+    def fail_reader():
+        raise SystemExit("secondary source proof")
+
+    def fail_logger(*_args, **_kwargs):
+        raise GeneratorExit("secondary logging")
+
+    def interrupt(stage):
+        if stage != "after-save":
+            return
+        state.source.GetSaveFlag = fail_reader
+        monkeypatch.setattr(drawing._telemetry, "warn", fail_logger)
+        try:
+            raise original
+        except BaseException as exc:
+            traces.append(exc.__traceback__)
+            raise
+
+    state.hook = interrupt
+    with pytest.raises(KeyboardInterrupt) as caught:
+        asyncio.run(drawing.build(state.native.adapter))
+    assert caught.value is original
+    trace = caught.value.__traceback__
+    while trace is not None and trace is not traces[0]:
+        trace = trace.tb_next
+    assert trace is traces[0]
+
+
+def test_tip_whole_ink_reads_the_current_model_callout_authority(projection_native, monkeypatch):
+    native = projection_native
+    name = stack.THREAD_PROJECTION_DIMENSION
+    callouts = stack.SETTING_CALLOUTS[stack.THREAD_FEATURE]
+    part, original = callouts[name]
+    changed = original.replace(original.split()[0], "MODEL", 1)
+    monkeypatch.setitem(callouts, name, (part, changed))
+    with pytest.raises(RuntimeError, match="callout reads"):
+        drawing._assert_callouts([(name, native.display)], callouts)
+    native.display.parts[part] = changed
+    drawing._assert_callouts([(name, native.display)], callouts)
+    # A good GetText is insufficient while DisplayData still renders old ink.
+    with pytest.raises(RuntimeError, match="missing rendered qualifier"):
+        drawing._thread_projection_text_box(native.adapter, native.annotation)
+    for row, text in zip(native.rows[1:], changed.splitlines(), strict=True):
+        row["text"] = text
+    box = drawing._thread_projection_text_box(native.adapter, native.annotation)
+    assert box[0] < box[2] and box[1] < box[3]
+
+
+def test_build_refuses_preexisting_dirty_source_before_tip_import(immutable_tip_build):
+    state = immutable_tip_build
+    state.source.dirty = True
+    with pytest.raises(RuntimeError, match="already dirty"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.source.dirty
+    assert state.native.imports == []
+    assert not state.finalized and not state.saved
+    assert state.path.read_bytes() == b"released MG source"
+
+
+def test_build_tip_settled_ink_failure_prevents_save_and_still_proves_source(immutable_tip_build):
+    state = immutable_tip_build
+
+    def erase_qualifier(stage):
+        if stage == "before-settled":
+            del state.native.rows[1:]
+
+    state.hook = erase_qualifier
+    with pytest.raises(RuntimeError, match="missing rendered qualifier"):
+        asyncio.run(drawing.build(state.native.adapter))
+    assert state.finalized and not state.saved
+    assert state.path.read_bytes() == b"released MG source"
+    assert not state.source.dirty
+    assert len(state.metadata_reads) == 2 * len(drawing.EXPLODED_VIEW_NAMES)
+
+

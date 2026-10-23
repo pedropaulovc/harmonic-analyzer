@@ -2389,6 +2389,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "export_features",
         "fr_harmonic_base_fasteners",
         "fr_top_frame_spec",
+        # Edge-break row bounds both threaded mouths' full lever engagement.
+        "mg_lever_thread_joint",
         "sm_gooseneck_spring_joint",
         "sm_gooseneck_spring_screw_spec",
         "sm_knife_mount_spec",

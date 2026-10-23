@@ -14,10 +14,12 @@ from __future__ import annotations
 
 SKU = "91882A221"
 THREAD = "#4-40"
+PITCH = 0.635
 
 THUMB_SPEC = dict(
     major_r=2.8448 / 2.0,
-    pitch=0.635,
+    pitch=PITCH,
+    tip_chamfer=0.75 * PITCH,
     length=11.1125,
     collar_r=6.35 / 2.0,
     collar_h=2.38125,
@@ -25,7 +27,8 @@ THUMB_SPEC = dict(
     head_h=2.38125,
 )
 
-PITCH = THUMB_SPEC["pitch"]
+TIP_CHAMFER = THUMB_SPEC["tip_chamfer"]
+TIP_FLAT_R = THUMB_SPEC["major_r"] - TIP_CHAMFER
 COLLAR_DIA = 2.0 * THUMB_SPEC["collar_r"]
 COLLAR_H = THUMB_SPEC["collar_h"]
 HEAD_DIA = 2.0 * THUMB_SPEC["head_r"]

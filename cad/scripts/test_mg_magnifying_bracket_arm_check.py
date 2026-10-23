@@ -1,146 +1,220 @@
-"""Offline pins for mg_magnifying_bracket_arm_check (#1559, A1 pose)."""
+"""Offline physical load/compliance checks for the current threaded L bracket."""
 
 from __future__ import annotations
+
+import itertools
+import math
 
 import pytest
 
 import error_budget
 import magnifying_bracket_joint_layout as joint
+import mg_lever_thread_joint as thread
 import mg_magnifying_bracket_arm_check as arm
 import mg_magnifying_lever_geom as lever
+import mg_magnifying_bracket_spec as bracket_spec
+import sh_vn_music_wire_lever_geom as wire
 import spring_force_model
-import sh_vn_music_wire_lever_geom
-from build_mg_magnifying_bracket import ARM_Z
+
 from mg_magnifying_wheel_geom import WIRE_RATIO
 
 
 def _spring_compliance_along_wire() -> float:
-    """Hook compliance along wire 1 (mm/N) the summing springs already give:
-    wire moment arm^2 over error_budget's rotational stiffness (the same sum
-    pen_gain_per_arm_mm divides by), at the as-built clamp station."""
     nom = error_budget.nominal()
-    channel = spring_force_model.channel_response(
-        nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension
-    )
-    stiffness = error_budget.N_ELEMENTS * channel.stiffness_n_mm_per_rad + (
-        spring_force_model.counter_stiffness(
-            nom.counter_rate, nom.counter_initial_tension
-        )
-    )
-    moment_arm = error_budget.wire_moment_arm(
-        nom, lever.KNIFE_LOCAL_X - lever.CLAMP_LOCAL_X
-    )
+    channel = spring_force_model.channel_response(nom.sum_hole_x, nom.spring_rate, nom.spring_initial_tension)
+    stiffness = error_budget.N_ELEMENTS * channel.stiffness_n_mm_per_rad + spring_force_model.counter_stiffness(nom.counter_rate, nom.counter_initial_tension)
+    moment_arm = error_budget.wire_moment_arm(nom, lever.KNIFE_LOCAL_X - lever.CLAMP_LOCAL_X)
     return moment_arm**2 / stiffness
 
 
-def test_a1_pose_and_arm_length():
-    assert joint.BRACKET_ORIGIN[2] == sh_vn_music_wire_lever_geom.DRUM_END_Z == -173.51
-    assert arm.COLLAR == joint.BRACKET_ORIGIN
-    # The arm starts buried in the collar's wall (r4: at Z 4.0 its +Y corner
-    # stepped the collar root); only its end, 103.51 from the axis, prints.
-    assert ARM_Z == (3.5, 103.51)
-    assert arm.ARM_SPAN == pytest.approx(91.2226, abs=1e-3)
-    assert arm.OLD_ARM_SPAN == pytest.approx(46.01)
+def test_neck_load_uses_current_mounting_seat_and_wire_plane() -> None:
+    assert arm.NECK == joint.BRACKET_ORIGIN
+    assert arm.ARM_SPAN == pytest.approx(97.965)
+    assert arm.ARM_SPAN > joint.SIDE_PLATE_Z[0]
+    assert arm.ARM_B == thread.NECK_THICKNESS - thread.NECK_THICKNESS_TOL == 11.7
+    assert arm.ARM_H == 2.0 * (thread.NOSE_R - thread.NOSE_R_TOL) == 10.9
+    assert arm.NECK[2] == wire.HOOK_Z == wire.DRUM_END_Z
+    assert arm.HOOK == (wire.HOOK_X, wire.HOOK_Y, wire.HOOK_Z)
 
 
-def test_loads_from_their_sources():
-    assert arm.PEN_SIDE_G == pytest.approx(145.25, abs=0.05)
+def test_arm_section_and_span_bound_every_accepted_size_corner() -> None:
+    for width, radius, seat, grip, nose_location in itertools.product(
+        (11.7, 13.3), (5.45, 5.55), (99.89, 100.91),
+        (3.045, 3.305), (-0.10, 0.10),
+    ):
+        height = 2.0 * radius
+        assert arm.I_VERTICAL <= width * height**3 / 12.0 + 1e-9
+        assert arm.I_LATERAL <= height * width**3 / 12.0 + 1e-9
+        assert arm.ARM_SPAN >= seat - grip + nose_location - 1e-9
+    assert bracket_spec.DRAWING_PRECISION["Neck"]["NeckThickness"] == 1
+    assert arm.AXIS_TO_SEAT_MAX == pytest.approx(101.01)
+
+
+def test_loads_follow_actual_force_direction_and_scale_linearly() -> None:
     assert arm.WIRE1_TENSION_MAX_N == pytest.approx(WIRE_RATIO * arm.PEN_LOAD_MAX_N)
-    assert arm.WIRE1_TENSION_MAX_N == pytest.approx(10.68, abs=0.01)
-    assert arm.LEVER_GROUP_G == pytest.approx(110.2, abs=0.1)
-    assert arm.HOOK == (
-        sh_vn_music_wire_lever_geom.HOOK_X,
-        sh_vn_music_wire_lever_geom.HOOK_Y,
-        sh_vn_music_wire_lever_geom.HOOK_Z,
+    fx, fy, mz = arm.joint_load(1.0, 0.0)
+    assert (fx, fy) == pytest.approx(arm.WIRE_DIR[:2])
+    assert mz == pytest.approx(arm.HOOK_DX * fy - arm.HOOK_DY * fx)
+    assert arm.joint_load(2.0, 3.0) == pytest.approx(tuple(2.0 * a + 3.0 * b for a, b in zip(arm.joint_load(1.0, 0.0), arm.joint_load(0.0, 1.0))))
+
+
+def test_gravity_moment_bounds_every_accepted_free_tip_in_the_fitted_frame() -> None:
+    free_tip_offsets = [
+        length - thickness / 2.0 - projection
+        for length, thickness, projection in itertools.product(
+            (thread.ROD_LENGTH - thread.ROD_LENGTH_TOL, thread.ROD_LENGTH + thread.ROD_LENGTH_TOL),
+            (thread.NECK_THICKNESS - thread.NECK_THICKNESS_TOL, thread.NECK_THICKNESS + thread.NECK_THICKNESS_TOL),
+            (lever.THREAD_PROJECTION - lever.THREAD_PROJECTION_TOL, lever.THREAD_PROJECTION + lever.THREAD_PROJECTION_TOL),
+        )
+    ]
+    farthest_tip = max(free_tip_offsets)
+    assert farthest_tip == pytest.approx(161.710)
+    assert arm.LEVER_GROUP_ARM_X == pytest.approx(farthest_tip)
+    # The former fixed-tip arm misses an accepted fitted rod by 1.710 mm.
+    assert farthest_tip > thread.ROD_LENGTH - thread.NECK_THICKNESS / 2.0 - lever.THREAD_PROJECTION
+    assert arm.joint_load(0.0, 1.0) == pytest.approx((0.0, -1.0, -farthest_tip))
+
+
+def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> None:
+    assert arm.NECK == (40.0, 979.7, -173.51)
+    assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.51))
+    assert joint.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
+    assert joint.SIDE_PLATE_Y == (-5.5, 5.5)
+    assert joint.SIDE_PLATE_FRONT_Z == pytest.approx(
+        joint.SEAT_PLANE_Z - 3.175,
+    )
+    assert (lever.KNIFE_LOCAL_X, lever.KNIFE_LOCAL_Y) == (215.0, 5.134)
+    assert arm.JOINT == pytest.approx((
+        sum(point[0] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
+        979.7 - 0.71,
+        joint.SEAT_PLANE_Z,
+    ))
+    assert arm.JOINT[1] == pytest.approx(
+        sum(point[1] for point in joint.SCREW_POSITIONS) / len(joint.SCREW_POSITIONS),
+    )
+    fx, fy, mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
+    centered_row_mz = mz + (arm.NECK[0] - arm.JOINT[0]) * fy
+    assert arm.JOINT_MZ == pytest.approx(centered_row_mz - 0.71 * fx)
+    assert arm.JOINT_MZ != pytest.approx(centered_row_mz)
+
+
+@pytest.mark.parametrize("case", ["peak", "minimum_tension", "wire_only"])
+def test_joint_moments_use_actual_force_stations_about_the_moved_row(case) -> None:
+    tension, weight, actual_mz = {
+        "peak": (arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N, arm.JOINT_MZ),
+        "minimum_tension": (
+            WIRE_RATIO * arm.PEN_SIDE_G * arm.G * (1.0 - arm.GUIDE_FRICTION_FRACTION),
+            arm.LEVER_GROUP_N,
+            arm.JOINT_MZ_MIN_TENSION,
+        ),
+        "wire_only": (arm.WIRE1_TENSION_MAX_N, 0.0, arm.JOINT_MZ_NO_GROUP),
+    }[case]
+    wire_fx, wire_fy = (tension * component for component in arm.WIRE_DIR[:2])
+    expected_mz = (
+        (arm.HOOK[0] - arm.JOINT[0]) * wire_fy
+        - (arm.HOOK[1] - arm.JOINT[1]) * wire_fx
+        - (arm.NECK[0] + arm.LEVER_GROUP_ARM_X - arm.JOINT[0]) * weight
+    )
+    assert actual_mz == pytest.approx(expected_mz)
+    assert actual_mz < 0.0
+    if case == "peak":
+        assert arm.AXIS_TO_SEAT_MAX > abs(arm.NECK[2] - arm.JOINT[2])
+        assert arm.JOINT_MX == pytest.approx(arm.AXIS_TO_SEAT_MAX * (wire_fy - weight))
+        assert arm.JOINT_MY == pytest.approx(-arm.AXIS_TO_SEAT_MAX * wire_fx)
+
+
+def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_shear() -> None:
+    lower, upper = (
+        joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
+    )
+    nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
+    assert nominal_edge == pytest.approx(4.79)
+    row_from_lower = arm.JOINT[1] - lower
+    nearest_edge = min(
+        row_from_lower - joint.POSITION_BAND,
+        joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - row_from_lower - joint.POSITION_BAND,
+    )
+    assert nearest_edge == pytest.approx(4.74)
+    assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
+    expected_tension = (
+        abs(arm.JOINT_MX) / (2.0 * nearest_edge)
+        + abs(arm.JOINT_MY) / arm.SCREW_PITCH_X
+    )
+    centered_tension = (
+        abs(arm.JOINT_MX) / joint.SIDE_PLATE_HEIGHT
+        + abs(arm.JOINT_MY) / arm.SCREW_PITCH_X
+    )
+    assert arm.JOINT_TENSION_INCREMENT_N == pytest.approx(expected_tension)
+    assert expected_tension > centered_tension
+    fx, fy, _mz = arm.joint_load(arm.WIRE1_TENSION_MAX_N, arm.LEVER_GROUP_N)
+    expected_shear = math.hypot(fx, fy) / 2.0 + abs(arm.JOINT_MZ) / arm.SCREW_PITCH_X
+    assert arm.JOINT_SHEAR_DEMAND_N == pytest.approx(expected_shear)
+    assert arm.SCREW_SHEAR_STRESS == pytest.approx(
+        expected_shear / (math.pi / 4.0 * arm.SCREW_MINOR_DIA**2),
+    )
+    assert arm.JOINT_PRELOAD_MARGIN == pytest.approx(
+        arm.SCREW_PRELOAD_N / expected_tension,
     )
 
 
-def test_arm_deflection_old_and_new():
-    assert arm.HOOK_OFFSET_OLD == pytest.approx(0.123, abs=0.001)
-    assert arm.HOOK_OFFSET_NEW == pytest.approx(0.276, abs=0.001)
-    assert arm.PEN_OFFSET_NEW == pytest.approx(1.38, abs=0.01)
-    assert arm.ARM_COMPLIANCE_MM_PER_N == pytest.approx(0.0227, abs=1e-4)
+def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
+    # The lower-edge ordinate and overall .X width are independent controls.
+    # Width variation is not a symmetric displacement of both nominal edges.
+    corner_arms = [
+        min(row_from_lower, width - row_from_lower)
+        for width, row_from_lower in itertools.product(
+            (10.2, 11.8), (4.74, 4.84),
+        )
+    ]
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx((4.74, 4.84))
+    corner_tensions = [
+        abs(arm.JOINT_MX) / (2.0 * edge_arm)
+        + abs(arm.JOINT_MY) / 13.7
+        for edge_arm in corner_arms
+    ]
+    assert arm.JOINT_PRYING_ARM_Y == pytest.approx(min(corner_arms))
+    assert arm.JOINT_TENSION_INCREMENT_N == pytest.approx(max(corner_tensions))
+    assert all(
+        demand <= arm.JOINT_TENSION_INCREMENT_N + 1e-9
+        for demand in corner_tensions
+    )
+    assert max(corner_tensions) < arm.SCREW_PRELOAD_N
+    # A stale 12.70 mm foot arm would underpredict the new tension demand.
+    old_foot_tension = abs(arm.JOINT_MX) / (2.0 * 5.59) + abs(arm.JOINT_MY) / 13.7
+    assert arm.JOINT_TENSION_INCREMENT_N > old_foot_tension
 
 
-def test_arm_adds_under_one_percent_to_the_spring_compliance():
+def test_deflection_grows_with_span_and_respects_superposition() -> None:
+    short = arm.hook_deflection_along_wire(arm.ARM_SPAN / 2.0, 1.0, 0.0)
+    long = arm.hook_deflection_along_wire(arm.ARM_SPAN, 1.0, 0.0)
+    assert 0.0 < abs(short) < abs(long)
+    assert arm.ARM_COMPLIANCE_MM_PER_N == pytest.approx(abs(long))
+    combined = arm.hook_deflection_along_wire(arm.ARM_SPAN, 2.0, 3.0)
+    assert combined == pytest.approx(2.0 * long + 3.0 * arm.hook_deflection_along_wire(arm.ARM_SPAN, 0.0, 1.0))
+
+
+def test_arm_adds_under_one_percent_to_the_actual_spring_compliance() -> None:
     spring = _spring_compliance_along_wire()
-    # 3.13 since the counter boss hook rides its jam-nut thread higher
-    # (spring_mount_geom.COUNTER_ANCHOR_XY), which moves the counter spring's
-    # installed geometry and stiffens the summing springs slightly.
-    assert spring == pytest.approx(3.13, abs=0.02)
-    share = arm.ARM_COMPLIANCE_MM_PER_N / spring
-    assert share == pytest.approx(0.0073, abs=2e-4)
-    assert share <= arm.ARM_SHARE_OF_SPRING_COMPLIANCE_MAX
+    assert spring > 0.0
+    assert arm.ARM_COMPLIANCE_MM_PER_N / spring <= arm.ARM_SHARE_OF_SPRING_COMPLIANCE_MAX
 
 
-def test_flange_joint_margins():
-    assert arm.JOINT_PRELOAD_MARGIN == pytest.approx(1.65, abs=0.01)
+def test_flange_joint_retains_screw_margins() -> None:
     assert arm.JOINT_PRELOAD_MARGIN > 1.0
-    assert arm.SCREW_SHEAR_STRESS == pytest.approx(66.5, abs=0.2)
     assert arm.SCREW_SHEAR_STRESS < arm.SCREW_SHEAR_ALLOWABLE
-    assert arm.BENDING_STRESS == pytest.approx(13.1, abs=0.1)
-    assert arm.TORSION_STRESS == pytest.approx(10.6, abs=0.1)
+    assert arm.JOINT_TENSION_INCREMENT_N < arm.SCREW_PRELOAD_N
+    assert joint.ENGAGEMENT_MIN >= 1.5 * joint.SCREW_MAJOR_DIA
 
 
-def _lame_pressure(interference: float, collar_od: float) -> float:
-    # Restated plane-stress Lamé, brass rod in a 1018 collar (MPa, mm).
-    k = (collar_od**2 + 36.0) / (collar_od**2 - 36.0)
-    return interference / (6.0 * ((1.0 - 0.34) / 97000.0 + (k + 0.29) / 200000.0))
-
-
-def test_press_alone_holds_the_lever_at_its_loosest_corner():
-    # #1570: 0.007 minimum less DIN 7190:1988 smoothing 0.8 (Rz 3.2 + Rz 3.2).
-    effective = 0.007 - 0.8 * (4.0 * 0.8 + 4.0 * 0.8) / 1000.0
-    assert effective == pytest.approx(0.00188, abs=1e-12)
-    pressure = _lame_pressure(effective, 12.0 - 0.51)
-    length = 10.0 - 0.05 - 6.0 / 2.0  # shortest collar less the largest dome radius
-    axial = 0.10 * pressure * 3.141592653589793 * 6.0 * length
-    hold = arm.PRESS_HOLDING
-    assert hold["contact_pressure_min_mpa"] == pytest.approx(pressure, rel=1e-12)
-    assert hold["length_min"] == pytest.approx(6.95, abs=1e-12)
-    assert hold["axial_hold_n"] == pytest.approx(axial, rel=1e-12)
-    assert hold["axial_hold_n"] == pytest.approx(241.41, abs=0.01)
-    assert hold["torque_hold_nmm"] == pytest.approx(724.24, abs=0.01)
-    # Demands: the lever's axial load at the collar; wire 1 plus the group's
-    # weight one lever diameter out of the A1 plane for twist.
-    assert abs(arm._FX) == pytest.approx(2.91, abs=0.05)
-    assert arm.COLLAR_TORQUE_DEMAND_NMM == pytest.approx(
-        (arm.WIRE1_TENSION_MAX_N + arm.LEVER_GROUP_N) * 6.0, rel=1e-12
-    )
-    assert arm.COLLAR_TORQUE_DEMAND_NMM == pytest.approx(70.5, abs=1.0)
-    assert hold["axial_margin"] > 75.0
-    assert hold["torque_margin"] > 10.0
-    assert (
-        min(hold["axial_margin"], hold["torque_margin"]) >= arm.PRESS_HOLDING_MARGIN_MIN
-    )
-
-
-def test_collar_edge_bending_is_the_accepted_local_yield():
-    edge = arm.COLLAR_EDGE_BENDING
-    moment = abs(arm._MZ)
-    assert moment == pytest.approx(1374.5, abs=5.0)
-    assert edge["edge_bearing_mpa"] == pytest.approx(
-        6.0 * moment / (6.0 * 6.95**2), rel=1e-12
-    )
-    # One edge unloads at the loosest corner past 890 N mm; the linear field's
-    # positive part keeps the friction's normal force (the holds stand).
-    loose = _lame_pressure(0.00188, 11.49)
-    assert edge["opening_moment_loose_nmm"] == pytest.approx(
-        loose * 6.0 * 6.95**2 / 6.0
-    )
-    assert edge["opening_moment_loose_nmm"] == pytest.approx(890.1, abs=0.1)
-    # Tightest, thinnest wall: 330.8 MPa uniform (< 333) plus the edge bearing.
-    tight = _lame_pressure(0.014, 11.49)
-    k = (11.49**2 + 36.0) / (11.49**2 - 36.0)
-    edge_p = tight + edge["edge_bearing_mpa"]
-    assert edge["edge_von_mises_tight_mpa"] == pytest.approx(
-        edge_p * (k**2 + 1.0 + k) ** 0.5, rel=1e-12
-    )
-    # Owner ruling (b), #1570: past the 370 MPa yield locally, pinned at 400.
-    assert edge["edge_von_mises_tight_mpa"] == pytest.approx(399.4, abs=0.5)
-    assert (
-        370.0
-        < edge["edge_von_mises_tight_mpa"]
-        <= arm.COLLAR_EDGE_VON_MISES_MAX_MPA
-        == 400.0
-    )
+def test_reported_material_demand_combines_bending_and_torsion_without_certifying_generic_steel() -> None:
+    report = arm.material_demand_report()
+    bending_alone = 3.0 * report["bending_stress_MPa"]
+    torsion_alone = 3.0 * 3.0**0.5 * report["torsion_stress_MPa"]
+    required = report["required_yield_for_factor_three_MPa"]
+    # Simultaneous nonzero loads demand more than either isolated-load check,
+    # while the sum is a conservative bound. This catches the former max-only
+    # calculation without reproducing the implementation's von Mises formula.
+    assert max(bending_alone, torsion_alone) < required < bending_alone + torsion_alone
+    assert report["verified_yield_MPa"] is None
+    assert report["verified_yield_safety_factor"] is None
