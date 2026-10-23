@@ -2939,16 +2939,8 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
             GetText=lambda index, texts=texts: texts[index],
         )
         decorate(annotation, name, native, display)
-    nominal, lower, upper = drawing.EXPECTED_CONTROLS["ThreadLengthMin"]
-    native = SimpleNamespace(
-        FullName="ThreadLengthMin@ThreadTailAcceptance@pivot.SLDPRT",
-        SystemValue=nominal, DrivenState=2,
-        Tolerance=SimpleNamespace(
-            Type=drawing.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"],
-            GetMinValue=lambda: lower, GetMaxValue=lambda: upper,
-        ),
-    )
     tail_display = tail.GetSpecificAnnotation()
+    native = tail_display.GetDimension2(0)
     tail_display.GetPrimaryPrecision2 = lambda: drawing.DIMENSION_PRECISION["ThreadLengthMin"]
     tail_display.GetText = lambda _index: ""
     decorate(tail, "ThreadLengthMin", native, tail_display)
@@ -3088,7 +3080,9 @@ def test_tail_column_move_uses_complete_major_ink_and_preserves_acceptance_text(
         return
     settled, _frame = drawing._move_tail_column(state.adapter, tail, major)
     assert [row[0] for row in tail_record["display"]["arrows"]] == pytest.approx([0.2706024] * 2)
-    assert tail_record["display"]["texts"] == original_text
+    for actual, original in zip(tail_record["display"]["texts"], original_text, strict=True):
+        assert actual["t"] == original["t"]
+        assert actual["pos"] == pytest.approx(original["pos"], abs=1e-12)
     if fault == "late_station":
         tail_record["display"]["arrows"][0][1] += 0.0001
     elif fault == "late_text":
@@ -3104,6 +3098,64 @@ def test_tail_column_move_uses_complete_major_ink_and_preserves_acceptance_text(
     else:
         with pytest.raises(RuntimeError):
             settled()
+
+
+@pytest.mark.parametrize("fault", (
+    "none", "nonuniform_offset", "offset_size", "offset_angle", "offset_wording",
+    "ignored_restore", "refused_restore",
+))
+def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
+    monkeypatch, tmp_path, fault,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.adapter.currentModel = state.saved
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    tail, major, record, _major_record, original_text = _tail_paper_boundary(
+        monkeypatch, state, fault=fault,
+    )
+    display = tail.GetSpecificAnnotation()
+    line_anchor = tail.GetPosition()
+    assert line_anchor != tuple(original_text[0]["pos"])
+    original_stations = tuple(tuple(row[:3]) for row in record["display"]["arrows"])
+    if fault == "none":
+        settled, _frame = drawing._move_tail_column(state.adapter, tail, major)
+        assert display.OffsetText is True
+        assert tail.GetPosition() == pytest.approx(original_text[0]["pos"], abs=1e-12)
+        for old, actual in zip(original_stations, record["display"]["arrows"], strict=True):
+            assert actual[0] == pytest.approx(0.2706024, abs=1e-12)
+            assert tuple(actual[1:3]) == old[1:3]
+        for old, actual in zip(original_text, record["display"]["texts"], strict=True):
+            assert actual["t"] == old["t"]
+            assert actual["pos"] == pytest.approx(old["pos"], abs=1e-12)
+            assert (actual["w"], actual["h"], actual["ang"]) == (old["w"], old["h"], old["ang"])
+        settled()
+        return
+    reason = (
+        "cannot restore measured acceptance ink" if fault == "refused_restore"
+        else "complete acceptance text moved" if fault == "ignored_restore"
+        else "not one congruent native text translation"
+    )
+    with pytest.raises(RuntimeError, match=reason) as refusal:
+        drawing._move_tail_column(state.adapter, tail, major)
+    assert isinstance(refusal.value.__cause__, RuntimeError)
+    if fault not in ("ignored_restore", "refused_restore"):
+        # Do not "repair" a changed fraction, size, angle or independent row.
+        assert tail.GetPosition() == pytest.approx(line_anchor, abs=1e-12)
+    evidence = next(
+        fields for name, fields in state.events
+        if name == "drawing.pivot_tail_layout_refusal"
+    )
+    assert evidence["original"]["full_name"] == evidence["current"]["full_name"]
+    assert evidence["current"]["full_name"] == display.GetDimension2(0).FullName
+    assert evidence["original"]["offset_text"] is False
+    assert evidence["current"]["offset_text"] is True
+    assert evidence["original"]["arrow_stations"] == tuple(row[:2] for row in original_stations)
+    assert all(abs(tip[0] - 0.2706024) < 1e-12 for tip in evidence["current"]["arrow_stations"])
+    assert tuple(
+        row["text"] for row in evidence["original"]["text_fragments"]
+    ) == tuple(row["t"] for row in original_text)
+    assert evidence["current"]["text_fragments"]
+    assert "native_snapshot=" in str(refusal.value)
 
 
 def test_native_jog_primitive_read_errors_cannot_be_masked_by_annotation_ink(monkeypatch, tmp_path):
@@ -3134,26 +3186,49 @@ def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
          _native_text("MIN FINISHED THREAD LENGTH", 0.180, 0.13145, 0.0982187)],
     )
     original_text = copy.deepcopy(tail_record["display"]["texts"])
-    tail = SimpleNamespace(paper_record=tail_record)
-    display = SimpleNamespace(GetAnnotation=lambda: tail, OffsetText=False)
+    tail = SimpleNamespace(paper_record=tail_record, Owner=state.front, OwnerType=0)
+    nominal, lower, upper = drawing.EXPECTED_CONTROLS["ThreadLengthMin"]
+    native = SimpleNamespace(
+        FullName="ThreadLengthMin@ThreadTailAcceptance@pivot.SLDPRT", SystemValue=nominal, DrivenState=2,
+        Tolerance=SimpleNamespace(
+            Type=drawing.DIMENSION_TOLERANCE_TYPES["ThreadLengthMin"],
+            GetMinValue=lambda: lower, GetMaxValue=lambda: upper,
+        ),
+    )
+    display = SimpleNamespace(
+        GetAnnotation=lambda: tail, OffsetText=False, Type2=2, GetDimension2=lambda _index: native,
+    )
     tail.GetSpecificAnnotation = lambda: display
-    position = [0.180, 0.1425625, 0.0]
-    tail.GetPosition = lambda: tuple(position)
+    line_position = [0.180, 0.1425625, 0.0]
+    # Actual ink insertion is not the OffsetText=False dimension-line anchor.
+    text_position = [*original_text[0]["pos"]]
+    tail.GetPosition = lambda: tuple(text_position if display.OffsetText else line_position)
+    text_writes = 0
 
     def move(x, y, z):
-        if fault == "ignored_column":
-            return True
-        old_column = tail_record["display"]["arrows"][0][0]
-        for row in tail_record["display"]["arrows"]:
-            row[0] = x
-        for row in tail_record["display"]["lines"]:
-            if abs(row[4] - old_column) < 1e-8 and abs(row[7] - old_column) < 1e-8:
-                row[4] = row[7] = x
-            elif abs(row[7] - old_column - 0.001) < 1e-8:
-                row[7] = x + 0.001
+        nonlocal text_writes
+        if display.OffsetText:
+            text_writes += 1
+            if text_writes > 1 and fault in ("ignored_restore", "refused_restore"):
+                return fault == "ignored_restore"
+            dx, dy = x - text_position[0], y - text_position[1]
+        else:
+            if fault == "ignored_column":
+                return True
+            old_column = tail_record["display"]["arrows"][0][0]
+            for row in tail_record["display"]["arrows"]:
+                row[0] = x
+            for row in tail_record["display"]["lines"]:
+                if abs(row[4] - old_column) < 1e-8 and abs(row[7] - old_column) < 1e-8:
+                    row[4] = row[7] = x
+                elif abs(row[7] - old_column - 0.001) < 1e-8:
+                    row[7] = x + 0.001
+            dx, dy = x - line_position[0], y - line_position[1]
+            line_position[:] = (x, y, z)
         for row in tail_record["display"]["texts"]:
-            row["pos"][0] += x - position[0]
-        position[:] = (x, y, z)
+            row["pos"][0] += dx
+            row["pos"][1] += dy
+        text_position[:] = (text_position[0] + dx, text_position[1] + dy, z)
         return True
 
     tail.SetPosition2 = move
@@ -3162,8 +3237,17 @@ def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
         assert tuple(annotations) == (tail,)
         assert targets["ThreadLengthMin"] == (0.180, 0.1425625)
         display.OffsetText = True
-        tail_record["display"]["texts"] = copy.deepcopy(original_text)
-        position[:] = (*targets["ThreadLengthMin"], 0.0)
+        target = targets["ThreadLengthMin"]
+        assert tail.SetPosition2(target[0], target[1], 0.0)
+        row = tail_record["display"]["texts"][0]
+        if fault == "nonuniform_offset":
+            row["pos"][0] += 0.0004
+        elif fault == "offset_size":
+            row["w"] += 0.0004
+        elif fault == "offset_angle":
+            row["ang"] += 0.0001
+        elif fault == "offset_wording":
+            row["t"] = "0.278 in"
 
     monkeypatch.setattr(drawing, "offset_dimension_text", offset)
     return tail, major, tail_record, major_record, original_text

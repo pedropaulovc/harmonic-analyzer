@@ -13,6 +13,7 @@ import argparse
 import math
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -750,6 +751,182 @@ def _assert_supplier_references(adapter: Any, identities: dict, configurations: 
     return displays
 
 
+def _record_purchased_note_source_failure(
+    adapter: Any, front: Any, annotation: Any, attached: Any, scan: Any, *, match_count: int,
+) -> None:
+    """Read the failed native identity census; never decide attachment acceptance.
+
+    Candidate indices identify only this scan, not persistent native entities.
+    Raw, source-reverse and view-forward contexts remain separate observations:
+    a null/unknown/error is evidence, never a fallback or a new refusal predicate.
+    """
+    missing = object()
+    evidence = {
+        "label": "Purchased Screw Note", "status": "refused",
+        "predicate_match_count": match_count, "candidate_count": len(scan.circles),
+        "scan_edge_count": len(scan.edges), "expected_source_path": str(SOURCE.resolve()),
+    }
+
+    def observe(record, key, getter, *, native=False):
+        try:
+            value = getter()
+        except Exception as error:
+            record.setdefault("errors", []).append({
+                "field": key, "type": type(error).__name__, "error": str(error),
+            })
+            return missing
+        if native:
+            record[f"{key}_null"] = value is None
+        else:
+            record[key] = value
+        return value
+
+    def available(value):
+        return value is not missing and value is not None
+
+    app = observe(evidence, "app", lambda: _early_bound(adapter.swApp, "ISldWorks"), native=True)
+    view = observe(evidence, "view", lambda: _early_bound(front, "IView"), native=True)
+    observe(evidence, "view_name", lambda: view_name(adapter, view))
+    observe(evidence, "view_configuration", lambda: view.ReferencedConfiguration)
+    observe(evidence, "view_display_mode", lambda: view.GetDisplayMode2())
+    observe(evidence, "annotation_name", lambda: annotation.GetName())
+    observe(evidence, "annotation_owner_same_view", lambda: app.IsSame(annotation.Owner, view))
+    observe(evidence, "native_leader_points_m", lambda: annotation.GetLeaderPointsAtIndex(0))
+    raw_source = observe(evidence, "referenced_source", lambda: view.ReferencedDocument, native=True)
+    source = observe(
+        evidence, "source", lambda: _early_bound(raw_source, "IModelDoc2"), native=True,
+    )
+    observe(evidence, "source_path", lambda: source.GetPathName())
+    observe(evidence, "source_document_type", lambda: source.GetType())
+    manager = observe(
+        evidence, "source_configuration_manager",
+        lambda: _early_bound(source.ConfigurationManager, "IConfigurationManager"), native=True,
+    )
+    configuration = observe(
+        evidence, "source_active_configuration",
+        lambda: _early_bound(manager.ActiveConfiguration, "IConfiguration"), native=True,
+    )
+    observe(evidence, "source_active_configuration_name", lambda: configuration.Name)
+    extension = observe(
+        evidence, "source_extension",
+        lambda: _early_bound(source.Extension, "IModelDocExtension"), native=True,
+    )
+    # The SDK example's receiver is the underlying PART extension, not the
+    # drawing extension. Observe bodies in the actual current source config;
+    # do not activate a configuration or claim it equals the view's config.
+    bodies = observe(
+        evidence, "source_bodies",
+        lambda: _early_bound(source, "IPartDoc").GetBodies2(0, False), native=True,
+    )
+    body_rows = []
+    evidence["source_body_inventory"] = body_rows
+    source_bodies = bodies if isinstance(bodies, (tuple, list)) else ()
+    for index, body in enumerate(source_bodies):
+        row = {"source_body_index": index, "body_null": body is None}
+        body_rows.append(row)
+        if body is not None:
+            observe(row, "self_same", lambda: app.IsSame(body, body))
+
+    selected = observe(
+        evidence, "current_selection_manager",
+        lambda: _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr"), native=True,
+    )
+    count = observe(evidence, "current_selection_count", lambda: selected.GetSelectedObjectCount2(-1))
+    selections = []
+    evidence["current_selection_inventory"] = selections
+    # This is the selection NOW, not a fabricated receipt of the original
+    # coordinate pick (the shared note helper already clears that selection).
+    for index in range(1, count + 1 if type(count) is int and count > 0 else 1):
+        row = {"selection_index": index}
+        selections.append(row)
+        entity = observe(row, "entity", lambda: selected.GetSelectedObject6(index, -1), native=True)
+        selected_view = observe(
+            row, "view", lambda: selected.GetSelectedObjectsDrawingView2(index, -1), native=True,
+        )
+        if available(entity):
+            observe(row, "same_attached", lambda: app.IsSame(entity, attached))
+        if available(selected_view):
+            observe(row, "same_view", lambda: app.IsSame(selected_view, view))
+
+    query_points = {
+        "original_coordinate_pick": tuple(value / 1000 for value in HEAD_PICK_MM),
+        "physical_height_top_station": tuple(value / 1000 for value in _head_height_points_mm()[1]),
+    }
+    evidence["closest_point_queries_model_m"] = query_points
+
+    def edge_geometry(record, raw):
+        edge = observe(record, "edge", lambda: _early_bound(raw, "IEdge"), native=True)
+        if not available(edge):
+            return
+        observe(record, "same_attached", lambda: app.IsSame(edge, attached))
+        body = observe(record, "body", lambda: edge.GetBody(), native=True)
+        if available(body):
+            record["source_body_comparisons"] = []
+            for index, source_body in enumerate(source_bodies):
+                comparison = {"source_body_index": index, "body_null": source_body is None}
+                record["source_body_comparisons"].append(comparison)
+                if source_body is not None:
+                    observe(comparison, "same", lambda: app.IsSame(body, source_body))
+        curve = observe(record, "curve", lambda: _early_bound(edge.GetCurve(), "ICurve"), native=True)
+        if available(curve):
+            circle = observe(record, "is_circle", lambda: curve.IsCircle())
+            observe(record, "is_line", lambda: curve.IsLine())
+            if circle is True:
+                observe(record, "circle_params_m", lambda: curve.CircleParams)
+            # GetCurve must precede GetCurveParams3, per the official SDK.
+            trim = observe(
+                record, "trim", lambda: _early_bound(edge.GetCurveParams3(), "ICurveParamData"),
+                native=True,
+            )
+            if available(trim):
+                observe(record, "trim_start_m", lambda: trim.StartPoint)
+                observe(record, "trim_end_m", lambda: trim.EndPoint)
+                observe(record, "trim_u_min", lambda: trim.UMinValue)
+                observe(record, "trim_u_max", lambda: trim.UMaxValue)
+                observe(record, "trim_sense", lambda: trim.Sense)
+        closest = {}
+        record["closest_points_m"] = closest
+        for key, point in query_points.items():
+            observe(closest, key, lambda: edge.GetClosestPointOn(point[0], point[1], point[2]))
+
+    def contexts(record, raw):
+        record["raw"] = {}
+        edge_geometry(record["raw"], raw)
+        reverse = observe(
+            record, "source_reverse", lambda: extension.GetCorrespondingEntity2(raw), native=True,
+        )
+        if available(reverse):
+            record["source_reverse"] = {}
+            edge_geometry(record["source_reverse"], reverse)
+        forward = observe(record, "view_forward_raw", lambda: view.GetCorrespondingEntity(raw), native=True)
+        if available(forward):
+            record["view_forward_raw"] = {}
+            edge_geometry(record["view_forward_raw"], forward)
+        if available(reverse):
+            roundtrip = observe(
+                record, "view_forward_reverse", lambda: view.GetCorrespondingEntity(reverse), native=True,
+            )
+            if available(roundtrip):
+                record["view_forward_reverse"] = {}
+                edge_geometry(record["view_forward_reverse"], roundtrip)
+                observe(record, "roundtrip_same_raw", lambda: app.IsSame(roundtrip, raw))
+        return reverse
+
+    evidence["attached"] = {}
+    attached_reverse = contexts(evidence["attached"], attached)
+    candidates = []
+    evidence["candidates"] = candidates
+    for index, item in enumerate(scan.circles):
+        row = {"candidate_index": index, "scan_circle_mm": item.circle}
+        candidates.append(row)
+        reverse = contexts(row, item.edge)
+        if available(attached_reverse):
+            observe(row, "raw_same_attached_reverse", lambda: app.IsSame(item.edge, attached_reverse))
+            if available(reverse):
+                observe(row, "reverse_same_attached_reverse", lambda: app.IsSame(reverse, attached_reverse))
+    _telemetry.event("drawing.stud_purchased_note_source_inventory", **evidence)
+
+
 def _purchased_note_geometry(
     adapter: Any, front: Any, note: Any, *, text: str,
     landing: tuple[float, ...] | None = None,
@@ -790,6 +967,11 @@ def _purchased_note_geometry(
         if int(adapter.swApp.IsSame(item.edge, attached[0])) == 1
     ]
     if len(matches) != 1:
+        # Diagnostics cannot mask this unchanged strict native-identity refusal.
+        with suppress(Exception):
+            _record_purchased_note_source_failure(
+                adapter, front, annotation, attached[0], scan, match_count=len(matches),
+            )
         raise RuntimeError(f"{label}: actual attached head-top edge is not unique in its source view")
     circle = tuple(float(value) for value in matches[0].circle)
     axis_length = math.hypot(*circle[3:6])

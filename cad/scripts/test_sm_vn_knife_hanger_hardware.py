@@ -2172,6 +2172,259 @@ def _stud_paper_fixture(case, monkeypatch):
     return case
 
 
+def _stud_note_source_diagnostic_case(monkeypatch):
+    """Separate native contexts; the diagnostic outputs are not acceptance fakes."""
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    case.source = case.front.ReferencedDocument
+    case.source_body, case.view_body = object(), object()
+    case.source.GetType = lambda: 1
+    case.source.GetBodies2 = lambda body_type, visible: (
+        (case.source_body,) if (body_type, visible) == (0, False) else ()
+    )
+    case.source.ConfigurationManager = SimpleNamespace(
+        ActiveConfiguration=SimpleNamespace(Name="Default"),
+    )
+    case.model.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda _entity: pytest.fail("reverse mapping receiver must be SOURCE"),
+    )
+    case.reverse, case.forward = {}, {}
+    case.source.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda entity: case.reverse.get(id(entity)),
+    )
+    case.front.GetCorrespondingEntity = lambda entity: case.forward.get(id(entity))
+    case.model.SelectionManager.GetSelectedObjectsDrawingView2 = lambda _index, _mark: case.front
+    # D1's observed census has five circles, with three identical top-circle
+    # frames. Distinct trim data below are controlled native-shaped readbacks,
+    # not a claim that D1 captured these currently-unobserved endpoint values.
+    frame = (0.0, bolt.HEAD_TOP_Y, 0.0, 0.0, 1.0, 0.0, bolt.HEAD_AF / 2)
+    circles = (
+        frame, frame, frame,
+        (0.0, 46.560428147091706, 0.0, 0.0, 1.0, 0.0, 2.413),
+        (0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 1.813),
+    )
+
+    def install(raw, circle, index, body):
+        x, y, z, nx, ny, nz, radius = circle
+        angle = index * 0.4
+        start = (radius * math.cos(angle) / 1000, y / 1000, radius * math.sin(angle) / 1000)
+        end = (
+            radius * math.cos(angle + 0.2) / 1000, y / 1000,
+            radius * math.sin(angle + 0.2) / 1000,
+        )
+        curve = SimpleNamespace(
+            IsCircle=lambda: True, IsLine=lambda: False,
+            CircleParams=(x / 1000, y / 1000, z / 1000, nx, ny, nz, radius / 1000),
+        )
+        raw.GetBody = lambda: body
+        raw.GetCurve = lambda: curve
+        raw.GetCurveParams3 = lambda: SimpleNamespace(
+            StartPoint=start, EndPoint=end, UMinValue=angle, UMaxValue=angle + 0.2, Sense=True,
+        )
+        raw.GetClosestPointOn = lambda x, y, z: (*start, angle, 0.0)
+        return raw
+
+    items = []
+    case.canonical_edges, case.drawing_edges = [], []
+    for index, circle in enumerate(circles):
+        raw = install(SimpleNamespace(), circle, index, case.view_body)
+        canonical = install(SimpleNamespace(), circle, index, case.source_body)
+        drawing = install(SimpleNamespace(), circle, index, case.view_body)
+        case.canonical_edges.append(canonical)
+        case.drawing_edges.append(drawing)
+        case.reverse[id(raw)] = case.reverse[id(drawing)] = canonical
+        case.forward[id(raw)] = case.forward[id(canonical)] = drawing
+        items.append(ViewEdge(edge=raw, circle=circle, line=None, vertices=None))
+    case.front.scan = ViewEdges("D1-shaped note failure", (case.bearing_item, *items))
+    case.note_annotation.attached = case.drawing_edges[0]
+    case.diagnostic_candidates = items
+    return case
+
+
+def _refuse_stud_note_source_with_inventory(case):
+    with pytest.raises(RuntimeError) as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert str(error.value) == (
+        "Purchased Screw Note: actual attached head-top edge is not unique in its source view"
+    )
+    return next(
+        fields for name, fields in case.events
+        if name == "drawing.stud_purchased_note_source_inventory"
+    )
+
+
+def test_stud_note_failure_records_all_raw_source_and_view_contexts_without_accepting_mapping(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    case.selections[:] = [case.note_annotation.attached]
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    assert receipt["candidate_count"] == 5
+    assert receipt["view_name"] == case.front.name
+    assert receipt["view_configuration"] == receipt["source_active_configuration_name"] == "Default"
+    assert receipt["source_path"] == str(bolt_drawing.SOURCE.resolve())
+    assert receipt["source_document_type"] == 1
+    assert receipt["current_selection_count"] == 1
+    assert receipt["current_selection_inventory"][0]["same_view"] == 1
+    assert receipt["current_selection_inventory"][0]["same_attached"] == 1
+    assert receipt["native_leader_points_m"][-3:] == case.note_landing
+    assert receipt["closest_point_queries_model_m"]["original_coordinate_pick"] == tuple(
+        value / 1000 for value in bolt_drawing.HEAD_PICK_MM
+    )
+    candidates = receipt["candidates"]
+    assert [row["candidate_index"] for row in candidates] == list(range(5))
+    assert all(row["raw"]["same_attached"] == 0 for row in candidates)
+    assert [row["reverse_same_attached_reverse"] for row in candidates] == [1, 0, 0, 0, 0]
+    assert candidates[0]["view_forward_reverse"]["same_attached"] == 1
+    assert candidates[0]["raw"]["source_body_comparisons"][0]["same"] == 0
+    assert candidates[0]["source_reverse"]["source_body_comparisons"][0]["same"] == 1
+    assert len({row["raw"]["circle_params_m"] for row in candidates[:3]}) == 1
+    assert len({row["raw"]["trim_start_m"] for row in candidates[:3]}) == 3
+    assert [row["raw"]["trim_u_min"] for row in candidates[:3]] == [0.0, 0.4, 0.8]
+    assert all(row["raw"]["trim_sense"] is True for row in candidates)
+    assert all(
+        set(row["raw"]["closest_points_m"]) == set(receipt["closest_point_queries_model_m"])
+        for row in candidates
+    )
+    assert not case.rebuilds
+    assert case.selections == [case.note_annotation.attached]
+
+
+def test_stud_note_failure_inventory_distinguishes_duplicate_direct_native_matches(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    item = case.diagnostic_candidates[0]
+    case.note_annotation.attached = item.edge
+    case.front.scan = ViewEdges("duplicate direct native note edge", (*case.front.scan.edges, item))
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 2
+    assert receipt["candidate_count"] == 6
+    assert [row["candidate_index"] for row in receipt["candidates"]] == list(range(6))
+    assert sum(row["raw"]["same_attached"] == 1 for row in receipt["candidates"]) == 2
+
+
+@pytest.mark.parametrize("native_state", [-1, 2])
+def test_stud_note_unknown_direct_identity_is_observed_not_accepted_by_successful_mapping(
+    monkeypatch, native_state,
+):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    original_same = case.app.IsSame
+    case.app.IsSame = lambda left, right: (
+        native_state
+        if right is case.note_annotation.attached
+        and any(left is item.edge for item in case.diagnostic_candidates)
+        else original_same(left, right)
+    )
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    assert all(row["raw"]["same_attached"] == native_state for row in receipt["candidates"])
+    assert receipt["candidates"][0]["view_forward_reverse"]["same_attached"] == 1
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["reverse_null", "forward_null", "reverse_error", "forward_error", "curve_error",
+     "trim_error", "body_error", "source_bodies_error", "body_same_error", "configuration_error"],
+)
+def test_stud_note_diagnostic_nulls_and_native_getter_errors_never_mask_original_refusal(
+    monkeypatch, fault,
+):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+    cause = OSError(f"diagnostic {fault}")
+
+    def fail(*_args):
+        raise cause
+
+    if fault == "reverse_null":
+        case.source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "forward_null":
+        case.front.GetCorrespondingEntity = lambda _entity: None
+    elif fault == "reverse_error":
+        case.source.Extension.GetCorrespondingEntity2 = fail
+    elif fault == "forward_error":
+        case.front.GetCorrespondingEntity = fail
+    elif fault == "curve_error":
+        case.diagnostic_candidates[0].edge.GetCurve = fail
+    elif fault == "trim_error":
+        case.diagnostic_candidates[0].edge.GetCurveParams3 = fail
+    elif fault == "body_error":
+        case.diagnostic_candidates[0].edge.GetBody = fail
+    elif fault == "source_bodies_error":
+        case.source.GetBodies2 = fail
+    elif fault == "body_same_error":
+        original_same = case.app.IsSame
+
+        def same(left, right):
+            if left is case.view_body and right is case.source_body:
+                raise cause
+            return original_same(left, right)
+
+        case.app.IsSame = same
+    elif fault == "configuration_error":
+        original_bind = bolt_drawing._early_bound
+
+        def bind(value, kind):
+            if kind == "IConfigurationManager":
+                raise cause
+            return original_bind(value, kind)
+
+        monkeypatch.setattr(bolt_drawing, "_early_bound", bind)
+    receipt = _refuse_stud_note_source_with_inventory(case)
+    assert receipt["predicate_match_count"] == 0
+    assert len(receipt["candidates"]) == 5
+    if fault == "reverse_null":
+        assert receipt["attached"]["source_reverse_null"] is True
+        assert all(row["source_reverse_null"] is True for row in receipt["candidates"])
+    elif fault == "forward_null":
+        assert receipt["attached"]["source_reverse_null"] is False
+        assert receipt["attached"]["view_forward_raw_null"] is True
+        assert receipt["attached"]["view_forward_reverse_null"] is True
+    else:
+        # Check the original getter's readable evidence, not snapshot spelling
+        # or a fabricated empty inventory standing in for inaccessible data.
+        def errors(value):
+            if isinstance(value, dict):
+                yield from value.get("errors", ())
+                for child in value.values():
+                    yield from errors(child)
+            elif isinstance(value, (tuple, list)):
+                for child in value:
+                    yield from errors(child)
+
+        assert any(
+            error["type"] == "OSError" and error["error"] == str(cause)
+            for error in errors(receipt)
+        )
+    assert not case.rebuilds
+
+
+def test_stud_note_diagnostic_sink_failure_cannot_replace_original_native_guard(monkeypatch):
+    case = _stud_note_source_diagnostic_case(monkeypatch)
+
+    def fail(*_args, **_kwargs):
+        raise OSError("diagnostic sink failed")
+
+    monkeypatch.setattr(bolt_drawing._telemetry, "event", fail)
+    with pytest.raises(RuntimeError, match="actual attached head-top edge is not unique"):
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+
+
+def test_stud_note_unique_direct_identity_does_not_read_diagnostic_mapping(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("successful strict direct identity must not invoke diagnostic correspondence")
+
+    monkeypatch.setattr(bolt_drawing, "_record_purchased_note_source_failure", unexpected)
+    record, _box, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert record["physical_top_circle_mm"] == case.top_item.circle
+    assert landing == case.note_landing
+    assert not any(name == "drawing.stud_purchased_note_source_inventory" for name, _ in case.events)
+
+
 def _shelve_stud_paper(case):
     def reacquire():
         displays = bolt_drawing._assert_supplier_references(

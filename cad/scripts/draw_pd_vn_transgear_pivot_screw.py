@@ -18,7 +18,7 @@ import argparse
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -1410,32 +1410,128 @@ def _tail_text_fragments(record: dict[str, Any]) -> tuple:
     return tuple(sorted(fragments))
 
 
+def _tail_measurement_snapshot(adapter: Any, tail: Any, display: Any, geometry: dict | None) -> dict:
+    """Last measured ink plus current metadata, without masking native getter errors."""
+    snapshot: dict[str, Any] = {
+        "measurement_available": geometry is not None,
+        "ink_measurement": "last_successful_read" if geometry is not None else "unavailable",
+    }
+    for key, getter in (
+        ("full_name", lambda: str(_early_bound(display.GetDimension2(0), "IDimension").FullName)[:512]),
+        ("owner", lambda: view_name(adapter, tail.Owner)),
+        ("owner_type", lambda: int(tail.OwnerType)),
+        ("offset_text", lambda: bool(display.OffsetText)),
+        ("annotation_position", lambda: tuple(float(value) for value in tail.GetPosition())[:3]),
+    ):
+        try:
+            snapshot[key] = getter()
+        except Exception as error:
+            snapshot.setdefault("metadata_errors", []).append({
+                "field": key, "type": type(error).__name__, "error": str(error)[:500],
+            })
+    if geometry is not None:
+        rows = geometry["record"]["display"]["texts"]
+        snapshot.update(
+            arrow_stations=geometry["tips"], witnesses=geometry["witnesses"],
+            text_fragment_count=len(rows),
+            text_fragments=[
+                dict(text=str(row["t"])[:256], position=tuple(row["pos"][:3]),
+                     width=row["w"], height=row["h"], angle=row["ang"])
+                for row in rows[:12]
+            ],
+            text_fragments_truncated=len(rows) > 12,
+        )
+    return snapshot
+
+
+def _tail_layout_refusal(
+    adapter: Any, tail: Any, display: Any, *, frame: dict,
+    current: dict | None, phase: str, error: Exception,
+) -> NoReturn:
+    reason = str(error)[:1000]
+    snapshot = dict(
+        phase=phase, failure_error_type=type(error).__name__, failure_error=reason,
+        original=frame.get("original", {"measurement_available": False}),
+        current=_tail_measurement_snapshot(adapter, tail, display, current),
+        column=frame.get("column"), measured_translation=frame.get("offset_translation"),
+    )
+    _telemetry.event("drawing.pivot_tail_layout_refusal", **snapshot)
+    prefix = "" if reason.startswith("ThreadLengthMin:") else "ThreadLengthMin: "
+    raise RuntimeError(f"{prefix}{reason}; native_snapshot={snapshot!r}") from error
+
+
 def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
-    """Move only the native tail column beyond measured major ink; retain its text."""
-    rebuild_drawing(adapter, label="measure pivot tail and thread-major ink")
+    """Move the column, then restore actual native ink by one text-only translation."""
     tail = _early_bound(tail, "IAnnotation")
     display = _early_bound(tail.GetSpecificAnnotation(), "IDisplayDimension")
-    before = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
-    original = tuple(float(value) for value in tail.GetPosition())
-    major_record = _paper_annotation(adapter, major, label="SupplierThreadMajor")
-    reach = display_box(major_record["display"])
-    if (
-        reach is None or not math.isfinite(reach.xmax)
-        or len(original) != 3 or not all(map(math.isfinite, original))
-        or display.OffsetText is not False
-    ):
-        raise RuntimeError("ThreadLengthMin: unavailable native column/major bounds")
-    column = reach.xmax + _PAPER_GAP_M + 0.0002
-    if not tail.SetPosition2(column, original[1], original[2]):
-        raise RuntimeError("ThreadLengthMin: cannot move physical column")
-    rebuild_drawing(adapter, label="pivot tail measured column")
-    offset_dimension_text(adapter, (tail,), {"ThreadLengthMin": original[:2]})
+    frame: dict[str, Any] = {}
+    current = None
+    phase = "measure_original"
+    try:
+        rebuild_drawing(adapter, label="measure pivot tail and thread-major ink")
+        before = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
+        current = before
+        frame["original"] = _tail_measurement_snapshot(adapter, tail, display, before)
+        original = tuple(float(value) for value in tail.GetPosition())
+        major_record = _paper_annotation(adapter, major, label="SupplierThreadMajor")
+        reach = display_box(major_record["display"])
+        if (
+            reach is None or not math.isfinite(reach.xmax)
+            or len(original) != 3 or not all(map(math.isfinite, original))
+            or display.OffsetText is not False
+        ):
+            raise RuntimeError("ThreadLengthMin: unavailable native column/major bounds")
+        column = reach.xmax + _PAPER_GAP_M + 0.0002
+        frame.update(
+            tips=before["tips"], text=before["text"], column=column,
+            words=tuple(sorted(str(row["t"]) for row in before["record"]["display"]["texts"])),
+            fragments=_tail_text_fragments(before["record"]),
+        )
+        phase = "move_column"
+        if not tail.SetPosition2(column, original[1], original[2]):
+            raise RuntimeError("ThreadLengthMin: cannot move physical column")
+        rebuild_drawing(adapter, label="pivot tail measured column")
+        phase = "enable_native_offset"
+        # With OffsetText=False GetPosition is the DIMENSION-LINE anchor, not
+        # the text origin. This seeds offset mode; its actual ink must be read.
+        offset_dimension_text(adapter, (tail,), {"ThreadLengthMin": original[:2]})
+        phase = "measure_offset_text"
+        current = None
+        current = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
+        if display.OffsetText is not True or any(
+            abs(old[1] - new[1]) > 1e-8 or abs(new[0] - column) > 1e-8
+            for old, new in zip(frame["tips"], current["tips"], strict=True)
+        ):
+            raise RuntimeError("ThreadLengthMin: native physical stations/column changed")
+        fragments = _tail_text_fragments(current["record"])
+        dx = current["text"].xmin - before["text"].xmin
+        dy = current["text"].ymin - before["text"].ymin
+        frame["offset_translation"] = (dx, dy)
+        # Congruence is tighter than the existing 0.2 mm placement tolerance.
+        # Native annotation dumps round coordinates to 0.1 um; allow 1 um for
+        # that readback, never a changed word, angle, size or independent row.
+        if len(fragments) != len(frame["fragments"]) or any(
+            old[0] != new[0] or abs(old[1] - new[1]) > 1e-8
+            or any(
+                abs(new_value - old_value - shift) > 1e-6
+                for old_value, new_value, shift in zip(old[2:], new[2:], (dx, dy, dx, dy), strict=True)
+            )
+            for old, new in zip(frame["fragments"], fragments, strict=True)
+        ):
+            raise RuntimeError("ThreadLengthMin: offset ink is not one congruent native text translation")
+        if dx != 0.0 or dy != 0.0:
+            phase = "restore_measured_text"
+            position = tuple(float(value) for value in tail.GetPosition())
+            if (
+                len(position) != 3 or not all(map(math.isfinite, position))
+                or display.OffsetText is not True
+                or not tail.SetPosition2(position[0] - dx, position[1] - dy, position[2])
+            ):
+                raise RuntimeError("ThreadLengthMin: cannot restore measured acceptance ink")
+            rebuild_drawing(adapter, label="restore measured pivot tail acceptance ink")
+    except Exception as error:
+        _tail_layout_refusal(adapter, tail, display, frame=frame, current=current, phase=phase, error=error)
 
-    frame = dict(
-        tips=before["tips"], text=before["text"], column=column,
-        words=tuple(sorted(str(row["t"]) for row in before["record"]["display"]["texts"])),
-        fragments=_tail_text_fragments(before["record"]),
-    )
     def settled() -> None:
         _assert_tail_layout(adapter, tail, major, frame=frame)
     settled()
@@ -1444,46 +1540,51 @@ def _move_tail_column(adapter: Any, tail: Any, major: Any) -> Any:
 
 def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str, Any]) -> None:
     """Read-only replay over fresh native annotations and scalar pre-move stations."""
-    display = _early_bound(_early_bound(tail, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
-    actual = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
-    column = frame["column"]
-    if display.OffsetText is not True or any(
-        abs(old[1] - new[1]) > 1e-8 or abs(new[0] - column) > 1e-8
-        for old, new in zip(frame["tips"], actual["tips"], strict=True)
-    ):
-        raise RuntimeError("ThreadLengthMin: native physical stations/column changed")
-    if max(
-        abs(getattr(frame["text"], key) - getattr(actual["text"], key))
-        for key in ("xmin", "ymin", "xmax", "ymax")
-    ) > 0.0002:
-        raise RuntimeError("ThreadLengthMin: complete acceptance text moved")
-    if tuple(sorted(str(row["t"]) for row in actual["record"]["display"]["texts"])) != frame["words"]:
-        raise RuntimeError("ThreadLengthMin: complete native acceptance wording changed")
-    fragments = _tail_text_fragments(actual["record"])
-    if len(fragments) != len(frame["fragments"]) or any(
-        old[0] != new[0] or abs(old[1] - new[1]) > 1e-8
-        or max(abs(a - b) for a, b in zip(old[2:], new[2:], strict=True)) > 0.0002
-        for old, new in zip(frame["fragments"], fragments, strict=True)
-    ):
-        raise RuntimeError("ThreadLengthMin: native acceptance fragment placement/format changed")
-    current_major = _paper_annotation(adapter, major, label="SupplierThreadMajor")
-    full = display_box(current_major["display"])
-    if full is None or column < full.xmax + _PAPER_GAP_M:
-        raise RuntimeError("ThreadLengthMin: physical column crowds complete thread-major ink")
-    major_ink = annotation_geometry(
-        current_major, owner="SupplierThreadMajor", advance=calibrate_sheet_advance((current_major,)),
-    )
-    tail_ink = annotation_geometry(
-        actual["record"], owner="ThreadLengthMin", advance=calibrate_sheet_advance((actual["record"],)),
-    )
-    if any(
-        _segment_crossing(first, second) is not None
-        for first in major_ink.segments for second in tail_ink.segments
-    ) or any(
-        segment_box_distance(run, display_box({"texts": current_major["display"]["texts"]})) <= 1e-8
-        for run in tail_ink.segments
-    ):
-        raise RuntimeError("ThreadLengthMin: native ink crosses thread-major line/text")
+    tail = _early_bound(tail, "IAnnotation")
+    display = _early_bound(tail.GetSpecificAnnotation(), "IDisplayDimension")
+    actual = None
+    try:
+        actual = measure_reference_text(adapter, display, axis=1, label="ThreadLengthMin")
+        column = frame["column"]
+        if display.OffsetText is not True or any(
+            abs(old[1] - new[1]) > 1e-8 or abs(new[0] - column) > 1e-8
+            for old, new in zip(frame["tips"], actual["tips"], strict=True)
+        ):
+            raise RuntimeError("ThreadLengthMin: native physical stations/column changed")
+        if max(
+            abs(getattr(frame["text"], key) - getattr(actual["text"], key))
+            for key in ("xmin", "ymin", "xmax", "ymax")
+        ) > 0.0002:
+            raise RuntimeError("ThreadLengthMin: complete acceptance text moved")
+        if tuple(sorted(str(row["t"]) for row in actual["record"]["display"]["texts"])) != frame["words"]:
+            raise RuntimeError("ThreadLengthMin: complete native acceptance wording changed")
+        fragments = _tail_text_fragments(actual["record"])
+        if len(fragments) != len(frame["fragments"]) or any(
+            old[0] != new[0] or abs(old[1] - new[1]) > 1e-8
+            or max(abs(a - b) for a, b in zip(old[2:], new[2:], strict=True)) > 0.0002
+            for old, new in zip(frame["fragments"], fragments, strict=True)
+        ):
+            raise RuntimeError("ThreadLengthMin: native acceptance fragment placement/format changed")
+        current_major = _paper_annotation(adapter, major, label="SupplierThreadMajor")
+        full = display_box(current_major["display"])
+        if full is None or column < full.xmax + _PAPER_GAP_M:
+            raise RuntimeError("ThreadLengthMin: physical column crowds complete thread-major ink")
+        major_ink = annotation_geometry(
+            current_major, owner="SupplierThreadMajor", advance=calibrate_sheet_advance((current_major,)),
+        )
+        tail_ink = annotation_geometry(
+            actual["record"], owner="ThreadLengthMin", advance=calibrate_sheet_advance((actual["record"],)),
+        )
+        if any(
+            _segment_crossing(first, second) is not None
+            for first in major_ink.segments for second in tail_ink.segments
+        ) or any(
+            segment_box_distance(run, display_box({"texts": current_major["display"]["texts"]})) <= 1e-8
+            for run in tail_ink.segments
+        ):
+            raise RuntimeError("ThreadLengthMin: native ink crosses thread-major line/text")
+    except Exception as error:
+        _tail_layout_refusal(adapter, tail, display, frame=frame, current=actual, phase="settled", error=error)
 
 
 def _route_purchased_note(
