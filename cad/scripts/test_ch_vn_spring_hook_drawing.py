@@ -175,9 +175,6 @@ def test_deburr_band_clears_the_receiving_tap_drill():
 def test_drawing_requires_every_cutting_control(monkeypatch, fault):
     """A lost band, a widened band or a reference-only size is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     annotations = []
     for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
         tolerance = SimpleNamespace(
@@ -186,7 +183,7 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
             GetMaxValue=lambda upper=upper: upper,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -219,10 +216,10 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
     elif fault == "missing":
         annotations.pop()
     if fault is None:
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
         return
     with pytest.raises(RuntimeError):
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
 
 
 def test_nut_thread_interference_literal_matches_the_specs():

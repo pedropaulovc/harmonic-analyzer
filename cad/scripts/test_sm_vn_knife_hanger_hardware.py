@@ -345,17 +345,7 @@ def test_native_controls_are_owned_and_printed_without_precision_rewrites() -> N
         assert sheet.script.is_file()
 
 
-@pytest.mark.parametrize("name", tuple(bolt_drawing.EXPECTED_CONTROLS))
-@pytest.mark.parametrize(
-    "fault", [None, "reference", "nominal", "type", "band", "precision", "missing"]
-)
-def test_sheet_readback_refuses_lost_cut_or_inspection_control(
-    monkeypatch, name, fault
-):
-    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
+def _native_machining_control_annotations():
     annotations = []
     for key, (nominal, lower, upper) in bolt_drawing.EXPECTED_CONTROLS.items():
         tolerance = SimpleNamespace(
@@ -364,7 +354,7 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
             GetMaxValue=lambda upper=upper: upper,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=key, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -379,13 +369,50 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
                 GetSpecificAnnotation=lambda display=display: display,
             )
         )
+    return annotations
+
+
+def _verify_native_machining_controls(annotations):
+    trim_drawing.verify_machining_controls(
+        annotations,
+        expected=bolt_drawing.EXPECTED_CONTROLS,
+        tolerance_types=bolt.DIMENSION_TOLERANCE_TYPES,
+        precision=bolt.DIMENSION_PRECISION,
+    )
+
+
+@pytest.mark.parametrize("name", tuple(bolt_drawing.EXPECTED_CONTROLS))
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None,
+        "reference",
+        "reference_prefix",
+        "nominal",
+        "type",
+        "minimum",
+        "band",
+        "precision",
+        "missing",
+    ],
+)
+def test_sheet_readback_refuses_lost_cut_or_inspection_control(
+    monkeypatch, name, fault
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
     target = next(annotation for annotation in annotations if annotation.name == name)
     if fault == "reference":
         target.dimension.DrivenState = 1
+    elif fault == "reference_prefix":
+        target.display.GetText = lambda _index: "("
     elif fault == "nominal":
         target.dimension.SystemValue += 0.001
     elif fault == "type":
         target.dimension.Tolerance.Type = 0
+    elif fault == "minimum":
+        lower = bolt_drawing.EXPECTED_CONTROLS[name][1]
+        target.dimension.Tolerance.GetMinValue = lambda: lower - 0.001
     elif fault == "band":
         target.dimension.Tolerance.GetMaxValue = lambda: 0.01
     elif fault == "precision":
@@ -394,19 +421,149 @@ def test_sheet_readback_refuses_lost_cut_or_inspection_control(
         annotations.remove(target)
 
     def verify():
-        trim_drawing.verify_machining_controls(
-            None,
-            annotations,
-            expected=bolt_drawing.EXPECTED_CONTROLS,
-            tolerance_types=bolt.DIMENSION_TOLERANCE_TYPES,
-            precision=bolt.DIMENSION_PRECISION,
-        )
+        _verify_native_machining_controls(annotations)
 
     if fault is None:
         verify()
     else:
         with pytest.raises(RuntimeError):
             verify()
+
+
+@pytest.mark.parametrize("obsolete_api", ["absent", "raises"])
+def test_machining_controls_use_native_names_without_the_obsolete_getter(
+    monkeypatch, obsolete_api
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+
+    def obsolete_getter(*_args):
+        pytest.fail("machining controls must not read obsolete GetDimension")
+
+    for annotation in annotations:
+        annotation.name = "NotTheNativeDimensionName"
+        if obsolete_api == "raises":
+            annotation.display.GetDimension = obsolete_getter
+    _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize(
+    "bad_name",
+    [
+        "",
+        " ",
+        None,
+        False,
+        7,
+        1.5,
+        (),
+        [],
+        "UnknownNativeControl",
+        "ChamferWidth@StockDeburrProfile",
+    ],
+)
+def test_machining_controls_refuse_invalid_native_names(monkeypatch, bad_name):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    annotations[0].dimension.Name = bad_name
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+def test_machining_controls_do_not_coerce_native_names_to_strings(monkeypatch):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    native_name = annotations[0].dimension.Name
+
+    class StringLikeNativeName:
+        def __str__(self):
+            return native_name
+
+    annotations[0].dimension.Name = StringLikeNativeName()
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("fault", ["extra", "duplicate", "missing"])
+def test_machining_controls_require_the_exact_native_name_inventory(monkeypatch, fault):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    if fault == "missing":
+        annotations.pop()
+    else:
+        extra = _native_machining_control_annotations()[0]
+        if fault == "extra":
+            extra.dimension.Name = "UnrequestedNativeControl"
+        annotations.append(extra)
+    with pytest.raises(RuntimeError):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("getter", ["dimension", "name"])
+def test_machining_controls_preserve_native_getter_failures(monkeypatch, getter):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    failure = OSError("native machining-control getter failed")
+
+    def failed_dimension(*_args):
+        raise failure
+
+    if getter == "dimension":
+        annotations[0].display.GetDimension2 = failed_dimension
+    else:
+
+        class UnreadableNativeName:
+            @property
+            def Name(self):
+                raise failure
+
+        unreadable = UnreadableNativeName()
+        annotations[0].display.GetDimension2 = lambda _configuration: unreadable
+    with pytest.raises((OSError, RuntimeError)) as caught:
+        _verify_native_machining_controls(annotations)
+    assert caught.value is failure or caught.value.__cause__ is failure
+
+
+@pytest.mark.parametrize("missing", ["display", "dimension"])
+def test_machining_controls_refuse_a_missing_native_dimension(monkeypatch, missing):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    if missing == "display":
+        annotations[0].GetSpecificAnnotation = lambda: None
+    else:
+        annotations[0].display.GetDimension2 = lambda _configuration: None
+    with pytest.raises((AttributeError, RuntimeError)):
+        _verify_native_machining_controls(annotations)
+
+
+@pytest.mark.parametrize("first_is_valid", [True, False])
+def test_machining_controls_read_name_and_values_from_the_same_native_object(
+    monkeypatch, first_is_valid
+):
+    monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
+    annotations = _native_machining_control_annotations()
+    _verify_native_machining_controls(annotations)
+    first = annotations[0].dimension
+    decoy = _native_machining_control_annotations()[0].dimension
+    decoy.Name = "NotTheIdentifiedNativeControl"
+    if first_is_valid:
+        decoy.SystemValue += 0.001
+    else:
+        first.SystemValue += 0.001
+    modern_dimensions = iter((first, decoy))
+    annotations[0].display.GetDimension2 = (
+        lambda _configuration: next(modern_dimensions)
+    )
+    if first_is_valid:
+        _verify_native_machining_controls(annotations)
+    else:
+        with pytest.raises(RuntimeError):
+            _verify_native_machining_controls(annotations)
 
 
 @pytest.mark.parametrize(

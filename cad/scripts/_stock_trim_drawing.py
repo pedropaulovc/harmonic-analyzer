@@ -16,7 +16,7 @@ import math
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, view_name
+from solidworks_mcp.adapters.solidworks.drawing import view_name
 
 from _com import _early_bound, _read_member
 from _drawing_projection import model_point_in_view
@@ -140,7 +140,6 @@ def position_parent_detail_letter(adapter: Any, front: Any, sheet: TrimSheet) ->
 
 
 def verify_machining_controls(
-    adapter: Any,
     annotations: list[Any],
     *,
     expected: dict[str, tuple[float, float, float]],
@@ -153,13 +152,21 @@ def verify_machining_controls(
     -- signed deviations, so a unilateral trim band and a symmetric deburr band
     are checked by the same walk. A control that silently became reference-only,
     lost its band or moved is a drawing regression, never a cosmetic drift.
+
+    Read native Name and all control properties from the same GetDimension2(0)
+    object. Each expected name must be consumed exactly once by the supplied
+    annotations; empty, non-string, duplicate, extra and missing names refuse.
     """
     remaining = dict(expected)
     for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        nominal, lower, upper = remaining.pop(name)
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        name = dimension.Name
+        if type(name) is not str or not name or name not in remaining:
+            raise RuntimeError(
+                f"invalid, duplicate or unexpected machining control name: {name!r}"
+            )
+        nominal, lower, upper = remaining.pop(name)
         tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
         if int(dimension.DrivenState) != 2 or "(" in str(display.GetText(1) or ""):
             raise RuntimeError(f"{name}: machining control became reference-only")
