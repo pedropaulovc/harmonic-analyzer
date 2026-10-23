@@ -1673,18 +1673,38 @@ def _assert_note_arrow(current: Any, landing: tuple, record: dict) -> None:
     points = tuple(float(value) for value in current.GetLeaderPointsAtIndex(0) or ())
     arrows = record["display"].get("arrows") or ()
     count, style = int(current.GetLeaderCount()), int(current.GetLeaderStyle())
+    # SDK IAnnotation.GetLeaderStyle -> swLeaderStyle_e: attachment-mode
+    # bitmasks swAttachLeaderTop/Center/Bottom/Nearest do not change shape.
+    # Native drawing notes can retain swAttachLeaderNearest. Strip only
+    # these documented bits; unknown bits remain in the exact base check.
+    attachment_mask = 0x100 | 0x200 | 0x400 | 0x800
+    attachment_mode = style & attachment_mask
+    base_style = style & ~attachment_mask
     if (
-        count != 1 or style != 1  # swSTRAIGHT
+        count != 1 or base_style != 1  # swSTRAIGHT
+        or attachment_mode not in (0, 0x100, 0x200, 0x400, 0x800)
         or len(points) != 6 or not all(map(math.isfinite, points))
         or math.dist(points[3:5], landing) > 1e-8 or math.dist(points[:2], points[3:5]) <= 1e-8
         or len(arrows) != 1 or len(arrows[0]) != 12 or not all(map(math.isfinite, arrows[0]))
         or math.dist(arrows[0][:2], landing) > 1e-8
         or math.hypot(arrows[0][3], arrows[0][4]) <= 1e-8 or min(arrows[0][6:8]) <= 0
     ):
+        leader_tip = points[3:5]
+        arrow_tip = tuple(arrows[0][:2]) if arrows else ()
+        leader_delta = tuple(
+            actual - expected for actual, expected in zip(leader_tip, landing, strict=True)
+        ) if len(leader_tip) == 2 else None
+        arrow_delta = tuple(
+            actual - expected for actual, expected in zip(arrow_tip, landing, strict=True)
+        ) if len(arrow_tip) == 2 and all(isinstance(value, (int, float)) for value in arrow_tip) else None
         raise RuntimeError(
             "Purchased Screw Note: actual straight leader/arrow/landing changed; "
-            f"leader_count={count}, style={style}, points={points[:12]!r}, "
-            f"arrow_count={len(arrows)}, arrow_lengths={[len(row) for row in arrows[:4]]!r}"
+            f"leader_count={count}, style={style}, base_style={base_style}, "
+            f"attachment_mode={attachment_mode}, points={points[:12]!r}, expected_tip={landing!r}, "
+            f"leader_tip={leader_tip!r}, leader_delta_m={leader_delta!r}, "
+            f"arrow_tip={arrow_tip!r}, arrow_delta_m={arrow_delta!r}, "
+            f"arrow_count={len(arrows)}, arrow_lengths={[len(row) for row in arrows[:4]]!r}, "
+            f"first_arrow={tuple(arrows[0][:12]) if arrows else ()!r}"
         )
     text = display_box({"texts": record["display"].get("texts") or ()})
     if text is None or not any(

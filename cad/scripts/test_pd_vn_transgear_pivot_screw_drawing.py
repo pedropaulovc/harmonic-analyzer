@@ -2958,7 +2958,7 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         )
     state.note_annotation = SimpleNamespace(
         Owner=state.front, OwnerType=0, Visible=1, IsDangling=lambda: False,
-        GetLeaderCount=lambda: 1, GetLeaderStyle=lambda: 1,
+        GetLeaderCount=lambda: 1, GetLeaderStyle=lambda: 1 | 0x800,  # Native swSTRAIGHT + nearest attachment.
         GetAttachedEntityCount3=lambda: 1, GetAttachedEntityTypes=lambda: (1,),
         GetAttachedEntities3=lambda: (state.top,),
         GetLeaderPointsAtIndex=lambda _index: (*leader_start(), 0.0, *state.landing, 0.0),
@@ -3552,9 +3552,63 @@ def test_cold_tail_cannot_keep_box_but_drop_native_minimum_acceptance_wording(mo
     assert state.adapter.currentModel is state.previous
 
 
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("style,accepted", (
+    (1, True),
+    (1 | 0x100, True),
+    (1 | 0x200, True),
+    (1 | 0x400, True),
+    (1 | 0x800, True),
+    (0, False),
+    (2, False),
+    (3, False),
+    (4, False),
+    (5, False),
+    (8, False),
+    (9, False),
+    (0x800, False),
+    (0x800 | 2, False),
+    (0x800 | 3, False),
+    (0x800 | 4, False),
+    (0x800 | 8, False),
+    (1 | 0x100 | 0x200, False),
+    (1 | 0x100 | 0x800, False),
+    (1 | 0x10, False),
+    (1 | 0x1000, False),
+    (-1, False),
+))
+def test_straight_note_decodes_only_documented_single_attachment_mode(
+    monkeypatch, tmp_path, phase, style, accepted,
+):
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    state.note_annotation.GetLeaderStyle = lambda: style
+    def verify():
+        if phase == "saved":
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+        else:
+            state.adapter.currentModel = state.saved
+            state.note_check()
+            drawing._assert_paper_layout(
+                state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+                state.paper_displays, purchased_text=state.note_text,
+            )
+    if accepted:
+        verify()
+    else:
+        with pytest.raises(RuntimeError, match="actual straight leader/arrow/landing changed"):
+            verify()
+
+
 @pytest.mark.parametrize("fault", (
     "attachment_count", "attachment_type", "dangling", "bent_leader", "arrow_count",
-    "leader_hidden", "leader_multiple",
+    "leader_hidden", "leader_multiple", "leader_points_short", "leader_points_long",
+    "leader_nonfinite", "leader_landing_drift", "leader_zero_length",
+    "short_arrow", "long_arrow", "nonfinite_arrow", "arrow_landing_drift",
+    "zero_arrow_direction", "zero_arrow_length", "zero_arrow_width",
 ))
 def test_straight_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch, tmp_path, fault):
     state = _saved_physical_fixture(monkeypatch, tmp_path)
@@ -3570,6 +3624,49 @@ def test_straight_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch,
         state.note_annotation.GetLeaderCount = lambda: 0
     elif fault == "leader_multiple":
         state.note_annotation.GetLeaderCount = lambda: 2
+    elif fault in (
+        "leader_points_short", "leader_points_long", "leader_nonfinite",
+        "leader_landing_drift", "leader_zero_length",
+    ):
+        original_points = state.note_annotation.GetLeaderPointsAtIndex
+        def broken_points(index):
+            points = list(original_points(index))
+            if fault == "leader_points_short":
+                points.pop()
+            elif fault == "leader_points_long":
+                points.append(0.0)
+            elif fault == "leader_nonfinite":
+                points[0] = math.nan
+            elif fault == "leader_landing_drift":
+                points[4] += 2e-8
+            else:
+                points[:3] = points[3:6]
+            return points
+        state.note_annotation.GetLeaderPointsAtIndex = broken_points
+    elif fault in (
+        "short_arrow", "long_arrow", "nonfinite_arrow", "arrow_landing_drift",
+        "zero_arrow_direction", "zero_arrow_length", "zero_arrow_width",
+    ):
+        original_record = state.note_annotation.paper_record
+        def broken_arrow():
+            record = original_record()
+            arrow = record["display"]["arrows"][0]
+            if fault == "short_arrow":
+                arrow.pop()
+            elif fault == "long_arrow":
+                arrow.append(0.0)
+            elif fault == "nonfinite_arrow":
+                arrow[3] = math.nan
+            elif fault == "arrow_landing_drift":
+                arrow[1] += 2e-8
+            elif fault == "zero_arrow_direction":
+                arrow[3:5] = (0.0, 0.0)
+            elif fault == "zero_arrow_length":
+                arrow[6] = 0.0
+            else:
+                arrow[7] = 0.0
+            return record
+        state.note_annotation.paper_record = broken_arrow
     else:
         state.note_arrow_count = 2
     with pytest.raises(RuntimeError):
