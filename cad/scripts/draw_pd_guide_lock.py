@@ -5,7 +5,7 @@ views, dimension layout and hole callout;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
-The sheet runs at 4:1 (the plate is 22 x 9.6, cut from 1/16 sheet, its four
+The sheet runs at 4:1 (the plate is 22.5 x 9.8, cut from 1/16 sheet, its four
 corners rounded); the isometric carries an explicit 2:1 override so it stays
 clear of the title block.  A flat plate needs only the face view (front), one
 thickness view (right) and the iso.
@@ -52,7 +52,6 @@ from _session import run_build
 import _telemetry
 from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
-    HOLE_EDGE_WALL_CALLOUT,
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
@@ -77,8 +76,8 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (4.0, 1.0)
 
-# Sheet layout (meters).  The front view's model bbox is 22 x 9.6 (the plate
-# face); at 4:1 the view is 88 x 38.4 mm, x 0.106..0.194, y 0.156..0.194.
+# Sheet layout (meters).  The front view's model bbox is 22.5 x 9.8 (the plate
+# face); at 4:1 the view is 90 x 39.2 mm, x 0.105..0.195, y 0.155..0.195.
 # Third angle: the right view (the 1/16 sheet edge-on) sits to its right,
 # past the hole callout; the isometric rides top-right.  The whole group sits
 # centred between the border and the title block (it sat 25 mm low and 15 mm
@@ -125,7 +124,7 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.125),
     "Height": (0.057, FRONT_CENTER[1]),
-    "Hole1X": (0.087, 0.138),
+    "Hole1X": (0.085, 0.138),
     "Hole2X": (0.142, 0.133),
     "Hole1Y": (0.076, 0.147),
     "CornerR": (0.215, 0.211),
@@ -145,15 +144,17 @@ HOLE_CALLOUT_PROCESS = "DRILL"
 # The hole coordinates' ±0.035 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
 # shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
-# so the callout names both, and the spec's least-edge-wall fact (rule 20).
+# so the callout names both.
 # Rows stay at most 23 characters so the block keeps between the plate and
 # the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
 SCREW_NUMBER = _config.parts("pd-vn-guide-lock-screw")["number"]
-HOLE_CALLOUT_BELOW = (
-    f"MATCHES {GUIDE_NUMBER} TAPS,\n"
-    "CLEARANCE FIT ON\n"
-    f"{SCREW_NUMBER} SCREWS\n" + HOLE_EDGE_WALL_CALLOUT
+HOLE_CALLOUT_BELOW = "\n".join(
+    (
+        f"MATCHES {GUIDE_NUMBER} TAPS,",
+        "CLEARANCE FIT ON",
+        f"{SCREW_NUMBER} SCREWS",
+    )
 )
 
 

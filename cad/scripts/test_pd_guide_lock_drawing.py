@@ -60,28 +60,33 @@ _DRILLED_PLUS = 0.10
 _CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
 
-def _ligaments(hole_y: float) -> dict[str, float]:
+def _ligaments(hole_y: float, width: float = 22.5) -> dict[str, float]:
     r_max = (0.125 * 25.4 + _DRILLED_PLUS) / 2.0
     band = 0.035
     xs = [x for x, _ in pd_guide_lock_spec.HOLE_XY]
     return {
         "guide-side edge": hole_y - band - r_max,
-        "far edge": (9.6 - _ONE_PLACE) - hole_y - band - r_max,
+        "far edge": (9.8 - _ONE_PLACE) - hole_y - band - r_max,
         "left edge": min(xs) - band - r_max,
-        "right edge": (22.0 - _ONE_PLACE) - max(xs) - band - r_max,
+        "right edge": (width - _ONE_PLACE) - max(xs) - band - r_max,
     }
 
 
-def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None:
+def test_screw_holes_reach_the_wall_target_at_the_printed_worst_case() -> None:
     """Review of 19e33c6c2 (blocker): 2.5 from the guide-side edge left 0.81
-    of ligament under the largest drilled 1/8 hole.  R9-59 laps the plate 1.0
-    past the rail, so the holes stand 3.5 from that edge."""
+    of ligament under the largest drilled 1/8 hole.  Machinist review ENFORCE
+    (PR #1897): the 1.0 lip and the 22.0 plate left 1.83 and 1.53, under the
+    2.0 target, so the plate laps the rail 1.2 (holes 3.7 from that edge) and
+    runs 22.5 long with the holes still 4 and 18 from its left end."""
     assert min(_ligaments(2.5).values()) < 1.0
+    assert min(_ligaments(3.5, width=22.0).values()) < 2.0
     (hole_y,) = {y for _, y in pd_guide_lock_spec.HOLE_XY}
-    assert hole_y == pytest.approx(3.5)
+    assert hole_y == pytest.approx(3.7)
+    assert [x for x, _ in pd_guide_lock_spec.HOLE_XY] == [4.0, 18.0]
     worst = _ligaments(hole_y)
-    assert min(worst.values()) >= 1.5
+    assert min(worst.values()) >= 2.0
     assert pd_guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
+    assert pd_guide_lock_spec.HOLE_PATTERN_X == pytest.approx(11.0)
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Height"] == 1
     assert pd_guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
 
@@ -114,8 +119,8 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
 def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
     """Machinist review ENFORCE r1-r3 (blocker): the ±0.035 hole coordinates
     named no mate.  The callout names the platen guide's taps the pattern
-    lands on and the screws its holes clear, and states the least edge wall
-    (the right end, under the 2.0 target) as a plain fact."""
+    lands on and the screws its holes clear; with every wall at the 2.0
+    target it states no shortfall."""
     import _config
 
     rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
@@ -123,10 +128,7 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
         f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS,",
         "CLEARANCE FIT ON",
         f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
-        "EDGE WALL 1.52 MIN",
     ]
-    assert pd_guide_lock_spec.HOLE_EDGE_WALL_CALLOUT == "EDGE WALL 1.52 MIN"
-    assert 1.52 <= min(pd_guide_lock_spec.HOLE_LIGAMENTS_WORST.values()) < 2.0
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).
     assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")

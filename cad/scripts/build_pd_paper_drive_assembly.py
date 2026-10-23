@@ -231,7 +231,6 @@ from build_pd_guide_lock import (  # noqa: E402
     HOLE_DIA as LOCK_HOLE_DIA,
     LOCK_HEIGHT,
     LOCK_THICK,
-    LOCK_WIDTH,
 )
 
 # The printed bands the lock-station sweep judges the platen's lock stack at:
@@ -241,6 +240,7 @@ from _fit_deviations import deviations  # noqa: E402
 from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from pd_guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
+    HOLE_PATTERN_X as LOCK_HOLE_PATTERN_X,
     HOLE_XY as LOCK_HOLE_XY,
     LOCK_THICK_BAND,
     RAIL_EDGE_LIP as LOCK_RAIL_LIP,
@@ -2737,12 +2737,14 @@ async def build(adapter) -> dict[str, str]:
     # _assert_lock_retention).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
-        # of the pre-mirror left-edge station PLATE_X0 + x_c).
+        # of the pre-mirror left-edge station PLATE_X0 + x_c). The plate's hole
+        # pattern, not the plate (its right end overhangs 0.5 more), centres on
+        # the station, over the guide's tap pair.
         station = PLATE_X0 + PLATE_WIDTH - x_c
         top = await place_component(
             adapter,
             "pd-guide-lock",
-            [station + LOCK_WIDTH / 2.0, LOCK_PLATE_Y[1][1], LOCK_Z0],
+            [station + LOCK_HOLE_PATTERN_X, LOCK_PLATE_Y[1][1], LOCK_Z0],
             [0.0, 0.0, 180.0],
             rot_z_rows(180.0),
             ground=False,
@@ -2752,7 +2754,7 @@ async def build(adapter) -> dict[str, str]:
         bot = await place_component(
             adapter,
             "pd-guide-lock",
-            [station - LOCK_WIDTH / 2.0, LOCK_PLATE_Y[0][0], LOCK_Z0],
+            [station - LOCK_HOLE_PATTERN_X, LOCK_PLATE_Y[0][0], LOCK_Z0],
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,

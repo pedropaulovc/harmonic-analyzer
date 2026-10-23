@@ -1615,7 +1615,7 @@ sections:
         - scaled + derived
         - med
       - - Guide lock plates (2026-10-11)
-        - '22 × 9.6 × 1/16 sheet (A36 ground, McMaster 1388K196, ±0.005 in, as supplied; was 2.0), 4X R1.8 corners (ch22 back photo: ~6.3 px arcs at 3.60 px/mm ≈ R1.75), one size on both rails (was 15.65, and 19 before that): 1.0 lip (R9-59) + 5 rail + 3.6 bar overlap at the top rail, 2.6 at the bottom rail across its 1.0 clearance under the 28-tall bar (user ruling 2026-10-11: one ~9-tall plate, ~3 overlap top and bottom); height 9.6 at the general .X so the lifted top plates still lap the bar 0.5 at the printed worst case (Codex P1 on #1353)'
+        - '22.5 × 9.8 × 1/16 sheet (A36 ground, McMaster 1388K196, ±0.005 in, as supplied; was 2.0), 4X R1.8 corners (ch22 back photo: ~6.3 px arcs at 3.60 px/mm ≈ R1.75), holes 4/18 from the left end so the right end overhangs 0.5 more (PR #1897: every hole wall 2.0 at the printed worst case; was 22 × 9.6 on a 1.0 lip), one size on both rails (was 15.65, and 19 before that): 1.2 lip (R9-59, PR #1897) + 5 rail + 3.6 bar overlap at the top rail, 2.6 at the bottom rail across its 1.0 clearance under the 28-tall bar (user ruling 2026-10-11: one ~9-tall plate, ~3 overlap top and bottom); height 9.8 at the general .X so the lifted top plates still lap the bar 0.5 at the printed worst case (Codex P1 on #1353)'
         - —
         - 'ch22 p.54 (page001_img01/img05): the locks lap the rail and ~3 onto the bright band (`pd_guide_lock_spec.py`)'
         - scaled
