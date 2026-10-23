@@ -106,3 +106,4 @@ REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 # its acceptance.  The sheet's prose lives in dt_crank_handle_ferrule_notes,
 # which the mating parts never import.
 TENON_GLUE_LINE = (0.05, 0.15)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

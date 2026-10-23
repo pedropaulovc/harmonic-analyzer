@@ -51,7 +51,6 @@ from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from solidworks_mcp.adapters.com_variant import bstr_array
-from dt_crank_handle_ferrule_notes import ISOMETRIC_VIEW_NOTE
 from dt_crank_handle_ferrule_spec import (
     BORE_DIA,
     BORE_DIA_TOL,
@@ -59,6 +58,7 @@ from dt_crank_handle_ferrule_spec import (
     DRAWING_PRECISION,
     INSTALLED_CONFIG,
     INSTALLED_OUTER_DIA,
+    ISOMETRIC_VIEW_NOTE,
     LENGTH,
     OUTER_DIA,
     SEAT_MOUTH_CHAMFER,

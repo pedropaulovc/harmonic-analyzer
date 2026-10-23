@@ -3,8 +3,8 @@ r"""MHA-DT-34 ferrule drawing prose -- its feature callouts and isometric label.
 Split OUT of ``dt_crank_handle_ferrule_spec`` (MHA-DT-34 machinist ENFORCE),
 as ``dt_crank_handle_butt_cup_notes`` was for the cup: the MHA-DT-08 handle
 spec and the drive train import that module, so prose living there re-keyed
-both on every wording edit.  The ferrule's part builder and drawing script
-import this module; the mating parts never do.
+both on every wording edit.  Only the ferrule's drawing script imports this
+module, so a callout edit re-keys neither the part nor its mates.
 
 No general note remains (MHA-DT-34 machinist ENFORCE, r1-r3).  Every
 requirement that has a feature sits on that feature's callout (rule 7: flag it
@@ -17,7 +17,12 @@ part's.
 
 from __future__ import annotations
 
-from dt_crank_handle_ferrule_spec import INSTALLED_OUTER_DIA, TENON_GLUE_LINE
+from dt_crank_handle_ferrule_spec import (
+    INSTALLED_OUTER_DIA,
+    TENON_GLUE_LENGTH_FLOOR,
+    TENON_GLUE_LINE,
+    TENON_LENGTH,
+)
 
 # The mating part, quoted only to identify it (rule 7); the offline test
 # checks it against the registry.
@@ -52,16 +57,16 @@ OUTER_DIA_CALLOUT = "\n".join(
 )
 # Both limits of the seat mouth's band are functional (owner ruling A on
 # #1661): the minimum clears the MHA-DT-08 tenon root so the ring seats on its
-# shoulder, and the maximum keeps the tenon's glue-length floor (r2-r3
+# shoulder, and the maximum is the glue-length budget on the 5.0 tenon (r2-r3
 # finding 4: a callout naming only the clearance left the upper limit
-# unexplained).
+# unexplained; ENFORCE iteration 1: "keeps glue length" alone read as if the
+# whole 7.0 ring were glued, so it quotes the floor and the tenon it is on).
 SEAT_MOUTH_CHAMFER_CALLOUT = "\n".join(
     (
         "X 45 DEG SEAT END;",
         f"MIN CLEARS {HANDLE_NUMBER}",
-        f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f}, MAX",
-        "KEEPS GLUE LENGTH",
+        f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f};",
+        f"MAX LEAVES {TENON_GLUE_LENGTH_FLOOR:.1f} BONDED",
+        f"ON THE {TENON_LENGTH:.1f} TENON",
     )
 )
-
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

@@ -186,8 +186,9 @@ def test_seat_mouth_chamfer_clears_the_tenon_root() -> None:
     assert notes.SEAT_MOUTH_CHAMFER_CALLOUT.splitlines() == [
         "X 45 DEG SEAT END;",
         "MIN CLEARS MHA-DT-08",
-        "TENON ROOT R0.3, MAX",
-        "KEEPS GLUE LENGTH",
+        "TENON ROOT R0.3;",
+        "MAX LEAVES 3.5 BONDED",
+        "ON THE 5.0 TENON",
     ]
     # Modelled in the revolve profile at 45 degrees by equation, before the
     # INSTALLED split, so the skimmed ring keeps it too.
@@ -261,7 +262,7 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     assert left >= drawing.SEAT_FACE_X + 0.003
     assert bottom >= drawing.BORE_TOP_Y + 0.003
     assert right <= drawing.ISO_NOTE_POS[0] - 0.003
-    chamfer_bottom = bottom
+    chamfer_bottom, chamfer_right = bottom, right
     # The bore's block stands between its extension lines, right of the seat
     # face, under the chamfer's block and clear of the isometric note.
     left, right, bottom, top = _block(
@@ -272,6 +273,9 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     assert top <= drawing.BORE_TOP_Y - 0.003
     assert top <= chamfer_bottom - 0.003
     assert right <= drawing.ISO_NOTE_POS[0] - 0.003
+    # The Ø7.70's dimension line stands right of the chamfer's block and the
+    # dimension line under it, so the two never cross (ENFORCE iteration 1).
+    assert drawing.SECTION_KEEP["BoreDia"][0] >= chamfer_right + 0.004
     # The OD's block stands between its extension lines, left of the section
     # and right of the end view.
     left, right, bottom, top = _block(

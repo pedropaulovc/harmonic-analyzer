@@ -91,7 +91,9 @@ END_CENTER = (0.085, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.205)
 CAPTION_XY = (0.195, 0.113)
-ISO_NOTE_POS = (0.335, 0.160)
+# Moved 10 right of iteration 1 so the bore's block, set right of the
+# chamfer's dimension line, keeps clear of it.
+ISO_NOTE_POS = (0.345, 0.160)
 
 OUTER_R = OUTER_DIA * VIEW_SCALE[0] / 2000.0  # 0.030
 HALF_LENGTH = LENGTH * VIEW_SCALE[0] / 2000.0  # 0.014
@@ -111,22 +113,24 @@ SECTION_KEEP = {
     # the end view (right edge x 0.115) by 39.
     "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.026, SECTION_CENTER[1]),
     # "Ø7.70 ±0.1" over three rows, the widest 25 chars: 68.8 x 22.2, so x
-    # 0.2366-0.3054 and y 0.1539-0.1761, between the bore's extension lines
-    # (y 0.1496, 0.1804) and 7.6 right of the seat face; the isometric note
-    # (x 0.335) stands 29.6 clear.
-    "BoreDia": (SEAT_FACE_X + 0.042, SECTION_CENTER[1]),
+    # 0.2626-0.3314 and y 0.1539-0.1761, between the bore's extension lines
+    # (y 0.1496, 0.1804).  Its dimension line (x 0.297) stands right of the
+    # chamfer's block and the dimension line under it (to x ~0.291), so the
+    # two never cross and the Ø7.70's upper arrow strikes no chamfer text
+    # (ENFORCE iteration 1); the isometric note (x 0.345) stands 13.6 clear.
+    "BoreDia": (SEAT_FACE_X + 0.068, SECTION_CENTER[1]),
     "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.012),
     # The seat mouth's axial leg (1.4 at 4:1, at the upper bore corner by
     # the seat face) reads up and right of it, outside the ring.  Value plus
-    # four callout rows: 5 x 5.55 = 27.75 tall, the widest row 20 chars x
-    # 2.75 = 55 wide, so the box spans x 0.2345-0.2895, y 0.1845-0.2123.  It
-    # clears the seat face and Length's right extension line (x 0.229, from
-    # 0.1946 up) by 5.5; the Ø7.70's upper extension line (y 0.1804) by 4.1
-    # and its callout block (top y 0.1761) by 8.4; the "7.0" (right edge
-    # 0.2181) by 16; the isometric view and its note (x 0.3346 on) by 45.
-    # The dimension line runs under the last row back to the chamfer's
-    # extension lines and crosses no other dimension or extension line.
-    "SeatMouthChamfer": (SEAT_FACE_X + 0.033, BORE_TOP_Y + 0.018),
+    # five callout rows: 6 x 5.55 = 33.3 tall, the widest row 21 chars x
+    # 2.75 = 57.75 wide, so the box spans x 0.2331-0.2909, y 0.1843-0.2176.
+    # It clears the seat face and Length's right extension line (x 0.229,
+    # from 0.1946 up) by 4.1; the Ø7.70's upper extension line (y 0.1804) by
+    # 3.9 and its callout block (top y 0.1761) by 8.2; the "7.0" (right edge
+    # 0.2181) by 15.  The dimension line runs under the last row back to the
+    # chamfer's extension lines and crosses no other dimension or extension
+    # line.
+    "SeatMouthChamfer": (SEAT_FACE_X + 0.033, BORE_TOP_Y + 0.0205),
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
