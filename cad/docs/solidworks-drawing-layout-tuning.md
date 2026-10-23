@@ -2097,10 +2097,30 @@ The vanished side ledges have no axial root edges: remove theirR0.60 bridge
 fillets. Keep the applicableR0.25 inside X root and free-foot outer rounds,
 but round only the **two free-end corners at localX−48**. The former+6.25
 corner picks now lie on full-length upright edges; rounding them would
-unauthorisedly change the head. The final part proves actual flushY planes
-through the root, retained sharp upright corners, and the unchanged native
-R5.50 nose axis/radius/extent using qualified faces and closest-point readback.
+unauthorisedly change the head. The final part gate checks actual flushY planes
+through the root, retained sharp upright corners, the unchanged nativeR5.50
+nose axis/radius/extent, and the actualR0.25 inside-root and both outside-foot
+cylinders with trimmed closest-point readback. These are nominal CAD identity
+checks, not additional manufacturing tolerances.
 Native success still requires enlarged visual inspection of the new root.
+
+R10 (source14975bf5b91a, worker`swmaker00000f@15`,
+attempt`20261023T153059Z-1-35ed5a70`) created the11mm foot and `InsideRoot`,
+then failed native creation of `FootTopEdges` at the two free-foot front/side
+edges. It did **not** reach `FootCorners`, holes, finishPMI or final topology
+checks. The worker log explicitly reports no forensic artefacts; no failed
+Brep was captured. Interacting termination at the newly coplanar side/root
+junction is a source-grounded **inference**, not a measured kernel diagnosis.
+The correction selects all **three raw incident edges**—insideXroot plus
+both free-foot front/side edges—in one constantR0.25 native feature,
+`RootAndFootRounds`, with `propagate=False`. It replaces the two sequential
+features; there is no radius reduction, omitted outside round or fallback.
+This follows the existing multi-edge constant-radius construction pattern in
+`build_dt_cone_gear_shaft` (round and flat step-root edges selected together),
+not a claim that its corner topology is identical. The final guard separately
+reads each resulting cylindrical radius, axis and transverse centre, then a
+trimmed diagonal point; successful construction and its actual corner patches
+still require the next native run and enlarged inspection.
 
 The previous5mm free-end extension remains: machineX−8..46.25,
 localX−48..+6.25, length54.25 and setbacks9.00/22.70. The matched receiver,

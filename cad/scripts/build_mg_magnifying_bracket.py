@@ -136,13 +136,42 @@ async def _coordinates(adapter, jobs) -> None:
 
 
 
+async def _round_foot_root(adapter) -> None:
+    """Solve the three incident R0.25 edges before any blend changes them."""
+    # Matched Y sides make these a single interacting corner treatment.
+    # Do not first create the inside-root cylinder and then try to terminate
+    # two new side rounds against its tangent boundary. Select only the raw
+    # root and free-foot front edges, never the upright's long sharp edges.
+    points = [
+        [-NECK_HALF_X, 0.0, FLANGE_Z[0]],
+        *[[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y],
+    ]
+    check("joint inside-root and outside-foot rounds",
+          await adapter.add_fillet(FOOT_CORNER_R, points, propagate=False))
+    name_last_feature(adapter, "RootAndFootRounds")
+
+
 def _assert_matched_width_topology(adapter) -> None:
     """Prove the real foot sides are flush and no upright corner was rounded."""
     neck_z = FLANGE_Z[0] / 2.0
     foot_z = sum(FLANGE_Z) / 2.0
     foot_x = (FLANGE_X[0] - NECK_HALF_X) / 2.0
     requests = {"nose": CylinderFace(2.0 * NOSE_R, contains_z_mm=-NOSE_R / 2.0)}
-    probes = []
+    radius = FOOT_CORNER_R
+    root_center = (-NECK_HALF_X - radius, 0.0, FLANGE_Z[0] - radius)
+    root_point = (
+        root_center[0] + radius / math.sqrt(2.0), 0.0,
+        root_center[2] + radius / math.sqrt(2.0),
+    )
+    requests["root_round"] = CylinderFace(
+        2.0 * radius, contains_x_mm=root_point[0],
+        contains_y_mm=0.0, contains_z_mm=root_point[2],
+    )
+    cylinders = {
+        "nose": (0, (0.0, 0.0, 0.0), NOSE_R),
+        "root_round": (1, root_center, radius),
+    }
+    probes = [("root_round", root_point)]
     for sign in (-1, 1):
         normal = (0.0, float(sign), 0.0)
         requests[f"neck_{sign}"] = PlanarFace(
@@ -162,20 +191,41 @@ def _assert_matched_width_topology(adapter) -> None:
             for delta in (-FOOT_CORNER_R, 0.0, FOOT_CORNER_R)
         )
         probes.append((f"foot_{sign}", (foot_x, sign * NOSE_R, foot_z)))
+        round_label = f"foot_round_{sign}"
+        round_center = (0.0, sign * (NOSE_R - radius), FLANGE_Z[0] + radius)
+        round_point = (
+            foot_x, round_center[1] + sign * radius / math.sqrt(2.0),
+            round_center[2] - radius / math.sqrt(2.0),
+        )
+        requests[round_label] = CylinderFace(
+            2.0 * radius, contains_x_mm=foot_x,
+            contains_y_mm=round_point[1], contains_z_mm=round_point[2],
+        )
+        cylinders[round_label] = (0, round_center, radius)
+        probes.append((round_label, round_point))
         probes.extend(
             ("nose", (x, sign * NOSE_R / math.sqrt(2.0), -NOSE_R / math.sqrt(2.0)))
             for x in (-NECK_HALF_X, NECK_HALF_X)
         )
     faces = resolve_faces(adapter.currentModel, requests)
-    nose = face_geometry(faces["nose"])
-    if (
-        nose is None or len(nose.parameters) != 7
-        or not all(math.isfinite(float(value)) for value in nose.parameters)
-        or math.dist((abs(nose.parameters[3]), *nose.parameters[4:6]), (1.0, 0.0, 0.0)) > 1e-8
-        or math.hypot(*nose.parameters[1:3]) > 1e-8
-        or abs(nose.parameters[6] * 1000.0 - NOSE_R) > 1e-5
-    ):
-        raise RuntimeError("matched-width cut changed the native head radius or axis")
+    for label, (axis, center, expected_radius) in cylinders.items():
+        geometry = face_geometry(faces[label])
+        if (
+            geometry is None or len(geometry.parameters) != 7
+            or not all(math.isfinite(float(value)) for value in geometry.parameters)
+            or math.dist(
+                tuple(abs(value) for value in geometry.parameters[3:6]),
+                tuple(float(index == axis) for index in range(3)),
+            ) > 1e-8
+            or max(
+                abs(geometry.parameters[index] * 1000.0 - center[index])
+                for index in range(3) if index != axis
+            ) > 1e-5
+            or abs(geometry.parameters[6] * 1000.0 - expected_radius) > 1e-5
+        ):
+            raise RuntimeError(
+                f"matched-width cut changed the native {label} radius or axis"
+            )
     records = []
     for label, point in probes:
         raw = faces[label].GetClosestPointOn(*(value / 1000.0 for value in point))
@@ -239,12 +289,9 @@ async def build(adapter) -> dict[str, str]:
     if FLANGE_X[1] != NECK_HALF_X:
         raise AssertionError("foot and neck must share the right face without a ledge")
 
-    check("foot inside X root", await adapter.add_fillet(FOOT_CORNER_R, [[-NECK_HALF_X, 0.0, FLANGE_Z[0]]], propagate=False))
-    name_last_feature(adapter, "InsideRoot")
-    # The foot and upright now share Y sides; the former side-root edges
-    # and their R0.60 bridge do not exist.
-    check("tangent outside foot edges", await adapter.add_fillet(FOOT_CORNER_R, [[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y], propagate=False))
-    name_last_feature(adapter, "FootTopEdges")
+    # The matched-width foot has no axial side-root bridge. Its inside X
+    # root and two outside foot edges are solved together on the raw solid.
+    await _round_foot_root(adapter)
     # Only the two free-end edges remain foot corners. At +X the old picks
     # now lie on full-length upright edges and must never receive a fillet.
     check("rounded free-end foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[FLANGE_X[0], y, sum(FLANGE_Z) / 2.0] for y in FLANGE_Y], propagate=False))

@@ -912,10 +912,56 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
             assert segment_box_overlap_length(Segment(.030, mode_shoulder_y, .051, mode_shoulder_y), inner) > 0.0
 
 
+@pytest.mark.parametrize("failure", (None, "refused", "exception"))
+def test_root_and_foot_rounds_share_one_raw_edge_transaction(monkeypatch, failure):
+    import asyncio
+
+    root, left_side, right_side, head = (object() for _ in range(4))
+    # Raw edge identity survives only until the first successful transaction.
+    raw_edges = [
+        (root, (-6.25, 0.0, part.FLANGE_Z[0])),
+        (left_side, (-27.125, -5.5, part.FLANGE_Z[0])),
+        (right_side, (-27.125, 5.5, part.FLANGE_Z[0])),
+        (head, (6.25, 5.5, part.FLANGE_Z[0] / 2.0)),
+    ]
+    transactions, names = [], []
+
+    async def add_fillet(radius, points, *, propagate):
+        selected = [
+            next(entity for entity, midpoint in raw_edges if math.dist(point, midpoint) < 1e-8)
+            for point in points
+        ]
+        transactions.append((radius, selected, propagate))
+        if failure == "exception":
+            raise RuntimeError("native fillet exception")
+        if failure != "refused":
+            raw_edges.clear()
+        return SimpleNamespace(is_success=failure != "refused", error="native corner refused", data=object())
+
+    adapter = SimpleNamespace(add_fillet=add_fillet)
+    monkeypatch.setattr(part, "name_last_feature", lambda actual, name: names.append((actual, name)))
+    if failure:
+        with pytest.raises(RuntimeError, match="native"):
+            asyncio.run(part._round_foot_root(adapter))
+        assert not names and len(raw_edges) == 4
+    else:
+        asyncio.run(part._round_foot_root(adapter))
+        assert names == [(adapter, "RootAndFootRounds")]
+        assert not raw_edges
+    assert len(transactions) == 1
+    radius, entities, propagate = transactions[0]
+    assert radius == .25 and propagate is False
+    assert entities == [root, left_side, right_side] and head not in entities
+
+
 @pytest.mark.parametrize("fault", (
     None, "foot_step", "rounded_root", "rounded_head", "trimmed_nose",
     "missing_point", "short_point", "nonfinite_point", "missing_nose",
     "short_nose", "nose_axis", "nose_center", "nose_radius", "nonfinite_nose",
+) + tuple(
+    f"{label}:{mutation}"
+    for label in ("root_round", "foot_round_-1", "foot_round_1")
+    for mutation in ("missing", "short", "nonfinite", "radius", "axis", "center", "trimmed")
 ))
 def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, fault):
     from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
@@ -942,18 +988,34 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
             x -= math.copysign(0.0001, x)
         if fault == "trimmed_nose" and label == "nose":
             x -= math.copysign(0.0001, x)
+        if fault == f"{label}:trimmed":
+            z += .0001
         return (x, y, z, 0.0, 0.0)
 
     faces = {
         label: SimpleNamespace(GetClosestPointOn=lambda *xyz, label=label: closest(label, *xyz))
-        for label in ("nose", "neck_-1", "neck_1", "foot_-1", "foot_1")
+        for label in ("nose", "root_round", "foot_round_-1", "foot_round_1", "neck_-1", "neck_1", "foot_-1", "foot_1")
     }
     geometry["nose"] = FaceGeometry(
         faces["nose"], SURFACE_CYLINDER,
         (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, .0055), None,
         (-.00625, -.0055, -.0055, .00625, .0055, 0.0),
     )
+    root_center = (-6.5, 0.0, part.FLANGE_Z[0] - .25)
+    geometry["root_round"] = FaceGeometry(
+        faces["root_round"], SURFACE_CYLINDER,
+        (*tuple(value / 1000.0 for value in root_center), 0.0, 1.0, 0.0, .00025), None,
+        (-.0065, -.0055, root_center[2] / 1000.0, -.00625, .0055, part.FLANGE_Z[0] / 1000.0),
+    )
     for sign in (-1, 1):
+        center = (0.0, sign * 5.25, part.FLANGE_Z[0] + .25)
+        label = f"foot_round_{sign}"
+        geometry[label] = FaceGeometry(
+            faces[label], SURFACE_CYLINDER,
+            (*tuple(value / 1000.0 for value in center), 1.0, 0.0, 0.0, .00025), None,
+            (part.FLANGE_X[0] / 1000.0, min(sign * .00525, sign * .0055), part.FLANGE_Z[0] / 1000.0,
+             -.00625, max(sign * .00525, sign * .0055), center[2] / 1000.0),
+        )
         for kind, x, z in (("neck", 0.0, neck_z), ("foot", foot_x, foot_z)):
             label = f"{kind}_{sign}"
             geometry[label] = FaceGeometry(
@@ -973,7 +1035,25 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
         return faces
 
     def read_geometry(face):
-        assert face is faces["nose"]
+        label = next(label for label, candidate in faces.items() if candidate is face)
+        if fault and ":" in fault and fault.split(":")[0] == label:
+            mutation = fault.split(":")[1]
+            if mutation == "missing":
+                return None
+            parameters = list(geometry[label].parameters)
+            if mutation == "short":
+                parameters.pop()
+            elif mutation == "nonfinite":
+                parameters[6] = math.nan
+            elif mutation == "radius":
+                parameters[6] = .0002
+            elif mutation == "axis":
+                parameters[3:6] = (0.0, 0.0, 1.0)
+            elif mutation == "center":
+                parameters[2] += .0001
+            return SimpleNamespace(parameters=tuple(parameters))
+        if label != "nose":
+            return geometry[label]
         if fault == "missing_nose":
             return None
         parameters = list(geometry["nose"].parameters)
@@ -1005,11 +1085,23 @@ def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, faul
             foot_points = [point for label, point in probes if label == f"foot_{sign}"]
             assert len(foot_points) == 1
             assert foot_points[0] == pytest.approx((foot_x, sign * 5.5, foot_z))
+            round_points = [point for label, point in probes if label == f"foot_round_{sign}"]
+            assert len(round_points) == 1
+            assert round_points[0] == pytest.approx((
+                foot_x, sign * (5.25 + .25 / math.sqrt(2.0)),
+                part.FLANGE_Z[0] + .25 - .25 / math.sqrt(2.0),
+            ))
+        root_points = [point for label, point in probes if label == "root_round"]
+        assert len(root_points) == 1
+        assert root_points[0] == pytest.approx((
+            -6.5 + .25 / math.sqrt(2.0), 0.0,
+            part.FLANGE_Z[0] - .25 + .25 / math.sqrt(2.0),
+        ))
         nose_points = [point for label, point in probes if label == "nose"]
         assert {point[0] for point in nose_points} == {-6.25, 6.25}
         assert all(math.hypot(point[1], point[2]) == pytest.approx(5.5) for point in nose_points)
         records = json.loads(messages[-1]["auditJSON"])
-        assert len(records) == len(probes) == 16
+        assert len(records) == len(probes) == 19
         assert all(record["gap_mm"] == pytest.approx(0.0, abs=1e-12) for record in records)
 
 
