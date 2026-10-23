@@ -95,14 +95,19 @@ profile plus 11.176 mm of fixed native padding. Even the smallest permitted
 scale exceeds the cell by 0.051 mm. No centering move was attempted.
 
 The six oblique-jig carriage, block, bracket, rail, clamp and lever screw
-recipes select the existing `tall_top` layout, as the shared clamp-screw sheet
-already does. It gives Top a 96 mm band and, with the same lanes, a 44 mm
-geometry cell. The bottom-row cell tops lower by 32 mm, reducing the Front
-geometry cell from 59 to 27 mm without moving its bottom. The measured carriage
-outline consequently selects 1:2 rather than the 1:1 its Front alone accepted
-in the old layout. All orthographic views must be measured together anew;
-the six rendered sheets and their automated machinist reviews decide whether
-the resulting scale remains readable.
+recipes instead select the existing ANSI B portrait template and
+`portrait_reference` layout. Their 88.4 mm Top band retains both 26 mm
+annotation lanes, leaving a 36.4 mm geometry cell; Front has a 173 mm band
+and retains its 46 mm annotation reserve, leaving 127 mm for geometry.
+Projected model origins are aligned after fitting and before annotations.
+The shared clamp-screw sheet separately retains `tall_top` and its own
+46 mm Top reserve, leaving 50 mm in that sheet's 96 mm Top band.
+The rejected six-screw landscape `tall_top` experiment left only 27 mm for
+Front geometry: native fit succeeded, but all six machinist reviews rejected
+the resulting small views. Do not restore that allocation to solve Top
+exhaustion. Measure all orthographic views together at the standard scales;
+actual captions, full printed sheets and automated machinist reviews, not
+fit success alone, decide readability and acceptance.
 Keep the lane budgets, independent-scale readback, strict native containment,
 caption checks and supplier-source preservation guards unchanged. Do not
 shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
