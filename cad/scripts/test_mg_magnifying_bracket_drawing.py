@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import json
 import math
@@ -94,23 +95,36 @@ def test_structural_reasons_are_authored_on_native_source_dimensions(monkeypatch
     else:
         part._author_dimension_callouts(object())
         assert writes == [(key, 4, text) for key, text in expected.items()]
-        assert all(text == "RETAINS TAP WALL" for key, text in expected.items() if key[1] != "FlangeDepth")
+        assert {
+            key: text for key, text in expected.items()
+            if key[0] in ("NeckProfile", "TapCoordinates")
+        } == {
+            ("NeckProfile", "NoseR"): "RETAINS TAP WALL",
+            ("TapCoordinates", "TapFromTip"): "RETAINS TAP WALL",
+            ("TapCoordinates", "TapFromSide"): "RETAINS TAP WALL",
+        }
         assert expected["FlangeProfile", "FlangeDepth"] == "MHA-MG-VN-53\nSCREW GRIP"
+        assert spec.MOUNTING_MATE_FLAG == "[1]"
+        assert spec.DIMENSION_CALLOUTS["MountingCoordinates"] == {
+            name: "[1]" for name in ("MountingX0", "MountingX1", "MountingY0")
+        }
+        assert spec.MOUNTING_HOLE_PROCESS == "[1] MATES MHA-SM-03 TAPPED HOLES"
 
 
 @pytest.mark.parametrize("fault", (None, "missing", "duplicate", "changed"))
-def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault) -> None:
+@pytest.mark.parametrize("dimension", ("NoseR", "MountingX0", "MountingX1", "MountingY0"))
+def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault, dimension) -> None:
     annotations = []
     for callouts in spec.DIMENSION_CALLOUTS.values():
         for name, text in callouts.items():
-            if fault == "missing" and name == "NoseR":
+            if fault == "missing" and name == dimension:
                 continue
-            value = "invented outside fit" if fault == "changed" and name == "NoseR" else text.replace("\n", "\r\n")
+            value = "changed source callout" if fault == "changed" and name == dimension else text.replace("\n", "\r\n")
             item = SimpleNamespace(name=name, GetText=lambda which, value=value: value if which == 4 else "")
             item.GetSpecificAnnotation = lambda item=item: item
             annotations.append(item)
     if fault == "duplicate":
-        annotations.append(annotations[0])
+        annotations.append(next(item for item in annotations if item.name == dimension))
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: item.name)
     if fault:
@@ -118,6 +132,59 @@ def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault) 
             drawing._assert_dimension_callouts(object(), annotations)
     else:
         drawing._assert_dimension_callouts(object(), annotations)
+
+
+def test_drawing_build_checks_flags_on_the_imported_mounting_dimensions(monkeypatch, tmp_path) -> None:
+    source = tmp_path / "bracket.SLDPRT"
+    source.touch()
+    adapter = SimpleNamespace(currentModel=object())
+
+    async def open_model(_path):
+        return {}
+
+    adapter.open_model = open_model
+    texts = {
+        name: text
+        for callouts in spec.DIMENSION_CALLOUTS.values()
+        for name, text in callouts.items()
+    }
+
+    def import_dimensions(_adapter, _view, *, keep, **_kwargs):
+        annotations = []
+        for name in keep:
+            text = texts.get(name, "")
+            item = SimpleNamespace(name=name, GetText=lambda which, text=text: text if which == 4 else "")
+            item.GetSpecificAnnotation = lambda item=item: item
+            annotations.append(item)
+        return annotations
+
+    class ImportedCalloutsRead(Exception):
+        pass
+
+    read_callouts = drawing._assert_dimension_callouts
+
+    def assert_callouts(actual_adapter, annotations):
+        read_callouts(actual_adapter, annotations)
+        assert {item.name for item in annotations if item.name in drawing.MOUNTING_KEEP} == {
+            "MountingX0", "MountingX1", "MountingY0",
+        }
+        raise ImportedCalloutsRead
+
+    monkeypatch.setattr(drawing, "SOURCE", source)
+    monkeypatch.setattr(drawing, "check", lambda _label, value: value)
+    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (object(), object()))
+    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(drawing, "_project_side_view", lambda *_args: None)
+    monkeypatch.setattr(drawing, "curate_view_dimensions", import_dimensions)
+    monkeypatch.setattr(drawing, "curate_hidden_dimensions", import_dimensions)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "_assert_dimension_callouts", assert_callouts)
+    with pytest.raises(ImportedCalloutsRead):
+        asyncio.run(drawing.build(adapter))
 
 
 def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:

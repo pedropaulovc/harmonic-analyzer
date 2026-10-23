@@ -29,6 +29,7 @@ DRAWING_PRECISION = {
 # They retain tap material and the real screw-grip stack, not a profile fit.
 HEAD_MATERIAL_TOL = 0.05
 FOOT_GRIP_TOL = printed_band_mm(DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"])
+MOUNTING_MATE_FLAG = "[1]"
 DIMENSION_CALLOUTS = {
     "NeckProfile": {"NoseR": "RETAINS TAP WALL"},
     "TapCoordinates": {
@@ -36,10 +37,15 @@ DIMENSION_CALLOUTS = {
         "TapFromSide": "RETAINS TAP WALL",
     },
     "FlangeProfile": {"FlangeDepth": "MHA-MG-VN-53\nSCREW GRIP"},
+    "MountingCoordinates": {
+        "MountingX0": MOUNTING_MATE_FLAG,
+        "MountingX1": MOUNTING_MATE_FLAG,
+        "MountingY0": MOUNTING_MATE_FLAG,
+    },
 }
 DRAWING_EDGE_PRECISION = {"NeckToFootSide": 2}
 DRAWING_REFERENCE_PRECISION = {"OverallHeight": 2}
 TAP_PROCESS = "MATES MHA-MG-03 LEVER"
-MOUNTING_HOLE_PROCESS = "MATES MHA-SM-03 TAPPED HOLES"
+MOUNTING_HOLE_PROCESS = f"{MOUNTING_MATE_FLAG} MATES MHA-SM-03 TAPPED HOLES"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 SURFACE_FINISHES = ()

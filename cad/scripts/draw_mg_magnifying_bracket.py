@@ -511,7 +511,7 @@ async def build(adapter: Any) -> dict[str, str]:
     mounting_dimensions = curate_hidden_dimensions(adapter, bottom, keep=MOUNTING_KEEP, view_label="plate-tap mounting coordinates", dimensions_by_feature={"MountingCoordinates": DRAWING_DIMENSIONS["MountingCoordinates"]})
     annotations = curate_hidden_dimensions(adapter, side, keep=TAP_KEEP, view_label="ordinary thread locations", dimensions_by_feature={"TapCoordinates": DRAWING_DIMENSIONS["TapCoordinates"]})
     _assert_dimension_callouts(adapter, [
-        *imported["front"], *imported["thread-axis end"], *annotations,
+        *imported["front"], *imported["thread-axis end"], *mounting_dimensions, *annotations,
     ])
     rim = _mounting_rims(bottom)[1]
     mounting_callout = _add_mounting_callout(adapter, bottom, rim.edge)

@@ -1654,6 +1654,14 @@ on the visible mounting face; the *Front HLR Hole Wizard callout attaches to
 the real +Z exit rim, not the hidden drill-entry rim. Named native part-feature
 lookups bind `IPartDoc`: `IModelDoc2` does not declare `FeatureByName`.
 
+The three native mounting-location dimensions `MountingX0`, `MountingX1`
+and `MountingY0` share the source-owned below-text flag `[1]`. The same flag
+prefixes the existing `MATES MHA-SM-03 TAPPED HOLES` row on the associative
+mounting-hole callout. Include all three imported mounting dimensions in the
+source-callout readback guard; naming the mate only at the drill callout does
+not attach it to the tight locations. The flag changes neither their ±0.05
+bands nor the matched receiver row, and adds no match-drilling instruction.
+
 For a point-only Wizard placement, retain the traversed early-bound `ISketch`
 and read `GetConstrainedStatus()` directly: only native status 3 proves fully
 defined. The named SDK status path returned `source=unavailable`, `raw_status=None`
