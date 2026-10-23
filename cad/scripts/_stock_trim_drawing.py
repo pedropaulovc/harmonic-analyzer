@@ -153,12 +153,16 @@ def verify_machining_controls(
     are checked by the same walk. A control that silently became reference-only,
     lost its band or moved is a drawing regression, never a cosmetic drift.
 
+    Normalize the incoming IAnnotation before invoking its generated method:
+    a raw dispatch may otherwise treat GetSpecificAnnotation as a property.
+
     Read native Name and all control properties from the same GetDimension2(0)
     object. Each expected name must be consumed exactly once by the supplied
     annotations; empty, non-string, duplicate, extra and missing names refuse.
     """
     remaining = dict(expected)
     for annotation in annotations:
+        annotation = _early_bound(annotation, "IAnnotation")
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
         dimension = _early_bound(display.GetDimension2(0), "IDimension")
         name = dimension.Name
