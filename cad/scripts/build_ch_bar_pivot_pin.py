@@ -15,7 +15,7 @@ The pin is a Front-plane half-profile revolved about that axis (the
 into the *Front side view (drawing-guidelines.md rule 11 (turned parts read like the lathe), turned parts).
 
 ``BlankReference`` (blanked, on the Front plane, on the pin axis): the blank,
-as construction geometry the side view draws phantom -- a centerline centred
+as construction geometry the side view draws thin dashed -- a centerline
 on the Right Plane and the blank's two ends run back to the installed pin's
 corners -- whose cut length prints at one place under the title block's band
 (drawing-simplicity-policy.md `How the repository implements the
@@ -168,11 +168,11 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"bar pivot pin is not centred on its origin (COM {com})")
 
     # REFERENCE sketch: the blank, all construction geometry (the sheet draws
-    # it as phantom): a centerline on the pin axis centred on the Right Plane
+    # it thin dashed): a centerline on the pin axis centred on the Right Plane
     # and, at each end, the blank's end line and the two outline stubs that
     # run it back to the installed pin's corners (the model is the installed
     # pin, so no model edge spans the blank). The side view imports its one
-    # dimension, the cut length between the phantom ends' lower corners, so
+    # dimension, the cut length between the dashed ends' lower corners, so
     # its witnesses rise from drawn geometry (ENFORCE review 2026-10-23: a
     # 7.5 BLANK dimensioned to an outline the sheet never drew).
     blank = SketchDims()

@@ -8,7 +8,7 @@ on the side view where a turned part's diameter sits beside its length
 with the drill rod's own grind band, its callout naming the stock and both
 mates; the installed length as REFERENCE (the bar's width; the MHA-CH-01
 stock owns it); and the blank's cut length with its band from the part's
-blanked ``BlankReference`` sketch, whose phantom ends beyond the installed
+blanked ``BlankReference`` sketch, whose thin dashed ends beyond the installed
 outline carry its witnesses. An axis centerline, a bare end view with its
 one center mark, the isometric, and the one property-linked note. No datums,
 no frames, no roughness symbol.
