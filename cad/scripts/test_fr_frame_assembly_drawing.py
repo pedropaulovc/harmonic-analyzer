@@ -707,6 +707,13 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     picks = {}
     added = {}
     checked = {}
+    leaves = [object()]
+    walks = []
+    settled = []
+
+    def component_leaves(_adapter, view, *, label):
+        walks.append(view)
+        return leaves
 
     def project(_adapter, _view, points, *, label, names):
         stations["points"] = points
@@ -714,9 +721,11 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
         # 1:3 plan view, machine x to the sheet's right.
         return [(0.300 + point[0] / 3.0, 0.180 - point[2] / 3.0) for point in points]
 
-    def pick(_adapter, view, *, label, stem, target_mm, stations_m):
-        picks[label] = (view, stem, target_mm, stations_m)
-        return f"edge {label}"
+    def pick(_adapter, view, *, leaves, label, stem, target_mm, stations_m):
+        picks[label] = (view, stem, target_mm, stations_m, leaves)
+        return drawing._InsetEdgeReference(
+            label, f"model {label}", f"edge {label}", f"{stem}-1"
+        )
 
     def add(_adapter, view, edges, *, text_xy, label):
         added.update(view=view, entities=edges, text_xy=text_xy, label=label)
@@ -730,8 +739,16 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     monkeypatch.setattr(drawing, "_pick_inset_edge", pick)
     monkeypatch.setattr(drawing, "_add_inset_dimension", add)
     monkeypatch.setattr(drawing, "_checked_linear_dimension", check)
+    monkeypatch.setattr(drawing, "_view_component_leaves", component_leaves)
+    monkeypatch.setattr(
+        drawing, "_assert_inset_dimension_settled",
+        lambda _adapter, proof, *, phase: settled.append((proof, phase)),
+    )
 
-    assert drawing._add_nameplate_inset_dimension(None, "B-B") == "display"
+    proof = drawing._add_nameplate_inset_dimension(None, "B-B")
+    assert proof.display == "display" and proof.view == "B-B"
+    assert walks == ["B-B"]  # One snapshot shared by both target rays.
+    assert settled == [(proof, "creation rebuild")]
 
     assert len(set(drawing.NAMEPLATE_INSET_PICK_Z_M)) == len(
         drawing.NAMEPLATE_INSET_PICK_Z_M
@@ -749,6 +766,7 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
             stem,
             pytest.approx(target),
             drawing.NAMEPLATE_INSET_PICK_Z_M,
+            leaves,
         )
     assert added["view"] == "B-B"
     # The dimension spans exactly the read-back edges; the value check stays.
@@ -771,48 +789,64 @@ def test_section_b_b_dimensions_the_nameplate_inset_from_the_deck_end(
     assert checked == {"display": "display", "expected_mm": drawing.NAMEPLATE_END_INSET}
 
 
-def _scripted_inset_edges(monkeypatch, rays, readback):
-    """Script the per-station ray answers and the selection read-back."""
-    logged = []
-    selected = []
-    events = []
+def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
+    """Script model hits and distinct mapped/selected section entities."""
+    logged, selected, events, mapped = [], [], [], []
+    section_edge = readback[0] if readback else None
 
-    def cast(_adapter, _view, *, stem, target_mm, stations_m):
+    def cast(_adapter, _view, *, leaves, stem, target_mm, stations_m):
         return "fr-frame-1/fr-nameplate-1", list(rays)
+
+    def map_edge(_adapter, view, edge, *, label):
+        mapped.append((view, edge, label))
+        return section_edge
 
     def select(_adapter, view, kind, xy, *, label, entity=None):
         selected.append((view, kind, xy, label, entity))
         return entity
 
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
     monkeypatch.setattr(drawing, "_inset_edge_rays", cast)
+    monkeypatch.setattr(drawing, "_inset_section_edge", map_edge)
     monkeypatch.setattr(drawing, "_select_view_entity", select)
     monkeypatch.setattr(drawing, "_read_selected_inset_edge", lambda _adapter: readback)
     monkeypatch.setattr(drawing._telemetry, "info", logged.append)
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
     )
-    return logged, selected, events
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda a, b: int(a == b)),
+        currentModel=SimpleNamespace(SelectionManager=SimpleNamespace(
+            GetSelectedObjectsDrawingView2=lambda _index, _mark: selected_view,
+        )),
+    )
+    return logged, selected, events, mapped, adapter
 
 
 INSET_STATIONS = (0.025, 0.020, 0.030)
 
 
 def test_the_first_station_whose_ray_meets_an_edge_chooses_it(monkeypatch) -> None:
-    logged, selected, events = _scripted_inset_edges(
+    logged, selected, events, mapped, adapter = _scripted_inset_edges(
         monkeypatch,
         [None, ("edge at 20", 0.0523), ("edge at 30", 0.0523)],
         ("selected", "fr-frame-1/fr-nameplate-1", (163.01, 162.99)),
     )
     edge = drawing._pick_inset_edge(
-        None,
+        adapter,
         "B-B",
+        leaves=(),
         label="plate",
         stem="fr-nameplate",
         target_mm=163.0,
         stations_m=INSET_STATIONS,
     )
-    assert edge == "selected"
-    assert selected == [("B-B", "EDGE", None, "plate", "edge at 20")]
+    assert edge == drawing._InsetEdgeReference(
+        "plate", "edge at 20", "selected", "fr-frame-1/fr-nameplate-1"
+    )
+    assert mapped == [("B-B", "edge at 20", "plate")]
+    assert selected == [("B-B", "EDGE", None, "plate", "selected")]
     assert len(logged) == 1
     assert "fr-frame-1/fr-nameplate-1 y 52.300 z 20 mm" in logged[0]
     assert "machine x 163.010/162.990 mm" in logged[0]
@@ -824,24 +858,30 @@ def test_the_first_station_whose_ray_meets_an_edge_chooses_it(monkeypatch) -> No
                 "label": "plate",
                 "instance": "fr-frame-1/fr-nameplate-1",
                 "owner": "fr-frame-1/fr-nameplate-1",
+                "expected_view": "B-B",
+                "selected_view": "B-B",
                 "machine_y_mm": pytest.approx(52.3),
                 "station_z_mm": 20.0,
                 "rays": 3,
                 "machine_x_mm": (163.01, 162.99),
                 "hit": True,
+                "same_entity": True,
+                "same_view": True,
+                "same_owner": True,
             },
         )
     ]
 
 
 def test_rays_meeting_no_edge_on_any_station_fail_the_sheet(monkeypatch) -> None:
-    logged, selected, _events = _scripted_inset_edges(
+    logged, selected, _events, mapped, adapter = _scripted_inset_edges(
         monkeypatch, [None, None, None], None
     )
     with pytest.raises(RuntimeError) as failure:
         drawing._pick_inset_edge(
-            None,
+            adapter,
             "B-B",
+            leaves=(),
             label="deck end",
             stem="fr-harmonic-base",
             target_mm=167.0,
@@ -850,20 +890,21 @@ def test_rays_meeting_no_edge_on_any_station_fail_the_sheet(monkeypatch) -> None
     message = str(failure.value)
     assert "no ray down machine -y through x 167 mm at z (25.0, 20.0, 30.0) mm" in message
     assert message.endswith("meets an edge of fr-frame-1/fr-nameplate-1")
-    assert selected == [] and logged == []
+    assert selected == [] and logged == [] and mapped == []
 
 
 def test_an_inset_edge_read_back_off_target_fails_the_sheet(monkeypatch) -> None:
     # A corner's edge along y meets the ray too: its far end is off target.
-    logged, selected, events = _scripted_inset_edges(
+    logged, selected, events, _mapped, adapter = _scripted_inset_edges(
         monkeypatch,
         [("corner", 0.0508)],
-        ("corner", "fr-frame-1/fr-harmonic-base-1", (167.0, 170.0)),
+        ("corner", "fr-frame-1/fr-nameplate-1", (167.0, 170.0)),
     )
-    with pytest.raises(RuntimeError, match="reads .*167.000/170.000 mm, not machine x 167 mm"):
+    with pytest.raises(RuntimeError, match="167.000/170.000 mm, not the section's named edge"):
         drawing._pick_inset_edge(
-            None,
+            adapter,
             "B-B",
+            leaves=(),
             label="deck end",
             stem="fr-harmonic-base",
             target_mm=167.0,
@@ -871,6 +912,26 @@ def test_an_inset_edge_read_back_off_target_fails_the_sheet(monkeypatch) -> None
         )
     assert len(selected) == 1 and logged[0].endswith("-> miss")
     assert events[0][1]["hit"] is False
+
+
+@pytest.mark.parametrize("change", ["entity", "view", "owner"])
+def test_inset_pick_at_the_right_x_still_requires_the_named_entity_view_and_instance(
+    monkeypatch, change,
+) -> None:
+    owner = "fr-nameplate-2" if change == "owner" else "fr-frame-1/fr-nameplate-1"
+    logged, _selected, events, _mapped, adapter = _scripted_inset_edges(
+        monkeypatch, [("model", 0.0523)], ("selected", owner, (163.0, 163.0)),
+        selected_view="A-A" if change == "view" else "B-B",
+    )
+    if change == "entity":
+        monkeypatch.setattr(drawing, "_inset_section_edge", lambda *_a, **_k: "other section edge")
+    with pytest.raises(RuntimeError, match="not the section's named edge"):
+        drawing._pick_inset_edge(
+            adapter, "B-B", leaves=(), label="plate", stem="fr-nameplate",
+            target_mm=163.0, stations_m=(0.025,),
+        )
+    assert logged[-1].endswith("-> miss")
+    assert events[-1][1][f"same_{change}"] is False
 
 
 class _RayModel:
@@ -933,7 +994,8 @@ def _ray_adapter(monkeypatch, model):
     monkeypatch.setattr(drawing, "dispatch_array", list)
     monkeypatch.setattr(drawing, "double_array", list)
     monkeypatch.setattr(
-        drawing, "_view_component_leaves", lambda _adapter, _view, label: model.leaves()
+        drawing, "_view_component_leaves",
+        lambda *_args, **_kwargs: pytest.fail("ray cast must reuse supplied component snapshot"),
     )
 
     def attempt(call, default=None):
@@ -968,7 +1030,8 @@ def test_inset_rays_go_down_machine_y_through_each_station_and_keep_the_highest_
     adapter, view = _ray_adapter(monkeypatch, model)
 
     name, rays = drawing._inset_edge_rays(
-        adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=INSET_STATIONS
+        adapter, view, leaves=model.leaves(), stem="fr-nameplate",
+        target_mm=163.0, stations_m=INSET_STATIONS,
     )
 
     assert name == "fr-frame-1/fr-nameplate-1"
@@ -1002,119 +1065,294 @@ def test_inset_rays_need_exactly_one_shown_instance_with_a_body(monkeypatch) -> 
     adapter, view = _ray_adapter(monkeypatch, _RayModel(twins, []))
     with pytest.raises(RuntimeError, match="2 shown fr-nameplate instances, expected one"):
         drawing._inset_edge_rays(
-            adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,)
+            adapter, view, leaves=_RayModel(twins, []).leaves(),
+            stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,),
         )
     bodiless = _ray_component("fr-nameplate", "fr-nameplate-1", values)
     bodiless.GetBodies3 = lambda _kind: (None, None)
     adapter, view = _ray_adapter(monkeypatch, _RayModel([bodiless], []))
     with pytest.raises(RuntimeError, match="'fr-frame-1/fr-nameplate-1' resolves no solid body"):
         drawing._inset_edge_rays(
-            adapter, view, stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,)
+            adapter, view, leaves=_RayModel([bodiless], []).leaves(),
+            stem="fr-nameplate", target_mm=163.0, stations_m=(0.025,),
         )
 
 
 class _InsetDrawing:
-    """A drawing whose dimensions dangle per the scripted ``dangling`` queue."""
+    """Record exact entity/view selections without a screen-pick API."""
 
-    def __init__(self, dangling) -> None:
-        self.dangling = list(dangling)
+    def __init__(self) -> None:
         self.calls = []
         self.SelectionManager = self
-        self.count = 0
+        self.selected = []
+        self.view = None
+        self.display = object()
 
     def ActivateView(self, name):  # noqa: N802
         self.calls.append(("activate", name))
         return True
 
     def ClearSelection2(self, _all):  # noqa: N802
-        self.count = 0
+        self.selected.clear()
 
     def CreateSelectData(self):  # noqa: N802
         return SimpleNamespace(View=None)
 
     def GetSelectedObjectCount2(self, _mark):  # noqa: N802
-        return self.count
+        return len(self.selected)
+
+    def GetSelectedObject6(self, index, _mark):  # noqa: N802
+        return self.selected[index - 1]
+
+    def GetSelectedObjectsDrawingView2(self, index, _mark):  # noqa: N802
+        return self.view
 
     def AddDimension2(self, x, y, z):  # noqa: N802
-        dangles = self.dangling.pop(0)
-        self.calls.append(("add", x, y, dangles))
-        annotation = SimpleNamespace(
-            IsDangling=lambda: dangles,
-            GetAttachedEntityTypes=lambda: (1, 1),
-            Select2=lambda append, mark: self.calls.append(("select-dim",)) or True,
-        )
-        return SimpleNamespace(GetAnnotation=lambda: annotation, dangles=dangles)
-
-    def EditDelete(self):  # noqa: N802
-        self.calls.append(("delete",))
+        self.calls.append(("add", x, y, tuple(self.selected)))
+        return self.display
 
 
-def _inset_dimension_harness(monkeypatch, dangling):
-    draw = _InsetDrawing(dangling)
-    events = []
+def _inset_dimension_harness(monkeypatch):
+    draw = _InsetDrawing()
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
-    monkeypatch.setattr(drawing._telemetry, "warn", lambda *a, **k: None)
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: "B-B")
+    view = object()
+
+    def edge(name):
+        result = SimpleNamespace(name=name)
+
+        def select(append, data):
+            assert data.View is view
+            assert append == bool(draw.selected)
+            draw.calls.append(("select4", name, append))
+            draw.selected.append(result)
+            draw.view = view
+            return True
+
+        result.Select4 = select
+        return result
+
+    adapter = SimpleNamespace(
+        currentModel=draw, swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)),
+    )
+    return adapter, view, (edge("plate"), edge("deck")), draw
+
+
+def test_inset_dimension_selects_only_its_mapped_section_entities(monkeypatch) -> None:
+    adapter, view, edges, draw = _inset_dimension_harness(monkeypatch)
+    display = drawing._add_inset_dimension(
+        adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+    )
+    assert display is draw.display
+    assert draw.calls == [
+        ("activate", "B-B"),
+        ("select4", "plate", False),
+        ("select4", "deck", True),
+        ("add", 0.4, 0.1, edges),
+    ]
+    assert draw.selected == []
+
+
+@pytest.mark.parametrize("change", ["entity", "view", "count"])
+def test_changed_section_selection_is_refused_before_dimension_creation(monkeypatch, change):
+    adapter, view, edges, draw = _inset_dimension_harness(monkeypatch)
+    if change == "entity":
+        draw.GetSelectedObject6 = lambda *_args: object()
+    elif change == "view":
+        draw.GetSelectedObjectsDrawingView2 = lambda *_args: object()
+    else:
+        draw.GetSelectedObjectCount2 = lambda *_args: 2
+    with pytest.raises(RuntimeError, match="selection changed identity or view"):
+        drawing._add_inset_dimension(
+            adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+        )
+    assert not any(call[0] == "add" for call in draw.calls)
+
+
+def _inset_correspondence_harness(monkeypatch):
+    """Distinct model/view wrappers resolve into one canonical part edge."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "B-B")
+    canonical = object()
+    section_edge = object()
+    state = {"mapped": section_edge, "canonical": canonical, "returned": canonical, "same": 1}
+    calls, events = [], []
+    part = SimpleNamespace()
+    component = SimpleNamespace(Name2="fr-nameplate-1", GetModelDoc2=lambda: part)
+    model_edge = SimpleNamespace(GetComponent=lambda: component)
+
+    def reverse(edge):
+        calls.append(("reverse", edge))
+        return state["canonical"] if edge is model_edge else state["returned"]
+
+    def corresponding(edge):
+        calls.append(("section", edge))
+        return state["mapped"]
+
+    part.Extension = SimpleNamespace(GetCorrespondingEntity2=reverse)
+    view = SimpleNamespace(GetCorrespondingEntity=corresponding)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda *_args: state["same"]),
+    )
     monkeypatch.setattr(
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
     )
+    return adapter, view, model_edge, section_edge, part, state, calls, events
 
-    def select_entity(edge, append):
-        draw.calls.append(("view-select", edge, append))
-        draw.count += 1
-        return True
 
-    view = SimpleNamespace(SelectEntity=select_entity)
-    edges = (
-        SimpleNamespace(Select4=lambda append, data: draw.calls.append(("select4", "a", append)) or (draw.__setattr__("count", draw.count + 1) or True)),
-        SimpleNamespace(Select4=lambda append, data: draw.calls.append(("select4", "b", append)) or (draw.__setattr__("count", draw.count + 1) or True)),
+def test_model_hit_is_mapped_to_the_section_and_roundtrips_to_its_source(monkeypatch):
+    adapter, view, model_edge, section_edge, _part, _state, calls, events = (
+        _inset_correspondence_harness(monkeypatch)
     )
-    return SimpleNamespace(currentModel=draw), view, edges, draw, events
+    assert drawing._inset_section_edge(adapter, view, model_edge, label="plate") is section_edge
+    assert calls == [
+        ("section", model_edge), ("reverse", model_edge), ("reverse", section_edge),
+    ]
+    assert events[-1][1]["source_identity"] == 1
+    assert events[-1][1]["expected_instance"] == "fr-nameplate-1"
+    assert events[-1][1]["expected_view"] == "B-B"
 
 
-def test_an_attached_inset_dimension_is_kept_from_the_view_selection(monkeypatch) -> None:
-    adapter, view, edges, draw, events = _inset_dimension_harness(monkeypatch, [False])
-    display = drawing._add_inset_dimension(
-        adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+@pytest.mark.parametrize(
+    "change", ["missing_section", "missing_model_source", "missing_reverse_source", "different", "unknown", "unloaded"],
+)
+def test_missing_or_unproven_section_correspondence_fails_without_a_fallback(monkeypatch, change):
+    adapter, view, model_edge, _section_edge, _part, state, _calls, events = (
+        _inset_correspondence_harness(monkeypatch)
     )
-    assert display.dangles is False
-    assert draw.calls == [
-        ("activate", view),
-        ("view-select", edges[0], False),
-        ("view-select", edges[1], True),
-        ("add", 0.4, 0.1, False),
-    ]
-    assert events == [
-        ("drawing.inset_dimension", {"label": "inset", "variant": "view.SelectEntity", "dangling": False, "types": (1, 1)})
-    ]
+    if change == "missing_section":
+        state["mapped"] = None
+    elif change == "missing_model_source":
+        state["canonical"] = None
+    elif change == "missing_reverse_source":
+        state["returned"] = None
+    elif change == "different":
+        state["same"] = 0
+    elif change == "unknown":
+        state["same"] = -1
+    else:
+        model_edge.GetComponent().GetModelDoc2 = lambda: None
+    with pytest.raises(RuntimeError, match="no source-verified section edge"):
+        drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+    assert events[-1][1]["source_identity"] != 1
 
 
-def test_a_dangling_inset_dimension_is_deleted_and_the_entity_selection_tried(monkeypatch) -> None:
-    adapter, view, edges, draw, events = _inset_dimension_harness(monkeypatch, [True, False])
-    display = drawing._add_inset_dimension(
-        adapter, view, edges, text_xy=(0.4, 0.1), label="inset"
+def _settled_inset_harness(monkeypatch):
+    import _drawing_edge_dimensions
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(_drawing_edge_dimensions, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "view_name", lambda *_args: "B-B")
+    model_edges = (object(), object())
+    initial_edges = (object(), object())
+    state = {
+        "edges": initial_edges, "attached": initial_edges, "dangling": False,
+        "types": (1, 1), "inventory": (), "equality_unknown": False,
+    }
+    native = SimpleNamespace(SystemValue=0.004)
+    annotation = SimpleNamespace(
+        IsDangling=lambda: state["dangling"],
+        GetAttachedEntityTypes=lambda: state["types"],
+        GetAttachedEntities3=lambda: state["attached"],
     )
-    assert display.dangles is False
-    assert draw.calls[3:] == [
-        ("add", 0.4, 0.1, True),
-        ("select-dim",),
-        ("delete",),
-        ("activate", view),
-        ("select4", "a", False),
-        ("select4", "b", True),
-        ("add", 0.4, 0.1, False),
-    ]
-    assert [(e["variant"], e["dangling"]) for _n, e in events] == [
-        ("view.SelectEntity", True),
-        ("entity.Select4", False),
-    ]
+    display = SimpleNamespace(
+        GetAnnotation=lambda: annotation, GetDimension2=lambda _index: native,
+        Type2=2,
+    )
+    state["inventory"] = (display,)
+    view = SimpleNamespace(GetDisplayDimensions=lambda: state["inventory"])
+    references = tuple(
+        drawing._InsetEdgeReference(label, source, entity, instance)
+        for label, source, entity, instance in zip(
+            ("plate", "deck"), model_edges, initial_edges,
+            ("fr-nameplate-1", "fr-harmonic-base-1"),
+        )
+    )
+    proof = drawing._InsetDimensionProof(view, display, references)
+    adapter = SimpleNamespace(swApp=SimpleNamespace(
+        IsSame=lambda a, b: -1 if state["equality_unknown"] else int(a is b),
+    ))
+    mapped, events = [], []
+
+    def map_edge(_adapter, actual_view, source, *, label):
+        assert actual_view is view
+        mapped.append(source)
+        return state["edges"][model_edges.index(source)]
+
+    monkeypatch.setattr(drawing, "_inset_section_edge", map_edge)
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
+    )
+    return adapter, proof, state, native, model_edges, mapped, events
 
 
-def test_inset_dimensions_dangling_under_every_selection_fail_the_sheet(monkeypatch) -> None:
-    adapter, view, edges, draw, _events = _inset_dimension_harness(monkeypatch, [True, True])
-    with pytest.raises(RuntimeError, match="every selection left the dimension dangling: view.SelectEntity: dangling=True.*entity.Select4: dangling=True"):
-        drawing._add_inset_dimension(adapter, view, edges, text_xy=(0.4, 0.1), label="inset")
-    assert draw.calls.count(("delete",)) == 2
+def test_settled_inset_reacquires_both_section_refs_and_checks_the_native_dimension(monkeypatch):
+    adapter, proof, state, _native, model_edges, mapped, events = _settled_inset_harness(monkeypatch)
+    drawing._assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
+    # Section regeneration replaces the view wrappers; the native attachment
+    # array can reverse its order. The model identities remain authoritative.
+    regenerated = (object(), object())
+    state.update(edges=regenerated, attached=regenerated[::-1])
+    drawing._assert_inset_dimension_settled(adapter, proof)
+    assert mapped == [*model_edges, *model_edges]
+    assert events[-1][1]["measured_mm"] == pytest.approx(4.0)
+    assert events[-1][1]["section_owned"] is True
+    assert events[-1][1]["expected_instances"] == ("fr-nameplate-1", "fr-harmonic-base-1")
+
+
+def test_initial_nondangling_read_does_not_admit_references_lost_on_rebuild(monkeypatch):
+    adapter, proof, state, _native, _sources, _mapped, events = _settled_inset_harness(monkeypatch)
+    drawing._assert_inset_dimension_settled(adapter, proof, phase="creation rebuild")
+    state.update(dangling=True, attached=(), types=())
+    with pytest.raises(RuntimeError, match="dangles after the final rebuild"):
+        drawing._assert_inset_dimension_settled(adapter, proof)
+    assert events[-1][1]["phase"] == "final rebuild"
+    assert events[-1][1]["dangling"] is True
+    assert events[-1][1]["expected_view"] == "B-B"
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ("missing", "named entities"),
+        ("foreign", "named entities"),
+        ("duplicate", "named entities"),
+        ("extra", "named entities"),
+        ("unknown_identity", "named entities"),
+        ("value", "measures"),
+        ("nonfinite", "measures"),
+        ("type", "edge/linear type"),
+        ("entity_types", "edge/linear type"),
+        ("owner", "owned by its section view"),
+    ],
+)
+def test_rebuilt_inset_requires_real_named_refs_value_type_and_section_owner(monkeypatch, change, error):
+    adapter, proof, state, native, _sources, _mapped, events = _settled_inset_harness(monkeypatch)
+    if change == "missing":
+        state["attached"] = ()
+    elif change == "foreign":
+        state["attached"] = (object(), object())
+    elif change == "duplicate":
+        state["attached"] = (state["edges"][0], state["edges"][0])
+    elif change == "extra":
+        state["attached"] = (*state["edges"], object())
+    elif change == "unknown_identity":
+        state["equality_unknown"] = True
+    elif change == "value":
+        native.SystemValue = 0.005334  # Prior off-target, but still a real native dimension.
+    elif change == "nonfinite":
+        native.SystemValue = math.nan
+    elif change == "type":
+        proof.display.Type2 = 3  # swAngularDimension: cannot be read as a length.
+    elif change == "entity_types":
+        state["types"] = (0, 0)
+    else:
+        state["inventory"] = ()
+    with pytest.raises(RuntimeError, match=error):
+        drawing._assert_inset_dimension_settled(adapter, proof)
+    assert events[-1][1]["reference_failure"]
+    assert events[-1][1]["expected_view"] == "B-B"
+
 
 
 def test_a_checked_linear_dimension_refuses_to_dangle(monkeypatch) -> None:
