@@ -80,6 +80,12 @@ cannot ask for what the authors were told to leave out.
   Native station/extent proof is not exact glyph or foreign-line clearance
   proof; retain every line, including fraction bars, and inspect the actual
   PDF ink, whole sheet and automated machinist result after regeneration.
+  A consumer's read-only native path audit can use `audit_records`: after all
+  strict station and shelf checks, the core passes that checkpoint's same
+  freshly measured record mapping once, without a second annotation dump.
+  The audit must not mutate native state or records; failures propagate.
+  Initial and later proofs each collect their own records, never a cached
+  snapshot from before a rebuild or save.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
