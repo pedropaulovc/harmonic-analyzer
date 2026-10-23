@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Mapping
 from functools import partial
 from typing import Any
 
@@ -16,7 +17,7 @@ from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
-from _supplier_reference_text import measure_reference_text, shelve_reference_text
+from _supplier_reference_text import shelve_reference_text
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
 from _supplier_screw_reference_names import FEATURE_BY_PLANE
@@ -82,14 +83,10 @@ def _supplier_displays(adapter: Any) -> dict[str, Any]:
     return found
 
 
-def _assert_supplier_layout(adapter: Any) -> None:
-    """Reacquire all four references; every native path must clear on the sheet."""
-    records = {
-        name: measure_reference_text(
-            adapter, display, axis=_AXES[name], label=f"clamp supplier {name}"
-        )["record"]
-        for name, display in _supplier_displays(adapter).items()
-    }
+def _assert_supplier_layout(
+    adapter: Any, records: Mapping[str, Mapping[str, Any]]
+) -> None:
+    """Audit the same freshly measured checkpoint, without native/record writes."""
     views = []
     for view in iter_views(adapter):
         view = _early_bound(view, "IView")
@@ -151,21 +148,16 @@ def _annotate_supplier_dimensions(
     )
     # The core rebuilds, measures every row, shelves the short ones beyond
     # their native tails in three batched transitions and returns a read-only
-    # station/shelf proof. This recipe keeps the exact inventory binding and
-    # the whole-sheet native path audit on the settled state.
+    # station/shelf proof. Its initial and later proofs also audit those same
+    # fresh records, retaining this recipe's full native path enforcement.
     proof = shelve_reference_text(
         adapter,
         reacquire=partial(_supplier_displays, adapter),
         axes=_AXES,
         label="clamp supplier",
+        audit_records=partial(_assert_supplier_layout, adapter),
     )
-    _assert_supplier_layout(adapter)
-
-    def settled() -> None:
-        proof()
-        _assert_supplier_layout(adapter)
-
-    settled_checks.append(settled)
+    settled_checks.append(proof)
 
 
 async def build(adapter: Any) -> dict[str, str]:
