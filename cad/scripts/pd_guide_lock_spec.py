@@ -17,6 +17,8 @@ run without SolidWorks in ~1 s.
 
 from __future__ import annotations
 
+import math
+
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 
@@ -143,6 +145,11 @@ if min(HOLE_LIGAMENTS_WORST.values()) < LIGAMENT_FLOOR:
     raise AssertionError(
         f"guide-lock screw-hole ligaments {HOLE_LIGAMENTS_WORST} under {LIGAMENT_FLOOR}"
     )
+# The least worst-case wall (the right end) sits under rule 17's 2.0 target,
+# so the sheet states it as a plain fact (rule 20), floored to its two places
+# so it never claims more than the worst case.
+_EDGE_WALL_MIN = math.floor(min(HOLE_LIGAMENTS_WORST.values()) * 100.0) / 100.0
+HOLE_EDGE_WALL_CALLOUT = f"EDGE WALL {_EDGE_WALL_MIN:.2f} MIN"
 
 # The rounded corners must not reach the holes: with each hole centre (at its
 # printed worst case, from the nearest edges at their printed worst case)

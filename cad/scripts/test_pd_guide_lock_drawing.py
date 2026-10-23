@@ -125,8 +125,8 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
         f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
         "EDGE WALL 1.52 MIN",
     ]
-    assert min(pd_guide_lock_spec.HOLE_LIGAMENTS_WORST.values()) >= 1.52
-    assert drawing.EDGE_WALL_MIN < 2.0
+    assert pd_guide_lock_spec.HOLE_EDGE_WALL_CALLOUT == "EDGE WALL 1.52 MIN"
+    assert 1.52 <= min(pd_guide_lock_spec.HOLE_LIGAMENTS_WORST.values()) < 2.0
     # Each row is no wider than the native row the plate and right view
     # already bound (test above).
     assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")

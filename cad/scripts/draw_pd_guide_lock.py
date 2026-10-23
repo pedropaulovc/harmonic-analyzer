@@ -20,7 +20,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import math
 import sys
 from typing import Any
 
@@ -53,7 +52,7 @@ from _session import run_build
 import _telemetry
 from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
-    HOLE_LIGAMENTS_WORST,
+    HOLE_EDGE_WALL_CALLOUT,
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
@@ -146,18 +145,15 @@ HOLE_CALLOUT_PROCESS = "DRILL"
 # The hole coordinates' ±0.035 bands exist for the mate (rule 4): the
 # pattern must land on the platen guide's #4-40 taps with the lock-screw
 # shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
-# so the callout names both. The least edge wall at the printed worst case
-# (HOLE_LIGAMENTS_WORST, the right end) sits under the 2.0 target and prints
-# as a plain fact (rule 20), floored to the printed places. Rows stay at most
-# 23 characters so the block keeps between the plate and the right view.
+# so the callout names both, and the spec's least-edge-wall fact (rule 20).
+# Rows stay at most 23 characters so the block keeps between the plate and
+# the right view.
 GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
 SCREW_NUMBER = _config.parts("pd-vn-guide-lock-screw")["number"]
-EDGE_WALL_MIN = math.floor(min(HOLE_LIGAMENTS_WORST.values()) * 100.0) / 100.0
 HOLE_CALLOUT_BELOW = (
     f"MATCHES {GUIDE_NUMBER} TAPS,\n"
     "CLEARANCE FIT ON\n"
-    f"{SCREW_NUMBER} SCREWS\n"
-    f"EDGE WALL {EDGE_WALL_MIN:.2f} MIN"
+    f"{SCREW_NUMBER} SCREWS\n" + HOLE_EDGE_WALL_CALLOUT
 )
 
 
