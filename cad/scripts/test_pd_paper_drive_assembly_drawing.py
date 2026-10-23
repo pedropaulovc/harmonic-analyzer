@@ -3524,12 +3524,22 @@ def _rebind_to_bogus_property(_adapter, table, column, *, label):
     (lambda *_, **__: None, _rebind_to_bogus_property),
     ids=("linked", "rebound"),
 )
-def test_default_bom_refuses_property_bound_description_write_back(monkeypatch, replacement):
-    # Negative controls: any property-bound column writes back and is refused.
+@pytest.mark.parametrize("recheck", (True, False), ids=("rechecked", "control"))
+def test_default_bom_refuses_property_bound_description_write_back(
+    monkeypatch, replacement, recheck,
+):
+    # Any property-bound column writes back; the pre-authoring recheck refuses
+    # it before SetText2, and without the recheck the write-back is observed.
     scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
     monkeypatch.setattr(
         _drawing_tables, "_unlink_bom_description_column", replacement
     )
+    if recheck:
+        with pytest.raises(RuntimeError, match="still reads property .* before authoring"):
+            scene.insert()
+        assert _pd_description_writes(scene) == set()
+        return
+    monkeypatch.setattr(_drawing_tables, "_require_unlinked_bom_column", lambda *_, **__: None)
     with pytest.raises(RuntimeError, match="BOM description did not persist: ''"):
         scene.insert()
     writes = _pd_description_writes(scene)
@@ -3537,15 +3547,37 @@ def test_default_bom_refuses_property_bound_description_write_back(monkeypatch, 
     assert all(name.endswith(" Simplified") for name, _prop in writes)
 
 
-def test_view_configuration_bom_keeps_linked_description_column(monkeypatch):
+def test_description_unlink_refuses_binding_restored_by_rebuild(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    native_rebuild = _drawing_tables.rebuild_drawing
+
+    def rebuild(adapter, *, label):
+        if label == "unlink_bom_description_column":
+            assert scene.table.SetColumnCustomProperty(2, "Description") is True
+        return native_rebuild(adapter, label=label)
+
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", rebuild)
+    with pytest.raises(RuntimeError, match="still reads property 'Description'.* after rebuild"):
+        scene.insert()
+    assert _pd_description_writes(scene) == set()
+
+
+def test_view_configuration_bom_unlinks_description_column(monkeypatch):
+    # Codjiflo P1 on #1895: view-derived callers' writes also landed in the
+    # component models' active configurations; the drawing now owns the text.
     scene = _pd_bom_insertion_fixture(monkeypatch)
     table = scene.insert()
-    assert table.GetColumnCustomProperty(2) == "Description"
+    assert table.GetColumnCustomProperty(2) == ""
     assert scene.state.configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    assert _pd_description_writes(scene) == set()
+    assert {
+        key: scene.cells[row][2] for row, key in enumerate(scene.state.row_keys, 1)
+    } == drawing.BOM_DESCRIPTIONS
 
 
-def test_default_bom_refuses_plain_description_without_row_text(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+@pytest.mark.parametrize("configuration", (None, "Default"))
+def test_bom_refuses_plain_description_without_row_text(monkeypatch, configuration):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
     descriptions = {
         key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"
     }
@@ -3556,8 +3588,40 @@ def test_default_bom_refuses_plain_description_without_row_text(monkeypatch):
             descriptions=descriptions,
             component_identities=drawing.BOM_COMPONENT_IDENTITIES,
             part_number_property="Number", configuration_grouping="same-name",
+            configuration=configuration, label="paper-drive",
+        )
+
+
+@pytest.mark.parametrize("blank", ("", "   ", None))
+def test_bom_refuses_blank_descriptions_before_any_mutation(monkeypatch, blank):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    descriptions = dict(drawing.BOM_DESCRIPTIONS) | {"pd-platen": blank}
+    before = [vars(column).copy() for column in scene.state.columns]
+    with pytest.raises(ValueError, match=r"descriptions are blank for \['pd-platen'\]"):
+        _drawing_tables.insert_bom_table(
+            scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
+            expected_components=tuple(drawing.BOM_PART_NUMBERS),
+            descriptions=descriptions,
+            component_identities=drawing.BOM_COMPONENT_IDENTITIES,
+            part_number_property="Number", configuration_grouping="same-name",
             configuration=drawing.BOM_CONFIGURATION, label="paper-drive",
         )
+    assert [vars(column) for column in scene.state.columns] == before
+
+
+@pytest.mark.parametrize("configuration", ("Default", "Default Simplified"))
+def test_visibility_mutation_refuses_beyond_typed_prefix(monkeypatch, configuration):
+    # Codjiflo P2 on #1895: with Default selected, physical len(typed) maps onto
+    # the latent Quantity, which SetColumnHidden would materialize.
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    table = scene.insert()
+    typed = len(scene.state.columns)
+    # Diagnostic reads still map the beyond-prefix index.
+    _drawing_tables._bom_visibility_index(table, typed, label="pd")
+    with pytest.raises(ValueError, match=f"physical column {typed} is not one of its {typed}"):
+        _drawing_tables._set_bom_column_hidden(table, typed, True, label="pd")
+    assert scene.state.materialized == []
+    assert len(scene.state.columns) == typed
 
 
 @pytest.mark.parametrize("fault", ("status", "readback"))
@@ -3946,7 +4010,8 @@ def test_bom_insertion_refuses_nonbool_property_setter_success(monkeypatch, resu
 
     def set_custom_property(index, property_name):
         assert native_set(index, property_name) is True
-        return result
+        # The DESCRIPTION unlink ("") keeps its native status; Number gets ``result``.
+        return result if property_name == "Number" else True
 
     scene.table.SetColumnCustomProperty.side_effect = set_custom_property
     with pytest.raises(RuntimeError):
@@ -4234,17 +4299,28 @@ def test_bom_column_census_refuses_bad_metadata_beyond_diagnostic_display_cap(
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     type(scene.table).TotalColumnCount = PropertyMock(return_value=16)
+    # 4 typed + 12 latent columns: 13 configurations, the selected one second,
+    # so the latent guard holds and the census reaches the advertised tail.
+    names = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION) + tuple(
+        f"Extra {number}" for number in range(11)
+    )
+    scene.table.BomFeature.GetConfigurations = lambda only_visible, _visibility: (
+        names, tuple(name == drawing.SIMPLIFIED_VIEW_CONFIGURATION for name in names)
+    )
+    assert _drawing_tables._bom_physical_columns(scene.table, label="paper-drive") == (
+        (202, False), (201, False), (204, False), (203, False)
+    )
     original_property = scene.table.GetColumnCustomProperty.side_effect
     scene.table.GetColumnCustomProperty.side_effect = lambda column: (
         "Audit" if column == index else original_property(column)
     )
     before_columns = [vars(column).copy() for column in scene.state.columns]
-    before_members = tuple(tuple(row) for row in scene.state.native_rows)
     before_cells = tuple(tuple(row) for row in scene.cells)
-    with pytest.raises(RuntimeError):
-        scene.insert()
+    with pytest.raises(
+        RuntimeError, match=f"nonempty unsupported column at physical index {index}$"
+    ):
+        _drawing_tables._bom_physical_columns(scene.table, label="paper-drive")
     assert [vars(column) for column in scene.state.columns] == before_columns
-    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
     assert tuple(tuple(row) for row in scene.cells) == before_cells
 
 

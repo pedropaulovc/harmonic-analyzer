@@ -88,7 +88,7 @@ from _drawing_tables import (
     BomSnapshot,
     _bom_column_hidden_at,
     _bom_physical_columns,
-    _bom_visibility_index,
+    _bom_mutable_visibility_index,
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
@@ -1779,7 +1779,9 @@ def _set_bom_column_widths(
     native_column = len(physical) - 1
     # Restore exactly the visibility slot that was exposed, even if the typed
     # census changes meanwhile (latent Quantity columns shift this index).
-    native_visibility = _bom_visibility_index(table, native_column, label="paper-drive widths")
+    native_visibility = _bom_mutable_visibility_index(
+        table, native_column, label="paper-drive widths"
+    )
     original_hidden = _bom_column_hidden_at(
         table, native_visibility, native_column, label="paper-drive widths"
     )

@@ -570,8 +570,10 @@ def _bom_visibility_offset(
     return quantities[0], visibility.index(True)
 
 
-def _bom_visibility_index(table: Any, physical_column: int, *, label: str) -> int:
-    """Translate a typed physical column into the native visibility domain."""
+def _bom_typed_visibility(
+    table: Any, physical_column: int, *, label: str
+) -> tuple[int, int]:
+    """Map a typed physical column; return it with the typed-prefix length."""
     if type(physical_column) is not int or physical_column < 0:
         raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
     declared = int(table.TotalColumnCount)
@@ -584,7 +586,36 @@ def _bom_visibility_index(table: Any, physical_column: int, *, label: str) -> in
     quantity, latent_before = _bom_visibility_offset(
         table, kinds, declared, label=label
     )
-    return physical_column + (latent_before if physical_column >= quantity else 0)
+    return (
+        physical_column + (latent_before if physical_column >= quantity else 0),
+        len(kinds),
+    )
+
+
+def _bom_visibility_index(table: Any, physical_column: int, *, label: str) -> int:
+    """Translate a typed physical column into the native visibility domain.
+
+    Beyond-prefix indices are mapped for diagnostic reads only; mutate through
+    :func:`_bom_mutable_visibility_index`.
+    """
+    return _bom_typed_visibility(table, physical_column, label=label)[0]
+
+
+def _bom_mutable_visibility_index(
+    table: Any, physical_column: int, *, label: str
+) -> int:
+    """The visibility slot of an existing typed column, safe to mutate.
+
+    A beyond-prefix index can land on a deselected configuration's latent
+    Quantity, which ``SetColumnHidden`` would materialize as a real column.
+    """
+    index, typed = _bom_typed_visibility(table, physical_column, label=label)
+    if physical_column >= typed:
+        raise ValueError(
+            f"{label} BOM physical column {physical_column} is not one of its "
+            f"{typed} typed columns"
+        )
+    return index
 
 
 def _bom_column_hidden_at(
@@ -613,7 +644,7 @@ def _set_bom_column_hidden(
         raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
     if type(hidden) is not bool:
         raise ValueError(f"{label} BOM column hidden state must be BOOL")
-    index = _bom_visibility_index(table, physical_column, label=label)
+    index = _bom_mutable_visibility_index(table, physical_column, label=label)
     table.SetColumnHidden(index, hidden)  # VT_VOID, not success.
 
 
@@ -794,6 +825,22 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
         raise RuntimeError(f"{label} BOM physical column census read failed") from error
 
 
+def _require_all_visible_bom(
+    table: Any, *, label: str, stage: str
+) -> tuple[tuple[int, bool], ...]:
+    """Read-only precondition of a structural edit: no hidden rows or columns."""
+    rows = int(table.RowCount)
+    if int(table.TotalRowCount) != rows:
+        raise RuntimeError(f"{label} BOM has hidden rows before {stage}")
+    for row in range(rows):
+        if table.RowHidden(row) is not False:
+            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
+    physical = _bom_physical_columns(table, label=label)
+    if any(hidden for _kind, hidden in physical):
+        raise RuntimeError(f"{label} BOM starts with typed hidden columns")
+    return physical
+
+
 def _bind_bom_number_property(
     adapter: Any,
     table: Any,
@@ -802,12 +849,7 @@ def _bind_bom_number_property(
     label: str,
 ) -> None:
     """Display associative Numbers without replacing the native grouping column."""
-    rows = int(table.RowCount)
-    if int(table.TotalRowCount) != rows:
-        raise RuntimeError(f"{label} BOM has hidden rows before Number binding")
-    for row in range(rows):
-        if table.RowHidden(row) is not False:
-            raise RuntimeError(f"{label} BOM row {row} is not proven visible")
+    physical = _require_all_visible_bom(table, label=label, stage="Number binding")
     headers = [
         str(table.DisplayedText2(0, column, True) or "").strip().upper()
         for column in range(int(table.ColumnCount))
@@ -816,9 +858,6 @@ def _bind_bom_number_property(
         raise RuntimeError(f"{label} BOM has no PART NUMBER column")
     column = headers.index("PART NUMBER")
     visible_columns = int(table.ColumnCount)
-    physical = _bom_physical_columns(table, label=label)
-    if any(hidden for _kind, hidden in physical):
-        raise RuntimeError(f"{label} BOM starts with typed hidden columns")
     if [index for index, (kind, _hidden) in enumerate(physical) if kind == 201] != [
         column
     ]:
@@ -1119,9 +1158,10 @@ def insert_bom_table(
     ``descriptions`` maps a part number to its DESCRIPTION cell text (written
     per cell and read-verified) — the components carry no Description custom
     property, and a blank column reads as an unreleased sheet. A cell write on
-    the template's ``$PRP:"Description"`` column writes back to the part's
-    active configuration, so under an explicit ``configuration`` that column is
-    first unlinked in place and every row must be described.
+    the template's ``$PRP:"Description"`` column writes the text into each
+    component model's active configuration, so the column is first unlinked in
+    place (the drawing owns the text) and every row must be described with
+    nonblank text.
     Returns the table rebound as ``ITableAnnotation``.
     """
     grouping_values = {"separate": 1, "same-part": 2, "same-name": 3}
@@ -1137,9 +1177,15 @@ def insert_bom_table(
         raise ValueError("an associative Number column requires native row identities")
     if configuration is not None and not configuration.strip():
         raise ValueError("an explicit BOM configuration must be nonempty")
+    if descriptions:
+        blank = sorted(
+            key for key, text in descriptions.items()
+            if not isinstance(text, str) or not text.strip()
+        )
+        if blank:
+            raise ValueError(f"{label} BOM descriptions are blank for {blank}")
     _activate_and_select_view(adapter, view, label=label)
     draw = adapter.currentModel
-    explicit_configuration = configuration is not None
     if configuration is None:
         configuration = str(
             adapter._get_attr_or_call(view, "ReferencedConfiguration") or "Default"
@@ -1238,7 +1284,7 @@ def insert_bom_table(
         expected_rows=1 + len(expected_components),
         grouping_requested=grouping_values[configuration_grouping],
     )
-    if descriptions and explicit_configuration:
+    if descriptions:
         # Structural edits only while every real column is still visible.
         headers = [
             str(table.DisplayedText2(0, index, True) or "").strip().upper()
@@ -1346,6 +1392,10 @@ def insert_bom_table(
                 f"{label} BOM header carries no DESCRIPTION/PART NUMBER: {header!r}"
             )
         description_column = header.index("DESCRIPTION")
+        # Regeneration must not have restored the template's property link.
+        _require_unlinked_bom_column(
+            table, description_column, label=label, stage="before authoring"
+        )
         part_column = header.index("PART NUMBER")
         remaining = {key.strip().lower(): text for key, text in descriptions.items()}
         described = 0
@@ -1381,12 +1431,15 @@ def insert_bom_table(
                 f"{label} BOM descriptions not applied (no matching row): "
                 f"{sorted(remaining)}"
             )
-        if explicit_configuration and described != rows - 1:
+        if described != rows - 1:
             raise RuntimeError(
                 f"{label} plain BOM DESCRIPTION column left "
                 f"{rows - 1 - described} of {rows - 1} rows blank"
             )
         rebuild_drawing(adapter, label="insert_bom_table")
+        _require_unlinked_bom_column(
+            table, description_column, label=label, stage="after authoring"
+        )
     final_rows = int(table.RowCount)
     final_columns = int(table.ColumnCount)
     final_grouping = int(
@@ -1462,14 +1515,15 @@ def _unlink_bom_description_column(
 
     Native PD runs 20261023T190254133Z and 20261023T192129678Z: SetText2 on any
     property-bound cell (even one rebound to a nonexistent property) writes the
-    text into the part's active configuration. Clear the binding in place, to
-    the inserted-column signature ``(204, '', 0)`` (native run
-    20261023T203233011Z); inserting/deleting columns moves the latent Quantity.
+    text into the part's active configuration, dirtying an open model the drawing
+    does not save. Clear the binding in place, to the inserted-column signature
+    ``(204, '', 0)`` (native run 20261023T203233011Z), so the drawing owns its
+    text; inserting/deleting columns moves the latent Quantity.
     """
     annotation = _sw_type_info.early_bound_or_flag(
         table, "IBomTableAnnotation", "GetColumnCustomProperty", "SetColumnCustomProperty"
     )
-    before = _bom_physical_columns(table, label=label)
+    before = _require_all_visible_bom(table, label=label, stage="DESCRIPTION unlink")
     rows = int(table.RowCount)
     if before[column] != (204, False) or not str(
         annotation.GetColumnCustomProperty(column) or ""
@@ -1478,21 +1532,32 @@ def _unlink_bom_description_column(
     result = annotation.SetColumnCustomProperty(column, "")
     if result is not True:
         raise RuntimeError(f"{label} BOM DESCRIPTION unlink failed: {result!r}")
-    bound = str(annotation.GetColumnCustomProperty(column) or "")
-    kind, property_data, status = table.GetColumnType3(column, True)
-    if bound or (kind, property_data or "", status) != (204, "", 0):
-        raise RuntimeError(
-            f"{label} BOM DESCRIPTION column still reads property {bound!r}/"
-            f"{property_data!r}"
-        )
+    _require_unlinked_bom_column(table, column, label=label, stage="after unlink")
     if _bom_physical_columns(table, label=label) != before or int(table.RowCount) != rows:
         raise RuntimeError(f"{label} BOM structure changed unlinking DESCRIPTION")
     if not table.SetColumnTitle2(column, "DESCRIPTION", True):
         raise RuntimeError(f"{label} BOM DESCRIPTION header could not be set")
     rebuild_drawing(adapter, label="unlink_bom_description_column")
+    _require_unlinked_bom_column(table, column, label=label, stage="after rebuild")
     header = str(table.DisplayedText2(0, column, True) or "").strip().upper()
     if header != "DESCRIPTION":
         raise RuntimeError(f"{label} BOM DESCRIPTION header reads {header!r}")
+
+
+def _require_unlinked_bom_column(
+    table: Any, column: int, *, label: str, stage: str
+) -> None:
+    """Read back a property-less user column: getter ``''``, type ``(204, '', 0)``."""
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "GetColumnCustomProperty"
+    )
+    bound = str(annotation.GetColumnCustomProperty(column) or "")
+    kind, property_data, status = table.GetColumnType3(column, True)
+    if bound or (kind, property_data or "", status) != (204, "", 0):
+        raise RuntimeError(
+            f"{label} BOM DESCRIPTION column still reads property {bound!r}/"
+            f"{property_data!r} {stage}"
+        )
 
 
 def _bom_cell_evidence(
