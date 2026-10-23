@@ -86,7 +86,13 @@ cannot ask for what the authors were told to leave out.
   narrow observed distinction: one unique pair of distinct raw primitives
   joins the arrow midpoint to a validated lower-left, unrotated horizontal
   fragment on the lowest validated native font baseline, then spans its complete
-  measured advance. Its endpoints, actual junction, full lengths and direct
+  measured advance. Only when no existing fragment candidate matches may all
+  validated lower-left, unrotated fragments form one complete advance run:
+  their X intervals must adjoin within the existing tolerance, without duplicate
+  starts, larger gaps or overlaps, and share positive vertical overlap. The
+  candidate uses every fragment and the global font bottom; sorting it does not
+  remove or reorder the raw record. The same unique-pair endpoints, actual
+  junction, full lengths and direct
   agreement with that global baseline use the existing tolerance once, without
   stacked allowances. The baseline must clear the remaining physical reach
   by the existing clearance.

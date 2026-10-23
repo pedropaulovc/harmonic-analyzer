@@ -190,11 +190,10 @@ def _offset_text_path_indices(
 ) -> tuple[int, int] | None:
     """Recognize one complete native horizontal offset-text path, not its ink area.
 
-    The lowest native lower-left, unrotated fragment supplies the full baseline
-    advance. Its connector starts at the arrow midpoint; its separate underline
-    starts at that same baseline. Unknown or competing paths stay physical.
-    These are indices of distinct raw primitives: never clip their intervals
-    out of other, possibly overlapping, physical dimension-line primitives.
+    Preserve the existing lowest-fragment candidate first. Only when none
+    matches may all validated, contiguous lower-left advances supply one run.
+    Unknown or competing paths stay physical. Exclude only the two distinct
+    raw primitives, never intervals in overlapping physical dimension lines.
     """
     midpoint = (
         tips[0][0] + (tips[1][0] - tips[0][0]) / 2,
@@ -211,19 +210,13 @@ def _offset_text_path_indices(
         ]
         return matches[0] if len(matches) == 1 else None
 
-    candidates = []
-    for raw in texts:
-        if raw["ref"] != 1 or float(raw["ang"]) != 0.0:
-            continue
-        baseline = tuple(float(value) for value in raw["pos"][:2])
-        advance = (baseline[0] + float(raw["w"]), baseline[1])
-        # This supported fragment's baseline is its own measured lower edge;
-        # it must be the global font bottom, not an arbitrary higher text row.
+    def matching_paths(baseline, advance):
         if (
             abs(baseline[1] - font_bottom) > _POSITION_TOLERANCE_M
             or baseline[0] <= tips[1][0]
         ):
-            continue
+            return []
+        candidates = []
         for connector_index, connector in enumerate(physical):
             connector_ends = oriented(connector, midpoint, baseline)
             if connector_ends is None:
@@ -260,6 +253,41 @@ def _offset_text_path_indices(
                 if baseline[0] - reach < CLEAR_GAP_M:
                     continue
                 candidates.append((connector_index, underline_index))
+        return candidates
+
+    candidates = []
+    for raw in texts:
+        if raw["ref"] != 1 or float(raw["ang"]) != 0.0:
+            continue
+        baseline = tuple(float(value) for value in raw["pos"][:2])
+        advance = (baseline[0] + float(raw["w"]), baseline[1])
+        candidates.extend(matching_paths(baseline, advance))
+    if candidates:
+        return candidates[0] if len(candidates) == 1 else None
+
+    if len(texts) < 2:
+        return None
+    advances = []
+    for raw in texts:
+        if raw["ref"] != 1 or float(raw["ang"]) != 0.0:
+            return None
+        x, y = (float(value) for value in raw["pos"][:2])
+        advances.append((x, x + float(raw["w"]), y, y + float(raw["h"])))
+    # Sorting is candidate geometry only: preserve every original fragment
+    # and raw primitive, including its order, in the measured record.
+    advances.sort()
+    if (
+        any(
+            second[0] <= first[0]
+            or abs(second[0] - first[1]) > _POSITION_TOLERANCE_M
+            for first, second in zip(advances, advances[1:])
+        )
+        or min(run[3] for run in advances) <= max(run[2] for run in advances)
+    ):
+        return None
+    baseline = (advances[0][0], min(run[2] for run in advances))
+    advance = (max(run[1] for run in advances), baseline[1])
+    candidates = matching_paths(baseline, advance)
     return candidates[0] if len(candidates) == 1 else None
 
 

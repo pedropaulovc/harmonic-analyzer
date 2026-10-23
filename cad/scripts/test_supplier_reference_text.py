@@ -1,10 +1,10 @@
 """Offline behavior of the measured-native reference-text shelf core.
 
 Every fixture is a native-shaped audit record (the layout-audit dump shape):
-the recovered clamp SupplierHeadHeight primitives and the actual jam-nut RD1
-across-flats row from the 2026-10-22 rolling-main layout audit. No COM, no
-source-feature inventory, no callback bookkeeping: only measured geometry,
-read-back behavior and late native mutation.
+the recovered clamp SupplierHeadHeight primitives, actual jam-nut offset rows,
+and the three-fragment clamp SupplierHeadDiameter before/after capture from
+the 2026-10-23 native refusal. No COM, source-feature inventory or callback
+bookkeeping: only measured geometry, read-back behavior and late native mutation.
 """
 
 from __future__ import annotations
@@ -340,6 +340,27 @@ def captured_offset_case(request):
         tips=tuple((station, support) for station in tips),
         witnesses=tuple((station, witness_low, witness_high) for station in tips),
         reach=high,
+    )
+
+
+@pytest.fixture
+def captured_multifragment_offset_case():
+    source = next(
+        row for row in _CAPTURED_OFFSET_TEXT["multifragment_sources"]
+        if row["dimension_role"] == "supplier_head_diameter"
+    )
+    return SimpleNamespace(
+        before=copy.deepcopy(source["before"]["raw_annotation"]),
+        after=copy.deepcopy(source["after"]["raw_annotation"]),
+        before_mode=source["before"]["offset_text"],
+        after_mode=source["after"]["offset_text"],
+        physical_lines=((0.1227121, 0.1227121, 0.105221, 0.124779),),
+        tips=((0.111571, 0.1227121), (0.118429, 0.1227121)),
+        witnesses=(
+            (0.111571, 0.1115, 0.1237121),
+            (0.118429, 0.1115, 0.1237121),
+        ),
+        reach=0.124779,
     )
 
 
@@ -2937,3 +2958,176 @@ def test_recorded_offset_bottom_agreement_uses_single_existing_radial_tolerance(
             core.assert_reference_text_stations(before, after, label=_LABEL)
     assert after["record"] == retained
     assert case.after == retained
+
+
+@pytest.mark.parametrize("representation", (
+    "captured", "reversed-texts", "reversed-primitives",
+    "fragmented-physical-tail", "coalesced-physical-line",
+))
+def test_recorded_multifragment_offset_preserves_actual_station_coverage(
+    native_reads, captured_multifragment_offset_case, representation,
+):
+    case = captured_multifragment_offset_case
+    data = case.after["display"]
+    lines = data["lines"]
+    if representation == "reversed-texts":
+        data["texts"].reverse()
+    elif representation == "reversed-primitives":
+        lines.reverse()
+        for row in lines:
+            row[4:7], row[7:10] = row[7:10], row[4:7]
+    elif representation == "fragmented-physical-tail":
+        lines[4:5] = _physical_pieces(lines[4], 0, ((0.0, 0.5), (0.5, 1.0)))
+    elif representation == "coalesced-physical-line":
+        combined = copy.deepcopy(lines[2])
+        combined[4:7], combined[7:10] = lines[2][7:10], lines[4][7:10]
+        lines[2:5] = [combined]
+    retained = copy.deepcopy((case.before, case.after))
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=case.before_mode), axis=0, label=_LABEL
+    )
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=case.after_mode), axis=0, label=_LABEL
+    )
+    assert before["offset_text"] is False and after["offset_text"] is True
+    for measured in (before, after):
+        assert measured["tips"] == case.tips
+        assert measured["witnesses"] == case.witnesses
+        assert measured["physical_lines"] == case.physical_lines
+        assert measured["reach"] == case.reach
+    core.assert_reference_text_stations(before, after, label=_LABEL)
+    # All three actual advances remain measured, including leading/trailing
+    # spaces and the lower diameter-symbol baseline. No grouping rewrites ink.
+    assert len(after["record"]["display"]["texts"]) == 3
+    assert after["text"] == _text_box(case.after)
+    assert (before["record"], after["record"]) == retained
+    assert (case.before, case.after) == retained
+
+
+@pytest.mark.parametrize("defect", (
+    "missing-first-fragment", "missing-middle-fragment", "missing-last-fragment",
+    "duplicate-fragment", "separate-row", "overlapping-advances", "gapped-advances",
+    "other-anchor", "rotated-fragment", "missing-connector", "missing-underline",
+    "duplicate-connector", "duplicate-underline", "wrong-midpoint",
+    "wrong-full-width", "missing-original-middle", "false-mode",
+))
+def test_recorded_multifragment_path_never_hides_missing_or_unknown_geometry(
+    native_reads, captured_multifragment_offset_case, defect,
+):
+    case = captured_multifragment_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=case.before_mode), axis=0, label=_LABEL
+    )
+    healthy = core.measure_reference_text(
+        None, _static(case.after, offset=case.after_mode), axis=0, label=_LABEL
+    )
+    core.assert_reference_text_stations(before, healthy, label=_LABEL)
+    data = case.after["display"]
+    texts, lines = data["texts"], data["lines"]
+    mode = case.after_mode
+    if defect.startswith("missing-") and defect.endswith("-fragment"):
+        del texts[{
+            "missing-first-fragment": 0, "missing-middle-fragment": 1,
+            "missing-last-fragment": 2,
+        }[defect]]
+    elif defect == "duplicate-fragment":
+        texts.append(copy.deepcopy(texts[1]))
+    elif defect == "separate-row":
+        texts[-1]["pos"][1] += 0.004
+    elif defect in ("overlapping-advances", "gapped-advances"):
+        texts[1]["pos"][0] += (
+            -1.001 * _TOL if defect == "overlapping-advances" else 1.001 * _TOL
+        )
+    elif defect == "other-anchor":
+        texts[1]["ref"] = 0
+    elif defect == "rotated-fragment":
+        texts[1]["ang"] = pi / 8
+    elif defect == "missing-connector":
+        del lines[5]
+    elif defect == "missing-underline":
+        del lines[6]
+    elif defect == "duplicate-connector":
+        lines.append(copy.deepcopy(lines[5]))
+    elif defect == "duplicate-underline":
+        lines.append(copy.deepcopy(lines[6]))
+    elif defect == "wrong-midpoint":
+        lines[5][4] += 1.1 * _TOL
+    elif defect == "wrong-full-width":
+        lines[6][7] += 1.1 * _TOL
+    elif defect == "missing-original-middle":
+        del lines[3]
+    elif defect == "false-mode":
+        mode = False
+    else:
+        raise AssertionError(f"unowned multifragment defect: {defect}")
+    retained = copy.deepcopy(case.after)
+    moved = core.measure_reference_text(
+        None, _static(case.after, offset=mode), axis=0, label=_LABEL
+    )
+    assert moved["tips"] == before["tips"]
+    assert moved["witnesses"] == before["witnesses"]
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, moved, label=_LABEL)
+    assert moved["record"] == retained
+    assert case.after == retained
+
+
+@pytest.mark.parametrize("delta", (-0.0001, 0.0001), ids=("shortened", "extended"))
+def test_recorded_multifragment_path_cannot_hide_original_100um_tail_change(
+    native_reads, captured_multifragment_offset_case, delta,
+):
+    case = captured_multifragment_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=case.before_mode), axis=0, label=_LABEL
+    )
+    healthy = core.measure_reference_text(
+        None, _static(case.after, offset=case.after_mode), axis=0, label=_LABEL
+    )
+    core.assert_reference_text_stations(before, healthy, label=_LABEL)
+    # This is the ORIGINAL physical tail, not either added offset primitive.
+    case.after["display"]["lines"][4][7] += delta
+    moved = core.measure_reference_text(
+        None, _static(case.after, offset=case.after_mode), axis=0, label=_LABEL
+    )
+    assert moved["tips"] == case.tips
+    assert moved["witnesses"] == case.witnesses
+    assert moved["physical_lines"][-1][3] == case.reach + delta
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, moved, label=_LABEL)
+
+
+@pytest.mark.parametrize(
+    "bottom_drop,path_rise,accepted",
+    (
+        (0.999 * _TOL, 0.0, True),
+        (1.001 * _TOL, 0.0, False),
+        (0.9 * _TOL, 0.9 * _TOL, False),
+    ),
+    ids=("bottom-within-10um", "bottom-beyond-10um", "compound-18um"),
+)
+def test_recorded_multifragment_bottom_uses_existing_single_radial_bound(
+    native_reads, captured_multifragment_offset_case,
+    bottom_drop, path_rise, accepted,
+):
+    case = captured_multifragment_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=case.before_mode), axis=0, label=_LABEL
+    )
+    data = case.after["display"]
+    data["texts"][1]["pos"][1] -= bottom_drop
+    data["lines"][5][8] += path_rise
+    data["lines"][6][5] += path_rise
+    data["lines"][6][8] += path_rise
+    retained = copy.deepcopy(case.after)
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=case.after_mode), axis=0, label=_LABEL
+    )
+    assert after["tips"] == case.tips
+    assert after["witnesses"] == case.witnesses
+    if accepted:
+        assert after["physical_lines"] == case.physical_lines
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    else:
+        with pytest.raises(RuntimeError, match="physical_lines"):
+            core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert after["record"] == retained
