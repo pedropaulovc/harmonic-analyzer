@@ -14,6 +14,7 @@ import pytest
 
 import _config
 import _supplier_screw_dimensions as supplier_dimensions
+import _supplier_dimensions as supplier_presentation
 import _supplier_spring_drawing as supplier_drawing
 import _stock_trim_drawing as trim_drawing
 import build_ch_rocker_arm_tl_vn_oblique_leadscrew as part
@@ -1371,6 +1372,384 @@ def supplier_stock_inset(monkeypatch, request, supplier_stock_source_state):
     if not options.get("defer", False):
         create()
     return state
+
+
+@pytest.fixture
+def supplier_stock_presentation(monkeypatch, supplier_stock_inset):
+    """Real shared settled/presentation guards after the owned placement.
+
+    Layout and source-scope fixtures remain synthetic; attachment identity is
+    independently covered above. Distinct settled display wrappers expose any
+    attempt to diagnose the pre-rebuild cached display instead of the refusal.
+    """
+    state = supplier_stock_inset
+    source = state.source_state
+    reads, inventories, view_reads = [], [], []
+    stock = spec.SUPPLIER_STOCK_CONFIGURATION
+
+    def observe(member, value):
+        assert source.configuration == stock
+        assert state.adapter.currentModel is source.drawing
+        reads.append(member)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    class Display:
+        def __init__(self, name, dimension, *, source_display=False):
+            precision, presentation, denominator, callout = spec.SUPPLIER_REFERENCE_FORMATS[name]
+            self.values = {
+                "GetUseDocUnits": source_display, "GetUnits": -1 if source_display else 0,
+                "GetPrimaryPrecision2": 2 if source_display else precision,
+                "GetFractionBase": -1 if source_display else (2 if denominator else 1),
+                "ShowParenthesis": False, "GetOverride": False, "ShowDimensionValue": True,
+                "GetFractionValue": denominator or -1, "GetRoundToFraction": False,
+                "GetUseDocPrecision": False, "GetPrimaryTolPrecision2": 2,
+                "GetAlternatePrecision2": 3, "GetAlternateTolPrecision2": 4, "Type2": 2,
+            }
+            self.text = {
+                1: "(<MOD-DIAM>" if presentation == "diameter" else "(",
+                2: " mm)", 4: callout,
+            }
+            self.dimension, self.name = dimension, name
+            self.source_display = source_display
+
+        def __getattr__(self, member):
+            if member not in self.values:
+                raise AttributeError(member)  # No setters or repair surface.
+            if member.startswith("Get"):
+                return lambda: observe(member, self.values[member])
+            return observe(member, self.values[member])
+
+        def GetText(self, part):
+            return observe(f"GetText({part})", self.text[part])
+
+        def GetDimension2(self, index):
+            assert index == 0
+            return self.dimension
+
+        def GetAnnotation(self):
+            return state.annotations[self.name]
+
+    settled_displays, source_displays, parameters = {}, {}, {}
+    for name, value, _orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS:
+        tolerance = SimpleNamespace(
+            Type=0, GetMinValue=lambda: -0.0001, GetMaxValue=lambda: 0.0002,
+        )
+
+        def system_value(configuration_option, configuration, value=value):
+            assert configuration_option == 3 and configuration == stock
+            return (value / 1000.0,)
+
+        dimension = SimpleNamespace(
+            FullName=f"{name}@SupplierReference@Source.SLDPRT",
+            GetSystemValue3=system_value, Tolerance=tolerance,
+        )
+        parameters[f"{name}@SupplierReference"] = dimension
+        settled_displays[name] = Display(name, dimension)
+        source_displays[name] = Display(name, dimension, source_display=True)
+        annotation = state.annotations[name]
+        annotation.GetType = lambda: 4
+        annotation.GetSpecificAnnotation = lambda name=name: settled_displays[name]
+        annotation.IsDangling = lambda: False
+        annotation.Visible, annotation.OwnerType, annotation.Owner = 1, 0, state.view
+        annotation.GetAttachedEntities3 = lambda: (object(), object())
+        annotation.GetAttachedEntityTypes = lambda: (11, 11)
+        annotation.GetAttachedEntityCount3 = lambda: 2
+
+    feature = SimpleNamespace(Name="SupplierReference")
+    source.model.Parameter = parameters.__getitem__
+    source.model.FeatureByName = lambda name: feature if name == "SupplierReference" else None
+    source.model.GetType = lambda: 1
+    source.model.GetConfigurationByName = lambda name: object() if name == stock else None
+    state.document_units = {
+        "source": (0, 1, 0, 4, 0), "drawing": (3, 2, 16, 3, 1),
+    }
+    source.model.GetUnits = lambda: observe(
+        "IModelDoc2.GetUnits(source)", state.document_units["source"],
+    )
+    source.drawing.GetUnits = lambda: observe(
+        "IModelDoc2.GetUnits(drawing)", state.document_units["drawing"],
+    )
+    state.view.GetOrientationName = lambda: "*Front"
+
+    def annotations():
+        view_reads.append("settled annotations")
+        return state.view.annotations
+
+    state.view.GetAnnotations = annotations
+
+    def inventory(native_feature):
+        assert native_feature is feature
+        assert source.configuration == stock
+        inventories.append(native_feature)
+        return iter(source_displays.values())
+
+    monkeypatch.setattr(draw, "_feature_display_dimensions", inventory)
+    monkeypatch.setattr(draw, "_bind", lambda value, _kind: value)
+    for module in (supplier_dimensions, supplier_presentation):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(supplier_dimensions, "iter_views", lambda _adapter: (state.view,))
+    monkeypatch.setattr(supplier_dimensions, "view_name", lambda _adapter, view: view.GetName2())
+
+    def source_identity(_adapter, view, _display, **_kwargs):
+        assert view is state.view and source.configuration == stock
+
+    monkeypatch.setattr(supplier_dimensions, "_assert_source", source_identity)
+    original_annotate = draw.annotate_supplier_screw
+
+    def annotate(*args, **kwargs):
+        displays = original_annotate(*args, **kwargs)
+        binding = (
+            state.view.GetName2(), str(draw.SOURCE.resolve()), stock,
+        )
+        kwargs["settled_checks"].append(
+            lambda: supplier_dimensions.assert_supplier_screw(
+                state.adapter, {"*Front": state.view},
+                dimensions=spec.SUPPLIER_REFERENCE_DIMENSIONS,
+                formats=spec.SUPPLIER_REFERENCE_FORMATS,
+                units=spec.SUPPLIER_REFERENCE_UNITS,
+                _bindings={"*Front": binding},
+            )
+        )
+        return displays
+
+    monkeypatch.setattr(draw, "annotate_supplier_screw", annotate)
+    state.presentation_reads, state.source_inventories = reads, inventories
+    state.settled_view_reads = view_reads
+    state.settled_displays, state.source_displays = settled_displays, source_displays
+    state.create()
+    return state
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+def test_supplier_stock_presentation_diagnostics_are_failure_only(
+    supplier_stock_presentation,
+) -> None:
+    state = supplier_stock_presentation
+    state.settled()
+    assert state.source_inventories == []
+    assert not any(
+        member.startswith("IModelDoc2.GetUnits(") for member in state.presentation_reads
+    )
+    assert not any("supplier_stock_presentation_failure:" in row for row in state.messages)
+    assert state.source_state.configuration == state.source_state.original
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+@pytest.mark.parametrize(
+    "field,actual",
+    (
+        ("GetUseDocUnits", True), ("GetUnits", 3), ("GetPrimaryPrecision2", 2),
+        ("GetFractionBase", 2), ("ShowParenthesis", True), ("GetOverride", True),
+        ("ShowDimensionValue", False), ("GetText(1)", ""), ("GetText(2)", " in)"),
+        ("GetText(4)", "OTHER CALLOUT"),
+    ),
+)
+def test_supplier_stock_presentation_failure_reads_exact_guard_fields_and_source(
+    supplier_stock_presentation, field, actual,
+) -> None:
+    state = supplier_stock_presentation
+    display = state.settled_displays["SupplierStockLength"]
+    if field.startswith("GetText("):
+        display.text[int(field[8])] = actual
+    else:
+        display.values[field] = actual
+    rebuilds = tuple(state.rebuilds)
+    with pytest.raises(RuntimeError, match="native supplier presentation differs") as refused:
+        state.settled()
+    rows = [
+        json.loads(row.split(": ", 1)[1]) for row in state.messages
+        if row.startswith("supplier_stock_presentation_failure: ")
+    ]
+    assert len(rows) == 1
+    report = rows[0]
+    assert report["differing_fields"] == [field]
+    assert report["actual"][field] == actual
+    assert set(report["expected"]) <= set(report["actual"])
+    assert report["expected"]["GetPrimaryPrecision2"] == 0
+    assert report["expected"]["GetText(4)"] == "AS PURCHASED"
+    assert report["guard_inputs"]["configuration"] == spec.SUPPLIER_STOCK_CONFIGURATION
+    assert report["context"]["source_active_configuration"] == spec.SUPPLIER_STOCK_CONFIGURATION
+    assert report["context"]["source_document_units"] == [0, 1, 0, 4, 0]
+    assert report["context"]["drawing_document_units"] == [3, 2, 16, 3, 1]
+    for document in ("source", "drawing"):
+        assert state.presentation_reads.count(f"IModelDoc2.GetUnits({document})") == 1
+    assert report["source_parameter"]["dimension_is_same"] == 1
+    assert len(report["source_displays"]) == 1
+    source = report["source_displays"][0]
+    assert source["FullName"] == report["actual"]["FullName"]
+    assert source["imported_dimension_is_same"] == 1
+    assert source["GetUseDocUnits"] is True and source["GetPrimaryPrecision2"] == 2
+    assert report["actual"]["tolerance"] == {
+        "present": True, "interface": "IDimensionTolerance",
+        "Type": 0, "GetMinValue": -0.0001, "GetMaxValue": 0.0002,
+    }
+    assert state.settled_view_reads == ["settled annotations"]  # No diagnostic reacquisition.
+    assert len(state.source_inventories) == 1
+    assert tuple(state.rebuilds) == rebuilds
+    assert state.source_state.configuration == state.source_state.original
+    assert state.adapter.currentModel is state.source_state.drawing
+    assert not getattr(refused.value, "__notes__", ())
+    json.dumps(report, allow_nan=False)  # Only scalar evidence survives the Stock scope.
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+def test_supplier_stock_presentation_failure_captures_individual_getter_errors(
+    supplier_stock_presentation,
+) -> None:
+    state = supplier_stock_presentation
+    display = state.settled_displays["SupplierStockLength"]
+    display.values["GetUseDocUnits"] = True  # Original guard short-circuits here.
+    display.values["GetUnits"] = ValueError("units unavailable")
+    state.source_displays["SupplierStockLength"].values["GetUnits"] = TypeError("source units")
+
+    def minimum():
+        raise LookupError("minimum unavailable")
+
+    display.dimension.Tolerance.GetMinValue = minimum
+    with pytest.raises(RuntimeError, match="native supplier presentation differs"):
+        state.settled()
+    report = json.loads(next(
+        row.split(": ", 1)[1] for row in state.messages
+        if row.startswith("supplier_stock_presentation_failure: ")
+    ))
+    assert report["actual"]["GetUnits"] == {
+        "member": "IDisplayDimension.GetUnits", "error_type": "ValueError",
+        "message": "units unavailable",
+    }
+    assert report["source_displays"][0]["GetUnits"]["error_type"] == "TypeError"
+    assert report["actual"]["GetText(4)"] == "AS PURCHASED"
+    assert report["actual"]["tolerance"]["GetMaxValue"] == 0.0002
+    assert report["actual"]["tolerance"]["GetMinValue"] == {
+        "member": "IDimensionTolerance.GetMinValue", "error_type": "LookupError",
+        "message": "minimum unavailable",
+    }
+    assert state.source_state.configuration == state.source_state.original
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+@pytest.mark.parametrize("document", ("source", "drawing"))
+def test_supplier_stock_presentation_document_unit_errors_preserve_original_refusal(
+    supplier_stock_presentation, monkeypatch, document,
+) -> None:
+    state = supplier_stock_presentation
+    state.settled_displays["SupplierStockLength"].values["GetUseDocUnits"] = True
+    state.document_units[document] = ValueError("document units unavailable")
+    original = draw._log_supplier_stock_presentation_failure
+    captured = []
+
+    def diagnostic(adapter, error):
+        captured.append(error)
+        return original(adapter, error)
+
+    monkeypatch.setattr(draw, "_log_supplier_stock_presentation_failure", diagnostic)
+    with pytest.raises(RuntimeError, match="native supplier presentation differs") as refused:
+        state.settled()
+    assert captured == [refused.value]
+    report = json.loads(next(
+        row.split(": ", 1)[1] for row in state.messages
+        if row.startswith("supplier_stock_presentation_failure: ")
+    ))
+    assert report["context"][f"{document}_document_units"] == {
+        "member": f"IModelDoc2.GetUnits({document})",
+        "error_type": "ValueError", "message": "document units unavailable",
+    }
+    other = "drawing" if document == "source" else "source"
+    assert report["context"][f"{other}_document_units"] == list(state.document_units[other])
+    assert report["actual"]["GetUseDocUnits"] is True
+    assert report["actual"]["GetText(4)"] == "AS PURCHASED"
+    for owner in ("source", "drawing"):
+        assert state.presentation_reads.count(f"IModelDoc2.GetUnits({owner})") == 1
+    assert state.source_state.configuration == state.source_state.original
+    assert state.adapter.currentModel is state.source_state.drawing
+    assert not getattr(refused.value, "__notes__", ())
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+@pytest.mark.parametrize("fault", ("logging", "inventory", "capture"))
+def test_supplier_stock_presentation_diagnostic_failure_preserves_original_refusal(
+    supplier_stock_presentation, monkeypatch, fault,
+) -> None:
+    state = supplier_stock_presentation
+    state.settled_displays["SupplierStockLength"].values["GetUseDocUnits"] = True
+    original = draw._log_supplier_stock_presentation_failure
+    captured = []
+
+    def diagnostic(adapter, error):
+        captured.append(error)
+        if fault == "capture":
+            raise ValueError("diagnostic capture unavailable")
+        return original(adapter, error)
+
+    def failed(*_args):
+        raise ValueError(f"{fault} unavailable")
+
+    monkeypatch.setattr(draw, "_log_supplier_stock_presentation_failure", diagnostic)
+    if fault == "logging":
+        info = draw._telemetry.info
+        monkeypatch.setattr(
+            draw._telemetry, "info",
+            lambda row: failed() if row.startswith("supplier_stock_presentation_failure: ") else info(row),
+        )
+    elif fault == "inventory":
+        monkeypatch.setattr(draw, "_feature_display_dimensions", failed)
+    rebuilds = tuple(state.rebuilds)
+    with pytest.raises(RuntimeError, match="native supplier presentation differs") as refused:
+        state.settled()
+    assert captured == [refused.value]
+    assert state.source_state.configuration == state.source_state.original
+    assert state.adapter.currentModel is state.source_state.drawing
+    assert tuple(state.rebuilds) == rebuilds
+    if fault != "inventory":
+        assert refused.value.__notes__ == [
+            "supplier presentation diagnostic also failed: ValueError",
+        ]
+    else:
+        report = json.loads(next(
+            row.split(": ", 1)[1] for row in state.messages
+            if row.startswith("supplier_stock_presentation_failure: ")
+        ))
+        assert report["source_display_read_error"]["error_type"] == "ValueError"
+        assert report["actual"]["GetUseDocUnits"] is True
+
+
+@pytest.mark.parametrize("supplier_stock_inset", [{"defer": True}], indirect=True)
+def test_supplier_stock_presentation_failure_uses_actual_guard_expectations(
+    supplier_stock_presentation, monkeypatch,
+) -> None:
+    state = supplier_stock_presentation
+    original = supplier_dimensions._reference_settings
+
+    def settings(*args, **kwargs):
+        values = original(*args, **kwargs)
+        values["precision"] = 1
+        return values
+
+    monkeypatch.setattr(supplier_dimensions, "_reference_settings", settings)
+    with pytest.raises(RuntimeError, match="native supplier presentation differs"):
+        state.settled()
+    report = json.loads(next(
+        row.split(": ", 1)[1] for row in state.messages
+        if row.startswith("supplier_stock_presentation_failure: ")
+    ))
+    assert spec.SUPPLIER_REFERENCE_FORMATS["SupplierStockLength"][0] == 0
+    assert report["guard_inputs"]["precision"] == 1
+    assert report["expected"]["GetPrimaryPrecision2"] == 1
+    assert report["actual"]["GetPrimaryPrecision2"] == 0
+    assert report["differing_fields"] == ["GetPrimaryPrecision2"]
+
+
+def test_supplier_stock_presentation_diagnostic_ignores_unrelated_refusals(
+    monkeypatch,
+) -> None:
+    def unexpected_log(_message):
+        raise AssertionError("unrelated refusal must not acquire diagnostic native objects")
+
+    monkeypatch.setattr(draw._telemetry, "info", unexpected_log)
+    draw._log_supplier_stock_presentation_failure(
+        object(), RuntimeError("earlier identity/inventory refusal"),
+    )
 
 
 def test_supplier_stock_source_scope_wires_immediate_and_settled_before_layout(
