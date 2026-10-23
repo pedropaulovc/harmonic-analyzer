@@ -793,6 +793,23 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
     """Script model hits and distinct mapped/selected section entities."""
     logged, selected, events, mapped = [], [], [], []
     section_edge = readback[0] if readback else None
+    raw_entities, safe_entities, safe_reads = {}, {}, []
+    for row in rays:
+        if row is None or row[0] in raw_entities:
+            continue
+        name = row[0]
+        safe_entities[name] = SimpleNamespace(IsSafe=True, name=f"safe {name}")
+
+        def retain(name=name):
+            safe_reads.append(name)
+            return safe_entities[name]
+
+        raw_entities[name] = SimpleNamespace(GetSafeEntity=retain)
+
+    def bound(value, kind):
+        if kind == "IEntity" and isinstance(value, str):
+            return raw_entities.get(value, value)
+        return value
 
     def cast(_adapter, _view, *, leaves, stem, target_mm, stations_m):
         return "fr-frame-1/fr-nameplate-1", list(rays)
@@ -805,7 +822,7 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
         selected.append((view, kind, xy, label, entity))
         return entity
 
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "_early_bound", bound)
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view)
     monkeypatch.setattr(drawing, "_inset_edge_rays", cast)
     monkeypatch.setattr(drawing, "_inset_section_edge", map_edge)
@@ -816,6 +833,7 @@ def _scripted_inset_edges(monkeypatch, rays, readback, *, selected_view="B-B"):
         drawing._telemetry, "event", lambda name, **attrs: events.append((name, attrs))
     )
     adapter = SimpleNamespace(
+        raw_entities=raw_entities, safe_entities=safe_entities, safe_reads=safe_reads,
         swApp=SimpleNamespace(IsSame=lambda a, b: int(a == b)),
         currentModel=SimpleNamespace(SelectionManager=SimpleNamespace(
             GetSelectedObjectsDrawingView2=lambda _index, _mark: selected_view,
@@ -843,9 +861,11 @@ def test_the_first_station_whose_ray_meets_an_edge_chooses_it(monkeypatch) -> No
         stations_m=INSET_STATIONS,
     )
     assert edge == drawing._InsetEdgeReference(
-        "plate", "edge at 20", "selected", "fr-frame-1/fr-nameplate-1"
+        "plate", adapter.safe_entities["edge at 20"], "selected", "fr-frame-1/fr-nameplate-1"
     )
-    assert mapped == [("B-B", "edge at 20", "plate")]
+    assert mapped == [("B-B", adapter.safe_entities["edge at 20"], "plate")]
+    assert adapter.safe_reads == ["edge at 20"]  # Only the chosen model edge is retained.
+    assert edge.model_edge is not adapter.raw_entities["edge at 20"]
     assert selected == [("B-B", "EDGE", None, "plate", "selected")]
     assert len(logged) == 1
     assert "fr-frame-1/fr-nameplate-1 y 52.300 z 20 mm" in logged[0]
@@ -871,6 +891,19 @@ def test_the_first_station_whose_ray_meets_an_edge_chooses_it(monkeypatch) -> No
             },
         )
     ]
+
+
+def test_a_model_hit_without_a_safe_entity_refuses_before_selection(monkeypatch):
+    _logged, selected, _events, mapped, adapter = _scripted_inset_edges(
+        monkeypatch, [("model", 0.0523)], ("selected", "fr-nameplate-1", (163.0, 163.0)),
+    )
+    adapter.raw_entities["model"].GetSafeEntity = lambda: None
+    with pytest.raises(RuntimeError, match="failed to retain a safe model edge"):
+        drawing._pick_inset_edge(
+            adapter, "B-B", leaves=(), label="plate", stem="fr-nameplate",
+            target_mm=163.0, stations_m=(0.025,),
+        )
+    assert selected == [] and mapped == []
 
 
 def test_rays_meeting_no_edge_on_any_station_fail_the_sheet(monkeypatch) -> None:
@@ -1179,7 +1212,7 @@ def _inset_correspondence_harness(monkeypatch):
     calls, events = [], []
     part = SimpleNamespace()
     component = SimpleNamespace(Name2="fr-nameplate-1", GetModelDoc2=lambda: part)
-    model_edge = SimpleNamespace(GetComponent=lambda: component)
+    model_edge = SimpleNamespace(GetComponent=lambda: component, IsSafe=True)
 
     def reverse(edge):
         calls.append(("reverse", edge))
@@ -1211,6 +1244,20 @@ def test_model_hit_is_mapped_to_the_section_and_roundtrips_to_its_source(monkeyp
     assert events[-1][1]["source_identity"] == 1
     assert events[-1][1]["expected_instance"] == "fr-nameplate-1"
     assert events[-1][1]["expected_view"] == "B-B"
+    assert events[-1][1]["model_safe"] is True
+
+
+def test_a_retained_model_entity_that_is_no_longer_safe_refuses_rebuild_mapping(monkeypatch):
+    adapter, view, model_edge, _section, _part, _state, calls, events = (
+        _inset_correspondence_harness(monkeypatch)
+    )
+    drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+    calls.clear()
+    model_edge.IsSafe = False  # Deleted topology cannot supply a surviving reference.
+    with pytest.raises(RuntimeError, match="not safe across rebuilds"):
+        drawing._inset_section_edge(adapter, view, model_edge, label="plate")
+    assert calls == []  # Do not dereference invalid topology in the mapping APIs.
+    assert events[-1][1]["model_safe"] is False
 
 
 @pytest.mark.parametrize(
