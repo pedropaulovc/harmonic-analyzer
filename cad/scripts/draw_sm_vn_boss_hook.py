@@ -138,9 +138,8 @@ EXPECTED_CONTROLS = {
 }
 
 
-def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
+def _verify_controls(annotations: list[Any]) -> None:
     trim_drawing.verify_machining_controls(
-        adapter,
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
@@ -1575,7 +1574,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
-    _verify_controls(adapter, annotations)
+    _verify_controls(annotations)
     refs = _supplier_references(adapter, front, finished_configuration)
     drawing.ActivateView("")  # False is documented for sheet context.
     if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
@@ -1679,7 +1678,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
-            lambda: _verify_controls(adapter, annotations),
+            lambda: _verify_controls(annotations),
             # The layout check owns pre-save view refreshes; the attachment
             # verifier is also safe to call after the native save.
             lambda: _verify_supplier_layout(

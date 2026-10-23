@@ -884,9 +884,102 @@ subagent running `e-code-review XHIGH`**: ten inline review angles,
 deduplication and a gap sweep against the exact frozen base/head and all
 five owned files. Same-family review is explicitly permitted. No paid
 remote reviewer, repeated Claude route probe or quota waiting is used.
-No completed review is claimed here. Final focused source checks, both
-normal native outputs, complete changed-paper v44 comparison, automated
-machinist SHIP and this independent exact-source review are distinct gates.
+The bounded diagnostic delta at `1f5e25353d42716ede2406d49311f037c5c75d17`
+completed that XHIGH method. Its console-visibility P2 was fixed, with zero
+new findings in the static correction. That is not final whole-PR approval.
+Focused source checks, native outputs or explicitly bounded historical carry,
+complete changed-paper v44 comparison, actual-XHIGH machinist SHIP and the
+independent exact-source code review remain distinct gates.
+
+## Actual-XHIGH configuration correction
+
+The latest session instruction requires actual Codex XHIGH for final
+machinist qualification. The three old CH authoritative provider receipts
+all say `gpt-6-astra`, `effort=medium`. Their raw SHIP verdicts remain
+unchanged historical diagnostics, not qualification under the new rule.
+The older `9bb6e4e` FIX reports likewise remain historical; no obsolete SM
+paper was rerolled.
+
+One **CONFIGCORRECTION** invocation reviewed the unchanged final CH PDF,
+not a new native build or a favorable-vote reroll. Current-source `1f5`
+ran the standard reviewer with both reviewer and judge explicitly set to
+Codex `gpt-6-astra` XHIGH, three independent blind runs, three jobs and
+zero retries. Every authoritative `rollout.jsonl` proves actual
+`turn_context.model=gpt-6-astra`, `turn_context.effort=xhigh`, OpenAI
+provider and CLI0.159.1. Each run made one successful attempt, inspected
+both sheets and reported no context errors. The actual verdicts are
+**SHIP / SHIP / SHIP**, zero findings and zero gating. The configured
+XHIGH judge correctly skipped because valid runs had zero findings;
+there is no actual judge invocation or runtime-effort receipt to claim.
+Existing RV-01 is the only exception, unchanged.
+
+All frozen package and sheet-tool PDFs match `76a775…` above. All three
+effective prompts recompute to
+`fad77cb481fcca4591333face01eb18b4be6e0ab7ffddd136085bc975717458a`.
+The completed qualification and 34 hash-bound raw artifacts are under
+`C:/temp/ha-hook-contour-identity-evidence-20261023/machinist-xhigh-config-correction/`.
+Corrected aggregate SHA-256:
+`58237185cddd96048b0aae412d5dbd3740930748ab6883517640e391e777e3d6`.
+Artifact-manifest SHA-256:
+`1331e695f15b1d53dc7eb15e35d57deb1fd09207a1d0d847a50dae3f4e6cb522`.
+The existing full v44 comparison stays bound to the same exact PDF.
+These facts do not make the native source newer than `652d`, prove a cold
+reopen, or qualify an unavailable final SM paper.
+
+## Actual canonical native-name intake
+
+PR1869 actually merged at `2026-10-23T11:37:32Z` as
+`c23dab7689507549eb76b6aa2783d083d9cd6c62`, with exact canonical head
+`000a8a06d7224efc2462e3dfb7c02853eb7e4662`. Its native qualification was
+the separately identified composite
+`31fbaa1042b30fe56d81960faacf4f2693a4dfbc`; it was not standalone `000a`
+or a new Hook execution. The Hook branch integrates actual merged main,
+not that qualification composite or an unmerged follow-on PR.
+
+The canonical read-only machining-control verifier normalizes the incoming
+`IAnnotation` before calling `GetSpecificAnnotation`, binds the resulting
+display dimension, and reads `Name` from the same modern
+`GetDimension2(0)` native dimension used for state, value and tolerance.
+Name must be an exact nonempty string in the unconsumed expected inventory.
+Empty, non-string, unknown, extra, duplicate and missing controls refuse.
+Driving state, prefix, nominal, tolerance type/min/max and printed precision
+checks remain load-bearing; the existing `math.isclose` relative tolerance
+is unchanged, not newly converted to absolute-only comparison.
+No geometry/state writes, selections, rebuilds, configuration activations
+or saves occur in this verifier.
+
+Both Hook wrappers and all four production wrapper invocations now use
+the annotations-only API. The additional owned machining-control fixtures
+read `Name` from their same captured native object and no longer patch the
+obsolete trim-helper name adapter. Supplier-eye reference fakes are not
+invented machining controls. Angular placement's separate name readers
+remain intact. Merge resolution retains the owned physical contour,
+pre-save refresh, linked-note, saved-key, paper-placement and exact
+pre-close entry-sheet/title restoration paths.
+
+Exact Git-object comparison of the thirteen read-only helper files from
+native `652d` to actual main `c23` finds ten unchanged files and three
+changed files: `_supplier_dimensions.py`,
+`_purchased_fastener_drawing.py`, and `_stock_trim_drawing.py`.
+Only the last is newly changed since `1f5`. The earlier reached supplier
+presentation reporting refactor and unused purchased-builder branches
+retain their disclosed boundaries; the new canonical binding/native-name
+path is a real reached identity change, not mere argument cleanup.
+This is not all-thirteen byte equality, unchanged execution/cache identity
+or new current-main native success.
+
+The separate fifteen-input machinist rubric/harness/exception/locked-runtime
+Git-object matrix is unchanged from actual review source `1f5` to `c23`.
+The complete context and thirteen-helper matrices are retained under
+`C:/temp/ha-hook-contour-identity-evidence-20261023/canonical-1869-intake/`.
+Main/coordinator explicitly retain the historical all-page CH native and
+actual-XHIGH paper proof within these source-impact boundaries.
+
+SM still requires the one approved changed-source normal diagnostic leaf
+to distinguish the original selected-null versus native-identity-zero
+refusal. The canonical intake is not that root fix and does not authorize
+a fallback, relaxed physical eye predicate, final SM output claim or
+extra unchanged native retry. Dispatch remains coordinator-only.
 
 ## Evidence boundary
 

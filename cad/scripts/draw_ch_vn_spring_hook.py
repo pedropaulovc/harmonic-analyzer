@@ -166,9 +166,8 @@ EXPECTED_CONTROLS = {
 }
 
 
-def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
+def _verify_controls(annotations: list[Any]) -> None:
     trim_drawing.verify_machining_controls(
-        adapter,
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
@@ -851,7 +850,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
-    _verify_controls(adapter, annotations)
+    _verify_controls(annotations)
     _place_chamfer_angle_text(adapter, annotations)
     refs = _supplier_references(adapter, front)
     drawing.ActivateView("")  # False is documented for sheet context.
@@ -960,7 +959,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
-            lambda: _verify_controls(adapter, annotations),
+            lambda: _verify_controls(annotations),
             # The existing layout check refreshes every view before the final
             # attachment readback; the shared verifier stays geometry-read-only.
             lambda: _verify_supplier_layout(adapter, view_contracts, notes_by_sheet),

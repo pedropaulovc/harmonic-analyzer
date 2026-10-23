@@ -271,9 +271,6 @@ def test_deburr_band_clears_the_receiving_tap_drill():
 def test_drawing_requires_every_cutting_control(monkeypatch, fault):
     """A lost band, a widened band or a reference-only size is a regression."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     annotations = []
     for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
         tolerance = SimpleNamespace(
@@ -282,7 +279,7 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
             GetMaxValue=lambda upper=upper: upper,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -315,10 +312,10 @@ def test_drawing_requires_every_cutting_control(monkeypatch, fault):
     elif fault == "missing":
         annotations.pop()
     if fault is None:
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
         return
     with pytest.raises(RuntimeError):
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
 
 
 # Recovered 9bb FINISHED native display data. Keep BOTH whole witnesses,
@@ -353,7 +350,6 @@ def _chamfer_angle_scene(monkeypatch, *, fault=None):
         lambda value, _kind, *_members: value,
     )
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, item: item.name)
     fragments = (
         *_CH_9BB_ANGLE_LINES,
         *(segment for raw in _CH_9BB_ANGLE_ARCS for segment in arc_segments(raw)),
@@ -368,6 +364,7 @@ def _chamfer_angle_scene(monkeypatch, *, fault=None):
     controls, native_controls = [], []
     for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
         native = SimpleNamespace(
+            Name=name,
             FullName=f"{name}@OriginalCutControl@original-anchor.SLDPRT",
             DrivenState=2, SystemValue=nominal,
             Tolerance=SimpleNamespace(
@@ -456,9 +453,9 @@ def test_chamfer_shelf_moves_only_original_native_text_and_keeps_controls(monkey
     original_annotations = tuple(scene.annotations)
     original_dimensions = scene.native_controls
     original_names = tuple(item.FullName for item in original_dimensions)
-    drawing._verify_controls(scene.adapter, scene.annotations)
+    drawing._verify_controls(scene.annotations)
     drawing._place_chamfer_angle_text(scene.adapter, scene.annotations)
-    drawing._verify_controls(scene.adapter, scene.annotations)
+    drawing._verify_controls(scene.annotations)
     assert drawing.FRONT_KEEP["ChamferAngle"] == (0.124, 0.117)
     assert drawing.CHAMFER_ANGLE_TEXT_XY == (0.137, 0.117)
     assert scene.events == [

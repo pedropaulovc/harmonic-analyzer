@@ -633,6 +633,26 @@ Keep the full Numbers and the view's actual scale. Read `INote::GetExtent`
 after insertion to prove at least 4 mm of final air, as well as sheet and
 title-block containment; a readable source string does not prove a readable PDF.
 
+**FR's set-screw balloon must follow that same rebuilt BOM boundary.**
+The full-sheet inspection at `ebb3c20596a66f93c01fa2084eca7b3602ea32dd`
+confirmed #1843: the BOM's bottom rule passed through balloon 10's ring and
+number. The recipe's measured placement and clearance helpers existed but
+were not consumed by `_place_package`. After ordinary reattachment, apply
+`_place_frame_set_screw_balloon`: keep its right-hand lane and real screw tip,
+placing the complete ring 4 mm below the native table bottom or lower to
+retain a short leader. Include its short-leader proof with the other balloon
+settlement proofs, not just an insertion-time check.
+
+`_assert_frame_bom_balloon_clearance` must run after placement and again after
+the final rebuild. It requires at least 3 mm between the BOM rule and the
+ring's outer edge, separation from the neighbouring cap balloon, and clear
+leader routes. A rebuilt table growing down or a ring drifting up refuses
+export. The regression also brackets that unchanged floor at 3.001/2.999 mm;
+these are offline geometry cases, not a claim of native pixel resolution.
+Do not rescale the view, alter its explode or move the attachment to create
+clearance. All ten item identities and the geometric inset proof stay intact;
+the next farm export and full-sheet inspection must establish the final ink.
+
 **The one thing that is NOT readable: rendered text WIDTH.** No API returns it
 (`IDisplayData::GetTextInBoxWidthAtIndex` is table cells only and returns 0 when
 `GetTextInBoxStyleAtIndex` is `swTextInBoxStyleNone`). `_layout_geometry`
@@ -1329,6 +1349,71 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+For FR-00's nameplate inset in section B-B, model geometry alone was not
+attachment evidence. Farm run
+`20261022T204612817Z-cd964f67d895402c96f536ac40ba51d8`
+(`C:/src/farm-runs/fix1667`) selected `fr-nameplate-1` at machine
+x=163/163, y=52.300, z=25 mm and `fr-harmonic-base-1` at x=167/167,
+y=50.006, z=25 mm. The initial dimension read 4 mm and not dangling, but
+the final rebuild returned dangling with attached types `()`.
+Changing the component provider to `IDrawingComponent.Component` did not
+fix that loss. Do not suppress the final guard or retry unchanged.
+
+The API distinguishes
+[`IComponent2.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IComponent2~GetCorrespondingEntity.html)
+(component context) from
+[`IView.GetCorrespondingEntity`](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks.IView~GetCorrespondingEntity.html)
+(drawing-view context). The FR recipe explicitly maps each ray-identified
+component edge into B-B, then reverse-maps both entities into the same source
+part with `IModelDocExtension.GetCorrespondingEntity2` and requires
+`IsSame == 1`. Missing or unknown correspondence refuses; changing the
+selection API is not a fallback. Share one drawing-component snapshot for
+both targets and retain the batched body rays: walking every engraved edge
+took 783 s, versus about 21 s for the ray path.
+
+Before retaining a component edge across these rebuilds, obtain its
+`IEntity.GetSafeEntity()` result; ordinary entity pointers are transient.
+Check `IEntity.IsSafe` before every section mapping. The documented safe entity
+retains model topology through rebuilds within this SolidWorks session, but is
+invalid if its source entity is deleted. Keep the ray's explicit `IComponent2`
+alongside it to identify the source part and occurrence; do not recover that
+ownership through `IEntity.GetComponent`. Missing or unsafe handles refuse
+rather than rematching similarly shaped geometry. This session-local proof
+does not promise identity across close/reopen.
+
+After creation rebuild and final rebuild, reacquire the section edges from
+their model identities and use `assert_dimension_measures` to prove exactly
+those two native attachments, not dangling, and the spec-owned 4 mm value.
+Require native edge/linear types and membership in B-B's display-dimension
+inventory too. Correspondence, selected view/instance and reference failures
+stay in `drawing.inset_*` telemetry. Offline lifecycle regressions are not
+native proof: require the farm's rebuilt/saved dimension, its ordinary PDF
+colour and the complete-sheet comparison, not a nominal note or detached
+sketch that merely prints the right number.
+
+The bounded diagnostic at source `c0e403c5b1255e5839a572d839f25514d2447b6b`,
+based on production `61a6fb0b53dc962955351559f8820de1f4662f01`, retained
+its evidence under the `fr-inset-safe-context-diagnostic` failure namespace
+(attempt `20261023T063410Z-1-e8160cfb`, receipt timestamp `20261023T063641Z`).
+For both references, the component-mapped input's `GetComponent` was already
+null **before** `GetSafeEntity`; the safe handle did not lose an owner.
+`IView.GetCorrespondingEntity` supplied the full drawing instance. Both mapped
+variants matched the original-main screen control by `IsSame == 1`, including
+their source-part reverse correspondences, before and after rebuild.
+
+All three native dimensions retained two exact attachments, measured
+`4.000000010000034` mm, belonged to B-B and printed black after rebuild.
+Nevertheless, `IAnnotation.GetAttachedEntityTypes` returned `[]` for **all**
+three, including the working screen control. That empty legacy summary made
+the diagnostic receipt's composite `passes` flags false; it was not evidence
+of missing attachments. The production guard therefore reads each actual
+`GetAttachedEntities3` object's `IEntity.GetType` and requires two edges.
+The summary remains diagnostic telemetry only. Exact attachment identities,
+`IsDangling`, native linear type, measured value and section ownership remain
+required. No screen-control code or expensive diagnostic probing belongs in
+the production recipe; a full production finalization/export still requires
+its own farm proof.
+
 **l. A datum named by a frame's datum identifier.**
 Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take
 `GetDatumIdentifier` as proof. On the knife mount (farm run
@@ -1667,6 +1752,255 @@ Native acceptance must inspect the complete exported sheet, the actual
 end landing and both leader/text clearances, not only attachment count.
 This changes neither centre-hole permission nor the dome's separate punched
 witness, shaft geometry, tolerances or the declared RV-02 rim shortfall.
+
+### Crankshaft necks: opposite real silhouettes and native full width
+
+The right-hand imported `NeckDiaDim` no longer carries `2X`; its native
+callout-above text is cleared and read back. Its native 9.525 mm value,
+original driven state (1 or 2), places, general band and placement remain
+unchanged. The left-hand collar-side neck gets its own associative native
+**vertical linear full-width measurement**, with only `<MOD-DIAM>` in the
+prefix. Neither a numerical text replacement nor native diameter doubling
+is involved.
+
+The actual geometry census
+`D:/farm-runs/rolling-main-post-v44-20261021/crank1864-81150dc3-complete-native-geometry-census.json`
+identifies the two real `ISilhouetteEdge` objects at
+`payload.visible_components[0].silhouettes[10:12]`. They span the exact
+`COLLAR_REAR .. JOURNAL_START` short land (41.33–42.50 mm), on model
+`X=0`, with opposite radial normals along `Z=±SHAFT_DIA/2`. Their actual
+separation is the full 9.525 mm. Endpoint order reverses between the two;
+the endpoints are `MathPoint` evidence, **not** selectable `IVertex` objects.
+Resolve exactly one lower and one upper outline from FRONT's native
+kind-4 silhouette inventory. Enumerate `IView.GetVisibleComponents()`, then
+call `visible_component_entities(view, component, 4)` for each component:
+the helper returns a flat list of bound entities, not component/entity pairs,
+and its first argument is the view, never the adapter. A long shank, right
+neck, journal flank, duplicate lower flank or screen-space pick is not an
+alternative.
+
+Independently resolve exactly one physical short-neck cylinder from all
+bodies of FRONT's referenced part. Require native cylindrical-surface
+parameters with the spec radius and unit ±Y axis through `X=Z=0`, and
+finite six-value face bounds confined to the same spec-owned land.
+`IFace2.GetBox` is approximate: the declared `1e-8 m` bound is only a source
+face discriminator, not the measured diameter or sole identity proof.
+Native silhouette endpoints independently prove both stations and both
+opposite radial extrema. Both silhouettes must own the same drawing-context
+cylinder, using `ISldWorks.IsSame == 1` in **both** directions.
+
+The census's drawing-context face 49 compares directly unequal to physical
+source face 6. Do not invent cross-context face or raw silhouette identity.
+Require the source model's documented
+`IModelDocExtension.GetCorrespondingEntity2(silhouette.GetFace())` to return
+a **non-null** canonical source face which is `IsSame == 1` to the
+independently resolved physical cylinder in both directions. Equal geometry
+alone does not suffice. A missing reverse map refuses; do not replace it
+with a forward roundtrip, a raw source/view identity OR branch or a fallback.
+The actual inverse face-map result for this new candidate remains unproven.
+
+Use the existing native projection helper to read FRONT's actual
+model-to-sheet transform. Require its endpoint projections to agree with
+model Y along sheet X, model Z along sheet Y, and the unchanged 2:1 scale;
+an additional projected model-X offset proves the view normal. These
+readbacks verify projection, not ghost selection coordinates. Prequalify
+each exact native silhouette with the existing entity-selection helper,
+strict selected count/type (`swSelSILHOUETTES=46`), non-null readback and
+`GetSelectedObjectsDrawingView2` owner equal to FRONT in both identity
+directions. Then reuse `add_edge_dimension` with both supplied objects,
+`entity_types=("SILHOUETTE", "SILHOUETTE")` and `orientation="vertical"`.
+It selects through `ISilhouetteEdge.Select2` with `SelectData.View`, checks
+the two-object selection count and calls `AddVerticalDimension2`.
+The factory's XYZ locate text only; supplied entities are not coordinate
+hit-tests.
+
+Keep the approved true-measurement initialization at the **fresh empty
+SIDE boundary**, before the angle setter, existing rebuild and any native
+dimension import. Require actual integer `GetDimensionCount4() == 0`
+and the strict counted annotation inventory: native nonnegative I4 count,
+`None` only for zero count, otherwise a tuple/list of exactly that length,
+no null annotations and actual I4 annotation types. There must be no type-4
+dimension; automatic non-dimension marks remain. Only then set
+`ProjectedDimensions=False` and require strict false readback.
+The SDK warns that changing this property deletes existing dimensions:
+never set it on a populated or unqualified view. Retain false readback after
+the existing angle rebuild and at all four proofs, alongside exact native
+`ScaleRatio=(2, 1)` and `ScaleDecimal=2`. No scale compensation is permitted.
+
+The first factory `IDimension.SystemValue` read must already be positive
+`0.009525 m`, **before** any driven-state or presentation write. Log native
+type/value/mode and refuse an incorrect immediate value; never divide,
+double or reformat it into correctness. Require the existing native linear
+type roster `(2, 12)` (`swLinearDimension`, `swVertLinearDimension`), not an
+unsupported guarantee that `AddVerticalDimension2` always reports type 12.
+Types 6, 11 and 15 are not this factory contract. Set only the new native
+dimension's `DrivenState=1` and read it back. Add only
+`SetText(swDimensionTextPrefix, "<MOD-DIAM>")`, with readback; never
+`swDimensionTextAll`, numeric notes/overrides, `Diametric=True`, constructed
+geometry or a type-6/type-15 fallback. Retain the visible native value and
+unparenthesized presentation, no suffix/callout prose and read-only
+`IDimension.Tolerance.Type == swTolNONE`. Its one-place precision comes from
+`DRAWING_REFERENCE_PRECISION["OutboardNeckDia"] == NECK_DIA_PLACES`, so the
+same title-block general band governs both necks.
+
+Author the new neck only **after all preexisting native annotations**, including
+the SIDE cross-hole callout, surface finishes and property notes, immediately
+before finalization. Immediately before its native factory, capture the **full**
+preexisting SIDE inventory as native `IDimension` reference, `FullName`, finite
+numeric `SystemValue`, native I4 `DrivenState` and the actual annotation row.
+Zero values and state 0 are valid for other dimensions. After insertion rebuild,
+final settling rebuild, actual SLDDRW save and actual PDF save, reacquire the new
+display from FRONT by the captured native object's **live** `FullName` and
+bidirectional native identity. Require exactly one matching dimension and
+exactly every preexisting dimension with unchanged value/state, no extras, using
+live names across SaveAs. Do not ignore native callouts, filter unexpected IDs or
+relax the count. Settling positions are not pinned. Continue proving the original
+right-hand neck's size, state, precision, empty quantity and general band.
+
+Inventory refusals report expected/current native `FullName` rows and actual
+annotation `OwnerType`/owner-wrapper IDs. Wrapper IDs are diagnostic only, never
+native identity evidence. If a receipt getter fails, retain the original refusal
+with an explicit getter-failure note rather than inventing an owner or name.
+
+At each of those four normal proofs require drawing-view `OwnerType=0`
+and annotation owner FRONT in both native identity directions, exactly two
+non-null kind-46 attachments and no dangling annotation. Re-read both
+attached endpoint sets, cylinder geometry, shared face identity and required
+inverse canonical source identity. The shared `assert_dimension_measures`
+adds its established two-attachment/native-value proof; its silhouette
+identity is owning-face identity, so the stricter opposite-endpoint proof
+distinguishes the two flanks. `GetLeaderCount` remains diagnostic, not a
+note's one-leader requirement.
+
+Keep one existing void `GraphicsRedraw2` per proof before reading native
+display data, with no retries, extra save/reopen or rebuild loops.
+Require exactly two finite twelve-value `GetArrowHeadAtIndex2` records,
+vertical nonzero projected directions and sheet-normal arrow planes.
+Both actual tips must lie within the short land's axial extent, one at each
+physical opposite flank, on the same vertical dimension line, with only
+the declared 0.01 mm sheet-space tip readback tolerance. Merely falling inside
+the neck's rectangular window does not prove either physical landing.
+Also require positive native width (along the normalized direction) and height
+(across it). Construct all three head vertices using the same tip-to-base
+direction semantics as `_layout_audit.arrowhead_segments`: the full horizontal
+envelope must stay inside the exact physical X trim, **without** extending it
+by the tip tolerance. Log both actual head bounds and the minimum physical-X
+clearance in millimetres at all four proofs. Inside/outside arrow directions
+are both legitimate; no additional inward-Y requirement is imposed.
+
+The bounded ordinary-dimension candidate requests the new native origin at
+`((COLLAR_REAR_X + JOURNAL_START_X) / 2, 0.1948) m`, i.e.
+`(177.53, 194.8) mm`. Keep both actual dimension tips and their complete
+heads inside the physical neck X trim `[176.36, 178.70] mm`; the opposite
+physical flank tips are at Y=`170.475` and `189.525 mm`. The rear finish
+symbol stays at X=`COLLAR_REAR_X + 0.0069`, Y=`0.1973 m`, with the exact
+physical tip `(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2))`, unchanged
+part-owned control, symbol type and roughness. All other finishes, stations,
+values, geometry, centre permission and dome witnesses remain unchanged.
+No `OffsetText`, dimension text-position setter or font-baseline calibration
+is involved.
+
+Capture `_collar_rear_rim(adapter, side)` once and retain the actual
+`ISFSymbol` returned by `add_surface_finish`, whose existing authoring helper
+qualifies the controlled face and exact edge attachment. This **one** finish
+is the local straight-leader exception: on its live early-bound `IAnnotation`,
+call `SetLeader3(1, 0, True, False, False, False)` and require actual integer
+status `0`, not a truthy/bool result. Do not change the shared factory's bent
+default or manipulate its root. A straight line from the old bent root can
+cross the symbol's own rising legs; refuse that crossing, rather than treating
+it as an attachment or tolerance waiver.
+
+At all four existing neck checkpoints, early-bind the retained symbol's live
+`GetAnnotation()` result and reuse `_assert_attached_to(..., entity_type="EDGE")`
+plus `_assert_leader_lands` with its unchanged **1 mm** default, not the stale
+5 mm helper-doc wording. Require native `GetSymbol() == 1` and `GetText(8)`
+equal to `dt_crankshaft_notes.COLLAR_REAR_FINISH_TEXT`, derived from the actual
+part control, without a literal value override. Require actual integer leader
+style `1`, exactly one leader and six finite straight-leader coordinates
+(physical tip last), with readable native line/text/head primitives. Preserve
+positive head dimensions, sheet-normal planes, actual rim identity and the
+exact specification through both saves. Log actual native points, identity,
+type, roughness, phase, route and full-head distances. The captured interfaces
+must survive SLDDRW/PDF SaveAs; no reopen, fallback identity strings, extra
+redraw/rebuild/save cycle or source-part write.
+
+The proof has two deliberately distinct stages:
+
+- **All four checkpoints:** require the ordinary three-line dimension route
+  and both complete, nonblank, positive-width native text **ADVANCES** on the
+  RIGHT of the actual dimension line, above the journal roof and within the
+  actual journal-dimension right wall. Native advances include trailing blank
+  space. Read raw doubles, not the rounded JSON audit dump; refuse side flips,
+  malformed counts/metrics, crossed preexisting routes, finish self-crossing
+  and full native head-to-advance gaps below the existing **2 mm** rule.
+  `GetTextPositionAtIndex + GetTextHeightAtIndex` is **not** printed glyph ink.
+  Skip only well-formed, finite ten-field zero-length display sentinels, as
+  the shared decoder does; they cannot replace any required real primitive.
+  The vertical interval union must connect both actual physical tips to the
+  actual shelf root, including reversed endpoints and the intended overlap.
+  Only the inclusive native shelf-X and text-ADVANCE bay bounds admit finite
+  binary roundoff of at most `2 * max(math.ulp(actual), math.ulp(boundary))`,
+  with **zero relative tolerance**. This is not a geometry or placement
+  tolerance: retain the strict open `roof < shelf Y < finish Y` bay, physical
+  arrow/head trim, route intersections and the exact printed **2 mm** rule.
+  Genuine shelf or advance escapes still refuse with actual bounds and signed
+  differences in the exception; no native reread or placement change is made.
+- **After the existing successful PDF export:** read that one actual PDF with
+  `_pdf_ink`. Match the actual `9.5` and roughness glyphs to their native text
+  owners, and identify the Ø token as a unique complete closed vector ring
+  plus crossing slash in its actual native prefix slot. Missing, open,
+  ambiguous, extra or observably bay-clipped components refuse qualification.
+  Merge joint crossings within the existing native geometry roundoff
+  tolerance before requiring two distinct ring/slash crossings.
+  The whole actual diameter glyph, including vector pen radius, must fit the RIGHT
+  placement bay whose top is `197.2 mm`; this is a placement boundary, **not**
+  a relaxed clearance threshold. Require complete painted heads (including
+  triangle interiors and actual pen radii) at least **2 mm** from every actual
+  numeric glyph and Ø stroke, not a union-box white corner. Also prove the
+  actual straight route, symbol legs and relevant dimension intersections.
+  Only solid painted paths can own those native primitives; unrelated
+  unpainted clip paths and dashed centre lines are not annotation ink.
+  All aligned PDF pieces, including interior fragments, must continuously
+  cover each complete native primitive within the existing attribution
+  tolerance. Retain their actual offsets and pen radii for collision checks;
+  endpoint fragments cannot stand in for a missing middle. Compare the finish
+  and neck paint against each other as well as preexisting dimensions.
+  Head coverage intervals do not clip head paint: retain complete attributable
+  endpoints, allowed displacement and pen radii for every distance/intersection
+  proof. Refuse an ambiguous longitudinal head overhang beyond the existing
+  attribution band rather than guessing a shortened triangle.
+  A shared symbol root exempts only a point junction, never positive-length
+  collinear overlap; this applies to native and printed routes alike.
+  This is semantic ownership of the reader-observed ring/slash, not forensic
+  font identity or arbitrary PDF clip-path detection; final whole-paper
+  legibility inspection remains necessary.
+  The finalizer's existing after-PDF callback propagates refusal before
+  downstream precision qualification, metadata/rendering and publication,
+  even if the exported PDF file already exists. No extra export is performed.
+
+**[INFERENCE]**, pending the exact-source export: the ordinary shelf at
+Y=`191.9951` clears the journal roof `191.388` by only `0.6071 mm`.
+The finish's middle bar at `202.9118` and the collar shelf at `203.6951`
+retain the tight `0.7915 mm` endpoint gap. Conservative native finish-text
+advance to the JournalDiaDim vertical remains `0.6963 mm`, not the roof-only
+`1.0086 mm`. Static inspection of the preceding LEFT-layout PDF found that
+the actual Ø slash is taller than the numeric glyphs; numeric-only
+`193..196.6 mm` bounds do not enclose the complete token. The straight
+route-to-slash paint gap is predicted to be only approximately `0.51 mm`,
+not a broad empty strip; the 2 mm ARROW_TEXT rule applies to the complete
+head, not every leader segment.
+None of these measurements or predictions is a new threshold or a PASS.
+Exact-source native/PDF qualification, both heads' final legibility, whole-paper
+inspection and machinist review remain mandatory.
+The discarded type-6 circle factory produced native 19.05 mm under projected
+mode and a type-mismatch under false-mode initialization; its resolver, factory
+and circle-only fixtures are not retained. Accept only exact-source native
+success and inspection of the whole exported sheet for both physical neck
+landings, readable arrows/text and clearance from collar, running-fit and finish
+leaders, followed by the required machinist review. Independent code review is
+not claimed. Preserve centre permission, dome/witness geometry,
+tolerance limits, RV-02 and MATCH DRILL unchanged.
+
 
 ## Synchronous builds and session hygiene
 

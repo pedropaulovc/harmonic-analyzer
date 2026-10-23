@@ -49,9 +49,6 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
 def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, fault):
     """General is toleranced, unlike None; neither replaces a real driving size."""
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(
-        trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name
-    )
     annotations = []
     for name, nominal, band in (
         (
@@ -76,7 +73,7 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
             GetMaxValue=lambda band=band: band,
         )
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal, Tolerance=tolerance
+            Name=name, DrivenState=2, SystemValue=nominal, Tolerance=tolerance
         )
         display = SimpleNamespace(
             GetDimension2=lambda _configuration, dimension=dimension: dimension,
@@ -105,10 +102,10 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
     elif fault == "missing":
         annotations.pop()
     if fault is None:
-        drawing._verify_controls(None, annotations)
+        drawing._verify_controls(annotations)
     else:
         with pytest.raises(RuntimeError):
-            drawing._verify_controls(None, annotations)
+            drawing._verify_controls(annotations)
 
 
 @pytest.fixture
@@ -339,10 +336,10 @@ def test_existing_hlv_to_hlr_setup_must_succeed_before_querying_the_source(
 def test_physical_eye_creation_preserves_imported_machining_controls(supplier_eye_scene, monkeypatch):
     scene = supplier_eye_scene
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     controls, displays = [], []
     for name, (nominal, lower, upper) in drawing.EXPECTED_CONTROLS.items():
         native = SimpleNamespace(
+            Name=name,
             DrivenState=2, SystemValue=nominal,
             Tolerance=SimpleNamespace(
                 Type=spec.DIMENSION_TOLERANCE_TYPES[name],
@@ -362,7 +359,7 @@ def test_physical_eye_creation_preserves_imported_machining_controls(supplier_ey
         following = displays[index + 1] if index + 1 < len(displays) else None
         display.GetNext5 = lambda following=following: following
     scene.front.GetFirstDisplayDimension6 = lambda: displays[0]
-    drawing._verify_controls(scene.adapter, controls)
+    drawing._verify_controls(controls)
     drawing._supplier_references(scene.adapter, scene.front, "Finished")
     surviving = []
     display = scene.front.GetFirstDisplayDimension6()
@@ -371,7 +368,7 @@ def test_physical_eye_creation_preserves_imported_machining_controls(supplier_ey
         display = display.GetNext5()
     assert len(surviving) == len(drawing.FRONT_KEEP)
     assert all(actual is expected for actual, expected in zip(surviving, displays))
-    drawing._verify_controls(scene.adapter, controls)
+    drawing._verify_controls(controls)
 
 
 @pytest.mark.parametrize("fault", ("wrong-configuration", "wrong-path", "alias-path", "missing-source", "missing-wire"))
