@@ -119,7 +119,7 @@ def test_current_identity_and_drawing_paths() -> None:
 
 def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> None:
     assert (spec.BODY_LENGTH, spec.BODY_WIDTH, spec.BODY_THICKNESS) == (200.0, 8.0, 3.0)
-    assert (spec.TICK_WIDTH, spec.TICK_DEPTH, spec.TICK_LENGTH) == (0.4, 0.5, 3.0)
+    assert (spec.TICK_WIDTH, spec.TICK_DEPTH, spec.TICK_LENGTH) == (0.4, 0.7, 3.0)
     assert (spec.MINOR_TICK_LENGTH, spec.HALF_TICK_LENGTH) == (1.8, 4.0)
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
     assert spec.SCALE_END_MARGIN == pytest.approx(1.5)
@@ -209,13 +209,20 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     assert bands["Tick0Width"] == pytest.approx(0.05)
 
 
-def test_loose_cosmetic_depth_keeps_the_structural_floor() -> None:
+def test_title_block_graduation_depth_states_its_stock_floor() -> None:
+    """Graduation depth names no mate, so it takes the .XX title-block band;
+    the thinnest stock under a groove is stated as a fact (short of 2.0)."""
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
-    floor_min = values["BodyThickness"] - bands["BodyThickness"] - values["TickDepth"] - bands["TickDepth"]
-    assert bands["TickDepth"] == pytest.approx(0.1)
-    assert bands["Tick0Width"] == pytest.approx(0.05)
-    assert floor_min == pytest.approx(2.3)
-    assert floor_min >= 2.0
+    assert "TickDepth" not in bands
+    assert spec.DRAWING_PRECISION_BY_NAME["TickDepth"] == 2
+    depth_min = values["TickDepth"] - spec.TITLE_BLOCK_XX_TOLERANCE_MM
+    floor_min = (values["BodyThickness"] - bands["BodyThickness"]
+                 - values["TickDepth"] - spec.TITLE_BLOCK_XX_TOLERANCE_MM)
+    assert depth_min == pytest.approx(0.19)
+    assert floor_min == pytest.approx(spec.GRADUATION_FLOOR_MIN_MM) == pytest.approx(1.69)
+    assert 1.5 <= floor_min < 2.0
+    assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE 1.69 MIN"
+    assert drawing.DIMENSION_CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
 
 
 
@@ -747,13 +754,12 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
     assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 2}
     assert spec.DRAWING_VALUES_BY_NAME["NumeralDepth"] == spec.NUMERAL_DEPTH
     assert spec.DRAWING_TOLERANCES["NumeralDepth"] == spec.NUMERAL_DEPTH_TOLERANCE_MM
-    assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.5)
+    assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.7)
     assert spec.DRAWING_TOLERANCES["Tick0Width"] == 0.05
-    assert spec.DRAWING_TOLERANCES["TickDepth"] == 0.1
     assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert drawing.DIMENSION_CALLOUTS["NumeralDepth"] == (
-        "NUMERAL DEPTH\n30° INCLUDED V\nHOLDS ENAMEL FILL")
+        "NUMERAL DEPTH\n30° INCLUDED V\nSETS STROKE WIDTH")
     assert not hasattr(spec, "NUMERAL_TOOL_NOTE")
     assert not hasattr(drawing, "NUMERAL_TOOL_NOTE_XY")
 
@@ -766,15 +772,14 @@ def test_every_tight_band_states_its_function() -> None:
         "ScaleStartX": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
         "FullTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
         "MinorTickPitch": "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS",
-        "Tick0Width": "HOLDS ENAMEL FILL",
-        "TickDepth": "HOLDS ENAMEL FILL",
-        "NumeralDepth": "HOLDS ENAMEL FILL",
+        "Tick0Width": "STATIONS READ ON GRADUATION CENTRE",
+        "NumeralDepth": "SETS STROKE WIDTH",
     }
     assert set(reasons) == set(spec.DRAWING_TOLERANCES)
     for name, reason in reasons.items():
         assert drawing.DIMENSION_CALLOUTS[name].endswith(reason), name
     for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
-                 "NumeralHeight", "NumeralXGap", "NumeralYGap"):
+                 "NumeralHeight", "NumeralXGap", "NumeralYGap", "TickDepth"):
         assert name not in spec.DRAWING_TOLERANCES, name
 
 
@@ -1016,9 +1021,12 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     )
     numeral_right = drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
     depth_left = drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DEPTH_SCALE[0] / 1000.0
-    # The V depth callout ends left of the section, right of detail F's circle.
-    depth_text_right = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"][0]
-    assert numeral_right < depth_text_right - len("HOLDS ENAMEL FILL") * 0.00275 < depth_text_right < profile.xmin
+    # The V depth callout (placed by its centre) sits between detail F's circle
+    # and the section, its dimension line level with the V grooves.
+    depth_x, depth_y = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"]
+    half_text = len("SETS STROKE WIDTH") * 0.00275 / 2.0
+    assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.008
+    assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020
     # The cutting line misses every graduation.
     minor = spec.SCALE_START_X + spec.MINOR_SPACING

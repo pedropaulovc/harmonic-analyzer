@@ -32,7 +32,7 @@ TICK_WIDTH = 0.4
 TICK_LENGTH = 3.0
 MINOR_TICK_LENGTH = 1.8
 HALF_TICK_LENGTH = 4.0
-TICK_DEPTH = 0.5
+TICK_DEPTH = 0.70
 TICK_OVERHANG = 1.0
 _REFERENCES = Path(__file__).resolve().parents[1] / "references"
 # One DXF per stroke layer (gen_ms_stick_numerals_dxf colours overlapping
@@ -65,13 +65,19 @@ NUMERAL_FIRST_LAYER_VOLUME_MM3 = 1.5603
 # rebate; graduation positions set the amplitude-bar stations through the
 # linear READOUT table. Overall length, tick lengths and numeral layout take
 # the title block (2026-10-23 owner ruling): at .XX +/-0.51 the 199.49
-# shortest bar still keeps the last tick whole (0.665 land past its groove). Groove width and depths hold the enamel fill; the
-# deepest groove leaves 2.3 mm of stock at worst case, above the 2.0 target.
+# shortest bar still keeps the last tick whole (0.665 land past its groove).
+# Graduation width is read for the stations (the reading is on the groove
+# centre) and the V depth sets the numeral stroke width, so both keep a band.
+# Graduation depth names no mate, so it takes the title block (coordinator
+# ruling 2026-10-23): 0.70 +/-0.51 still leaves a 0.19 groove for the fill,
+# and the deepest groove leaves the stated 1.69 of stock, short of 2.0.
 TITLE_BLOCK_XX_TOLERANCE_MM = 0.51
 BODY_FIT_TOLERANCE_MM = 0.1
 GRADUATION_POSITION_TOLERANCE_MM = 0.05
 GRADUATION_WIDTH_TOLERANCE_MM = 0.05
-GRADUATION_DEPTH_TOLERANCE_MM = 0.1
+GRADUATION_FLOOR_MIN_MM = round(
+    BODY_THICKNESS - BODY_FIT_TOLERANCE_MM - TICK_DEPTH - TITLE_BLOCK_XX_TOLERANCE_MM, 2)
+GRADUATION_FLOOR_CALLOUT = f"STOCK UNDER GROOVE {GRADUATION_FLOOR_MIN_MM:.2f} MIN"
 
 # Construction chords use the actual finished edge and actual groove/glyph
 # extents. ScaleStartX and both pitch chords terminate at true groove centres,
@@ -106,7 +112,6 @@ DRAWING_TOLERANCES = {
     "BodyWidth": BODY_FIT_TOLERANCE_MM,
     "BodyThickness": BODY_FIT_TOLERANCE_MM,
     "Tick0Width": GRADUATION_WIDTH_TOLERANCE_MM,
-    "TickDepth": GRADUATION_DEPTH_TOLERANCE_MM,
     "NumeralDepth": NUMERAL_DEPTH_TOLERANCE_MM,
     "ScaleStartX": GRADUATION_POSITION_TOLERANCE_MM,
     "FullTickPitch": GRADUATION_POSITION_TOLERANCE_MM,

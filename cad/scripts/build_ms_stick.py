@@ -173,11 +173,12 @@ V_CUT_VARIANTS = (
 )
 
 
-def _v_cut_args(ddir1: bool, *, reverse: bool = True, drafted: bool = True) -> tuple:
-    """FeatureCut3's 26 arguments for a single-ended blind V cut."""
+def _v_cut_args(ddir1: bool, *, reverse: bool = True, drafted: bool = True,
+                depth_mm: float = NUMERAL_DEPTH) -> tuple:
+    """FeatureCut3's 26 arguments for a single-ended blind (V) cut."""
     return (
         True, False, reverse,  # Sd single-ended, Flip, Dir (reversed: into the bar)
-        0, 0, NUMERAL_DEPTH / 1000.0, 0.0,  # T1/T2 blind, D1, D2
+        0, 0, depth_mm / 1000.0, 0.0,  # T1/T2 blind, D1, D2
         drafted, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
         math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
@@ -312,8 +313,6 @@ async def _cut_tick(
     equation for the tick's centre x; the corner-X dim is an UNSIGNED distance,
     so it drives to that centre minus half the tick width.
     """
-    from solidworks_mcp.adapters.base import ExtrusionParameters
-
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch("Front"))
     half = TICK_WIDTH / 2.0
@@ -366,8 +365,12 @@ async def _cut_tick(
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, f"{stem}Profile")
     drive_jobs += dims.apply(adapter, f"{stem}Profile")
-    cut = await adapter.create_cut_extrude(ExtrusionParameters(depth=TICK_DEPTH))
-    check(f"cut {label}", cut)
+    # Single-ended into the bar, so the depth dimension spans face to floor;
+    # the adapter's double-ended cut put D1 on the air side (detail B, run
+    # 20261023T211330900Z-bfdf1b6e: the depth read from a stub above the face).
+    cut = _feature_cut3(adapter, f"{stem}Profile", _v_cut_args(False, drafted=False, depth_mm=TICK_DEPTH))
+    if isinstance(cut, Exception):
+        raise RuntimeError(f"cut {label}: {cut}")
     return name_last_feature(adapter, f"{stem}Cut")
 
 
