@@ -586,13 +586,15 @@ def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault)
         # The native insertion/reference point clears the view, but a
         # lower-right anchored glyph extends left into the physical outline.
         state.text_fault = "lower-right-reference"
-        _x, y, z = annotation.position
+        _x, _y, z = annotation.position
         annotation.position = (
-            state.right.outline[2] + 0.003 - note.ink_offset[0], y, z,
+            state.right.outline[2] + 0.003 - note.ink_offset[0],
+            state.center[1] - note.ink_offset[1], z,
         )
         x0, y0, _x1, y1 = note._text_bounds()
         assert x0 > state.right.outline[2] + 0.002
         assert x0 - note.width < state.right.outline[2]
+        assert y0 < state.right.outline[3] and y1 > state.right.outline[1]
         note.extent_override = (x0 - note.width, y0, z, x0, y1, z)
     elif fault in (
         "unreadable-display", "empty-text", "unreadable-width", "nonfinite-position",
