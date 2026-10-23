@@ -418,7 +418,6 @@ async def build(adapter: Any) -> dict[str, str]:
     if set(by_name) != {"CutLength", *EXPECTED_CONTROLS}:
         raise RuntimeError(f"Front view controls are {sorted(by_name)}")
     verify_machining_controls(
-        adapter,
         [by_name[name] for name in EXPECTED_CONTROLS],
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
