@@ -122,8 +122,9 @@ def numeral_feature_names() -> list[str]:
     return ["Numerals" if i == 0 else f"Numerals{i + 1}" for i in range(len(NUMERAL_LAYER_DXFS))]
 
 
-def _assert_one_numeral_cut(adapter, name: str) -> None:
-    """Read one native numeral cut's depth and V draft back."""
+def _assert_one_numeral_cut(adapter, name: str) -> bool:
+    """Read one native numeral cut's depth and V draft back; returns its
+    draft-outward flag (the seat's sense of it is proved by removed volume)."""
     half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
     feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
     definition = feature.GetDefinition()
@@ -135,81 +136,107 @@ def _assert_one_numeral_cut(adapter, name: str) -> None:
         raise RuntimeError(f"{name}: expected depth {NUMERAL_DEPTH}; got depth {depth}")
     drafted = bool(definition.GetDraftWhileExtruding(True))
     angle = math.degrees(float(definition.GetDraftAngle(True)))
-    outward = bool(definition.GetDraftOutward(True))
-    if not drafted or outward or abs(angle - half_angle) > 1e-6:
+    if not drafted or abs(angle - half_angle) > 1e-6:
         raise RuntimeError(
-            f"{name}: expected a {half_angle:g} deg inward draft (a "
+            f"{name}: expected a {half_angle:g} deg draft on every wall (a "
             f"{NUMERAL_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
-            f"drafted={drafted} outward={outward} angle={angle:.6g}"
+            f"drafted={drafted} angle={angle:.6g}"
         )
+    return bool(definition.GetDraftOutward(True))
 
 
 def _assert_numeral_cut(adapter) -> None:
-    """Read every native numeral cut's depth and V draft, including after the final save."""
-    for name in numeral_feature_names():
-        _assert_one_numeral_cut(adapter, name)
+    """Read every native numeral cut's depth and V draft, including after the
+    final save: all layers keep the one draft sense the first layer's removed
+    volume proved inward."""
+    senses = {name: _assert_one_numeral_cut(adapter, name) for name in numeral_feature_names()}
+    if len(set(senses.values())) != 1:
+        raise RuntimeError(f"numeral cuts disagree on draft direction: {senses}")
 
 
-def _v_cut_args(half_angle_deg: float, drafted: bool = True) -> tuple:
-    """FeatureCut4's 27 arguments for a single-ended blind cut into the bar.
+# FeatureCut4 forms tried on the first stroke layer, in order. The seat's
+# answer is not the API page's: an early-bound single-ended drafted cut, and
+# even an undrafted one, returned None on these imported sketches (runs
+# 20261023T200553835Z-02d5bd36 and 20261023T202808806Z-2e8adf1c), while the
+# adapter's late-bound double-ended form cuts them; Ddir1's inward sense is
+# also seat-specific (diag_mcmaster_phillips_flat_head: True flared). The
+# removed volume, not the flags, decides: the first layer's V is pinned to
+# 1e-4 by its closed form, and a flared or straight cut removes 2-3x as much.
+V_CUT_VARIANTS = (
+    ("double-ended, Ddir1 False", False, False),
+    ("double-ended, Ddir1 True", False, True),
+    ("single-ended, Ddir1 False", True, False),
+    ("single-ended, Ddir1 True", True, True),
+)
 
-    The 91255A148 socket idiom (diag_mcmaster_phillips_flat_head, farm run
-    20261017T051944296Z): Ddir1 = False is INWARD on the seat, whatever the
-    API page says (True flared the walls there)."""
+
+def _v_cut_args(single_ended: bool, ddir1: bool) -> tuple:
+    """FeatureCut4's 26 leading arguments for a blind V cut into the bar."""
     return (
-        True, False, False,  # Sd single-ended, no flip, default direction
+        single_ended, False, False,  # Sd, Flip, Dir (default: into the bar)
         0, 0, NUMERAL_DEPTH / 1000.0, 0.0,  # T1/T2 blind, D1, D2
-        drafted, False, False, False,  # Dchk1, Dchk2, Ddir1 (False = inward), Ddir2
-        math.radians(half_angle_deg), 0.0,  # Dang1, Dang2
+        True, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
+        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
         False, True, False, False, False,  # scope, auto-select, assembly flags
-        0, 0.0, False, False,  # T0 sketch plane, StartOffset, flip, OptimizeGeometry
+        0, 0.0, False,  # T0 sketch plane, StartOffset, FlipStartOffset
     )
 
 
-def _drafted_v_cut(adapter, sketch_name: str) -> None:
-    """Native single-ended blind ``FeatureCut4`` with every wall drafted inward.
+def _feature_cut4(adapter, sketch_name: str, args: tuple) -> object:
+    """The adapter's late-bound FeatureCut4 on the named sketch (26 arguments,
+    or 27 with OptimizeGeometry where the install wants it)."""
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
-    The adapter's blind cut takes no draft, and adding one afterwards through
-    ``ModifyDefinition`` reported success yet left straight walls (run
-    20261023T193801341Z-862662a6: the first layer removed the straight-wall
-    3.1352 mm^3, not the V's 1.5603). If the seat refuses the V, the same
-    selection is probed with a 10-degree draft and with none, so the failure
-    says whether the near-closed root or the draft itself is refused.
-    """
-    from _com import _read_member
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(sketch_name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"select sketch {sketch_name!r} failed")
+    manager = model.FeatureManager
+    feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
+    if not feature:
+        feature, long_error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args, False))
+        error = f"{error} | 27 arguments: {long_error}"
+    model.ClearSelection2(True)
+    return feature or RuntimeError(f"FeatureCut4 returned None ({error})")
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    manager = _early_bound(_read_member(model, "FeatureManager"), "IFeatureManager")
 
-    def cut(args: tuple) -> object:
-        model.ClearSelection2(True)
-        _feature_by_name(adapter, sketch_name).Select2(False, 0)
-        feature, error = adapter._attempt_with_error(lambda: manager.FeatureCut4(*args))
-        model.ClearSelection2(True)
-        return feature or error
-
-    half_angle = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0
-    feature = cut(_v_cut_args(half_angle))
-    if feature and not isinstance(feature, Exception):
-        return
-    probes = {
-        "10 deg draft": cut(_v_cut_args(10.0)),
-        "no draft": cut(_v_cut_args(0.0, drafted=False)),
-    }
-    outcome = ", ".join(
-        f"{label}: {'created' if result and not isinstance(result, Exception) else result}"
-        for label, result in probes.items()
-    )
+async def _first_v_cut(adapter, sketch_name: str) -> tuple:
+    """Find the form that removes exactly the first layer's V; undo the rest."""
+    pre = await _volume_mm3(adapter)
+    tried = []
+    for label, single_ended, ddir1 in V_CUT_VARIANTS:
+        args = _v_cut_args(single_ended, ddir1)
+        feature = _feature_cut4(adapter, sketch_name, args)
+        if isinstance(feature, Exception):
+            tried.append(f"{label}: {feature}")
+            continue
+        removed = pre - await _volume_mm3(adapter)
+        expected = NUMERAL_FIRST_LAYER_VOLUME_MM3
+        if abs(removed - expected) <= NUMERAL_VOLUME_REL_TOL * expected:
+            _telemetry.info(f"V cut form: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
+            return args
+        tried.append(f"{label}: removed {removed:.4f} mm^3")
+        adapter.currentModel.EditUndo2(1)
+        restored = pre - await _volume_mm3(adapter)
+        if abs(restored) > 1e-6:
+            raise RuntimeError(f"undo of the {label} V cut left {restored:.4f} mm^3 removed; tried {tried}")
     raise RuntimeError(
-        f"drafted V FeatureCut4 on {sketch_name} returned {feature!r} at {half_angle:g} deg "
-        f"inward; probes on the same sketch -- {outcome}"
+        f"no FeatureCut4 form removed the first layer's {NUMERAL_FIRST_LAYER_VOLUME_MM3:.4f} mm^3 V: "
+        + "; ".join(tried)
     )
 
 
-async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str) -> None:
-    """Blind V cut of one imported stroke layer, read back at once."""
-    _drafted_v_cut(adapter, f"{name}Sketch")
+async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None) -> tuple:
+    """Blind V cut of one imported stroke layer, read back at once; returns
+    the FeatureCut4 form, found on the first layer and reused after it."""
+    sketch = f"{name}Sketch"
+    if args is None:
+        args = await _first_v_cut(adapter, sketch)
+    else:
+        feature = _feature_cut4(adapter, sketch, args)
+        if isinstance(feature, Exception):
+            raise RuntimeError(f"{name}: {feature}")
     name_last_feature(adapter, name)
     # Rename the one dimension reading the depth (the draft adds an angle).
     rows = dump_dimensions(adapter, name)
@@ -219,6 +246,7 @@ async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str) -
     name_dimensions(adapter, name, [None] * depth_rows[0] + ["NumeralDepth"])
     drive_jobs.append((f"NumeralDepth@{name}", '"NumeralDepth"'))
     _assert_one_numeral_cut(adapter, name)
+    return args
 
 
 async def _volume_mm3(adapter) -> float:
@@ -595,7 +623,7 @@ async def build(adapter) -> dict[str, str]:
         if not path.is_file():
             raise RuntimeError(f"numerals DXF not found: {path}")
     pre = await _volume_mm3(adapter)
-    first_layer_removed = None
+    cut_form = None  # found (and volume-proved) on the first layer
     for path, name in zip(NUMERAL_LAYER_DXFS, numeral_feature_names(), strict=True):
         check(
             f"import {path.name}",
@@ -613,10 +641,7 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, f"{name}Sketch")
-        await _cut_numerals(adapter, drive_jobs, name)
-        if first_layer_removed is None:
-            first_layer_removed = pre - await _volume_mm3(adapter)
-            _check_numeral_volume(name, first_layer_removed, NUMERAL_FIRST_LAYER_VOLUME_MM3)
+        cut_form = await _cut_numerals(adapter, drive_jobs, name, cut_form)
     _check_numeral_volume("all numerals", pre - await _volume_mm3(adapter), NUMERAL_VOLUME_MM3)
     _assert_numeral_cut(adapter)
 

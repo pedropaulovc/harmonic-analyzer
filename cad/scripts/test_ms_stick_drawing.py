@@ -794,77 +794,111 @@ class _NumeralDefinition:
         return math.radians(self.angle_deg)
 
 
-def _cut_adapter(cut, selected):
-    sketch = SimpleNamespace(Select2=lambda append, mark: selected.append((append, mark)) or True)
-    model = SimpleNamespace(FeatureManager=SimpleNamespace(FeatureCut4=cut),
-                            ClearSelection2=lambda clear: None, sketch=sketch)
+class _CutSeat:
+    """Late-bound seat fake: FeatureCut4 removes a volume chosen per form."""
 
-    def attempt(fn):
-        try:
-            return fn(), None
-        except Exception as exc:  # noqa: BLE001
-            return None, exc
+    def __init__(self, removed_by_form, arity=26):
+        self.removed_by_form, self.arity = removed_by_form, arity
+        self.volume, self.cuts, self.selected, self.undone = 4800.0, [], [], 0
+        seat = self
 
-    return SimpleNamespace(currentModel=model, _attempt_with_error=attempt)
+        class Model:
+            FeatureManager = SimpleNamespace(FeatureCut4=seat.cut)
+            Extension = SimpleNamespace(SelectByID2=lambda *args: seat.selected.append(args[:2]) or True)
+
+            @staticmethod
+            def ClearSelection2(clear):  # noqa: N802 - COM member name
+                return None
+
+            @staticmethod
+            def EditUndo2(steps):  # noqa: N802 - COM member name
+                seat.undone += steps
+                seat.volume = 4800.0
+
+        async def mass():
+            return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=seat.volume))
+
+        def attempt(fn):
+            try:
+                return fn(), None
+            except Exception as exc:  # noqa: BLE001
+                return None, exc
+
+        self.adapter = SimpleNamespace(currentModel=Model, get_mass_properties=mass, _attempt_with_error=attempt)
+
+    def cut(self, *args):
+        if len(args) != self.arity:
+            raise TypeError(f"{len(args)} arguments")
+        self.cuts.append(args)
+        removed = self.removed_by_form.get((args[0], args[9]))
+        if removed is None:
+            return None
+        self.volume -= removed
+        return object()
 
 
-def test_numeral_cut_is_one_native_inward_drafted_v_and_drives_its_depth(monkeypatch) -> None:
-    selected, cuts, names, looked_up = [], [], [], []
+def _patch_cut_bookkeeping(monkeypatch, names):
+    import solidworks_mcp.adapters.pywin32_adapter as pywin32_adapter
+
     feature = SimpleNamespace(GetDefinition=lambda: _NumeralDefinition())
-
-    def cut(*args):
-        cuts.append(args)
-        return feature
-
-    adapter = _cut_adapter(cut, selected)
-
-    def by_name(actual, name):
-        looked_up.append(name)
-        return adapter.currentModel.sketch if name.endswith("Sketch") else feature
-
+    monkeypatch.setattr(pywin32_adapter, "null_callout", lambda: None)
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(builder, "_feature_by_name", by_name)
+    monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
     monkeypatch.setattr(builder, "dump_dimensions", lambda actual, name: [
         {"index": 0, "full_name": f"D2@{name}", "value_mm": 0.0},
         {"index": 1, "full_name": f"D1@{name}", "value_mm": spec.NUMERAL_DEPTH},
     ])
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
+
+
+@pytest.mark.parametrize("arity", [26, 27])
+def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch, arity) -> None:
+    v = spec.NUMERAL_FIRST_LAYER_VOLUME_MM3
+    # Double-ended Ddir1 False flares (2x), double-ended Ddir1 True is the V,
+    # single-ended forms return None: the volume, not the flag, decides.
+    seat = _CutSeat({(False, False): 3.35 * v / 1.56, (False, True): v}, arity=arity)
+    names = []
+    _patch_cut_bookkeeping(monkeypatch, names)
     jobs = []
-    asyncio.run(builder._cut_numerals(adapter, jobs, "Numerals2"))
-    assert looked_up[0] == "Numerals2Sketch" and selected == [(False, 0)]
-    (args,) = cuts
-    assert len(args) == 27
-    # Single-ended blind, into the bar, walls drafted 15 deg with the seat's
-    # inward flag (Ddir1 False, proved by the 91255A148 socket cut).
-    assert args[:7] == (True, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
-    assert args[7:11] == (True, False, False, False)
-    assert args[11] == pytest.approx(math.radians(15.0))
-    assert names == [("Numerals2", [None, "NumeralDepth"])]
-    assert jobs == [("NumeralDepth@Numerals2", '"NumeralDepth"')]
+    form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals", None))
+    assert [(args[0], args[9]) for args in seat.cuts] == [(False, False), (False, True)]
+    assert seat.undone == 1 and seat.selected[0] == ("NumeralsSketch", "SKETCH")
+    assert form == builder._v_cut_args(False, True)
+    args = seat.cuts[-1]
+    assert args[:7] == (False, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
+    assert args[7] is True and args[11] == pytest.approx(math.radians(15.0))
+    assert names == [("Numerals", [None, "NumeralDepth"])]
+    assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
+    # Later layers reuse the proved form without re-probing.
+    builder_form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals2", form))
+    assert builder_form is form and seat.cuts[-1][:26] == form
+    assert seat.selected[-1] == ("Numerals2Sketch", "SKETCH")
     assert builder.numeral_feature_names() == ["Numerals", "Numerals2", "Numerals3"]
 
 
-def test_refused_v_cut_reports_discriminating_probes(monkeypatch) -> None:
-    cuts = []
+def test_no_form_that_removes_the_v_fails_with_every_outcome(monkeypatch) -> None:
+    seat = _CutSeat({(False, False): 3.0, (True, False): 5.0})
+    _patch_cut_bookkeeping(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="no FeatureCut4 form removed") as raised:
+        asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None))
+    message = str(raised.value)
+    assert "double-ended, Ddir1 False: removed 3.0000" in message
+    assert "double-ended, Ddir1 True: FeatureCut4 returned None" in message
+    assert seat.undone == 2
 
-    def cut(*args):
-        cuts.append(args)
-        return None if args[7] and args[11] > math.radians(12.0) else object()
 
-    adapter = _cut_adapter(cut, [])
-    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
-    monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: adapter.currentModel.sketch)
-    with pytest.raises(RuntimeError, match="10 deg draft: created, no draft: created"):
-        builder._drafted_v_cut(adapter, "NumeralsSketch")
-    assert [args[7] for args in cuts] == [True, True, False]
+def test_numeral_readback_requires_one_draft_sense(monkeypatch) -> None:
+    senses = iter([False, True, False])
+    monkeypatch.setattr(builder, "_assert_one_numeral_cut", lambda adapter, name: next(senses))
+    with pytest.raises(RuntimeError, match="disagree on draft direction"):
+        builder._assert_numeral_cut(object())
 
 
 @pytest.mark.parametrize("definition,message", [
     (_NumeralDefinition(depth=spec.TICK_DEPTH), "expected depth"),
-    (_NumeralDefinition(drafted=False), "inward draft"),
-    (_NumeralDefinition(outward=True), "inward draft"),
-    (_NumeralDefinition(angle_deg=30.0), "inward draft"),
+    (_NumeralDefinition(drafted=False), "draft on every wall"),
+    (_NumeralDefinition(angle_deg=30.0), "draft on every wall"),
 ])
 def test_native_numeral_readback_refuses_square_or_wrong_v(monkeypatch, definition, message) -> None:
     feature = SimpleNamespace(GetDefinition=lambda: definition)
