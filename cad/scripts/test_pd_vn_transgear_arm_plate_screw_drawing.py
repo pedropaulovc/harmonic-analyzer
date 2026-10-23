@@ -434,3 +434,42 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
     )
 
 
+def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    rows = drawing._printed_rows()
+    assert tuple(name for name, _, _ in rows) == drawing.PRINTED_REFERENCES
+    assert all(orientation != "angle" for _, _, orientation in rows)
+    # The part still authors these; a standard oval head implies them.
+    authored = {name for name, _, _ in screw.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert authored - set(drawing.PRINTED_REFERENCES) == {
+        "SupplierHeadAngle", "SupplierCrownHeight",
+    }
+    plan = supplier_screw_lane_plan(
+        rows,
+        planes=drawing._printed(screw.SUPPLIER_REFERENCE_PLANES),
+        sides=drawing._printed(screw.SUPPLIER_REFERENCE_SIDES),
+    )
+    assert set(plan) == set(drawing.PRINTED_REFERENCES)
+    monkeypatch.setattr(
+        drawing, "PRINTED_REFERENCES", ("SupplierStockLength", "SupplierMissing")
+    )
+    with pytest.raises(ValueError, match="SupplierMissing"):
+        drawing._printed_rows()
+
+
+def test_sheet_callouts_keep_spec_presentation_and_shelve_top_text(monkeypatch) -> None:
+    formats = drawing._printed_formats()
+    assert set(formats) == set(drawing.PRINTED_REFERENCES)
+    for name, (precision, presentation, denominator, callout) in formats.items():
+        source = screw.SUPPLIER_REFERENCE_FORMATS[name]
+        assert (precision, presentation, denominator) == source[:3]
+        assert callout == drawing.PRINTED_CALLOUTS.get(name, source[3])
+    assert formats["SupplierStockLength"][3] is None
+    assert formats["SupplierNominalThreadMajor"][3] == "8-32"
+    assert "supplier_top" in drawing.build.__code__.co_consts
+    monkeypatch.setattr(drawing, "PRINTED_CALLOUTS", {"SupplierCrownHeight": "REF"})
+    with pytest.raises(ValueError, match="SupplierCrownHeight"):
+        drawing._printed_formats()
+
+

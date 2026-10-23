@@ -20,10 +20,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note, dimension_name, iter_views, place_view, view_name,
-)
+from solidworks_mcp.adapters.solidworks.drawing import iter_views, place_view, view_name
 
 from _check import check
 from _com import _early_bound
@@ -36,18 +33,11 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
-from _drawing_attachment import _is_same_attachment
-from _drawing_edges import visible_view_entities
-from _drawing_hidden_sketches import (
-    _show_hidden_owners, curate_view_dimensions as curate_stock_dimensions,
-)
+from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import model_points_in_view
-from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
-from _drawing_selection import _select_view_entity
+from _purchased_fastener_drawing import assert_supplier_view_fits
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
     assert_supplier_reference_dimension, supplier_reference_dimension,
@@ -67,17 +57,12 @@ from ch_vn_spring_hook_spec import (
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
     REFERENCE_SKETCHES,
-    SUPPLIER_EYE_MM,
     SUPPLIER_REFERENCE_PRECISION,
     SUPPLIER_THREAD,
     SUPPLIER_THREAD_MAJOR_MM,
     SUPPLIER_THREAD_DIMENSIONS,
     SUPPLIER_THREAD_FEATURE,
-    SUPPLIER_STOCK_AXIS_MM,
     SUPPLIER_STOCK_CONFIGURATION,
-    SUPPLIER_STOCK_DIMENSIONS,
-    SUPPLIER_STOCK_FEATURE,
-    SUPPLIER_STOCK_MM,
 )
 
 SPEC = DRAWINGS_BY_NAME["ch_vn_spring_hook"]
@@ -91,21 +76,22 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 # chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-STOCK_SCALE = (5.0, 1.0)
-SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
-STOCK_CENTER = (0.150, 0.1755)
-FRONT_CENTER = (0.100, 0.18625)
-ISO_CENTER = (0.310, 0.213)
-# The cut end sits about 0.078 below the view centre (half the 31.3 at 5:1);
-# the centre rose 0.00475 with the 1.9 mm longer shank and 0.0015 more with
-# the 0.6 mm the plate's thickest limit added (code review C10), so the end,
-# its deburr dimensions and the notes keep their 28.8-era stations; the
-# eye's top stands ~2 mm under the top border.
-# The deburr's value and callout hang right of the shank, clear of their own
-# extension lines (review r8: centred under the 2.3 mm leg they were struck)
-# and above the notes.
+FRONT_CENTER = (0.100, 0.1805)
+ISO_CENTER = (0.310, 0.209)
+# The settled front view's native outline is the 31.3 part plus SolidWorks'
+# boundary pad: 0.0848 half-height about the centre (run 0c4519c5 read
+# y 0.1014..0.2711 at centre 0.18625), and it must stay inside the B sheet's
+# 12.7 mm top zone border (y 0.2667). Centred at 0.1805 its top is 0.2653 and
+# its bottom 0.0957, clear of the 0.0651 notes band; the eye crown stands at
+# 0.2593. The cut end (0.078 below the centre) drops 5.75 mm to 0.1023 while
+# the deburr texts keep their reviewed stations: still right of the shank,
+# clear of their own extension lines (review r8: centred under the 2.3 mm leg
+# they were struck) and above the notes.
+# The settled isometric outline is 0.0543 half-height about its centre (run
+# 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
+# centred at 0.209 its top is 0.2633 and its bottom 0.1547.
 FRONT_KEEP = {
-    "FinishedOverall": (0.042, 0.18625),
+    "FinishedOverall": (0.042, FRONT_CENTER[1]),
     "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }
@@ -147,48 +133,16 @@ def _verify_controls(annotations: list[Any]) -> None:
     )
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
-    """Physical unchanged eye sizes plus an associative nominal-major carrier."""
-    eye = {}
+def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
+    """The one sourcing reference: the #6-32 thread on its nominal-major carrier.
+
+    A replacement anchor must take the lever's tap and the jam nut, so the
+    thread is kept. The eye sizes and the as-supplied lengths are not
+    replacement criteria -- the 0.66 spring wire links the 6.35 eye with ~10x
+    margin, and the finished overall already fixes the length the stock must
+    give -- and the SKU names the catalogue part.
+    """
     refs = []
-    for raw in visible_view_entities(front, 4, label="spring anchor supplier contours"):
-        silhouette = _early_bound(raw, "ISilhouetteEdge")
-        raw_curve = silhouette.GetCurve()
-        if raw_curve is None:
-            continue
-        curve = _early_bound(raw_curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        circle = tuple(float(value) for value in curve.CircleParams)
-        if (
-            any(abs(value) > 1e-8 for value in circle[:3])
-            or abs(abs(circle[5]) - 1.0) > 1e-8
-        ):
-            continue
-        for name, diameter in SUPPLIER_EYE_MM.items():
-            if abs(circle[6] * 2000.0 - diameter) < 1e-5:
-                eye.setdefault(name, raw)
-    for name, text_xy in (
-        ("EyeOD", (0.169, 0.255)),
-        ("EyeID", (0.165, 0.228)),
-    ):
-        if name not in eye:
-            raise RuntimeError(f"{name}: unchanged spring eye has no circular silhouette")
-        try:
-            _select_view_entity(
-                adapter, front, "SILHOUETTE", None, label=name, entity=eye[name]
-            )
-            display = adapter.currentModel.AddDiameterDimension2(*text_xy, 0.0)
-        finally:
-            adapter.currentModel.ClearSelection2(True)
-        if display is None:
-            raise RuntimeError(f"{name}: cannot dimension the spring eye silhouette")
-        contract = dict(
-            label=name, expected_mm=SUPPLIER_EYE_MM[name], units="in",
-            precision=SUPPLIER_REFERENCE_PRECISION[name], presentation="diameter",
-        )
-        display = supplier_reference_dimension(adapter, display, **contract)
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, eye[name]))
     annotations = curate_stock_dimensions(
         adapter, front, keep={"SupplierThreadMajor": (0.166, 0.175)},
         view_label="supplier thread nominal major, not helical geometry",
@@ -204,192 +158,60 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     return refs
 
 
-def _supplier_stock_sheet(adapter):
-    """Dimension the actual restored original bolt body, not its finished cut."""
-    stock = _early_bound(
-        place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=STOCK_SCALE),
-        "IView",
-    )
-    iso = _early_bound(
-        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE),
-        "IView",
-    )
-    for view in (stock, iso):
-        view.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
-        if str(view.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
-            raise RuntimeError("as-supplied spring anchor view references the finished cut")
-        set_hidden_lines_removed(adapter, view)
-    shown = _show_hidden_owners(
-        adapter, stock, (SUPPLIER_STOCK_FEATURE,),
-        view_label="spring anchor original source axis before centering",
-    )
-    if set(shown) != {SUPPLIER_STOCK_FEATURE}:
-        raise RuntimeError("spring anchor original source axis is not saved hidden")
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot rebuild the as-supplied spring anchor views")
-    stock.UpdateViewDisplayGeometry()
-    midpoint = (
-        0.0,
-        (SUPPLIER_STOCK_AXIS_MM[0][1] + SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
-        0.0,
-    )
-    projected = model_points_in_view(
-        adapter, stock, [midpoint], label="original stock bolt centre"
-    )[0]
-    before = tuple(float(value) for value in stock.Position)
-    stock.Position = double_array([
-        before[0] + STOCK_CENTER[0] - projected[0],
-        before[1] + STOCK_CENTER[1] - projected[1],
-    ])
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot centre the full original stock bolt")
-    keep = {
-        "SupplierStockShank": (0.105, 0.150),
-        "SupplierStockThread": (0.210, 0.140),
-        "SupplierStockOverall": (0.065, STOCK_CENTER[1]),
-    }
-    annotations = curate_stock_dimensions(
-        adapter, stock, keep=keep, view_label="as-supplied original bolt dimensions",
-        dimensions_by_feature=SUPPLIER_STOCK_DIMENSIONS,
-    )
-    refs = []
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        contract = dict(
-            label=name, expected_mm=SUPPLIER_STOCK_MM[name], units="in",
-            precision=SUPPLIER_REFERENCE_PRECISION[name],
-            callout={
-                "SupplierStockShank": "AS-SUPPLIED SHANK",
-                "SupplierStockThread": "AS-SUPPLIED THREAD LENGTH",
-                "SupplierStockOverall": "AS-SUPPLIED OVERALL",
-            }[name],
-        )
-        display = supplier_reference_dimension(
-            adapter, annotation.GetSpecificAnnotation(), **contract
-        )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+def _verify_supplier_references(adapter, refs, view_names, configuration):
+    """Resolve source coverage from freshly enumerated post-rebuild dimensions."""
+    if len(refs) != 1:
+        raise RuntimeError("spring anchor must retain its supplier thread dimension")
+    views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
+    for name in view_names:
+        if name not in views or str(views[name].ReferencedConfiguration) != configuration:
+            raise RuntimeError("supplier view lost its source configuration")
+    view = views[view_names[0]]
+    view.UpdateViewDisplayGeometry()
+    displays = {}
+    display = view.GetFirstDisplayDimension6()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        key = str(native.FullName)
+        if key in displays:
+            raise RuntimeError(f"duplicate native dimension {key}")
+        displays[key] = display
+        display = display.GetNext5()
+    if len(displays) != len(refs) + len(FRONT_KEEP):
+        raise RuntimeError("settled native dimension coverage changed")
+    for key, contract in refs:
+        if key not in displays:
+            raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
+        display = displays[key]
+        assert_supplier_reference_dimension(adapter, display, **contract)
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
+            raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
+        if str(native.FullName).split("@")[:2] != [contract["label"], SUPPLIER_THREAD_FEATURE]:
+            raise RuntimeError(f"{contract['label']}: nominal model attachment changed")
+
+
+def _verify_supplier_layout(adapter, view_names):
+    """Inspect every view's settled native ink inside the usable sheet cell."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    drawing.ActivateView("")  # False is documented for sheet context.
-    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
-        raise RuntimeError("cannot enter original stock sheet context for labels")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     properties = tuple(sheet.GetProperties2())
     region = sheet_drawable_region(
         adapter, sheet, width=float(properties[5]), height=float(properties[6])
     )
-    notes = []
-    for text, x, y in (
-        (
-            "AS-SUPPLIED EYEBOLT BODY — SUPPLIER REFERENCE",
-            region.xmin + 0.0033, region.ymax - 0.004,
-        ),
-        (
-            "SUPPLIED HEX NUT OMITTED FROM THIS BODY VIEW\n"
-            "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
-            0.016, 0.089,
-        ),
-        (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", 0.275, 0.163),
-    ):
-        note = add_note(adapter, text, x, y)
-        if note is None:
-            raise RuntimeError("cannot label the original supplier stock body")
-        notes.append((_early_bound(note, "INote"), text))
-    for view in (stock, iso):
-        set_hidden_lines_removed(adapter, view)
-    return stock, iso, refs, notes
-
-
-def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Resolve source coverage from freshly enumerated post-rebuild dimensions."""
-    if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
-        raise RuntimeError("spring anchor must retain all six supplier dimensions")
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name, refs in refs_by_sheet.items():
-        if drawing.ActivateSheet(sheet_name) is not True:
-            raise RuntimeError(f"cannot inspect settled references on {sheet_name}")
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
-        names, configuration = view_contracts[sheet_name]
-        for name in names:
-            if name not in views or str(views[name].ReferencedConfiguration) != configuration:
-                raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
-        view = views[names[0]]
+    cell = (region.xmin, 0.0651, region.xmax, region.ymax)
+    views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
+    for name in view_names:
+        if name not in views:
+            raise RuntimeError("supplier dimension view disappeared")
+        view = views[name]
         view.UpdateViewDisplayGeometry()
-        displays = {}
-        display = view.GetFirstDisplayDimension6()
-        while display is not None:
-            display = _early_bound(display, "IDisplayDimension")
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            key = str(native.FullName)
-            if key in displays:
-                raise RuntimeError(f"{sheet_name}: duplicate native dimension {key}")
-            displays[key] = display
-            display = display.GetNext5()
-        expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
-        if len(displays) != expected_count:
-            raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
-        for key, contract, expected_entity in refs:
-            if key not in displays:
-                raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
-            display = displays[key]
-            assert_supplier_reference_dimension(adapter, display, **contract)
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-                raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
-            if expected_entity is None:
-                feature = (
-                    SUPPLIER_THREAD_FEATURE
-                    if contract["label"] == "SupplierThreadMajor" else SUPPLIER_STOCK_FEATURE
-                )
-                if str(native.FullName).split("@")[:2] != [contract["label"], feature]:
-                    raise RuntimeError(f"{contract['label']}: nominal model attachment changed")
-                if contract["label"] in ("SupplierStockShank", "SupplierStockOverall") and int(native.DrivenState) != 1:
-                    raise RuntimeError(f"{contract['label']}: source station span is no longer driven")
-            else:
-                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-                entities = tuple(annotation.GetAttachedEntities3() or ())
-                kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-                if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                    adapter, entities[0], expected_entity, "SILHOUETTE"
-                ):
-                    raise RuntimeError(f"{contract['label']}: supplier eye reference moved to another contour")
-
-
-def _verify_supplier_layout(adapter, view_contracts, notes):
-    """Inspect every view's settled native ink and sheet-owned source labels."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name, (names, _configuration) in view_contracts.items():
-        if drawing.ActivateSheet(sheet_name) is not True:
-            raise RuntimeError(f"cannot inspect supplier ink on {sheet_name}")
-        sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
-        properties = tuple(sheet.GetProperties2())
-        region = sheet_drawable_region(
-            adapter, sheet, width=float(properties[5]), height=float(properties[6])
-        )
-        border = (region.xmin, region.ymin, region.xmax, region.ymax)
-        cell = (
-            region.xmin, 0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
-            region.xmax, region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
-        )
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
-        for name in names:
-            if name not in views:
-                raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
-            view = views[name]
-            view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"spring anchor {sheet_name}")
-        if sheet_name == SHEET_NAMES[1]:
-            for note, text in notes:
-                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-                bounds = _box(note.GetExtent(), label=text, kind="note")
-                if (
-                    int(annotation.OwnerType) != 1 or not _inside(bounds, border)
-                    or str(note.GetText()).replace("\r\n", "\n") != text
-                ):
-                    raise RuntimeError(f"original stock label changed or leaves the usable sheet: {text}")
+        assert_supplier_view_fits(adapter, view, cell, label="spring anchor")
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
@@ -425,10 +247,6 @@ async def build(adapter: Any) -> dict[str, str]:
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="spring anchor stock package")
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
-        raise RuntimeError("cannot activate finished spring anchor sheet")
     stamp_drawing_summary(
         adapter,
         draw,
@@ -456,6 +274,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
+    # Footer notes belong to the sheet. The curates leave the front view
+    # active, and a note added there is view-owned ink its cell polices (the
+    # Supplier row at y 0.060 sits below the 0.0651 cell floor).
+    drawing = _early_bound(draw, "IDrawingDoc")
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter spring anchor sheet context for its notes")
     add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
@@ -466,27 +291,19 @@ async def build(adapter: Any) -> dict[str, str]:
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
-    if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
-        raise RuntimeError("cannot activate spring anchor supplier stock sheet")
-    stock, stock_iso, stock_refs, stock_notes = _supplier_stock_sheet(adapter)
-    view_contracts = {
-        SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
-        SHEET_NAMES[1]: ((view_name(adapter, stock), view_name(adapter, stock_iso)), SUPPLIER_STOCK_CONFIGURATION),
-    }
+    view_names = (view_name(adapter, front), view_name(adapter, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Channel Spring Anchor — Modified Stock Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(annotations),
             lambda: _verify_supplier_references(
-                adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
+                adapter, refs, view_names, finished_configuration
             ),
-            lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
+            lambda: _verify_supplier_layout(adapter, view_names),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
     )

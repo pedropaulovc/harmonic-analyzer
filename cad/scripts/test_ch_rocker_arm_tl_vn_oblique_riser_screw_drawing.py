@@ -210,3 +210,27 @@ def test_purchased_sheet_documents_the_built_part() -> None:
     assert sheet.source_kind == "part"
     assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
     assert sheet.layout in DRAWING_TEMPLATES
+
+
+def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
+    import draw_ch_rocker_arm_tl_vn_oblique_riser_screw as drawing
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    rows = drawing._printed_rows()
+    assert tuple(name for name, _, _ in rows) == drawing.PRINTED_REFERENCES
+    assert all(orientation != "angle" for _, _, orientation in rows)
+    # The part still authors these; the B18.6.3 flat head in ITEM implies them.
+    authored = {name for name, _, _ in spec.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert authored - set(drawing.PRINTED_REFERENCES) == {
+        "SupplierHeadAngle", "SupplierHeadHeight",
+    }
+    plan = supplier_screw_lane_plan(
+        rows,
+        planes=drawing._printed(spec.SUPPLIER_REFERENCE_PLANES),
+        sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
+    )
+    assert set(plan) == set(drawing.PRINTED_REFERENCES)
+    assert "supplier_top" in drawing.build.__code__.co_consts
+    monkeypatch.setattr(drawing, "PRINTED_REFERENCES", ("SupplierLength", "SupplierMissing"))
+    with pytest.raises(ValueError, match="SupplierMissing"):
+        drawing._printed_rows()

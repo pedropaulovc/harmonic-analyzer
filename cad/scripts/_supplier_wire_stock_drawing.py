@@ -5,14 +5,15 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
+import _telemetry
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
-from _mcmaster_9666k56 import CATALOG_LENGTH_FT, DIA, SKU
+from _mcmaster_9666k56 import DIA
 from _mcmaster_9666k56_reference import (
     SUPPLIER_DIAMETER_PRECISION,
     SUPPLIER_REFERENCE_CONFIGURATION,
@@ -24,33 +25,56 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
+from _purchased_fastener_drawing import assert_supplier_view_fits
 from _supplier_spring_drawing import (
     assert_supplier_configuration_value,
     reacquire_supplier_dimensions,
 )
 
 STOCK_SCALE = (20, 1)
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # Reserve these separate diagram fields without moving/refitting either of the
-# existing member views or their independently checked Depth references.
+# existing member views or their independently checked Depth references. The
+# native diameter is the only supplier datum here; SKU and material are in each
+# member's Manufacturing Notes, so the view carries no caption.
 STOCK_LAYOUTS = {
-    "LeverWire": ((0.300, 0.155), (0.325, 0.168), (0.255, 0.135)),
-    "PenWire": ((0.190, 0.241), (0.215, 0.252), (0.155, 0.223)),
+    "LeverWire": ((0.300, 0.155), (0.325, 0.168)),
+    "PenWire": ((0.190, 0.241), (0.215, 0.252)),
 }
 STOCK_FIELDS = {
     "LeverWire": (0.240, 0.110, 0.410, 0.190),
     "PenWire": (0.145, 0.205, 0.260, 0.265),
 }
-STOCK_CAPTION = (
-    f"SUPPLIER NOMINAL STOCK — NOT INSTALLED\nMcMASTER-CARR {SKU}\n"
-    f"COIL PACKAGE: {CATALOG_LENGTH_FT} ft (NOT CUT LENGTH)\n"
-    f"SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
-)
+
+
+def _delete_center_marks(adapter, view, *, member: str) -> None:
+    """Delete the template's mark on the stock circle and read none back.
+
+    Its arms scale with the 20:1 view (50 mm cross plus 8 mm extensions), so it
+    crossed the PenWire top border. The stock circle locates nothing; the
+    native diameter alone is the replacement datum.
+    """
+    label = f"{member} supplier stock centre mark"
+    marks = tuple(view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
+    if not marks:
+        _telemetry.info(f"{label}: none drawn")
+        return
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    for index, mark in enumerate(marks):
+        if not _early_bound(mark, "IAnnotation").Select2(index > 0, 0):
+            raise RuntimeError(f"cannot select {label}")
+    draw.EditDelete()  # VT_VOID: the re-read below is the proof
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"delete {label}")
+    if view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
+        raise RuntimeError(f"{label} survived deletion")
+    _telemetry.info(f"{label}: deleted {len(marks)}")
 
 
 def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable[[], None]:
     """Show/import the saved model circle and return final native readback."""
-    center, text, caption = STOCK_LAYOUTS[member]
+    center, text = STOCK_LAYOUTS[member]
     view = _early_bound(
         place_view(adapter, str(source), "*Top", *center, scale=STOCK_SCALE), "IView",
     )
@@ -76,6 +100,7 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
     ):
         raise RuntimeError("cannot centre supplier nominal stock circle")
     rebuild_drawing(adapter, label=f"{member} supplier circle position")
+    _delete_center_marks(adapter, view, member=member)
     annotation = _early_bound(annotations[0], "IAnnotation")
     if not annotation.SetPosition(*text, 0.0):
         raise RuntimeError("cannot position native supplier stock diameter")
@@ -87,13 +112,6 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
         "configuration": SUPPLIER_REFERENCE_CONFIGURATION,
     }
     supplier_reference_dimension(adapter, display, **options)
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    drawing.ActivateView("")
-    if not drawing.GetEditSheet() or drawing.ActiveDrawingView is not None:
-        raise RuntimeError("cannot restore sheet context for stock caption")
-    note = add_note(adapter, STOCK_CAPTION, *caption)
-    if note is None:
-        raise RuntimeError("cannot create supplier stock caption")
 
     def settled() -> None:
         if (str(view.ReferencedConfiguration) != SUPPLIER_REFERENCE_CONFIGURATION
@@ -118,18 +136,10 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
         if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
             raise RuntimeError("supplier stock diameter acquired an unprovided band")
         assert_supplier_reference_dimension(adapter, final, **options)
-        if str(_early_bound(note, "INote").GetText()).replace("\r", "") != STOCK_CAPTION:
-            raise RuntimeError("supplier stock caption changed")
-        owner = _early_bound(note, "INote").GetAnnotation()
-        if owner is None or int(_early_bound(owner, "IAnnotation").OwnerType) != 1:
-            raise RuntimeError("supplier stock caption must remain sheet-owned")
+        if view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
+            raise RuntimeError(f"{member}: supplier stock view regained a centre mark")
         assert_supplier_view_fits(
             adapter, view, STOCK_FIELDS[member], label=f"{member} supplier stock",
         )
-        if not _inside(
-            _box(_early_bound(note, "INote").GetExtent(), label="stock caption", kind="note"),
-            STOCK_FIELDS[member],
-        ):
-            raise RuntimeError(f"{member}: supplier stock caption leaves its reserved field")
 
     return settled

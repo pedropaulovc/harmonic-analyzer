@@ -7,10 +7,7 @@ import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note, dimension_name, iter_views, place_view, view_name,
-)
+from solidworks_mcp.adapters.solidworks.drawing import iter_views, place_view, view_name
 
 from _check import check
 from _com import _early_bound
@@ -23,19 +20,13 @@ from _drawing_common import (
 )
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
-from _drawing_attachment import _is_same_attachment
-from _drawing_layout_check import DEFAULT_BOUNDARY_ALLOWANCE_M
-from _drawing_edges import visible_view_entities
 from _drawing_hidden_sketches import (
-    _show_hidden_owners, curate_view_dimensions as curate_stock_dimensions,
+    curate_view_dimensions as curate_reference_dimensions,
 )
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_projection import model_points_in_view
-from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_sheet_region import sheet_drawable_region
 from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
-from _drawing_selection import _select_view_entity
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
     assert_supplier_reference_dimension, supplier_reference_dimension,
@@ -55,18 +46,8 @@ from sm_vn_boss_hook_spec import (
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
     REFERENCE_SKETCHES,
-    SUPPLIER_EYE_ID_MM,
-    SUPPLIER_FRACTION_DENOMINATOR,
-    SUPPLIER_NOMINAL_EYE_OD_MM,
-    SUPPLIER_NOMINAL_WIRE_MM,
     SUPPLIER_REFERENCE_PRECISION,
     SUPPLIER_STOCK_CONFIGURATION,
-    SUPPLIER_STOCK_DIMENSIONS,
-    SUPPLIER_STOCK_FEATURE,
-    SUPPLIER_STOCK_AXIS_MM,
-    SUPPLIER_STOCK_OVERALL_MM,
-    SUPPLIER_STOCK_SHANK_MM,
-    SUPPLIER_STOCK_WIRE_CENTER_MM,
     SUPPLIER_THREAD,
     SUPPLIER_THREAD_MAJOR_MM,
     SUPPLIER_THREAD_DIMENSIONS,
@@ -78,9 +59,10 @@ SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
-STOCK_SCALE = (2.0, 1.0)
-SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
-STOCK_CENTER = (0.150, 0.175)
+# Bottom of the cell for settled view-owned ink (views, dimensions): 5 mm above
+# the Supplier / Supplier SKUs footer row, whose text tops out at y 0.060. The
+# footer notes are sheet-owned and checked against the sheet border instead.
+INK_CELL_YMIN = 0.0651
 # The jam-nut shank (#1189) is 3.8 longer, 15 mm on the sheet: the view sits
 # high enough that the cut-end chamfer dimensions clear the notes below it.
 FRONT_CENTER = (0.100, 0.175)
@@ -125,48 +107,19 @@ def _verify_controls(annotations: list[Any]) -> None:
     )
 
 
-def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any], Any]]:
-    """Use the physical matching eye ID and an explicit nominal thread carrier."""
-    eye = None
-    for raw in visible_view_entities(front, 4, label="counter anchor supplier contours"):
-        silhouette = _early_bound(raw, "ISilhouetteEdge")
-        raw_curve = silhouette.GetCurve()
-        if raw_curve is None:
-            continue
-        curve = _early_bound(raw_curve, "ICurve")
-        if not curve.IsCircle():
-            continue
-        circle = tuple(float(value) for value in curve.CircleParams)
-        if (
-            all(abs(value) < 1e-8 for value in circle[:3])
-            and abs(abs(circle[5]) - 1.0) < 1e-8
-            and abs(circle[6] * 2000.0 - SUPPLIER_EYE_ID_MM) < 1e-5
-        ):
-            eye = raw
-            break
-    if eye is None:
-        raise RuntimeError("unchanged counter eye has no exact ID circular silhouette")
-    try:
-        _select_view_entity(
-            adapter, front, "SILHOUETTE", None, label="EyeID", entity=eye
-        )
-        display = adapter.currentModel.AddDiameterDimension2(0.150, 0.241, 0.0)
-    finally:
-        adapter.currentModel.ClearSelection2(True)
-    if display is None:
-        raise RuntimeError("cannot dimension the counter eye ID silhouette")
-    contract = dict(
-        label="EyeID", expected_mm=SUPPLIER_EYE_ID_MM, units="in",
-        precision=SUPPLIER_REFERENCE_PRECISION["EyeID"], presentation="diameter",
-        fraction_denominator=SUPPLIER_FRACTION_DENOMINATOR,
-    )
-    display = supplier_reference_dimension(adapter, display, **contract)
-    refs = [(str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, eye)]
-    annotations = curate_stock_dimensions(
+def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
+    """The thread is the one supplier reference: a hidden nominal-major carrier.
+
+    With the finished trim and deburr controls, the #10-24 designation is what
+    a replacement eyebolt must match. Eye and as-supplied stock sizes are
+    catalogue facts of the listed SKU, not sizes this sheet controls.
+    """
+    annotations = curate_reference_dimensions(
         adapter, front, keep={"SupplierThreadMajor": (0.166, 0.170)},
         view_label="supplier thread nominal major, not helical geometry",
         dimensions_by_feature=SUPPLIER_THREAD_DIMENSIONS,
     )
+    refs = []
     for annotation in annotations:
         contract = dict(
             label="SupplierThreadMajor", expected_mm=SUPPLIER_THREAD_MAJOR_MM,
@@ -177,213 +130,67 @@ def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, 
         display = supplier_reference_dimension(
             adapter, annotation.GetSpecificAnnotation(), **contract
         )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract))
     return refs
 
 
-def _supplier_stock_diagram(adapter: Any):
-    """A separate zero-body source profile, never false-sized finished edges."""
-    stock = _early_bound(
-        place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=STOCK_SCALE),
-        "IView",
-    )
-    stock.ReferencedConfiguration = SUPPLIER_STOCK_CONFIGURATION
-    if str(stock.ReferencedConfiguration) != SUPPLIER_STOCK_CONFIGURATION:
-        raise RuntimeError("supplier stock view references the finished configuration")
-    set_hidden_lines_removed(adapter, stock)
-    # Reveal the saved-hidden sketch before the first outline/projection/fit.
-    shown = _show_hidden_owners(
-        adapter, stock, (SUPPLIER_STOCK_FEATURE,),
-        view_label="counter anchor source diagram before fitting",
-    )
-    if set(shown) != {SUPPLIER_STOCK_FEATURE}:
-        raise RuntimeError("counter anchor source diagram owner is not saved hidden")
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot rebuild the revealed supplier nominal stock view")
-    stock.UpdateViewDisplayGeometry()
-    outline = _box(stock.GetOutline(), label="revealed counter anchor source diagram")
-    ratio = STOCK_SCALE[0] / STOCK_SCALE[1]
-    expected_spans = (
-        (
-            SUPPLIER_STOCK_WIRE_CENTER_MM[0]
-            + SUPPLIER_NOMINAL_WIRE_MM / 2.0
-            + SUPPLIER_NOMINAL_EYE_OD_MM / 2.0
-        ) / 1000.0 * ratio,
-        SUPPLIER_STOCK_OVERALL_MM / 1000.0 * ratio,
-    )
-    for actual, expected in zip(
-        (outline[2] - outline[0], outline[3] - outline[1]), expected_spans, strict=True
-    ):
-        if not expected - 1e-7 <= actual <= expected + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M:
-            raise RuntimeError("revealed supplier diagram outline does not cover its source profile")
-    midpoint = (
-        0.0,
-        (SUPPLIER_STOCK_AXIS_MM[0][1] + SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
-        0.0,
-    )
-    projected = model_points_in_view(
-        adapter, stock, [midpoint], label="source stock envelope centre"
-    )[0]
-    before = tuple(float(value) for value in stock.Position)
-    stock.Position = double_array([
-        before[0] + STOCK_CENTER[0] - projected[0],
-        before[1] + STOCK_CENTER[1] - projected[1],
-    ])
-    if adapter.currentModel.EditRebuild3() is not True:
-        raise RuntimeError("cannot position the complete supplier stock envelope")
-    keep = {
-        "SupplierNominalEyeOD": (0.180, 0.244),
-        "SupplierNominalWire": (0.255, 0.235),
-        "SupplierStockShank": (0.105, 0.160),
-        "SupplierStockOverall": (0.065, STOCK_CENTER[1]),
-    }
-    annotations = curate_stock_dimensions(
-        adapter, stock, keep=keep,
-        view_label="as-supplied nominal stock envelope and wire section",
-        dimensions_by_feature=SUPPLIER_STOCK_DIMENSIONS,
-    )
-    expected = {
-        "SupplierNominalEyeOD": SUPPLIER_NOMINAL_EYE_OD_MM,
-        "SupplierNominalWire": SUPPLIER_NOMINAL_WIRE_MM,
-        "SupplierStockShank": SUPPLIER_STOCK_SHANK_MM,
-        "SupplierStockOverall": SUPPLIER_STOCK_OVERALL_MM,
-    }
-    refs = []
-    for annotation in annotations:
-        name = dimension_name(adapter, annotation)
-        contract = dict(
-            label=name, expected_mm=expected[name], units="in",
-            precision=SUPPLIER_REFERENCE_PRECISION[name],
-            presentation="diameter" if name.startswith("SupplierNominal") else "length",
-            fraction_denominator=(
-                None if name == "SupplierStockOverall" else SUPPLIER_FRACTION_DENOMINATOR
-            ),
-            callout={
-                "SupplierNominalEyeOD": "NOMINAL EYE ENVELOPE",
-                "SupplierNominalWire": "NOMINAL WIRE SECTION",
-                "SupplierStockShank": "AS-SUPPLIED SHANK / THREAD",
-                "SupplierStockOverall": "AS-SUPPLIED OVERALL",
-            }[name],
-        )
-        display = supplier_reference_dimension(
-            adapter, annotation.GetSpecificAnnotation(), **contract
-        )
-        refs.append((str(_early_bound(display.GetDimension2(0), "IDimension").FullName), contract, None))
+def _verify_supplier_references(adapter, refs, view_names, configuration):
+    """Resolve the final views/dimensions afresh; never repair settled state."""
+    if len(refs) != 1:
+        raise RuntimeError("counter anchor must retain its one supplier thread reference")
+    views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
+    for name in view_names:
+        if name not in views or str(views[name].ReferencedConfiguration) != configuration:
+            raise RuntimeError("counter anchor view lost its finished source configuration")
+    view = views[view_names[0]]
+    view.UpdateViewDisplayGeometry()
+    displays = {}
+    display = view.GetFirstDisplayDimension6()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        key = str(native.FullName)
+        if key in displays:
+            raise RuntimeError(f"duplicate native dimension {key}")
+        displays[key] = display
+        display = display.GetNext5()
+    if len(displays) != len(refs) + len(FRONT_KEEP):
+        raise RuntimeError("settled native dimension coverage changed")
+    for key, contract in refs:
+        if key not in displays:
+            raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
+        display = displays[key]
+        assert_supplier_reference_dimension(adapter, display, **contract)
+        native = _early_bound(display.GetDimension2(0), "IDimension")
+        if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
+            raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
+        if str(native.FullName).split("@")[:2] != [contract["label"], SUPPLIER_THREAD_FEATURE]:
+            raise RuntimeError(f"{contract['label']}: nominal model attachment changed")
+
+
+def _verify_supplier_layout(adapter, view_names, notes):
+    """View-owned ink in its cell; sheet-owned footer notes inside the border."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    drawing.ActivateView("")  # False is documented for sheet context.
-    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
-        raise RuntimeError("cannot enter supplier stock sheet context for labels")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     properties = tuple(sheet.GetProperties2())
     region = sheet_drawable_region(
         adapter, sheet, width=float(properties[5]), height=float(properties[6])
     )
-    notes = []
-    for text, x, y in (
-        (
-            "SUPPLIER NOMINAL STOCK ENVELOPE — AS SUPPLIED",
-            region.xmin + 0.0033, region.ymax - 0.004,
-        ),
-        (
-            "NOMINAL PROFILE ONLY — INSTALLED VENDOR-CAD EYE UNCHANGED\n"
-            "STOCK REFERENCES ONLY — FINISHED TRIM AND CHAMFER: SHEET 1",
-            0.016, 0.089,
-        ),
-    ):
-        note = add_note(adapter, text, x, y)
-        if note is None:
-            raise RuntimeError("cannot label the supplier nominal stock envelope")
-        notes.append((_early_bound(note, "INote"), text))
-    return stock, refs, notes
-
-
-def _verify_supplier_references(adapter, refs_by_sheet, view_contracts):
-    """Resolve the final views/dimensions afresh; never repair settled state."""
-    if sum(len(refs) for refs in refs_by_sheet.values()) != 6:
-        raise RuntimeError("counter anchor must retain all six supplier dimensions")
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name, refs in refs_by_sheet.items():
-        if drawing.ActivateSheet(sheet_name) is not True:
-            raise RuntimeError(f"cannot inspect settled references on {sheet_name}")
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
-        names, configuration = view_contracts[sheet_name]
-        for name in names:
-            if name not in views or str(views[name].ReferencedConfiguration) != configuration:
-                raise RuntimeError(f"{sheet_name}: supplier view lost its source configuration")
-        view = views[names[0]]
+    cell = (region.xmin, INK_CELL_YMIN, region.xmax, region.ymax)
+    views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
+    for name in view_names:
+        if name not in views:
+            raise RuntimeError("counter anchor dimension view disappeared")
+        view = views[name]
         view.UpdateViewDisplayGeometry()
-        displays = {}
-        display = view.GetFirstDisplayDimension6()
-        while display is not None:
-            display = _early_bound(display, "IDisplayDimension")
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            key = str(native.FullName)
-            if key in displays:
-                raise RuntimeError(f"{sheet_name}: duplicate native dimension {key}")
-            displays[key] = display
-            display = display.GetNext5()
-        expected_count = len(refs) + (len(FRONT_KEEP) if sheet_name == SHEET_NAMES[0] else 0)
-        if len(displays) != expected_count:
-            raise RuntimeError(f"{sheet_name}: settled native dimension coverage changed")
-        for key, contract, expected_entity in refs:
-            if key not in displays:
-                raise RuntimeError(f"{contract['label']}: settled supplier dimension disappeared")
-            display = displays[key]
-            assert_supplier_reference_dimension(adapter, display, **contract)
-            native = _early_bound(display.GetDimension2(0), "IDimension")
-            if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-                raise RuntimeError(f"{contract['label']}: supplier reference acquired a tolerance band")
-            if expected_entity is None:
-                feature = (
-                    SUPPLIER_THREAD_FEATURE
-                    if contract["label"] == "SupplierThreadMajor" else SUPPLIER_STOCK_FEATURE
-                )
-                if str(native.FullName).split("@")[:2] != [contract["label"], feature]:
-                    raise RuntimeError(f"{contract['label']}: nominal model attachment changed")
-                if contract["label"] == "SupplierStockOverall" and int(native.DrivenState) != 1:
-                    raise RuntimeError("supplier overall lost its driven envelope measurement")
-            else:
-                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
-                entities = tuple(annotation.GetAttachedEntities3() or ())
-                kinds = tuple(int(value) for value in (annotation.GetAttachedEntityTypes() or ()))
-                if len(entities) != 1 or kinds != (46,) or not _is_same_attachment(
-                    adapter, entities[0], expected_entity, "SILHOUETTE"
-                ):
-                    raise RuntimeError("supplier eye ID moved to another physical contour")
-
-
-def _verify_supplier_layout(adapter, view_contracts, notes):
-    """Inspect complete native view/dimension ink and sheet-owned label extents."""
-    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
-    for sheet_name, (names, _configuration) in view_contracts.items():
-        if drawing.ActivateSheet(sheet_name) is not True:
-            raise RuntimeError(f"cannot inspect supplier ink on {sheet_name}")
-        sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
-        properties = tuple(sheet.GetProperties2())
-        region = sheet_drawable_region(
-            adapter, sheet, width=float(properties[5]), height=float(properties[6])
-        )
-        border = (region.xmin, region.ymin, region.xmax, region.ymax)
-        cell = (
-            region.xmin, 0.094 if sheet_name == SHEET_NAMES[1] else 0.0651,
-            region.xmax, region.ymax - (0.009 if sheet_name == SHEET_NAMES[1] else 0.0),
-        )
-        views = {view_name(adapter, raw): _early_bound(raw, "IView") for raw in iter_views(adapter)}
-        for name in names:
-            if name not in views:
-                raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
-            view = views[name]
-            view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"counter anchor {sheet_name}")
-        if sheet_name == SHEET_NAMES[1]:
-            for note, text in notes:
-                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-                bounds = _box(note.GetExtent(), label=text, kind="note")
-                if (
-                    int(annotation.OwnerType) != 1 or not _inside(bounds, border)
-                    or str(note.GetText()).replace("\r\n", "\n") != text
-                ):
-                    raise RuntimeError(f"supplier stock label changed or leaves the usable sheet: {text}")
+        assert_supplier_view_fits(adapter, view, cell, label="counter anchor finished sheet")
+    border = (region.xmin, region.ymin, region.xmax, region.ymax)
+    for property_name, note in notes:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        if int(annotation.OwnerType) != 1:  # swAnnotationOwner_DrawingSheet
+            raise RuntimeError(f"{property_name}: footer note is no longer sheet-owned")
+        if not _inside(_box(note.GetExtent(), label=property_name, kind="note"), border):
+            raise RuntimeError(f"{property_name}: footer note leaves the usable sheet")
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
@@ -419,10 +226,6 @@ async def build(adapter: Any) -> dict[str, str]:
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="counter anchor stock package")
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if drawing.ActivateSheet(SHEET_NAMES[0]) is not True:
-        raise RuntimeError("cannot activate finished counter anchor sheet")
     stamp_drawing_summary(
         adapter,
         draw,
@@ -450,38 +253,38 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
-    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
-    add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, NOTES_Y, char_height=0.003
-    )
+    # Footer notes belong to the sheet. The curates leave the front view
+    # active, and a note added there is view-owned ink that its cell polices.
+    drawing = _early_bound(draw, "IDrawingDoc")
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter counter anchor sheet context for its notes")
+    notes = [
+        (name, _early_bound(add_property_linked_note(adapter, name, x, y, **text), "INote"))
+        for name, x, y, text in (
+            ("Supplier", 0.016, 0.060, {"char_height": 0.003}),
+            ("Supplier SKUs", 0.080, 0.060, {"char_height": 0.003}),
+            ("Stock Name", 0.016, 0.049, {"char_height": 0.003}),
+            ("Isometric View Note", 0.275, 0.163, {}),
+            ("Manufacturing Notes", 0.016, NOTES_Y, {"char_height": 0.003}),
+        )
+    ]
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
-    if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
-        raise RuntimeError("cannot activate counter anchor supplier stock sheet")
-    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter)
-    set_hidden_lines_removed(adapter, stock)
-    view_contracts = {
-        SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),
-        SHEET_NAMES[1]: ((view_name(adapter, stock),), SUPPLIER_STOCK_CONFIGURATION),
-    }
+    view_names = (view_name(adapter, front), view_name(adapter, iso))
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Counter Spring Anchor — Modified Stock Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        expected_sheet_names=SHEET_NAMES,
-        sheet_scales={SHEET_NAMES[0]: SHEET_SCALE, SHEET_NAMES[1]: STOCK_SCALE},
         settled_checks=(
             lambda: _verify_controls(annotations),
             lambda: _verify_supplier_references(
-                adapter, {SHEET_NAMES[0]: refs, SHEET_NAMES[1]: stock_refs}, view_contracts
+                adapter, refs, view_names, finished_configuration
             ),
-            lambda: _verify_supplier_layout(adapter, view_contracts, stock_notes),
+            lambda: _verify_supplier_layout(adapter, view_names, notes),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
     )

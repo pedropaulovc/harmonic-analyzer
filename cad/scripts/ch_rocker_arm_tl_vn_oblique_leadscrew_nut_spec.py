@@ -120,40 +120,46 @@ SUPPLIER_DRAWING_URLS = (
 )
 # Construction-only source chords are nominal size references, not measurements
 # of the omitted internal thread. No source bore diameter or tolerance is given.
+# Only what a drop-in substitute must match: the flange OD, the pilot (spigot)
+# diameter TL-29's counterbore takes, the overall length (C4's 1.5 + 3.5 + 10),
+# the flange thickness (the #4-40 screws' grip) and the bolt pattern.
+# Any Top-plane reference reserves at least 20 mm on every side of the 64 mm
+# Top cell, and a top/bottom lane 26 mm: horizontal end-view chords left a
+# 12 mm window, under every scale's padded native outline. Vertical chords
+# take the left/right lanes and leave 24 mm, which holds 1:2. Both Front
+# lengths start on their own lane's side; the pilot chord ends on the
+# length's anchored start.
 SUPPLIER_REFERENCE_DIMENSIONS = (
-    ("SupplierSpigotLength", SPIGOT_LENGTH, "vertical"),
+    ("SupplierLength", LENGTH, "vertical"),
     ("SupplierFlangeThickness", FLANGE_THICK, "vertical"),
-    ("SupplierBodyLength", BODY_LONG, "vertical"),
-    ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
     ("SupplierFlangeDiameter", FLANGE_DIA, "horizontal"),
-    ("SupplierHolePitchDiameter", HOLE_PCD, "horizontal"),
-    ("SupplierMountingHoleDiameter", HOLE_DIA, "horizontal"),
+    ("SupplierBodyDiameter", BODY_DIA, "horizontal"),
+    ("SupplierMountingHoleDiameter", HOLE_DIA, "vertical"),
+    ("SupplierHolePitchDiameter", HOLE_PCD, "vertical"),
 )
 SUPPLIER_REFERENCE_STARTS = {
-    "SupplierSpigotLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
-    "SupplierFlangeThickness": (FLANGE_DIA / 2.0, 0.0),
-    "SupplierBodyLength": (BODY_DIA / 2.0, FLANGE_THICK),
-    "SupplierBodyDiameter": (-BODY_DIA / 2.0, 0.0),
+    "SupplierLength": (BODY_DIA / 2.0, -SPIGOT_LENGTH),
+    "SupplierFlangeThickness": (-FLANGE_DIA / 2.0, 0.0),
     "SupplierFlangeDiameter": (-FLANGE_DIA / 2.0, 0.0),
-    "SupplierHolePitchDiameter": (-HOLE_PCD / 2.0, 0.0),
+    "SupplierBodyDiameter": (-BODY_DIA / 2.0, -SPIGOT_LENGTH),
     "SupplierMountingHoleDiameter": (
-        HOLE_CENTRES[0][0] - HOLE_DIA / 2.0,
-        -HOLE_CENTRES[0][1],
+        HOLE_CENTRES[0][0],
+        -HOLE_CENTRES[0][1] - HOLE_DIA / 2.0,
     ),
+    "SupplierHolePitchDiameter": (0.0, -HOLE_PCD / 2.0),
 }
 SUPPLIER_REFERENCE_PLANES = {
-    "SupplierHolePitchDiameter": "Top",
     "SupplierMountingHoleDiameter": "Top",
+    "SupplierHolePitchDiameter": "Top",
 }
 SUPPLIER_REFERENCE_SIDES = {}
 SUPPLIER_REFERENCE_FORMATS = {
-    "SupplierSpigotLength": (1, "length", None, None),
+    "SupplierLength": (0, "length", None, None),
     "SupplierFlangeThickness": (1, "length", None, None),
-    "SupplierBodyLength": (0, "length", None, None),
-    "SupplierBodyDiameter": (1, "diameter", None, None),
     "SupplierFlangeDiameter": (0, "diameter", None, None),
-    "SupplierHolePitchDiameter": (0, "diameter", None, "PCD"),
+    "SupplierBodyDiameter": (1, "diameter", None, None),
     "SupplierMountingHoleDiameter": (1, "diameter", None, "4X"),
+    "SupplierHolePitchDiameter": (0, "diameter", None, "PCD"),
 }
 SUPPLIER_REFERENCE_UNITS = {
     name: "mm" for name, _, _ in SUPPLIER_REFERENCE_DIMENSIONS
