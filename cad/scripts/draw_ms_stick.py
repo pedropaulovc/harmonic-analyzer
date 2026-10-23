@@ -7,8 +7,9 @@ dimensions from the open-edge Top detail for the square-bottom groove depth.
 The numeral detail and its dimensions leave air at the left border, with its
 placement note below the detail title and scale. Section G-G cuts the whole
 8 x 3 bar across both strokes of the zero numeral, so the true V grooves read
-in profile; the Top parent imports NumeralDepth, whose callout names the V.
-Native probes import TickDepth in Top but not in a removed cut-only section.
+in profile, and imports NumeralDepth there; its callout names the V angle.
+Native probes import TickDepth in Top but not in a removed cut-only section,
+so G-G is a full section (with hidden lines removed only the cut face shows).
 All sizes, bands and places come from the part; scale is never shrunk to fit.
 Part-spec coordinates are millimetres; model-point projection takes metres.
 Drawing-sheet positions and projected fence coordinates are also metres.
@@ -72,8 +73,10 @@ DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
 DEPTH_PARENT_CENTER = (0.330, 0.210)
-DEPTH_CENTER = (0.330, 0.125)
-DEPTH_RADIUS_MM = 2.0
+# r1-r3 sheet 4: at 6:1 the 0.40 x 0.50 groove could not be read; 15:1 can.
+DEPTH_CENTER = (0.375, 0.120)
+DEPTH_SCALE = (15.0, 1.0)
+DEPTH_RADIUS_MM = 1.6
 NUMERAL_PARENT_CENTER = (0.130, 0.210)
 # r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
 # Shift the entire detail/dimension group right without changing its scale.
@@ -84,19 +87,20 @@ NUMERAL_NOTE_XY = (0.045, 0.068)
 # A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
 # over a readable 11 mm instead of a 1:2 nick.
 NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
-NUMERAL_PROFILE_CENTER = (0.260, 0.125)
+NUMERAL_PROFILE_CENTER = (0.280, 0.125)
 # The 0.40 mm V must read as a profile; 10:1 keeps the full 8 x 3 bar on sheet.
 NUMERAL_PROFILE_SCALE = (10.0, 1.0)
 # Mid-height of the zero numeral: the cut crosses both of its straight side
 # strokes square, and no graduation (the nearest minor tick ends 0.18 short).
 NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
                      + part.NUMERAL_HEIGHT_MM / 2.0)
-NUMERAL_SECTION_OVERSHOOT_MM = 1.5
+# r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
+NUMERAL_SECTION_OVERSHOOT_MM = 4.0
 STOP_REBATE_FIT = "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE"
 AMPLITUDE_STATIONS = "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS"
 ENAMEL = "HOLDS ENAMEL FILL"
 FRONT_KEEP = {
-    "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
+    "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
 }
 TOP_KEEP = {"BodyThickness": (0.275, 0.130)}
@@ -121,8 +125,8 @@ NUMERAL_KEEP = {
     "NumeralXGap": (0.100, 0.170),
     "NumeralYGap": (0.100, 0.155),
 }
-DEPTH_KEEP = {"TickDepth": (0.330, 0.180)}
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.365, 0.245)}
+DEPTH_KEEP = {"TickDepth": (0.380, 0.175)}
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.255, 0.105)}
 DIMENSION_CALLOUTS = {
     "BodyWidth": STOP_REBATE_FIT,
     "BodyThickness": STOP_REBATE_FIT,
@@ -137,7 +141,7 @@ DIMENSION_CALLOUTS = {
     "NumeralHeight": "NUMERAL HEIGHT",
     "NumeralXGap": "NUMERAL TO TICK EDGE",
     "NumeralYGap": "NUMERAL TO FULL-TICK END",
-    "NumeralDepth": f"NUMERAL DEPTH, {part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{ENAMEL}",
+    "NumeralDepth": f"NUMERAL DEPTH\n{part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{ENAMEL}",
 }
 
 
@@ -156,6 +160,7 @@ def _rotate_ruled_face(adapter: Any, view: Any) -> None:
 def _engraving_detail(
     adapter: Any, parent: Any, *, model_center: tuple[float, float, float],
     view_xy: tuple[float, float], radius_mm: float, detail_label: str,
+    scale: tuple[float, float] = DETAIL_SCALE,
 ) -> Any:
     """Fence a useful-scale detail and move its parent letter off the strip."""
     draw = adapter.currentModel
@@ -178,12 +183,12 @@ def _engraving_detail(
     manager = _early_bound(draw.SketchManager, "ISketchManager")
     if manager.CreateCircle(*points[0], *points[1]) is None:
         raise RuntimeError(f"failed to draw engraving detail {detail_label} fence")
-    detail = ddoc.CreateDetailViewAt4(*view_xy, 0.0, 0, *DETAIL_SCALE,
+    detail = ddoc.CreateDetailViewAt4(*view_xy, 0.0, 0, *scale,
                                     detail_label, 1, True, False, False, 5)
     if detail is None:
         raise RuntimeError(f"failed to create engraving detail {detail_label}")
     detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array(list(DETAIL_SCALE))
+    detail.ScaleRatio = double_array(list(scale))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     circles = tuple(parent.GetDetailCircles() or ())
@@ -203,7 +208,7 @@ def _engraving_detail(
 
 
 def _numeral_profile(adapter: Any, parent: Any) -> Any:
-    """Whole-bar section across both straight side strokes of the zero numeral."""
+    """Whole-bar full section across both straight side strokes of the zero numeral."""
     endpoints = tuple(
         model_point_in_view(
             adapter, parent, (NUMERAL_SECTION_X / 1000.0, y / 1000.0, 0.0),
@@ -220,10 +225,10 @@ def _numeral_profile(adapter: Any, parent: Any) -> Any:
     section.UseParentScale = False
     section.ScaleRatio = double_array(list(NUMERAL_PROFILE_SCALE))
     definition = _early_bound(section.GetSection(), "IDrSection")
-    definition.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="numeral G-G cut surface")
-    if not bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
-        raise RuntimeError("numeral G-G must be a full, cut-surface-only section of the bar")
+    definition.SetDisplayOnlySurfaceCut(False)
+    rebuild_drawing(adapter, label="numeral G-G full section")
+    if bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
+        raise RuntimeError("numeral G-G must be a full section of the whole bar")
     set_hidden_lines_removed(adapter, section)
     if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
         raise RuntimeError("numeral G-G must retain its independent 10:1 scale")
@@ -352,23 +357,23 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=SHEET_SCALE)
     _rotate_ruled_face(adapter, profile_parent)
     set_hidden_lines_removed(adapter, profile_parent)
-    _numeral_profile(adapter, profile_parent)
-    depth_parent = place_view(
-        adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
-    set_hidden_lines_removed(adapter, depth_parent)
+    profile = _numeral_profile(adapter, profile_parent)
     numeral_depth_annotations = curate_view_dimensions(
-        adapter, depth_parent, keep=NUMERAL_DEPTH_KEEP, view_label="native numeral depth",
+        adapter, profile, keep=NUMERAL_DEPTH_KEEP, view_label="numeral V section",
         dimensions_by_feature=part.DRAWING_DIMENSIONS,
     )
     if len(numeral_depth_annotations) != 1:
         raise RuntimeError("expected one own model-linked numeral depth")
     _assert_numeral_depth_owner(numeral_depth_annotations[0])
     annotations += numeral_depth_annotations
+    depth_parent = place_view(
+        adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
+    set_hidden_lines_removed(adapter, depth_parent)
     depth = _engraving_detail(
         adapter, depth_parent,
         model_center=(part.SCALE_START_X / 1000.0, part.BODY_WIDTH / 1000.0,
                       part.BODY_THICKNESS / 2000.0),
-        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B")
+        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B", scale=DEPTH_SCALE)
     set_hidden_lines_removed(adapter, depth)
     annotations += curate_view_dimensions(adapter, depth, keep=DEPTH_KEEP,
                                            view_label="engraving depth detail",

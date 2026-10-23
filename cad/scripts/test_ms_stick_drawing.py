@@ -440,9 +440,10 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     def create_detail(*args):
         label = args[6]
         parent = active["parent"]
-        assert args[2:] == (0.0, 0, *drawing.DETAIL_SCALE, label, 1, True, False, False, 5)
+        scale = drawing.DEPTH_SCALE if label == "B" else drawing.DETAIL_SCALE
+        assert args[2:] == (0.0, 0, *scale, label, 1, True, False, False, 5)
         parent.Circles.append(DetailCircle(label))
-        detail = make_view(args[:2], drawing.DETAIL_SCALE, 0.0646, parent.Orientation)
+        detail = make_view(args[:2], scale, 0.0646, parent.Orientation)
         detail_calls.append((label, active["sheet"], parent, detail))
         return detail
 
@@ -580,8 +581,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     assert profile_args["scale"] == drawing.NUMERAL_PROFILE_SCALE == (10.0, 1.0)
     # The cutting line crosses the whole bar width at the zero's mid-height.
     start, end = utility.points[15:17]
-    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -0.0015, 0.0))
-    assert end == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, 0.0095, 0.0))
+    assert start == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, -0.004, 0.0))
+    assert end == pytest.approx((drawing.NUMERAL_SECTION_X / 1000.0, 0.012, 0.0))
     assert tuple(profile.ScaleRatio) == drawing.NUMERAL_PROFILE_SCALE
     assert profile.UseParentScale is False
     assert len(section_moves) == 1
@@ -594,11 +595,11 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     ]
     assert len(numeral_depth_imports) == 1
     depth_import_view, depth_import_args = numeral_depth_imports[0]
-    assert depth_import_view.Orientation == "*Top"
-    assert depth_import_view.Position == drawing.DEPTH_PARENT_CENTER
+    # The V depth is dimensioned where the V reads: on section G-G.
+    assert depth_import_view is profile
     assert depth_import_args["dimensions_by_feature"] is spec.DRAWING_DIMENSIONS
     assert spec.DRAWING_DIMENSIONS["Numerals"] == set(depth_import_args["keep"])
-    assert profile.GetSection().GetDisplayOnlySurfaceCut()
+    assert not profile.GetSection().GetDisplayOnlySurfaceCut()
     assert any(view is profile for view in clean_views)
     assert len(utility.points) == 22  # six fences, profile endpoints, centre and placement readback
     expected = [
@@ -623,7 +624,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
         assert (label, sheet) == (wanted_label, wanted_sheet)
         assert detail.Position == xy
         assert parent.ScaleRatio == (1.0, 2.0)
-        assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == drawing.DETAIL_SCALE
+        scale = drawing.DEPTH_SCALE if label == "B" else drawing.DETAIL_SCALE
+        assert tuple(getattr(detail.ScaleRatio, "value", detail.ScaleRatio)) == scale
         projection_index = 3 * index + (4 if label == "B" else 0)
         assert utility.points[projection_index] == pytest.approx(model_xyz)
         projected = parent.ModelToViewTransform.apply(model_xyz)
@@ -751,7 +753,7 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
     assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
     assert drawing.DIMENSION_CALLOUTS["NumeralDepth"] == (
-        "NUMERAL DEPTH, 30° INCLUDED V\nHOLDS ENAMEL FILL")
+        "NUMERAL DEPTH\n30° INCLUDED V\nHOLDS ENAMEL FILL")
     assert not hasattr(spec, "NUMERAL_TOOL_NOTE")
     assert not hasattr(drawing, "NUMERAL_TOOL_NOTE_XY")
 
@@ -956,7 +958,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
         def __init__(self):
             object.__setattr__(self, "UseParentScale", True)
             object.__setattr__(self, "ScaleRatio", (1.0, 2.0))
-            object.__setattr__(self, "surface", False)
+            object.__setattr__(self, "surface", True)
             object.__setattr__(self, "Position", drawing.NUMERAL_PROFILE_CENTER)
 
         def __setattr__(self, name, value):
@@ -996,7 +998,7 @@ def test_numeral_profile_refuses_ignored_native_display_or_placement(monkeypatch
             if view is section and refusal == "centering" else drawing.NUMERAL_PROFILE_CENTER
         ),
     )
-    with pytest.raises(RuntimeError, match="full, cut-surface-only|scale|centred"):
+    with pytest.raises(RuntimeError, match="full section|scale|centred"):
         drawing._numeral_profile(object(), parent)
 
 
@@ -1004,19 +1006,20 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     ratio = drawing.NUMERAL_PROFILE_SCALE[0] / drawing.NUMERAL_PROFILE_SCALE[1]
     assert spec.NUMERAL_DEPTH * ratio >= 4.0
     assert spec.NUMERAL_STROKE_WIDTH_MM * ratio >= 2.4
-    # The full 8 x 3 bar section; the cutting line misses every graduation.
-    half_width = spec.BODY_WIDTH * ratio / 2000.0
-    half_height = spec.BODY_THICKNESS * ratio / 2000.0
+    # The full 8 x 3 bar section reads upright: thickness across, width up.
+    half_width = spec.BODY_THICKNESS * ratio / 2000.0
+    half_height = spec.BODY_WIDTH * ratio / 2000.0
     x, y = drawing.NUMERAL_PROFILE_CENTER
     profile = Box(x - half_width, y - half_height, x + half_width, y + half_height)
     assert (profile.xmin, profile.ymin, profile.xmax, profile.ymax) == pytest.approx(
-        (0.220, 0.110, 0.300, 0.140),
+        (0.265, 0.085, 0.295, 0.165),
     )
-    assert profile.xmin - (drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 2000.0) > 0.005
-    assert drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DETAIL_SCALE[0] / 2000.0 - profile.xmax > 0.020
+    numeral_right = drawing.NUMERAL_CENTER[0] + drawing.NUMERAL_RADIUS_MM * drawing.DETAIL_SCALE[0] / 1000.0
+    depth_left = drawing.DEPTH_CENTER[0] - drawing.DEPTH_RADIUS_MM * drawing.DEPTH_SCALE[0] / 1000.0
+    # The V depth callout ends left of the section, right of detail F's circle.
+    depth_text_right = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"][0]
+    assert numeral_right < depth_text_right - len("HOLDS ENAMEL FILL") * 0.00275 < depth_text_right < profile.xmin
+    assert depth_left - profile.xmax > 0.020
+    # The cutting line misses every graduation.
     minor = spec.SCALE_START_X + spec.MINOR_SPACING
     assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.1
-    # The 1:1 parent sits clear of the depth callout to its right.
-    parent_right = drawing.NUMERAL_PROFILE_PARENT_CENTER[0] + spec.BODY_LENGTH / 2000.0
-    depth_text = "NUMERAL DEPTH, 30° INCLUDED V"
-    assert drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"][0] - len(depth_text) * 0.00275 / 2.0 - parent_right > 0.005
