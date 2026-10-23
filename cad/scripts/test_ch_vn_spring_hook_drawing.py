@@ -862,13 +862,13 @@ def _settled_eye_scene(monkeypatch, module):
     monkeypatch.setattr(module, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(module, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
     state = SimpleNamespace(sheet="FINISHED", saved=False)
-    sheet = SimpleNamespace(GetName=lambda: state.sheet)
+    native_sheet = SimpleNamespace(GetName=lambda: state.sheet)
     model = SimpleNamespace(
         ActivateSheet=lambda name: setattr(state, "sheet", name) or True,
         ActiveDrawingView=None, GetEditSheet=lambda: True,
         GetType=lambda: 3,
         GetPathName=lambda: str(module.OUTPUTS.slddrw.resolve()) if state.saved else "",
-        GetCurrentSheet=lambda: sheet,
+        GetCurrentSheet=lambda: native_sheet,
         GetTitle=lambda: {
             "FINISHED": "opaque drawing window / first # 71",
             "SUPPLIER-STOCK": "opaque drawing window / second # 24",
