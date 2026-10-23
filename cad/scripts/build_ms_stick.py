@@ -207,12 +207,18 @@ def _feature_cut4(adapter, sketch_name: str, args: tuple, region_xy: tuple | Non
 async def _try_cut(adapter, sketch_name: str, args: tuple, region_xy: tuple | None = None) -> str:
     """Diagnostic: make one cut, report what it removed, and undo it."""
     pre = await _volume_mm3(adapter)
-    feature = _feature_cut4(adapter, sketch_name, args, region_xy)
+    try:
+        feature = _feature_cut4(adapter, sketch_name, args, region_xy)
+    except Exception as exc:  # noqa: BLE001 - a diagnostic reports, never raises
+        feature = exc
     if isinstance(feature, Exception):
-        return str(feature)
-    removed = pre - await _volume_mm3(adapter)
-    adapter.currentModel.EditUndo2(1)
-    return f"created, removed {removed:.4f} mm^3"
+        result = str(feature)
+    else:
+        removed = pre - await _volume_mm3(adapter)
+        adapter.currentModel.EditUndo2(1)
+        result = f"created, removed {removed:.4f} mm^3"
+    _telemetry.info(f"V cut probe on {sketch_name}: {result}")
+    return result
 
 
 async def _first_v_cut(adapter, sketch_name: str, first_rect_center: tuple) -> tuple:
