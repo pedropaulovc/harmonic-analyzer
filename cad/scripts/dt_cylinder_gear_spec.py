@@ -126,10 +126,18 @@ CAM_WALL_MIN_MM = (
 # datum); error_budget.yaml cam_phase. Carried on the native NotchPhase
 # angular dimension (build_dt_cylinder_gear), lobe axis to notch radial.
 CAM_PHASE_TOLERANCE_DEG = 0.25
+# The kerf is a sighted phase mark, engaged by nothing (no pin, gauge or
+# mating part), so no lower limit carries a function.  Its one functional
+# limit is the maximum: where the flanks meet the root the stock tooth gap is
+# just over 0.41 wide, so a wider kerf nicks both neighbouring teeth (the old
+# +0.10/0 band reached 0.50; machinist review e04fd60 r2/r3).  Printed as the
+# single limit "0.40 MAX": swTolMAX prints the nominal, so the modelled kerf
+# IS the limit and the band runs from nothing up to it.
 NOTCH_WIDTH = 0.4  # alignment saw-kerf
-NOTCH_WIDTH_BAND = (0.10, 0.0)  # (upper, lower) deviations
-# The kerf is a sighted phase mark, engaged by nothing: its depth only has to
-# reach below the tooth root, so it prints to the title-block .X band.
+NOTCH_WIDTH_BAND = (0.0, -NOTCH_WIDTH)  # (upper, lower): any saw up to the MAX
+NOTCH_WIDTH_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "0.40 MAX"
+# Its depth only has to reach below the tooth root, so it prints to the
+# title-block .X band.
 NOTCH_DEPTH = 3.0
 TIP_RADIUS = OUTSIDE_DIA / 2.0
 NOTCH_FLOOR_RADIUS = TIP_RADIUS - NOTCH_DEPTH

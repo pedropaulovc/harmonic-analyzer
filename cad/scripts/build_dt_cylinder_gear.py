@@ -88,7 +88,7 @@ from _sketch import (
 )
 from _sketch_circle import define_circle
 from _drawing_dimension_insert import add_angular_reference_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -124,6 +124,7 @@ from dt_cylinder_gear_spec import (
     NOTCH_PHASE_DEG,
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
+    NOTCH_WIDTH_TOL_TYPE,
     PATTERN_NOTCH_REF_ANGLE_DEG,
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
@@ -249,6 +250,36 @@ def _body_state(adapter, feature_name: str | None = None) -> str:
         error = _early_bound(raw, "IFeature").GetErrorCode2()
         state += f", {feature_name} error {error!r}"
     return state
+
+
+def _notch_width_max_limit(adapter) -> None:
+    """NotchWidth as the single limit "0.40 MAX" (dt_cylinder_gear_spec.
+    NOTCH_WIDTH): swTolMAX prints the nominal then MAX, so the modelled kerf
+    IS the limit; the deviations stay on the native tolerance as the model's
+    record of the band (build_ch_fulcrum_keeper._single_limit's recipe)."""
+    label = "NotchWidth@NotchProfile"
+    _, dimension = _named_dimension(adapter, "NotchProfile", "NotchWidth")
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, NOTCH_WIDTH / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the limit {NOTCH_WIDTH}"
+        )
+    lower, upper = deviations(NOTCH_WIDTH_BAND)
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = NOTCH_WIDTH_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != NOTCH_WIDTH_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {NOTCH_WIDTH:g} MAX")
 
 
 def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
@@ -673,7 +704,7 @@ async def build(adapter) -> dict[str, str]:
                 f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
             )
     # Bilateral bands print at the nominal's places (rule 3): machinist
-    # review r1 read "0.0/-0.1" under 64.44 and "+0.1/0.0" under 0.40.
+    # review r1 read "0.0/-0.1" under 64.44.
     set_dimension_bilateral_tolerance(
         adapter,
         "GearBlankProfile",
@@ -704,13 +735,7 @@ async def build(adapter) -> dict[str, str]:
         "CamCy",
         ECCENTRICITY_TOLERANCE_MM,
     )
-    set_dimension_bilateral_tolerance(
-        adapter,
-        "NotchProfile",
-        "NotchWidth",
-        *deviations(NOTCH_WIDTH_BAND),
-        places=DRAWING_PRECISION["NotchProfile"]["NotchWidth"],
-    )
+    _notch_width_max_limit(adapter)
     # NotchDepth carries no model band: the sighted kerf prints to the
     # title-block .X row (dt_cylinder_gear_spec.NOTCH_DEPTH).
     set_dimension_symmetric_angular_tolerance(
