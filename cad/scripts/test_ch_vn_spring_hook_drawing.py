@@ -304,11 +304,18 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
 
 
 @pytest.mark.parametrize(
+    "target_orientation", ("*Front", "*Isometric"), ids=("front-a269", "iso-a06"),
+)
+@pytest.mark.parametrize(
     "placement,fault",
     (
         ("old", None),
         ("previous-whole-mm", None),
         ("current", None),
+        ("current", "left-boundary"),
+        ("current", "bottom-boundary"),
+        ("current", "right-boundary"),
+        ("current", "top-boundary"),
         ("current", "left"),
         ("current", "bottom"),
         ("current", "right"),
@@ -316,22 +323,35 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
         ("current", "missing"),
     ),
 )
-def test_finished_front_creation_fits_recorded_a269_native_cell(
-    monkeypatch, tmp_path, placement, fault,
+def test_finished_view_creation_fits_recorded_native_cell(
+    monkeypatch, tmp_path, target_orientation, placement, fault,
 ):
-    """Replay native-box translation, not a new-leaf or printed-edge proof."""
-    old_center = (0.100, 0.18625)
-    recorded_outline = (
-        0.06266199906333915, 0.10143093577628477,
-        0.13733800093666088, 0.2710690642237152,
-    )
+    """Replay recorded native boxes, not a new-leaf or printed-edge proof."""
+    native_cases = {
+        "*Front": (
+            "FRONT_CENTER", (0.100, 0.18625), (5.0, 1.0),
+            (
+                0.06266199906333915, 0.10143093577628477,
+                0.13733800093666088, 0.2710690642237152,
+            ),
+        ),
+        "*Isometric": (
+            "FINISHED_ISO_CENTER", (0.310, 0.213), (3.0, 1.0),
+            (
+                0.2872237893868808, 0.15867221871562523,
+                0.3327762106131192, 0.2673277812843747,
+            ),
+        ),
+    }
+    center_attribute, old_center, _recorded_scale, recorded_outline = native_cases[target_orientation]
     finished_cell = (0.0127, 0.0651, 0.4191, 0.2667)
     overflow = recorded_outline[3] - finished_cell[3]
     whole_mm_shift = math.ceil(overflow * 1000) / 1000
+    assert whole_mm_shift == (0.005 if target_orientation == "*Front" else 0.001)
     assert whole_mm_shift <= recorded_outline[1] - finished_cell[1]
     if placement != "current":
         shift = 0.0 if placement == "old" else whole_mm_shift - 0.001
-        monkeypatch.setattr(drawing, "FRONT_CENTER", (old_center[0], old_center[1] - shift))
+        monkeypatch.setattr(drawing, center_attribute, (old_center[0], old_center[1] - shift))
 
     source_path = tmp_path / "anchor.SLDPRT"
     source_path.touch()
@@ -362,21 +382,22 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
 
     def place_view(_adapter, _path, orientation, x, y, *, scale):
         placements.append((orientation, x, y, scale))
-        if orientation == "*Front":
-            ratio = scale[0] / scale[1] / 5.0
-            outline = tuple(
-                (x, y)[index % 2]
-                + (value - old_center[index % 2]) * ratio
-                for index, value in enumerate(recorded_outline)
+        _attribute, baseline_center, baseline_scale, baseline_outline = native_cases[orientation]
+        ratio = scale[0] / scale[1] / (baseline_scale[0] / baseline_scale[1])
+        outline = tuple(
+            (x, y)[index % 2]
+            + (value - baseline_center[index % 2]) * ratio
+            for index, value in enumerate(baseline_outline)
+        )
+        if orientation == target_orientation and fault not in (None, "missing"):
+            edge = fault.removesuffix("-boundary")
+            index = ("left", "bottom", "right", "top").index(edge)
+            values = list(outline)
+            values[index] = finished_cell[index] + (
+                0.0 if fault.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
             )
-            if fault in ("left", "bottom", "right", "top"):
-                index = ("left", "bottom", "right", "top").index(fault)
-                values = list(outline)
-                values[index] = finished_cell[index] + (-1e-12 if index < 2 else 1e-12)
-                outline = tuple(values)
-            view = make_view("finished-front", outline)
-        else:
-            view = make_view("finished-iso", (0.280, 0.180, 0.340, 0.240))
+            outline = tuple(values)
+        view = make_view("finished-front" if orientation == "*Front" else "finished-iso", outline)
         views[orientation] = view
         model.ActiveDrawingView = view
         return view
@@ -386,9 +407,9 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
 
     def iter_views(_adapter):
         if state.sheet == "FINISHED":
-            return (
-                (views["*Isometric"],) if fault == "missing"
-                else (views["*Front"], views["*Isometric"])
+            return tuple(
+                view for orientation, view in views.items()
+                if fault != "missing" or orientation != target_orientation
             )
         return stock, stock_iso
 
@@ -440,26 +461,43 @@ def test_finished_front_creation_fits_recorded_a269_native_cell(
     monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
 
-    if placement != "current" or fault is not None:
+    if placement != "current" or fault in ("left", "bottom", "right", "top", "missing"):
         message = "view disappeared" if fault == "missing" else "view leaves its cell"
         with pytest.raises(RuntimeError, match=message):
             asyncio.run(drawing.build(adapter))
         return
 
     assert asyncio.run(drawing.build(adapter)) == {"layout": "contained"}
-    orientation, x, y, scale = placements[0]
-    assert orientation == "*Front"
-    assert (x, y) == pytest.approx(
-        (old_center[0], old_center[1] - whole_mm_shift), rel=0, abs=1e-15,
-    )
-    assert scale == (5.0, 1.0)
-    assert placements[1] == ("*Isometric", 0.310, 0.213, (3.0, 1.0))
-    assert views["*Front"].outline == pytest.approx(
-        (
-            recorded_outline[0], 0.09643093577628477,
-            recorded_outline[2], 0.2660690642237152,
+    assert placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+    ]
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.213)
+    assert drawing.STOCK_CENTER == (0.150, 0.1755)
+    assert drawing.FRONT_KEEP == {
+        "FinishedOverall": (0.042, 0.18625),
+        "ChamferWidth": (0.168, 0.100),
+        "ChamferAngle": (0.124, 0.117),
+    }
+    expected_outline = [
+        value - (whole_mm_shift if index % 2 else 0)
+        for index, value in enumerate(recorded_outline)
+    ]
+    if fault is not None:
+        index = ("left", "bottom", "right", "top").index(fault.removesuffix("-boundary"))
+        expected_outline[index] = finished_cell[index]
+    actual_outline = views[target_orientation].outline
+    assert actual_outline == pytest.approx(expected_outline, rel=0, abs=1e-15)
+    if target_orientation == "*Isometric" and fault is None:
+        assert (
+            actual_outline[0] - finished_cell[0],
+            actual_outline[1] - finished_cell[1],
+            finished_cell[2] - actual_outline[2],
+            finished_cell[3] - actual_outline[3],
+        ) == pytest.approx(
+            (0.2745237893868808, 0.09257221871562523, 0.0863237893868808, 0.0003722187156253),
+            rel=0, abs=1e-15,
         )
-    )
     assert [name for name, _cell in checked_cells] == [
         "finished-front", "finished-iso", "stock-front", "stock-iso",
     ]
@@ -857,8 +895,12 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(monkeypat
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock, stock_iso))
     else:
-        monkeypatch.setattr(module, "_supplier_stock_diagram", lambda *_args:
-                            (stock, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)))
+        def supplier_stock_diagram(stock_adapter, source_model):
+            assert stock_adapter is scene.adapter
+            assert source_model is source
+            return stock, scene.refs["SUPPLIER-STOCK"], _stock_note_contracts(module)
+
+        monkeypatch.setattr(module, "_supplier_stock_diagram", supplier_stock_diagram)
         monkeypatch.setattr(module, "iter_views", lambda _adapter:
                             (front, iso) if scene.state.sheet == "FINISHED" else (stock,))
     saved = []
@@ -1106,12 +1148,15 @@ def _note_build_scene(monkeypatch, tmp_path, module):
             state.mutate_note(note)
         return note
 
-    def supplier_stock(*_args):
+    def supplier_stock(stock_adapter, *source_models):
         model.ActiveDrawingView = None
         if state.target_sheet == "SUPPLIER-STOCK" and stock_notes:
             state.mutate_note(stock_notes[0][0])
         if module is drawing:
             return stock, stock_iso, [], stock_notes
+        assert stock_adapter is adapter
+        assert len(source_models) == 1
+        assert source_models[0] is source
         return stock, [], stock_notes
 
     async def finalize(_adapter, _outputs, *, settled_checks, checkpoint, **_kwargs):
@@ -1179,7 +1224,11 @@ def test_finished_source_notes_keep_links_resolved_text_and_sheet_ownership(
     assert scene.notes["Supplier"].extent[1] < 0.0651
     assert scene.placements == [
         ("*Front", *module.FRONT_CENTER, module.SHEET_SCALE),
-        ("*Isometric", *module.ISO_CENTER, module.ISO_SCALE),
+        (
+            "*Isometric",
+            *(module.FINISHED_ISO_CENTER if module is drawing else module.ISO_CENTER),
+            module.ISO_SCALE,
+        ),
     ]
     assert scene.state.sheet == "FINISHED"
     assert scene.state.saved
@@ -1355,8 +1404,10 @@ def test_channel_stock_builder_returns_sheet_owned_literal_triples(monkeypatch, 
         assert note.extent == pytest.approx(expected_note.extent)
     assert placements == [
         ("*Front", *drawing.STOCK_CENTER, drawing.STOCK_SCALE),
-        ("*Isometric", *drawing.ISO_CENTER, drawing.ISO_SCALE),
+        ("*Isometric", *drawing.STOCK_ISO_CENTER, drawing.ISO_SCALE),
     ]
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.213)
+    assert placements[1] == ("*Isometric", 0.310, 0.213, (3.0, 1.0))
     assert stock.ReferencedConfiguration == iso.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
 
 

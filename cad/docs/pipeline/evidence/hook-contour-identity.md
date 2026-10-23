@@ -337,6 +337,76 @@ a larger model cell or permission to skip a guard. Its native outcome, and
 both recipes' subsequent rebuild/save boundaries, remain unproven until the
 next changed-source production pair.
 
+## Production root corrections exercised at a06
+
+Source `a06dd6c3b57497825d45d95a77cc7e3437d287bd`, run
+`20261023T005708129Z-602010ea5bbb4ef2af13b5c407c9e212`, build
+`20261023T005745.286345Z-9969d5f3cd7042d5ab8089b1df698d59`, completed with two
+part cache hits and two failed drawings. The immutable handoff is
+`hook-contour-proof/final-root-a06dd6c3b-native-handoff.json`.
+
+SM reached successful native `drawing.assert_supplier_reference_dimension`
+spans for `EyeID` and `SupplierThreadMajor`. Correlating those spans with the
+exact source proves that the complete coordinate-pick group passed validation,
+the unconditional direct silhouette reselection passed count1/type46/current
+physical-circle/source-owner checks, and the diameter was created. These
+primitive guard values were not individually emitted; this is source-correlated
+successful native control flow, not a new raw geometry census.
+
+The subsequent stock diagram failed
+`revealed supplier diagram outline does not cover its source profile` after
+revealing its saved-hidden `SupplierNominalStockProfile` and rebuilding. That
+error did not emit the actual outline, transform or individual expected/actual
+spans. It does not establish a different physical eye, and does not authorize
+changing nominal source geometry, coverage bounds or the boundary allowance.
+Source-profile configuration, projection and native outline must distinguish
+the stock-stage root before changing its acceptance guard.
+
+CH reached successful native reference assertions for EyeOD, EyeID, the
+finished thread and all three stock references. In its first settled layout
+check, the retained FINISHED-note owner/link/resolved-text/border checks and
+front-view containment passed. The second real view then failed with:
+
+```text
+(0.2872237893868808, 0.15867221871562523,
+ 0.3327762106131192, 0.2673277812843747) m
+```
+
+The box midpoint matches the FINISHED isometric centre `(0.310, 0.213) m`.
+Against the unchanged cell `(0.0127, 0.0651, 0.4191, 0.2667) m`, clearances are
+left `274.5237893868808 mm`, right `86.3237893868808 mm` and bottom
+`93.57221871562523 mm`; the top overflows by `0.6277812843747 mm`. A 1 mm
+downward FINISHED-only translation is the smallest whole-millimetre correction:
+predicted Y bounds become `(0.15767221871562523, 0.2663277812843747) m`, leaving
+`0.3722187156253 mm` top clearance. The stock isometric position must remain
+independent and unchanged. Neither this box calculation nor border containment
+proves printed neighbour-ink clearance; the final whole-page native PDF and
+machinist review must inspect the isometric label and nearby annotations.
+
+The finished and stock isometric placements are now separate contracts:
+`FINISHED_ISO_CENTER = (0.310, 0.212) m` and unchanged
+`STOCK_ISO_CENTER = (0.310, 0.213) m`. Both callers use their own contract;
+there is no shared alias that would inadvertently move the stock diagram.
+
+Baseline-only neighbour evidence is retained in
+`hook-contour-proof/ch-finished-iso-a06-bounded-placement-and-baseline-neighbor-ink.json`.
+The released-v44 PDF's uncropped embedded isometric image (xref32, soft mask33)
+has nonzero-alpha support at sheet Y `172.8152244464137..254.03166100315443 mm`.
+The unchanged caption's original PDF font-span top is `164.43422453138564 mm`:
+the baseline gap is `8.38099991502806 mm`, predicting `7.38099991502806 mm`
+after moving only the pictorial down 1 mm. This uses every alpha byte greater
+than zero, not a hand-picked crop or threshold search. Raster support and
+font-span boxes are not exact analytic edges/glyph ink, and new supplier
+annotations/current native rendering still require whole-page acceptance.
+
+Neither drawing reached the final post-rebuild attachment observer or native
+save. Neither exported a PDF, PNG, native drawing or layout audit; neither
+uploaded a failure-artifact bundle. SM's successful initial physical-ID
+attachment does not substitute for after-rebuild/save survival. CH's FINISHED
+note success does not prove its later stock-note checks, nor SM note ownership.
+No whole-v44 comparison or automated machinist qualification is available from
+this attempt.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate

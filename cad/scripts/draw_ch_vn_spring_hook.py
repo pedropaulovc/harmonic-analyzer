@@ -96,13 +96,21 @@ ISO_SCALE = (3.0, 1.0)
 STOCK_SCALE = (5.0, 1.0)
 SHEET_NAMES = ("FINISHED", "SUPPLIER-STOCK")
 STOCK_CENTER = (0.150, 0.1755)
-FRONT_CENTER = (0.100, 0.18125)
-ISO_CENTER = (0.310, 0.213)
 # a269's settled GetOutline exceeded the unchanged FINISHED cell top by
 # 4.3690642237152 mm, with 36.33093577628477 mm of bottom slack. Lower only
 # this view 5 mm: the smallest whole-mm translation containing that recorded
 # native box. GetOutline does not guarantee a tight physical-edge envelope;
 # the translated placement still needs native qualification. Text anchors stay put.
+FRONT_CENTER = (0.100, 0.18125)
+# a06's FINISHED isometric GetOutline exceeds the unchanged cell top by
+# 0.6277812843747 mm, with 93.57221871562523 mm of bottom slack. Lower only
+# that pictorial 1 mm, the smallest whole-mm shift: top/bottom clearance becomes
+# 0.3722187156253/92.57221871562523 mm. Its padded outline is not physical ink;
+# the retained v44 PDF's opaque pictorial-to-caption gap predicts 7.381 mm
+# after this shift, not native/printed acceptance of the new output.
+FINISHED_ISO_CENTER = (0.310, 0.212)
+# Preserve the supplier-stock pictorial independently of the finished placement.
+STOCK_ISO_CENTER = (0.310, 0.213)
 # The deburr's value and callout hang right of the shank, clear of their own
 # extension lines (review r8: centred under the 2.3 mm leg they were struck)
 # and above the notes.
@@ -277,7 +285,7 @@ def _supplier_stock_sheet(adapter):
         "IView",
     )
     iso = _early_bound(
-        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE),
+        place_view(adapter, str(SOURCE), "*Isometric", *STOCK_ISO_CENTER, scale=ISO_SCALE),
         "IView",
     )
     for view in (stock, iso):
@@ -537,7 +545,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=SHEET_SCALE)
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *FINISHED_ISO_CENTER, scale=ISO_SCALE)
     for view in (front, iso):
         view = _early_bound(view, "IView")
         view.ReferencedConfiguration = finished_configuration

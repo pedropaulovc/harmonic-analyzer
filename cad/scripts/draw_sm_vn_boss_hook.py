@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.com_variant import bstr_array, double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note, dimension_name, iter_views, place_view, view_name,
 )
@@ -358,7 +359,159 @@ def _supplier_references(
     return refs
 
 
-def _supplier_stock_diagram(adapter: Any):
+def _supplier_stock_coverage_receipt(
+    adapter: Any, stock: Any, source_model: Any, original: dict[str, Any],
+) -> dict[str, Any]:
+    """Read one failed stock view without refreshing, selecting or changing it."""
+    receipt: dict[str, Any] = {
+        "kind": "sm_stock_profile_coverage_failure",
+        "original_predicate": original,
+        "later_readback": {},
+    }
+    later = receipt["later_readback"]
+
+    def read(target, field, getter):
+        try:
+            value = getter()
+            # A nonfinite/native-only value is a field error, not lost JSON.
+            json.dumps(value, allow_nan=False)
+            target[field] = {"value": value}
+            return value
+        except Exception as error:
+            target[field] = {
+                "error": {"type": type(error).__name__, "message": str(error)},
+            }
+            return None
+
+    def native(target, field, getter, interface):
+        try:
+            raw = getter()
+            target[field] = {"present": raw is not None}
+            return None if raw is None else _early_bound(raw, interface)
+        except Exception as error:
+            target[field] = {
+                "error": {"type": type(error).__name__, "message": str(error)},
+            }
+            return None
+
+    def point(target, field, getter):
+        raw = native(target, field, getter, "ISketchPoint")
+        if raw is not None:
+            read(target[field], "coordinates_m",
+                 lambda: [float(raw.X), float(raw.Y), float(raw.Z)])
+
+    view = later["view"] = {}
+    read(view, "name", lambda: str(stock.GetName2()))
+    read(view, "ReferencedConfiguration", lambda: str(stock.ReferencedConfiguration))
+    read(view, "GetDisplayMode2", lambda: int(stock.GetDisplayMode2()))
+    read(view, "ScaleRatio", lambda: [float(value) for value in stock.ScaleRatio])
+    read(view, "ScaleDecimal", lambda: float(stock.ScaleDecimal))
+    read(view, "UseSheetScale", lambda: int(stock.UseSheetScale))
+    read(view, "Position", lambda: [float(value) for value in stock.Position])
+    transform = native(
+        view, "ModelToViewTransform", lambda: stock.ModelToViewTransform, "IMathTransform",
+    )
+    if transform is not None:
+        read(view["ModelToViewTransform"], "ArrayData",
+             lambda: [float(value) for value in transform.ArrayData])
+    source = native(view, "ReferencedDocument", lambda: stock.ReferencedDocument, "IModelDoc2")
+    document = later["source"] = {
+        "expected_path": SOURCE.resolve().as_posix(),
+        "expected_stock_configuration": SUPPLIER_STOCK_CONFIGURATION,
+    }
+    read(document, "source_model_self_IsSame", lambda: int(adapter.swApp.IsSame(source_model, source_model)))
+    if source is None:
+        return receipt
+    read(document, "view_source_IsSame", lambda: int(adapter.swApp.IsSame(source, source_model)))
+    path = read(document, "path", lambda: str(source.GetPathName()))
+    read(document, "path_matches_expected",
+         lambda: path.replace("\\", "/").casefold() == document["expected_path"].casefold())
+    read(document, "active_configuration", lambda: active_configuration_name(adapter, source))
+    configuration = native(
+        document, "stock_configuration",
+        lambda: source.GetConfigurationByName(SUPPLIER_STOCK_CONFIGURATION), "IConfiguration",
+    )
+    if configuration is not None:
+        read(document["stock_configuration"], "Name", lambda: str(configuration.Name))
+        read(document["stock_configuration"], "GetID", lambda: int(configuration.GetID()))
+    part = native(document, "IPartDoc", lambda: source, "IPartDoc")
+    if part is None:
+        return receipt
+    profile = document["profile"] = {}
+    feature = native(
+        profile, "IFeature", lambda: part.FeatureByName(SUPPLIER_STOCK_FEATURE), "IFeature",
+    )
+    if feature is None:
+        return receipt
+    read(profile, "name", lambda: str(feature.Name))
+    read(profile, "GetTypeName2", lambda: str(feature.GetTypeName2()))
+    read(profile, "Visible_in_source", lambda: int(feature.Visible))
+    read(profile, "suppressed_in_stock_configuration",
+         lambda: list(feature.IsSuppressed2(
+             3, bstr_array([SUPPLIER_STOCK_CONFIGURATION]),
+         )))
+    dimensions = profile["dimensions_in_stock_configuration"] = {}
+    for name in sorted(SUPPLIER_STOCK_DIMENSIONS[SUPPLIER_STOCK_FEATURE]):
+        row = dimensions[name] = {}
+        dimension = native(row, "IDimension", lambda name=name: feature.Parameter(name), "IDimension")
+        if dimension is not None:
+            read(row, "FullName", lambda: str(dimension.FullName))
+            read(row, "GetSystemValue3",
+                 lambda: [float(value) for value in dimension.GetSystemValue3(
+                     3, bstr_array([SUPPLIER_STOCK_CONFIGURATION]),
+                 )])
+    sketch = native(profile, "ISketch", lambda: feature.GetSpecificFeature2(), "ISketch")
+    if sketch is None:
+        return receipt
+    transform = native(
+        profile, "ModelToSketchTransform", lambda: sketch.ModelToSketchTransform, "IMathTransform",
+    )
+    if transform is not None:
+        read(profile["ModelToSketchTransform"], "ArrayData",
+             lambda: [float(value) for value in transform.ArrayData])
+    # Geometry is read in the reported active configuration, never switched.
+    # The named-config dimension/suppression reads above remain independent.
+    try:
+        raw_segments = sketch.GetSketchSegments()
+        segments = tuple(raw_segments) if raw_segments is not None else ()
+        profile["GetSketchSegments"] = {
+            "present": raw_segments is not None, "count": len(segments),
+            "expected_count": 9, "sample_truncated": len(segments) > 9,
+        }
+    except Exception as error:
+        profile["GetSketchSegments"] = {
+            "error": {"type": type(error).__name__, "message": str(error)},
+        }
+        return receipt
+    rows = profile["segments"] = []
+    for index, raw in enumerate(segments[:9]):
+        row = {"index": index}
+        rows.append(row)
+        segment = native(row, "ISketchSegment", lambda raw=raw: raw, "ISketchSegment")
+        if segment is None:
+            continue
+        kind = read(row, "GetType", lambda: int(segment.GetType()))
+        read(row, "ConstructionGeometry", lambda: bool(segment.ConstructionGeometry))
+        if kind == 0:  # swSketchLINE: never ask a line for arc-only members.
+            line = native(row, "ISketchLine", lambda: segment, "ISketchLine")
+            if line is not None:
+                point(row, "start", lambda: line.GetStartPoint2())
+                point(row, "end", lambda: line.GetEndPoint2())
+        elif kind == 1:  # swSketchARC: IsCircle distinguishes full circles.
+            arc = native(row, "ISketchArc", lambda: segment, "ISketchArc")
+            if arc is not None:
+                read(row, "IsCircle", lambda: int(arc.IsCircle()))
+                point(row, "centre", lambda: arc.GetCenterPoint2())
+                point(row, "start", lambda: arc.GetStartPoint2())
+                point(row, "end", lambda: arc.GetEndPoint2())
+                read(row, "radius_m", lambda: float(arc.GetRadius()))
+                read(row, "normal", lambda: [float(value) for value in arc.GetNormalVector()])
+        elif kind is not None:
+            row["unexpected_type"] = kind
+    return receipt
+
+
+def _supplier_stock_diagram(adapter: Any, source_model: Any):
     """A separate zero-body source profile, never false-sized finished edges."""
     stock = _early_bound(
         place_view(adapter, str(SOURCE), "*Front", *STOCK_CENTER, scale=STOCK_SCALE),
@@ -388,11 +541,46 @@ def _supplier_stock_diagram(adapter: Any):
         ) / 1000.0 * ratio,
         SUPPLIER_STOCK_OVERALL_MM / 1000.0 * ratio,
     )
-    for actual, expected in zip(
+    for failed_index, (actual, expected) in enumerate(zip(
         (outline[2] - outline[0], outline[3] - outline[1]), expected_spans, strict=True
-    ):
+    )):
         if not expected - 1e-7 <= actual <= expected + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M:
-            raise RuntimeError("revealed supplier diagram outline does not cover its source profile")
+            error = RuntimeError("revealed supplier diagram outline does not cover its source profile")
+            # Freeze both axes and the first failed index before any census read.
+            original = {
+                "outline_m": outline,
+                "expected_spans_m": expected_spans,
+                "failed_index": failed_index,
+                "shown_owners": tuple(shown),
+                "axes": [
+                    {
+                        "axis": axis, "actual_m": span, "expected_m": wanted,
+                        "minimum_m": wanted - 1e-7,
+                        "maximum_m": wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
+                        "covers_source": wanted - 1e-7 <= span,
+                        "within_padding": span <= wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
+                        "passes": wanted - 1e-7 <= span <= wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
+                        "undersize": span < wanted - 1e-7,
+                        "oversize": span > wanted + 2.0 * DEFAULT_BOUNDARY_ALLOWANCE_M,
+                    }
+                    for axis, span, wanted in zip(
+                        ("x", "y"), (outline[2] - outline[0], outline[3] - outline[1]),
+                        expected_spans, strict=True,
+                    )
+                ],
+            }
+            try:
+                receipt = _supplier_stock_coverage_receipt(adapter, stock, source_model, original)
+                error.add_note(
+                    "SM_STOCK_PROFILE_COVERAGE_RECEIPT "
+                    + json.dumps(receipt, allow_nan=False, sort_keys=True, separators=(",", ":"))
+                )
+            except Exception as capture_error:
+                error.add_note(
+                    "SM_STOCK_PROFILE_COVERAGE_RECEIPT capture failed: "
+                    f"{type(capture_error).__name__}: {capture_error}"
+                )
+            raise error
     midpoint = (
         0.0,
         (SUPPLIER_STOCK_AXIS_MM[0][1] + SUPPLIER_STOCK_AXIS_MM[-1][1]) / 2000.0,
@@ -683,7 +871,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
     if drawing.ActivateSheet(SHEET_NAMES[1]) is not True:
         raise RuntimeError("cannot activate counter anchor supplier stock sheet")
-    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter)
+    stock, stock_refs, stock_notes = _supplier_stock_diagram(adapter, source_model)
     set_hidden_lines_removed(adapter, stock)
     view_contracts = {
         SHEET_NAMES[0]: ((view_name(adapter, front), view_name(adapter, iso)), finished_configuration),

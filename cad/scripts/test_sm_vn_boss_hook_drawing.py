@@ -1,5 +1,6 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
+import json
 import math
 from types import SimpleNamespace
 
@@ -1061,3 +1062,410 @@ def test_rebuild_and_native_save_reacquire_strict_attached_geometry_without_repa
             drawing._verify_supplier_references(scene.adapter, settled.refs, settled.contracts)
             assert len(scene.mappings) == before + 1 and scene.mappings[-1] is fresh_eye.GetFace()
     assert scene.picks == [] and scene.projections == [] and scene.visible_queries == []
+
+
+@pytest.fixture
+def stock_profile_receipt_scene(monkeypatch, tmp_path):
+    """One retained view/source/sketch; all mutation and foreign casts fail."""
+    calls, bindings, queries = [], [], []
+
+    def forbid(*_args, **_kwargs):
+        pytest.fail("a stock coverage receipt must not mutate or refresh native state")
+
+    def bind(value, kind):
+        assert kind in value._interfaces
+        if kind in ("ISketchLine", "ISketchArc"):
+            assert ("type", value.index) in queries
+        bindings.append((value, kind))
+        return value
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing, "bstr_array", lambda values: values)
+    def point(xyz):
+        return SimpleNamespace(_interfaces={"ISketchPoint"}, X=xyz[0], Y=xyz[1], Z=xyz[2])
+
+    view_matrix = [0.0, 1.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                   0.15, 0.175, 0.0, 2.0, 0.0, 0.0, 0.0]
+    sketch_matrix = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, -1.0, 0.0,
+                     0.003, 0.004, 0.005, 1.0, 0.0, 0.0, 0.0]
+    segments = []
+    for index in range(9):
+        kind = 1 if index < 3 else 0
+        start = (index / 1000.0, -0.04, 0.0)
+        end = (index / 1000.0 + 0.002, -0.06, 0.0)
+        segment = SimpleNamespace(
+            _interfaces={"ISketchSegment", "ISketchArc" if kind == 1 else "ISketchLine"},
+            index=index, ConstructionGeometry=True, Select4=forbid,
+            GetType=lambda index=index, kind=kind: queries.append(("type", index)) or kind,
+            GetStartPoint2=lambda start=start: point(start),
+            GetEndPoint2=lambda end=end: point(end),
+        )
+        if kind == 1:
+            segment.IsCircle = lambda: 1
+            segment.GetCenterPoint2 = lambda index=index: point((0.003 + index / 100.0, 0.004, 0.0))
+            segment.GetRadius = lambda index=index: 0.009 + index / 1000.0
+            segment.GetNormalVector = lambda: (0.0, 0.0, 1.0)
+            segment.SetRadius = forbid
+        segments.append(segment)
+    sketch = SimpleNamespace(
+        _interfaces={"ISketch"},
+        ModelToSketchTransform=SimpleNamespace(_interfaces={"IMathTransform"}, ArrayData=sketch_matrix),
+        GetSketchSegments=lambda: queries.append("segments") or tuple(segments),
+    )
+    values = {
+        "SupplierNominalEyeOD": 0.018, "SupplierNominalWire": 0.0048,
+        "SupplierStockShank": 0.058, "SupplierStockOverall": 0.076,
+    }
+    dimensions = {}
+
+    def dimension_value(name, option, names):
+        assert option == 3 and names == [drawing.SUPPLIER_STOCK_CONFIGURATION]
+        queries.append(("dimension", name, option, tuple(names)))
+        return (values[name],)
+
+    for name in values:
+        dimensions[name] = SimpleNamespace(
+            _interfaces={"IDimension"}, FullName=f"{name}@{drawing.SUPPLIER_STOCK_FEATURE}",
+            GetSystemValue3=lambda option, names, name=name: dimension_value(name, option, names),
+        )
+
+    def suppressed(option, names):
+        assert option == 3 and names == [drawing.SUPPLIER_STOCK_CONFIGURATION]
+        queries.append(("suppression", option, tuple(names)))
+        return (False,)
+
+    feature = SimpleNamespace(
+        _interfaces={"IFeature"}, Name=drawing.SUPPLIER_STOCK_FEATURE, Visible=1,
+        GetTypeName2=lambda: "ProfileFeature", IsSuppressed2=suppressed,
+        Parameter=lambda name: dimensions[name], GetSpecificFeature2=lambda: sketch,
+        Select2=forbid, SetSuppression2=forbid,
+    )
+
+    def by_name(name):
+        assert name == drawing.SUPPLIER_STOCK_FEATURE
+        queries.append(("feature", name))
+        return feature
+
+    source_path = tmp_path / "anchor.SLDPRT"
+    monkeypatch.setattr(drawing, "SOURCE", source_path)
+    configuration = SimpleNamespace(
+        _interfaces={"IConfiguration"}, Name=drawing.SUPPLIER_STOCK_CONFIGURATION,
+        GetID=lambda: 23,
+    )
+
+    def named_configuration(name):
+        assert name == drawing.SUPPLIER_STOCK_CONFIGURATION
+        queries.append(("configuration", name))
+        return configuration
+
+    source = SimpleNamespace(
+        _interfaces={"IModelDoc2", "IPartDoc"},
+        GetPathName=lambda: str(source_path.resolve()).replace("/", "\\").upper(),
+        GetConfigurationByName=named_configuration,
+        FeatureByName=by_name, ShowConfiguration2=forbid, EditRebuild3=forbid,
+        ForceRebuild3=forbid, ClearSelection2=forbid,
+    )
+    stock = SimpleNamespace(
+        _interfaces={"IView"}, ReferencedConfiguration="Default", ReferencedDocument=source,
+        GetName2=lambda: "original-stock-view", ScaleRatio=(2.0, 1.0), Position=drawing.STOCK_CENTER,
+        GetDisplayMode2=lambda: 2, ScaleDecimal=2.0, UseSheetScale=0,
+        ModelToViewTransform=SimpleNamespace(_interfaces={"IMathTransform"}, ArrayData=view_matrix),
+        UpdateViewDisplayGeometry=lambda: calls.append("update"),
+    )
+    state = SimpleNamespace(outline=(0.10, 0.10, 0.11, 0.11))
+
+    def outline():
+        calls.append("outline")
+        assert calls.count("outline") == 1, "never reacquire the failed outline"
+        return state.outline
+
+    stock.GetOutline = outline
+    model = SimpleNamespace(EditRebuild3=lambda: calls.append("rebuild") or True)
+    identity_reads = []
+
+    def same(first, second):
+        assert second is source
+        identity_reads.append((first, second))
+        return int(first is second)
+
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(IsSame=same, GetOpenDocumentByName=forbid, OpenDoc6=forbid),
+    )
+
+    def active_configuration(actual_adapter, actual_source):
+        assert actual_adapter is adapter and actual_source is source
+        return "Default"
+
+    monkeypatch.setattr(drawing, "active_configuration_name", active_configuration)
+    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: calls.append("place") or stock)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: calls.append("mode"))
+    monkeypatch.setattr(
+        drawing, "_show_hidden_owners",
+        lambda *_args, **_kwargs: calls.append("reveal") or [drawing.SUPPLIER_STOCK_FEATURE],
+    )
+    monkeypatch.setattr(drawing, "model_points_in_view", forbid)
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", forbid)
+    return SimpleNamespace(
+        adapter=adapter, stock=stock, source=source, feature=feature, sketch=sketch,
+        segments=segments, dimensions=dimensions, values=values, state=state,
+        calls=calls, bindings=bindings, queries=queries,
+        view_matrix=view_matrix, sketch_matrix=sketch_matrix,
+        identity_reads=identity_reads, configuration=configuration, source_path=source_path,
+    )
+
+
+def _failed_stock_receipt(scene):
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_stock_diagram(scene.adapter, scene.source)
+    assert str(caught.value) == "revealed supplier diagram outline does not cover its source profile"
+    assert len(caught.value.__notes__) == 1
+    marker = "SM_STOCK_PROFILE_COVERAGE_RECEIPT "
+    assert caught.value.__notes__[0].startswith(marker)
+    return json.loads(caught.value.__notes__[0][len(marker):])
+
+
+@pytest.mark.parametrize(
+    "width,height,failed_index,status",
+    (
+        (0.080, 0.1524, 0, ("undersize", None)),
+        (0.090, 0.1524, 0, ("oversize", None)),
+        (0.082225, 0.150, 1, (None, "undersize")),
+        (0.082225, 0.160, 1, (None, "oversize")),
+        (0.080, 0.160, 0, ("undersize", "oversize")),
+        (0.160, 0.160, 0, ("oversize", "oversize")),
+    ),
+)
+def test_stock_failure_freezes_both_original_axis_predicates_before_native_reads(
+    stock_profile_receipt_scene, monkeypatch, width, height, failed_index, status,
+):
+    scene = stock_profile_receipt_scene
+    scene.state.outline = (0.0, 0.0, width, height)
+    capture = drawing._supplier_stock_coverage_receipt
+
+    def later_readback(adapter, stock, source_model, original):
+        assert stock is scene.stock and source_model is scene.source
+        assert scene.calls == ["place", "mode", "reveal", "rebuild", "update", "outline"]
+        assert original["outline_m"] == scene.state.outline
+        # Different later metadata cannot rewrite the original failed predicate.
+        stock.ScaleRatio = (7.0, 1.0)
+        stock.ReferencedConfiguration = "later-configuration"
+        return capture(adapter, stock, source_model, original)
+
+    monkeypatch.setattr(drawing, "_supplier_stock_coverage_receipt", later_readback)
+    receipt = _failed_stock_receipt(scene)
+    original = receipt["original_predicate"]
+    assert original["failed_index"] == failed_index
+    assert original["expected_spans_m"] == pytest.approx([0.082225, 0.1524])
+    assert original["shown_owners"] == [drawing.SUPPLIER_STOCK_FEATURE]
+    for row, wanted, actual, fault in zip(
+        original["axes"], (0.082225, 0.1524), (width, height), status, strict=True,
+    ):
+        assert row["actual_m"] == actual and row["expected_m"] == pytest.approx(wanted)
+        assert row["minimum_m"] == pytest.approx(wanted - 1e-7)
+        assert row["maximum_m"] == pytest.approx(wanted + 0.006)
+        assert row["undersize"] is (fault == "undersize")
+        assert row["oversize"] is (fault == "oversize")
+        assert row["passes"] is (fault is None)
+        assert row["covers_source"] is (fault != "undersize")
+        assert row["within_padding"] is (fault != "oversize")
+    assert receipt["later_readback"]["view"]["ScaleRatio"]["value"] == [7.0, 1.0]
+    assert scene.calls.count("rebuild") == scene.calls.count("update") == scene.calls.count("outline") == 1
+
+
+def test_stock_receipt_records_actual_geometry_transforms_and_named_configuration_values(
+    stock_profile_receipt_scene,
+):
+    scene = stock_profile_receipt_scene
+    receipt = _failed_stock_receipt(scene)
+    later = receipt["later_readback"]
+    assert later["view"]["ModelToViewTransform"]["ArrayData"]["value"] == scene.view_matrix
+    assert later["source"]["active_configuration"]["value"] == "Default"
+    assert later["view"]["GetDisplayMode2"]["value"] == 2
+    assert later["view"]["ScaleDecimal"]["value"] == 2.0
+    assert later["view"]["UseSheetScale"]["value"] == 0
+    assert later["source"]["expected_path"] == scene.source_path.resolve().as_posix()
+    assert later["source"]["path_matches_expected"]["value"] is True
+    assert later["source"]["source_model_self_IsSame"]["value"] == 1
+    assert later["source"]["view_source_IsSame"]["value"] == 1
+    assert len(scene.identity_reads) == 2
+    assert all(first is scene.source and second is scene.source
+               for first, second in scene.identity_reads)
+    assert later["source"]["stock_configuration"] == {
+        "present": True,
+        "Name": {"value": drawing.SUPPLIER_STOCK_CONFIGURATION},
+        "GetID": {"value": 23},
+    }
+    profile = later["source"]["profile"]
+    assert profile["Visible_in_source"]["value"] == 1
+    assert profile["suppressed_in_stock_configuration"]["value"] == [False]
+    assert profile["ModelToSketchTransform"]["ArrayData"]["value"] == scene.sketch_matrix
+    assert profile["GetSketchSegments"] == {
+        "present": True, "count": 9, "expected_count": 9, "sample_truncated": False,
+    }
+    rows = profile["segments"]
+    assert len(rows) == 9
+    for index, row in enumerate(rows):
+        assert row["GetType"]["value"] == (1 if index < 3 else 0)
+        assert row["ConstructionGeometry"]["value"] is True
+        assert row["start"]["coordinates_m"]["value"] == [index / 1000.0, -0.04, 0.0]
+        assert row["end"]["coordinates_m"]["value"] == [index / 1000.0 + 0.002, -0.06, 0.0]
+        if index < 3:
+            assert row["IsCircle"]["value"] == 1
+            assert row["centre"]["coordinates_m"]["value"] == [0.003 + index / 100.0, 0.004, 0.0]
+            assert row["radius_m"]["value"] == 0.009 + index / 1000.0
+            assert row["normal"]["value"] == [0.0, 0.0, 1.0]
+    for name, actual in scene.values.items():
+        assert profile["dimensions_in_stock_configuration"][name]["GetSystemValue3"]["value"] == [actual]
+    assert len([query for query in scene.queries if isinstance(query, tuple) and query[0] == "dimension"]) == 4
+    assert [value for value, kind in scene.bindings if kind == "IView"] == [scene.stock]
+    assert [value for value, kind in scene.bindings if kind == "IFeature"] == [scene.feature]
+
+
+@pytest.mark.parametrize("fault", ("type", "point", "radius", "dimension", "suppression", "transform"))
+def test_stock_receipt_retains_per_field_native_errors_and_continues_other_reads(
+    stock_profile_receipt_scene, fault,
+):
+    scene = stock_profile_receipt_scene
+
+    def failed():
+        raise RuntimeError("native field unavailable")
+
+    if fault == "type":
+        scene.segments[0].GetType = failed
+    elif fault == "point":
+        scene.segments[0].GetCenterPoint2 = failed
+    elif fault == "radius":
+        scene.segments[0].GetRadius = failed
+    elif fault == "dimension":
+        scene.dimensions["SupplierNominalWire"].GetSystemValue3 = lambda *_args: failed()
+    elif fault == "suppression":
+        scene.feature.IsSuppressed2 = lambda *_args: failed()
+    else:
+        scene.stock.ModelToViewTransform.ArrayData = (float("nan"),)
+    receipt = _failed_stock_receipt(scene)
+    profile = receipt["later_readback"]["source"]["profile"]
+    field = {
+        "type": profile["segments"][0].get("GetType"),
+        "point": profile["segments"][0].get("centre"),
+        "radius": profile["segments"][0].get("radius_m"),
+        "dimension": profile["dimensions_in_stock_configuration"]["SupplierNominalWire"].get("GetSystemValue3"),
+        "suppression": profile.get("suppressed_in_stock_configuration"),
+        "transform": receipt["later_readback"]["view"]["ModelToViewTransform"].get("ArrayData"),
+    }[fault]
+    assert "error" in field
+    assert len(profile["segments"]) == 9
+    assert profile["segments"][-1]["end"]["coordinates_m"]["value"] == [0.010, -0.06, 0.0]
+    if fault == "type":
+        assert not any(value is scene.segments[0] and kind in ("ISketchArc", "ISketchLine")
+                       for value, kind in scene.bindings)
+
+
+def test_stock_receipt_never_dual_casts_unexpected_native_segment_type(stock_profile_receipt_scene):
+    scene = stock_profile_receipt_scene
+    scene.segments[0].GetType = lambda: 2  # swSketchELLIPSE, not an arc.
+    receipt = _failed_stock_receipt(scene)
+    row = receipt["later_readback"]["source"]["profile"]["segments"][0]
+    assert row["unexpected_type"] == 2
+    assert not any(value is scene.segments[0] and kind in ("ISketchArc", "ISketchLine")
+                   for value, kind in scene.bindings)
+
+
+@pytest.mark.parametrize("failure", ("capture", "serialization"))
+def test_stock_guard_preserves_original_exception_when_receipt_capture_fails(
+    stock_profile_receipt_scene, monkeypatch, failure,
+):
+    scene = stock_profile_receipt_scene
+
+    def failed(*_args, **_kwargs):
+        raise OSError("receipt capture unavailable")
+
+    if failure == "capture":
+        monkeypatch.setattr(drawing, "_supplier_stock_coverage_receipt", failed)
+    else:
+        monkeypatch.setattr(drawing.json, "dumps", failed)
+    with pytest.raises(RuntimeError) as caught:
+        drawing._supplier_stock_diagram(scene.adapter, scene.source)
+    assert str(caught.value) == "revealed supplier diagram outline does not cover its source profile"
+    assert caught.value.__notes__ == [
+        "SM_STOCK_PROFILE_COVERAGE_RECEIPT capture failed: OSError: receipt capture unavailable",
+    ]
+    assert scene.calls == ["place", "mode", "reveal", "rebuild", "update", "outline"]
+
+
+def test_passing_stock_coverage_never_runs_native_receipt(stock_profile_receipt_scene, monkeypatch):
+    scene = stock_profile_receipt_scene
+    scene.state.outline = (0.0, 0.0, 0.082225, 0.1524)
+
+    def past_guard(*_args, **_kwargs):
+        raise RuntimeError("reached original positioning sequence")
+
+    monkeypatch.setattr(drawing, "model_points_in_view", past_guard)
+    monkeypatch.setattr(
+        drawing, "_supplier_stock_coverage_receipt",
+        lambda *_args: pytest.fail("a passing coverage guard must not run the receipt"),
+    )
+    with pytest.raises(RuntimeError, match="reached original positioning sequence"):
+        drawing._supplier_stock_diagram(scene.adapter, scene.source)
+    assert scene.queries == []
+    assert scene.calls == ["place", "mode", "reveal", "rebuild", "update", "outline"]
+
+
+@pytest.mark.parametrize("fault", ("same-path-foreign-source", "wrong-path", "identity-read-error"))
+def test_stock_receipt_separates_path_and_retained_native_source_identity(
+    stock_profile_receipt_scene, fault,
+):
+    scene = stock_profile_receipt_scene
+    if fault == "same-path-foreign-source":
+        scene.stock.ReferencedDocument = SimpleNamespace(**vars(scene.source))
+    elif fault == "wrong-path":
+        scene.source.GetPathName = lambda: "D:/foreign/anchor.SLDPRT"
+    else:
+        def identity_error(first, second):
+            assert second is scene.source
+            if first is not second:
+                raise RuntimeError("native identity unavailable")
+            return 1
+
+        scene.stock.ReferencedDocument = SimpleNamespace(**vars(scene.source))
+        scene.adapter.swApp.IsSame = identity_error
+    receipt = _failed_stock_receipt(scene)
+    source = receipt["later_readback"]["source"]
+    assert source["source_model_self_IsSame"]["value"] == 1
+    assert source["path_matches_expected"]["value"] is (fault != "wrong-path")
+    if fault == "identity-read-error":
+        assert source["view_source_IsSame"]["error"] == {
+            "type": "RuntimeError", "message": "native identity unavailable",
+        }
+    else:
+        assert source["view_source_IsSame"]["value"] == (0 if fault == "same-path-foreign-source" else 1)
+    assert len(source["profile"]["segments"]) == 9
+
+
+@pytest.mark.parametrize("fault", ("missing", "wrong-name", "read-error"))
+def test_stock_receipt_records_named_configuration_without_activation(
+    stock_profile_receipt_scene, fault,
+):
+    scene = stock_profile_receipt_scene
+    if fault == "missing":
+        scene.source.GetConfigurationByName = lambda _name: None
+    elif fault == "wrong-name":
+        scene.configuration.Name = "different-configuration"
+    else:
+        def unavailable(_name):
+            raise RuntimeError("named configuration unavailable")
+
+        scene.source.GetConfigurationByName = unavailable
+    source = _failed_stock_receipt(scene)["later_readback"]["source"]
+    assert source["expected_stock_configuration"] == drawing.SUPPLIER_STOCK_CONFIGURATION
+    configuration = source["stock_configuration"]
+    if fault == "missing":
+        assert configuration == {"present": False}
+    elif fault == "wrong-name":
+        assert configuration["Name"]["value"] == "different-configuration"
+        assert configuration["GetID"]["value"] == 23
+    else:
+        assert configuration["error"] == {
+            "type": "RuntimeError", "message": "named configuration unavailable",
+        }
+    assert len(source["profile"]["segments"]) == 9
