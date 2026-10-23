@@ -172,9 +172,30 @@ def test_overall_length_is_a_one_place_reference_and_enforced() -> None:
     assert overall == pytest.approx(round(offsets, 1))
     # Outermost: above the offsets' row.
     assert drawing.OVERALL_LINE_Y > drawing.TIP_LINE_Y
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_reference_dimension(" in source
-    assert "assert_dimension_measures(" in source
+    functions = {
+        node.name: node
+        for node in ast.walk(ast.parse(Path(drawing.__file__).read_text("utf-8")))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    def called(function: str) -> set[str]:
+        return {
+            node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+            for node in ast.walk(functions[function])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, (ast.Name, ast.Attribute))
+        }
+
+    # The sheet places it, and the helper creates, measures, parenthesises
+    # and sets the spec's places on it.
+    assert "_add_overall_length" in called("build")
+    assert {
+        "add_edge_dimension",
+        "assert_dimension_measures",
+        "set_reference_dimension",
+        "SetPrecision3",
+        "GetPrimaryPrecision2",
+    } <= called("_add_overall_length")
 
 
 def test_registry_row() -> None:

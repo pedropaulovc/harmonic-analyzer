@@ -49,7 +49,6 @@ from _drawing_dimensions import (
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import scan_view_edges
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -199,17 +198,14 @@ def _add_overall_length(adapter: Any, front: Any) -> None:
         edges.exact_vertex_at(point, label=f"strap tip corner {index}")
         for index, point in enumerate(tips)
     )
-    tips_xy = model_points_in_view(
-        adapter,
-        front,
-        [tuple(v / 1000.0 for v in point) for point in tips],
-        label="strap tip corners",
-    )
+    # The vertices are selected as entities and the dimension is forced
+    # horizontal, so add_edge_dimension never reads p0/p1: the 1:1 view's
+    # nominal sheet points stand in, no COM projection needed (codjiflo P3).
     dimension = add_edge_dimension(
         adapter,
         front,
-        p0=tips_xy[0],
-        p1=tips_xy[1],
+        p0=_front(-ROD_TIP_X, ROD_TIP_Y),
+        p1=_front(ROD_TIP_X, ROD_TIP_Y),
         text_xy=(FRONT_CENTER[0], OVERALL_LINE_Y),
         label="strap overall length",
         orientation="horizontal",
