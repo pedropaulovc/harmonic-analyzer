@@ -1723,6 +1723,179 @@ def test_portrait_zone_three_centres_complete_native_box_in_same_cell_right_half
     assert case.zoom is None and case.restores == len(case.zooms)
 
 
+@pytest.fixture
+def portrait_zone_native_block_lever(portrait_zone_native):
+    """Shared block/lever before geometry from the frozen 6eafd root receipt."""
+    case = portrait_zone_native
+    case.properties = (
+        12.0, 13.0, 2.0, 1.0, 0.0, 0.2794, 0.43179999999999996, 0.0,
+    )
+    assert case.bottom.anchor == (0.104775, 0.009488, 0.0)
+    # The root receipt has four XY extent edges, not a measured after box.
+    # Retain the existing fixture's native Z noise; translate the complete box
+    # synthetically below rather than claiming a failed native run exported it.
+    old = case.bottom.extent
+    case.bottom.extent = (
+        0.10250848082595869, 0.0016109144542772874, old[2],
+        0.10693849557522123, 0.00954373156342183, old[5],
+    )
+    return case
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+def test_portrait_zone_three_accepts_measured_block_lever_one_ulp_roundtrip(
+    portrait_zone_native_block_lever, phase,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    target = case.bottom
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    grid = (case.properties, tuple(case.margins), case.distribution, case.region)
+    requested = (0.12228901179941004, 0.009488, 0.0)
+    roundtrip = (0.12228901179941006, 0.009488000000000002, 0.0)
+    assert roundtrip == (
+        math.nextafter(requested[0], math.inf),
+        math.nextafter(requested[1], math.inf), requested[2],
+    )
+    assert all(
+        abs(actual - wanted) <= 1e-7
+        for actual, wanted in zip(roundtrip, requested, strict=True)
+    )
+
+    def native_roundtrip():
+        target.translate(roundtrip)
+
+    if phase == "rebuild":
+        case.on_rebuild = native_roundtrip
+    verify = case.align()
+    # Exact setter arguments are independent of the tolerated native readback.
+    assert target.moves == [requested]
+    assert target.moves[0][1:] == before[target.name][4][1:]
+    assert case.rebuilds == 1
+    case.frozen = True
+    if phase == "final":
+        assert target.anchor == requested
+        native_roundtrip()
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+
+    assert target.anchor == roundtrip
+    box = target.extent
+    setter_delta = tuple(
+        wanted - original
+        for wanted, original in zip(requested, before[target.name][4], strict=True)
+    )
+    roundtrip_delta = tuple(
+        actual - wanted
+        for actual, wanted in zip(roundtrip, requested, strict=True)
+    )
+    expected_box = tuple(
+        (value + setter_delta[index % 3]) + roundtrip_delta[index % 3]
+        for index, value in enumerate(before[target.name][5])
+    )
+    assert box == expected_box
+    assert 0.104775 < box[0] < box[3] < 0.1391
+    assert 0.0006 < box[1] < box[4] < 0.0121
+    assert box[2] == before[target.name][5][2]
+    assert box[5] == before[target.name][5][5]
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    for note in case.notes:
+        if note is not target:
+            assert _zone_snapshot(note) == before[note.name]
+            assert note.moves == []
+    assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
+    assert target.moves == [requested]
+    assert case.rebuilds == 1
+    assert case.extent_reads[0][2] == before[target.name][5]
+    assert case.extent_reads[-1][2] == box
+    assert len({zoom for _name, zoom, _box in case.extent_reads}) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_three_refuses_just_outside_existing_xyz_bound(
+    portrait_zone_native_block_lever, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    requested = (0.12228901179941004, 0.009488, 0.0)
+
+    def mutate():
+        position = list(case.bottom.anchor)
+        position[axis] = math.nextafter(
+            requested[axis] + direction * 1e-7, direction * math.inf,
+        )
+        assert abs(position[axis] - requested[axis]) > 1e-7
+        case.bottom.translate(tuple(position))
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            verify()
+    assert case.bottom.moves == [requested]
+    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert case.rebuilds == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize(
+    "name",
+    (
+        "DetailItem398", "DetailItem399", "DetailItem401", "DetailItem402",
+        "DetailItem403", "DetailItem404", "DetailItem405",
+    ),
+)
+def test_portrait_zone_three_refuses_one_ulp_drift_of_every_untouched_column(
+    portrait_zone_native_block_lever, phase, axis, name,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    other = next(note for note in case.notes if note.name == name)
+    before = _zone_snapshot(other)
+
+    def mutate():
+        position = list(other.anchor)
+        position[axis] = math.nextafter(position[axis], math.inf)
+        assert 0.0 < position[axis] - before[4][axis] < 1e-7
+        other.translate(tuple(position))
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="other column position changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="other column position changed"):
+            verify()
+    after = _zone_snapshot(other)
+    assert after[:4] == before[:4]
+    assert after[6:] == before[6:]
+    assert after[4][axis] == math.nextafter(before[4][axis], math.inf)
+    assert case.bottom.moves == [(0.12228901179941004, 0.009488, 0.0)]
+    assert all(not note.moves for note in case.notes if note is not case.bottom)
+    assert case.rebuilds == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
 @pytest.mark.parametrize("count", (0, -1, True, 1.0, "1", None))
 def test_note_text_style_refuses_invalid_native_format_count(monkeypatch, count):
     monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)

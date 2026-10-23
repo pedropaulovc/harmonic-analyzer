@@ -843,12 +843,11 @@ def _align_portrait_bottom_zone_three(
             if record[3] != original_record[3]:
                 raise RuntimeError(f"{prefix}: style or identity changed for {column!r}")
             if column == key:
-                if (
-                    record[2][1:] != anchor[1:]
-                    or any(
-                        abs(actual - wanted) > tolerance
-                        for actual, wanted in zip(record[2], target, strict=True)
-                    )
+                # Original Y/Z are requested unchanged; native doubles still
+                # round-trip through the same three-axis readback contract.
+                if any(
+                    abs(actual - wanted) > tolerance
+                    for actual, wanted in zip(record[2], target, strict=True)
                 ):
                     raise RuntimeError(
                         f"{prefix}: position readback changed: {record[2]!r}"
