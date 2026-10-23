@@ -22,12 +22,13 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
@@ -38,7 +39,8 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-from _com import _early_bound, _read_member
+from _com import _bind, _early_bound, _read_member
+from _dimensions import _feature_display_dimensions
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -1266,6 +1268,190 @@ def _supplier_stock_source_scope(
                 raise failure
 
 
+def _log_supplier_stock_presentation_failure(adapter: Any, error: RuntimeError) -> None:
+    """Read the refused guard's exact objects before leaving the Stock scope.
+
+    These are post-refusal observations, not cached predicate results. Never
+    reacquire a drawing view/display, activate a document, rebuild or repair it.
+    Expected presentation comes from the actual guard frame, not a second
+    formatter. No native object or traceback is put into the scalar report.
+    """
+    guard = settled = None
+    traceback = error.__traceback__
+    while traceback is not None:
+        frame = traceback.tb_frame
+        owner = frame.f_globals.get("__name__")
+        if owner == "_supplier_dimensions" and (
+            frame.f_code.co_name == "assert_supplier_reference_dimension"
+        ):
+            guard = frame.f_locals
+        elif owner == "_supplier_screw_dimensions" and (
+            frame.f_code.co_name == "assert_supplier_screw"
+        ):
+            settled = frame.f_locals
+        traceback = traceback.tb_next
+    if guard is None or settled is None:
+        return  # An earlier identity/inventory refusal has its own diagnostics.
+
+    def read_error(member: str, failure: Exception) -> dict[str, str]:
+        try:
+            message = str(failure)
+        except Exception:
+            message = "<exception message could not be read>"
+        return {"member": member, "error_type": type(failure).__name__, "message": message}
+
+    def scalar(member: str, read: Callable[[], Any]) -> Any:
+        try:
+            value = read()
+            if value is None:
+                raise RuntimeError("native scalar getter returned null")
+            return json.loads(json.dumps(value, allow_nan=False))
+        except Exception as failure:
+            return read_error(member, failure)
+
+    def native(row: dict, key: str, interface: str, read: Callable[[], Any]) -> Any:
+        try:
+            value = _early_bound(read(), interface)
+            if value is None:
+                raise RuntimeError("native object getter returned null")
+            row[key] = {"present": True, "interface": interface}
+            return value
+        except Exception as failure:
+            row[key] = read_error(key, failure)
+            return None
+
+    def same(left: Any, right: Any) -> int:
+        if left is None or right is None:
+            raise RuntimeError("native comparison operand is unavailable")
+        return int(adapter.swApp.IsSame(left, right))
+
+    def presentation(display: Any) -> dict[str, Any]:
+        # Every presentation getter used by the strict guard, including its
+        # conditional exact-fraction branch; each failure is independent.
+        fields = {
+            member: scalar(
+                f"IDisplayDimension.{member}",
+                lambda member=member: (
+                    getattr(display, member)
+                    if member in ("ShowParenthesis", "ShowDimensionValue", "Type2")
+                    else getattr(display, member)()
+                ),
+            )
+            for member in (
+                "GetUseDocUnits", "GetUnits", "GetPrimaryPrecision2",
+                "GetFractionBase", "ShowParenthesis", "GetOverride",
+                "ShowDimensionValue", "GetFractionValue", "GetRoundToFraction",
+                "GetUseDocPrecision", "GetPrimaryTolPrecision2",
+                "GetAlternatePrecision2", "GetAlternateTolPrecision2", "Type2",
+            )
+        }
+        for part in (1, 2, 4):
+            fields[f"GetText({part})"] = scalar(
+                f"IDisplayDimension.GetText({part})",
+                lambda part=part: display.GetText(part),
+            )
+        dimension = native(fields, "dimension", "IDimension", lambda: display.GetDimension2(0))
+        fields["FullName"] = scalar("IDimension.FullName", lambda: dimension.FullName)
+        fields["GetSystemValue3"] = scalar(
+            "IDimension.GetSystemValue3",
+            lambda: dimension.GetSystemValue3(3, guard["configuration"]),
+        )
+        tolerance = native(
+            fields, "tolerance", "IDimensionTolerance", lambda: dimension.Tolerance,
+        )
+        fields["tolerance"].update({
+            member: scalar(
+                f"IDimensionTolerance.{member}",
+                lambda member=member: (
+                    tolerance.Type if member == "Type" else getattr(tolerance, member)()
+                ),
+            )
+            for member in ("Type", "GetMinValue", "GetMaxValue")
+        })
+        return fields
+
+    view, display = settled["view"], guard["display"]
+    report: dict[str, Any] = {
+        "observation": "post-refusal exact guard display and settled view; no reacquisition",
+        "failure": read_error("assert_supplier_reference_dimension", error),
+        "guard_inputs": {
+            key: guard[key] for key in (
+                "label", "units", "precision", "expected_mm", "expected_degrees",
+                "presentation", "fraction_denominator", "callout", "configuration",
+            )
+        },
+        "expected": {
+            "GetUseDocUnits": False, "GetUnits": guard["unit"],
+            "GetPrimaryPrecision2": guard["precision"],
+            "GetFractionBase": guard["fraction"], "ShowParenthesis": False,
+            "GetOverride": False, "ShowDimensionValue": True,
+            "GetText(1)": guard["prefix"], "GetText(2)": guard["suffix"],
+            "GetText(4)": guard["callout"] or "",
+        },
+        "source_displays": [],
+    }
+    if guard["fraction_denominator"] is not None:
+        report["expected"].update({
+            "GetFractionValue": guard["fraction_denominator"], "GetRoundToFraction": False,
+        })
+    model = native(report, "source_document", "IModelDoc2", lambda: view.ReferencedDocument)
+    drawing = native(
+        report, "drawing_document", "IModelDoc2", lambda: adapter.currentModel,
+    )
+    report["context"] = {
+        "view_name": scalar("IView.GetName2", lambda: view.GetName2()),
+        "view_source_path": scalar("IView.GetReferencedModelName", lambda: view.GetReferencedModelName()),
+        "view_configuration": scalar("IView.ReferencedConfiguration", lambda: view.ReferencedConfiguration),
+        "view_orientation": scalar("IView.GetOrientationName", lambda: view.GetOrientationName()),
+        "source_path": scalar("IModelDoc2.GetPathName", lambda: model.GetPathName()),
+        "source_document_units": scalar("IModelDoc2.GetUnits(source)", lambda: model.GetUnits()),
+        "source_active_configuration": scalar(
+            "IModelDoc2.ConfigurationManager.ActiveConfiguration.Name",
+            lambda: active_configuration_name(adapter, model),
+        ),
+        "drawing_path": scalar("IModelDoc2.GetPathName", lambda: drawing.GetPathName()),
+        "drawing_document_units": scalar("IModelDoc2.GetUnits(drawing)", lambda: drawing.GetUnits()),
+    }
+    report["actual"] = presentation(display)
+    report["differing_fields"] = [
+        key for key, expected in report["expected"].items()
+        if not isinstance(report["actual"][key], dict) and report["actual"][key] != expected
+    ]
+    parameter = native(
+        report, "source_parameter", "IDimension", lambda: model.Parameter(guard["label"]),
+    )
+    report["source_parameter"]["dimension_is_same"] = scalar(
+        "ISldWorks.IsSame", lambda: same(settled["native"], parameter),
+    )
+    report["source_parameter"]["FullName"] = scalar(
+        "IDimension.FullName", lambda: parameter.FullName,
+    )
+    feature = native(
+        report, "source_feature", "IFeature",
+        lambda: _early_bound(model, "IPartDoc").FeatureByName(settled["feature"]),
+    )
+    report["source_feature"]["Name"] = scalar("IFeature.Name", lambda: feature.Name)
+    try:
+        for raw in _feature_display_dimensions(feature):
+            source_display = _bind(raw, "IDisplayDimension")
+            dimension = _early_bound(source_display.GetDimension2(0), "IDimension")
+            if same(dimension, parameter) == 1:
+                row = presentation(source_display)
+                row["imported_dimension_is_same"] = scalar(
+                    "ISldWorks.IsSame",
+                    lambda: same(dimension, settled["native"]),
+                )
+                report["source_displays"].append(row)
+    except Exception as failure:
+        report["source_display_read_error"] = read_error(
+            "IFeature display dimension inventory", failure,
+        )
+    _telemetry.info(
+        "supplier_stock_presentation_failure: "
+        + json.dumps(report, sort_keys=True, allow_nan=False)
+    )
+
+
 def _add_supplier_stock_inset(adapter: Any):
     """Jointly place the actual native frame and complete supplier diagram ink.
 
@@ -1521,7 +1707,19 @@ def _add_supplier_stock_inset(adapter: Any):
             adapter, view, capture=captures["*Front"], allow_presentation_dirty=True,
         ):
             for check_source in checks:
-                check_source()
+                try:
+                    check_source()
+                except RuntimeError as error:
+                    try:
+                        _log_supplier_stock_presentation_failure(adapter, error)
+                    except Exception as diagnostic_error:
+                        # A getter, inventory or log failure cannot replace the
+                        # original strict refusal or skip source restoration.
+                        error.add_note(
+                            "supplier presentation diagnostic also failed: "
+                            f"{type(diagnostic_error).__name__}"
+                        )
+                    raise
         if (
             str(view.ReferencedConfiguration) != supplier.SUPPLIER_STOCK_CONFIGURATION
             or tuple(view.ScaleRatio) != SUPPLIER_STOCK_SCALE
