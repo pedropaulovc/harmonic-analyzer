@@ -830,7 +830,7 @@ class _CutSeat:
         if len(args) != self.arity:
             raise TypeError(f"{len(args)} arguments")
         self.cuts.append(args)
-        removed = self.removed_by_form.get((args[0], args[9]))
+        removed = self.removed_by_form.get((args[2], args[9], args[7]))
         if removed is None:
             return None
         self.volume -= removed
@@ -855,18 +855,19 @@ def _patch_cut_bookkeeping(monkeypatch, names):
 
 def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> None:
     v = spec.NUMERAL_FIRST_LAYER_VOLUME_MM3
-    # Double-ended Ddir1 False flares (2x), double-ended Ddir1 True is the V,
-    # single-ended forms return None: the volume, not the flag, decides.
-    seat = _CutSeat({(False, False): 3.35 * v / 1.56, (False, True): v})
+    # Keyed (reversed, Ddir1, drafted): Ddir1 False flares (2x), Ddir1 True is
+    # the V -- the volume, not the flag, decides.
+    seat = _CutSeat({(True, False, True): 3.35 * v / 1.56, (True, True, True): v})
     names = []
     _patch_cut_bookkeeping(monkeypatch, names)
     jobs = []
     form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals", None))
-    assert [(args[0], args[9]) for args in seat.cuts] == [(False, False), (False, True)]
+    assert [(args[2], args[9]) for args in seat.cuts] == [(True, False), (True, True)]
     assert seat.undone == 1 and seat.selected[0] == ("NumeralsSketch", "SKETCH")
-    assert form == builder._v_cut_args(False, True)
+    assert form == builder._v_cut_args(True)
     args = seat.cuts[-1]
-    assert args[:7] == (False, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, spec.NUMERAL_DEPTH / 1000.0)
+    # Single-ended, reversed into the bar, blind, both walls drafted 15 deg.
+    assert args[:7] == (True, False, True, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
     assert args[7] is True and args[11] == pytest.approx(math.radians(15.0))
     assert names == [("Numerals", [None, "NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
@@ -878,15 +879,15 @@ def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> N
 
 
 def test_no_form_that_removes_the_v_fails_with_discriminating_probes(monkeypatch) -> None:
-    seat = _CutSeat({(False, False): 3.0, (True, False): 5.0})
+    seat = _CutSeat({(True, False, True): 3.0, (True, False, False): 3.1352})
     _patch_cut_bookkeeping(monkeypatch, [])
     with pytest.raises(RuntimeError, match="no FeatureCut3 form removed") as raised:
         asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None))
     message = str(raised.value)
-    assert "double-ended, Ddir1 False: removed 3.0000" in message
-    assert "double-ended, Ddir1 True: FeatureCut3 returned None" in message
-    for probe in ("undrafted", "15 deg 0.10 deep Ddir1 False", "5 deg Ddir1 True"):
-        assert f"probe {probe}: " in message
+    assert "single-ended reversed, Ddir1 False: removed 3.0000" in message
+    assert "single-ended reversed, Ddir1 True: FeatureCut3 returned None" in message
+    assert "probe undrafted reversed: created, removed 3.1352" in message
+    assert "probe undrafted default direction: FeatureCut3 returned None" in message
     # Every cut a form or probe made was undone.
     assert seat.volume == 4800.0
 

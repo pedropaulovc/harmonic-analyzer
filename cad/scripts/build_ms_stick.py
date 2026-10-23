@@ -155,31 +155,31 @@ def _assert_numeral_cut(adapter) -> None:
 
 
 # FeatureCut3 forms tried on the first stroke layer, in order. On the 2026
-# seat (revision 34) FeatureCut4 returns None on these imported sketches even
-# undrafted (run 20261023T204652498Z-9ac53a38); the adapter's blind cut that
-# works here is its FeatureCut3 fallback (double-ended, D2 = D1). Ddir1's
+# seat (revision 34), with these imported sketches on the Front plane:
+# - single-ended cuts in the default direction return None from FeatureCut3
+#   and FeatureCut4 alike: that direction leaves the bar, so nothing is cut;
+# - the adapter's double-ended cut (D2 = D1) cuts, but takes no draft at
+#   all: 15 deg removed the straight-wall 3.1352 mm^3, 15 deg at 0.10 deep the
+#   straight 0.7838 (run 20261023T205133476Z-58eeb077), and a draft added
+#   later through ModifyDefinition was ignored too.
+# So the V is single-ended in the REVERSED direction, into the bar. Ddir1's
 # inward sense is seat-specific (diag_mcmaster_phillips_flat_head: True
 # flared). The removed volume, not the flags, decides: the first layer's V is
 # pinned to 1e-4 by its closed form, and a flared or straight cut removes 2-3x
 # as much. If none cuts, discriminating probes are reported.
 V_CUT_VARIANTS = (
-    ("double-ended, Ddir1 False", False, False),
-    ("double-ended, Ddir1 True", False, True),
-    ("single-ended, Ddir1 False", True, False),
-    ("single-ended, Ddir1 True", True, True),
+    ("single-ended reversed, Ddir1 False", False),
+    ("single-ended reversed, Ddir1 True", True),
 )
 
 
-def _v_cut_args(single_ended: bool, ddir1: bool, *, half_angle_deg: float | None = None,
-                depth_mm: float = NUMERAL_DEPTH, drafted: bool = True) -> tuple:
-    """FeatureCut3's 26 arguments for a blind V cut into the bar."""
-    half = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0 if half_angle_deg is None else half_angle_deg
-    depth = depth_mm / 1000.0
+def _v_cut_args(ddir1: bool, *, reverse: bool = True, drafted: bool = True) -> tuple:
+    """FeatureCut3's 26 arguments for a single-ended blind V cut."""
     return (
-        single_ended, False, False,  # Sd, Flip, Dir (default: into the bar)
-        0, 0, depth, depth,  # T1/T2 blind, D1, D2 (the adapter's form)
+        True, False, reverse,  # Sd single-ended, Flip, Dir (reversed: into the bar)
+        0, 0, NUMERAL_DEPTH / 1000.0, 0.0,  # T1/T2 blind, D1, D2
         drafted, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
-        math.radians(half), 0.0,  # Dang1, Dang2
+        math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
         False, True, False, False, False,  # scope, auto-select, assembly flags
         0, 0.0, False,  # T0 sketch plane, StartOffset, FlipStartOffset
@@ -220,8 +220,8 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
     """Find the form that removes exactly the first layer's V; undo the rest."""
     pre = await _volume_mm3(adapter)
     tried = []
-    for label, single_ended, ddir1 in V_CUT_VARIANTS:
-        args = _v_cut_args(single_ended, ddir1)
+    for label, ddir1 in V_CUT_VARIANTS:
+        args = _v_cut_args(ddir1)
         feature = _feature_cut3(adapter, sketch_name, args)
         if isinstance(feature, Exception):
             tried.append(f"{label}: {feature}")
@@ -236,12 +236,11 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
         restored = pre - await _volume_mm3(adapter)
         if abs(restored) > 1e-6:
             raise RuntimeError(f"undo of the {label} V cut left {restored:.4f} mm^3 removed; tried {tried}")
-    # Discriminate the refusal: the undrafted control, a shallow (wide-root)
-    # V and a gentle draft.
+    # Discriminate the refusal: undrafted single-ended controls in each
+    # direction say whether the direction or the draft is refused.
     probes = {
-        "undrafted": _v_cut_args(False, False, drafted=False),
-        **{f"15 deg 0.10 deep Ddir1 {d}": _v_cut_args(False, d, depth_mm=0.10) for d in (False, True)},
-        **{f"5 deg Ddir1 {d}": _v_cut_args(False, d, half_angle_deg=5.0) for d in (False, True)},
+        "undrafted reversed": _v_cut_args(False, drafted=False),
+        "undrafted default direction": _v_cut_args(False, reverse=False, drafted=False),
     }
     for label, args in probes.items():
         tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
