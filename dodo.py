@@ -4191,11 +4191,11 @@ def _check_nameplate_spec(pytest_cmd: list[str]) -> dict[str, Any]:
 
 def _check_numerals_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     return {
-        # Guards the GENERATED numerals DXF the ms-stick build imports:
-        # byte-identical regeneration from gen_ms_stick_numerals_dxf,
-        # closed-loop census, clearance from every tick, and the area/bbox
-        # the build pins.
-        # Deps: the test, the asset, the generator/build/font-render modules it
+        # Guards the GENERATED numerals DXFs (one per stroke layer) the
+        # ms-stick build imports: byte-identical regeneration from
+        # gen_ms_stick_numerals_dxf, closed-loop census, clearance from every
+        # tick, and the bbox/volumes the build pins.
+        # Deps: the test, the assets, the generator/build/font-render modules it
         # imports (module_deps_of) AND the cad/config files those modules read
         # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
         # scale) -- so a layout-constant OR scale-config edit that forgot to
@@ -4204,13 +4204,9 @@ def _check_numerals_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
             *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
             *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
-            str(
-                (
-                    REPO_ROOT
-                    / "cad"
-                    / "references"
-                    / "ms-stick-numerals.dxf"
-                ).resolve()
+            *(
+                str((REPO_ROOT / "cad" / "references" / f"ms-stick-numerals-{layer}.dxf").resolve())
+                for layer in (1, 2, 3)
             ),
         ],
         "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
