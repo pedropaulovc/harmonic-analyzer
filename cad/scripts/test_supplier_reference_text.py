@@ -10,7 +10,7 @@ read-back behavior and late native mutation.
 from __future__ import annotations
 
 import copy
-from math import isfinite
+from math import cos, isfinite, pi, sin
 from types import SimpleNamespace
 
 import pytest
@@ -289,6 +289,48 @@ def _static(record):
     return SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(record=record))
 
 
+@pytest.fixture(
+    params=((_nut_rd1, 0, 1), (_recovered_head_height, 1, 0)),
+    ids=("horizontal-nut", "vertical-clamp"),
+)
+def witness_case(request):
+    factory, axis, index = request.param
+    return SimpleNamespace(record=factory(), axis=axis, index=index)
+
+
+def _witness_pieces(row, axis, intervals):
+    """Native line pieces at fractional positions on the original witness.
+
+    Fractions may arrive reversed, duplicated, overlapping or out of order;
+    the source row's station, Z coordinates and native header stay intact.
+    """
+    across = 1 - axis
+    low, high = sorted((row[4 + across], row[7 + across]))
+    pieces = []
+    for start, end in intervals:
+        piece = list(row)
+        piece[4 + across] = low + start * (high - low)
+        piece[7 + across] = low + end * (high - low)
+        pieces.append(piece)
+    return pieces
+
+
+def _centre_native_fragment(row, *, reference, angle, centre):
+    """Encode one known physical text centre using swTextPosition_e anchors."""
+    fx, fy = {
+        0: (0.0, 1.0), 1: (0.0, 0.0), 2: (0.5, 0.5),
+        3: (1.0, 1.0), 4: (1.0, 0.0), 5: (0.5, 1.0),
+    }[reference]
+    dx, dy = (fx - 0.5) * row["w"], (fy - 0.5) * row["h"]
+    row["ref"] = reference
+    row["ang"] = angle
+    row["pos"] = (
+        centre[0] + dx * cos(angle) - dy * sin(angle),
+        centre[1] + dx * sin(angle) + dy * cos(angle),
+        row["pos"][2],
+    )
+
+
 # --------------------------------------------------------------------------
 # measure_reference_text
 # --------------------------------------------------------------------------
@@ -451,6 +493,202 @@ def test_measure_witnesses_are_perpendicular_runs_on_actual_stations(native_read
         core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
 
 
+@pytest.mark.parametrize("reference", range(6))
+@pytest.mark.parametrize("angle", (0.0, pi / 2, pi / 6), ids=("level", "vertical", "oblique"))
+def test_measure_uses_native_anchor_and_rotated_measured_extent(
+    native_reads, reference, angle
+):
+    record = _recovered_head_height()
+    row = record["display"]["texts"][0]
+    width, height = row["w"], row["h"]
+    cx, cy = row["pos"][0] + width / 2, row["pos"][1] + height / 2
+    _centre_native_fragment(row, reference=reference, angle=angle, centre=(cx, cy))
+    original = copy.deepcopy(record)
+    geometry = core.measure_reference_text(None, _static(record), axis=1, label=_LABEL)
+
+    # Projection of a known centred rectangle, independently of its native
+    # anchor. All six anchors must describe this same physical font extent.
+    extent_x = width * abs(cos(angle)) + height * abs(sin(angle))
+    extent_y = width * abs(sin(angle)) + height * abs(cos(angle))
+    text = geometry["text"]
+    assert (text.xmin, text.ymin, text.xmax, text.ymax) == pytest.approx(
+        (cx - extent_x / 2, cy - extent_y / 2, cx + extent_x / 2, cy + extent_y / 2)
+    )
+    assert geometry["record"] == original
+    assert record == original
+
+    dx, dy = 0.021, -0.017
+    display = _Display(record, 1)
+    display.move_text(dx, dy)
+    translated = core.measure_reference_text(None, display, axis=1, label=_LABEL)
+    moved = translated["text"]
+    assert (moved.xmin, moved.ymin, moved.xmax, moved.ymax) == pytest.approx(
+        (text.xmin + dx, text.ymin + dy, text.xmax + dx, text.ymax + dy)
+    )
+    assert translated["tips"] == geometry["tips"]
+    assert translated["witnesses"] == geometry["witnesses"]
+
+
+@pytest.mark.parametrize("reference", (None, -1, 6, True, 1.0, "1"))
+def test_measure_refuses_unknown_or_non_native_text_reference(native_reads, reference):
+    record = _nut_rd1()
+    # A valid widest run cannot hide an unreadable fraction fragment.
+    record["display"]["texts"][1]["ref"] = reference
+    with pytest.raises(RuntimeError, match="reference|fragment"):
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+
+def test_native_bounds_preserve_every_fragment_in_raw_order():
+    texts = _nut_rd1()["display"]["texts"]
+    expected = []
+    for row, reference, angle in zip(
+        texts, (3, 0, 4, 2, 5), (0.0, pi / 2, pi / 6, 0.0, pi / 6), strict=True
+    ):
+        width, height = row["w"], row["h"]
+        cx, cy = row["pos"][0] + width / 2, row["pos"][1] + height / 2
+        extent_x = width * abs(cos(angle)) + height * abs(sin(angle))
+        extent_y = width * abs(sin(angle)) + height * abs(cos(angle))
+        expected.append(
+            (cx - extent_x / 2, cy - extent_y / 2, cx + extent_x / 2, cy + extent_y / 2)
+        )
+        _centre_native_fragment(row, reference=reference, angle=angle, centre=(cx, cy))
+    # Duplicate ink is still a distinct raw fragment for downstream leader
+    # checks; the public helper must not deduplicate or reorder it.
+    texts.append(copy.deepcopy(texts[1]))
+    expected.append(expected[1])
+    original = copy.deepcopy(texts)
+    bounds, fragments = core.measured_native_text_bounds(texts, label=_LABEL)
+
+    assert len(fragments) == len(texts) == len(expected)
+    for fragment, box in zip(fragments, expected, strict=True):
+        assert (fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax) == pytest.approx(box)
+    assert (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax) == pytest.approx((
+        min(box[0] for box in expected), min(box[1] for box in expected),
+        max(box[2] for box in expected), max(box[3] for box in expected),
+    ))
+    assert texts == original
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (("w", 0.0), ("h", float("nan")), ("pos", (0.1, 0.2)), ("ang", None), ("ref", 6)),
+)
+def test_native_bounds_refuse_unreadable_later_fragment_with_identity(field, value):
+    texts = _nut_rd1()["display"]["texts"]
+    texts[1][field] = value
+    with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref="):
+        core.measured_native_text_bounds(texts, label=_LABEL)
+
+
+@pytest.mark.parametrize("reference", (1, 3), ids=("hull-overflow", "anchor-overflow"))
+def test_native_bounds_refuse_nonfinite_derived_fragment_before_union(reference):
+    texts = [_nut_rd1()["display"]["texts"][0]]
+    coordinate = 1e308 if reference == 1 else -1e308
+    later = _nut_text("later", (coordinate, coordinate, 0.0), 1e308)
+    later.update(h=1e308, ref=reference)
+    texts.append(later)
+    with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref={reference}"):
+        core.measured_native_text_bounds(texts, label=_LABEL)
+
+
+def test_measure_retains_each_disjoint_witness_interval(native_reads, witness_case):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    lines = record["display"]["lines"]
+    row = lines[case.index]
+    pieces = _witness_pieces(row, case.axis, ((1.0, 0.7), (0.2, 0.0), (0.5, 0.35)))
+    lines[case.index:case.index + 1] = pieces
+    original = copy.deepcopy(record)
+    after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+    station, low, high = before["witnesses"][0]
+    extent = high - low
+    expected = (
+        (station, low, low + 0.2 * extent),
+        (station, low + 0.35 * extent, low + 0.5 * extent),
+        (station, low + 0.7 * extent, high),
+        before["witnesses"][1],
+    )
+    assert len(after["witnesses"]) == len(expected)
+    for actual, interval in zip(after["witnesses"], expected, strict=True):
+        assert actual == pytest.approx(interval)
+        assert len(actual) == 3 and all(isfinite(value) for value in actual)
+    assert after["tips"] == before["tips"]
+    assert after["reach"] == before["reach"]
+    assert after["record"] == original
+    assert record == original
+
+
+@pytest.mark.parametrize(
+    "intervals",
+    (
+        ((0.0, 0.25), (0.25, 0.7), (0.7, 1.0)),
+        ((1.0, 0.6), (0.6, 0.2), (0.2, 0.0)),
+        ((0.8, 0.3), (1.0, 0.6), (0.4, 0.0), (0.8, 0.3), (0.2, 0.25)),
+    ),
+    ids=("touching-splits", "reversed-pieces", "overlaps-duplicates-nesting"),
+)
+def test_measure_and_assert_accept_equivalent_witness_coverage(
+    native_reads, witness_case, intervals
+):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    lines = record["display"]["lines"]
+    lines[case.index:case.index + 1] = _witness_pieces(
+        lines[case.index], case.axis, intervals
+    )
+    lines.reverse()
+    record["display"]["arrows"].reverse()
+    original = copy.deepcopy(record)
+    after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+    assert after["witnesses"] == before["witnesses"]
+    assert after["tips"] == before["tips"]
+    assert after["reach"] == before["reach"]
+    assert after["record"] == original
+    core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("gap", (0.5 * _TOL, 1.5 * _TOL), ids=("readback", "real-gap"))
+def test_witness_union_uses_existing_station_tolerance(native_reads, witness_case, gap):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    lines = record["display"]["lines"]
+    row = lines[case.index]
+    extent = before["witnesses"][0][2] - before["witnesses"][0][1]
+    lines[case.index:case.index + 1] = _witness_pieces(
+        row, case.axis, ((0.0, 0.4), (0.4 + gap / extent, 1.0))
+    )
+    after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+    if gap < _TOL:
+        assert after["witnesses"] == before["witnesses"]
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    else:
+        assert len(after["witnesses"]) == len(before["witnesses"]) + 1
+        with pytest.raises(RuntimeError, match="witnesses moved"):
+            core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("skew", (0.5e-7, 2e-7), ids=("collinear", "noncollinear"))
+def test_measure_keeps_strict_perpendicular_collinearity(
+    native_reads, witness_case, skew
+):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    record["display"]["lines"][case.index][7 + case.axis] += skew
+    if skew < 1e-7:
+        after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    else:
+        with pytest.raises(RuntimeError, match="lost a native witness"):
+            core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+
 # --------------------------------------------------------------------------
 # assert_reference_text_stations
 # --------------------------------------------------------------------------
@@ -493,6 +731,76 @@ def test_stations_reject_lost_station():
     before = dict(tips=((0.1, 0.2), (0.1, 0.204)), witnesses=((0.2, 0.0, 0.1), (0.204, 0.0, 0.1)))
     after = dict(tips=before["tips"][:1], witnesses=before["witnesses"])
     with pytest.raises(RuntimeError, match="tips moved"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+def test_stations_reject_interior_gap_with_unchanged_extrema(native_reads, witness_case):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    lines = record["display"]["lines"]
+    lines[case.index:case.index + 1] = _witness_pieces(
+        lines[case.index], case.axis, ((0.0, 0.3), (0.6, 1.0))
+    )
+    after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+    assert after["tips"] == before["tips"]
+    assert after["reach"] == before["reach"]
+    assert after["witnesses"][0][1] == before["witnesses"][0][1]
+    assert after["witnesses"][1][2] == before["witnesses"][0][2]
+    with pytest.raises(RuntimeError, match="witnesses moved"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+def test_stations_reject_same_count_moved_gap(native_reads, witness_case):
+    case = witness_case
+    row = case.record["display"]["lines"][case.index]
+    captures = []
+    for intervals in (((0.0, 0.3), (0.5, 1.0)), ((0.0, 0.4), (0.6, 1.0))):
+        record = copy.deepcopy(case.record)
+        record["display"]["lines"][case.index:case.index + 1] = _witness_pieces(
+            row, case.axis, intervals
+        )
+        captures.append(
+            core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+        )
+    before, after = captures
+
+    assert len(before["witnesses"]) == len(after["witnesses"]) == 3
+    assert before["tips"] == after["tips"]
+    assert before["reach"] == after["reach"]
+    assert before["witnesses"][0][1] == after["witnesses"][0][1]
+    assert before["witnesses"][1][2] == after["witnesses"][1][2]
+    with pytest.raises(RuntimeError, match="witnesses moved"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("defect", ("noncollinear-connector", "off-station-line"))
+def test_unrelated_ink_cannot_restore_missing_witness_coverage(
+    native_reads, witness_case, defect
+):
+    case = witness_case
+    record = case.record
+    before = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+    lines = record["display"]["lines"]
+    row = lines[case.index]
+    bridge = _witness_pieces(row, case.axis, ((0.3, 0.6),))[0]
+    if defect == "noncollinear-connector":
+        # Inside station tolerance, but NOT the stricter perpendicular test.
+        bridge[7 + case.axis] += 2e-7
+    else:
+        bridge[4 + case.axis] += 2 * _TOL
+        bridge[7 + case.axis] += 2 * _TOL
+    lines[case.index:case.index + 1] = [
+        *_witness_pieces(row, case.axis, ((0.0, 0.3), (0.6, 1.0))),
+        bridge,
+    ]
+    after = core.measure_reference_text(None, _static(record), axis=case.axis, label=_LABEL)
+
+    assert len(after["witnesses"]) == 3
+    assert after["record"]["display"]["lines"] == lines
+    assert after["tips"] == before["tips"]
+    with pytest.raises(RuntimeError, match="witnesses moved"):
         core.assert_reference_text_stations(before, after, label=_LABEL)
 
 
@@ -582,6 +890,82 @@ def test_shelve_moves_short_rows_beyond_actual_tails_and_keeps_long_row(native_r
 
     proof()  # Execute the returned proof: it reacquires and re-measures.
     assert _measure_all(displays, axes) == after
+
+
+def test_shelve_refuses_gap_created_by_native_shelf(native_reads, witness_case):
+    case = witness_case
+    display = _Display(
+        case.record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
+    )
+    original = list(case.record["display"]["lines"][case.index])
+    move = display.SetPosition2
+
+    def loses_interior_coverage(x, y, z):
+        was_offset = display.OffsetText
+        previous = display.position[case.axis]
+        ok = move(x, y, z)
+        if was_offset and abs(display.position[case.axis] - previous) > 0.001:
+            lines = display.record["display"]["lines"]
+            lines[case.index:case.index + 1] = _witness_pieces(
+                original, case.axis, ((0.0, 0.3), (0.6, 1.0))
+            )
+        return ok
+
+    display.SetPosition2 = loses_interior_coverage
+    # The final native move still reports success and preserves both extrema.
+    # A post-shelf recapture must NOT become the station proof's baseline.
+    with pytest.raises(RuntimeError, match="witnesses moved"):
+        core.shelve_reference_text(
+            None,
+            reacquire=lambda: {display.name: display},
+            axes={display.name: case.axis},
+            label=_LABEL,
+        )
+
+
+def test_shelve_and_proof_preserve_original_disjoint_coverage(native_reads, witness_case):
+    case = witness_case
+    record = case.record
+    lines = record["display"]["lines"]
+    original = list(lines[case.index])
+    lines[case.index:case.index + 1] = _witness_pieces(
+        original, case.axis, ((0.0, 0.3), (0.6, 1.0))
+    )
+    display = _Display(
+        record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
+    )
+    found = {display.name: display}
+    before = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: dict(found), axes={display.name: case.axis}, label=_LABEL
+    )
+    after = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    _assert_shelved(display, before, after)
+    settled_record = copy.deepcopy(display.record)
+
+    replacement = copy.copy(display)
+    replacement.record = copy.deepcopy(settled_record)
+    found[display.name] = replacement
+    lines = replacement.record["display"]["lines"]
+    lines[case.index:case.index + 2] = _witness_pieces(
+        original, case.axis, ((0.3, 0.1), (0.1, 0.0), (0.6, 0.8), (1.0, 0.8))
+    )
+    lines.reverse()
+    replacement.record["display"]["arrows"].reverse()
+    equivalent_record = copy.deepcopy(replacement.record)
+    proof()
+    assert replacement.record == equivalent_record
+
+    replacement.record = copy.deepcopy(settled_record)
+    replacement.record["display"]["lines"][case.index:case.index + 2] = _witness_pieces(
+        original, case.axis, ((0.0, 0.4), (0.7, 1.0))
+    )
+    # Same interval count and extrema, but the original gap has moved.
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="witnesses moved"):
+            proof()
+    replacement.record = copy.deepcopy(equivalent_record)
+    proof()
 
 
 def test_shelve_force_shelves_long_row_too(native_reads):
@@ -761,6 +1145,68 @@ def test_shelve_default_rule_is_full_extent_plus_both_gaps_on_each_side(
     proof()
 
 
+@pytest.mark.parametrize("axis", (0, 1), ids=("horizontal", "vertical"))
+@pytest.mark.parametrize("reference", range(6))
+@pytest.mark.parametrize("angle", (0.0, pi / 2, pi / 6), ids=("level", "vertical", "oblique"))
+@pytest.mark.parametrize("origin", ((0.0, 0.0), (0.041, -0.063)), ids=("origin", "translated"))
+@pytest.mark.parametrize("margin", (-0.0001, 0.0001), ids=("must-shelf", "fits"))
+def test_shelve_fit_boundary_uses_physical_anchored_rotated_extent(
+    native_reads, axis, reference, angle, margin, origin
+):
+    width, height = 0.0035, 0.0025
+    extent_x = width * abs(cos(angle)) + height * abs(sin(angle))
+    extent_y = width * abs(sin(angle)) + height * abs(cos(angle))
+    extent = (extent_x, extent_y)[axis]
+    span = extent + 2 * (core.CLEAR_GAP_M + core.PLACE_SETTLE_M) + margin
+    record = _boundary_row(span)
+    if axis == 0:
+        for line in record["display"]["lines"]:
+            line[4], line[5] = line[5], line[4]
+            line[7], line[8] = line[8], line[7]
+        for arrow in record["display"]["arrows"]:
+            arrow[0], arrow[1] = arrow[1], arrow[0]
+            arrow[3], arrow[4] = arrow[4], arrow[3]
+    record["pos"] = (*origin, record["pos"][2])
+    for line in record["display"]["lines"]:
+        for coordinate in (0, 1):
+            line[4 + coordinate] += origin[coordinate]
+            line[7 + coordinate] += origin[coordinate]
+    for arrow in record["display"]["arrows"]:
+        arrow[0] += origin[0]
+        arrow[1] += origin[1]
+    row = record["display"]["texts"][0]
+    row["w"], row["h"] = width, height
+    _centre_native_fragment(row, reference=reference, angle=angle, centre=origin)
+    original = copy.deepcopy(record)
+    display = _Display(record, axis)
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: {display.name: display}, axes={display.name: axis}, label=_LABEL
+    )
+    after = core.measure_reference_text(None, display, axis=axis, label=_LABEL)
+
+    assert display.OffsetText is (margin < 0.0)
+    if margin < 0.0:
+        # Compute the REAL lower edge from the known physical text centre,
+        # not from the core's claimed bounds. Upper/right/centre references
+        # cannot win a false-clear proof by measuring their anchor as ink.
+        physical_low = display.position[axis] - extent / 2
+        assert physical_low - after["reach"] >= core.CLEAR_GAP_M
+        assert physical_low - after["reach"] == pytest.approx(
+            core.CLEAR_GAP_M + core.PLACE_SETTLE_M
+        )
+        assert (after["text"].xmin if axis == 0 else after["text"].ymin) == pytest.approx(
+            physical_low
+        )
+    else:
+        assert display.position == display.original_position
+        assert display.record == original
+    assert row["ref"] == reference
+    assert row["ang"] == angle
+    settled_record = copy.deepcopy(display.record)
+    proof()
+    assert display.record == settled_record
+
+
 @pytest.mark.parametrize(
     ("axes", "force", "message"),
     (
@@ -849,6 +1295,19 @@ def _recaptured(case, name):
     return replacement
 
 
+@pytest.mark.parametrize("name", ("SupplierHeadHeight", "RD1", "SupplierLength"))
+def test_proof_rejects_late_interior_gap_on_every_measured_row(shelved, name):
+    replacement = _recaptured(shelved, name)
+    index = 1 if name == "RD1" else 0
+    lines = replacement.record["display"]["lines"]
+    lines[index:index + 1] = _witness_pieces(
+        lines[index], replacement.axis, ((0.0, 0.3), (0.6, 1.0))
+    )
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="witnesses moved"):
+            shelved.proof()
+
+
 def test_proof_reacquires_and_rejects_text_back_on_its_line(shelved):
     replacement = _recaptured(shelved, "SupplierHeadHeight")
     replacement.record["display"]["texts"][0]["pos"] = (0.0916157, 0.232235, 0)
@@ -923,6 +1382,13 @@ def test_proof_accepts_late_fragment_beyond_the_gap(shelved):
     far = max(row["pos"][0] + row["w"] for row in texts)
     texts.append(_nut_text("NOM", (far + 0.001, texts[0]["pos"][1], texts[0]["pos"][2]), 0.008))
     shelved.proof()
+
+
+def test_proof_refuses_late_unknown_fragment_anchor(shelved):
+    replacement = _recaptured(shelved, "RD1")
+    replacement.record["display"]["texts"][1]["ref"] = 6
+    with pytest.raises(RuntimeError, match="reference|fragment"):
+        shelved.proof()
 
 
 def test_proof_rejects_late_unmeasured_fragment(shelved):
