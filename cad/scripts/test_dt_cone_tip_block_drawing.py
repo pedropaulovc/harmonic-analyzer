@@ -266,8 +266,10 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
 
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     """Every marked dimension lands on one view; the bottom view carries the
-    hold-down tap's two stations (2026-09-29)."""
-    adjuster_axis = {"AxisHeight", "PassageCenter", "SlitDepth"}
+    hold-down tap's two stations (2026-09-29).  The slit's depth runs to a
+    floor inside the bore that no view draws, so it stays marked but
+    unprinted (machinist review of e04fd60ab)."""
+    adjuster_axis = {"AxisHeight", "PassageCenter"}
     kept = [
         *drawing.FRONT_KEEP,
         *drawing.TOP_KEEP,
@@ -282,7 +284,9 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
         for name in names
     }
     assert sorted(kept) == sorted(set(kept))
-    assert set(kept) == marked
+    assert drawing.UNPRINTED_DIMENSIONS == {"SlitDepth"}
+    assert drawing.UNPRINTED_DIMENSIONS <= marked
+    assert set(kept) == marked - drawing.UNPRINTED_DIMENSIONS
     assert set(drawing.TOP_KEEP) == {"Depth"}
     assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
 
@@ -299,6 +303,12 @@ def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
     passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
     assert passage_x < slot_x < text_x
     assert "SlitW" in drawing.ARROWS_OUTSIDE
+    # Machinist review of e04fd60ab: the width states the slit's extent, and
+    # that row clears the outside arrow tails over the slot (its own and
+    # PassageCenter's, which runs from the slot centre).
+    assert drawing.DIMENSION_CALLOUTS_ABOVE["SlitW"] == "SLOT INTO BORE"
+    row_left = text_x - drawing._callout_half_width("SLOT INTO BORE")
+    assert row_left >= right_wall + drawing.OUTSIDE_ARROW_RUN + drawing.TEXT_CLEARANCE
 
 
 def test_every_view_centres_on_the_prism_with_north_where_it_shows() -> None:
@@ -395,7 +405,6 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
     assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
     assert drawing.ARROWS_INSIDE == (
-        "SlitDepth",
         "PinchHeight",
         "PinchDepthCenter",
         "Width",
@@ -708,9 +717,10 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
 
 
 def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
-    """With the heights at .X the slit floor (SlitDepth down from the top)
-    must still open into the adjuster's tap drill (AxisHeight up from the
-    foot) by 0.25, or the jaws never grip the thread."""
+    """With the heights at .X the model's slit floor (SlitDepth down from the
+    top, an unprinted overcut) must still open into the adjuster's tap drill
+    (AxisHeight up from the foot) by 0.25, or the jaws never grip the thread;
+    the print states the extent itself (SLOT INTO BORE)."""
     spec = dt_cone_tip_block_spec
     floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - _printed(
         "SlitDepth", spec.SLIT_DEPTH
