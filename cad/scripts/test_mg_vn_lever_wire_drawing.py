@@ -56,7 +56,9 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         "PEN WIRE: MHA-PN-00 SHEET 3, STEPS 2 AND 8"
     )
     numbers = {
-        stem: yaml.safe_load((_ASSEMBLIES / f"{stem}.yaml").read_text(encoding="utf-8"))["number"]
+        stem: yaml.safe_load(
+            (_ASSEMBLIES / f"{stem}.yaml").read_text(encoding="utf-8")
+        )["number"]
         for stem in ("mg-magnifier", "pn-pen")
     }
     assert numbers == {
@@ -64,14 +66,21 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         "pn-pen": drawing.PEN_DRAWING_NUMBER,
     }
     # Each assembly prints its sequence on its ASSEMBLY STEPS sheet.
-    assert magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1 == drawing.MAGNIFIER_STEPS_SHEET
+    assert (
+        magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1
+        == drawing.MAGNIFIER_STEPS_SHEET
+    )
     assert pen.SHEET_NAMES.index("ASSEMBLY STEPS") + 1 == drawing.PEN_STEPS_SHEET
     steps = magnifier_sheet.STEP_TEXT
-    for key in (drawing.magnifier_steps.WIRE_HOOKED_KEY, drawing.magnifier_steps.WIRE_TIED_KEY):
+    for key in (
+        drawing.magnifier_steps.WIRE_HOOKED_KEY,
+        drawing.magnifier_steps.WIRE_TIED_KEY,
+    ):
         assert "WIRE" in steps[key] and "TRIM THE TAIL" in steps[key]
     pen_steps = {
         int(text.split(".", 1)[0]): text
-        for text in pen_sheet.ASSEMBLY_STEPS if text[:1].isdigit()
+        for text in pen_sheet.ASSEMBLY_STEPS
+        if text[:1].isdigit()
     }
     first, last = drawing.PEN_WIRE_STEPS
     assert "PEN WIRE" in pen_steps[first] and "TRIM THE TAIL" in pen_steps[first]
@@ -131,7 +140,9 @@ class _IsoView:
         return self.edges
 
     def GetOutline(self):
-        offset = (0.012, -0.040) if self.ReferencedConfiguration == "PenWire" else (0.0, 0.0)
+        offset = (
+            (0.012, -0.040) if self.ReferencedConfiguration == "PenWire" else (0.0, 0.0)
+        )
         half = (0.007, pen_geom.WIRE_LEN / 1000 * math.sqrt(2 / 3) + 0.0056)
         cx, cy = (self.Position[i] + offset[i] for i in range(2))
         return (cx - half[0], cy - half[1], cx + half[0], cy + half[1])
@@ -142,14 +153,23 @@ class _IsoView:
         return True
 
 
-def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None, iso_fault=None,
-             settled_fault=None):
+def _package(
+    monkeypatch,
+    tmp_path,
+    *,
+    note_text=None,
+    note_at=None,
+    iso_fault=None,
+    settled_fault=None,
+):
     source = tmp_path / f"{STEM}.SLDPRT"
     source.write_bytes(b"offline native-path fixture")
     monkeypatch.setattr(drawing, "SOURCE", source)
     calls = SimpleNamespace(sections=[], settled=[], notes=[], views=[], finalize={})
     document = SimpleNamespace(
-        ActivateView=lambda _name: True, GetEditSheet=lambda: True, ActiveDrawingView=None,
+        ActivateView=lambda _name: True,
+        GetEditSheet=lambda: True,
+        ActiveDrawingView=None,
     )
     adapter = SimpleNamespace(currentModel=None)
 
@@ -238,7 +258,9 @@ def test_one_sheet_carries_end_view_isometric_and_notes(monkeypatch, tmp_path):
     assert iso.ScaleRatio == drawing.ISO_SCALE and iso.UseSheetScale == 0
     assert (iso.mode, iso.edges) == (3, True)
     box = iso.GetOutline()
-    assert ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2) == pytest.approx(drawing.ISO_CENTER)
+    assert ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2) == pytest.approx(
+        drawing.ISO_CENTER
+    )
     assert [(note.text, (note.x, note.y)) for note in calls.notes] == [
         (part.DRAWING_NOTES, drawing.NOTES_XY),
         (drawing.ASSEMBLY_NOTE, drawing.ASSEMBLY_NOTE_XY),
@@ -250,9 +272,13 @@ def test_one_sheet_carries_end_view_isometric_and_notes(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize(
     "fault",
-    ({"note_text": "PURCHASED WIRE: OTHER"}, {"note_at": (0.300, 0.060)},
-     {"note_at": (-0.020, 0.075)}, {"note_at": (0.020, 0.103)},
-     {"note_at": (0.120, 0.170)}),
+    (
+        {"note_text": "PURCHASED WIRE: OTHER"},
+        {"note_at": (0.300, 0.060)},
+        {"note_at": (-0.020, 0.075)},
+        {"note_at": (0.020, 0.103)},
+        {"note_at": (0.120, 0.170)},
+    ),
     ids=("text", "title-block", "off-sheet", "on-assembly-note", "on-end-view"),
 )
 def test_purchase_note_fails_closed_after_final_rebuild(monkeypatch, tmp_path, fault):
@@ -263,8 +289,12 @@ def test_purchase_note_fails_closed_after_final_rebuild(monkeypatch, tmp_path, f
 
 @pytest.mark.parametrize(
     "fault",
-    ({"iso_fault": "ignored-recenter"}, {"settled_fault": "configuration"},
-     {"settled_fault": "wireframe"}, {"settled_fault": "scale"}),
+    (
+        {"iso_fault": "ignored-recenter"},
+        {"settled_fault": "configuration"},
+        {"settled_fault": "wireframe"},
+        {"settled_fault": "scale"},
+    ),
     ids=("ignored-recenter", "configuration", "wireframe", "scale"),
 )
 def test_isometric_fails_closed_after_final_rebuild(monkeypatch, tmp_path, fault):

@@ -148,7 +148,9 @@ def assert_plan_leaders(
         groups,
         centre=((x0 + x1) / 2.0, (y0 + y1) / 2.0),
         keep_out={name: 0.5 * radii[ID_NAME] for name in groups},
-        lands_within={name: (0.8 * radius, 1.2 * radius) for name, radius in radii.items()},
+        lands_within={
+            name: (0.8 * radius, 1.2 * radius) for name, radius in radii.items()
+        },
         label=label,
     )
 
@@ -158,9 +160,7 @@ def stations_match(prior: Mapping[str, Any], current: Mapping[str, Any]) -> bool
         len(prior[field]) == len(current[field])
         and all(
             len(before) == len(after)
-            and all(
-                abs(a - b) <= 1e-5 for a, b in zip(before, after, strict=True)
-            )
+            and all(abs(a - b) <= 1e-5 for a, b in zip(before, after, strict=True))
             for before, after in zip(prior[field], current[field], strict=True)
         )
         for field in _STATION_FIELDS
@@ -174,7 +174,9 @@ def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
     position = (record or {}).get("pos") or ()
     texts = ((record or {}).get("display") or {}).get("texts") or ()
     if (
-        errors or record is None or int(record.get("type", 0)) != 4
+        errors
+        or record is None
+        or int(record.get("type", 0)) != 4
         or len(position) != 3
         or not all(math.isfinite(float(value)) for value in position)
         or not texts
@@ -203,7 +205,9 @@ def _size_displays(adapter: Any, views: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
-def _move_text(display: Any, record: Mapping[str, Any], dx: float, *, label: str) -> None:
+def _move_text(
+    display: Any, record: Mapping[str, Any], dx: float, *, label: str
+) -> None:
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     x, y = (float(value) for value in record["pos"][:2])
     if not annotation.SetPosition2(x + dx, y, 0.0):
@@ -228,7 +232,9 @@ def stray_leader_lines(record: Mapping[str, Any]) -> list[tuple[float, ...]]:
     data = record["display"]
     arrows = data.get("arrows") or ()
     if len(arrows) != 1:
-        raise RuntimeError(f"{record.get('name')}: near-side diameter has {len(arrows)} arrows")
+        raise RuntimeError(
+            f"{record.get('name')}: near-side diameter has {len(arrows)} arrows"
+        )
     lines = [
         (float(line[4]), float(line[5]), float(line[7]), float(line[8]))
         for line in data.get("lines") or ()
@@ -260,13 +266,17 @@ def _assert_size_texts(
     for name, side in TEXT_SIDES["free_front"].items():
         display = displays[name]
         geometry = supplier_top_text_geometry(records[name], horizontal=False)
-        if display.OffsetText is not True or not stations_match(stations[name], geometry):
+        if display.OffsetText is not True or not stations_match(
+            stations[name], geometry
+        ):
             raise RuntimeError(f"{name}: offset text moved its native lines")
         assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
     groups = {}
     for name, side in TEXT_SIDES["free_top"].items():
         text = display_box({"texts": records[name]["display"]["texts"]})
-        assert_diameter_text_clear(text, plan, side, label=f"{supplier_spec.SKU} {name}")
+        assert_diameter_text_clear(
+            text, plan, side, label=f"{supplier_spec.SKU} {name}"
+        )
         if displays[name].ArcExtensionLineOrOppositeSide is not False:
             raise RuntimeError(f"{name}: arc extension line came back")
         stray = stray_leader_lines(records[name])
@@ -276,7 +286,9 @@ def _assert_size_texts(
     assert_plan_leaders(groups, plan, label=f"{supplier_spec.SKU} plan diameters")
     struck = lines_through_own_text(records)
     if struck:
-        raise RuntimeError(f"{supplier_spec.SKU}: size text struck by its own line: {struck}")
+        raise RuntimeError(
+            f"{supplier_spec.SKU}: size text struck by its own line: {struck}"
+        )
 
 
 def place_size_texts(
@@ -288,7 +300,9 @@ def place_size_texts(
     """Move the four size texts off their lines; return their settled check."""
     displays = _size_displays(adapter, views)
     for name in TEXT_SIDES["free_top"]:
-        set_near_side_diameter(displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}")
+        set_near_side_diameter(
+            displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
+        )
         displays[name].ArcExtensionLineOrOppositeSide = False
         if displays[name].ArcExtensionLineOrOppositeSide is not False:
             raise RuntimeError(f"{name}: arc extension line was not turned off")
@@ -349,7 +363,10 @@ def supplier_dimensions(
     settled_checks: list[Callable[[], None]],
 ) -> None:
     supplier_disc_spring_dimensions(
-        adapter, views, spec=SHEET_SPEC, reference_bounds=reference_bounds,
+        adapter,
+        views,
+        spec=SHEET_SPEC,
+        reference_bounds=reference_bounds,
         settled_checks=settled_checks,
     )
     settled_checks.append(

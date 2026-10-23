@@ -153,7 +153,10 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     # lie on the axis or on visible edges, never across a face: the overall
     # length on the axis, the flange thickness on the flange rim, the pilot on
     # the spigot's end face.
-    assert chord("SupplierLength") == ((0.0, -spec.SPIGOT_LENGTH), (0.0, spec.FAR_END_Y))
+    assert chord("SupplierLength") == (
+        (0.0, -spec.SPIGOT_LENGTH),
+        (0.0, spec.FAR_END_Y),
+    )
     assert chord("SupplierFlangeThickness") == (
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (-spec.FLANGE_DIA / 2.0, spec.FLANGE_THICK),
@@ -164,7 +167,10 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     )
     # Top sketch reads model (x, -z): every chord crosses its circle's centre,
     # the flange OD and the pitch circle on the view's centrelines.
-    assert chord("SupplierFlangeDiameter") == ((-spec.FLANGE_DIA / 2.0, 0.0), (spec.FLANGE_DIA / 2.0, 0.0))
+    assert chord("SupplierFlangeDiameter") == (
+        (-spec.FLANGE_DIA / 2.0, 0.0),
+        (spec.FLANGE_DIA / 2.0, 0.0),
+    )
     (hx, hy0), (_, hy1) = chord("SupplierMountingHoleDiameter")
     centre_x, centre_z = spec.HOLE_CENTRES[0]
     assert hx == centre_x
@@ -302,7 +308,9 @@ def _fit_orthographic(
     return purchased._fit_group(_Drawing(), members)
 
 
-def test_supplier_lanes_leave_one_to_one_for_the_padded_native_outlines(monkeypatch) -> None:
+def test_supplier_lanes_leave_one_to_one_for_the_padded_native_outlines(
+    monkeypatch,
+) -> None:
     assert _fit_orthographic(monkeypatch) == (1, 1)
 
 
@@ -318,7 +326,8 @@ def test_each_part_of_the_layout_is_needed_for_one_to_one(monkeypatch) -> None:
     # A second horizontal Front size (the flange OD back in the side view)
     # takes a second bottom lane: 1:2.
     front_od = {
-        name: plane for name, plane in spec.SUPPLIER_REFERENCE_PLANES.items()
+        name: plane
+        for name, plane in spec.SUPPLIER_REFERENCE_PLANES.items()
         if name != "SupplierFlangeDiameter"
     }
     assert _fit_orthographic(monkeypatch, planes=front_od) == (1, 2)

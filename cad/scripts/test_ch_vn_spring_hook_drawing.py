@@ -340,7 +340,10 @@ def _deburr_ink(placement):
             (124.9, 121.6, 127.2, 119.0, "arrow"),
         )
     angle = AnnotationGeometry(
-        "ChamferAngle", "dim", "front", (_mm_box(*text),),
+        "ChamferAngle",
+        "dim",
+        "front",
+        (_mm_box(*text),),
         tuple(_mm_run(*run) for run in runs),
     )
     width = AnnotationGeometry("ChamferWidth", "dim", "front", (_mm_box(*width_row),))
@@ -364,10 +367,13 @@ def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
         )
     reader = SimpleNamespace(take_errors=lambda: [])
     monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
-    monkeypatch.setattr(drawing, "_dump_annotation", lambda _reader, name: {"name": name})
+    monkeypatch.setattr(
+        drawing, "_dump_annotation", lambda _reader, name: {"name": name}
+    )
     monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
     monkeypatch.setattr(
-        drawing, "annotation_geometry",
+        drawing,
+        "annotation_geometry",
         lambda record, *, owner, advance: ink[record["name"]],
     )
 

@@ -36,7 +36,10 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
     maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
     # The next one-place nominal down would put the short leg's end over the drill.
-    assert anchor.thread_major_dia_mm - 2 * (minimum - 0.1) >= TAP_DRILL_MM[anchor.thread_size]
+    assert (
+        anchor.thread_major_dia_mm - 2 * (minimum - 0.1)
+        >= TAP_DRILL_MM[anchor.thread_size]
+    )
     # The long leg still leaves an end flat: the deburr cannot reach the axis.
     assert anchor.thread_major_radius_mm - maximum > 0.2
     # Include the adverse angular corner, not only the nominal 45-degree leg.
@@ -61,13 +64,18 @@ def test_lead_in_drives_the_restored_deburr_to_the_spec_nominal(monkeypatch, fau
         calls.append(("rebuild",))
 
     monkeypatch.setattr(
-        part, "_named_dimension",
-        lambda _adapter, feature, name: (None, Dimension())
-        if (feature, name) == ("StockDeburrProfile", "ChamferWidth") else None,
+        part,
+        "_named_dimension",
+        lambda _adapter, feature, name: (
+            (None, Dimension())
+            if (feature, name) == ("StockDeburrProfile", "ChamferWidth")
+            else None
+        ),
     )
     monkeypatch.setattr(part, "force_rebuild", rebuild)
     monkeypatch.setattr(
-        part, "_hard_faults",
+        part,
+        "_hard_faults",
         lambda _adapter, _model: ["StockDeburr"] if fault == "faults" else [],
     )
     adapter = SimpleNamespace(currentModel=object())

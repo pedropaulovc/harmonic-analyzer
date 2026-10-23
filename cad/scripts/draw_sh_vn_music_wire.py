@@ -59,14 +59,16 @@ MAGNIFIER_STEPS_SHEET = 4
 PEN_DRAWING_NUMBER = "MHA-PN-00"
 PEN_STEPS_SHEET = 3
 PEN_WIRE_STEPS = (2, 8)
-ASSEMBLY_NOTE = "\n".join((
-    "CUT TO LENGTH AND FORM AT ASSEMBLY:",
-    f"LEVER WIRE: {magnifier_steps.DRAWING_NUMBER} SHEET {MAGNIFIER_STEPS_SHEET}, "
-    f"STEPS {magnifier_steps.step_number(magnifier_steps.WIRE_HOOKED_KEY)}-"
-    f"{magnifier_steps.step_number(magnifier_steps.WIRE_TIED_KEY)}",
-    f"PEN WIRE: {PEN_DRAWING_NUMBER} SHEET {PEN_STEPS_SHEET}, "
-    f"STEPS {PEN_WIRE_STEPS[0]} AND {PEN_WIRE_STEPS[1]}",
-))
+ASSEMBLY_NOTE = "\n".join(
+    (
+        "CUT TO LENGTH AND FORM AT ASSEMBLY:",
+        f"LEVER WIRE: {magnifier_steps.DRAWING_NUMBER} SHEET {MAGNIFIER_STEPS_SHEET}, "
+        f"STEPS {magnifier_steps.step_number(magnifier_steps.WIRE_HOOKED_KEY)}-"
+        f"{magnifier_steps.step_number(magnifier_steps.WIRE_TIED_KEY)}",
+        f"PEN WIRE: {PEN_DRAWING_NUMBER} SHEET {PEN_STEPS_SHEET}, "
+        f"STEPS {PEN_WIRE_STEPS[0]} AND {PEN_WIRE_STEPS[1]}",
+    )
+)
 ASSEMBLY_NOTE_XY = (0.020, 0.105)
 
 # Rule 8's pictorial: one member's straight run, undimensioned, in the empty
@@ -82,20 +84,34 @@ ISO_LABEL_XY = (0.268, 0.108)
 
 
 def _overlaps(box: tuple[float, ...], other: tuple[float, ...]) -> bool:
-    return box[0] < other[2] and other[0] < box[2] and box[1] < other[3] and other[1] < box[3]
+    return (
+        box[0] < other[2]
+        and other[0] < box[2]
+        and box[1] < other[3]
+        and other[1] < box[3]
+    )
 
 
 def _inside(box: tuple[float, ...], field: tuple[float, ...]) -> bool:
-    return field[0] <= box[0] and field[1] <= box[1] and box[2] <= field[2] and box[3] <= field[3]
+    return (
+        field[0] <= box[0]
+        and field[1] <= box[1]
+        and box[2] <= field[2]
+        and box[3] <= field[3]
+    )
 
 
 def _note_box(note: Any, expected: str, label: str) -> tuple[float, ...]:
     text = str(_early_bound(note, "INote").GetText() or "").replace("\r\n", "\n")
     if text != expected.replace("\r\n", "\n"):
         raise RuntimeError(f"{label} resolved to {text!r}, expected {expected!r}")
-    extent = tuple(float(value) for value in (_early_bound(note, "INote").GetExtent() or ()))
-    if len(extent) != 6 or not all(map(math.isfinite, extent)) or (
-        extent[3] <= extent[0] or extent[4] <= extent[1]
+    extent = tuple(
+        float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
+    )
+    if (
+        len(extent) != 6
+        or not all(map(math.isfinite, extent))
+        or (extent[3] <= extent[0] or extent[4] <= extent[1])
     ):
         raise RuntimeError(f"{label} has no resolved native extent: {extent!r}")
     box = (extent[0], extent[1], extent[3], extent[4])
@@ -106,7 +122,12 @@ def _note_box(note: Any, expected: str, label: str) -> tuple[float, ...]:
 
 def _outline(view: Any) -> tuple[float, ...]:
     box = tuple(float(value) for value in (view.GetOutline() or ()))
-    if len(box) != 4 or not all(map(math.isfinite, box)) or box[2] <= box[0] or box[3] <= box[1]:
+    if (
+        len(box) != 4
+        or not all(map(math.isfinite, box))
+        or box[2] <= box[0]
+        or box[3] <= box[1]
+    ):
         raise RuntimeError(f"wire isometric: invalid view outline {box!r}")
     return box
 
@@ -121,7 +142,9 @@ def _assert_iso_state(view: Any) -> None:
         or ratio != tuple(float(value) for value in ISO_SCALE)
         or int(view.UseSheetScale) != 0
     ):
-        raise RuntimeError(f"wire isometric: native source/configuration/scale changed: {ratio!r}")
+        raise RuntimeError(
+            f"wire isometric: native source/configuration/scale changed: {ratio!r}"
+        )
     mode, edges = view.GetDisplayMode2(), view.GetDisplayEdgesInShadedMode()
     if mode is None or int(mode) not in (3, 7) or not bool(edges):
         raise RuntimeError("wire isometric is not Shaded With Edges")
@@ -130,7 +153,8 @@ def _assert_iso_state(view: Any) -> None:
 def _add_isometric(adapter: Any) -> Any:
     """Configured member run, primed through HLR before shading, centred."""
     view = _early_bound(
-        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE), "IView",
+        place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE),
+        "IView",
     )
     view.ReferencedConfiguration = ISO_CONFIGURATION
     view.UseSheetScale = 0
@@ -158,7 +182,9 @@ def _add_isometric(adapter: Any) -> Any:
 def _assert_iso_field(view: Any) -> tuple[float, ...]:
     box = _outline(view)
     centre = ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
-    if math.dist(centre, ISO_CENTER) > _POSITION_TOLERANCE or not _inside(box, ISO_FIELD):
+    if math.dist(centre, ISO_CENTER) > _POSITION_TOLERANCE or not _inside(
+        box, ISO_FIELD
+    ):
         raise RuntimeError(f"wire isometric leaves its field: {box!r}")
     return box
 
@@ -176,12 +202,21 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open shared music-wire source", await adapter.open_model(str(SOURCE)))
     properties = read_required_properties(
         adapter.currentModel,
-        ("Number", "Revision", "Title", "Material Specification", "Finish",
-         "Manufacturing Notes"),
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Manufacturing Notes",
+        ),
         required=("Number", "Material Specification", "Finish", "Manufacturing Notes"),
     )
     drawing_model, _ = new_project_drawing(
-        adapter, property_view=PART_STEM, scale=STOCK_SCALE, layout=SPEC.layout,
+        adapter,
+        property_view=PART_STEM,
+        scale=STOCK_SCALE,
+        layout=SPEC.layout,
     )
     stamp_drawing_summary(
         adapter,
@@ -202,7 +237,9 @@ async def build(adapter: Any) -> dict[str, str]:
     if not drawing.GetEditSheet() or drawing.ActiveDrawingView is not None:
         raise RuntimeError("cannot restore sheet context for the wire notes")
     purchase = add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    assembly = _literal_note(adapter, ASSEMBLY_NOTE, ASSEMBLY_NOTE_XY, "assembly pointer note")
+    assembly = _literal_note(
+        adapter, ASSEMBLY_NOTE, ASSEMBLY_NOTE_XY, "assembly pointer note"
+    )
     iso_label = _literal_note(adapter, ISO_LABEL, ISO_LABEL_XY, "isometric label")
 
     def settled() -> None:
@@ -211,18 +248,24 @@ async def build(adapter: Any) -> dict[str, str]:
         iso_box = _assert_iso_field(iso)
         notes = {
             "purchase note": _note_box(
-                purchase, str(properties["Manufacturing Notes"]), "purchase note",
+                purchase,
+                str(properties["Manufacturing Notes"]),
+                "purchase note",
             ),
-            "assembly pointer note": _note_box(assembly, ASSEMBLY_NOTE, "assembly pointer note"),
+            "assembly pointer note": _note_box(
+                assembly, ASSEMBLY_NOTE, "assembly pointer note"
+            ),
             "isometric label": _note_box(iso_label, ISO_LABEL, "isometric label"),
         }
         if not _inside(notes["isometric label"], ISO_FIELD):
-            raise RuntimeError(f"isometric label leaves its field: {notes['isometric label']!r}")
+            raise RuntimeError(
+                f"isometric label leaves its field: {notes['isometric label']!r}"
+            )
         boxes = list(notes.items())
         for index, (label, box) in enumerate(boxes):
             if _overlaps(box, iso_box) or _overlaps(box, STOCK_FIELD):
                 raise RuntimeError(f"{label} overlaps a native view: {box!r}")
-            for other, other_box in boxes[index + 1:]:
+            for other, other_box in boxes[index + 1 :]:
                 if _overlaps(box, other_box):
                     raise RuntimeError(f"{label} overlaps {other}")
 

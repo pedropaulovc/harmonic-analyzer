@@ -347,9 +347,7 @@ async def build(adapter) -> dict[str, str]:
             "Supplier SKUs": ", ".join(str(sku) for sku in row["supplier_skus"]),
         },
     )
-    apply_drawing_properties(
-        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
-    )
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_member_part(
         adapter,
         PART_NAME,
