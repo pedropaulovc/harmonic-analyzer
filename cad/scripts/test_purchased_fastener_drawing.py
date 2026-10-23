@@ -11918,7 +11918,8 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
         consumer=consumer, core=core, checks=[], rebuilds=[], captures=[],
         dimensions=(dimension,), formats=formats, units=units, sides=sides,
         name=name, axis=axis, plane=plane, style_calls=[], writes=[], redraws=0,
-        set_status=0, style_effect=None, style_drift=None, rebuild_drift=None,
+        justification=0, getter_error=None, setter_error=None,
+        font_calls=[], style_effect=None, style_drift=None, rebuild_drift=None,
     )
 
     def native_display(previous=None):
@@ -11978,43 +11979,76 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
             previous.display.OffsetText if previous is not None else False
         )
         case.annotation.position = tuple(case.annotation.record["pos"])
-        case.broken_mode = previous.broken_mode if previous is not None else -1
-        case.use_doc_broken = previous.use_doc_broken if previous is not None else True
+        case.justification = (
+            previous.justification if previous is not None else state.justification
+        )
+        case.fonts = (
+            copy.deepcopy(previous.fonts) if previous is not None else [
+                SimpleNamespace(
+                    TypeFaceName="Arial", CharHeight=0.0035, CharHeightInPts=10,
+                    IsHeightSpecifiedInPts=lambda: False, Bold=False, Italic=False,
+                    Underline=False, Strikeout=False, WidthFactor=1.0,
+                    CharSpacingFactor=1.0, LineSpacing=1.0, LineLength=0.0,
+                    Escapement=0, ObliqueAngle=0.0, BackWards=False,
+                    UpsideDown=False, Vertical=False,
+                ),
+            ]
+        )
+        case.use_doc_fonts = (
+            list(previous.use_doc_fonts) if previous is not None else [True]
+        )
 
-        def broken_line(use_doc, mode):
-            assert not case.stale, "stale display received broken-line setter"
-            state.style_calls.append(("set", id(case.display), use_doc, mode))
-            state.writes.append("broken-line")
-            if type(state.set_status) is int and state.set_status == 1:
-                case.broken_mode, case.use_doc_broken = -1, True
-            elif type(state.set_status) is int and state.set_status == 0:
+        class NativeDisplay(SimpleNamespace):
+            @property
+            def VerticalJustification(self):
+                assert not case.stale, "stale display supplied justification"
+                state.style_calls.append(("get", id(self)))
+                if state.getter_error is not None:
+                    raise state.getter_error
+                return case.justification
+
+            @VerticalJustification.setter
+            def VerticalJustification(self, value):
+                assert not case.stale, "stale display received justification"
+                state.style_calls.append(("set", id(self), value))
+                state.writes.append("justification")
+                if state.setter_error is not None:
+                    raise state.setter_error
                 if state.style_effect != "ignored":
-                    case.broken_mode, case.use_doc_broken = mode, use_doc
-                if state.style_effect == "wrong-mode":
-                    case.broken_mode = 2
-                elif state.style_effect == "noninteger-mode":
-                    case.broken_mode = 3.0
-                elif state.style_effect == "doc-default":
-                    case.use_doc_broken = True
-                elif state.style_effect == "nonboolean-doc-default":
-                    case.use_doc_broken = 0
+                    case.justification = value
+                if state.style_effect == "wrong-value":
+                    case.justification = 2
+                elif state.style_effect == "noninteger":
+                    case.justification = 1.0
+                elif state.style_effect == "boolean":
+                    case.justification = True
                 if state.style_drift:
                     mutate(state.style_drift, case)
-            return state.set_status
 
-        def read_mode():
-            assert not case.stale, "stale display supplied broken-line readback"
-            state.style_calls.append(("mode", id(case.display)))
-            return case.broken_mode
+        # Preserve the complete native/source methods supplied by _supplier_native.
+        case.display = NativeDisplay(**vars(case.display))
+        case.annotation.GetSpecificAnnotation = lambda: case.display
 
-        def read_doc_default():
-            assert not case.stale, "stale display supplied document-default readback"
-            state.style_calls.append(("doc", id(case.display)))
-            return case.use_doc_broken
+        def font_count():
+            assert not case.stale, "stale annotation supplied font count"
+            state.font_calls.append(("count", id(case.annotation)))
+            return len(case.fonts)
 
-        case.display.SetBrokenLeader2 = broken_line
-        case.display.GetBrokenLeader2 = read_mode
-        case.display.GetUseDocBrokenLeader = read_doc_default
+        def font(index):
+            assert not case.stale, "stale annotation supplied font"
+            assert index == 0
+            state.font_calls.append(("font", id(case.annotation), index))
+            return case.fonts[index]
+
+        def use_doc_font(index):
+            assert not case.stale, "stale annotation supplied font inheritance"
+            assert index == 0
+            state.font_calls.append(("inheritance", id(case.annotation), index))
+            return case.use_doc_fonts[index]
+
+        case.annotation.GetTextFormatCount = font_count
+        case.annotation.GetTextFormat = font
+        case.annotation.GetUseDocTextFormat = use_doc_font
 
         def annotation():
             assert not case.stale, "creation/rebuild display handle was reused"
@@ -12073,10 +12107,40 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
     def mutate(drift, case=None):
         case = state.current if case is None else case
         data = case.annotation.record["display"]
-        if drift == "mode":
-            case.broken_mode = 1
-        elif drift == "doc-default":
-            case.use_doc_broken = True
+        if drift == "justification":
+            case.justification = 2
+        elif drift == "font-inheritance":
+            case.use_doc_fonts[0] = not case.use_doc_fonts[0]
+        elif drift == "font-type-only":
+            assert case.fonts[0].Bold is False
+            case.fonts[0].Bold = 0  # Equal value, different native primitive type.
+        elif drift.startswith("font:"):
+            field = drift.split(":", 1)[1]
+            original = getattr(case.fonts[0], field)
+            if field == "IsHeightSpecifiedInPts":
+                case.fonts[0].IsHeightSpecifiedInPts = lambda: True
+            else:
+                setattr(
+                    case.fonts[0], field,
+                    not original if type(original) is bool else (
+                        original + " Narrow" if type(original) is str else original + 1
+                    ),
+                )
+        elif drift == "raw-text":
+            data["texts"][0]["t"] += " "
+        elif drift == "captured-normal-shift":
+            # Actual a04 style transition: 2.7781 mm transverse arrow movement.
+            # Keep model-side witness endpoints held, never shift the baseline.
+            for row in data["arrows"]:
+                row[1 - axis] += 0.0027781
+            for index in (0, 1):
+                data["lines"][index][8 - axis] += 0.0027781
+            for index in (2, 3):
+                data["lines"][index][5 - axis] += 0.0027781
+                data["lines"][index][8 - axis] += 0.0027781
+        elif drift == "physical-tail":
+            # Add 100 um to an existing free tail, retaining arrows/witnesses.
+            data["lines"][2][7 + axis] += 0.0001
         elif drift == "source":
             view._source = model._path = source.with_name("other.SLDPRT")
         elif drift == "configuration":
@@ -12144,6 +12208,8 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
     # format readback, measurement, station preservation and shelving stay real.
     for module in (screws, core, consumer):
         monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+    import _purchased_fastener_drawing as purchased
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "iter_views", lambda actual: iter(actual.views))
     monkeypatch.setattr(screws, "view_name", lambda _adapter, actual: actual.GetName2())
@@ -12184,7 +12250,8 @@ def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
             tuple(point.native_identity for point in case.annotation.entities),
             source_dimension.FullName, source_dimension.SystemValue,
             len(state.rebuilds),
-            case.broken_mode, case.use_doc_broken, state.redraws, len(state.writes),
+            case.justification, tuple(tuple(vars(font).items()) for font in case.fonts),
+            tuple(case.use_doc_fonts), state.redraws, len(state.writes),
         )
 
     def settle():
@@ -12323,7 +12390,7 @@ def test_screw_reference_shelf_consumer_preserves_native_state_and_refuses_late_
     assert state.snapshot() == mutated
 
 
-@pytest.mark.parametrize("options", ({}, {"broken_lines": ()}))
+@pytest.mark.parametrize("options", ({}, {"top_justified": ()}))
 def test_screw_reference_shelf_empty_style_default_adds_no_native_calls(
     screw_reference_shelf_native_consumer, options,
 ):
@@ -12331,6 +12398,7 @@ def test_screw_reference_shelf_empty_style_default_adds_no_native_calls(
     returned = state.run(**options)
     assert returned == {"HeadHeight": state.current.display}
     assert state.style_calls == []
+    assert state.font_calls == []
     assert state.redraws == 0
     assert state.rebuilds == [
         "purchased screw reference text measured",
@@ -12342,51 +12410,58 @@ def test_screw_reference_shelf_empty_style_default_adds_no_native_calls(
     state.settle()
     assert state.snapshot() == settled
     assert state.style_calls == []
+    assert state.font_calls == []
 
 
-def test_screw_reference_shelf_rejects_unknown_broken_line_before_native_access():
+def test_screw_reference_shelf_rejects_unknown_top_justified_before_native_access():
     from _supplier_screw_reference_text import annotate_supplier_screw_with_shelves
 
     class NoNativeAccess:
         def __getattr__(self, name):
-            raise AssertionError(f"unknown broken-line selection touched native {name}")
+            raise AssertionError(f"unknown justification selection touched native {name}")
 
-    with pytest.raises(ValueError, match="broken lines must name actual references"):
+    with pytest.raises(ValueError, match="must name actual references"):
         annotate_supplier_screw_with_shelves(
             NoNativeAccess(), {"*Front": NoNativeAccess()},
             dimensions=(("HeadHeight", 3.9624, "vertical"),),
             formats={"HeadHeight": (3, "length", None, "MIN")},
             settled_checks=[], label="purchased screw",
-            broken_lines=("SupplierDriveWidth",),
+            top_justified=("SupplierDriveWidth",),
         )
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
 @pytest.mark.parametrize("replace_final_wrapper", (False, True))
-def test_carriage_broken_line_preserves_exact_native_reference_and_readonly_proofs(
-    screw_reference_shelf_native_consumer, replace_final_wrapper,
+@pytest.mark.parametrize("initial", (0, 1, 2, 3))
+def test_carriage_top_justified_preserves_exact_native_reference_and_readonly_proofs(
+    screw_reference_shelf_native_consumer, replace_final_wrapper, initial,
 ):
+    # Legal fake state proves driver controls, not native or printed clearance.
     state = screw_reference_shelf_native_consumer
+    state.current.justification = initial
     before = state.core.measure_reference_text(
         state.adapter, state.current.display, axis=state.axis, label=state.name
     )
     original_position = state.current.annotation.position
-    returned = state.run(broken_lines=(state.name,))
+    returned = state.run(top_justified=(state.name,))
     case = state.current
     assert returned == {"SupplierDriveWidth": case.display}
     assert case.display is not state.creation.display
     assert state.creation.stale
-    assert (case.broken_mode, case.use_doc_broken) == (3, False)
+    assert case.justification == 1
     setters = [row for row in state.style_calls if row[0] == "set"]
-    modes = [row for row in state.style_calls if row[0] == "mode"]
-    defaults = [row for row in state.style_calls if row[0] == "doc"]
-    assert len(setters) == 1 and setters[0][2:] == (False, 3)
-    assert len(modes) == len(defaults) == 6
-    assert modes[0][1] != setters[0][1]  # Readback is post-rebuild, never the setter wrapper.
+    getters = [row for row in state.style_calls if row[0] == "get"]
+    assert len(setters) == (0 if initial == 1 else 1)
+    if setters:
+        assert setters[0][2:] == (1,)  # VOID property setter, no status.
+        assert getters[0][1] == setters[0][1]
+        assert getters[1][1] != setters[0][1]
+    assert len(getters) == 7
+    assert state.font_calls
     assert state.redraws == 1
     assert state.rebuilds == [
-        "purchased screw original reference line stations",
-        "purchased screw local broken reference lines",
+        "purchased screw original reference text stations",
+        "purchased screw local top-justified reference text",
         "purchased screw reference text measured",
         "purchased screw reference offset anchors",
         "purchased screw reference native offset mode",
@@ -12397,6 +12472,7 @@ def test_carriage_broken_line_preserves_exact_native_reference_and_readonly_proo
     )
     assert after["tips"] == before["tips"]
     assert after["witnesses"] == before["witnesses"]
+    assert after["physical_lines"] == before["physical_lines"]
     assert all(len(witness) == 3 for witness in after["witnesses"])
     assert case.annotation.position[1] == original_position[1]
     assert after["text"].xmin - after["reach"] >= state.core.CLEAR_GAP_M
@@ -12420,44 +12496,97 @@ def test_carriage_broken_line_preserves_exact_native_reference_and_readonly_proo
     settled = state.snapshot()
     state.settle()
     assert state.snapshot() == settled  # No setters, formatting, rebuild or redraw.
-    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
-    assert len([row for row in state.style_calls if row[0] == "mode"]) == 8
-    assert len([row for row in state.style_calls if row[0] == "doc"]) == 8
+    assert len([row for row in state.style_calls if row[0] == "set"]) == (
+        0 if initial == 1 else 1
+    )
+    assert len([row for row in state.style_calls if row[0] == "get"]) == 9
     assert state.style_calls[-1][1] == id(state.current.display)
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
-@pytest.mark.parametrize("status", (1, -1, False, True, 0.0, None, "0"))
-def test_carriage_broken_line_refuses_fallback_failure_and_noninteger_status(
-    screw_reference_shelf_native_consumer, status,
+@pytest.mark.parametrize("initial", (False, True, -1, 4, 0.0, None, "0"))
+def test_carriage_top_justified_refuses_invalid_initial_getter_before_write(
+    screw_reference_shelf_native_consumer, initial,
 ):
     state = screw_reference_shelf_native_consumer
-    state.set_status = status
-    with pytest.raises(RuntimeError, match="failed to break supplier reference line"):
-        state.run(broken_lines=(state.name,))
-    assert [row[0] for row in state.style_calls] == ["set"]
+    state.current.justification = initial
+    with pytest.raises(RuntimeError):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get"]
     assert state.redraws == 0
     assert len(state.rebuilds) == 1
-    if type(status) is int and status == 1:
-        assert state.current.use_doc_broken is True
-        assert state.current.broken_mode == -1  # SDK invalid-value/default fallback.
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
-@pytest.mark.parametrize(
-    "effect",
-    ("ignored", "wrong-mode", "noninteger-mode", "doc-default", "nonboolean-doc-default"),
-)
-def test_carriage_broken_line_refuses_unapplied_or_mismatched_local_style(
+@pytest.mark.parametrize("effect", ("ignored", "wrong-value", "noninteger", "boolean"))
+def test_carriage_top_justified_refuses_unapplied_or_mismatched_local_style(
     screw_reference_shelf_native_consumer, effect,
 ):
     state = screw_reference_shelf_native_consumer
     state.style_effect = effect
-    with pytest.raises(RuntimeError, match="local broken supplier reference line did not persist"):
-        state.run(broken_lines=(state.name,))
-    assert [row[0] for row in state.style_calls] == ["set", "mode", "doc"]
+    with pytest.raises(RuntimeError):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get", "set", "get"]
     assert state.redraws == 1
     assert len(state.rebuilds) == 2
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+def test_carriage_top_justified_setter_exception_is_original(
+    screw_reference_shelf_native_consumer,
+):
+    state = screw_reference_shelf_native_consumer
+    error = ValueError("native property put unavailable")
+    state.setter_error = error
+    with pytest.raises(ValueError) as refused:
+        state.run(top_justified=(state.name,))
+    assert refused.value is error
+    assert [row[0] for row in state.style_calls] == ["get", "set"]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("initial", "fresh", "final"))
+@pytest.mark.parametrize("error_type", (AttributeError, NotImplementedError, ValueError))
+def test_carriage_top_justified_getter_exception_is_original_without_retry(
+    screw_reference_shelf_native_consumer, phase, error_type, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    error = error_type("native justification getter unavailable")
+    if phase == "initial":
+        state.getter_error = error
+    elif phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def fail_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.getter_error = error
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", fail_fresh)
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.getter_error = error
+    before_calls = len(state.style_calls)
+    before_writes = len(state.writes)
+    if phase == "final":
+        for check in state.checks:
+            before_calls = len(state.style_calls)
+            with pytest.raises(error_type) as refused:
+                check()
+            assert refused.value is error
+            assert len(state.style_calls) == before_calls + 1
+            assert len(state.writes) == before_writes
+    else:
+        with pytest.raises(error_type) as refused:
+            state.run(top_justified=(state.name,))
+        assert refused.value is error
+        assert [row[0] for row in state.style_calls] == (
+            ["get"] if phase == "initial" else ["get", "set", "get"]
+        )
+        assert len(state.rebuilds) == (1 if phase == "initial" else 2)
+        assert state.redraws == (0 if phase == "initial" else 1)
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
@@ -12467,25 +12596,27 @@ def test_carriage_broken_line_refuses_unapplied_or_mismatched_local_style(
         ("configuration", "changed source/configuration/orientation"),
         ("tips", "native tips moved"),
         ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
     ),
 )
-def test_carriage_broken_line_refuses_style_transition_source_or_station_drift(
+def test_carriage_top_justified_refuses_style_transition_source_or_station_drift(
     screw_reference_shelf_native_consumer, drift, message,
 ):
     state = screw_reference_shelf_native_consumer
     state.style_drift = drift
     with pytest.raises(RuntimeError, match=message):
-        state.run(broken_lines=(state.name,))
+        state.run(top_justified=(state.name,))
     assert len(state.rebuilds) == 2
     assert state.redraws == 1
     assert len([row for row in state.style_calls if row[0] == "set"]) == 1
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
-@pytest.mark.parametrize("drift", ("tips", "witnesses"))
-@pytest.mark.parametrize("logging_fails", (False, True))
-def test_carriage_broken_line_station_failure_retains_native_evidence_and_rethrows(
-    screw_reference_shelf_native_consumer, monkeypatch, drift, logging_fails,
+@pytest.mark.parametrize("drift", ("tips", "witnesses", "captured-normal-shift"))
+@pytest.mark.parametrize("logging_error", (None, ValueError, KeyboardInterrupt))
+def test_carriage_top_justified_station_failure_retains_native_evidence_and_rethrows(
+    screw_reference_shelf_native_consumer, monkeypatch, drift, logging_error,
 ):
     import _supplier_screw_reference_text as consumer
 
@@ -12504,24 +12635,27 @@ def test_carriage_broken_line_station_failure_retains_native_evidence_and_rethro
 
     def record_event(name, **attributes):
         events.append((name, attributes))
-        if logging_fails and name == "drawing.supplier_screw_broken_line_station_failure":
-            raise OSError("diagnostic sink unavailable")
+        if logging_error and name == "drawing.supplier_screw_text_justification_station_failure":
+            raise logging_error("diagnostic sink unavailable")
 
     monkeypatch.setattr(consumer, "assert_reference_text_stations", capture_failure)
     monkeypatch.setattr(consumer._telemetry, "event", record_event)
-    with pytest.raises(RuntimeError, match=f"native {drift} moved") as refused:
-        state.run(broken_lines=(state.name,))
+    moved = "tips" if drift == "captured-normal-shift" else drift
+    with pytest.raises(RuntimeError, match=f"native {moved} moved") as refused:
+        state.run(top_justified=(state.name,))
     assert refused.value is failures[0]
     diagnostic = [
         attributes for name, attributes in events
-        if name == "drawing.supplier_screw_broken_line_station_failure"
+        if name == "drawing.supplier_screw_text_justification_station_failure"
     ]
     assert len(diagnostic) == 1
     actual = diagnostic[0]
     assert actual["reference"] == "SupplierDriveWidth"
-    assert actual["setter_status"] == 0
-    assert actual["broken_line_mode"] == 3
-    assert actual["use_doc_broken_line"] is False
+    assert actual["original_justification"] == 0
+    assert actual["actual_justification"] == 1
+    assert actual["original_font"] == actual["actual_font"]
+    assert actual["coordinate_basis"] == "held native audit record, metres, 0.1 um"
+    assert actual["native_array_order"] == "unchanged IDisplayData index order"
     before, after = actual["before"], actual["after"]
     assert before["axis"] == after["axis"] == 0
     assert before["record"]["name"] == after["record"]["name"] == state.name
@@ -12529,10 +12663,21 @@ def test_carriage_broken_line_station_failure_retains_native_evidence_and_rethro
     # Native primitive order and coordinates remain available for role matching;
     # reporting the already-normalized tips alone would lose this evidence.
     assert after["record"]["display"] == state.current.annotation.record["display"]
+    assert set(before) == set(after) == {
+        "axis", "tips", "witnesses", "physical_lines", "record",
+    }
     if drift == "tips":
         assert [new[0] - old[0] for old, new in zip(
             before["tips"], after["tips"], strict=True,
         )] == pytest.approx([0.0001, 0.0001])
+    elif drift == "captured-normal-shift":
+        assert [new[1] - old[1] for old, new in zip(
+            before["tips"], after["tips"], strict=True,
+        )] == pytest.approx([0.0027781, 0.0027781])
+        assert [point[0] for point in before["tips"]] == [
+            point[0] for point in after["tips"]
+        ]
+        assert before["witnesses"] != after["witnesses"]
     else:
         assert before["tips"] == after["tips"]
         assert before["witnesses"] != after["witnesses"]
@@ -12554,19 +12699,20 @@ def test_carriage_broken_line_station_failure_retains_native_evidence_and_rethro
 )
 @pytest.mark.parametrize(
     "drift,message", (
-        ("mode", "local broken supplier reference line did not persist"),
-        ("doc-default", "local broken supplier reference line did not persist"),
+        ("justification", "justif"),
         ("tips", "native tips moved"),
         ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
     ),
 )
-def test_carriage_broken_line_and_original_stations_survive_every_core_reacquire(
+def test_carriage_top_justified_and_original_stations_survive_every_core_reacquire(
     screw_reference_shelf_native_consumer, phase, drift, message,
 ):
     state = screw_reference_shelf_native_consumer
     state.rebuild_drift = (phase, drift)
     with pytest.raises(RuntimeError, match=message):
-        state.run(broken_lines=(state.name,))
+        state.run(top_justified=(state.name,))
     assert state.rebuilds[-1].endswith(phase)
     assert len([row for row in state.style_calls if row[0] == "set"]) == 1
 
@@ -12574,8 +12720,7 @@ def test_carriage_broken_line_and_original_stations_survive_every_core_reacquire
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
 @pytest.mark.parametrize(
     "drift,message", (
-        ("mode", "local broken supplier reference line did not persist"),
-        ("doc-default", "local broken supplier reference line did not persist"),
+        ("justification", "justif"),
         ("source", "changed source/configuration/orientation"),
         ("configuration", "changed source/configuration/orientation"),
         ("attachment", "attachment changed source sketch"),
@@ -12584,13 +12729,15 @@ def test_carriage_broken_line_and_original_stations_survive_every_core_reacquire
         ("full-ref", "native supplier presentation differs from its source"),
         ("tips", "native tips moved"),
         ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
     ),
 )
-def test_carriage_broken_line_every_final_proof_refuses_fresh_wrapper_drift_readonly(
+def test_carriage_top_justified_every_final_proof_refuses_fresh_wrapper_drift_readonly(
     screw_reference_shelf_native_consumer, drift, message,
 ):
     state = screw_reference_shelf_native_consumer
-    returned = state.run(broken_lines=(state.name,))
+    returned = state.run(top_justified=(state.name,))
     state.replace()
     assert state.current.display is not returned[state.name]
     state.mutate(drift)
@@ -12610,17 +12757,282 @@ def test_carriage_broken_line_every_final_proof_refuses_fresh_wrapper_drift_read
         ("axis-clearance", "supplier reference text crowds its native line"),
     ),
 )
-def test_carriage_broken_line_retains_generic_transverse_and_axis_clearance_guards(
+def test_carriage_top_justified_retains_generic_transverse_and_axis_clearance_guards(
     screw_reference_shelf_native_consumer, drift, message,
 ):
     state = screw_reference_shelf_native_consumer
-    state.run(broken_lines=(state.name,))
+    state.run(top_justified=(state.name,))
     state.replace()
     state.mutate(drift)
     mutated = state.snapshot()
     with pytest.raises(RuntimeError, match=message):
         state.checks[-1]()
     assert state.snapshot() == mutated
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "field",
+    (
+        "TypeFaceName", "CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts",
+        "Bold", "Italic", "Underline", "Strikeout", "WidthFactor",
+        "CharSpacingFactor", "LineSpacing", "LineLength", "Escapement",
+        "ObliqueAngle", "BackWards", "UpsideDown", "Vertical",
+        "font-inheritance", "font-type-only", "raw-text",
+    ),
+)
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "transition", "reference text measured", "reference offset anchors",
+        "reference native offset mode", "measured reference text shelves", "final",
+    ),
+)
+def test_carriage_top_justified_preserves_full_native_font_and_text_at_every_checkpoint(
+    screw_reference_shelf_native_consumer, field, phase,
+):
+    state = screw_reference_shelf_native_consumer
+    drift = (
+        field if field in ("font-inheritance", "font-type-only", "raw-text")
+        else f"font:{field}"
+    )
+    message = (
+        "supplier reference native text changed"
+        if field == "raw-text" else "supplier reference native font/binding changed"
+    )
+    if phase == "transition":
+        state.style_drift = drift
+    elif phase != "final":
+        state.rebuild_drift = (phase, drift)
+    if phase != "final":
+        with pytest.raises(RuntimeError, match=message):
+            state.run(top_justified=(state.name,))
+    else:
+        returned = state.run(top_justified=(state.name,))
+        previous = state.current
+        state.replace()
+        assert state.current.display is not returned[state.name]
+        assert state.current.fonts[0] is not previous.fonts[0]
+        assert state.current.use_doc_fonts is not previous.use_doc_fonts
+        before_fields = dict(vars(state.current.fonts[0]))
+        state.mutate(drift)
+        if field == "font-inheritance":
+            assert vars(state.current.fonts[0]) == before_fields
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match=message):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("flag", (0, 1, None, "True"))
+def test_carriage_top_justified_refuses_nonboolean_initial_font_inheritance_before_write(
+    screw_reference_shelf_native_consumer, flag,
+):
+    state = screw_reference_shelf_native_consumer
+    state.current.use_doc_fonts[0] = flag
+    with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+        state.run(top_justified=(state.name,))
+    assert not [row for row in state.style_calls if row[0] == "set"]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("count", (0, 2))
+def test_carriage_top_justified_refuses_unsupported_dimension_format_count_before_write(
+    screw_reference_shelf_native_consumer, count,
+):
+    state = screw_reference_shelf_native_consumer
+    state.current.fonts = [
+        copy.deepcopy(state.current.fonts[0]) for _ in range(count)
+    ]
+    with pytest.raises(RuntimeError, match="unsupported native dimension format count"):
+        state.run(top_justified=(state.name,))
+    assert not [row for row in state.style_calls if row[0] == "set"]
+    assert not [row for row in state.font_calls if row[0] in ("font", "inheritance")]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("fresh", "final"))
+@pytest.mark.parametrize("value", (False, True, -1, 4, 1.0, None, "1"))
+def test_carriage_top_justified_refuses_invalid_fresh_and_final_getter_readonly(
+    screw_reference_shelf_native_consumer, phase, value, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    if phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def corrupt_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.current.justification = value
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", corrupt_fresh)
+        with pytest.raises(RuntimeError, match="unreadable native vertical justification"):
+            state.run(top_justified=(state.name,))
+        assert len(state.rebuilds) == 2 and state.redraws == 1
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.current.justification = value
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match="unreadable native vertical justification"):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("fresh", "final"))
+@pytest.mark.parametrize("flag", (0, 1, None, "True"))
+def test_carriage_top_justified_refuses_nonboolean_fresh_font_inheritance_readonly(
+    screw_reference_shelf_native_consumer, phase, flag, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    if phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def corrupt_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.current.use_doc_fonts[0] = flag
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", corrupt_fresh)
+        with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+            state.run(top_justified=(state.name,))
+        assert len(state.rebuilds) == 2 and state.redraws == 1
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.current.use_doc_fonts[0] = flag
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("invalid", (object(), float("nan")))
+def test_carriage_top_justified_runs_genuine_complete_font_reader_before_write(
+    screw_reference_shelf_native_consumer, invalid,
+):
+    state = screw_reference_shelf_native_consumer
+    # A late census field ensures the real 17-field reader is exercised.
+    state.current.fonts[0].LineLength = invalid
+    with pytest.raises((TypeError, ValueError), match="ITextFormat.LineLength"):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get"]
+    assert any(row[0] == "font" for row in state.font_calls)
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+def test_carriage_top_justified_refuses_exact_captured_a04_native_transform(
+    screw_reference_shelf_native_consumer, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    consumer = state.consumer
+    # Bounded inline copy of actual a04 event's before/after native records,
+    # 2026-10-23T13:03:43.594537Z. No runtime artifact dependency or ink claim.
+    before_record = {
+        "type": 4, "name": "SupplierDriveWidth", "visible": 1, "owner_type": 0,
+        "pos": [0.08, 0.351612, 0.0165131], "layer": "",
+        "display": {
+            "lines": [
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3692, 0.0165131, 0.077, 0.3478339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.083, 0.3692, 0.0165131, 0.083, 0.3478339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3488339, 0.0165131, 0.07065, 0.3488339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3488339, 0.0165131, 0.083, 0.3488339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.083, 0.3488339, 0.0165131, 0.08935, 0.3488339, 0.0165131],
+            ],
+            "arrows": [
+                [0.077, 0.3488339, 0.0165131, -1.0, -0.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+                [0.083, 0.3488339, 0.0165131, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            ],
+            "texts": [{
+                "t": " (3 mm) ", "pos": [0.0706715, 0.3488339, 0.0165131],
+                "h": 0.0035, "ref": 1, "ang": 0.0, "font": "Century Gothic",
+                "ls": 0.001, "w": 0.0186569,
+            }],
+        },
+        "dim": {"hole_callout": False},
+    }
+    after_record = copy.deepcopy(before_record)
+    after_record["display"]["lines"] = [
+        [0.0, 0.0, 0.0, 0.0, 0.077, 0.3692, 0.0165131, 0.077, 0.350612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.083, 0.3692, 0.0165131, 0.083, 0.350612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.077, 0.351612, 0.0165131, 0.07065, 0.351612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.083, 0.351612, 0.0165131, 0.08935, 0.351612, 0.0165131],
+    ]
+    after_record["display"]["arrows"] = [
+        [0.077, 0.351612, 0.0165131, -1.0, -0.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.083, 0.351612, 0.0165131, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ]
+    state.current.annotation.record = copy.deepcopy(before_record)
+    state.current.annotation.position = tuple(before_record["pos"])
+    state.current.fonts[0].TypeFaceName = "Century Gothic"
+    rebuild = consumer.rebuild_drawing
+    strict = consumer.assert_reference_text_stations
+    failures, events = [], []
+
+    def transition(adapter, *, label):
+        rebuild(adapter, label=label)
+        if label.endswith("local top-justified reference text"):
+            state.current.annotation.record = copy.deepcopy(after_record)
+
+    def capture_failure(before, after, *, label):
+        try:
+            strict(before, after, label=label)
+        except RuntimeError as error:
+            failures.append(error)
+            raise
+
+    monkeypatch.setattr(consumer, "rebuild_drawing", transition)
+    monkeypatch.setattr(consumer, "assert_reference_text_stations", capture_failure)
+    monkeypatch.setattr(
+        consumer._telemetry, "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
+    # Only this regression directly drives the style helper at the native
+    # boundary. The other cases retain full annotate/source ownership checks.
+    with pytest.raises(RuntimeError, match="native tips moved") as refused:
+        consumer._top_justify_reference_text(
+            state.adapter, reacquire=lambda: {state.name: state.current.display},
+            axes={state.name: 0}, names=(state.name,), label="purchased screw",
+        )
+    assert refused.value is failures[0]
+    diagnostic = [
+        attributes for name, attributes in events
+        if name == "drawing.supplier_screw_text_justification_station_failure"
+    ]
+    assert len(diagnostic) == 1
+    held = diagnostic[0]
+    assert held["original_justification"] == 0
+    assert held["actual_justification"] == 1
+    assert held["before"]["record"] == before_record
+    assert held["after"]["record"] == after_record
+    assert held["before"]["tips"] == ((0.077, 0.3488339), (0.083, 0.3488339))
+    assert held["after"]["tips"] == ((0.077, 0.351612), (0.083, 0.351612))
+    assert held["before"]["witnesses"] == (
+        (0.077, 0.3478339, 0.3692), (0.083, 0.3478339, 0.3692),
+    )
+    assert held["after"]["witnesses"] == (
+        (0.077, 0.350612, 0.3692), (0.083, 0.350612, 0.3692),
+    )
+    assert len(held["before"]["record"]["display"]["lines"]) == 5
+    assert len(held["after"]["record"]["display"]["lines"]) == 4
+    assert held["before"]["record"]["pos"] == held["after"]["record"]["pos"]
+    assert held["before"]["record"]["display"]["texts"] == (
+        held["after"]["record"]["display"]["texts"]
+    )
+    assert len(state.rebuilds) == 2 and state.redraws == 1
+    assert [row[0] for row in state.style_calls] == ["get", "set", "get"]
 
 
 @pytest.mark.parametrize(

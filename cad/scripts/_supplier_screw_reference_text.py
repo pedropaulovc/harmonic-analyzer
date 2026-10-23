@@ -12,6 +12,7 @@ from typing import Any
 
 from _com import _early_bound
 from _drawing_common import rebuild_drawing
+from _purchased_fastener_drawing import _note_text_style
 from _supplier_reference_text import (
     assert_reference_text_stations,
     measure_reference_text,
@@ -25,12 +26,12 @@ from _supplier_screw_dimensions import (
 import _telemetry
 
 
-# swDisplayDimensionLeaderText_e.swBrokenLeaderAlignedText.
-_BROKEN_LINE_ALIGNED_TEXT = 3
+# swVerticalJustification_e.swVerticalJustificationTop, not document Top=0.
+_TOP_JUSTIFICATION = 1
 
 
-@_telemetry.traced("drawing.supplier_screw_broken_lines", label_param="label")
-def _break_reference_lines(
+@_telemetry.traced("drawing.supplier_screw_top_text", label_param="label")
+def _top_justify_reference_text(
     adapter: Any,
     *,
     reacquire: Callable[[], dict[str, Any]],
@@ -38,78 +39,112 @@ def _break_reference_lines(
     names: Collection[str],
     label: str,
 ) -> Callable[[], dict[str, Any]]:
-    """Apply local line breaks without adopting post-style stations as authority."""
-    rebuild_drawing(adapter, label=f"{label} original reference line stations")
+    """Justify native text locally without adopting changed physical stations."""
+    def justification(display: Any, name: str) -> int:
+        value = display.VerticalJustification
+        if type(value) is not int or value not in (0, 1, 2, 3):
+            raise RuntimeError(
+                f"{label} {name}: unreadable native vertical justification: {value!r}"
+            )
+        return value
+
+    def text_style(display: Any, name: str) -> tuple[Any, bool]:
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        # Display dimensions share one format; the SDK requires index zero.
+        count = annotation.GetTextFormatCount()
+        if type(count) is not int or count != 1:
+            raise RuntimeError(
+                f"{label} {name}: unsupported native dimension format count {count!r}"
+            )
+        formats = _note_text_style(annotation)
+        if len(formats) != 1:
+            raise RuntimeError(f"{label} {name}: native dimension format count changed")
+        use_doc = annotation.GetUseDocTextFormat(0)
+        if type(use_doc) is not bool:
+            raise RuntimeError(
+                f"{label} {name}: unreadable native font inheritance: {use_doc!r}"
+            )
+        # Native primitive types matter too; do not equate False with integer 0.
+        typed_formats = tuple(
+            tuple((field, type(value).__name__, value) for field, value in fields)
+            for fields in formats
+        )
+        return typed_formats, use_doc
+
+    rebuild_drawing(adapter, label=f"{label} original reference text stations")
     found = reacquire()
     stations = {}
-    setter_statuses = {}
-    for name in names:
-        geometry = measure_reference_text(
-            adapter, found[name], axis=axes[name], label=f"{label} {name}"
-        )
-        stations[name] = geometry
+    styles = {}
+    initial_justifications = {}
+    # Validate every opted-in carrier before any justification write.
     for name in names:
         display = _early_bound(found[name], "IDisplayDimension")
-        status = display.SetBrokenLeader2(False, _BROKEN_LINE_ALIGNED_TEXT)
-        # SDK: 0 succeeds; -1 fails; 1 silently falls back to the document default.
-        # bool is not the SDK integer status, even though False compares equal to 0.
-        if type(status) is not int or status != 0:
-            raise RuntimeError(
-                f"{label} {name}: failed to break supplier reference line: "
-                f"status={status!r}"
-            )
-        setter_statuses[name] = status
-    rebuild_drawing(adapter, label=f"{label} local broken reference lines")
+        initial_justifications[name] = justification(display, name)
+        styles[name] = text_style(display, name)
+        stations[name] = measure_reference_text(
+            adapter, display, axis=axes[name], label=f"{label} {name}"
+        )
+    for name in names:
+        if initial_justifications[name] != _TOP_JUSTIFICATION:
+            display = _early_bound(found[name], "IDisplayDimension")
+            # SDK property-put is VOID; only fresh getter readback proves it.
+            display.VerticalJustification = _TOP_JUSTIFICATION
+    rebuild_drawing(adapter, label=f"{label} local top-justified reference text")
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
 
-    @_telemetry.traced("drawing.supplier_screw_broken_line_check")
+    @_telemetry.traced("drawing.supplier_screw_top_text_check")
     def checked_reacquire() -> dict[str, Any]:
         found = reacquire()
         for name, original in stations.items():
             display = _early_bound(found[name], "IDisplayDimension")
-            mode = display.GetBrokenLeader2()
-            use_doc = display.GetUseDocBrokenLeader()
-            if (
-                type(mode) is not int
-                or mode != _BROKEN_LINE_ALIGNED_TEXT
-                or use_doc is not False
-            ):
+            actual_justification = justification(display, name)
+            if actual_justification != _TOP_JUSTIFICATION:
                 raise RuntimeError(
-                    f"{label} {name}: local broken supplier reference line did not persist: "
-                    f"mode={mode!r}, use_doc={use_doc!r}"
+                    f"{label} {name}: top text justification did not persist: "
+                    f"actual={actual_justification!r}"
                 )
+            actual_style = text_style(display, name)
             actual = measure_reference_text(
                 adapter, display, axis=axes[name], label=f"{label} {name}"
             )
             try:
+                if actual_style != styles[name]:
+                    raise RuntimeError(
+                        f"{label} {name}: supplier reference native font/binding changed"
+                    )
+                if tuple(row["t"] for row in actual["record"]["display"]["texts"]) != tuple(
+                    row["t"] for row in original["record"]["display"]["texts"]
+                ):
+                    raise RuntimeError(
+                        f"{label} {name}: supplier reference native text changed"
+                    )
                 assert_reference_text_stations(original, actual, label=f"{label} {name}")
             except RuntimeError as error:
                 try:
-                    # Keep native array order/indices and exact held coordinates.
-                    # The reader already rounds to 0.1 um; do not round again
-                    # or invent an entity identity from an arrow array index.
+                    # These are held records, rounded to 0.1 um by the reader,
+                    # not raw native doubles or invented entity identities.
                     _telemetry.event(
-                        "drawing.supplier_screw_broken_line_station_failure",
+                        "drawing.supplier_screw_text_justification_station_failure",
                         label=label,
                         reference=name,
-                        setter_status=setter_statuses[name],
-                        broken_line_mode=mode,
-                        use_doc_broken_line=use_doc,
+                        original_justification=initial_justifications[name],
+                        actual_justification=actual_justification,
+                        original_font=styles[name],
+                        actual_font=actual_style,
                         coordinate_basis="held native audit record, metres, 0.1 um",
                         native_array_order="unchanged IDisplayData index order",
                         before={
                             key: original[key]
-                            for key in ("axis", "tips", "witnesses", "record")
+                            for key in ("axis", "tips", "witnesses", "physical_lines", "record")
                         },
                         after={
                             key: actual[key]
-                            for key in ("axis", "tips", "witnesses", "record")
+                            for key in ("axis", "tips", "witnesses", "physical_lines", "record")
                         },
                         error=str(error),
                     )
-                except Exception:
-                    # Only the diagnostic is best-effort, never the failed proof.
-                    pass
+                except BaseException:
+                    pass  # Only secondary reporting is best-effort.
                 raise
         return found
 
@@ -130,7 +165,7 @@ def annotate_supplier_screw_with_shelves(
     sides: Mapping[str, str] | None = None,
     units: Mapping[str, str] | None = None,
     force: Collection[str] = (),
-    broken_lines: Collection[str] = (),
+    top_justified: Collection[str] = (),
 ) -> dict[str, Any]:
     """Annotate, shelf short full text, and return fresh authoritative displays.
 
@@ -138,10 +173,10 @@ def annotate_supplier_screw_with_shelves(
     plan for pre-fit margins and keeps its complete native/PDF collision guards.
     Original view/source/configuration bindings survive every rebuild and the
     final read-only proof; no stale display mapping becomes readback authority.
-    ``broken_lines`` opts named carriers into the local SDK aligned-text line
-    break, preserving their complete original native arrow/witness stations
-    through styling, shelving and every fresh read-only final proof. The empty
-    default adds no style getters, setters, measurements, rebuilds or redraws.
+    ``top_justified`` opts named carriers into the dimension-local native Top
+    text justification, retaining original stations, complete effective font
+    and document/local font binding at every fresh read-only proof. The empty
+    default adds no justification/font reads, writes, rebuilds or redraws.
     Printed-parenthesis clearance still requires the final exported PDF audit.
     """
     axes = {}
@@ -149,9 +184,9 @@ def annotate_supplier_screw_with_shelves(
         if orientation not in ("horizontal", "vertical"):
             raise ValueError(f"{label} {name}: text shelves require a linear reference")
         axes[name] = 0 if orientation == "horizontal" else 1
-    broken_lines = frozenset(broken_lines)
-    if broken_lines - axes.keys():
-        raise ValueError(f"{label}: broken lines must name actual references")
+    top_justified = frozenset(top_justified)
+    if top_justified - axes.keys():
+        raise ValueError(f"{label}: top-justified text must name actual references")
     bindings = {key: _binding(adapter, view) for key, view in views.items()}
     annotate_supplier_screw(
         adapter,
@@ -162,7 +197,7 @@ def annotate_supplier_screw_with_shelves(
         planes=planes,
         sides=sides,
         units=units,
-        settled_checks=None if broken_lines else settled_checks,
+        settled_checks=None if top_justified else settled_checks,
     )
     reacquire: Callable[[], dict[str, Any]] = partial(
         assert_supplier_screw,
@@ -174,9 +209,9 @@ def annotate_supplier_screw_with_shelves(
         units=units,
         _bindings=bindings,
     )
-    if broken_lines:
-        reacquire = _break_reference_lines(
-            adapter, reacquire=reacquire, axes=axes, names=broken_lines, label=label
+    if top_justified:
+        reacquire = _top_justify_reference_text(
+            adapter, reacquire=reacquire, axes=axes, names=top_justified, label=label
         )
 
         def settled_source() -> None:

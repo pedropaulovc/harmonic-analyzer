@@ -43,9 +43,9 @@ async def build(adapter: Any) -> dict[str, str]:
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
             units=supplier.SUPPLIER_REFERENCE_UNITS,
             label=SPEC.artifact_stem,
-            # Keep the full metric REF text clear of its local dimension line;
-            # the exported PDF, not the SDK mode alone, proves printed ink clearance.
-            broken_lines=("SupplierDriveWidth",),
+            # Qualify text versus its own underline without changing line style;
+            # native station guards and the actual PDF remain authoritative.
+            top_justified=("SupplierDriveWidth",),
             settled_checks=checks,
         ),
         supplier_margins=supplier_screw_margins(

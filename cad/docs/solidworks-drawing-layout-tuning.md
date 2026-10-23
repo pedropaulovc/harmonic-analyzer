@@ -145,6 +145,19 @@ attachment, value and format checks, complete cell/caption containment, its
 settled layout checks and post-export inspection/audit using actual PDF ink.
 Native shelf separation alone does not prove body or foreign-line clearance.
 
+The carriage screw's `SupplierDriveWidth` alone opts into local dimension
+`VerticalJustification=1` (`swVerticalJustificationTop`, not document Top=0)
+before shelving. Read back that native setting after redraw and retain the
+original arrow/witness/physical-line stations, complete font and document/local
+font binding through every fresh proof. A display dimension has one text format;
+`GetUseDocTextFormat` uses index 0, not one index per font field.
+Do not substitute a broken-leader style: on source `a04f81128058`, mode 3 moved
+both arrow stations by 2.7781 mm while leaving the glyphs and annotation origin
+fixed. The station guard must reject that movement, not adopt it as a baseline.
+Local justification is not an SDK guarantee of printed clearance: the exported
+PDF must show neither parenthesis intersecting its own offset underline, as well
+as satisfying the existing full-sheet/caption/source checks.
+
 ### Magnifier CHECK block placement (combined 0fb89)
 
 The retained report
