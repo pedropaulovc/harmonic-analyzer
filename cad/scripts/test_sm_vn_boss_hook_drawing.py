@@ -1,7 +1,9 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
 from dataclasses import FrozenInstanceError, replace
+from io import StringIO
 import json
+import logging
 import math
 from types import SimpleNamespace
 
@@ -2408,14 +2410,16 @@ def stock_identity_failure_scene(stock_source_scene, monkeypatch):
         receipts.append(json.loads(message[len(prefix):]))
         emitted_selected.append(scene.state.selected)
 
+    native_warn = drawing._telemetry.warn
     monkeypatch.setattr(drawing, "_early_bound", bind)
-    monkeypatch.setattr(drawing._telemetry, "progress", emit)
+    monkeypatch.setattr(drawing._telemetry, "warn", emit)
     scene.state.after_select = lambda _mapped: setattr(scene.state, "selected", raw)
     return SimpleNamespace(
         scene=scene, capture=capture, raw=raw, typed=typed, mapped_owner=mapped_owner,
         selected_owner=selected_owner, active_configuration=active_configuration,
         reverse_reads=reverse_reads, selected_view_reads=selected_view_reads,
         receipts=receipts, emitted_selected=emitted_selected, none_binds=none_binds,
+        native_warn=native_warn,
     )
 
 
@@ -2424,6 +2428,31 @@ def _stock_identity_receipt(diagnostic):
     rows = [entry["fields"] for entry in diagnostic.receipts if entry["section"] == "row"]
     assert len(rows) == 9
     return context, rows
+
+
+def test_selection_identity_receipt_reaches_default_warning_console(
+    stock_identity_failure_scene, monkeypatch,
+):
+    diagnostic = stock_identity_failure_scene
+    monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
+    output = StringIO()
+    console = logging.StreamHandler(output)
+    console.setLevel(drawing._telemetry._console_level())
+    logger = logging.Logger("hook-profile-selection-test", logging.DEBUG)
+    logger.propagate = False
+    logger.addHandler(console)
+    monkeypatch.setattr(drawing._telemetry, "get_logger", lambda: logger)
+    monkeypatch.setattr(drawing._telemetry, "warn", diagnostic.native_warn)
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(diagnostic.scene, diagnostic.capture)
+    prefix = "supplier stock selection identity REPORTING ONLY / NO MUTATING PROBES: "
+    lines = output.getvalue().splitlines()
+    assert len(lines) == 10
+    assert all(line.startswith(prefix) for line in lines)
+    receipts = [json.loads(line[len(prefix):]) for line in lines]
+    assert [entry["section"] for entry in receipts].count("context") == 1
+    assert [entry["section"] for entry in receipts].count("row") == 9
+    assert diagnostic.scene.colors == [] and diagnostic.scene.state.selected is None
 
 
 def test_selection_identity_receipt_is_null_safe_and_still_refuses(stock_identity_failure_scene):
@@ -2679,7 +2708,7 @@ def test_selection_identity_emitter_failure_preserves_original_exception_object(
         raise OSError("receipt log unavailable")
 
     scene.adapter.swApp.IsSame = selected_identity
-    monkeypatch.setattr(drawing._telemetry, "progress", broken_emitter)
+    monkeypatch.setattr(drawing._telemetry, "warn", broken_emitter)
     with pytest.raises(OSError) as caught:
         _blacken_stock(scene, diagnostic.capture)
     assert caught.value is primary

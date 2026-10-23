@@ -980,7 +980,7 @@ def _report_supplier_selection_identity(
     # Separate bounded lines keep all nine rows readable in the actual task log.
     for section, fields in (("context", context), *(("row", row) for row in rows)):
         try:
-            _telemetry.progress(
+            _telemetry.warn(
                 "supplier stock selection identity REPORTING ONLY / NO MUTATING PROBES: "
                 + json.dumps({"section": section, "fields": fields})
             )
