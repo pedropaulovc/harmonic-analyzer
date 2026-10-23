@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+import gc
 import hashlib
 import importlib
 import json
@@ -2137,6 +2138,57 @@ def _original_source_capture_reads(case, *, imported=True):
     return json.loads(notes[0])["reads"]
 
 
+class _OriginalCaptureDispatch:
+    """Python dispatch transport: binding never retains the input wrapper."""
+
+    def __init__(self, surface, dispatch):
+        self._surface = surface
+        self._oleobj_ = dispatch
+
+    def __getattr__(self, name):
+        return getattr(self._surface, name)
+
+
+def _install_original_capture_rebinder(case, monkeypatch, *, check_lifetime=False):
+    dispatches = {}
+    wrappers = []
+    counts = SimpleNamespace(bindings=0)
+
+    def unwrap(value):
+        return value._surface if isinstance(value, _OriginalCaptureDispatch) else value
+
+    def wrap(value):
+        if value is None:
+            return None
+        surface = unwrap(value)
+        if check_lifetime:
+            gc.collect()
+            assert all(reference() is not None for reference in wrappers), (
+                "a previously keyed raw/bound wrapper died during capture"
+            )
+        entry = dispatches.setdefault(id(surface), (surface, object()))
+        result = _OriginalCaptureDispatch(surface, entry[1])
+        wrappers.append(weakref.ref(result))
+        return result
+
+    def bind(value, _interface):
+        result = wrap(value)
+        assert result is not value, "this control must exercise real Python rebinding"
+        counts.bindings += 1
+        return result
+
+    view = case.original[case.side]
+    actual_forward = view.GetCorresponding
+    actual_reverse = case.model.Extension.GetCorresponding2
+    actual_same = case.app.IsSame
+    monkeypatch.setattr(washer, "_early_bound", bind)
+    monkeypatch.setattr(view, "GetCorresponding", lambda value: wrap(actual_forward(unwrap(value))))
+    monkeypatch.setattr(case.model.Extension, "GetCorresponding2",
+                        lambda value: wrap(actual_reverse(unwrap(value))))
+    monkeypatch.setattr(case.app, "IsSame", lambda first, second: actual_same(unwrap(first), unwrap(second)))
+    return SimpleNamespace(wrap=wrap, wrappers=wrappers, counts=counts)
+
+
 def _bind_original_capture_import(monkeypatch):
     monkeypatch.setattr(washer, "curate_view_dimensions", lambda _adapter, view, **_kwargs: [
         SimpleNamespace(GetSpecificAnnotation=lambda display=display: display)
@@ -2147,7 +2199,7 @@ def _bind_original_capture_import(monkeypatch):
 
 
 @pytest.mark.parametrize("phase", ("before_import", "after_import", "final_or_saved"))
-@pytest.mark.parametrize("transport", ("capture", "getter", "note", "logging", "note-and-logging"))
+@pytest.mark.parametrize("transport", ("capture", "getter", "note", "logging", "note-and-logging", "span"))
 def test_original_source_capture_keeps_gate_exception_at_each_seam(
     original_source_capture, monkeypatch, phase, transport,
 ):
@@ -2195,6 +2247,16 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
     monkeypatch.setattr(washer, "assert_supplier_washer_references", gate)
     monkeypatch.setattr(washer, "_capture_original_washer_source_failure", capture)
     monkeypatch.setattr(washer._telemetry, "info", log)
+    if transport == "span":
+        actual_span = washer._telemetry.span
+
+        def span(name, **kwargs):
+            if name == "drawing.capture_original_supplier_washer_source_failure":
+                attempts.append(("span", name))
+                raise KeyboardInterrupt("diagnostic span entry failed")
+            return actual_span(name, **kwargs)
+
+        monkeypatch.setattr(washer._telemetry, "span", span)
     with pytest.raises(Refusal) as caught:
         if phase == "final_or_saved":
             washer.assert_supplier_washer_dimensions(
@@ -2215,13 +2277,15 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
     assert kwargs["imported"] is (
         None if phase == "before_import" else _authoring_display(case, source.THICKNESS)
     )
-    if transport != "capture":
+    if transport not in {"capture", "span"}:
         assert any(attempt[0] == "note" for attempt in attempts)
         assert any(attempt[0] == "logging" for attempt in attempts)
     if transport == "getter":
         assert sum(attempt[0] == "getter" for attempt in attempts) == 1
         assert any("independent first-display getter failure" in attempt[1]
                    for attempt in attempts if attempt[0] == "note")
+    if transport == "span":
+        assert sum(attempt[0] == "span" for attempt in attempts) == 1
     assert not case.app.open_calls and not case.app.close_calls
     assert not case.rebuilds
     assert case.path.read_bytes() == case.original_bytes
@@ -2367,7 +2431,7 @@ def test_original_source_capture_keeps_null_empty_slots_and_array_errors(
     assert reads["source.annotation.visible"]["value"] == 1
 
 
-@pytest.mark.parametrize("inventory", ("segments", "points", "attachments", "unknown-attachment"))
+@pytest.mark.parametrize("inventory", ("segments", "attachments", "unknown-attachment"))
 def test_original_source_capture_bounds_inventory_without_unknown_interface_walks(
     original_source_capture, monkeypatch, inventory,
 ):
@@ -2386,11 +2450,6 @@ def test_original_source_capture_bounds_inventory_without_unknown_interface_walk
     annotation = case.source_displays[source.THICKNESS].annotation
     if inventory == "segments":
         case.diagnostic_sketch.GetSketchSegments = lambda: (unknown,) * 7
-    elif inventory == "points":
-        case.diagnostic_sketch.GetSketchPointsCount2 = lambda: 7
-        segment = case.diagnostic_sketch.GetSketchSegments()[0]
-        segment.GetStartPoint2 = lambda: pytest.fail("unexpected point count enumerated endpoints")
-        segment.GetEndPoint2 = segment.GetStartPoint2
     elif inventory == "attachments":
         annotation.GetAttachedEntityCount3 = lambda: 7
         annotation.GetAttachedEntities3 = lambda: (unknown,) * 7
@@ -2411,9 +2470,6 @@ def test_original_source_capture_bounds_inventory_without_unknown_interface_walk
         assert reads["source.segments.overflow"]["value"] == 6
         assert reads["source.segments"]["count"] == 7
         assert "source.segment.interface" not in reads
-    elif inventory == "points":
-        assert reads["source.point_count"]["value"] == 7
-        assert "source.start" not in reads
     elif inventory == "attachments":
         assert reads["source.annotation.entities.overflow"]["value"] == 5
         assert reads["source.annotation.types.overflow"]["value"] == 5
@@ -2562,6 +2618,278 @@ def test_original_source_capture_common_saved_boundary_uses_fresh_actual_view(
     assert reads["feature.identity.imported_owner.mapped"]["value"] == 1
     assert not case.app.open_calls and not case.app.close_calls
     assert not case.rebuilds
+
+
+@pytest.mark.parametrize("fault", ("forward", "reverse", "identity", "point", "mapped-point"))
+def test_original_source_capture_rebound_aliases_do_not_retry_failed_reads(
+    original_source_capture, monkeypatch, fault,
+):
+    case = original_source_capture
+    feature = case.features[source.THICKNESS_FEATURE]
+    view = case.original[case.side]
+    mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
+    first_point = case.source_entities[source.THICKNESS][0]
+    attempts = []
+    actual_forward = view.GetCorresponding
+    actual_reverse = case.model.Extension.GetCorresponding2
+    actual_same = case.app.IsSame
+
+    def refuse():
+        attempts.append(fault)
+        raise ValueError("rebound native " + fault)
+
+    if fault == "forward":
+        monkeypatch.setattr(view, "GetCorresponding", lambda value:
+                            refuse() if value is first_point else actual_forward(value))
+    elif fault == "reverse":
+        monkeypatch.setattr(case.model.Extension, "GetCorresponding2", lambda value:
+                            refuse() if value is mapped_feature else actual_reverse(value))
+    elif fault == "identity":
+        monkeypatch.setattr(case.app, "IsSame", lambda first, second:
+                            refuse() if first is feature and second is feature else actual_same(first, second))
+    elif fault == "point":
+        first_point.GetID = refuse
+    else:
+        case.mapped_entities[view][source.THICKNESS][0].GetID = refuse
+    transport = _install_original_capture_rebinder(case, monkeypatch)
+    annotation = case.source_displays[source.THICKNESS].annotation
+    actual_entities = annotation.GetAttachedEntities3
+    annotation.GetAttachedEntities3 = lambda: tuple(transport.wrap(value) for value in actual_entities())
+    reads = _original_source_capture_reads(case)
+    assert transport.counts.bindings > 10
+    assert len(transport.wrappers) > transport.counts.bindings
+    assert attempts == [fault]
+    assert "diagnostic.capture_error" not in reads
+    field = {
+        "forward": "source.point.0.forward", "reverse": "feature.reverse",
+        "identity": "feature.identity.source.source", "point": "source.point.0.id",
+        "mapped-point": "forward.point.0.id",
+    }[fault]
+    assert reads[field] == {"error_type": "ValueError", "read_error": "rebound native " + fault}
+    if fault in {"forward", "reverse"}:
+        skipped = ("source.attached.0.forward.unavailable" if fault == "forward"
+                   else "mapped.feature.reverse.unavailable")
+        assert reads[skipped]["value"] == "prior_getter_failed:" + field
+    elif fault == "point":
+        assert reads["source.attached.0.details_from"]["value"] == "source.point.0"
+    elif fault == "mapped-point":
+        assert reads["mapped.point.0.details_from"]["value"] == "forward.point.0"
+        assert reads["imported.attached.0.details_from"]["value"] == "forward.point.0"
+    assert reads["source.annotation.visible"]["value"] == 1
+    assert reads["imported.annotation.visible"]["value"] == 1
+
+
+def test_original_source_capture_retains_raw_and_bound_wrapper_lifetimes(
+    original_source_capture, monkeypatch,
+):
+    case = original_source_capture
+    transport = _install_original_capture_rebinder(case, monkeypatch, check_lifetime=True)
+    reads = _original_source_capture_reads(case)
+    assert "diagnostic.capture_error" not in reads
+    assert transport.counts.bindings > 10
+    assert reads["source.point.0.id"]["count"] == 2
+    assert reads["source.point.1.id"]["count"] == 2
+    # The transport retains only weakrefs to wrapper instances; each bound
+    # wrapper holds the stable surface/dispatch, not its original raw wrapper.
+    gc.collect()
+    assert all(reference() is None for reference in transport.wrappers)
+
+
+def test_original_source_capture_native_equality_does_not_merge_owner_contexts(
+    original_source_capture, monkeypatch,
+):
+    case = original_source_capture
+    feature = case.features[source.THICKNESS_FEATURE]
+    mapped = case.mapped_features[case.original[case.side]][source.THICKNESS_FEATURE]
+    query = "SupplierThickness@SupplierWasherThicknessReference"
+    dimensions = {
+        "source": case.source_natives[source.THICKNESS],
+        "parameter": case.canonical_parameters[query],
+        "imported": _authoring_display(case, source.THICKNESS).native,
+    }
+    calls = {name: 0 for name in dimensions}
+
+    def owner(name):
+        calls[name] += 1
+        return feature if name == "parameter" else mapped
+
+    for name, native in dimensions.items():
+        native.GetFeatureOwner = lambda name=name: owner(name)
+    _install_original_capture_rebinder(case, monkeypatch)
+    reads = _original_source_capture_reads(case)
+    assert calls == {"source": 1, "parameter": 1, "imported": 1}
+    assert reads["dimension.identity.source.parameter"]["value"] == 1
+    assert reads["dimension.identity.source.imported"]["value"] == 1
+    assert reads["feature.identity.source_owner.source"]["value"] == 0
+    assert reads["feature.identity.source_owner.mapped"]["value"] == 1
+    assert reads["feature.identity.parameter_owner.source"]["value"] == 1
+    assert reads["feature.identity.imported_owner.mapped"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("context", ("source", "mapped"))
+@pytest.mark.parametrize("fault", ("wrong-type", "type-error"))
+def test_original_source_capture_requires_observed_profile_before_sketch_binding(
+    original_source_capture, context, fault,
+):
+    case = original_source_capture
+    feature = (case.features[source.THICKNESS_FEATURE] if context == "source" else
+               case.mapped_features[case.original[case.side]][source.THICKNESS_FEATURE])
+    calls = []
+
+    def kind():
+        calls.append("type")
+        if fault == "type-error":
+            raise ValueError("observed feature type unavailable")
+        return "RefPlane"
+
+    def forbidden_specific():
+        calls.append("specific")
+        pytest.fail("unknown specific-feature interface was requested")
+
+    feature.GetTypeName2 = kind
+    feature.GetSpecificFeature2 = forbidden_specific
+    reads = _original_source_capture_reads(case)
+    assert calls == ["type"]
+    assert reads[f"{context}.sketch.unavailable"]["value"] == (
+        "feature_type_getter_failed" if fault == "type-error" else "feature_type_not_ProfileFeature"
+    )
+    assert f"{context}.sketch.interface" not in reads
+    assert f"{context}.segments" not in reads
+    if fault == "type-error":
+        assert reads[f"{context}.feature.type"] == {
+            "error_type": "ValueError", "read_error": "observed feature type unavailable",
+        }
+    else:
+        assert reads[f"{context}.feature.type"]["value"] == "RefPlane"
+    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
+    assert reads["source.annotation.count"]["value"] == 2
+    assert reads["imported.annotation.count"]["value"] == 2
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("count", (7, None, True, ValueError("sketch-wide point count unavailable")),
+                         ids=("extra-point", "null-count", "boolean-count", "count-error"))
+def test_original_source_capture_known_endpoints_survive_unrelated_point_count(
+    original_source_capture, count,
+):
+    case = original_source_capture
+    calls = []
+    segment = case.diagnostic_sketch.GetSketchSegments()[0]
+    actual_start, actual_end = segment.GetStartPoint2, segment.GetEndPoint2
+
+    def count_getter():
+        calls.append("count")
+        if isinstance(count, Exception):
+            raise count
+        return count
+
+    def endpoint(name, getter):
+        calls.append(name)
+        return getter()
+
+    case.diagnostic_sketch.GetSketchPointsCount2 = count_getter
+    segment.GetStartPoint2 = lambda: endpoint("start", actual_start)
+    segment.GetEndPoint2 = lambda: endpoint("end", actual_end)
+    reads = _original_source_capture_reads(case)
+    assert calls == ["count", "start", "end"]
+    if isinstance(count, Exception):
+        assert reads["source.point_count"] == {
+            "error_type": "ValueError", "read_error": "sketch-wide point count unavailable",
+        }
+    else:
+        assert reads["source.point_count"] == {"python_type": type(count).__name__, "value": count}
+    assert reads["source.expected_endpoint_count"]["value"] == 2
+    assert reads["source.start"]["present"] is True
+    assert reads["source.end"]["present"] is True
+    assert reads["source.point.0.X"]["value"] == 0.005
+    assert reads["source.point.1.id"]["count"] == 2
+    assert reads["source.point.0.forward"]["present"] is True
+    assert reads["attachment.identity.source.attached.0.source.point.0"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("endpoint", ("start", "end"))
+@pytest.mark.parametrize("fault", ("null", "error"))
+def test_original_source_capture_endpoint_null_and_error_leave_other_endpoint_intact(
+    original_source_capture, endpoint, fault,
+):
+    case = original_source_capture
+    segment = case.diagnostic_sketch.GetSketchSegments()[0]
+    calls = []
+
+    def getter():
+        calls.append(endpoint)
+        if fault == "error":
+            raise ValueError("individual line endpoint unavailable")
+        return None
+
+    setattr(segment, "GetStartPoint2" if endpoint == "start" else "GetEndPoint2", getter)
+    reads = _original_source_capture_reads(case)
+    assert calls == [endpoint]
+    assert reads[f"source.{endpoint}"] == (
+        {"python_type": "NoneType", "value": None} if fault == "null" else
+        {"error_type": "ValueError", "read_error": "individual line endpoint unavailable"}
+    )
+    other = "1" if endpoint == "start" else "0"
+    assert reads[f"source.point.{other}.X"]["value"] == 0.005
+    assert reads[f"source.point.{other}.id"]["count"] == 2
+    assert reads["imported.annotation.visible"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("kind", (1, None, False))
+def test_original_source_capture_unknown_segment_type_never_binds_line(
+    original_source_capture, kind,
+):
+    case = original_source_capture
+    segment = case.diagnostic_sketch.GetSketchSegments()[0]
+    segment.GetType = lambda: kind
+    segment.GetStartPoint2 = lambda: pytest.fail("unknown native segment was cast as line")
+    segment.GetEndPoint2 = segment.GetStartPoint2
+    reads = _original_source_capture_reads(case)
+    assert reads["source.segment.type"] == {"python_type": type(kind).__name__, "value": kind}
+    assert reads["source.endpoints.unavailable"]["value"] == "unexpected_segment_type"
+    assert "source.line.interface" not in reads
+    assert "source.start" not in reads
+    assert reads["source.annotation.visible"]["value"] == 1
+    assert "diagnostic.capture_error" not in reads
+
+
+def test_original_source_capture_has_distinct_diagnostic_operation_span(
+    original_source_capture, monkeypatch,
+):
+    calls = []
+    actual_span = washer._telemetry.span
+
+    def span(name, **kwargs):
+        calls.append(name)
+        return actual_span(name, **kwargs)
+
+    monkeypatch.setattr(washer._telemetry, "span", span)
+    _original_source_capture_reads(original_source_capture)
+    assert calls == ["drawing.capture_original_supplier_washer_source_failure"]
+
+
+def test_original_source_capture_internal_error_receipt_preserves_captured_exception(
+    original_source_capture, monkeypatch,
+):
+    class RefusedMetadata:
+        def __getitem__(self, _label):
+            raise ValueError("diagnostic inventory metadata failure")
+
+    monkeypatch.setattr(washer, "SOURCE_DIMENSIONS", RefusedMetadata())
+    reads = _original_source_capture_reads(original_source_capture)
+    assert reads["diagnostic.capture_error"] == {
+        "python_type": "tuple", "count": 2, "items": [
+            {"python_type": "str", "value": "ValueError"},
+            {"python_type": "str", "value": "diagnostic inventory metadata failure"},
+        ],
+    }
+    assert reads["source.document_type"]["value"] == 1
+    assert reads["view.configuration"]["value"] == original_source_capture.original[
+        original_source_capture.side
+    ].ReferencedConfiguration
 
 
 @pytest.mark.parametrize("failure_stage", ("none", "logging", "note"))

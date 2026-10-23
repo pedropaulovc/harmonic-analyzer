@@ -79,6 +79,7 @@ class SupplierWasherProof:
         self.settled_check()
 
 
+@_telemetry.traced("drawing.capture_original_supplier_washer_source_failure")
 def _capture_original_washer_source_failure(
     error: Exception, adapter: Any, model: Any, view: Any, *,
     phase: Literal["before_import", "after_import", "final_or_saved"],
@@ -96,6 +97,28 @@ def _capture_original_washer_source_failure(
         failed_correspondence: dict[tuple[str, int], str] = {}
         failed_identities: dict[tuple[int, int], str] = {}
         point_reads: dict[int, tuple[str, Any]] = {}
+        surfaces: dict[int, tuple[Any, int]] = {}
+        dispatch_surfaces: dict[int, tuple[Any, int]] = {}
+
+        def surface_key(value: Any, *, derived_from: int | None = None) -> int:
+            # Retain raw/bound wrappers AND their held dispatches. Only our own
+            # binding derivation or literally the same Python-held dispatch
+            # shares a call surface; native IsSame never merges these contexts.
+            previous = surfaces.get(id(value))
+            if previous is not None:
+                return previous[1]
+            try:
+                dispatch = object.__getattribute__(value, "_oleobj_")
+            except AttributeError:
+                dispatch = None
+            held = dispatch_surfaces.get(id(dispatch)) if dispatch is not None else None
+            key = held[1] if held is not None else (
+                derived_from if derived_from is not None else id(value)
+            )
+            surfaces[id(value)] = (value, key)
+            if dispatch is not None:
+                dispatch_surfaces[id(dispatch)] = (dispatch, key)
+            return key
 
         def read(field: str, getter: Callable[[], Any]) -> Any:
             try:
@@ -110,7 +133,12 @@ def _capture_original_washer_source_failure(
             if not available(value):
                 read(f"{field}.unavailable", lambda: "getter_failed" if value is missing else "null")
                 return missing
-            return read(f"{field}.interface", lambda: _early_bound(value, interface))
+            key = surface_key(value)
+            native = read(f"{field}.interface", lambda: _early_bound(value, interface))
+            if available(native):
+                key = surface_key(native, derived_from=key)
+                surfaces[id(value)] = (value, key)
+            return native
 
         def matrix(
             field: str, members: dict[str, Any], columns: dict[str, Any] | None = None,
@@ -122,7 +150,7 @@ def _capture_original_washer_source_failure(
                     if not available(first) or not available(second):
                         read(f"{name}.unavailable", lambda: "null_or_failed_input")
                         continue
-                    key = (id(first), id(second))
+                    key = (surface_key(first), surface_key(second))
                     if key in failed_identities:
                         read(f"{name}.unavailable", lambda: "prior_getter_failed:" + failed_identities[key])
                         continue
@@ -154,7 +182,7 @@ def _capture_original_washer_source_failure(
             if not available(value) or not available(owning_view):
                 read(f"{field}.unavailable", lambda: "input_or_view_unavailable")
                 return missing
-            key = ("forward", id(value))
+            key = ("forward", surface_key(value))
             if key in failed_correspondence:
                 read(f"{field}.unavailable", lambda: "prior_getter_failed:" + failed_correspondence[key])
                 return missing
@@ -167,7 +195,7 @@ def _capture_original_washer_source_failure(
             if not available(value) or not available(extension):
                 read(f"{field}.unavailable", lambda: "input_or_extension_unavailable")
                 return missing
-            key = ("reverse", id(value))
+            key = ("reverse", surface_key(value))
             if key in failed_correspondence:
                 read(f"{field}.unavailable", lambda: "prior_getter_failed:" + failed_correspondence[key])
                 return missing
@@ -201,12 +229,19 @@ def _capture_original_washer_source_failure(
         def point(field: str, value: Any, sketches: dict[str, Any]) -> Any:
             if not available(value):
                 return bind(field, value, "ISketchPoint")
-            previous = point_reads.get(id(value))
+            key = surface_key(value)
+            previous = point_reads.get(key)
             if previous is not None:
                 read(f"{field}.details_from", lambda: previous[0])
                 return previous[1]
             native = bind(field, value, "ISketchPoint")
-            point_reads[id(value)] = (field, native)
+            # Binding can establish an alias to an already observed dispatch.
+            key = surface_key(value)
+            previous = point_reads.get(key)
+            if previous is not None:
+                read(f"{field}.details_from", lambda: previous[0])
+                return previous[1]
+            point_reads[key] = (field, native)
             if available(native):
                 read(f"{field}.id", lambda: native.GetID())
                 sketch = read(f"{field}.sketch", lambda: native.GetSketch())
@@ -221,12 +256,12 @@ def _capture_original_washer_source_failure(
             # ISketch has no documented total segment-count getter. Inspect the
             # returned array length, never enumerate beyond the one known line.
             raw = read(f"{field}.segments", lambda: sketch.GetSketchSegments())
-            count = read(f"{field}.point_count", lambda: sketch.GetSketchPointsCount2())
+            read(f"{field}.point_count", lambda: sketch.GetSketchPointsCount2())
             segments = slots(
                 f"{field}.segments", raw, 1,
                 count=len(raw) if type(raw) in (tuple, list) else missing,
             )
-            read(f"{field}.expected_point_count", lambda: 2)
+            read(f"{field}.expected_endpoint_count", lambda: 2)
             if not segments:
                 return missing, ()
             segment = bind(f"{field}.segment", segments[0], "ISketchSegment")
@@ -237,8 +272,8 @@ def _capture_original_washer_source_failure(
             owner = read(f"{field}.segment.sketch", lambda: segment.GetSketch())
             read(f"{field}.segment.construction", lambda: segment.ConstructionGeometry)
             matrix(f"{field}.segment.sketch_identity", {"owner": owner, "expected": sketch})
-            if type(kind) is not int or kind != 0 or type(count) is not int or count != 2:
-                read(f"{field}.endpoints.unavailable", lambda: "unexpected_line_or_point_count")
+            if type(kind) is not int or kind != 0:
+                read(f"{field}.endpoints.unavailable", lambda: "unexpected_segment_type")
                 return segment, ()
             line = bind(f"{field}.line", segment, "ISketchLine")
             if not available(line):
@@ -306,11 +341,16 @@ def _capture_original_washer_source_failure(
             sketch = missing
             if available(current_feature):
                 read(f"{name}.feature.name", lambda: current_feature.Name)
-                read(f"{name}.feature.type", lambda: current_feature.GetTypeName2())
-                sketch = bind(
-                    f"{name}.sketch",
-                    read(f"{name}.sketch", lambda: current_feature.GetSpecificFeature2()), "ISketch",
-                )
+                kind = read(f"{name}.feature.type", lambda: current_feature.GetTypeName2())
+                if type(kind) is str and kind == "ProfileFeature":
+                    sketch = bind(
+                        f"{name}.sketch",
+                        read(f"{name}.sketch", lambda: current_feature.GetSpecificFeature2()), "ISketch",
+                    )
+                else:
+                    read(f"{name}.sketch.unavailable", lambda: (
+                        "feature_type_getter_failed" if kind is missing else "feature_type_not_ProfileFeature"
+                    ))
             sketches[name] = sketch
         source_mapping("source.sketch", sketches["source"])
         mapped_mapping("mapped.sketch", sketches["mapped"])
@@ -419,8 +459,8 @@ def _capture_original_washer_source_failure(
     except BaseException as capture_error:
         if proof is not None:
             try:
-                proof.read("diagnostic.capture_error", lambda: (
-                    type(capture_error).__name__, str(capture_error)[:512],
+                proof.read("diagnostic.capture_error", lambda captured=capture_error: (
+                    type(captured).__name__, str(captured)[:512],
                 ))
             except BaseException:
                 pass
