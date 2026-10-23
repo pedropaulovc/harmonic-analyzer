@@ -229,10 +229,7 @@ def add_rework_notes(adapter: Any, front: Any) -> Callable[[], None]:
     ) / 2.0
     source_model = _early_bound(front.ReferencedDocument, "IModelDoc2")
     angle = read_saved_cut_end_angle(source_model)
-    chamfer_text = (
-        f"{stud.CUT_END_CHAMFER_MAX:.{stud.CUT_END_CHAMFER_PLACES}f} MAX "
-        f"X {math.degrees(angle):g}° {stud.DIMENSION_CALLOUTS['CutEndChamfer']}"
-    )
+    chamfer_text = stud.cut_end_chamfer_callout(angle)
     model_points = (
         (lower_x / 1000.0, 0.0, math.sqrt(lower_radius**2 - lower_x**2) / 1000.0),
         (-stud.RADIUS / 1000.0, barrel_y / 1000.0, 0.0),
