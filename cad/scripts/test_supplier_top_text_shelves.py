@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 from pathlib import Path
@@ -267,3 +268,115 @@ def test_unaffected_layouts_do_not_read_or_change_offset_text(monkeypatch, layou
     checks[0]()
     assert case.native.SystemValue == 0.006
     assert case.text[2] == " in)"
+
+
+def _settled_block_replay(monkeypatch):
+    """Keep real placement/final callbacks; isolate unrelated source COM readers."""
+    import draw_ch_rocker_arm_tl_vn_oblique_block_screw as block
+
+    displays = _displays("block")
+    views = {}
+    supplier = block.supplier
+    for plane, feature in screws.FEATURE_BY_PLANE.items():
+        rows = [
+            displays[name] for name, _value, _orientation in supplier.SUPPLIER_REFERENCE_DIMENSIONS
+            if supplier.SUPPLIER_REFERENCE_PLANES.get(name, "Front") == plane
+        ]
+        if not rows:
+            continue
+        for display in rows:
+            name = display.record["name"]
+            native = SimpleNamespace(
+                FullName=f"{name}@{feature}@stock.SLDPRT",
+                Tolerance=SimpleNamespace(
+                    Type=5 if name in supplier.SUPPLIER_REFERENCE_MINIMUMS else 0,
+                    GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0,
+                ),
+            )
+            display.GetDimension2 = lambda _index, native=native: native
+            display.GetType = lambda: 4
+            display.GetSpecificAnnotation = lambda display=display: display
+            display.GetPrimaryTolPrecision2 = lambda: 3
+        outline = _RECORDED["block"][f"*{plane}"]["outline"]
+        views[f"*{plane}"] = SimpleNamespace(
+            name=plane, rows=rows,
+            GetOrientationName=lambda plane=plane: f"*{plane}",
+            GetOutline=lambda outline=outline: outline,
+            UpdateViewDisplayGeometry=lambda: None,
+            GetAnnotations=lambda rows=rows: rows,
+        )
+    monkeypatch.setattr(block, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_binding", lambda _adapter, view: (view.name, "stock.SLDPRT", "Default"))
+    monkeypatch.setattr(screws, "_assert_source", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(screws, "supplier_reference_dimension", lambda _adapter, display, **_kwargs: display)
+    monkeypatch.setattr(screws, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(screws, "iter_views", lambda _adapter: list(views.values()))
+    monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(screws, "dimension_name", lambda _adapter, display: display.record["name"])
+    monkeypatch.setattr(
+        screws, "model_points_in_view",
+        lambda _adapter, view, _points, **_kwargs: [display.GetPosition()[:2] for display in view.rows],
+    )
+    monkeypatch.setattr(
+        screws, "curate_view_dimensions", lambda _adapter, view, **_kwargs: view.rows
+    )
+    return block, views, displays
+
+
+@pytest.mark.parametrize("callback", ("shared", "block"))
+@pytest.mark.parametrize("defect", (None, "station", "witness", "physical_line"))
+def test_final_callbacks_retain_native_stations_even_when_text_stays_clear(
+    native_replay, monkeypatch, callback, defect,
+):
+    block, views, displays = _settled_block_replay(monkeypatch)
+    source_state = {name: display.source_state for name, display in displays.items()}
+
+    def exercise(final_check):
+        final_check()  # Healthy final readback must succeed before the mutation.
+        if defect is None:
+            return
+        display = displays["SupplierDriveWidth"]
+        geometry = supplier_top_text_geometry(display.record, horizontal=True)
+        left_tip = min(geometry["tips"])
+        if defect == "station":
+            display._move_station(0.0001)
+        else:
+            for raw in display.record["display"]["lines"]:
+                if defect == "witness" and raw[4] == raw[7] == left_tip[0]:
+                    index = 5 if abs(raw[5] - left_tip[1]) > abs(raw[8] - left_tip[1]) else 8
+                    raw[index] += 0.0001
+                    break
+                if (
+                    defect == "physical_line" and raw[5] == raw[8] == left_tip[1]
+                    and min(raw[4], raw[7]) < left_tip[0]
+                ):
+                    raw[4 if raw[4] < raw[7] else 7] -= 0.0001
+                    break
+            else:
+                raise AssertionError("recorded native mutation target is absent")
+        # Fresh clearance alone still accepts this final-rebuild drift.
+        screws._assert_supplier_top_shelves(None, displays)
+        with pytest.raises(RuntimeError):
+            final_check()
+        assert {name: display.source_state for name, display in displays.items()} == source_state
+
+    if callback == "shared":
+        checks = []
+        screws.annotate_supplier_screw(
+            None, views,
+            dimensions=block.supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            formats=block.supplier.SUPPLIER_REFERENCE_FORMATS,
+            starts=block.supplier.SUPPLIER_REFERENCE_STARTS,
+            planes=block.supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=block.supplier.SUPPLIER_REFERENCE_SIDES,
+            settled_checks=checks, layout="supplier_top",
+        )
+        exercise(checks[0])
+    else:
+        async def build_reference_sheet(adapter, _spec, **kwargs):
+            kwargs["supplier_dimensions"](adapter, views)
+            exercise(kwargs["settled_checks"][0])
+            return {}
+
+        monkeypatch.setattr(block, "build_purchased_fastener_drawing", build_reference_sheet)
+        assert asyncio.run(block.build(None)) == {}

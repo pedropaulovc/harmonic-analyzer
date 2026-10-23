@@ -551,7 +551,9 @@ def _assert_supplier_top_shelves(
     return measured
 
 
-def _shelf_supplier_top_text(adapter: Any, displays: Mapping[str, Any]) -> None:
+def _shelf_supplier_top_text(
+    adapter: Any, displays: Mapping[str, Any]
+) -> dict[str, dict[str, Any]]:
     """Move text only, after formatting; retain measured native line stations."""
     rebuild_drawing(adapter, label="supplier Top formatting and native lanes settled")
     before = {}
@@ -606,6 +608,7 @@ def _shelf_supplier_top_text(adapter: Any, displays: Mapping[str, Any]) -> None:
     rebuild_drawing(adapter, label="supplier Top text shelves settled")
     for name, actual in _assert_supplier_top_shelves(adapter, displays).items():
         _assert_supplier_top_stations(name, before[name], actual)
+    return before
 
 
 @_telemetry.traced("drawing.supplier_screw_settled_check")
@@ -619,6 +622,7 @@ def assert_supplier_screw(
     units: Mapping[str, str] | None = None,
     _bindings: Mapping[str, tuple[str, str, str]] | None = None,
     layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    shelf_stations: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Reacquire final native carriers and refuse missing, duplicate or alien ink."""
     planes = planes or {}
@@ -698,7 +702,11 @@ def assert_supplier_screw(
             f"settled supplier references missing {sorted(set(expected) - set(found))}"
         )
     if layout == "supplier_top":
-        _assert_supplier_top_shelves(adapter, found)
+        measured = _assert_supplier_top_shelves(adapter, found)
+        if shelf_stations is None or set(shelf_stations) != set(measured):
+            raise RuntimeError("supplier Top settled check has no retained native stations")
+        for name, actual in measured.items():
+            _assert_supplier_top_stations(name, shelf_stations[name], actual)
     return found
 
 
@@ -715,6 +723,7 @@ def annotate_supplier_screw(
     units: Mapping[str, str] | None = None,
     settled_checks: list[Callable[[], None]] | None = None,
     layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    shelf_stations: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Curate exact native sizes into their orthographic annotation lanes.
 
@@ -723,6 +732,7 @@ def annotate_supplier_screw(
     Physical-edge dimensions use their own existing attachment checks.
     Per-row units retain metric supplier prints; omitted rows use inches.
     Geometry always remains exact millimetres, with angles in degrees.
+    Custom settled checks retain the caller-owned shelf_stations mapping.
     """
     starts = starts or {}
     planes = planes or {}
@@ -830,8 +840,11 @@ def annotate_supplier_screw(
         raise RuntimeError(
             f"supplier references missing {sorted(names - set(displays))}"
         )
+    stations = {}
     if layout == "supplier_top":
-        _shelf_supplier_top_text(adapter, displays)
+        stations = _shelf_supplier_top_text(adapter, displays)
+        if shelf_stations is not None:
+            shelf_stations.update(stations)
     if settled_checks is not None:
         settled_checks.append(
             partial(
@@ -844,6 +857,7 @@ def annotate_supplier_screw(
                 units=units,
                 _bindings=bindings,
                 layout=layout,
+                shelf_stations=stations,
             )
         )
     return displays

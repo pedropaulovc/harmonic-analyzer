@@ -47,6 +47,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callback_count += 1
         if callback_count != 1:
             raise RuntimeError("91251A188: repeated supplier dimension callback")
+        shelf_stations: dict[str, dict[str, Any]] = {}
         displays = annotate_supplier_screw(
             adapter,
             views,
@@ -56,6 +57,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
             layout=view_layout,
+            shelf_stations=shelf_stations,
         )
         _assert_supplier_minimums(displays)
 
@@ -67,6 +69,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 formats=supplier.SUPPLIER_REFERENCE_FORMATS,
                 planes=supplier.SUPPLIER_REFERENCE_PLANES,
                 layout=view_layout,
+                shelf_stations=shelf_stations,
             )
             _assert_supplier_minimums(fresh)
 
