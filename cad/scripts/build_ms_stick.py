@@ -5,7 +5,8 @@ The unchanged 0-10 scale spans 142 mm at the configured 14.2 mm pitch.
 The longer half-division tick follows the book. The stop is a separate brass
 block, cover and stock hardware in the ms-measuring-stick assembly.
 
-The annotated bar is 200 mm long and 8 mm wide; thickness is photo-derived.
+The bar is 202 mm long (2026-10-23 owner ruling; the book annotates 200)
+and 8 mm wide; thickness is photo-derived.
 
 Layout: bar along +X with the bottom-left corner on the origin; graduations
 engraved 0.5 mm deep into the back face (z=0), tick 0 at x=56.5 following the
@@ -726,7 +727,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven measuring-stick (equations neutral)", v_built, 0.005 * v_built
     )
 
-    # Verify the annotated 200 mm length and the untouched front face
+    # Verify the 202 mm length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
     # End faces are edge-on in the active view (point picking is
     # screen-projected) — measure the uncut front-bottom edge instead;
@@ -734,7 +735,7 @@ async def build(adapter) -> dict[str, str]:
     mid_y = BODY_WIDTH / 2.0
     await measure_check(
         adapter,
-        "body length (annotated 200)",
+        "body length (202, 2026-10-23 ruling)",
         [{"entity_type": "EDGE", "point": [BODY_LENGTH / 2.0, 0.0, BODY_THICKNESS]}],
         "length",
         BODY_LENGTH,

@@ -118,11 +118,12 @@ def test_current_identity_and_drawing_paths() -> None:
 
 
 def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> None:
-    assert (spec.BODY_LENGTH, spec.BODY_WIDTH, spec.BODY_THICKNESS) == (200.0, 8.0, 3.0)
+    # 2026-10-23 owner ruling: 202 blank, scale zero and stations unchanged.
+    assert (spec.BODY_LENGTH, spec.BODY_WIDTH, spec.BODY_THICKNESS) == (202.0, 8.0, 3.0)
     assert (spec.TICK_WIDTH, spec.TICK_DEPTH, spec.TICK_LENGTH) == (0.4, 0.5, 3.0)
     assert (spec.MINOR_TICK_LENGTH, spec.HALF_TICK_LENGTH) == (1.8, 4.0)
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
-    assert spec.SCALE_END_MARGIN == pytest.approx(1.5)
+    assert spec.SCALE_END_MARGIN == pytest.approx(3.5)
     assert spec.SCALE_START_X == pytest.approx(56.5)
     assert spec.NUMERALS_BBOX == (57.300, 1.721, 197.700, 4.400)
     assert spec.SCALE_SPAN == pytest.approx(
@@ -199,14 +200,13 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
         values["ScaleStartX"] + bands["ScaleStartX"]
         + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"] + bands["FullTickPitch"]
     )
-    assert stock_min == pytest.approx(199.2)
+    assert stock_min == pytest.approx(201.2)
     assert last_center_max == pytest.approx(198.6)
-    assert stock_min - (last_center_max + values["Tick0Width"] / 2.0) == pytest.approx(0.40)
-    # Any groove up to 1.20 wide (3x the 0.40 minimum) keeps the last tick whole;
-    # the stated 0.62 MAX stays inside that and keeps neighbours apart on the
-    # 1.42 minor pitch even with both stations at their band.
-    assert 2.0 * (stock_min - last_center_max) == pytest.approx(1.20)
-    assert spec.GRADUATION_WIDTH_MAX_MM < 2.0 * (stock_min - last_center_max)
+    # Rule 17 at the worst case: the widest stated groove keeps 2.0+ to the end.
+    end_land = stock_min - (last_center_max + spec.GRADUATION_WIDTH_MAX_MM / 2.0)
+    assert end_land == pytest.approx(2.29) and end_land >= 2.0
+    # The stated 0.62 MAX keeps neighbours apart on the 1.42 minor pitch even
+    # with both stations at their band.
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
     assert land_min == pytest.approx(0.70)
     assert spec.GRADUATION_WIDTH_CALLOUT == "0.62 MAX ON 1.42 PITCH"
@@ -215,7 +215,7 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
     )
-    assert values["BodyLength"] - last_edge_nominal == pytest.approx(1.30)
+    assert values["BodyLength"] - last_edge_nominal == pytest.approx(3.30)
 
 
 def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -> None:

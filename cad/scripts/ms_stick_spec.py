@@ -2,6 +2,10 @@ r"""Pure model/drawing contract for the graduated brass stick.
 
 The 2026-10-10 user Option B ruling keeps the 200 x 8 x 3 blank and
 groove geometry, shifting the whole scale and numerals 1.00 mm left.
+The 2026-10-23 owner ruling lengthens that blank to 202 x 8 x 3 (still .X):
+at 200 -0.8 the last graduation kept only a 0.29 land to the end face, below
+the rule-17 floor; at 202 it keeps 2.29 at worst case. Scale zero (56.50) and
+every station and numeral stay put; the end margin grows from 1.5 to 3.5.
 Model dimensions own the manufacturing values, bands and decimal places.
 The release supplies the engraved native/STEP model and its ruled-face/detail
 drawings, not the generated build-input DXFs.
@@ -23,10 +27,10 @@ from ms_stick_geom import (
     SCALE_SPAN,
 )
 
-BODY_LENGTH = 200.0
+BODY_LENGTH = 202.0
 BODY_WIDTH = 8.0
 BODY_THICKNESS = 3.0
-SCALE_END_MARGIN = 1.5
+SCALE_END_MARGIN = 3.5
 SCALE_START_X = BODY_LENGTH - SCALE_SPAN - SCALE_END_MARGIN
 TICK_WIDTH = 0.4
 TICK_LENGTH = 3.0
@@ -66,8 +70,8 @@ NUMERAL_LAYER_VOLUMES_MM3 = (1.5603, 0.9996, 0.0927)
 # rebate; graduation positions set the amplitude-bar stations through the
 # linear READOUT table. Overall length (one place), tick lengths and numeral
 # layout take the title block (2026-10-23 owner ruling): at .X +/-0.8 the
-# 199.2 shortest bar still keeps the last tick whole (0.375 land past a 0.40
-# groove). Graduation width and both engraving depths name no mate, so they
+# 201.2 shortest bar keeps 2.29 past the widest last groove (202 blank,
+# 2026-10-23 owner ruling). Graduation width and both engraving depths name no mate, so they
 # are single "n.nn MIN" limits that hold the enamel fill (coordinator ruling
 # 2026-10-23). Their ceilings are stated facts, not bands (coordinator ruling
 # 2026-10-23, on codjiflo's #1905 review): the graduation width stays 0.62 MAX

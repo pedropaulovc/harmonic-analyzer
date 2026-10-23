@@ -1003,10 +1003,10 @@ sections:
       - confidence
       rows:
       - - Overall length
-        - 200 mm
-        - '7.87'
-        - photo callout pp. 34–35
-        - annotated
+        - 202 mm (book annotates 200)
+        - '7.95'
+        - 'photo callout pp. 34–35 reads 200; owner ruling 2026-10-23 lengthens the blank to 202 so the last graduation keeps a 2.29 land at worst case (`ms_stick_spec.py`)'
+        - ruled
         - high
       - - Stick width
         - 8 mm
@@ -1021,7 +1021,7 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ms-stick-numerals.dxf`)
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 3.5 end margin at the 10 end on the 202 bar, 2026-10-23); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ms-stick-numerals-{1,2,3}.dxf`)
         - '5.59'
         - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ms_stick.py`)'
         - scaled

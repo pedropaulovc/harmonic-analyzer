@@ -117,7 +117,7 @@ if (*SUBASSEMBLIES, spec.MEASURING_STICK) != spec.BOM_ORDER:
 # The graduated face stays opposite the screw, now facing down. The full
 # assembly envelope, not the old screw-head datum, locates the parked tool.
 # The land corridor is between the deck's east edge and the east columns'
-# inboard faces. Keep the 200 bar inboard of the column band and centred on Z.
+# inboard faces. Keep the 202 bar inboard of the column band and centred on Z.
 MS_ROWS = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]]
 MS_EULER = euler_from_rows(MS_ROWS)
 assert all(

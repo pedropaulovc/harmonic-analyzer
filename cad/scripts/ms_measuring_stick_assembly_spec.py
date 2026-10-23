@@ -50,7 +50,7 @@ DRAWING_EXPLODED_VIEW = "ISO FRONT-TOP-LEFT"
 DRAWING_EXPLODED_OCTANTS = {"FRONT-TOP-LEFT": (-1, 1, 1)}
 
 # --- Stick ------------------------------------------------------------------
-# ms-stick's frame: X along the 200 bar, Y across its 8 width (the ticks hang
+# ms-stick's frame: X along the 202 bar, Y across its 8 width (the ticks hang
 # from the y=8 edge), Z through its 3 thickness from the graduated z=0 face
 # (outward normal -Z). The same fit, turned screw-up: part -Z -> -Y,
 # part X stays along the stop, and part Y runs across into -Z.

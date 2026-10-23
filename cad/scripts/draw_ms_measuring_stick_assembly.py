@@ -115,7 +115,7 @@ TITLE_BLOCK = (
     _TEMPLATE.title_block_top_m,
 )
 
-# Sheet 1: the 200-long stick at full size, working elevation screw-up.
+# Sheet 1: the 202-long stick at full size, working elevation screw-up.
 # The graduated underside sits below Front in aligned third-angle projection.
 # Section A-A uses native end-only cutting-line style: its upper arrow sits
 # above the setting witnesses, below the overall reference dimension.
