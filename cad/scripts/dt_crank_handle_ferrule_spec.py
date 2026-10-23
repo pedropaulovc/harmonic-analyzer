@@ -101,34 +101,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # The OD is the rod as supplied: a reference, not a turned size.
 REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 
-# The mating part, quoted only to identify it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).  Written here rather
-# than read from _config.parts so dt-crank-handle.yaml is not a rebuild input; the
-# offline test checks it against the registry.
-HANDLE_NUMBER = "MHA-DT-08"
-HANDLE_NAME = "CRANK HANDLE"
-# The tenon root's largest radius on MHA-DT-08, quoted for the chamfer's
-# callout: dt_crank_handle_spec.INSIDE_CORNER_R_MAX, which cannot be imported
-# here (that spec imports this one); the offline test checks it.
-HANDLE_ROOT_R_MAX = 0.3
-# The chamfer's band names its end and its reason at the callout (rule 4).
-SEAT_MOUTH_CHAMFER_CALLOUT = "\n".join(
-    (
-        "X 45 DEG SEAT END",
-        f"CLEARS {HANDLE_NUMBER}",
-        f"TENON ROOT R{HANDLE_ROOT_R_MAX:.1f}",
-    )
-)
 # The oak tenon is turned to suit this bore for an epoxy line (the handle spec
-# reads it from here); stated on this sheet too, so the fitted joint has its
-# acceptance (MHA-DT-34 re-review).
+# reads it from here); the bore's callout states it, so the fitted joint has
+# its acceptance.  The sheet's prose lives in dt_crank_handle_ferrule_notes,
+# which the mating parts never import.
 TENON_GLUE_LINE = (0.05, 0.15)
-DRAWING_NOTES = "\n".join(
-    (
-        "BORE THRU.",
-        f"OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>{INSTALLED_OUTER_DIA:.1f} WITH {HANDLE_NUMBER} AFTER CURE.",
-        f"THE {HANDLE_NUMBER} {HANDLE_NAME} TENON IS TURNED TO SUIT THIS BORE FOR",
-        f"  {TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL CLEARANCE; "
-        "EPOXY THE RING ON, SEATED ON ITS SHOULDER.",
-    )
-)
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
