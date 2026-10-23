@@ -58,7 +58,8 @@ from _fit_deviations import deviations
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
+from _printed_tolerance import printed_band_mm
 
 STOCK_DIA = 38.1  # 1-1/2 in 1144 round
 LENGTH_PLACES = 1

@@ -24,7 +24,7 @@ import _config
 
 import ch_rocker_arm_tl_oblique_retention_spec as retention
 from _gtol_planar import PlanarFace
-from _printed_tolerance import drilled_oversize_mm
+from _printed_drilled_tolerance import drilled_oversize_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OUTER_DIA = retention.TOP_WASHER_OD

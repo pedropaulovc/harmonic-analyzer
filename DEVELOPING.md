@@ -1663,6 +1663,8 @@ without reinstating retired CAD modules or qualifying the held machining route.
 
 Import numerical bands from `_printed_angular_tolerance`,
 `_printed_drilled_tolerance`, or the linear `_printed_tolerance` provider.
+When integrating newer consumers, move their imports to the owning provider;
+do not restore re-exports in the linear provider.
 Cylindrical Hole Wizard operations live in `_cylindrical_holes`, which imports
 the shared metadata helpers from `_holes`; generic hole consumers never import
 back through the cylindrical provider. Assembly chain identities live in
