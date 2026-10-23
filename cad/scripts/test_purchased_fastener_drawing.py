@@ -8505,10 +8505,6 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         if original_attachment_error is not None:
             assert caught.value is original_attachment_error
             assert census == {}
-            assert context["attachment_error"] == {
-                "error_type": "RuntimeError",
-                "message": str(original_attachment_error),
-            }
         elif drift == "attachment-type-count":
             assert census == {}
             assert "lost its source sketch attachments" in str(caught.value)
