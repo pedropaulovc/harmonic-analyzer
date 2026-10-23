@@ -113,8 +113,12 @@ FRONT_CENTER = (0.100, 0.18125)
 # the retained v44 PDF's opaque pictorial-to-caption gap predicts 7.381 mm
 # after this shift, not native/printed acceptance of the new output.
 FINISHED_ISO_CENTER = (0.310, 0.212)
-# Preserve the supplier-stock pictorial independently of the finished placement.
-STOCK_ISO_CENTER = (0.310, 0.213)
+# c12's actual STOCK isometric exceeded its unchanged cell top by
+# 9.6277812843747 mm. Lower this pictorial and only its caption 10 mm:
+# the minimum whole-mm translation leaves 0.3722187156253 mm top clearance.
+# This preserves their relative composition, not a new native/printed ink proof.
+STOCK_ISO_CENTER = (0.310, 0.203)
+STOCK_ISO_CAPTION = (0.275, 0.153)
 # The deburr's value and callout hang right of the shank, clear of their own
 # extension lines (review r8: centred under the 2.3 mm leg they were struck)
 # and above the notes.
@@ -366,7 +370,7 @@ def _supplier_stock_sheet(adapter):
             "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
             0.016, 0.089,
         ),
-        (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", 0.275, 0.163),
+        (f"ISOMETRIC VIEW SCALE {ISO_SCALE[0]:g}:{ISO_SCALE[1]:g}", *STOCK_ISO_CAPTION),
     ):
         note = add_note(adapter, text, x, y)
         if note is None:
@@ -497,7 +501,13 @@ def _verify_supplier_layout(adapter, view_contracts, notes_by_sheet):
                 raise RuntimeError(f"{sheet_name}: supplier dimension view disappeared")
             view = views[name]
             view.UpdateViewDisplayGeometry()
-            assert_supplier_view_fits(adapter, view, cell, label=f"spring anchor {sheet_name}")
+            assert_supplier_view_fits(
+                adapter, view, cell,
+                label=(
+                    f"spring anchor {sheet_name} view={name!r} "
+                    f"configuration={str(view.ReferencedConfiguration)!r} cell={cell!r}"
+                ),
+            )
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):

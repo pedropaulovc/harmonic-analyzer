@@ -56,7 +56,7 @@ def _stock_note_contracts(module):
                 "STOCK REFERENCES ONLY — FINISHED CUTTING CONTROLS: SHEET 1",
                 0.016, 0.089,
             ),
-            ("ISOMETRIC VIEW SCALE 3:1", 0.275, 0.163),
+            ("ISOMETRIC VIEW SCALE 3:1", 0.275, 0.153),
         )
     else:
         labels = (
@@ -415,7 +415,12 @@ def test_finished_view_creation_fits_recorded_native_cell(
     views, placements, refreshed, checked_cells = {}, [], [], []
 
     def make_view(name, outline):
-        view = SimpleNamespace(Name=name, outline=outline)
+        view = SimpleNamespace(
+            Name=name, outline=outline,
+            ReferencedConfiguration=(
+                drawing.SUPPLIER_STOCK_CONFIGURATION if name.startswith("stock-") else "Default"
+            ),
+        )
         view.UpdateViewDisplayGeometry = lambda: refreshed.append(name)
         view.GetOutline = lambda: view.outline
         view.GetFirstDisplayDimension6 = lambda: None
@@ -513,7 +518,7 @@ def test_finished_view_creation_fits_recorded_native_cell(
         ("*Front", 0.100, 0.18125, (5.0, 1.0)),
         ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
     ]
-    assert drawing.STOCK_ISO_CENTER == (0.310, 0.213)
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.203)
     assert drawing.STOCK_CENTER == (0.150, 0.1755)
     assert drawing.FRONT_KEEP == {
         "FinishedOverall": (0.042, 0.18625),
@@ -1244,6 +1249,7 @@ def _note_build_scene(monkeypatch, tmp_path, module):
         "_verify_controls", "_verify_supplier_references", "_verify_source_state",
     ):
         monkeypatch.setattr(module, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "_verify_supplier_references", lambda *_args, **_kwargs: ())
     monkeypatch.setattr(module, "read_required_properties", read_properties)
     monkeypatch.setattr(module, "new_project_drawing", new_drawing)
     monkeypatch.setattr(module, "place_view", place_view)
@@ -1443,7 +1449,7 @@ def test_channel_stock_scale_creation_metadata_and_native_candidate_cell(
         ("*Front", 0.100, 0.18125, (5.0, 1.0)),
         ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
         ("*Front", 0.150, 0.1755, expected_stock_scale),
-        ("*Isometric", 0.310, 0.213, (3.0, 1.0)),
+        ("*Isometric", 0.310, 0.203, (3.0, 1.0)),
     ]
     assert scene.state.initial_scale == scene.state.finalizer_options["scale"] == (5.0, 1.0)
     assert scene.state.finalizer_options["sheet_scales"] == {
@@ -1466,6 +1472,146 @@ def test_channel_stock_scale_creation_metadata_and_native_candidate_cell(
     ):
         assert note.extent == pytest.approx(expected_note.extent, rel=0, abs=1e-15)
     assert created_notes[-1][1:] == ("ISOMETRIC VIEW SCALE 3:1", "ISOMETRIC VIEW SCALE 3:1")
+
+
+@pytest.mark.parametrize(
+    "shift_mm,fault",
+    (
+        (0, None), (9, None), (10, None),
+        (10, "left-boundary"), (10, "bottom-boundary"),
+        (10, "right-boundary"), (10, "top-boundary"),
+        (10, "left"), (10, "bottom"), (10, "right"), (10, "top"),
+        (10, "caption-text"), (10, "caption-owner"),
+    ),
+)
+def test_stock_iso_creation_translates_native_box_and_caption_together(
+    monkeypatch, tmp_path, shift_mm, fault,
+):
+    """Translate c12's actual box only; new native ink/readability remains pending."""
+    native_stock_builder = drawing._supplier_stock_sheet
+    scene = _note_build_scene(monkeypatch, tmp_path, drawing)
+    monkeypatch.setattr(drawing, "_supplier_stock_sheet", native_stock_builder)
+    old_center, old_caption = (0.310, 0.213), (0.275, 0.163)
+    recorded_box = (
+        0.2872237893868808, 0.15756259535002917,
+        0.3327762106131192, 0.2673277812843747,
+    )
+    cell = (0.0127, 0.094, 0.4318 - 0.0127, 0.2794 - 0.0127 - 0.009)
+    before_clearances = (
+        recorded_box[0] - cell[0], recorded_box[1] - cell[1],
+        cell[2] - recorded_box[2], cell[3] - recorded_box[3],
+    )
+    assert before_clearances == pytest.approx(
+        (0.2745237893868808, 0.06356259535002917, 0.0863237893868808, -0.0096277812843747),
+        rel=0, abs=1e-15,
+    )
+    assert math.ceil(-before_clearances[3] * 1000) == 10
+    assert recorded_box[3] - 0.009 - cell[3] == pytest.approx(
+        0.0006277812843747, rel=0, abs=1e-15,
+    )
+    if shift_mm != 10:
+        shift = shift_mm / 1000.0
+        monkeypatch.setattr(drawing, "STOCK_ISO_CENTER", (old_center[0], old_center[1] - shift))
+        monkeypatch.setattr(drawing, "STOCK_ISO_CAPTION", (old_caption[0], old_caption[1] - shift))
+    scene.stock.Position = (0.150, 0.1755)
+    scene.model.EditRebuild3 = lambda: True
+    monkeypatch.setattr(drawing, "double_array", tuple)
+    monkeypatch.setattr(
+        drawing, "_show_hidden_owners",
+        lambda *_args, **_kwargs: (drawing.SUPPLIER_STOCK_FEATURE,),
+    )
+    monkeypatch.setattr(
+        drawing, "model_points_in_view", lambda *_args, **_kwargs: ((0.150, 0.1755),),
+    )
+    monkeypatch.setattr(drawing, "curate_stock_dimensions", lambda *_args, **_kwargs: [])
+    created_notes, fit_labels = [], []
+    fixture_place_view = drawing.place_view
+
+    def place_view(adapter, path, orientation, x, y, *, scale):
+        view = fixture_place_view(adapter, path, orientation, x, y, scale=scale)
+        if scene.state.sheet == "SUPPLIER-STOCK" and orientation == "*Isometric":
+            assert scale == (3.0, 1.0)
+            outline = [
+                value + (x, y)[index % 2] - old_center[index % 2]
+                for index, value in enumerate(recorded_box)
+            ]
+            edge = "" if fault is None else fault.removesuffix("-boundary")
+            if edge in ("left", "bottom", "right", "top"):
+                index = ("left", "bottom", "right", "top").index(edge)
+                outline[index] = cell[index] + (
+                    0.0 if fault.endswith("-boundary") else -1e-12 if index < 2 else 1e-12
+                )
+            view.outline = tuple(outline)
+        return view
+
+    def add_stock_note(_adapter, text, x, y):
+        note = _note_double(text, text, x, y)
+        note.position = (x, y)
+        if text == "ISOMETRIC VIEW SCALE 3:1":
+            if fault == "caption-text":
+                note.text = "ISOMETRIC VIEW SCALE 4:1"
+            elif fault == "caption-owner":
+                note.annotation.OwnerType = 0
+        created_notes.append(note)
+        return note
+
+    def assert_fits(adapter, view, actual_cell, *, label):
+        assert f"view={view.Name!r}" in label
+        assert f"configuration={view.ReferencedConfiguration!r}" in label
+        assert f"cell={actual_cell!r}" in label
+        fit_labels.append(label)
+        purchased_drawing.assert_supplier_view_fits(adapter, view, actual_cell, label=label)
+
+    monkeypatch.setattr(drawing, "place_view", place_view)
+    monkeypatch.setattr(drawing, "add_note", add_stock_note)
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", assert_fits)
+    accepted = shift_mm == 10 and (fault is None or fault.endswith("-boundary"))
+    if accepted:
+        assert asyncio.run(drawing.build(scene.adapter)) == {"drawing": "saved"}
+        assert scene.state.saved
+        assert len(fit_labels) == 4
+    else:
+        caption_failure = fault in ("caption-text", "caption-owner")
+        with pytest.raises(
+            RuntimeError,
+            match="source label changed" if caption_failure else "settled supplier view leaves its cell",
+        ) as failure:
+            asyncio.run(drawing.build(scene.adapter))
+        assert not scene.state.saved
+        if not caption_failure:
+            message = str(failure.value)
+            assert "view='stock-iso'" in message
+            assert "configuration='AsSuppliedStock'" in message
+            assert f"cell={cell!r}" in message
+            assert repr(scene.stock_iso.outline) in message
+    expected_y = 0.203 if shift_mm == 10 else old_center[1] - shift_mm / 1000.0
+    expected_caption_y = 0.153 if shift_mm == 10 else old_caption[1] - shift_mm / 1000.0
+    assert scene.placements == [
+        ("*Front", 0.100, 0.18125, (5.0, 1.0)),
+        ("*Isometric", 0.310, 0.212, (3.0, 1.0)),
+        ("*Front", 0.150, 0.1755, (4.0, 1.0)),
+        ("*Isometric", 0.310, expected_y, (3.0, 1.0)),
+    ]
+    caption = created_notes[-1]
+    assert caption.position == (0.275, expected_caption_y)
+    assert (caption.position[0] - 0.310, caption.position[1] - expected_y) == pytest.approx(
+        (-0.035, -0.050), rel=0, abs=1e-15,
+    )
+    assert caption.PropertyLinkedText == "ISOMETRIC VIEW SCALE 3:1"
+    assert scene.notes["Isometric View Note"].position == (0.275, 0.163)
+    assert scene.notes["Isometric View Note"].GetText() == "ISOMETRIC VIEW SCALE 3:1"
+    assert scene.stock.ReferencedConfiguration == scene.stock_iso.ReferencedConfiguration == "AsSuppliedStock"
+    assert scene.state.finalizer_options["sheet_scales"] == {
+        "FINISHED": (5.0, 1.0), "SUPPLIER-STOCK": (4.0, 1.0),
+    }
+    if shift_mm == 10 and fault is None:
+        box = scene.stock_iso.outline
+        assert (box[0] - cell[0], box[1] - cell[1], cell[2] - box[2], cell[3] - box[3]) == pytest.approx(
+            (0.2745237893868808, 0.05356259535002917, 0.0863237893868808, 0.0003722187156253),
+            rel=0, abs=1e-15,
+        )
+        assert caption.GetText() == "ISOMETRIC VIEW SCALE 3:1"
+        assert caption.annotation.OwnerType == 1
 
 
 @pytest.mark.parametrize("module", (drawing, boss_drawing))
@@ -1676,8 +1822,8 @@ def test_channel_stock_builder_returns_sheet_owned_literal_triples(monkeypatch, 
         ("*Front", *drawing.STOCK_CENTER, drawing.STOCK_SCALE),
         ("*Isometric", *drawing.STOCK_ISO_CENTER, drawing.ISO_SCALE),
     ]
-    assert drawing.STOCK_ISO_CENTER == (0.310, 0.213)
-    assert placements[1] == ("*Isometric", 0.310, 0.213, (3.0, 1.0))
+    assert drawing.STOCK_ISO_CENTER == (0.310, 0.203)
+    assert placements[1] == ("*Isometric", 0.310, 0.203, (3.0, 1.0))
     assert stock.ReferencedConfiguration == iso.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
 
 

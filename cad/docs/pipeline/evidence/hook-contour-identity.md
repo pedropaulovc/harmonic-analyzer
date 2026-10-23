@@ -519,6 +519,72 @@ failure bundle was uploaded. The changed stock corrections, final native
 attachment survival, whole-v44 comparison, automated machinist review and
 exact-source independent review remain qualification requirements.
 
+## New native boundaries after the stock-oracle cutover
+
+Source `c12df92c2a2718d0e867f410d2dbc76905085655` contains freshly fetched main
+`433d033d8434cb0cfe3fda040b27e5a008c585af`. Its final focused checks passed
+560 tests, F821, 149 adapter methods and 103 native binding contracts; those
+results are archived separately under `final-stock-root-c12df92c2a2718d0e867f410d2dbc76905085655/`.
+They are offline evidence, not the native acceptance verdict.
+
+Run `20261023T021846928Z-f1b1da44bf2a4ea4a07da47714f549df`, build
+`20261023T021918.189559Z-ac44e80621b14177b94e95e6a50d1ed1`, failed both
+drawing leaves. The complete atomic handoff is
+`hook-contour-proof/final-stock-root-c12df92c2-native-handoff.json`, SHA-256
+`48910ae7e7054a81889f6349e9a790acd07012e30ce4225b574a7692d032db94`.
+The companion arithmetic and proof limits are
+`hook-contour-proof/root-readback-c12df92c2.json`. Dependency farm success
+does not mean new part COM execution: both drawing logs explicitly restore
+their part cache and skip that part build.
+
+CH passed the primary 4:1 stock-view check and then refused the stock
+isometric's outline:
+
+```text
+(0.2872237893868808, 0.15756259535002917,
+ 0.3327762106131192, 0.2673277812843747) m
+```
+
+Its X midpoint is the isometric's `0.310 m`, not the primary's `0.150 m`.
+OTEL names `SUPPLIER-STOCK 'Drawing View4'` in a display span; the failed
+cell span itself does not identify the view or configuration. Associating
+that refusal with the isometric therefore remains exact-source/order
+correlation rather than a raw failed-view-name readback.
+
+Against the unchanged cell `(0.0127, 0.094, 0.4191, 0.2577) m`, top overflow
+is `9.6277812843747 mm`. Main approved the smallest whole-millimetre downward
+translation, 10 mm, for **only the stock isometric and its own 3:1 caption
+together**. Their centres/anchors become `(0.310, 0.203) m` and
+`(0.275, 0.153) m`, preserving the relative offset `(-0.035, -0.050) m`.
+The translated recorded box has clearances left `274.5237893868808 mm`,
+right `86.3237893868808 mm`, bottom `53.5625953500292 mm` and top
+`0.3722187156253 mm`. Nine millimetres would still overflow. This leaves
+the primary 4:1 view, FINISHED views, source geometry, text, scales and cells
+unchanged. Whole-page native neighbour-ink and caption acceptance is still
+required; a translated box is not printed-ink proof.
+
+SM passed its exact target-source stock capture and the final pre-save
+checks, then failed `EyeID: settled supplier dimension disappeared` in the
+`after_drawing_save` reference callback. Its current-view dimension map did
+not contain the originally captured `IDimension.FullName` key. The packet
+does not emit the old/current key pair or native annotation identity; it
+does not establish deletion, a document-suffix rename, or attachment loss.
+The SDK names do not promise SaveAs3 stability.
+
+The approved next SM observation is a concise **failure-only** missing-key
+receipt: exact pre-save and current names, drawing/view/source bindings,
+native owners and comparison with the last strictly verified pre-save
+`IAnnotation` when that handle remains available. It must preserve the
+original exception and every attachment criterion; it is not a name alias,
+scan rescue or successful repair. Neither this observation nor the callback
+event alone proves a successful save: the shared artifact wrapper also
+invokes its after callback when the wrapped operation fails.
+
+All eight requested drawing exports were missing, and no same-attempt
+failure bundle was uploaded. SM reached the save context but has no
+qualified saved attachment or cold-reopen proof. No current PDF comparison,
+automated machinist qualification or merge readiness follows from this run.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate
