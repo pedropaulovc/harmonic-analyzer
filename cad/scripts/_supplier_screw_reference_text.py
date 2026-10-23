@@ -42,11 +42,12 @@ def _break_reference_lines(
     rebuild_drawing(adapter, label=f"{label} original reference line stations")
     found = reacquire()
     stations = {}
+    setter_statuses = {}
     for name in names:
         geometry = measure_reference_text(
             adapter, found[name], axis=axes[name], label=f"{label} {name}"
         )
-        stations[name] = {key: geometry[key] for key in ("tips", "witnesses")}
+        stations[name] = geometry
     for name in names:
         display = _early_bound(found[name], "IDisplayDimension")
         status = display.SetBrokenLeader2(False, _BROKEN_LINE_ALIGNED_TEXT)
@@ -57,6 +58,7 @@ def _break_reference_lines(
                 f"{label} {name}: failed to break supplier reference line: "
                 f"status={status!r}"
             )
+        setter_statuses[name] = status
     rebuild_drawing(adapter, label=f"{label} local broken reference lines")
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
 
@@ -79,7 +81,36 @@ def _break_reference_lines(
             actual = measure_reference_text(
                 adapter, display, axis=axes[name], label=f"{label} {name}"
             )
-            assert_reference_text_stations(original, actual, label=f"{label} {name}")
+            try:
+                assert_reference_text_stations(original, actual, label=f"{label} {name}")
+            except RuntimeError as error:
+                try:
+                    # Keep native array order/indices and exact held coordinates.
+                    # The reader already rounds to 0.1 um; do not round again
+                    # or invent an entity identity from an arrow array index.
+                    _telemetry.event(
+                        "drawing.supplier_screw_broken_line_station_failure",
+                        label=label,
+                        reference=name,
+                        setter_status=setter_statuses[name],
+                        broken_line_mode=mode,
+                        use_doc_broken_line=use_doc,
+                        coordinate_basis="held native audit record, metres, 0.1 um",
+                        native_array_order="unchanged IDisplayData index order",
+                        before={
+                            key: original[key]
+                            for key in ("axis", "tips", "witnesses", "record")
+                        },
+                        after={
+                            key: actual[key]
+                            for key in ("axis", "tips", "witnesses", "record")
+                        },
+                        error=str(error),
+                    )
+                except Exception:
+                    # Only the diagnostic is best-effort, never the failed proof.
+                    pass
+                raise
         return found
 
     checked_reacquire()

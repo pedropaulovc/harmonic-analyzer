@@ -116,6 +116,13 @@ cannot ask for what the authors were told to leave out.
   The shared clamp and these six screws align orthographic projected model origins
   after fitting, before reference annotation, without changing selected scales
   or relaxing their cells.
+  The carriage's local aligned-text line break must retain the original native
+  arrow/witness stations; post-style geometry never replaces that authority.
+  A station refusal records the already-held before/after annotation, arrow and
+  line arrays in native index order, plus setter/readback state. Indices are
+  not entity identities. These audit coordinates retain their existing 0.1 um
+  precision, not unrounded native doubles. Diagnostic failure cannot mask the
+  original strict exception, and emitted data is not a clearance/fix verdict.
   The existing linked title-cell fitter owns PART, the actual Material property
   and DWG. NO. together; it is not combined with the separate Number fitter.
   Only these six Material notes use `label_right`: the complete native value box

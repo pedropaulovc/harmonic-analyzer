@@ -12089,6 +12089,67 @@ def test_carriage_broken_line_refuses_style_transition_source_or_station_drift(
 
 
 @pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("drift", ("tips", "witnesses"))
+@pytest.mark.parametrize("logging_fails", (False, True))
+def test_carriage_broken_line_station_failure_retains_native_evidence_and_rethrows(
+    screw_reference_shelf_native_consumer, monkeypatch, drift, logging_fails,
+):
+    import _supplier_screw_reference_text as consumer
+
+    state = screw_reference_shelf_native_consumer
+    state.style_drift = drift
+    events = []
+    failures = []
+    strict = consumer.assert_reference_text_stations
+
+    def capture_failure(before, after, *, label):
+        try:
+            strict(before, after, label=label)
+        except RuntimeError as error:
+            failures.append(error)
+            raise
+
+    def record_event(name, **attributes):
+        events.append((name, attributes))
+        if logging_fails and name == "drawing.supplier_screw_broken_line_station_failure":
+            raise OSError("diagnostic sink unavailable")
+
+    monkeypatch.setattr(consumer, "assert_reference_text_stations", capture_failure)
+    monkeypatch.setattr(consumer._telemetry, "event", record_event)
+    with pytest.raises(RuntimeError, match=f"native {drift} moved") as refused:
+        state.run(broken_lines=(state.name,))
+    assert refused.value is failures[0]
+    diagnostic = [
+        attributes for name, attributes in events
+        if name == "drawing.supplier_screw_broken_line_station_failure"
+    ]
+    assert len(diagnostic) == 1
+    actual = diagnostic[0]
+    assert actual["reference"] == "SupplierDriveWidth"
+    assert actual["setter_status"] == 0
+    assert actual["broken_line_mode"] == 3
+    assert actual["use_doc_broken_line"] is False
+    before, after = actual["before"], actual["after"]
+    assert before["axis"] == after["axis"] == 0
+    assert before["record"]["name"] == after["record"]["name"] == state.name
+    assert before["record"]["pos"] == after["record"]["pos"]
+    # Native primitive order and coordinates remain available for role matching;
+    # reporting the already-normalized tips alone would lose this evidence.
+    assert after["record"]["display"] == state.current.annotation.record["display"]
+    if drift == "tips":
+        assert [new[0] - old[0] for old, new in zip(
+            before["tips"], after["tips"], strict=True,
+        )] == pytest.approx([0.0001, 0.0001])
+    else:
+        assert before["tips"] == after["tips"]
+        assert before["witnesses"] != after["witnesses"]
+        assert before["record"]["display"]["arrows"] == after["record"]["display"]["arrows"]
+    assert len(state.rebuilds) == 2
+    assert state.redraws == 1
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
 @pytest.mark.parametrize(
     "phase",
     (
