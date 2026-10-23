@@ -1053,6 +1053,11 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.005
     assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020
+    # Detail B's callout block runs left from its keep point over G-G's
+    # columns (rendered 0.292-0.380 m), so its shoulder, about 2.5 line
+    # pitches below the keep height, must pass above the section.
+    _tick_x, tick_y = drawing.DEPTH_KEEP["TickDepth"]
+    assert tick_y - 2.5 * 0.0034 > profile.ymax + 0.008
     # The cutting line misses every graduation.
     minor = spec.SCALE_START_X + spec.MINOR_SPACING
     assert drawing.NUMERAL_SECTION_X - (minor + spec.TICK_WIDTH / 2.0) > 0.1

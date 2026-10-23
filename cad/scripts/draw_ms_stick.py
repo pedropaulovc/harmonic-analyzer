@@ -126,7 +126,9 @@ NUMERAL_KEEP = {
     "NumeralXGap": (0.100, 0.170),
     "NumeralYGap": (0.100, 0.155),
 }
-DEPTH_KEEP = {"TickDepth": (0.380, 0.175)}
+# Text centre high enough that the shoulder under its last line clears the
+# top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
+DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
 NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
 DIMENSION_CALLOUTS = {
