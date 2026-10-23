@@ -104,6 +104,13 @@ cannot ask for what the authors were told to leave out.
   incomplete, duplicated, competing or unsupported paths are not a text escape.
   Every other on-support candidate remains conservatively physical against
   the original baseline. This is not a general glyph-clearance classifier.
+  A station refusal retains a bounded JSON note of already-read original and
+  actual vectors, native offset mode, text fragments, lines and arrows, with
+  explicit truncation counts. The initial settled check can include both raw
+  measurements; later read-only proofs retain only original station vectors,
+  so unavailable original raw data is identified rather than reconstructed.
+  Diagnostics add no native reads, change no predicate and never mask the
+  original failure if formatting fails.
   Every reported text fragment participates,
   including both fraction parts, all three nominal-major rows, and measured
   empty/whitespace BSTR advances. The shared native bounds reader normalizes all

@@ -102,34 +102,36 @@ def measured_native_text_bounds(
     return text, tuple(fragments)
 
 
-def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> str:
+def _bounded_native_fields(value: Any, depth: int = 0) -> Any:
     """Bound already-read primitives only; never inspect or repr a native object."""
-    def bounded(value: Any, depth: int = 0) -> Any:
-        if value is None or type(value) in (bool, int):
+    if value is None or type(value) in (bool, int):
+        return value
+    if type(value) is float:
+        return value if isfinite(value) else {"non_finite": repr(value)}
+    if type(value) is str:
+        if len(value) <= 128:
             return value
-        if type(value) is float:
-            return value if isfinite(value) else {"non_finite": repr(value)}
-        if type(value) is str:
-            if len(value) <= 128:
-                return value
-            return {"prefix": value[:128], "omitted_characters": len(value) - 128}
-        if depth < 3 and type(value) in (tuple, list):
-            return {
-                "items": [bounded(item, depth + 1) for item in value[:16]],
-                "omitted_items": max(0, len(value) - 16),
-            }
-        if depth < 3 and type(value) is dict:
-            fields = list(value.items())
-            return {
-                "fields": {
-                    key[:128] if type(key) is str else "<non-string-key>":
-                    bounded(item, depth + 1)
-                    for key, item in fields[:16]
-                },
-                "omitted_fields": max(0, len(fields) - 16),
-            }
-        return {"unreadable_type": type(value).__name__[:128]}
+        return {"prefix": value[:128], "omitted_characters": len(value) - 128}
+    if depth < 3 and type(value) in (tuple, list):
+        return {
+            "items": [_bounded_native_fields(item, depth + 1) for item in value[:16]],
+            "omitted_items": max(0, len(value) - 16),
+        }
+    if depth < 3 and type(value) is dict:
+        fields = list(value.items())
+        return {
+            "fields": {
+                key[:128] if type(key) is str else "<non-string-key>":
+                _bounded_native_fields(item, depth + 1)
+                for key, item in fields[:16]
+            },
+            "omitted_fields": max(0, len(fields) - 16),
+        }
+    return {"unreadable_type": type(value).__name__[:128]}
 
+
+def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> str:
+    bounded = _bounded_native_fields
     texts = (record.get("display") or {}).get("texts") or ()
     census = {
         "label": bounded(label),
@@ -147,6 +149,36 @@ def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> s
         ],
     }
     return "supplier_reference_native_fontbox_fields " + json.dumps(census, allow_nan=False)
+
+
+def _station_failure_note(
+    before: dict[str, Any], after: dict[str, Any], *, label: str
+) -> str:
+    """Retain bounded held measurements, not new native reads, on a refusal."""
+    def observation(measured: dict[str, Any]) -> dict[str, Any]:
+        fields = {
+            key: _bounded_native_fields(measured[key])
+            for key in ("axis", "offset_text", "tips", "witnesses", "physical_lines")
+            if key in measured
+        }
+        record = measured.get("record")
+        fields["raw_record_available"] = type(record) is dict
+        if type(record) is dict:
+            data = record.get("display") or {}
+            fields["raw"] = {
+                key: _bounded_native_fields(data.get(key))
+                for key in ("texts", "lines", "arrows")
+            }
+        return fields
+
+    return "supplier_reference_native_station_fields " + json.dumps(
+        {
+            "label": _bounded_native_fields(label),
+            "before": observation(before),
+            "after": observation(after),
+        },
+        allow_nan=False,
+    )
 
 
 def _offset_text_path_indices(
@@ -398,6 +430,7 @@ def measure_reference_text(
         record=record,
         text=text,
         axis=axis,
+        offset_text=offset_text,
         tips=tips,
         witnesses=tuple(witnesses),
         physical_lines=tuple(physical_lines),
@@ -414,7 +447,15 @@ def assert_reference_text_stations(
             dist(old, new) > _POSITION_TOLERANCE_M
             for old, new in zip(before[key], after[key], strict=True)
         ):
-            raise RuntimeError(f"{label}: supplier reference native {key} moved")
+            error = RuntimeError(f"{label}: supplier reference native {key} moved")
+            try:
+                error.add_note(_station_failure_note(before, after, label=label))
+            except Exception as diagnostic_error:
+                error.add_note(
+                    "supplier reference station field census formatting failed "
+                    f"({type(diagnostic_error).__name__}); original failure retained"
+                )
+            raise error
 
 
 def _position(annotation: Any, *, label: str) -> tuple[float, ...]:
@@ -525,10 +566,13 @@ def shelve_reference_text(
                 raise RuntimeError(f"{label} {name}: cannot shelf supplier reference text")
         rebuild_drawing(adapter, label=f"{label} measured reference text shelves")
 
-    stations = {
+    station_vectors = {
         name: {key: geometry[key] for key in ("tips", "witnesses", "physical_lines")}
         for name, geometry in before.items()
     }
+    # Only the initial proof can diagnose the original raw dump and mode.
+    # The returned closure retains station vectors, not the original records.
+    stations = before
 
     def settled() -> None:
         found = current_displays()
@@ -554,5 +598,8 @@ def shelve_reference_text(
         if audit_records is not None:
             audit_records(records)
 
-    settled()
+    try:
+        settled()
+    finally:
+        stations = station_vectors
     return settled
