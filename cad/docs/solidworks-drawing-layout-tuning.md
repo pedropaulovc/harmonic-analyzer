@@ -1934,11 +1934,17 @@ The proof has two deliberately distinct stages:
   malformed counts/metrics, crossed preexisting routes, finish self-crossing
   and full native head-to-advance gaps below the existing **2 mm** rule.
   `GetTextPositionAtIndex + GetTextHeightAtIndex` is **not** printed glyph ink.
+  Skip only well-formed, finite ten-field zero-length display sentinels, as
+  the shared decoder does; they cannot replace any required real primitive.
+  The vertical interval union must connect both actual physical tips to the
+  actual shelf root, including reversed endpoints and the intended overlap.
 - **After the existing successful PDF export:** read that one actual PDF with
   `_pdf_ink`. Match the actual `9.5` and roughness glyphs to their native text
   owners, and identify the Ø token as a unique complete closed vector ring
   plus crossing slash in its actual native prefix slot. Missing, open,
   ambiguous, extra or observably bay-clipped components refuse qualification.
+  Merge joint crossings within the existing native geometry roundoff
+  tolerance before requiring two distinct ring/slash crossings.
   The whole actual diameter glyph, including vector pen radius, must fit the RIGHT
   placement bay whose top is `197.2 mm`; this is a placement boundary, **not**
   a relaxed clearance threshold. Require complete painted heads (including
@@ -1947,6 +1953,13 @@ The proof has two deliberately distinct stages:
   actual straight route, symbol legs and relevant dimension intersections.
   Only solid painted paths can own those native primitives; unrelated
   unpainted clip paths and dashed centre lines are not annotation ink.
+  All aligned PDF pieces, including interior fragments, must continuously
+  cover each complete native primitive within the existing attribution
+  tolerance. Retain their actual offsets and pen radii for collision checks;
+  endpoint fragments cannot stand in for a missing middle. Compare the finish
+  and neck paint against each other as well as preexisting dimensions.
+  A shared symbol root exempts only a point junction, never positive-length
+  collinear overlap; this applies to native and printed routes alike.
   This is semantic ownership of the reader-observed ring/slash, not forensic
   font identity or arbitrary PDF clip-path detection; final whole-paper
   legibility inspection remains necessary.

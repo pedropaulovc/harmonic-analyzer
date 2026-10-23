@@ -71,7 +71,6 @@ from _layout_audit import (
     COLLINEAR_TOL_M,
     InkSpan,
     TextItem,
-    _same_run,
     _segment_crossing,
     arrowhead_segments,
     ink_key,
@@ -1320,9 +1319,10 @@ def _neck_native_lines(data: Any, *, label: str) -> tuple[Segment, ...]:
     for index in range(count):
         values = _neck_numbers(data.GetLineAtIndex3(index), 10, label=f"{label} line {index}")
         segment = line_segment(values)
-        if segment is None:
-            raise RuntimeError(f"{label}: degenerate native line {index}")
-        lines.append(segment)
+        # SOLIDWORKS may interleave well-formed zero-length display sentinels.
+        # They draw no ink; the owning route still proves its real primitives.
+        if segment is not None:
+            lines.append(segment)
     return tuple(lines)
 
 
@@ -1373,8 +1373,28 @@ def _neck_crossing(first: Segment, second: Segment) -> tuple[float, float] | Non
     return None
 
 
+def _neck_root_point_contact(
+    first: Segment, second: Segment, root: tuple[float, float],
+) -> bool:
+    """Exempt only a shared root point, never a positive collinear stretch."""
+    crossing = _neck_crossing(first, second)
+    tolerance = NECK_GEOMETRY_TOLERANCE_M
+    if crossing is None or math.dist(crossing, root) > tolerance or any(
+        min(math.dist(root, (line.x0, line.y0)), math.dist(root, (line.x1, line.y1))) > tolerance
+        for line in (first, second)
+    ):
+        return False
+    ux, uy = (first.x1 - first.x0) / first.length, (first.y1 - first.y0) / first.length
+    ends = ((second.x0, second.y0), (second.x1, second.y1))
+    if max(abs((x - first.x0) * uy - (y - first.y0) * ux) for x, y in ends) <= tolerance:
+        low, high = sorted((x - first.x0) * ux + (y - first.y0) * uy for x, y in ends)
+        if min(high, first.length) > max(low, 0.0):
+            return False
+    return True
+
+
 def _assert_neck_right_advance(
-    data: Any, foreign_lines: tuple[Segment, ...], *, label: str,
+    data: Any, heads: tuple[Segment, ...], foreign_lines: tuple[Segment, ...], *, label: str,
 ) -> tuple[tuple[Segment, ...], tuple[dict[str, Any], ...]]:
     lines = _neck_native_lines(data, label=label)
     texts = _neck_native_texts(data, label=label)
@@ -1404,6 +1424,19 @@ def _assert_neck_right_advance(
         raise RuntimeError(f"{label}: ordinary native shelf lost its actual vertical root")
     if any(abs(line.x0 - x) > NECK_GEOMETRY_TOLERANCE_M for line in lines if line not in shelves):
         raise RuntimeError(f"{label}: ordinary native diameter vertical primitives moved")
+    intervals = sorted(
+        (min(line.y0, line.y1), max(line.y0, line.y1)) for line in lines if line not in shelves
+    )
+    lower_tip, upper_tip = sorted(heads[index].y0 for index in (0, 3))
+    tolerance = NECK_GEOMETRY_TOLERANCE_M
+    if (
+        abs(intervals[0][0] - lower_tip) > tolerance
+        or abs(max(high for _, high in intervals) - shelf.y0) > tolerance
+        or intervals[1][0] > intervals[0][1] + tolerance
+        or any(low < lower_tip - tolerance or high > shelf.y0 + tolerance for low, high in intervals)
+        or not any(low - tolerance <= upper_tip <= high + tolerance for low, high in intervals)
+    ):
+        raise RuntimeError(f"{label}: ordinary native vertical route does not connect both tips to the shelf")
     for row in texts:
         box = row["advance"]
         if (
@@ -1511,7 +1544,7 @@ def _assert_outboard_neck_dimension(
         if raw_data is None:
             raise RuntimeError(f"{label}: preexisting dimension has no native display data")
         foreign_lines.extend(_neck_native_lines(_early_bound(raw_data, "IDisplayData"), label=label))
-    lines, texts = _assert_neck_right_advance(data, tuple(foreign_lines), label=label)
+    lines, texts = _assert_neck_right_advance(data, heads, tuple(foreign_lines), label=label)
     _telemetry.info(
         f"{label}: native diameter {full_name!r}, measured_mm={measured_mm}, "
         f"driven=1, places={NECK_DIA_PLACES}, tolerance=NONE, opposite_silhouettes=True, "
@@ -1623,7 +1656,7 @@ def _assert_collar_rear_finish(
     adapter: Any, rim: Any, symbol: Any,
     neck: tuple[tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], tuple[Segment, ...]],
     *, phase: str,
-) -> tuple[tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], Segment]:
+) -> tuple[tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], Segment, tuple[float, float]]:
     """Prove the one straight finish, its native ADVANCE and its unchanged rim."""
     label = f"crankshaft collar rear (post boss) face finish ({phase})"
     if symbol is None or rim is None:
@@ -1688,11 +1721,7 @@ def _assert_collar_rear_finish(
         if line is registered[0]:
             continue
         crossing = _neck_crossing(leader, line)
-        if crossing is not None and not (
-            math.dist(crossing, root) <= NECK_GEOMETRY_TOLERANCE_M
-            and min(math.dist(root, (line.x0, line.y0)), math.dist(root, (line.x1, line.y1)))
-            <= NECK_GEOMETRY_TOLERANCE_M
-        ):
+        if crossing is not None and not _neck_root_point_contact(leader, line, root):
             raise RuntimeError(f"{label}: straight leader crosses its own surface-finish legs")
     count = data.GetArrowHeadCount()
     if type(count) is not int or count != 1:
@@ -1736,7 +1765,7 @@ def _assert_collar_rear_finish(
         f"native_full_head_record={arrow}, native_full_head_segments_m={heads}, "
         f"native_symbol_lines_m={lines}; printed glyph proof remains separate"
     )
-    return lines, heads, texts, registered[0]
+    return lines, heads, texts, registered[0], root
 
 
 def _neck_segment_distance(first: Segment, second: Segment) -> float:
@@ -1750,19 +1779,54 @@ def _neck_segment_distance(first: Segment, second: Segment) -> float:
     )
 
 
+def _neck_pdf_line_overlap(segment: Segment, line: Segment) -> tuple[float, float, Segment] | None:
+    """Actual aligned paint projected onto its native owner, including middles."""
+    if not segment.length or not line.length:
+        return None
+    ux, uy = (line.x1 - line.x0) / line.length, (line.y1 - line.y0) / line.length
+    dx, dy = segment.x1 - segment.x0, segment.y1 - segment.y0
+    # Retain the existing _same_run angular and perpendicular attribution bands,
+    # without requiring either piece endpoint to be a native endpoint.
+    if abs(dx * uy - dy * ux) > segment.length * math.sin(math.radians(2.0)):
+        return None
+    ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+    if max(abs((x - line.x0) * uy - (y - line.y0) * ux) for x, y in ends) > COLLINEAR_TOL_M:
+        return None
+    start, end = ((x - line.x0) * ux + (y - line.y0) * uy for x, y in ends)
+    low, high = max(min(start, end), 0.0), min(max(start, end), line.length)
+    if high <= low:
+        return None
+    if min(start, end) < 0.0 or max(start, end) > line.length:
+        # Do not claim a collinear model edge's out-of-owner tail. Clip on the
+        # actual PDF stroke, preserving its real perpendicular offset and pen.
+        first = segment.point_at((low - start) / (end - start))
+        last = segment.point_at((high - start) / (end - start))
+        segment = Segment(*first, *last)
+    return low, high, segment
+
+
 def _neck_pdf_owned_lines(
     strokes: tuple[tuple[Segment, float], ...], native: tuple[Segment, ...], *, label: str,
 ) -> dict[Segment, tuple[tuple[Segment, float], ...]]:
-    """Attribute actual ink with the audit's existing tolerance, not a gap waiver."""
+    """Require continuous projected paint coverage, retaining every owned piece."""
     owned = {}
     for line in native:
-        matches = tuple(stroke for stroke in strokes if _same_run(stroke[0], line))
-        if not matches or any(
-            min(point_segment_distance(point, segment) for segment, _ in matches) > COLLINEAR_TOL_M
-            for point in ((line.x0, line.y0), (line.x1, line.y1))
-        ):
+        matches = []
+        intervals = []
+        for segment, radius in strokes:
+            overlap = _neck_pdf_line_overlap(segment, line)
+            if overlap is not None:
+                low, high, piece = overlap
+                intervals.append((low, high))
+                matches.append((piece, radius))
+        covered = 0.0
+        for low, high in sorted(intervals):
+            if low > covered + COLLINEAR_TOL_M:
+                break
+            covered = max(covered, high)
+        if not matches or covered < line.length - COLLINEAR_TOL_M:
             raise RuntimeError(f"{label}: complete native primitive has no actual PDF owner: {line!r}")
-        owned[line] = matches
+        owned[line] = tuple(matches)
     return owned
 
 
@@ -1812,10 +1876,14 @@ def _neck_pdf_diameter_paths(
         raise RuntimeError("collar-side neck PDF: missing/open/extra diameter ring or slash")
     ring = [line for line, _ in paths if (line.x0, line.y0) in rings[0]]
     slash = [line for line, _ in paths if (line.x0, line.y0) in slashes[0]]
-    crossings = {
-        point for first in ring for second in slash
-        if (point := _segment_crossing(first, second)) is not None
-    }
+    crossings = []
+    for first in ring:
+        for second in slash:
+            point = _segment_crossing(first, second)
+            if point is not None and not any(
+                math.dist(point, prior) <= NECK_GEOMETRY_TOLERANCE_M for prior in crossings
+            ):
+                crossings.append(point)
     if len(crossings) != 2:
         raise RuntimeError("collar-side neck PDF: diameter slash does not cross the complete ring twice")
     return paths
@@ -1858,7 +1926,9 @@ def _neck_pdf_head_clearance(
 
 def _assert_neck_pdf_presentation(
     neck: tuple[tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], tuple[Segment, ...]],
-    finish: tuple[tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], Segment],
+    finish: tuple[
+        tuple[Segment, ...], tuple[Segment, ...], tuple[dict[str, Any], ...], Segment, tuple[float, float],
+    ],
 ) -> None:
     """Qualify the existing export using actual glyphs and vector Ø, not COM height."""
     pages = read_pdf_ink(OUTPUTS.pdf)
@@ -1869,7 +1939,7 @@ def _assert_neck_pdf_presentation(
     if page_width <= 0.0 or page_height <= 0.0:
         raise RuntimeError("collar-side neck PDF: invalid actual page dimensions")
     lines, heads, texts, foreign_lines = neck
-    finish_lines, finish_heads, finish_texts, leader = finish
+    finish_lines, finish_heads, finish_texts, leader, native_root = finish
     spans = [InkSpan(ink_key(span.text), InkBox(span.xmin, span.ymin, span.xmax, span.ymax)) for span in page.spans]
     rows = (*texts, *finish_texts)
     matches = match_ink_indices([
@@ -1943,7 +2013,8 @@ def _assert_neck_pdf_presentation(
     actual_foreign = _neck_pdf_owned_lines(tuple(strokes), foreign_lines, label="preexisting dimension PDF")
     owned_lines = (*lines, *finish_lines, *heads, *finish_heads, *foreign_lines)
     unowned = tuple(
-        stroke for stroke in token_strokes if not any(_same_run(stroke[0], line) for line in owned_lines)
+        stroke for stroke in token_strokes
+        if not any(_neck_pdf_line_overlap(stroke[0], line) is not None for line in owned_lines)
     )
     diameter = _neck_pdf_diameter_paths(unowned, texts[0]["advance"], bay)
     clearance = min(
@@ -1952,26 +2023,36 @@ def _assert_neck_pdf_presentation(
     )
     if clearance < ARROW_TEXT_CLEARANCE_M:
         raise RuntimeError(f"collar-side neck PDF: complete actual head-to-glyph clearance below 2 mm ({clearance})")
+    root = min(
+        (point for line, _ in actual_finish[leader] for point in ((line.x0, line.y0), (line.x1, line.y1))),
+        key=lambda point: math.dist(point, native_root),
+    )
     for line, _ in actual_finish[leader]:
-        root = min(((line.x0, line.y0), (line.x1, line.y1)), key=lambda point: math.dist(
-            point, (leader.x0, leader.y0),
-        ))
         for native, group in actual_finish.items():
             if native == leader:
                 continue
             for bar, _ in group:
                 crossing = _neck_crossing(line, bar)
-                if crossing is not None and not (
-                    math.dist(crossing, root) <= NECK_GEOMETRY_TOLERANCE_M
-                    and min(math.dist(root, (bar.x0, bar.y0)), math.dist(root, (bar.x1, bar.y1)))
-                    <= NECK_GEOMETRY_TOLERANCE_M
-                ):
+                if crossing is not None and not _neck_root_point_contact(line, bar, root):
                     raise RuntimeError("collar rear finish PDF: straight route crosses its own legs")
     for group in (*actual_finish.values(), *actual_neck.values()):
         for line, pen in group:
             for other_group in actual_foreign.values():
                 if any(_neck_segment_distance(line, other) <= pen + width for other, width in other_group):
                     raise RuntimeError("collar-side neck PDF: actual annotation route intersects a preexisting dimension")
+    finish_routes = tuple(stroke for group in actual_finish.values() for stroke in group)
+    neck_routes = tuple(stroke for group in actual_neck.values() for stroke in group)
+    finish_head_paint = tuple(stroke for group in actual_heads.values() for stroke in group)
+    neck_head_paint = tuple(stroke for group in actual_neck_heads.values() for stroke in group)
+    if (
+        any(
+            _neck_segment_distance(line, other) <= pen + width
+            for line, pen in finish_routes for other, width in neck_routes
+        )
+        or _neck_pdf_head_clearance(finish_heads, actual_heads, (), (*neck_routes, *neck_head_paint)) <= 0.0
+        or _neck_pdf_head_clearance(heads, actual_neck_heads, (), (*finish_routes, *finish_head_paint)) <= 0.0
+    ):
+        raise RuntimeError("collar-side neck PDF: actual finish and neck primitives intersect")
     for group in actual_finish.values():
         for line, pen in group:
             if (

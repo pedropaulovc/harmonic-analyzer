@@ -3079,3 +3079,258 @@ def test_native_line_guard_decodes_active_sdk_ten_field_record_without_style_off
         drawing.Segment(points[0], points[1], points[3], points[4]),
     )
     data.GetLineAtIndex3.assert_called_once_with(0)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_native_zero_length_sentinels_are_not_ink_or_required_route_primitives(neck_dimension_fakes, phase) -> None:
+    f = neck_dimension_fakes
+    for rows in (f.neck_lines, f.foreign_lines, f.station_lines, f.finish_lines):
+        rows.insert(0, (0.0,) * 6)
+    _neck_proof(f, phase)
+    f.rebuild.assert_not_called()
+
+
+@pytest.mark.parametrize("raw", [
+    (0.0,) * 9,
+    (False, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    (0.0, 0.0, 0.0, 0.0, float("nan"), 0.0, 0.0, 0.0, 0.0, 0.0),
+], ids=["short", "bool-field", "nonfinite-field"])
+def test_native_sentinel_skip_does_not_accept_malformed_ten_field_records(raw) -> None:
+    data = _native_presentation_data([(0.0,) * 6])
+    data.GetLineAtIndex3.side_effect = None
+    data.GetLineAtIndex3.return_value = raw
+    with pytest.raises(RuntimeError, match="malformed native geometry"):
+        drawing._neck_native_lines(data, label="sentinel")
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_native_sentinels_cannot_replace_the_real_ordinary_route(neck_dimension_fakes, phase) -> None:
+    f = neck_dimension_fakes
+    f.neck_lines[:] = [(0.0,) * 6] * 3
+    with pytest.raises(RuntimeError, match="three ordinary native diameter primitives"):
+        _neck_proof(f, phase)
+
+
+def test_owned_pdf_coverage_retains_reversed_and_sub_tolerance_middle_paint() -> None:
+    line = drawing.Segment(0.17, 0.19, 0.18, 0.19)
+    first, last = line.point_at(0.4975), line.point_at(0.5025)
+    strokes = (
+        (drawing.Segment(*last, line.x1, line.y1), 0.000065),
+        (drawing.Segment(*last, *first), 0.0002),
+        (drawing.Segment(line.x0, line.y0, *first), 0.000065),
+    )
+    assert strokes[1][0].length < drawing.COLLINEAR_TOL_M
+    owned = drawing._neck_pdf_owned_lines(strokes, (line,), label="split native line")
+    assert owned[line] == strokes
+
+
+@pytest.mark.parametrize("missing", ["middle", "start", "end"])
+def test_owned_pdf_endpoint_fragments_do_not_prove_complete_coverage(missing) -> None:
+    line = drawing.Segment(0.17, 0.19, 0.18, 0.19)
+    fractions = {
+        "middle": ((0.0, 0.2), (0.8, 1.0)),
+        "start": ((0.2, 1.0),),
+        "end": ((0.0, 0.8),),
+    }[missing]
+    strokes = tuple(
+        (drawing.Segment(*line.point_at(start), *line.point_at(end)), 0.000065)
+        for start, end in fractions
+    )
+    with pytest.raises(RuntimeError, match="complete native primitive has no actual PDF owner"):
+        drawing._neck_pdf_owned_lines(strokes, (line,), label="missing paint")
+
+
+@pytest.mark.parametrize("gap_factor", [0.5, 1.5], ids=["within-existing-attribution", "beyond-existing-attribution"])
+def test_owned_pdf_projected_union_uses_only_existing_attribution_tolerance(gap_factor) -> None:
+    line = drawing.Segment(0.17, 0.19, 0.18, 0.19)
+    half_gap = drawing.COLLINEAR_TOL_M * gap_factor / 2.0
+    strokes = (
+        (drawing.Segment(line.x0, line.y0, 0.175 - half_gap, line.y0), 0.000065),
+        (drawing.Segment(0.175 + half_gap, line.y0, line.x1, line.y1), 0.000065),
+    )
+    if gap_factor < 1.0:
+        assert len(drawing._neck_pdf_owned_lines(strokes, (line,), label="roundoff")[line]) == 2
+    else:
+        with pytest.raises(RuntimeError, match="complete native primitive has no actual PDF owner"):
+            drawing._neck_pdf_owned_lines(strokes, (line,), label="actual gap")
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("overlap", [False, True], ids=["reversed", "reversed-with-intended-overlap"])
+def test_native_vertical_route_connects_actual_tips_and_shelf_with_reversal_or_overlap(
+    neck_dimension_fakes, phase, overlap,
+) -> None:
+    f = neck_dimension_fakes
+    if overlap:
+        row = list(f.neck_lines[2])
+        row[4] = f.neck_lines[0][1]
+        f.neck_lines[2] = tuple(row)
+    for index in (1, 2):
+        row = f.neck_lines[index]
+        f.neck_lines[index] = (*row[3:], *row[:3])
+    _neck_proof(f, phase)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("missing", ["lower-tip", "junction", "shelf-root"])
+def test_native_vertical_fragments_cannot_replace_the_connected_diameter_route(
+    neck_dimension_fakes, phase, missing,
+) -> None:
+    f = neck_dimension_fakes
+    extension = list(f.neck_lines[1])
+    diameter = list(f.neck_lines[2])
+    if missing == "lower-tip":
+        diameter[1] += 0.001
+    elif missing == "junction":
+        diameter[4] -= 0.001
+        extension[4] += 0.001
+    else:
+        extension[1] -= 0.001
+    f.neck_lines[1], f.neck_lines[2] = tuple(extension), tuple(diameter)
+    with pytest.raises(RuntimeError, match="vertical route does not connect both tips to the shelf"):
+        _neck_proof(f, phase)
+
+
+@pytest.mark.parametrize("case", ["clear", "paint-contact", "wide-middle"], ids=[
+    "positive-painted-gap", "combined-pen-contact", "split-middle-pen-contact",
+])
+def test_actual_finish_and_neck_paint_are_checked_against_each_other(neck_dimension_fakes, case) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+    gap = 0.00012 if case == "paint-contact" else 0.0002
+    x = drawing.OUTBOARD_NECK_DIAMETER_XY[0] + gap
+    f.finish_lines[-1] = (x, 0.180, 0.0, x, 0.185, 0.0)
+
+    def mutate(spans, strokes, token):
+        if case != "wide-middle":
+            return
+        for index, stroke in enumerate(strokes):
+            if (stroke.x0, stroke.y0, stroke.x1, stroke.y1) == (x, 0.180, x, 0.185):
+                strokes[index:index + 1] = [
+                    replace(stroke, y1=0.181),
+                    replace(stroke, y0=0.181, y1=0.184, width=0.0004),
+                    replace(stroke, y0=0.184),
+                ]
+                break
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "final settling rebuild")  # native centre lines do not cross
+    if case == "clear":
+        _neck_proof(f, "after_pdf_save")
+    else:
+        with pytest.raises(RuntimeError, match="actual finish and neck primitives intersect"):
+            _neck_proof(f, "after_pdf_save")
+
+
+@pytest.mark.parametrize("joint_roundoff", [False, True], ids=["actual-vertex", "independent-joint-roundoff"])
+def test_pdf_diameter_ring_vertex_crossings_count_as_two_geometric_crossings(monkeypatch, joint_roundoff) -> None:
+    center, y, radius = 0.1814, 0.1948, 0.0015
+    points = ((center - radius, y), (center, y + radius), (center + radius, y), (center, y - radius))
+    paths = tuple(
+        (drawing.Segment(*first, *last), 0.000065)
+        for first, last in zip(points, (*points[1:], points[0]))
+    ) + ((drawing.Segment(center - 0.0022, y, center + 0.0022, y), 0.000065),)
+    if joint_roundoff:
+        crossing = drawing._segment_crossing
+        count = 0
+
+        def independently_rounded(first, second):
+            nonlocal count
+            point = crossing(first, second)
+            if point is None:
+                return None
+            count += 1
+            return math.nextafter(point[0], math.inf if count % 2 else -math.inf), point[1]
+
+        monkeypatch.setattr(drawing, "_segment_crossing", independently_rounded)
+    prefix = drawing.InkBox(0.1788, 0.1919951, 0.1841, 0.1954951)
+    bay = drawing.InkBox(0.17753, 0.1919951, 0.1988, 0.1972)
+    assert drawing._neck_pdf_diameter_paths(paths, prefix, bay) == paths
+
+
+def test_pdf_diameter_tangent_joint_is_not_two_distinct_crossings() -> None:
+    center, y, radius = 0.1814, 0.1948, 0.0015
+    points = ((center - radius, y), (center, y + radius), (center + radius, y), (center, y - radius))
+    paths = tuple(
+        (drawing.Segment(*first, *last), 0.000065)
+        for first, last in zip(points, (*points[1:], points[0]))
+    ) + ((drawing.Segment(center - 0.0022, y + radius, center + 0.0022, y + radius), 0.000065),)
+    with pytest.raises(RuntimeError, match="does not cross the complete ring twice"):
+        drawing._neck_pdf_diameter_paths(
+            paths, drawing.InkBox(0.1788, 0.1919951, 0.1841, 0.1954951),
+            drawing.InkBox(0.17753, 0.1919951, 0.1988, 0.1972),
+        )
+
+
+@pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reversed"])
+@pytest.mark.parametrize("overlap_length", [0.0, 1e-9, 0.001], ids=["point-only", "tiny-positive-overlap", "visible-overlap"])
+def test_shared_root_exemption_is_only_a_point_not_a_collinear_stretch(reverse, overlap_length) -> None:
+    root = (0.18326, 0.1973)
+    leader = drawing.Segment(*root, root[0] + 0.004, root[1] + 0.002)
+    if overlap_length:
+        point = leader.point_at(overlap_length / leader.length)
+    else:
+        point = root[0] - 0.004, root[1] - 0.002
+    body = drawing.Segment(*root, *point)
+    if reverse:
+        leader = drawing.Segment(leader.x1, leader.y1, leader.x0, leader.y0)
+        body = drawing.Segment(body.x1, body.y1, body.x0, body.y0)
+    assert drawing._neck_root_point_contact(leader, body, root) is (overlap_length == 0.0)
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_native_finish_refuses_collinear_body_overlap_beyond_the_shared_root(neck_dimension_fakes, phase) -> None:
+    f = neck_dimension_fakes
+    leader = f.finish_lines[0]
+    middle = ((leader[0] + leader[3]) / 2.0, (leader[1] + leader[4]) / 2.0)
+    f.finish_lines[1] = (*leader[:3], *middle, 0.0)
+    with pytest.raises(RuntimeError, match="straight leader crosses its own surface-finish legs"):
+        _neck_proof(f, phase)
+
+
+def test_pdf_finish_refuses_collinear_paint_overlap_at_an_otherwise_valid_native_root(neck_dimension_fakes) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+    root = drawing.COLLAR_REAR_FINISH[1]
+    tip = drawing.COLLAR_REAR_FINISH[0]
+    dx, dy = tip[0] - root[0], tip[1] - root[1]
+    length = math.hypot(dx, dy)
+    middle = ((root[0] + tip[0]) / 2.0, (root[1] + tip[1]) / 2.0)
+    native_end = middle[0] - dy / length * 0.00005, middle[1] + dx / length * 0.00005
+    f.finish_lines[1] = (*root, 0.0, *native_end, 0.0)
+
+    def mutate(spans, strokes, token):
+        for index, stroke in enumerate(strokes):
+            if (stroke.x0, stroke.y0, stroke.x1, stroke.y1) == (*root, *native_end):
+                strokes[index] = replace(stroke, x1=middle[0], y1=middle[1])
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "final settling rebuild")
+    with pytest.raises(RuntimeError, match="straight route crosses its own legs"):
+        _neck_proof(f, "after_pdf_save")
+
+
+def test_split_reversed_pdf_leader_preserves_the_one_actual_native_root(neck_dimension_fakes) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+    original = f.finish_lines[0]
+    f.finish_lines[0] = (*original[3:], *original[:3])
+
+    def mutate(spans, strokes, token):
+        for index, stroke in enumerate(strokes):
+            if (stroke.x0, stroke.y0, stroke.x1, stroke.y1) == (original[3], original[4], original[0], original[1]):
+                dx, dy = stroke.x1 - stroke.x0, stroke.y1 - stroke.y0
+                first = stroke.x0 + dx / 3.0, stroke.y0 + dy / 3.0
+                last = stroke.x0 + dx * 2.0 / 3.0, stroke.y0 + dy * 2.0 / 3.0
+                strokes[index:index + 1] = [
+                    replace(stroke, x1=first[0], y1=first[1]),
+                    replace(stroke, x0=first[0], y0=first[1], x1=last[0], y1=last[1]),
+                    replace(stroke, x0=last[0], y0=last[1]),
+                ]
+                break
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "after_pdf_save")
