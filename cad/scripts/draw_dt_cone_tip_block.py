@@ -228,6 +228,12 @@ SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
 # SLOT INTO BORE and no depth prints.  The spec keeps the mark so this
 # drawing-only fix re-keys neither the part nor the assemblies reading it.
 UNPRINTED_DIMENSIONS = frozenset({"SlitDepth"})
+# Every printed dimension must still arrive at its part-authored places.
+PRINTED_PRECISION = {
+    name: places
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in UNPRINTED_DIMENSIONS
+}
 # Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
@@ -1688,7 +1694,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, PRINTED_PRECISION)
 
     for view, label in (
         (front, "adjuster entry elevation"),

@@ -287,6 +287,12 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     assert drawing.UNPRINTED_DIMENSIONS == {"SlitDepth"}
     assert drawing.UNPRINTED_DIMENSIONS <= marked
     assert set(kept) == marked - drawing.UNPRINTED_DIMENSIONS
+    # The native precision check reads only what prints: an unprinted
+    # dimension never reaches the sheet (farm run 20261023T181434160Z).
+    assert set(drawing.PRINTED_PRECISION) == set(kept)
+    assert "assert_imported_precision(adapter, annotations, PRINTED_PRECISION)" in Path(
+        drawing.__file__
+    ).read_text(encoding="utf-8")
     assert set(drawing.TOP_KEEP) == {"Depth"}
     assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
 
