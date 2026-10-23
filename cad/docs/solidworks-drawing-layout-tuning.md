@@ -1758,17 +1758,24 @@ unparenthesized presentation, no suffix/callout prose and read-only
 `DRAWING_REFERENCE_PRECISION["OutboardNeckDia"] == NECK_DIA_PLACES`, so the
 same title-block general band governs both necks.
 
-Immediately before the native factory, capture the **full** imported SIDE
-inventory as native `IDimension` reference, `FullName`, finite numeric
-`SystemValue` and native I4 `DrivenState`. Zero values and state 0 are valid
-for other imported dimensions. After insertion rebuild, final settling
-rebuild, actual SLDDRW save and actual PDF save, reacquire the new display
-from FRONT by the captured native object's **live** `FullName` and
+Author the new neck only **after all preexisting native annotations**, including
+the SIDE cross-hole callout, surface finishes and property notes, immediately
+before finalization. Immediately before its native factory, capture the **full**
+preexisting SIDE inventory as native `IDimension` reference, `FullName`, finite
+numeric `SystemValue`, native I4 `DrivenState` and the actual annotation row.
+Zero values and state 0 are valid for other dimensions. After insertion rebuild,
+final settling rebuild, actual SLDDRW save and actual PDF save, reacquire the new
+display from FRONT by the captured native object's **live** `FullName` and
 bidirectional native identity. Require exactly one matching dimension and
-exactly every original imported dimension with unchanged value/state, no
-extras, using live names across SaveAs. Settling positions are not pinned.
-Continue proving the original right-hand neck's size, state, precision,
-empty quantity and general band at those boundaries.
+exactly every preexisting dimension with unchanged value/state, no extras, using
+live names across SaveAs. Do not ignore native callouts, filter unexpected IDs or
+relax the count. Settling positions are not pinned. Continue proving the original
+right-hand neck's size, state, precision, empty quantity and general band.
+
+Inventory refusals report expected/current native `FullName` rows and actual
+annotation `OwnerType`/owner-wrapper IDs. Wrapper IDs are diagnostic only, never
+native identity evidence. If a receipt getter fails, retain the original refusal
+with an explicit getter-failure note rather than inventing an owner or name.
 
 At each of those four normal proofs require drawing-view `OwnerType=0`
 and annotation owner FRONT in both native identity directions, exactly two
@@ -1791,17 +1798,20 @@ the neck's rectangular window does not prove either physical landing.
 This replaces the old circle-leader approach-direction assumption.
 
 The unchanged text-anchor candidate is below the neck at its axial midpoint.
-**Native qualification remains pending**: geometry census and SDK support
-do not prove that this actual factory yields 9.525 mm, that the new inverse
-face map succeeds, that the normal save checkpoints retain the association,
-or that the final ink is readable. The discarded type-6 circle factory
-already produced native 19.05 mm under projected mode and a type-mismatch
-under false-mode initialization; its resolver, factory and circle-only
-fixtures are not retained. Accept only exact-source native success and
-inspection of the whole exported sheet for both physical neck landings,
-readable arrows/text and clearance from collar, running-fit and finish
-leaders, followed by the required machinist review. Independent code review
-is not claimed. Preserve centre permission, dome/witness geometry,
+A prior native attempt created a type-2 linear 9.525 mm dimension in false mode
+and passed the insertion proof, including the two physical silhouette tips,
+driven state 1, one decimal place and no explicit tolerance. It then stopped at
+the final-settling full-inventory guard; the extra/missing native identity was
+not printed, so attribution to the later cross-hole callout remains inference.
+**Qualification of the corrected late-authoring order remains pending**,
+including the normal save checkpoints and whole-sheet arrow/text readability.
+The discarded type-6 circle factory produced native 19.05 mm under projected
+mode and a type-mismatch under false-mode initialization; its resolver, factory
+and circle-only fixtures are not retained. Accept only exact-source native
+success and inspection of the whole exported sheet for both physical neck
+landings, readable arrows/text and clearance from collar, running-fit and finish
+leaders, followed by the required machinist review. Independent code review is
+not claimed. Preserve centre permission, dome/witness geometry,
 tolerance limits, RV-02 and MATCH DRILL unchanged.
 
 

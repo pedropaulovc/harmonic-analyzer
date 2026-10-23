@@ -1105,49 +1105,82 @@ def _native_neck_view_dimensions(side: Any, *, label: str) -> list[tuple[Any, An
 
 
 def _neck_dimension_record(native: Any, *, label: str) -> tuple[Any, str, float, int]:
-    """Retain native identity and the complete imported scalar/state record."""
+    """Retain native identity and the complete preexisting scalar/state record."""
     name = native.FullName
     value = native.SystemValue
     state = native.DrivenState
     if not isinstance(name, str) or not name:
-        raise RuntimeError(f"{label}: imported native dimension has no FullName")
+        raise RuntimeError(f"{label}: preexisting native dimension has no FullName")
     if type(value) not in (int, float) or not math.isfinite(value):
-        raise RuntimeError(f"{label}: imported dimension {name!r} has invalid value {value!r}")
+        raise RuntimeError(f"{label}: preexisting dimension {name!r} has invalid value {value!r}")
     if type(state) is not int or not -2147483648 <= state <= 2147483647:
-        raise RuntimeError(f"{label}: imported dimension {name!r} has invalid driven state {state!r}")
+        raise RuntimeError(f"{label}: preexisting dimension {name!r} has invalid driven state {state!r}")
     return native, name, float(value), state
 
 
-def _assert_imported_neck_inventory(
-    adapter: Any, current: list[Any], imported: tuple[tuple[Any, str, float, int], ...],
-    *, label: str,
+def _assert_preexisting_neck_inventory(
+    adapter: Any, current: list[tuple[Any, Any, Any]],
+    preexisting: tuple[tuple[Any, str, float, int, Any], ...], *, label: str,
 ) -> None:
-    """Require every old dimension, and no extra dimension, without position guards."""
-    if len(current) != len(imported):
-        raise RuntimeError(f"{label}: imported dimension inventory missing/extra entries")
-    matched = set()
-    for reference, captured_name, value, state in imported:
-        # SaveAs may update the native reference's title component. Match its
-        # live FullName and native identity, not the captured spelling alone.
-        live_name = reference.FullName
-        if not isinstance(live_name, str) or not live_name:
-            raise RuntimeError(f"{label}: imported dimension {captured_name!r} lost its FullName")
-        matches = [
-            index for index, native in enumerate(current)
-            if native.FullName == live_name
-            and int(adapter.swApp.IsSame(native, reference)) == 1
-            and int(adapter.swApp.IsSame(reference, native)) == 1
-        ]
-        if len(matches) != 1 or matches[0] in matched:
-            raise RuntimeError(f"{label}: expected one preserved imported dimension {captured_name!r}")
-        index = matches[0]
-        matched.add(index)
-        _native, _name, actual_value, actual_state = _neck_dimension_record(current[index], label=label)
-        if actual_value != value or actual_state != state:
-            raise RuntimeError(
-                f"{label}: imported dimension {captured_name!r} changed value/state "
-                f"from {(value, state)!r} to {(actual_value, actual_state)!r}"
+    """Require every prior native dimension, including drawing-authored callouts."""
+    try:
+        if len(current) != len(preexisting):
+            raise RuntimeError(f"{label}: preexisting dimension inventory missing/extra entries")
+        matched = set()
+        for reference, captured_name, value, state, _annotation in preexisting:
+            # SaveAs may update the native reference's title component. Match
+            # its live FullName and native identity, never captured text alone.
+            live_name = reference.FullName
+            if not isinstance(live_name, str) or not live_name:
+                raise RuntimeError(f"{label}: preexisting dimension {captured_name!r} lost its FullName")
+            matches = [
+                index for index, (_owner, _display, native) in enumerate(current)
+                if native.FullName == live_name
+                and int(adapter.swApp.IsSame(native, reference)) == 1
+                and int(adapter.swApp.IsSame(reference, native)) == 1
+            ]
+            if len(matches) != 1 or matches[0] in matched:
+                raise RuntimeError(f"{label}: expected one preserved preexisting dimension {captured_name!r}")
+            index = matches[0]
+            matched.add(index)
+            _native, _name, actual_value, actual_state = _neck_dimension_record(
+                current[index][2], label=label,
             )
+            if actual_value != value or actual_state != state:
+                raise RuntimeError(
+                    f"{label}: preexisting dimension {captured_name!r} changed value/state "
+                    f"from {(value, state)!r} to {(actual_value, actual_state)!r}"
+                )
+    except Exception as original:
+        # Read diagnostic ownership only on refusal, from the actual captured
+        # and current annotation rows. Wrapper IDs are explicitly diagnostic,
+        # never a substitute for the native IsSame checks above.
+        def row(annotation: Any, native: Any) -> dict[str, Any]:
+            owner = annotation.Owner
+            return {
+                "FullName": native.FullName,
+                "native_wrapper_id": hex(id(native)),
+                "OwnerType": annotation.OwnerType,
+                "owner_wrapper_id": None if owner is None else hex(id(owner)),
+            }
+
+        try:
+            expected_rows = [
+                {"captured_FullName": name, **row(annotation, native)}
+                for native, name, _value, _state, annotation in preexisting
+            ]
+            current_rows = [
+                row(annotation, native) for annotation, _display, native in current
+            ]
+        except Exception as receipt_error:
+            original.add_note(
+                f"{label}: preexisting inventory receipt getter failed: "
+                f"{type(receipt_error).__name__}: {receipt_error}"
+            )
+            raise original from None
+        raise RuntimeError(
+            f"{original}; expected_native_rows={expected_rows!r}; current_native_rows={current_rows!r}"
+        ) from original
 
 
 def _assert_plain_neck_size(
@@ -1232,7 +1265,7 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
 
 def _assert_outboard_neck_dimension(
     adapter: Any, side: Any, identity: Any, right_driven_state: int,
-    imported: tuple[tuple[Any, str, float, int], ...], *, phase: str,
+    preexisting: tuple[tuple[Any, str, float, int, Any], ...], *, phase: str,
 ) -> None:
     """Reacquire the native linear size and both exact physical silhouettes."""
     label = f"collar-side neck ({phase})"
@@ -1250,7 +1283,7 @@ def _assert_outboard_neck_dimension(
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
     matches: list[tuple[Any, Any]] = []
     inboard: list[Any] = []
-    current_imported: list[Any] = []
+    current_preexisting: list[tuple[Any, Any, Any]] = []
     for annotation, display, native in _native_neck_view_dimensions(side, label=label):
         if dimension_name(adapter, annotation) == "NeckDiaDim":
             inboard.append(display)
@@ -1261,7 +1294,7 @@ def _assert_outboard_neck_dimension(
         ):
             matches.append((annotation, display))
         else:
-            current_imported.append(native)
+            current_preexisting.append((annotation, display, native))
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one native view dimension {full_name!r}")
     annotation, display = matches[0]
@@ -1282,7 +1315,7 @@ def _assert_outboard_neck_dimension(
         inboard[0], label=f"right-hand NeckDiaDim ({phase})",
         expected_driven_state=right_driven_state, linear=False,
     )
-    _assert_imported_neck_inventory(adapter, current_imported, imported, label=label)
+    _assert_preexisting_neck_inventory(adapter, current_preexisting, preexisting, label=label)
     source_face, entities = _outboard_neck_silhouettes(adapter, side)
     attached = tuple(annotation.GetAttachedEntities3() or ())
     count = annotation.GetAttachedEntityCount3()
@@ -1316,7 +1349,7 @@ def _assert_outboard_neck_dimension(
 
 def _add_outboard_neck_dimension(
     adapter: Any, drawing_model: Any, side: Any
-) -> tuple[Any, int, tuple[tuple[Any, str, float, int], ...]]:
+) -> tuple[Any, int, tuple[tuple[Any, str, float, int, Any], ...]]:
     """Add only a native driven measurement; never write a diameter value."""
     label = "collar-side neck"
     original = [
@@ -1351,12 +1384,12 @@ def _add_outboard_neck_dimension(
             adapter, side, picked, source_face, sign, label=f"{label} selection",
         )
         selected.append(picked)
-    # Capture every imported native dimension before the factory can change
+    # Capture every preexisting native dimension before the factory can change
     # anything. The shared helper then selects these exact two objects using
     # ISilhouetteEdge.Select2 + SelectData.View and checks the pair's count.
-    imported = tuple(
-        _neck_dimension_record(native, label=label)
-        for _annotation, _display, native in _native_neck_view_dimensions(side, label=label)
+    preexisting = tuple(
+        (*_neck_dimension_record(native, label=label), annotation)
+        for annotation, _display, native in _native_neck_view_dimensions(side, label=label)
     )
     display = add_edge_dimension(
         adapter, side, p0=(COLLAR_REAR_X, _sheet_y(-SHAFT_DIA / 2.0)),
@@ -1407,14 +1440,14 @@ def _add_outboard_neck_dimension(
     drawing_model.ClearSelection2(True)
     rebuild_drawing(adapter, label=label)
     _assert_outboard_neck_dimension(
-        adapter, side, dimension, right_driven_state, imported, phase="after insertion rebuild",
+        adapter, side, dimension, right_driven_state, preexisting, phase="after insertion rebuild",
     )
-    return dimension, right_driven_state, imported
+    return dimension, right_driven_state, preexisting
 
 
 def _outboard_neck_checkpoint(
     adapter: Any, side: Any, identity: Any, right_driven_state: int,
-    imported: tuple[tuple[Any, str, float, int], ...], phase: str,
+    preexisting: tuple[tuple[Any, str, float, int, Any], ...], phase: str,
 ) -> None:
     """Use the finalizer's existing save boundaries; never reopen the drawing."""
     if phase in (
@@ -1422,7 +1455,7 @@ def _outboard_neck_checkpoint(
         "after_pdf_save",
     ):
         _assert_outboard_neck_dimension(
-            adapter, side, identity, right_driven_state, imported, phase=phase
+            adapter, side, identity, right_driven_state, preexisting, phase=phase
         )
 
 
@@ -1680,10 +1713,6 @@ async def build(adapter: Any) -> dict[str, str]:
             continue
         set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
 
-    (
-        outboard_neck_dimension, right_neck_driven_state, imported_side_dimensions,
-    ) = _add_outboard_neck_dimension(adapter, drawing_model, side)
-
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
     # ASME centre mark, the side view marks the cross-hole circle.
@@ -1813,6 +1842,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # rule 9 (show internal shape in solid lines)): the punch mark is flagged by
     # its own leader, so no dashed cross-hole is needed to clock it.
 
+    (
+        outboard_neck_dimension, right_neck_driven_state, preexisting_side_dimensions,
+    ) = _add_outboard_neck_dimension(adapter, drawing_model, side)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -1822,12 +1855,12 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             lambda: _assert_outboard_neck_dimension(
                 adapter, side, outboard_neck_dimension, right_neck_driven_state,
-                imported_side_dimensions, phase="final settling rebuild",
+                preexisting_side_dimensions, phase="final settling rebuild",
             ),
         ),
         checkpoint=lambda phase: _outboard_neck_checkpoint(
             adapter, side, outboard_neck_dimension, right_neck_driven_state,
-            imported_side_dimensions, phase
+            preexisting_side_dimensions, phase
         ),
     )
 
