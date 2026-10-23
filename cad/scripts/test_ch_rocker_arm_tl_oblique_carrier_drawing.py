@@ -736,6 +736,55 @@ def _b9e4_crossing(a, b):
     )
 
 
+# The current REAM rows' native (width, baseline - annotation y), sheet m, read
+# from the layout audit of farm run
+# 20261023T221615220Z-ecf9bdf512a4457e989c2c7ec5d79601 (cde5928fa). Century
+# Gothic is proportional, so a character count cannot bound them; a text
+# change must be re-measured here before the b9e4 replay can cover it.
+_CURRENT_REAM_ROWS_M = {
+    "4X REAM THRU (0.000-0.024": (0.0600007, 0.0093649),
+    "DIAMETRAL CLEARANCE ON": (0.0632187, 0.0038087),
+    "MHA-CH-06-TL-23 PIVOT PIN)": (0.0633063, -0.0017476),
+    "AXES SQUARE TO UNDERSIDE:": (0.065241, -0.0073038),
+    "0.05 MAX LEAN IN 10.50 OF": (0.0601174, -0.0128601),
+    "LAND, ANY DIRECTION, SO PIN": (0.0677979, -0.0184163),
+    "CLEARS MHA-CH-06-TL-30 CAP": (0.0682451, -0.0239726),
+}
+
+
+def _b9e4_ream_row_envelope(raw, boxes):
+    """Widen b9e4's below-rows into one contiguous, block-wide envelope.
+
+    b9e4 printed the earlier eight below-rows; the current block has its own
+    row count and widths. Each recorded below-row box becomes as wide as the
+    widest recorded row, centred on the block, and reaches down to the next
+    row, so any current row no wider than that and within the recorded
+    vertical extent lies inside the replayed boxes.
+    """
+    from _layout_geometry import Box
+
+    rows = [run for run in raw["display"]["texts"][6:]]
+    width = max(run["w"] for run in rows)
+    centre = rows[0]["pos"][0] + rows[0]["w"] / 2.0
+    for run in rows:
+        assert math.isclose(run["pos"][0] + run["w"] / 2.0, centre, abs_tol=2e-7)
+    current = spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    assert list(_CURRENT_REAM_ROWS_M) == current
+    assert all(run["h"] == 0.0035 for run in rows)
+    assert max(w for w, _ in _CURRENT_REAM_ROWS_M.values()) <= width
+    baselines = [run["pos"][1] - raw["pos"][1] for run in rows]
+    assert all(
+        min(baselines) <= dy <= max(baselines) for _, dy in _CURRENT_REAM_ROWS_M.values()
+    )
+    below = sorted(boxes[2:], key=lambda box: -box.ymax)
+    assert len(below) == len(rows)
+    widened = []
+    for upper, lower in zip(below, [*below[1:], None]):
+        floor = upper.ymin if lower is None else lower.ymax
+        widened.append(Box(centre - width / 2.0, floor, centre + width / 2.0, upper.ymax))
+    return (*boxes[:2], *widened)
+
+
 def _conditional_b9e4_layout():
     """Translate observed glyphs; conditionally reroute, not native elbow proof.
 
@@ -756,6 +805,7 @@ def _conditional_b9e4_layout():
     raw = _b9e4_annotation(layout, "PinHoleDia")
     ream_xy = tuple(value / 1000.0 for value in _top_text("PinHoleDia"))
     moved = _b9e4_translated(ream, raw["pos"], ream_xy)
+    moved = replace(moved, text_boxes=_b9e4_ream_row_envelope(raw, moved.text_boxes))
     dx, dy = (ream_xy[i] - raw["pos"][i] for i in (0, 1))
     first, diameter, shoulder = raw["display"]["lines"]
     centre = tuple((diameter[4 + i] + diameter[7 + i]) / 2.0 for i in (0, 1))
@@ -855,15 +905,12 @@ def test_b9e4_complete_native_rows_record_the_actual_three_layout_defects() -> N
     raw = _b9e4_annotation(layout, "PinHoleDia")
     assert len(raw["display"]["texts"]) == 14
     assert len(ream.text_boxes) == 10  # +.015 row, diameter/.000, all eight below
-    # b9e4 printed the earlier nine-row REAM block. The plain squareness
-    # wording keeps its fit rows and has fewer, no wider rows, so the observed
-    # glyph block still bounds the current text for the layout replay below.
+    # b9e4 printed the earlier nine-row REAM block, whose fit rows the current
+    # block keeps; _b9e4_ream_row_envelope bounds the current rows for replay.
     recorded = [run["t"] for run in raw["display"]["texts"][6:]]
-    current = spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
     fit_rows = spec.PIN_HOLE_CALLOUT.splitlines()
-    assert recorded[: len(fit_rows)] == current[: len(fit_rows)] == fit_rows
-    assert len(current) <= len(recorded)
-    assert max(map(len, current)) <= max(map(len, recorded))
+    assert recorded[: len(fit_rows)] == fit_rows
+    assert spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()[: len(fit_rows)] == fit_rows
     assert not [item for item in layout.unmatched if "PinHoleDia" in item[0]]
     near_y = _b9e4_named(layout, "PlateNearY")
     assert "45.00" in near_y.label
@@ -956,11 +1003,34 @@ def test_conditional_b9e4_all_rows_and_routes_clear_every_native_neighbor() -> N
     # Also retain the full 1645-segment PDF vector census, including model
     # edges not present in the native display arrays, against every moved row.
     # These are OLD printed vectors, not evidence of future native regeneration.
+    # A moved annotation's own old ink (b9e4's REAM shoulder at y 111.10 lies
+    # inside the widened row envelope) leaves with it, so it is not an obstacle.
+    observed_by_label = {a.label: a for a in observed.annotations}
+
+    def _own(segment, own) -> bool:
+        ends = ((segment.x0, segment.y0), (segment.x1, segment.y1))
+        return any(
+            all(
+                math.dist(p, q) < 2e-6
+                for p, q in zip(ends, line_ends, strict=True)
+            )
+            for line in own
+            for line_ends in (
+                ((line.x0, line.y0), (line.x1, line.y1)),
+                ((line.x1, line.y1), (line.x0, line.y0)),
+            )
+        )
+
     for annotation in candidate.changes.values():
+        own = observed_by_label[annotation.label].segments
+        obstacles = [
+            segment for segment in candidate.observed.pdf_lines if not _own(segment, own)
+        ]
+        assert len(obstacles) >= len(candidate.observed.pdf_lines) - len(own)
         for box in annotation.text_boxes:
             assert all(
                 segment_box_overlap_length(segment, box) <= 0.00015
-                for segment in candidate.observed.pdf_lines
+                for segment in obstacles
             ), annotation.label
 
     crossings = []
