@@ -19,6 +19,7 @@ import ch_rocker_strap_spec as spec
 import draw_ch_rocker_strap as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
@@ -157,6 +158,23 @@ def test_drawing_quality_and_no_gdt() -> None:
     ]
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert drawing.ISO_SCALE == (1, 2)
+
+
+def test_overall_length_is_a_one_place_reference_and_enforced() -> None:
+    # ENFORCE r3: the 292.5 overall printed only as two 146.25 offsets (rule 10).
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
+    assert spec.DRAWING_REFERENCE_PRECISION == {"OverallLength": 1}
+    offsets = 2 * round(spec.ROD_TIP_X, notes.DRAWING_PRECISION_BY_NAME["RodTipX"])
+    overall = round(
+        2 * spec.ROD_TIP_X, spec.DRAWING_REFERENCE_PRECISION["OverallLength"]
+    )
+    # One place, so the reference agrees with the offsets' printed sum.
+    assert overall == pytest.approx(round(offsets, 1))
+    # Outermost: above the offsets' row.
+    assert drawing.OVERALL_LINE_Y > drawing.TIP_LINE_Y
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_reference_dimension(" in source
+    assert "assert_dimension_measures(" in source
 
 
 def test_registry_row() -> None:
