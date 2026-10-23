@@ -99,6 +99,24 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
 
 
+def test_blank_ends_are_drawn_phantom_and_carry_the_cut_length() -> None:
+    """ENFORCE review 2026-10-23: the 7.5 BLANK witnesses rose from empty
+    space past the installed outline. The blank's ends are construction
+    geometry in the shown reference sketch (phantom on the sheet), and the cut
+    length runs between their lower corners."""
+    build = _build_source()
+    assert "_as_construction(adapter, line)" in build
+    assert (
+        'f"{left_end}.end",\n        f"{right_end}.end",\n'
+        '        "horizontal_distance",\n        PIN_BLANK_LENGTH,'
+    ) in build
+    assert (
+        build.count('blank.record(f"BlankStub{side.title()}", \'"PinLen" / 2\')') == 1
+    )
+    assert 'blank.record("BlankEndDia", \'"PinDia"\')' in build
+    assert "PHANTOM" in notes.DRAWING_NOTES
+
+
 def test_precision_and_band_are_authored_on_the_part() -> None:
     assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 1}
     assert "draw_ch_bar_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
@@ -136,7 +154,7 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
     govern; the drill-rod stock explains the tight grind band. Each now rides
     its dimension; one note says what the views show."""
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."
+        "1. SOLID OUTLINE IS THE INSTALLED PIN; PHANTOM ENDS SHOW THE BLANK."
     ]
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
     assert notes.DIMENSION_CALLOUTS == {

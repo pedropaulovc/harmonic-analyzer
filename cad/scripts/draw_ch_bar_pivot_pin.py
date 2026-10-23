@@ -8,8 +8,9 @@ on the side view where a turned part's diameter sits beside its length
 with the drill rod's own grind band, its callout naming the stock and both
 mates; the installed length as REFERENCE (the bar's width; the MHA-CH-01
 stock owns it); and the blank's cut length with its band from the part's
-blanked ``BlankReference`` sketch. An axis centerline, a bare end view with
-its center mark, the isometric, and the one property-linked note. No datums,
+blanked ``BlankReference`` sketch, whose phantom ends beyond the installed
+outline carry its witnesses. An axis centerline, a bare end view with its
+one center mark, the isometric, and the one property-linked note. No datums,
 no frames, no roughness symbol.
 The decimal places and the band are the PART's
 (``ch_bar_pivot_pin_notes.DRAWING_PRECISION``, applied natively by
@@ -53,6 +54,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -64,6 +66,9 @@ from ch_bar_pivot_pin_notes import (
 )
 from ch_bar_pivot_pin_spec import PIN_DIA, PIN_INSTALLED_LENGTH
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_bar_pivot_pin"]
 PART_STEM = SPEC.artifact_stem
@@ -105,6 +110,14 @@ FRONT_KEEP = {
 # lines 3.25 mm beyond each pin end.
 ARROWS_INSIDE = ("PinLen",)
 _DIM_ARROWS_INSIDE = 0
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
 
 
 def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
@@ -194,8 +207,16 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"expected one pin {name} reference dimension")
         set_reference_dimension(adapter, matches[0], label=f"pin {name}")
     _set_arrows_inside(adapter, front_annotations)
-    if not auto_center_marks(adapter, right, holes=True, size=0.0025):
+    # The template may centre-mark the circle as the view is placed: farm run
+    # 20261023T185703445Z's layout audit found two identical marks on it
+    # (duplicate-annotation, fleet issue #913) after the explicit call.  Mark
+    # only a bare view, then prove the end carries exactly one.
+    if _center_mark_count(right) == 0 and not auto_center_marks(
+        adapter, right, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to the pin end view")
+    if (found := _center_mark_count(right)) != 1:
+        raise RuntimeError(f"pin end view carries {found} centre marks, not one")
     add_view_centerline(
         adapter,
         front,
