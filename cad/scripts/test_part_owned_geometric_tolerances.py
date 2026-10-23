@@ -405,9 +405,12 @@ def _require_import(
         ), "part controls need one import route, not unchecked alternate aliases"
         assert not any(
             isinstance(node, ast.ImportFrom) and node.module == module
-            and any(alias.name.startswith("_") for alias in node.names)
+            and any(
+                alias.name.startswith("_") or not alias.name.isupper()
+                for alias in node.names
+            )
             for node in nodes
-        ), "part module namespace cannot escape through private imports"
+        ), "drawings project public spec data, not its constructor/module namespace"
     assert not any(
         isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names)
         for node in nodes
@@ -419,7 +422,7 @@ def _require_import(
         parents = {child: parent for parent in nodes for child in ast.iter_child_nodes(parent)}
         assert all(
             isinstance(parents[node], ast.Attribute) and parents[node].value is node
-            and not parents[node].attr.startswith("_")
+            and not parents[node].attr.startswith("_") and parents[node].attr.isupper()
             for node in nodes if isinstance(node, ast.Name) and node.id == name
         ), f"{name}: module alias escapes the proven ownership chain"
 
@@ -449,8 +452,20 @@ def _require_part_control_projection(
 
     Each link must be a direct, dominating binding in its lexical scope:
     imported spec -> controls tuple -> range(len(controls)) -> controls[index].
-    Nested readback functions may have their own index/control locals.
+    Nested readback functions may have their own index/control locals. Only
+    public uppercase spec data may cross this boundary; constructors and their
+    mutable class namespaces remain spec-owned.
     """
+    assert not any(
+        (
+            isinstance(node, ast.Import)
+            and any(alias.name == "_gtol_controls" for alias in node.names)
+        ) or (
+            isinstance(node, ast.ImportFrom) and node.module == "_gtol_controls"
+            and any(alias.name == "GeometricControl" for alias in node.names)
+        )
+        for node in ast.walk(tree)
+    ), "GeometricControl constructors/type mutation belong to the part spec"
     tolerance = _keyword(call, "tolerance")
     assert (
         isinstance(tolerance, ast.Attribute) and tolerance.attr == "tolerance"
@@ -687,6 +702,10 @@ def test_typed_projection_allows_unrelated_spec_text_methods() -> None:
     ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec.__dict__.update(GEOMETRIC_CONTROLS=local_controls)"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport sample_spec as alternate\nalternate.GEOMETRIC_CONTROLS = local_controls"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom sample_spec import GEOMETRIC_CONTROLS as alternate"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nRow = part_spec.GeometricControl\nRow.tolerance = property(lambda _: '9.9')"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom sample_spec import GeometricControl as Row\nRow.tolerance = property(lambda _: '9.9')"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nfrom _gtol_controls import GeometricControl as Row\nRow.tolerance = property(lambda _: '9.9')"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport _gtol_controls as rows\nrows.GeometricControl.tolerance = property(lambda _: '9.9')"),
     ("control = controls[index]", "control = controls[index]\n        state = control.__dict__\n        state['tolerance'] = '9.9'"),
     (
         "    controls = part_spec.GEOMETRIC_CONTROLS",
