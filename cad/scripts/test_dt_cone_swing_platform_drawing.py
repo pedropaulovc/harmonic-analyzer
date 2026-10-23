@@ -1821,6 +1821,35 @@ def test_sections_turn_to_look_south_top_face_up(monkeypatch, defect) -> None:
             look()
 
 
+@pytest.mark.parametrize("defect", [None, "refused", "ignored"])
+def test_broad_face_finishes_take_the_any_process_symbol(monkeypatch, defect):
+    """Machinist review of 8c9acd48 (blocker, r2+r3): material-removal-
+    required symbols on both broad faces contradicted "1/4 PLATE AS
+    SUPPLIED" (U41).  The stock faces take the any-process symbol, read back."""
+    state = {"symbol": 1}
+
+    def set_symbol(kind, texture, all_around):
+        assert (texture, all_around) == (0, False)
+        if defect == "refused":
+            return False
+        if defect != "ignored":
+            state["symbol"] = kind
+        return True
+
+    symbol = types.SimpleNamespace(
+        SetSymbol=set_symbol, GetSymbol=lambda: state["symbol"]
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    if defect is None:
+        drawing._set_any_process_finish(object(), symbol, label="seat")
+        assert state["symbol"] == drawing.SF_ANY_PROCESS == 0
+    else:
+        message = "failed to set" if defect == "refused" else "did not persist"
+        with pytest.raises(RuntimeError, match=message):
+            drawing._set_any_process_finish(object(), symbol, label="seat")
+
+
 def _fake_pivot_section(monkeypatch, *, origin, ignored=False):
     state = {"origin": origin}
 

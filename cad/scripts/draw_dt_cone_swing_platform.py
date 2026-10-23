@@ -1375,6 +1375,27 @@ def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
     return pivot_edges[0], mount_edges[0]
 
 
+# swSFSymType_e.swSFBasic: the any-process symbol (open vee, no bar).
+SF_ANY_PROCESS = 0
+
+
+def _set_any_process_finish(adapter: Any, symbol: Any, *, label: str) -> None:
+    """Turn a broad-face finish into the any-process form.
+
+    Both broad faces stay as the cold-finished stock supplies them (U41: the
+    thickness is the stock's, "1/4 PLATE AS SUPPLIED"), so their roughness is
+    met by any process.  The material-removal-required form asked the shop
+    to cut faces whose thickness the same view keeps as supplied (machinist
+    review of 8c9acd48, confirmed r2+r3 blocker).
+    """
+    native = _early_bound(symbol, "ISFSymbol")
+    if not native.SetSymbol(SF_ANY_PROCESS, 0, False):
+        raise RuntimeError(f"failed to set the any-process finish symbol ({label})")
+    rebuild_drawing(adapter, label=f"{label} any-process symbol")
+    if int(native.GetSymbol()) != SF_ANY_PROCESS:
+        raise RuntimeError(f"any-process finish symbol did not persist ({label})")
+
+
 def _horizontal_section_edge(
     view: Any, y_mm: float, *, label: str, prefer_right: bool = False
 ) -> Any:
@@ -2223,7 +2244,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # corner, hole wall or outer edge: both on the left-hand piece, the
     # longest edge of each face.
     seat_edge = _horizontal_section_edge(section, 6.35, label="top seat")
-    add_surface_finish(
+    seat_symbol = add_surface_finish(
         adapter,
         section,
         symbol_xy=SEAT_FINISH_XY,
@@ -2234,7 +2255,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=_section_edge_midpoint(adapter, section, seat_edge, label="top seat"),
     )
     slide_edge = _horizontal_section_edge(section, 0.0, label="base slide")
-    add_surface_finish(
+    slide_symbol = add_surface_finish(
         adapter,
         section,
         symbol_xy=BASE_SLIDE_FINISH_XY,
@@ -2244,6 +2265,11 @@ async def build(adapter: Any) -> dict[str, str]:
         entity=slide_edge,
         leader_attach_xy=_section_edge_midpoint(adapter, section, slide_edge, label="base slide"),
     )
+    for symbol, label in (
+        (seat_symbol, "post and tip-block seat finish"),
+        (slide_symbol, "base sliding-face finish"),
+    ):
+        _set_any_process_finish(adapter, symbol, label=label)
 
     add_property_linked_note(adapter, "Profile View Note", 0.045, 0.085)
     add_property_linked_note(adapter, "Feature View Note", 0.150, 0.085)
