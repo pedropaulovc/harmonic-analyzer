@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextvars
 import io
 import json
 import os
@@ -239,6 +240,44 @@ def _views(reviewer: str, sheets_to_view: Sequence[int]) -> list[dict[str, Any]]
         event
         for sheet in sheets_to_view
         for event in _call_events(reviewer, "view_sheet", {"sheet": sheet}, f"view_{sheet}")
+    ]
+
+
+def _claude_provider_event() -> dict[str, Any]:
+    return {
+        "type": "assistant",
+        "message": {
+            "role": "assistant", "model": "claude-opus-5-5",
+            "content": [{"type": "text", "text": "first response"}],
+            "usage": {
+                "input_tokens": 0, "cache_creation_input_tokens": 27143,
+                "cache_read_input_tokens": 0, "output_tokens": 0,
+            },
+        },
+    }
+
+
+def _claude_nonresponses() -> list[Any]:
+    zero = _claude_provider_event()
+    zero["message"]["usage"]["cache_creation_input_tokens"] = 0
+    synthetic = _claude_provider_event()
+    synthetic["message"]["model"] = "<synthetic>"
+    api_error = _claude_provider_event()
+    api_error["isApiErrorMessage"] = True
+    api_error["error"] = "rate_limit"
+    malformed = _claude_provider_event()
+    malformed["message"]["usage"]["input_tokens"] = "12"
+    boolean = _claude_provider_event()
+    boolean["message"]["usage"]["cache_creation_input_tokens"] = True
+    reported_error = _claude_provider_event()
+    reported_error["is_error"] = True
+    return [
+        None, [], {"type": "assistant", "message": None},
+        {"type": "assistant", "message": {"model": "claude-opus-5-5"}},
+        {"type": "system", "subtype": "init"},
+        {"type": "control_response", "response": {"subtype": "success"}},
+        {"type": "result", "subtype": "success", "usage": {"input_tokens": 12}},
+        zero, synthetic, api_error, reported_error, malformed, boolean,
     ]
 
 
@@ -696,6 +735,23 @@ def respond(request, value, subtype="success"):
     }), flush=True)
 
 print("synthetic CLI startup diagnostic", flush=True)
+
+def emit(text):
+    data = text.encode("utf-8")
+    # Deliberately split JSON, multibyte text and CRLF across pipe writes.
+    for offset in range(0, len(data), 4093):
+        sys.stdout.buffer.write(data[offset:offset + 4093])
+        sys.stdout.buffer.flush()
+
+def wait_for(path):
+    if path is None:
+        return
+    deadline = time.monotonic() + 10
+    while not Path(path).exists():
+        if time.monotonic() >= deadline:
+            sys.exit("test stream gate timed out")
+        time.sleep(0.01)
+
 print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
 if mode == "eof":
     sys.exit(9)
@@ -739,6 +795,15 @@ for line in sys.stdin:
             sys.exit("review submitted before connection")
         if mode == "review_timeout":
             time.sleep(60)
+        if mode == "stream":
+            stream = json.loads(Path(reply_path).read_text(encoding="utf-8"))
+            emit(stream.get("before", ""))
+            Path("before-response").touch()
+            wait_for(stream.get("response_gate"))
+            emit(stream.get("response", ""))
+            wait_for(stream.get("finish_gate"))
+            emit(stream.get("after", ""))
+            sys.exit(stream.get("exit_code", 0))
         # Include a line larger than asyncio's default readline limit.
         print(json.dumps({"type": "diagnostic", "payload": "x" * 131072}), flush=True)
         print(Path(reply_path).read_text(encoding="utf-8"), flush=True)
@@ -757,7 +822,7 @@ for line in sys.stdin:
     def command(
         mode: str, reply: str, delay_s: float = 0.0, *, pending_polls: int = -1,
     ) -> list[str]:
-        reply_path = tmp_path / f"reply-{len(state.commands)}.jsonl"
+        reply_path = tmp_path / f"reply-{uuid.uuid4().hex}.jsonl"
         reply_path.write_text(reply, encoding="utf-8")
         argv = [
             sys.executable, str(script), mode, str(reply_path), str(delay_s),
@@ -770,6 +835,114 @@ for line in sys.stdin:
     monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
     return state
+
+
+def _wait_for_file(path: Path) -> None:
+    deadline = mr.time.monotonic() + 10
+    while not path.exists():
+        if mr.time.monotonic() >= deadline:
+            pytest.fail(f"subprocess did not reach {path.name}")
+        mr.time.sleep(0.01)
+
+
+def test_claude_first_response_stream_is_chunked_unlimited_once_only_and_not_completion(
+    tmp_path: Path, claude_transport: SimpleNamespace,
+) -> None:
+    response_gate = tmp_path / "allow-response"
+    finish_gate = tmp_path / "allow-finish"
+    # Large diagnostics and image-like assistant content exercise framing above
+    # asyncio's readline limit, with malformed JSON and CRLF mixed into the stream.
+    before = (
+        "not JSON\r\n{broken\r\n"
+        + "\r\n".join(json.dumps(event) for event in _claude_nonresponses())
+        + "\r\n" + json.dumps({"type": "diagnostic", "payload": "x" * 2097152})
+        + "\r\n"
+    )
+    response = _claude_provider_event()
+    response["message"]["content"][0]["text"] = "画像" * 350000
+    response_text = json.dumps(response, ensure_ascii=False) + "\r\n"
+    after = (
+        json.dumps(_claude_provider_event()) + "\r\n"
+        + _claude_stdout(1, _clean_verdict()) + "\r\n"
+    )
+    command = claude_transport.command("stream", json.dumps({
+        "before": before, "response": response_text, "after": after,
+        "response_gate": str(response_gate), "finish_gate": str(finish_gate),
+    }))
+    notified = threading.Event()
+    calls = []
+
+    def first_response() -> None:
+        calls.append("response")
+        notified.set()
+
+    with mr.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            mr._run_reviewer, command, reviewer="claude", input="synthetic prompt",
+            timeout=15, cwd=str(tmp_path), env=None, on_first_response=first_response,
+        )
+        try:
+            _wait_for_file(tmp_path / "before-response")
+            assert not notified.wait(0.1)
+            response_gate.touch()
+            assert notified.wait(10)
+            assert not future.done()  # Partial output usage is not review completion.
+        finally:
+            response_gate.touch()
+            finish_gate.touch()
+        completed = future.result()
+    assert calls == ["response"] and completed.returncode == 0
+    assert completed.stdout.endswith(before + response_text + after)
+    assert claude_transport.processes[0].returncode == 0
+
+
+@pytest.mark.parametrize("real_response", [False, True])
+def test_claude_first_response_handles_unterminated_eof_without_false_readiness(
+    tmp_path: Path, claude_transport: SimpleNamespace, real_response: bool,
+) -> None:
+    events = _claude_nonresponses()
+    if real_response:
+        events.append(_claude_provider_event())
+    payload = "\r\n".join(json.dumps(event) for event in events)
+    command = claude_transport.command("stream", json.dumps({"response": payload}))
+    calls = []
+    completed = mr._run_reviewer(
+        command, reviewer="claude", input="synthetic prompt", timeout=10,
+        cwd=str(tmp_path), env=None, on_first_response=lambda: calls.append("response"),
+    )
+    assert completed.returncode == 0
+    assert completed.stdout.endswith(payload)
+    assert calls == (["response"] if real_response else [])
+
+
+@pytest.mark.parametrize("respond_before_failure", [False, True])
+def test_claude_first_response_retries_without_duplicate_notifications(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, respond_before_failure: bool,
+) -> None:
+    first_events = [_claude_provider_event()] if respond_before_failure else _claude_nonresponses()
+    commands = [
+        claude_transport.command("stream", json.dumps({
+            "response": "\n".join(json.dumps(event) for event in first_events) + "\n",
+            "exit_code": 1,
+        })),
+        claude_transport.command("stream", json.dumps({
+            "response": json.dumps(_claude_provider_event()) + "\n",
+            "after": _claude_stdout(1, _clean_verdict()),
+        })),
+    ]
+    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
+    calls = []
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
+        retries=1, timeout_s=10, on_first_response=lambda: calls.append("response"),
+    )
+    assert review.passed and review.attempts == 2 and calls == ["response"]
+    assert [attempt["outcome"] for attempt in review.extra["evidence"]["attempts"]] == [
+        "failed", "succeeded",
+    ]
+    assert all(process.returncode is not None for process in claude_transport.processes)
 
 
 @pytest.fixture
@@ -3988,6 +4161,8 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
         else:
             snapshot = Path(_codex_overrides(command)["mcp_servers.sheets.args"][-1])
         seen.append((Path(kwargs["cwd"]), snapshot))
+        if reviewer == "claude" and snapshot.parents[1].name == "r1":
+            kwargs["on_first_response"]()
         barrier.wait()
         if snapshot.parents[1].name == "r1":
             source.write_bytes(b"replaced by a later build")
@@ -4022,6 +4197,275 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
     assert "sample.aggregate.md" in mr.write_index(directory).read_text(encoding="utf-8")
     assert aggregate["judge"]["model"] == review_config.DEFAULT_MODELS[reviewer]
     assert aggregate["judge"]["prompt_sha256"]
+
+
+@pytest.mark.parametrize("reviewer", mr.REVIEWERS)
+def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reviewer: str,
+) -> None:
+    source = _pdf_source(tmp_path / "sheet.pdf", [(144, 72)])
+    judge_reviewer = "codex" if reviewer == "claude" else "claude"
+    trace = contextvars.ContextVar("review-test-trace", default=None)
+    trace.set("aggregate-context")
+    leader_started = threading.Event()
+    allow_response = threading.Event()
+    response_sent = threading.Event()
+    follower_started = threading.Event()
+    leader_finished = threading.Event()
+    continuation = threading.Barrier(3, timeout=15)
+    seen = []
+    release_events = []
+    monkeypatch.setattr(
+        mr._telemetry, "event",
+        lambda name, **attributes: release_events.append((name, attributes)),
+    )
+
+    def reply(command: list[str], **kwargs: Any):
+        assert trace.get() == "aggregate-context"
+        findings = _judge_inputs(kwargs["input"])
+        if findings is not None:
+            assert leader_finished.is_set() and kwargs["on_first_response"] is None
+            return _session_reply(command, kwargs, {
+                "clusters": [_judge_cluster([finding["id"] for finding in findings])],
+            })
+        if reviewer == "claude":
+            config = json.loads(Path(_flag(command, "--mcp-config")).read_text())
+            snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
+            session_id = _flag(command, "--session-id")
+            assert "--resume" not in command
+        else:
+            snapshot = Path(_codex_overrides(command)["mcp_servers.sheets.args"][-1])
+            session_id = None
+            assert kwargs["on_first_response"] is None
+        run_id = snapshot.parents[1].name
+        seen.append((run_id, kwargs["cwd"], session_id, kwargs["input"]))
+        if run_id == "r1":
+            leader_started.set()
+            if reviewer == "claude":
+                assert allow_response.wait(15)
+                response_sent.set()
+                kwargs["on_first_response"]()
+        else:
+            if reviewer == "claude":
+                assert response_sent.is_set()
+            assert not leader_finished.is_set()
+            follower_started.set()
+        # All three must continue before r1 completes; serializing the full
+        # leader review cannot pass this barrier.
+        continuation.wait()
+        if run_id == "r1":
+            leader_finished.set()
+        return _session_reply(command, kwargs, _finding_verdict())
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    with mr.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            contextvars.copy_context().run, mr.aggregate_package,
+            mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+            judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+            retries=0, force=True, claude="claude-test", codex="codex-test",
+        )
+        try:
+            assert leader_started.wait(15)
+            if reviewer == "claude":
+                assert not follower_started.wait(0.1)
+            else:
+                assert follower_started.wait(15)
+        finally:
+            allow_response.set()
+        aggregate = future.result(timeout=30)
+    assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
+    assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
+    assert len(seen) == len({row[1] for row in seen}) == 3
+    assert len({row[3] for row in seen}) == 1  # Same rubric, no shared history.
+    if reviewer == "claude":
+        assert len({row[2] for row in seen}) == 3
+        assert all(uuid.UUID(row[2]).version == 4 for row in seen)
+        assert len(release_events) == 1
+        name, attributes = release_events[0]
+        assert name == "machinist_review.followers_released"
+        assert attributes["reason"] == "first_provider_response"
+        assert attributes["follower_count"] == 2 and attributes["wait_s"] >= 0
+    else:
+        assert release_events == []
+
+
+@pytest.mark.parametrize("judge_reviewer", mr.REVIEWERS)
+def test_aggregate_single_review_does_not_require_response_notification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, judge_reviewer: str,
+) -> None:
+    calls = []
+
+    def reply(command: list[str], **kwargs: Any):
+        assert kwargs["on_first_response"] is None
+        findings = _judge_inputs(kwargs["input"])
+        calls.append(findings)
+        value = _finding_verdict() if findings is None else {
+            "clusters": [_judge_cluster([finding["id"] for finding in findings])],
+        }
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        retries=0, force=True, claude="claude-test", codex="codex-test",
+    )
+    assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
+    assert len(calls) == 2 and calls[0] is None and calls[1] is not None
+
+
+@pytest.mark.parametrize("failure", ["retry", "provider", "exception"])
+def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    followers = threading.Event()
+    continuation = threading.Barrier(3 if failure == "retry" else 2, timeout=15)
+    attempts = []
+    release_events = []
+    monkeypatch.setattr(
+        mr._telemetry, "event",
+        lambda name, **attributes: release_events.append((name, attributes)),
+    )
+    real_review = mr.review_package
+
+    def review(package: mr.ReviewPackage, **kwargs: Any):
+        if failure == "exception" and kwargs["report_dir"].name == "r1":
+            raise RuntimeError("leader failed before transport")
+        return real_review(package, **kwargs)
+
+    def reply(command: list[str], **kwargs: Any):
+        findings = _judge_inputs(kwargs["input"])
+        if findings is not None:
+            return _session_reply(command, kwargs, {
+                "clusters": [_judge_cluster([finding["id"] for finding in findings])],
+            })
+        config = json.loads(Path(_flag(command, "--mcp-config")).read_text())
+        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
+        run_id = snapshot.parents[1].name
+        if run_id == "r1":
+            assert not followers.is_set()
+            attempts.append(kwargs["cwd"])
+            if failure == "provider" or len(attempts) == 1:
+                return mr.subprocess.CompletedProcess(
+                    command, 1, stdout="", stderr="provider unavailable",
+                )
+            kwargs["on_first_response"]()
+        else:
+            followers.set()
+            assert len(attempts) == (0 if failure == "exception" else 2)
+        continuation.wait()
+        return _session_reply(command, kwargs, _finding_verdict())
+
+    monkeypatch.setattr(mr, "review_package", review)
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+        retries=1, force=True, claude="claude-test",
+    )
+    assert followers.is_set() and aggregate["verdict"] == "FIX"
+    assert aggregate["gating_count"] == 1 and aggregate["error"] is None
+    assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
+    assert bool(aggregate["runs"][0]["error"]) is (failure != "retry")
+    assert all(not run["error"] for run in aggregate["runs"][1:])
+    assert len(attempts) == len(set(attempts)) == (0 if failure == "exception" else 2)
+    assert len(release_events) == 1
+    assert release_events[0][1]["reason"] == (
+        "first_provider_response" if failure == "retry" else "leader_terminal_without_response"
+    )
+
+
+def test_aggregate_claude_real_stream_releases_only_on_response_before_leader_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+) -> None:
+    source = _pdf_source(tmp_path / "sheet.pdf", [(144, 72)])
+    response_gate = tmp_path / "allow-response"
+    finish_gate = tmp_path / "allow-finish"
+    leader_started = threading.Event()
+    leader_cwd = []
+    followers = []
+    before = "\r\n".join(json.dumps(event) for event in _claude_nonresponses()) + "\r\n"
+
+    def command(**kwargs: Any) -> list[str]:
+        config = json.loads(kwargs["mcp_config"].read_text())
+        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
+        run_id = snapshot.parents[1].name
+        if run_id == "r1":
+            leader_cwd.append(kwargs["workdir"])
+            leader_started.set()
+            return claude_transport.command("stream", json.dumps({
+                "before": before, "response": json.dumps(_claude_provider_event()) + "\r\n",
+                "after": _claude_stdout(1, _clean_verdict()),
+                "response_gate": str(response_gate), "finish_gate": str(finish_gate),
+            }))
+        assert response_gate.exists()
+        assert claude_transport.processes[0].returncode is None
+        followers.append(run_id)
+        if len(followers) == 2:
+            finish_gate.touch()
+        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
+
+    monkeypatch.setattr(mr, "build_claude_command", command)
+    with mr.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            mr.aggregate_package, mr.ReviewPackage("sample", "part", (source,)),
+            report_dir=tmp_path / "reports", retries=0, timeout_s=15,
+            force=True, claude="fake",
+        )
+        try:
+            assert leader_started.wait(10)
+            _wait_for_file(leader_cwd[0] / "before-response")
+            mr.time.sleep(0.1)
+            assert followers == []
+            response_gate.touch()
+            aggregate = future.result(timeout=20)
+        finally:
+            response_gate.touch()
+            finish_gate.touch()
+    assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
+    assert set(followers) == {"r2", "r3"}
+    assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
+    assert all(not run["error"] for run in aggregate["runs"])
+    assert len(claude_transport.processes) == 3
+    assert all(process.returncode == 0 for process in claude_transport.processes)
+
+
+def test_aggregate_claude_leader_real_timeout_reaps_then_releases_followers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+) -> None:
+    source = _png_source(tmp_path / "sheet.png")
+    leader_process = None
+
+    def command(**kwargs: Any) -> list[str]:
+        nonlocal leader_process
+        config = json.loads(kwargs["mcp_config"].read_text())
+        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
+        run_id = snapshot.parents[1].name
+        if run_id == "r1":
+            argv = claude_transport.command("review_timeout", "")
+            leader_process = argv
+            return argv
+        assert leader_process is not None
+        # The timeout path must kill/drain/reap before terminal release.
+        assert claude_transport.processes[0].returncode is not None
+        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
+
+    monkeypatch.setattr(mr, "build_claude_command", command)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+        retries=0, timeout_s=2, force=True, claude="fake",
+    )
+    assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
+    assert "TimeoutExpired" in aggregate["runs"][0]["error"]
+    assert all(not run["error"] for run in aggregate["runs"][1:])
+    assert len(claude_transport.processes) == 3
+    assert all(process.returncode is not None for process in claude_transport.processes)
+    leader = json.loads(Path(aggregate["runs"][0]["report"]).read_text())
+    (attempt,) = leader["extra"]["evidence"]["attempts"]
+    assert attempt["outcome"] == "timed_out"
+    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
+    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
 
 
 @pytest.mark.parametrize(

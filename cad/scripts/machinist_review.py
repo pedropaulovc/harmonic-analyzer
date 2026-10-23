@@ -2003,8 +2003,6 @@ def _review_session(
     success_first_turn: dict[str, Any] = {}
     attempt_records: list[dict[str, Any]] = []
     attempts = 0
-    # Never retry a resumed turn: a failed turn may already have mutated this
-    # conversation. A fresh judge would lose the required precheck continuity.
     response_notified = False
 
     def notify_first_response() -> None:
@@ -2013,6 +2011,8 @@ def _review_session(
             response_notified = True
             on_first_response()
 
+    # Never retry a resumed turn: a failed turn may already have mutated this
+    # conversation. A fresh judge would lose the required precheck continuity.
     for attempt in range(1 if resume_id is not None else retries + 1):
         attempts = attempt + 1
         if resume_review is None:
