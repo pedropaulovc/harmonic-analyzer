@@ -1803,45 +1803,86 @@ by the tip tolerance. Log both actual head bounds and the minimum physical-X
 clearance in millimetres at all four proofs. Inside/outside arrow directions
 are both legitimate; no additional inward-Y requirement is imposed.
 
-The bounded presentation candidate requests the new native dimension at
-`(JOURNAL_START_X - 0.0005, 0.1949) m`, i.e. `(178.2, 194.9) mm`.
-Keep both actual dimension tips and their complete heads inside the physical
-neck X trim `[176.36, 178.70] mm`; the opposite physical flank tips are at
-Y=`170.475` and `189.525 mm`. Only the collar-rear finish symbol's Y changes
-to `0.1973 m`; retain X=`COLLAR_REAR_X + 0.0069`, the exact physical tip
-`(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2))`, its part-owned control and all
-other surface finishes, stations, values and model geometry.
+The bounded ordinary-dimension candidate requests the new native origin at
+`((COLLAR_REAR_X + JOURNAL_START_X) / 2, 0.1948) m`, i.e.
+`(177.53, 194.8) mm`. Keep both actual dimension tips and their complete
+heads inside the physical neck X trim `[176.36, 178.70] mm`; the opposite
+physical flank tips are at Y=`170.475` and `189.525 mm`. The rear finish
+symbol stays at X=`COLLAR_REAR_X + 0.0069`, Y=`0.1973 m`, with the exact
+physical tip `(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2))`, unchanged
+part-owned control, symbol type and roughness. All other finishes, stations,
+values, geometry, centre permission and dome witnesses remain unchanged.
+No `OffsetText`, dimension text-position setter or font-baseline calibration
+is involved.
 
 Capture `_collar_rear_rim(adapter, side)` once and retain the actual
 `ISFSymbol` returned by `add_surface_finish`, whose existing authoring helper
-qualifies the controlled face and exact edge attachment. At each of the four
-normal neck checkpoints, early-bind its live `GetAnnotation()` result and
-reuse `_assert_attached_to(..., entity_type="EDGE")` plus
-`_assert_leader_lands` with its unchanged **1 mm** default, not the stale
-5 mm helper-doc wording. Require native `GetSymbol() == 1` and
-`GetText(8)` to equal `dt_crankshaft_notes.COLLAR_REAR_FINISH_TEXT`, derived
-from the actual part control rather than authored in the presentation recipe,
-without a literal value override or setter. Record the phase, actual native edge-identity result,
-symbol type, roughness and all finite bent-leader points (physical tip last).
-The captured interfaces must survive actual SLDDRW/PDF SaveAs; no cold reopen,
-fallback identity strings, extra redraw/rebuild/save cycle or source-part write.
+qualifies the controlled face and exact edge attachment. This **one** finish
+is the local straight-leader exception: on its live early-bound `IAnnotation`,
+call `SetLeader3(1, 0, True, False, False, False)` and require actual integer
+status `0`, not a truthy/bool result. Do not change the shared factory's bent
+default or manipulate its root. A straight line from the old bent root can
+cross the symbol's own rising legs; refuse that crossing, rather than treating
+it as an attachment or tolerance waiver.
 
-**[INFERENCE]**, pending the new exact-source native export: predicted DD
-glyph bounds are `[179.47, 193.0]–[191.07, 196.6] mm`; its shelf at
-Y=`192.0951` clears the journal's `191.388` silhouette by `0.7071 mm`.
-The rear finish's flat at `197.3` clears the DD glyph top by `0.7 mm`;
-its middle bar at `202.9118` clears the collar shelf at `203.6951` by
-`0.7915 mm` endpoint distance. Conservative native finish-text advance to the
-JournalDiaDim vertical remains `0.6963 mm`, not the roof-only `1.0086 mm`.
-Predicted finish-head to new-DD-glyph separation is `2.15 mm` horizontally
-(`2.22 mm` Euclidean); the complete DD-head X extent
-`[177.819, 178.581] mm` leaves `0.119 mm` to the physical right boundary.
-These are predictions, **not** new thresholds, qualifications or a PASS:
-the full existing **2 mm ARROW_TEXT** rule applies everywhere. Exact-source
-native qualification and final PDF inspection of both actual arrowheads'
-legibility remain pending. Inspect the complete sheet for collar, Ra, fit-block
-and witness clearance while retaining every association/value/head/inventory
-and actual-save proof.
+At all four existing neck checkpoints, early-bind the retained symbol's live
+`GetAnnotation()` result and reuse `_assert_attached_to(..., entity_type="EDGE")`
+plus `_assert_leader_lands` with its unchanged **1 mm** default, not the stale
+5 mm helper-doc wording. Require native `GetSymbol() == 1` and `GetText(8)`
+equal to `dt_crankshaft_notes.COLLAR_REAR_FINISH_TEXT`, derived from the actual
+part control, without a literal value override. Require actual integer leader
+style `1`, exactly one leader and six finite straight-leader coordinates
+(physical tip last), with readable native line/text/head primitives. Preserve
+positive head dimensions, sheet-normal planes, actual rim identity and the
+exact specification through both saves. Log actual native points, identity,
+type, roughness, phase, route and full-head distances. The captured interfaces
+must survive SLDDRW/PDF SaveAs; no reopen, fallback identity strings, extra
+redraw/rebuild/save cycle or source-part write.
+
+The proof has two deliberately distinct stages:
+
+- **All four checkpoints:** require the ordinary three-line dimension route
+  and both complete, nonblank, positive-width native text **ADVANCES** on the
+  RIGHT of the actual dimension line, above the journal roof and within the
+  actual journal-dimension right wall. Native advances include trailing blank
+  space. Read raw doubles, not the rounded JSON audit dump; refuse side flips,
+  malformed counts/metrics, crossed preexisting routes, finish self-crossing
+  and full native head-to-advance gaps below the existing **2 mm** rule.
+  `GetTextPositionAtIndex + GetTextHeightAtIndex` is **not** printed glyph ink.
+- **After the existing successful PDF export:** read that one actual PDF with
+  `_pdf_ink`. Match the actual `9.5` and roughness glyphs to their native text
+  owners, and identify the Ø token as a unique complete closed vector ring
+  plus crossing slash in its actual native prefix slot. Missing, open,
+  ambiguous, extra or observably bay-clipped components refuse qualification.
+  The whole actual diameter glyph, including vector pen radius, must fit the RIGHT
+  placement bay whose top is `197.2 mm`; this is a placement boundary, **not**
+  a relaxed clearance threshold. Require complete painted heads (including
+  triangle interiors and actual pen radii) at least **2 mm** from every actual
+  numeric glyph and Ø stroke, not a union-box white corner. Also prove the
+  actual straight route, symbol legs and relevant dimension intersections.
+  Only solid painted paths can own those native primitives; unrelated
+  unpainted clip paths and dashed centre lines are not annotation ink.
+  This is semantic ownership of the reader-observed ring/slash, not forensic
+  font identity or arbitrary PDF clip-path detection; final whole-paper
+  legibility inspection remains necessary.
+  The finalizer's existing after-PDF callback propagates refusal before
+  downstream precision qualification, metadata/rendering and publication,
+  even if the exported PDF file already exists. No extra export is performed.
+
+**[INFERENCE]**, pending the exact-source export: the ordinary shelf at
+Y=`191.9951` clears the journal roof `191.388` by only `0.6071 mm`.
+The finish's middle bar at `202.9118` and the collar shelf at `203.6951`
+retain the tight `0.7915 mm` endpoint gap. Conservative native finish-text
+advance to the JournalDiaDim vertical remains `0.6963 mm`, not the roof-only
+`1.0086 mm`. Static inspection of the preceding LEFT-layout PDF found that
+the actual Ø slash is taller than the numeric glyphs; numeric-only
+`193..196.6 mm` bounds do not enclose the complete token. The straight
+route-to-slash paint gap is predicted to be only approximately `0.51 mm`,
+not a broad empty strip; the 2 mm ARROW_TEXT rule applies to the complete
+head, not every leader segment.
+None of these measurements or predictions is a new threshold or a PASS.
+Exact-source native/PDF qualification, both heads' final legibility, whole-paper
+inspection and machinist review remain mandatory.
 The discarded type-6 circle factory produced native 19.05 mm under projected
 mode and a type-mismatch under false-mode initialization; its resolver, factory
 and circle-only fixtures are not retained. Accept only exact-source native

@@ -23,6 +23,8 @@ import draw_dt_crankshaft as drawing
 import _drawing_attachment as attachment_helpers
 import _drawing_edge_dimensions as edge_dimensions
 import _drawing_selection as selection_helpers
+import _drawing_common as drawing_common
+from _pdf_ink import Glyph, PageInk, Span, Stroke
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
@@ -471,8 +473,9 @@ def test_each_bare_neck_has_its_own_native_loose_diameter() -> None:
     assert spec.NECK_DIA_PLACES == 1
     neck_x, neck_y = drawing.OUTBOARD_NECK_DIAMETER_XY
     assert drawing.COLLAR_REAR_X < neck_x < drawing.JOURNAL_START_X
-    assert neck_x == pytest.approx(drawing.JOURNAL_START_X - 0.0005)
-    assert neck_y == pytest.approx(0.1949)
+    assert neck_x == pytest.approx((drawing.COLLAR_REAR_X + drawing.JOURNAL_START_X) / 2.0)
+    assert neck_x == pytest.approx(0.17753)
+    assert neck_y == pytest.approx(0.1948)
     assert drawing._sheet_y(spec.JOURNAL_DIA / 2.0) < neck_y
     assert neck_y < drawing._sheet_y(spec.COLLAR_DIA / 2.0)
     finish_pick, finish_symbol = drawing.COLLAR_REAR_FINISH
@@ -1083,6 +1086,68 @@ def _neck_silhouette(side, face, sign):
     )
 
 
+def _native_presentation_data(lines, texts=(), arrows=()):
+    """SDK-shaped mutable raw doubles, not a precomputed proof result."""
+    return SimpleNamespace(
+        GetLineCount=Mock(side_effect=lambda: len(lines)),
+        GetLineAtIndex3=Mock(side_effect=lambda index: (0, 0, 0, 0, *lines[index])),
+        GetTextCount=Mock(side_effect=lambda: len(texts)),
+        GetTextAtIndex=Mock(side_effect=lambda index: texts[index]["text"]),
+        GetTextPositionAtIndex=Mock(side_effect=lambda index: texts[index]["position"]),
+        GetTextHeightAtIndex=Mock(side_effect=lambda index: texts[index]["height"]),
+        GetTextInBoxWidthAtIndex=Mock(side_effect=lambda index: texts[index]["width"]),
+        GetTextAngleAtIndex=Mock(side_effect=lambda index: texts[index].get("angle", 0.0)),
+        GetTextRefPositionAtIndex=Mock(side_effect=lambda index: texts[index].get("reference", 1)),
+        GetArrowHeadCount=Mock(return_value=len(arrows)),
+        GetArrowHeadAtIndex2=Mock(side_effect=lambda index: arrows[index]),
+    )
+
+
+def _neck_presentation_pdf(
+    neck_lines, neck_arrows, texts, foreign_lines, station_lines,
+    finish_lines, finish_arrows, finish_texts, options,
+):
+    """A full raw PageInk with separately attributable glyphs, paths and heads."""
+    spans = []
+    for row, baseline, height in ((texts[2], 0.1930, 0.0035), (finish_texts[0], 0.2015, 0.002)):
+        chars = row["text"].replace(" ", "")
+        left = row["position"][0] + 0.0001
+        width = (row["width"] - 0.0015) / len(chars)
+        glyphs = tuple(
+            Glyph(char, left + index * width, baseline, left + (index + 1) * width - 0.0001, baseline + height)
+            for index, char in enumerate(chars)
+        )
+        spans.append(Span(chars, glyphs[0].xmin, baseline, glyphs[-1].xmax, baseline + height, glyphs))
+    native_lines = [
+        drawing.Segment(raw[0], raw[1], raw[3], raw[4])
+        for raw in (*neck_lines, *foreign_lines, *station_lines, *finish_lines)
+    ]
+    native_lines.extend(
+        segment for raw in (*neck_arrows, *finish_arrows) for segment in drawing.arrowhead_segments(raw)
+    )
+    strokes = [
+        Stroke(line.x0, line.y0, line.x1, line.y1, 0.00013, (0, 0, 0), False, False, True)
+        for line in native_lines
+    ]
+    center = texts[1]["position"][0] + texts[1]["width"] / 2.0
+    points = tuple(
+        (center + 0.0015 * math.cos(index * math.tau / 12),
+         0.1948 + 0.0015 * math.sin(index * math.tau / 12))
+        for index in range(12)
+    )
+    token = [
+        Stroke(*first, *second, 0.00013, (0, 0, 0), False, False, True)
+        for first, second in zip(points, (*points[1:], points[0]))
+    ]
+    token.append(Stroke(center - 0.0009, 0.19265, center + 0.0009, 0.1970, 0.00013,
+                        (0, 0, 0), False, False, True))
+    if hasattr(options, "mutate"):
+        options.mutate(spans, strokes, token)
+    strokes.extend(token)
+    return PageInk(0.4318, 0.2794, tuple(glyph for span in spans for glyph in span.glyphs),
+                   tuple(spans), tuple(strokes))
+
+
 @pytest.fixture
 def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Exercise the real selection, two-entity factory and shared attachment helper."""
@@ -1130,10 +1195,19 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
          0.0, float(sign), 0.0, 0.0035, 0.00075, 1.0, 0.0, 0.0, 1.0)
         for sign in (-1, 1)
     ]
-    arrow_data = SimpleNamespace(
-        GetArrowHeadCount=Mock(return_value=2),
-        GetArrowHeadAtIndex2=Mock(side_effect=lambda index: arrow_rows[index]),
-    )
+    shelf_y = 0.1919951
+    neck_lines = [
+        (x, shelf_y, 0.0, x + 0.0143298, shelf_y, 0.0),
+        (x, shelf_y, 0.0, x, drawing._sheet_y(spec.SHAFT_DIA / 2.0), 0.0),
+        (x, drawing._sheet_y(-spec.SHAFT_DIA / 2.0), 0.0,
+         x, drawing._sheet_y(spec.SHAFT_DIA / 2.0), 0.0),
+    ]
+    native_texts = [
+        {"text": " ", "position": (x, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0012931},
+        {"text": "<MOD-DIAM>", "position": (x + 0.0012931, shelf_y, 0.0), "height": 0.0035, "width": 0.0052784},
+        {"text": "9.5 ", "position": (x + 0.0065715, shelf_y + 0.0000535, 0.0), "height": 0.0035, "width": 0.0077583},
+    ]
+    arrow_data = _native_presentation_data(neck_lines, native_texts, arrow_rows)
     display = SimpleNamespace(
         Type2=12, ShowParenthesis=True, ShowDimensionValue=True,
         GetDimension2=Mock(return_value=native), SetPrecision3=Mock(return_value=0),
@@ -1161,6 +1235,11 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetPrimaryPrecision2=Mock(return_value=spec.NECK_DIA_PLACES),
         GetOverride=Mock(return_value=False), GetText=Mock(side_effect=lambda part: right_texts[part]),
     )
+    foreign_lines = [
+        (0.1988, 0.2139181, 0.0, 0.1988, 0.191388, 0.0),
+        (0.1797, 0.191388, 0.0, 0.1998, 0.191388, 0.0),
+    ]
+    right_display.GetDisplayData = Mock(return_value=_native_presentation_data(foreign_lines))
     right_annotation = SimpleNamespace(
         name="NeckDiaDim", OwnerType=0, Owner=side, GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=right_display),
@@ -1169,6 +1248,8 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         SystemValue=0.0, DrivenState=0, FullName="Depth@Stations@dt-crankshaft",
     )
     station_display = SimpleNamespace(GetDimension2=Mock(return_value=station_native))
+    station_lines = [(0.17636, 0.179, 0.0, 0.17636, 0.1107219, 0.0)]
+    station_display.GetDisplayData = Mock(return_value=_native_presentation_data(station_lines))
     station_annotation = SimpleNamespace(
         name="Depth", OwnerType=0, Owner=side, GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=station_display),
@@ -1231,12 +1312,28 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetAttachedEntityCount3=Mock(return_value=1),
         GetAttachedEntityTypes=Mock(return_value=(1,)),
         GetLeaderCount=Mock(return_value=1), IsDangling=Mock(return_value=False),
+        GetLeaderStyle=Mock(return_value=1), SetLeader3=Mock(return_value=0),
         GetLeaderPointsAtIndex=Mock(return_value=(
-            *drawing.COLLAR_REAR_FINISH[1], 0.0,
-            drawing.COLLAR_REAR_X + 0.002, drawing.COLLAR_REAR_FINISH[1][1], 0.0,
-            *drawing.COLLAR_REAR_FINISH[0], 0.0,
+            *drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0,
         )),
     )
+    finish_lines = [
+        (*drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0),
+        (0.18326, 0.1973, 0.0, 0.181095, 0.20105, 0.0),
+        (0.185425, 0.20105, 0.0, 0.181095, 0.20105, 0.0),
+        (0.18326, 0.1973, 0.0, 0.1874735, 0.2044425, 0.0),
+        (0.1847905, 0.2029118, 0.0, 0.1817295, 0.2029118, 0.0),
+        (0.1874735, 0.2044425, 0.0, 0.1977225, 0.2044425, 0.0),
+    ]
+    finish_native_texts = [{
+        "text": notes.COLLAR_REAR_FINISH_TEXT, "position": (0.18826, 0.2008713, 0.0),
+        "height": 0.0025, "width": 0.0098437,
+    }]
+    finish_arrows = [
+        (*drawing.COLLAR_REAR_FINISH[0], 0.0, 0.0069, -0.0033, 0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0),
+    ]
+    finish_data = _native_presentation_data(finish_lines, finish_native_texts, finish_arrows)
+    collar_annotation.GetDisplayData = Mock(return_value=finish_data)
     collar_texts = {
         8: f"Ra {drawing.surface_finish_by_key(spec.SURFACE_FINISHES, 'collar_rear_face').roughness_ra}",
     }
@@ -1245,6 +1342,11 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetText=Mock(side_effect=lambda part: collar_texts[part]),
         GetAnnotation=Mock(return_value=collar_annotation),
     )
+    pdf = SimpleNamespace()
+    monkeypatch.setattr(drawing, "read_pdf_ink", Mock(side_effect=lambda path: [
+        _neck_presentation_pdf(neck_lines, arrow_rows, native_texts, foreign_lines, station_lines,
+                               finish_lines, finish_arrows, finish_native_texts, pdf),
+    ]))
     return SimpleNamespace(
         adapter=adapter, model=model, side=side, component=component, source=source, body=body,
         source_face=source_face, view_face=view_face, canonical_face=canonical_face,
@@ -1258,6 +1360,9 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
         collar_rim=collar_rim, collar_symbol=collar_symbol,
         collar_annotation=collar_annotation, collar_texts=collar_texts,
+        neck_lines=neck_lines, native_texts=native_texts, foreign_lines=foreign_lines,
+        station_lines=station_lines, finish_lines=finish_lines, finish_arrows=finish_arrows,
+        finish_data=finish_data, finish_native_texts=finish_native_texts, pdf=pdf,
         preexisting=(
             (right_native, right_native.FullName, spec.SHAFT_DIA / 1000.0, 2, right_annotation),
             (station_native, station_native.FullName, 0.0, 0, station_annotation),
@@ -2079,12 +2184,9 @@ def test_neck_checkpoint_uses_only_existing_rebuild_and_post_save_boundaries(
     neck_dimension_fakes, monkeypatch, phase,
 ) -> None:
     f = neck_dimension_fakes
-    verify = Mock()
+    verify = Mock(wraps=drawing._assert_outboard_neck_dimension)
     monkeypatch.setattr(drawing, "_assert_outboard_neck_dimension", verify)
-    drawing._outboard_neck_checkpoint(
-        f.adapter, f.side, f.native, 2, f.preexisting,
-        f.collar_rim, f.collar_symbol, phase,
-    )
+    _neck_proof(f, phase)
     verify.assert_called_once_with(f.adapter, f.side, f.native, 2, f.preexisting, phase=phase)
     f.collar_symbol.GetAnnotation.assert_called_once_with()
     f.collar_annotation.GetLeaderPointsAtIndex.assert_called_with(0)
@@ -2095,7 +2197,7 @@ def test_neck_checkpoint_uses_only_existing_rebuild_and_post_save_boundaries(
         )
     verify.assert_called_once()
     f.collar_symbol.GetAnnotation.assert_called_once()
-    f.model.GraphicsRedraw2.assert_not_called()
+    f.model.GraphicsRedraw2.assert_called_once_with()
     f.rebuild.assert_not_called()
 
 
@@ -2340,9 +2442,9 @@ def test_collar_rear_finish_records_actual_native_spec_identity_and_last_point_t
     f = neck_dimension_fakes
     assert f.collar_texts[8] == notes.COLLAR_REAR_FINISH_TEXT
     points = list(f.collar_annotation.GetLeaderPointsAtIndex.return_value)
-    points[0] += 0.005  # text origin is not the physical tip
-    points[-3] += 0.00061  # existing helper's legitimate same-edge re-solve
+    points[2] = 0.0103  # actual root Z is not the physical tip, which remains last
     f.collar_annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+    f.finish_lines[0] = tuple(points)
     telemetry = Mock()
     monkeypatch.setattr(drawing._telemetry, "info", telemetry)
     _neck_proof(f, phase)
@@ -2362,8 +2464,8 @@ def test_collar_rear_finish_records_actual_native_spec_identity_and_last_point_t
 
 
 @pytest.mark.parametrize(
-    "failure", [None, "unexpected-dimension", *_NECK_PHASES],
-    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension", *_NECK_PHASES],
+    "failure", [None, "unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", *_NECK_PHASES],
+    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", *_NECK_PHASES],
 )
 def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
     neck_dimension_fakes, monkeypatch: pytest.MonkeyPatch, failure: str | None,
@@ -2372,6 +2474,10 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
     f = neck_dimension_fakes
     events = []
     live_annotations = []
+    if failure in ("bool-status", "float-status", "negative-status", "null-status"):
+        f.collar_annotation.SetLeader3.return_value = {
+            "bool-status": False, "float-status": 0.0, "negative-status": -1, "null-status": None,
+        }[failure]
 
     def drift_finish(phase):
         if failure == phase:
@@ -2384,7 +2490,10 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
     callout_native = SimpleNamespace(
         FullName="NativeCrossHole@FRONT@Drawing1", SystemValue=0.003, DrivenState=1,
     )
-    callout_display = SimpleNamespace(GetDimension2=Mock(return_value=callout_native))
+    callout_display = SimpleNamespace(
+        GetDimension2=Mock(return_value=callout_native),
+        GetDisplayData=Mock(return_value=_native_presentation_data(f.station_lines)),
+    )
     callout_annotation = SimpleNamespace(
         name="NativeCrossHole", OwnerType=0, Owner=f.side, GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=callout_display),
@@ -2501,6 +2610,12 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         return {"status": "fixture-finalized"}
 
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
+    if failure in ("bool-status", "float-status", "negative-status", "null-status"):
+        with pytest.raises(RuntimeError, match="SetLeader3 failed"):
+            asyncio.run(drawing.build(f.adapter))
+        f.model.AddVerticalDimension2.assert_not_called()
+        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
+        return
     if failure == "unexpected-dimension":
         with pytest.raises(RuntimeError, match="preexisting dimension inventory missing/extra") as exc:
             asyncio.run(drawing.build(f.adapter))
@@ -2521,7 +2636,8 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         assert asyncio.run(drawing.build(f.adapter)) == {"status": "fixture-finalized"}
         assert f.model.GraphicsRedraw2.call_count == 4
         rim_resolver.assert_called_once_with(f.adapter, f.side)
-        assert f.collar_symbol.GetAnnotation.call_count == 4
+        assert f.collar_symbol.GetAnnotation.call_count == 5
+        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
         f.collar_symbol.GetSymbol.assert_has_calls([call()] * 4)
         f.collar_symbol.GetText.assert_has_calls([call(8)] * 4)
         assert events.index("finish:collar_rear_face") < events.index("neck-factory")
@@ -2648,3 +2764,318 @@ def test_neck_geometry_refuses_incomplete_or_non_native_arrays(neck_dimension_fa
     with pytest.raises(RuntimeError, match="malformed native geometry"):
         _neck_proof(f, phase)
     f.model.AddVerticalDimension2.assert_not_called()
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("failure", [
+    "left-shelf", "left-text", "bad-line-count", "extra-line", "null-display",
+    "bad-text-count", "no-text", "null-text", "zero-width", "negative-width", "nan-width",
+    "bool-height", "rotated-text", "bool-reference", "wrong-value", "foreign-route",
+])
+def test_native_right_advance_and_ordinary_route_refuse_actual_bad_buffers(
+    neck_dimension_fakes, phase, failure,
+) -> None:
+    f = neck_dimension_fakes
+    if failure == "left-shelf":
+        row = list(f.neck_lines[0])
+        row[0] -= 0.014
+        f.neck_lines[0] = tuple(row)
+    elif failure == "left-text":
+        row = f.native_texts[1]
+        row["position"] = (drawing.OUTBOARD_NECK_DIAMETER_XY[0] - 0.001, *row["position"][1:])
+    elif failure == "bad-line-count":
+        f.arrow_data.GetLineCount.side_effect = None
+        f.arrow_data.GetLineCount.return_value = True
+    elif failure == "extra-line":
+        f.neck_lines.append((0.18, 0.18, 0.0, 0.181, 0.181, 0.0))
+    elif failure == "null-display":
+        f.display.GetDisplayData.return_value = None
+    elif failure in ("bad-text-count", "no-text"):
+        f.arrow_data.GetTextCount.side_effect = None
+        f.arrow_data.GetTextCount.return_value = True if failure == "bad-text-count" else 0
+    elif failure == "null-text":
+        f.native_texts[1]["text"] = None
+    elif failure in ("zero-width", "negative-width", "nan-width"):
+        f.native_texts[1]["width"] = {"zero-width": 0.0, "negative-width": -0.001, "nan-width": float("nan")}[failure]
+    elif failure == "bool-height":
+        f.native_texts[1]["height"] = True
+    elif failure == "rotated-text":
+        f.native_texts[1]["angle"] = 0.01
+    elif failure == "bool-reference":
+        f.native_texts[1]["reference"] = True
+    elif failure == "wrong-value":
+        f.native_texts[2]["text"] = "9.6 "
+    else:
+        f.foreign_lines.append((0.19, 0.191, 0.0, 0.19, 0.196, 0.0))
+    with pytest.raises(RuntimeError):
+        _neck_proof(f, phase)
+    f.rebuild.assert_not_called()
+    assert f.model.GraphicsRedraw2.call_count == 1
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+@pytest.mark.parametrize("failure", [
+    "bent", "bool-style", "bool-count", "nine-points", "bool-point", "null-display",
+    "no-lines", "extra-line", "malformed-line", "extra-arrow", "bad-head-width", "bad-head-height",
+    "bad-head-direction", "bad-head-normal", "bad-head-tip", "old-bent-root-self-cross",
+])
+def test_straight_finish_requires_typed_actual_native_route_and_complete_head(
+    neck_dimension_fakes, phase, failure,
+) -> None:
+    f = neck_dimension_fakes
+    if failure in ("bent", "bool-style"):
+        f.collar_annotation.GetLeaderStyle.return_value = 0 if failure == "bent" else True
+    elif failure == "bool-count":
+        f.collar_annotation.GetLeaderCount.return_value = True
+    elif failure in ("nine-points", "bool-point"):
+        points = list(f.collar_annotation.GetLeaderPointsAtIndex.return_value)
+        if failure == "nine-points":
+            points[3:3] = [0.18, 0.1973, 0.0]
+        else:
+            points[2] = False
+        f.collar_annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+    elif failure == "null-display":
+        f.collar_annotation.GetDisplayData.return_value = None
+    elif failure == "no-lines":
+        f.finish_lines.clear()
+    elif failure == "extra-line":
+        f.finish_lines.append((0.18326, 0.1973, 0.0, 0.184, 0.199, 0.0))
+    elif failure == "malformed-line":
+        f.finish_lines[0] = f.finish_lines[0][:-1]
+    elif failure == "extra-arrow":
+        f.finish_arrows.append(f.finish_arrows[0])
+        f.finish_data.GetArrowHeadCount.return_value = 2
+    elif failure.startswith("bad-head-"):
+        row = list(f.finish_arrows[0])
+        index, value = {
+            "bad-head-width": (6, 0.0), "bad-head-height": (7, -0.001),
+            "bad-head-direction": (5, 0.01), "bad-head-normal": (11, 0.0),
+            "bad-head-tip": (0, row[0] + 0.0001),
+        }[failure]
+        row[index] = value
+        f.finish_arrows[0] = tuple(row)
+    else:
+        points = list(f.collar_annotation.GetLeaderPointsAtIndex.return_value)
+        points[0] += 0.00125
+        f.collar_annotation.GetLeaderPointsAtIndex.return_value = tuple(points)
+        f.finish_lines[0] = tuple(points)
+    with pytest.raises(RuntimeError):
+        _neck_proof(f, phase)
+    f.rebuild.assert_not_called()
+    assert f.model.GraphicsRedraw2.call_count == 1
+
+
+def test_native_proofs_do_not_claim_glyphs_or_read_pdf_before_existing_export(
+    neck_dimension_fakes, monkeypatch,
+) -> None:
+    f = neck_dimension_fakes
+    telemetry = Mock()
+    monkeypatch.setattr(drawing._telemetry, "info", telemetry)
+    for phase in _NECK_PHASES[:-1]:
+        _neck_proof(f, phase)
+    drawing.read_pdf_ink.assert_not_called()
+    assert sum("native_ADVANCE_only_m=" in item.args[0] for item in telemetry.call_args_list) == 6
+    _neck_proof(f, "after_pdf_save")
+    drawing.read_pdf_ink.assert_called_once_with(drawing.OUTPUTS.pdf)
+    assert any("actual_PDF_diameter_paths_m=" in item.args[0] for item in telemetry.call_args_list)
+
+
+@pytest.mark.parametrize("failure", [
+    "missing-numeric", "wrong-numeric-owner", "missing-ring-edge", "missing-slash", "extra-path",
+    "bay-clipped-slash", "negative-pen", "nan-pen", "missing-sf-head", "glyph-inside-head",
+])
+def test_actual_pdf_requires_complete_owned_numeric_and_vector_diameter_and_painted_head_gap(
+    neck_dimension_fakes, failure,
+) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+
+    def mutate(spans, strokes, token):
+        if failure == "missing-numeric":
+            spans.pop(0)
+        elif failure == "wrong-numeric-owner":
+            spans[0] = replace(spans[0], xmin=0.22, xmax=0.23)
+        elif failure == "missing-ring-edge":
+            token.pop(0)
+        elif failure == "missing-slash":
+            token.pop()
+        elif failure == "extra-path":
+            token.append(Stroke(0.18, 0.194, 0.181, 0.194, 0.00013, (0, 0, 0), False, False, True))
+        elif failure == "bay-clipped-slash":
+            token[-1] = replace(token[-1], y1=0.19719)
+        elif failure in ("negative-pen", "nan-pen"):
+            token[0] = replace(token[0], width=-0.001 if failure == "negative-pen" else float("nan"))
+        elif failure == "missing-sf-head":
+            head = drawing.arrowhead_segments(f.finish_arrows[0])[0]
+            strokes[:] = [stroke for stroke in strokes if (stroke.x0, stroke.y0, stroke.x1, stroke.y1)
+                          != (head.x0, head.y0, head.x1, head.y1)]
+        else:
+            head = drawing.arrowhead_segments(f.finish_arrows[0])
+            x = sum(segment.x0 for segment in head) / 3.0
+            y = sum(segment.y0 for segment in head) / 3.0
+            glyph = replace(spans[0].glyphs[0], xmin=x, xmax=x + 0.00001, ymin=y, ymax=y + 0.00001)
+            spans[0] = replace(spans[0], glyphs=(glyph, *spans[0].glyphs[1:]))
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "final settling rebuild")
+    with pytest.raises(RuntimeError, match="PDF|actual"):
+        _neck_proof(f, "after_pdf_save")
+
+
+def test_painted_triangle_interior_and_both_pen_radii_count_in_exact_gap() -> None:
+    triangle = (
+        drawing.Segment(0.0, 0.0, 0.004, 0.0),
+        drawing.Segment(0.004, 0.0, 0.002, 0.004),
+        drawing.Segment(0.002, 0.004, 0.0, 0.0),
+    )
+    owned = {edge: ((edge, 0.000065),) for edge in triangle}
+    assert drawing._neck_pdf_head_clearance(
+        triangle, owned, (drawing.InkBox(0.0019, 0.001, 0.0021, 0.0011),), (),
+    ) == 0.0
+    path = drawing.Segment(0.006, 0.0, 0.006, 0.001)
+    assert drawing._neck_pdf_head_clearance(triangle, owned, (), ((path, 0.000065),)) == pytest.approx(0.00187)
+
+
+@pytest.mark.parametrize("primary_save_failure", [False, True])
+def test_actual_export_context_propagates_pdf_proof_failure_before_qualification_or_publication(
+    neck_dimension_fakes, monkeypatch, tmp_path, primary_save_failure,
+) -> None:
+    """Use the real finalizer and actual artifact checkpoint context."""
+    import contextlib
+
+    f = neck_dimension_fakes
+    outputs = SimpleNamespace(slddrw=tmp_path / "crank.SLDDRW", pdf=tmp_path / "crank.pdf", png=tmp_path / "crank.png")
+    monkeypatch.setattr(drawing, "OUTPUTS", outputs)
+    sheet = SimpleNamespace(
+        SetScale=lambda *args: True, GetProperties2=lambda: [0] * 8, CustomPropertyView="FRONT", GetViews=lambda: (),
+    )
+    model = f.model
+    model.GetSheetNames = lambda: ("Sheet1",)
+    model.ActivateSheet = lambda name: True
+    model.GetCurrentSheet = lambda: sheet
+    model.Sheet = lambda name: sheet
+    f.side.GetOrientationName = lambda: "*Front"
+    f.adapter._get_attr_or_call = lambda obj, name: getattr(obj, name)() if callable(getattr(obj, name)) else getattr(obj, name)
+    f.side.ReferencedDocument = f.source
+    monkeypatch.setattr(drawing_common, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing_common._sw_type_info, "early_bound_or_flag", lambda value, *args: value)
+    monkeypatch.setattr(drawing_common, "iter_views", lambda adapter: (f.side,))
+    monkeypatch.setattr(drawing_common, "view_name", lambda adapter, view: "FRONT")
+    monkeypatch.setattr(drawing_common, "_build_id", lambda: "test-build")
+    for name in ("apply_custom_properties", "assert_asme_b_sheet", "read_required_properties", "rebuild_drawing"):
+        monkeypatch.setattr(drawing_common, name, Mock())
+    monkeypatch.setattr(drawing_common, "pdf_shaded_raster_dpi", lambda *args: contextlib.nullcontext())
+    qualification = Mock()
+    publication = Mock()
+    monkeypatch.setattr(drawing_common, "assert_precise_isometric_views", qualification)
+    monkeypatch.setattr(drawing_common, "sanitize_pdf_metadata", publication)
+    monkeypatch.setattr(drawing_common, "render_pdf_png", Mock(side_effect=AssertionError("must not render a refused PDF")))
+    monkeypatch.setattr(drawing_common, "run_layout_audit", Mock(side_effect=AssertionError("must not qualify a refused PDF")))
+    events = []
+
+    def save(adapter, path, *, pdf_path, artifact_context):
+        for kind, target in (("drawing", path), ("pdf", pdf_path)):
+            with artifact_context(kind, target):
+                Path(target).write_bytes(b"existing export")
+                events.append(f"saved-{kind}")
+                if kind == "pdf" and primary_save_failure:
+                    raise OSError("native PDF export failed")
+        return {"drawing": path, "pdf": pdf_path}
+
+    monkeypatch.setattr(drawing_common, "save_drawing", save)
+    f.pdf.mutate = lambda spans, strokes, token: token.pop()
+
+    def checkpoint(phase):
+        events.append(phase)
+        _neck_proof(f, phase)
+
+    with pytest.raises(OSError if primary_save_failure else RuntimeError) as exc:
+        asyncio.run(drawing_common.finalize_drawing(
+            f.adapter, outputs, layout=drawing.SPEC.layout, pdf_title="Crankshaft", checkpoint=checkpoint,
+        ))
+    assert outputs.pdf.is_file()
+    assert events.index("saved-pdf") < events.index("after_pdf_save")
+    if primary_save_failure:
+        assert "native PDF export failed" in str(exc.value)
+        assert any("after_pdf_save checkpoint also failed" in note for note in exc.value.__notes__)
+    else:
+        assert "diameter ring or slash" in str(exc.value)
+    qualification.assert_not_called()
+    publication.assert_not_called()
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_straight_finish_allows_safe_native_body_vertex_root_without_origin_override(
+    neck_dimension_fakes, phase,
+) -> None:
+    f = neck_dimension_fakes
+    root = (0.181095, 0.20105)
+    tip = drawing.COLLAR_REAR_FINISH[0]
+    points = (*root, 0.0, *tip, 0.0)
+    f.collar_annotation.GetLeaderPointsAtIndex.return_value = points
+    f.finish_lines[0] = points
+    arrow = list(f.finish_arrows[0])
+    arrow[3:6] = (root[0] - tip[0], root[1] - tip[1], 0.0)
+    f.finish_arrows[0] = tuple(arrow)
+    _neck_proof(f, phase)
+    f.collar_annotation.SetLeader3.assert_not_called()
+    assert drawing.COLLAR_REAR_FINISH[1] != root
+
+
+@pytest.mark.parametrize("phase", _NECK_PHASES)
+def test_actual_neck_tips_must_keep_approved_origin_x_even_when_heads_fit(neck_dimension_fakes, phase) -> None:
+    f = neck_dimension_fakes
+    for index, native in enumerate(f.arrow_rows):
+        row = list(native)
+        row[0] += 0.0001
+        f.arrow_rows[index] = tuple(row)
+    with pytest.raises(RuntimeError, match="actual diameter tips moved"):
+        _neck_proof(f, phase)
+
+
+@pytest.mark.parametrize("kind", ["unpainted", "dashed"])
+def test_actual_pdf_ignores_unowned_clip_paths_and_dashed_foreign_ink(neck_dimension_fakes, kind) -> None:
+    f = neck_dimension_fakes
+
+    def mutate(spans, strokes, token):
+        # It crosses the prefix slot, but is not a solid painted annotation.
+        # Its irrelevant width must not contaminate the owned-ink proof.
+        strokes.append(Stroke(
+            0.180, 0.194, 0.183, 0.194, float("nan"), (0, 0, 0),
+            kind == "dashed", False, kind == "dashed",
+        ))
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "after_pdf_save")
+
+
+@pytest.mark.parametrize("kind", ["unpainted", "dashed"])
+def test_actual_pdf_refuses_a_head_with_only_unpainted_or_dashed_owner(neck_dimension_fakes, kind) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+    head = drawing.arrowhead_segments(f.finish_arrows[0])[0]
+
+    def mutate(spans, strokes, token):
+        for index, stroke in enumerate(strokes):
+            if (stroke.x0, stroke.y0, stroke.x1, stroke.y1) == (head.x0, head.y0, head.x1, head.y1):
+                strokes[index] = replace(
+                    stroke, dashed=kind == "dashed", filled=False, stroked=kind == "dashed",
+                )
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "final settling rebuild")
+    with pytest.raises(RuntimeError, match="complete native primitive has no actual PDF owner"):
+        _neck_proof(f, "after_pdf_save")
+
+
+def test_native_line_guard_decodes_active_sdk_ten_field_record_without_style_offset() -> None:
+    points = (0.177530000005, 0.1919951, 0.01, 0.1918598, 0.1919951, 0.02)
+    data = _native_presentation_data([points])
+    data.GetLineAtIndex3.side_effect = None
+    data.GetLineAtIndex3.return_value = (255.0, 1.0, 2.0, 3.0, *points)
+    assert drawing._neck_native_lines(data, label="active line SDK") == (
+        drawing.Segment(points[0], points[1], points[3], points[4]),
+    )
+    data.GetLineAtIndex3.assert_called_once_with(0)
