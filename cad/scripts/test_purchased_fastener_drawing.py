@@ -9495,6 +9495,131 @@ def test_source_checkpoint_failure_capture_cannot_replace_primary(
 
 
 @pytest.mark.parametrize(
+    "primary_type", (RuntimeError, asyncio.CancelledError, KeyboardInterrupt)
+)
+@pytest.mark.parametrize("reporter_type", (ValueError, KeyboardInterrupt))
+@pytest.mark.parametrize("failure", ("str", "add_note"))
+def test_source_failure_capture_reporting_preserves_primary_identity(
+    monkeypatch, tmp_path, primary_type, reporter_type, failure
+):
+    attempted_notes = []
+    reporting_error = reporter_type("secondary reporting failure")
+
+    class Primary(primary_type):
+        def add_note(self, note):
+            attempted_notes.append(note)
+            raise reporting_error
+
+    class CaptureFailure(RuntimeError):
+        def __str__(self):
+            if failure == "str":
+                raise reporting_error
+            return "secondary capture failure"
+
+    original = Primary("primary native failure")
+    capture_calls = []
+
+    def failed_capture(*_args, exception, **_kwargs):
+        capture_calls.append(exception)
+        raise CaptureFailure()
+
+    monkeypatch.setattr(
+        purchased._seat_forensics, "capture_com_failure", failed_capture
+    )
+    spec = SimpleNamespace(
+        artifact_stem="supplier",
+        source=tmp_path / "supplier.SLDPRT",
+        outputs={key: tmp_path / key for key in ("slddrw", "pdf", "png")},
+    )
+    with pytest.raises(primary_type) as caught:
+        purchased._retain_supplier_source_failure(spec, original, [])
+    assert caught.value is original
+    assert capture_calls == [original]
+    assert len(attempted_notes) == (failure == "add_note")
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring"))
+@pytest.mark.parametrize(
+    "primary_type", (RuntimeError, asyncio.CancelledError, KeyboardInterrupt)
+)
+@pytest.mark.parametrize("reporter_type", (ValueError, KeyboardInterrupt))
+@pytest.mark.parametrize("failure", ("repr", "add_note"))
+def test_public_build_source_reporting_preserves_primary_identity(
+    monkeypatch, tmp_path, lane, primary_type, reporter_type, failure
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    reporting_error = reporter_type("secondary reporting failure")
+    attempted_notes = []
+
+    class Primary(primary_type):
+        def add_note(self, note):
+            attempted_notes.append(note)
+            raise reporting_error
+
+    class PreservationFailure(OSError):
+        def __repr__(self):
+            if failure == "repr":
+                raise reporting_error
+            return "PreservationFailure('source unreadable')"
+
+    original = Primary("primary native failure")
+    preservation_error = PreservationFailure("source unreadable")
+    hash_calls = []
+    captured = []
+
+    def failed_hash(source):
+        hash_calls.append(source)
+        raise preservation_error
+
+    def fail(phase):
+        if phase == "layout":
+            monkeypatch.setattr(purchased, "_source_file_sha256", failed_hash)
+            raise original
+
+    case.on_phase = fail
+    monkeypatch.setattr(
+        purchased._seat_forensics,
+        "capture_com_failure",
+        lambda *_args, exception, **_kwargs: captured.append(exception),
+    )
+    with pytest.raises(primary_type) as caught:
+        case.run()
+    assert caught.value is original
+    assert case.phases[-1] == "layout"
+    assert hash_calls == [case.source]
+    assert captured == [original]
+    assert len(attempted_notes) == (failure == "add_note")
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring"))
+def test_public_build_without_primary_keeps_source_preservation_failure(
+    monkeypatch, tmp_path, lane
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    original = OSError("supplier source unreadable")
+    captured = []
+
+    def failed_hash(_source):
+        raise original
+
+    def finish(phase):
+        if phase == "layout":
+            monkeypatch.setattr(purchased, "_source_file_sha256", failed_hash)
+
+    case.on_phase = finish
+    monkeypatch.setattr(
+        purchased._seat_forensics,
+        "capture_com_failure",
+        lambda *_args, exception, **_kwargs: captured.append(exception),
+    )
+    with pytest.raises(OSError) as caught:
+        case.run()
+    assert caught.value is original
+    assert case.phases[-1] == "drawing-close"
+    assert captured == [original]
+
+
+@pytest.mark.parametrize(
     ("raw", "expression"),
     [
         ('$PRPSHEET:"SW-Title(Title)"', '$PRPSHEET:"SW-Title(Title)"'),
