@@ -2,9 +2,12 @@ pd-guide-lock:
   number: MHA-PD-12
   # 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied; the
   # sheet's +/-0.005 in mill band is the one the lock-station sweep and the
-  # screw engagement spend (pd_guide_lock_spec.LOCK_THICK_BAND).
-  material: A36 GROUND SHEET 1/16 in
-  material_specification: ASTM A36 precision-ground sheet, 1/16 in, +/-0.005 in (McMaster-Carr 1388K196); thickness as supplied
+  # screw engagement spend (pd_guide_lock_spec.LOCK_THICK_BAND), printed on
+  # the thickness. That printed band, not a grade or a ground form, is what
+  # the plate needs, so the title block names the low-carbon family (rule 2;
+  # machinist review ENFORCE, PR #1897); 1388K196 stays the example source.
+  material: LOW-CARBON STEEL SHEET 1/16 in
+  material_specification: Low-carbon steel sheet (ASTM A36, AISI 1008/1010 or 1018), 1/16 in, thickness as supplied within the printed 1.588 +/-0.127 (e.g. McMaster-Carr 1388K196 A36 precision-ground, +/-0.005 in)
   finish: black oxide
   quantity: 4
   tolerance_class: machined_block

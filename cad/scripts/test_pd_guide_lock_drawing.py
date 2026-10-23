@@ -278,6 +278,10 @@ def test_the_plate_is_1_16_sheet_under_its_own_mill_band() -> None:
     spec = _config.parts("pd-guide-lock")
     assert pd_guide_lock_spec.LOCK_STOCK_SKU in spec["material_specification"]
     assert "1/16" in spec["material"]
+    # Machinist review ENFORCE (PR #1897, rule 2): the printed band, not a
+    # grade or ground form, is the requirement, so the field names the family.
+    assert spec["material"].startswith("LOW-CARBON STEEL")
+    assert "GROUND" not in spec["material"].upper()
 
 
 def test_part_registry_row_carries_the_title_block_facts() -> None:

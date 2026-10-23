@@ -41,10 +41,12 @@ RAIL_EDGE_LIP = 1.0
 # (R9-61) spanned the old 7 channel and stood 9.65 over the bar at the top
 # rail, toward the latch hook.
 LOCK_HEIGHT = 9.6
-# 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied: A36
+# 2026-10-11 (user): 1/16 in steel sheet, thickness as supplied, e.g. A36
 # precision-ground sheet, McMaster-Carr 1388K196, 1/16 in -0.005 to +0.005 in
 # (read live 2026-10-11; the family's +/-0.003 and +/-0.001 grades sit inside
-# that band).  It replaced R9-31's machined 2.0 strip, whose slotted pan heads
+# that band).  The printed band is the requirement, so the title block names
+# the low-carbon steel family, not the grade or ground form (rule 2).
+# It replaced R9-31's machined 2.0 strip, whose slotted pan heads
 # (MHA-PD-VN-60) stood too proud for the arm plate, and a 0.25 head spot face,
 # which left no wall at the 3.5-from-edge holes.  The thickness prints .XXX
 # under the sheet's own band, which the lock-station sweep and the screw's
