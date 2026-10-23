@@ -772,6 +772,10 @@ def feature_release(
     )
 
     def git_metadata(*args, **_kwargs):
+        # There are no drawing notes/artwork in this fixture, but the real
+        # artwork stage still asks for the tracked DXF inventory.
+        if args == ("ls-files", "--", ":(icase)*.dxf"):
+            return ""
         assert args in (
             ("config", "--get", "remote.origin.url"),
             ("config", "--get", "user.name"),
@@ -890,6 +894,7 @@ def feature_release(
 def test_feature_release_refuses_host_action_collaborators(feature_release: Path) -> None:
     """Prove the tripwires refuse without starting a process or publication."""
     import export_models
+    assert cut_release._git("ls-files", "--", ":(icase)*.dxf") == ""
 
     calls = (
         lambda: subprocess.run(["git", "tag", "fixture-must-not-exist"]),
