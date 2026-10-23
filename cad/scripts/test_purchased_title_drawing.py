@@ -1623,7 +1623,7 @@ def test_public_title_ignores_unselected_alias_without_rewriting_it(native_title
 def test_public_title_refuses_material_authority_collisions_before_native_access(selected):
     # Neither object offers a native document or spec: a collision must be
     # refused before looking for either, not collapse a required field or floor.
-    with pytest.raises(RuntimeError, match="three distinct source fields"):
+    with pytest.raises(ValueError, match="unsupported purchased material property"):
         title.fit_purchased_title_block(
             object(), spec=object(), material_property=selected,
         )

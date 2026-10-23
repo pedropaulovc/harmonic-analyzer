@@ -1,7 +1,7 @@
 """Native supplier references for Y-axis dowels and X-axis spring pins.
 
-Banded references and every model-owned witness import read-only. Only new
-bandless drawing geometry dimensions receive local presentation settings.
+Model-owned values, bands and witnesses remain read-only. Imported drawing
+displays receive explicit presentation after independent source validation.
 Nothing here sets a SystemValue or replaces numeric dimension text.
 """
 
@@ -19,6 +19,7 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_projection import model_points_in_view
+from _drawing_precision import _named_dimensions
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
@@ -30,7 +31,7 @@ from _supplier_pin_data import (
     WALL_DIMENSION,
     SupplierPinReference,
 )
-from _supplier_pin_model import assert_supplier_pin_model_reference
+from _supplier_pin_model import _reference_contract, assert_supplier_pin_model_reference
 
 
 # Planned sheet-space lanes (left, bottom, right, top), before the first fit.
@@ -196,12 +197,13 @@ def _supplier_diameter(
 
 def _supplier_length(
     adapter: Any, view: Any, circles: list[ViewEdge], source: SupplierPinReference,
-    *, axis: int, stations: tuple[float, float]
+    *, axis: int, stations: tuple[float, float],
 ) -> tuple[Any, Callable[[Any], None]]:
     label = f"{source.sku} supplier length"
     ends = tuple(_end_circle(circles, axis, station, label=label) for station in stations)
-    # Project actual end-rim points in one batch. Center arc conditions below
-    # make the span end-plane to end-plane, not a tangent-offset distance.
+    # Each rim lies in a plane normal to the measured axis. Its axial
+    # coordinate is constant, so this linear dimension measures the full
+    # end-plane separation without applying an arc-length endpoint mode.
     points = []
     for edge in ends:
         point = list(edge.circle[:3])
@@ -220,10 +222,6 @@ def _supplier_length(
     ), "IDisplayDimension")
     if int(display.Type2) not in (2, 11, 12):
         raise RuntimeError(f"{label}: end-plane reference is not a native length")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    for index in (1, 2):
-        if dimension.SetArcEndCondition(index, 1) != 0:  # swArcEndConditionCenter
-            raise RuntimeError(f"{label}: cannot center native end-rim endpoint {index}")
     display = supplier_reference_dimension(
         adapter, display, label=label, units=source.units,
         precision=source.length_precision, expected_mm=source.length_mm,
@@ -237,8 +235,8 @@ def _supplier_length(
         if int(current.Type2) not in (2, 11, 12):
             raise RuntimeError(f"{label}: final reference is not a native length")
         native = _early_bound(current.GetDimension2(0), "IDimension")
-        if any(int(native.GetArcEndCondition(index)) != 1 for index in (1, 2)):
-            raise RuntimeError(f"{label}: final end-rim endpoints are not centered")
+        if any(int(native.GetArcEndCondition(index)) != 0 for index in (1, 2)):
+            raise RuntimeError(f"{label}: final end-rim conditions are not linear")
         assert_dimension_measures(
             adapter, current, expected_mm=source.length_mm, label=label,
             entities=(ends[0].edge, ends[1].edge),
@@ -253,11 +251,32 @@ def _import_model_references(
     adapter: Any, view: Any, source: SupplierPinReference,
     keep: dict[str, tuple[float, float]],
 ) -> dict[str, tuple[Any, Callable[[Any], None]]]:
+    model = view.ReferencedDocument
+    if model is None or model == "":
+        raise RuntimeError(f"{source.sku}: imported references have no source part")
+    owners = {name: feature for feature, names in REFERENCE_DIMENSIONS.items() for name in names}
+    if set(keep) - owners.keys():
+        raise ValueError(f"{source.sku}: unknown required model reference")
+    source_displays = []
+    for name in keep:
+        feature_name = owners[name]
+        feature = _early_bound(model, "IPartDoc").FeatureByName(feature_name)
+        if feature is None:
+            raise RuntimeError(f"{source.sku}: missing model reference {feature_name}")
+        display, _ = _named_dimensions(adapter, feature_name, {name}, feature=feature)[name]
+        source_displays.append((display, feature_name))
+
+    def assert_sources() -> None:
+        for display, feature in source_displays:
+            assert_supplier_pin_model_reference(
+                adapter, model, display, feature, source, view=None,
+            )
+
+    assert_sources()
     annotations = curate_view_dimensions(
         adapter, view, keep=keep, view_label=f"{source.sku} model-owned supplier references",
         dimensions_by_feature=REFERENCE_DIMENSIONS,
     )
-    owners = {name: feature for feature, names in REFERENCE_DIMENSIONS.items() for name in names}
     imported: dict[str, tuple[Any, Callable[[Any], None]]] = {}
     for raw in annotations:
         name = dimension_name(adapter, raw)
@@ -266,14 +285,23 @@ def _import_model_references(
         display = _early_bound(
             _early_bound(raw, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension"
         )
+        feature = owners[name]
+        _, kwargs, band = _reference_contract(source, feature)
+        display = supplier_reference_dimension(adapter, display, **kwargs)
+        if band is not None and display.SetPrecision3(
+            kwargs["precision"], -1, kwargs["precision"], -1,
+        ) != 0:
+            raise RuntimeError(f"{source.sku}: imported tolerance display precision was rejected")
 
-        def assert_imported(current: Any, *, feature: str = owners[name]) -> None:
-            model = view.ReferencedDocument
-            if model is None or model == "":
-                raise RuntimeError(f"{source.sku}: imported reference has no source part")
-            assert_supplier_pin_model_reference(adapter, model, current, feature, source)
+        def assert_imported(current: Any, *, feature: str = feature) -> None:
+            referenced = view.ReferencedDocument
+            if referenced is None or int(adapter.swApp.IsSame(referenced, model)) != 1:
+                raise RuntimeError(f"{source.sku}: imported reference changed its source part")
+            assert_supplier_pin_model_reference(
+                adapter, model, current, feature, source, view=view,
+            )
+            assert_sources()
 
-        # A model-owned import is never reformatted or retoleranced here.
         assert_imported(display)
         imported[name] = (display, assert_imported)
     if set(imported) != set(keep):
@@ -289,13 +317,13 @@ def add_supplier_dowel_dimensions(
     front = views["*Front"]
     circles = _axis_circles(scan_view_edges(front, label=f"{source.sku} dowel"), 1, label=source.sku)
     length, length_check = _supplier_length(
-        adapter, front, circles, source, axis=1, stations=(0.0, source.length_mm)
+        adapter, front, circles, source, axis=1, stations=(0.0, source.length_mm),
     )
     top = views["*Top"]
     outline = tuple(float(value) for value in top.GetOutline())
     imported = _import_model_references(
         adapter, top, source,
-        {DIAMETER_DIMENSION: (outline[2] + 0.018, (outline[1] + outline[3]) / 2.0)},
+        {DIAMETER_DIMENSION: (outline[2] + 0.033, (outline[1] + outline[3]) / 2.0)},
     )
     diameter, diameter_check = imported[DIAMETER_DIMENSION]
     return _settled_pin_check(
@@ -335,7 +363,7 @@ def add_supplier_spring_pin_dimensions(
         adapter, right, source,
         {
             WALL_DIMENSION: (center[0] - 0.022, center[1] + 0.018),
-            MATING_HOLE_DIMENSION: (center[0] + 0.029, center[1] - 0.031),
+            MATING_HOLE_DIMENSION: (center[0] + 0.064, center[1] - 0.031),
         },
     )
     wall, wall_check = imported[WALL_DIMENSION]
@@ -347,4 +375,4 @@ def add_supplier_spring_pin_dimensions(
             ("*Right", wall, wall_check), ("*Right", hole, hole_check),
         ],
         expected_count=4, label=source.sku,
-    )
+    )

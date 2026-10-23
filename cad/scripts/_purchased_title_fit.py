@@ -1,4 +1,4 @@
-"""Opt-in native title-cell fitting for purchased-part drawings.
+"""Opt-in native title-cell fitting for purchased reference drawings.
 
 Format and optionally align existing source-linked notes, never source properties
 or saved templates.
@@ -570,12 +570,16 @@ def fit_purchased_title_block(
 ) -> Callable[[], None]:
     """Fit Name/selected Material/Number; return strict final-rebuild checks.
 
-    ``material_property`` names the source property already linked by the sheet.
+    ``material_property`` selects ``Material Specification`` (the default) or
+    ``Material`` already linked by the sheet; the builder declares its actual
+    source field, without adding aliases or changing links.
     The default preserves the captured-pivot and kit consumers unchanged.
     ``material_alignment="label_right"`` centres the complete Material value
     beside the unique, unchanged MATERIAL label in their original inset cell.
     The default retains every note's original fixed anchor and read surface.
     """
+    if material_property not in ("Material Specification", "Material"):
+        raise ValueError(f"unsupported purchased material property {material_property!r}")
     if material_alignment not in ("fixed", "label_right"):
         raise ValueError("material_alignment must be 'fixed' or 'label_right'")
     # Native metres, not authored points converted at 72 dpi. The material floor
