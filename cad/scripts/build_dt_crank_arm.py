@@ -43,7 +43,7 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 
 import _telemetry
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -55,6 +55,9 @@ from dt_crank_arm_spec import (
     ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,
+    BORE_REAR_CHAMFER,
+    BORE_REAR_CHAMFER_DEVIATIONS,
+    BORE_REAR_CHAMFER_TOL_TYPE,
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_X,
     AXIAL_PIN_Y,
@@ -97,6 +100,44 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
+def _bore_rear_chamfer_limits(adapter) -> None:
+    """BoreRearChamferSize as a native LIMIT band (build_mg_output_fixture's
+    ``_limit_band``): the model value is the largest leg, the lower deviation
+    takes it to the smallest, both printed at the leg's own places."""
+    label = "BoreRearChamferSize@BoreRearChamfer"
+    display, dimension = _named_dimension(
+        adapter, "BoreRearChamfer", "BoreRearChamferSize"
+    )
+    value = float(dimension.SystemValue) * 1000.0
+    if not math.isclose(value, BORE_REAR_CHAMFER, abs_tol=1e-7):
+        raise RuntimeError(
+            f"{label}: model {value:.7f} is not the largest leg {BORE_REAR_CHAMFER}"
+        )
+    lower, upper = BORE_REAR_CHAMFER_DEVIATIONS
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = BORE_REAR_CHAMFER_TOL_TYPE
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != BORE_REAR_CHAMFER_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = DRAWING_PRECISION["BoreRearChamfer"]["BoreRearChamferSize"]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -112,6 +153,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
     await set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
+    await set_global(adapter, "BoreRearChamferSize", f"{BORE_REAR_CHAMFER}mm")
     await set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
     await set_global(adapter, "AxialPinLength", f"{AXIAL_PIN_LENGTH}mm")
     await set_global(adapter, "FiducialDia", f"{FIDUCIAL_MODEL_DIA}mm")
@@ -228,6 +270,28 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "HubSeat")
+
+    # Inboard mouth of the seat (z = 0): the face that bears on the MHA-DT-31
+    # barrel shoulder, so its chamfer clears the hub's seat-root radius.  The
+    # pick is opposite the six-o'clock seam, which never reaches this face.
+    before_chamfer = await _volume(adapter)
+    check(
+        "chamfer hub seat inboard mouth",
+        await adapter.add_chamfer(BORE_REAR_CHAMFER, [[-HUB_SEAT_DIA / 2.0, 0.0, 0.0]]),
+    )
+    name_last_feature(adapter, "BoreRearChamfer")
+    chamfer_dim = name_dimensions(adapter, "BoreRearChamfer", ["BoreRearChamferSize"])
+    drive_jobs.append((chamfer_dim[0], '"BoreRearChamferSize"'))
+    # A 45-degree internal ring: triangle c^2/2 swept at radius R + c/3.
+    v_chamfer = (
+        math.pi * BORE_REAR_CHAMFER**2 * (HUB_SEAT_DIA / 2.0 + BORE_REAR_CHAMFER / 3.0)
+    )
+    await volume_check(
+        adapter,
+        "hub seat inboard chamfer",
+        before_chamfer - v_chamfer,
+        0.03 * v_chamfer + 0.05,
+    )
 
     # Handle-pivot native fractional-drill hole at the handle-pivot centre,
     # drilled +Z through the plate while the body is still prismatic.
@@ -540,6 +604,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _bore_rear_chamfer_limits(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

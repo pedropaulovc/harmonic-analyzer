@@ -1,7 +1,7 @@
-r"""Crank-arm drawing prose -- the hub-seat, seam and pivot callouts on its sheet.
+r"""Crank-arm feature callouts and the replacement profile's rotation caption.
 
-Imported ONLY by ``draw_crank_arm`` and its offline test (codex #361; see
-``crank_hub_notes``), so a wording edit re-keys the drawing, never the part.
+Imported ONLY by ``draw_dt_crank_arm`` and its offline test, so a wording edit
+re-keys the drawing, never the part.
 """
 
 from __future__ import annotations
@@ -27,17 +27,15 @@ HUB_SEAT_CALLOUT = "\n".join(
         "INTERFERENCE; FACES FLUSH",
     )
 )
-# The MHA-DT-VN-59 seam is match-drilled with the hub at assembly; its callout
-# sits on the seam itself with the pin's nominal size and depth.  Half the
-# hole is in the hub, open toward the arm's outboard face: pressing the hub
-# out slides it off the pin, which then lifts out of the arm's half-hole --
-# the drive-fit pin's way out (#984 machinist review r1, blind-hole finding).
+# The MHA-DT-VN-59 seam is match-drilled with the hub at assembly.  The dowel's
+# axial pull thread gives it a way out of the blind seat without first
+# pressing the arm off the hub (owner's #0-80 UNF THRU ruling).
 SEAM_CALLOUT = "\n".join(
     (
         f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
         "MATCH-DRILL/REAM WITH MHA-DT-31 AT ASSEMBLY,",
         "CENTRED ON THE SEAM, FOR MHA-DT-VN-59 AXIAL PIN:",
-        "LIGHT DRIVE FIT; PRESSING MHA-DT-31 OUT FREES THE PIN",
+        "LIGHT DRIVE FIT; AXIAL THREAD FOR EXTRACTION",
     )
 )
 # The handle-pivot tap's mouth limit rides its own callout, under the native
@@ -52,3 +50,11 @@ PIVOT_TAP_ROWS = (
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
 # undimensioned hole).
 FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
+# The native leg and LIMIT band identify the rear-Z bore mouth in the turned
+# Top/profile view. FAR SIDE still names that face against the PRINCIPAL FRONT
+# view, not against this rotated view; HUB SIDE is the same mating face. The
+# principal view's primary bore callout names MHA-DT-31 and its light press fit.
+# The leg, limits and decimal places remain the imported model dimension's,
+# not prose. Five short suffix rows preserve the clear lane at normal text size.
+BORE_REAR_CHAMFER_CALLOUT = " X 45 DEG\nFAR SIDE\nHUB SIDE\nPRESS\nLEAD-IN"
+PROFILE_VIEW_CAPTION = "TOP VIEW\nROTATED 90 DEG CCW\nSCALE 1:1"

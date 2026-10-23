@@ -1,11 +1,12 @@
 r"""Crank-hub drawing prose -- the feature callouts only its sheet prints.
 
-Split OUT of ``crank_hub_geometry`` / ``crank_hub_spec`` (codex #361): every
-crank part recipe and every assembly (through ``_interference_contracts``)
+Split OUT of ``dt_crank_hub_geometry`` / ``dt_crank_hub_spec`` (codex #361):
+every crank part recipe and every assembly (through ``_interference_contracts``)
 imports those modules, so callout prose living there made a wording edit
-rebuild all five crank parts.  This module is imported ONLY by the hub and arm
-drawing scripts (the arm through ``crank_arm_notes``) and their offline tests,
-so a prose edit re-keys drawings, never a part.
+rebuild all five crank parts.  This module is imported by the hub, arm and shaft
+drawing scripts (the arm through ``dt_crank_arm_notes``), the MHA-DT-00
+assembly drawing and their offline tests. A prose edit re-keys drawings,
+never a part.
 
 Callouts read in the order the work is done: the size and process line
 first, the matched-fit prose after it (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
@@ -20,21 +21,26 @@ from dt_crank_hub_geometry import (
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
+from dt_crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA
+from dt_crankshaft_spec import PIN_HOLE_SPEC as SHAFT_PIN_HOLE_SPEC
 
 
-def seat_callout(mate: str) -> str:
-    """Hub-seat fit on MHA-DT-31, turned second to press into ``mate``'s bore.
+def seat_callout(name: str, number: str) -> str:
+    """Hub-seat fit on MHA-DT-31, turned second to press into the bore of
+    ``name`` ``number`` (the mate by name and number, drawing-guidelines.md
+    rule 4 (tighten only for function, and name the mate)).
 
-    Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). FACES FLUSH is the acceptance; how the hub
-    gets there (an arbor press) is a method, so the sheet does not say it.
+    Four lines (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)). FRONT FACES FLUSH is the acceptance (the
+    hub's labelled front face and the arm's); how the hub gets there (an
+    arbor press) is a method, so the sheet does not say it.
     """
     low, high = SEAT_PRESS_INTERFERENCE
     return "\n".join(
         (
-            f"TURN TO SUIT {mate} BORE",
-            f"FOR LIGHT PRESS: {low:.3f}-{high:.3f}",
+            f"TURN TO SUIT {name}",
+            f"{number} BORE; {low:.3f}-{high:.3f}",
             "DIAMETRAL INTERFERENCE;",
-            "FACES FLUSH",
+            "FRONT FACES FLUSH",
         )
     )
 
@@ -49,15 +55,16 @@ def seat_bore_callout(mate: str) -> str:
 def seam_callout(mate: str, pin: str = "MHA-DT-VN-59") -> str:
     """MHA-DT-VN-59 seam, match-drilled with ``mate``: size first, then the process.
 
-    ``pin`` names the pin as the sheet identifies it; the arm's print adds its
-    part name (MHA-DT-06 machinist review, 2026-09-29).
+    ``mate`` and ``pin`` name the parts as the sheet identifies them (name
+    and number, drawing-guidelines.md rule 4 (tighten only for function, and name the mate)).
     """
     return "\n".join(
         (
-            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
-            f"MATCH-DRILL/REAM WITH {mate}",
-            "AT ASSEMBLY, CENTRED ON THE SEAM",
-            f"FOR {pin}: LIGHT DRIVE FIT",
+            f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}, "
+            "MATCH-DRILL/REAM AT ASSY",
+            f"WITH {mate} ON THE SEAM",
+            f"FOR {pin}:",
+            "LIGHT DRIVE FIT",
         )
     )
 
@@ -71,31 +78,49 @@ BORE_CALLOUT = (
 )
 # The arm bore is made first and carries the band; this seat is turned to fit
 # it, so its nominal prints as a reference under the match-fit callout.
-SEAT_CALLOUT = seat_callout("MHA-DT-06")
-SEAM_CALLOUT = seam_callout("MHA-DT-06")
-# The cross-hole is drilled, then taper-reamed through hub and shaft together.
-# The ream fixes the hub on the shaft for good, so the front face is set flush
-# with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
-# the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
-# arm front is already flush with the hub front from the seat press).  The
-# MHA-DT-00 hub step prints the same datum.  The prose reads under the native
-# #14 drill size, in the order the work is done.
+SEAT_CALLOUT = seat_callout("CRANK ARM", "MHA-DT-06")
+# The seam is blind in the hub, so the dowel names its pull thread: the way
+# it comes out (machinist review r2b of 383c31baa, rule 16).
+SEAM_CALLOUT = seam_callout("CRANK ARM MHA-DT-06", pin="PULL-THREAD DOWEL MHA-DT-VN-59")
+# The cross-hole: this hub is drilled alone with its #14 pilot (the native
+# size and its station from the arm shoulder).  The shaft is NOT drilled
+# alone (#1678): drilled separately, the shaft's .X station and the hub's own
+# location could set the two holes up to ~1.8 mm apart, while the 1:48 ream
+# cleans up only ~0.2 mm radially round a #9 hole.  So at assembly, the front
+# face set flush with the crankshaft's dome root first -- the crank face,
+# CRANK_FACE_Z, where the 3/8 in cylinder meets the dome; the dome stands
+# proud of the hub (the arm front is already flush with the hub front from the
+# seat press) -- the shaft's #9 is drilled through this pilot, opening it, and
+# the pair is taper-reamed together.  The #9's DRILLED HOLES limit stays inside
+# the reamed taper along the whole pin (thinnest at the far hub wall).  The
+# drill and taper come from their owners (the shaft's hole spec and the pin's
+# end diameters); MHA-DT-00 step 6 and the shaft's callout read the same
+# names.  The prose reads under the native #14 drill size, in the order the
+# work is done; three rows, so the block stays four rows tall.
 FRONT_FACE_DATUM = "MHA-DT-11 DOME ROOT"
+CROSS_HOLE_DRILL = SHAFT_PIN_HOLE_SPEC.size
+CROSS_HOLE_TAPER = f"1:{PIN_LENGTH / (BIG_END_DIA - SMALL_END_DIA):.0f}"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "FRONT FACE FLUSH WITH",
-        f"{FRONT_FACE_DATUM};",
-        "MATCH TAPER-REAM 1:48 FOR",
-        "MHA-DT-09: LIGHT DRIVE FIT",
+        f"AT ASSY DRILL {CROSS_HOLE_DRILL} THRU CRANKSHAFT",
+        f"MHA-DT-11; TAPER-REAM {CROSS_HOLE_TAPER} BOTH FOR",
+        "CRANK PIN MHA-DT-09: LIGHT DRIVE FIT",
     )
 )
+# The front face carries the setting the cross-hole is drilled at, on a
+# leader to the face itself (the end view looks at it), so no text has to say
+# which end is the front (machinist review r1 of 114fa71c1).
+FRONT_FACE_NOTE = "\n".join(
+    ("FRONT FACE: AT ASSY,", "SET FLUSH WITH", FRONT_FACE_DATUM)
+)
 
-# The two axial bands state the mate they serve, under their dimensions
-# (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the overall places the rear face against the removable sprocket
+# The two axial bands name the stack each sets, under their dimensions
+# (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the overall places the rear face against the removable sprocket
 # (stack B below), the relief places the barrel's rear shoulder ahead of the
-# #25 chain wrapping it (stack A).
-HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-PD-09"
-RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
+# #25 chain wrapping it (stack A).  The overall's rows stay narrower than its
+# span, so its extension lines run clear of them.
+HUB_LENGTH_CALLOUT = "SETS SPROCKET\nMHA-PD-09 AIR"
+RELIEF_LENGTH_CALLOUT = "SETS #25 CHAIN AIR ON\nSPROCKET MHA-PD-09"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
@@ -108,14 +133,14 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-09"
 #     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.10
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
 #                                                                    3.85 +/-0.05
-#     removable seat face           transgear_removable_spec.SEAT_FACE_Z
-#                                   + crankshaft_spec.SEAT_COLLAR_BAND
+#     removable seat face           pd_transgear_removable_spec.SEAT_FACE_Z
+#                                   + dt_crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
 #     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
 #                                   4.699, chain floated frontmost)
-#   A  chain -> relief shoulder, in two poses (crank_hub_geometry.
+#   A  chain -> relief shoulder, in two poses (dt_crank_hub_geometry.
 #      chain_shoulder_axial_air; floor CHAIN_SHOULDER_AIR_MIN 0.2135):
 #      seated, the wheel on the seat face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)

@@ -45,6 +45,15 @@ Purchased ANSI #25 inner and outer chain links (configurations of `sh-vn-chain-l
 hub dowel stock are vendor parts, including cut-to-length modifications. Pins machined
 from raw drill rod remain owned by their subsystem.
 
+The crank-hub interface uses `dt-crank-hub` (MHA-DT-31), `dt-crank-arm`
+(MHA-DT-06), `dt-crankshaft` (MHA-DT-11) and the parent-scoped purchased
+`dt-vn-crank-hub-pin` (MHA-DT-VN-59). Its builder, drawing, spec and native
+readback helper use the `dt_vn_crank_hub_pin` module stem. The pin registry's
+PW-01 acceptance applies only to MHA-DT-VN-59's disclosed nominal thread-major
+wall; it is not a minimum-wall guarantee or an exception for another part.
+The shared assembly drill/taper wording lives in `dt_crank_hub_notes` and is
+consumed by the hub, shaft and MHA-DT-00 assembly drawings, not part recipes.
+
 Doit selection uses the underscore stem:
 
 ```powershell

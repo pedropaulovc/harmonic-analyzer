@@ -3,19 +3,23 @@ r"""Build the MHA-DT-VN-59 axial crank-arm-to-hub seam pin.
 The flat-ended cylinder runs on local +Z from the outboard face.  In the drive
 train +Z is parallel to the crankshaft and the pin sits at six o'clock, half in
 the arm and half in the hub-seat seam.  Its length is shared geometry:
-``ARM_THICKNESS / 2``.
+``ARM_THICKNESS / 2``. The seam hole is blind, so the pin is a pull-dowel:
+a native #0-80 UNF THRU Hole Wizard tap starts at the flush outboard end.
 """
 
 from __future__ import annotations
 
 import math
 import sys
+from typing import Any
 
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
+from _com import _early_bound
 from _dimensions import drive_dimension, set_global
 from _feature_tree import name_last_feature
+from _holes import _standard, _verify_tap_metadata, wizard_holes
 from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
@@ -31,12 +35,16 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
+from dt_vn_crank_hub_pin_native import read_hole_wizard_metadata
 from dt_vn_crank_hub_pin_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     PIN_DIA,
     PIN_LEN,
+    PULL_THREAD_HOLE,
+    PULL_THREAD_NATIVE_THROUGH_TAP_TYPES,
+    PULL_THREAD_TAP_DRILL,
 )
 
 
@@ -44,6 +52,46 @@ PART_NAME = "dt-vn-crank-hub-pin"
 MATERIAL = "Plain Carbon Steel"
 PIN_R = PIN_DIA / 2.0
 V_PIN = math.pi * PIN_R**2 * PIN_LEN
+TAP_R = PULL_THREAD_TAP_DRILL / 2.0
+V_TAP = math.pi * TAP_R**2 * PIN_LEN
+# Local +Z runs inboard. Select the opposite-facing plane at station zero,
+# not the inaccessible pin end at +PIN_LEN, for the extraction screw entry.
+PULL_THREAD_ENTRY_POINT = (0.0, 0.0, 0.0)
+PULL_THREAD_ENTRY_NORMAL = (0.0, 0.0, -1.0)
+
+
+def _require_pull_thread_definition(definition: Any) -> None:
+    """Prove the committed feature is the specified inch tap and #56 cut."""
+    definition = read_hole_wizard_metadata(
+        definition, label="MHA-DT-VN-59 built pull thread"
+    )
+    _verify_tap_metadata(definition, PULL_THREAD_HOLE, "MHA-DT-VN-59 built pull thread")
+    # Control build 20261019T195835.864950Z-3cf3a31cc7644bbf8d4f0ebbdd501a43:
+    # restored #6-32 has Type=48 but FastenerType2=-1. The latter is logged
+    # telemetry, not identity; enforce the documented saved-Type contract.
+    native_type = definition.Type
+    if native_type not in PULL_THREAD_NATIVE_THROUGH_TAP_TYPES:
+        raise RuntimeError(
+            f"MHA-DT-VN-59 native extraction Type {native_type!r} is not a through tap"
+        )
+    for member, expected in (
+        ("Standard2", _standard(PULL_THREAD_HOLE.kind)),
+        ("FastenerSize", PULL_THREAD_HOLE.size),
+    ):
+        actual = getattr(definition, member)
+        if actual != expected:
+            raise RuntimeError(
+                f"MHA-DT-VN-59 native extraction {member} {actual!r} != {expected!r}"
+            )
+    if not math.isclose(
+        float(definition.ThruTapDrillDiameter) * 1000.0,
+        PULL_THREAD_TAP_DRILL,
+        rel_tol=0.0,
+        abs_tol=0.005,
+    ):
+        raise RuntimeError(
+            f"MHA-DT-VN-59 native tap drill is not #56 ({PULL_THREAD_TAP_DRILL:.4f} mm)"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -92,7 +140,31 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs = pin.apply(adapter, "PinProfile")
     check("revolve pin", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Pin")
-    volume = await volume_check(adapter, "axial seam pin", V_PIN, 0.005 * V_PIN)
+    await volume_check(adapter, "axial seam pin", V_PIN, 0.005 * V_PIN)
+
+    # The native feature owns both the real tap-drill cut and the associative
+    # through-thread callout. Do not fake a blind ThreadDepth equal to the pin
+    # length: the tap must run clear of the far end to complete its lead.
+    pull_thread = wizard_holes(
+        adapter,
+        PULL_THREAD_HOLE,
+        [PULL_THREAD_ENTRY_POINT],
+        PULL_THREAD_ENTRY_NORMAL,
+        "MHA-DT-VN-59 extraction thread",
+        name="PullThread",
+        expect_dia_mm=PULL_THREAD_TAP_DRILL,
+        placement_dims=[((None, None), (None, None))],
+    )
+    drive_jobs += pull_thread.placement_drive_jobs
+    if not math.isclose(
+        pull_thread.hole_dia_mm, PULL_THREAD_TAP_DRILL, rel_tol=0.0, abs_tol=0.005
+    ):
+        raise RuntimeError(
+            f"MHA-DT-VN-59 native tap drill is not {PULL_THREAD_TAP_DRILL:.4f} mm"
+        )
+    volume = await volume_check(
+        adapter, "native through pull tap", V_PIN - V_TAP, 0.005 * V_PIN
+    )
 
     await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "pin axis")
     await force_rebuild(adapter)
@@ -100,6 +172,15 @@ async def build(adapter) -> dict[str, str]:
         await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
     await volume_check(adapter, "driven axial pin", volume, 0.005 * V_PIN)
+    feature = _early_bound(adapter.currentModel, "IPartDoc").FeatureByName(
+        pull_thread.name
+    )
+    if feature is None:
+        raise RuntimeError("MHA-DT-VN-59 native pull-thread feature is missing")
+    definition = _early_bound(
+        _early_bound(feature, "IFeature").GetDefinition(), "IWizardHoleFeatureData2"
+    )
+    _require_pull_thread_definition(definition)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

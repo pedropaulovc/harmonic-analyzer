@@ -6,4 +6,10 @@ dt-vn-crank-hub-pin:
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: "dowel stock cut to length; match-reamed axial seam fit"
+  process: "dowel stock cut to length; through-tapped axial #0-80 UNF extraction feature with #56 tap drill; match-reamed axial seam fit"
+  machinist_exceptions:
+    - id: PW-01
+      kind: minor
+      where: "#0-80 UNF pull thread in Ø4 seam pin, MHA-DT-VN-59 only"
+      finding: "Nominal thread-major wall is (4.000 - 0.060 x 25.4)/2 = 1.238 mm, printed THREAD-MAJOR WALL 1.24 NOM, below the rule 17 floor of 1.5 mm; rule 20 disclosure is printed on the pin sheet."
+      reason: "OWNER ACCEPTED 2026-10-19: the #0-80 UNF extraction-only thread in the unchanged light-drive Ø4 x 4 seam pin has the computed 1.238 mm nominal thread-major wall (1.24 NOM). No maximum finished internal major is specified, so this is not a minimum-wall guarantee. The 4 mm nominal axial length is about 2.625 basic diameters, not a guaranteed full-profile engagement after facing and mouth breaks. This acceptance applies to MHA-DT-VN-59 only; no other exception is granted."

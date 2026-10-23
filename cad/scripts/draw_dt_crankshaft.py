@@ -73,6 +73,7 @@ import _telemetry
 from build_dt_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from dt_crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from dt_crankshaft_notes import (
+    ASSEMBLY_SET_REFERENCES,
     CENTRES_NOTE,
     CHAIN_AIR_MATE,
     COLLAR_REAR_MATE,
@@ -295,7 +296,7 @@ CALLOUTS_ABOVE = {
     "NeckDiaDim": f"{len(SHAFT_NECKS)}X",
 }
 # Each drive-pin location names the mate its +/-0.025 serves
-# (crankshaft_notes), in the clear field under its text; the spigot's length
+# (dt_crankshaft_notes), in the clear field under its text; the spigot's length
 # names the chain it keeps clear, between the cross-hole's and the collar
 # seat's extension lines.  Each banded diameter names its mate under its
 # value.
@@ -353,8 +354,8 @@ COLLAR_REAR_FINISH = (
 DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
 # text's left end and runs down-left at ~55 deg to the hole, a clean
-# crossing of the 122.7 station's extension line rather than a near
-# parallel one (run 20260923T030252135Z-49e46990).  Its three prose rows and
+# crossing of the (122.7) reference station's extension line rather than a
+# near parallel one (run 20260923T030252135Z-49e46990).  Its three prose rows and
 # drill row centre on y 0.251; its left end (~36 mm left of the centre) sets
 # the leader's slope that the diameter blocks under it are laid out around
 # (DIAMETER_POSITIONS).
@@ -1071,7 +1072,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_dimension_suffixes(adapter, annotations, SUFFIXES)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    for name in sorted(REFERENCE_DIMENSIONS):
+    for name in sorted(REFERENCE_DIMENSIONS | ASSEMBLY_SET_REFERENCES):
         matches = [
             annotation
             for annotation in annotations
