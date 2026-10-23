@@ -393,8 +393,14 @@ def nut_installation_native(monkeypatch, request):
         assert entity is attached_to
         assert same(entity, state.target)
         assert text == "1"
-        assert leader_attach_xy == pytest.approx(center)
-        assert note_xy == pytest.approx((center[0] + 0.012, center[1] + 0.010))
+        # The synthetic projection uses model Y/Z for sheet X/Y. Jam's
+        # source-derived bearing Z is nonzero; do not silently move it to z=0.
+        point_m = tuple(value / 1000 for value in state.bearing_point_mm)
+        bearing_pick = (center[0] + point_m[1], center[1] + point_m[2])
+        assert leader_attach_xy == pytest.approx(bearing_pick)
+        assert note_xy == pytest.approx((
+            bearing_pick[0] + 0.012, bearing_pick[1] + 0.010,
+        ))
         note = Note(text, view, entity, leader_attach_xy)
         note.annotation.position = (*note_xy, 0.0)
         state.note = note

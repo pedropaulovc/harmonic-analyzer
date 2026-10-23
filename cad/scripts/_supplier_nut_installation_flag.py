@@ -21,6 +21,7 @@ from _purchased_fastener_drawing import (
 from _supplier_reference_text import measured_native_text_bounds
 
 
+@_telemetry.traced("drawing.supplier_nut_installation_flag", label_param="artifact_stem")
 def add_supplier_nut_installation_flag(
     adapter: Any,
     right: Any,
