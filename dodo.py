@@ -3828,6 +3828,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_reference_geometry.py",
         SCRIPTS_DIR / "test_supplier_reference_text.py",
         SCRIPTS_DIR / "test_supplier_nut_saved_readback.py",
+        SCRIPTS_DIR / "test_drawing_physical_axial_dimension.py",
+        SCRIPTS_DIR / "test_drawing_serialized_note_identity.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
         SCRIPTS_DIR / "test_purchased_title_fit.py",
         SCRIPTS_DIR / "test_supplier_native_contracts.py",
