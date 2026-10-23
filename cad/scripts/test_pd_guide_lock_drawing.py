@@ -111,6 +111,42 @@ def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None
     assert drawing.RIGHT_EDGE_X < left and right < right_view_left
 
 
+def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
+    """Machinist review ENFORCE r1-r3 (blocker): the ±0.035 hole coordinates
+    named no mate.  The callout names the platen guide's taps the pattern
+    lands on and the screws its holes clear, and states the least edge wall
+    (the right end, under the 2.0 target) as a plain fact."""
+    import _config
+
+    rows = drawing.HOLE_CALLOUT_BELOW.split("\n")
+    assert rows == [
+        f"MATCHES {_config.parts('pd-platen-guide')['number']} TAPS,",
+        "CLEARANCE FIT ON",
+        f"{_config.parts('pd-vn-guide-lock-screw')['number']} SCREWS",
+        "EDGE WALL 1.52 MIN",
+    ]
+    assert min(pd_guide_lock_spec.HOLE_LIGAMENTS_WORST.values()) >= 1.52
+    assert drawing.EDGE_WALL_MIN < 2.0
+    # Each row is no wider than the native row the plate and right view
+    # already bound (test above).
+    assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")
+
+
+def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
+    """Machinist review ENFORCE r1-r3: centred between the 1/16 sheet's
+    extension lines, the value's digits sat on them; it stands right of the
+    edge-on view, left of the isometric."""
+    x, _ = drawing.RIGHT_KEEP["Depth"]
+    half = len("1.588 ±0.127") * _CHAR_WIDTH / 2.0
+    right_view_right = (
+        drawing.RIGHT_CENTER[0]
+        + pd_guide_lock_spec.LOCK_THICK * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert x - half > right_view_right + 0.002
+    stock_half = len(pd_guide_lock_spec.LOCK_STOCK_CALLOUT) * _CHAR_WIDTH / 2.0
+    assert x + stock_half < drawing.ISO_CENTER[0] - 0.015
+
+
 def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
     x, y = drawing.FRONT_KEEP["Hole1Y"]
     half = len("2X 3.500±0.035") * _CHAR_WIDTH / 2.0

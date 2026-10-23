@@ -20,6 +20,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -31,6 +32,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+import _config
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -45,11 +47,13 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from pd_guide_lock_spec import (
     DRAWING_PRECISION_BY_NAME,
+    HOLE_LIGAMENTS_WORST,
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
@@ -57,6 +61,8 @@ from pd_guide_lock_spec import (
     LOCK_WIDTH,
 )
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_guide_lock"]
 PART_STEM = SPEC.artifact_stem
@@ -113,8 +119,10 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # value sat on the top extension line, machinist review of 1c9f9b2a6); the 4X
 # corner radius stands off the top-right corner, its leader landing on that
 # arc clear of the Height's extension lines on the left and the hole callout
-# below; the sheet thickness rides above the right view, its one-line
-# as-supplied stock callout in the clear field above the value.
+# below; the sheet thickness rides above the right view, its value outboard
+# right of the view's extension lines (centred between them, the lines struck
+# its digits, machinist review ENFORCE r1-r3) and its one-line as-supplied
+# stock callout in the clear field above the value.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.125),
     "Height": (0.057, FRONT_CENTER[1]),
@@ -123,7 +131,7 @@ FRONT_KEEP = {
     "Hole1Y": (0.076, 0.147),
     "CornerR": (0.215, 0.211),
 }
-RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.209)}
+RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0] + 0.023, 0.209)}
 # Both holes stand on the one Y coordinate the part prints (Hole1Y); the one
 # printed fillet stands for all four equal corners (CornerR). A custom prefix
 # replaces SolidWorks' own radius "R", so it carries it ("4X 1.8" printed
@@ -135,6 +143,22 @@ DIMENSION_CALLOUTS = {"Depth": LOCK_STOCK_CALLOUT}
 # between that edge and the right view.
 HOLE_CALLOUT_XY = (0.230, 0.185)
 HOLE_CALLOUT_PROCESS = "DRILL"
+# The hole coordinates' ±0.035 bands exist for the mate (rule 4): the
+# pattern must land on the platen guide's #4-40 taps with the lock-screw
+# shanks clear in their holes (pd_vn_guide_lock_screw_spec.LOCK_SET_OFFSET),
+# so the callout names both. The least edge wall at the printed worst case
+# (HOLE_LIGAMENTS_WORST, the right end) sits under the 2.0 target and prints
+# as a plain fact (rule 20), floored to the printed places. Rows stay at most
+# 23 characters so the block keeps between the plate and the right view.
+GUIDE_NUMBER = _config.parts("pd-platen-guide")["number"]
+SCREW_NUMBER = _config.parts("pd-vn-guide-lock-screw")["number"]
+EDGE_WALL_MIN = math.floor(min(HOLE_LIGAMENTS_WORST.values()) * 100.0) / 100.0
+HOLE_CALLOUT_BELOW = (
+    f"MATCHES {GUIDE_NUMBER} TAPS,\n"
+    "CLEARANCE FIT ON\n"
+    f"{SCREW_NUMBER} SCREWS\n"
+    f"EDGE WALL {EDGE_WALL_MIN:.2f} MIN"
+)
 
 
 def _set_dimension_prefixes(
@@ -153,6 +177,26 @@ def _set_dimension_prefixes(
             raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
     if remaining:
         raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+
+
+def _set_hole_callout_below(display: Any, text: str) -> None:
+    """Write ``text`` under the native hole callout and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_ch_channel_lever._name_hole_mate)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    below = definitions[8].rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "guide-lock hole callout mate or native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -202,6 +246,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # edge-on needs no hidden bores.
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
+    # Seen edge-on, the corner fillets' tangent edges drew as two solid lines
+    # across the sheet's thickness that read as steps (machinist review
+    # ENFORCE r1); the plain plate needs none of them.
+    right.SetDisplayTangentEdges2(0)  # swTangentEdgesHidden
+    if int(right.GetDisplayTangentEdges2()) != 0:
+        raise RuntimeError("failed to hide the right view's tangent edges")
+    right.UpdateViewDisplayGeometry()
 
     # The places and the explicit bands (sheet thickness, hole coordinates)
     # are authored on the part (the paper-drive lock-station
@@ -219,7 +270,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
-    add_native_hole_callout(
+    hole_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -230,6 +281,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="guide-lock screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
+    _set_hole_callout_below(hole_callout, HOLE_CALLOUT_BELOW)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
