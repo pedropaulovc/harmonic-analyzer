@@ -112,7 +112,6 @@ Keep the lane budgets, independent-scale readback, strict native containment,
 caption checks and supplier-source preservation guards unchanged. Do not
 shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
 or suppress exhaustion to make the old 12 mm allocation pass.
-
 ### Measured native supplier-reference text shelves
 
 `_supplier_reference_text.shelve_reference_text` extracts the proven shared

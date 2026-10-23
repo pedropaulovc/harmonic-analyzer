@@ -230,7 +230,6 @@ def _offset_text_path_indices(
                 candidates.append((connector_index, underline_index))
     return candidates[0] if len(candidates) == 1 else None
 
-
 def measure_reference_text(
     adapter: Any, display: Any, *, axis: int, label: str
 ) -> dict[str, Any]:
