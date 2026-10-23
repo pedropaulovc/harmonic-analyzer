@@ -256,9 +256,18 @@ def test_source_census_requires_the_wire_presentation_to_be_collapsed(
 
 
 class _Bom:
-    def __init__(self, drawing, member, *, advertised_excess=0):
+    def __init__(
+        self,
+        drawing,
+        member,
+        *,
+        configurations=(("Default", "Default Simplified"), (False, True)),
+    ):
         self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY.", "PART NUMBER"]]
-        self.advertised_excess = advertised_excess
+        self.configurations = configurations
+        self.BomFeature = SimpleNamespace(
+            GetConfigurations=lambda _only_visible, _unused: self.configurations
+        )
         self.columns = [
             {"kind": 202, "property": None, "hidden": False, "width": 0.02},
             {
@@ -333,7 +342,7 @@ class _Bom:
 
     @property
     def TotalColumnCount(self):
-        return len(self.columns) + self.advertised_excess
+        return len(self.columns) + len(self.configurations[0]) - 1
 
     def _column_index(self, index, include_hidden):
         indices = [
@@ -350,15 +359,35 @@ class _Bom:
         column = self.columns[physical]
         return column["kind"], column["property"], 0
 
+    def _visibility_slots(self):
+        # 0-based native visibility domain: deselected configurations' latent
+        # Quantity columns precede the selected Qty (k of them) or trail.
+        names, flags = self.configurations
+        selected = flags.index(True)
+        slots = list(range(len(self.columns)))
+        quantity = next(
+            index for index, column in enumerate(self.columns) if column["kind"] == 203
+        )
+        latent = len(names) - 1
+        return (
+            slots[:quantity]
+            + [None] * selected
+            + slots[quantity:]
+            + [None] * (latent - selected)
+        )
+
     def ColumnHidden(self, index):
-        # Visibility PROPERTY indices are 1-based; typed/text indices are not.
-        physical = self._column_index(index - 1, True)
+        slots = self._visibility_slots()
+        physical = slots[index] if 0 <= index < len(slots) else None
         return self.columns[physical]["hidden"] if physical is not None else False
 
     def SetColumnHidden(self, index, hidden):
-        physical = self._column_index(index - 1, True)
-        if physical is None:
+        slots = self._visibility_slots()
+        if not 0 <= index < len(slots):
             raise IndexError("invalid visibility property")
+        physical = slots[index]
+        if physical is None:
+            raise AssertionError("latent Quantity column must not be written")
         self.columns[physical]["hidden"] = hidden
 
     def GetColumnWidth(self, index):
@@ -385,7 +414,9 @@ class _Bom:
         return self.cells[row][physical] if physical is not None else ""
 
     def GetComponents2(self, row, configuration):
-        return self.components[row] if configuration == "Default Simplified" else ()
+        names, flags = self.configurations
+        selected = names[flags.index(True)]
+        return self.components[row] if configuration == selected else ()
 
     def IsCellTextEditable(self, _row, column):
         physical = self._column_index(column, True)
@@ -437,15 +468,26 @@ class _Bom:
 
 
 @pytest.mark.parametrize("drawing,member,_assembly", CONSUMERS)
-@pytest.mark.parametrize("advertised_excess", [0, 1])
+@pytest.mark.parametrize(
+    "configurations",
+    [
+        (("Default Simplified",), (True,)),
+        (("Default Simplified", "Default"), (True, False)),
+        (("Default", "Default Simplified"), (False, True)),
+    ],
+    ids=["single", "selected-first", "selected-second"],
+)
 def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
-    monkeypatch, drawing, member, _assembly, advertised_excess
+    monkeypatch, drawing, member, _assembly, configurations
 ):
     _unwrapped_com(monkeypatch, drawing)
-    table = _Bom(drawing, member + " Simplified", advertised_excess=advertised_excess)
+    table = _Bom(drawing, member + " Simplified", configurations=configurations)
+    latent = len(configurations[0]) - 1
+    latent_before = configurations[1].index(True)
     assert table.GetColumnType3(4, True)[0] == 201
-    assert table.ColumnHidden(4) is False
-    assert table.ColumnHidden(5) is True
+    # Typed Qty3 / native201[4] sit after the k latents preceding the selected Qty.
+    assert table.ColumnHidden(3 + latent_before) is False
+    assert table.ColumnHidden(4 + latent_before) is True
     assert table.GetColumnType3(5, True) == (-1, None, 0)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     items = dict(drawing._validate_bom(adapter, table))
@@ -458,12 +500,14 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
         for _row, column, include_hidden, _text in table.writes
     )
     assert len(table.columns) == table.ColumnCount + 1
-    assert table.TotalColumnCount == len(table.columns) + advertised_excess
+    assert table.TotalColumnCount == len(table.columns) + latent
     native_column = len(table.columns) - 1
     assert table.GetColumnType3(native_column, True)[0] == 201
     assert native_column == 5
-    assert table.ColumnHidden(native_column + 1) is True
-    assert table.ColumnHidden(native_column) is False
+    assert _drawing_tables._bom_column_hidden(table, native_column, label="native")
+    assert not _drawing_tables._bom_column_hidden(
+        table, native_column - 1, label="native"
+    )
     assert table.GetColumnWidth(native_column) == 0.0
     assert table.GetColumnType3(1, True) == (204, '$PRP:"Number"', 0)
     assert table.GetColumnCustomProperty(1) == "Number"
@@ -528,7 +572,8 @@ def test_bom_uses_native_member_identity_and_preserves_associative_numbers(
             assert table.GetColumnTitle2(index, include_hidden) == ""
             assert table.DisplayedText2(0, index, include_hidden) == ""
         assert table.GetColumnWidth(index) == 0.0
-        assert table.ColumnHidden(index + 1) is False
+        # Past-the-end visibility index (shifted by the k preceding latents).
+        assert table.ColumnHidden(index + latent_before) is False
         assert table.GetColumnCustomProperty(index) == ""
 
 
@@ -550,8 +595,8 @@ def test_bom_refuses_invisible_or_wrong_visible_projection_after_sku(
     if fault in ("qty-hidden", "number-hidden"):
         # Model the real wrong-property mutation, not a fabricated False view.
         hidden_column = quantity_column if fault == "qty-hidden" else 1
-        table.SetColumnHidden(hidden_column + 1, True)
-        table.SetColumnHidden(native_column + 1, False)
+        _drawing_tables._set_bom_column_hidden(table, hidden_column, True, label="f")
+        _drawing_tables._set_bom_column_hidden(table, native_column, False, label="f")
         table.columns[native_column]["width"] = 0.02
         assert table.GetColumnType3(hidden_column, True)[0] in (203, 204)
         assert table.GetColumnTitle2(hidden_column, False) != (

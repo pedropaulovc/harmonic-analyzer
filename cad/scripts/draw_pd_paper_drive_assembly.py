@@ -86,9 +86,9 @@ from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_tables import (
     BomSnapshot,
-    _bom_column_hidden,
+    _bom_column_hidden_at,
     _bom_physical_columns,
-    _set_bom_column_hidden,
+    _bom_visibility_index,
     bom_row_identities,
     insert_bom_table,
     validate_bom_number_property,
@@ -1774,7 +1774,12 @@ def _set_bom_column_widths(
     ):
         raise RuntimeError("paper-drive BOM widths need one hidden trailing native column")
     native_column = len(physical) - 1
-    original_hidden = _bom_column_hidden(table, native_column, label="paper-drive widths")
+    # Restore exactly the visibility slot that was exposed, even if the typed
+    # census changes meanwhile (latent Quantity columns shift this index).
+    native_visibility = _bom_visibility_index(table, native_column, label="paper-drive widths")
+    original_hidden = _bom_column_hidden_at(
+        table, native_visibility, native_column, label="paper-drive widths"
+    )
     if original_hidden is not True:
         raise RuntimeError("paper-drive BOM native column hidden state is not proven")
     if (
@@ -1811,7 +1816,7 @@ def _set_bom_column_widths(
     primary_error: BaseException | None = None
     try:
         # Width indices remain unversioned: author only in the all-visible window.
-        _set_bom_column_hidden(table, native_column, False, label="paper-drive widths")
+        table.SetColumnHidden(native_visibility, False)  # VT_VOID, not success.
         prove_all_visible()
         expected_widths = [float(table.GetColumnWidth(index)) for index in range(len(physical))]
         if any(not math.isfinite(width) or width <= 0.0 for width in expected_widths):
@@ -1838,9 +1843,7 @@ def _set_bom_column_widths(
     finally:
         try:
             # Also restore if exposing the native column raised after taking effect.
-            _set_bom_column_hidden(
-                table, native_column, original_hidden, label="paper-drive restored widths"
-            )
+            table.SetColumnHidden(native_visibility, original_hidden)  # VT_VOID.
             if _bom_physical_columns(table, label="paper-drive restored widths") != physical:
                 raise RuntimeError("paper-drive BOM native column hidden state was not restored")
             if tuple(column_record(index, True) for index in range(len(physical))) != original_records:

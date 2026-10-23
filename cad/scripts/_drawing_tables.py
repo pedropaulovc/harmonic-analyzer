@@ -515,17 +515,94 @@ def bom_row_identities(
     return result
 
 
-def _bom_column_hidden(table: Any, physical_column: int, *, label: str) -> bool:
-    """Read the native one-based visibility PROPERTY for a physical column."""
+def _bom_visibility_offset(
+    table: Any, kinds: Sequence[Any], declared: int, *, label: str
+) -> tuple[int, int]:
+    """Locate the latent Quantity columns of deselected BOM configurations.
+
+    A top-level BOM keeps one Quantity column per available configuration
+    (``IBomFeature.GetConfigurations`` remarks), in that configuration order.
+    Only the selected configuration's column is in the typed/title/text
+    ``IncludeHidden`` index domain; each deselected one stays latent, yet
+    ``TotalColumnCount`` and the 0-based ``ColumnHidden``/``SetColumnHidden``
+    domain still count it. Native paper-drive evidence with configurations
+    ``('Default', 'Default Simplified')``: selecting Default Simplified put
+    visibility index 4 on typed Qty3 and 5 on the trailing native201[4];
+    selecting Default put index 4 on native201[4], while writing index 5
+    materialized the latent Default Simplified Qty as a hidden column.
+
+    Returns the typed index of the selected Quantity column and the number of
+    latent columns that precede it (and every later typed column).
+    """
+    annotation = _sw_type_info.early_bound_or_flag(
+        table, "IBomTableAnnotation", "BomFeature"
+    )
+    feature = annotation.BomFeature
+    if feature is None:
+        raise RuntimeError(f"{label} BOM table has no BOM feature")
+    feature = _sw_type_info.early_bound_or_flag(
+        feature, "IBomFeature", "GetConfigurations"
+    )
+    names, visibility = feature.GetConfigurations(False, None)
+    names = tuple(names or ())
+    visibility = tuple(visibility or ())
+    if (
+        not names
+        or any(type(name) is not str or not name for name in names)
+        or len(set(names)) != len(names)
+        or len(visibility) != len(names)
+        or any(type(visible) is not bool for visible in visibility)
+        or sum(visibility) != 1
+    ):
+        raise RuntimeError(
+            f"{label} BOM column visibility needs exactly one selected "
+            f"configuration: names={repr(names)[:256]}, "
+            f"visibility={repr(visibility)[:128]}"
+        )
+    quantities = [index for index, kind in enumerate(kinds) if kind == 203]
+    latent = declared - len(kinds)
+    if len(quantities) != 1 or latent != len(names) - 1:
+        raise RuntimeError(
+            f"{label} BOM Quantity columns do not match its configurations: "
+            f"typed Quantity indices {quantities}, {latent} latent columns, "
+            f"{len(names)} configurations"
+        )
+    return quantities[0], visibility.index(True)
+
+
+def _bom_visibility_index(table: Any, physical_column: int, *, label: str) -> int:
+    """Translate a typed physical column into the native visibility domain."""
     if type(physical_column) is not int or physical_column < 0:
         raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
-    hidden = table.ColumnHidden(physical_column + 1)
+    declared = int(table.TotalColumnCount)
+    kinds: list[Any] = []
+    for index in range(declared):
+        kind = table.GetColumnType3(index, True)[0]
+        if type(kind) is int and kind == -1:
+            break
+        kinds.append(kind)
+    quantity, latent_before = _bom_visibility_offset(
+        table, kinds, declared, label=label
+    )
+    return physical_column + (latent_before if physical_column >= quantity else 0)
+
+
+def _bom_column_hidden_at(
+    table: Any, visibility_index: int, physical_column: int, *, label: str
+) -> bool:
+    hidden = table.ColumnHidden(visibility_index)
     if type(hidden) is not bool:
         raise RuntimeError(
             f"{label} BOM column visibility is not BOOL at physical index "
             f"{physical_column}"
         )
     return hidden
+
+
+def _bom_column_hidden(table: Any, physical_column: int, *, label: str) -> bool:
+    """Read the native visibility of a typed physical column."""
+    index = _bom_visibility_index(table, physical_column, label=label)
+    return _bom_column_hidden_at(table, index, physical_column, label=label)
 
 
 def _set_bom_column_hidden(
@@ -536,7 +613,8 @@ def _set_bom_column_hidden(
         raise ValueError(f"{label} BOM physical column must be a nonnegative integer")
     if type(hidden) is not bool:
         raise ValueError(f"{label} BOM column hidden state must be BOOL")
-    table.SetColumnHidden(physical_column + 1, hidden)  # VT_VOID, not success.
+    index = _bom_visibility_index(table, physical_column, label=label)
+    table.SetColumnHidden(index, hidden)  # VT_VOID, not success.
 
 
 def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], ...]:
@@ -556,7 +634,7 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
             table.DisplayedText2(0, index, False),
         )
         width = table.GetColumnWidth(index)
-        hidden = _bom_column_hidden(table, index, label=label)
+        hidden = _bom_column_hidden_at(table, visibility(index), index, label=label)
         binding = annotation.GetColumnCustomProperty(index)
         for kind, property_data, status in (physical_type, visible_type):
             if (
@@ -589,8 +667,8 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
             raise RuntimeError(
                 f"{label} BOM physical column census bounds are {visible}/{declared}"
             )
-        # Discover the whole typed prefix before reading visibility. A trailing
-        # native column's PROPERTY index can equal the first typed-invalid slot.
+        # Discover the whole typed prefix before reading visibility: latent
+        # Quantity columns shift the visibility domain, not the typed one.
         typed_prefix: list[Any] = []
         typed_tail: list[tuple[int, Any]] = []
         in_tail = False
@@ -613,15 +691,23 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
                 )
             typed_prefix.append(physical_type)
 
+        quantity, latent_before = _bom_visibility_offset(
+            table, [physical_type[0] for physical_type in typed_prefix], declared,
+            label=label,
+        )
+
+        def visibility(index: int) -> int:
+            return index + (latent_before if index >= quantity else 0)
+
         physical: list[tuple[int, bool]] = []
         metadata: list[tuple[Any, Any, Any]] = []
         visible_index = 0
         for index, physical_type in enumerate(typed_prefix):
             kind, _property_data, _status = physical_type
-            hidden = _bom_column_hidden(table, index, label=label)
+            hidden = _bom_column_hidden_at(table, visibility(index), index, label=label)
             # The unversioned width accessor uses visible positions, not the
-            # visibility PROPERTY's +1 domain. Hidden reads only prove a finite
-            # nonnegative accessor result; they do not measure hidden width.
+            # visibility domain. Hidden reads only prove a finite nonnegative
+            # accessor result; they do not measure hidden width.
             width = table.GetColumnWidth(index if hidden else visible_index)
             if not hidden:
                 visible_index += 1
@@ -679,7 +765,7 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
                 try:
                     columns = tuple(
                         (
-                            index, index + 1, kind, hidden,
+                            index, visibility(index), kind, hidden,
                             repr(metadata[index][0])[:192],
                             str(metadata[index][1])[:96],
                             str(metadata[index][2])[:96],
@@ -688,7 +774,7 @@ def _bom_physical_columns(table: Any, *, label: str) -> tuple[tuple[int, bool], 
                     )
                     observations = (
                         f"; ColumnCount={visible}, TotalColumnCount={declared}; "
-                        f"columns(physical,visibility_property,kind,hidden,type,title,header)"
+                        f"columns(physical,visibility_index,kind,hidden,type,title,header)"
                         f"={columns!r}; visible_read={repr(projected)[:512]}"
                     )
                 except Exception:

@@ -2138,6 +2138,14 @@ class _MagnifierBomTable:
         self.text_writes = []
         self.title_writes = []
         self.number_property = "Number"
+        # Native: one Quantity column per configuration; deselected ones are latent.
+        self.configurations = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+        self.selected_configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+        self.BomFeature = SimpleNamespace(GetConfigurations=self._get_configurations)
+
+    def _get_configurations(self, _only_visible, _unused):
+        names = tuple(self.configurations)
+        return names, tuple(name == self.selected_configuration for name in names)
 
     @property
     def RowCount(self):
@@ -2158,7 +2166,7 @@ class _MagnifierBomTable:
 
     @property
     def TotalColumnCount(self):
-        return len(self.column_types)
+        return len(self.column_types) + len(self.configurations) - 1
 
     def _physical_column(self, column, include_hidden=True):
         columns = [
@@ -2171,9 +2179,25 @@ class _MagnifierBomTable:
         physical = self._physical_column(column, include_hidden)
         return (-1, None, 0) if physical is None else self.column_types[physical]
 
+    def _visibility_physical(self, column):
+        # 0-based visibility domain: latents of earlier configurations sit just
+        # before the selected Quantity column; later ones after the last column.
+        quantity = next(
+            index for index, kind in enumerate(self.column_types) if kind[0] == 203
+        )
+        selected = self.configurations.index(self.selected_configuration)
+        if column < quantity:
+            return column
+        if column < quantity + selected:
+            return None
+        physical = column - selected
+        return physical if physical < len(self.column_types) else None
+
     def ColumnHidden(self, column):
-        # Visibility PROPERTY indices are 1-based; storage remains physical.
-        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
+        if column < 0:
+            return False
+        physical = self._visibility_physical(column)
+        return False if physical is None else self.hidden[physical]
 
     def GetColumnWidth(self, column):
         physical = self._physical_column(column, False)
@@ -2350,6 +2374,7 @@ def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
         assert table.DisplayedText(0, 4) == "QTY."
         assert table.GetColumnType3(4, True)[0] == 203
         assert table.GetColumnType3(4, False)[0] == 203
+        # Visibility index = typed + 1 past Quantity (one earlier latent, "Default").
         assert table.ColumnHidden(6) is True
         assert table.ColumnHidden(5) is False
         proof = drawing.validate_bom_number_property(

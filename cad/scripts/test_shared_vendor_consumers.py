@@ -483,14 +483,40 @@ def test_semantic_balloon_anchor_refuses_hidden_duplicate_or_missing_occurrence(
         )
 
 
-class _NumberTable:
-    """Physical typed/text storage with one-based visibility PROPERTY indices."""
+class _BomConfigurations:
+    """IBomFeature with one Quantity column per available configuration."""
 
-    def __init__(self, components, *, advertised_excess=0):
+    def __init__(
+        self,
+        available=("Default", "Default Simplified"),
+        selected="Default Simplified",
+        *,
+        PartConfigurationGrouping=1,
+    ):
+        self.available = tuple(available)
+        self.selected = (selected,)
+        self.PartConfigurationGrouping = PartConfigurationGrouping
+        self.DisplayAsOneItem = False
+
+    def GetConfigurations(self, only_visible, _visible):
+        names = self.selected if only_visible else self.available
+        return tuple(names), tuple(name in self.selected for name in names)
+
+
+class _NumberTable:
+    """Physical typed/text storage with the native 0-based visibility domain.
+
+    Each deselected configuration keeps a latent Quantity column: absent from
+    typed/text indices, present in ``ColumnHidden``/``SetColumnHidden``.
+    Earlier configurations' latents precede the selected Quantity column;
+    later ones follow the last typed column.
+    """
+
+    def __init__(self, components):
         self.cells = [["ITEM NO.", "PART NUMBER", "QTY."], ["1", "native-key", "1"]]
         self.components = tuple(components)
         self.components_by_row = None
-        self.advertised_excess = advertised_excess
+        self.BomFeature = _BomConfigurations()
         self.columns = [
             {"kind": 202, "property": None, "hidden": False, "width": 0.02},
             {"kind": 201, "property": False, "hidden": False, "width": 0.02},
@@ -517,7 +543,24 @@ class _NumberTable:
 
     @property
     def TotalColumnCount(self):
-        return len(self.columns) + self.advertised_excess
+        names, _flags = self.BomFeature.GetConfigurations(False, None)
+        return len(self.columns) + len(names) - 1
+
+    def _visibility_columns(self):
+        """Physical typed index per visibility index; ``None`` is latent."""
+        names, flags = self.BomFeature.GetConfigurations(False, None)
+        quantities = [
+            index for index, column in enumerate(self.columns) if column["kind"] == 203
+        ]
+        quantity = quantities[0] if quantities else len(self.columns)
+        before = list(flags).index(True) if True in flags else 0
+        typed = list(range(len(self.columns)))
+        return (
+            typed[:quantity]
+            + [None] * before
+            + typed[quantity:]
+            + [None] * (len(names) - 1 - before)
+        )
 
     def _column_index(self, index, include_hidden):
         indices = [
@@ -579,15 +622,19 @@ class _NumberTable:
         return True
 
     def SetColumnHidden(self, index, hidden):
-        physical = index - 1
-        if self._column_index(physical, True) is None:
-            raise IndexError("invalid visibility PROPERTY index")
+        domain = self._visibility_columns()
+        if not 0 <= index < len(domain):
+            raise IndexError("invalid visibility index")
+        physical = domain[index]
+        if physical is None:
+            raise AssertionError("latent Quantity column must not be written")
         if self.accept_hide:
             self.columns[physical]["hidden"] = hidden
         # Generated indexed property setter returns VT_VOID, not success.
 
     def ColumnHidden(self, index):
-        physical = self._column_index(index - 1, True)
+        domain = self._visibility_columns()
+        physical = domain[index] if 0 <= index < len(domain) else None
         return self.columns[physical]["hidden"] if physical is not None else False
 
     def GetColumnWidth(self, index):
@@ -844,10 +891,18 @@ def number_binding(unwrapped_com, monkeypatch):
 
 
 @pytest.mark.parametrize("member", ["LeverWire", "LeverWire Simplified"])
-@pytest.mark.parametrize("advertised_excess", [0, 1])
+@pytest.mark.parametrize(
+    "configurations",
+    [
+        ("Default Simplified",),
+        ("Default Simplified", "Default"),
+        ("Default", "Default Simplified"),
+    ],
+    ids=["no-latent", "selected-first", "selected-second"],
+)
 @pytest.mark.parametrize("occurrences", [1, 3])
 def test_number_column_binds_native_property_and_reads_actual_configuration(
-    number_binding, member, advertised_excess, occurrences
+    number_binding, member, configurations, occurrences
 ):
     adapter, _rebuilds = number_binding
     properties = {
@@ -865,7 +920,9 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
         )
         for ordinal in range(1, occurrences + 1)
     ]
-    table = _NumberTable(components, advertised_excess=advertised_excess)
+    table = _NumberTable(components)
+    table.BomFeature.available = configurations
+    latent_before = configurations.index("Default Simplified")
     table.cells[1][2] = str(occurrences)
     table.cells[0][1] = " part number "
     tables._bind_bom_number_property(
@@ -883,9 +940,11 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
     assert table.cells[0][1] == "PART NUMBER"
     assert table.ColumnCount == 3
     assert len(table.columns) == 4
-    assert table.TotalColumnCount == 4 + advertised_excess
+    assert table.TotalColumnCount == 4 + len(configurations) - 1
     assert table.GetColumnType3(3, True)[0] == 201
-    assert table.ColumnHidden(4) is True
+    # Visibility index of typed native201[3] skips latents of earlier configurations.
+    assert tables._bom_visibility_index(table, 3, label="wire") == 3 + latent_before
+    assert table.ColumnHidden(3 + latent_before) is True
     assert table.GetColumnWidth(3) == 0.0
     assert table.GetColumnType3(2, True)[0] == 203
     assert table.GetColumnType3(2, False)[0] == 203
@@ -927,7 +986,7 @@ def test_number_column_binds_native_property_and_reads_actual_configuration(
             assert table.GetColumnTitle2(index, include_hidden) == ""
             assert table.DisplayedText2(0, index, include_hidden) == ""
         assert table.GetColumnWidth(index) == 0.0
-        assert table.ColumnHidden(index + 1) is False
+        assert table.ColumnHidden(index + latent_before) is False
         assert table.GetColumnCustomProperty(index) == ""
 
     # Changing the actual selected member makes the displayed Number stale,
@@ -1157,9 +1216,7 @@ def grouped_number_table(number_binding):
             )
         )
     table.RowCount = table.TotalRowCount = len(table.cells)
-    table.BomFeature = SimpleNamespace(
-        PartConfigurationGrouping=3, DisplayAsOneItem=False
-    )
+    table.BomFeature = _BomConfigurations(PartConfigurationGrouping=3)
     native_members = {
         row: tuple(
             (component.Name2, component.ReferencedConfiguration, component.ComponentReference)
@@ -1201,7 +1258,8 @@ def test_visibility_property_hides_native_not_grouped_qty(grouped_number_table):
     )
     physical_cells = tuple(tuple(row) for row in table.cells)
 
-    # Native PROPERTY4 hides physical Qty3, not native201physical4.
+    # With Default Simplified selected, the latent Default Qty is visibility
+    # index 3, so index 4 hides physical Qty3, not native201physical4 (index 5).
     table.SetColumnHidden(5, False)
     table.SetColumnHidden(4, True)
     assert table.columns[3]["hidden"] is True
@@ -1241,20 +1299,38 @@ def test_visibility_property_hides_native_not_grouped_qty(grouped_number_table):
 
 
 @pytest.mark.parametrize("with_sku", [False, True])
-@pytest.mark.parametrize("advertised_excess", [0, 1, 2])
+@pytest.mark.parametrize(
+    "configurations, selected",
+    [
+        (("Default Simplified",), "Default Simplified"),
+        (("Default", "Default Simplified"), "Default"),
+        (("Default", "Default Simplified"), "Default Simplified"),
+        (("Default", "Default Simplified", "Default Spare"), "Default Simplified"),
+    ],
+    ids=["no-latent", "selected-first", "selected-second", "latents-both-sides"],
+)
 @pytest.mark.parametrize("invalid_status", [0, 1])
 def test_hidden_native_property_may_collide_with_first_typed_invalid_slot(
-    grouped_number_table, with_sku, advertised_excess, invalid_status
+    grouped_number_table, with_sku, configurations, selected, invalid_status
 ):
     table, expected = grouped_number_table
-    table.advertised_excess = advertised_excess
+    table.BomFeature.available = configurations
+    table.BomFeature.selected = (selected,)
     table.invalid_status = invalid_status
     if with_sku:
         assert table.InsertColumn2(3, 1, "VENDOR SKU", 0)
     native = len(table.columns) - 1
     first_invalid = native + 1
     table.columns[native]["width"] = 0.0
-    assert table.ColumnHidden(first_invalid) is True
+    # The old "advertised excess" is the latent Quantity count; one latent
+    # before the selected Qty puts the native hidden column at visibility
+    # index first_invalid, which is still the typed-last column.
+    latent_before = configurations.index(selected)
+    assert table.TotalColumnCount == len(table.columns) + len(configurations) - 1
+    visibility = tables._bom_visibility_index(table, native, label="typed-last native")
+    assert visibility == native + latent_before
+    assert (visibility == first_invalid) is (latent_before == 1)
+    assert table.ColumnHidden(visibility) is True
     assert table.GetColumnType3(first_invalid, True) == (-1, None, invalid_status)
     assert tables._bom_column_hidden(
         table, first_invalid, label="mapped invalid tail"
@@ -1362,7 +1438,6 @@ def test_column_census_refuses_real_tail_and_projection_damage(
     grouped_number_table, monkeypatch, fault
 ):
     table, _expected = grouped_number_table
-    table.advertised_excess = 1
     tail = len(table.columns)
     control = table.TotalColumnCount + 1
     if fault in ("tail-type", "tail-status", "interior", "control-status", "visible-type"):
@@ -1401,7 +1476,9 @@ def test_column_census_refuses_real_tail_and_projection_damage(
         )
     elif fault in ("tail-hidden", "control-hidden"):
         original = table.ColumnHidden
-        property_index = (tail if fault == "tail-hidden" else control) + 1
+        property_index = tables._bom_visibility_index(
+            table, tail if fault == "tail-hidden" else control, label="census fault"
+        )
         assert original(property_index) is False
         monkeypatch.setattr(
             table, "ColumnHidden", lambda index: True if index == property_index else original(index)
@@ -1452,6 +1529,36 @@ def test_visibility_helpers_require_actual_bool_states(monkeypatch, hidden):
         tables._bom_column_hidden(table, 1, label="invalid hidden result")
 
 
+@pytest.mark.parametrize(
+    "selected",
+    [(), ("Default", "Default Simplified")],
+    ids=["none-selected", "two-selected"],
+)
+def test_visibility_refuses_ambiguous_configuration_selection(selected):
+    table = _NumberTable([])
+    table.BomFeature.selected = selected
+    with pytest.raises(
+        RuntimeError, match="needs exactly one selected configuration"
+    ):
+        tables._bom_column_hidden(table, 2, label="ambiguous configuration")
+    with pytest.raises(RuntimeError, match="needs exactly one selected configuration"):
+        tables._bom_physical_columns(table, label="ambiguous configuration")
+
+
+def test_visibility_refuses_quantity_columns_that_do_not_match_configurations():
+    table = _NumberTable([])
+    table.columns.append(
+        {"kind": 203, "property": None, "hidden": False, "width": 0.02}
+    )
+    for row in table.cells:
+        row.append(row[2])
+    with pytest.raises(
+        RuntimeError, match="Quantity columns do not match its configurations"
+    ):
+        tables._bom_column_hidden(table, 2, label="extra Quantity")
+    assert not any(column["hidden"] for column in table.columns)
+
+
 @pytest.mark.parametrize("name, column", [("Number", 1), ("quantity", 2)])
 def test_number_binding_proves_consumer_visible_cells_after_actual_rebuild(
     number_binding, monkeypatch, name, column
@@ -1474,7 +1581,7 @@ def test_number_binding_proves_consumer_visible_cells_after_actual_rebuild(
         )
     assert table.DisplayedText2(1, 1, True) == NUMBER
     assert table.DisplayedText2(1, 2, True) == "1"
-    assert table.ColumnHidden(4) is True
+    assert tables._bom_column_hidden(table, 3, label="rebuilt native") is True
 
 
 @pytest.fixture
