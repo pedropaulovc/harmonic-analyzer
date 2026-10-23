@@ -909,6 +909,40 @@ def _look_section_south(
     )
 
 
+# A-A's underside on the sheet: the strip's foot, centred on SECTION_CENTER's
+# y as when the section looked north (the PlateThk witness check reads this
+# level and the top face's, 2 x 6.35 mm above it).  Reversed, SolidWorks kept
+# the cut-plane origin (the underside) at its old sheet y, 0.12635, and drew
+# the strip upward from there, 12.7 mm higher (run 20261023T181910549Z:
+# relief floor at 0.13855).
+PIVOT_SECTION_UNDERSIDE_Y = SECTION_SHIFT[1] + 0.09865
+
+
+def _place_pivot_section(adapter: Any, section: Any) -> None:
+    """Move A-A so its underside stands at PIVOT_SECTION_UNDERSIDE_Y, the
+    strip centred on SECTION_CENTER's y as before the reversal."""
+    native = _early_bound(section, "IView")
+    for _attempt in range(3):
+        origin = model_point_in_view(
+            adapter, section, (0.0, 0.0, 0.0), label="A-A underside at the bore"
+        )
+        error = PIVOT_SECTION_UNDERSIDE_Y - float(origin[1])
+        if abs(error) < 0.00005:
+            break
+        position = tuple(float(value) for value in native.Position)
+        if not native.SetViewPosition(
+            double_array([position[0], position[1] + error]), False
+        ):
+            raise RuntimeError("failed to move section A-A onto its strip station")
+        rebuild_drawing(adapter, label="place section A-A strip")
+    else:
+        raise RuntimeError(
+            f"section A-A underside landed at y {origin[1]}, "
+            f"requested {PIVOT_SECTION_UNDERSIDE_Y}"
+        )
+    print(f"section A-A underside at bore axis: {tuple(float(v) for v in origin[:2])}")
+
+
 def _look_holddown_section_south(
     adapter: Any, parent: Any, section: Any, cut: Any
 ) -> None:
@@ -1915,6 +1949,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _look_section_south(adapter, profile, section, cut, z_mm=0.0, label="A-A")
+    _place_pivot_section(adapter, section)
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(

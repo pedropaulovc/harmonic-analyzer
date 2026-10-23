@@ -1805,6 +1805,35 @@ def test_sections_turn_to_look_south_top_face_up(monkeypatch, defect) -> None:
             look()
 
 
+@pytest.mark.parametrize("ignored", [False, True])
+def test_reversed_pivot_section_is_moved_back_onto_its_station(monkeypatch, ignored):
+    """Run 20261023T181910549Z: reversed, A-A kept its underside at 0.12635
+    and grew 12.7 mm upward, so one PlateThk witness missed its level.  The
+    view is moved until the underside reads PIVOT_SECTION_UNDERSIDE_Y; a
+    move SolidWorks ignores is refused."""
+    state = {"y": 0.12635}
+
+    def move(position, _snap):
+        if not ignored:
+            state["y"] += position[1] - 0.120
+        return True
+
+    view = types.SimpleNamespace(Position=(0.365, 0.120), SetViewPosition=move)
+    monkeypatch.setattr(drawing, "_early_bound", lambda item, _interface: item)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda *_args, **_kwargs: (0.372, state["y"])
+    )
+    assert drawing.PIVOT_SECTION_UNDERSIDE_Y == pytest.approx(0.11365)
+    if ignored:
+        with pytest.raises(RuntimeError, match="landed at"):
+            drawing._place_pivot_section(object(), view)
+    else:
+        drawing._place_pivot_section(object(), view)
+        assert state["y"] == pytest.approx(drawing.PIVOT_SECTION_UNDERSIDE_Y)
+
+
 @pytest.mark.parametrize(
     ("accepted", "persisted", "error"),
     (
