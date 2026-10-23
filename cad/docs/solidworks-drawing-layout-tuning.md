@@ -2615,8 +2615,12 @@ entity_type="FACE", ...)`, which qualifies the controlled face and exact face
 attachment. Attached to the rim, the selection point lands on the edge-on
 circle's projected extreme, the corner. This **one** finish
 is the local straight-leader exception: on its live early-bound `IAnnotation`,
-call `SetLeader3(1, 0, True, False, False, False)` and require actual integer
-status `0`, not a truthy/bool result. Do not change the shared factory's bent
+call `SetLeader3(1, 0, False, False, False, False)` then
+`SetArrowHeadStyleAtIndex(0, 1)` (`swCLOSED_ARROWHEAD`), each requiring actual
+integer status `0`, not a truthy/bool result: a smart arrowhead on a FACE
+attachment prints a dot (farm run 20261023T182235406Z), and the checkpoints
+require smart style off, style `1` and a style-`1` native head record. Do not
+change the shared factory's bent
 default or manipulate its root. A straight line from the old bent root can
 cross the symbol's own rising legs; refuse that crossing, rather than treating
 it as an attachment or tolerance waiver.

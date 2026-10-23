@@ -1734,6 +1734,7 @@ def _assert_collar_rear_finish(
     style = annotation.GetLeaderStyle()
     leader_count = annotation.GetLeaderCount()
     attached_count = annotation.GetAttachedEntityCount3()
+    arrow_style = annotation.GetArrowHeadStyleAtIndex(0)
     if (
         type(style) is not int or style != 1
         or type(leader_count) is not int or leader_count != 1
@@ -1741,6 +1742,11 @@ def _assert_collar_rear_finish(
         or annotation.IsDangling() is not False
     ):
         raise RuntimeError(f"{label}: expected one attached native STRAIGHT leader")
+    if (
+        annotation.GetSmartArrowHeadStyle() is not False
+        or type(arrow_style) is not int or arrow_style != 1  # swCLOSED_ARROWHEAD
+    ):
+        raise RuntimeError(f"{label}: expected the explicit filled arrowhead, not a smart one")
     _assert_attached_to(
         adapter, annotation, face, entity_type="FACE",
         what="surface-finish symbol", label=label,
@@ -1789,7 +1795,7 @@ def _assert_collar_rear_finish(
     if (
         math.dist(arrow[:2], points[3:5]) > NECK_GEOMETRY_TOLERANCE_M
         or math.hypot(*arrow[3:5]) == 0.0 or abs(arrow[5]) > 1e-9
-        or arrow[6] <= 0.0 or arrow[7] <= 0.0
+        or arrow[6] <= 0.0 or arrow[7] <= 0.0 or arrow[8] != 1.0
         or max(abs(arrow[9]), abs(arrow[10]), abs(abs(arrow[11]) - 1.0)) > 1e-9
     ):
         raise RuntimeError(f"{label}: malformed native surface-finish head geometry")
@@ -2558,11 +2564,18 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("crankshaft collar rear finish: missing captured native annotation")
     # This one symbol needs a straight native route; keep the shared finish
     # factory's default, the symbol origin, and the exact physical tip intact.
-    status = _early_bound(collar_rear_annotation, "IAnnotation").SetLeader3(
-        1, 0, True, False, False, False,
-    )
+    # A smart arrowhead on a FACE attachment prints a dot (swDOT_ARROWHEAD,
+    # farm run 20261023T182235406Z); the edge-on face line takes the filled
+    # arrow it carried when attached to the rim.
+    collar_rear_annotation = _early_bound(collar_rear_annotation, "IAnnotation")
+    status = collar_rear_annotation.SetLeader3(1, 0, False, False, False, False)
     if type(status) is not int or status != 0:
         raise RuntimeError(f"crankshaft collar rear finish: SetLeader3 failed ({status!r})")
+    status = collar_rear_annotation.SetArrowHeadStyleAtIndex(0, 1)  # swCLOSED_ARROWHEAD
+    if type(status) is not int or status != 0:
+        raise RuntimeError(
+            f"crankshaft collar rear finish: SetArrowHeadStyleAtIndex failed ({status!r})"
+        )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view prints hidden lines removed with the rest (drawing-guidelines.md

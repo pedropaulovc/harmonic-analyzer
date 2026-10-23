@@ -1342,6 +1342,9 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetAttachedEntityTypes=Mock(return_value=(2,)),  # swSelFACES
         GetLeaderCount=Mock(return_value=1), IsDangling=Mock(return_value=False),
         GetLeaderStyle=Mock(return_value=1), SetLeader3=Mock(return_value=0),
+        GetSmartArrowHeadStyle=Mock(return_value=False),
+        GetArrowHeadStyleAtIndex=Mock(return_value=1),  # swCLOSED_ARROWHEAD
+        SetArrowHeadStyleAtIndex=Mock(return_value=0),
         GetLeaderPointsAtIndex=Mock(return_value=(
             *drawing.COLLAR_REAR_FINISH[1], 0.0, *drawing.COLLAR_REAR_FINISH[0], 0.0,
         )),
@@ -2401,6 +2404,7 @@ def test_neck_head_trim_reuses_raw_shared_segments_without_dump_quantization(
     "wrong-roughness", "no-attachment", "duplicate-attachment", "count-mismatch",
     "wrong-entity-type", "foreign-face", "native-identity-zero", "dangling",
     "no-leader", "extra-leader", "unreadable-leader", "nonfinite-leader", "moved-tip",
+    "smart-arrowhead", "dot-arrowhead", "dot-head-record",
 ])
 def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_four_proofs(
     neck_dimension_fakes, phase, failure,
@@ -2436,6 +2440,12 @@ def test_collar_rear_finish_refuses_native_identity_spec_or_leader_drift_at_all_
         )
     elif failure == "dangling":
         annotation.IsDangling.return_value = True
+    elif failure == "smart-arrowhead":
+        annotation.GetSmartArrowHeadStyle.return_value = True
+    elif failure == "dot-arrowhead":
+        annotation.GetArrowHeadStyleAtIndex.return_value = 3  # swDOT_ARROWHEAD
+    elif failure == "dot-head-record":
+        f.finish_arrows[0] = (*f.finish_arrows[0][:8], 3.0, *f.finish_arrows[0][9:])
     elif failure in ("no-leader", "extra-leader"):
         annotation.GetLeaderCount.return_value = 0 if failure == "no-leader" else 2
     elif failure == "unreadable-leader":
@@ -2498,8 +2508,8 @@ def test_collar_rear_finish_records_actual_native_spec_identity_and_last_point_t
 
 
 @pytest.mark.parametrize(
-    "failure", [None, "unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", *_NECK_PHASES],
-    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", *_NECK_PHASES],
+    "failure", [None, "unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", "arrow-status", *_NECK_PHASES],
+    ids=["preserves-preexisting-callout", "rejects-unexpected-dimension", "bool-status", "float-status", "negative-status", "null-status", "arrow-status", *_NECK_PHASES],
 )
 def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
     neck_dimension_fakes, monkeypatch: pytest.MonkeyPatch, failure: str | None,
@@ -2512,6 +2522,8 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         f.collar_annotation.SetLeader3.return_value = {
             "bool-status": False, "float-status": 0.0, "negative-status": -1, "null-status": None,
         }[failure]
+    elif failure == "arrow-status":
+        f.collar_annotation.SetArrowHeadStyleAtIndex.return_value = -3  # smart style still on
 
     def drift_finish(phase):
         if failure == phase:
@@ -2653,7 +2665,14 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         with pytest.raises(RuntimeError, match="SetLeader3 failed"):
             asyncio.run(drawing.build(f.adapter))
         f.model.AddVerticalDimension2.assert_not_called()
-        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
+        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, False, False, False, False)
+        f.collar_annotation.SetArrowHeadStyleAtIndex.assert_not_called()
+        return
+    if failure == "arrow-status":
+        with pytest.raises(RuntimeError, match="SetArrowHeadStyleAtIndex failed"):
+            asyncio.run(drawing.build(f.adapter))
+        f.model.AddVerticalDimension2.assert_not_called()
+        f.collar_annotation.SetArrowHeadStyleAtIndex.assert_called_once_with(0, 1)
         return
     if failure == "unexpected-dimension":
         with pytest.raises(RuntimeError, match="preexisting dimension inventory missing/extra") as exc:
@@ -2678,7 +2697,8 @@ def test_build_neck_snapshot_follows_existing_native_annotation_authoring(
         rim_resolver.assert_called_once_with(f.adapter, f.side)
         face_resolver.assert_called_once_with(collar_rim)
         assert f.collar_symbol.GetAnnotation.call_count == 5
-        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, True, False, False, False)
+        f.collar_annotation.SetLeader3.assert_called_once_with(1, 0, False, False, False, False)
+        f.collar_annotation.SetArrowHeadStyleAtIndex.assert_called_once_with(0, 1)
         f.collar_symbol.GetSymbol.assert_has_calls([call()] * 4)
         f.collar_symbol.GetText.assert_has_calls([call(8)] * 4)
         assert events.index("finish:collar_rear_face") < events.index("neck-factory")
