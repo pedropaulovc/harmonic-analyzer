@@ -585,6 +585,42 @@ def test_an_uncrossed_ring_keeps_its_slots() -> None:
     assert drawing.uncrossed_ring_slots(centres[:2], attachments[1::-1]) == [1, 0]
 
 
+@pytest.mark.parametrize("offset_m", (-5e-5, 0.0, 5e-5, 1.15e-4))
+def test_the_inner_ring_knob_pair_from_run_222629_swaps_when_touching(offset_m) -> None:
+    """Run 20261023T222629630Z's audit: inner-view balloons 36 (knob shaft) and
+    40 (cup pin) crossed 0.115 mm past 36's attachment after the final rebuild;
+    within the 0.1 mm touch tolerance at uncross time no swap was made."""
+    from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+
+    start_40, end_40 = (0.2453, 0.1719), (0.2317, 0.1763)
+    dx, dy = end_40[0] - start_40[0], end_40[1] - start_40[1]
+    norm = math.hypot(dx, dy)
+    # 36's attachment on 40's leader, displaced normally by offset_m.
+    t = 0.9
+    attach_36 = (
+        start_40[0] + t * dx - dy / norm * offset_m,
+        start_40[1] + t * dy + dx / norm * offset_m,
+    )
+    centres = [(0.2414, 0.1586), (0.2462, 0.1716)]
+    attachments = [attach_36, end_40]
+    unswapped = [
+        LeaderSegment("36", "balloon", *centres[0], *attach_36),
+        LeaderSegment("40", "balloon", *centres[1], *end_40),
+    ]
+    if abs(offset_m) < 1e-4:
+        assert not find_leader_leader_crossings(unswapped)  # The audit's touch.
+    slots = drawing.uncrossed_ring_slots(centres, attachments)
+    assert slots == [1, 0]
+    swapped = [
+        LeaderSegment("36", "balloon", *centres[1], *attach_36),
+        LeaderSegment("40", "balloon", *centres[0], *end_40),
+    ]
+    assert not find_leader_leader_crossings(swapped, tol=0.0, shared_terminus=0.0)
+    assert drawing._leader_clearance(
+        (*centres[1], *attach_36), (*centres[0], *end_40)
+    ) >= drawing._UNCROSS_CLEARANCE_M
+
+
 def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
     """Run 20261015T082822796Z's audit: isometric balloons 14 and 16, leaders
     (circle edge -> attachment), crossed at (372.9, 178.4) mm. Their slots

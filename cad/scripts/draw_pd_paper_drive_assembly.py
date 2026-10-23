@@ -919,6 +919,41 @@ def collar_rim_landing(
 # length (the triangle inequality), so repeated swaps end; the cap only
 # bounds a wrong input.
 _UNCROSS_SWAPS_MAX = 64
+# Farm run 20261023T222629630Z (swmaker000004): the inner view's knob-shaft
+# (item 36) attachment sat within the audit's 0.1 mm touch tolerance of the cup
+# pin's (item 40) leader when the ring was uncrossed, so no swap was made, and
+# after later rebuilds it crossed 0.115 mm past it. The green run of the same
+# recipe had swapped them. Leaders nearer than this are swapped too whenever
+# that shortens them (so they were effectively crossing); a swap still strictly
+# shortens the total, so the loop ends.
+_UNCROSS_CLEARANCE_M = 5e-4
+
+
+def _segment_point_distance(
+    segment: tuple[float, float, float, float], x: float, y: float
+) -> float:
+    x0, y0, x1, y1 = segment
+    dx, dy = x1 - x0, y1 - y0
+    length2 = dx * dx + dy * dy
+    t = 0.0 if length2 == 0.0 else max(0.0, min(1.0, ((x - x0) * dx + (y - y0) * dy) / length2))
+    return math.hypot(x - (x0 + t * dx), y - (y0 + t * dy))
+
+
+def _leader_clearance(
+    a: tuple[float, float, float, float], b: tuple[float, float, float, float]
+) -> float:
+    """Least distance between two non-crossing leaders (0 when they cross)."""
+    if find_leader_leader_crossings(
+        [LeaderSegment("a", "balloon", *a), LeaderSegment("b", "balloon", *b)],
+        tol=0.0, shared_terminus=0.0,
+    ):
+        return 0.0
+    return min(
+        _segment_point_distance(b, a[0], a[1]),
+        _segment_point_distance(b, a[2], a[3]),
+        _segment_point_distance(a, b[0], b[1]),
+        _segment_point_distance(a, b[2], b[3]),
+    )
 
 
 def uncrossed_ring_slots(
@@ -927,27 +962,46 @@ def uncrossed_ring_slots(
 ) -> list[int]:
     """Which ring slot (an index into ``centres``, the circle centres as
     placed) each balloon takes so that no two leaders, each from its circle's
-    centre to its attachment, cross. Leaders that do not cross keep their
-    slots, so the slots, and the circles' clearances, are the ring's own."""
+    centre to its attachment, cross or pass within ``_UNCROSS_CLEARANCE_M``
+    where swapping shortens them. Other leaders keep their slots, so the
+    slots, and the circles' clearances, are the ring's own."""
     if len(centres) != len(attachments):
         raise ValueError("one ring slot per balloon attachment")
     slots = list(range(len(centres)))
+
+    def leader(index: int, slot: int) -> tuple[float, float, float, float]:
+        return (*centres[slot], *attachments[index])
+
+    def length(segment: tuple[float, float, float, float]) -> float:
+        return math.hypot(segment[2] - segment[0], segment[3] - segment[1])
+
     for _swap in range(_UNCROSS_SWAPS_MAX + 1):
         segments = [
-            LeaderSegment(
-                label=str(index),
-                kind="balloon",
-                x0=centres[slots[index]][0],
-                y0=centres[slots[index]][1],
-                x1=attach[0],
-                y1=attach[1],
-            )
-            for index, attach in enumerate(attachments)
+            LeaderSegment(str(index), "balloon", *leader(index, slots[index]))
+            for index in range(len(attachments))
         ]
         crossings = find_leader_leader_crossings(segments)
-        if not crossings:
-            return slots
-        first, second = int(crossings[0].a.label), int(crossings[0].b.label)
+        if crossings:
+            pair = (int(crossings[0].a.label), int(crossings[0].b.label))
+        else:
+            pair = next(
+                (
+                    (first, second)
+                    for first in range(len(slots))
+                    for second in range(first + 1, len(slots))
+                    if _leader_clearance(
+                        leader(first, slots[first]), leader(second, slots[second])
+                    ) < _UNCROSS_CLEARANCE_M
+                    and length(leader(first, slots[second]))
+                    + length(leader(second, slots[first]))
+                    < length(leader(first, slots[first]))
+                    + length(leader(second, slots[second]))
+                ),
+                None,
+            )
+            if pair is None:
+                return slots
+        first, second = pair
         slots[first], slots[second] = slots[second], slots[first]
     raise RuntimeError(
         f"balloon ring: leaders still cross after {_UNCROSS_SWAPS_MAX} slot swaps"
