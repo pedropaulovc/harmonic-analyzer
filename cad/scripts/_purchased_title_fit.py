@@ -1,4 +1,4 @@
-"""Opt-in native title-cell fitting for the four captured-pivot purchases.
+"""Opt-in native title-cell fitting for purchased reference drawings.
 
 Format existing source-linked notes, never source properties or saved templates.
 A native SetTextFormat call removes the Name note's leading FONT size tag; only

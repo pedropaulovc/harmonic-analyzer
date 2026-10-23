@@ -1439,6 +1439,7 @@ async def build_purchased_fastener_drawing(
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
+    title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1448,6 +1449,8 @@ async def build_purchased_fastener_drawing(
     ``cut_to_suit`` marks a fastener its registry installation note cuts at
     assembly.  ``number_fit`` opts a sheet whose registry number overruns the
     DWG. NO. cell into the measured fit (:func:`_fit_number`).
+    ``title_block_setup`` formats existing linked title notes and returns their
+    mandatory final-rebuild check, as for purchased-part reference sheets.
     ``view_layout="supplier_top"`` reserves the supplier screw family's Top
     annotation lanes; ``"tall_top"`` gives a longer axial Top view. Neither
     changes annotation margins or the standard-scale fitting contract.
@@ -1512,6 +1515,7 @@ async def build_purchased_fastener_drawing(
             configuration=configuration,
             settled_checks=settled_checks,
             supplier_data=supplier_data,
+            title_block_setup=title_block_setup,
             source_checkpoint=_supplier_source_checkpoint(
                 adapter,
                 source,

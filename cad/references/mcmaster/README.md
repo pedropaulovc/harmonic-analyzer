@@ -1639,6 +1639,12 @@ block's custom minimum check); the full ink audit still sees the offset leader.
 The block screw's thread-length lane is left of the part,
 opposite its overall length. Recorded R44 paint-data replays cover the observed
 collisions and refusal paths; they do not qualify a fresh native export.
+These six sheets also use the existing purchased title-cell fitter for their
+linked Name, Material and Number notes. It preserves the complete source values,
+property expressions and note anchors, measures the actual sheet-format rules,
+and requires one row inside a 0.6 mm inset at the existing readable font floors.
+The same checks repeat after final rebuild. This replaces the clamp screw's
+separate number-only fit; other purchased sheets retain their existing opt-ins.
 
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never

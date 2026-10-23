@@ -11,6 +11,7 @@ import _telemetry
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_title_fit import fit_purchased_title_block
 from _supplier_screw_dimensions import annotate_supplier_screw
 from _supplier_screw_layout import supplier_screw_margins
 import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as supplier
@@ -28,6 +29,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
+        title_block_setup=partial(fit_purchased_title_block, spec=SPEC),
         view_layout=view_layout,
         supplier_dimensions=partial(
             annotate_supplier_screw,
