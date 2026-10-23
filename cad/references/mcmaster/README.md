@@ -1645,6 +1645,9 @@ property expressions and note anchors, measures the actual sheet-format rules,
 and requires one row inside a 0.6 mm inset at the existing readable font floors.
 The same checks repeat after final rebuild. This replaces the clamp screw's
 separate number-only fit; other purchased sheets retain their existing opt-ins.
+The fastener sheets explicitly declare their source `Material` link; purchased
+part sheets retain the fitter's `Material Specification` default. The census
+requires exactly one declared material field, never an alias or optional note.
 
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never

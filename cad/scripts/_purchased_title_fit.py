@@ -132,7 +132,9 @@ def _fit_title_note(
     # keep the bounded length used by the successful Name path and DWG. NO.
     line_length = (
         None
-        if source_property_expression(link) == property_link("Material Specification")
+        if source_property_expression(link) in (
+            property_link("Material Specification"), property_link("Material")
+        )
         else limit[2] - anchor[0] - 0.0003
     )
     centre = ((cell[0] + cell[2]) / 2, (cell[1] + cell[3]) / 2)
@@ -227,15 +229,25 @@ def _fit_title_note(
     return settled
 
 
-def fit_purchased_title_block(adapter: Any, *, spec: DrawingSpec) -> Callable[[], None]:
-    """Opt-in Name/Material/Number fitting; return strict final-rebuild checks."""
+def fit_purchased_title_block(
+    adapter: Any, *, spec: DrawingSpec, material_property: str = "Material Specification"
+) -> Callable[[], None]:
+    """Fit exact source fields; the builder declares its actual material link."""
+    if material_property not in ("Material Specification", "Material"):
+        raise ValueError(f"unsupported purchased material property {material_property!r}")
+    fields = {
+        property_link(material_property)
+        if expression == property_link("Material Specification")
+        else expression: contract
+        for expression, contract in _FIELDS.items()
+    }
     draw = _early_bound(adapter.currentModel, "IModelDoc2")
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     sheet_view = _early_bound(ddoc.GetFirstView(), "IView")
     if sheet is None or sheet_view is None:
         raise RuntimeError("purchased drawing has no native sheet or sheet view")
-    found: dict[str, list[Any]] = {expression: [] for expression in _FIELDS}
+    found: dict[str, list[Any]] = {expression: [] for expression in fields}
     note = sheet_view.GetFirstNote2()
     while note is not None:
         note = _early_bound(note, "INote")
@@ -260,7 +272,7 @@ def fit_purchased_title_block(adapter: Any, *, spec: DrawingSpec) -> Callable[[]
             label=f"{spec.artifact_stem} {label}",
             minimum=minimum,
         )
-        for expression, (label, minimum) in _FIELDS.items()
+        for expression, (label, minimum) in fields.items()
     )
 
     def settled() -> None:

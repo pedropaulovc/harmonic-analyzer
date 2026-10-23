@@ -87,7 +87,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
-        title_block_setup=partial(fit_purchased_title_block, spec=SPEC),
+        title_block_setup=partial(
+            fit_purchased_title_block, spec=SPEC, material_property="Material"
+        ),
         view_layout=view_layout,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=supplier_screw_margins(

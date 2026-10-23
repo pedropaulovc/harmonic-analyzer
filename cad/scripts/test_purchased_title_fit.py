@@ -85,13 +85,13 @@ def _line(start, end):
     )
 
 
-def _sheet(monkeypatch, family, number):
+def _sheet(monkeypatch, family, number, material_property="Material Specification"):
     spec = DRAWINGS_BY_NAME[f"ch_rocker_arm_tl_vn_oblique_{family}_screw"]
     source_values = (spec.artifact_stem, "Alloy Steel", f"MHA-CH-06-TL-VN-{number}")
     notes = [
         _Note(property_link("SW-Title(Title)"), source_values[0], _CELLS[0],
               0.00396875, 0.114, 0.100),
-        _Note(property_link("Material Specification"), source_values[1], _CELLS[1],
+        _Note(property_link(material_property), source_values[1], _CELLS[1],
               0.003, 0.033, 0.080),
         _Note(property_link("Number"), source_values[2], _CELLS[2],
               0.0047625, 0.064, 0.080),
@@ -121,12 +121,17 @@ def _sheet(monkeypatch, family, number):
 
 
 @pytest.mark.parametrize("family,number", _FAMILIES)
-def test_full_linked_values_fit_measured_cells_and_remain_checked(monkeypatch, family, number):
-    adapter, spec, notes, values = _sheet(monkeypatch, family, number)
+@pytest.mark.parametrize("material_property", ("Material Specification", "Material"))
+def test_full_linked_values_fit_measured_cells_and_remain_checked(
+    monkeypatch, family, number, material_property
+):
+    adapter, spec, notes, values = _sheet(monkeypatch, family, number, material_property)
     before = tuple((note.PropertyLinkedText, note.text, note.anchor) for note in notes)
     assert notes[0].rows() == 2
     assert notes[2].GetExtent()[3] > _CELLS[2][2]
-    settled = title_fit.fit_purchased_title_block(adapter, spec=spec)
+    settled = title_fit.fit_purchased_title_block(
+        adapter, spec=spec, material_property=material_property
+    )
     adapter.currentModel.EditRebuild3()
     settled()
     for note, (link, text, anchor), cell, minimum in zip(
@@ -143,17 +148,21 @@ def test_full_linked_values_fit_measured_cells_and_remain_checked(monkeypatch, f
         box = title_fit._box(note.GetExtent(), label="offline", kind="note")
         assert title_fit.note_fits_cell(box, note.rows(), limit)
     assert tuple(note.text for note in notes) == values
+    assert notes[1].format.LineLength == 0.080
 
 
 @pytest.mark.parametrize("family,number", _FAMILIES)
+@pytest.mark.parametrize("material_property", ("Material Specification", "Material"))
 @pytest.mark.parametrize("change", ("name-wrap", "number-rev", "name-link",
                                    "number-value", "name-anchor", "material-value",
                                    "number-format"))
 def test_final_rebuild_refuses_title_collisions_or_identity_drift(
-    monkeypatch, family, number, change
+    monkeypatch, family, number, change, material_property
 ):
-    adapter, spec, notes, _values = _sheet(monkeypatch, family, number)
-    settled = title_fit.fit_purchased_title_block(adapter, spec=spec)
+    adapter, spec, notes, _values = _sheet(monkeypatch, family, number, material_property)
+    settled = title_fit.fit_purchased_title_block(
+        adapter, spec=spec, material_property=material_property
+    )
     name, material, drawing_number = notes
     if change == "name-wrap":
         name.forced_rows = 2
@@ -188,4 +197,48 @@ def test_fitter_refuses_native_format_setter_failure(monkeypatch):
     notes[0].accepts = False
     with pytest.raises(RuntimeError):
         title_fit.fit_purchased_title_block(adapter, spec=spec)
+    assert tuple(note.text for note in notes) == values
+
+
+@pytest.mark.parametrize("declared", ("Material Specification", "Material"))
+@pytest.mark.parametrize("defect", ("wrong-link", "missing", "duplicate"))
+def test_material_census_requires_one_exact_declared_source_field(
+    monkeypatch, declared, defect
+):
+    adapter, spec, notes, values = _sheet(monkeypatch, "block", "63", declared)
+    other = "Material" if declared == "Material Specification" else "Material Specification"
+    if defect == "wrong-link":
+        notes[1].PropertyLinkedText = property_link(other)
+    elif defect == "missing":
+        notes[0].next = notes[2]
+    else:
+        duplicate = copy.copy(notes[1])
+        duplicate.next = None
+        notes[2].next = duplicate
+    with pytest.raises(RuntimeError):
+        title_fit.fit_purchased_title_block(
+            adapter, spec=spec, material_property=declared
+        )
+    assert all(note.use_doc for note in notes)  # Census fails before formatting.
+    assert tuple(note.text for note in notes) == values
+
+
+def test_existing_default_still_requires_material_specification(monkeypatch):
+    adapter, spec, notes, values = _sheet(monkeypatch, "bracket", "62", "Material")
+    with pytest.raises(RuntimeError):
+        title_fit.fit_purchased_title_block(adapter, spec=spec)
+    assert all(note.use_doc for note in notes)
+    assert tuple(note.text for note in notes) == values
+
+
+@pytest.mark.parametrize("material_property", ("Number", "SW-Title(Title)", "Steel", ""))
+def test_material_contract_cannot_replace_a_different_required_field(
+    monkeypatch, material_property
+):
+    adapter, spec, notes, values = _sheet(monkeypatch, "carriage", "64")
+    with pytest.raises(ValueError):
+        title_fit.fit_purchased_title_block(
+            adapter, spec=spec, material_property=material_property
+        )
+    assert all(note.use_doc for note in notes)
     assert tuple(note.text for note in notes) == values
