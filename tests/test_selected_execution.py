@@ -10,6 +10,7 @@ import ntpath
 import os
 import posixpath
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -571,6 +572,90 @@ def test_task_record_normalizes_workspace_paths_without_serializing_environment_
         selected.task_record(case.workspace, task)
 
 
+@pytest.mark.parametrize("has_remote_leaf", [False, True])
+@pytest.mark.parametrize("ownership_failure", [False, True])
+@pytest.mark.parametrize("preparation_readiness", [
+    None,
+    {"capability": "preparation-publish-v1", "configured": False,
+     "account": None, "configuration_error": False},
+    {"capability": "preparation-publish-v1", "configured": True,
+     "account": "fixturebootstrap", "configuration_error": False},
+    {"capability": "preparation-publish-v1", "configured": False,
+     "account": None, "configuration_error": True},
+])
+def test_farm_agent_identity_is_scoped_after_preflight_and_restored(
+    monkeypatch, has_remote_leaf, ownership_failure, preparation_readiness,
+):
+    admitted_identity = "b" * 64
+    previous_identity = "c" * 64
+    previous_admission = '["previous:leaf"]'
+    previous_readiness = '{"previous":"readiness"}'
+    observed = []
+    monkeypatch.setenv("HARMONIC_FARM_AGENT_IDENTITY", previous_identity)
+    monkeypatch.setenv("HARMONIC_FARM_ADMITTED_LEAVES", previous_admission)
+    monkeypatch.setenv("HARMONIC_FARM_PREPARATION_READINESS", previous_readiness)
+    monkeypatch.setattr(build, "_validate_farm_selection", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        build, "_require_leaf_admission",
+        lambda control: (
+            ([_ROOT], (admitted_identity, "fixture-version"), preparation_readiness)
+            if has_remote_leaf else ([], None, None)
+        ),
+    )
+
+    def preflight(**kwargs):
+        assert os.environ["HARMONIC_FARM_AGENT_IDENTITY"] == previous_identity
+        assert os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] == previous_admission
+        assert os.environ["HARMONIC_FARM_PREPARATION_READINESS"] == previous_readiness
+        observed.append(("preflight", kwargs))
+
+    monkeypatch.setattr(build, "_farm_preflight", preflight)
+
+    class OwnershipError(RuntimeError):
+        pass
+
+    @contextmanager
+    def producer_build(label):
+        observed.append(("producer", label))
+        yield SimpleNamespace(finish=lambda success: observed.append(("finish", success)))
+
+    monkeypatch.setitem(sys.modules, "_farm", SimpleNamespace(
+        _display_name=lambda label: label,
+        producer_build=producer_build, BuildOwnershipError=OwnershipError,
+    ))
+
+    class Run:
+        name = "run"
+
+        @classmethod
+        def get_name(cls):
+            return cls.name
+
+        def _execute(self, **kwargs):
+            assert os.environ.get("HARMONIC_FARM_AGENT_IDENTITY") == (
+                admitted_identity if has_remote_leaf else None
+            )
+            assert json.loads(os.environ["HARMONIC_FARM_ADMITTED_LEAVES"]) == (
+                [_ROOT] if has_remote_leaf else []
+            )
+            if has_remote_leaf:
+                assert json.loads(os.environ["HARMONIC_FARM_PREPARATION_READINESS"]) == preparation_readiness
+            else:
+                assert "HARMONIC_FARM_PREPARATION_READINESS" not in os.environ
+            if ownership_failure:
+                raise OwnershipError("ownership lost")
+            return 0
+
+    command = build._farm_command(Run, "fixture owner")()
+    command.task_list = []
+    command.sel_tasks = [_ROOT]
+    command.dep_manager = SimpleNamespace(close=lambda: None)
+    assert command._execute() == (2 if ownership_failure else 0)
+    assert observed[0][0] == "preflight"
+    assert os.environ["HARMONIC_FARM_AGENT_IDENTITY"] == previous_identity
+    assert os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] == previous_admission
+    assert os.environ["HARMONIC_FARM_PREPARATION_READINESS"] == previous_readiness
+
 @pytest.mark.parametrize("mode", ["missing-root", "actionless-root", "relative-graph"])
 def test_selected_graph_requires_present_action_bearing_root_and_absolute_path(case, mode):
     if mode == "relative-graph":
@@ -704,7 +789,6 @@ def test_windows_path_comparison_preserves_records_across_filesystem_states(
                 path.write_text("preexisting output with on-disk spelling")
             else:
                 path.unlink(missing_ok=True)
-
     resolve = Path.resolve
 
     def on_disk_case(path, *args, **kwargs):

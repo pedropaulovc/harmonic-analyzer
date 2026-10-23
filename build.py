@@ -41,12 +41,20 @@ import argparse
 import copy
 import functools
 import getopt
+import importlib.util
 import json
+import logging
+import math
 import os
+import signal
 import subprocess
 import sys
+import tempfile
+import threading
 import time
-from collections.abc import Sequence
+import uuid
+from collections.abc import Callable, Sequence
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
 # Capture the dependency-import boundary before loading doit and the scanner.
@@ -103,6 +111,12 @@ doit's own help follows. `build.py help run` shows the run options (-n, -a,
 
 class FarmPreflightError(Exception):
     """Why a farm run must stop before task actions; printed as ``farm: <reason>``."""
+
+
+class PoolProcessCleanupError(FarmPreflightError):
+    """The owned publisher tree may still write; keep its receipt nonterminal."""
+
+    cleanup_confirmed = False
 
 
 class CacheRefreshError(Exception):
@@ -452,7 +466,7 @@ def _farm_command(command_class, display_name: str | None = None):
                     raise FarmPreflightError(str(exc)) from None
                 if display_name is not None:
                     os.environ["HARMONIC_FARM_DISPLAY_NAME"] = label
-                admitted, pool_identity = _require_leaf_admission(control)
+                admitted, pool_identity, preparation_readiness = _require_leaf_admission(control)
                 if pool_identity is None:
                     _farm_preflight()
                 else:
@@ -466,6 +480,14 @@ def _farm_command(command_class, display_name: str | None = None):
                     return 2
                 raise
             previous_admission = os.environ.get("HARMONIC_FARM_ADMITTED_LEAVES")
+            previous_agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY")
+            previous_readiness = os.environ.get("HARMONIC_FARM_PREPARATION_READINESS")
+            if pool_identity is None:
+                os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
+                os.environ.pop("HARMONIC_FARM_PREPARATION_READINESS", None)
+            else:
+                os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = pool_identity[0]
+                os.environ["HARMONIC_FARM_PREPARATION_READINESS"] = json.dumps(preparation_readiness)
             os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = json.dumps(admitted)
             try:
                 with _farm.producer_build(label) as producer:
@@ -486,6 +508,14 @@ def _farm_command(command_class, display_name: str | None = None):
                     os.environ.pop("HARMONIC_FARM_ADMITTED_LEAVES", None)
                 else:
                     os.environ["HARMONIC_FARM_ADMITTED_LEAVES"] = previous_admission
+                if previous_agent_identity is None:
+                    os.environ.pop("HARMONIC_FARM_AGENT_IDENTITY", None)
+                else:
+                    os.environ["HARMONIC_FARM_AGENT_IDENTITY"] = previous_agent_identity
+                if previous_readiness is None:
+                    os.environ.pop("HARMONIC_FARM_PREPARATION_READINESS", None)
+                else:
+                    os.environ["HARMONIC_FARM_PREPARATION_READINESS"] = previous_readiness
 
     return FarmCommand
 
@@ -625,8 +655,8 @@ def _pool_home() -> Path:
 
 def _require_leaf_admission(
     control: TaskControl,
-) -> tuple[list[str], tuple[str, str] | None]:
-    """Check would-be leaves, not local/aggregate tasks, against the selected pool."""
+) -> tuple[list[str], tuple[str, str] | None, object]:
+    """Check leaves and capture pure publisher readiness, without requiring it."""
     tasks = sorted(
         task.name
         for task in tasks_and_deps_iter(control.tasks, control.selected_tasks)
@@ -636,7 +666,7 @@ def _require_leaf_admission(
         )
     )
     if not tasks:
-        return [], None
+        return [], None, None
     pool = _pool_home().resolve()
     missing = [
         str(path.relative_to(pool))
@@ -651,23 +681,43 @@ def _require_leaf_admission(
     # Load the selected checkout's exact file in the pool's environment: its
     # namespace package must not lose to an unrelated installed ``agent`` package.
     program = (
-        "import importlib.util, json, sys\n"
+        "import contextlib, importlib.util, io, json, sys, types\n"
         "from pathlib import Path\n"
         "pool = Path(sys.argv[1])\n"
+        "package = types.ModuleType('_harmonic_selected_pool')\n"
+        "package.__path__ = [str(pool / 'agent')]\n"
+        "sys.modules[package.__name__] = package\n"
         "def load(name, path):\n"
         "    spec = importlib.util.spec_from_file_location(name, path)\n"
         "    module = importlib.util.module_from_spec(spec)\n"
         "    sys.modules[spec.name] = module\n"
         "    spec.loader.exec_module(module)\n"
         "    return module\n"
-        "protocol = load('pool_protocol', pool / 'agent' / 'protocol.py')\n"
-        "contract = load('pool_contract', pool / 'agent' / 'contract.py')\n"
+        "protocol = load('_harmonic_selected_pool.protocol', pool / 'agent' / 'protocol.py')\n"
+        "contract = load('_harmonic_selected_pool.contract', pool / 'agent' / 'contract.py')\n"
         "identity = protocol.agent_identity(pool / 'agent')\n"
+        "version = contract.agent_identity_tag(identity)\n"
         "tasks = json.load(sys.stdin)\n"
+        "refused = [task for task in tasks if not protocol.leaf_admitted(task)]\n"
+        "preparation_readiness = None\n"
+        "try:\n"
+        "    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):\n"
+        "        preparation_path = pool / 'agent' / 'preparation.py'\n"
+        "        if preparation_path.is_file():\n"
+        "            preparation = load('_harmonic_selected_pool.preparation', preparation_path)\n"
+        "            probe = getattr(preparation, 'publisher_readiness', None)\n"
+        "            if probe is not None:\n"
+        "                preparation_readiness = probe()\n"
+        "                json.dumps(preparation_readiness, allow_nan=False)\n"
+        "except KeyboardInterrupt:\n"
+        "    raise\n"
+        "except BaseException as error:\n"
+        "    preparation_readiness = {'capability': None, 'probe_error': type(error).__name__}\n"
         "print(json.dumps({\n"
-        "    'refused': [task for task in tasks if not protocol.leaf_admitted(task)],\n"
+        "    'refused': refused,\n"
         "    'agent_identity': identity,\n"
-        "    'agent_version': contract.agent_identity_tag(identity),\n"
+        "    'agent_version': version,\n"
+        "    'preparation_readiness': preparation_readiness,\n"
         "}))\n"
     )
     argv = [
@@ -729,27 +779,14 @@ def _require_leaf_admission(
                 for task in sorted(set(refused))
             )
         )
-    return tasks, (identity, version)
+    return tasks, (identity, version), response.get("preparation_readiness")
 
 
 def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    """Run one ``farm.py`` subcommand from the pool checkout, capturing stdout.
-
-    stderr is inherited so the pool's own progress and diagnostics reach the
-    console as they happen; stdout is the machine-readable result. The nested
-    ``uv`` targets the pool's own environment (``--project``); the
-    ``VIRTUAL_ENV`` this process inherited from the outer ``uv run`` names
-    ours, which uv would (correctly) ignore with a warning on every call.
-    """
+    """Run an ordinary pool CLI command using its explicitly selected checkout."""
     argv = [
-        "uv",
-        "run",
-        "--frozen",
-        "--project",
-        str(pool),
-        "python",
-        str(pool / "farm.py"),
-        *args,
+        "uv", "run", "--frozen", "--project", str(pool),
+        "python", str(pool / "farm.py"), *args,
     ]
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
     try:
@@ -760,6 +797,291 @@ def _pool_farm(pool: Path, *args: str) -> subprocess.CompletedProcess[str]:
         raise FarmPreflightError(
             f"{args[0]} could not start ({argv[0]}): {exc}"
         ) from None
+
+
+def _pool_process_log(event: str, level: int = logging.INFO, **fields) -> None:
+    logging.getLogger(__name__).log(level, "pool publisher %s %s", event, fields)
+
+
+def _load_pool_helper(pool: Path, module_name: str):
+    """Load one selected stdlib helper, without reusing a foreign ``agent``."""
+    source = pool / "agent" / f"{module_name}.py"
+    name = f"_harmonic_selected_{module_name}_{uuid.uuid4().hex}"
+    try:
+        spec = importlib.util.spec_from_file_location(name, source)
+        if spec is None or spec.loader is None:
+            raise FarmPreflightError(f"PoolHome {pool} cannot load its {module_name} helper")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+        return module
+    except (ImportError, OSError) as error:
+        raise FarmPreflightError(
+            f"PoolHome {pool} cannot load its {module_name} helper; update the selected pool revision"
+        ) from error
+    finally:
+        sys.modules.pop(name, None)
+
+
+def _pool_process_tree(pool: Path):
+    module = _load_pool_helper(pool, "process_tree")
+    tree_class = getattr(module, "ProcessTree", None)
+    if not isinstance(tree_class, type):
+        raise FarmPreflightError(f"PoolHome {pool} lacks required ProcessTree ownership API")
+    return tree_class(log=_pool_process_log)
+
+
+def _pool_publication_clock(pool: Path) -> Callable[[], float]:
+    """Use the selected pool's cross-interpreter publication clock authority."""
+    clock = getattr(_load_pool_helper(pool, "protocol"), "publication_clock", None)
+    if not callable(clock):
+        raise FarmPreflightError(
+            f"PoolHome {pool} lacks the publication clock API; update the selected pool revision"
+        )
+    return clock
+
+
+@contextmanager
+def _defer_pool_interrupts():
+    """Keep an owned handle registered and cleanup confirmed before SIGINT."""
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    previous = signal.getsignal(signal.SIGINT)
+    pending = None
+
+    def defer(signum, frame):
+        nonlocal pending
+        if pending is None:
+            pending = (signum, frame)
+
+    signal.signal(signal.SIGINT, defer)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, previous)
+        if pending:
+            active_error = sys.exc_info()[1]
+            if active_error is not None:
+                active_error.add_note("SIGINT was deferred through owned-process cleanup.")
+            elif callable(previous):
+                previous(*pending)
+            elif previous != signal.SIG_IGN:
+                raise KeyboardInterrupt
+
+
+def _close_owned_pool_process(
+    tree, process, *, adopted: bool, cleanup_deadline: float,
+    clock: Callable[[], float] | None = None,
+) -> bool:
+    """Kill, terminate and reap using only the caller's one cleanup reserve."""
+    clock = time.monotonic if clock is None else clock
+    if not adopted:
+        # Assignment can fail while the root is suspended and outside the job.
+        # Kill only our stored handle before spending any reserve waiting.
+        try:
+            process.kill()
+        except BaseException:
+            pass
+    try:
+        confirmed = tree.terminate(
+            process, timeout_s=max(0.0, cleanup_deadline - clock()),
+        )
+    except BaseException:
+        confirmed = False
+    if not adopted:
+        try:
+            process.wait(timeout=max(0.0, cleanup_deadline - clock()))
+        except BaseException:
+            return False
+    return confirmed
+
+
+def _raise_if_pool_publication_cancelled() -> None:
+    """Observe Runner's first SIGINT cancellation without awaiting in sync work."""
+    import asyncio
+
+    try:
+        task = asyncio.current_task()
+    except RuntimeError:
+        return
+    if task is not None and task.cancelling():
+        raise asyncio.CancelledError
+
+
+def _bounded_pool_farm(
+    pool: Path, argv: list[str], env: dict[str, str], *,
+    operation_deadline: float, process_margin_s: float,
+    clock: Callable[[], float] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Supervise the private publisher body, never another supervisor."""
+    clock = time.monotonic if clock is None else clock
+    if any(
+        isinstance(value, bool) or not isinstance(value, (int, float))
+        or not math.isfinite(value) or value <= 0
+        for value in (operation_deadline, process_margin_s)
+    ):
+        raise FarmPreflightError("pool publisher requires a finite positive operation deadline and margin")
+    if clock() >= operation_deadline:
+        raise FarmPreflightError("pool publisher operation deadline expired before launch")
+    _raise_if_pool_publication_cancelled()
+    tree = _pool_process_tree(pool)
+    process = None
+    adopted = False
+    try:
+        try:
+            # Signal delivery cannot lose a just-created suspended root before
+            # its handle is stored and the mandatory cleanup path can see it.
+            with _defer_pool_interrupts():
+                popen_options = tree.popen_options
+                if clock() >= operation_deadline:
+                    raise subprocess.TimeoutExpired(argv, 0)
+                process = subprocess.Popen(
+                    argv, cwd=REPO_ROOT, env=env, stdout=None, text=True,
+                    **popen_options,
+                )
+                tree.adopt(process)
+                adopted = True
+            while True:
+                _raise_if_pool_publication_cancelled()
+                remaining = operation_deadline - clock()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(argv, 0)
+                try:
+                    returncode = process.wait(timeout=min(1.0, remaining))
+                except subprocess.TimeoutExpired:
+                    continue
+                _raise_if_pool_publication_cancelled()
+                if clock() > operation_deadline:
+                    raise subprocess.TimeoutExpired(argv, 0)
+                break
+        except BaseException as error:
+            cleanup_deadline = min(clock() + 5.0, operation_deadline + process_margin_s)
+            with _defer_pool_interrupts():
+                if process is not None and not _close_owned_pool_process(
+                    tree, process, adopted=adopted, cleanup_deadline=cleanup_deadline,
+                    clock=clock,
+                ):
+                    raise PoolProcessCleanupError(
+                        "pool publisher cleanup could not confirm the owned process tree stopped"
+                    ) from error
+            if isinstance(error, subprocess.TimeoutExpired):
+                raise FarmPreflightError(
+                    "pool publisher operation deadline expired; owned process tree stopped"
+                ) from error
+            if isinstance(error, OSError):
+                raise FarmPreflightError(
+                    "pool publisher could not create or adopt its owned process"
+                ) from error
+            raise
+        else:
+            cleanup_deadline = min(clock() + 5.0, operation_deadline + process_margin_s)
+            with _defer_pool_interrupts():
+                if not _close_owned_pool_process(
+                    tree, process, adopted=adopted, cleanup_deadline=cleanup_deadline,
+                    clock=clock,
+                ):
+                    raise PoolProcessCleanupError(
+                        "pool publisher exited but its owned process tree did not stop"
+                    )
+    finally:
+        with _defer_pool_interrupts():
+            try:
+                tree.close()
+            except BaseException as error:
+                raise PoolProcessCleanupError(
+                    "pool publisher ownership handle could not be closed safely"
+                ) from error
+    # A first SIGINT during cleanup/close cancels the Runner task but does not
+    # raise. Honor it only after confirmed cleanup, before accepting a result.
+    _raise_if_pool_publication_cancelled()
+    return subprocess.CompletedProcess(argv, returncode, None)
+
+
+def _pool_preparation(
+    pool: Path, workspace: Path, *, commit: str,
+    operation_deadline: float, process_margin_s: float,
+    clock: Callable[[], float],
+) -> dict:
+    """Publish through this pool's private body under HA's sole ProcessTree."""
+    protocol = _load_pool_helper(pool, "protocol")
+    arguments = getattr(protocol, "publication_body_arguments", None)
+    decode = getattr(protocol, "decode_publication_receipt", None)
+    timeout = getattr(protocol, "PREPARATION_OPERATION_TIMEOUT_S", None)
+    margin = getattr(protocol, "PREPARATION_PROCESS_MARGIN_S", None)
+    receipt_limit = getattr(protocol, "PREPARATION_RECEIPT_MAX_BYTES", None)
+    if (
+        not callable(arguments) or not callable(decode)
+        or not callable(getattr(protocol, "publication_clock", None)) or not callable(clock)
+        or any(
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(value) or value <= 0
+            for value in (timeout, margin, operation_deadline, process_margin_s)
+        )
+        or process_margin_s != margin
+        or type(receipt_limit) is not int or receipt_limit <= 0
+    ):
+        raise FarmPreflightError(
+            f"PoolHome {pool} lacks the required bounded preparation API; update the selected pool revision"
+        )
+    # Keep the original caller deadline, including its prior lock wait. A
+    # selected protocol cap can shorten that deadline, never restart it.
+    deadline = min(operation_deadline, clock() + timeout)
+    if clock() >= deadline:
+        raise FarmPreflightError("pool publisher operation deadline expired before launch")
+    owned = tempfile.TemporaryDirectory(prefix="harmonic-preparation-result-", delete=False)
+    primary_error = None
+    try:
+        result_file = Path(owned.name) / "result.json"
+        argv = [
+            "uv", "run", "--frozen", "--project", str(pool), "python",
+            *arguments(
+                workspace, operation_deadline=deadline,
+                result_file=result_file, commit=commit,
+            ),
+        ]
+        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        result = _bounded_pool_farm(
+            pool, argv, env, operation_deadline=deadline, process_margin_s=margin,
+            clock=clock,
+        )
+        if clock() >= deadline + margin:
+            raise FarmPreflightError("pool publisher supervision margin expired before receipt validation")
+        try:
+            with result_file.open("rb") as stream:
+                payload = stream.read(receipt_limit + 1)
+        except OSError:
+            raise FarmPreflightError("pool publisher did not leave a readable result receipt") from None
+        try:
+            receipt = decode(payload, result.returncode)
+        except ValueError:
+            raise FarmPreflightError("pool publisher returned an invalid result receipt") from None
+        if not receipt["ok"]:
+            raise FarmPreflightError(receipt["error"]["message"])
+        return receipt["result"]
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        if getattr(primary_error, "cleanup_confirmed", None) is False:
+            primary_error.add_note(f"Owned publisher result directory retained: {owned.name}")
+        else:
+            try:
+                owned.cleanup()
+            except Exception as error:
+                message = (
+                    "Owned publisher result cleanup failed; possible residue at "
+                    f"{owned.name} ({type(error).__name__})"
+                )
+                if primary_error is None:
+                    raise FarmPreflightError(message) from None
+                primary_error.add_note(message)
+                try:
+                    logging.getLogger(__name__).warning("%s", message)
+                except Exception:
+                    pass
+            if primary_error is None and clock() >= deadline + margin:
+                raise FarmPreflightError("pool publisher supervision margin expired during receipt handling")
 
 
 def _dissenting_workers(reports: object, protocol: int) -> list[str]:

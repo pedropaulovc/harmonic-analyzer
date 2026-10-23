@@ -286,6 +286,15 @@ survive, so the child cannot prune other sessions' evidence. Child stdout/stderr
 are retained under the outer test's temporary directory even on timeout; the
 30-second deadline is unchanged.
 
+Root conftest also removes inherited `HARMONIC_FARM_REQUESTS`,
+`HARMONIC_FARM_BUILD_ID` and `HARMONIC_FARM_PREPARATION_READINESS` before
+collection and before each test. Tests may explicitly set their own temporary
+request root and ownership afterward. The publication-ownership regression in
+`tests/test_farm_mode.py` checks collection and per-test isolation, leaves the
+inherited root untouched, and permits an explicit fixture-owned result record.
+Its guard log stays private and must be empty after the nested process exits,
+including session-fixture teardown.
+
 ### Finite stock-envelope endpoint reuse
 
 `paper_drive_stock_envelope._endcut_integral_bounds` carries each branch cell's
@@ -670,9 +679,88 @@ their ordinary full-loader invocation; the new worker release and the explicitly
 selected `PoolHome` must match under existing fleet-identity admission before
 selective farm execution is available. No controller wire change is required.
 
-This staged feature leaves ordinary farm submission and lifecycle handling
-unchanged. It adds no preparation-publication API or publisher-configuration
-requirement; preparation transport is a separate change.
+### First-miss preparation and publisher ownership
+
+Use an updated, committed pool checkout at the existing `-PoolHome`, with the
+matching full agent identity deployed to the fleet. Remote misses require its
+preparation publisher/readiness API and `agent/process_tree.py`; there is no new
+producer package pin, adjacent-checkout fallback or automatic deployment. The
+existing admission subprocess reads readiness from that exact PoolHome. Missing
+preparation capability/configuration or a failure of this optional probe does
+not itself reject cache-hit-only work. Probe failures carry only a sanitized
+exception type, not configuration/error text. The first real remote miss refuses
+unready preparation before that leaf connects or reserves capacity. Mandatory
+identity, fleet admission and producer registration still apply to every build.
+
+The first actual remote miss publishes the source/graph preparation once for the
+build, before leaf dispatch. A cache-hit-only build does not publish or eagerly
+export the graph. Producer registration and acknowledged lease still precede the
+doit scheduler; publication is lazy within that scheduler, not a new registration
+gate. Authentication, corrupt-artifact and publication errors surface rather than
+silently reverting to another preparation path.
+
+Spawned action processes coordinate through a `FileLock` and atomic receipts in
+`HARMONIC_FARM_REQUESTS/preparation/`. The key includes the full build, source and
+agent identities plus canonical repository and PoolHome roots. A successful
+receipt is reused across processes; a failed publication is shared without a
+fresh publisher retry in the same build. The receipt enters `publishing` before
+the private body starts, so a crashed owner cannot be mistaken for a safe retry.
+The nested directory does not add preparation records to the launcher's
+root-level workflow request inventory.
+
+Readiness declares one **900-second operation deadline** and a **10-second
+supervision margin**. The original absolute deadline starts before receipt-lock
+waiting and uv/Popen setup; later phases cannot acquire another 900 seconds.
+Process and receipt-lock waits use slices of at most one second and observe
+pending `asyncio.Runner` task cancellation, including the first SIGINT.
+The margin is only for terminal-receipt observation and cleanup, not new
+publication work. Owned-tree cleanup gets one deadline
+`min(now + 5, operation_deadline + 10)` shared by termination and reaping.
+These bounds do not change native-leaf budgets, FIFO grace or build lifetime.
+Every publication deadline, remaining-time calculation, elapsed metric and
+cleanup subtraction uses the selected pool's `publication_clock()` authority
+(`perf_counter`). Do not mix it with `monotonic()` across Windows Python 3.12
+and 3.14 processes. The cross-interpreter clock proof covers CPython 3.12–3.14;
+reverify it when upgrading the toolchain. Native/FIFO duration clocks are unchanged.
+
+HA loads the selected pool's pure private-body argv/receipt helpers and invokes
+that body through its existing, sole `ProcessTree`; it does not invoke the
+supervising public CLI/API underneath another job or process group. Stdout and
+stderr remain inherited stage diagnostics; the bounded, parent-owned receipt
+is separate and decoded by the selected pool's protocol authority. Every result
+requires confirmation that the created tree stopped, even after a normal root
+exit. Windows creates the root suspended and assigns its Job Object before
+resuming it; POSIX confirms the owned root and process group. An uncertain
+adoption kills only the stored root handle before terminating/reaping its owned
+tree. No process-name kill or pre-existing SOLIDWORKS seat is involved.
+Unconfirmed cleanup raises `PoolProcessCleanupError`, retains owned result
+storage, and leaves the shared receipt nonterminal.
+
+The launcher's requests root remains launcher-owned. An attended direct build
+without an inherited requests root owns a temporary root for its producer/action
+worker lifetime. Any primary exception, interrupt, nonzero runner result or
+completion without an explicit zero-success outcome retains that owned requests
+root without scanning or deleting it: doit may still have unjoined processes or
+threads that have not reached their preparation lock yet, even when it converts
+`InvalidTask` to return code 2 instead of raising. A missing receipt is not
+cleanup evidence on these paths. Existing failures retain their outcome and
+receive a warning naming the retained root; primary exceptions also receive a
+note and are not replaced by a secondary cleanup fault.
+
+Only explicit zero-success, joined runner completion permits cleanup. The normal
+doit process and thread paths join their workers before returning. Cleanup then
+requires canonical, matching-build terminal preparation receipts and nonblocking
+free locks. Nonterminal, corrupt,
+unreadable, mismatched, unknown or aliased preparation entries retain the root.
+An otherwise successful build still fails loudly when retention is required or
+directory cleanup fails. Inherited launcher-owned roots are never deleted here.
+Preserve diagnostics and do not edit/delete a receipt or lock to retry inside
+the same build. Establish that all owned publishers stopped before recovery
+through a fresh build identity.
+There is no automatic sweep of retained failed-build roots. After preserving the
+diagnostics and confirming that the build's runner and publisher process trees
+have exited, remove only the exact owned root named in its warning; do not use a
+wildcard sweep that can include active builds.
 
 ### Interpreting selective execution measurements
 
@@ -692,6 +780,10 @@ For file-only comparison runs, pass explicit empty strings for
 re-enable default discovery; use a launcher that preserves empty child values.
 Existing COM-free `check:math` component measurements do not establish native
 output equivalence or the whole-farm **25% overhead-reduction target**.
+
+This retains JSON telemetry capture while preventing the default local OTLP
+endpoint from adding exporter timeout delays. An **11-second head** is also a
+target, not an established portfolio result.
 
 ### Parameters
 

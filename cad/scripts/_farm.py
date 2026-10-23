@@ -4,6 +4,9 @@ The constants and frozen wire types below mirror
 ``solidworks-pool/agent/contract.py`` field-for-field; ``FARM_PROTOCOL_VERSION``
 mirrors ``agent/protocol.py`` and guards drift between the two repos (a mismatch
 fails admission on the farm). This module must never import the pool package.
+Preparation publication uses the build wrapper's owned private-body bridge only
+when a cache-missing leaf is about to submit; local/cache-only work never loads
+the pool runtime or exports a graph.
 
 Configuration is the same ``~/.solidworks-pool/config.json`` that ``farm.py``
 writes (``farm.py credentials issue``); ``SOLIDWORKS_POOL_CONFIG`` overrides the
@@ -19,13 +22,17 @@ import asyncio
 import getpass
 import hashlib
 import json
+import math
 import os
+import re
 import socket
+import stat
 import subprocess
+import tempfile
 import threading
 import time
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -520,7 +527,11 @@ async def _reserved_leaf_status(handle, key: LeafKey) -> LeafStatus:
 
 
 def producer_build(display_name: str):
-    """Register the parent producer before scheduling or cache checks."""
+    """Register the parent producer before scheduling or cache checks.
+
+    Call finish(True) only after the runner returns zero with workers joined.
+    Failed or missing explicit completion retains owned requests without a scan.
+    """
     return _ProducerBuild(_display_name(display_name))
 
 
@@ -540,8 +551,11 @@ class _ProducerBuild:
         self._stop = threading.Event()
         self._failure: BaseException | None = None
         self._executing = False
-        self._reason = "finished"
+        # Only finish(True) proves the runner's zero-success completion.
+        self._reason = "failed"
         self._previous_id: str | None = None
+        self._previous_requests: str | None = None
+        self._owned_requests: tempfile.TemporaryDirectory[str] | None = None
         self._lease_deadline: float | None = None
         self._lease_wall: datetime | None = None
         self._thread = threading.Thread(
@@ -552,6 +566,14 @@ class _ProducerBuild:
         self._previous_id = os.environ.get("HARMONIC_FARM_BUILD_ID")
         os.environ["HARMONIC_FARM_BUILD_ID"] = self.build_id
         try:
+            self._previous_requests = os.environ.get("HARMONIC_FARM_REQUESTS")
+            if not self._previous_requests:
+                # Cleanup is explicit: uncertain publisher termination must
+                # retain its receipts instead of a GC finalizer deleting them.
+                self._owned_requests = tempfile.TemporaryDirectory(
+                    prefix="harmonic-farm-requests-", delete=False,
+                )
+                os.environ["HARMONIC_FARM_REQUESTS"] = self._owned_requests.name
             _record_build(self.build_id)
             self._thread.start()
             # Windows CPython 3.12/3.13 needs finite waits to deliver Ctrl-C.
@@ -571,7 +593,7 @@ class _ProducerBuild:
             self._stop.set()
             if self._thread.ident is not None:
                 self._thread.join()
-            self._restore_env()
+            self._restore_env(primary_error=exc)
             raise
 
     def finish(self, success: bool) -> None:
@@ -592,17 +614,72 @@ class _ProducerBuild:
         self._stop.set()
         try:
             self._thread.join()
-        finally:
-            self._restore_env()
-        if exc is None or isinstance(exc, KeyboardInterrupt):
-            self.check()
+            if exc is None or isinstance(exc, KeyboardInterrupt):
+                self.check()
+        except BaseException as lifecycle_error:
+            self._restore_env(primary_error=lifecycle_error)
+            raise
+        else:
+            self._restore_env(primary_error=exc)
         return False
 
-    def _restore_env(self) -> None:
+    def _restore_env(self, *, primary_error: BaseException | None = None) -> None:
         if self._previous_id is None:
             os.environ.pop("HARMONIC_FARM_BUILD_ID", None)
         else:
             os.environ["HARMONIC_FARM_BUILD_ID"] = self._previous_id
+        owned = self._owned_requests
+        if owned is None:
+            return
+        if self._previous_requests is None:
+            os.environ.pop("HARMONIC_FARM_REQUESTS", None)
+        else:
+            os.environ["HARMONIC_FARM_REQUESTS"] = self._previous_requests
+        if primary_error is not None:
+            # Doit terminates process workers without joining on exceptions,
+            # and thread workers may continue. Even an empty/free receipt scan
+            # cannot close the race before a worker's first publishing marker.
+            message = (
+                "Farm requests retained after a primary build exception or interrupt; "
+                f"publisher cleanup cannot be inferred; owned directory: {owned.name}"
+            )
+        elif self._reason != "finished":
+            # Runner.run_all also converts InvalidTask into a nonzero return
+            # after run_tasks skipped its joins. Missing explicit success is
+            # likewise not proof that workers can no longer publish.
+            message = (
+                "Farm requests retained without an explicit successful runner outcome; "
+                f"publisher cleanup cannot be inferred; owned directory: {owned.name}"
+            )
+        else:
+            try:
+                _require_quiescent_requests(Path(owned.name), self.build_id)
+            except Exception as evidence_error:
+                message = (
+                    "Farm requests retained because owned preparation evidence "
+                    f"is not quiescent ({type(evidence_error).__name__}); "
+                    f"owned directory: {owned.name}"
+                )
+            else:
+                try:
+                    owned.cleanup()
+                except Exception as cleanup_error:
+                    message = (
+                        "Farm requests cleanup could not be confirmed; possible residue "
+                        f"at {owned.name} ({type(cleanup_error).__name__})"
+                    )
+                else:
+                    self._owned_requests = None
+                    return
+        if primary_error is not None:
+            primary_error.add_note(message)
+        try:
+            _telemetry.warn(message, build_id=self.build_id)
+        except Exception:
+            # A secondary diagnostic must not replace the primary build fault.
+            pass
+        if primary_error is None and self._reason == "finished":
+            raise BuildOwnershipError(message) from None
 
     def _fail(self, exc: BaseException) -> None:
         if self._failure is None:
@@ -824,14 +901,20 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         return result
 
 
+def _atomic_json(path: Path, value: dict) -> None:
+    staging = path.with_name(f"{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
+    try:
+        staging.write_text(json.dumps(value), encoding="utf-8")
+        os.replace(staging, path)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
 def _record_json(name: str, value: dict) -> None:
     directory = os.environ.get("HARMONIC_FARM_REQUESTS")
     if not directory:
         return
-    path = Path(directory) / f"{name}.json"
-    staging = path.with_name(f"{name}.{os.getpid()}.tmp")
-    staging.write_text(json.dumps(value), encoding="utf-8")
-    os.replace(staging, path)
+    _atomic_json(Path(directory) / f"{name}.json", value)
 
 
 def _record_build(build_id: str) -> None:
@@ -895,10 +978,354 @@ def _display_name(label: str | None = None) -> str:
     return label
 
 
+_PREPARATION_CAPABILITY = "preparation-publish-v1"
+
+
+def _preparation_identity_digest(identity: dict[str, str]) -> str:
+    return hashlib.sha256(
+        json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _read_preparation_receipt(
+    path: Path, *, build_id: str, identity: dict[str, str] | None = None,
+) -> dict:
+    """Use the same receipt schema and filename identity for owner and teardown."""
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, RecursionError) as exc:
+        raise RuntimeError(
+            f"farm preparation publication receipt is corrupt: {path}"
+        ) from exc
+    recorded_identity = receipt.get("identity") if isinstance(receipt, dict) else None
+    if (
+        not isinstance(recorded_identity, dict)
+        or set(recorded_identity) != {
+            "build_id", "workspace", "pool_home", "commit", "agent_identity_sha256",
+        }
+        or not all(isinstance(value, str) for value in recorded_identity.values())
+        or recorded_identity["build_id"] != build_id
+        or (identity is not None and recorded_identity != identity)
+        or path.stem != _preparation_identity_digest(recorded_identity)
+        or receipt.get("state") not in ("publishing", "succeeded", "failed")
+        or (
+            receipt["state"] == "failed"
+            and (not isinstance(receipt.get("error"), str) or not receipt["error"])
+        )
+    ):
+        raise RuntimeError(f"farm preparation publication receipt is invalid: {path}")
+    return receipt
+
+
+def _requests_entry_mode(path: Path) -> int:
+    entry = path.lstat()
+    if (
+        stat.S_ISLNK(entry.st_mode)
+        or getattr(entry, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    ):
+        raise RuntimeError(f"farm requests evidence is an alias: {path}")
+    return entry.st_mode
+
+
+def _require_quiescent_requests(root: Path, build_id: str) -> None:
+    """Inspect only our root after normal worker completion, never on an error.
+
+    I1: every preparation receipt/staging write holds its digest lock.
+    I2: publishing is atomic before any launch, so a free lock without JSON is safe.
+    I3: succeeded/failed are absorbing; a free terminal receipt cannot relaunch.
+    These prove normal-return cleanup only, not exception-time worker quiescence.
+    """
+    from filelock import FileLock
+
+    if not stat.S_ISDIR(_requests_entry_mode(root)):
+        raise RuntimeError(f"farm requests root is not a directory: {root}")
+    preparation = root / "preparation"
+    try:
+        mode = _requests_entry_mode(preparation)
+    except FileNotFoundError:
+        return
+    if not stat.S_ISDIR(mode):
+        raise RuntimeError(f"farm preparation root is not a directory: {preparation}")
+    digests, receipts, staging = set(), set(), set()
+    for entry in preparation.iterdir():
+        if not stat.S_ISREG(_requests_entry_mode(entry)):
+            raise RuntimeError(f"farm preparation contains non-file evidence: {entry}")
+        match = re.fullmatch(r"([0-9a-f]{64})\.(json|lock)", entry.name)
+        if match is not None:
+            digest, kind = match.groups()
+            digests.add(digest)
+            if kind == "json":
+                receipts.add(digest)
+        else:
+            match = re.fullmatch(
+                r"([0-9a-f]{64})\.json\.[0-9]+\.[0-9a-f]{32}\.tmp", entry.name,
+            )
+            if match is None:
+                raise RuntimeError(f"farm preparation contains unknown evidence: {entry}")
+            staging.add(match.group(1))
+    if staging - digests:
+        raise RuntimeError("farm preparation contains staging without a receipt or lock")
+    for digest in sorted(digests):
+        # Probe before reading. Windows filelock may unlink its file on release;
+        # only snapshot JSON/lock digests are probed, never staging-only digests.
+        lock = FileLock(str(preparation / f"{digest}.lock"))
+        with lock.acquire(timeout=0):
+            path = preparation / f"{digest}.json"
+            try:
+                if not stat.S_ISREG(_requests_entry_mode(path)):
+                    raise RuntimeError(f"farm preparation receipt is not a file: {path}")
+                receipt = _read_preparation_receipt(path, build_id=build_id)
+            except FileNotFoundError:
+                if digest in receipts:
+                    raise
+                continue
+            if receipt["state"] == "publishing":
+                raise RuntimeError(f"farm preparation publication is still publishing: {path}")
+
+
+def _require_preparation_readiness() -> tuple[float, float]:
+    """Refuse an unavailable publisher only when a real remote leaf is needed."""
+    from build import _pool_home
+
+    pool = _pool_home().resolve()
+    try:
+        readiness = json.loads(
+            os.environ.get("HARMONIC_FARM_PREPARATION_READINESS", "null")
+        )
+    except (ValueError, RecursionError):
+        readiness = None
+    if isinstance(readiness, dict) and readiness.get("probe_error") is not None:
+        raise RuntimeError(
+            f"PoolHome {pool} preparation publisher readiness probe failed; "
+            "repair the selected pool environment before remote dispatch"
+        )
+    if (
+        not isinstance(readiness, dict)
+        or readiness.get("capability") != _PREPARATION_CAPABILITY
+    ):
+        raise RuntimeError(
+            f"PoolHome {pool} requires an updated pool revision supporting "
+            "`preparation publish` and publisher readiness before remote dispatch"
+        )
+    if (
+        not isinstance(readiness.get("configured"), bool)
+        or not isinstance(readiness.get("configuration_error"), bool)
+    ):
+        raise RuntimeError(f"PoolHome {pool} returned invalid publisher readiness")
+    if readiness["configuration_error"]:
+        raise RuntimeError(
+            f"PoolHome {pool} has invalid preparation publisher configuration; "
+            "fix FARM_BOOTSTRAP_ACCOUNT or the pool configuration before remote dispatch"
+        )
+    if not readiness["configured"]:
+        raise RuntimeError(
+            f"PoolHome {pool} preparation publisher is not configured; set "
+            "FARM_BOOTSTRAP_ACCOUNT or bootstrap_account in the pool configuration "
+            "before remote dispatch"
+        )
+    if not isinstance(readiness.get("account"), str) or not readiness["account"].strip():
+        raise RuntimeError(f"PoolHome {pool} returned invalid publisher account readiness")
+    budgets = []
+    for name in ("operation_timeout_s", "process_margin_s"):
+        value = readiness.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise RuntimeError(f"PoolHome {pool} returned invalid publisher {name} readiness")
+        try:
+            budget = float(value)
+        except OverflowError:
+            raise RuntimeError(
+                f"PoolHome {pool} returned invalid publisher {name} readiness"
+            ) from None
+        if not math.isfinite(budget) or budget <= 0:
+            raise RuntimeError(f"PoolHome {pool} returned invalid publisher {name} readiness")
+        budgets.append(budget)
+    return budgets[0], budgets[1]
+
+
+def _publish_preparation(
+    pool: Path, workspace: Path, commit: str, agent_identity: str, *,
+    operation_deadline: float, process_margin_s: float, clock: Callable[[], float],
+) -> None:
+    # The existing owned ProcessTree is the sole supervisor. Its selected-pool
+    # private body shares this operation's original deadline, not a fresh budget.
+    from build import _pool_preparation
+
+    published = _pool_preparation(
+        pool, workspace, commit=commit, operation_deadline=operation_deadline,
+        process_margin_s=process_margin_s, clock=clock,
+    )
+    if (
+        not isinstance(published, dict)
+        or published.get("configured") is not True
+        or published.get("commit") != commit
+        or published.get("agent_identity_sha256") != agent_identity
+    ):
+        raise RuntimeError(
+            "farm preparation publication does not match the admitted "
+            "source and pool agent identity"
+        )
+
+
+def _ensure_preparation_published(request: LeafRequest) -> None:
+    """Publish once across this build's action processes, or share its failure.
+
+    The parent's existing requests directory owns these receipts and their OS
+    locks. A holder interrupted after starting publication leaves a marker that
+    fails closed; a later process must not launch a second publisher.
+    """
+    from build import (
+        PoolProcessCleanupError, _pool_home, _pool_publication_clock,
+        _raise_if_pool_publication_cancelled,
+    )
+
+    operation_timeout_s, process_margin_s = _require_preparation_readiness()
+    pool = _pool_home().resolve()
+    # This exact selected protocol counter is shared with the private child.
+    # Its perf_counter domain (raw QPC on supported Windows CPython) is not the
+    # unrelated duration-only monotonic domain used by FIFO/lease operations.
+    clock = _pool_publication_clock(pool)
+    started = clock()
+    operation_deadline = started + operation_timeout_s
+    observation_deadline = operation_deadline + process_margin_s
+
+    commit = request.commit
+    agent_identity = os.environ.get("HARMONIC_FARM_AGENT_IDENTITY", "")
+    for name, value, length in (
+        ("HARMONIC_FARM_COMMIT", commit, 40),
+        ("HARMONIC_FARM_AGENT_IDENTITY", agent_identity, 64),
+    ):
+        if len(value) != length or any(char not in "0123456789abcdef" for char in value):
+            raise RuntimeError(
+                f"farm preparation publication requires admitted {name} "
+                f"as a full lowercase {length}-hex identity"
+            )
+    if commit != os.environ.get("HARMONIC_FARM_COMMIT"):
+        raise RuntimeError(
+            "farm preparation publication source does not match the admitted commit"
+        )
+    workspace = REPO_ROOT.resolve()
+    directory = os.environ.get("HARMONIC_FARM_REQUESTS")
+    if not directory or not Path(directory).is_dir():
+        raise BuildOwnershipError(
+            "farm preparation publication has no parent-owned requests directory"
+        )
+    identity = {
+        "build_id": request.build_id,
+        "workspace": str(workspace),
+        "pool_home": str(pool),
+        "commit": commit,
+        "agent_identity_sha256": agent_identity,
+    }
+    digest = _preparation_identity_digest(identity)
+    receipts = Path(directory) / "preparation"
+    receipts.mkdir(exist_ok=True)
+    path = receipts / f"{digest}.json"
+    from filelock import FileLock, Timeout
+
+    with _telemetry.span(
+        "farm.preparation", service=_telemetry.BUILD_INFRA_SERVICE,
+        build_id=request.build_id, commit=commit,
+    ) as sp:
+        sp.set_attribute("operation_timeout_s", operation_timeout_s)
+        sp.set_attribute("process_margin_s", process_margin_s)
+        sp.set_attribute("operation_deadline_counter", operation_deadline)
+        sp.set_attribute("publication_clock_domain", "perf_counter")
+        lock = FileLock(str(path.with_suffix(".lock")))
+        while True:
+            _raise_if_pool_publication_cancelled()
+            remaining = observation_deadline - clock()
+            if remaining <= 0:
+                raise RuntimeError(
+                    f"farm preparation publication lock timed out after "
+                    f"{operation_timeout_s:g}s work and {process_margin_s:g}s "
+                    f"process margin for build {request.build_id} at PoolHome {pool}"
+                )
+            try:
+                # Short Windows waits keep Ctrl-C responsive. The margin is
+                # only for observing an existing owner's terminal outcome.
+                lock.acquire(timeout=min(1.0, remaining))
+            except Timeout:
+                continue
+            break
+        try:
+            _raise_if_pool_publication_cancelled()
+            sp.set_attribute("lock_wait_ms", int((clock() - started) * 1000))
+            try:
+                receipt = _read_preparation_receipt(
+                    path, build_id=request.build_id, identity=identity,
+                )
+            except FileNotFoundError:
+                receipt = None
+            # I3: terminal receipts are absorbing: no rewrite or second launch.
+            if receipt is not None:
+                sp.set_attribute("publication_state", receipt["state"])
+                if receipt["state"] == "succeeded":
+                    return
+                if receipt["state"] == "publishing":
+                    error = (
+                        "farm preparation publication was interrupted or owned "
+                        f"process cleanup is unconfirmed for build {request.build_id}; "
+                        "verify publisher cleanup before restarting the build"
+                    )
+                else:
+                    error = receipt["error"]
+                raise RuntimeError(error)
+            publication_started = clock()
+            try:
+                if publication_started >= operation_deadline:
+                    raise RuntimeError(
+                        "preparation publication operation deadline exhausted "
+                        "before publisher launch"
+                    )
+                # I1: every receipt/staging write is under this digest lock.
+                # I2: atomically record publishing before any publisher launch.
+                _atomic_json(path, {
+                    "identity": identity, "state": "publishing", "error": None,
+                })
+                _raise_if_pool_publication_cancelled()
+                if clock() >= operation_deadline:
+                    raise RuntimeError(
+                        "preparation publication operation deadline exhausted "
+                        "before publisher launch"
+                    )
+                _publish_preparation(
+                    pool, workspace, commit, agent_identity,
+                    operation_deadline=operation_deadline,
+                    process_margin_s=process_margin_s, clock=clock,
+                )
+            except PoolProcessCleanupError:
+                # The owned publisher may still be writing. Keep the
+                # nonterminal marker; every observer must fail closed.
+                sp.set_attribute("publication_state", "cleanup_unconfirmed")
+                raise
+            except Exception as exc:
+                error = (
+                    f"farm preparation publication failed for build "
+                    f"{request.build_id}: {exc}"
+                )
+                _atomic_json(path, {
+                    "identity": identity, "state": "failed", "error": error,
+                })
+                sp.set_attribute("publication_state", "failed")
+                raise RuntimeError(error) from exc
+            finally:
+                sp.set_attribute(
+                    "publication_ms",
+                    int((clock() - publication_started) * 1000),
+                )
+            _atomic_json(path, {
+                "identity": identity, "state": "succeeded", "error": None,
+            })
+            sp.set_attribute("publication_state", "succeeded")
+        finally:
+            lock.release()
+
+
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     _display_name()
     if request.build_id != _required_build_id():
         raise BuildOwnershipError("leaf build ID does not match parent ownership")
+    _require_preparation_readiness()
     from temporalio.client import WorkflowFailureError
     from temporalio.exceptions import CancelledError
 
@@ -906,6 +1333,10 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         _connect_client(request.submitter), timeout=FIFO_RPC_TIMEOUT_S
     )
     coordinator = await _fifo_handle(client)
+    # Parent registration and its independent lease renewer already precede all
+    # task/cache work. Publish only here, after a genuine miss and coordinator
+    # admission, but before recording or accepting the first remote reservation.
+    _ensure_preparation_published(request)
     identity = {
         "workflow_id": wf_id,
         "task": request.task,

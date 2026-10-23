@@ -1446,7 +1446,8 @@ def test_only_opted_in_drawings_are_submitter_only_build_and_release_leaves(
 
     monkeypatch.setattr(build.subprocess, "run", protocol_query)
     monkeypatch.setattr(build, "_pool_home", lambda: tmp_path)
-    dispatchable, _identity = build._require_leaf_admission(control)
+    dispatchable, _identity, readiness = build._require_leaf_admission(control)
+    assert readiness is None
     assert queried == dispatchable
     assert dispatchable
     assert not {f"check:{name}" for name in leaves} & set(dispatchable)
