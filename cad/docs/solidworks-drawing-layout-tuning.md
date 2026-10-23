@@ -2596,32 +2596,44 @@ The bounded ordinary-dimension candidate requests the new native origin at
 `(177.53, 194.8) mm`. Keep both actual dimension tips and their complete
 heads inside the physical neck X trim `[176.36, 178.70] mm`; the opposite
 physical flank tips are at Y=`170.475` and `189.525 mm`. The rear finish
-symbol stays at X=`COLLAR_REAR_X + 0.0069`, Y=`0.1973 m`, with the exact
-physical tip `(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2))`, unchanged
-part-owned control, symbol type and roughness. All other finishes, stations,
-values, geometry, centre permission and dome witnesses remain unchanged.
+symbol sits at X=`COLLAR_REAR_X + 0.0069`, Y=`0.1983 m` (1 mm above its
+corner-landing spot, with the Ø20.6 `CollarDiaDim` raised the same 1 mm over
+it), with the exact physical tip `(COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2 -
+0.8))`, 1.6 mm down the thrust face's edge-on line from the Ø20.6 corner
+(machinist review of e04fd60ab: a tip on the corner read as the OD or the
+face; any lower, the head closes within 2 mm of the Ø9.5's printed Ø), and
+unchanged part-owned control, symbol type and roughness. All other finishes,
+stations, values, geometry, centre permission and dome witnesses remain
+unchanged.
 No `OffsetText`, dimension text-position setter or font-baseline calibration
 is involved.
 
-Capture `_collar_rear_rim(adapter, side)` once and retain the actual
-`ISFSymbol` returned by `add_surface_finish`, whose existing authoring helper
-qualifies the controlled face and exact edge attachment. This **one** finish
+Resolve `_collar_rear_face(_collar_rear_rim(adapter, side))` once, the rim's
+one adjacent face matching the `collar_rear_face` control, and retain the
+actual `ISFSymbol` returned by `add_surface_finish(entity=face,
+entity_type="FACE", ...)`, which qualifies the controlled face and exact face
+attachment. Attached to the rim, the selection point lands on the edge-on
+circle's projected extreme, the corner. This **one** finish
 is the local straight-leader exception: on its live early-bound `IAnnotation`,
-call `SetLeader3(1, 0, True, False, False, False)` and require actual integer
-status `0`, not a truthy/bool result. Do not change the shared factory's bent
+call `SetLeader3(1, 0, False, False, False, False)` then
+`SetArrowHeadStyleAtIndex(0, 1)` (`swCLOSED_ARROWHEAD`), each requiring actual
+integer status `0`, not a truthy/bool result: a smart arrowhead on a FACE
+attachment prints a dot (farm run 20261023T182235406Z), and the checkpoints
+require smart style off, style `1` and a style-`1` native head record. Do not
+change the shared factory's bent
 default or manipulate its root. A straight line from the old bent root can
 cross the symbol's own rising legs; refuse that crossing, rather than treating
 it as an attachment or tolerance waiver.
 
 At all four existing neck checkpoints, early-bind the retained symbol's live
-`GetAnnotation()` result and reuse `_assert_attached_to(..., entity_type="EDGE")`
+`GetAnnotation()` result and reuse `_assert_attached_to(..., entity_type="FACE")`
 plus `_assert_leader_lands` with its unchanged **1 mm** default, not the stale
 5 mm helper-doc wording. Require native `GetSymbol() == 1` and `GetText(8)`
 equal to `dt_crankshaft_notes.COLLAR_REAR_FINISH_TEXT`, derived from the actual
 part control, without a literal value override. Require actual integer leader
 style `1`, exactly one leader and six finite straight-leader coordinates
 (physical tip last), with readable native line/text/head primitives. Preserve
-positive head dimensions, sheet-normal planes, actual rim identity and the
+positive head dimensions, sheet-normal planes, actual face identity and the
 exact specification through both saves. Log actual native points, identity,
 type, roughness, phase, route and full-head distances. The captured interfaces
 must survive SLDDRW/PDF SaveAs; no reopen, fallback identity strings, extra
