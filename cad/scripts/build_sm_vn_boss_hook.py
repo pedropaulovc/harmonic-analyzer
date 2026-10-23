@@ -94,6 +94,7 @@ from sm_vn_boss_hook_spec import (
 )
 from diagnostics.diag_build_9490T1 import build_9490T1
 from stock_anchor_geom import ANCHOR_9490T1
+import _telemetry
 
 PART_NAME = "sm-vn-boss-hook"
 SPEC = fastener(PART_NAME)
@@ -138,6 +139,7 @@ def _manufacturing_controls(adapter) -> None:
     # swTolGeneral omits the redundant printed band in favour of the title block.
     for feature, name, band in (
         ("StockTrimProfile", "FinishedOverall", FINISHED_OVERALL_TOLERANCE_MM / 1000),
+        ("StockDeburrProfile", "ChamferWidth", CHAMFER_WIDTH_TOLERANCE_MM / 1000),
         (
             "StockDeburrProfile",
             "ChamferAngle",
@@ -167,6 +169,27 @@ def _manufacturing_controls(adapter) -> None:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+
+
+@_telemetry.traced("stock.shank.lead_in")
+async def _size_lead_in(adapter) -> None:
+    """Drive the restored factory deburr's leg to the tap-clearing lead-in.
+
+    The shared trim recipe restores the vendor's 0.80 leg; the counter anchor's
+    own driving ChamferWidth then takes the spec nominal, whose short title-block
+    leg still brings the cut end under the mating tap drill.
+    """
+    _, dimension = _named_dimension(adapter, "StockDeburrProfile", "ChamferWidth")
+    # swSetValue_InAllConfigurations (2); only the finished configuration exists yet.
+    status = dimension.SetSystemValue3(CHAMFER_WIDTH_MM / 1000, 2, null_variant())
+    if int(status) != 0:  # swSetValueReturnStatus_e.swSetValue_Successful
+        raise RuntimeError(
+            f"ChamferWidth@StockDeburrProfile: lead-in rejected ({status})"
+        )
+    await force_rebuild(adapter)
+    faults = _hard_faults(adapter, adapter.currentModel)
+    if faults:
+        raise RuntimeError(f"lead-in deburr rebuilt with faults {faults}")
 
 
 def _stock_construction(adapter, entity):
@@ -391,6 +414,7 @@ async def _save_anchor(adapter, part_name, suppressed_features):
 @wraps(build_9490T1)
 async def _modified_anchor(adapter, truth=None, **parameters):
     receipt = await build_9490T1(adapter, truth, **parameters)
+    await _size_lead_in(adapter)
     _manufacturing_controls(adapter)
     return receipt
 

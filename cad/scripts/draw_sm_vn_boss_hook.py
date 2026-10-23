@@ -74,9 +74,9 @@ FRONT_KEEP = {
     "ChamferWidth": (0.150, 0.089),
     "ChamferAngle": (0.132, 0.106),
 }
-# The deburr band is tighter than the title block because its minimum leg
-# must bring the cut end under the 3.797 tap drill, so the cut thread starts
-# in the lever's tap: the callout names that mate.
+# The lead-in carries the title block's band: even its short leg brings the cut
+# end under the 3.797 tap drill, so the cut thread starts in the lever's tap.
+# The callout names that mate.
 CHAMFER_CALLOUT = {"ChamferWidth": "LEAD-IN TO MHA-SM-03 TAP"}
 NOTES_Y = 0.076
 EXPECTED_CONTROLS = {

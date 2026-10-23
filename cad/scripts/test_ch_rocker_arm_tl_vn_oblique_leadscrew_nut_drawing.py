@@ -130,39 +130,53 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert rows == {
         "SupplierLength": (spec.LENGTH, "vertical"),
         "SupplierFlangeThickness": (spec.FLANGE_THICK, "vertical"),
-        "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
         "SupplierBodyDiameter": (spec.BODY_DIA, "horizontal"),
+        "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
         "SupplierMountingHoleDiameter": (spec.HOLE_DIA, "vertical"),
         "SupplierHolePitchDiameter": (spec.HOLE_PCD, "vertical"),
     }
     assert set(spec.SUPPLIER_REFERENCE_STARTS) == set(rows) == set(spec.SUPPLIER_REFERENCE_FORMATS)
-    assert set(spec.SUPPLIER_REFERENCE_PLANES) == {
-        "SupplierMountingHoleDiameter",
-        "SupplierHolePitchDiameter",
+    # The end view carries every diameter and the bolt pattern; the side view
+    # only the two lengths, so its lane reserves balance (projection test).
+    assert spec.SUPPLIER_REFERENCE_PLANES == {
+        "SupplierFlangeDiameter": "Top",
+        "SupplierBodyDiameter": "Top",
+        "SupplierMountingHoleDiameter": "Top",
+        "SupplierHolePitchDiameter": "Top",
     }
-    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Top"}
+    assert spec.SUPPLIER_REFERENCE_SIDES == {
+        "SupplierFlangeDiameter": "top",
+        "SupplierBodyDiameter": "bottom",
+    }
 
     def chord(name: str) -> tuple[tuple[float, float], tuple[float, float]]:
         (x, y), (value, orientation) = spec.SUPPLIER_REFERENCE_STARTS[name], rows[name]
         return (x, y), (x + value, y) if orientation == "horizontal" else (x, y + value)
 
-    # Front sketch (x = radius, y = station): each chord spans its own feature.
+    # Front sketch (x = radius, y = station). The printed construction chords
+    # lie on the axis or on visible edges, never across a face: the overall
+    # length on the axis, the flange thickness on the flange rim.
     assert chord("SupplierLength") == (
-        (spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
-        (spec.BODY_DIA / 2.0, spec.FAR_END_Y),
+        (0.0, -spec.SPIGOT_LENGTH),
+        (0.0, spec.FAR_END_Y),
     )
     assert chord("SupplierFlangeThickness") == (
         (-spec.FLANGE_DIA / 2.0, 0.0),
         (-spec.FLANGE_DIA / 2.0, spec.FLANGE_THICK),
     )
-    assert chord("SupplierFlangeDiameter") == ((-spec.FLANGE_DIA / 2.0, 0.0), (spec.FLANGE_DIA / 2.0, 0.0))
-    # The pilot chord is the spigot's end face and ends on the length's start.
+    # Top sketch reads model (x, -z): the pilot's Ø10.2 is the long body's
+    # circle in the end view (the spigot is the same diameter, behind it).
+    assert spec.PROFILE[1][0] == spec.PROFILE[6][0] == spec.BODY_DIA / 2.0
     assert chord("SupplierBodyDiameter") == (
-        (-spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
-        spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"],
+        (-spec.BODY_DIA / 2.0, 0.0),
+        (spec.BODY_DIA / 2.0, 0.0),
     )
-    # Top sketch reads model (x, -z): the hole chord crosses the first hole's
-    # centre and the pitch chord the bolt circle, both through their centres.
+    # Every chord crosses its circle's centre: the flange OD, the pilot and the
+    # pitch circle on the view's centrelines.
+    assert chord("SupplierFlangeDiameter") == (
+        (-spec.FLANGE_DIA / 2.0, 0.0),
+        (spec.FLANGE_DIA / 2.0, 0.0),
+    )
     (hx, hy0), (_, hy1) = chord("SupplierMountingHoleDiameter")
     centre_x, centre_z = spec.HOLE_CENTRES[0]
     assert hx == centre_x
@@ -170,7 +184,7 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert chord("SupplierHolePitchDiameter") == ((0.0, -spec.HOLE_PCD / 2.0), (0.0, spec.HOLE_PCD / 2.0))
 
 
-def test_short_chords_shelve_their_text_outward_and_the_length_keeps_its_own() -> None:
+def test_every_chord_shelves_its_text_outward() -> None:
     from _supplier_screw_layout import supplier_screw_lane_plan
 
     lanes = supplier_screw_lane_plan(
@@ -179,9 +193,9 @@ def test_short_chords_shelve_their_text_outward_and_the_length_keeps_its_own() -
         sides=spec.SUPPLIER_REFERENCE_SIDES,
     )
     rows = {name: orientation for name, _, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
-    # The 15 mm length (7.5 mm at 1:2) is the one chord whose text fits
-    # between its own witnesses; the native farm audit found it clear.
-    assert set(draw.TEXT_SHELVES) == set(rows) - {"SupplierLength"}
+    # At 1:1 each horizontal text is wider than its span or crosses its own
+    # vertical dimension line, so every one moves clear of its own ink.
+    assert set(draw.TEXT_SHELVES) == set(rows)
     for name, side in draw.TEXT_SHELVES.items():
         assert side in ("left", "right")
         if rows[name] == "vertical":
@@ -198,6 +212,32 @@ def test_shelf_gap_measures_clearance_on_the_shelf_side() -> None:
     text = SimpleNamespace(xmin=0.135, xmax=0.160)
     actual = {"left": 0.118, "right": 0.133, "text": text}
     assert draw._shelf_gap("SupplierMountingHoleDiameter", actual) == pytest.approx(0.002)
+
+
+def test_sheet_fits_its_title_cells_and_selects_the_tall_top_layout() -> None:
+    import _purchased_title_fit as title_fit
+
+    assert draw.TITLE_BLOCK_SETUP.func is title_fit.fit_purchased_title_block
+    assert draw.TITLE_BLOCK_SETUP.keywords == {"spec": draw.SPEC}
+    assert draw.VIEW_LAYOUT == "tall_top"
+    assert not hasattr(draw, "SUPPLIER_DATA")
+
+
+def test_hidden_line_guard_refuses_any_orthographic_view_not_hlr() -> None:
+    from _drawing_view_display import _SW_HLR
+
+    class View:
+        def __init__(self, mode: int) -> None:
+            self.mode = mode
+
+        def GetDisplayMode2(self) -> int:
+            return self.mode
+
+    views = {name: View(_SW_HLR) for name in ("*Front", "*Top", "*Right")}
+    draw._assert_hidden_lines_removed(views)
+    views["*Front"].mode = 1  # swHIDDEN_GREYED
+    with pytest.raises(RuntimeError, match="Front"):
+        draw._assert_hidden_lines_removed(views)
 
 
 # Native ``GetOutline`` at farm run 20261023T163903809Z (e04fd60ab): every
@@ -247,17 +287,25 @@ class _Drawing:
         return True
 
 
-def _fit_orthographic(monkeypatch, dimensions, planes) -> tuple[int, int]:
+def _fit_orthographic(
+    monkeypatch,
+    dimensions=spec.SUPPLIER_REFERENCE_DIMENSIONS,
+    planes=spec.SUPPLIER_REFERENCE_PLANES,
+    *,
+    sides=spec.SUPPLIER_REFERENCE_SIDES,
+    layout=draw.VIEW_LAYOUT,
+    supplier_data=(),
+    adjust=lambda margins: margins,
+) -> tuple[int, int]:
     import _purchased_fastener_drawing as purchased
     from _supplier_screw_layout import supplier_screw_margins
 
     monkeypatch.setattr(purchased, "double_array", tuple)
-    # The sheet's footer: its one-line note plus the supplier-data block.
     caption_y = purchased.view_band_bottom(
-        spec.DRAWING_NOTES, label=STEM, supplier_data=draw.SUPPLIER_DATA
+        spec.DRAWING_NOTES, label=STEM, supplier_data=supplier_data
     )
-    cells = purchased.fastener_view_cells(caption_y)
-    margins = supplier_screw_margins(dimensions, planes=planes, sides=spec.SUPPLIER_REFERENCE_SIDES)
+    cells = purchased.fastener_view_cells(caption_y, layout=layout)
+    margins = adjust(supplier_screw_margins(dimensions, planes=planes, sides=sides))
     fitted = purchased.supplier_fit_cells(cells, margins, label=STEM)
     members = [
         (_PaddedView(name, center), (name, center, bounds))
@@ -267,17 +315,89 @@ def _fit_orthographic(monkeypatch, dimensions, planes) -> tuple[int, int]:
     return purchased._fit_group(_Drawing(), members)
 
 
-def test_supplier_lanes_leave_a_standard_scale_for_the_padded_native_outlines(monkeypatch) -> None:
-    assert (
-        _fit_orthographic(monkeypatch, spec.SUPPLIER_REFERENCE_DIMENSIONS, spec.SUPPLIER_REFERENCE_PLANES)
-        == (1, 2)
+def test_supplier_lanes_leave_one_to_one_for_the_padded_native_outlines(
+    monkeypatch,
+) -> None:
+    assert _fit_orthographic(monkeypatch) == (1, 1)
+
+
+def test_each_part_of_the_layout_is_needed_for_one_to_one(monkeypatch) -> None:
+    # The standard 64 mm Top cell: a 52 mm reserve leaves 12 mm, under even
+    # the 1:8 outline (13.926 mm).
+    with pytest.raises(RuntimeError, match="no project-standard scale"):
+        _fit_orthographic(monkeypatch, layout="standard")
+    # supplier_top's 70 mm Top cell leaves 18 mm: 1:4 (16.676 mm).
+    assert _fit_orthographic(monkeypatch, layout="supplier_top") == (1, 4)
+    # Restoring the two-line supplier-data footer lowers the tall_top Front
+    # row to 60.5 mm, a 20.5 mm window: 1:2 (18.676 mm).
+    data = ("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",)
+    assert _fit_orthographic(monkeypatch, supplier_data=data) == (1, 2)
+
+
+def _fitted_cells(
+    planes=spec.SUPPLIER_REFERENCE_PLANES, sides=spec.SUPPLIER_REFERENCE_SIDES
+):
+    import _purchased_fastener_drawing as purchased
+    from _supplier_screw_layout import supplier_screw_margins
+
+    margins = supplier_screw_margins(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS, planes=planes, sides=sides
+    )
+    caption_y = purchased.view_band_bottom(spec.DRAWING_NOTES, label=STEM)
+    cells = purchased.fastener_view_cells(caption_y, layout=draw.VIEW_LAYOUT)
+    fitted = purchased.supplier_fit_cells(cells, margins, label=STEM)
+    return margins, {name: (center, bounds) for name, center, bounds in fitted}
+
+
+def test_front_keeps_the_projection_axes_of_top_and_right() -> None:
+    margins, fitted = _fitted_cells()
+    # Front: 26 mm lanes left and right, 20 mm text room above and below.
+    assert margins["*Front"] == pytest.approx((0.026, 0.020, 0.026, 0.020))
+    assert margins["*Top"] == pytest.approx((0.026, 0.026, 0.026, 0.026))
+    assert draw.projection_margins(margins) == margins
+    # The builder centres each outline on its fitted cell's centre: Front and
+    # the unannotated Right share a row centre, Front and Top a column centre.
+    front, top, right = (fitted[name][0] for name in ("*Front", "*Top", "*Right"))
+    assert front[1] == pytest.approx(right[1], abs=1e-12)
+    assert front[0] == pytest.approx(top[0], abs=1e-12)
+    # And 1:1 still fits: Front 73 - 40 = 33 >= 15 + 11.176; Top 96 - 52 = 44
+    # >= 22 + 11.176; both 180 - 52 = 128 mm wide.
+    front_box, top_box = fitted["*Front"][1], fitted["*Top"][1]
+    assert front_box[3] - front_box[1] == pytest.approx(0.033)
+    assert front_box[3] - front_box[1] >= spec.LENGTH / 1000.0 + _NATIVE_PADDING_M
+    assert top_box[3] - top_box[1] == pytest.approx(0.044)
+    assert top_box[3] - top_box[1] >= spec.FLANGE_DIA / 1000.0 + _NATIVE_PADDING_M
+
+
+def test_a_horizontal_front_size_cannot_be_both_aligned_and_one_to_one(
+    monkeypatch,
+) -> None:
+    # The 33ec855 arrangement: the pilot below Front. Its 26/20 reserves put
+    # Front 3 mm above Right's row (review 4364103672); the guard refuses it.
+    planes = {
+        name: plane
+        for name, plane in spec.SUPPLIER_REFERENCE_PLANES.items()
+        if name != "SupplierBodyDiameter"
+    }
+    sides = {"SupplierBodyDiameter": "bottom", "SupplierFlangeDiameter": "top"}
+    margins, fitted = _fitted_cells(planes, sides)
+    assert fitted["*Front"][0][1] - fitted["*Right"][0][1] == pytest.approx(0.003)
+    with pytest.raises(ValueError, match="projection axis"):
+        draw.projection_margins(margins)
+
+    # Balancing it (the riser's widening) leaves 73 - 52 = 21 mm < 26.176: 1:2.
+    def widen(raw):
+        left, bottom, right, top = raw["*Front"]
+        return {**raw, "*Front": (left, max(bottom, top), right, max(bottom, top))}
+
+    assert _fit_orthographic(monkeypatch, planes=planes, sides=sides, adjust=widen) == (
+        1,
+        2,
     )
 
 
-def test_horizontal_end_view_lanes_reproduce_the_native_no_scale_failure(monkeypatch) -> None:
-    horizontal = tuple(
-        (name, value, "horizontal" if name in spec.SUPPLIER_REFERENCE_PLANES else orientation)
-        for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS
-    )
-    with pytest.raises(RuntimeError, match="no project-standard scale fitting"):
-        _fit_orthographic(monkeypatch, horizontal, spec.SUPPLIER_REFERENCE_PLANES)
+def test_projection_guard_refuses_unbalanced_top_columns() -> None:
+    with pytest.raises(ValueError, match=r"\*Top"):
+        draw.projection_margins({"*Top": (0.026, 0.020, 0.034, 0.020)})
+    # Top's own vertical reserves are free: no other view shares its row.
+    assert draw.projection_margins({"*Top": (0.026, 0.020, 0.026, 0.034)})

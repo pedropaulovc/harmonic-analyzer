@@ -1,11 +1,16 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
+import asyncio
+import contextlib
 import math
 from types import SimpleNamespace
 
 import pytest
 
+import _config
 import _stock_trim_drawing as trim_drawing
+import _telemetry
+import build_sm_vn_boss_hook as part
 import sm_vn_boss_hook_spec as spec
 import draw_sm_vn_boss_hook as drawing
 from _hole_spec import TAP_DRILL_MM
@@ -22,15 +27,83 @@ def test_finished_overall_preserves_factory_thread_datum():
 
 
 def test_deburr_band_clears_receiver_and_retains_full_threads():
+    # The lead-in is a one-place chamfer under the printed .X title-block band,
+    # never a tighter one; the governing stack below must hold across it.
+    printed = _config.title_block("linear_1pl")["display"]
+    assert printed == f"±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.1f}"
+    assert spec.DIMENSION_PRECISION["ChamferWidth"] == 1
+    assert spec.CHAMFER_WIDTH_MM == round(spec.CHAMFER_WIDTH_MM, 1)
+    assert spec.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11  # swTolGeneral
     minimum = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
+    # The next one-place nominal down would put the short leg's end over the drill.
+    assert (
+        anchor.thread_major_dia_mm - 2 * (minimum - 0.1)
+        >= TAP_DRILL_MM[anchor.thread_size]
+    )
+    # The long leg still leaves an end flat: the deburr cannot reach the axis.
+    assert anchor.thread_major_radius_mm - maximum > 0.2
     # Include the adverse angular corner, not only the nominal 45-degree leg.
     maximum_axial = maximum / math.tan(
         math.radians(spec.CHAMFER_ANGLE_DEG - spec.CHAMFER_ANGLE_TOLERANCE_DEG)
     )
     short_shank = spec.SHANK_LENGTH_MM - spec.FINISHED_OVERALL_TOLERANCE_MM
     assert short_shank - maximum_axial > 17.0
+
+
+@pytest.mark.parametrize("fault", [None, "rejected", "faults"])
+def test_lead_in_drives_the_restored_deburr_to_the_spec_nominal(monkeypatch, fault):
+    """The shared trim restores the factory leg; the anchor drives its own."""
+    calls = []
+    spans = []
+
+    @contextlib.asynccontextmanager
+    async def aspan(name, **_attributes):
+        spans.append(name)
+        try:
+            yield None
+        finally:
+            spans.append(f"/{name}")
+
+    monkeypatch.setattr(_telemetry, "aspan", aspan)
+
+    class Dimension:
+        def SetSystemValue3(self, value, which, names):
+            calls.append(("set", value, which, list(spans)))
+            return 2 if fault == "rejected" else 0
+
+    async def rebuild(_adapter):
+        calls.append(("rebuild", list(spans)))
+
+    monkeypatch.setattr(
+        part,
+        "_named_dimension",
+        lambda _adapter, feature, name: (
+            (None, Dimension())
+            if (feature, name) == ("StockDeburrProfile", "ChamferWidth")
+            else None
+        ),
+    )
+    monkeypatch.setattr(part, "force_rebuild", rebuild)
+    monkeypatch.setattr(
+        part,
+        "_hard_faults",
+        lambda _adapter, _model: ["StockDeburr"] if fault == "faults" else [],
+    )
+    adapter = SimpleNamespace(currentModel=object())
+    if fault is None:
+        asyncio.run(part._size_lead_in(adapter))
+        inside = ["stock.shank.lead_in"]
+        assert calls == [
+            ("set", spec.CHAMFER_WIDTH_MM / 1000, 2, inside),
+            ("rebuild", inside),
+        ]
+    else:
+        with pytest.raises(RuntimeError):
+            asyncio.run(part._size_lead_in(adapter))
+    # One operation span, closed on success and on refusal alike.
+    assert spans == ["stock.shank.lead_in", "/stock.shank.lead_in"]
 
 
 @pytest.mark.parametrize(

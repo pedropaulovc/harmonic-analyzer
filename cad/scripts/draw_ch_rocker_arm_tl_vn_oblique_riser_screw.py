@@ -38,6 +38,29 @@ def _printed(settings: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in settings.items() if name in PRINTED_REFERENCES}
 
 
+def _aligned_margins(
+    margins: dict[str, tuple[float, float, float, float]],
+) -> dict[str, tuple[float, float, float, float]]:
+    """Keep each view centred in its cell so the views stay in ASME projection.
+
+    The builder centres every view in its cell less these lane reserves. One
+    lane on one side (length right, thread below) shifted FRONT 3 mm off the
+    TOP axis and the RIGHT row. Reserving the larger lane on both sides of the
+    axis a view shares with FRONT only adds room; it never shrinks a lane.
+    """
+    aligned = {}
+    for name, (left, bottom, right, top) in margins.items():
+        across = max(left, right) if name in ("*Front", "*Top") else None
+        along = max(bottom, top) if name in ("*Front", "*Right") else None
+        aligned[name] = (
+            left if across is None else across,
+            bottom if along is None else along,
+            right if across is None else across,
+            top if along is None else along,
+        )
+    return aligned
+
+
 async def build(adapter: Any) -> dict[str, str]:
     # The .112 in thread and .212 in head chords are narrower than their text:
     # shelve it beside the arrows instead of between the extension lines.
@@ -64,7 +87,9 @@ async def build(adapter: Any) -> dict[str, str]:
             settled_checks=checks,
             layout=view_layout,
         ),
-        supplier_margins=supplier_screw_margins(dimensions, planes=planes, sides=sides),
+        supplier_margins=_aligned_margins(
+            supplier_screw_margins(dimensions, planes=planes, sides=sides)
+        ),
         settled_checks=checks,
     )
 
