@@ -31,6 +31,7 @@ from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dim
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_layout_audit import annotation_display
 from _drawing_layout_check import LeaderSegment
+from _drawing_leaders import set_near_side_diameter
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
@@ -38,6 +39,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _layout_audit import _display_segments
 from _layout_geometry import Box, Segment, estimate_text_box, segment_box_overlap_length, union_boxes
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _surface_finish import surface_finish_by_key
 from _session import run_build
@@ -46,6 +48,9 @@ from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, 
 from mg_lever_thread_joint import MOUTH_CHAMFER, NECK_HALF_X, NOSE_R, TAP_DRILL_DIA, THREAD
 from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_REFERENCE_PRECISION, MOUNTING_HOLE_PROCESS, TAP_PROCESS
 from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -241,6 +246,28 @@ def _set_hole_process(display: Any, *, mate: str, tapped: bool) -> None:
         raise RuntimeError("native hole process words did not persist")
 
 
+def _exterior_nose_radius(adapter: Any, annotations: list[Any]) -> None:
+    """The R5.50 leader stops at the nose arc, outside the tapped hole.
+
+    Native, it ran on from the arc to the hole centre, where the through-tap
+    leader also passed: the two leaders crossed there and the tap callout read
+    as pointing at the nose profile (machinist review, 3/3 runs). Arrow
+    outside with no solid leader, as draw_ch_fulcrum_keeper's crown radius.
+    """
+    matches = [item for item in annotations if dimension_name(adapter, item) == "NoseR"]
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one NoseR dimension, found {len(matches)}")
+    display = _early_bound(_early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
+    display.ArcExtensionLineOrOppositeSide = False
+    display.ArrowSide = 1  # swDimArrowsOutside
+    display.SolidLeader = False
+    if (
+        bool(display.Diametric)
+        or bool(display.ArcExtensionLineOrOppositeSide)
+        or int(display.ArrowSide) != 1
+        or bool(display.SolidLeader)
+    ):
+        raise RuntimeError("NoseR kept its leader to the hole centre")
 
 
 def _overall_reference(adapter: Any, side: Any, edges: Any) -> Any:
@@ -547,6 +574,12 @@ async def build(adapter: Any) -> dict[str, str]:
     tap = add_native_hole_callout(adapter, side, edge=rim.edge, callout_xy=(0.345, 0.236), label="quarter-inch lever through tap")
     _curate_tap_callout(adapter, side, tap)
     _set_hole_process(tap, mate=TAP_PROCESS, tapped=True)
+    tap_annotation = _early_bound(tap, "IDisplayDimension").GetAnnotation()
+    # One arrow on the hole's own rim, no line through the centre, and an
+    # R5.50 leader that stops at the nose arc: the two never meet.
+    set_near_side_diameter(tap_annotation, "quarter-inch lever through tap")
+    _exterior_nose_radius(adapter, imported["thread-axis end"])
+    rebuild_drawing(adapter, label="tap near-side and nose-radius exterior leaders")
     ratio = tuple(float(value) for value in _early_bound(iso, "IView").ScaleRatio)
     if len(ratio) != 2 or any(not math.isfinite(value) or value <= 0.0 for value in ratio):
         raise RuntimeError("isometric view has no valid native scale ratio")
@@ -570,7 +603,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "isometric view": iso_outline,
         "title block": (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m),
     })
-    tap_annotation = _early_bound(tap, "IDisplayDimension").GetAnnotation()
     linear_annotations = [
         *imported["front"], *imported["mounting face"], *imported["thread-axis end"],
         *mounting_dimensions, *annotations,
