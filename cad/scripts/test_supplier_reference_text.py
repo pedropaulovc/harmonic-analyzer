@@ -517,8 +517,84 @@ def test_stations_reject_actual_100um_free_tail_mutation(native_reads, physical_
     moved = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
     for key in ("tips", "witnesses", "reach"):
         assert moved[key] == original[key]
-    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+    with pytest.raises(
+        RuntimeError, match="supplier reference native physical_lines moved"
+    ) as exc:
         core.assert_reference_text_stations(original, moved, label=_LABEL)
+    prefix = "supplier_reference_native_station_fields "
+    note, = exc.value.__notes__
+    assert note.startswith(prefix)
+    fields = json.loads(note[len(prefix):])
+    assert fields["label"] == _LABEL
+    for checkpoint, measured in (("before", original), ("after", moved)):
+        observed = fields[checkpoint]
+        assert observed["axis"] == case.axis
+        assert observed["offset_text"] is False
+        assert observed["raw_record_available"] is True
+        for key in ("tips", "witnesses", "physical_lines"):
+            assert tuple(
+                tuple(row["items"]) for row in observed[key]["items"]
+            ) == measured[key]
+        for key in ("lines", "arrows"):
+            assert [
+                row["items"] for row in observed["raw"][key]["items"]
+            ] == measured["record"]["display"][key]
+        assert observed["raw"]["texts"]["items"][0]["fields"]["t"] == (
+            measured["record"]["display"]["texts"][0]["t"]
+        )
+
+
+def test_station_diagnostic_failure_does_not_mask_actual_tail_refusal(
+    native_reads, physical_case, monkeypatch
+):
+    case = physical_case
+    display = _static(case.record)
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    case.record["display"]["lines"][case.index][7 + case.axis] -= 0.0001
+    moved = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+
+    def fail_census(*_args, **_kwargs):
+        raise ValueError("diagnostic formatting fault")
+
+    monkeypatch.setattr(core, "_station_failure_note", fail_census)
+    with pytest.raises(
+        RuntimeError, match="supplier reference native physical_lines moved"
+    ) as exc:
+        core.assert_reference_text_stations(original, moved, label=_LABEL)
+    assert exc.value.__cause__ is None
+    assert exc.value.__notes__ == [
+        "supplier reference station field census formatting failed "
+        "(ValueError); original failure retained"
+    ]
+
+
+def test_station_refusal_retains_held_modes_without_reading_native_again(
+    native_reads, physical_case
+):
+    case = physical_case
+
+    class ModeCountedDisplay(_StaticDisplay):
+        mode_reads = 0
+
+        @property
+        def OffsetText(self):
+            self.mode_reads += 1
+            return self.offset
+
+    display = ModeCountedDisplay(case.record, False)
+    original = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    display.offset = True
+    case.record["display"]["lines"][case.index][7 + case.axis] -= 0.0001
+    moved = core.measure_reference_text(None, display, axis=case.axis, label=_LABEL)
+    assert display.mode_reads == 2
+    with pytest.raises(RuntimeError, match="physical_lines moved") as exc:
+        core.assert_reference_text_stations(original, moved, label=_LABEL)
+    prefix = "supplier_reference_native_station_fields "
+    note, = exc.value.__notes__
+    fields = json.loads(note[len(prefix):])
+    assert fields["before"]["offset_text"] is False
+    assert fields["after"]["offset_text"] is True
+    assert display.mode_reads == 2
 
 
 @pytest.mark.parametrize(
@@ -1569,11 +1645,61 @@ def test_shelve_refuses_physical_tail_mutation_during_each_transition(
     display = TailMovingDisplay(
         case.record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
     )
-    with pytest.raises(RuntimeError, match="supplier reference native physical_lines moved"):
+    with pytest.raises(
+        RuntimeError, match="supplier reference native physical_lines moved"
+    ) as exc:
         core.shelve_reference_text(
             None, reacquire=lambda: {display.name: display},
             axes={display.name: case.axis}, label=_LABEL,
         )
+    prefix = "supplier_reference_native_station_fields "
+    note, = exc.value.__notes__
+    fields = json.loads(note[len(prefix):])
+    # Even a final-settled refusal retains the original pre-seed measurement,
+    # including mode and raw fragments, rather than only the stripped vectors.
+    assert fields["before"]["raw_record_available"] is True
+    assert fields["before"]["offset_text"] is False
+    assert fields["after"]["offset_text"] is (phase != "seed")
+    assert fields["before"]["raw"]["lines"] != fields["after"]["raw"]["lines"]
+
+
+def test_retained_proof_releases_initial_raw_records_and_reports_unavailable_original(
+    native_reads, physical_case, monkeypatch
+):
+    case = physical_case
+    dumps = []
+    dump = core._dump_annotation
+
+    class LifetimeToken:
+        pass
+
+    def held_dump(reader, annotation):
+        record = dump(reader, annotation)
+        record["_lifetime"] = token = LifetimeToken()
+        dumps.append(weakref.ref(token))
+        return record
+
+    monkeypatch.setattr(core, "_dump_annotation", held_dump)
+    display = _Display(
+        case.record, case.axis, attached=(_NUT_FRACTION_BAR,) if case.axis == 0 else ()
+    )
+    proof = core.shelve_reference_text(
+        None, reacquire=lambda: {display.name: display},
+        axes={display.name: case.axis}, label=_LABEL,
+    )
+    gc.collect()
+    assert dumps and all(record() is None for record in dumps)
+    display.record["display"]["lines"][case.index][7 + case.axis] -= 0.0001
+    with pytest.raises(RuntimeError, match="physical_lines moved") as exc:
+        proof()
+    prefix = "supplier_reference_native_station_fields "
+    note, = exc.value.__notes__
+    fields = json.loads(note[len(prefix):])
+    assert fields["before"]["raw_record_available"] is False
+    assert "raw" not in fields["before"]
+    assert "offset_text" not in fields["before"]
+    assert fields["after"]["raw_record_available"] is True
+    assert fields["after"]["offset_text"] is True
 
 
 @pytest.mark.parametrize("late_delta", (0.0001, 0.6 * _TOL), ids=("100um", "cumulative"))
