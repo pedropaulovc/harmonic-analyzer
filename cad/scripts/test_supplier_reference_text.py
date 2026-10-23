@@ -2735,3 +2735,78 @@ def test_recorded_offset_paths_preserve_fragment_order_and_coalesced_physical_un
     assert coalesced["physical_lines"] == case.physical_lines
     core.assert_reference_text_stations(before, coalesced, label=_LABEL)
     assert case.after == retained_coalesced
+
+
+def test_recorded_offset_pair_on_nonlowest_native_baseline_remains_physical(
+    native_reads, captured_offset_case
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=False), axis=0, label=_LABEL
+    )
+    data = case.after["display"]
+    original_lines = copy.deepcopy(data["lines"])
+    lower_fragment = copy.deepcopy(data["texts"][-1])
+    lower_fragment["pos"][1] -= 0.001
+    data["texts"].append(lower_fragment)
+    retained = copy.deepcopy(case.after)
+
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["text"].ymin == lower_fragment["pos"][1]
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["reach"] == original_lines[-1][7]
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert after["record"] == retained
+    assert after["record"]["display"]["lines"] == original_lines
+    assert case.after == retained
+
+
+@pytest.mark.parametrize(
+    ("bottom_drop", "path_rise", "accepted"),
+    (
+        (0.999 * _TOL, 0.0, True),
+        (1.001 * _TOL, 0.0, False),
+        (0.9 * _TOL, 0.9 * _TOL, False),
+    ),
+    ids=("bottom-within-10um", "bottom-beyond-10um", "compound-18um"),
+)
+def test_recorded_offset_bottom_agreement_uses_single_existing_radial_tolerance(
+    native_reads, captured_offset_case, bottom_drop, path_rise, accepted
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=False), axis=0, label=_LABEL
+    )
+    data = case.after["display"]
+    lower_fragment = copy.deepcopy(data["texts"][-1])
+    # This valid lower font fragment establishes the global bottom but has no
+    # matching path of its own: its X is 1 mm beyond the captured path joint.
+    lower_fragment["pos"][0] += 0.001
+    lower_fragment["pos"][1] -= bottom_drop
+    data["texts"].append(lower_fragment)
+    connector, underline = data["lines"][case.connector_index:]
+    connector[8] += path_rise
+    underline[5] += path_rise
+    underline[8] += path_rise
+    retained = copy.deepcopy(case.after)
+
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["text"].ymin == lower_fragment["pos"][1]
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    if accepted:
+        assert after["physical_lines"] == before["physical_lines"]
+        assert after["reach"] == before["reach"]
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    else:
+        assert after["reach"] == underline[7]
+        with pytest.raises(RuntimeError, match="physical_lines"):
+            core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert after["record"] == retained
+    assert case.after == retained
