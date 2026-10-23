@@ -10025,7 +10025,8 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
             case.annotation.entities = tuple(
                 owner_view.GetCorresponding(entity) if imported else entity for entity in source_entities[label]
             )
-            case.annotation.Owner = owner_view
+            case.annotation.OwnerType = 0 if imported else 3
+            case.annotation.Owner = owner_view if imported else model
             case.annotation.GetAttachedEntityTypes = lambda case=case, label=label: (
                 (11 if label == washer.THICKNESS else 10),
             ) * len(case.annotation.entities)

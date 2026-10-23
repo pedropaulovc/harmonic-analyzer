@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-import gc
 import hashlib
 import importlib
 import json
@@ -643,6 +642,11 @@ def _saved_washer_case(parameters, tmp_path, monkeypatch, *, prepare_proof=True)
         canonical_parameters[f"{native_name}@{feature_name}"] = canonical
         source_natives[label] = native
         source_displays[label] = _Display(label, native, None, source_entities[label], units=0, precision=2)
+        # Prospective named-source contract, not a measured native positive:
+        # the source annotation remains on the original Part and original
+        # witness even if its IDimension later exposes a view-mapped owner.
+        source_displays[label].annotation.Owner = model
+        source_displays[label].annotation.OwnerType = 3
         features[feature_name].dimensions[native_name] = (source_displays[label], native)
 
     def named_dimensions(_adapter, feature_name, names, *, feature):
@@ -826,6 +830,8 @@ def test_unloaded_authoring_source_is_reacquired_from_drawing_autoload(saved_was
         case.app.loaded[str(case.source_path)] = reloaded
         for view in case.fresh.values():
             view.ReferencedDocument = reloaded
+        for display in case.source_displays.values():
+            display.annotation.Owner = reloaded
 
     case.app.on_open = autoload
     case.proof.saved_check(case.adapter, case.path)
@@ -883,6 +889,8 @@ def _autoload_source(case, loaded):
         case.app.loaded[str(case.source_path)] = loaded
         for view in case.fresh.values():
             view.ReferencedDocument = loaded
+        for display in case.source_displays.values():
+            display.annotation.Owner = loaded
 
     case.app.on_open = autoload
 
@@ -1035,10 +1043,16 @@ def test_saved_reader_surfaces_are_write_traps(saved_washer, monkeypatch):
     _assert_closed_unchanged(case)
 
 
-def test_public_authoring_return_exposes_saved_proof(saved_washer, monkeypatch):
+@pytest.mark.parametrize("mapped_source_after_import", (False, True))
+def test_public_authoring_return_exposes_saved_proof(saved_washer, monkeypatch, mapped_source_after_import):
     case = saved_washer
     _reset_authoring_layout(case)
     def curate(_adapter, view, **_kwargs):
+        if mapped_source_after_import and view is case.original[case.side]:
+            mapped = case.mapped_features[view][source.THICKNESS_FEATURE]
+            case.source_natives[source.THICKNESS].GetFeatureOwner = lambda: mapped
+            query = "SupplierThickness@SupplierWasherThicknessReference"
+            case.canonical_parameters[query].GetFeatureOwner = lambda: mapped
         return [SimpleNamespace(GetSpecificAnnotation=lambda display=display: display)
                 for display in view.displays]
     monkeypatch.setattr(washer, "curate_view_dimensions", curate)
@@ -1053,6 +1067,15 @@ def test_public_authoring_return_exposes_saved_proof(saved_washer, monkeypatch):
     monkeypatch.setattr(washer, "supplier_reference_dimension", lambda _adapter, display, **_kw: display)
     proof = washer.supplier_washer_dimensions(case.adapter, case.original, **case.arguments)
     assert isinstance(proof, washer.SupplierWasherProof)
+    if mapped_source_after_import:
+        # A cold saved context must expose its own feature wrapper, not the
+        # authoring IView's mapped feature. Native physical state is unchanged.
+        def fresh_owner():
+            mapped = case.mapped_features[case.fresh[case.side]][source.THICKNESS_FEATURE]
+            case.source_natives[source.THICKNESS].GetFeatureOwner = lambda: mapped
+            query = "SupplierThickness@SupplierWasherThicknessReference"
+            case.canonical_parameters[query].GetFeatureOwner = lambda: mapped
+        case.app.on_open = fresh_owner
     case.invalidate()
     proof.saved_check(case.adapter, case.path)
     _assert_closed_unchanged(case)
@@ -1218,6 +1241,268 @@ def _check_source(case, display, label=source.THICKNESS, *, view):
         case.adapter, case.model, display, view=view, label=label, axis=case.arguments["axis"],
         bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91,
     )
+
+
+def _paired_source_context(case, label=source.THICKNESS):
+    view, imported = _source_context(case, label)
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[label]
+    mapped_feature = case.mapped_features[view][feature_name]
+    case.source_natives[label].GetFeatureOwner = lambda: mapped_feature
+    case.canonical_parameters[f"{dimension_name}@{feature_name}"].GetFeatureOwner = lambda: mapped_feature
+    return view, imported
+
+
+def _check_paired_source(case, view, imported, label=source.THICKNESS):
+    source.assert_supplier_washer_source_attachment(
+        case.adapter, case.model, case.source_displays[label], view=None, label=label,
+        axis=case.arguments["axis"], bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91,
+        known_view=view, known_imported=imported,
+    )
+
+
+@pytest.mark.parametrize("label", tuple(VALUES))
+def test_named_source_mapped_owner_all_three_identities_need_explicit_paired_context(
+    saved_washer, label, monkeypatch,
+):
+    """Captured owner0/all-IDim1 shape plus a prospective correct Part annotation."""
+    case = saved_washer
+    view, imported = _paired_source_context(case, label)
+    feature_name, dimension_name = source.SOURCE_DIMENSIONS[label]
+    feature = case.features[feature_name]
+    native = case.source_natives[label]
+    parameter = case.canonical_parameters[f"{dimension_name}@{feature_name}"]
+    assert case.app.IsSame(native.GetFeatureOwner(), feature) == 0
+    assert case.app.IsSame(native, parameter) == 1
+    assert case.app.IsSame(imported.native, native) == 1
+    assert case.app.IsSame(imported.native, parameter) == 1
+    annotation = case.source_displays[label].annotation
+    assert annotation.OwnerType == 3 and annotation.Owner is case.model
+    assert annotation.attached == case.source_entities[label]
+    forward = view.GetCorresponding
+    calls = []
+    monkeypatch.setattr(view, "GetCorresponding", lambda entity: (calls.append(entity), forward(entity))[1])
+    with pytest.raises(RuntimeError, match="named model witness"):
+        _check_source(case, case.source_displays[label], label, view=None)
+    assert calls == []  # A failed strict check never discovers drawing context.
+    _check_paired_source(case, view, imported, label)
+    assert calls and calls[0] is feature
+    assert annotation.Owner is case.model and annotation.attached == case.source_entities[label]
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("fault", (
+    "foreign-view", "foreign-model", "foreign-path", "empty-config", "parameter-clone",
+    "import-clone", "import-name", "import-type", "named-owner-clone", "reverse-clone",
+    "source-owner-type", "source-owner-view", "source-owner-clone", "source-count-bool",
+    "source-attachment-type", "source-mapped-attachments", "source-duplicate", "source-missing",
+    "source-foreign-attachment", "import-owner-type", "import-original-attachments",
+    "import-duplicate", "import-missing", "import-foreign-attachment",
+))
+def test_paired_named_source_context_keeps_independent_owners_and_attachments_strict(
+    saved_washer, fault,
+):
+    case = saved_washer
+    view, imported = _paired_source_context(case)
+    feature = case.features[source.THICKNESS_FEATURE]
+    mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
+    named = case.source_displays[source.THICKNESS]
+    annotation = named.annotation
+    originals = case.source_entities[source.THICKNESS]
+    mapped = case.mapped_entities[view][source.THICKNESS]
+    if fault == "foreign-view":
+        view = case.original["*Right"]  # Same model/path, wrong actual annotation owner.
+    elif fault == "foreign-model":
+        view.ReferencedDocument = _Part(**vars(case.model))
+    elif fault == "foreign-path":
+        view.model_name = str(case.source_path.with_name("foreign.SLDPRT"))
+    elif fault == "empty-config":
+        view.ReferencedConfiguration = ""
+    elif fault == "parameter-clone":
+        query = "SupplierThickness@SupplierWasherThicknessReference"
+        case.canonical_parameters[query] = _native_clone(case.canonical_parameters[query])
+    elif fault == "import-clone":
+        imported.native = _native_clone(imported.native)
+    elif fault == "import-name":
+        imported.native.FullName = "D1@SupplierWasherThicknessReference@washer.SLDPRT"
+    elif fault == "import-type":
+        imported.Type2 = 6
+    elif fault == "named-owner-clone":
+        # A correct imported owner cannot replace the actual named source owner.
+        named.native.GetFeatureOwner = lambda: SimpleNamespace(**vars(mapped_feature))
+    elif fault == "reverse-clone":
+        case.model.Extension.reverse[id(mapped_feature)] = SimpleNamespace(**vars(feature))
+    elif fault == "source-owner-type":
+        annotation.OwnerType = 0
+    elif fault == "source-owner-view":
+        annotation.Owner = view
+    elif fault == "source-owner-clone":
+        annotation.Owner = _Part(**vars(case.model))
+    elif fault == "source-count-bool":
+        annotation.GetAttachedEntityCount3 = lambda: True
+    elif fault == "source-attachment-type":
+        annotation.GetAttachedEntityTypes = lambda: (10, 10)
+    elif fault == "source-mapped-attachments":
+        annotation.attached = mapped
+    elif fault == "source-duplicate":
+        annotation.attached = (originals[0], originals[0])
+    elif fault == "source-missing":
+        annotation.attached = originals[:1]
+    elif fault == "source-foreign-attachment":
+        annotation.attached = (originals[0], SimpleNamespace(**vars(originals[1])))
+    elif fault == "import-owner-type":
+        imported.annotation.OwnerType = 3
+    elif fault == "import-original-attachments":
+        imported.annotation.attached = originals
+    elif fault == "import-duplicate":
+        imported.annotation.attached = (mapped[0], mapped[0])
+    elif fault == "import-missing":
+        imported.annotation.attached = mapped[:1]
+    elif fault == "import-foreign-attachment":
+        imported.annotation.attached = (mapped[0], SimpleNamespace(**vars(mapped[1])))
+    with pytest.raises(RuntimeError):
+        _check_paired_source(case, view, imported)
+    assert case.source_path.read_bytes() == case.source_bytes
+
+
+@pytest.mark.parametrize("fault", ("value", "band", "units", "precision", "reference-ink", "override"))
+def test_paired_source_reference_guard_retains_original_value_band_and_presentation(saved_washer, fault):
+    case = saved_washer
+    context = {label: _paired_source_context(case, label) for label in case.arguments["bands"]}
+    named = case.source_displays[source.THICKNESS]
+    if fault == "value":
+        named.native.SystemValue *= 2
+    elif fault == "band":
+        named.native.Tolerance.Type = 0
+    elif fault == "units":
+        named.units = 3
+    elif fault == "precision":
+        named.precision += 1
+    elif fault == "reference-ink":
+        named.text[2] = " mm"
+    else:
+        named.override = True
+    with pytest.raises(RuntimeError):
+        source.assert_supplier_washer_references(
+            case.adapter, case.model, **case.arguments, import_context=context,
+        )
+
+
+@pytest.mark.parametrize("label", (source.OUTER_DIAMETER, source.BORE_DIAMETER))
+@pytest.mark.parametrize("annotation_context", ("named-source", "imported"))
+def test_paired_source_context_does_not_exchange_outer_and_bore_circles(
+    saved_washer, label, annotation_context,
+):
+    case = saved_washer
+    view, imported = _paired_source_context(case, label)
+    other = source.BORE_DIAMETER if label == source.OUTER_DIAMETER else source.OUTER_DIAMETER
+    if annotation_context == "named-source":
+        case.source_displays[label].annotation.attached = case.source_entities[other]
+    else:
+        imported.annotation.attached = case.mapped_entities[view][other]
+    with pytest.raises(RuntimeError, match="independently resolved source entity"):
+        _check_paired_source(case, view, imported, label)
+
+
+def test_saved_named_source_owner_cannot_reuse_authoring_mapped_feature(saved_washer):
+    case = saved_washer
+    _paired_source_context(case)
+    case.invalidate()
+    with pytest.raises(RuntimeError, match="named model witness"):
+        case.proof.saved_check(case.adapter, case.path)
+    _assert_closed_unchanged(case)
+
+
+@pytest.mark.parametrize("raw", (True, 2, ValueError("actual paired identity getter failed")))
+@pytest.mark.parametrize("relation", ("source-parameter", "import-source", "import-parameter", "source-owner", "source-annotation-owner"))
+def test_paired_source_context_never_flattens_native_identity_or_getter_errors(
+    saved_washer, monkeypatch, raw, relation,
+):
+    case = saved_washer
+    view, imported = _paired_source_context(case)
+    native = case.source_natives[source.THICKNESS]
+    parameter = case.canonical_parameters["SupplierThickness@SupplierWasherThicknessReference"]
+    mapped = case.mapped_features[view][source.THICKNESS_FEATURE]
+    annotation_owner = _Part(**vars(case.model))
+    if relation == "source-annotation-owner":
+        case.source_displays[source.THICKNESS].annotation.Owner = annotation_owner
+    left, right = {
+        "source-parameter": (native, parameter), "import-source": (imported.native, native),
+        "import-parameter": (imported.native, parameter), "source-owner": (mapped, mapped),
+        "source-annotation-owner": (annotation_owner, case.model),
+    }[relation]
+    actual = case.app.IsSame
+    def same(first, second):
+        if first is left and second is right:
+            if isinstance(raw, Exception):
+                raise raw
+            return raw
+        return actual(first, second)
+    monkeypatch.setattr(case.app, "IsSame", same)
+    with pytest.raises((RuntimeError, ValueError)) as caught:
+        _check_paired_source(case, view, imported)
+    if isinstance(raw, Exception):
+        assert caught.value is raw
+
+
+@pytest.mark.parametrize("fault", ("view-only", "display-only", "both-contexts"))
+def test_source_attachment_refuses_partial_or_mutually_incompatible_context(saved_washer, fault):
+    case = saved_washer
+    view, imported = _paired_source_context(case)
+    with pytest.raises(RuntimeError, match="complete view/display pair"):
+        source.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, case.source_displays[source.THICKNESS],
+            view=view if fault == "both-contexts" else None, label=source.THICKNESS,
+            axis=case.arguments["axis"], bore_mm=4.0, outer_mm=10.0, thickness_mm=0.91,
+            known_view=None if fault == "display-only" else view,
+            known_imported=None if fault == "view-only" else imported,
+        )
+
+
+@pytest.mark.parametrize("fault", ("missing", "extra", "null-view", "null-display", "short", "long"))
+def test_source_reference_context_requires_exact_band_coverage_and_complete_pairs(saved_washer, fault):
+    case = saved_washer
+    context = {label: _source_context(case, label) for label in case.arguments["bands"]}
+    pair = context[source.THICKNESS]
+    if fault == "missing":
+        context.pop(source.THICKNESS)
+    elif fault == "extra":
+        context["unregistered supplier size"] = pair
+    else:
+        context[source.THICKNESS] = {
+            "null-view": (None, pair[1]), "null-display": (pair[0], None),
+            "short": pair[:1], "long": (*pair, pair[1]),
+        }[fault]
+    case.parameter_queries.clear()
+    with pytest.raises(RuntimeError, match="exactly all bands"):
+        source.assert_supplier_washer_references(
+            case.adapter, case.model, **case.arguments, import_context=context,
+        )
+    assert case.parameter_queries == []
+
+
+@pytest.mark.parametrize("fault", ("configuration", "path", "model"))
+def test_public_import_freezes_binding_before_import_instead_of_learning_late_context(
+    original_source_capture, monkeypatch, fault,
+):
+    case = original_source_capture
+    _reset_authoring_layout(case)
+    _bind_original_capture_import(monkeypatch)
+    curate = washer.curate_view_dimensions
+    def drift(adapter, view, **kwargs):
+        result = curate(adapter, view, **kwargs)
+        if view is case.original[case.side]:
+            if fault == "configuration":
+                view.ReferencedConfiguration = "LateButNonemptyWrongConfiguration"
+            elif fault == "path":
+                view.model_name = str(case.source_path.with_name("late.SLDPRT"))
+            else:
+                view.ReferencedDocument = _Part(**vars(case.model))
+        return result
+    monkeypatch.setattr(washer, "curate_view_dimensions", drift)
+    with pytest.raises(RuntimeError, match="changed during import"):
+        washer.supplier_washer_dimensions(case.adapter, case.original, **case.arguments)
+    assert not case.app.open_calls and not case.app.close_calls
+    assert not case.rebuilds
 
 
 @pytest.mark.parametrize("label", tuple(VALUES))
@@ -2088,40 +2373,8 @@ def original_source_capture(request, tmp_path, monkeypatch):
         case.canonical_parameters[query].Name = name
         for imported in case.imported_natives.values():
             imported[label].Name = name
-    feature = case.features[source.THICKNESS_FEATURE]
-    sketch = feature.GetSpecificFeature2()
-    segment = sketch.GetSketchSegments()[0]
-    segment.GetID = lambda: (71, 72)
-    segment.GetSketch = lambda: sketch
-    sketch.GetSketchPointsCount2 = lambda: 2
-    feature.GetFirstDisplayDimension = lambda: case.source_displays[source.THICKNESS]
-    original_annotation = case.source_displays[source.THICKNESS].annotation
-    original_annotation.Owner = case.model
-    original_annotation.OwnerType = 3
-    mapped_sketches = {}
-    for collection in (case.original, case.fresh):
-        view = collection[case.side]
-        mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
-        mapped_sketch = mapped_feature.GetSpecificFeature2()
-        endpoints = case.mapped_entities[view][source.THICKNESS]
-        mapped_line = SimpleNamespace(
-            GetType=lambda: 0, GetID=lambda: (81, 82),
-            GetSketch=lambda mapped_sketch=mapped_sketch: mapped_sketch,
-            ConstructionGeometry=True,
-            GetStartPoint2=lambda endpoints=endpoints: endpoints[0],
-            GetEndPoint2=lambda endpoints=endpoints: endpoints[1],
-        )
-        mapped_sketch.GetSketchSegments = lambda mapped_line=mapped_line: (mapped_line,)
-        mapped_sketch.GetSketchPointsCount2 = lambda: 2
-        view.forward[id(segment)] = mapped_line
-        case.model.Extension.reverse[id(mapped_line)] = segment
-        imported_annotation = next(display.annotation for display in view.displays
-                                   if display.label == source.THICKNESS)
-        view.forward[id(original_annotation)] = imported_annotation
-        case.model.Extension.reverse[id(imported_annotation)] = original_annotation
-        mapped_sketches[view] = mapped_sketch
-    case.diagnostic_sketch = sketch
-    case.diagnostic_mapped_sketches = mapped_sketches
+    # No first-display or annotation-mapping seed is needed: capture consumes
+    # only the independently named source display and its actual annotation.
     return case
 
 
@@ -2149,10 +2402,8 @@ class _OriginalCaptureDispatch:
         return getattr(self._surface, name)
 
 
-def _install_original_capture_rebinder(case, monkeypatch, *, check_lifetime=False):
+def _install_original_capture_rebinder(case, monkeypatch):
     dispatches = {}
-    wrappers = []
-    counts = SimpleNamespace(bindings=0)
 
     def unwrap(value):
         return value._surface if isinstance(value, _OriginalCaptureDispatch) else value
@@ -2161,20 +2412,12 @@ def _install_original_capture_rebinder(case, monkeypatch, *, check_lifetime=Fals
         if value is None:
             return None
         surface = unwrap(value)
-        if check_lifetime:
-            gc.collect()
-            assert all(reference() is not None for reference in wrappers), (
-                "a previously keyed raw/bound wrapper died during capture"
-            )
         entry = dispatches.setdefault(id(surface), (surface, object()))
-        result = _OriginalCaptureDispatch(surface, entry[1])
-        wrappers.append(weakref.ref(result))
-        return result
+        return _OriginalCaptureDispatch(surface, entry[1])
 
     def bind(value, _interface):
         result = wrap(value)
         assert result is not value, "this control must exercise real Python rebinding"
-        counts.bindings += 1
         return result
 
     view = case.original[case.side]
@@ -2186,7 +2429,6 @@ def _install_original_capture_rebinder(case, monkeypatch, *, check_lifetime=Fals
     monkeypatch.setattr(case.model.Extension, "GetCorresponding2",
                         lambda value: wrap(actual_reverse(unwrap(value))))
     monkeypatch.setattr(case.app, "IsSame", lambda first, second: actual_same(unwrap(first), unwrap(second)))
-    return SimpleNamespace(wrap=wrap, wrappers=wrappers, counts=counts)
 
 
 def _bind_original_capture_import(monkeypatch):
@@ -2235,7 +2477,7 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
 
     def fail_getter():
         attempts.append(("getter",))
-        raise ValueError("independent first-display getter failure")
+        raise ValueError("independent named source annotation getter failure")
 
     def log(message):
         attempts.append(("logging", message))
@@ -2243,7 +2485,7 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
             raise ValueError("independent telemetry transport failure")
 
     if transport == "getter":
-        case.features[source.THICKNESS_FEATURE].GetFirstDisplayDimension = fail_getter
+        case.source_displays[source.THICKNESS].GetAnnotation = fail_getter
     monkeypatch.setattr(washer, "assert_supplier_washer_references", gate)
     monkeypatch.setattr(washer, "_capture_original_washer_source_failure", capture)
     monkeypatch.setattr(washer._telemetry, "info", log)
@@ -2266,9 +2508,15 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
             washer.supplier_washer_dimensions(case.adapter, case.original, **case.arguments)
     assert caught.value is original
     assert len(gate_calls) == (2 if phase == "after_import" else 1)
-    assert all(adapter is case.adapter and model is case.model
-               and kwargs == {**case.arguments, "bore_callout": None}
-               for adapter, model, kwargs in gate_calls)
+    for index, (adapter, model, kwargs) in enumerate(gate_calls):
+        assert adapter is case.adapter and model is case.model
+        expected = {**case.arguments, "bore_callout": None}
+        if phase == "final_or_saved" or (phase == "after_import" and index == 1):
+            expected["import_context"] = {
+                reference.label: (reference.view, _authoring_display(case, reference.label))
+                for reference in case.references if reference.imported
+            }
+        assert kwargs == expected
     assert len(capture_calls) == 1
     error, adapter, model, view, kwargs = capture_calls[0]
     assert error is original and adapter is case.adapter and model is case.model
@@ -2282,7 +2530,7 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
         assert any(attempt[0] == "logging" for attempt in attempts)
     if transport == "getter":
         assert sum(attempt[0] == "getter" for attempt in attempts) == 1
-        assert any("independent first-display getter failure" in attempt[1]
+        assert any("independent named source annotation getter failure" in attempt[1]
                    for attempt in attempts if attempt[0] == "note")
     if transport == "span":
         assert sum(attempt[0] == "span" for attempt in attempts) == 1
@@ -2301,9 +2549,7 @@ def test_original_source_capture_healthy_paths_read_no_new_diagnostic_getters(
         pytest.fail("healthy original-source gate reached a diagnostic getter")
 
     case.features[source.THICKNESS_FEATURE].GetFirstDisplayDimension = forbidden
-    case.diagnostic_sketch.GetSketchPointsCount2 = forbidden
-    for sketch in case.diagnostic_mapped_sketches.values():
-        sketch.GetSketchPointsCount2 = forbidden
+    case.features[source.THICKNESS_FEATURE].GetSpecificFeature2().GetSketchPointsCount2 = forbidden
     monkeypatch.setattr(washer, "_capture_original_washer_source_failure", forbidden)
     washer.assert_supplier_washer_dimensions(
         case.adapter, case.original, case.references, **case.arguments,
@@ -2328,7 +2574,6 @@ def test_original_source_capture_keeps_independent_fields_after_getter_errors(
     calls = []
     annotation = case.source_displays[source.THICKNESS].annotation
     native = case.source_natives[source.THICKNESS]
-    first_point = case.source_entities[source.THICKNESS][0]
 
     def fail(name):
         def getter():
@@ -2339,28 +2584,24 @@ def test_original_source_capture_keeps_independent_fields_after_getter_errors(
     annotation.GetAttachedEntityCount3 = fail("annotation count")
     annotation.GetAttachedEntityTypes = lambda: (11, 25)
     native.GetFeatureOwner = fail("source dimension owner")
-    first_point.GetID = fail("point ID")
     reads = _original_source_capture_reads(case)
     assert "diagnostic.capture_error" not in reads
     for field, name in (
         ("source.annotation.count", "annotation count"),
         ("source.dimension.owner", "source dimension owner"),
-        ("source.point.0.id", "point ID"),
     ):
         assert reads[field] == {"error_type": "ValueError", "read_error": "actual diagnostic " + name}
         assert calls.count(name) == 1
     assert reads["source.annotation.types.slot.1"] == {"python_type": "int", "value": 25}
     assert reads["source.annotation.entities"]["count"] == 2
     assert reads["source.annotation.entities.inventory_state"]["value"] == "unexpected_count"
-    assert reads["source.point.0.X"]["value"] == 0.005
-    assert reads["source.point.0.Z"]["value"] == 0.0
     assert reads["imported.annotation.owner_type"]["value"] == 0
     assert reads["imported.annotation.owner_identity.owner.view"]["value"] == 1
     assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
 
 
-@pytest.mark.parametrize("raw", (0, -1, None, False, True, 1),
-                         ids=("zero", "minus-one", "null", "false", "true", "one"))
+@pytest.mark.parametrize("raw", (0, -1, 2, None, False, True, 1),
+                         ids=("zero", "minus-one", "unsupported-two", "null", "false", "true", "one"))
 def test_original_source_capture_retains_raw_identity_type_and_bidirectionality(
     original_source_capture, monkeypatch, raw,
 ):
@@ -2389,12 +2630,6 @@ def test_original_source_capture_retains_raw_identity_type_and_bidirectionality(
     assert reads["feature.identity.imported_owner.mapped"]["value"] == 1
     assert reads["source.annotation.owner_identity.owner.model"]["value"] == 1
     assert reads["source.annotation.owner_type"]["value"] == 3
-    assert reads["display.identity.source.imported"]["value"] == 0
-    assert reads["source.point.0.reverse"] == {"python_type": "NoneType", "value": None}
-    assert reads["attachment.identity.source.attached.0.source.point.0"]["value"] == 1
-    assert reads["attachment.identity.imported.attached.0.mapped.point.0"]["value"] == 1
-    assert reads["source.attached.0.correspondence_identity.forward.mapped.point.0"]["value"] == 1
-    assert reads["source.attached.0.correspondence_identity_reverse.mapped.point.0.forward"]["value"] == 1
     assert imported is not native and parameter is not native
     assert case.parameter_queries[-1] == query
 
@@ -2431,7 +2666,7 @@ def test_original_source_capture_keeps_null_empty_slots_and_array_errors(
     assert reads["source.annotation.visible"]["value"] == 1
 
 
-@pytest.mark.parametrize("inventory", ("segments", "attachments", "unknown-attachment"))
+@pytest.mark.parametrize("inventory", ("attachments", "unknown-attachment"))
 def test_original_source_capture_bounds_inventory_without_unknown_interface_walks(
     original_source_capture, monkeypatch, inventory,
 ):
@@ -2448,9 +2683,7 @@ def test_original_source_capture_bounds_inventory_without_unknown_interface_walk
 
     unknown = Unknown()
     annotation = case.source_displays[source.THICKNESS].annotation
-    if inventory == "segments":
-        case.diagnostic_sketch.GetSketchSegments = lambda: (unknown,) * 7
-    elif inventory == "attachments":
+    if inventory == "attachments":
         annotation.GetAttachedEntityCount3 = lambda: 7
         annotation.GetAttachedEntities3 = lambda: (unknown,) * 7
         annotation.GetAttachedEntityTypes = lambda: [11] * 7
@@ -2466,86 +2699,67 @@ def test_original_source_capture_bounds_inventory_without_unknown_interface_walk
     reads = _original_source_capture_reads(case)
     assert not touched
     assert "diagnostic.capture_error" not in reads
-    if inventory == "segments":
-        assert reads["source.segments.overflow"]["value"] == 6
-        assert reads["source.segments"]["count"] == 7
-        assert "source.segment.interface" not in reads
-    elif inventory == "attachments":
+    if inventory == "attachments":
         assert reads["source.annotation.entities.overflow"]["value"] == 5
         assert reads["source.annotation.types.overflow"]["value"] == 5
         assert "source.annotation.entities.slot.2" not in reads
         assert "source.attached.0.interface" not in reads
     else:
-        assert reads["source.attached.0.interface_unavailable"]["value"] == (
-            "no_native_identity_to_known_endpoint"
-        )
+        assert "source.attached.0.interface" not in reads
 
 
-def test_original_source_capture_does_not_retry_failed_correspondence(
-    original_source_capture, monkeypatch,
-):
-    case = original_source_capture
-    view = case.original[case.side]
-    first = case.source_entities[source.THICKNESS][0]
-    actual_forward = view.GetCorresponding
-    attempts = []
-
-    def forward(value):
-        if value is first:
-            attempts.append(value)
-            raise ValueError("known point forward failed")
-        return actual_forward(value)
-
-    monkeypatch.setattr(view, "GetCorresponding", forward)
-    reads = _original_source_capture_reads(case)
-    assert attempts == [first]
-    assert reads["source.point.0.forward"] == {
-        "error_type": "ValueError", "read_error": "known point forward failed",
-    }
-    assert reads["source.attached.0.forward.unavailable"]["value"] == (
-        "prior_getter_failed:source.point.0.forward"
-    )
-    assert reads["imported.annotation.visible"]["value"] == 1
-
-
-@pytest.mark.parametrize("first_kind", ("wrong-dimension", "null"))
-def test_original_source_capture_labels_first_display_without_parameter_substitution(
+@pytest.mark.parametrize("first_kind", ("wrong-dimension", "null", "raises"))
+def test_original_source_capture_resolves_named_display_not_first_dimension(
     original_source_capture, first_kind,
 ):
     case = original_source_capture
     feature = case.features[source.THICKNESS_FEATURE]
-    actual = case.source_displays[source.THICKNESS]
+    named = case.source_displays[source.THICKNESS]
     calls = []
-    other_native = _ReadSurface(
-        FullName="UnexpectedDimension@UnexpectedSubfeature@washer.SLDPRT",
-        Name="UnexpectedDimension", GetFeatureOwner=lambda: feature,
-    )
-    other_display = _ReadSurface(
-        GetDimension2=lambda _index: other_native,
-        GetNameForSelection=lambda: "UnexpectedDimension@FirstDisplay",
-        GetAnnotation=actual.GetAnnotation, Type2=2,
-    )
-
     def first():
         calls.append("first")
-        return None if first_kind == "null" else other_display
-
+        if first_kind == "raises":
+            raise AssertionError("nondeterministic first-display path must not be read")
+        return None if first_kind == "null" else object()
     feature.GetFirstDisplayDimension = first
+    annotation_getter = named.GetAnnotation
+    def annotation():
+        calls.append("named.GetAnnotation")
+        return annotation_getter()
+    named.GetAnnotation = annotation
     reads = _original_source_capture_reads(case)
-    assert calls == ["first"]
-    assert reads["source.display_origin"]["value"] == "feature_first_display_not_named_enumeration"
-    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
-    if first_kind == "null":
-        assert reads["source.first_display"] == {"python_type": "NoneType", "value": None}
-        assert reads["source.first_display.unavailable"]["value"] == "null"
-        assert "source.dimension.full_name" not in reads
-        assert reads["imported.annotation.visible"]["value"] == 1
-    else:
-        assert reads["source.first_display.dimension_state"]["value"] == "unexpected_first_display"
-        assert reads["source.dimension.full_name"]["value"] == other_native.FullName
-        assert reads["source.dimension.name"]["value"] == "UnexpectedDimension"
-        assert reads["dimension.identity.source.parameter"]["value"] == 0
+    assert calls == ["named.GetAnnotation"]
+    assert reads["source.display_origin"]["value"] == "_named_dimensions"
+    assert reads["source.dimension.full_name"]["value"].startswith("SupplierThickness@")
+    assert reads["source.annotation.owner_type"]["value"] == 3
+    assert reads["source.annotation.owner_identity.owner.model"]["value"] == 1
+    assert reads["source.annotation.entities"]["count"] == 2
+    assert not any("first_display" in field for field in reads)
+    assert not any(".point." in field or "annotation.forward" in field for field in reads)
     assert "diagnostic.capture_error" not in reads
+
+
+@pytest.mark.parametrize("failure", (RuntimeError("named source enumeration failed"), KeyError("SupplierThickness")))
+def test_original_source_capture_named_resolution_failure_never_substitutes_parameter_or_first_display(
+    original_source_capture, monkeypatch, failure,
+):
+    case = original_source_capture
+    attempts = []
+    def named(*_args, **_kwargs):
+        attempts.append("named")
+        raise failure
+    monkeypatch.setattr(washer, "_named_dimensions", named)
+    case.features[source.THICKNESS_FEATURE].GetFirstDisplayDimension = lambda: pytest.fail("first-display fallback")
+    reads = _original_source_capture_reads(case)
+    assert attempts == ["named"]
+    assert reads["source.named_dimensions"] == {
+        "error_type": type(failure).__name__, "read_error": str(failure),
+    }
+    assert "source.annotation" not in reads
+    assert "source.dimension.full_name" not in reads
+    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
+    assert reads["imported.annotation.owner_type"]["value"] == 0
+    assert reads["imported.annotation.visible"]["value"] == 1
 
 
 def test_original_source_capture_identity_getter_failure_is_not_retried(
@@ -2565,9 +2779,11 @@ def test_original_source_capture_identity_getter_failure_is_not_retried(
     monkeypatch.setattr(case.app, "IsSame", same)
     reads = _original_source_capture_reads(case)
     assert len(calls) == 1
-    assert reads["feature.identity.source.source.unavailable"]["value"].startswith(
-        "prior_getter_failed:",
-    )
+    assert reads["feature.identity.source.source"] == {
+        "error_type": "ValueError", "read_error": "actual feature self identity failed",
+    }
+    assert any(field.endswith(".unavailable") and value.get("value", "").startswith("prior_getter_failed:")
+               for field, value in reads.items() if isinstance(value.get("value", ""), str))
     errors = [field for field in reads.values() if field.get("error_type") == "ValueError"]
     assert errors == [{
         "error_type": "ValueError", "read_error": "actual feature self identity failed",
@@ -2620,79 +2836,6 @@ def test_original_source_capture_common_saved_boundary_uses_fresh_actual_view(
     assert not case.rebuilds
 
 
-@pytest.mark.parametrize("fault", ("forward", "reverse", "identity", "point", "mapped-point"))
-def test_original_source_capture_rebound_aliases_do_not_retry_failed_reads(
-    original_source_capture, monkeypatch, fault,
-):
-    case = original_source_capture
-    feature = case.features[source.THICKNESS_FEATURE]
-    view = case.original[case.side]
-    mapped_feature = case.mapped_features[view][source.THICKNESS_FEATURE]
-    first_point = case.source_entities[source.THICKNESS][0]
-    attempts = []
-    actual_forward = view.GetCorresponding
-    actual_reverse = case.model.Extension.GetCorresponding2
-    actual_same = case.app.IsSame
-
-    def refuse():
-        attempts.append(fault)
-        raise ValueError("rebound native " + fault)
-
-    if fault == "forward":
-        monkeypatch.setattr(view, "GetCorresponding", lambda value:
-                            refuse() if value is first_point else actual_forward(value))
-    elif fault == "reverse":
-        monkeypatch.setattr(case.model.Extension, "GetCorresponding2", lambda value:
-                            refuse() if value is mapped_feature else actual_reverse(value))
-    elif fault == "identity":
-        monkeypatch.setattr(case.app, "IsSame", lambda first, second:
-                            refuse() if first is feature and second is feature else actual_same(first, second))
-    elif fault == "point":
-        first_point.GetID = refuse
-    else:
-        case.mapped_entities[view][source.THICKNESS][0].GetID = refuse
-    transport = _install_original_capture_rebinder(case, monkeypatch)
-    annotation = case.source_displays[source.THICKNESS].annotation
-    actual_entities = annotation.GetAttachedEntities3
-    annotation.GetAttachedEntities3 = lambda: tuple(transport.wrap(value) for value in actual_entities())
-    reads = _original_source_capture_reads(case)
-    assert transport.counts.bindings > 10
-    assert len(transport.wrappers) > transport.counts.bindings
-    assert attempts == [fault]
-    assert "diagnostic.capture_error" not in reads
-    field = {
-        "forward": "source.point.0.forward", "reverse": "feature.reverse",
-        "identity": "feature.identity.source.source", "point": "source.point.0.id",
-        "mapped-point": "forward.point.0.id",
-    }[fault]
-    assert reads[field] == {"error_type": "ValueError", "read_error": "rebound native " + fault}
-    if fault in {"forward", "reverse"}:
-        skipped = ("source.attached.0.forward.unavailable" if fault == "forward"
-                   else "mapped.feature.reverse.unavailable")
-        assert reads[skipped]["value"] == "prior_getter_failed:" + field
-    elif fault == "point":
-        assert reads["source.attached.0.details_from"]["value"] == "source.point.0"
-    elif fault == "mapped-point":
-        assert reads["mapped.point.0.details_from"]["value"] == "forward.point.0"
-        assert reads["imported.attached.0.details_from"]["value"] == "forward.point.0"
-    assert reads["source.annotation.visible"]["value"] == 1
-    assert reads["imported.annotation.visible"]["value"] == 1
-
-
-def test_original_source_capture_retains_raw_and_bound_wrapper_lifetimes(
-    original_source_capture, monkeypatch,
-):
-    case = original_source_capture
-    transport = _install_original_capture_rebinder(case, monkeypatch, check_lifetime=True)
-    reads = _original_source_capture_reads(case)
-    assert "diagnostic.capture_error" not in reads
-    assert transport.counts.bindings > 10
-    assert reads["source.point.0.id"]["count"] == 2
-    assert reads["source.point.1.id"]["count"] == 2
-    # The transport retains only weakrefs to wrapper instances; each bound
-    # wrapper holds the stable surface/dispatch, not its original raw wrapper.
-    gc.collect()
-    assert all(reference() is None for reference in transport.wrappers)
 
 
 def test_original_source_capture_native_equality_does_not_merge_owner_contexts(
@@ -2727,133 +2870,6 @@ def test_original_source_capture_native_equality_does_not_merge_owner_contexts(
     assert "diagnostic.capture_error" not in reads
 
 
-@pytest.mark.parametrize("context", ("source", "mapped"))
-@pytest.mark.parametrize("fault", ("wrong-type", "type-error"))
-def test_original_source_capture_requires_observed_profile_before_sketch_binding(
-    original_source_capture, context, fault,
-):
-    case = original_source_capture
-    feature = (case.features[source.THICKNESS_FEATURE] if context == "source" else
-               case.mapped_features[case.original[case.side]][source.THICKNESS_FEATURE])
-    calls = []
-
-    def kind():
-        calls.append("type")
-        if fault == "type-error":
-            raise ValueError("observed feature type unavailable")
-        return "RefPlane"
-
-    def forbidden_specific():
-        calls.append("specific")
-        pytest.fail("unknown specific-feature interface was requested")
-
-    feature.GetTypeName2 = kind
-    feature.GetSpecificFeature2 = forbidden_specific
-    reads = _original_source_capture_reads(case)
-    assert calls == ["type"]
-    assert reads[f"{context}.sketch.unavailable"]["value"] == (
-        "feature_type_getter_failed" if fault == "type-error" else "feature_type_not_ProfileFeature"
-    )
-    assert f"{context}.sketch.interface" not in reads
-    assert f"{context}.segments" not in reads
-    if fault == "type-error":
-        assert reads[f"{context}.feature.type"] == {
-            "error_type": "ValueError", "read_error": "observed feature type unavailable",
-        }
-    else:
-        assert reads[f"{context}.feature.type"]["value"] == "RefPlane"
-    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
-    assert reads["source.annotation.count"]["value"] == 2
-    assert reads["imported.annotation.count"]["value"] == 2
-    assert "diagnostic.capture_error" not in reads
-
-
-@pytest.mark.parametrize("count", (7, None, True, ValueError("sketch-wide point count unavailable")),
-                         ids=("extra-point", "null-count", "boolean-count", "count-error"))
-def test_original_source_capture_known_endpoints_survive_unrelated_point_count(
-    original_source_capture, count,
-):
-    case = original_source_capture
-    calls = []
-    segment = case.diagnostic_sketch.GetSketchSegments()[0]
-    actual_start, actual_end = segment.GetStartPoint2, segment.GetEndPoint2
-
-    def count_getter():
-        calls.append("count")
-        if isinstance(count, Exception):
-            raise count
-        return count
-
-    def endpoint(name, getter):
-        calls.append(name)
-        return getter()
-
-    case.diagnostic_sketch.GetSketchPointsCount2 = count_getter
-    segment.GetStartPoint2 = lambda: endpoint("start", actual_start)
-    segment.GetEndPoint2 = lambda: endpoint("end", actual_end)
-    reads = _original_source_capture_reads(case)
-    assert calls == ["count", "start", "end"]
-    if isinstance(count, Exception):
-        assert reads["source.point_count"] == {
-            "error_type": "ValueError", "read_error": "sketch-wide point count unavailable",
-        }
-    else:
-        assert reads["source.point_count"] == {"python_type": type(count).__name__, "value": count}
-    assert reads["source.expected_endpoint_count"]["value"] == 2
-    assert reads["source.start"]["present"] is True
-    assert reads["source.end"]["present"] is True
-    assert reads["source.point.0.X"]["value"] == 0.005
-    assert reads["source.point.1.id"]["count"] == 2
-    assert reads["source.point.0.forward"]["present"] is True
-    assert reads["attachment.identity.source.attached.0.source.point.0"]["value"] == 1
-    assert "diagnostic.capture_error" not in reads
-
-
-@pytest.mark.parametrize("endpoint", ("start", "end"))
-@pytest.mark.parametrize("fault", ("null", "error"))
-def test_original_source_capture_endpoint_null_and_error_leave_other_endpoint_intact(
-    original_source_capture, endpoint, fault,
-):
-    case = original_source_capture
-    segment = case.diagnostic_sketch.GetSketchSegments()[0]
-    calls = []
-
-    def getter():
-        calls.append(endpoint)
-        if fault == "error":
-            raise ValueError("individual line endpoint unavailable")
-        return None
-
-    setattr(segment, "GetStartPoint2" if endpoint == "start" else "GetEndPoint2", getter)
-    reads = _original_source_capture_reads(case)
-    assert calls == [endpoint]
-    assert reads[f"source.{endpoint}"] == (
-        {"python_type": "NoneType", "value": None} if fault == "null" else
-        {"error_type": "ValueError", "read_error": "individual line endpoint unavailable"}
-    )
-    other = "1" if endpoint == "start" else "0"
-    assert reads[f"source.point.{other}.X"]["value"] == 0.005
-    assert reads[f"source.point.{other}.id"]["count"] == 2
-    assert reads["imported.annotation.visible"]["value"] == 1
-    assert "diagnostic.capture_error" not in reads
-
-
-@pytest.mark.parametrize("kind", (1, None, False))
-def test_original_source_capture_unknown_segment_type_never_binds_line(
-    original_source_capture, kind,
-):
-    case = original_source_capture
-    segment = case.diagnostic_sketch.GetSketchSegments()[0]
-    segment.GetType = lambda: kind
-    segment.GetStartPoint2 = lambda: pytest.fail("unknown native segment was cast as line")
-    segment.GetEndPoint2 = segment.GetStartPoint2
-    reads = _original_source_capture_reads(case)
-    assert reads["source.segment.type"] == {"python_type": type(kind).__name__, "value": kind}
-    assert reads["source.endpoints.unavailable"]["value"] == "unexpected_segment_type"
-    assert "source.line.interface" not in reads
-    assert "source.start" not in reads
-    assert reads["source.annotation.visible"]["value"] == 1
-    assert "diagnostic.capture_error" not in reads
 
 
 def test_original_source_capture_has_distinct_diagnostic_operation_span(
@@ -2967,107 +2983,8 @@ def test_original_source_capture_document_native_equality_keeps_distinct_getter_
     assert "diagnostic.capture_error" not in reads
 
 
-@pytest.mark.parametrize("member,field", (
-    ("Name", "feature.name"), ("GetTypeName2", "feature.type"), ("GetSpecificFeature2", "sketch"),
-))
-@pytest.mark.parametrize("rebind", (False, True), ids=("held-object", "rebound-dispatch"))
-def test_original_source_capture_feature_metadata_failure_is_borrowed_across_roles(
-    original_source_capture, monkeypatch, member, field, rebind,
-):
-    case = original_source_capture
-    original = case.features[source.THICKNESS_FEATURE]
-    sketch = original.GetSpecificFeature2()
-    calls = {"Name": 0, "GetTypeName2": 0, "GetSpecificFeature2": 0}
-
-    def getter(name, value):
-        calls[name] += 1
-        if name == member:
-            raise ValueError("known feature " + member)
-        return value
-
-    class FeatureMetadata:
-        @property
-        def Name(self):
-            return getter("Name", source.THICKNESS_FEATURE)
-
-        def GetTypeName2(self):
-            return getter("GetTypeName2", "ProfileFeature")
-
-        def GetSpecificFeature2(self):
-            return getter("GetSpecificFeature2", sketch)
-
-        def GetFirstDisplayDimension(self):
-            return case.source_displays[source.THICKNESS]
-
-    feature = FeatureMetadata()
-    monkeypatch.setitem(case.features, source.THICKNESS_FEATURE, feature)
-    monkeypatch.setitem(case.original[case.side].forward, id(feature), feature)
-    monkeypatch.setitem(case.model.Extension.reverse, id(feature), feature)
-    if rebind:
-        _install_original_capture_rebinder(case, monkeypatch)
-    reads = _original_source_capture_reads(case)
-    assert calls[member] == 1
-    assert reads[f"source.{field}"] == {
-        "error_type": "ValueError", "read_error": "known feature " + member,
-    }
-    assert f"mapped.{field}" not in reads
-    assert reads[f"mapped.{field}.unavailable"]["value"] == f"prior_getter_failed:source.{field}"
-    if member == "GetTypeName2":
-        assert calls["GetSpecificFeature2"] == 0
-    elif member != "GetSpecificFeature2":
-        assert calls["GetSpecificFeature2"] == 2
-    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
-    assert reads["source.annotation.count"]["value"] == 2
-    assert reads["imported.annotation.count"]["value"] == 2
-    assert "diagnostic.capture_error" not in reads
 
 
-@pytest.mark.parametrize("member,field", (
-    ("FullName", "full_name"), ("Name", "name"), ("GetFeatureOwner", "owner"),
-))
-def test_original_source_capture_dimension_metadata_failure_is_borrowed_only_for_known_surface(
-    original_source_capture, monkeypatch, member, field,
-):
-    case = original_source_capture
-    feature = case.features[source.THICKNESS_FEATURE]
-    full_name = case.source_natives[source.THICKNESS].FullName
-    calls = {"FullName": 0, "Name": 0, "GetFeatureOwner": 0}
-
-    def getter(name, value):
-        calls[name] += 1
-        if name == member:
-            raise ValueError("known dimension " + member)
-        return value
-
-    class DimensionMetadata:
-        @property
-        def FullName(self):
-            return getter("FullName", full_name)
-
-        @property
-        def Name(self):
-            return getter("Name", "SupplierThickness")
-
-        def GetFeatureOwner(self):
-            return getter("GetFeatureOwner", feature)
-
-    native = DimensionMetadata()
-    monkeypatch.setitem(case.canonical_parameters, "SupplierThickness@SupplierWasherThicknessReference", native)
-    for display in (case.source_displays[source.THICKNESS], _authoring_display(case, source.THICKNESS)):
-        monkeypatch.setattr(display, "GetDimension2", lambda _index: native)
-    _install_original_capture_rebinder(case, monkeypatch)
-    reads = _original_source_capture_reads(case)
-    assert calls[member] == 1
-    assert all(count == 3 for name, count in calls.items() if name != member)
-    first = "parameter.dimension." + field
-    assert reads[first] == {"error_type": "ValueError", "read_error": "known dimension " + member}
-    for role in ("source", "imported"):
-        later = role + ".dimension." + field
-        assert later not in reads
-        assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
-    assert reads["source.annotation.visible"]["value"] == 1
-    assert reads["imported.annotation.visible"]["value"] == 1
-    assert "diagnostic.capture_error" not in reads
 
 
 @pytest.mark.parametrize("member,field", (
@@ -3107,72 +3024,6 @@ def test_original_source_capture_annotation_metadata_failure_is_borrowed_across_
     assert "diagnostic.capture_error" not in reads
 
 
-@pytest.mark.parametrize("member,field,arguments", (
-    ("GetDimension2", "dimension", (0,)),
-    ("GetAnnotation", "annotation", ()),
-    ("GetNameForSelection", "display.selection_name", ()),
-))
-def test_original_source_capture_display_failed_member_and_arguments_are_not_retried(
-    original_source_capture, monkeypatch, member, field, arguments,
-):
-    case = original_source_capture
-    display = _authoring_display(case, source.THICKNESS)
-    calls = []
-
-    def getter(*args):
-        calls.append(args)
-        raise ValueError("known display " + member)
-
-    monkeypatch.setattr(case.features[source.THICKNESS_FEATURE], "GetFirstDisplayDimension", lambda: display)
-    monkeypatch.setattr(display, member, getter)
-    _install_original_capture_rebinder(case, monkeypatch)
-    reads = _original_source_capture_reads(case)
-    assert calls == [arguments]
-    first = "source." + field
-    later = "imported." + field
-    assert reads[first] == {"error_type": "ValueError", "read_error": "known display " + member}
-    assert later not in reads
-    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
-    assert reads["parameter.dimension.full_name"]["value"].startswith("SupplierThickness@")
-    assert reads["source.point.0.X"]["value"] == 0.005
-    assert "diagnostic.capture_error" not in reads
-
-
-@pytest.mark.parametrize("member,field", (
-    ("GetSketchSegments", "segments"), ("GetSketchPointsCount2", "point_count"),
-    ("GetID", "segment.id"),
-))
-def test_original_source_capture_witness_metadata_failure_is_borrowed_across_roles(
-    original_source_capture, monkeypatch, member, field,
-):
-    case = original_source_capture
-    feature = case.features[source.THICKNESS_FEATURE]
-    view = case.original[case.side]
-    monkeypatch.setitem(view.forward, id(feature), feature)
-    monkeypatch.setitem(case.model.Extension.reverse, id(feature), feature)
-    surface = (case.diagnostic_sketch.GetSketchSegments()[0] if member == "GetID"
-               else case.diagnostic_sketch)
-    calls = []
-
-    def getter():
-        calls.append(member)
-        raise ValueError("known witness " + member)
-
-    monkeypatch.setattr(surface, member, getter)
-    _install_original_capture_rebinder(case, monkeypatch)
-    reads = _original_source_capture_reads(case)
-    assert calls == [member]
-    first = "source." + field
-    later = "mapped." + field
-    assert reads[first] == {"error_type": "ValueError", "read_error": "known witness " + member}
-    assert later not in reads
-    assert reads[later + ".unavailable"]["value"] == "prior_getter_failed:" + first
-    if member == "GetSketchPointsCount2":
-        assert reads["source.start"]["present"] is True
-        assert reads["mapped.end"]["present"] is True
-    assert reads["source.annotation.visible"]["value"] == 1
-    assert reads["imported.annotation.visible"]["value"] == 1
-    assert "diagnostic.capture_error" not in reads
 
 
 @pytest.mark.parametrize("failure_stage", ("none", "logging", "note"))

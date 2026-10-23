@@ -4,8 +4,10 @@ The part owns every banded dimension's native value, tolerance and supplier
 presentation. Imports retain the source's explicit display units; precision,
 reference ink and bands are never rewritten.
 
-Source attachments are proved from independent part geometry in the actual owning
-view; native feature/entity correspondence, not names or values, proves membership.
+Source checks keep the independently named Part annotation separate from the
+imported annotation. Only explicit paired import context permits mapped feature
+ownership; source attachments remain original and imports require a full native
+view bijection. Source path/configuration expectations are frozen before import.
 """
 
 from __future__ import annotations
@@ -85,17 +87,20 @@ def _capture_original_washer_source_failure(
     phase: Literal["before_import", "after_import", "final_or_saved"],
     imported: Any | None,
 ) -> None:
-    """Observe only the known thickness witness after an unchanged source refusal.
+    """Capture only named thickness/source/import/Parameter failure fields.
 
-    No document traversal, selection or mutation is permitted here. Native null,
-    non-integer identities and individual getter errors are evidence, not verdicts.
+    The authoritative named resolver supplies the source display and IDimension;
+    no first-display, D1, annotation correspondence or geometry walk is used.
+    Native nulls, raw identity types and exact getter errors remain evidence,
+    never an alternative success path.
     """
     proof = None
     try:
         proof = _WasherSourceReadback(adapter, THICKNESS)
         missing = object()
         failed_reads: dict[tuple[int, str, tuple], str] = {}
-        point_reads: dict[int, tuple[str, Any]] = {}
+        # Keep known raw/bound call surfaces alive; native equality does not
+        # merge their independently observable owner/property contexts.
         surfaces: dict[int, tuple[Any, int]] = {}
         dispatch_surfaces: dict[int, tuple[Any, int]] = {}
 
@@ -189,126 +194,6 @@ def _capture_original_washer_source_failure(
             read(f"{field}.inventory_state", lambda: "exact")
             return tuple(raw)
 
-        def forward(field: str, value: Any) -> Any:
-            if not available(value) or not available(owning_view):
-                read(f"{field}.unavailable", lambda: "input_or_view_unavailable")
-                return missing
-            return read(
-                field, lambda: owning_view.GetCorresponding(value),
-                operation=(owning_view, "IView.GetCorresponding", (surface_key(value),)),
-            )
-
-        def reverse(field: str, value: Any) -> Any:
-            if not available(value) or not available(extension):
-                read(f"{field}.unavailable", lambda: "input_or_extension_unavailable")
-                return missing
-            return read(
-                field, lambda: extension.GetCorresponding2(value),
-                operation=(extension, "IModelDocExtension.GetCorresponding2", (surface_key(value),)),
-            )
-
-        def source_mapping(field: str, value: Any, context: dict[str, Any] | None = None) -> Any:
-            mapped = forward(f"{field}.forward", value)
-            back = reverse(f"{field}.reverse", mapped)
-            roundtrip = forward(f"{field}.roundtrip", back)
-            matrix(f"{field}.identity", {"source": value, "reverse": back})
-            matrix(f"{field}.roundtrip_identity", {"mapped": mapped, "roundtrip": roundtrip})
-            if context is not None:
-                probes = {"forward": mapped, "reverse": back, "roundtrip": roundtrip}
-                matrix(f"{field}.correspondence_identity", probes, context)
-                matrix(f"{field}.correspondence_identity_reverse", context, probes)
-            return mapped
-
-        def mapped_mapping(field: str, value: Any, context: dict[str, Any] | None = None) -> Any:
-            back = reverse(f"{field}.reverse", value)
-            roundtrip = forward(f"{field}.roundtrip", back)
-            matrix(f"{field}.identity", {"mapped": value, "roundtrip": roundtrip})
-            if context is not None:
-                probes = {"reverse": back, "roundtrip": roundtrip}
-                matrix(f"{field}.correspondence_identity", probes, context)
-                matrix(f"{field}.correspondence_identity_reverse", context, probes)
-            return back
-
-        def point(field: str, value: Any, sketches: dict[str, Any]) -> Any:
-            if not available(value):
-                return bind(field, value, "ISketchPoint")
-            key = surface_key(value)
-            previous = point_reads.get(key)
-            if previous is not None:
-                read(f"{field}.details_from", lambda: previous[0])
-                return previous[1]
-            native = bind(field, value, "ISketchPoint")
-            # Binding can establish an alias to an already observed dispatch.
-            key = surface_key(value)
-            previous = point_reads.get(key)
-            if previous is not None:
-                read(f"{field}.details_from", lambda: previous[0])
-                return previous[1]
-            point_reads[key] = (field, native)
-            if available(native):
-                read(f"{field}.id", lambda: native.GetID(), operation=(native, "ISketchPoint.GetID", ()))
-                sketch = read(
-                    f"{field}.sketch", lambda: native.GetSketch(),
-                    operation=(native, "ISketchPoint.GetSketch", ()),
-                )
-                for coordinate in ("X", "Y", "Z"):
-                    read(
-                        f"{field}.{coordinate}", lambda coordinate=coordinate: getattr(native, coordinate),
-                        operation=(native, f"ISketchPoint.{coordinate}", ()),
-                    )
-                matrix(f"{field}.sketch_identity", {"owner": sketch, **sketches})
-            return native
-
-        def witness(field: str, sketch: Any) -> tuple[Any, tuple]:
-            if not available(sketch):
-                return missing, ()
-            # ISketch has no documented total segment-count getter. Inspect the
-            # returned array length, never enumerate beyond the one known line.
-            raw = read(
-                f"{field}.segments", lambda: sketch.GetSketchSegments(),
-                operation=(sketch, "ISketch.GetSketchSegments", ()),
-            )
-            read(
-                f"{field}.point_count", lambda: sketch.GetSketchPointsCount2(),
-                operation=(sketch, "ISketch.GetSketchPointsCount2", ()),
-            )
-            segments = slots(
-                f"{field}.segments", raw, 1,
-                count=len(raw) if type(raw) in (tuple, list) else missing,
-            )
-            read(f"{field}.expected_endpoint_count", lambda: 2)
-            if not segments:
-                return missing, ()
-            segment = bind(f"{field}.segment", segments[0], "ISketchSegment")
-            if not available(segment):
-                return missing, ()
-            kind = read(
-                f"{field}.segment.type", lambda: segment.GetType(),
-                operation=(segment, "ISketchSegment.GetType", ()),
-            )
-            read(f"{field}.segment.id", lambda: segment.GetID(), operation=(segment, "ISketchSegment.GetID", ()))
-            owner = read(
-                f"{field}.segment.sketch", lambda: segment.GetSketch(),
-                operation=(segment, "ISketchSegment.GetSketch", ()),
-            )
-            read(
-                f"{field}.segment.construction", lambda: segment.ConstructionGeometry,
-                operation=(segment, "ISketchSegment.ConstructionGeometry", ()),
-            )
-            matrix(f"{field}.segment.sketch_identity", {"owner": owner, "expected": sketch})
-            if type(kind) is not int or kind != 0:
-                read(f"{field}.endpoints.unavailable", lambda: "unexpected_segment_type")
-                return segment, ()
-            line = bind(f"{field}.line", segment, "ISketchLine")
-            if not available(line):
-                return segment, ()
-            return segment, (
-                read(f"{field}.start", lambda: line.GetStartPoint2(),
-                     operation=(line, "ISketchLine.GetStartPoint2", ())),
-                read(f"{field}.end", lambda: line.GetEndPoint2(),
-                     operation=(line, "ISketchLine.GetEndPoint2", ())),
-            )
-
         read("diagnostic.phase", lambda: phase)
         read("diagnostic.witness", lambda: THICKNESS)
         read("diagnostic.imported_present", lambda: imported is not None)
@@ -372,41 +257,38 @@ def _capture_original_washer_source_failure(
                     "source.feature", read("source.feature", lambda: part.FeatureByName(feature_name),
                                            operation=(part, "IPartDoc.FeatureByName", (feature_name,))), "IFeature",
                 )
-        mapped_feature = bind("mapped.feature", source_mapping("feature", feature), "IFeature")
-        reverse_feature = mapped_mapping("mapped.feature", mapped_feature)
-        sketches = {}
-        for name, current_feature in (("source", feature), ("mapped", mapped_feature)):
-            sketch = missing
-            if available(current_feature):
-                read(f"{name}.feature.name", lambda: current_feature.Name,
-                     operation=(current_feature, "IFeature.Name", ()))
-                kind = read(f"{name}.feature.type", lambda: current_feature.GetTypeName2(),
-                            operation=(current_feature, "IFeature.GetTypeName2", ()))
-                if type(kind) is str and kind == "ProfileFeature":
-                    sketch = bind(
-                        f"{name}.sketch",
-                        read(f"{name}.sketch", lambda: current_feature.GetSpecificFeature2(),
-                             operation=(current_feature, "IFeature.GetSpecificFeature2", ())), "ISketch",
-                    )
-                else:
-                    read(f"{name}.sketch.unavailable", lambda: (
-                        "feature_type_getter_failed" if kind is missing else "feature_type_not_ProfileFeature"
-                    ))
-            sketches[name] = sketch
-        source_mapping("source.sketch", sketches["source"])
-        mapped_mapping("mapped.sketch", sketches["mapped"])
 
-        read("source.display_origin", lambda: "feature_first_display_not_named_enumeration")
+        read("source.display_origin", lambda: "_named_dimensions")
         original_display = missing
+        named_native = missing
         if available(feature):
-            original_display = bind(
-                "source.first_display",
-                read("source.first_display", lambda: feature.GetFirstDisplayDimension(),
-                     operation=(feature, "IFeature.GetFirstDisplayDimension", ())), "IDisplayDimension",
+            named = read(
+                "source.named_dimensions",
+                lambda: _named_dimensions(adapter, feature_name, {dimension_name}, feature=feature),
             )
+            if available(named):
+                original_display, named_native = named[dimension_name]
+                original_display = bind("source.named_display", original_display, "IDisplayDimension")
+                named_native = bind("source.named_dimension", named_native, "IDimension")
         imported_display = bind("imported.display", imported, "IDisplayDimension")
         displays = {"source": original_display, "imported": imported_display}
         dimensions = {"parameter": parameter}
+        mapped_feature = missing
+        reverse_feature = missing
+        if available(feature) and available(owning_view):
+            mapped_feature = bind(
+                "mapped.feature",
+                read("mapped.feature", lambda: owning_view.GetCorresponding(feature),
+                     operation=(owning_view, "IView.GetCorresponding", (surface_key(feature),))),
+                "IFeature",
+            )
+        if available(mapped_feature) and available(extension):
+            reverse_feature = bind(
+                "mapped.feature_reverse",
+                read("mapped.feature_reverse", lambda: extension.GetCorresponding2(mapped_feature),
+                     operation=(extension, "IModelDocExtension.GetCorresponding2", (surface_key(mapped_feature),))),
+                "IFeature",
+            )
         features = {"source": feature, "mapped": mapped_feature, "reverse": reverse_feature}
         annotations = {}
         for name, display in displays.items():
@@ -416,7 +298,7 @@ def _capture_original_washer_source_failure(
                  operation=(display, "IDisplayDimension.GetNameForSelection", ()))
             read(f"{name}.display.type", lambda: display.Type2,
                  operation=(display, "IDisplayDimension.Type2", ()))
-            dimensions[name] = bind(
+            dimensions[name] = named_native if name == "source" else bind(
                 f"{name}.dimension", read(f"{name}.dimension", lambda: display.GetDimension2(0),
                                           operation=(display, "IDisplayDimension.GetDimension2", (0,))), "IDimension",
             )
@@ -426,46 +308,25 @@ def _capture_original_washer_source_failure(
             )
         for name, dimension in dimensions.items():
             if available(dimension):
-                full_name = read(f"{name}.dimension.full_name", lambda: dimension.FullName,
-                                 operation=(dimension, "IDimension.FullName", ()))
+                read(f"{name}.dimension.full_name", lambda: dimension.FullName,
+                     operation=(dimension, "IDimension.FullName", ()))
                 read(f"{name}.dimension.name", lambda: dimension.Name,
                      operation=(dimension, "IDimension.Name", ()))
-                if name == "source":
-                    read("source.first_display.expected_dimension_heads", lambda: (dimension_name, feature_name))
-                    read("source.first_display.dimension_state", lambda: (
-                        "unavailable_full_name" if full_name is missing else
-                        "expected_thickness" if isinstance(full_name, str)
-                        and full_name.split("@")[:2] == [dimension_name, feature_name]
-                        else "unexpected_first_display"
-                    ))
                 features[f"{name}_owner"] = bind(
                     f"{name}.dimension.owner",
                     read(f"{name}.dimension.owner", lambda: dimension.GetFeatureOwner(),
                          operation=(dimension, "IDimension.GetFeatureOwner", ())), "IFeature",
                 )
         matrix("dimension.identity", dimensions)
-        matrix("display.identity", displays)
+        for name, current_feature in tuple(features.items()):
+            if not available(current_feature):
+                continue
+            read(f"{name}.feature.name", lambda: current_feature.Name,
+                 operation=(current_feature, "IFeature.Name", ()))
+            read(f"{name}.feature.type", lambda: current_feature.GetTypeName2(),
+                 operation=(current_feature, "IFeature.GetTypeName2", ()))
         matrix("feature.identity", features)
 
-        members = {}
-        for name, sketch in sketches.items():
-            segment, endpoints = witness(name, sketch)
-            if name == "source":
-                mapped_segment = source_mapping("source.segment", segment)
-            else:
-                mapped_mapping("mapped.segment", segment)
-                matrix("segment.identity", {"forward": mapped_segment, "mapped": segment})
-            for index, endpoint in enumerate(endpoints):
-                field = f"{name}.point.{index}"
-                members[field] = point(field, endpoint, sketches)
-                if name == "source":
-                    mapped = source_mapping(field, endpoint)
-                    members[f"forward.point.{index}"] = point(f"forward.point.{index}", mapped, sketches)
-                else:
-                    mapped_mapping(field, endpoint)
-
-        attachments = {}
-        mapped_annotation = missing
         for name, annotation in annotations.items():
             if not available(annotation):
                 continue
@@ -485,33 +346,7 @@ def _capture_original_washer_source_failure(
             read(f"{name}.annotation.visible", lambda: annotation.Visible,
                  operation=(annotation, "IAnnotation.Visible", ()))
             slots(f"{name}.annotation.types", types, 2, count=count)
-            attached = slots(f"{name}.annotation.entities", entities, 2, count=count)
-            for index, entity in enumerate(attached):
-                attachments[f"{name}.attached.{index}"] = entity
-            if name == "source":
-                mapped_annotation = source_mapping("source.annotation", annotation)
-            else:
-                mapped_mapping("imported.annotation", annotation)
-                matrix("annotation.identity", {"forward": mapped_annotation, "imported": annotation})
-        identities = matrix("attachment.identity", {**members, **attachments})
-        for field, entity in attachments.items():
-            # Only native identity to a known endpoint establishes a point
-            # interface. Annotation type codes alone do not justify a cast.
-            known_point = any(
-                type(identities.get((field, known))) is int
-                and identities[field, known] == 1
-                and type(identities.get((known, field))) is int
-                and identities[known, field] == 1
-                for known in members
-            )
-            if known_point:
-                point(field, entity, sketches)
-            else:
-                read(f"{field}.interface_unavailable", lambda: "no_native_identity_to_known_endpoint")
-            if field.startswith("source."):
-                source_mapping(field, entity, {**members, **attachments})
-            else:
-                mapped_mapping(field, entity, {**members, **attachments})
+            slots(f"{name}.annotation.entities", entities, 2, count=count)
     except BaseException as capture_error:
         if proof is not None:
             try:
@@ -739,6 +574,10 @@ def assert_supplier_washer_dimensions(
             bands=bands, bore_callout=next(
                 reference.callout for reference in references if reference.label == BORE_DIAMETER
             ),
+            import_context={
+                reference.label: (reference.view, current[reference.label])
+                for reference in references if reference.imported
+            },
         )
     except Exception as error:
         try:
@@ -1395,6 +1234,24 @@ def supplier_washer_dimensions(
         raise
     face = views["*Top" if axis == "y" else "*Front"]
     side = views["*Front" if axis == "y" else "*Top"]
+    # Freeze the existing source/view binding before native import can change
+    # wrappers or configuration. Do not learn expectations from a failed guard
+    # or from the later placement proof's post-import capture.
+    source_path = _native_path(model.GetPathName(), label="authoring washer source")
+    configurations = {}
+    for orientation, raw in views.items():
+        view = _early_bound(raw, "IView")
+        referenced = view.ReferencedDocument
+        identity = None if referenced is None else adapter.swApp.IsSame(referenced, model)
+        configuration = view.ReferencedConfiguration
+        if (
+            view.GetOrientationName() != orientation
+            or type(identity) is not int or identity != 1
+            or _native_path(view.GetReferencedModelName(), label=orientation) != source_path
+            or not isinstance(configuration, str) or not configuration.strip()
+        ):
+            raise RuntimeError(f"{orientation}: authoring washer source/view identity differs before import")
+        configurations[orientation] = configuration
     bounds = tuple(float(value) for value in face.GetOutline())
     center_y = (bounds[1] + bounds[3]) / 2.0
     positions = {
@@ -1438,10 +1295,29 @@ def supplier_washer_dimensions(
                 precision=precision[label], label=label,
             )
     try:
+        if _native_path(model.GetPathName(), label="authoring washer source") != source_path:
+            raise RuntimeError("authoring washer source path changed during import")
+        if set(views) != set(configurations):
+            raise RuntimeError("authoring washer view census changed during import")
+        for orientation, raw in views.items():
+            view = _early_bound(raw, "IView")
+            referenced = view.ReferencedDocument
+            identity = None if referenced is None else adapter.swApp.IsSame(referenced, model)
+            if (
+                view.GetOrientationName() != orientation
+                or type(identity) is not int or identity != 1
+                or _native_path(view.GetReferencedModelName(), label=orientation) != source_path
+                or view.ReferencedConfiguration != configurations[orientation]
+            ):
+                raise RuntimeError(f"{orientation}: authoring washer source/view identity changed during import")
         assert_supplier_washer_references(
             adapter, model, axis=axis, bore_mm=bore_mm, outer_mm=outer_mm,
             thickness_mm=thickness_mm, units=units, precision=precision,
             bands=bands, bore_callout=bore_callout,
+            import_context={
+                reference.label: (reference.view, imported_displays[reference.label])
+                for reference in references
+            },
         )
     except Exception as error:
         try:

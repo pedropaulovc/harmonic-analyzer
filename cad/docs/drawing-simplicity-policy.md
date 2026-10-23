@@ -69,6 +69,20 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Washer source checks keep the named model display's Part annotation separate
+  from an imported drawing annotation. Before import and during part authoring,
+  the native dimension owner and original attachments must belong to the model
+  witness directly. After import, an explicit paired owning view and imported
+  display may prove the named dimension's feature-owner context through the
+  same original/mapped feature and reverse-correspondence proof. Both members
+  are required; names, values, a failed check or an unrelated first feature
+  display cannot supply missing context. Independently resolved named source,
+  imported and model-parameter dimensions must retain exact native identity,
+  and the imported annotation must belong to that actual view with the frozen
+  source path/configuration. The named source annotation still requires its
+  actual Part owner and original source entities; drawing context never
+  substitutes for that source-side proof. Settled and saved-read-only checks
+  reacquire and repeat both distinct contracts without repairing the source.
   Shared supplier-reference text shelving retains the original perpendicular
   witnesses and axial physical dimension lines as canonical interval unions,
   including every disjoint component and gap, not merely outside endpoints or

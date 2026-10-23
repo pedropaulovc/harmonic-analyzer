@@ -3,6 +3,11 @@
 Stock recipes initially make +Y solids. Their optional normalization moves
 bodies only, so witnesses are authored directly in the final model planes.
 Neither this module nor the drawing changes a solid or a native size value.
+
+Post-import source checks accept only an explicit owning-view/imported-display
+pair. Feature ownership may then use proved mapped/reverse lineage, while the
+independently named source annotation must still be Part-owned and attached to
+the original witness. No context is inferred from a failed source-only check.
 """
 
 from __future__ import annotations
@@ -416,16 +421,22 @@ def _assert_washer_view_attachments(
 def assert_supplier_washer_source_attachment(
     adapter: Any, model: Any, display: Any, *, view: Any | None, label: str,
     axis: Literal["y", "z"], bore_mm: float, outer_mm: float, thickness_mm: float,
+    known_view: Any | None = None, known_imported: Any | None = None,
 ) -> None:
     """Independently prove exact source geometry and its actual attachment.
 
-    Both contexts require the independently enumerated source IDimension and
-    exact IModelDoc2.Parameter("Dimension@Feature") to have native identity.
-    Explicit view=None proves the authoring part's exact owner and attachments;
-    an actual view additionally proves full source/view lineage, visibility and
-    complete entity correspondence, including circle reverse/roundtrip checks.
+    Source-only authoring/pre-import checks remain strict. After import, callers
+    may supply both known_view and known_imported, never either alone or together
+    with view. This proves the source IDimension's owner through the existing
+    feature correspondence proof, not by substituting the imported owner's
+    feature. The named source annotation remains independently Part-owned with
+    original attachments; imported annotations require the full view bijection.
     """
     with _WasherSourceReadback(adapter, label) as proof:
+        if (known_view is None) != (known_imported is None) or (
+            view is not None and known_view is not None
+        ):
+            raise RuntimeError(f"{label}: source import context requires only a complete view/display pair")
         feature_name, dimension_name = SOURCE_DIMENSIONS[label]
         raw = proof.read("source.feature", lambda: _early_bound(model, "IPartDoc").FeatureByName(feature_name))
         if raw is None:
@@ -449,15 +460,29 @@ def assert_supplier_washer_source_attachment(
         parameter = proof.object(
             "dimension.model_parameter", lambda: source_model.Parameter(parameter_name), "IDimension",
         )
+        imported_annotation = None
+        binding_native = native
+        if known_view is not None:
+            known_imported = proof.object(
+                "known.imported", lambda: known_imported, "IDisplayDimension",
+            )
+            binding_native = proof.object(
+                "known.dimension", lambda: known_imported.GetDimension2(0), "IDimension",
+            )
+            if proof.same("dimension.display_source_identity", native, source_native) != 1:
+                raise RuntimeError(f"{label}: source display is not its independently named dimension")
         # IsSame returns a native integer (VT_I4), not a truthy Boolean.
         # Names and values cannot replace any of these independent controls.
-        imported_source = proof.same("dimension.source_identity", native, source_native)
+        imported_source = proof.same("dimension.source_identity", binding_native, source_native)
         source_parameter = proof.same("dimension.source_parameter_identity", source_native, parameter)
-        imported_parameter = proof.same("dimension.imported_parameter_identity", native, parameter)
+        imported_parameter = proof.same("dimension.imported_parameter_identity", binding_native, parameter)
         if imported_source != 1 or source_parameter != 1 or imported_parameter != 1:
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
-        full_name = str(proof.read("dimension.imported_full_name", lambda: native.FullName) or "")
-        owner = proof.read("dimension.owner", native.GetFeatureOwner)
+        full_name = str(proof.read("dimension.imported_full_name", lambda: binding_native.FullName) or "")
+        owner = proof.read(
+            "dimension.owner",
+            source_native.GetFeatureOwner if known_view is not None else native.GetFeatureOwner,
+        )
         if (
             full_name.split("@")[:2] != [dimension_name, feature_name]
             or str(proof.read("dimension.source_full_name", lambda: source_native.FullName)).split("@")[:2]
@@ -465,7 +490,27 @@ def assert_supplier_washer_source_attachment(
             or owner is None
         ):
             raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
-        if view is None:
+        if known_view is not None:
+            display_type = proof.read("dimension.imported_type2", lambda: known_imported.Type2)
+            source_type = proof.read("dimension.source_type2", lambda: source_display.Type2)
+            if type(display_type) is not int or type(source_type) is not int or display_type != source_type:
+                raise RuntimeError(f"{label}: imported dimension does not belong to its named model witness")
+            imported_annotation = proof.object(
+                "known.annotation", known_imported.GetAnnotation, "IAnnotation",
+            )
+            owner_type = proof.read("known.annotation.owner_type", lambda: imported_annotation.OwnerType)
+            annotation_owner = proof.object(
+                "known.annotation.owner", lambda: imported_annotation.Owner, "IView",
+            )
+            if type(owner_type) is not int or owner_type != 0 or (
+                proof.same("known.annotation.owner_view_identity", annotation_owner, known_view) != 1
+            ):
+                raise RuntimeError(f"{label}: known imported annotation does not belong to its actual view")
+            context_view, mapped_sketch, extension = _washer_view_source_context(
+                proof, model, known_view, feature, binding_native, source_native, owner,
+                feature_name=feature_name,
+            )
+        elif view is None:
             if (
                 proof.same("dimension.owner_source_identity", owner, feature) != 1
                 or int(proof.read("dimension.imported_type2", lambda: display.Type2))
@@ -533,21 +578,44 @@ def assert_supplier_washer_source_attachment(
                              if math.isclose(diameter, expected_mm, rel_tol=0.0, abs_tol=1e-6))
             if int(display.Type2) != 6:
                 raise RuntimeError(f"{label}: source diameter lost its native diameter type")
-        annotation = proof.object("annotation", display.GetAnnotation, "IAnnotation")
+        if known_view is not None:
+            _assert_washer_view_attachments(
+                proof, context_view, extension, sketch, mapped_sketch, imported_annotation,
+                inventory, selected, points=label == THICKNESS,
+            )
+        annotation = proof.object(
+            "source.annotation" if view is None else "annotation",
+            (source_display if view is None else display).GetAnnotation, "IAnnotation",
+        )
         if view is not None:
             _assert_washer_view_attachments(
                 proof, view, extension, sketch, mapped_sketch, annotation, inventory, selected,
                 points=label == THICKNESS,
             )
             return
-        attached = list(proof.read("annotation.entities", annotation.GetAttachedEntities3) or ())
+        owner_type = proof.read("source.annotation.owner_type", lambda: annotation.OwnerType)
+        annotation_owner = proof.object("source.annotation.owner", lambda: annotation.Owner, "IModelDoc2")
+        if type(owner_type) is not int or owner_type != 3 or (
+            proof.same("source.annotation.owner_model_identity", annotation_owner, source_model) != 1
+        ):
+            raise RuntimeError(f"{label}: named source annotation does not belong to its original part")
+        count = proof.read("source.annotation.count", annotation.GetAttachedEntityCount3)
+        types = tuple(proof.read("source.annotation.types", annotation.GetAttachedEntityTypes) or ())
+        attached = list(proof.read("source.annotation.entities", annotation.GetAttachedEntities3) or ())
+        if type(count) is not int or count != len(attached) or count != len(types) or (
+            count != len(expected_entities)
+        ):
+            raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
+        allowed_types = (11, 25) if label == THICKNESS else (10, 24)
+        if any(type(kind) is not int or kind not in allowed_types for kind in types):
+            raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
         for entity in expected_entities:
             matches = [i for i, item in enumerate(attached)
                        if item is not None and proof.same("attached.source_identity", item, entity) == 1]
             if len(matches) != 1:
                 raise RuntimeError(f"{label}: attachment is not the independently resolved source entity")
             attached.pop(matches[0])
-        if attached or proof.read("annotation.dangling", annotation.IsDangling):
+        if attached or proof.read("source.annotation.dangling", annotation.IsDangling):
             raise RuntimeError(f"{label}: unexpected, hidden or dangling source attachments")
 
 
@@ -655,16 +723,31 @@ def assert_supplier_washer_references(
     outer_mm: float, thickness_mm: float, units: Literal["in", "mm"],
     precision: Mapping[str, int], bands: Mapping[str, tuple[float, float, str]],
     bore_callout: str | None = None,
+    import_context: Mapping[str, tuple[Any, Any]] | None = None,
 ) -> None:
+    """Read original sources; optional context must cover exactly every band.
+
+    Each pair is (validated owning IView, current imported IDisplayDimension).
+    The drawing caller freezes/rechecks source path and per-view configuration
+    before supplying these handles; an absent context never enables mapping.
+    """
+    if import_context is not None:
+        if set(import_context) != set(bands) or any(
+            type(pair) is not tuple or len(pair) != 2 or any(item is None for item in pair)
+            for pair in import_context.values()
+        ):
+            raise RuntimeError("supplier washer source import context must cover exactly all bands with view/display pairs")
     values = {OUTER_DIAMETER: outer_mm, BORE_DIAMETER: bore_mm, THICKNESS: thickness_mm}
     part = _early_bound(model, "IPartDoc")
     for label, band in bands.items():
         feature, name = SOURCE_DIMENSIONS[label]
         raw = part.FeatureByName(feature)
         display, _ = _named_dimensions(adapter, feature, {name}, feature=raw)[name]
+        known_view, known_imported = (None, None) if import_context is None else import_context[label]
         assert_supplier_washer_source_attachment(
             adapter, model, display, view=None, label=label, axis=axis, bore_mm=bore_mm,
             outer_mm=outer_mm, thickness_mm=thickness_mm,
+            known_view=known_view, known_imported=known_imported,
         )
         _assert_supplier_washer_presentation(
             display, label=label, units=units, precision=precision[label],
