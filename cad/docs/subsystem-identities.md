@@ -1,6 +1,6 @@
 # Subsystem identities
 
-Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities and the 2026-10-20 consolidation of repeated supplier SKUs into shared `sh-vn-*` identities: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains all three cutovers; it does not replace either source of truth.
+Current part and assembly identities are frozen in [`cad/config/parts/`](../config/parts/) and [`cad/config/assemblies/`](../config/assemblies/). Those registry files own the Number and canonical stem. Build scripts own geometry. [`cad/config/current-identity-map.json`](../config/current-identity-map.json) records the 2026-10-19 cutover to two-digit Numbers and parent-scoped vendor identities, the 2026-10-20 consolidation of repeated supplier SKUs into shared `sh-vn-*` identities, and later dated allocations: `parts_and_assemblies` supplies the active web projection, while `retired_identities` preserves full prior/current identity pairs marked `retired` for historical lookup and permanent Number reservations, not current CAD or API aliases. [`cad/config/identity-migration-map.json`](../config/identity-migration-map.json) keeps the released v39 lookup used by the category cutover at `bfde892a5`. This guide explains all three cutovers and later additions; it does not replace either source of truth.
 
 ## Naming and numbering
 
@@ -14,7 +14,7 @@ SH means Shared: one native model per supplier-qualified SKU (supplier plus SKU)
 
 Shared physical dimensions live in pure-data `_mcmaster_<sku>.py` modules and in the shared part's own `sh_vn_<name>_spec.py` (or per-member `sh_vn_<name>_<member>_spec.py`) modules, not in a helper named after one consuming parent.
 
-Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the only current fixture kit is the oblique trammel jig, whose 31 TL and TL-VN families below are the only current tooling parts. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; where a shop route still describes one, its geometry lives in `cad/process/shop/inventory.toml` without a CAD owner. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-72` (VN-72 retired, never reissued).
+Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<NN>`, sequenced per parent from `01`: `MHA-CH-06-TL-20` is the rocker arm's oblique base bar. The stem is the parent stem plus `-tl-<name>`, such as `ch-rocker-arm-tl-oblique-base-bar`. Fixture parts never enter a machine assembly or BOM, and the table's part counts exclude them. A fixture kit may have its own TL-numbered assembly, such as `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`, using the `00` assembly convention); it references only its fixture parts and never enters a machine assembly or BOM. Every registered fixture part must belong to a registered assembly, which for a fixture is its kit's TL assembly: the coverage contract (`test_part_coverage.py`) no longer exempts tooling from orphan detection, it only exempts tooling from the machine tree. Tooling that no registered assembly references is retired, not kept as a standalone model; the only current fixture kit is the oblique trammel jig, whose 37 logical families use the 35 current tooling part identities below, including three configurations of shared SH-VN-57. The 18 standalone rocker-arm, pivot-bracket and cone-pivot-post fixtures retired on 2026-10-21 (MHA-CH-06-TL-04, TL-05 and TL-10 through TL-19; MHA-CH-08-TL-01 and TL-02; MHA-DT-05-TL-01 through TL-04) keep their rows below and their Numbers are never reissued; where a shop route still describes one, its geometry lives in `cad/process/shop/inventory.toml` without a CAD owner. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled, except the oblique trammel jig's. Those bought parts are modelled as purchased parts (`process: purchased`) so the jig assembly can run native interference against them. Their direct parent assembly is the jig, `ch-rocker-arm-tl-oblique-jig` (`MHA-CH-06-TL-00`), but apart from shared supplier SKUs their stems and Numbers belong to the namespace of the fixture's parent part, the rocker arm `ch-rocker-arm` (`MHA-CH-06`): the stem is that part's stem plus `-tl-vn-<name>`, and the Number is its Number plus `-TL-VN-<NN>`, counted from `50`. `ch-rocker-arm-tl-vn-oblique-rail` is `MHA-CH-06-TL-VN-50`, and the set runs to `MHA-CH-06-TL-VN-76` (VN-58 through VN-60 and VN-72 retired, never reissued).
 
 The 2026-10-21 standalone-tooling retirement removes CAD ownership, while retaining analytic shop-process checks for the held reference route; those checks do not qualify a physical fixture or machining route. `test_process_shop.py` checks the inline rocker risers, shim stacks, filing stand and hub filing kit against `cad/process/ch_rocker_arm/plan.toml` and the current rocker geometry, retaining the former acceptance bands. The plan remains unenrolled, and its S5/S7 physical outline-template dependency must be requalified before machining; an inventory collision envelope is not replacement tooling CAD. Their historical source is revision `fcfc947c4`, under `cad/scripts/ch_rocker_arm_tl_{riser_block,strap_shim_stack,filing_stand,filing_button,filing_stud}_spec.py` and the corresponding drawing/tests; those are provenance references, not current imports.
 
@@ -80,6 +80,248 @@ Drawing callouts retain complete category-qualified Numbers and process
 information; do not abbreviate Numbers in cross-part callouts.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers.
+
+### Oblique jig captured-pivot tooling
+
+The oblique jig's positive-capture additions (2026-10-20) are manufactured
+`ch-rocker-arm-tl-oblique-pivot-cap` (MHA-CH-06-TL-30, two) and
+`ch-rocker-arm-tl-oblique-pivot-retainer` (MHA-CH-06-TL-31, two), followed by
+the jig's purchased TL-VN-73 to TL-VN-76 hardware. They belong only to the
+jig's BOM and moving/free-DOF contract, never to a machine assembly. New rows
+in `current-identity-map.json` retain their canonical stem as the source key
+with `old_number: null` and an introduction date: there is no prior model or
+historical Number to invent. TL-VN-72 stays retired and is never reissued.
+
+[`ch_rocker_arm_tl_oblique_retention_spec.py`](../scripts/ch_rocker_arm_tl_oblique_retention_spec.py)
+owns cartridge dimensions and intact-rigid upset bounds; the pure
+[`retention hardware provider`](../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py)
+owns supplier dimensions. Native builders own the model and its manufacturing
+dimensions; each manufactured part's sheet imports those dimensions and precision.
+The safety path is carrier → top washer and clevis cross-pin → pivot pin's
+integral full flange → opposing cap and block-floor stops → block → carriage,
+**not** bearing press-fit pullout or bearing axial restraint. Two integral
+registers retain each cap in XY without reliance on clamp friction. Both ends
+remain positively captured against uplift in both pass pairs; there is no skid.
+
+The pin's clevis-hole construction references the actual retained `PinProfile`
+top-face endpoint. `CrossEndStation` is a measured reference, never an
+equation's dependent variable; only the end offset and hole diameter are
+independent drivers. Native readback checks the reference state and unchanged
+overall/end-offset/diameter values before the cut and after the driven rebuild.
+Its numerical equation-neutrality check is not a manufacturing tolerance.
+
+For a pass change, isolate the machine and support the carrier before removing
+**both** top retainers; only then lift the carrier. Refit both retainers,
+install two fresh cotters and repeat the actual top-capture qualification
+before either pass can run. Replace disturbed safety wire with freshly formed
+pieces. Destructive **upward** pivot-pin extraction
+requires replacement of the service pin and both bearings in that cartridge,
+not reuse after a through-ball extraction load.
+
+The capture stack raises the carrier/work setup by **12.5 mm**, including the
+1 mm carrier-seat increase (upper boss 12.35 mm). The pivot-pin
+end remains nominally **4 mm above the finished work**; the actual-fit
+qualification does not change pin or retainer geometry or raise the setup.
+The cap is **50 × 86 × 11.60 mm**, with ordinary outline ±0.8 mm and
+thickness ±0.51 mm bands, machined from the unchanged 5/8 in stock.
+Its bolt coordinates are X = ±13.25 mm, Y = ±28.50 mm; the two register
+centres are (−2.50, −24) and (2.50, 24) mm. The head counterbores are
+**8.40 mm REF**, fitted to the actual seated NAS heads: the highest head
+must be **0.50–0.60 mm normal below the actual cap top face**, with
+**2.00 mm minimum whole-floor thickness under each counterbore, including
+the full-width edge openings**. The recess upper limit controls fixed
+head/wire height for the VN-76 groove clearance, not merely floor thickness.
+The block wing is nominally **72 mm wide**: its opposed faces are each
+located **36.00 mm from the bearing axis**, with ordinary ±0.51 mm tolerance.
+The overall width derives from those two locations, not a separate size band.
+It starts at −54.5 mm and retains the 1 × 3 in flat-bar stock.
+Its end is controlled directly by the
+**20.60 mm bearing-axis-to-wing-edge reach**, ordinary two-place ±0.51 mm,
+not a competing wing-length/end chain. The source retains the 2 mm
+thread-wall target and 0.50 mm wing/bracket-clearance contract without
+changing the two-rectangle topology, anchors, rails, leadline or bracket pose.
+
+Both flat-bottom register receivers retain **2.000 ±0.13 mm depth**.
+For this unchanged 2 mm nominal, the ordinary two-place band would allow
+1.49 mm, below the source's 1.649708 mm positive-clearance threshold through
+full cap rock. The present band gives source lower bounds of **0.220259 mm
+register-bottom clearance** and **0.124936 mm assembly clearance**.
+These are analytical bounds from `capture_bounds`, not installed readings.
+The tight upper limit is not claimed to be necessary for floor thickness,
+and an unbounded MIN depth is not the receiver's material contract.
+
+TL-29's height is **33.3 mm**, with the existing ordinary .X ±0.8 mm
+band, independent of the raised carrier. This cuts unused upper bracket
+material only: nominal bottom Z = 27.4 mm and top Z = 60.7 mm; XY placement,
+nut/leadscrew axis Z = 40.4 mm, side-hole positions, 3/4 × 2 in stock and
+leadline remain unchanged. No cap relief or capture-hardware change is part
+of this repair.
+
+The `HoldDownStud` configuration of **MHA-SH-VN-57** retains Precision Matthews
+52PCCK-9/16-14mm procurement: **four 1/2-13 × 3 in STOCK studs**, not a
+57.2 mm vendor SKU. Rework only each unused upper free end to **57.2 mm
+finished length, ordinary .X ±0.8 mm**, and restore the cut-end chamfer
+(1.0 mm maximum). Its native configuration and the shared drawing's **REWORK**
+sheet describe the finished reworked stud, not a purchased-identification-only envelope.
+The lower factory end, loaded lower thread interval and insertion remain
+unchanged, as do all anchors, stations, slots, footprints, clamp spans,
+T-nut/flange-nut positions, both full pass sweeps and the +12.5 mm work height.
+
+Accept the actual installed stud/nut stack only with **G ≥3 mm** to the moving
+block/wing throughout **both complete hand sweeps**, and at least **one
+complete 1/2-13 pitch (25.4/13 mm)** beyond every fully seated flange nut,
+while retaining that nut's **entire actual complete internal thread span**.
+Do not cut an engaged thread, insert a stud deeper to rescue the cut, add a
+hold-down washer or force the assembly; reject an incompatible setup.
+Measure the actual complete-thread setback separately: the cut-end chamfer
+limit alone does not bound incomplete threads or establish nut engagement.
+The complete installed authority is **TL-00, HD1–HD3, sheet 10**. The stud's
+single REWORK sheet cites that authority rather than duplicating it. HD1/HD2
+retain actual B/D/H/N/W/U intervals and finished L limits; HD3 repeats the
+installed checks after final clamping. Missing readings reject the setup.
+
+These are actual fit-up requirements, not invented PM kit tolerance bands.
+The 22 mm insertion stack (assumed 14 mm throat + 8 mm foot), 28 mm nominal
+carriage height and 13 mm estimated nut height remain unverified kit inputs.
+TECO 41605's approximately 17.5 mm nut is comparison data, not a PM maximum.
+Explicit measured ranges and their uncertainty are needed to accept the
+installed setup; nominal dimensions alone cannot mark it VERIFIED. Neither
+the free-end trim nor these geometric checks certify preload, mechanical
+strength, bump-force capacity or deflection.
+
+Follow F1/F2 on TL-00's cartridge sheet for the single fit-up procedure. **Before transfer
+punching**, check that the actual TL-22 side-hole axes are at least **5.0 mm
+below the actual TL-29 top**. Deduct the source-catalog #8 major radius
+and transfer-punch float for the shortest top wall; this bound exceeds the
+2 mm target. **After free-feed alignment and final tightening, throughout travel**,
+the entire actual TL-29 top footprint, including every high corner, must
+remain at least **2.35 mm below the actual TL-22 cap mounting plane**.
+Inspect from that plane before final cap installation; do not force the nut
+or screw out of alignment to obtain the gap. These are actual fit-up
+acceptance checks, not tighter bracket-height tolerances or invented HGH,
+KP08 or end-bracket STOCK height bands. Existing formed-wire/cotter
+envelope inspections remain required; the top cut alone does not certify
+all hardware clearances.
+
+The fitter package preserves its original sheets 1–10. **CARTRIDGEASSEMBLY**
+sheet 8 prints bench work in order (C2A with its functional schematic, C1,
+C2), then F1/F2 under their own feed-check heading. **TOPCAPTUREFIT** sheet 9
+prints cap seating/wiring C3–C3C, then carrier/top-retainer C4–C5D. Operation,
+pass changes, the complete installed stud contract (HD1–HD3), the numbered
+actual spindle/tool/holder clearance check C8 and machine acceptance remain
+on **CAPTUREANDOPERATION**, sheet 10. Its finished isometric stays at 1:15.
+
+Sheet 4 presents one exploded cartridge in C1 press order, with separate
+upper/lower bearing occurrences and both real bearings identified as item 14.
+The clevis/cotter presentation stays aligned with the pin's cross-hole.
+The former unballooned duplicate is replaced by an assembled plan locator,
+a longitudinal cartridge section A-A and a small cap-bolt-seat section B-B. These
+identify the existing C2–C5 reading points, relieved mouths, flat lands and
+carrier-backed shank strips; they introduce no new limits and do not certify
+the whole-face or moving/endplay acceptance from one static view.
+
+C1 refers to C2A after final pin-boss fitting and **before pressing bearings**.
+With the actual pin/block/cap benched without bearings and the cap temporarily
+seated by the C3 method, without wire, C2A requires **minimum pin-tip recess
+≥0.50 mm above the carriage mounting plane Z0 (+Z into the block)** throughout
+the entire free hard-capture motion, including tilt. The actual carriage
+beneath the pin must have no feature proud above that plane. An accessible
+ground bridge/0.50 mm feeler inspection before bearing installation records
+measurement uncertainty; neither bearing restraint, an assumed endplay band
+nor altered fits substitutes for this actual qualification.
+
+C4 qualifies both the actual **0.10–0.25 mm normal carrier/retainer running
+gap** and **maximum primary relative take-up travel ≤0.25 mm**. C5 requires
+actual carrier clearance **≥0.50 mm to every cotter eye, prong, head and end
+at primary retainer/clevis take-up**, through all reachable endplay, clocking
+and rocking states at both supports in both pass pairs. Positive full-shank
+bridging and carrier undersupport beneath both retainer lands must remain.
+Secondary hardware must not contact first: reject such a set, refit or replace
+the correct parts and repeat the qualification. Arbitrary cotter reforming
+is not a clearance remedy, and a cotter is not an uplift stop.
+
+Nominal geometry is conditionally viable, not a guarantee for every tolerance
+corner or a vendor-maximum claim. Actual eye/prong envelopes and their
+tooling authority remain unknown until established by measurement, including
+measurement uncertainty. Follow sheet 9 for the complete qualification
+procedure; this outline is not a second instruction authority.
+
+The cap chamber's existing associative pocket-size callout limits only its
+floor/wall inside corner to **R0.20 MAX**; the shared template's R1.0 general
+ceiling remains unchanged elsewhere. The analytical roof-land allowance
+reserves that complete local radius throughout the intact-rigid upset.
+Earlier peripheral corner contact is permitted, but the full fixed stop
+circle must still lie on a flat roof. Centered size clearance proves normal
+assembly is feasible, not that every register-slop pose runs clear: the fitter
+must inspect both actual gaps over the complete flange faces/rims and verify
+a full free pin turn before fitting the carrier.
+
+Source B supplies direct functional inspections, not new GD&T controls:
+inspect the pivot-pin functional face variation ≤0.05 mm over Ø35 mm and
+each of the four carrier bores' axis variation ≤0.05 mm over 10.5 mm.
+Use the actual inspection notes and ordinary stock-corner coordinates for
+cap pocket/aperture locations; cap-bolt coordinates remain relative to the
+actual pocket axis at the block seating face. Nominal concentric CAD circles
+and a loose stock edge do not replace these inspections.
+
+Use CBS Fasteners NAS1352N5H12, 5/16-18 × 3/4 in drilled-head A286 screws,
+as defined by the retention hardware provider. Block threads are THRU.
+Inspect physical complete full-form screw/receiver overlap ≥1.5D =
+11.90625 mm; overall screw length or a nominal fully threaded native solid
+alone is not proof. Seat clean, dry, free-running actual screws in a cross
+pattern at **0.50 ±0.05 N·m**. The cap must seat on all faces, with cap/block
+base gap ≤0.05 mm over the **whole mounting footprint**. Independently,
+underhead gap must be ≤0.05 mm over each **whole accessible head bearing
+footprint**. These are separate allowances and are spent separately in the
+motion bound; then safety-wire heads in pairs in the tightening direction.
+This is an engineering seating torque, not a minimum-preload or force
+certification, generic shop-qualified torque, or new approval claim.
+
+The retainers address plate lift-off. They do not certify strength, bump force,
+deflection or installed toolholder/spindle clearance. Check the actual tool,
+workholding and intended travel before machining; capture is not permission
+to operate with an interference.
+
+The bearing purchase drawing MHA-CH-06-TL-VN-52 owns its receiving bands
+and intact full-circumference cylindrical OD-land inspection. Assembly C1
+uses qualified bearings, keeps the actual upper-bearing identity and
+qualification with its support, and retains the ring-specific press
+sequence. A valid supplier dimensional authority tied to the actual
+identity can establish the catalogue bands; it does not replace the
+physical OD-land inspection. Both passes reuse the same physical support
+record. Primary plate capture does not rely on bearing friction. The receiving
+checks do not certify every bearing component's motion during an upset.
+
+The safety wire is attached to the fixed screw heads, not carried by the
+floating cap, and wire contact is not a cap stop. The cap-owned
+`ch_rocker_arm_tl_oblique_cap_wire_clearance.require_wire_capture_geometry`
+checks the representative source route against the open-mouth, groove and
+counterbore cut union throughout captured cap motion. The assembly places
+that route at the fixed screw heads.
+
+The modeled 0/180-degree head route does not qualify every actual head clock.
+C3C requires the whole formed route and tails to remain at least .50 below
+the actual cap top face, unforced; never loosen or over-torque screws to clock
+their holes. That recess alone does not establish lateral clearance through
+captured cap motion. Qualify the actual route against the cap's cutouts without
+claiming that a clamped cap can be hand-swept through its full free motion.
+
+The representative VN-76 native sweep requires physical forward-tangent
+blends at every independently authored cubic-route join. In
+`_pivot_retention_stock_geometry.bezier_spline_parameters`, keep the exact
+Bezier controls and triple interior knots; normalize the parameter domain
+to the SDK-required `[0, 1]`. Adjacent span lengths follow the outgoing/
+incoming endpoint-handle ratio, making the first derivative continuous
+without fitting or moving the real straight head passages. On 2026-10-21,
+source `7f008ec06db9` freshly created `PairedLockWire`, rebuilt its one
+configuration cleanly, and saved the SLDPRT, 8 MB STL and isometric PNG
+before storing cache key `7f6d0341ba7b`. The native image shows the formed
+loops, twisted bridge and tucked tails; it cannot resolve the approximately
+17 µm closest strand gap. This confirms native feature/solid creation and
+export, not installed fit, locking strength or an independent body-validity
+inspection. The earlier `695c4b02eebe` run created the path but returned no
+sweep feature; correcting both its sharp joins and out-of-domain knots does
+not isolate which defect caused that failure.
 
 ## Drawing package layout
 
@@ -345,6 +587,8 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-006-TL-26 | `ch-rocker-arm-tl-oblique-feed-lever` | MHA-CH-06-TL-26 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-006-TL-28 | `ch-rocker-arm-tl-oblique-end-bracket` | MHA-CH-06-TL-28 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-006-TL-29 | `ch-rocker-arm-tl-oblique-nut-bracket` | MHA-CH-06-TL-29 |
+| new tooling part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 |
+| new tooling part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-rail` | MHA-CH-006-TL-30 | `ch-rocker-arm-tl-vn-oblique-rail` | MHA-CH-06-TL-VN-50 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-carriage` | MHA-CH-006-TL-31 | `ch-rocker-arm-tl-vn-oblique-carriage` | MHA-CH-06-TL-VN-51 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-bearing` | MHA-CH-006-TL-32 | `ch-rocker-arm-tl-vn-oblique-bearing` | MHA-CH-06-TL-VN-52 |
@@ -367,6 +611,10 @@ The measuring-stick cutover is recorded here and in the current registries, not 
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-screw` | MHA-CH-006-TL-49 | `ch-rocker-arm-tl-vn-oblique-lever-screw` | MHA-CH-06-TL-VN-69 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-block-washer` | MHA-CH-006-TL-50 | `ch-rocker-arm-tl-vn-oblique-block-washer` | MHA-CH-06-TL-VN-70 |
 | tooling part | — | — | `ch-rocker-arm-tl-oblique-lever-washer` | MHA-CH-006-TL-51 | `ch-rocker-arm-tl-vn-oblique-lever-washer` | MHA-CH-06-TL-VN-71 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cap-screw` | MHA-CH-06-TL-VN-73 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin` | MHA-CH-06-TL-VN-74 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 |
+| new tooling vendor part (2026-10-20) | — | — | — | — | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-ledge` | MHA-CH-008-TL-01 | — | MHA-CH-08-TL-01 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `ch-pivot-bracket-tl-angle-plate` | MHA-CH-008-TL-02 | — | MHA-CH-08-TL-02 (retired 2026-10-21; never reissued) |
 | retired tooling part | — | — | `dt-cone-pivot-post-tl-bond-cradle` | MHA-DT-005-TL-01 | — | MHA-DT-05-TL-01 (retired 2026-10-21; never reissued) |
@@ -406,6 +654,8 @@ Configured chain and clamping-kit reference sheets place each member caption fro
 The two wire sheets must settle configuration, independent view scale and any in-sheet rotation before centering each view by its measured native outline and importing dimensions. Final readback checks keep the configured views and their dimension ink inside their reserved drawing fields; matching a configuration name alone does not establish on-sheet placement. Each front view carries the existing model-owned `Depth@Wire` as an associative straight-rest-run reference. The lever front remains at 1:5, with a full-size horizontal isometric above it; the pen views remain at 2:1. These references do not define the missing formed ends, wraps or developed cut lengths, and both sheets retain their DO NOT RELEASE limitations.
 
 The clamping-kit sheet identifies its installed stud with an associative overall reference between the existing model's end rims; its measured reference text must stay at least 2 mm left of the FRONT view outline. Each nut retains one bore-owned native `ICThread.ThreadCallout` in its isometric view, inserting that callout once if absent. Bore-owned native callouts in other views are deliberately retired by selected-note identity, with fresh readback proving removal and unchanged cosmetic-thread/model geometry; they are not transferred by changing annotation ownership or replaced with free text. The returned `INote` can have zero direct geometry attachments: hole association and strict edge/face identity are proved on the owning cosmetic-thread annotation. Each leader targets the projected native top bore rim, identified by its center, axis, height, owning feature identity and the Hole Wizard's actual through-tap drill diameter, not a rounded nominal. A visible rim edge must map into the referenced source part and back to the exact original view edge; its adjacent features are compared with the bore feature only within that source context, never by matching names or comparing source and drawing feature wrappers directly. Source queries use fresh inventories in one explicitly activated view configuration, then strictly restore the prior configuration in `finally` without saving or forcing a rebuild. Initial mismatched/matched mapping observations test configuration dependence; the SDK does not state it as a precondition. Source SHA before/after the initial control, unsaved state, all view configurations and drawing activation must remain unchanged, and a fresh inventory after restoration must identify exactly the same visible edge. Across scopes, bore identity uses the source path, persistent `IFeature.GetID()` and exact diameter; mapped source-edge wrappers never escape the active scope. Native edge-parameter and closest-point readbacks require that target to lie on exactly one visible physical rim edge; an underlying circle alone does not establish its trim. After relocation and the final rebuild, checks require the same native note, cosmetic thread, bore feature/diameter, attachments and visible rim edge, unchanged note content, a live leader at that rim, and rendered text plus complete native extent inside the member's reserved panel. A successful leader setter alone is not evidence that the native parent relationship survived. The existing installation requirements remain unchanged and property-linked, with matching `[1]`/`[2]`/`[3]` keys on their member headings and exactly one native, view-owned leader flag at the stud's lower end rim, the T-nut foot and the flange bearing rim respectively. Flags select the identified visible drawing edge directly through view-scoped `IEntity.Select4`, never a coordinate hit or a canonical source-part edge. Before `InsertNote`, `ISelectionMgr.SetSelectionPoint2` initializes that selected entity's landing, requiring boolean success, finite matching XYZ readback and unchanged single-entity native identity. No post-insertion endpoint mutation or reattachment repair is permitted on this path; attachment identity and the desired landing are read back after rebuilding and settling. Nut flag targets lie outside the actual Hole Wizard bore projection but inside the outer boundary, with physical edge-trim proof rather than an arbitrary nearest edge. Each member uses one text-only displacement: its preferred right-lane position is clamped to feasible intervals computed from finite positive rendered text dimensions, the reserved cell and 2 mm view separation, with 1 micrometre of explicit authoring air. An empty interval refuses before relocation; neither the fixed leader tip nor the complete native extent is treated as a rigid translated text box. Final checks preserve each key's native attachment and unique linked requirement, contain every leader vertex and the measured text/native extent in its view cell, and require at least 2 mm of measured key-text and leader clearance from its view caption.
+
+The stud-only REWORK sheet prints the finished-length model dimension and one native side-view chamfer leader attached to the upper bevel/barrel boundary. The leader uses the saved source angle and the model's validated maximum size and precision; the unprinted chamfer dimension must remain a driving MAX control with its original tolerance band and decimal places. Settled readback verifies that source control and the leader's front-view ownership, text, native attachment and landing. The end view retains no duplicate chamfer dimension. The reference-sheet footer retains the reference-view limitation, scopes “as supplied” to the two nuts and directs the stud rework explicitly to sheet 2.
 
 SOLIDWORKS owns occurrence names and native instance indices. Shared components are identified by physical file, selected configuration and scoped `Role:N` component reference, not a custom `Name2` spelling. Logical BOM keys such as `sh-vn-chain-link--InnerLink` identify file/configuration rows; they are not native occurrence aliases. The pipeline never renames these occurrences or changes the application naming preference.
 
@@ -512,7 +762,7 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | added | `ch-rocker-arm-tl-vn-oblique-leadscrew-nut` | MHA-CH-06-TL-VN-55 | ZYLtech HW-SC-T8x2-NUT Tr8x2 brass flange nut (ships with HW-SC-T8x2-600), screwed to the TL-29 nut bracket; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-pillow-block` | MHA-CH-06-TL-VN-56 | AMPEC KP08 pillow blocks (Bearings Direct) x2, one on each TL-28 end bracket, carrying the TL-VN-54 leadscrew; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-handwheel` | MHA-CH-06-TL-VN-57 | MISUMI HOK40-HC8 Ø40 knurled handwheel, revolving grip, Ø8 H8 through bore, 2 x M5 taps (one set screw supplied), on the TL-VN-54 leadscrew; bought fixture hardware modelled vendor-checked for the jig assembly |
-| added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in studs x4, holding the TL-20 base bars down to the mill table; bought fixture hardware modelled datasheet-built for the jig assembly |
+| added | `ch-rocker-arm-tl-vn-oblique-hold-down-stud` | MHA-CH-06-TL-VN-58 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 x 3 in STOCK studs x4, reworked at the unused upper free ends to 57.2 ±0.8 mm finished length; unchanged lower ends, loaded intervals, insertion and TL-20 table anchors; actual G ≥3 mm through both full hand sweeps and ≥one complete pitch beyond each seated nut with its full actual complete internal span engaged are required |
 | added | `ch-rocker-arm-tl-vn-oblique-t-nut` | MHA-CH-06-TL-VN-59 | Precision Matthews 52PCCK-9/16-14mm kit 14 mm T-nuts x4, tapped 1/2-13, one under each TL-VN-58 stud; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-flange-nut` | MHA-CH-06-TL-VN-60 | Precision Matthews 52PCCK-9/16-14mm kit 1/2-13 flange nuts x4, one on each TL-VN-58 stud on the TL-20 base bar's top face; bought fixture hardware modelled datasheet-built for the jig assembly |
 | added | `ch-rocker-arm-tl-vn-oblique-rail-screw` | MHA-CH-06-TL-VN-61 | McMaster 91251A197 #8-32 X 3/4 SHCS x14: holds an HGR15R rail to its TL-20 base bar, tapped THRU; bought fixture hardware modelled for the jig assembly |
@@ -553,3 +803,9 @@ A retired Number is never reused. A family added after a cutover takes the next 
 | shared | `sh-vn-thumb-screw` | MHA-SH-VN-55 | 2026-10-20: McMaster 91882A221 consolidated from `mg-vn-thumb-screw` MHA-MG-VN-50 and `ms-vn-thumb-screw` MHA-MS-VN-50 (`Default`); those Numbers reserved |
 | shared | `sh-vn-music-wire` | MHA-SH-VN-56 | 2026-10-20: McMaster 9666K56 wire forms consolidated from `mg-vn-lever-wire` MHA-MG-VN-56 (`LeverWire`) and `pn-vn-pen-wire` MHA-PN-VN-57 (`PenWire`); one two-sheet reference package, still DO NOT RELEASE with developed cut lengths unmodelled; those Numbers reserved |
 | shared | `sh-vn-clamping-kit-hardware` | MHA-SH-VN-57 | 2026-10-20: Precision Matthews 52PCCK-9/16-14mm kit members consolidated from `ch-rocker-arm-tl-vn-oblique-hold-down-stud` MHA-CH-06-TL-VN-58 (`HoldDownStud` x4), `ch-rocker-arm-tl-vn-oblique-t-nut` MHA-CH-06-TL-VN-59 (`TNut` x4) and `ch-rocker-arm-tl-vn-oblique-flange-nut` MHA-CH-06-TL-VN-60 (`FlangeNut` x4); `usage_scope: tooling`, jig only, never a machine BOM row; TL-VN-58 to TL-VN-60 reserved |
+| added | `ch-rocker-arm-tl-oblique-pivot-cap` | MHA-CH-06-TL-30 | low-carbon steel capture cap x2, machined from 5/8 x 2-1/2 in flat with integral underside registers; retains the pivot-pin flange in the oblique trammel jig |
+| added | `ch-rocker-arm-tl-oblique-pivot-retainer` | MHA-CH-06-TL-31 | low-carbon steel top retainer x2, turned from 3/8 x 1 in flat and faced to the actual loaded running gap on the carrier and pivot pin |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-cap-screw` | MHA-CH-06-TL-VN-73 | CBS Fasteners NAS1352N5H12 5/16-18 X 3/4 predrilled socket head cap screw x8, A286 heat-resistant steel, passivated; safety-wired in pairs to secure the pivot capture caps |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin` | MHA-CH-06-TL-VN-74 | Huyett CLPS6-0187-1250D 3/16 x 1-1/4 in headed clevis pin x2, 316 stainless steel; installed with fresh split cotters for the pivot top retainers |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-cotter` | MHA-CH-06-TL-VN-75 | Huyett CP-062-0500 split cotter pin x2, carbon steel, zinc clear, ASME B18.8.1; spread both prongs and replace after every removal |
+| added | `ch-rocker-arm-tl-vn-oblique-pivot-lock-wire` | MHA-CH-06-TL-VN-76 | Aircraft Spruce 05-02685 MS20995 soft-temper 302/304 stainless safety wire, four cut lengths, one per X screw pair; formed in the tightening sense with ends below the cap top and replaced after opening |

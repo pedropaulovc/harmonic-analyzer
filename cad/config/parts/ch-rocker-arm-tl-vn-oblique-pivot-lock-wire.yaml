@@ -1,0 +1,16 @@
+ch-rocker-arm-tl-vn-oblique-pivot-lock-wire:
+  title: Stainless Safety Wire
+  number: MHA-CH-06-TL-VN-76
+  stock_name: Stainless Safety Wire
+  supplier: Aircraft Spruce
+  supplier_skus: ["05-02685"]
+  material: AISI 304
+  material_specification: "302/304 stainless steel, soft temper; MS20995"
+  finish: AS SUPPLIED
+  purchased_note: |-
+    ONE CUT LENGTH PER CAP SCREW PAIR; TWO PER CAP MHA-CH-06-TL-30.
+    SHOWN FORMED; CUT AND INSTALL PER MHA-CH-06-TL-00, STEP C3C.
+  quantity: 4
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

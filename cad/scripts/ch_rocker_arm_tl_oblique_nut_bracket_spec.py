@@ -15,14 +15,17 @@ along the rail; its +X end is milled to the finished length
 set centred on the two #8 screws at assembly (``X_SET_*``), so each tap's end
 wall clears rule 17's floor at half the length's ±0.51 (Main, 2026-10-17;
 c4-r3). The bar is sawn and faced to the height and milled to the 48 depth.
+The finished height is independent of the carrier underside; it removes
+unused material above the unchanged nut seat and block-screw row. TL-00
+cartridge-sheet F1/F2 own actual fit-up acceptance, not a tighter part-height band.
 
 Frame (SolidWorks model, and the ``PRECHIPS_SOLIDS`` frame; the leadscrew
 spec's): pivot block 1's axes, the origin on the block's -Y face at the
 carriage centre, on the bracket's bottom face. +X runs along the rail away
 from the spindle, +Y is the block's +Y, +Z is up. The bracket lies at -Y.
 Envelope X ``leadscrew.NUT_BRACKET_X`` (-9.25 .. 9.25), Y -48 .. 0,
-Z 0 .. 35.3. The origin's X is mid-air (the bracket centres on the block
-screws), so every printed X station runs from the real -X face.
+Z 0 .. ``BRACKET_HEIGHT``. The origin's X is mid-air (the bracket centres
+on the block screws), so every printed X station runs from the real -X face.
 
 Features:
 
@@ -50,10 +53,14 @@ Features:
   bolt circle.
 
 Bands. The #8 pair is spotted from TL-22 (rule 19, fit-up at assembly), so
-it carries no band of its own: each spot lands within TL-22's three-place
+it carries no band of its own: along X each spot takes TL-22's three-place
 station band, the X set's ``X_SET_BAND`` and the transfer punch's float in
-TL-22's Ø4.978 hole (``SPOT_FLOAT``). The nut seat's stations, from the
-Y = 0 face and the bottom face, print at two places (title block ±0.51):
+TL-22's Ø4.978 hole (``SPOT_FLOAT``). Along Z, TL-00 step 7 requires the
+actual TL-22 hole axes at least ``TRANSFER_AXIS_TOP_MIN`` below the actual
+bracket top before punching; only the punch's float is then deducted for
+the top-wall bound. The nominal ``SCREW_Z`` is not a manufacturing guarantee.
+The nut seat's stations, from the Y = 0 face and the bottom face, print at
+two places (title block ±0.51):
 the bracket's place on TL-22 is set at assembly by the match-drill, so the
 edges carry only walls. The #4-40 taps are spotted from the nut itself, so
 their offsets from the seat's axis print as REFERENCE values at two places
@@ -73,11 +80,15 @@ the fit-up in the jig's assembly step.
 
 Rule 17 (walls, 2.0 target, 1.5 floor) at worst case: the seat at its
 two-place band, each #4-40 tap at the nut's nominal hole off by the floats
-(and the seat's band to an edge), each #8 spot off by TL-22's band, the X set and the
-punch's float, the finished length at its two-place ±0.51, the depth and
-height at one place (±0.8), each thread at its major diameter, the
-counterbore at its +0.10 and the clearance at the drilled +0.1.
-``WALLS_MM`` holds the nominal values, ``WORST_WALLS`` the worst. The binding
+(and the seat's band to an edge), each #8 X spot off by TL-22's band, the X
+set and the punch's float, the finished length at its two-place ±0.51, the
+depth and height at one place (±0.8), each thread at its major diameter,
+the counterbore at its +0.10 and the clearance at the drilled +0.1. The
+#8 top wall instead uses the measured transfer-axis/top acceptance, less
+punch float and thread radius; it must retain the full 2.0 target.
+``NOMINAL_ROW_TOP_WALL_MIN`` is only the source-cutting check at the nominal
+row and existing printed bands, not a bound on the aligned assembly stack.
+``WALLS_MM`` holds nominal values, ``WORST_WALLS`` the accepted bounds. The binding
 wall is the #4-40 taps' to the spigot counterbore: the nut's bolt circle fixes
 it under the floor, only within the counterbore's depth, where the flange
 clamps. The owner accepted it (``RULE_17_FLOOR_EXCEPTIONS``; the part YAML's
@@ -121,12 +132,18 @@ FACE_X = round(leadscrew.NUT_BRACKET_X[0], 9)  # the -X (nut) face, -9.25
 BRACKET_FACE_X = -FACE_X  # origin to the -X face: an unprinted model knob
 BRACKET_LENGTH = round(leadscrew.NUT_BRACKET_X[1] - leadscrew.NUT_BRACKET_X[0], 9)
 BRACKET_DEPTH = round(leadscrew.NUT_BRACKET_DEPTH, 9)  # 48
-BRACKET_HEIGHT = round(leadscrew.NUT_BRACKET_HEIGHT, 9)  # 35.3
+BRACKET_HEIGHT = round(leadscrew.NUT_BRACKET_HEIGHT, 9)
 # The finished length sets each #8 tap's end wall (WORST_WALLS): with the
 # bracket set centred on the taps, each wall takes half the length's band
 # and holds the floor at two places.
 LENGTH_PLACES = 2
-SIZE_PLACES = 1  # 48.0 and 35.3, milled and faced
+SIZE_PLACES = 1  # depth and height, milled and faced
+# Functional fit-up authority for TL-00 cartridge-sheet F1/F2. These are actual clearances,
+# not part-height tolerances or assumed purchased support-height bands.
+# Inspect the entire top footprint/high corners after free-feed alignment
+# and final tightening, throughout travel; never force alignment for a gap.
+BLOCK_PLANE_TOP_GAP_MIN = 2.35
+TRANSFER_AXIS_TOP_MIN = 5.0  # actual TL-22 side-hole axes below top, before punching
 if abs(BRACKET_LENGTH - leadscrew.NUT_BRACKET_LENGTH) > 1e-9:
     raise AssertionError("the nut bracket envelope no longer spans its length")
 if abs(leadscrew.NUT_FLANGE_X[1] - leadscrew.NUT_BRACKET_X[0]) > 1e-9:
@@ -146,15 +163,16 @@ SCREW_Z = round(leadscrew.NUT_BRACKET_BLOCK_HOLES_Z, 9)  # 22.3
 BLOCK_SCREW_POINTS = tuple((x, 0.0, SCREW_Z) for x in leadscrew.BLOCK_SCREW_X)
 # The X set (TL-00's match-drill step): clamped on TL-22's -Y face, the
 # bracket's centre stands X_SET_MID from TL-22's -X end, within X_SET_BAND.
-# X_SET_MID is the mid-station of TL-22's
-# two side holes, so the bracket centres on them and each tap's end wall
-# takes half the length's band. The set prints at three places and takes the
+# X_SET_MID is the mid-station of TL-22's two side holes. Extending TL-22's
+# -X end changes this datum distance, not the screws, the bracket's physical
+# centre or the leadscrew line. Each tap's end wall still takes half the
+# length's band. The set prints at three places and takes the
 # title block's ±0.13 (Main's ruling (a), 2026-10-17: no bespoke ±0.10; the
 # .X band's 0.8 would need a 19.75 bracket, past FEED_GAP and the 3/4 in
 # stock), which holds each end wall over the floor (_END_WALL below).
-X_SET_MID = sum(pivot_block.SIDE_STATIONS_X) / 2.0  # 50
-X_SET_FAR_END = X_SET_MID + BRACKET_LENGTH / 2.0  # 59.25 at the nominal length
-X_SET_NUT_FACE = X_SET_MID - BRACKET_LENGTH / 2.0  # 40.75 at the nominal length
+X_SET_MID = sum(pivot_block.SIDE_STATIONS_X) / 2.0
+X_SET_FAR_END = X_SET_MID + BRACKET_LENGTH / 2.0
+X_SET_NUT_FACE = X_SET_MID - BRACKET_LENGTH / 2.0
 X_SET_PLACES = 3
 X_SET_BAND = printed_band_mm(X_SET_PLACES)  # ±0.13
 if abs(pivot_block.DATUM_X + X_SET_FAR_END - leadscrew.NUT_BRACKET_X[1]) > 1e-9:
@@ -292,8 +310,9 @@ BLOCK_HOLE_DIA = CLEARANCE_MM[
 SPOT_FLOAT = (BLOCK_HOLE_DIA - TRANSFER_PUNCH_DIA) / 2.0  # 0.108
 if not SPOT_FLOAT > 0.0:
     raise AssertionError("the transfer punch no longer fits TL-22's #8 hole")
-# Each spot off its TL-22 hole's nominal: along X, TL-22's station band, the
-# X set and the punch's float; along Z, the row's band and the float.
+# Each X spot off its TL-22 hole's nominal: TL-22's station band, the X set
+# and punch float. The nominal-row source-cutting check also takes the row's
+# Z band, but the actual top-wall bound uses TRANSFER_AXIS_TOP_MIN instead.
 _TL22_BAND = printed_band_mm(pivot_block.SIDE_STATION_PLACES)  # ±0.13
 _SPOT_OFF_X = _TL22_BAND + X_SET_BAND + SPOT_FLOAT
 _SPOT_OFF_Z = _TL22_BAND + SPOT_FLOAT
@@ -362,12 +381,19 @@ _CLEAR_R_MAX = (SCREW_CLEARANCE_DIA + DRILLED_BAND[0]) / 2.0
 # Each #4-40 tap from the seat's axis: the nut's circle less its offset.
 _DIAGONAL_MIN = _DIAGONAL - _TAP_OFFSET
 _LENGTH_MIN = BRACKET_LENGTH - printed_band_mm(LENGTH_PLACES)
-# The #8 taps: the shortest bracket set centred on TL-22's holes, each spot
-# off by _SPOT_OFF_X toward its end face. The row's height on the bracket
-# also follows the screw line it hangs on at the spot, a stack the top
-# face's ~8 mm margin over the floor carries.
+# The #8 taps: the shortest bracket set centred on TL-22's holes, each X
+# spot off by _SPOT_OFF_X toward its end face. The nominal row checks the
+# source cut at the existing height/row bands only; real Z alignment is
+# accepted by the actual transfer-axis/top measurement in TL-00 step 7.
 _HALF_PITCH = (SCREW_X[1] - SCREW_X[0]) / 2.0  # 5
 _END_WALL = _LENGTH_MIN / 2.0 - _HALF_PITCH - _SPOT_OFF_X - _BLOCK_R
+NOMINAL_ROW_TOP_WALL_MIN = (
+    (BRACKET_HEIGHT - _B1) - (SCREW_Z + _SPOT_OFF_Z) - _BLOCK_R
+)
+if NOMINAL_ROW_TOP_WALL_MIN < WALL_TARGET:
+    raise AssertionError(
+        "the nominal #8 row's source cut misses the 2 mm top-wall target"
+    )
 WORST_WALLS: dict[str, float] = {
     "#4-40 tap to nut-seat counterbore": _DIAGONAL_MIN - _CBORE_R_MAX - _NUT_R,
     "#4-40 tap to screw clearance": _DIAGONAL_MIN - _CLEAR_R_MAX - _NUT_R,
@@ -391,10 +417,14 @@ WORST_WALLS: dict[str, float] = {
     - 2.0 * (_TL22_BAND + SPOT_FLOAT)
     - 2.0 * _BLOCK_R,
     "#8 tap to +X face": _END_WALL,
-    "#8 tap to top face": (BRACKET_HEIGHT - _B1) - (SCREW_Z + _SPOT_OFF_Z) - _BLOCK_R,
+    "#8 tap to top face": TRANSFER_AXIS_TOP_MIN - SPOT_FLOAT - _BLOCK_R,
     "#8 tap drill to #4-40 tap": (NUT_HOLE_Y[0] - _TAP_BAND - _NUT_R)
     - (BLOCK_TAP_DRILL_DEPTH + _B2 + _point_h(BLOCK_TAP_DRILL)),
 }
+if WORST_WALLS["#8 tap to top face"] < WALL_TARGET:
+    raise AssertionError(
+        "the actual transfer-axis/top minimum misses the 2 mm wall target"
+    )
 # The nut's own circle leaves the #4-40 taps under the floor to their spigot's
 # counterbore, only within its depth: inherent in the bought nut, accepted by
 # the owner at 0.99 (part YAML machinist exception RV-01, 2026-10-17); the

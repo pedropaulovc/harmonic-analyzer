@@ -1776,6 +1776,7 @@ def add_purchased_footer(
     item: str,
     notes: str = "",
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     label: str,
     supplier_data: Sequence[str] = (),
     y_offset: float = 0.0,
@@ -1783,8 +1784,10 @@ def add_purchased_footer(
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
     Returns (note, linked text, resolved text, reserved box) for the native
-    readback.  ``cut_to_suit`` says the part is cut at assembly (its note says
-    where); otherwise the general line says it is used as supplied.
+    readback.  When ``general_text`` is None, ``cut_to_suit`` says the part is
+    cut at assembly (its note says where); otherwise the default general line
+    says it is used as supplied. A literal override uses the same reserved
+    single-line space and native text/extent checks.
     ``y_offset`` translates every annotation anchor and its reserved box equally.
     """
     if not math.isfinite(y_offset):
@@ -1824,7 +1827,7 @@ def add_purchased_footer(
         placed.append(
             (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
-    general = _GENERAL_TEXT[cut_to_suit]
+    general = _GENERAL_TEXT[cut_to_suit] if general_text is None else general_text
     note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y + y_offset)
     placed.append(
         (

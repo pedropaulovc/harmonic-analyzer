@@ -38,6 +38,7 @@ _HEIGHT_STEP = 0.0001
 _FORMAT_TOL = 1e-7
 
 
+
 def source_property_expression(raw: str) -> str | None:
     """Identify one complete source link, independent only of its FONT size tag."""
     match = _SOURCE_PROPERTY.fullmatch(raw)
@@ -405,7 +406,6 @@ def _fit_title_note(
 
     if alignment == "label_right":
         measure("before-title-fit", formatted=False)
-
     # Measure every candidate; no source text is rewritten or cut. The material
     # property's semantic content is owned by the registry, not by this fitter.
     while True:
@@ -466,7 +466,6 @@ def _fit_title_note(
 
     if alignment == "label_right":
         accepted_style = _note_text_style(annotation)
-
     def settled() -> None:
         actual_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
         actual_anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))

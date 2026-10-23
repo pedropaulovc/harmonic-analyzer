@@ -8,8 +8,9 @@ A carrier plate (MHA-CH-06-TL-21) rides one pivot pin on each rail. The angle
 the spindle subtends between the two pins is constant, so by the
 inscribed-angle theorem the spindle traces a circle of radius
 ``R = D / (2 sin ALPHA)`` in the carrier's frame. The outer edge reuses the
-same rails: the carrier is re-seated on a second pin-hole pair (A2/B2) lying
-radially outward on the same centre.
+same rails: with the spindle isolated, both top retainers are removed and the
+carrier is deliberately re-seated on A2/B2, then both retainers are reinstalled
+with two fresh split cotters before either support is used again.
 
 This module is the one pure calculator: it derives every value marked ⚙ on
 the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
@@ -28,6 +29,14 @@ the jig sheets (MHA-CH-06-TL-20 to TL-26 and the TL-00 jig assembly) from:
   HGH15CA Z0 carriage, 6200-2RS bearing) and the PM-30MV table (maker manual,
   macclab.com PM-30MV-v3-2020-10: table 33 x 8-1/4 in, three 14 mm T-slots at
   63.5 mm, spindle centreline 7-1/2 in from the pleated column cover).
+
+Captured pivots retain both supports during both passes. The integral flange
+is trapped between the unchanged block top and a safety-wired cap; a removable
+washer, headed clevis pin and fresh split cotter capture the carrier above.
+The original k5/N6 bearing fits support rotation, not axial safety. The raised
+carrier seat adds 12.5 mm to the former work height, with no skid or rail change.
+Heights alone do not prove spindle/toolholder clearance: installed-machine
+acceptance needs the actual stepped tooling envelope over both complete sweeps.
 
 Frames.
 
@@ -347,8 +356,9 @@ CARRIAGE_BOLT_SPAN = (26.0, 26.0)  # (along, across), four M4 tapped
 CARRIAGE_BOLT = "M4"
 # 6200-2RS deep-groove ball bearing (inventory fixtures.trammel-6200-2rs):
 # bore 10 0/-0.008, OD 30 0/-0.009, width 9 0/-0.12. The pivot pin's k5
-# press reads the bore band and the pivot block's N6 seat reads the OD band;
-# a narrow bearing only lowers the carrier by up to 0.12 (title block).
+# press reads the bore band and the pivot block's N6 seat reads the OD band.
+# The lower boss is fitted from the measured upper-race face and block floor;
+# bearing-width variation must not be mistaken for a fitted stop clearance.
 BEARING_BORE = 10.0
 BEARING_OD = 30.0
 BEARING_WIDTH = 9.0
@@ -385,9 +395,11 @@ BASE_BAR_THICK = round(0.5 * INCH, 9)  # 1/2 in 6061 flat bar
 PIVOT_BLOCK_HEIGHT = (
     2.0 * BEARING_RECESS + BEARINGS_PER_PIN * BEARING_WIDTH + BEARING_SHOULDER
 )
-# The pivot pin's collar seats on the upper inner race (in the 1 mm recess)
-# and stands PIN_COLLAR_PROUD above the block; the carrier rests on it.
-PIN_COLLAR_PROUD = 3.0
+# The raised Ø12.7 seat remains on the upper inner race through its narrow
+# lower boss. The broad Ø36 flange is relieved clear of the seal and its rim
+# is fitted above the block floor, independently of the bearing press fits.
+# The raised cartridge leaves block height and the carriage unchanged.
+PIN_COLLAR_PROUD = 15.5
 PIN_COLLAR_HEIGHT = BEARING_RECESS + PIN_COLLAR_PROUD
 # Finished dimensions, not purchased stock: face 1/2 in 6061-T651 plate to
 # CARRIER_THICK and 1/4 in acetal to RISER_THICK (#1619). Both native drawing

@@ -8,13 +8,14 @@ enters the harmonic-analyzer assembly tree or a machine BOM
 read from the calculator ``ch_rocker_arm_tl_oblique_trammel_spec`` (imported as
 ``trammel``), never retyped.
 
-Material: see the component drawings (TL-20 to TL-26, TL-28, TL-29) and the
-bought items' (TL-VN drawings and shared SH-VN-57). Overall envelope at the modelled pose,
+Material: see the component drawings (TL-20 to TL-26, TL-28 to TL-31) and the
+bought items' (TL-VN drawings through TL-VN-76 and shared SH-VN-57).
+Overall envelope at the modelled pose,
 machine frame: X -507.3 (the handwheel's rim) to +463.0 (the base bars' far
 column-side corners), Y -347.5 (the feed lever's grip end) to +85.8 (the
 bars' near column-side corners since the 2026-10-17 1/2 x 6 widening; the
 TL-28 brackets end flush with bar 1's column-side edge), Z -22.0 (the
-T-nuts' feet in the table slots) to 102.6 (the feed lever screws' heads); see
+T-nuts' feet in the table slots) to the raised feed lever screws' heads; see
 ``MODEL_EXTENT``.
 
 Frame: the MACHINE frame. Origin on the spindle axis at the table top; +X along
@@ -27,7 +28,7 @@ pivot block stands at carriage station
 ``SYMMETRIC_PIN_STATION["inner"] - PIN_OFFSET`` ⚙ on its rail
 (``trammel.rail_point``). Heights are the calculator's stack ⚙: base bars on
 the table, carriage tops at ``CARRIAGE_TOP_Z`` 40.7, pivot blocks to 64.7, the
-carrier from ``CARRIER_UNDERSIDE_Z`` 67.7 to ``CARRIER_TOP_Z`` 79.7; riser and
+carrier from ``CARRIER_UNDERSIDE_Z`` 80.2 to ``CARRIER_TOP_Z`` 92.2; riser and
 feed lever on the carrier top; the HUB pin's head under the carrier.
 
 Leadscrew feed (``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as
@@ -58,8 +59,8 @@ never drives. The build writes ``sweep_sidecar``: both passes' poses
 (``sweep_poses``, the end stops at ``trammel.END_STOPS`` ⚙), which verify.py's
 ``pass-sweep-interference-free`` gate drives through, running SolidWorks'
 own interference check at each pose against the exact press fits and thread
-envelopes of ``_interference_contracts``. That native check replaces the
-analytic plan and height gaps between moving and fixed items.
+envelopes of ``_interference_contracts``. Discrete native poses do not prove
+intersample clearance or certify the actual installed tooling.
 
 The analytic clearance check (``clearance_report``) keeps what the model
 cannot show: over ``trammel.SWEEP`` ⚙ on both passes, the clearance of every
@@ -80,6 +81,7 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_bearing_spec as bearing
 import ch_rocker_arm_tl_vn_oblique_block_washer_spec as block_washer
@@ -91,7 +93,9 @@ import ch_rocker_arm_tl_oblique_carrier_spec as carrier
 import ch_rocker_arm_tl_vn_oblique_cl_dowel_spec as cl_dowel
 import ch_rocker_arm_tl_vn_oblique_clamp_screw_spec as clamp_screw
 import ch_rocker_arm_tl_oblique_fasteners_spec as fasteners
+import ch_rocker_arm_tl_oblique_cap_wire_clearance as cap_wire_clearance
 import ch_rocker_arm_tl_oblique_feed_lever_spec as feed_lever
+import ch_rocker_arm_tl_oblique_end_bracket_spec as end_bracket
 import sh_vn_clamping_kit_flange_nut_spec as flange_nut
 import ch_rocker_arm_tl_vn_oblique_handwheel_spec as handwheel
 import sh_vn_clamping_kit_hold_down_stud_spec as hold_down_stud
@@ -107,6 +111,14 @@ import ch_rocker_arm_tl_vn_oblique_kp08_screw_spec as kp08_screw
 import ch_rocker_arm_tl_vn_oblique_pillow_block_spec as pillow_block
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_pivot_pin_spec as pivot_pin
+import ch_rocker_arm_tl_oblique_retention_spec as retention
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
+import ch_rocker_arm_tl_oblique_pivot_cap_spec as pivot_cap
+import ch_rocker_arm_tl_oblique_pivot_retainer_spec as pivot_retainer
+import ch_rocker_arm_tl_vn_oblique_pivot_cap_screw_spec as cap_screw
+import ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin_spec as clevis_pin
+import ch_rocker_arm_tl_vn_oblique_pivot_cotter_spec as pivot_cotter
+import ch_rocker_arm_tl_vn_oblique_pivot_lock_wire_spec as pivot_wire
 import ch_rocker_arm_tl_vn_oblique_rail_screw_spec as rail_screw
 import ch_rocker_arm_tl_vn_oblique_rail_spec as guide_rail
 import ch_rocker_arm_tl_vn_oblique_riser_screw_spec as riser_screw
@@ -120,13 +132,16 @@ DRAWING_NUMBER = "MHA-CH-06-TL-00"
 BASE_BAR = "ch-rocker-arm-tl-oblique-base-bar"
 PIVOT_BLOCK = "ch-rocker-arm-tl-oblique-pivot-block"
 PIVOT_PIN = "ch-rocker-arm-tl-oblique-pivot-pin"
+PIVOT_CAP = "ch-rocker-arm-tl-oblique-pivot-cap"
+PIVOT_RETAINER = "ch-rocker-arm-tl-oblique-pivot-retainer"
 CARRIER = "ch-rocker-arm-tl-oblique-carrier"
 RISER = "ch-rocker-arm-tl-oblique-riser"
 HUB_PIN = "ch-rocker-arm-tl-oblique-hub-pin"
 FEED_LEVER = "ch-rocker-arm-tl-oblique-feed-lever"
 END_BRACKET = leadscrew.END_BRACKET
 NUT_BRACKET = leadscrew.NUT_BRACKET
-# Bought hardware (parent-scoped TL-VN and shared SH-VN-57), every member modelled.
+# Bought hardware (parent-scoped TL-VN and shared SH-VN-57; VN-72 retired),
+# every member modelled and mated.
 RAIL = "ch-rocker-arm-tl-vn-oblique-rail"
 CARRIAGE = "ch-rocker-arm-tl-vn-oblique-carriage"
 BEARING = "ch-rocker-arm-tl-vn-oblique-bearing"
@@ -150,6 +165,10 @@ CLAMP_SCREW = "ch-rocker-arm-tl-vn-oblique-clamp-screw"
 LEVER_SCREW = "ch-rocker-arm-tl-vn-oblique-lever-screw"
 BLOCK_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-block-washer"
 LEVER_LOCK_WASHER = "ch-rocker-arm-tl-vn-oblique-lever-washer"
+PIVOT_CAP_SCREW = "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw"
+PIVOT_CLEVIS_PIN = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+PIVOT_COTTER = "ch-rocker-arm-tl-vn-oblique-pivot-cotter"
+PIVOT_LOCK_WIRE = "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire"
 
 # Every logical component family and its count: the builder places, the explode
 # moves and the drawing proves this inventory in its established item order.
@@ -164,6 +183,8 @@ QUANTITIES = {
     FEED_LEVER: 1,
     END_BRACKET: leadscrew.END_BRACKET_QUANTITY,
     NUT_BRACKET: leadscrew.NUT_BRACKET_QUANTITY,
+    PIVOT_CAP: 2,
+    PIVOT_RETAINER: 2,
     RAIL: fasteners.RAILS,
     CARRIAGE: fasteners.RAILS,
     BEARING: bearing.QUANTITY,
@@ -186,6 +207,10 @@ QUANTITIES = {
     LEVER_SCREW: lever_screw.QUANTITY,
     BLOCK_LOCK_WASHER: block_washer.QUANTITY,
     LEVER_LOCK_WASHER: lever_washer.QUANTITY,
+    PIVOT_CAP_SCREW: cap_screw.QUANTITY,
+    PIVOT_CLEVIS_PIN: clevis_pin.QUANTITY,
+    PIVOT_COTTER: pivot_cotter.QUANTITY,
+    PIVOT_LOCK_WIRE: pivot_wire.QUANTITY,
 }
 # SolidWorks numbers a top-level BOM in FeatureManager order, so BOM_ORDER is
 # the builder's insertion order (the builder asserts it) and the steps' item
@@ -200,6 +225,8 @@ BOM_ORDER = (
     FEED_LEVER,
     END_BRACKET,
     NUT_BRACKET,
+    PIVOT_CAP,
+    PIVOT_RETAINER,
     RAIL,
     CARRIAGE,
     BEARING,
@@ -222,6 +249,10 @@ BOM_ORDER = (
     LEVER_SCREW,
     BLOCK_LOCK_WASHER,
     LEVER_LOCK_WASHER,
+    PIVOT_CAP_SCREW,
+    PIVOT_CLEVIS_PIN,
+    PIVOT_COTTER,
+    PIVOT_LOCK_WIRE,
 )
 
 # Logical BOM families are not filenames. The heterogeneous kit members share
@@ -402,39 +433,21 @@ NUT_BRACKET_ROWS = rail_rows(leadscrew.RAIL)
 RAIL_TOP_Z = trammel.RAIL_SEAT_Z + trammel.RAIL_HEIGHT  # 27.7
 CARRIAGE_UNDERSIDE_Z = trammel.RAIL_SEAT_Z + trammel.CARRIAGE_UNDER  # 17.0
 HUB_HEAD_BOTTOM_Z = HUB_PIN_ORIGIN[2]  # 63.7
-HUB_PIN_TOP_Z = HUB_HEAD_BOTTOM_Z + hub_pin.OVERALL_LENGTH  # 87.7
-PIN_TOP_Z = PIN_BOTTOM_Z + pivot_pin.OVERALL_LENGTH  # 78.7
-PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK  # 88.2
+HUB_PIN_TOP_Z = HUB_HEAD_BOTTOM_Z + hub_pin.OVERALL_LENGTH
+PIN_TOP_Z = PIN_BOTTOM_Z + pivot_pin.OVERALL_LENGTH
+PART_TOP_Z = trammel.CARRIER_TOP_Z + trammel.RISER_THICK + trammel.STRAP_THICK
 
-# --- Hold-down studs (ESTIMATES, unmeasured) ---------------------------------------
-# PM-30MV T-slot: 14 throat (⚙ TSLOT_WIDTH) about 14 deep to the undercut; the
-# kit's T-nut foot is pulled up against the undercut's roof, and the stud
-# bottoms flush with the foot. The T-nut spec owns both estimates
-# (``t_nut.THROAT_DEPTH``, ``t_nut.FOOT_HEIGHT``). The kit's 3 in stud only
-# (``fasteners``).
+# --- Hold-down studs: reworked length on the reference installed stack ------------
+# PM-30MV T-slot throat/foot depths are unmeasured reference estimates owned
+# by t_nut, not universal machine or delivered-kit tolerances. Procurement
+# remains the kit's 3 in stock; only its unused upper end is shortened.
+# Sheet 10's HD1-HD3 (HOLD_DOWN_STEPS) own the measured installed-stack
+# acceptance after final nut seating: clear the moving block wing and
+# preserve every loaded thread. The stud drawing cites HOLD_DOWN_REFERENCE.
 STUD_BOTTOM_Z = -(t_nut.THROAT_DEPTH + t_nut.FOOT_HEIGHT)
 STUD_DIA = base_bar.HOLD_DOWN_STUD_DIA  # 1/2-13
-STUD_LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM  # the kit's 3 in stud only
-STUD_TOP_Z = STUD_BOTTOM_Z + STUD_LENGTH  # 54.2
-# The longest stud the carrier clears: its underside, which swings over the
-# studs, less the most that stands below it (the CR clamp screw's worst-case
-# stand-out; the CL dowel's lower end stays within it) and the stud's bottom;
-# step 2 states it. The modelled 3 in studs are proved clear by the native
-# sweep gate (verify.py).
-STUD_LENGTH_MAX = (
-    trammel.CARRIER_UNDERSIDE_Z - clamp_screw.STAND_OUT_MAX - STUD_BOTTOM_Z
-)  # 86.35
-
-
-def inch_eighths_down(mm: float) -> str:
-    """``mm`` in inches rounded down to 1/8, as shop text (``3-1/2``)."""
-    eighths = math.floor(mm / trammel.INCH * 8.0 + 1e-9)
-    whole, part = divmod(eighths, 8)
-    if not part:
-        return f"{whole}"
-    common = math.gcd(part, 8)
-    fraction = f"{part // common}/{8 // common}"
-    return f"{whole}-{fraction}" if whole else fraction
+STUD_LENGTH = fasteners.HOLD_DOWN_STUD_LENGTH_MM
+STUD_TOP_Z = STUD_BOTTOM_Z + STUD_LENGTH  # 35.2 on this reference stack
 
 
 # The flange nut (its spec owns the Ø and height estimates) seats on the bar top.
@@ -678,6 +691,49 @@ LEVER_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
     for point in carrier.LEVER_HOLES
 )
 
+# Positive capture stays with each cartridge, not with a removable carrier.
+# Retainers are shown at their upper loaded stop: the visible gap is running
+# clearance, not a clamping preload. Lock mates preserve these representative
+# clearance positions without pretending a loose cross-pin is concentric.
+PIVOT_CAP_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(block, (pivot_block.BORE_X, 0.0, trammel.PIVOT_BLOCK_HEIGHT))
+    for block in PIVOT_BLOCK_PLACEMENTS
+)
+PIVOT_RETAINER_PLACEMENTS: tuple[Placement, ...] = tuple(
+    (origin[:2] + (trammel.CARRIER_TOP_Z + sum(retention.TOP_RUNNING_GAP) / 2.0,), PIN_ROWS)
+    for origin in PIVOT_PIN_ORIGINS
+)
+PIVOT_CAP_SCREW_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(cap, (x, y, retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH))
+    for cap in PIVOT_CAP_PLACEMENTS
+    for x, y in retention.CAP_BOLT_CENTERS
+)
+PIVOT_CLEVIS_HEAD_X = -13.0
+PIVOT_CLEVIS_CENTRE_ABOVE_SEAT = (
+    retention.PIN_CROSS_HOLE_FROM_SEAT + retention.PIN_CROSS_HOLE_DIA / 2.0
+    - retention_hardware.CLEVIS_DIA / 2.0
+)
+PIVOT_CLEVIS_PIN_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(
+        (origin, PIN_ROWS),
+        (
+            PIVOT_CLEVIS_HEAD_X,
+            0.0,
+            pivot_pin.CARRIER_STATION + PIVOT_CLEVIS_CENTRE_ABOVE_SEAT,
+        ),
+    )
+    for origin in PIVOT_PIN_ORIGINS
+)
+PIVOT_COTTER_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(clevis, (retention_hardware.CLEVIS_HOLE_FROM_HEAD, 0.0, 0.0))
+    for clevis in PIVOT_CLEVIS_PIN_PLACEMENTS
+)
+PIVOT_LOCK_WIRE_PLACEMENTS: tuple[Placement, ...] = tuple(
+    compose(cap, (0.0, y, retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH))
+    for cap in PIVOT_CAP_PLACEMENTS
+    for y in retention.CAP_BOLT_Y_OFFSETS
+)
+
 # Every instance of every logical family, in insertion order. Ordinary families
 # keep native <stem>-N names; kit instances use persisted role-local references.
 PLACEMENTS: dict[str, tuple[Placement, ...]] = {
@@ -690,6 +746,8 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     FEED_LEVER: ((FEED_LEVER_ORIGIN, FEED_LEVER_ROWS),),
     END_BRACKET: END_BRACKET_PLACEMENTS,
     NUT_BRACKET: (NUT_BRACKET_PLACEMENT,),
+    PIVOT_CAP: PIVOT_CAP_PLACEMENTS,
+    PIVOT_RETAINER: PIVOT_RETAINER_PLACEMENTS,
     RAIL: RAIL_PLACEMENTS,
     CARRIAGE: CARRIAGE_PLACEMENTS,
     BEARING: BEARING_PLACEMENTS,
@@ -712,6 +770,10 @@ PLACEMENTS: dict[str, tuple[Placement, ...]] = {
     LEVER_SCREW: LEVER_SCREW_PLACEMENTS,
     BLOCK_LOCK_WASHER: BLOCK_LOCK_WASHER_PLACEMENTS,
     LEVER_LOCK_WASHER: LEVER_LOCK_WASHER_PLACEMENTS,
+    PIVOT_CAP_SCREW: PIVOT_CAP_SCREW_PLACEMENTS,
+    PIVOT_CLEVIS_PIN: PIVOT_CLEVIS_PIN_PLACEMENTS,
+    PIVOT_COTTER: PIVOT_COTTER_PLACEMENTS,
+    PIVOT_LOCK_WIRE: PIVOT_LOCK_WIRE_PLACEMENTS,
 }
 
 
@@ -743,6 +805,12 @@ SLIDE_RAIL = leadscrew.RAIL  # the rail whose carriage carries the nut bracket
 LOCKED_TO: dict[str, tuple[str, int]] = {
     PIVOT_BLOCK: (CARRIAGE, 1),
     PIVOT_PIN: (PIVOT_BLOCK, 1),
+    PIVOT_CAP: (PIVOT_BLOCK, 1),
+    PIVOT_RETAINER: (PIVOT_PIN, 1),
+    PIVOT_CAP_SCREW: (PIVOT_CAP, 4),
+    PIVOT_CLEVIS_PIN: (PIVOT_PIN, 1),
+    PIVOT_COTTER: (PIVOT_CLEVIS_PIN, 1),
+    PIVOT_LOCK_WIRE: (PIVOT_CAP, 2),
     BEARING: (PIVOT_BLOCK, len(BEARING_SEAT_Z)),
     CARRIAGE_SCREW: (PIVOT_BLOCK, len(pivot_block.BOLT_POINTS)),
     NUT_BRACKET: (PIVOT_BLOCK, 1),
@@ -814,6 +882,8 @@ BOM_DESCRIPTIONS = {
     FEED_LEVER: "FEED LEVER",
     END_BRACKET: "END BRACKET",
     NUT_BRACKET: "NUT BRACKET",
+    PIVOT_CAP: "CAPTIVE PIVOT CAP",
+    PIVOT_RETAINER: "FITTED PIVOT RETAINER",
     RAIL: (
         f"HGR15R RAIL, {trammel.RAIL_LENGTH:.0f}, "
         f"E{trammel.RAIL_HOLE_END:.0f} BOTH ENDS"
@@ -842,6 +912,10 @@ BOM_DESCRIPTIONS = {
     LEVER_SCREW: lever_screw.CALLOUT,
     BLOCK_LOCK_WASHER: f"{block_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
     LEVER_LOCK_WASHER: f"{lever_washer.SCREW_SIZE} WEDGE-LOCK WASHER PAIR",
+    PIVOT_CAP_SCREW: f"{cap_screw.SKU} DRILLED SHCS",
+    PIVOT_CLEVIS_PIN: "3/16 HEADED CLEVIS PIN",
+    PIVOT_COTTER: "1/16 X 1/2 SPLIT COTTER",
+    PIVOT_LOCK_WIRE: "0.032 IN STAINLESS LOCK WIRE, FORMED",
 }
 # BOM item n is BOM_ORDER position n: the builder inserts each family's first
 # instance in BOM_ORDER sequence (SolidWorks numbers a top-level BOM in
@@ -856,21 +930,23 @@ ITEM_NUMBERS = {stem: str(index) for index, stem in enumerate(BOM_ORDER, 1)}
 # on the brackets, the handwheel slid off its end, the bracket screws dropped
 # out of bar 1's underside and the KP08 screws lifted out; the carriages over
 # their rails with the rail screws lifted out between; each pivot block over
-# its carriage with its bearings pressed out beneath it, its carriage screws
-# and its pivot pin above it, as it is pressed in; block 1 carries the nut
-# bracket and the nut, their screws backed out along the axes they are
+# its carriage, its upper bearing between block and pin and its lower bearing
+# visibly below the block; its carriage screws and pivot pin above it.
+# Block 1 carries the nut bracket and the nut, their screws backed out along
+# the axes they are
 # driven on, each block screw's wedge-lock pair halfway out to its head;
 # then the carrier, its HUB pin dropped out beneath it (step 11 presses it up
 # from below once the riser is down) and its CL dowel lifted out above the
 # riser (step 11 presses it down through the riser), and the riser and the
 # feed lever over it with their screws above them, each lever screw's
 # wedge-lock pair halfway out to its head.
-# Each step's families move by a signed distance along a machine
-# axis; a family's displacement along an axis is the sum of the steps naming
-# it (``explode_shift``; ``explode_lift`` along Z). The rail 1 axis runs
-# along -X within 9 degrees, so the nut screws back out along +X and the
-# handwheel slides off along -X.
-# (label, families, axis, signed distance mm).
+# Each step's selectors move by a signed distance along a machine axis.
+# Ordinary selectors are family stems; only the two bearing extraction steps
+# name exact occurrences. ``explode_shift`` sums both kinds for an occurrence;
+# a family query is valid only when every occurrence shares that axis shift.
+# The rail 1 axis runs along -X within 9 degrees, so the nut screws back out
+# along +X and the handwheel slides off along -X.
+# (label, selectors, axis, signed distance mm).
 EXPLODED_VIEW_NAME = "JIG_EXPLODED"
 SOURCE_CONFIGURATION = "Default"
 _CARRIER_RIDERS = (
@@ -890,8 +966,21 @@ _BLOCK_RIDERS = (
     LEADSCREW_NUT,
     NUT_SCREW,
     BLOCK_LOCK_WASHER,
+    PIVOT_CAP,
+    PIVOT_RETAINER,
+    PIVOT_CAP_SCREW,
+    PIVOT_CLEVIS_PIN,
+    PIVOT_COTTER,
+    PIVOT_LOCK_WIRE,
 )
 EXPLODE_STEPS = (
+    ("cotters withdraw after straightening", (PIVOT_COTTER,), "y", 40.0),
+    ("clevis pins withdraw", (PIVOT_CLEVIS_PIN, PIVOT_COTTER), "x", 40.0),
+    ("top retainers lift clear", (PIVOT_RETAINER,), "z", 170.0),
+    ("discard lock wire", (PIVOT_LOCK_WIRE,), "y", -16.0),
+    ("lock wire lifts clear", (PIVOT_LOCK_WIRE,), "z", 176.0),
+    ("cap screws lift clear", (PIVOT_CAP_SCREW,), "z", 160.0),
+    ("capture caps lift clear", (PIVOT_CAP,), "z", 130.0),
     ("lever screws lift out", (LEVER_SCREW,), "z", 40.0),
     ("lever wedge-lock pairs lift out", (LEVER_LOCK_WASHER,), "z", 20.0),
     (
@@ -918,8 +1007,24 @@ EXPLODE_STEPS = (
     ("wedge-lock pairs back out", (BLOCK_LOCK_WASHER,), "y", -20.0),
     ("pivot blocks lift off", (PIVOT_BLOCK, *_BLOCK_RIDERS), "z", 90.0),
     ("carriage screws lift out", (CARRIAGE_SCREW,), "z", 60.0),
-    ("pivot pins press out up", (PIVOT_PIN,), "z", 60.0),
-    ("bearings press out down", (BEARING,), "z", -35.0),
+    (
+        "pivot pins press out up",
+        (PIVOT_PIN, PIVOT_CLEVIS_PIN, PIVOT_COTTER),
+        "z",
+        60.0,
+    ),
+    (
+        "upper bearings press out up",
+        (instance_name(BEARING, 1), instance_name(BEARING, 3)),
+        "z",
+        24.0,
+    ),
+    (
+        "lower bearings press out down",
+        (instance_name(BEARING, 0), instance_name(BEARING, 2)),
+        "z",
+        -80.0,
+    ),
     ("carriages lift off the rails", (CARRIAGE,), "z", 50.0),
     ("rail screws lift out", (RAIL_SCREW,), "z", 35.0),
     ("handwheel slides off", (HANDWHEEL,), "x", -50.0),
@@ -940,18 +1045,47 @@ EXPLODE_STATIC = (
 )
 
 
-def explode_shift(family: str, axis: str) -> float:
-    """``family``'s total exploded displacement along machine ``axis`` (mm, signed)."""
-    return sum(
-        d
-        for _label, families, step_axis, d in EXPLODE_STEPS
-        if step_axis == axis and family in families
-    )
+def explode_shift(component_or_family: str, axis: str) -> float:
+    """Signed machine-axis presentation shift (mm) of an occurrence or family.
+
+    A family has no common shift on an axis whose occurrences separate; callers
+    projecting real geometry must use ``instance_name(stem, index)`` instead.
+    Kit occurrences use their persisted role-local references, never the shared
+    part file's native instance suffixes.
+    """
+    if component_or_family in QUANTITIES:
+        family = component_or_family
+        names = tuple(instance_name(family, index) for index in range(QUANTITIES[family]))
+    else:
+        identity = KIT_COMPONENT_REFERENCES.get(component_or_family)
+        if identity is not None:
+            family = component_family(*identity)
+        else:
+            family, _separator, _suffix = component_or_family.rpartition("-")
+        if family not in QUANTITIES or component_or_family not in (
+            instance_name(family, index) for index in range(QUANTITIES[family])
+        ):
+            raise ValueError(f"unknown explode occurrence: {component_or_family!r}")
+        names = (component_or_family,)
+    shifts = {
+        sum(
+            distance
+            for _label, selectors, step_axis, distance in EXPLODE_STEPS
+            if step_axis == axis and (family in selectors or name in selectors)
+        )
+        for name in names
+    }
+    if len(shifts) != 1:
+        raise ValueError(
+            f"{component_or_family}: nonuniform exploded {axis.upper()} displacement; "
+            "use an exact instance_name(stem, index)"
+        )
+    return shifts.pop()
 
 
-def explode_lift(family: str) -> float:
-    """``family``'s total exploded displacement along machine Z (mm, signed)."""
-    return explode_shift(family, "z")
+def explode_lift(component_or_family: str) -> float:
+    """Signed machine-Z presentation shift (mm); reject nonuniform families."""
+    return explode_shift(component_or_family, "z")
 
 
 # The isometric looks down along (-1, +1, -1): a part under the lifted carrier
@@ -976,26 +1110,58 @@ if PIN_BOTTOM_Z + explode_lift(PIVOT_PIN) <= (
 # The riser must clear the HUB pin's locator before it moves sideways.
 if explode_lift(RISER) - explode_lift(CARRIER) <= HUB_PIN_TOP_Z - trammel.CARRIER_TOP_Z:
     raise AssertionError("the exploded riser does not clear the HUB pin")
-_moved = {
-    family for _label, families, _axis, _d in EXPLODE_STEPS for family in families
+_instances = {
+    instance_name(family, index)
+    for family in BOM_ORDER
+    for index in range(QUANTITIES[family])
 }
-if _moved & set(EXPLODE_STATIC) or _moved | set(EXPLODE_STATIC) != set(BOM_ORDER):
-    raise AssertionError("every family is exploded or deliberately static, not both")
-# Each pivot block's stack reads apart: carriage, its rail screws under it,
-# the bearings between it and the lifted block.
-_CARRIAGE_TOP_EXPLODED = trammel.CARRIAGE_TOP_Z + explode_lift(CARRIAGE)
-if not (
-    _CARRIAGE_TOP_EXPLODED
-    < PIN_BOTTOM_Z + explode_lift(BEARING)
-    < BEARING_SEAT_Z[1]
-    + trammel.BEARING_WIDTH
-    + trammel.CARRIAGE_TOP_Z
-    + explode_lift(BEARING)
-    < trammel.CARRIAGE_TOP_Z + explode_lift(PIVOT_BLOCK)
-):
-    raise AssertionError(
-        "the exploded bearings do not stand between carriage and block"
+_bearing_instances = {
+    instance_name(BEARING, index) for index in range(QUANTITIES[BEARING])
+}
+_moved: set[str] = set()
+for _label, _selectors, _axis, _distance in EXPLODE_STEPS:
+    for _selector in _selectors:
+        if _selector in QUANTITIES:
+            _moved.update(
+                instance_name(_selector, index)
+                for index in range(QUANTITIES[_selector])
+            )
+        elif _selector in _bearing_instances:
+            _moved.add(_selector)
+        else:
+            raise AssertionError(f"unknown explode selector: {_selector}")
+_static = {
+    instance_name(family, index)
+    for family in EXPLODE_STATIC
+    for index in range(QUANTITIES[family])
+}
+if _moved & _static or _moved | _static != _instances:
+    raise AssertionError("every occurrence is exploded or deliberately static, not both")
+# C1: upper bearing on the pin, that pair into the upper seat, lower bearing
+# last from below. Each actual occurrence must stand on its own side of its
+# support, not merely share a family displacement somewhere under the block.
+for _support, (_block_origin, _block_rows) in enumerate(PIVOT_BLOCK_PLACEMENTS):
+    _block_bottom = _block_origin[2] + explode_lift(instance_name(PIVOT_BLOCK, _support))
+    _block_top = _block_bottom + pivot_block.BLOCK_HEIGHT
+    _lower, _upper = (2 * _support, 2 * _support + 1)
+    _lower_top = (
+        BEARING_PLACEMENTS[_lower][0][2]
+        + explode_lift(instance_name(BEARING, _lower))
+        + bearing.WIDTH
     )
+    _upper_bottom = (
+        BEARING_PLACEMENTS[_upper][0][2]
+        + explode_lift(instance_name(BEARING, _upper))
+    )
+    _pin_bottom = (
+        PIVOT_PIN_ORIGINS[_support][2]
+        + explode_lift(instance_name(PIVOT_PIN, _support))
+    )
+    if not (
+        _lower_top < _block_bottom < _block_top
+        < _upper_bottom < _upper_bottom + bearing.WIDTH < _pin_bottom
+    ):
+        raise AssertionError("the exploded bearing occurrences do not show C1 press order")
 _RAIL_SCREW_TOP_EXPLODED = RAIL_TOP_Z + explode_lift(RAIL_SCREW)
 if _RAIL_SCREW_TOP_EXPLODED > CARRIAGE_UNDERSIDE_Z + explode_lift(CARRIAGE):
     raise AssertionError("the exploded rail screws stand inside the carriages")
@@ -1047,6 +1213,41 @@ for _name, (_right, _up, _sight) in VIEW_AXES.items():
         > 1e-12
     ):
         raise AssertionError(f"{_name}: not a right-handed orthonormal frame")
+# A lower bearing can be axially clear yet hidden behind the block's wing in
+# this isometric. Separate their complete sheet-up envelopes: the block uses
+# its conservative enclosing footprint (including both wings); the bearing
+# uses its exact cylindrical OD silhouette, not its centre or a seat stub.
+# Net lower +10 Z puts its faces at block-bottom +11..20, 70 mm below the
+# lifted block; the old +55 Z faces at +56..65 did not clear this projection.
+_iso_up = VIEW_AXES[ISOMETRIC_VIEW][1]
+for _support, _block in enumerate(PIVOT_BLOCK_PLACEMENTS):
+    _block_name = instance_name(PIVOT_BLOCK, _support)
+    _block_floor_up = min(
+        sum(value * up for value, up in zip(frame_point(_block, (x, y, 0.0)), _iso_up))
+        for x in (pivot_block.BLOCK_X0, max(pivot_block.BLOCK_X1, pivot_block.WING_X1))
+        for y in (
+            -max(pivot_block.BLOCK_WIDTH, pivot_block.WING_WIDTH) / 2.0,
+            max(pivot_block.BLOCK_WIDTH, pivot_block.WING_WIDTH) / 2.0,
+        )
+    ) + sum(
+        explode_shift(_block_name, axis) * up for axis, up in zip("xyz", _iso_up)
+    )
+    _lower = 2 * _support
+    _lower_origin, _lower_rows = BEARING_PLACEMENTS[_lower]
+    _lower_name = instance_name(BEARING, _lower)
+    _lower_radius_up = bearing.OD / 2.0 * math.hypot(
+        sum(value * up for value, up in zip(_lower_rows[0], _iso_up)),
+        sum(value * up for value, up in zip(_lower_rows[2], _iso_up)),
+    )
+    _lower_top_up = (
+        sum(value * up for value, up in zip(_lower_origin, _iso_up))
+        + bearing.WIDTH * sum(value * up for value, up in zip(_lower_rows[1], _iso_up))
+        + _lower_radius_up
+        + sum(explode_shift(_lower_name, axis) * up for axis, up in zip("xyz", _iso_up))
+    )
+    if _lower_top_up >= _block_floor_up:
+        raise AssertionError("the exploded block hides a lower bearing in the isometric")
+
 PLAN_VIEW_LABEL = "PLAN, FROM ABOVE"
 ELEVATION_VIEW_LABEL = "ELEVATION FROM THE OPERATOR SIDE (-Y)"
 
@@ -1160,9 +1361,12 @@ PLAN_TAGS: tuple[PlanTag, ...] = (
 # its own pin spacing to ±POSITION_BAND, the same band the readings use.
 ALIGNMENT_BAND = carrier.POSITION_BAND
 ASSEMBLED_CAPTION = (
-    "INNER PASS AT THE SYMMETRIC POSITION: CARRIER ON A1/B1 (THE OUTER PASS "
-    "PUTS A2/B2 ON THE PINS). MACHINE FRAME: ORIGIN ON THE SPINDLE AT THE "
-    "TABLE TOP, +Y TOWARD THE COLUMN."
+    "INNER PASS AT THE SYMMETRIC POSITION: A1/B1; OUTER PASS: A2/B2. BOTH "
+    "TOP RETAINERS MUST BE LOCKED IN EITHER PASS. PIN ENDS STAND "
+    f"{retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} mm ABOVE THE WORK "
+    "NOMINALLY. CHECK ACTUAL SPINDLE/TOOL/HOLDER CLEARANCE PER C8 (SHEET 10) "
+    "BEFORE USE. MACHINE ORIGIN: SPINDLE AT TABLE TOP; "
+    "+Y TOWARD COLUMN."
 )
 
 
@@ -1462,6 +1666,15 @@ _CL_HOLE = (
     f"Ø{carrier.CL_DOWEL_DIA:.0f} X 20 M6 DOWEL "
     f"({_limits(carrier.CL_DOWEL_DIA, carrier.CL_DOWEL_BAND, 3)})"
 )
+# The instruction steps cite sheet 10 (CAPTUREANDOPERATION: C6-C8, HD1-HD3) by
+# this number; the drawing asserts it. The shared MHA-SH-VN-57 REWORK sheet
+# for HoldDownStud prints HOLD_DOWN_REFERENCE as its only measuring and
+# acceptance pointer.
+OPERATION_SHEET_NUMBER = 10
+HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD3 (SHEET {OPERATION_SHEET_NUMBER})"
+# Initial A1/B1, first A2/B2, A2/B2 after the carrier-off realignment, then
+# final A1/B1: each fitting consumes one fresh cotter at each support.
+INITIAL_FIT_UP_COTTER_QUANTITY = 4 * pivot_cotter.QUANTITY
 ASSEMBLY_STEPS = (
     f"1. SCREW AN HGR15R RAIL {_item(RAIL)} ON EACH BASE BAR WITH "
     f"{trammel.RAIL_HOLE_COUNT} {_RAIL_SCREW} {_item(RAIL_SCREW)}, ENDS FLUSH: "
@@ -1474,23 +1687,18 @@ ASSEMBLY_STEPS = (
     f"{_item(BRACKET_SCREW)} PER BRACKET FROM BELOW, "
     f"{leadscrew.BAR_SCREW_TORQUE_NM:.1f} N·m "
     f"({leadscrew.BAR_SCREW_TORQUE_IN_LBF} IN·LBF).",
-    "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE, EACH HELD "
-    "DOWN IN THE OUTER T-SLOTS BY TWO "
-    f"{fasteners.HOLD_DOWN_STUD_THREAD} X {fasteners.HOLD_DOWN_STUD_LENGTH} IN "
-    f"STUDS ONLY {_item(HOLD_DOWN_STUD)} IN T-NUTS {_item(T_NUT)} UNDER "
-    f"FINGER-TIGHT FLANGE NUTS {_item(FLANGE_NUT)}; A STUD OVER "
-    f"{inch_eighths_down(STUD_LENGTH_MAX)} IN REACHES THE SWINGING CARRIER.",
+    "2. SET BOTH BARS ON THE TABLE, NEAR ENDS TOWARD THE SPINDLE. USE TWO "
+    f"UNCUT {fasteners.HOLD_DOWN_STUD_THREAD} STUDS {_item(HOLD_DOWN_STUD)} "
+    "PER BAR IN THE OUTER T-SLOTS, IN T-NUTS "
+    f"{_item(T_NUT)} UNDER FINGER-TIGHT FLANGE NUTS {_item(FLANGE_NUT)}. "
+    "FOLLOW HD1 FOR UNCUT-STOCK OBSTRUCTIONS; REWORK AT STEP 13B.",
     f"3. SLIDE A FACTORY-GREASED HGH15CA CARRIAGE {_item(CARRIAGE)} ON EACH RAIL.",
     # Review bought-r15: a pin pressed through two seated bearings loads the
     # upper one through its balls and drags the lower one off its shoulder,
     # so each press loads only the ring it fits.
-    f"4. FOR EACH PIVOT BLOCK, PRESS A 6200-2RS BEARING {_item(BEARING)} ON A "
-    f"PIVOT PIN {_item(PIVOT_PIN)}, BEARING END FIRST, UNTIL ITS INNER RACE "
-    "SEATS ON THE COLLAR, PUSHING ON THE INNER RACE ONLY. PRESS THE PIN DOWN "
-    "FROM THE BLOCK'S TOP FACE, PUSHING ON THE OUTER RACE ONLY, UNTIL IT SEATS "
-    "ON THE SHOULDER. TURN THE BLOCK OVER ON A SUPPORT UNDER THE PIN'S COLLAR "
-    "END AND PRESS THE SECOND BEARING OVER THE PIN INTO THE BLOCK WITH A FLAT "
-    "DRIVER ON BOTH RACES UNTIL ITS OUTER RACE SEATS ON THE SHOULDER.",
+    f"4. ASSEMBLE EACH PIN {_item(PIVOT_PIN)} AND BOTH BEARINGS {_item(BEARING)} "
+    "PER C2A THEN C1-C2 (SHEET 8), BEFORE FITTING THE BLOCKS. TRIAL-FIT CAPS "
+    "FOR C2A AND C2, THEN LEAVE THEM OFF FOR FEED FIT-UP; DO NOT COMPLETE C3 YET.",
     f"5. SCREW EACH BLOCK ON ITS CARRIAGE WITH 4 {_CARRIAGE_SCREW} "
     f"{_item(CARRIAGE_SCREW)}, BORE TOWARD THE SPINDLE.",
     # Review bought-r15: the DRO reads the table, not the carriage, so the
@@ -1515,8 +1723,8 @@ ASSEMBLY_STEPS = (
     "7C. CLAMP THE NUT BRACKET ON THE COLUMN SIDE OF RAIL 1'S PIVOT BLOCK (STILL "
     f"ON ITS CARRIAGE), CENTRE {nut_bracket.X_SET_MID:.{nut_bracket.X_SET_PLACES}f} "
     "FROM "
-    "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); SPOT THE NUT BRACKET "
-    "THROUGH THE BLOCK'S 2 "
+    "THE BLOCK'S SPINDLE END (SETS #8 TAP END WALLS); CHECK F1 (SHEET 8), "
+    "THEN SPOT THROUGH THE BLOCK'S 2 "
     f"Ø{pivot_block.SIDE_HOLE_DIA:.2f} SIDE HOLES ({nut_bracket.TRANSFER_PUNCH} "
     "TRANSFER PUNCH).",
     "7D. RUN THE SCREW OUT, UNCLAMP THE NUT BRACKET, DRILL AND TAP ITS 2 "
@@ -1530,16 +1738,17 @@ ASSEMBLY_STEPS = (
     # round it (7B threads it only to locate the nut for 7C's spotting).
     "7F. RE-THREAD THE SCREW THROUGH THE NUT, "
     f"{leadscrew.NEAR_STUB:.0f} PAST THE NEAR BLOCK.",
-    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS TO "
-    f"{_BLOCK_TORQUE}, THEN THE KP08 "
+    f"8. TIGHTEN THE NUT SCREWS TO {_NUT_TORQUE}, THE BLOCK SCREWS "
+    f"{_item(BLOCK_SCREW)} TO {_BLOCK_TORQUE}, THEN THE KP08 "
     "SCREWS, SO THE SCREW TURNS FREELY OVER THE WHOLE TRAVEL. PUSH THE "
     f"HANDWHEEL {_item(HANDWHEEL)} ON, HUB {leadscrew.HUB_GAP:.0f} OFF THE FAR "
     # Owner ruling 2026-10-18 (rule 23, exception RV-03): the set screws are
     # locked with a bought low-strength threadlocker, named, not prescribed.
     "BLOCK; TIGHTEN ITS AND THE KP08 SET SCREWS ON THE SCREW'S FLATS, EACH "
-    "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER.",
-    "9. LOWER THE CARRIER PLATE ONTO THE PINS, ITS HOLES A1 AND B1 (INNER PASS, "
-    "TAGGED ON SHEET 1) ON THE COLLARS.",
+    "LOCKED WITH LOW-STRENGTH (PURPLE) THREADLOCKER. THEN FOLLOW F2 (SHEET 8).",
+    "9. LOWER THE CARRIER A1/B1 (INNER PASS) ONTO BOTH PIN SEATS. FIT AND "
+    "LOCK BOTH TOP RETAINERS PER C4-C5D (SHEET 9). RECORD HD1 H THROUGH "
+    "THE COMPLETE INNER-PASS HAND SWEEP.",
     "10. DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS (LOCATED ON "
     "MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH IN ONE SETUP SQUARE TO THE "
     "CARRIER TOP: "
@@ -1555,7 +1764,8 @@ ASSEMBLY_STEPS = (
     "ONLY NOW PRESS THE HUB PIN UP TO ITS HEAD AND THE CL DOWEL "
     f"{_item(CL_DOWEL)} CHAMFERED END FIRST DOWN THROUGH THE RISER UNTIL ITS "
     f"ROUND TIP IS {cl_dowel.TIP_SET_MIN:.2f}-{cl_dowel.TIP_SET_MAX:.2f} ABOVE "
-    "THE RISER; CHECK THE STRAP SEATS FLAT, LOCATES AND SLIDES ON AND OFF, AND "
+    f"THE RISER; CHECK THE {carrier.STRAP_NUMBER} STRAP SEATS FLAT, LOCATES "
+    "AND SLIDES ON AND OFF, AND "
     "THE TIP IS NOT ABOVE IT. "
     f"FACE THE HUB PIN'S TOP {hub_pin.LOCATOR_SET_MIN:.2f}-"
     f"{hub_pin.LOCATOR_SET_MAX:.2f} ABOVE THE RISER AND RECHAMFER IT "
@@ -1566,10 +1776,10 @@ ASSEMBLY_STEPS = (
     f"{_CLAMP_SCREW} {_item(CLAMP_SCREW)} GOES DOWN THROUGH THE WORKPIECE, "
     f"THE {carrier.STRAP_NUMBER} STRAP BLANK (NOT SUPPLIED), AND THE RISER "
     "INTO THE CARRIER'S CR TAP.",
-    "13. TO CHANGE PASS, LIFT THE CARRIER, RUN CARRIAGE 1 BY THE HANDWHEEL AND "
-    "SLIDE CARRIAGE 2 UNTIL THE PINS MEET A2/B2, AND LOWER IT; THE STEP 6 "
-    "READINGS STAND. SHIP ON A1/B1, BLOCK SCREWS "
-    f"{_item(BLOCK_SCREW)} IN AT {_BLOCK_TORQUE}.",
+    f"13A. FIT A2/B2 PER C6; COMPLETE HD1 (SHEET {OPERATION_SHEET_NUMBER}).",
+    "13B. REMOVE CARRIER PER C6; REWORK STUDS PER HD2-HD3.",
+    "13C. REFIT A2/B2 PER C6; DO HD3 AND THE CHECKS BELOW.",
+    "13D. RETURN TO A1/B1 PER C6; REPEAT HD3/CHECKS AND SHIP.",
 )
 # The Tr8x2 nut does not back-drive: the lever feeds (roughing) only with the
 # nut bracket's block screws out; the handwheel feeds the finish pass.
@@ -1583,8 +1793,224 @@ ASSEMBLY_CHECKS = (
     f"CHECK: REFIT THE BLOCK SCREWS {_item(BLOCK_SCREW)} ON THEIR WEDGE-LOCK "
     f"PAIRS AT {_BLOCK_TORQUE}; THE HANDWHEEL RUNS THE SAME SWEEPS WITHOUT "
     "BINDING.",
-    "CHECK: THE CARRIER SITS ON BOTH PIN COLLARS; NEITHER PIVOT PIN "
-    f"{_item(PIVOT_PIN)} STANDS ABOVE THE CARRIER TOP.",
+    "CHECK: THE CARRIER SITS ON BOTH PIN SEATS WITHOUT THE TOP RETAINERS "
+    "CLAMPING IT; BOTH CLEVIS PINS HAVE NEW BENT COTTERS AND BOTH CAPS "
+    "HAVE INTACT TIGHTENING-DIRECTION SAFETY WIRE.",
+)
+
+CARTRIDGE_STEPS = (
+    "C2A. BEFORE BEARINGS/CARRIAGE HIDE THE UNDERSIDE, BENCH-TRIAL THE "
+    "FINAL PIN/BLOCK WITH THE ACTUAL CAP TEMPORARILY SEATED USING THE C3 "
+    "METHOD (SHEET 9), NO WIRE. Z=0 IS THE CARRIAGE-MOUNTING PLANE; +Z IS INTO THE "
+    "BLOCK. BRIDGE ITS ACTUAL MOUNTING FACES WITH A GROUND STRAIGHTEDGE. "
+    "THROUGH THE ENTIRE MECHANICALLY REACHABLE FLANGE-CAPTURE LIFT, SHIFT, "
+    f"TILT AND CLOCKING, PASS A {retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} "
+    "FEELER BETWEEN BRIDGE AND LOWEST PIN TIP: THE TIP MUST STAY ABOVE "
+    "Z=0, INTO THE BLOCK, NOT PROTRUDE TOWARD THE CARRIAGE. VERIFY NO ACTUAL "
+    "CARRIAGE FEATURE BENEATH THE PIN PROJECTS ABOVE THAT PLANE. "
+    "REJECT/REFIT AND REPEAT A FAILED TRIAL; DO NOT "
+    "ALTER JOURNAL OR BEARING-SEAT FITS TO RESCUE IT.",
+    "C1. BEFORE FINAL PRESS ASSEMBLY, USE QUALIFIED MHA-CH-06-TL-VN-52 "
+    "BEARINGS; KEEP EACH ACTUAL UPPER BEARING'S IDENTITY/QUALIFICATION "
+    "WITH ITS SUPPORT. MEASURE EACH ACTUAL BLOCK SHOULDER/"
+    "UPPER-BEARING FACE STACK AND FIT THE PIN'S LOWER BOSS HEIGHT FOR THE "
+    "C2 GAPS; DO NOT PLAN POST-PRESS MACHINING. COMPLETE C2A WITH THE FINAL "
+    "MACHINED PARTS BEFORE PRESSING ANY BEARING. FOR EACH BLOCK, PRESS THE "
+    "UPPER 6200 ON THE PIN'S LOWER JOURNAL UNTIL THE INNER RACE SEATS ON "
+    "THE NARROW BOSS, DRIVING THE INNER RACE ONLY. PRESS THIS PAIR INTO "
+    "THE UPPER BLOCK SEAT, DRIVING ITS OUTER RACE ONLY. SUPPORT THE PIN "
+    "AND PRESS THE LOWER BEARING WITH A DRIVER ON BOTH RACES UNTIL THE "
+    "OUTER RACE SEATS; DO NOT PRESS THROUGH BALLS.",
+    "C2. A-A, SHEET 4: AFTER PRESS ASSEMBLY, VERIFY THE LOWER FLANGE-RIM/FLOOR GAP "
+    f"{retention.PIN_LOWER_GAP[0]:.2f}-{retention.PIN_LOWER_GAP[1]:.2f} AND TOTAL "
+    f"CHAMBER EXCESS {retention.CAP_CHAMBER_EXCESS[0]:.2f}-"
+    f"{retention.CAP_CHAMBER_EXCESS[1]:.2f}, INCLUDING FACE VARIATION; "
+    "THE UPPER GAP MUST ALSO "
+    f"BE {retention.PIN_UPPER_GAP[0]:.2f}-{retention.PIN_UPPER_GAP[1]:.2f}. "
+    "MEASURE BOTH GAPS OVER THE FULL FLANGE FACES/RIMS, NOT "
+    "ONLY THE STOP CIRCLE, AND VERIFY A COMPLETE FREE PIN TURN. CONTACT "
+    "LANDS MUST BE CLEAR OF SEALS. THE FLANGE RIM NORMALLY FLOATS; NO CAP, "
+    "BLOCK OR RETAINER MAY DRAG THE ROTATING PIN OR CARRIER. DO NOT "
+    "PRELOAD THE BEARINGS TO OBTAIN THESE GAPS.",
+)
+
+FEED_STEPS = (
+    f"F1. AT STEP 7C, BEFORE TRANSFER-PUNCHING, CHECK THAT BOTH ACTUAL "
+    f"TL-22 SIDE-HOLE AXES ARE {nut_bracket.TRANSFER_AXIS_TOP_MIN:.1f} MIN "
+    "BELOW THE TL-29 TOP. KEEP THE NUT AND SCREW IN FREE-FEED ALIGNMENT; "
+    "DO NOT MOVE THEM TO PASS THIS MATERIAL CHECK.",
+    f"F2. AFTER STEP 8 ALIGNMENT AND FINAL TIGHTENING, BEFORE FITTING CAPS, "
+    "BRIDGE A STRAIGHTEDGE FROM THE ACTUAL TL-22 CAP MOUNTING PLANE OVER "
+    f"TL-29. GAUGE {nut_bracket.BLOCK_PLANE_TOP_GAP_MIN:.2f} MIN BELOW THAT "
+    "PLANE OVER THE WHOLE BRACKET TOP, INCLUDING ALL HIGH CORNERS, THROUGH "
+    "FULL TRAVEL. DO NOT FORCE FEED ALIGNMENT TO OBTAIN THE GAP; RE-MACHINE "
+    "OR REPLACE A FAILED BRACKET. THEN COMPLETE C3-C3C (SHEET 9).",
+)
+
+CAP_SEATING_STEPS = (
+    f"C3. AFTER F2 ACCEPTANCE, FIT FOUR {_item(PIVOT_CAP_SCREW)} "
+    f"{retention_hardware.SCREW_SKU} SCREWS PER CAP. CLEAN/DRY THREADS AND "
+    "FACES; EACH SCREW MUST FREE-RUN "
+    "BEFORE SEATING, WITHOUT FILLET INTERFERENCE OR BOTTOMING. TIGHTEN "
+    f"CROSSWISE TO {retention.CAP_SEATING_TORQUE_NM:.2f} +/- "
+    f"{retention.CAP_SEATING_TORQUE_BAND_NM:.2f} N·m.",
+    "C3A. B-B, SHEET 4: WITH CAPS SEATED, REPEAT C2. BEFORE WIRING, CHECK A SEPARATE "
+    f"{retention.CAP_BASE_SEATING_GAP_MAX:.2f} MAX CAP/BLOCK GAP AROUND "
+    "THE WHOLE MOUNTING-LAND PERIMETER AND "
+    f"{retention.CAP_HEAD_SEATING_GAP_MAX:.2f} MAX UNDER EACH HEAD OVER "
+    "ITS WHOLE ACCESSIBLE BEARING FOOTPRINT. FLAT FACES MUST SEAT; "
+    "REGISTERS MUST NOT BOTTOM. DO NOT PULL A GAP SHUT WITH THE SCREWS: "
+    "RE-MACHINE OR REPLACE A FAILED PART.",
+    "C3B. ALONG THE ACTUAL THREAD AXIS, MEASURE FULL-THREAD INTERVAL "
+    "[S0,S1] FROM THE UNDERHEAD BEARING-PLANE INTERSECTION AND [B0,B1] "
+    "DOWN FROM BLOCK TOP; H IS THE SEATED UNDERHEAD INTERSECTION HEIGHT "
+    "ABOVE BLOCK TOP ALONG THAT SAME AXIS, NOT WORLD Z. "
+    "ENGAGEMENT = MIN(B1,S1-H)-MAX(B0,S0-H), ALL IN MM; REQUIRE "
+    f"{retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f} MIN "
+    "AT EVERY SCREW. CHAMFERS, RUNOUT AND TIP THREADS DO NOT COUNT.",
+    f"C3C. LOCK EACH PAIR WITH NEW 0.032 STAINLESS WIRE {_item(PIVOT_LOCK_WIRE)} "
+    "PULLING EACH HEAD TOWARD TIGHTENING. ROUTE SINGLE STRANDS THROUGH "
+    "DRILLED HEADS; KEEP TWISTED PAIRS AND TURNED-IN TAILS IN THE CHANNELS. "
+    f"NORMAL SEATED POSE: WHOLE ACTUAL WIRE/TAIL ROUTE {cap_wire_clearance.NORMAL_WIRE_RECESS_MIN:.2f} MIN "
+    "BELOW ACTUAL CAP TOP FACE, UNFORCED. NEVER LOOSEN OR OVER-TORQUE TO ALIGN "
+    "HEAD HOLES. THE ACTUAL FORMED WIRE MUST CLEAR THE CAP CUTOUTS THROUGH "
+    "CAPTURED MOVEMENT, UNFORCED.",
+)
+
+# Complete inspection ink belongs here; the drawing only places this callout.
+PIN_TIP_MIN_RECESS_CALLOUT = (
+    f"{retention.PIN_TIP_CARRIAGE_CLEARANCE_MIN:.2f} MIN"
+)
+
+# Measured matched-set fit-up limits, not purchased-shank or bent-cotter
+# guarantees. C4/C5C accept the actual endpoints and common bearing strips.
+TOP_FULL_SECTION_SHANK_OVERLAP_MIN = 2.0
+TOP_CARRIER_BACKED_BEARING_STRIP_MIN = 2.0
+
+TOP_CAPTURE_STEPS = (
+    "C4. C4-C5 POINTS: A-A, SHEET 4. STOP/ISOLATE THE SPINDLE AND WITHDRAW THE CUTTER/TOOLHOLDER. "
+    "FOR THE MATCHED SET, MEASURE ACTUAL RELIEVED RETAINER BORE MOUTHS, "
+    "FLAT LANDS, CARRIER BACKING AND UNINTERRUPTED FULL-DIAMETER CLEVIS "
+    "SHANK; EXCLUDE FILLETS, CHAMFERS AND THE COTTER BORE. AT BOTH CLEVIS "
+    "ENDPLAY EXTREMES, MEASURE ALONG ITS AXIS: REQUIRE "
+    f"{TOP_FULL_SECTION_SHANK_OVERLAP_MIN:.1f} MIN FULL-SECTION SHANK PAST "
+    f"EACH BORE MOUTH AND {TOP_CARRIER_BACKED_BEARING_STRIP_MIN:.1f} MIN "
+    "CONTINUOUS COMMON SHANK/FLAT-RETAINER/SOLID-CARRIER BEARING STRIP "
+    "ON EACH SIDE OF THE BORE. TANGENCY OR RELIEF-ONLY SUPPORT FAILS.",
+    f"C4A. WITH THE CARRIER SEATED, FIT EACH RETAINER {_item(PIVOT_RETAINER)} "
+    f"FROM ITS SUPPLY {retention.TOP_WASHER_SUPPLY_MIN_THICKNESS:.0f} MIN BLANK. "
+    f"FACE IT TO GIVE {retention.TOP_RUNNING_GAP[0]:.2f}-"
+    f"{retention.TOP_RUNNING_GAP[1]:.2f} CARRIER/TOP RETAINER RUNNING GAP "
+    "AROUND THE WHOLE WASHER THROUGH THE FREE SWING, WITH THE ACTUAL CLEVIS "
+    "HELD AGAINST THE UPPER EDGE OF THE PIN CROSS-HOLE, NOT CENTRED OR ON "
+    "THE LOWER EDGE. KEEP ONE MATCHED SET AT EACH SUPPORT; THE SAME SET "
+    "MUST QUALIFY BOTH HOLE PAIRS.",
+    f"C5. INSERT BOTH HEADED CLEVIS PINS {_item(PIVOT_CLEVIS_PIN)} AND FIT NEW "
+    f"SPLIT COTTERS {_item(PIVOT_COTTER)}. SPREAD BOTH LEGS TO LOCK POSITIVELY; "
+    "DO NOT FORCE HEADS OR COTTERS AGAINST THE CARRIER. BOTH ENDS MUST BE "
+    "RETAINED DURING THE FOLLOWING HAND CHECKS.",
+    "C5A. USE LIGHT HAND TAKE-UP ONLY, NO HAMMER, ADDED LEVER OR PROOF LOAD. "
+    "ESTABLISH PRIMARY RETAINER/CLEVIS ENGAGEMENT, NOT SECONDARY CONTACT. "
+    "CARRIER-TO-PIN TRAVEL, READ ALONG THE PIN AXIS FROM THE EXPOSED CARRIER "
+    "FACE TO THE FLAT PIN END WITH CARRIER ROCK AVERAGED OUT, MUST BE "
+    f"{retention.TOP_PRIMARY_RELATIVE_TRAVEL_MAX:.2f} MAX; BLOCK/CARRIAGE "
+    "MOVEMENT IS NOT THIS TRAVEL.",
+    f"C5B. AT PRIMARY TAKE-UP, PASS A "
+    f"{retention.TOP_SECONDARY_CLEARANCE_MIN:.2f} FEELER BETWEEN THE CARRIER "
+    "AND EVERY CLEVIS HEAD, EXPOSED SHANK END, COTTER EYE AND BOTH PRONGS/"
+    "ENDS AT THEIR CLOSEST POINTS. IF SECONDARY HARDWARE TOUCHES "
+    "BEFORE PRIMARY ENGAGEMENT, STOP: THAT IS NOT A VALID TAKE-UP POSITION.",
+    "C5C. ON THE FITTED HOLE PAIR, CHECK BOTH SUPPORTS THROUGH ALL "
+    "REACHABLE CLEVIS/COTTER ENDPLAY AND CLOCKING WHILE TAKING UP LOCAL "
+    "CARRIER ROCK, INCLUDING COUPLED POSITIONS, ONE-END LIFT AND "
+    "TILT BOTH WAYS ABOUT THE SUPPORT LINE. SWEEP THE COMPLETE PASS BY HAND. "
+    "RECHECK BOTH SHANK BRIDGES/UNDER-SUPPORTS THROUGH THIS MOTION; STEP 13 "
+    "REPEATS THESE CHECKS ON A2/B2 THEN A1/B1.",
+    "C5D. ANY EXCESS TRAVEL, FAILED C4 OVERLAP/BACKING OR GAP LIMIT, OR "
+    "UNINSPECTED REGION FAILS. REFIT OR REPLACE THE CORRECT PARTS AND REPEAT BOTH-PAIR "
+    "QUALIFICATION. DO NOT REFORM THE COTTER EYE, ARBITRARILY RE-BEND LEGS "
+    "TO GAIN CLEARANCE, FORCE A SET TOGETHER OR ACCEPT NO GAP. REPLACE "
+    "REMOVED COTTERS. ACCEPT ONLY WITH GAUGE UNCERTAINTY INSIDE EACH LIMIT; "
+    "KEEP C2A-C5C READINGS WITH THE MATCHED SET.",
+)
+
+# The studs' measurements, fit limits and installed acceptance, migrated from
+# the stud drawing (hold_down_stud.measured_fit_bounds evaluates the same G, Q,
+# nut-span, lower-interval and insertion predicates). H is only measurable
+# with the blocks on their carriages over both passes.
+_STUD_CLEARANCE = f"{hold_down_stud.CLEARANCE_MIN:.1f}"
+_STUD_PITCH = (
+    f"{hold_down_stud.COMPLETE_PROJECTION_PITCHES:g} COMPLETE {hold_down_stud.THREAD} PITCH"
+)
+HOLD_DOWN_STEPS = (
+    "HD1. FOR UNCUT-STOCK OBSTRUCTIONS, ISOLATE THE SPINDLE, SUPPORT THE "
+    "CARRIER AND SECURE THE OTHER HOLD-DOWNS. MARK/REMOVE ONLY THE "
+    "OBSTRUCTING STUD; RESTORE ITS ORIGINAL INSERTION BEFORE REMOVING "
+    "ANOTHER. NEVER FORCE MOTION PAST UNCUT STOCK. BEFORE CUTTING THE "
+    f"{hold_down_stud.QUANTITY} STUDS {_item(HOLD_DOWN_STUD)}, MEASURE AT EACH "
+    "STUD ON THE ACTUAL PARTS, MIN "
+    "AND MAX IN mm WITH GAUGE UNCERTAINTY INCLUDED: B, BAR THICKNESS; D, "
+    "STUD LOWER END TO BAR UNDERSIDE AT THE ORIGINAL INSERTION; H, BAR TOP TO "
+    f"PIVOT BLOCK/WING UNDERSIDE {_item(PIVOT_BLOCK)}, LEAST OVER BOTH "
+    "COMPLETE PASSES: INNER AT STEP 9, OUTER AT STEP 13A; N, SEATED FLANGE "
+    f"NUT {_item(FLANGE_NUT)} BEARING FACE "
+    "TO THE FAR END OF ITS COMPLETE THREADS, NOT BODY HEIGHT; W, WASHER "
+    "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
+    "THREAD, NOT THE CHAMFER. MARK THE LOWER FACTORY END, THE ORIGINAL "
+    "INSERTION AND THE ORIGINAL LOWER LOADED COMPLETE-THREAD INTERVAL.",
+    "HD2. WITH LMIN/LMAX THE STUD'S PRINTED FINISHED-LENGTH LIMITS, NOT STOCK "
+    "LENGTH, REQUIRE GMIN = BMIN + HMIN + DMIN - LMAX >= "
+    f"{_STUD_CLEARANCE} AND QMIN = LMIN - DMAX - BMAX - WMAX - NMAX - UMAX "
+    f">= {_STUD_PITCH}. THE NUT'S WHOLE COMPLETE-THREAD SPAN MUST STAY ON "
+    "COMPLETE STUD THREAD AND THE ORIGINAL LOWER LOADED INTERVAL MUST STAY "
+    "INTACT BELOW THE BAR. AN UNKNOWN MEASUREMENT OR A FAILED LIMIT REJECTS "
+    "THE SETUP: NO DEEPER INSERTION, NO CUT THROUGH ENGAGED THREADS.",
+    "HD3. AT STEP 13B, KEEP THE CARRIER OFF AND THE OTHER HOLD-DOWNS SECURE. "
+    "REMOVE, SHORTEN AND REFIT ONE STUD AT A TIME. SHORTEN ONLY THE UNUSED "
+    "UPPER END TO THE STUD DRAWING; DEBURR, GAUGE THE COMPLETE THREADS AND "
+    "REMEASURE U. RESTORE THE ORIGINAL INSERTION AND SEAT ITS NUT FULLY "
+    "WITH NO WASHER BEFORE REMOVING ANOTHER STUD; DO NOT FORCE OR BOTTOM "
+    "DEEPER. AFTER THE LAST STUD REFIT, WITH THE CARRIER STILL OFF, REPEAT "
+    "STEP 6 ALIGNMENT, FINAL CLAMPING AND ALL READINGS. HAND-SWEEP BOTH "
+    "COMPLETE PASSES AT STEPS 13C-13D: "
+    f"EVERY STUD CLEARS EVERY MOVING BLOCK/WING BY {_STUD_CLEARANCE} MIN "
+    f"THROUGHOUT AND SHOWS {_STUD_PITCH} MIN BEYOND ITS SEATED NUT, THE NUT'S "
+    "WHOLE COMPLETE-THREAD SPAN ENGAGED. REJECT ANY INCOMPATIBLE SETUP.",
+)
+
+CAPTURE_STEPS = (
+    "C6. BEFORE EITHER PASS, CHECK BOTH CAPS/WIRES, BOTH FITTED TOP "
+    "RETAINERS AND BOTH BENT COTTERS. BEFORE LIFTING THE CARRIER, STOP/"
+    "ISOLATE THE SPINDLE, WITHDRAW THE CUTTER/TOOLHOLDER AND SUPPORT THE "
+    "CARRIER; REMOVE BOTH COTTERS, CLEVIS PINS AND RETAINERS. AFTER LOWERING "
+    "ON THE CHOSEN HOLE PAIR, REFIT BOTH RETAINERS WITH NEW COTTERS AND "
+    "REPEAT C4-C5D ON THAT PAIR BEFORE CUTTING.",
+    "C7. SERVICE: REMOVE THE CAP/WIRE AND PRESS THE PIN UPWARD FROM BELOW. "
+    "THE INTEGRAL FLANGE PREVENTS DOWNWARD EXTRACTION. DESTRUCTIVE REMOVAL "
+    "MAY LOAD THE BALLS: REPLACE THE PIN AND BOTH 6200 BEARINGS AS A SET. "
+    "USE THE EXISTING PULLER CAVITY FOR A REMAINING BEARING. RE-FIT ALL GAPS "
+    "AND APPLY NEW WIRE/COTTERS.",
+    *HOLD_DOWN_STEPS,
+)
+CAPTURE_CHECKS = (
+    "C8. TOOLING CLEARANCE: BEFORE USE, WITH THE SPINDLE ISOLATED, CHECK THE ACTUAL SPINDLE, CUTTER, "
+    "NON-CUTTING TOOL AND HOLDER AGAINST THE FIXTURE THROUGH BOTH INTENDED "
+    "PASSES AND THE ENTIRE USED Z RANGE, INCLUDING BREAKTHROUGH AND "
+    "RETRACTION. INCLUDE THE ACTUAL RETAINERS, CLEVIS HEADS, BENT COTTERS "
+    "AND PIN ENDS. VERIFY VISIBLE OR MEASURED CLEARANCE AT EACH CLOSEST "
+    "APPROACH: NO SPINDLE/TOOL/HOLDER CONTACT WITH THE FIXTURE.",
+    "KEEP THE REPEATED STEP 6 ACTUAL SPINDLE-AXIS REGISTER; REINDICATE AFTER "
+    "XY CHANGES. RECHECK CLEARANCE AFTER TOOL/DEPTH/SETUP CHANGES.",
+    f"CONSUMABLES: {INITIAL_FIT_UP_COTTER_QUANTITY} NEW COTTERS REQUIRED FOR "
+    f"INITIAL FIT-UP; {pivot_cotter.QUANTITY} REMAIN INSTALLED "
+    f"{_item(PIVOT_COTTER)}. PROVIDE {pivot_cotter.QUANTITY} NEW COTTERS FOR "
+    "EACH SUBSEQUENT PASS CHANGE.",
+    f"REFERENCE TABLE HEIGHTS: WORK {PART_TOP_Z:.1f}; PIN ENDS {PIN_TOP_Z:.1f} "
+    f"({retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL:.1f} ABOVE WORK), NOMINAL. "
+    "SET CUTTING DEPTH FROM THE ACTUAL SEATED WORK, NOT THESE REFERENCES.",
+    "ACCEPTANCE: THE CARRIAGE/RAIL AND TABLE ANCHORS PASS THE SHEET 7 CHECKS "
+    f"AFTER FINAL TIGHTENING (EVERY STEP 6 READING WITHIN ±{ALIGNMENT_BAND:.2f}; "
+    "FREE SWEEP WITH BOTH CARRIAGES ON THEIR RAILS) AND HD3 AT EVERY STUD.",
 )
 
 # --- Assembly extent at the modelled pose (sheet layout reads it) -----------------
@@ -1621,47 +2047,158 @@ CARRIER_OUTLINES: dict[str, list[tuple[float, float]]] = {
 }
 
 
+Box3 = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
+
+
+def _box_corners(box: Box3) -> list[Point3]:
+    return [(x, y, z) for x in box[0] for y in box[1] for z in box[2]]
+
+
+def _axis_y_box(radius: float, bottom: float, top: float) -> Box3:
+    return ((-radius, radius), (bottom, top), (-radius, radius))
+
+
+def _component_local_boxes() -> dict[str, Box3]:
+    """Native-source material bounds in each part's ACTUAL local frame.
+
+    Voids/chamfers are deliberately not subtracted. Purchased dimensions with
+    unknown limits remain nominal authority: the caller must include their
+    measured deviations and installation uncertainty in its supplied envelope.
+    Wire bounds use every cubic control point plus the swept wire radius, not
+    just centreline samples. The two row pieces are combined per cap downstream.
+    """
+    wire_points = [point for segment in pivot_wire.installed_wire_segments() for point in segment]
+    wire_radius = pivot_wire.WIRE_DIA / 2.0
+    wire_box = tuple(
+        (min(point[axis] for point in wire_points) - wire_radius,
+         max(point[axis] for point in wire_points) + wire_radius)
+        for axis in range(3)
+    )
+    flange_radius = pivot_pin.FLANGE_DIA / 2.0
+    clevis_radius = retention_hardware.CLEVIS_HEAD_DIA_MAX / 2.0
+    nut_radius = leadscrew_nut.FLANGE_DIA / 2.0
+    boxes = {
+        BASE_BAR: ((0.0, base_bar.BAR_LENGTH), (base_bar.LOW_SIDE_Y, base_bar.HIGH_SIDE_Y), (0.0, base_bar.BAR_THICK)),
+        RAIL: ((0.0, guide_rail.LENGTH), (-guide_rail.WIDTH / 2.0, guide_rail.WIDTH / 2.0), (0.0, guide_rail.HEIGHT)),
+        CARRIAGE: ((-carriage.LENGTH / 2.0 - carriage.NIPPLE_PROUD, carriage.LENGTH / 2.0 + carriage.PLUG_PROUD), (-carriage.WIDTH / 2.0, carriage.WIDTH / 2.0), (carriage.UNDERSIDE_Z, carriage.MOUNTING_FACE_Z)),
+        BEARING: _axis_y_box(trammel.BEARING_OD / 2.0, 0.0, trammel.BEARING_WIDTH),
+        PIVOT_BLOCK: ((pivot_block.BLOCK_X0, pivot_block.BLOCK_X1), (-retention.BLOCK_WING_HALF_WIDTH, retention.BLOCK_WING_HALF_WIDTH), (0.0, pivot_block.BLOCK_HEIGHT)),
+        PIVOT_PIN: ((-flange_radius, flange_radius), (-flange_radius, flange_radius), (0.0, pivot_pin.OVERALL_LENGTH)),
+        PIVOT_CAP: ((-pivot_cap.WIDTH / 2.0, pivot_cap.WIDTH / 2.0), (-pivot_cap.LENGTH / 2.0, pivot_cap.LENGTH / 2.0), (-pivot_cap.REGISTER_PROJECTION, pivot_cap.HEIGHT)),
+        PIVOT_RETAINER: ((-pivot_retainer.OUTER_DIA / 2.0, pivot_retainer.OUTER_DIA / 2.0), (-pivot_retainer.OUTER_DIA / 2.0, pivot_retainer.OUTER_DIA / 2.0), (0.0, pivot_retainer.THICKNESS)),
+        PIVOT_CLEVIS_PIN: ((-retention_hardware.CLEVIS_HEAD_HEIGHT_MAX, retention_hardware.CLEVIS_LENGTH_MAX), (-clevis_radius, clevis_radius), (-clevis_radius, clevis_radius)),
+        PIVOT_COTTER: ((pivot_cotter.INSTALLED_X_MIN, pivot_cotter.INSTALLED_X_MAX), (-pivot_cotter.INSTALLED_Y_HALF_WIDTH, pivot_cotter.INSTALLED_Y_HALF_WIDTH), (pivot_cotter.INSTALLED_Z_MIN, pivot_cotter.INSTALLED_Z_MAX)),
+        PIVOT_LOCK_WIRE: wire_box,
+        CARRIER: (carrier.OUTLINE_X, (-carrier.THICKNESS, 0.0), (-carrier.OUTLINE_Y[1], -carrier.OUTLINE_Y[0])),
+        RISER: ((0.0, riser.BLANK_LENGTH), (0.0, riser.BLANK_WIDTH), (0.0, riser.THICKNESS)),
+        HUB_PIN: ((-hub_pin.HEAD_DIA / 2.0, hub_pin.HEAD_DIA / 2.0), (-hub_pin.HEAD_DIA / 2.0, hub_pin.HEAD_DIA / 2.0), (0.0, hub_pin.OVERALL_LENGTH)),
+        FEED_LEVER: ((0.0, feed_lever.LEVER_LENGTH), (0.0, feed_lever.LEVER_THICK), (-feed_lever.LEVER_WIDTH, 0.0)),
+        CL_DOWEL: _axis_y_box(cl_dowel.DIA_MAX / 2.0, 0.0, cl_dowel.LENGTH),
+        END_BRACKET: ((0.0, leadscrew.BRACKET_LENGTH), (-leadscrew.BRACKET_WIDTH / 2.0, leadscrew.BRACKET_WIDTH / 2.0), (0.0, leadscrew.BRACKET_THICK)),
+        NUT_BRACKET: (leadscrew.NUT_BRACKET_X, (-leadscrew.NUT_BRACKET_DEPTH, 0.0), (0.0, leadscrew.NUT_BRACKET_HEIGHT)),
+        LEADSCREW: _axis_y_box(leadscrew_stock.MAJOR_DIA / 2.0, 0.0, leadscrew_stock.LENGTH),
+        LEADSCREW_NUT: _axis_y_box(nut_radius, -leadscrew_nut.SPIGOT_LENGTH, leadscrew_nut.FAR_END_Y),
+        PILLOW_BLOCK: ((-pillow_block.LENGTH / 2.0, pillow_block.LENGTH / 2.0), (-pillow_block.WIDTH / 2.0, pillow_block.WIDTH / 2.0), (0.0, pillow_block.HEIGHT)),
+        HANDWHEEL: _axis_y_box(handwheel.SWEEP_R, 0.0, handwheel.LENGTH),
+        HOLD_DOWN_STUD: _axis_y_box(hold_down_stud.RADIUS, 0.0, hold_down_stud.LENGTH),
+        T_NUT: ((-t_nut.LENGTH / 2.0, t_nut.LENGTH / 2.0), (0.0, t_nut.HEIGHT), (-t_nut.FOOT_WIDTH / 2.0, t_nut.FOOT_WIDTH / 2.0)),
+        FLANGE_NUT: _axis_y_box(max(flange_nut.FLANGE_DIA / 2.0, flange_nut.ACROSS_FLATS / math.sqrt(3.0)), 0.0, flange_nut.HEIGHT),
+        BLOCK_LOCK_WASHER: _axis_y_box(block_washer.OD / 2.0, block_washer.BOTTOM_Y, block_washer.TOP_Y),
+        LEVER_LOCK_WASHER: _axis_y_box(lever_washer.OD / 2.0, lever_washer.BOTTOM_Y, lever_washer.TOP_Y),
+        RISER_SCREW: _axis_y_box(riser_screw.DIMS.head_dia / 2.0, -riser_screw.DIMS.length, 0.0),
+        PIVOT_CAP_SCREW: ((-retention_hardware.SCREW_HEAD_DIA_MAX / 2.0, retention_hardware.SCREW_HEAD_DIA_MAX / 2.0), (-retention_hardware.SCREW_HEAD_DIA_MAX / 2.0, retention_hardware.SCREW_HEAD_DIA_MAX / 2.0), (-retention_hardware.SCREW_LENGTH, retention_hardware.SCREW_HEAD_HEIGHT_MAX)),
+    }
+    for stem, screw in (
+        (RAIL_SCREW, rail_screw), (BRACKET_SCREW, bracket_screw),
+        (BLOCK_SCREW, block_screw), (CARRIAGE_SCREW, carriage_screw),
+        (PILLOW_BLOCK_SCREW, kp08_screw), (NUT_SCREW, nut_screw),
+        (CLAMP_SCREW, clamp_screw), (LEVER_SCREW, lever_screw),
+    ):
+        boxes[stem] = _axis_y_box(max(screw.DIMS.head_dia, screw.DIMS.major_dia) / 2.0, -screw.DIMS.length, screw.DIMS.head_h)
+    if set(boxes) != set(BOM_ORDER):
+        raise ValueError("fixture envelope must cover every native BOM family")
+    return boxes
+
+
+def _component_label(stem: str, index: int) -> str:
+    names = {
+        BASE_BAR: "base bar", RAIL: "rail", CARRIAGE: "carriage",
+        PIVOT_BLOCK: "pivot block", PIVOT_PIN: "pivot pin",
+        PIVOT_CAP: "pivot cap", PIVOT_RETAINER: "pivot retainer",
+        PIVOT_CLEVIS_PIN: "pivot clevis", PIVOT_COTTER: "pivot cotter",
+        PIVOT_CAP_SCREW: "pivot cap screw", PIVOT_LOCK_WIRE: "pivot lock wire",
+        CARRIER: "carrier", RISER: "riser", FEED_LEVER: "feed lever",
+        HUB_PIN: "HUB pin head", CL_DOWEL: "CL dowel", BEARING: "bearing",
+        NUT_BRACKET: "nut bracket", LEADSCREW_NUT: "leadscrew nut",
+        LEADSCREW: "screw", HANDWHEEL: "handwheel",
+        END_BRACKET: "end bracket", PILLOW_BLOCK: "pillow block",
+        HOLD_DOWN_STUD: "hold-down stud", T_NUT: "T-nut", FLANGE_NUT: "flange nut",
+        RAIL_SCREW: "rail screw", BRACKET_SCREW: "bracket screw",
+        BLOCK_SCREW: "block screw", CARRIAGE_SCREW: "carriage screw",
+        PILLOW_BLOCK_SCREW: "pillow block screw", NUT_SCREW: "nut screw",
+        RISER_SCREW: "riser screw", CLAMP_SCREW: "clamp screw",
+        LEVER_SCREW: "lever screw", BLOCK_LOCK_WASHER: "block lock washer",
+        LEVER_LOCK_WASHER: "lever lock washer",
+    }
+    name = names[stem]
+    return f"{name} {index + 1}" if QUANTITIES[stem] > 1 else name
+
+
+def _motion_root(stem: str, index: int) -> tuple[str, int]:
+    while stem in LOCKED_TO:
+        stem, per = LOCKED_TO[stem]
+        index //= per
+    return stem, index
+
+
+def _swept_placement(stem: str, index: int, pass_name: str, theta: float) -> Placement:
+    """Actual authored frame: carrier branch rotates, rail branches translate."""
+    placement = PLACEMENTS[stem][index]
+    root, root_index = _motion_root(stem, index)
+    origin, rows = placement
+    if root == CARRIER:
+        c, s = math.cos(POSE.rotation), math.sin(POSE.rotation)
+        dx, dy = origin[0] - POSE.origin[0], origin[1] - POSE.origin[1]
+        local = (c * dx + s * dy, -s * dx + c * dy)
+        pose = trammel.carrier_pose(pass_name, theta)
+        return ((*pose.to_machine(local), origin[2]), _rz(pose.rotation - POSE.rotation, rows))
+    if root == CARRIAGE:
+        rail = RAILS[root_index]
+        delta = carriage_stations(pass_name, theta)[rail] - CARRIAGE_STATION
+        dx, dy = rail_direction(rail)
+        return ((origin[0] + delta * dx, origin[1] + delta * dy, origin[2]), rows)
+    return placement
+
+
+def _component_records(
+    pass_name: str | None = None, theta: float = 0.0,
+    boxes: dict[str, Box3] | None = None,
+) -> dict[str, tuple[str, int, list[Point3]]]:
+    """Complete source census; wire pieces share their cap's one hull record."""
+    boxes = _component_local_boxes() if boxes is None else boxes
+    records: dict[str, tuple[str, int, list[Point3]]] = {}
+    for stem in BOM_ORDER:
+        if pass_name is not None and stem not in MOVING:
+            continue
+        corners = _box_corners(boxes[stem])
+        for index, placement in enumerate(PLACEMENTS[stem]):
+            if pass_name is not None:
+                placement = _swept_placement(stem, index, pass_name, theta)
+            label_index = index // 2 if stem == PIVOT_LOCK_WIRE else index
+            label = _component_label(stem, label_index)
+            points = [frame_point(placement, corner) for corner in corners]
+            if label in records:
+                records[label][2].extend(points)
+            else:
+                records[label] = (stem, index, points)
+    return records
+
+
 def _model_extent() -> tuple[
     tuple[float, float], tuple[float, float], tuple[float, float]
 ]:
-    points = [p for rail in RAILS for p in _bar_corners(rail)]
-    points += [
-        POSE.to_machine(p) for outline in CARRIER_OUTLINES.values() for p in outline
-    ]
-    points += [
-        p
-        for boxes in (
-            leadscrew.BRACKET_BOXES,
-            leadscrew.KP08_BOXES,
-            {"screw": leadscrew.SCREW_BOX, "handwheel": leadscrew.HANDWHEEL_BOX},
-        )
-        for box in boxes.values()
-        for p in leadscrew.rect(*box)
-    ]
-    points += leadscrew.rect(
-        CARRIAGE_STATION + leadscrew.NUT_BRACKET_X[0],
-        CARRIAGE_STATION + leadscrew.NUT_BRACKET_X[1],
-        leadscrew.BLOCK_SIDE_LATERAL,
-        leadscrew.BLOCK_SIDE_LATERAL + leadscrew.NUT_BRACKET_DEPTH,
-    )
-    radius = flange_nut.FLANGE_DIA / 2.0
-    points += [
-        (x + dx, y + dy)
-        for x, y in STUD_XY
-        for dx in (-radius, radius)
-        for dy in (-radius, radius)
-    ]
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    top = max(
-        [HUB_PIN_TOP_Z]
-        + [
-            origin[2] + screw.DIMS.head_h
-            for screw, stem in ((clamp_screw, CLAMP_SCREW), (lever_screw, LEVER_SCREW))
-            for origin, _rows in PLACEMENTS[stem]
-        ]
-    )
-    return (min(xs), max(xs)), (min(ys), max(ys)), (STUD_BOTTOM_Z, top)
+    points = [point for _stem, _index, corners in _component_records().values() for point in corners]
+    return tuple((min(point[axis] for point in points), max(point[axis] for point in points)) for axis in range(3))
 
 
 MODEL_EXTENT = _model_extent()
@@ -1693,21 +2230,59 @@ def carriage_stations(pass_name: str, theta: float) -> dict[int, float]:
 
 
 def moving_outlines(
-    pass_name: str, theta: float
+    pass_name: str, theta: float, *, _boxes: dict[str, Box3] | None = None,
 ) -> dict[str, list[tuple[float, float]]]:
     """Machine-XY plan polygons of every moving item at one cutter angle."""
     pose = trammel.carrier_pose(pass_name, theta)
     out = {
+        name: [(point[0], point[1]) for point in points]
+        for name, (_stem, _index, points) in _component_records(pass_name, theta, _boxes).items()
+    }
+    # Keep the authored concave block wing and the familiar main-body outlines.
+    out.update({
         name: [pose.to_machine(p) for p in outline]
         for name, outline in CARRIER_OUTLINES.items()
-    }
+    })
     stations = carriage_stations(pass_name, theta)
     for rail, station in stations.items():
-        out[f"pivot block {rail}"] = _rail_rect(
+        out[f"pivot block {rail}"] = [
+            trammel.rail_point(rail, station + x, y)
+            for x, y in (
+                (pivot_block.BLOCK_X0, -retention.BLOCK_WING_HALF_WIDTH),
+                (retention.BLOCK_WING_END, -retention.BLOCK_WING_HALF_WIDTH),
+                (retention.BLOCK_WING_END, -pivot_block.BLOCK_WIDTH / 2.0),
+                (pivot_block.BLOCK_X1, -pivot_block.BLOCK_WIDTH / 2.0),
+                (pivot_block.BLOCK_X1, pivot_block.BLOCK_WIDTH / 2.0),
+                (retention.BLOCK_WING_END, pivot_block.BLOCK_WIDTH / 2.0),
+                (retention.BLOCK_WING_END, retention.BLOCK_WING_HALF_WIDTH),
+                (pivot_block.BLOCK_X0, retention.BLOCK_WING_HALF_WIDTH),
+            )
+        ]
+        pin_station = station + pivot_block.BORE_X
+        out[f"pivot cap {rail}"] = _rail_rect(
             rail,
-            station + pivot_block.BLOCK_X0,
-            station + pivot_block.BLOCK_X1,
-            pivot_block.BLOCK_WIDTH / 2.0,
+            pin_station - retention.CAP_WIDTH / 2.0,
+            pin_station + retention.CAP_WIDTH / 2.0,
+            retention.CAP_LENGTH / 2.0,
+        )
+        px, py = trammel.rail_point(rail, pin_station)
+        out[f"pivot retainer {rail}"] = _rect(
+            px - retention.TOP_WASHER_OD / 2.0,
+            px + retention.TOP_WASHER_OD / 2.0,
+            py - retention.TOP_WASHER_OD / 2.0,
+            py + retention.TOP_WASHER_OD / 2.0,
+        )
+        out[f"pivot pin {rail}"] = _rect(
+            px - pivot_pin.FLANGE_DIA / 2.0,
+            px + pivot_pin.FLANGE_DIA / 2.0,
+            py - pivot_pin.FLANGE_DIA / 2.0,
+            py + pivot_pin.FLANGE_DIA / 2.0,
+        )
+        out[f"pivot clevis {rail}"] = _rect(
+            px + PIVOT_CLEVIS_HEAD_X - retention_hardware.CLEVIS_HEAD_HEIGHT_MAX,
+            px + PIVOT_CLEVIS_HEAD_X + retention_hardware.CLEVIS_LENGTH_MAX,
+            py - retention_hardware.CLEVIS_HEAD_DIA_MAX / 2.0,
+            py + retention_hardware.CLEVIS_HEAD_DIA_MAX / 2.0,
         )
         out[f"carriage {rail}"] = _rail_rect(
             rail,
@@ -1717,6 +2292,11 @@ def moving_outlines(
         )
     out["nut bracket"] = leadscrew.rect(
         *leadscrew.nut_bracket_box(stations[leadscrew.RAIL])
+    )
+    centre, radius = hub_head(pass_name, theta)
+    out["HUB pin head"] = _rect(
+        centre[0] - radius, centre[0] + radius,
+        centre[1] - radius, centre[1] + radius,
     )
     return out
 
@@ -1759,9 +2339,9 @@ def stud_centres() -> dict[str, tuple[float, float]]:
 @dataclass(frozen=True)
 class ClearanceReport:
     """The jig's clearances to the machine's unmodelled features (mm): the
-    column cover, the table and the rails' travel. Native interference over the
-    sweep (verify.py ``pass-sweep-interference-free``) proves the modelled
-    solids clear of each other."""
+    column cover, the table and the rails' travel. This is NOT fixture
+    self-collision acceptance; retain the mandatory native whole-model
+    interference gates."""
 
     cover_clearance: dict[str, float]  # item -> min gap to the column cover
     moving_x: tuple[float, float]  # machine X reached by any moving item
@@ -1780,6 +2360,7 @@ def _update_min(store: dict, key, value: float) -> None:
 def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
     """Sweep both passes over ±SWEEP ⚙ and measure every clearance to the
     machine's unmodelled features."""
+    capture_feed_clearance_bounds()
     bars = fixed_outlines()
     feed = feed_outlines()
     cover: dict[str, float] = {}
@@ -1845,6 +2426,351 @@ def clearance_report(samples: int = SWEEP_SAMPLES) -> ClearanceReport:
         bar_overhang=overhang,
         carriage_margin=margins,
         table_edge_margins=edges,
+    )
+
+
+def _printed_fixture_allowances() -> tuple[float, dict[str, float]]:
+    """Deliberately loose L1 printed-dimension bounds, not vendor tolerances.
+
+    Summing a part's displayed linear bands overbounds its source dimension
+    chains (even reference/internal dimensions are retained). The separate
+    placement stack covers the machined height/station chain to the moving
+    carrier and its highest screw/washer seats. Unknown catalogue limits,
+    rail alignment, installation and hand-form deviations are NOT invented:
+    actual fit and formed-wire checks remain necessary.
+    """
+    specs = {
+        BASE_BAR: base_bar, PIVOT_BLOCK: pivot_block, PIVOT_PIN: pivot_pin,
+        PIVOT_CAP: pivot_cap, PIVOT_RETAINER: pivot_retainer, CARRIER: carrier,
+        RISER: riser, HUB_PIN: hub_pin, FEED_LEVER: feed_lever,
+        END_BRACKET: end_bracket, NUT_BRACKET: nut_bracket,
+        LEADSCREW: leadscrew_stock,
+    }
+    local = {
+        stem: sum(
+            printed_band_mm(places)
+            for row in spec.DRAWING_PRECISION.values()
+            for places in row.values() if places >= 1
+        )
+        for stem, spec in specs.items()
+    }
+    placement = (
+        printed_band_mm(base_bar.THICK_PLACES)
+        + printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["BlockHeight"])
+        + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+        + printed_band_mm(retention.PIN_UPPER_BOSS_PLACES)
+        + printed_band_mm(carrier.THICKNESS_PLACES)
+        + printed_band_mm(riser.THICKNESS_PLACES)
+        + printed_band_mm(feed_lever.THICK_PLACES)
+        + printed_band_mm(carrier.DRAWING_PRECISION_BY_NAME["A1X"])
+        + 3.0 * carrier.POSITION_BAND
+        + retention.PIN_LOWER_GAP[1] + retention.TOP_RUNNING_GAP[1]
+        + max(block_washer.THICKNESS_MAX - block_washer.THICKNESS,
+              lever_washer.THICKNESS_MAX - lever_washer.THICKNESS)
+    )
+    return placement, local
+
+
+def _upset_fixture_padding(
+    stem: str, index: int, points: list[Point3],
+    bounds: retention.CaptureBounds,
+) -> tuple[float, float, float]:
+    """Additional (XY, down, up) for the intact rigid captured mechanism."""
+    if stem in (PIVOT_CAP_SCREW, PIVOT_LOCK_WIRE):
+        # C3 seats these screws in the BLOCK's receiver threads. The cap can
+        # move around their fixed shanks/heads, not carry them with its register
+        # float, yaw or rock. Source wire stays at those fixed heads; arbitrary
+        # permitted flex needs separate contour/envelope authority. Direct
+        # head errors remain in source prisms, without connection-strength credit.
+        return 0.0, 0.0, 0.0
+    pin_face_angle = bounds.pin_tilt
+    seat_height = (
+        retention.PIN_LOWER_GAP[1] + retention.PIN_FLANGE_THICK
+        + printed_band_mm(retention.PIN_FLANGE_THICK_PLACES)
+        + retention.PIN_UPPER_BOSS_HEIGHT + printed_band_mm(retention.PIN_UPPER_BOSS_PLACES)
+    )
+    pin_lateral = (
+        bounds.cap_lateral_shift + bounds.flange_lateral_shift
+        + seat_height * math.tan(pin_face_angle)
+        + retention.CARRIER_DIAMETRAL_CLEARANCE_MAX / 2.0
+    )
+    _root, root_index = _motion_root(stem, index)
+    ancestor = stem
+    while ancestor in LOCKED_TO and ancestor != PIVOT_PIN:
+        ancestor = LOCKED_TO[ancestor][0]
+    if ancestor == PIVOT_PIN:
+        pin_origin = PIVOT_PIN_ORIGINS[root_index]
+        radius = max(math.hypot(point[0] - pin_origin[0], point[1] - pin_origin[1]) for point in points)
+        height = max(abs(point[2] - trammel.PIVOT_BLOCK_TOP_Z) for point in points)
+        xy = pin_lateral + height * math.sin(pin_face_angle) + radius * (1.0 - math.cos(pin_face_angle))
+        # A freely turning pin can clock its headed clevis/cotter independently
+        # of the carrier. A full radial overbound avoids relying on that yaw.
+        if stem in (PIVOT_CLEVIS_PIN, PIVOT_COTTER):
+            xy += 2.0 * radius
+        vertical = (
+            retention.CAP_CHAMBER_EXCESS[1] + bounds.cap_roof_rise
+            + radius * math.sin(pin_face_angle) + height * (1.0 - math.cos(pin_face_angle))
+        )
+        return xy, vertical, vertical
+    if stem == PIVOT_CAP:
+        cap_origin = PLACEMENTS[PIVOT_CAP][root_index][0]
+        radius = max(math.hypot(p[0] - cap_origin[0], p[1] - cap_origin[1]) for p in points)
+        height = max(abs(p[2] - cap_origin[2]) for p in points)
+        xy = (
+            bounds.cap_lateral_shift + 2.0 * radius * math.sin(bounds.cap_yaw / 2.0)
+            + height * math.sin(bounds.cap_tilt) + radius * (1.0 - math.cos(bounds.cap_tilt))
+        )
+        return xy, retention.CAP_VERTICAL_MOTION_ENCLOSURE, bounds.cap_top_rise
+    return 0.0, 0.0, 0.0
+
+
+def require_wing_bracket_clearance(*, wing_axis_reach: float | None = None) -> float:
+    """Worst X gap between the solid wing and TL-29, in their common rail frame.
+
+    Both the bracket centre set and bearing station start at TL-22's -X
+    datum, so its absolute position cancels. The bracket's near face takes
+    half its finished-length band; the wing end takes ONLY its direct
+    bearing-axis reach band, not a second overall-length/end-location chain.
+    The core's -Y face is the intended bracket mounting contact. Outside
+    that face the positive X gap separates the entire wing, at every slide
+    position, without subtracting holes or claiming an interference waiver.
+    """
+    reach = pivot_block.WING_AXIS_REACH if wing_axis_reach is None else wing_axis_reach
+    nominal = (
+        nut_bracket.X_SET_MID - nut_bracket.BRACKET_LENGTH / 2.0
+        - pivot_block.BORE_STATION_X - reach
+    )
+    gap = nominal - (
+        nut_bracket.X_SET_BAND
+        + printed_band_mm(nut_bracket.LENGTH_PLACES) / 2.0
+        + printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["BoreStationX"])
+        + printed_band_mm(pivot_block.WING_AXIS_REACH_PLACES)
+    )
+    if gap < retention.WING_BRACKET_CLEARANCE_MIN:
+        raise ValueError("pivot wing/nut bracket worst-case clearance is below the required gap")
+    return gap
+
+
+CAPTURE_FIXTURE_FAMILIES = (
+    PIVOT_BLOCK, PIVOT_CAP, PIVOT_PIN, PIVOT_RETAINER,
+    PIVOT_CAP_SCREW, PIVOT_CLEVIS_PIN, PIVOT_COTTER, PIVOT_LOCK_WIRE,
+)
+
+
+def capture_feed_clearance_bounds(
+    *, actual_top_gap: float | None = None, transfer_axis_to_top: float | None = None,
+) -> dict[tuple[str, str, str], float]:
+    """Conditional source-solid bounds for accepted TL-29 fit-up, both passes.
+
+    The actual whole-top and transfer-axis inspections are prerequisites,
+    not inferred from unknown HGH/KP08 or stock-height bands. Purchased nut/
+    screw limits and hand-formed wire/cotter deviations remain installed
+    authority, not zero-error manufacturing certificates. This fixture-only
+    census uses its existing native boxes, motion roots and analytic station
+    ranges; no sampled pose or interference allowance substitutes for a gap.
+    """
+    top_gap = nut_bracket.BLOCK_PLANE_TOP_GAP_MIN if actual_top_gap is None else actual_top_gap
+    transfer_gap = nut_bracket.TRANSFER_AXIS_TOP_MIN if transfer_axis_to_top is None else transfer_axis_to_top
+    if not math.isfinite(top_gap) or top_gap < nut_bracket.BLOCK_PLANE_TOP_GAP_MIN:
+        raise ValueError("TL-29 actual whole-top gap fails the aligned fit-up minimum")
+    if not math.isfinite(transfer_gap) or transfer_gap < nut_bracket.TRANSFER_AXIS_TOP_MIN:
+        raise ValueError("TL-29 actual transfer-axis/top distance fails its material minimum")
+    bounds = retention.capture_bounds()
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    boxes = _component_local_boxes()
+    placement_band, part_bands = _printed_fixture_allowances()
+    origin, rows = PIVOT_BLOCK_PLACEMENTS[0]
+
+    def in_block_frame(point: Point3) -> Point3:
+        return tuple(
+            sum((point[a] - origin[a]) * rows[k][a] for a in range(3))
+            - (pivot_block.BLOCK_HEIGHT if k == 2 else 0.0)
+            for k in range(3)
+        )
+
+    def source_box(stem: str, index: int) -> tuple[Box3, list[Point3]]:
+        points = [frame_point(PLACEMENTS[stem][index], p) for p in _box_corners(boxes[stem])]
+        local = [in_block_frame(point) for point in points]
+        return tuple((min(p[a] for p in local), max(p[a] for p in local)) for a in range(3)), points
+
+    x_set_band = nut_bracket.X_SET_BAND + printed_band_mm(nut_bracket.LENGTH_PLACES) / 2.0
+    bore_band = printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["BoreStationX"])
+    side_band = printed_band_mm(pivot_block.DRAWING_PRECISION_BY_NAME["BoreStationY"])
+    seat_band = printed_band_mm(nut_bracket.SEAT_PLACES) + nut_bracket.SPIGOT_FLOAT
+    nut_below_top = (
+        nut_bracket.BRACKET_HEIGHT - printed_band_mm(nut_bracket.SIZE_PLACES)
+        - nut_bracket.BORE_Z - seat_band - leadscrew_nut.FLANGE_DIA / 2.0
+    )
+    # -infinity deliberately refuses to credit an unmeasured lower datum.
+    bracket = (
+        (nut_bracket.FACE_X - x_set_band, nut_bracket.FACE_X + nut_bracket.BRACKET_LENGTH + x_set_band),
+        (-pivot_block.BLOCK_WIDTH / 2.0 - side_band - nut_bracket.BRACKET_DEPTH
+         - printed_band_mm(nut_bracket.SIZE_PLACES), -pivot_block.BLOCK_WIDTH / 2.0 + side_band),
+        (-math.inf, -top_gap),
+    )
+    nut_source, _ = source_box(LEADSCREW_NUT, 0)
+    screw_source, _ = source_box(LEADSCREW, 0)
+    targets = {
+        "nut bracket": bracket,
+        "leadscrew nut": (
+            (nut_source[0][0] - x_set_band, nut_source[0][1] + x_set_band),
+            (nut_source[1][0] - side_band - seat_band, nut_source[1][1] + side_band + seat_band),
+            (-math.inf, -top_gap - nut_below_top),
+        ),
+        "leadscrew": (
+            screw_source[0],
+            (screw_source[1][0] - side_band - seat_band, screw_source[1][1] + side_band + seat_band),
+            (-math.inf, -top_gap - nut_below_top - leadscrew_nut.FLANGE_DIA / 2.0
+             + leadscrew_stock.MAJOR_DIA / 2.0),
+        ),
+    }
+    families = CAPTURE_FIXTURE_FAMILIES
+    cap_radius = math.hypot(pivot_cap.WIDTH / 2.0, pivot_cap.LENGTH / 2.0)
+    cap_xy = (
+        bounds.cap_lateral_shift + 2.0 * cap_radius * math.sin(bounds.cap_yaw / 2.0)
+        + pivot_cap.HEIGHT * math.sin(bounds.cap_tilt)
+    )
+    outline_band = printed_band_mm(pivot_cap.OUTLINE_PLACES) + printed_band_mm(pivot_cap.CENTER_LOCATION_PLACES)
+    pin_height = (
+        retention.PIN_LOWER_GAP[1] + pivot_pin.FLANGE_THICK + printed_band_mm(pivot_pin.FLANGE_THICK_PLACES)
+        + pivot_pin.UPPER_BOSS_HEIGHT + printed_band_mm(pivot_pin.UPPER_BOSS_PLACES)
+        + pivot_pin.CARRIER_LENGTH + printed_band_mm(pivot_pin.LENGTH_PLACES)
+    )
+    pin_radius = (
+        (pivot_pin.FLANGE_DIA + pivot_pin.FLANGE_DIA_BAND[0]) / 2.0
+        + bounds.cap_lateral_shift + bounds.flange_lateral_shift + pin_height * math.sin(bounds.pin_tilt)
+    )
+    direction_dot = sum(a * b for a, b in zip(rail_direction(1), rail_direction(2), strict=True))
+    if direction_dot >= 0.0:
+        raise ValueError("capture/feed continuous separator requires the authored opposing rails")
+    margins: dict[tuple[str, str, str], float] = {}
+    for pass_name, (pin_min, _pin_max) in trammel.PIN_TRAVEL.items():
+        for stem in families:
+            per_rail = QUANTITIES[stem] // len(RAILS)
+            for index in range(QUANTITIES[stem]):
+                rail_index = index // per_rail
+                box, points = source_box(stem, index)
+                xy, drop, rise = _upset_fixture_padding(stem, index, points, bounds)
+                source = placement_band + part_bands.get(stem, 0.0)
+                if rail_index:
+                    # For every theta, p1,p2 >= pin_min. Projection onto e1:
+                    # e1.(e2*p2-e1*(p1-PIN_OFFSET)) <= c*pin_min-pin_min+PIN_OFFSET.
+                    pin_origin = PIVOT_PIN_ORIGINS[rail_index]
+                    radius = max(math.hypot(p[0] - pin_origin[0], p[1] - pin_origin[1]) for p in points)
+                    radius += source + xy
+                    moving_right = direction_dot * pin_min - pin_min + trammel.PIN_OFFSET + radius
+                    for target, target_box in targets.items():
+                        if target == "leadscrew":
+                            # The screw is fixed, so do not cancel carriage-1
+                            # motion against this target's near-end station.
+                            gap = (
+                                leadscrew.SCREW_NEAR_END_S - direction_dot * pin_min - radius
+                                - placement_band - part_bands.get(LEADSCREW, 0.0)
+                            )
+                        else:
+                            gap = target_box[0][0] - moving_right
+                        margins[pass_name, instance_name(stem, index), target] = gap
+                    continue
+                if stem == PIVOT_BLOCK:
+                    box = (
+                        (pivot_block.BLOCK_X0 - printed_band_mm(2), pivot_block.BLOCK_X1 + printed_band_mm(2)),
+                        (-pivot_block.WING_WIDTH / 2.0 - printed_band_mm(pivot_block.WING_HALF_WIDTH_PLACES),
+                         pivot_block.WING_WIDTH / 2.0 + printed_band_mm(pivot_block.WING_HALF_WIDTH_PLACES)),
+                        (-pivot_block.BLOCK_HEIGHT - printed_band_mm(2), 0.0),
+                    )
+                elif stem == PIVOT_CAP:
+                    pad = outline_band + cap_xy
+                    box = (
+                        (pivot_block.BORE_X - pivot_cap.WIDTH / 2.0 - pad - bore_band,
+                         pivot_block.BORE_X + pivot_cap.WIDTH / 2.0 + pad + bore_band),
+                        (-pivot_cap.LENGTH / 2.0 - pad - side_band, pivot_cap.LENGTH / 2.0 + pad + side_band),
+                        (-pivot_cap.REGISTER_PROJECTION - printed_band_mm(pivot_cap.REGISTER_PROJECTION_PLACES)
+                         - retention.CAP_VERTICAL_MOTION_ENCLOSURE,
+                         pivot_cap.HEIGHT + printed_band_mm(pivot_cap.HEIGHT_PLACES) + bounds.cap_top_rise),
+                    )
+                elif stem == PIVOT_PIN:
+                    box = (
+                        (pivot_block.BORE_X - pin_radius - bore_band, pivot_block.BORE_X + pin_radius + bore_band),
+                        (-pin_radius - side_band, pin_radius + side_band),
+                        (box[2][0] - source - drop, box[2][1] + source + rise),
+                    )
+                elif stem == PIVOT_CAP_SCREW:
+                    # Reuse complete fitted-C/3D head and low-shank extents;
+                    # the screw tap starts at block TOP. Its bore-axis datum
+                    # errors relative to this block frame remain independent.
+                    direct = [in_block_frame(frame_point(PLACEMENTS[stem][index], p))
+                              for piece in _cap_screw_source_prisms()
+                              for p in _box_corners(piece)]
+                    box = tuple((min(p[a] for p in direct) - error,
+                                 max(p[a] for p in direct) + error)
+                                for a, error in enumerate((bore_band, side_band, 0.0)))
+                elif stem == PIVOT_LOCK_WIRE:
+                    box = (
+                        (box[0][0] - xy - outline_band - bore_band,
+                         box[0][1] + xy + outline_band + bore_band),
+                        (box[1][0] - xy - outline_band - side_band,
+                         box[1][1] + xy + outline_band + side_band),
+                        # Representative source route only; actual formed wire
+                        # must clear the cap cutouts through captured movement.
+                        (retention.fitted_counterbore_bounds().head_seat_min + boxes[stem][2][0]
+                         - (pivot_wire.WIRE_AXIS_Z - retention_hardware.SCREW_WIRE_HEIGHT_MIN)
+                         - retention_hardware.SCREW_HEAD_DIA_MAX / 2.0 * math.sin(gamma),
+                         retention.fitted_counterbore_bounds().head_seat_max + boxes[stem][2][1]
+                         + (retention_hardware.SCREW_WIRE_HEIGHT_MAX - pivot_wire.WIRE_AXIS_Z)
+                         + retention_hardware.SCREW_HEAD_DIA_MAX / 2.0 * math.sin(gamma)),
+                    )
+                else:
+                    box = (
+                        (box[0][0] - source - xy, box[0][1] + source + xy),
+                        (box[1][0] - source - xy, box[1][1] + source + xy),
+                        (box[2][0] - source - drop, box[2][1] + source + rise),
+                    )
+                for target, target_box in targets.items():
+                    gap = max(
+                        max(a[0] - b[1], b[0] - a[1]) for a, b in zip(box, target_box, strict=True)
+                    )
+                    if stem == PIVOT_BLOCK and target == "nut bracket":
+                        # Its core intentionally mounts on the bracket face;
+                        # use the separately proved solid wing, not a full-box
+                        # collision or a blanket overlapping-pair allowance.
+                        gap = require_wing_bracket_clearance()
+                    margins[pass_name, instance_name(stem, index), target] = gap
+    for pair, gap in margins.items():
+        if gap <= 0.0:
+            raise ValueError(f"capture/feed source separator is lost for {pair}: {gap:.4f} mm")
+    return margins
+
+
+def _cap_screw_source_prisms() -> tuple[Box3, ...]:
+    """Fitted head and low-shank extents, including direct manufacturing bands."""
+    # The large head/under-head fillet is not present at the low thread tip
+    # beside the original block-mounting hardware.
+    head_r = retention_hardware.SCREW_HEAD_DIA_MAX / 2.0
+    body_r = retention_hardware.SCREW_MAJOR_DIA_MAX / 2.0
+    # The tap-entry XY is dimensioned on the block top, not its bottom.
+    # C is the actual screw-axis/bearing-plane intersection above that top.
+    # Functional fitted recess/floor authority replaces reference depth;
+    # all C variation is in these pieces, not another Z-chain allowance.
+    fitted = retention.fitted_counterbore_bounds()
+    model_c = retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    beta = math.radians(retention_hardware.SCREW_BEARING_ANGLE_MAX_DEGREES)
+    head_r += retention_hardware.SCREW_HEAD_ECCENTRICITY_MAX
+    face = head_r * math.tan(beta)
+    head_lo = -retention_hardware.SCREW_FILLET_LENGTH_MAX - face
+    head_hi = retention_hardware.SCREW_HEAD_HEIGHT_MAX + face
+    location = (printed_band_mm(retention.CAP_BOLT_LOCATION_PLACES)
+                + fitted.head_seat_max * math.tan(gamma))
+    head_xy = head_r + location + max(abs(head_lo), abs(head_hi)) * math.sin(gamma)
+    body_xy = body_r + location + retention_hardware.SCREW_LENGTH * math.sin(gamma)
+    return (
+        ((-head_xy, head_xy), (-head_xy, head_xy),
+         (fitted.head_seat_min + head_lo - head_r * math.sin(gamma) - model_c,
+          fitted.head_top_height_max - model_c)),
+        ((-body_xy, body_xy), (-body_xy, body_xy),
+         (fitted.head_seat_min - retention_hardware.SCREW_LENGTH
+          - body_r * math.sin(gamma) - model_c,
+          fitted.head_seat_max + body_r * math.sin(gamma) - model_c)),
     )
 
 
@@ -1932,10 +2858,10 @@ for (_origin, _rows), _pin in zip(PIVOT_BLOCK_PLACEMENTS, PIVOT_PIN_ORIGINS):
     _bore = tuple(_origin[i] + pivot_block.BORE_X * _rows[0][i] for i in range(2))
     if math.dist(_bore, _pin[:2]) > 1e-9:
         raise AssertionError("pivot block bore is not on its pin")
-if abs(PIN_TOP_Z - (trammel.CARRIER_TOP_Z - pivot_pin.CARRIER_TOP_SHORTFALL)) > 1e-9:
-    raise AssertionError(
-        "the pivot pin top does not sit its shortfall under the carrier top"
-    )
+if abs(PIN_TOP_Z - (trammel.CARRIER_UNDERSIDE_Z + retention.PIN_CARRIER_JOURNAL_LENGTH)) > 1e-9:
+    raise AssertionError("the retained pivot pin journal does not reach its declared end")
+if abs(PIN_TOP_Z - PART_TOP_Z - retention.PIN_PROJECTION_ABOVE_WORK_NOMINAL) > 1e-9:
+    raise AssertionError("the pin's above-work projection is not represented")
 if abs(PIN_BOTTOM_Z + pivot_pin.CARRIER_STATION - trammel.CARRIER_UNDERSIDE_Z) > 1e-9:
     raise AssertionError("the pin collar top is not the carrier's seat")
 if not HUB_PIN_TOP_Z < PART_TOP_Z:

@@ -1,16 +1,27 @@
-r"""Pure 5972K41 (6200-2RS) ball-bearing dimensions; isolate this SKU's cache inputs.
+r"""Pure 5972K41 (6200-2RS) catalogue bands and vendor-model dimensions.
 
 The envelope is the calculator's: bore, OD and width are
 ``ch_rocker_arm_tl_oblique_trammel_spec.BEARING_BORE`` / ``BEARING_OD`` /
 ``BEARING_WIDTH`` (10 / 30 / 9), imported, so the faces the jig mates on are
-exactly those nominals.  Everything else is read off McMaster's vendor model,
-downloaded 2026-10-17 from the https://www.mcmaster.com/5972K41/ CAD links
+exactly those nominals. Internal ring, seal and ball geometry is read off
+McMaster's vendor model, downloaded 2026-10-17 from the
+https://www.mcmaster.com/5972K41/ CAD links
 (``5972K41_Steel Ball Bearing.STEP``, SHA-256
 ``617c061f9ee7b93425cf85cd29eb80eae1382ae82e6c66bfbf61f80f08754090``) and
 measured with headless FreeCAD 1.1 on 2026-10-17
 (dt-logs ``trammel-bought/vendor-cad/bd-freecad-harvest.json``): 11 solids,
 3824.014343 mm^3, 5563.163779 mm^2.  The vendor model is read for dimensions
 only; the part is not replica-gated against it (user ruling 2026-10-17).
+
+Purchased size authority is the SKU-specific McMaster catalogue transcription
+read live 2026-10-17 and rechecked live 2026-10-21
+(cad/references/mcmaster/README.md): bore 10 -0.008/0,
+OD 30 -0.009/0, width 9 -0.12/0, ABEC 1, C3, DIN 625-1. The bands below
+are catalogue deviations, not a claim that an actual bearing has been received
+or qualified. Trace the actual purchase to that dimensional authority and
+inspect its intact full-circumference cylindrical OD land, including the axial
+mid-plane, before pressing. Vendor CAD does not qualify that physical profile
+or establish a maximum supplied chamfer.
 
 * Outer ring (1427.660359 mm^3): Ø30 OD, 0.45 x 45 deg chamfers on both OD
   corners, Ø26 lands, a raceway groove of radius sqrt(13) centred on the
@@ -48,10 +59,12 @@ __all__ = [
     "BALL_COUNT",
     "BALL_DIA",
     "BORE",
+    "BORE_BAND",
     "CHAMFER_RS_MIN",
     "GROOVE_HALF_WIDTH",
     "INNER_LAND_DIA",
     "OD",
+    "OD_BAND",
     "OUTER_LAND_DIA",
     "PITCH_DIA",
     "RING_CHAMFER",
@@ -60,6 +73,7 @@ __all__ = [
     "SEAL_LIP_RECESS",
     "SEAL_WEB_RECESS",
     "WIDTH",
+    "WIDTH_BAND",
     "ball_volume",
     "inner_ring_volume",
     "outer_ring_volume",
@@ -68,6 +82,12 @@ __all__ = [
     "seal_volume",
     "total_volume",
 ]
+
+# --- Purchased catalogue deviations, (upper, lower), millimetres ------------
+# SKU-specific supplier dimensions, not inferred from the CAD or ABEC label.
+BORE_BAND = (0.0, -0.008)
+OD_BAND = (0.0, -0.009)
+WIDTH_BAND = (0.0, -0.12)
 
 # --- Vendor model (FreeCAD read of the STEP, 2026-10-17) --------------------
 RING_CHAMFER = 0.45  # 45 deg legs: OD corners (cone Ø29.1-Ø30) and bore corners
