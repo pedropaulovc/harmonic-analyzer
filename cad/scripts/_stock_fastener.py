@@ -351,6 +351,7 @@ async def build_stock_fastener(
     screw_axis_planes: tuple[str, str] | None = None,
     save_threaded_part: ThreadedPartSaver | None = None,
     save_unthreaded_part: UnthreadedPartSaver | None = None,
+    properties: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     """Create, normalize, finish, and save one production stock part.
 
@@ -359,8 +360,12 @@ async def build_stock_fastener(
     transformed recipe reference.
 
     Callers may supply a statically imported saver to add model-owned supplier
-    references after normalization. Unthreaded leaves need no simplified-part
-    machinery; either path still performs exactly one save.
+    references after normalization. Threaded callers use ``save_threaded_part``
+    for their simplified views; ``save_unthreaded_part`` needs no simplified-part
+    machinery. Either path still performs exactly one final save.
+
+    ``properties`` adds part-owned drawing metadata before the single save.
+    Catalog stock name, supplier and SKUs always retain their catalog values.
     """
 
     check("create_part", await adapter.create_part())
@@ -449,12 +454,13 @@ async def build_stock_fastener(
     if color is not None:
         await apply_color(adapter, color)
     stock = fastener(part_name)
-    properties = {
+    stock_properties = {
+        **(properties or {}),
         "Stock Name": stock.stock_name,
         "Supplier": stock.supplier,
         "Supplier SKUs": ", ".join(stock.skus),
     }
-    apply_custom_properties(adapter, properties)
+    apply_custom_properties(adapter, stock_properties)
     await report_mass_properties(adapter)
     return await _save_stock_part(
         adapter,

@@ -96,7 +96,18 @@ async def _linear(
         adapter, f"{line}.start", f"{line}.end", f"{orientation}_distance", abs(value), name
     )
     dimensions.record(name)
-    await _anchor(adapter, dimensions, line, start, name)
+    # CreateLine can weld either end to an earlier, anchored witness. After
+    # orientation and size, both points then have no remaining freedom; a new
+    # origin anchor would redundantly constrain that connected construction.
+    native = _early_bound(adapter._sketch_entities[line], "ISketchLine")
+    endpoints = (native.GetStartPoint2(), native.GetEndPoint2())
+    if any(point is None for point in endpoints):
+        raise RuntimeError(f"{name}: supplier reference endpoint is missing")
+    states = tuple(_early_bound(point, "ISketchPoint").Status for point in endpoints)
+    if any(not isinstance(state, int) for state in states):
+        raise RuntimeError(f"{name}: supplier reference endpoint status is unreadable")
+    if states != (3, 3):  # swConstrainedStatus_e.swFullyConstrained
+        await _anchor(adapter, dimensions, line, start, name)
     _assert_line_frame(adapter, line, start, end)
 
 
@@ -139,10 +150,63 @@ async def _angle(
     )
     await dimension_between(adapter, f"{ray}.start", f"{ray}.end", "distance", 1.0, name)
     dimensions.record(f"{name}RayLength")
-    check(
-        f"dimension {name} supplier angle",
-        await adapter.add_sketch_dimension(baseline, ray, "angular", degrees),
+    # The generic SDK angle path selects one segment and a vertex. Here the
+    # supplier control must drive the angle BETWEEN these two existing rays.
+    from solidworks_mcp.adapters.com_variant import double_array
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    segment = _early_bound(adapter._sketch_entities[baseline], "ISketchSegment")
+    sketch = _early_bound(segment.GetSketch(), "ISketch")
+    if sketch is None:
+        raise RuntimeError(f"{name}: angle baseline has no native sketch owner")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    if transform is None:
+        raise RuntimeError(f"{name}: angle sketch has no model-to-sketch transform")
+    inverse = _early_bound(transform.Inverse(), "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    if inverse is None or utility is None:
+        raise RuntimeError(f"{name}: cannot transform the angular text point")
+    # Halfway along the unit rays' bisector, in their actual owning plane.
+    wedge = (
+        (start[0] + 0.5 * math.cos(radians / 2.0)) / 1000.0,
+        (start[1] + 0.5 * math.sin(radians / 2.0)) / 1000.0,
+        0.0,
     )
+    point = _early_bound(utility.CreatePoint(double_array(list(wedge))), "IMathPoint")
+    if point is None:
+        raise RuntimeError(f"{name}: cannot create the angular text point")
+    projected = _early_bound(point.MultiplyTransform(inverse), "IMathPoint")
+    if projected is None:
+        raise RuntimeError(f"{name}: cannot project the angular text point")
+    text_xyz = tuple(float(value) for value in (projected.ArrayData or ()))
+    if len(text_xyz) != 3 or not all(math.isfinite(value) for value in text_xyz):
+        raise RuntimeError(f"{name}: angular text point is invalid: {text_xyz!r}")
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    try:
+        _select_sketch_entities(adapter, [baseline, ray], 0)
+        display, status = _early_bound(model.Extension, "IModelDocExtension").AddSpecificDimension(
+            *text_xyz, 3, 0  # swDimensionType_e.swAngularDimension
+        )
+    finally:
+        model.ClearSelection2(True)
+    if display is None or status != 0:  # swAddSpecificDimension_Success
+        raise RuntimeError(f"{name}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) != 3:
+        raise RuntimeError(f"{name}: supplier angle is not a native angular dimension")
+    angle = _early_bound(display.GetDimension2(0), "IDimension")
+    if angle is None:
+        raise RuntimeError(f"{name}: supplier angle has no native dimension")
+    tolerance = math.radians(1e-5)  # Same exact-angle guard as the saved feature.
+    actual = float(angle.SystemValue)
+    if not math.isclose(actual, radians, rel_tol=0.0, abs_tol=tolerance):
+        raise RuntimeError(f"{name}: supplier angle is not the specified {degrees:g} degrees")
+    angle.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(angle.DrivenState) != 2 or not math.isclose(
+        float(angle.SystemValue), radians, rel_tol=0.0, abs_tol=tolerance
+    ):
+        raise RuntimeError(f"{name}: supplier angle is not an exact driving control")
     _assert_line_frame(adapter, baseline, start, (start[0] + 1.0, start[1]))
     _assert_line_frame(
         adapter, ray, start,
