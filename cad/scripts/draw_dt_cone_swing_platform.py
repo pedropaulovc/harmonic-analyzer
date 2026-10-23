@@ -159,10 +159,20 @@ def _shifted(x: float, y: float) -> tuple[float, float]:
 
 
 SECTION_CENTER = _shifted(0.335, 0.105)
-# The layout audit boxes an Ra symbol 39 mm right of its anchor, so the
-# base-slide finish keeps its aa9766da sheet x (box to 0.414) rather than
-# taking SECTION_SHIFT's extra 10 mm past the border (0.4189).
-BASE_SLIDE_FINISH_XY = (0.375, _shifted(0.355, 0.120)[1])
+# A-A looks south like C-C (machinist review of e04fd60: looking north it
+# drew the top face at its foot, opposite to C-C), so the top seat stands up
+# and the base slide down.  The layout audit boxes an Ra symbol 39 mm right
+# of its anchor, so neither anchor takes SECTION_SHIFT's extra 10 mm past the
+# border (0.4189).  The seat's symbol stands over the right-hand piece, over
+# the (0.25) text (~0.133..0.136) and clear of the relief note's leader; its
+# leader drops right to that piece's top face.  The base slide's stands
+# under the bore's gap and the right-hand piece, its leader rising left
+# (smart side) to the left-hand piece's underside, clear of its text.
+SEAT_FINISH_XY = (0.375, 0.139)
+BASE_SLIDE_FINISH_XY = (0.370, 0.099)
+# A-A's native caption, top centre, lowered 8 mm under the base-slide symbol
+# into the open band above the title block (top 0.066).
+SECTION_LABEL_XY = _shifted(0.335, 0.077)
 
 # The pivot on the profile plan, where the farm run at 039e557da landed it
 # (the plate's current outline re-centres the 1:2 view), less PLAN_DROP.
@@ -277,7 +287,10 @@ SECTION_KEEP = {
     # the top witness, the set-back last line beside the arrowhead (aa9766da:
     # "AS SUPPLIED" there ran its D into it).
     "PlateThk": _shifted(0.300, 0.114),
-    "PivotBearingReliefDepth": _shifted(0.365, 0.115),
+    # Text right of the dimension line on its shelf, over the strip's head:
+    # with the relief now at the head, the shelf (~0.132) stands over the
+    # upper arrowhead (top ~0.1302) and the text 2 mm clear of it.
+    "PivotBearingReliefDepth": _shifted(0.365, 0.1195),
 }
 
 # Tip-block hold-down hole (user ruling 2026-09-29): its 10.45 station from
@@ -359,28 +372,29 @@ DETAIL_LABEL_LOWER_LEFT = (0.016, 0.0145)
 # characters), anchored by its upper-left corner in the open field over
 # section A-A: right of the 213.56 dimension line (x 0.296), over the
 # PlateThk text (top 0.1366), under the isometric caption.  Its leader
-# leaves the note's right end and drops through the pivot bore's gap to
-# where the top relief's floor meets the bore on the right-hand piece
-# (relief_floor_tip_xy): rule 7, a matched fit is flagged at the feature
-# (machinist review r1: under section C-C it read as C-C's).  r2's four
-# 30-character rows measured 84 mm wide (2.8 mm a character): their leader
-# left from x 0.3839 and crossed the Ra 1.6 leader (y 0.135, x >= 0.3738);
-# 23 characters end ~0.364, so the leader crosses y 0.135 near x 0.373.
+# leaves the note's right end and drops to the top relief's floor on the
+# left-hand piece (relief_floor_tip_xy), now at A-A's head: rule 7, a
+# matched fit is flagged at the feature (machinist review r1: under section
+# C-C it read as C-C's).  The note's right end (~0.357) stands over the
+# left-hand floor, so the leader falls nearly straight, right of the TOP
+# FACE label and left of the seat's Ra symbol (x >= 0.372); to the
+# right-hand piece's floor it would cross y 0.135 at ~0.373, on that symbol.
 # r3 put the top row on the 213.56 text (bottom ~0.169, right end ~0.3025):
 # the note's top stands under it, its bottom row (~0.141) over the PlateThk
-# text and A-A's UNDERSIDE label.
+# text and A-A's TOP FACE label.
 # r11 left 2.68 mm to the 213.56 text; 1.2 mm lower clears the 3.57 mm
 # text-separation threshold while preserving the relief-floor leader route.
 RELIEF_NOTE_XY = (0.300, 0.1653)
 # The leader's tip, this far (model mm) into the relief floor from the bore
-# wall: the leader runs down the bore's gap and must not cross the hatch.
-RELIEF_TIP_INSET_MM = 0.05
+# wall: mid-floor (the floor runs 2.075 from the bore to the relief wall), so
+# the leader meets the floor through the relief's open air, off the hatch.
+RELIEF_TIP_INSET_MM = 1.0
 # The isometric's caption, 22 mm higher than r1's 0.158 (still 9 mm under
 # the isometric's ink, ~0.189), to free the field the relief note stands in.
 ISO_CAPTION_UPPER_LEFT = (0.315, 0.180)
 # The MHA-DT-VN-61 named-exception note (2.5 mm text, one line), anchored
 # upper-left in the empty band above the title block (0.066): right of the
-# plan caption row (x <= 0.2185) and under the A-A label (y >= 0.0853). A
+# plan caption row (x <= 0.2185) and left of the A-A label (x >= 0.342). A
 # sheet must state the shortfall pending ruling #1019 (codex review of
 # 68565ace, blocker B1).
 ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
@@ -438,11 +452,12 @@ HOLDDOWN_STRIP_LOWER_LEFT = (0.1395, 0.0352)
 # off the title block, its top row (~0.0748) 5.7 mm under the plan
 # captions (0.0805).
 HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
-# Face labels on both sections (machinist review r3 blocker): A-A, looking
-# down the sheet, draws the top face at its foot; C-C, looking up it, at its
-# head.  Both are true projections, but with no face named a reader cannot
-# tell the relief (top) from the counterbore (underside).  Each label is a
-# pointer note on its face: (view key, text, model x candidates in mm, model
+# Face labels on both sections (machinist review r3 blocker): both sections
+# look south (sheet-up arrows), so each draws the top face at its head and
+# the underside at its foot (machinist review of e04fd60: A-A looking north
+# drew the plate the other way up from C-C).  With no face named a reader
+# cannot tell the relief (top) from the counterbore (underside).  Each label
+# is a pointer note on its face: (view key, text, model x candidates in mm, model
 # y in mm, which candidate -- the one furthest "max" right or "min" left on
 # the sheet -- and the note's upper-left corner relative to the tip).  A
 # label's text is 22.1 (TOP FACE) / 24.7 (UNDERSIDE) x 3.6 mm (r8).  Each
@@ -450,16 +465,15 @@ HOLDDOWN_CALLOUT_XY = (0.1830, 0.0657)
 # without running back through the letters (r6: two leader-through-own-text
 # with tips over the text's span).  The layout audit boxes a note with its
 # leader, text to tip.  Positions are measured on r3..r8's renders; the tip
-# is projected on the face.  Each section names one face, at its foot, so
-# the two labels read side by side across the flip: A-A's TOP FACE (every
-# field over its strip lies in the relief note's box, x 0.2998..0.3784, y
-# 0.1144 up, or under the Ra 1.6 and (0.25) texts) and C-C's UNDERSIDE, the
-# face its callout's FROM UNDERSIDE names.  No field right of C-C's strip
+# is projected on the face.  A-A's TOP FACE stands over its strip, in the
+# field between the PlateThk text (right end 0.3298) and the relief note's
+# leader, under the note (bottom ~0.148); C-C's UNDERSIDE names the face
+# its callout's FROM UNDERSIDE names.  No field right of C-C's strip
 # holds a 22 mm label short of the hold-down callout and the title block.
 FACE_LABELS = (
-    # Under A-A's strip, ending 2 mm left of its tip on the right-hand
-    # piece, over the A-A label (top ~0.0995).
-    ("A-A", TOP_FACE_LABEL, (-6.8, 6.8), PLATE_THICKNESS, "max", (-0.024, -0.00515)),
+    # Over A-A's strip, ending 2 mm left of its tip on the left-hand piece's
+    # top face, 1.55 mm (model) outboard of the relief's edge.
+    ("A-A", TOP_FACE_LABEL, (-6.8, 6.8), PLATE_THICKNESS, "min", (-0.024, 0.0086)),
     # Under C-C's strip, left of its native label: the tip on the left
     # piece's underside (0.1463, 0.0352), the text 0.1198..0.1445 x
     # 0.0288..0.0324, 2.0 mm right of detail B's outline (0.1179) and 4.0 mm
@@ -639,7 +653,7 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"expected one native section label, found {len(notes)}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-    target = (*_shifted(0.335, 0.085), 0.0)
+    target = (*SECTION_LABEL_XY, 0.0)
     if not annotation.SetPosition2(*target):
         raise RuntimeError("failed to position native section label")
     adapter.currentModel.EditRebuild3()
@@ -845,45 +859,70 @@ def _create_detail_view(
     return detail
 
 
-def _look_holddown_section_south(
-    adapter: Any, parent: Any, section: Any, cut: Any
+def _look_section_south(
+    adapter: Any, parent: Any, section: Any, cut: Any, *, z_mm: float, label: str
 ) -> None:
-    """Point section C-C's arrows sheet-up (looking south) and prove the strip.
+    """Point a plan section's arrows sheet-up (looking south), top face up.
 
     The view direction is read from the section's own projection, not from
     arrow-array layouts: with screen-right r and screen-up u, the sight line
     is u x r, so it runs along -z (south) exactly when model +x's sheet-x sign
-    times model +y's sheet-y sign is positive.  The strip must be the full
-    width of the 6.35 plate at the hold-down station, at
-    HOLDDOWN_SECTION_SCALE.
+    times model +y's sheet-y sign is positive.  Folded about the cutting line
+    as projected, model +x stays sheet-right and the top face (+y) stands at
+    the head; a view turned 180 degrees also looks south but reads both signs
+    negative and is refused.  Both sections share this orientation (machinist
+    review of e04fd60: A-A looking north drew the top face at its foot,
+    opposite to C-C).
     """
-    z = HOLDDOWN_LOCAL_Z / 1000.0
+    z = z_mm / 1000.0
 
-    def x_direction() -> float:
-        base = model_point_in_view(adapter, section, (0.0, 0.003, z), label="C-C origin")
-        east = model_point_in_view(adapter, section, (0.001, 0.003, z), label="C-C +x")
-        up = model_point_in_view(adapter, section, (0.0, 0.004, z), label="C-C +y")
-        return (east[0] - base[0]) * (up[1] - base[1])
+    def steps() -> tuple[float, float]:
+        base = model_point_in_view(
+            adapter, section, (0.0, 0.003, z), label=f"{label} origin"
+        )
+        east = model_point_in_view(
+            adapter, section, (0.001, 0.003, z), label=f"{label} +x"
+        )
+        up = model_point_in_view(adapter, section, (0.0, 0.004, z), label=f"{label} +y")
+        return (float(east[0] - base[0]), float(up[1] - base[1]))
 
-    if x_direction() < 0.0:
+    east_step, up_step = steps()
+    if east_step * up_step < 0.0:
         reversed_cut = not bool(cut.GetReversedCutDirection())
         cut.SetReversedCutDirection(reversed_cut)
-        rebuild_drawing(adapter, label="section C-C looks south")
+        rebuild_drawing(adapter, label=f"section {label} looks south")
         if bool(cut.GetReversedCutDirection()) != reversed_cut:
-            raise RuntimeError("section C-C cut direction did not persist")
-    direction = x_direction()
-    if not direction > 0.0:
-        raise RuntimeError(f"section C-C still looks north (x/y sign product {direction})")
-    low, high = _holddown_strip_corners(adapter, section)
-    span = (high[0] - low[0], high[1] - low[1])
+            raise RuntimeError(f"section {label} cut direction did not persist")
+        east_step, up_step = steps()
+    if not (east_step > 0.0 and up_step > 0.0):
+        raise RuntimeError(
+            f"section {label} does not look south top face up: sheet steps of "
+            f"model +x {east_step}, +y {up_step}"
+        )
     print(
-        f"section C-C: reversed={bool(cut.GetReversedCutDirection())} "
-        f"x_dir={direction} strip_span_m={span} "
+        f"section {label}: reversed={bool(cut.GetReversedCutDirection())} "
+        f"east_step={east_step} up_step={up_step} "
         f"arrows={tuple(float(v) for v in (cut.GetArrowInfo() or ()))} "
         f"texts={tuple(float(v) for v in (cut.GetTextInfo() or ()))} "
         f"parent_line_info="
         f"{tuple(float(v) for v in (_early_bound(parent, 'IView').GetSectionLineInfo2() or ()))}"
     )
+
+
+def _look_holddown_section_south(
+    adapter: Any, parent: Any, section: Any, cut: Any
+) -> None:
+    """Point section C-C's arrows sheet-up (looking south) and prove the strip.
+
+    The strip must be the full width of the 6.35 plate at the hold-down
+    station, at HOLDDOWN_SECTION_SCALE.
+    """
+    _look_section_south(
+        adapter, parent, section, cut, z_mm=HOLDDOWN_LOCAL_Z, label="C-C"
+    )
+    low, high = _holddown_strip_corners(adapter, section)
+    span = (high[0] - low[0], high[1] - low[1])
+    print(f"section C-C: strip_span_m={span}")
     strip = holddown_strip_box()
     expected = (strip[2] - strip[0], strip[3] - strip[1])
     if any(abs(abs(span[i]) - expected[i]) > 1e-6 for i in (0, 1)):
@@ -1170,8 +1209,8 @@ def section_point_xy(
 
 
 def relief_floor_tip_xy(adapter: Any, section: Any) -> tuple[float, float]:
-    """Sheet point where the top relief's floor meets the pivot bore, on A-A's
-    right-hand piece (RELIEF_TIP_INSET_MM into the floor).
+    """Sheet point on the top relief's floor on A-A's left-hand piece,
+    RELIEF_TIP_INSET_MM out from the pivot bore's wall.
 
     The section is cut on the pivot's axis (model z = 0), so the floor stands
     PIVOT_BEARING_RELIEF_DEPTH under the plate's top face either side of the
@@ -1184,7 +1223,7 @@ def relief_floor_tip_xy(adapter: Any, section: Any) -> tuple[float, float]:
         (-x, x),
         PLATE_THICKNESS - PIVOT_BEARING_RELIEF_DEPTH,
         0.0,
-        pick="max",
+        pick="min",
         label="relief floor tip",
     )
 
@@ -1875,6 +1914,7 @@ async def build(adapter: Any) -> dict[str, str]:
     rebuild_drawing(adapter, label="pivot section cut faces only")
     if cut.GetDisplayOnlySurfaceCut() is not True:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
+    _look_section_south(adapter, profile, section, cut, z_mm=0.0, label="A-A")
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(
@@ -2067,22 +2107,24 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _omit_post_mount_thread_class(post_mount_callout)
     rebuild_drawing(adapter, label="plan hole callout rows")
-    # The section shows the top seat at the bottom.  Arrows land mid-face so
-    # neither symbol reads as controlling a corner, hole wall or outer edge.
-    seat_edge = _horizontal_section_edge(section, 6.35, label="top seat")
+    # The section shows the top seat at its head and the base slide at its
+    # foot.  Arrows land mid-face so neither symbol reads as controlling a
+    # corner, hole wall or outer edge: the seat on the right-hand piece's top
+    # face (outboard of the relief), the slide on the left-hand piece's.
+    seat_edge = _horizontal_section_edge(
+        section, 6.35, label="top seat", prefer_right=True
+    )
     add_surface_finish(
         adapter,
         section,
-        symbol_xy=_shifted(0.291, 0.087),
+        symbol_xy=SEAT_FINISH_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "post_seat"),
         label="post and tip-block seat finish",
         char_height=0.0025,
         entity=seat_edge,
         leader_attach_xy=_section_edge_midpoint(adapter, section, seat_edge, label="top seat"),
     )
-    slide_edge = _horizontal_section_edge(
-        section, 0.0, label="base slide", prefer_right=True
-    )
+    slide_edge = _horizontal_section_edge(section, 0.0, label="base slide")
     add_surface_finish(
         adapter,
         section,
