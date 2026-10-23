@@ -756,6 +756,7 @@ print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
 if mode == "eof":
     sys.exit(9)
 if mode == "silent":
+    Path("silent-ready").touch()
     time.sleep(60)
 for line in sys.stdin:
     event = json.loads(line)
@@ -947,7 +948,7 @@ def test_claude_first_response_retries_without_duplicate_notifications(
 
 @pytest.fixture
 def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
-    """Advance retry deadlines by protocol polls, never mutate the loop's clock."""
+    """Advance startup deadlines by protocol progress, not process scheduling."""
     real_run = mr._run_claude
     transport_asyncio = mr.asyncio
     clocks = []
@@ -978,11 +979,30 @@ def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespac
                     clock.startup.reschedule(asyncio.get_running_loop().time())
                 await asyncio.sleep(0)
 
+        async def expire_silent_startup() -> None:
+            # A silent CLI never answers initialize, so there are no status
+            # polls to advance the clock. Wait until its diagnostics are written
+            # before cancelling; CPU load must not select the failure outcome.
+            ready = Path(kwargs["cwd"]) / "silent-ready"
+            while not ready.exists():
+                await asyncio.sleep(0.01)
+            clock.elapsed = clock.budget
+            clock.startup.reschedule(asyncio.get_running_loop().time())
+
         with monkeypatch.context() as scoped:
             # Only this module binding is replaced; asyncio and loop.time stay
             # untouched for subprocess machinery and the real outer timeout.
             scoped.setattr(mr, "asyncio", ProtocolAsyncio())
-            return await real_run(*args, **kwargs)
+            silent = (
+                asyncio.create_task(expire_silent_startup())
+                if args[0][2] == "silent" else None
+            )
+            try:
+                return await real_run(*args, **kwargs)
+            finally:
+                if silent is not None:
+                    silent.cancel()
+                    await asyncio.gather(silent, return_exceptions=True)
 
     monkeypatch.setattr(mr, "_run_claude", run)
     return clocks
@@ -1050,7 +1070,8 @@ def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
 )
 def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, mode: str, error: str,
+    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
+    mode: str, error: str,
 ) -> None:
     command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
@@ -1058,9 +1079,12 @@ def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=0, timeout_s=10,
+        retries=0, timeout_s=30,
     )
     assert not review.passed and review.verdict is None and error in review.error
+    (clock,) = claude_startup_clock
+    assert not clock.outer.expired()
+    assert clock.startup.expired() is (mode in ("pending", "silent"))
     (attempt,) = review.extra["evidence"]["attempts"]
     assert attempt["outcome"] == ("timed_out" if mode in ("pending", "silent") else "failed")
     log = Path(attempt["retained_dir"]) / "protocol.jsonl"
