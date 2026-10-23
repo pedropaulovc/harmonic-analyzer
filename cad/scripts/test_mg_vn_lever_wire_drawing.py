@@ -893,3 +893,539 @@ def test_native_note_bounds_must_remain_on_sheet_and_clear(
     package = _package(monkeypatch, tmp_path, settled_fault=fault)
     with pytest.raises(RuntimeError):
         asyncio.run(drawing.build(package.adapter))
+
+
+def _supplier_caption_package(
+    monkeypatch, tmp_path, *, offset=(-0.0004, 0.0003), line_advance=0.003879,
+    placement_fault=None, settled_fault=None, fault_member="PenWire",
+    mark_members=(), final_mark_kind=None, selection_failure=None, deletion_failure=None,
+    final_inventory="both", enumerator_misses=False,
+):
+    """Run the real stock-caption consumer beside the existing installed views.
+
+    The note's synthetic font metrics are deliberately independent of its
+    insertion point; they are not a claimed capture of the rolling-v44 failure,
+    whose log did not retain GetExtent. Supplier geometry/value collaborators
+    are isolated here: this fixture owns caption layout and neighbor retention.
+    """
+    import _purchased_fastener_drawing as purchased
+    import _supplier_wire_stock_drawing as stock
+
+    package = _package(monkeypatch, tmp_path)
+    captions = []
+    stock_views = []
+    neighbors = []
+    telemetry = []
+    rebuilds = []
+    selected_marks = []
+    diameter_positions = {}
+    document = package.document
+    document.ActiveDrawingView = None
+    document.ActivateView = lambda _name: True
+    document.GetEditSheet = lambda: True
+    document.finalizing = False
+
+    def clear_selection(_all):
+        selected_marks.clear()
+
+    def delete_selected():
+        for mark in selected_marks:
+            if mark.view.sheet != deletion_failure:
+                mark.view.mark_available = False
+
+    document.ClearSelection2 = clear_selection
+    document.EditDelete = delete_selected
+
+    class NativeCenterMark:
+        def __init__(self, view):
+            self.view = view
+
+        def Select2(self, append, mark):
+            assert (append, mark) == (True, 0)
+            if self.view.sheet == selection_failure:
+                return False
+            selected_marks.append(self)
+            return True
+
+    class FalseyMark:
+        def __bool__(self):
+            return False
+
+    class StockView:
+        def __init__(self, x, y, scale):
+            self.sheet = document.active.name
+            self.Position = (x, y)
+            self.ScaleRatio = tuple(scale)
+            self.ReferencedConfiguration = ""
+            self.UseSheetScale = 1
+            self.center_mark = NativeCenterMark(self) if self.sheet in mark_members else None
+            self.mark_available = self.center_mark is not None
+
+        def GetFirstCenterMark2(self):
+            if self.sheet == fault_member and (
+                enumerator_misses
+                or document.finalizing and final_inventory == "annotations-only"
+            ):
+                return None
+            return self.center_mark if self.mark_available else None
+
+        def GetAnnotationsByType(self, annotation_type):
+            assert annotation_type == 13  # native swCenterMarkSym, never the diameter
+            if (
+                self.sheet == fault_member and document.finalizing
+                and final_inventory == "enumerator-only"
+            ):
+                return None
+            return (self.center_mark,) if self.mark_available else None
+
+        def UpdateViewDisplayGeometry(self):
+            pass
+
+        def SetViewPosition(self, position, _move_children):
+            self.Position = tuple(position)
+            return True
+
+        def GetOutline(self):
+            radius = stock.DIA / 2000 * self.ScaleRatio[0] / self.ScaleRatio[1]
+            x, y = self.Position
+            return (x - radius, y - radius, x + radius, y + radius)
+
+    class Caption:
+        def __init__(self, text, x, y):
+            self.sheet = document.active.name
+            self.text = text
+            self.position = (x, y, 0.0002)
+            self.OwnerType = 1 if document.ActiveDrawingView is None else 0
+            self.format = SimpleNamespace(
+                CharHeight=0.0035, TypeFaceName="Arial",
+                WidthFactor=1.0, CharSpacingFactor=1.0,
+            )
+            self.positions = []
+            self.extents = []
+            self.fault = placement_fault if self.sheet == fault_member else None
+            self.pending_format = None
+            self.pending_position = None
+            captions.append(self)
+
+        def GetText(self):
+            return self.text
+
+        def GetAnnotation(self):
+            return self
+
+        def GetPosition(self):
+            if self.fault == "invalid-position":
+                return (math.nan, self.position[1], 0.0)
+            return self.position
+
+        def GetTextFormat(self, index):
+            assert index == 0
+            if self.fault == "missing-format":
+                return None
+            return SimpleNamespace(**vars(self.format))
+
+        def SetTextFormat(self, index, use_doc, text_format):
+            assert (index, use_doc) == (0, False)
+            if self.fault == "failed-format":
+                return False
+            self.pending_format = SimpleNamespace(**vars(text_format))
+            return True
+
+        def SetPosition(self, x, y, z):
+            # The shared insertion helper uses this setter. A native-style
+            # readback can retain its annotation-plane Z instead of the request.
+            self.positions.append((x, y, z))
+            self.position = (x, y, self.position[2])
+            return True
+
+        def SetPosition2(self, x, y, z):
+            self.positions.append((x, y, z))
+            if self.fault == "failed-position":
+                return False
+            if self.fault != "ignored-position":
+                self.pending_position = (x, y, z)
+            return True
+
+        def settle(self):
+            if self.pending_format is not None:
+                self.format = self.pending_format
+                self.pending_format = None
+            if self.pending_position is not None:
+                self.position = self.pending_position
+                self.pending_position = None
+
+        def GetExtent(self):
+            if self.pending_format is not None or self.pending_position is not None:
+                raise AssertionError("caption extent was read before its native rebuild")
+            if self.fault == "missing-extent":
+                return ()
+            if self.fault == "nonfinite-extent":
+                return (0.15, 0.21, 0.0, math.nan, 0.22, 0.0)
+            lines = self.text.splitlines()
+            width = max(map(len, lines)) * self.format.CharHeight * 0.8
+            height = len(lines) * line_advance * self.format.CharHeight / 0.003
+            if self.fault == "too-wide":
+                width = 0.200
+            elif self.fault == "too-tall":
+                height = 0.100
+            x = self.position[0] + offset[0]
+            top = self.position[1] + offset[1]
+            extent = (x, top - height, 0.0, x + width, top, 0.0)
+            self.extents.append(extent)
+            return extent
+
+    native = SimpleNamespace(
+        FullName=f"{stock.SUPPLIER_REFERENCE_DIMENSION}@{stock.SUPPLIER_REFERENCE_FEATURE}@wire",
+        Tolerance=SimpleNamespace(Type=0),
+    )
+    display = SimpleNamespace(Type2=6, GetDimension2=lambda _index: native)
+
+    def set_diameter_position(x, y, z):
+        diameter_positions[document.active.name] = (x, y, z)
+        return True
+
+    diameter = SimpleNamespace(
+        SetPosition=set_diameter_position, GetSpecificAnnotation=lambda: display,
+    )
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        assert orientation == "*Top"
+        view = StockView(x, y, scale)
+        stock_views.append(view)
+        return view
+
+    def assert_stock_field(_adapter, view, field, *, label):
+        assert purchased._inside(view.GetOutline(), field), label
+
+    def neighbor_state():
+        return (
+            tuple(
+                (view.key, view.Position, view.ReferencedConfiguration,
+                 view.ScaleRatio, view.UseSheetScale, view.Angle, view.GetOutline())
+                for view in package.views if view.sheet is document.active
+            ),
+            tuple(
+                (annotation.GetPosition(), annotation.display.dimension.FullName,
+                 annotation.display.GetPrimaryPrecision2(),
+                 annotation.display.GetText(1), annotation.display.GetText(2),
+                 annotation.display.dimension.GetSystemValue3(3, document.active.name),
+                 tuple(drawing.dimension_segments(annotation)))
+                for annotation in package.annotations if annotation.view.sheet is document.active
+            ),
+        )
+
+    def add_stock(adapter, source, *, member):
+        before = neighbor_state()
+        settled = stock.add_nominal_stock_cross_section(adapter, source, member=member)
+        neighbors.append((member, before, neighbor_state()))
+        return settled
+
+    def rebuild(_adapter, *, label):
+        rebuilds.append(label)
+        document.EditRebuild3()
+        for note in captions:
+            note.settle()
+
+    monkeypatch.setattr(stock, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(stock, "double_array", tuple)
+    monkeypatch.setattr(stock, "place_view", place)
+    monkeypatch.setattr(stock, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(stock, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(stock, "curate_view_dimensions", lambda *_args, **_kw: [diameter])
+    monkeypatch.setattr(
+        stock, "model_point_in_view",
+        lambda _adapter, view, _point, **_kw: (*view.Position, 0.0),
+    )
+    monkeypatch.setattr(stock, "supplier_reference_dimension", lambda *_args, **_kw: None)
+    monkeypatch.setattr(stock, "assert_supplier_reference_dimension", lambda *_args, **_kw: None)
+    monkeypatch.setattr(stock, "assert_supplier_configuration_value", lambda *_args, **_kw: None)
+    monkeypatch.setattr(
+        stock, "reacquire_supplier_dimensions",
+        lambda *_args, **_kw: {stock.SUPPLIER_REFERENCE_DIMENSION: display},
+    )
+    monkeypatch.setattr(stock, "assert_supplier_view_fits", assert_stock_field)
+    monkeypatch.setattr(purchased, "add_note", lambda _adapter, text, x, y: Caption(text, x, y))
+    monkeypatch.setattr(drawing, "add_nominal_stock_cross_section", add_stock)
+    monkeypatch.setattr(
+        stock, "_telemetry",
+        SimpleNamespace(info=lambda message, **_kw: telemetry.append(message)),
+    )
+    finalize = drawing.finalize_drawing
+
+    async def finalize_caption(adapter, outputs, **kwargs):
+        note = next(item for item in captions if item.sheet == fault_member)
+        if settled_fault == "text":
+            note.text = note.text.replace("NOT INSTALLED", "INSTALLED")
+        elif settled_fault == "owner":
+            note.OwnerType = 0
+        elif settled_fault == "extent-drift":
+            note.position = (note.position[0] + 0.100, note.position[1], 0.0)
+        elif settled_fault is not None:
+            note.fault = settled_fault
+        original_rebuild = document.EditRebuild3
+
+        def final_rebuild():
+            result = original_rebuild()
+            document.finalizing = True
+            if final_mark_kind is not None:
+                view = next(item for item in stock_views if item.sheet == fault_member)
+                assert final_mark_kind in ("bare", "falsey")
+                view.center_mark = FalseyMark() if final_mark_kind == "falsey" else object()
+                view.mark_available = True
+            return result
+
+        document.EditRebuild3 = final_rebuild
+        return await finalize(adapter, outputs, **kwargs)
+
+    monkeypatch.setattr(drawing, "finalize_drawing", finalize_caption)
+    package.captions = captions
+    package.stock_views = stock_views
+    package.neighbor_states = neighbors
+    package.caption_telemetry = telemetry
+    package.caption_rebuilds = rebuilds
+    package.stock_diameter_positions = diameter_positions
+    return package
+
+
+@pytest.mark.parametrize("offset", ((-0.0004, 0.0003), (-0.012, 0.009), (0.015, -0.008)))
+# Supplier 3 mm notes advance at most 4.5 mm per line (_LINE_PITCH in
+# _purchased_fastener_drawing); exercise that full-height block as well.
+@pytest.mark.parametrize("line_advance", (0.003879, 0.0045))
+def test_supplier_caption_seats_complete_measured_extent_without_changing_neighbors(
+    monkeypatch, tmp_path, offset, line_advance
+):
+    import _purchased_fastener_drawing as purchased
+    import _supplier_wire_stock_drawing as stock
+
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, offset=offset, line_advance=line_advance,
+    )
+    assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
+    assert stock.STOCK_FIELDS["PenWire"] == (0.145, 0.205, 0.260, 0.265)
+    assert stock.STOCK_SCALE == (20, 1)
+    assert stock.STOCK_LAYOUTS == {
+        "LeverWire": ((0.300, 0.155), (0.325, 0.168), (0.255, 0.135)),
+        "PenWire": ((0.190, 0.241), (0.215, 0.252), (0.155, 0.223)),
+    }
+    expected_text = (
+        "SUPPLIER NOMINAL STOCK — NOT INSTALLED\nMcMASTER-CARR 9666K56\n"
+        "COIL PACKAGE: 110 ft (NOT CUT LENGTH)\nSCALE 20:1"
+    )
+    assert stock.STOCK_CAPTION == expected_text
+    assert len(package.captions) == 2
+    for note, view in zip(package.captions, package.stock_views, strict=True):
+        member = note.sheet
+        target = stock.STOCK_LAYOUTS[member][2]
+        first = purchased._box(note.extents[0], label="before placement", kind="note")
+        final = purchased._box(note.GetExtent(), label="after placement", kind="note")
+        assert (first[0], first[3]) != pytest.approx(target)
+        assert (final[0], final[3]) == pytest.approx(target)
+        assert purchased._inside(final, stock.STOCK_FIELDS[member])
+        assert final[3] - final[1] == pytest.approx(4 * line_advance)
+        assert note.GetPosition()[2] == 0.0002
+        assert note.positions[-1][2] == 0.0002
+        assert f"{member} supplier stock caption format" in package.caption_rebuilds
+        assert f"{member} supplier stock caption position" in package.caption_rebuilds
+        measured_log = next(
+            item for item in package.caption_telemetry
+            if item.startswith(f"{member} supplier stock caption:")
+        )
+        assert "position_m=" in measured_log and "extent_m=" in measured_log
+        assert " -> " in measured_log
+        assert f"reserved_m={stock.STOCK_FIELDS[member]!r}" in measured_log
+        assert note.GetText() == expected_text and len(note.GetText().splitlines()) == 4
+        assert note.GetAnnotation().OwnerType == 1
+        assert vars(note.format) == {
+            "CharHeight": 0.003, "TypeFaceName": "Arial",
+            "WidthFactor": 1.0, "CharSpacingFactor": 1.0,
+        }
+        assert view.Position == stock.STOCK_LAYOUTS[member][0]
+        assert view.ScaleRatio == (20, 1) and view.UseSheetScale == 0
+        assert not drawing._overlaps(final, view.GetOutline())
+        for neighbor in package.views:
+            if neighbor.sheet.name == member:
+                assert not drawing._overlaps(final, neighbor.GetOutline())
+        for annotation in package.annotations:
+            if annotation.view.sheet.name == member:
+                assert all(
+                    not drawing._overlaps(
+                        final,
+                        (min(start[0], end[0]), min(start[1], end[1]),
+                         max(start[0], end[0]), max(start[1], end[1])),
+                    )
+                    for start, end in drawing.dimension_segments(annotation)
+                )
+    assert [member for member, _before, _after in package.neighbor_states] == [
+        "LeverWire", "PenWire",
+    ]
+    for _member, before, after in package.neighbor_states:
+        assert before == after  # positions/configs/scales and every native Depth stroke
+        assert len(before[0]) == 2 and len(before[1]) == 1
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize(
+    "fault,match",
+    (
+        ("missing-format", "purchased drawing note has no text format"),
+        ("failed-format", "failed to size purchased drawing note"),
+        ("invalid-position", "supplier stock caption has invalid position"),
+        ("failed-position", "cannot position supplier stock caption"),
+        ("missing-extent", "stock caption: invalid native extent"),
+        ("nonfinite-extent", "stock caption: invalid native extent"),
+        ("ignored-position", "supplier stock caption leaves its reserved field"),
+        ("too-wide", "supplier stock caption leaves its reserved field"),
+        ("too-tall", "supplier stock caption leaves its reserved field"),
+    ),
+)
+def test_supplier_caption_refuses_unmeasured_or_unfitted_native_layout(
+    monkeypatch, tmp_path, member, fault, match
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, offset=(-0.020, 0.009),
+        placement_fault=fault, fault_member=member,
+    )
+    with pytest.raises(RuntimeError, match=match) as failure:
+        asyncio.run(drawing.build(package.adapter))
+    assert package.captions[-1].sheet == member
+    assert package.captions[-1].fault == fault
+    if member == "PenWire":
+        assert package.captions[0].sheet == "LeverWire"
+        assert package.captions[0].fault is None
+    if fault not in ("missing-format", "failed-format"):
+        assert member in str(failure.value)
+    if fault in ("ignored-position", "too-wide", "too-tall"):
+        assert "extent_m=" in str(failure.value)
+        assert "reserved_m=" in str(failure.value)
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize(
+    "fault,match",
+    (
+        ("text", "supplier stock caption changed"),
+        ("owner", "supplier stock caption must remain sheet-owned"),
+        ("extent-drift", "supplier stock caption leaves its reserved field"),
+        ("missing-extent", "invalid native extent"),
+        ("nonfinite-extent", "invalid native extent"),
+        ("too-wide", "supplier stock caption leaves its reserved field"),
+        ("too-tall", "supplier stock caption leaves its reserved field"),
+    ),
+)
+def test_supplier_caption_rechecks_complete_text_owner_and_extent_after_final_rebuild(
+    monkeypatch, tmp_path, member, fault, match
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, settled_fault=fault, fault_member=member,
+    )
+    with pytest.raises(RuntimeError, match=match) as failure:
+        asyncio.run(drawing.build(package.adapter))
+    note = next(item for item in package.captions if item.sheet == member)
+    if fault == "text":
+        assert "NOT INSTALLED" not in note.GetText()
+    elif fault == "owner":
+        assert note.OwnerType == 0
+    else:
+        assert member in str(failure.value)
+
+
+def test_supplier_stock_zero_native_center_mark_inventory_passes_and_is_logged(
+    monkeypatch, tmp_path
+):
+    package = _supplier_caption_package(monkeypatch, tmp_path)
+    assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
+    for member in ("LeverWire", "PenWire"):
+        assert (
+            f"{member} supplier stock centre marks after removal: none drawn; "
+            "deleted=0; remaining=0; enumerator_remaining=False"
+        ) in package.caption_telemetry
+        assert (
+            f"{member} supplier stock centre marks after final rebuild: "
+            "remaining=0; enumerator_remaining=False"
+        ) in package.caption_telemetry
+    assert all(view.GetFirstCenterMark2() is None for view in package.stock_views)
+    assert all(view.GetAnnotationsByType(13) is None for view in package.stock_views)
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize("enumerator_misses", (False, True))
+def test_supplier_stock_removes_center_mark_without_touching_circle_diameter_or_neighbors(
+    monkeypatch, tmp_path, member, enumerator_misses
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        enumerator_misses=enumerator_misses,
+    )
+    assert asyncio.run(drawing.build(package.adapter)) == {"pdf": "offline-export"}
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.GetFirstCenterMark2() is None
+    assert view.GetAnnotationsByType(13) is None
+    assert (
+        f"{member} supplier stock centre marks after removal: deleted; "
+        "deleted=1; remaining=0; enumerator_remaining=False"
+    ) in package.caption_telemetry
+    assert view.ScaleRatio == (20, 1)
+    assert view.Position == {"LeverWire": (0.300, 0.155), "PenWire": (0.190, 0.241)}[member]
+    radius = 0.031 * 25.4 / 2000 * 20
+    x, y = view.Position
+    assert view.GetOutline() == pytest.approx((x - radius, y - radius, x + radius, y + radius))
+    assert package.stock_diameter_positions == {
+        "LeverWire": (0.325, 0.168, 0.0), "PenWire": (0.215, 0.252, 0.0),
+    }
+    for _member, before, after in package.neighbor_states:
+        assert before == after
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize(
+    "fault,match",
+    (
+        ("selection", "cannot select supplier stock centre mark"),
+        ("deletion", "supplier stock centre mark survived deletion"),
+    ),
+)
+def test_supplier_stock_native_center_mark_removal_must_succeed(
+    monkeypatch, tmp_path, member, fault, match
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        selection_failure=member if fault == "selection" else None,
+        deletion_failure=member if fault == "deletion" else None,
+    )
+    with pytest.raises(RuntimeError, match=f"{member}: {match}"):
+        asyncio.run(drawing.build(package.adapter))
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.GetAnnotationsByType(13) == (view.center_mark,)
+    if fault == "deletion":
+        assert (
+            f"{member} supplier stock centre marks after removal: refused; "
+            "deleted=unconfirmed; remaining=1; enumerator_remaining=True"
+        ) in package.caption_telemetry
+
+
+@pytest.mark.parametrize("member", ("LeverWire", "PenWire"))
+@pytest.mark.parametrize("kind", ("bare", "falsey"))
+@pytest.mark.parametrize("inventory", ("both", "annotations-only", "enumerator-only"))
+def test_supplier_stock_final_rebuild_refuses_any_residual_center_mark_without_deleting_it(
+    monkeypatch, tmp_path, member, kind, inventory
+):
+    package = _supplier_caption_package(
+        monkeypatch, tmp_path, mark_members=(member,), fault_member=member,
+        final_mark_kind=kind, final_inventory=inventory,
+    )
+    with pytest.raises(
+        RuntimeError, match=f"{member}: unexpected supplier stock centre mark after final rebuild",
+    ) as failure:
+        asyncio.run(drawing.build(package.adapter))
+    view = next(item for item in package.stock_views if item.sheet == member)
+    assert view.mark_available  # final refusal must not delete the unexpected annotation
+    remaining = int(inventory != "enumerator-only")
+    enumerator_remaining = inventory != "annotations-only"
+    assert (
+        f"remaining={remaining}; enumerator_remaining={enumerator_remaining}"
+    ) in str(failure.value)
+    assert (
+        f"{member} supplier stock centre marks after final rebuild: "
+        f"remaining={remaining}; enumerator_remaining={enumerator_remaining}"
+    ) in package.caption_telemetry
