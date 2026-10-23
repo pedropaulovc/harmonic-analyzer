@@ -8803,25 +8803,61 @@ def _clamp_recovered_head_height():
     }
 
 
-@pytest.mark.parametrize("defect", (None, "shared-station"))
-def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
-    monkeypatch, defect
+@pytest.fixture
+def clamp_supplier_annotation_replay(
+    monkeypatch, clamp_native_supplier_inventory, request
 ):
-    import _supplier_reference_text as core
-    import draw_sh_vn_clamp_screw as clamp
-    from _layout_audit import annotation_geometry, calibrate_sheet_advance
-    from _layout_geometry import Box, segment_box_distance
+    import _dimensions
+    import _supplier_reference_text as reference_text
+    import _supplier_screw_dimensions as screws
+    from _layout_geometry import Box
+    from solidworks_mcp.adapters import sw_type_info
 
-    # Bounded native-shaped model, following the core fixture: text moves
-    # independently; enabling OffsetText snaps the native line to its seeded
-    # transverse anchor, then later text moves leave it fixed. Every row is
-    # the recovered HeadHeight primitives translated to its own sheet station;
-    # the long vertical Length row has enough span to stay on its line.
-    class Display:
-        def __init__(self, name, axis, span, offset):
-            self.name, self.axis = name, axis
+    case = clamp_native_supplier_inventory
+    clamp = case.clamp
+    case.defect = getattr(request, "param", None)
+    case.writes, case.rebuilds = [], []
+
+    # Native replay migrated from immutable 65a820602e2b5ed6e0ea2e188596c29b1c12ea30:
+    # retain its four translated rows, shared-station audit control and frozen
+    # settled reads. Extend only the native boundary so real screw authoring,
+    # source/value proof and exact inventory run instead of their former stubs.
+    class Display(SimpleNamespace):
+        def __init__(self, name, feature, axis, span, offset):
+            value = next(
+                abs(value)
+                for candidate, value, _orientation
+                in clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+                if candidate == name
+            )
+            native = _supplier_native(monkeypatch, value=value / 1000)
+            super().__init__(**vars(native.display))
+            self.native, self.annotation = native.native, native.annotation
+            self.state, self.text = native.state, native.text
+            self.GetAnnotation = lambda: self.annotation
+            self.GetDimension = lambda: self.native
+            self.annotation.GetSpecificAnnotation = lambda: self
+            self.annotation.GetPosition = self.GetPosition
+            self.annotation.SetPosition2 = self.SetPosition2
+            self.name, self.axis, self.feature = name, axis, feature
+            self.frozen = False
+            for method_name in ("SetUnits2", "SetPrecision3", "SetText"):
+                method = getattr(self, method_name)
+
+                def native_write(*args, method=method, method_name=method_name):
+                    assert not self.frozen, f"{name}: settled guard wrote {method_name}"
+                    case.writes.append((name, method_name, args))
+                    return method(*args)
+
+                setattr(self, method_name, native_write)
+            self.native.Name = name
+            self.native.FullName = f"{name}@{feature}@sh-vn-clamp-screw.Part"
+            self.native.GetSystemValue3 = lambda _which, _configuration: (
+                self.native.SystemValue,
+            )
             self.record = _clamp_recovered_head_height()
             self.record["name"] = name
+            self.annotation.record = self.record
             data = self.record["display"]
             if axis == 0:
                 for row in data["lines"]:
@@ -8869,28 +8905,17 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
                 row[0] += dx
                 row[1] += dy
             for row in data["texts"]:
-                px, py, pz = row["pos"]
-                row["pos"] = (px + dx, py + dy, pz)
-            px, py, pz = self.record["pos"]
-            self.record["pos"] = (px + dx, py + dy, pz)
-            self.position = tuple(self.record["pos"])
+                x, y, z = row["pos"]
+                row["pos"] = (x + dx, y + dy, z)
+            x, y, z = self.record["pos"]
+            self.position = (x + dx, y + dy, z)
+            self.record["pos"] = self.position
             self.original_position = self.position
             self._offset = False
-            self.frozen = False
-            dimensions = clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
-            values = {name: value for name, value, _orientation in dimensions}
-            value = values[name]
-            self.native = SimpleNamespace(
-                Name=name,
-                FullName=f"{name}@SupplierReference@clamp.SLDPRT",
-                SystemValue=value / 1000,
-            )
+            self.next = None
 
-        def GetAnnotation(self):
-            return self
-
-        def GetDimension2(self, _index):
-            return self.native
+        def GetNext5(self):
+            return self.next
 
         def GetPosition(self):
             return self.position
@@ -8902,6 +8927,7 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
         @OffsetText.setter
         def OffsetText(self, enabled):
             assert not self.frozen, f"{self.name}: settled guard wrote offset mode"
+            case.writes.append((self.name, "OffsetText", enabled))
             if enabled and not self._offset:
                 transverse = 1 - self.axis
                 delta = (
@@ -8920,6 +8946,7 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
 
         def SetPosition2(self, x, y, z):
             assert not self.frozen, f"{self.name}: settled guard moved text"
+            case.writes.append((self.name, "SetPosition2", (x, y, z)))
             delta = (x - self.position[0], y - self.position[1])
             for row in self.record["display"]["texts"]:
                 px, py, pz = row["pos"]
@@ -8928,78 +8955,194 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
             self.record["pos"] = self.position
             return True
 
-    # With the defect, the long Length row shares HeadHeight's x station: the
-    # core shelf is still correct row by row, but HeadHeight's shelved text
-    # lands across Length's line, which only the whole-sheet audit sees.
-    length_dx = 0.0 if defect == "shared-station" else 0.150 - 0.1029834
-    displays = {
-        name: Display(name, axis, span, offset)
-        for name, axis, span, offset in (
-            ("SupplierHeadHeight", 1, None, (0.0, 0.0)),
-            ("SupplierThreadDiameter", 0, None, (0.0, 0.0)),
-            ("SupplierLength", 1, 0.050, (length_dx, 0.0)),
-            ("SupplierHeadDiameter", 0, None, (0.0, -0.05)),
+    # The immutable migration's same-station defect passes each row's core
+    # shelf proof but puts HeadHeight's text across Length's native line.
+    length_dx = 0.0 if case.defect == "shared-station" else 0.150 - 0.1029834
+    placements = {
+        "SupplierHeadHeight": (1, None, (0.0, 0.0)),
+        "SupplierThreadDiameter": (0, None, (0.0, 0.0)),
+        "SupplierLength": (1, 0.050, (length_dx, 0.0)),
+        "SupplierHeadDiameter": (0, None, (0.0, -0.05)),
+    }
+    case.displays = {
+        name: Display(name, feature, *placements[name])
+        for name, feature, _owner in case.identities
+    }
+    case.parameters = {
+        f"{name}@{feature}": case.displays[name].native
+        for name, feature, _owner in case.identities
+    }
+    case.features, case.feature_displays = {}, {}
+    source_path = r"C:\fixture\sh-vn-clamp-screw.SLDPRT"
+    case.model = SimpleNamespace(
+        GetType=lambda: 1,
+        GetPathName=lambda: source_path,
+        GetConfigurationByName=lambda name: object() if name == "Default" else None,
+        Parameter=lambda name: case.parameters.get(name),
+        FeatureByName=lambda name: case.features.get(name),
+    )
+    outlines = {
+        "*Front": (0.02, 0.02, 0.40, 0.08),
+        "*Top": (0.02, 0.09, 0.40, 0.27),
+        "*Right": (0.280, 0.080, 0.300, 0.100),
+        "*Isometric": (0.300, 0.170, 0.340, 0.200),
+    }
+    for owner, view in case.views.items():
+        view.displays = [
+            case.displays[name]
+            for name, _feature, expected_owner in case.identities
+            if owner == expected_owner
+        ]
+        view.GetName2 = lambda owner=owner: owner.removeprefix("*")
+        view.GetOutline = lambda owner=owner: outlines[owner]
+        view.GetAnnotations = lambda view=view: [
+            display.GetAnnotation() for display in view.displays
+        ]
+        view.UpdateViewDisplayGeometry = lambda: None
+        view.GetReferencedModelName = lambda: source_path
+        view.ReferencedConfiguration = "Default"
+        view.ReferencedDocument = case.model
+        points = (object(), object())
+        mapped = (object(), object())
+        mapping = dict(zip(points, mapped, strict=True))
+        view.GetCorresponding = mapping.get
+        for display in view.displays:
+            display.annotation.Owner = view
+            display.annotation.entities = mapped
+        if not view.displays:
+            continue
+        feature_name = view.displays[0].feature
+        sketch = SimpleNamespace(
+            GetSketchPoints2=lambda points=points: points,
+            GetSketchSegments=lambda: (),
         )
-    }
-    adapter = object()
-    views = {
-        "*Top": SimpleNamespace(
-            GetOrientationName=lambda: "*Top",
-            GetName2=lambda: "Top",
-            GetOutline=lambda: (0.02, 0.09, 0.40, 0.27),
+        members = [
+            SimpleNamespace(GetDimension2=display.GetDimension2)
+            for display in view.displays
+        ]
+        case.feature_displays[feature_name] = members
+        feature = SimpleNamespace(
+            Name=feature_name,
+            GetTypeName2=lambda: "ProfileFeature",
+            GetSpecificFeature2=lambda sketch=sketch: sketch,
+            GetFirstDisplayDimension=lambda members=members: members[0],
+            GetNextDisplayDimension=lambda display, members=members: (
+                members[members.index(display) + 1]
+                if members.index(display) + 1 < len(members)
+                else None
+            ),
+        )
+        case.features[feature_name] = feature
+        for display in view.displays:
+            display.native.GetFeatureOwner = lambda feature=feature: feature
+
+    case.adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+        _get_attr_or_call=lambda target, name: (
+            getattr(target, name)()
+            if callable(getattr(target, name))
+            else getattr(target, name)
         ),
-        "*Front": SimpleNamespace(
-            GetOrientationName=lambda: "*Front",
-            GetName2=lambda: "Front",
-            GetOutline=lambda: (0.02, 0.02, 0.40, 0.08),
-        ),
-    }
-    checks, rebuilds = [], []
+        _attempt=lambda action, **_kwargs: action(),
+    )
 
-    def source_callback():
-        pass
+    def native_member(target, _interface, name, *args):
+        value = getattr(target, name)
+        return value(*args) if callable(value) else value
 
-    def shared_annotate(actual_adapter, actual_views, **settings):
-        assert actual_adapter is adapter and actual_views is views
-        assert settings["dimensions"] is clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
-        assert settings["formats"] is clamp.supplier.SUPPLIER_REFERENCE_FORMATS
-        assert settings["settled_checks"] is checks
-        settings["settled_checks"].append(source_callback)
+    def native_import(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
+        expected = {display.name for display in view.displays}
+        assert set(keep) == expected
+        assert dimensions_by_feature == {view.displays[0].feature: expected}
+        return view.GetAnnotations()
 
-    monkeypatch.setattr(clamp, "annotate_supplier_screw", shared_annotate)
-    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(clamp, "_supplier_displays", lambda _adapter: dict(displays))
-    monkeypatch.setattr(clamp, "iter_views", lambda _adapter: iter(views.values()))
+    def native_projection(_adapter, view, points, **_kwargs):
+        assert len(points) == len(view.displays)
+        rows = [
+            name
+            for name, _value, _orientation
+            in clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+            if f"*{clamp.supplier.SUPPLIER_REFERENCE_PLANES.get(name, 'Front')}"
+            == view.orientation
+        ]
+        return [case.displays[name].position[:2] for name in rows]
+
+    monkeypatch.setattr(_dimensions, "_com_invoke", native_member)
+    monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "iter_views", lambda _adapter: iter(case.views.values()))
+    monkeypatch.setattr(screws, "curate_view_dimensions", native_import)
+    monkeypatch.setattr(screws, "model_points_in_view", native_projection)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj)
+    monkeypatch.setattr(reference_text, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(
-        clamp, "sheet_region", lambda _adapter: Box(0.01, 0.01, 0.42, 0.27)
+        reference_text, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
     )
     monkeypatch.setattr(
-        core, "rebuild_drawing", lambda _adapter, *, label: rebuilds.append(label)
-    )
-    monkeypatch.setattr(core, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(
-        core, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
-    )
-    monkeypatch.setattr(
-        core,
+        reference_text,
         "_dump_annotation",
         lambda _reader, annotation: copy.deepcopy(annotation.record),
     )
-    # The real sheet audit runs on the collected native records: no findings
-    # are faked either way.
+    monkeypatch.setattr(
+        reference_text,
+        "rebuild_drawing",
+        lambda _adapter, *, label: case.rebuilds.append(label),
+    )
+    monkeypatch.setattr(
+        clamp, "sheet_region", lambda _adapter: Box(0.01, 0.01, 0.42, 0.27)
+    )
+    case.reference_text = reference_text
+    settled = dict(case.displays)
 
-    def measure(name, display):
-        return core.measure_reference_text(
-            adapter, display, axis=display.axis, label=name
+    def recaptured(name):
+        """Replace a settled native display in both actual inventories."""
+        old = settled[name]
+        replacement = copy.copy(old)
+        replacement.record = copy.deepcopy(old.record)
+        replacement.annotation = copy.copy(old.annotation)
+        replacement.annotation.record = replacement.record
+        replacement.annotation.GetPosition = replacement.GetPosition
+        replacement.annotation.SetPosition2 = replacement.SetPosition2
+        replacement.annotation.GetSpecificAnnotation = lambda: replacement
+        replacement.GetAnnotation = lambda: replacement.annotation
+        case.displays[name] = replacement
+        owner = next(
+            owner
+            for candidate, _feature, owner in case.identities
+            if candidate == name
         )
+        displays = case.views[owner].displays
+        index = next(
+            index for index, display in enumerate(displays) if display.name == name
+        )
+        displays[index] = replacement
+        return replacement
 
-    transverse_before = {
-        name: tuple(
-            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
+    case.recaptured = recaptured
+    return case
+
+
+@pytest.mark.parametrize(
+    "clamp_supplier_annotation_replay",
+    (None, "shared-station"),
+    indirect=True,
+    ids=("clear", "shared-station"),
+)
+def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
+    clamp_supplier_annotation_replay,
+):
+    from _layout_audit import annotation_geometry, calibrate_sheet_advance
+    from _layout_geometry import segment_box_distance
+
+    case = clamp_supplier_annotation_replay
+    core = case.reference_text
+    displays = case.displays
+    before = {
+        name: core.measure_reference_text(
+            case.adapter, display, axis=display.axis, label=name
         )
         for name, display in displays.items()
     }
-    before = {name: measure(name, display) for name, display in displays.items()}
     native_before = {
         name: (display.native.FullName, display.native.SystemValue)
         for name, display in displays.items()
@@ -9008,27 +9151,33 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
         row["t"]
         for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
     )
-    if defect == "shared-station":
+    checks = []
+    if case.defect == "shared-station":
         with pytest.raises(
             RuntimeError, match="clamp supplier paths are not clear"
         ) as exc:
-            clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
+            case.clamp._annotate_supplier_dimensions(
+                case.adapter, case.views, settled_checks=checks
+            )
         assert "[text-on-line]" in str(exc.value)
         assert "SupplierHeadHeight" in str(exc.value)
         assert "SupplierLength" in str(exc.value)
         return
 
-    clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
+    case.clamp._annotate_supplier_dimensions(
+        case.adapter, case.views, settled_checks=checks
+    )
+    assert len(checks) == 2  # Real source/value proof, then shelf/layout proof.
+    assert set(case.clamp._supplier_displays(case.adapter)) == set(displays)
     for name, display in displays.items():
-        after = measure(name, display)
-        assert (display.native.FullName, display.native.SystemValue) == native_before[
-            name
-        ]
+        after = core.measure_reference_text(
+            case.adapter, display, axis=display.axis, label=name
+        )
+        assert (display.native.FullName, display.native.SystemValue) == native_before[name]
         for key in ("tips", "witnesses"):
             assert after[key] == before[name][key]
-        # Geometric ink clearance, not a tautological assertion about the
-        # core: the entire text block must clear every physical native run,
-        # including witnesses and arrowheads, on both short and long rows.
+        # The whole measured text block clears every native physical run,
+        # including witnesses and arrowheads, on short and long references.
         ink = annotation_geometry(
             after["record"],
             owner=name,
@@ -9040,8 +9189,13 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
             for segment in ink.segments
         )
         assert tuple(
-            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
-        ) == pytest.approx(transverse_before[name])
+            row["pos"][1 - display.axis] for row in after["record"]["display"]["texts"]
+        ) == pytest.approx(
+            tuple(
+                row["pos"][1 - display.axis]
+                for row in before[name]["record"]["display"]["texts"]
+            )
+        )
         if name == "SupplierLength":
             assert display.OffsetText is False
             assert display.position == display.original_position
@@ -9052,44 +9206,32 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
             assert low - after["reach"] >= core.CLEAR_GAP_M
             assert display.position[1 - axis] == display.original_position[1 - axis]
             assert display.position[axis] != display.original_position[axis]
-    assert (
-        tuple(
-            row["t"]
-            for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
-        )
-        == thread_text
-    )
+    assert tuple(
+        row["t"]
+        for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
+    ) == thread_text
     assert "8-32" in thread_text
 
-    # The registered late guard is read-only: it reacquires and remeasures,
-    # never moves, enables or rebuilds.
+    # The immutable migration's late guard is read-only and must reacquire:
+    # a captured old display would pass these later native changes.
     for display in displays.values():
         display.frozen = True
-    settled = dict(displays)
-    settled_rebuilds = len(rebuilds)
-    checks[-1]()
-    assert len(rebuilds) == settled_rebuilds
-
-    def recaptured(name):
-        """A fresh native handle for the settled row, late-mutated by the caller."""
-        replacement = copy.copy(settled[name])
-        replacement.record = copy.deepcopy(settled[name].record)
-        displays[name] = replacement
-        return replacement
-
-    # Core station/shelf proof: a captured old display would still pass.
-    replacement = recaptured("SupplierHeadHeight")
+    writes, rebuilds = list(case.writes), list(case.rebuilds)
+    for check in checks:
+        check()
+    replacement = case.recaptured("SupplierHeadHeight")
     replacement.record["display"]["texts"][0]["pos"] = (0.0916157, 0.232235, 0)
     with pytest.raises(RuntimeError, match="text crowds its native line"):
         checks[-1]()
-    replacement = recaptured("SupplierHeadHeight")
+    replacement = case.recaptured("SupplierHeadHeight")
     replacement.shift_stations(replacement.axis, 0.0001)
     with pytest.raises(RuntimeError, match="native (tips|witnesses) moved"):
         checks[-1]()
-    # Caller audit: the unshelved Length row's text dropped onto its own line
-    # keeps every station and shelf, so only the whole-sheet audit refuses it.
-    recaptured("SupplierHeadHeight")
-    replacement = recaptured("SupplierLength")
+
+    # The unchanged long row is not shelved: only the complete caller audit
+    # rejects its text dropped onto its own line, not the core station proof.
+    case.recaptured("SupplierHeadHeight")
+    replacement = case.recaptured("SupplierLength")
     text = replacement.record["display"]["texts"][0]
     text["pos"] = (text["pos"][0], 0.2255, text["pos"][2])
     with pytest.raises(
@@ -9098,7 +9240,73 @@ def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
         checks[-1]()
     assert "[dim-line-through-own-text]" in str(exc.value)
     assert "SupplierLength" in str(exc.value)
-    assert len(rebuilds) == settled_rebuilds
+    assert case.writes == writes and case.rebuilds == rebuilds
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        # Unique real clamp source/value/inventory boundaries absent from the
+        # immutable shelf/audit replay; no duplicate shared-core algorithm cases.
+        ("native-value", "!= exact expected"),
+        ("source-parameter", "native model/feature owner"),
+        ("feature-membership", "native model/feature owner"),
+        ("source-path", "source/configuration"),
+        ("source-configuration", "source/configuration"),
+        ("missing-display", "inventory changed"),
+        ("wrong-feature", "inventory changed"),
+    ),
+)
+def test_clamp_settled_consumer_reacquires_and_refuses_source_or_inventory_changes(
+    clamp_supplier_annotation_replay, defect, message
+):
+    case = clamp_supplier_annotation_replay
+    checks = []
+    case.clamp._annotate_supplier_dimensions(
+        case.adapter, case.views, settled_checks=checks
+    )
+    for check in checks:
+        check()
+    replacement = case.recaptured("SupplierHeadHeight")
+    top = case.views["*Top"]
+    # A clean replacement proves that both closures accept fresh native handles.
+    for check in checks:
+        check()
+    check = checks[-1]
+    if defect == "native-value":
+        replacement.native.SystemValue += 0.0001
+        check = checks[0]
+    elif defect == "source-parameter":
+        case.parameters.pop(f"{replacement.name}@{replacement.feature}")
+        check = checks[0]
+    elif defect == "feature-membership":
+        member = next(
+            member
+            for member in case.feature_displays[replacement.feature]
+            if member.GetDimension2(0) is replacement.native
+        )
+        member.GetDimension2 = lambda _index: copy.copy(replacement.native)
+        check = checks[0]
+    elif defect == "source-path":
+        top.GetReferencedModelName = lambda: r"C:\fixture\foreign.SLDPRT"
+        check = checks[0]
+    elif defect == "source-configuration":
+        top.ReferencedConfiguration = "Foreign"
+        check = checks[0]
+    elif defect == "missing-display":
+        top.displays.remove(replacement)
+    elif defect == "wrong-feature":
+        replacement.native.FullName = (
+            f"{replacement.name}@SupplierReference@sh-vn-clamp-screw.Part"
+        )
+    writes, rebuilds = list(case.writes), list(case.rebuilds)
+    records = {
+        name: copy.deepcopy(display.record) for name, display in case.displays.items()
+    }
+    with pytest.raises(RuntimeError, match=message):
+        check()
+    assert case.writes == writes and case.rebuilds == rebuilds
+    assert {name: display.record for name, display in case.displays.items()} == records
 
 
 def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
