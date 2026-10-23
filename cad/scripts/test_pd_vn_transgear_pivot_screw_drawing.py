@@ -2614,10 +2614,13 @@ def _saved_shelf_boundary(monkeypatch, state):
 
     def project(_adapter, view, points, *, label):
         origin = tuple(a + b for a, b in zip(view.Position, view.origin_offset, strict=True))
-        return tuple(
-            (origin[0] + 4 * x, origin[1] + (-4 * z if view is state.paper_top else 4 * y))
-            for x, y, z in points
-        )
+        projected = []
+        for index in range(len(points)):
+            x, y, z = points[index]
+            projected.append((
+                origin[0] + 4 * x, origin[1] + (-4 * z if view is state.paper_top else 4 * y),
+            ))
+        return tuple(projected)
 
     monkeypatch.setattr(drawing, "model_points_in_view", project)
     monkeypatch.setattr(
@@ -3076,6 +3079,53 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
     )
     state.paper["names"]["ThreadLengthMin"] = native.FullName
     return state
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+def test_paper_and_saved_source_geometry_use_real_sized_projection_contract(
+    monkeypatch, tmp_path, phase,
+):
+    import _drawing_projection as projection
+
+    state = _saved_physical_fixture(monkeypatch, tmp_path)
+    utility = object()
+    def invoke(obj, interface, member, *args):
+        # Fake only the raw COM math boundary. The real projection helpers
+        # retain their len/index/iteration contract and source-point math.
+        if (interface, member) == ("ISldWorks", "GetMathUtility"):
+            return utility
+        if (interface, member) == ("IView", "ModelToViewTransform"):
+            return obj
+        if (interface, member) == ("IMathUtility", "CreatePoint"):
+            return args[0]
+        if (interface, member) == ("IMathPoint", "MultiplyTransform"):
+            view = args[0]
+            origin = tuple(a + b for a, b in zip(view.Position, view.origin_offset, strict=True))
+            return (
+                origin[0] + 4 * obj[0],
+                origin[1] + (-4 * obj[2] if view is state.paper_top else 4 * obj[1]),
+                0.0,
+            )
+        if (interface, member) == ("IMathPoint", "ArrayData"):
+            return obj
+        raise AssertionError(f"unexpected projection math boundary: {interface}.{member}")
+    monkeypatch.setattr(projection, "_com_invoke", invoke)
+    monkeypatch.setattr(projection, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "model_points_in_view", projection.model_points_in_view)
+    monkeypatch.setattr(drawing, "model_point_in_view", projection.model_point_in_view)
+    if phase == "saved":
+        drawing._assert_saved_physical_references(
+            state.adapter, state.identities, state.configurations,
+            serialized_full_names=state.serialized_full_names,
+            serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+        )
+    else:
+        state.adapter.currentModel = state.saved
+        state.note_check()
+        drawing._assert_paper_layout(
+            state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+            state.paper_displays, purchased_text=state.note_text,
+        )
 
 
 @pytest.mark.parametrize("fault", (

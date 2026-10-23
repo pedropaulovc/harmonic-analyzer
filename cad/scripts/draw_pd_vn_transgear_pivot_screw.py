@@ -1305,7 +1305,7 @@ def _assert_socket_source(adapter: Any, top: Any, display: Any) -> None:
     physical = measure_reference_text(adapter, display, axis=0, label="SupplierSocketAF")
     expected = sorted(model_points_in_view(
         adapter, top,
-        ((x / 1000, HEAD_H / 1000, 0.0) for x in (-SOCKET_AF / 2, SOCKET_AF / 2)),
+        [(x / 1000, HEAD_H / 1000, 0.0) for x in (-SOCKET_AF / 2, SOCKET_AF / 2)],
         label="actual socket width stations",
     ))
     if int(display.Type2) != 2 or any(
@@ -1874,9 +1874,9 @@ def _assert_paper_layout(
             raise RuntimeError("Purchased Screw Note: complete native text crowds a finished view")
     top_points = model_points_in_view(
         adapter, top,
-        ((x / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, z / 1000)
+        [(x / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, z / 1000)
          for x, z in ((-HEAD_DIA / 2, 0), (HEAD_DIA / 2, 0),
-                      (0, -HEAD_DIA / 2), (0, HEAD_DIA / 2))),
+                      (0, -HEAD_DIA / 2), (0, HEAD_DIA / 2))],
         label="Top actual head perimeter",
     )
     body = Box.from_points(list(top_points))
@@ -1909,11 +1909,11 @@ def _assert_paper_layout(
     radial_x, radial_z = left_point[0] * 1000 / _HEAD_TOP_R, left_point[2] * 1000 / _HEAD_TOP_R
     head = model_points_in_view(
         adapter, front,
-        ((radial_x * radius / 1000, y / 1000, radial_z * radius / 1000) for radius, y in (
+        [(radial_x * radius / 1000, y / 1000, radial_z * radius / 1000) for radius, y in (
             (HEAD_DIA / 2, 0), (-HEAD_DIA / 2, 0),
             (-HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER), (-_HEAD_TOP_R, HEAD_H),
             (_HEAD_TOP_R, HEAD_H), (HEAD_DIA / 2, HEAD_H - HEAD_CHAMFER),
-        )), label="actual source head silhouette stations",
+        )], label="actual source head silhouette stations",
     )
     outline = [Segment(*first, *second) for first, second in zip(head, (*head[1:], head[0]), strict=True)]
     for run in note_ink.segments:
