@@ -568,10 +568,7 @@ def test_source_part_stamps_every_required_property(drawing) -> None:
     assert not blank, f"{stem}: apply_drawing_properties reads blank registry fields {blank}"
 
 
-@pytest.mark.parametrize(
-    "name",
-    ("sh_vn_clamping_kit_hardware", "sh_vn_music_wire"),
-)
+@pytest.mark.parametrize("name", ("sh_vn_clamping_kit_hardware",))
 def test_configured_notes_must_reach_the_stamping_call(name, monkeypatch) -> None:
     drawing = next(drawing for drawing in PART_DRAWINGS if drawing.name == name)
     build = SCRIPTS / f"build_{drawing.part}.py"
@@ -593,43 +590,6 @@ def test_configured_notes_must_reach_the_stamping_call(name, monkeypatch) -> Non
         globals(), "_tree", lambda path: tree if path == build else read_tree(path)
     )
     with pytest.raises(AssertionError, match="never stamps"):
-        test_source_part_stamps_every_required_property(drawing)
-
-
-@pytest.mark.parametrize("move_to_other_member", (False, True), ids=("missing", "wrong-member"))
-def test_wire_note_keys_belong_to_their_own_member(move_to_other_member, monkeypatch) -> None:
-    drawing = next(drawing for drawing in PART_DRAWINGS if drawing.name == "sh_vn_music_wire")
-    build = SCRIPTS / f"build_{drawing.part}.py"
-    tree = _tree(build)
-    table_tree, members = _metadata_dict(
-        tree, ast.Name(id="MEMBER_PROPERTIES", ctx=ast.Load())
-    )
-    member_properties = {
-        _metadata_string(table_tree, configuration): properties
-        for configuration, properties in zip(members.keys, members.values, strict=True)
-    }
-    lever = member_properties["LeverWire"]
-    pen = member_properties["PenWire"]
-    assert isinstance(lever, ast.Dict) and isinstance(pen, ast.Dict)
-    index = next(
-        index for index, key in enumerate(lever.keys)
-        if _metadata_string(table_tree, key) == "Front View Note"
-    )
-    key, value = lever.keys.pop(index), lever.values.pop(index)
-    if move_to_other_member:
-        pen.keys.append(key)
-        pen.values.append(value)
-    # A disconnected string, including one in a readback guard, is not proof.
-    tree.body.append(ast.Expr(value=ast.Constant(value="LeverWire Front View Note")))
-    read_tree = _tree
-    monkeypatch.setitem(
-        globals(), "_tree", lambda path: tree if path == build else read_tree(path)
-    )
-    stamped, _ = _stamped(drawing.part.replace("_", "-"), build)
-    assert "LeverWire Front View Note" not in stamped
-    assert "LeverWire Elevation View Note" not in stamped
-    assert ("PenWire Front View Note" in stamped) == move_to_other_member
-    with pytest.raises(AssertionError, match="LeverWire Front View Note"):
         test_source_part_stamps_every_required_property(drawing)
 
 

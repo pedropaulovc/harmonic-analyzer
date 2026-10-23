@@ -1,11 +1,12 @@
-"""A native supplier stock circle, never a dimension on the installed wire."""
+"""The labelled supplier wire section: the package's one native dimension."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.sw_type_info import constant
 
 import _telemetry
 from _com import _early_bound
@@ -25,7 +26,7 @@ from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
 )
-from _purchased_fastener_drawing import assert_supplier_view_fits
+from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
 from _supplier_spring_drawing import (
     assert_supplier_configuration_value,
     reacquire_supplier_dimensions,
@@ -33,28 +34,49 @@ from _supplier_spring_drawing import (
 
 STOCK_SCALE = (20, 1)
 _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
-# Reserve these separate diagram fields without moving/refitting either of the
-# existing member views or their independently checked Depth references. The
-# native diameter is the only supplier datum here; SKU and material are in each
-# member's Manufacturing Notes, so the view carries no caption.
-STOCK_LAYOUTS = {
-    "LeverWire": ((0.300, 0.155), (0.325, 0.168)),
-    "PenWire": ((0.190, 0.241), (0.215, 0.252)),
-}
-STOCK_FIELDS = {
-    "LeverWire": (0.240, 0.110, 0.410, 0.190),
-    "PenWire": (0.145, 0.205, 0.260, 0.265),
-}
+# Sheet metres: the circle (15.7 mm at 20:1) centred left of the title block,
+# its Ø text up-right on the leader, the view label under the padded outline.
+STOCK_CENTER = (0.150, 0.170)
+STOCK_TEXT = (0.175, 0.183)
+STOCK_LABEL = f"WIRE SECTION SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
+STOCK_LABEL_XY = (0.121, 0.152)
+STOCK_FIELD = (0.100, 0.130, 0.260, 0.220)
+# The supplier circle is model construction geometry (the zero-body diagram
+# contract). This package prints nothing else, so its construction curves draw
+# as the section's solid visible outline: DP_LineFont, this SLDDRW only.
+_CONSTRUCTION_LINE_FONT = (
+    ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
+    ("swLineFontConstructionCurvesThickness", "swLW_THICK"),
+)
 
 
-def _delete_center_marks(adapter, view, *, member: str) -> None:
+def _construction_curves_as_outline(adapter) -> Callable[[], None]:
+    extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+    option = constant("swDetailingNoOptionSpecified")
+    settings = tuple(
+        (name, constant(name), constant(value)) for name, value in _CONSTRUCTION_LINE_FONT
+    )
+
+    def readback() -> None:
+        for name, preference, value in settings:
+            if int(extension.GetUserPreferenceInteger(preference, option)) != value:
+                raise RuntimeError(f"wire section line font {name} readback differs")
+
+    for name, preference, value in settings:
+        if not extension.SetUserPreferenceInteger(preference, option, value):
+            raise RuntimeError(f"failed to set wire section line font {name}")
+    readback()
+    return readback
+
+
+def _delete_center_marks(adapter, view) -> None:
     """Delete the template's mark on the stock circle and read none back.
 
-    Its arms scale with the 20:1 view (50 mm cross plus 8 mm extensions), so it
-    crossed the PenWire top border. The stock circle locates nothing; the
-    native diameter alone is the replacement datum.
+    Its arms scale with the 20:1 view (50 mm cross plus 8 mm extensions) and
+    run off the sheet. The circle locates nothing; the native diameter is the
+    replacement datum.
     """
-    label = f"{member} supplier stock centre mark"
+    label = "supplier wire section centre mark"
     marks = tuple(view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ())
     if not marks:
         _telemetry.info(f"{label}: none drawn")
@@ -72,51 +94,61 @@ def _delete_center_marks(adapter, view, *, member: str) -> None:
     _telemetry.info(f"{label}: deleted {len(marks)}")
 
 
-def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable[[], None]:
-    """Show/import the saved model circle and return final native readback."""
-    center, text = STOCK_LAYOUTS[member]
+def add_wire_section(adapter, source) -> Callable[[], None]:
+    """Show/import the saved supplier circle, label it, return final readback."""
+    line_font = _construction_curves_as_outline(adapter)
     view = _early_bound(
-        place_view(adapter, str(source), "*Top", *center, scale=STOCK_SCALE), "IView",
+        place_view(adapter, str(source), "*Top", *STOCK_CENTER, scale=STOCK_SCALE), "IView",
     )
     view.ReferencedConfiguration = SUPPLIER_REFERENCE_CONFIGURATION
     if str(view.ReferencedConfiguration) != SUPPLIER_REFERENCE_CONFIGURATION:
-        raise RuntimeError("wire stock view references installed geometry")
+        raise RuntimeError("wire section view references installed geometry")
     view.UseSheetScale = 0
     view.ScaleRatio = double_array(STOCK_SCALE)
     set_hidden_lines_removed(adapter, view)
-    rebuild_drawing(adapter, label=f"{member} supplier stock configuration")
+    rebuild_drawing(adapter, label="supplier wire section configuration")
     annotations = curate_view_dimensions(
-        adapter, view, keep={SUPPLIER_REFERENCE_DIMENSION: text},
-        view_label=f"{member} supplier nominal stock circle",
+        adapter, view, keep={SUPPLIER_REFERENCE_DIMENSION: STOCK_TEXT},
+        view_label="supplier wire section",
         dimensions_by_feature=SUPPLIER_REFERENCE_DIMENSIONS,
     )
     if len(annotations) != 1:
-        raise RuntimeError("supplier nominal stock needs one native diameter")
+        raise RuntimeError("supplier wire section needs one native diameter")
     view.UpdateViewDisplayGeometry()
     at = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="supplier circle centre")
     position = tuple(float(value) for value in view.Position)
     if not view.SetViewPosition(
-        double_array([position[index] + center[index] - at[index] for index in range(2)]), False,
+        double_array([position[index] + STOCK_CENTER[index] - at[index] for index in range(2)]),
+        False,
     ):
-        raise RuntimeError("cannot centre supplier nominal stock circle")
-    rebuild_drawing(adapter, label=f"{member} supplier circle position")
-    _delete_center_marks(adapter, view, member=member)
+        raise RuntimeError("cannot centre supplier wire section")
+    rebuild_drawing(adapter, label="supplier wire section position")
+    _delete_center_marks(adapter, view)
     annotation = _early_bound(annotations[0], "IAnnotation")
-    if not annotation.SetPosition(*text, 0.0):
-        raise RuntimeError("cannot position native supplier stock diameter")
+    if not annotation.SetPosition(*STOCK_TEXT, 0.0):
+        raise RuntimeError("cannot position native supplier wire diameter")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     options = {
-        "label": "9666K56 supplier nominal stock diameter", "units": "in",
+        "label": "9666K56 supplier nominal wire diameter", "units": "in",
         "precision": SUPPLIER_DIAMETER_PRECISION, "expected_mm": DIA,
         "presentation": "diameter",
         "configuration": SUPPLIER_REFERENCE_CONFIGURATION,
     }
     supplier_reference_dimension(adapter, display, **options)
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    drawing.ActivateView("")
+    if not drawing.GetEditSheet() or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot restore sheet context for the wire section label")
+    label = add_note(adapter, STOCK_LABEL, *STOCK_LABEL_XY)
+    if label is None:
+        raise RuntimeError("cannot create the wire section label")
+    label = _early_bound(label, "INote")
 
     def settled() -> None:
+        line_font()
         if (str(view.ReferencedConfiguration) != SUPPLIER_REFERENCE_CONFIGURATION
                 or tuple(view.ScaleRatio) != STOCK_SCALE):
-            raise RuntimeError("wire stock view configuration/scale changed")
+            raise RuntimeError("wire section view configuration/scale changed")
         found = reacquire_supplier_dimensions(
             adapter, {"stock": view},
             expected={"stock": {
@@ -129,17 +161,24 @@ def add_nominal_stock_cross_section(adapter, source, *, member: str) -> Callable
         if (str(native.FullName).split("@")[:2]
                 != [SUPPLIER_REFERENCE_DIMENSION, SUPPLIER_REFERENCE_FEATURE]
                 or int(final.Type2) != 6):
-            raise RuntimeError("stock diameter lost its true native circle identity")
+            raise RuntimeError("wire diameter lost its true native circle identity")
         assert_supplier_configuration_value(
-            final, SUPPLIER_REFERENCE_CONFIGURATION, DIA, label="supplier stock circle",
+            final, SUPPLIER_REFERENCE_CONFIGURATION, DIA, label="supplier wire circle",
         )
         if int(_early_bound(native.Tolerance, "IDimensionTolerance").Type) != 0:
-            raise RuntimeError("supplier stock diameter acquired an unprovided band")
+            raise RuntimeError("supplier wire diameter acquired an unprovided band")
         assert_supplier_reference_dimension(adapter, final, **options)
         if view.GetAnnotationsByType(_CENTER_MARK_ANNOTATION):
-            raise RuntimeError(f"{member}: supplier stock view regained a centre mark")
-        assert_supplier_view_fits(
-            adapter, view, STOCK_FIELDS[member], label=f"{member} supplier stock",
-        )
+            raise RuntimeError("supplier wire section regained a centre mark")
+        assert_supplier_view_fits(adapter, view, STOCK_FIELD, label="supplier wire section")
+        if str(label.GetText() or "").replace("\r", "") != STOCK_LABEL:
+            raise RuntimeError("wire section label changed")
+        box = _box(label.GetExtent(), label="wire section label", kind="note")
+        outline = _box(view.GetOutline(), label="supplier wire section")
+        if not _inside(box, STOCK_FIELD) or (
+            box[0] < outline[2] and outline[0] < box[2]
+            and box[1] < outline[3] and outline[1] < box[3]
+        ):
+            raise RuntimeError(f"wire section label leaves its field or overlaps the view: {box!r}")
 
     return settled

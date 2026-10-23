@@ -435,41 +435,34 @@ def test_drawing_is_the_purchased_reference_sheet() -> None:
 
 
 def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
-    from _supplier_screw_layout import supplier_screw_lane_plan
+    from _supplier_screw_layout import supplier_screw_lane_plan, supplier_screw_margins
 
     rows = drawing._printed_rows()
     assert tuple(name for name, _, _ in rows) == drawing.PRINTED_REFERENCES
     assert all(orientation != "angle" for _, _, orientation in rows)
-    # The part still authors these; a standard oval head implies them.
+    # The part still authors these; ITEM and a standard oval head imply them.
     authored = {name for name, _, _ in screw.SUPPLIER_REFERENCE_DIMENSIONS}
     assert authored - set(drawing.PRINTED_REFERENCES) == {
         "SupplierHeadAngle", "SupplierCrownHeight",
+        "SupplierStockLength", "SupplierNominalThreadMajor",
     }
-    plan = supplier_screw_lane_plan(
-        rows,
-        planes=drawing._printed(screw.SUPPLIER_REFERENCE_PLANES),
-        sides=drawing._printed(screw.SUPPLIER_REFERENCE_SIDES),
-    )
+    planes = drawing._printed(screw.SUPPLIER_REFERENCE_PLANES)
+    sides = drawing._printed(screw.SUPPLIER_REFERENCE_SIDES)
+    plan = supplier_screw_lane_plan(rows, planes=planes, sides=sides)
     assert set(plan) == set(drawing.PRINTED_REFERENCES)
+    # Only TOP is reserved, so only TOP may carry imported dimensions; FRONT
+    # and RIGHT stay centred in their cells, in projection with TOP.
+    margins = supplier_screw_margins(rows, planes=planes, sides=sides)
+    assert set(margins) == {"*Top"}
+    left, _bottom, right, _top = margins["*Top"]
+    assert left == right
+    formats = drawing._printed(screw.SUPPLIER_REFERENCE_FORMATS)
+    assert formats == {"SupplierHeadDiameter": screw.SUPPLIER_REFERENCE_FORMATS["SupplierHeadDiameter"]}
+    assert "supplier_top" in drawing.build.__code__.co_consts
     monkeypatch.setattr(
         drawing, "PRINTED_REFERENCES", ("SupplierStockLength", "SupplierMissing")
     )
     with pytest.raises(ValueError, match="SupplierMissing"):
         drawing._printed_rows()
-
-
-def test_sheet_callouts_keep_spec_presentation_and_shelve_top_text(monkeypatch) -> None:
-    formats = drawing._printed_formats()
-    assert set(formats) == set(drawing.PRINTED_REFERENCES)
-    for name, (precision, presentation, denominator, callout) in formats.items():
-        source = screw.SUPPLIER_REFERENCE_FORMATS[name]
-        assert (precision, presentation, denominator) == source[:3]
-        assert callout == drawing.PRINTED_CALLOUTS.get(name, source[3])
-    assert formats["SupplierStockLength"][3] is None
-    assert formats["SupplierNominalThreadMajor"][3] == "8-32"
-    assert "supplier_top" in drawing.build.__code__.co_consts
-    monkeypatch.setattr(drawing, "PRINTED_CALLOUTS", {"SupplierCrownHeight": "REF"})
-    with pytest.raises(ValueError, match="SupplierCrownHeight"):
-        drawing._printed_formats()
 
 

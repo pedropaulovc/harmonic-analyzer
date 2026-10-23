@@ -3,7 +3,8 @@ r"""McMaster 9666K56 music wire, with the two existing straight rest-run members
 LeverWire retains the drum-origin frame, midpoint balloon edge, hook/hub
 reference points and wire axis. PenWire retains the eye-origin frame and its
 independent length. Neither member defines wraps, tie-offs or a developed cut
-length; both drawings remain DO NOT RELEASE. Geometry is not supplier redesign.
+length; the purchased package drawing prints only the supplier wire diameter
+from the zero-body SUPPLIER_REFERENCE state. Geometry is not supplier redesign.
 
 The lever endpoint/yoke solver lives in ``sh_vn_music_wire_lever_geom``. Its
 wheel mid-plane is the pen-rod line ``_recording_geometry.PEN_Z_MID``; recording
@@ -26,11 +27,7 @@ from _check import check
 from _com import _com_invoke, _early_bound
 from _custom_properties import apply_custom_properties
 from _dimensions import drive_dimension, name_dimensions, set_global
-from _drawing_marks import (
-    apply_drawing_properties,
-    clear_dimensions_for_drawing,
-    mark_dimensions_for_drawing,
-)
+from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing
 from _feature_tree import _feature_by_name, feature_name_by_type, name_last_feature
 from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _purchased_part_variants import (
@@ -54,6 +51,7 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
+from _mcmaster_9666k56 import SKU
 from _sketch_circle import define_circle
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 from _supplier_wire_stock import author_nominal_stock_cross_section
@@ -81,18 +79,9 @@ DESCRIPTIONS = {
     lever.CONFIGURATION: lever_spec.BOM_DESCRIPTION,
     pen.CONFIGURATION: pen_spec.BOM_DESCRIPTION,
 }
-MEMBER_PROPERTIES = {
-    lever.CONFIGURATION: {
-        "Manufacturing Notes": lever_spec.DRAWING_NOTES,
-        "Front View Note": lever_spec.FRONT_VIEW_NOTE,
-        "Isometric View Note": lever_spec.ISOMETRIC_VIEW_NOTE,
-    },
-    pen.CONFIGURATION: {
-        "Manufacturing Notes": pen_spec.DRAWING_NOTES,
-        "Elevation View Note": pen_spec.ELEVATION_VIEW_NOTE,
-        "Isometric View Note": pen_spec.ISOMETRIC_VIEW_NOTE,
-    },
-}
+# The one package note: the purchase identity. The diameter is the native
+# supplier dimension on the drawing, never note text.
+DRAWING_NOTES = f"PURCHASED WIRE: McMASTER-CARR {SKU}"
 
 if not math.isclose(WIRE_DIA, pen.WIRE_DIA, abs_tol=1e-12):
     raise ValueError("the two 9666K56 members must retain their shared stock diameter")
@@ -292,11 +281,7 @@ async def _readback(adapter, configuration: str) -> None:
     await bbox_extent_check(adapter, f"{configuration} length", "y", length)
     _require_cylinder_areas(adapter, configuration)
     assert_member_properties(
-        adapter,
-        PART_NAME,
-        configuration,
-        DESCRIPTIONS[configuration],
-        MEMBER_PROPERTIES[configuration],
+        adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
     )
     assert_reference_geometry_hidden(adapter, f"{PART_NAME} {configuration}")
 
@@ -345,19 +330,13 @@ async def build(adapter) -> dict[str, str]:
         blank_reference_geometry(adapter, (("Axis1", "AXIS"),))
         await apply_material(adapter, MATERIAL)
         apply_member_properties(
-            adapter,
-            PART_NAME,
-            configuration,
-            DESCRIPTIONS[configuration],
-            MEMBER_PROPERTIES[configuration],
+            adapter, PART_NAME, configuration, DESCRIPTIONS[configuration], {}
         )
         await report_mass_properties(adapter)
 
     clear_dimensions_for_drawing(adapter)
-    for feature_name, dimensions in pen_spec.DRAWING_DIMENSIONS.items():
-        mark_dimensions_for_drawing(adapter, feature_name, dimensions)
-    # Keep both straight-run Depth references. The supplier's .7874-mm stock
-    # circle lives only in its own zero-body construction reference state.
+    # The supplier's .7874-mm stock circle lives only in its own zero-body
+    # construction reference state; it is the package's one printed dimension.
     await author_nominal_stock_cross_section(adapter)
     row = _config.parts(PART_NAME)
     apply_custom_properties(
@@ -368,12 +347,9 @@ async def build(adapter) -> dict[str, str]:
             "Supplier SKUs": ", ".join(str(sku) for sku in row["supplier_skus"]),
         },
     )
-    document_notes = {
-        f"{configuration} {name}": value
-        for configuration, properties in MEMBER_PROPERTIES.items()
-        for name, value in properties.items()
-    }
-    apply_drawing_properties(adapter, PART_NAME, document_notes)
+    apply_drawing_properties(
+        adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES}
+    )
     return await save_member_part(
         adapter,
         PART_NAME,

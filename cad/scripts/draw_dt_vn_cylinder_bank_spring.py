@@ -4,17 +4,38 @@ The sheet prints only replacement sizes: ID, OD, free height and thickness.
 The part keeps its catalogue load-point gauge sketch (compressed height and
 deflection at 1.5 lb), which is rating data rather than a replacement size;
 the 0.95 mm set gap governs the installed preload.
+
+At 2:1 these diagrams are smaller than their text. The shared disc placement
+centres each value on its own line, so machinist review of b344192 found the
+thickness and free height struck by their witnesses and dimension lines, and
+the two plan diameters crossing at the centre with their text on the OD rim.
+``place_size_texts`` keeps every native dimension, value and station, and
+moves only presentation: the heights take native offset text shelved beyond
+their own lines (the R48 washer pattern), and the diameters take one
+near-side arrow with their text a text height clear of the OD rim.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Mapping
 from functools import partial
+import math
 from types import SimpleNamespace
 import sys
 from typing import Any
 
 import _telemetry
+from _com import _early_bound
+from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
+from _drawing_common import rebuild_drawing
+from _drawing_layout_audit import _Reader, _dump_annotation
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    set_near_side_diameter,
+)
+from _layout_audit import display_box
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_disc_spring_drawing import (
@@ -22,9 +43,17 @@ from _supplier_disc_spring_drawing import (
     supplier_disc_reference_features,
     supplier_disc_spring_dimensions,
 )
-from _supplier_spring_drawing import build_supplier_spring_drawing
+from _supplier_screw_layout import supplier_top_text_geometry
+from _supplier_spring_drawing import (
+    build_supplier_spring_drawing,
+    reacquire_supplier_dimensions,
+)
 from _supplier_spring_reference import SUPPLIER_DIAGRAM_CONFIGURATION
 import dt_vn_cylinder_bank_spring_spec as supplier_spec
+from vn_disc_spring_supplier_stock import (
+    SUPPLIER_DIMENSION_NAMES,
+    SUPPLIER_DIMENSIONS_BY_FEATURE,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["dt_vn_cylinder_bank_spring"]
@@ -34,6 +63,235 @@ ITEM = "WAVE DISC SPRING"
 SHEET_SPEC = SimpleNamespace(
     **{**vars(supplier_spec), "SUPPLIER_APPLICATION_DIMENSIONS": ()}
 )
+ID_NAME = SUPPLIER_DIMENSION_NAMES["ID"]
+OD_NAME = SUPPLIER_DIMENSION_NAMES["OD"]
+# Each size keeps the side of its diagram the shared placement gave it:
+# -1 left, +1 right.
+TEXT_SIDES = {
+    "free_front": {
+        SUPPLIER_DIMENSION_NAMES["THICKNESS"]: -1,
+        SUPPLIER_DIMENSION_NAMES["FREE_HEIGHT"]: 1,
+    },
+    "free_top": {ID_NAME: -1, OD_NAME: 1},
+}
+_STATION_FIELDS = ("tips", "witnesses", "physical_lines")
+
+
+def height_text_shift(geometry: Mapping[str, Any], side: int) -> float:
+    """Sheet x move that shelves offset text wholly past its own native lines."""
+    text = geometry["text"]
+    air = CLEAR_GAP_M + PLACE_SETTLE_M
+    if side < 0:
+        return geometry["left"] - air - text.xmax
+    return geometry["right"] + air - text.xmin
+
+
+def assert_height_text_clear(
+    geometry: Mapping[str, Any], side: int, *, label: str
+) -> None:
+    """No witness, dimension line or arrow of its own reaches the text."""
+    text = geometry["text"]
+    gap = geometry["left"] - text.xmax if side < 0 else text.xmin - geometry["right"]
+    if not gap >= CLEAR_GAP_M:
+        raise RuntimeError(
+            f"{label}: text is {gap * 1000:.2f} mm from its own native lines"
+        )
+
+
+def diameter_air(text: Any) -> float:
+    """A text height of air between a diameter's text and the OD rim."""
+    return max(CLEAR_GAP_M, text.height)
+
+
+def diameter_text_shift(
+    text: Any, plan: tuple[float, float, float, float], side: int
+) -> float:
+    """Sheet x move that leaves ``diameter_air`` between text and plan ink."""
+    air = diameter_air(text) + PLACE_SETTLE_M
+    if side < 0:
+        return plan[0] - air - text.xmax
+    return plan[2] + air - text.xmin
+
+
+def assert_diameter_text_clear(
+    text: Any, plan: tuple[float, float, float, float], side: int, *, label: str
+) -> None:
+    gap = plan[0] - text.xmax if side < 0 else text.xmin - plan[2]
+    if not gap >= diameter_air(text):
+        raise RuntimeError(
+            f"{label}: text is {gap * 1000:.2f} mm from the OD rim, under a text height"
+        )
+
+
+def assert_plan_leaders(
+    groups: Mapping[str, Any], plan: tuple[float, float, float, float], *, label: str
+) -> None:
+    """Each diameter lands on its own rim and no line reaches the centre."""
+    x0, y0, x1, y1 = plan
+    radii = {OD_NAME: (x1 - x0) / 2.0}
+    radii[ID_NAME] = radii[OD_NAME] * supplier_spec.ID / supplier_spec.OD
+    assert_leaders_clear(
+        groups,
+        centre=((x0 + x1) / 2.0, (y0 + y1) / 2.0),
+        keep_out={name: 0.5 * radii[ID_NAME] for name in groups},
+        lands_within={name: (0.8 * radius, 1.2 * radius) for name, radius in radii.items()},
+        label=label,
+    )
+
+
+def stations_match(prior: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    return all(
+        len(prior[field]) == len(current[field])
+        and all(
+            len(before) == len(after)
+            and all(
+                abs(a - b) <= 1e-5 for a, b in zip(before, after, strict=True)
+            )
+            for before, after in zip(prior[field], current[field], strict=True)
+        )
+        for field in _STATION_FIELDS
+    )
+
+
+def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
+    reader = _Reader(adapter)
+    record = _dump_annotation(reader, display.GetAnnotation())
+    errors = reader.take_errors()
+    position = (record or {}).get("pos") or ()
+    texts = ((record or {}).get("display") or {}).get("texts") or ()
+    if (
+        errors or record is None or int(record.get("type", 0)) != 4
+        or len(position) != 3
+        or not all(math.isfinite(float(value)) for value in position)
+        or not texts
+        or not all(float(row.get("w") or 0.0) > 0.0 for row in texts)
+    ):
+        raise RuntimeError(f"{label}: no measured native text/position: {errors!r}")
+    return record
+
+
+def _size_displays(adapter: Any, views: Mapping[str, Any]) -> dict[str, Any]:
+    return reacquire_supplier_dimensions(
+        adapter,
+        {key: views[key] for key in TEXT_SIDES},
+        expected={
+            key: {
+                name: next(
+                    feature
+                    for feature, names in SUPPLIER_DIMENSIONS_BY_FEATURE.items()
+                    if name in names
+                )
+                for name in sides
+            }
+            for key, sides in TEXT_SIDES.items()
+        },
+        configurations={key: SUPPLIER_DIAGRAM_CONFIGURATION for key in TEXT_SIDES},
+    )
+
+
+def _move_text(display: Any, record: Mapping[str, Any], dx: float, *, label: str) -> None:
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    x, y = (float(value) for value in record["pos"][:2])
+    if not annotation.SetPosition2(x + dx, y, 0.0):
+        raise RuntimeError(f"{label}: text placement was rejected")
+
+
+def _assert_size_texts(
+    adapter: Any,
+    displays: Mapping[str, Any],
+    plan: tuple[float, float, float, float],
+    stations: Mapping[str, Mapping[str, Any]],
+) -> None:
+    for name, side in TEXT_SIDES["free_front"].items():
+        display = displays[name]
+        geometry = supplier_top_text_geometry(
+            _text_record(adapter, display, label=name), horizontal=False
+        )
+        if display.OffsetText is not True or not stations_match(stations[name], geometry):
+            raise RuntimeError(f"{name}: offset text moved its native lines")
+        assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
+    groups = {}
+    for name, side in TEXT_SIDES["free_top"].items():
+        record = _text_record(adapter, displays[name], label=name)
+        text = display_box({"texts": record["display"]["texts"]})
+        assert_diameter_text_clear(text, plan, side, label=f"{supplier_spec.SKU} {name}")
+        groups[name] = dimension_segments(displays[name].GetAnnotation())
+    assert_plan_leaders(groups, plan, label=f"{supplier_spec.SKU} plan diameters")
+
+
+def place_size_texts(
+    adapter: Any,
+    views: Mapping[str, Any],
+    *,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
+) -> Callable[[], None]:
+    """Move the four size texts off their lines; return their settled check."""
+    displays = _size_displays(adapter, views)
+    for name in TEXT_SIDES["free_top"]:
+        set_near_side_diameter(displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}")
+    # Pin each height's dimension line at its own station before offset mode;
+    # from then on SetPosition2 moves only the text (R48 washer sequence).
+    anchors = {}
+    for name in TEXT_SIDES["free_front"]:
+        record = _text_record(adapter, displays[name], label=name)
+        tips = supplier_top_text_geometry(record, horizontal=False)["tips"]
+        anchors[name] = (sum(tip[0] for tip in tips) / 2.0, float(record["pos"][1]))
+        annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
+        if not annotation.SetPosition2(*anchors[name], 0.0):
+            raise RuntimeError(f"{name}: dimension line station was rejected")
+    rebuild_drawing(adapter, label="cylinder bank spring height stations")
+    for name, anchor in anchors.items():
+        display = displays[name]
+        display.OffsetText = True
+        annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+        if display.OffsetText is not True or not annotation.SetPosition2(*anchor, 0.0):
+            raise RuntimeError(f"{name}: native offset text was rejected")
+    rebuild_drawing(adapter, label="cylinder bank spring offset height text")
+    plan = reference_bounds("free_top")
+    shifts = {}
+    for name, side in TEXT_SIDES["free_front"].items():
+        record = _text_record(adapter, displays[name], label=name)
+        geometry = supplier_top_text_geometry(record, horizontal=False)
+        shifts[name] = height_text_shift(geometry, side)
+        _move_text(displays[name], record, shifts[name], label=name)
+    for name, side in TEXT_SIDES["free_top"].items():
+        record = _text_record(adapter, displays[name], label=name)
+        text = display_box({"texts": record["display"]["texts"]})
+        shifts[name] = diameter_text_shift(text, plan, side)
+        _move_text(displays[name], record, shifts[name], label=name)
+    rebuild_drawing(adapter, label="cylinder bank spring size text shelves")
+    stations = {
+        name: supplier_top_text_geometry(
+            _text_record(adapter, displays[name], label=name), horizontal=False
+        )
+        for name in TEXT_SIDES["free_front"]
+    }
+    _telemetry.info(
+        f"{supplier_spec.SKU}: size texts moved "
+        + ", ".join(f"{name} {dx * 1000:+.2f} mm" for name, dx in shifts.items())
+    )
+
+    def settled() -> None:
+        _assert_size_texts(adapter, _size_displays(adapter, views), plan, stations)
+
+    settled()
+    return settled
+
+
+def supplier_dimensions(
+    adapter: Any,
+    views: Mapping[str, Any],
+    *,
+    reference_bounds: Callable[[str], tuple[float, float, float, float]],
+    settled_checks: list[Callable[[], None]],
+) -> None:
+    supplier_disc_spring_dimensions(
+        adapter, views, spec=SHEET_SPEC, reference_bounds=reference_bounds,
+        settled_checks=settled_checks,
+    )
+    settled_checks.append(
+        place_size_texts(adapter, views, reference_bounds=reference_bounds)
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -49,9 +307,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "free_front": (0.035, 0.0, 0.035, 0.0),
             "free_top": (0.040, 0.0, 0.040, 0.0),
         },
-        supplier_dimensions=partial(
-            supplier_disc_spring_dimensions, spec=SHEET_SPEC, settled_checks=settled_checks,
-        ),
+        supplier_dimensions=partial(supplier_dimensions, settled_checks=settled_checks),
         installed_caption="INSTALLED ENVELOPE",
         settled_checks=settled_checks,
     )

@@ -16,20 +16,26 @@ SHANK_LENGTH_MM = round(ANCHOR_H + JAM_NUT_THREAD_MM, 3)
 TRIM = trim(ANCHOR_9490T1, SHANK_LENGTH_MM)
 FINISHED_OVERALL_MM = ANCHOR_9490T1.eye_od_mm / 2 - TRIM.shank_end_y_mm
 FINISHED_OVERALL_TOLERANCE_MM = _config.title_block("linear_1pl")["value_in"] * 25.4
-CHAMFER_WIDTH_MM = ANCHOR_9490T1.end_chamfer_mm
-CHAMFER_WIDTH_TOLERANCE_MM = 0.25
+# The restored deburr is a lead-in, so the title block's printed two-place band
+# governs it (no tighter band). Its nominal is raised from the factory 0.80 so
+# that even the band's short leg brings the cut end under the 3.797-mm tap
+# drill, which needs at least (4.826 - 3.797) / 2 = 0.5145: 1.05 - 0.51 = 0.54.
+CHAMFER_WIDTH_MM = 1.05
+CHAMFER_WIDTH_TOLERANCE_MM = float(
+    str(_config.title_block("linear_2pl")["display"]).lstrip("±")
+)
 CHAMFER_ANGLE_DEG = 45.0
 CHAMFER_ANGLE_TOLERANCE_DEG = _config.title_block("angular")["value_deg"]
 
-# Minimum radial deburr clears the 3.797-mm mating tap drill. At nominal angle
-# the maximum leg is shorter than one factory pitch; including the adverse
-# angular corner still leaves >17 mm full thread at the short overall limit.
+# The short leg clears the mating tap drill (above). At nominal angle the long
+# leg is shorter than two factory pitches; including the adverse angular corner
+# still leaves >17 mm full thread at the short overall limit.
 DRAWING_DIMENSIONS = {
     "StockTrimProfile": {"FinishedOverall"},
     "StockDeburrProfile": {"ChamferWidth", "ChamferAngle"},
 }
 DIMENSION_PRECISION = {"FinishedOverall": 1, "ChamferWidth": 2, "ChamferAngle": 0}
-DIMENSION_TOLERANCE_TYPES = {"FinishedOverall": 11, "ChamferWidth": 4, "ChamferAngle": 11}
+DIMENSION_TOLERANCE_TYPES = {"FinishedOverall": 11, "ChamferWidth": 11, "ChamferAngle": 11}
 DRAWING_NOTES = (
     "FINISHED OVERALL TO EYE CROWN IS THE ACCEPTANCE SIZE.\n"
     "UNDIMENSIONED PURCHASED GEOMETRY IS REFERENCE."
