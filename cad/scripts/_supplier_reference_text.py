@@ -25,7 +25,7 @@ from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
 from _drawing_layout_audit import _Reader, _dump_annotation
 from _layout_audit import TextItem, _rotated_hull, annotation_geometry, calibrate_sheet_advance
-from _layout_geometry import Box, point_segment_distance, union_boxes
+from _layout_geometry import Box, Segment, point_segment_distance, union_boxes
 import _telemetry
 
 # The existing shared-clamp native station/readback contract, not a new allowance.
@@ -149,6 +149,69 @@ def _fontbox_failure_note(record: dict[str, Any], *, axis: int, label: str) -> s
     return "supplier_reference_native_fontbox_fields " + json.dumps(census, allow_nan=False)
 
 
+def _offset_text_path_indices(
+    physical: list[Segment],
+    tips: tuple[tuple[float, float], ...],
+    texts: Collection[Mapping[str, Any]],
+) -> tuple[int, int] | None:
+    """Recognize one complete native horizontal offset-text path, not its ink area.
+
+    Native lower-left, unrotated text supplies the full baseline advance. Its
+    connector starts at the arrow midpoint; its separate underline starts at
+    that same baseline. Unknown or competing representations stay physical.
+    These are indices of distinct raw primitives: never clip their intervals
+    out of other, possibly overlapping, physical dimension-line primitives.
+    """
+    midpoint = (
+        tips[0][0] + (tips[1][0] - tips[0][0]) / 2,
+        tips[0][1] + (tips[1][1] - tips[0][1]) / 2,
+    )
+
+    def oriented(run: Segment, start: tuple[float, float], end: tuple[float, float]):
+        first, last = (run.x0, run.y0), (run.x1, run.y1)
+        matches = [
+            (a, b)
+            for a, b in ((first, last), (last, first))
+            if max(dist(a, start), dist(b, end)) <= _POSITION_TOLERANCE_M
+            and abs(dist(a, b) - dist(start, end)) <= _POSITION_TOLERANCE_M
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    candidates = []
+    for raw in texts:
+        if raw["ref"] != 1 or float(raw["ang"]) != 0.0:
+            continue
+        baseline = tuple(float(value) for value in raw["pos"][:2])
+        advance = (baseline[0] + float(raw["w"]), baseline[1])
+        if baseline[0] <= tips[1][0]:
+            continue
+        for connector_index, connector in enumerate(physical):
+            connector_ends = oriented(connector, midpoint, baseline)
+            if connector_ends is None:
+                continue
+            for underline_index, underline in enumerate(physical):
+                if underline_index == connector_index:
+                    continue
+                underline_ends = oriented(underline, baseline, advance)
+                if (
+                    underline_ends is None
+                    or dist(connector_ends[1], underline_ends[0])
+                    > _POSITION_TOLERANCE_M
+                ):
+                    continue
+                remaining = [
+                    run for index, run in enumerate(physical)
+                    if index not in (connector_index, underline_index)
+                ]
+                if not remaining:
+                    continue
+                reach = max(max(run.x0, run.x1) for run in remaining)
+                if baseline[0] - reach < CLEAR_GAP_M:
+                    continue
+                candidates.append((connector_index, underline_index))
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def measure_reference_text(
     adapter: Any, display: Any, *, axis: int, label: str
 ) -> dict[str, Any]:
@@ -188,6 +251,11 @@ def measure_reference_text(
                 f"({type(diagnostic_error).__name__}); original failure retained"
             )
         raise
+    # This existing native property is semantic authority, not an inferred
+    # field in the display-data dump. A failed getter must remain a failure.
+    offset_text = display.OffsetText
+    if type(offset_text) is not bool:
+        raise RuntimeError(f"{label}: unreadable native reference text offset state")
     arrows = data.get("arrows") or ()
     if (
         len(arrows) != 2
@@ -226,8 +294,15 @@ def measure_reference_text(
             for endpoint in ((segment.x0, segment.y0), (segment.x1, segment.y1))
         )
     ]
-    # Preserve complete collinear ink, including fragments not incident to a
-    # tip. Text connectors/underlines off the actual support line stay raw ink.
+    # Preserve complete collinear physical ink, including detached fragments.
+    # OffsetText can add a connector/underline exactly ON the support line.
+    # Remove only one positively explained pair; all other ink stays physical.
+    if offset_text and axis == 0:
+        text_path = _offset_text_path_indices(physical, tips, texts)
+        if text_path is not None:
+            physical = [
+                run for index, run in enumerate(physical) if index not in text_path
+            ]
     intervals = []
     for segment in physical:
         start, end = (segment.x0, segment.y0), (segment.x1, segment.y1)

@@ -77,15 +77,28 @@ cannot ask for what the authors were told to leave out.
   immutable pre-transition measurement. Union gaps use the existing 10
   micrometre readback tolerance once, without padding stored endpoints or
   adopting a later station as the baseline. Physical candidates must lie on
-  the actual arrow support line at both ends. Off-support text strokes remain
-  in the raw record, but an exactly coincident text stroke has no proven native
-  discriminator and is conservatively physical. This is not a general
-  glyph-clearance classifier. Every reported text fragment participates,
-  including all fraction parts and measured empty/whitespace BSTR advances.
-  The shared native bounds reader normalizes all six SDK anchor positions and
-  their rotation using measured font rectangles, without the visible-ink filter
-  or estimated glyph widths. Each fragment must have readable string data,
-  positive finite dimensions, a finite position and
+  the actual arrow support line at both ends. Each arrow tip must also lie
+  within the existing radial 10 micrometre bound of an actual finite physical
+  segment; a gap-closed union cannot supply synthetic tip support. Off-support
+  text strokes remain in the raw record. Native `OffsetText` can add a
+  connector and underline exactly on the arrow support line. Only a positive
+  live Boolean `OffsetText` read permits the narrow observed distinction:
+  one unique pair of distinct raw primitives joins the arrow midpoint to a
+  validated lower-left, unrotated horizontal fragment baseline, then spans
+  its complete measured advance. Its endpoints, actual junction and full
+  lengths must agree within the existing tolerance, with the baseline beyond
+  the remaining physical reach and existing clearance. Exclude only those
+  two matched primitives, never their spatial intervals from overlapping
+  physical runs. Getter failures propagate; non-Boolean mode, incomplete,
+  duplicated, competing or unsupported paths are not a text escape.
+  Every other on-support candidate remains conservatively physical against
+  the original baseline. This is not a general glyph-clearance classifier.
+  Every reported text fragment participates, including all fraction parts
+  and measured empty/whitespace BSTR advances. The shared native bounds reader
+  normalizes all six SDK anchor positions and their rotation using measured
+  font rectangles, without the visible-ink filter or estimated glyph widths.
+  Each fragment must have readable string data, positive finite dimensions,
+  a finite position and
   angle, and a known reference before forming the union; blank text never
   excuses malformed geometry or removes a fragment from the measured inventory.
   Native station/extent proof is not exact glyph or foreign-line clearance

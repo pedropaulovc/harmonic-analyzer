@@ -14,6 +14,7 @@ import gc
 import json
 import weakref
 from math import cos, isfinite, pi, sin
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +26,11 @@ from _layout_geometry import Box, segment_box_distance
 
 _TOL = 1e-5
 _LABEL = "reference text"
+_CAPTURED_OFFSET_TEXT = json.loads(
+    (
+        Path(__file__).parent / "testdata" / "supplier_reference_text_native_offset.json"
+    ).read_text(encoding="utf-8")
+)
 
 
 # --------------------------------------------------------------------------
@@ -288,8 +294,53 @@ def native_reads(monkeypatch):
     return errors
 
 
-def _static(record):
-    return SimpleNamespace(GetAnnotation=lambda: SimpleNamespace(record=record))
+class _StaticDisplay:
+    def __init__(self, record, offset):
+        self.record = record
+        self.offset = offset
+
+    def GetAnnotation(self):
+        return self
+
+    @property
+    def OffsetText(self):
+        return self.offset
+
+
+def _static(record, *, offset=False):
+    # Live native mode is independent of audit records: historical captures
+    # did not read OffsetText. Ordinary unoffset test displays start False.
+    return _StaticDisplay(record, offset)
+
+
+@pytest.fixture(params=("across_flats", "thickness"))
+def captured_offset_case(request):
+    records = {
+        source["phase"]: next(
+            row["raw_annotation"]
+            for row in source["raw_annotations"]
+            if row["dimension_role"] == request.param
+        )
+        for source in _CAPTURED_OFFSET_TEXT["sources"]
+    }
+    across_flats = request.param == "across_flats"
+    support = 0.1588138 if across_flats else 0.105553
+    low, high = (0.092775, 0.137225) if across_flats else (0.3026969, 0.3273031)
+    tips = (0.099125, 0.130875) if across_flats else (0.3090469, 0.3209531)
+    witness_low, witness_high = (
+        (0.1444154, 0.1598138) if across_flats else (0.104553, 0.1300846)
+    )
+    return SimpleNamespace(
+        before=copy.deepcopy(records["before"]),
+        after=copy.deepcopy(records["after"]),
+        connector_index=len(records["before"]["display"]["lines"]),
+        tail_index=5 if across_flats else 2,
+        axial_indices=(3, 4, 5) if across_flats else (2, 3, 4),
+        physical_lines=((support, support, low, high),),
+        tips=tuple((station, support) for station in tips),
+        witnesses=tuple((station, witness_low, witness_high) for station in tips),
+        reach=high,
+    )
 
 
 @pytest.fixture(
@@ -625,6 +676,7 @@ def test_physical_union_retains_disjoint_coverage_and_refuses_loss(
     case = physical_case
     lines = case.record["display"]["lines"]
     row = list(lines[case.index])
+    retained = lines[case.index + 1:]
     intervals = ((0.0, 0.25), (0.4, 0.6), (0.8, 1.0))
     lines[case.index:case.index + 1] = _physical_pieces(row, case.axis, intervals)
     original = core.measure_reference_text(
@@ -632,11 +684,22 @@ def test_physical_union_retains_disjoint_coverage_and_refuses_loss(
     )
     low, high = sorted((row[4 + case.axis], row[7 + case.axis]))
     support = row[4 + (1 - case.axis)]
-    assert len(original["physical_lines"]) == (3 if case.axis == 0 else 4)
-    for actual, (start, end) in zip(original["physical_lines"][:3], intervals, strict=True):
-        assert actual == pytest.approx(
-            (support, support, low + start * (high - low), low + end * (high - low))
-        )
+    expected = [
+        (support, support, low + start * (high - low), low + end * (high - low))
+        for start, end in intervals
+    ]
+    # The nut's last fragment meets its retained inter-tip run and positive
+    # tail. The clamp's other tail is disjoint. Include those actual native
+    # rows rather than treating the fragmented negative tail as all the ink.
+    for native in retained:
+        native_low, native_high = sorted((native[4 + case.axis], native[7 + case.axis]))
+        if native_low == expected[-1][3]:
+            expected[-1] = (support, support, expected[-1][2], native_high)
+        else:
+            expected.append((support, support, native_low, native_high))
+    assert len(original["physical_lines"]) == len(expected)
+    for actual, component in zip(original["physical_lines"], expected, strict=True):
+        assert actual == pytest.approx(component)
     changed = {
         "missing-component": ((0.0, 0.25), (0.8, 1.0)),
         "interior-gap": ((0.0, 0.25), (0.4, 0.46), (0.54, 0.6), (0.8, 1.0)),
@@ -1523,9 +1586,11 @@ def test_retained_physical_proof_uses_original_baseline_after_fragmentation(
 
     def settles_with_small_tail_readback(x, y, z):
         was_offset = display.OffsetText
+        previous = display.position[case.axis]
         result = move(x, y, z)
-        if was_offset:
-            # Accepted once against the original, NOT a new station baseline.
+        if was_offset and display.position[case.axis] != previous:
+            # Only the shelf move, not the repeated enable anchor, settles
+            # this once against the original, NOT a new station baseline.
             display.record["display"]["lines"][case.index][4 + case.axis] -= 0.6 * _TOL
         return result
 
@@ -2279,3 +2344,382 @@ def test_proof_never_moves_enables_or_rebuilds(shelved, monkeypatch):
     assert {name: d.OffsetText for name, d in shelved.found.items()} == offsets
     assert {name: d.position for name, d in shelved.found.items()} == positions
     assert all(isfinite(v) for position in positions.values() for v in position)
+
+
+# --------------------------------------------------------------------------
+# Actual before/after native offset paths. OffsetText itself was NOT captured;
+# each replay below supplies an independent live getter result.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("before_offset", (False, True), ids=("unoffset", "offset"))
+def test_recorded_offset_paths_preserve_actual_physical_stations(
+    native_reads, captured_offset_case, before_offset
+):
+    case = captured_offset_case
+    frozen_capture = copy.deepcopy(_CAPTURED_OFFSET_TEXT)
+    frozen_before, frozen_after = copy.deepcopy((case.before, case.after))
+    before = core.measure_reference_text(
+        None, _static(case.before, offset=before_offset), axis=0, label=_LABEL
+    )
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    for measured in (before, after):
+        assert measured["tips"] == case.tips
+        assert measured["witnesses"] == case.witnesses
+        assert measured["physical_lines"] == case.physical_lines
+        assert measured["reach"] == case.reach
+    core.assert_reference_text_stations(before, after, label=_LABEL)
+
+    data = case.after["display"]
+    connector, underline = data["lines"][case.connector_index:]
+    baseline = data["texts"][-1]
+    assert connector[4] == sum(point[0] for point in case.tips) / 2
+    assert connector[7:9] == baseline["pos"][:2] == underline[4:6]
+    assert underline[7] == pytest.approx(baseline["pos"][0] + baseline["w"])
+    assert case.after["pos"][1] != baseline["pos"][1]
+    assert baseline["pos"][0] >= case.reach + core.CLEAR_GAP_M
+    assert after["text"] == _text_box(case.after)
+    assert after["record"] == frozen_after
+    assert before["record"] == frozen_before
+    assert len(data["lines"]) == len(case.before["display"]["lines"]) + 2
+    for index in case.axial_indices:
+        assert data["lines"][index] == case.before["display"]["lines"][index]
+    assert "OffsetText" not in case.before and "OffsetText" not in case.after
+    assert "OffsetText" in _CAPTURED_OFFSET_TEXT["uncaptured_fields"]
+    assert (case.before, case.after) == (frozen_before, frozen_after)
+    assert _CAPTURED_OFFSET_TEXT == frozen_capture
+
+
+@pytest.mark.parametrize("delta", (-0.0001, 0.0001), ids=("shortened", "extended"))
+def test_recorded_offset_connector_cannot_mask_positive_physical_tail_mutation(
+    native_reads, captured_offset_case, delta
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(
+        None, _static(case.before), axis=0, label=_LABEL
+    )
+    healthy = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    core.assert_reference_text_stations(before, healthy, label=_LABEL)
+    frozen_healthy = copy.deepcopy(healthy)
+    row = case.after["display"]["lines"][case.tail_index]
+    endpoint = max((4, 7), key=row.__getitem__)
+    row[endpoint] += delta
+    connector = case.after["display"]["lines"][case.connector_index]
+    assert connector[4] < row[endpoint] < connector[7]
+    moved = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert moved["tips"] == before["tips"]
+    assert moved["witnesses"] == before["witnesses"]
+    assert moved["physical_lines"][0][3] == pytest.approx(case.reach + delta)
+    assert moved["reach"] == pytest.approx(case.reach + delta)
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, moved, label=_LABEL)
+    assert healthy == frozen_healthy
+
+
+def test_recorded_offset_path_requires_live_true_mode(native_reads, captured_offset_case):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    after = core.measure_reference_text(None, _static(case.after), axis=0, label=_LABEL)
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["reach"] == case.after["display"]["lines"][-1][7]
+    assert after["physical_lines"] == (
+        (*case.physical_lines[0][:3], after["reach"]),
+    )
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("mode", (None, 0, 1, "True", []))
+def test_measure_refuses_nonboolean_live_offset_mode(
+    native_reads, captured_offset_case, mode
+):
+    with pytest.raises(RuntimeError):
+        core.measure_reference_text(
+            None, _static(captured_offset_case.after, offset=mode), axis=0, label=_LABEL
+        )
+
+
+@pytest.mark.parametrize("error_type", (RuntimeError, AttributeError))
+def test_measure_propagates_native_offset_getter_failure(
+    native_reads, captured_offset_case, error_type
+):
+    failure = error_type("native OffsetText getter failed")
+
+    class UnreadableMode(_StaticDisplay):
+        @property
+        def OffsetText(self):
+            raise failure
+
+    with pytest.raises(error_type) as caught:
+        core.measure_reference_text(
+            None, UnreadableMode(captured_offset_case.after, True), axis=0, label=_LABEL
+        )
+    assert caught.value is failure
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "missing-connector", "missing-underline",
+        "duplicate-connector", "duplicate-underline", "duplicate-fragment",
+        "competing-pair", "fragmented-connector", "fragmented-underline",
+        "wrong-midpoint", "short-width", "long-width",
+        "two-near-endpoints-with-18um-joint-gap",
+        "compound-short-width", "compound-long-width", "annotation-anchor",
+    ),
+)
+def test_recorded_incomplete_or_ambiguous_offset_paths_remain_physical(
+    native_reads, captured_offset_case, defect
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    data = case.after["display"]
+    lines, texts = data["lines"], data["texts"]
+    index = case.connector_index
+    connector, underline = lines[index:]
+    if defect == "missing-connector":
+        del lines[index]
+    elif defect == "missing-underline":
+        del lines[index + 1]
+    elif defect == "duplicate-connector":
+        lines.append(copy.deepcopy(connector))
+    elif defect == "duplicate-underline":
+        lines.append(copy.deepcopy(underline))
+    elif defect == "duplicate-fragment":
+        texts.append(copy.deepcopy(texts[-1]))
+    elif defect == "competing-pair":
+        competing_text = copy.deepcopy(texts[-1])
+        competing_text["pos"][0] += 0.001
+        competing_connector = copy.deepcopy(connector)
+        competing_connector[7] += 0.001
+        competing_underline = copy.deepcopy(underline)
+        competing_underline[4] += 0.001
+        competing_underline[7] += 0.001
+        texts.append(competing_text)
+        lines.extend((competing_connector, competing_underline))
+    elif defect in ("fragmented-connector", "fragmented-underline"):
+        split_index = index + (defect == "fragmented-underline")
+        lines[split_index:split_index + 1] = _physical_pieces(
+            lines[split_index], 0, ((0.0, 0.5), (0.5, 1.0))
+        )
+    elif defect == "wrong-midpoint":
+        connector[4] += 11e-6
+    elif defect in ("short-width", "long-width"):
+        underline[7] += -11e-6 if defect == "short-width" else 11e-6
+    elif defect == "two-near-endpoints-with-18um-joint-gap":
+        connector[7] -= 9e-6
+        underline[4] += 9e-6
+    elif defect in ("compound-short-width", "compound-long-width"):
+        shift = 9e-6 if defect == "compound-short-width" else -9e-6
+        connector[7] += shift
+        underline[4] += shift
+        underline[7] -= shift
+    else:
+        connector[7:9] = case.after["pos"][:2]
+    retained = copy.deepcopy(case.after)
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["reach"] > before["reach"] + core.CLEAR_GAP_M
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert after["record"] == retained
+    assert case.after == retained
+
+
+@pytest.mark.parametrize("endpoint", ("midpoint", "joint", "advance"))
+@pytest.mark.parametrize("factor", (0.9, 1.1), ids=("radial-inside", "radial-outside"))
+def test_recorded_offset_endpoints_require_direct_radial_native_agreement(
+    native_reads, captured_offset_case, endpoint, factor
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    connector, underline = case.after["display"]["lines"][case.connector_index:]
+    rows_and_offsets = {
+        "midpoint": ((connector, 4),),
+        "joint": ((connector, 7), (underline, 4)),
+        "advance": ((underline, 7),),
+    }[endpoint]
+    # Each coordinate stays below 10 um even in the failing case. Only the
+    # actual Euclidean endpoint distance distinguishes 9 um from 11 um.
+    for row, offset in rows_and_offsets:
+        row[offset] += 8e-6 * factor
+        row[offset + 1] += 6e-6 * factor
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    if factor < 1:
+        assert after["physical_lines"] == before["physical_lines"]
+        assert after["reach"] == before["reach"]
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    else:
+        assert after["reach"] > before["reach"] + core.CLEAR_GAP_M
+        with pytest.raises(RuntimeError, match="physical_lines"):
+            core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize(
+    ("reference", "angle"),
+    ((0, 0.0), (2, 0.0), (3, 0.0), (4, 0.0), (5, 0.0), (1, pi / 6), (1, 1e-12)),
+)
+def test_recorded_offset_paths_do_not_own_other_valid_font_anchors_or_angles(
+    native_reads, captured_offset_case, reference, angle
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    fragment = case.after["display"]["texts"][-1]
+    fragment["ref"], fragment["ang"] = reference, angle
+    expected_text, _ = core.measured_native_text_bounds(
+        case.after["display"]["texts"], label=_LABEL
+    )
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["text"] == expected_text
+    assert after["reach"] == case.after["display"]["lines"][-1][7]
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+@pytest.mark.parametrize("label_text", ("arbitrary BSTR", "", " "))
+def test_recorded_offset_ownership_does_not_depend_on_names_or_text_values(
+    native_reads, captured_offset_case, label_text
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    case.after["name"] = "UnrelatedNativeDimension"
+    for fragment in case.after["display"]["texts"]:
+        fragment["t"] = label_text
+    retained = copy.deepcopy(case.after)
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label="different caller label"
+    )
+    assert after["physical_lines"] == case.physical_lines
+    assert after["record"] == retained
+    core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert case.after == retained
+
+
+@pytest.mark.parametrize("extra_kind", ("overlapping", "disjoint"))
+def test_recorded_offset_excludes_only_owned_raw_primitives(
+    native_reads, captured_offset_case, extra_kind
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    extra = list(case.after["display"]["lines"][case.tail_index])
+    if extra_kind == "overlapping":
+        extra[4], extra[7] = case.tips[-1][0] + 0.0001, case.reach + 0.0001
+        expected = ((*case.physical_lines[0][:3], case.reach + 0.0001),)
+    else:
+        low = case.physical_lines[0][2]
+        extra[4], extra[7] = low - 0.003, low - 0.001
+        expected = ((extra[5], extra[8], extra[4], extra[7]), *case.physical_lines)
+    case.after["display"]["lines"].append(extra)
+    retained = copy.deepcopy(case.after)
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["physical_lines"] == expected
+    assert after["record"] == retained
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+    assert case.after == retained
+
+
+def test_recorded_offset_paths_require_clearance_from_remaining_physical_ink(
+    native_reads, captured_offset_case
+):
+    case = captured_offset_case
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    # Move the actual text and its attached path 0.3 mm back toward the tail:
+    # its original 2.2 mm air becomes 1.9 mm, below the existing 2 mm gap.
+    data = case.after["display"]
+    for fragment in data["texts"]:
+        fragment["pos"][0] -= 0.0003
+    if case.connector_index == 6:
+        data["lines"][0][4] -= 0.0003
+        data["lines"][0][7] -= 0.0003
+    data["lines"][case.connector_index][7] -= 0.0003
+    data["lines"][case.connector_index + 1][4] -= 0.0003
+    data["lines"][case.connector_index + 1][7] -= 0.0003
+    case.after["pos"][0] -= 0.0003
+    assert data["texts"][-1]["pos"][0] - case.reach < core.CLEAR_GAP_M
+    after = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert after["reach"] == data["lines"][-1][7]
+    with pytest.raises(RuntimeError, match="physical_lines"):
+        core.assert_reference_text_stations(before, after, label=_LABEL)
+
+
+def test_recorded_offset_path_cannot_supply_missing_finite_native_tip_ink(
+    native_reads, captured_offset_case
+):
+    case = captured_offset_case
+    lines = case.after["display"]["lines"]
+    tip = case.tips[-1][0]
+    del lines[case.tail_index]
+    # Remove the physical 20 um next to the positive tip while retaining the
+    # legitimate connector, whose interior still passes straight through it.
+    intertip = lines[case.tail_index - 1 if case.tail_index == 5 else 2]
+    endpoint = max((4, 7), key=intertip.__getitem__)
+    intertip[endpoint] = tip - 20e-6
+    with pytest.raises(RuntimeError, match="(?:witness|line).*ink"):
+        core.measure_reference_text(
+            None, _static(case.after, offset=True), axis=0, label=_LABEL
+        )
+
+
+def test_recorded_offset_paths_preserve_fragment_order_and_coalesced_physical_union(
+    native_reads, captured_offset_case
+):
+    case = captured_offset_case
+    original_after = copy.deepcopy(case.after)
+    before = core.measure_reference_text(None, _static(case.before), axis=0, label=_LABEL)
+    data = case.after["display"]
+    lines = data["lines"]
+    template = list(lines[case.tail_index])
+    physical_indices = set(case.axial_indices)
+    fragmented = []
+    for index, row in enumerate(lines):
+        if index in physical_indices:
+            fragmented.extend(_physical_pieces(
+                row, 0, ((1.0, 0.4), (0.6, 0.0), (0.2, 0.8), (0.2, 0.8))
+            ))
+        else:
+            fragmented.append(row)
+    lines[:] = list(reversed(fragmented))
+    data["arrows"].reverse()
+    retained_fragments = copy.deepcopy(case.after)
+    measured = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert measured["physical_lines"] == case.physical_lines
+    core.assert_reference_text_stations(before, measured, label=_LABEL)
+    assert case.after == retained_fragments
+
+    # Reacquire a coalesced native line with both arrow tips in its interior.
+    case.after = original_after
+    data = case.after["display"]
+    data["lines"][:] = [
+        row for index, row in enumerate(data["lines"]) if index not in physical_indices
+    ]
+    support_low, support_high, low, high = case.physical_lines[0]
+    template[4], template[5], template[7], template[8] = high, support_high, low, support_low
+    data["lines"].insert(0, template)
+    retained_coalesced = copy.deepcopy(case.after)
+    coalesced = core.measure_reference_text(
+        None, _static(case.after, offset=True), axis=0, label=_LABEL
+    )
+    assert coalesced["physical_lines"] == case.physical_lines
+    core.assert_reference_text_stations(before, coalesced, label=_LABEL)
+    assert case.after == retained_coalesced
