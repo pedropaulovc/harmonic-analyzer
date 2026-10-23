@@ -2620,7 +2620,7 @@ def test_original_source_capture_keeps_gate_exception_at_each_seam(
 
     def gate(adapter, model, **kwargs):
         gate_calls.append((adapter, model, kwargs))
-        if phase != "after_import" or len(gate_calls) == 2:
+        if phase != "after_import" or kwargs.get("import_context") is not None:
             if transport == "getter":
                 # Corrupt only the intended failing phase. The after-import
                 # case must first pass the real strict pre-import source guard.
