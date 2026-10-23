@@ -214,12 +214,13 @@ def test_end_view_layout_stays_clear() -> None:
     assert tap[1] > cy + half + 0.010
     assert tap[1] > block[3] + 0.010
     assert tap[2] < line_x - 0.005
-    # Scale note (text 4.5 mm under its anchor, ~45 mm) under the square,
-    # left of the SQ line's lower arrow, inside the border.
+    # Scale note (text 4.5 mm under its anchor, END_NOTE_WIDTH long) centred
+    # under the square, left of the SQ line's lower arrow, inside the border.
     note_x, note_y = drawing.END_NOTE_XY
+    assert note_x + drawing.END_NOTE_WIDTH / 2.0 == pytest.approx(cx)
     assert note_y < cy - half - 0.005
     assert note_y - 0.0045 > border + 0.010
-    assert note_x + 0.046 < line_x - air
+    assert note_x + drawing.END_NOTE_WIDTH < line_x - air
     assert note_x > border + 0.005
     # Lower-left field: left of the title block, under the side view's
     # lowest ink over the group (the R MAX leader and the Ø's tail).
@@ -481,7 +482,7 @@ def test_view_scales_and_notes_are_explicit() -> None:
     assert drawing.END_SCALE == (5, 1)
     assert drawing.ISO_SCALE == (1, 1)
     # Every view off the sheet scale says its own scale.
-    assert spec.END_VIEW_NOTE == "END VIEW SCALE 5:1"
+    assert spec.END_VIEW_NOTE == "VIEW FROM SQUARE END SCALE 5:1"
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
     for retired in ("TOP_VIEW_NOTE", "BOTTOM_VIEW_NOTE"):
         assert not hasattr(spec, retired)

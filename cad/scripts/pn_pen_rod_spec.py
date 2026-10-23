@@ -145,5 +145,9 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "ShoulderRadius": f"SEATS ON PEN V-BLOCK\n{PEN_V_BLOCK_NUMBER}",
 }
 
-END_VIEW_NOTE = "END VIEW SCALE 5:1"
+# The 5:1 end view stands off projection (under the side view, rescaled), so
+# its label names the end it looks at: "*Top" looks down the rod axis onto
+# the tapped top face (machinist review 2026-10-23: unnamed, the tap's end
+# read only from the missing Ø4 circle and the isometric).
+END_VIEW_NOTE = "VIEW FROM SQUARE END SCALE 5:1"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

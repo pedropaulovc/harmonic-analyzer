@@ -56,6 +56,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -74,6 +75,9 @@ from pn_pen_rod_spec import (
     STUD_TAP_SPEC,
     TOTAL_LENGTH,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pn_pen_rod"]
@@ -216,14 +220,19 @@ _FRAME_TOL_M = 2.5e-4
 # shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
 # over the square, 18 mm over the block, 7 mm left of the SQ line's upper
 # arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
-# the drill rim.  The scale note (anchored top-left, text 4.5 mm under its
-# anchor, ~45 mm long) 7 mm under the square: x 0.060..0.105, y
-# 0.051..0.0545, left of the SQ line's lower arrow piece (to y ~0.0561).
+# the drill rim.  The view label (anchored top-left, text 4.5 mm under its
+# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred 7 mm
+# under the square: x 0.0425..0.1175, y 0.051..0.0545, left of the SQ
+# line's lower arrow piece (x 0.132, to y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
 }
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
-END_NOTE_XY = (END_CENTER[0] - 0.020, END_CENTER[1] - _END_HALF_M - 0.007)
+END_NOTE_WIDTH = 0.075
+END_NOTE_XY = (
+    END_CENTER[0] - END_NOTE_WIDTH / 2.0,
+    END_CENTER[1] - _END_HALF_M - 0.007,
+)
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
 # ~60 mm scale note 8 mm under it: x 0.350..0.410, y ~0.1050..0.1085.
