@@ -541,6 +541,32 @@ def test_own_text_guard_catches_the_b344192_struck_heights() -> None:
     struck = drawing.lines_through_own_text(B344192)
     assert any("SupplierThickness" in detail for detail in struck)
     assert any("SupplierFreeHeight" in detail for detail in struck)
+    heights = ("SupplierThickness", "SupplierFreeHeight")
+    assert len(drawing.lines_through_own_text(B344192, heights)) >= 2
+
+
+def test_pass3_refusal_was_the_heights_alone_calibration_not_the_ink() -> None:
+    """Run 054fe692 (head 519ba8a5) refused the shelved thickness with exactly
+    this detail. The heights were shelved by the same -14.57 mm as on run
+    86053b8e, whose sheet audit passed them: calibrated on the height texts
+    alone (no exact width sample, so the 0.62 default) the guard boxes the
+    text past its native width onto its own offset leg."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    clean = _without_stray(R86053)
+    heights = ("SupplierThickness", "SupplierFreeHeight")
+    alone = {name: clean[name] for name in heights}
+    assert drawing.lines_through_own_text(alone) == [
+        "extension line of \"dim SupplierThickness '(0.005 in)'\" (100.8,133.5)->(97.6,130.7)mm "
+        "runs 0.93mm through its own text [77.0,130.7]..[98.7,134.2]mm"
+    ]
+    assert drawing.lines_through_own_text(clean, heights) == []
+    # The native width ends exactly where SolidWorks starts the offset leg.
+    thickness = clean["SupplierThickness"]["display"]
+    (run,) = thickness["texts"]
+    assert run["pos"][0] + run["w"] == pytest.approx(
+        thickness["lines"][-1][4], abs=1e-6
+    )
 
 
 def test_pass2_stray_is_the_86053_line_and_still_off_chain() -> None:
