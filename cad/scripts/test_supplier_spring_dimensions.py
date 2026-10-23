@@ -262,7 +262,7 @@ def _disc_views(spec):
     return views
 
 
-@pytest.mark.parametrize("spec,count", [(cylinder, 6), (rocker, 4), (pivot, 6)])
+@pytest.mark.parametrize("spec,count", [(cylinder, 4), (rocker, 4), (pivot, 6)])
 @pytest.mark.parametrize(
     "corruption", ["owner", "config", "value", "missing", "extra", "band"]
 )
@@ -311,8 +311,6 @@ def test_disc_final_checks_reacquire_source_and_application_gauges(
                 "ID": 0.385,
                 "FREE_HEIGHT": 0.050,
                 "THICKNESS": 0.005,
-                "WORKING_HEIGHT": 0.024,
-                "WORKING_DEFLECTION": 0.026,
             },
         ),
         (rocker, {"OD": 0.367, "ID": 0.265, "FREE_HEIGHT": 0.03, "THICKNESS": 0.006}),
@@ -504,7 +502,6 @@ def test_disc_stock_and_application_positions_follow_actual_native_ink(
             {
                 "free_front": (12.7, 1.27),
                 "free_top": (12.7, 12.7),
-                "free_right": (12.7, 1.27),
             },
         ),
         (rocker, {"free_front": (9.3218, 0.762), "free_top": (9.3218, 9.3218)}),
@@ -570,7 +567,6 @@ def test_disc_preparation_defers_capture_then_reuses_it_for_fitted_annotations(
     for key, span in {
         "free_front": (0.0127, 0.00127),
         "free_top": (0.0127, 0.0127),
-        "free_right": (0.0127, 0.00127),
     }.items():
         views[key].source_points = ((0.0, 0.0), span)
     _readback_environment(monkeypatch, disc, views)

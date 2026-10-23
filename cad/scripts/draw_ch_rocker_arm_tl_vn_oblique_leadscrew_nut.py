@@ -24,6 +24,8 @@ SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_leadscrew_nut"]
 PART_STEM = SPEC.artifact_stem
 # The footer's ITEM row: the catalogue designation in plain text.
 ITEM = "TR8X2 BRASS FLANGE NUT"
+# The footer's supplier-data block; it also sets the bottom view row's floor.
+SUPPLIER_DATA = ("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -47,7 +49,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
         ),
-        supplier_data=("SOURCE NOMINALS; INTERNAL THREAD NOT MODELLED.",),
+        supplier_data=SUPPLIER_DATA,
         settled_checks=checks,
     )
 

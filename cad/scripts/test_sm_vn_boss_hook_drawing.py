@@ -96,3 +96,118 @@ def test_drawing_accepts_general_controls_and_rejects_lost_control(monkeypatch, 
     else:
         with pytest.raises(RuntimeError):
             drawing._verify_controls(annotations)
+
+
+THREAD_KEY = f"SupplierThreadMajor@{spec.SUPPLIER_THREAD_FEATURE}@sm-vn-boss-hook.Part"
+
+
+def _settled_sheet(monkeypatch, *, thread_key=THREAD_KEY, tolerance_type=0):
+    """The finished front/iso views and their settled native dimensions."""
+    keys = [f"{name}@Profile@sm-vn-boss-hook.Part" for name in drawing.FRONT_KEEP]
+    keys.append(thread_key)
+    displays = []
+    for key in keys:
+        dimension = SimpleNamespace(
+            FullName=key, Tolerance=SimpleNamespace(Type=tolerance_type)
+        )
+        displays.append(SimpleNamespace(GetDimension2=lambda _index, d=dimension: d))
+    for display, following in zip(displays, [*displays[1:], None]):
+        display.GetNext5 = lambda following=following: following
+    front = SimpleNamespace(
+        name="Drawing View1", ReferencedConfiguration="Default",
+        UpdateViewDisplayGeometry=lambda: None,
+        GetFirstDisplayDimension6=lambda: displays[0],
+    )
+    iso = SimpleNamespace(
+        name="Drawing View2", ReferencedConfiguration="Default",
+        UpdateViewDisplayGeometry=lambda: None,
+    )
+    views = [front, iso]
+    asserted = []
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: list(views))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(
+        drawing, "assert_supplier_reference_dimension",
+        lambda _adapter, display, **contract: asserted.append((display, contract)),
+    )
+    contract = {"label": "SupplierThreadMajor"}
+    refs = [(thread_key, contract)]
+    return SimpleNamespace(
+        views=views, displays=displays, refs=refs, asserted=asserted,
+        names=(front.name, iso.name),
+    )
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        None, "no_reference", "configuration", "lost_view", "extra_dimension",
+        "duplicate", "attachment", "tolerance", "presentation",
+    ],
+)
+def test_settled_thread_reference_is_the_one_native_supplier_dimension(monkeypatch, fault):
+    """The kept #10-24 carrier stays native, untoleranced and on its sketch."""
+    case = _settled_sheet(
+        monkeypatch,
+        thread_key=(
+            "SupplierThreadMajor@SupplierNominalStockProfile@sm-vn-boss-hook.Part"
+            if fault == "attachment" else THREAD_KEY
+        ),
+        tolerance_type=1 if fault == "tolerance" else 0,
+    )
+    if fault == "no_reference":
+        case.refs.clear()
+    elif fault == "configuration":
+        case.views[1].ReferencedConfiguration = spec.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "lost_view":
+        case.views.pop()
+    elif fault == "extra_dimension":
+        stray = SimpleNamespace(
+            GetDimension2=lambda _index: SimpleNamespace(
+                FullName="EyeID@Drawing View1", Tolerance=SimpleNamespace(Type=0)
+            ),
+            GetNext5=lambda: None,
+        )
+        case.displays[-1].GetNext5 = lambda: stray
+    elif fault == "duplicate":
+        case.displays[-1].GetNext5 = lambda: case.displays[0]
+    elif fault == "presentation":
+        def refuse(_adapter, _display, **_contract):
+            raise RuntimeError("native supplier presentation differs")
+        monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", refuse)
+    arguments = (object(), case.refs, case.names, "Default")
+    if fault is None:
+        drawing._verify_supplier_references(*arguments)
+        assert case.asserted == [(case.displays[-1], case.refs[0][1])]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_supplier_references(*arguments)
+
+
+@pytest.mark.parametrize("fault", [None, "lost_view", "outside"])
+def test_settled_layout_checks_every_finished_view_in_the_ink_cell(monkeypatch, fault):
+    case = _settled_sheet(monkeypatch)
+    region = SimpleNamespace(xmin=0.01, ymin=0.01, xmax=0.41, ymax=0.287)
+    sheet = SimpleNamespace(GetProperties2=lambda: (0, 0, 1, 1, 0, 0.42, 0.297))
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(GetCurrentSheet=lambda: sheet)
+    )
+    monkeypatch.setattr(drawing, "sheet_drawable_region", lambda *_a, **_k: region)
+    checked = []
+
+    def fits(_adapter, view, cell, *, label):
+        if fault == "outside" and view is case.views[1]:
+            raise RuntimeError(f"{label}: settled supplier view leaves its cell")
+        checked.append((view.name, cell))
+
+    monkeypatch.setattr(drawing, "assert_supplier_view_fits", fits)
+    if fault == "lost_view":
+        case.views.pop()
+    if fault is None:
+        drawing._verify_supplier_layout(adapter, case.names)
+        cell = (region.xmin, drawing.INK_CELL_YMIN, region.xmax, region.ymax)
+        assert checked == [(name, cell) for name in case.names]
+    else:
+        with pytest.raises(RuntimeError):
+            drawing._verify_supplier_layout(adapter, case.names)

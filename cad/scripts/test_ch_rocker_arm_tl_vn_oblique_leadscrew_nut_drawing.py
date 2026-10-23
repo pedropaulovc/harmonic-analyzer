@@ -123,3 +123,131 @@ def test_note_is_one_short_line_without_numbers() -> None:
     note = spec.DRAWING_NOTES
     assert "\n" not in note and len(note) <= 80
     assert not re.search(r"\d", note)
+
+
+def test_supplier_references_are_the_drop_in_interface() -> None:
+    rows = {name: (value, orientation) for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
+    assert rows == {
+        "SupplierLength": (spec.LENGTH, "vertical"),
+        "SupplierFlangeThickness": (spec.FLANGE_THICK, "vertical"),
+        "SupplierFlangeDiameter": (spec.FLANGE_DIA, "horizontal"),
+        "SupplierBodyDiameter": (spec.BODY_DIA, "horizontal"),
+        "SupplierMountingHoleDiameter": (spec.HOLE_DIA, "vertical"),
+        "SupplierHolePitchDiameter": (spec.HOLE_PCD, "vertical"),
+    }
+    assert set(spec.SUPPLIER_REFERENCE_STARTS) == set(rows) == set(spec.SUPPLIER_REFERENCE_FORMATS)
+    assert set(spec.SUPPLIER_REFERENCE_PLANES) == {
+        "SupplierMountingHoleDiameter",
+        "SupplierHolePitchDiameter",
+    }
+    assert set(spec.SUPPLIER_REFERENCE_PLANES.values()) == {"Top"}
+
+    def chord(name: str) -> tuple[tuple[float, float], tuple[float, float]]:
+        (x, y), (value, orientation) = spec.SUPPLIER_REFERENCE_STARTS[name], rows[name]
+        return (x, y), (x + value, y) if orientation == "horizontal" else (x, y + value)
+
+    # Front sketch (x = radius, y = station): each chord spans its own feature.
+    assert chord("SupplierLength") == (
+        (spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
+        (spec.BODY_DIA / 2.0, spec.FAR_END_Y),
+    )
+    assert chord("SupplierFlangeThickness") == (
+        (-spec.FLANGE_DIA / 2.0, 0.0),
+        (-spec.FLANGE_DIA / 2.0, spec.FLANGE_THICK),
+    )
+    assert chord("SupplierFlangeDiameter") == ((-spec.FLANGE_DIA / 2.0, 0.0), (spec.FLANGE_DIA / 2.0, 0.0))
+    # The pilot chord is the spigot's end face and ends on the length's start.
+    assert chord("SupplierBodyDiameter") == (
+        (-spec.BODY_DIA / 2.0, -spec.SPIGOT_LENGTH),
+        spec.SUPPLIER_REFERENCE_STARTS["SupplierLength"],
+    )
+    # Top sketch reads model (x, -z): the hole chord crosses the first hole's
+    # centre and the pitch chord the bolt circle, both through their centres.
+    (hx, hy0), (_, hy1) = chord("SupplierMountingHoleDiameter")
+    centre_x, centre_z = spec.HOLE_CENTRES[0]
+    assert hx == centre_x
+    assert (hy0 + hy1) / 2.0 == pytest.approx(-centre_z, abs=1e-12)
+    assert chord("SupplierHolePitchDiameter") == ((0.0, -spec.HOLE_PCD / 2.0), (0.0, spec.HOLE_PCD / 2.0))
+
+
+# Native ``GetOutline`` at farm run 20261023T163903809Z (e04fd60ab): every
+# orthographic view measured its model extent times the scale plus a constant
+# 11.176 mm of sheet-space padding (Front/Right 22 x 15, Top 22 x 22 mm).
+_NATIVE_PADDING_M = 0.011176
+_MODEL_EXTENT_MM = {
+    "*Front": (spec.FLANGE_DIA, spec.LENGTH),
+    "*Top": (spec.FLANGE_DIA, spec.FLANGE_DIA),
+    "*Right": (spec.FLANGE_DIA, spec.LENGTH),
+}
+
+
+class _PaddedView:
+    def __init__(self, orientation: str, center: tuple[float, float]) -> None:
+        self._orientation = orientation
+        self._center = center
+        self.UseSheetScale = 0
+        self.ScaleRatio = (1.0, 1.0)
+
+    @property
+    def Position(self) -> tuple[float, float]:
+        return self._center
+
+    def GetOrientationName(self) -> str:
+        return self._orientation
+
+    def UpdateViewDisplayGeometry(self) -> None:
+        return None
+
+    def GetOutline(self) -> tuple[float, float, float, float]:
+        ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+        width, height = (
+            extent / 1000.0 * ratio + _NATIVE_PADDING_M for extent in _MODEL_EXTENT_MM[self._orientation]
+        )
+        x, y = self._center
+        return (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
+
+    def SetViewPosition(self, position, _update) -> bool:
+        self._center = tuple(position)
+        return True
+
+
+class _Drawing:
+    @staticmethod
+    def EditRebuild3() -> bool:
+        return True
+
+
+def _fit_orthographic(monkeypatch, dimensions, planes) -> tuple[int, int]:
+    import _purchased_fastener_drawing as purchased
+    from _supplier_screw_layout import supplier_screw_margins
+
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    # The sheet's footer: its one-line note plus the supplier-data block.
+    caption_y = purchased.view_band_bottom(
+        spec.DRAWING_NOTES, label=STEM, supplier_data=draw.SUPPLIER_DATA
+    )
+    cells = purchased.fastener_view_cells(caption_y)
+    margins = supplier_screw_margins(dimensions, planes=planes, sides=spec.SUPPLIER_REFERENCE_SIDES)
+    fitted = purchased.supplier_fit_cells(cells, margins, label=STEM)
+    members = [
+        (_PaddedView(name, center), (name, center, bounds))
+        for name, center, bounds in fitted
+        if name in _MODEL_EXTENT_MM
+    ]
+    return purchased._fit_group(_Drawing(), members)
+
+
+def test_supplier_lanes_leave_a_standard_scale_for_the_padded_native_outlines(monkeypatch) -> None:
+    assert (
+        _fit_orthographic(monkeypatch, spec.SUPPLIER_REFERENCE_DIMENSIONS, spec.SUPPLIER_REFERENCE_PLANES)
+        == (1, 2)
+    )
+
+
+def test_horizontal_end_view_lanes_reproduce_the_native_no_scale_failure(monkeypatch) -> None:
+    horizontal = tuple(
+        (name, value, "horizontal" if name in spec.SUPPLIER_REFERENCE_PLANES else orientation)
+        for name, value, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS
+    )
+    with pytest.raises(RuntimeError, match="no project-standard scale fitting"):
+        _fit_orthographic(monkeypatch, horizontal, spec.SUPPLIER_REFERENCE_PLANES)

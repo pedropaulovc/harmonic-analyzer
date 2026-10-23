@@ -248,3 +248,52 @@ def test_chamfer_band_is_owner_accepted_with_both_functional_limits():
     low = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert f"the {low:.2f} low limit" in entry.reason
     assert f"{spec.FULL_THREADS_PAST_NUT * anchor.thread_pitch_mm:.4f}" in entry.reason
+
+
+@pytest.mark.parametrize(
+    "fault", [None, "extra", "missing", "foreign", "banded", "configuration"]
+)
+def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, fault):
+    """The #6-32 thread is the one replacement reference; eye and as-supplied
+    sizes are not sourcing criteria, so any extra native dimension fails."""
+    thread = f"SupplierThreadMajor@{spec.SUPPLIER_THREAD_FEATURE}@ch-vn-spring-hook.Part"
+    names = [thread, *(f"{name}@Sketch@ch-vn-spring-hook.Part" for name in drawing.FRONT_KEEP)]
+    if fault == "extra":
+        names.append("EyeID@Drawing View1")
+    elif fault == "missing":
+        names.remove(thread)
+    elif fault == "foreign":
+        names[0] = thread = "SupplierThreadMajor@SupplierStockAxis@ch-vn-spring-hook.Part"
+    displays = []
+    for name in names:
+        native = SimpleNamespace(
+            FullName=name,
+            Tolerance=SimpleNamespace(Type=1 if fault == "banded" else 0),
+        )
+        displays.append(SimpleNamespace(GetDimension2=lambda _index, native=native: native))
+    for display, following in zip(displays, [*displays[1:], None]):
+        display.GetNext5 = lambda following=following: following
+    configuration = "Default"
+    front = SimpleNamespace(
+        name="Drawing View1",
+        ReferencedConfiguration="AsSuppliedStock" if fault == "configuration" else configuration,
+        UpdateViewDisplayGeometry=lambda: None,
+        GetFirstDisplayDimension6=lambda: displays[0],
+    )
+    iso = SimpleNamespace(name="Drawing View2", ReferencedConfiguration=configuration)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "iter_views", lambda _adapter: (front, iso))
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, view: view.name)
+    monkeypatch.setattr(drawing, "assert_supplier_reference_dimension", lambda *_a, **_k: None)
+    refs = [(thread, {"label": "SupplierThreadMajor"})]
+
+    def check():
+        drawing._verify_supplier_references(
+            None, refs, ("Drawing View1", "Drawing View2"), configuration
+        )
+
+    if fault is None:
+        check()
+        return
+    with pytest.raises(RuntimeError):
+        check()

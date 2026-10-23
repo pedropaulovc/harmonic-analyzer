@@ -1,4 +1,4 @@
-"""Supplier nominal stock/application diagrams beside the installed 9714K392 envelope."""
+"""Supplier nominal dimension diagrams beside the installed 9714K392 envelope."""
 
 from __future__ import annotations
 
@@ -32,16 +32,15 @@ async def build(adapter: Any) -> dict[str, str]:
         stock_configuration=SUPPLIER_DIAGRAM_CONFIGURATION,
         prepare_views=partial(prepare_supplier_disc_diagram, spec=supplier_spec),
         supplier_reference_features=supplier_disc_reference_features(supplier_spec),
+        include_right=False,
         stock_caption="SUPPLIER NOMINAL DIMENSION DIAGRAM — NOT PART SHAPE",
         supplier_margins={
             "free_front": (0.035, 0.0, 0.035, 0.0),
             "free_top": (0.040, 0.0, 0.040, 0.0),
-            "free_right": (0.035, 0.0, 0.035, 0.0),
         },
         supplier_dimensions=partial(
             supplier_disc_spring_dimensions, spec=supplier_spec, settled_checks=settled_checks,
         ),
-        right_caption="SUPPLIER APPLICATION GAUGES — NOT PART SHAPE",
         installed_caption="INSTALLED ENVELOPE",
         settled_checks=settled_checks,
     )

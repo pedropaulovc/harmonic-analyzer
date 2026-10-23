@@ -63,11 +63,10 @@ SUPPLIER_NATIVE_URL = (
     "9714K392_Wave%20Disc%20Spring.SLDPRT"
 )
 SUPPLIER_NATIVE_SHA256 = "5597d77be331b24286107f0337bbabe25477a35d8255f1c67f2791f74572508e"
-SUPPLIER_DRAWING_PRECISION = {
-    "ID": 3, "OD": 3, "FREE_HEIGHT": 3, "THICKNESS": 3,
-    "WORKING_HEIGHT": 3, "WORKING_DEFLECTION": 3,
-}
-SUPPLIER_APPLICATION_DIMENSIONS = ("WORKING_HEIGHT", "WORKING_DEFLECTION")
+SUPPLIER_DRAWING_PRECISION = {"ID": 3, "OD": 3, "FREE_HEIGHT": 3, "THICKNESS": 3}
+# The catalogue load point (compressed height/deflection at 1.5 lb) is rating
+# data, not a replacement size; the 0.95 set gap governs the preload here.
+SUPPLIER_APPLICATION_DIMENSIONS = ()
 
 if not math.isclose(FREE_HEIGHT - WORKING_DEFLECTION, WORKING_HEIGHT):
     raise AssertionError("9714K392 free height, deflection and working height disagree")
