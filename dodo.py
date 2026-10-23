@@ -3991,6 +3991,8 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(
                 (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
             ),
+            # Drawing regressions read captured native sheet dumps at runtime.
+            *(str(path.resolve()) for path in (SCRIPTS_DIR / "fixtures").glob("*.json")),
         }
     )
     return {
