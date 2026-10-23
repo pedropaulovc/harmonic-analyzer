@@ -83,7 +83,10 @@ cannot ask for what the authors were told to leave out.
   The boss-hook nut keys its existing installation instruction to the visible
   boundary of its z=0 bearing face, the face seated on the summing-lever boss
   by the assembly recipe. A native attached leader and its single linked
-  legend are re-proved after the final rebuild; this flag does not establish
+  legend are re-proved after the final rebuild. Every reported key text
+  fragment must have three finite position coordinates, a finite angle and
+  positive finite dimensions before forming its aggregate bounds; a valid
+  fragment cannot hide unreadable later ink. This flag does not establish
   full-thread engagement or waive the physical shortfall review.
   Numeric border zones owned by the drawing template are not installation-key
   candidates. Sheet- or foreign-view duplicates still fail; the whole-inventory

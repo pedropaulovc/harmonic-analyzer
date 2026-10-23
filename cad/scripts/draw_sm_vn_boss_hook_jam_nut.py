@@ -113,8 +113,15 @@ def _installation_flag(adapter: Any, right: Any) -> Callable[[], None]:
         geometry, refused = annotation_display(adapter, annotation)
         texts = geometry.get("texts", ())
         if refused or not texts or any(
-            not all(math.isfinite(float(text.get(field, 0))) and float(text.get(field, 0)) > 0
-                    for field in ("w", "h"))
+            not all(
+                math.isfinite(float(text.get(field) or 0))
+                and float(text.get(field) or 0) > 0
+                for field in ("w", "h")
+            )
+            or len(text.get("pos") or ()) != 3
+            or not all(math.isfinite(float(value)) for value in text["pos"])
+            or text.get("ang") is None
+            or not math.isfinite(float(text["ang"]))
             for text in texts
         ):
             raise RuntimeError(f"{label}: native key text is unreadable")

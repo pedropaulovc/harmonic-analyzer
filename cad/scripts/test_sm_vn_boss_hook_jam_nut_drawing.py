@@ -357,6 +357,23 @@ def boss_installation_native(monkeypatch):
                 data.GetTextInBoxWidthAtIndex = refused_width
             elif state.text_fault == "nonfinite-position":
                 data.GetTextPositionAtIndex = lambda _i: (math.nan, center[1], 0.0)
+            elif state.text_fault.startswith("later-"):
+                # A finite first fragment must not conceal malformed later
+                # geometry in Box.union or a short-position rendering skip.
+                data.GetTextCount = lambda: 2
+                position = data.GetTextPositionAtIndex
+                native_position = position(0)
+                if state.text_fault == "later-nonfinite-angle":
+                    angle = data.GetTextAngleAtIndex
+                    data.GetTextAngleAtIndex = lambda i: math.nan if i else angle(i)
+                else:
+                    malformed = {
+                        "later-short-position": native_position[:1],
+                        "later-missing-z": native_position[:2],
+                        "later-nonfinite-position": (math.nan, *native_position[1:]),
+                        "later-nonfinite-z": (*native_position[:2], math.nan),
+                    }[state.text_fault]
+                    data.GetTextPositionAtIndex = lambda i: malformed if i else position(i)
             return data
 
     def author(
@@ -478,6 +495,8 @@ def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometr
     "unreadable-display", "empty-text", "unreadable-width", "zero-width",
     "negative-width", "nonfinite-width", "zero-height", "nonfinite-height",
     "nonfinite-position", "duplicate-key", "foreign-key", "replaced-key",
+    "later-short-position", "later-missing-z", "later-nonfinite-position",
+    "later-nonfinite-z", "later-nonfinite-angle",
     "missing-legend", "changed-legend", "unlinked-legend", "duplicate-legend",
     "duplicate-literal-instruction", "duplicate-unkeyed-instruction",
     "duplicate-template-legend", "duplicate-template-instruction",
@@ -544,6 +563,8 @@ def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault)
         state.right.outline = (x0 - 0.005, y0, x0 - 0.001, y1)
     elif fault in (
         "unreadable-display", "empty-text", "unreadable-width", "nonfinite-position",
+        "later-short-position", "later-missing-z", "later-nonfinite-position",
+        "later-nonfinite-z", "later-nonfinite-angle",
     ):
         state.text_fault = fault
     elif fault in ("zero-width", "negative-width", "nonfinite-width"):
