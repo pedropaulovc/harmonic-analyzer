@@ -3,8 +3,9 @@
 The head-height value and label use the immutable measured +Y text-only shelf;
 the complete property-linked head note rises only enough to clear that shelf.
 Physical source stations, manufacturing controls and both stock views stay put.
-Settled checks retain the original note entity/landing, and the closed read-only
-SLDDRW receives fresh exact-name physical, native text and adjacent-ink proofs.
+Settled checks retain the original note entity/landing and complete native trim;
+the closed read-only SLDDRW freshly proves exact names, source body/configuration,
+physical stations, native XYZ landing, complete text and adjacent-ink clearance.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name, place_view, set_view_position, view_name,
 )
@@ -763,7 +765,7 @@ def _record_purchased_note_source_failure(
     missing = object()
     evidence = {
         "label": "Purchased Screw Note", "status": "refused",
-        "predicate_match_count": match_count, "candidate_count": len(scan.circles),
+        "predicate_match_count": match_count, "candidate_count": len(scan.edges),
         "scan_edge_count": len(scan.edges), "expected_source_path": str(SOURCE.resolve()),
     }
 
@@ -871,6 +873,7 @@ def _record_purchased_note_source_failure(
         if available(curve):
             circle = observe(record, "is_circle", lambda: curve.IsCircle())
             observe(record, "is_line", lambda: curve.IsLine())
+            observe(record, "curve_type", lambda: curve.Identity())
             if circle is True:
                 observe(record, "circle_params_m", lambda: curve.CircleParams)
             # GetCurve must precede GetCurveParams3, per the official SDK.
@@ -883,6 +886,7 @@ def _record_purchased_note_source_failure(
                 observe(record, "trim_end_m", lambda: trim.EndPoint)
                 observe(record, "trim_u_min", lambda: trim.UMinValue)
                 observe(record, "trim_u_max", lambda: trim.UMaxValue)
+                observe(record, "trim_curve_type", lambda: trim.CurveType)
                 observe(record, "trim_sense", lambda: trim.Sense)
         closest = {}
         record["closest_points_m"] = closest
@@ -916,8 +920,8 @@ def _record_purchased_note_source_failure(
     attached_reverse = contexts(evidence["attached"], attached)
     candidates = []
     evidence["candidates"] = candidates
-    for index, item in enumerate(scan.circles):
-        row = {"candidate_index": index, "scan_circle_mm": item.circle}
+    for index, item in enumerate(scan.edges):
+        row = {"candidate_index": index, "scan_circle_mm": item.circle, "scan_line_mm": item.line}
         candidates.append(row)
         reverse = contexts(row, item.edge)
         if available(attached_reverse):
@@ -925,6 +929,52 @@ def _record_purchased_note_source_failure(
             if available(reverse):
                 observe(row, "reverse_same_attached_reverse", lambda: app.IsSame(reverse, attached_reverse))
     _telemetry.event("drawing.stud_purchased_note_source_inventory", **evidence)
+
+
+def _purchased_note_edge_descriptor(raw: Any) -> dict:
+    """Scalar native curve/trim readback, with no curve-kind acceptance list."""
+    label = "Purchased Screw Note"
+    try:
+        edge = _early_bound(raw, "IEdge")
+        raw_curve = edge.GetCurve()
+        if raw_curve is None:
+            raise RuntimeError("native curve is null")
+        curve = _early_bound(raw_curve, "ICurve")
+        kind = curve.Identity()
+        raw_trim = edge.GetCurveParams3()
+        if raw_trim is None:
+            raise RuntimeError("native trim data are null")
+        trim = _early_bound(raw_trim, "ICurveParamData")
+        descriptor = {
+            "curve_type": kind, "trim_curve_type": trim.CurveType,
+            "start_m": tuple(float(value) for value in trim.StartPoint),
+            "end_m": tuple(float(value) for value in trim.EndPoint),
+            "u": (float(trim.UMinValue), float(trim.UMaxValue)), "sense": trim.Sense,
+        }
+    except Exception as error:
+        raise RuntimeError(f"{label}: unreadable actual native head-top curve/trim") from error
+    if (
+        type(descriptor["curve_type"]) is not int
+        or type(descriptor["trim_curve_type"]) is not int
+        or type(descriptor["sense"]) is not bool
+        or len(descriptor["start_m"]) != 3 or len(descriptor["end_m"]) != 3
+        or not all(map(math.isfinite, (*descriptor["start_m"], *descriptor["end_m"], *descriptor["u"])))
+        or descriptor["u"][0] >= descriptor["u"][1]
+        or math.dist(descriptor["start_m"], descriptor["end_m"]) <= 1e-8
+    ):
+        raise RuntimeError(f"{label}: invalid actual native head-top curve/trim")
+    return descriptor
+
+
+def _same_purchased_note_edge_descriptor(first: dict, second: dict) -> bool:
+    return (
+        first["curve_type"] == second["curve_type"]
+        and first["trim_curve_type"] == second["trim_curve_type"]
+        and first["sense"] is second["sense"]
+        and first["u"] == second["u"]
+        and math.dist(first["start_m"], second["start_m"]) <= 1e-8
+        and math.dist(first["end_m"], second["end_m"]) <= 1e-8
+    )
 
 
 def _purchased_note_geometry(
@@ -949,40 +999,85 @@ def _purchased_note_geometry(
     _assert_attached_to(
         adapter, annotation, attached[0], entity_type="EDGE", what=label, label=label,
     )
-    # Resolve the actual attached edge, not an assumed outer/crown radius. The
-    # coordinate pick projects more than one physical top boundary to this Y.
-    raw_source = _early_bound(front, "IView").ReferencedDocument
-    source_path = (
-        str(_early_bound(raw_source, "IModelDoc2").GetPathName() or "")
-        if raw_source is not None else ""
-    )
+    # The original native pick is the noncircular corner-trim boundary in E8,
+    # not one of the five visible circles. Census every actual physical edge.
+    view = _early_bound(front, "IView")
+    raw_source = view.ReferencedDocument
+    if raw_source is None:
+        raise RuntimeError(f"{label}: actual physical head-top source document changed")
+    source = _early_bound(raw_source, "IModelDoc2")
+    source_path = str(source.GetPathName() or "")
     if (
-        not source_path or not Path(source_path).is_absolute()
+        int(source.GetType()) != 1 or not source_path or not Path(source_path).is_absolute()
         or Path(source_path).resolve() != SOURCE.resolve()
     ):
         raise RuntimeError(f"{label}: actual physical head-top source document changed")
+    configuration = str(view.ReferencedConfiguration)
+    manager = _early_bound(source.ConfigurationManager, "IConfigurationManager")
+    active = _early_bound(manager.ActiveConfiguration, "IConfiguration")
+    if (
+        not configuration or configuration == SUPPLIER_STOCK_CONFIGURATION
+        or str(active.Name) != configuration
+    ):
+        raise RuntimeError(f"{label}: actual physical head-top source configuration changed")
     scan = scan_view_edges(front, label=f"{label} physical head top")
     matches = [
-        item for item in scan.circles
+        item for item in scan.edges
         if int(adapter.swApp.IsSame(item.edge, attached[0])) == 1
     ]
     if len(matches) != 1:
-        # Diagnostics cannot mask this unchanged strict native-identity refusal.
+        # Full raw/mapped evidence never substitutes for exact unique identity.
         with suppress(Exception):
             _record_purchased_note_source_failure(
                 adapter, front, annotation, attached[0], scan, match_count=len(matches),
             )
         raise RuntimeError(f"{label}: actual attached head-top edge is not unique in its source view")
-    circle = tuple(float(value) for value in matches[0].circle)
-    axis_length = math.hypot(*circle[3:6])
+    extension = _early_bound(source.Extension, "IModelDocExtension")
+    raw_canonical = extension.GetCorrespondingEntity2(attached[0])
+    if raw_canonical is None:
+        raise RuntimeError(f"{label}: original physical head-top source correspondence is missing")
+    canonical = _early_bound(raw_canonical, "IEdge")
+    bodies = tuple(_early_bound(source, "IPartDoc").GetBodies2(0, False) or ())
+    body = canonical.GetBody()
     if (
-        len(circle) != 7 or not all(map(math.isfinite, circle)) or circle[6] <= 0
-        or max(abs(circle[0]), abs(circle[1] - HEAD_TOP_Y), abs(circle[2])) > 1e-5
-        or axis_length <= 0
-        or max(abs(circle[3] / axis_length), abs(circle[5] / axis_length),
-               abs(abs(circle[4] / axis_length) - 1.0)) > 1e-6
+        len(bodies) != 1 or bodies[0] is None or body is None
+        or int(adapter.swApp.IsSame(body, bodies[0])) != 1
     ):
-        raise RuntimeError(f"{label}: attachment is not an actual physical head-top boundary")
+        raise RuntimeError(f"{label}: original physical head-top source body changed")
+    descriptor = _purchased_note_edge_descriptor(canonical)
+    if not _same_purchased_note_edge_descriptor(
+        _purchased_note_edge_descriptor(matches[0].edge), descriptor,
+    ):
+        raise RuntimeError(f"{label}: original physical head-top source descriptor changed")
+    # The original head-top endpoint is the front-right hex facet's tangency
+    # to the inscribed top circle. Read BOTH real trim endpoints; do not pick a
+    # different rim, impose a curve-kind list or fit the observed lower end.
+    top_m = (HEAD_AF / 4000, HEAD_TOP_Y / 1000, math.sqrt(3) * HEAD_AF / 4000)
+    endpoints = [
+        point for point in (descriptor["start_m"], descriptor["end_m"])
+        if math.dist(point, top_m) <= 1e-8
+    ]
+    if len(endpoints) != 1:
+        raise RuntimeError(f"{label}: original physical head-top endpoint is missing or ambiguous")
+    raw_utility = adapter.swApp.GetMathUtility()
+    if raw_utility is None:
+        raise RuntimeError(f"{label}: actual native projection utility is missing")
+    utility = _early_bound(raw_utility, "IMathUtility")
+    raw_point = utility.CreatePoint(double_array(endpoints[0]))
+    if raw_point is None:
+        raise RuntimeError(f"{label}: cannot create actual native head-top endpoint")
+    point = _early_bound(raw_point, "IMathPoint")
+    transform = view.ModelToViewTransform
+    if transform is None:
+        raise RuntimeError(f"{label}: actual native view projection transform is missing")
+    raw_projected = point.MultiplyTransform(transform)
+    if raw_projected is None:
+        raise RuntimeError(f"{label}: cannot project actual native head-top endpoint")
+    projected = tuple(
+        float(value) for value in _early_bound(raw_projected, "IMathPoint").ArrayData
+    )
+    if len(projected) != 3 or not all(map(math.isfinite, projected)):
+        raise RuntimeError(f"{label}: unreadable actual native head-top endpoint projection")
     points = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
     if len(points) < 6 or len(points) % 3 or not all(map(math.isfinite, points)):
         raise RuntimeError(f"{label}: unreadable native leader landing")
@@ -994,6 +1089,7 @@ def _purchased_note_geometry(
     if (
         len(expected_xy) != 2 or not all(map(math.isfinite, expected_xy))
         or math.dist(actual_landing[:2], expected_xy) > 1e-5
+        or math.dist(actual_landing, projected) > 1e-8
         or (landing is not None and math.dist(actual_landing, landing) > 1e-8)
     ):
         raise RuntimeError(f"{label}: original physical head-top landing moved")
@@ -1020,7 +1116,7 @@ def _purchased_note_geometry(
     box = display_box({"texts": rows})
     if box is None or not all(map(math.isfinite, (box.xmin, box.ymin, box.xmax, box.ymax))):
         raise RuntimeError(f"{label}: unreadable complete native note box")
-    record["physical_top_circle_mm"] = circle
+    record["physical_head_edge"] = descriptor
     record["physical_source"] = (
         str(SOURCE.resolve()), view_name(adapter, front), str(front.ReferencedConfiguration),
     )
@@ -1051,7 +1147,9 @@ def _assert_head_height_paper(
     )
     if (
         tuple(record["physical_source"]) != tuple(purchased_note["source"])
-        or math.dist(record["physical_top_circle_mm"], purchased_note["circle_mm"]) > 1e-5
+        or not _same_purchased_note_edge_descriptor(
+            record["physical_head_edge"], purchased_note["edge_descriptor"],
+        )
     ):
         raise RuntimeError("Purchased Screw Note: original physical head-top source descriptor changed")
     if text.ymin < shelf["text"].ymax + CLEAR_GAP_M:
@@ -1152,7 +1250,7 @@ def _place_purchased_note_above_shelf(
         raise RuntimeError("Purchased Screw Note: native text move did not settle")
     saved = {
         "name": str(annotation.GetName()), "text": text, "landing": landing,
-        "circle_mm": original_record["physical_top_circle_mm"],
+        "edge_descriptor": original_record["physical_head_edge"],
         "source": original_record["physical_source"],
     }
     if not saved["name"]:

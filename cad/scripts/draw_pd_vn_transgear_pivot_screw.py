@@ -20,7 +20,6 @@ import sys
 from pathlib import Path
 from typing import Any, NoReturn
 
-from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name, place_view, set_view_position, view_name,
 )
@@ -41,7 +40,7 @@ from _drawing_dimensions import offset_dimension_text, set_dimension_callouts
 from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_edges import scan_view_edges
 from _drawing_hidden_sketches import curate_view_dimensions
-from _drawing_layout_audit import _Reader, _dump_annotation, _dump_display
+from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_serialized_note_identity import capture_serialized_note_name
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note, property_link
@@ -58,7 +57,7 @@ from _mcmaster_90325a174 import TIP_CHAMFER
 from _layout_audit import (
     _segment_crossing, _segment_enters_box, annotation_geometry, calibrate_sheet_advance, display_box,
 )
-from _layout_geometry import Box, Segment, point_segment_distance, segment_box_distance
+from _layout_geometry import Box, Segment, segment_box_distance
 from _session import run_build
 from _stock_trim_drawing import verify_machining_controls
 from _supplier_dimensions import (
@@ -147,12 +146,11 @@ CHAMFER_TEXT_XY = (0.185, TIP_SHEET_Y - 0.018)
 # The reference length's four lines stand wholly left of its dimension line
 # (73 mm wide), so neither its arrows nor its extension lines strike them.
 CUT_LENGTH_TEXT_XY = (0.062, (TIP_SHEET_Y + SHOULDER_END_SHEET_Y) / 2)
-# The note names the actual left extremum of the upper trimmed rim. A native
-# measured multi-jog route exits above the head chamfer, below the left HD
-# witness, then passes between the settled head-height shelf and socket line.
+# The native straight leader departs down-right from the actual upper trimmed
+# rim, outside its chamfer. Native automatic wrapping fits the measured field.
 _HEAD_TOP_R = HEAD_DIA / 2 - HEAD_CHAMFER
-HEAD_PICK_MM = (-_HEAD_TOP_R, HEAD_H, 0.0)
-PURCHASED_NOTE_XY = (0.238, 0.235)
+HEAD_PICK_MM = (_HEAD_TOP_R, HEAD_H, 0.0)
+PURCHASED_NOTE_XY = (0.238, 0.235)  # Creation only; measured placement follows.
 # Every view and the sheet are 4:1, so the title-block SCALE is the view
 # scale and the isometric carries no scale label.
 ISO_CENTER = (0.360, 0.165)
@@ -1069,7 +1067,7 @@ def _assert_saved_paper(adapter: Any, front: Any, top: Any, iso: Any, *, shelf_m
         raise RuntimeError("saved paper: exact purchased note owner changed")
     note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
     landing = _purchased_head_target(adapter, front)[1]
-    _assert_note_route(adapter, note, landing=landing, jogs=paper["jogs"])
+    _assert_note_wrap(adapter, note, landing=landing, frame=paper["wrap"])
     tail = fresh["ThreadLengthMin"].GetAnnotation()
     verify_machining_controls(
         adapter, [tail], expected={"ThreadLengthMin": EXPECTED_CONTROLS["ThreadLengthMin"]},
@@ -1088,31 +1086,6 @@ def _paper_annotation(adapter: Any, annotation: Any, *, label: str) -> dict[str,
     """Complete native fragments and strokes, never INote's leader-inclusive extent."""
     reader = _Reader(adapter)
     record = _dump_annotation(reader, annotation)
-    if record is not None and int(record.get("type", 0)) == 6:
-        native = _early_bound(annotation, "IAnnotation")
-        jogs = tuple(native.GetMultiJogLeaders() or ())
-        if len(jogs) != int(native.GetMultiJogLeaderCount()):
-            raise RuntimeError(f"{label}: native multi-jog inventory changed")
-        for jog in jogs:
-            data = _dump_display(reader, _early_bound(jog, "IMultiJogLeader").GetDisplayData())
-            jog_record = dict(type=6, display=data)
-            actual = annotation_geometry(jog_record, owner=label, advance=calibrate_sheet_advance((jog_record,)))
-            # The unchanged full-sheet collector reads this annotation's display,
-            # not IMultiJogLeader. Refuse if any real jog ink would be absent there.
-            native_record = dict(type=6, display=record["display"])
-            published = annotation_geometry(
-                native_record, owner=label, advance=calibrate_sheet_advance((native_record,)),
-            )
-            if not actual.segments or any(
-                not all(math.isfinite(value) for value in (run.x0, run.y0, run.x1, run.y1))
-                or not any(
-                    point_segment_distance((run.x0, run.y0), candidate) <= 1e-7
-                    and point_segment_distance((run.x1, run.y1), candidate) <= 1e-7
-                    for candidate in published.segments
-                )
-                for run in actual.segments
-            ):
-                raise RuntimeError(f"{label}: actual multi-jog strokes missing from native annotation dump")
     errors = reader.take_errors()
     if record is None or errors:
         raise RuntimeError(f"{label}: unreadable native paper geometry: {errors}")
@@ -1587,73 +1560,170 @@ def _assert_tail_layout(adapter: Any, tail: Any, major: Any, *, frame: dict[str,
         _tail_layout_refusal(adapter, tail, display, frame=frame, current=actual, phase="settled", error=error)
 
 
-def _route_purchased_note(
-    adapter: Any, front: Any, note: Any, displays: dict[str, Any],
+def _note_font(annotation: Any) -> tuple[Any, tuple]:
+    """Keep the existing native font; LineLength alone is the wrapping control."""
+    if int(annotation.GetTextFormatCount()) != 1:
+        raise RuntimeError("Purchased Screw Note: expected one simple native text format")
+    native = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    metrics = (
+        str(native.TypeFaceName), float(native.CharHeight), float(native.WidthFactor),
+        float(native.CharSpacingFactor), float(native.LineSpacing),
+        bool(native.Bold), bool(native.Italic), bool(native.Underline),
+        bool(native.Strikeout), bool(native.BackWards), bool(native.UpsideDown), bool(native.Vertical),
+    )
+    if not metrics[0] or not all(map(math.isfinite, metrics[1:5])) or any(value <= 0 for value in metrics[1:4]):
+        raise RuntimeError("Purchased Screw Note: unreadable native font metrics")
+    return native, metrics
+
+
+def _place_purchased_note(
+    adapter: Any, front: Any, iso: Any, note: Any, displays: dict[str, Any],
 ) -> Any:
-    """Route the real attached note through measured whitespace, never a free sketch."""
+    """Native word wrapping and one straight leader, sized from actual clear paper."""
     _edge, landing = _purchased_head_target(adapter, front)
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    diameter = _paper_annotation(adapter, displays["SupplierHeadDiameter"].GetAnnotation(), label="SupplierHeadDiameter")
-    extent = display_box(diameter["display"])
-    height = _assert_text_shelf(adapter, displays["SupplierHeadHeight"], axis=1, label="SupplierHeadHeight")
-    socket = _assert_text_shelf(adapter, displays["SupplierSocketAF"], axis=0, label="SupplierSocketAF")
-    head_corner = model_point_in_view(
-        adapter, front, (-HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
-        label="actual head left chamfer station",
+    before = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
+    text = display_box({"texts": before["display"]["texts"]})
+    shoulder = _paper_annotation(
+        adapter, displays["SupplierShoulderDiameter"].GetAnnotation(), label="SupplierShoulderDiameter",
+    )
+    shoulder_text = display_box({"texts": shoulder["display"]["texts"]})
+    front_box = Box(*(float(value) for value in _early_bound(front, "IView").GetOutline()))
+    iso_box = Box(*(float(value) for value in _early_bound(iso, "IView").GetOutline()))
+    corner = model_point_in_view(
+        adapter, front, (HEAD_DIA / 2 / 1000, (HEAD_H - HEAD_CHAMFER) / 1000, 0.0),
+        label="actual head right chamfer station",
     )
     leaders = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
-    if extent is None or len(leaders) < 6 or not all(map(math.isfinite, leaders)):
-        raise RuntimeError("Purchased Screw Note: unavailable native route anchors")
-    left = extent.xmin - _PAPER_GAP_M - 0.0002
-    slope = (landing[1] - head_corner[1]) / (landing[0] - head_corner[0])
-    low = height["text"].ymax + _PAPER_GAP_M + 0.0002
-    high = socket["tips"][0][1] - _PAPER_GAP_M - 0.0002
-    if not 0 < slope or not low < high or not left < head_corner[0]:
-        raise RuntimeError("Purchased Screw Note: no measured head/socket route corridor")
-    across = (low + high) / 2
-    # The shallow down-left departure stays ABOVE the actual 45-degree chamfer.
-    jogs = ((leaders[0], across, 0.0), (left, across, 0.0),
-            (left, landing[1] - (landing[0] - left) * slope * 0.55, 0.0))
-    if not annotation.ConvertToMultiJog(0, len(jogs), double_array([
-        value for point in jogs for value in point
-    ])):
-        raise RuntimeError("Purchased Screw Note: native multi-jog conversion failed")
-    rebuild_drawing(adapter, label="purchased head note measured native route")
+    if (
+        text is None or shoulder_text is None or len(leaders) != 6
+        or not all(map(math.isfinite, (*leaders, *landing, *corner,
+                                      front_box.xmax, iso_box.xmin, shoulder_text.ymax)))
+        or corner[0] <= landing[0] or corner[1] >= landing[1]
+    ):
+        raise RuntimeError("Purchased Screw Note: unreadable actual straight-note corridor")
+    low = shoulder_text.ymax + _PAPER_GAP_M + 0.0002
+    slope = (landing[1] - corner[1]) / (corner[0] - landing[0])
+    height = _assert_text_shelf(
+        adapter, displays["SupplierHeadHeight"], axis=1, label="SupplierHeadHeight",
+    )
+    # Reserve the physical height column, including a middle run that can
+    # become visible when its text is shelved. Never wrap through that line.
+    left_limit = front_box.xmax + _PAPER_GAP_M + 0.0002
+    right = min(
+        height["tips"][0][0], iso_box.xmin, _finished_border(adapter).xmax,
+    ) - _PAPER_GAP_M - 0.0002
+    width = right - left_limit
+    if low >= landing[1] or not math.isfinite(width) or width <= 0:
+        raise RuntimeError("Purchased Screw Note: no measured native wrapping corridor")
+    native, font = _note_font(annotation)
+    frame = dict(line_length=width, font=font)
+    native.LineLength = width
+    if not annotation.SetTextFormat(0, False, native):
+        raise RuntimeError("Purchased Screw Note: native word wrapping was refused")
+    rebuild_drawing(adapter, label="native purchased-note automatic wrapping")
+    wrapped = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
+    ink = display_box({"texts": wrapped["display"]["texts"]})
+    leaders = tuple(float(value) for value in annotation.GetLeaderPointsAtIndex(0) or ())
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if (
+        ink is None or len(position) != 3 or len(leaders) != 6
+        or not all(map(math.isfinite, (*position, *leaders)))
+    ):
+        raise RuntimeError("Purchased Screw Note: unreadable native wrapped text/leader")
+    dy = low - ink.ymin
+    start_y = leaders[1] + dy
+    start_x = landing[0] + (landing[1] - start_y) / (0.55 * slope)
+    left = max(left_limit, start_x + ink.xmin - leaders[0])
+    frame.update(left=left, low=low)
+    if (
+        start_y >= landing[1] or left + ink.width > right + 1e-5
+        or not annotation.SetPosition2(
+            position[0] + left - ink.xmin, position[1] + dy, position[2],
+        )
+    ):
+        raise RuntimeError(
+            "Purchased Screw Note: cannot fit/place complete native wrapped text; "
+            f"ink={ink!r}, field={(left_limit, right, low)!r}, "
+            f"target_left={left!r}, leader={leaders!r}, landing={landing!r}"
+        )
+    rebuild_drawing(adapter, label="measured straight purchased-note placement")
 
     def settled() -> None:
-        _assert_note_route(adapter, note, landing=landing, jogs=jogs)
+        _assert_note_wrap(adapter, note, landing=landing, frame=frame)
     settled()
-    return settled, jogs
+    return settled, frame
 
 
-def _assert_note_arrow(current: Any, landing: tuple) -> None:
-    """One displayed native leader plus its actual converted leader and arrow."""
-    native_jogs = tuple(current.GetMultiJogLeaders() or ())
+def _assert_note_arrow(current: Any, landing: tuple, record: dict) -> None:
+    """One real standard straight leader and finite native twelve-double arrow."""
+    points = tuple(float(value) for value in current.GetLeaderPointsAtIndex(0) or ())
+    arrows = record["display"].get("arrows") or ()
+    count, style = int(current.GetLeaderCount()), int(current.GetLeaderStyle())
     if (
-        int(current.GetLeaderCount()) != 1
-        or int(current.GetMultiJogLeaderCount()) != 1 or len(native_jogs) != 1
+        count != 1 or style != 1  # swSTRAIGHT
+        or len(points) != 6 or not all(map(math.isfinite, points))
+        or math.dist(points[3:5], landing) > 1e-8 or math.dist(points[:2], points[3:5]) <= 1e-8
+        or len(arrows) != 1 or len(arrows[0]) != 12 or not all(map(math.isfinite, arrows[0]))
+        or math.dist(arrows[0][:2], landing) > 1e-8
+        or math.hypot(arrows[0][3], arrows[0][4]) <= 1e-8 or min(arrows[0][6:8]) <= 0
     ):
-        raise RuntimeError("Purchased Screw Note: one actual multi-jog leader did not persist")
-    jog = _early_bound(native_jogs[0], "IMultiJogLeader")
-    arrow = tuple(float(value) for value in jog.GetArrowHeadAtIndex(0) or ())
+        raise RuntimeError(
+            "Purchased Screw Note: actual straight leader/arrow/landing changed; "
+            f"leader_count={count}, style={style}, points={points[:12]!r}, "
+            f"arrow_count={len(arrows)}, arrow_lengths={[len(row) for row in arrows[:4]]!r}"
+        )
+    text = display_box({"texts": record["display"].get("texts") or ()})
+    if text is None or not any(
+        len(line) == 10 and all(map(math.isfinite, line))
+        and math.dist(line[4:6], line[7:9]) > 1e-8 and any(
+            math.dist(tip, landing) <= 1e-8
+            and text.gap(Box.from_points((other,))) <= _PAPER_GAP_M
+            for tip, other in ((line[4:6], line[7:9]), (line[7:9], line[4:6]))
+        )
+        for line in record["display"].get("lines") or ()
+    ):
+        raise RuntimeError("Purchased Screw Note: actual full straight leader missing from native annotation dump")
+
+
+def _assert_note_wrap(adapter: Any, note: Any, *, landing: tuple, frame: dict) -> None:
+    """Fresh native width/font/full-fragment proof, also used after cold reopening."""
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    native, font = _note_font(annotation)
+    width = float(native.LineLength)
     if (
-        int(jog.GetArrowHeadCount()) != 1 or len(arrow) != 9
-        or not all(map(math.isfinite, arrow)) or math.dist(arrow[:2], landing) > 1e-8
+        bool(annotation.GetUseDocTextFormat(0)) or not math.isfinite(width) or width <= 0
+        or not math.isclose(width, frame["line_length"], rel_tol=0, abs_tol=1e-8)
+        or font[0] != frame["font"][0] or font[5:] != frame["font"][5:]
+        or any(
+            not math.isclose(actual, original, rel_tol=0, abs_tol=1e-10)
+            for actual, original in zip(font[1:5], frame["font"][1:5], strict=True)
+        )
     ):
-        raise RuntimeError("Purchased Screw Note: actual multi-jog arrow lost its head-top landing")
-
-
-def _assert_note_route(adapter: Any, note: Any, *, landing: tuple, jogs: tuple) -> None:
-    """Read fresh native jogs/arrow and prove the shared full audit sees all ink."""
-    current = _early_bound(note.GetAnnotation(), "IAnnotation")
-    _assert_note_arrow(current, landing)
-    record = _paper_annotation(adapter, current, label="Purchased Screw Note")
-    geometry = annotation_geometry(record, owner="Purchased Screw Note", advance=calibrate_sheet_advance((record,)))
-    endpoints = [(run.x0, run.y0) for run in geometry.segments] + [
-        (run.x1, run.y1) for run in geometry.segments
-    ]
-    if any(not any(math.dist(point[:2], actual) <= 1e-5 for actual in endpoints) for point in jogs):
-        raise RuntimeError("Purchased Screw Note: native jog points did not settle")
+        raise RuntimeError(
+            "Purchased Screw Note: native wrapping width/font did not persist; "
+            f"width={width!r}, font={font!r}, expected={frame!r}"
+        )
+    record = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
+    _assert_note_arrow(annotation, landing, record)
+    rows = record["display"]["texts"]
+    text = display_box({"texts": rows})
+    ordered = sorted(rows, key=lambda row: (-float(row["pos"][1]), float(row["pos"][0])))
+    printed = " ".join(str(row["t"]) for row in ordered).split()
+    if (
+        text is None or text.width > width + 1e-5
+        or abs(text.xmin - frame["left"]) > 1e-5 or abs(text.ymin - frame["low"]) > 1e-5
+        or printed != str(note.GetText() or "").split()
+        or any(
+            not math.isclose(float(row["h"]), font[1], rel_tol=0, abs_tol=1e-8)
+            or str(row["font"]) != font[0] or abs(float(row["ang"])) > 1e-8
+            for row in rows
+        )
+    ):
+        raise RuntimeError(
+            "Purchased Screw Note: complete native wrapped ink/font/width changed; "
+            f"ink={text!r}, frame={frame!r}, fragments={len(rows)}"
+        )
 
 
 def _assert_paper_layout(
@@ -1673,14 +1743,15 @@ def _assert_paper_layout(
         or bool(annotation.IsDangling())
     ):
         raise RuntimeError("Purchased Screw Note: exact native head-top EDGE attachment changed")
-    _assert_note_arrow(annotation, landing)
+    note_record = _paper_annotation(adapter, annotation, label="Purchased Screw Note")
+    _assert_note_arrow(annotation, landing, note_record)
     if (
         int(annotation.OwnerType) != 0 or int(adapter.swApp.IsSame(annotation.Owner, front)) != 1
         or str(note.PropertyLinkedText or "") != property_link("Purchased Screw Note")
         or str(note.GetText() or "").replace("\r", "") != purchased_text.replace("\r", "")
     ):
         raise RuntimeError("Purchased Screw Note: native target/owner/property text changed")
-    owned = {"Purchased Screw Note": _paper_annotation(adapter, annotation, label="Purchased Screw Note")}
+    owned = {"Purchased Screw Note": note_record}
     for name, axis in _REFERENCE_SHELF_AXES.items():
         owned[name] = _assert_text_shelf(adapter, displays[name], axis=axis, label=name)["record"]
     foreign = []
@@ -1892,8 +1963,8 @@ async def build(adapter: Any) -> dict[str, str]:
         force=tuple(_REFERENCE_SHELF_AXES), label="pivot purchased references",
     )
     _clear_socket_text(adapter, top, shelf_displays()["SupplierSocketAF"])
-    note_route_check, note_frame = _route_purchased_note(
-        adapter, front, note, _assert_supplier_references(adapter, identities, configurations),
+    note_check, note_frame = _place_purchased_note(
+        adapter, front, iso, note, _assert_supplier_references(adapter, identities, configurations),
     )
 
     def settled_paper() -> None:
@@ -1901,7 +1972,7 @@ async def build(adapter: Any) -> dict[str, str]:
         alignment_check()
         centre_mark_check()
         tail_check()
-        note_route_check()
+        note_check()
         verify_machining_controls(
             adapter, [by_name[name] for name in EXPECTED_CONTROLS],
             expected=EXPECTED_CONTROLS, tolerance_types=DIMENSION_TOLERANCE_TYPES,
@@ -1924,7 +1995,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "SupplierHeadHeight": supplier_refs["SupplierHeadHeight"],
     }
     paper_identities = _supplier_reference_identities(adapter, paper_refs)
-    paper = dict(tail=tail_frame, jogs=note_frame, text=properties["Purchased Screw Note"])
+    paper = dict(tail=tail_frame, wrap=note_frame, text=properties["Purchased Screw Note"])
 
     def checkpoint(stage: str) -> None:
         nonlocal capture_called

@@ -1766,7 +1766,7 @@ def _record_drawing_build(
     monkeypatch.setattr(drawing, "_trim_top_mark", lambda *_args: lambda: None)
     monkeypatch.setattr(drawing, "_move_tail_column", lambda *_args: (lambda: None, {}))
     monkeypatch.setattr(drawing, "_assert_paper_layout", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "_route_purchased_note", lambda *_args: (lambda: None, ()))
+    monkeypatch.setattr(drawing, "_place_purchased_note", lambda *_args: (lambda: None, {}))
     monkeypatch.setattr(drawing, "_clear_socket_text", lambda *_args: None)
     monkeypatch.setattr(drawing, "_head_height_entities", lambda *_args: (object(), head_entity))
 
@@ -2838,71 +2838,98 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
     diameter_record["display"]["lines"][1] = _native_line((0.124125, 0.2019408), (0.124125, 0.207577))
     diameter_record["display"]["lines"][3] = _native_line((0.155875, 0.2019408), (0.155875, 0.207577))
     state.diameter_annotation = SimpleNamespace(paper_record=diameter_record)
+    shoulder_record = dict(type=4, display=dict(texts=[
+        _native_text("AS-SUPPLIED SHOULDER", 0.1758545, 0.1646962, 0.052291),
+        _native_text("0.000", 0.203526, 0.1747781, 0.0116375),
+    ]))
+    state.shoulder_annotation = SimpleNamespace(paper_record=shoulder_record, GetType=lambda: 4)
     state.paper_displays = dict(
         SupplierHeadDiameter=SimpleNamespace(GetAnnotation=lambda: state.diameter_annotation),
+        SupplierShoulderDiameter=SimpleNamespace(GetAnnotation=lambda: state.shoulder_annotation),
         SupplierHeadHeight=state.display, SupplierSocketAF=state.socket_display,
     )
     state.note_text = _config.parts(part.PART_NAME)["purchased_note"]
     _edge, state.landing = drawing._purchased_head_target(state.adapter, state.front)
-    state.jogs = []
-    state.note_start = (0.2371887, 0.2332717)
+    state.note_position = [*drawing.PURCHASED_NOTE_XY, 0.0]
+    state.note_start_override = None
+    state.note_ink_missing = False
+    state.note_arrow_count = 1
+    state.wrap_fault = ""
+    state.note_uses_doc_font = True
+    state.note_format = SimpleNamespace(
+        LineLength=0.0, TypeFaceName="Century Gothic", CharHeight=0.0035,
+        WidthFactor=1.0, CharSpacingFactor=1.0, LineSpacing=0.001,
+        Bold=False, Italic=False, Underline=False, Strikeout=False,
+        BackWards=False, UpsideDown=False, Vertical=False,
+    )
+    def leader_start():
+        return state.note_start_override or (
+            state.note_position[0] - 0.0005182, state.note_position[1] - 0.0018311,
+        )
     state.note_annotation = SimpleNamespace(
         Owner=state.front, OwnerType=0, Visible=1, IsDangling=lambda: False,
-        GetLeaderCount=lambda: 1,
+        GetLeaderCount=lambda: 1, GetLeaderStyle=lambda: 1,
         GetAttachedEntityCount3=lambda: 1, GetAttachedEntityTypes=lambda: (1,),
         GetAttachedEntities3=lambda: (state.top,),
-        GetLeaderPointsAtIndex=lambda _index: (*state.note_start, 0.0, *state.landing, 0.0),
-        GetMultiJogLeaderCount=lambda: int(bool(state.jogs)),
+        GetLeaderPointsAtIndex=lambda _index: (*leader_start(), 0.0, *state.landing, 0.0),
+        GetPosition=lambda: tuple(state.note_position), GetTextFormatCount=lambda: 1,
+        GetTextFormat=lambda _index: copy.deepcopy(state.note_format),
+        GetUseDocTextFormat=lambda _index: state.note_uses_doc_font,
     )
-    state.jog_dump_missing = False
-
-    def leader_display():
-        points = (state.note_start, *[point[:2] for point in state.jogs], state.landing)
-        dx, dy = points[-2][0] - points[-1][0], points[-2][1] - points[-1][1]
-        length = math.hypot(dx, dy)
-        return dict(
-            lines=[_native_line(a, b) for a, b in zip(points, points[1:])],
-            arrows=[[*state.landing, 0.0, dx / length, dy / length, 0.0,
-                     0.002, 0.0005, 0.0, 0.0, 0.0, 1.0]],
-        )
-
-    state.native_jog = SimpleNamespace(
-        GetDisplayData=leader_display, GetArrowHeadCount=lambda: 1,
-        GetArrowHeadAtIndex=lambda _index: (
-            *state.landing, 0.0, -1.0, -0.55, 0.0, 0.002, 0.0005, 1.0,
-        ),
-    )
-    state.note_annotation.GetMultiJogLeaders = lambda: (state.native_jog,) if state.jogs else ()
-
-    def convert(_leader, count, points):
-        assert len(points) == count * 3
-        state.jogs = [tuple(points[index:index + 3]) for index in range(0, len(points), 3)]
+    def set_format(_index, _use_doc, native):
+        if state.wrap_fault == "refused":
+            return False
+        if state.wrap_fault != "ignored":
+            state.note_format = copy.deepcopy(native)
+            state.note_uses_doc_font = False
+        if state.wrap_fault == "font_shrink":
+            state.note_format.CharHeight /= 2
         return True
-
-    state.note_annotation.ConvertToMultiJog = convert
-
+    state.note_annotation.SetTextFormat = set_format
+    def position_note(x, y, z):
+        if state.wrap_fault != "ignored_position":
+            state.note_position[:] = (x, y, z)
+        return True
+    state.note_annotation.SetPosition2 = position_note
     def note_record():
-        display = leader_display()
-        if state.jog_dump_missing:
-            display = {}
-        display["texts"] = [
-            _native_text(state.note_text, 0.238, 0.2304743, 0.1777368),
+        # Native boundary double: automatic rows leave the underlying string
+        # untouched. Source-projected view/edge geometry remains the real recipe.
+        chunks = [state.note_text]
+        if state.note_format.LineLength > 0 and state.wrap_fault != "unwrapped":
+            chunks = [""]
+            for word in state.note_text.split():
+                candidate = f"{chunks[-1]} {word}".strip()
+                # A bounded native font-width double, not a production wrapping algorithm.
+                measured = 0.1777368 * len(candidate) / len(state.note_text)
+                if chunks[-1] and measured > state.note_format.LineLength:
+                    chunks.append(word)
+                else:
+                    chunks[-1] = candidate
+        x, y, _z = state.note_position
+        rows = [
+            {**_native_text(chunk, x, y - 0.0045257 - index * (0.0035 + state.note_format.LineSpacing),
+                           0.1777368 * len(chunk) / len(state.note_text)), "font": "Century Gothic"}
+            for index, chunk in enumerate(chunks)
         ]
-        return dict(type=6, name="Purchased note", visible=1, owner_type=0, display=display)
-
+        start = state.note_start_override or (x - 0.0008113, y - 0.0017283)
+        dx, dy = start[0] - state.landing[0], start[1] - state.landing[1]
+        length = math.hypot(dx, dy)
+        arrow = [*state.landing, 0.0, dx / length, dy / length, 0.0,
+                 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0]
+        return dict(type=6, name="Purchased note", visible=1, owner_type=0, display=dict(
+            texts=rows, lines=[] if state.note_ink_missing else [_native_line(start, state.landing)],
+            arrows=[] if state.note_ink_missing else [list(arrow) for _ in range(state.note_arrow_count)],
+        ))
     state.note_annotation.paper_record = note_record
     state.note = SimpleNamespace(
-        GetAnnotation=lambda: state.note_annotation,
-        GetText=lambda: state.note_text,
+        GetAnnotation=lambda: state.note_annotation, GetText=lambda: state.note_text,
         PropertyLinkedText=drawing.property_link("Purchased Screw Note"),
     )
-    state.foreign_annotations = [state.diameter_annotation]
+    state.foreign_annotations = [state.diameter_annotation, state.shoulder_annotation]
     state.front.GetAnnotations = lambda: (state.annotation, state.note_annotation, *state.foreign_annotations)
-    monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "_dump_display", lambda _reader, data: copy.deepcopy(data))
-    state.route_check, state.note_frame = drawing._route_purchased_note(
-        state.adapter, state.front, state.note, state.paper_displays,
+    state.note_check, state.note_frame = drawing._place_purchased_note(
+        state.adapter, state.front, state.paper_iso, state.note, state.paper_displays,
     )
     tail, major, tail_record, major_record, _original_text = _tail_paper_boundary(monkeypatch, state)
     _tail_check, tail_frame = drawing._move_tail_column(state.adapter, tail, major)
@@ -2960,7 +2987,7 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
         view.GetAnnotations = lambda: ()
     state.paper = dict(
         names={name: row[2] for name, row in native_members.items()},
-        note=state.note_annotation.GetName(), tail=tail_frame, jogs=state.note_frame, text=state.note_text,
+        note=state.note_annotation.GetName(), tail=tail_frame, wrap=state.note_frame, text=state.note_text,
     )
     state.paper["names"]["ThreadLengthMin"] = native.FullName
     return state
@@ -2969,15 +2996,15 @@ def _finished_paper_fixture(monkeypatch, tmp_path, *, _state=None):
 @pytest.mark.parametrize("fault", (
     "none", "foreign_line", "fraction_foreign_line", "qualifier_foreign_line",
     "note_width", "note_property", "note_attachment", "note_landing", "head_trim",
-    "head_shelf_late", "socket_shelf_late", "socket_line", "jog_into_head",
-    "jog_into_top", "missing_published_jog", "jog_arrow",
+    "head_shelf_late", "socket_shelf_late", "socket_line", "leader_into_head",
+    "leader_into_top", "missing_published_leader", "arrow_landing",
 ))
 def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, tmp_path, fault):
     state = _finished_paper_fixture(monkeypatch, tmp_path)
     expected = state.note_text
     if fault in ("foreign_line", "fraction_foreign_line", "qualifier_foreign_line"):
         location = {
-            "foreign_line": ((0.240, 0.232), (0.410, 0.232)),
+            "foreign_line": ((0.194, 0.185), (0.330, 0.185)),
             "fraction_foreign_line": ((0.176, 0.237), (0.180, 0.237)),
             "qualifier_foreign_line": ((0.162, 0.229), (0.195, 0.229)),
         }[fault]
@@ -2988,7 +3015,7 @@ def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, 
         old_record = state.note_annotation.paper_record
         def too_wide():
             record = old_record()
-            record["display"]["texts"][0]["w"] += 0.010
+            record["display"]["texts"][0]["w"] += 0.100
             return record
         state.note_annotation.paper_record = too_wide
     elif fault == "note_property":
@@ -3006,27 +3033,115 @@ def test_actual_complete_native_paper_boundaries_refuse_late_drift(monkeypatch, 
     elif fault == "socket_line":
         for row in state.socket_record["display"]["arrows"]:
             row[1] = 0.212
-    elif fault == "jog_into_head":
-        state.jogs[-1] = (0.135, 0.195, 0.0)
-    elif fault == "jog_into_top":
-        state.jogs[1] = (0.140, 0.250, 0.0)
-    elif fault == "missing_published_jog":
-        state.jog_dump_missing = True
-    elif fault == "jog_arrow":
-        state.native_jog.GetArrowHeadAtIndex = lambda _index: (0.147, 0.20216, 0, -1, 0, 0, 0.002, 0.0005, 1)
+    elif fault == "leader_into_head":
+        state.note_start_override = (0.135, 0.195)
+    elif fault == "leader_into_top":
+        state.note_start_override = (0.140, 0.250)
+    elif fault == "missing_published_leader":
+        state.note_ink_missing = True
+    elif fault == "arrow_landing":
+        state.landing = (0.147, 0.20216)
 
     def prove():
-        state.route_check()
+        state.note_check()
         drawing._assert_paper_layout(
             state.adapter, state.front, state.paper_top, state.paper_iso,
             state.note, state.paper_displays, purchased_text=expected,
         )
     if fault == "none":
         prove()
-        assert state.landing == pytest.approx((0.1253442, 0.20216))
+        assert state.landing == pytest.approx((0.1546558, 0.20216))
     else:
         with pytest.raises(RuntimeError):
             prove()
+
+
+@pytest.mark.parametrize("fault", (
+    "none", "refused", "ignored", "unwrapped", "font_shrink", "ignored_position",
+))
+def test_native_note_wrapping_measures_full_ink_and_preserves_linked_text(monkeypatch, tmp_path, fault):
+    state = _finished_paper_fixture(monkeypatch, tmp_path)
+    original = state.note.GetText()
+    original_link = state.note.PropertyLinkedText
+    state.note_position[:] = (*drawing.PURCHASED_NOTE_XY, 0.0)
+    state.note_format.LineLength = 0.0
+    state.note_uses_doc_font = True
+    state.wrap_fault = fault
+    def place():
+        check, frame = drawing._place_purchased_note(
+            state.adapter, state.front, state.paper_iso, state.note, state.paper_displays,
+        )
+        check()
+        drawing._assert_paper_layout(
+            state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+            state.paper_displays, purchased_text=original,
+        )
+        return frame
+    if fault == "none":
+        frame = place()
+        assert state.note_format.LineLength == pytest.approx(frame["line_length"])
+        actual = state.note_annotation.paper_record()["display"]["texts"]
+        box = drawing.display_box({"texts": actual})
+        assert box.xmin > state.front.GetOutline()[2] + 0.002
+        height = drawing.measure_reference_text(state.adapter, state.display, axis=1, label="SupplierHeadHeight")
+        assert box.xmax < height["tips"][0][0] - 0.002
+        assert box.ymin > 0.1782781 + 0.002
+        assert " ".join(row["t"] for row in actual) == original
+    else:
+        with pytest.raises(RuntimeError, match="Purchased Screw Note"):
+            place()
+    assert state.note.GetText() == original
+    assert state.note.PropertyLinkedText == original_link
+
+
+@pytest.mark.parametrize("phase", ("settled", "saved"))
+@pytest.mark.parametrize("fault", (
+    "width", "font", "doc_format", "missing_fragment", "line_missing", "foreign_height_line",
+))
+def test_wrapped_note_refuses_actual_width_font_fragment_and_foreign_line_drift(
+    monkeypatch, tmp_path, phase, fault,
+):
+    state = _finished_paper_fixture(monkeypatch, tmp_path)
+    if fault == "width":
+        state.note_format.LineLength += 0.001
+    elif fault == "font":
+        state.note_format.WidthFactor = 0.8
+    elif fault == "doc_format":
+        state.note_uses_doc_font = True
+    elif fault in ("missing_fragment", "line_missing"):
+        original_record = state.note_annotation.paper_record
+        def incomplete():
+            record = original_record()
+            if fault == "missing_fragment":
+                record["display"]["texts"].pop()
+            else:
+                record["display"]["lines"].clear()
+            return record
+        state.note_annotation.paper_record = incomplete
+    else:
+        box = drawing.display_box(state.note_annotation.paper_record()["display"])
+        x = (box.xmin + box.xmax) / 2
+        state.foreign_annotations.append(SimpleNamespace(
+            GetType=lambda: 13, paper_record=dict(
+                type=13, display=dict(lines=[_native_line((x, box.ymin), (x, box.ymax))]),
+            ),
+        ))
+    with pytest.raises(RuntimeError):
+        if phase == "saved":
+            drawing._assert_saved_physical_references(
+                state.adapter, state.identities, state.configurations,
+                serialized_full_names=state.serialized_full_names,
+                serialized_shelf_names=state.serialized_shelf_names, paper=state.paper,
+            )
+        else:
+            state.note_check()
+            drawing._assert_paper_layout(
+                state.adapter, state.front, state.paper_top, state.paper_iso, state.note,
+                state.paper_displays, purchased_text=state.note_text,
+            )
+    if phase == "saved":
+        assert state.closes == [state.path.name]
+        assert state.adapter.currentModel is state.previous
 
 
 def test_socket_whole_fraction_moves_only_text_beyond_source_body(monkeypatch, tmp_path):
@@ -3158,14 +3273,15 @@ def test_tail_offset_restores_measured_native_ink_not_the_dimension_line_anchor(
     assert "native_snapshot=" in str(refusal.value)
 
 
-def test_native_jog_primitive_read_errors_cannot_be_masked_by_annotation_ink(monkeypatch, tmp_path):
+def test_native_note_primitive_read_errors_cannot_be_masked_by_complete_text(monkeypatch, tmp_path):
     state = _finished_paper_fixture(monkeypatch, tmp_path)
-    def refused_display(reader, data):
+    original_dump = drawing._dump_annotation
+    def refused_display(reader, annotation):
         reader._count("GetPolyLineAtIndex")
-        return copy.deepcopy(data)
-    monkeypatch.setattr(drawing, "_dump_display", refused_display)
+        return original_dump(reader, annotation)
+    monkeypatch.setattr(drawing, "_dump_annotation", refused_display)
     with pytest.raises(RuntimeError, match="GetPolyLineAtIndex"):
-        state.route_check()
+        state.note_check()
 
 
 def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
@@ -3254,8 +3370,8 @@ def _tail_paper_boundary(monkeypatch, state, *, fault="none"):
 
 
 @pytest.mark.parametrize("fault", (
-    "none", "note_name", "note_property", "note_landing", "note_jog_lost",
-    "note_jog_unpublished", "note_owner", "note_duplicate", "tail_identity",
+    "none", "note_name", "note_property", "note_landing", "note_leader_lost",
+    "note_ink_unpublished", "note_owner", "note_duplicate", "tail_identity",
     "tail_column", "tail_text", "tail_nominal", "tail_band", "major_identity", "major_extent",
 ))
 def test_cold_saved_note_and_tail_replay_exact_identity_and_actual_paper(monkeypatch, tmp_path, fault):
@@ -3266,10 +3382,10 @@ def test_cold_saved_note_and_tail_replay_exact_identity_and_actual_paper(monkeyp
         state.note.PropertyLinkedText = "free text"
     elif fault == "note_landing":
         state.landing = (state.landing[0] + 0.0001, state.landing[1])
-    elif fault == "note_jog_lost":
-        state.jogs.clear()
-    elif fault == "note_jog_unpublished":
-        state.jog_dump_missing = True
+    elif fault == "note_leader_lost":
+        state.note_annotation.GetLeaderCount = lambda: 0
+    elif fault == "note_ink_unpublished":
+        state.note_ink_missing = True
     elif fault == "note_owner":
         state.note_annotation.Owner = state.paper_top
     elif fault == "note_duplicate":
@@ -3330,10 +3446,10 @@ def test_cold_tail_cannot_keep_box_but_drop_native_minimum_acceptance_wording(mo
 
 
 @pytest.mark.parametrize("fault", (
-    "attachment_count", "attachment_type", "dangling", "jog_count", "arrow_count",
+    "attachment_count", "attachment_type", "dangling", "bent_leader", "arrow_count",
     "leader_hidden", "leader_multiple",
 ))
-def test_converted_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch, tmp_path, fault):
+def test_straight_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch, tmp_path, fault):
     state = _saved_physical_fixture(monkeypatch, tmp_path)
     if fault == "attachment_count":
         state.note_annotation.GetAttachedEntityCount3 = lambda: 2
@@ -3341,14 +3457,14 @@ def test_converted_note_keeps_exact_one_actual_attached_native_arrow(monkeypatch
         state.note_annotation.GetAttachedEntityTypes = lambda: (46,)
     elif fault == "dangling":
         state.note_annotation.IsDangling = lambda: True
-    elif fault == "jog_count":
-        state.note_annotation.GetMultiJogLeaderCount = lambda: 2
+    elif fault == "bent_leader":
+        state.note_annotation.GetLeaderStyle = lambda: 2
     elif fault == "leader_hidden":
         state.note_annotation.GetLeaderCount = lambda: 0
     elif fault == "leader_multiple":
         state.note_annotation.GetLeaderCount = lambda: 2
     else:
-        state.native_jog.GetArrowHeadCount = lambda: 2
+        state.note_arrow_count = 2
     with pytest.raises(RuntimeError):
         drawing._assert_saved_physical_references(
             state.adapter, state.identities, state.configurations,

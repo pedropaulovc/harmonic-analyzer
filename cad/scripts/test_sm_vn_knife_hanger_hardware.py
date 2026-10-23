@@ -2004,6 +2004,96 @@ def test_stud_settled_supplier_census_rescans_physical_head_height(monkeypatch, 
             )
 
 
+def _install_stud_note_source_edges(case):
+    """E8's original noncircular head boundary, with separate source/view bodies."""
+    case.note_source = case.front.ReferencedDocument
+    case.note_source_body, case.note_view_body = object(), object()
+    case.note_canonical = {}
+    case.note_source.GetType = lambda: 1
+    case.note_source.GetBodies2 = lambda body_type, visible: (
+        (case.note_source_body,) if (body_type, visible) == (0, False) else ()
+    )
+    case.note_source.ConfigurationManager = SimpleNamespace(
+        ActiveConfiguration=SimpleNamespace(Name=case.front.ReferencedConfiguration),
+    )
+    case.note_source.Extension = SimpleNamespace(
+        GetCorrespondingEntity2=lambda entity: case.note_canonical.get(id(entity)),
+    )
+    top = (bolt.HEAD_AF / 4000, bolt.HEAD_TOP_Y / 1000, math.sqrt(3) * bolt.HEAD_AF / 4000)
+    end = (
+        bolt.HEAD_AF / 2000,
+        (bolt.HEAD_TOP_Y - (bolt.HEAD_AF / math.sqrt(3) - bolt.HEAD_AF / 2)
+         / math.tan(math.radians(60))) / 1000,
+        bolt.HEAD_AF / (2000 * math.sqrt(3)),
+    )
+    # Endpoint/U/sense values are grounded in E8; numeric kernel-kind values
+    # below are controlled fake data, not an unobserved native Identity claim.
+    case.note_trim = SimpleNamespace(
+        StartPoint=top, EndPoint=end, UMinValue=0.002318718406006465,
+        UMaxValue=0.004628534409111542, Sense=True, CurveType=3006,
+    )
+
+    def install(trim, kind, *, raw=None):
+        raw = SimpleNamespace() if raw is None else raw
+        curve = SimpleNamespace(kind=kind)
+        curve.Identity = lambda: curve.kind
+        curve.IsCircle = lambda: curve.kind == 3002
+        curve.IsLine = lambda: curve.kind == 3001
+        raw.curve = curve
+        raw.trim = trim
+        raw.GetCurve = lambda: raw.curve
+        raw.GetCurveParams3 = lambda: raw.trim
+        raw.GetBody = lambda: case.note_view_body
+        if not hasattr(raw, "GetClosestPointOn"):
+            raw.GetClosestPointOn = lambda _x, _y, _z: (*raw.trim.StartPoint, raw.trim.UMinValue, 0.0)
+        canonical = SimpleNamespace(curve=curve, trim=trim, body=case.note_source_body)
+        canonical.GetCurve = lambda: canonical.curve
+        canonical.GetCurveParams3 = lambda: canonical.trim
+        canonical.GetBody = lambda: canonical.body
+        canonical.GetClosestPointOn = lambda _x, _y, _z: (
+            *canonical.trim.StartPoint, canonical.trim.UMinValue, 0.0,
+        )
+        case.note_canonical[id(raw)] = canonical
+        return raw, canonical
+
+    case.install_note_edge = install
+    case.note_edge, case.note_model_edge = install(case.note_trim, 3006)
+    case.note_annotation.attached = case.note_edge
+    case.front.scan = ViewEdges(
+        case.front.scan.label,
+        (*case.front.scan.edges, ViewEdge(edge=case.note_edge, line=None, circle=None, vertices=None)),
+    )
+    # A circular top trim is a DIFFERENT actual native edge, not rejected just
+    # by its kind. It shares the original tangent endpoint and projected leader
+    # position, so post-capture rejection must retain the full original trim.
+    top_circle = SimpleNamespace(
+        StartPoint=(-top[0], top[1], top[2]), EndPoint=top,
+        UMinValue=5.759586531581287, UMaxValue=6.806784082777885,
+        Sense=True, CurveType=3002,
+    )
+    install(top_circle, 3002, raw=case.top)
+    case.note_projection_inputs = []
+    case.front.ModelToViewTransform = object()
+
+    def point(data):
+        coordinates = tuple(float(value) for value in getattr(data, "value", data))
+        case.note_projection_inputs.append(coordinates)
+
+        def multiply(transform):
+            assert transform is case.front.ModelToViewTransform
+            x, y = case.paper_project(case.adapter, case.front, coordinates, label="native XYZ fake")
+            return SimpleNamespace(ArrayData=(x, y, coordinates[2] * case.front.ScaleDecimal))
+
+        return SimpleNamespace(MultiplyTransform=multiply)
+
+    case.note_math_utility = SimpleNamespace(CreatePoint=point)
+    case.app.GetMathUtility = lambda: case.note_math_utility
+    x, y = case.paper_project(case.adapter, case.front, top, label="native original endpoint fake")
+    case.note_landing = (x, y, top[2] * case.front.ScaleDecimal)
+    case.note_data["lines"][0][7:10] = case.note_landing
+    case.note_data["arrows"][0][0:3] = case.note_landing
+
+
 def _stud_paper_fixture(case, monkeypatch):
     """Actual c356 FINISHED primitives through the real native dump/shelf boundary."""
     monkeypatch.setattr(native_layout, "_early_bound", lambda value, _kind: value)
@@ -2120,7 +2210,7 @@ def _stud_paper_fixture(case, monkeypatch):
         install(display.GetAnnotation(), {"texts": rows}, 4, (0.110, 0.255, 0))
         display.IsHoleCallout = lambda: False
     case.note_text = _config.parts(bolt_part.PART_NAME)["purchased_note"]
-    z = 0.0068741
+    z = 2 * math.sqrt(3) * bolt.HEAD_AF / 4000
     case.note_data = {
         "texts": [row(case.note_text, 0.130, 0.2354743, 0.141191, z)],
         "lines": [[0, 0, 0, 0, 0.1291411, 0.238506, z, 0.1139687, 0.2205528, z]],
@@ -2169,6 +2259,7 @@ def _stud_paper_fixture(case, monkeypatch):
           if name != "SupplierStockLength"),
         case.note_annotation, *case.foreign_annotations,
     )
+    _install_stud_note_source_edges(case)
     return case
 
 
@@ -2259,7 +2350,7 @@ def test_stud_note_failure_records_all_raw_source_and_view_contexts_without_acce
     case.selections[:] = [case.note_annotation.attached]
     receipt = _refuse_stud_note_source_with_inventory(case)
     assert receipt["predicate_match_count"] == 0
-    assert receipt["candidate_count"] == 5
+    assert receipt["candidate_count"] == len(case.front.scan.edges)
     assert receipt["view_name"] == case.front.name
     assert receipt["view_configuration"] == receipt["source_active_configuration_name"] == "Default"
     assert receipt["source_path"] == str(bolt_drawing.SOURCE.resolve())
@@ -2272,16 +2363,17 @@ def test_stud_note_failure_records_all_raw_source_and_view_contexts_without_acce
         value / 1000 for value in bolt_drawing.HEAD_PICK_MM
     )
     candidates = receipt["candidates"]
-    assert [row["candidate_index"] for row in candidates] == list(range(5))
+    assert [row["candidate_index"] for row in candidates] == list(range(len(case.front.scan.edges)))
     assert all(row["raw"]["same_attached"] == 0 for row in candidates)
-    assert [row["reverse_same_attached_reverse"] for row in candidates] == [1, 0, 0, 0, 0]
-    assert candidates[0]["view_forward_reverse"]["same_attached"] == 1
-    assert candidates[0]["raw"]["source_body_comparisons"][0]["same"] == 0
-    assert candidates[0]["source_reverse"]["source_body_comparisons"][0]["same"] == 1
-    assert len({row["raw"]["circle_params_m"] for row in candidates[:3]}) == 1
-    assert len({row["raw"]["trim_start_m"] for row in candidates[:3]}) == 3
-    assert [row["raw"]["trim_u_min"] for row in candidates[:3]] == [0.0, 0.4, 0.8]
-    assert all(row["raw"]["trim_sense"] is True for row in candidates)
+    circles = [row for row in candidates if row["scan_circle_mm"] is not None]
+    assert [row["reverse_same_attached_reverse"] for row in circles] == [1, 0, 0, 0, 0]
+    assert circles[0]["view_forward_reverse"]["same_attached"] == 1
+    assert circles[0]["raw"]["source_body_comparisons"][0]["same"] == 0
+    assert circles[0]["source_reverse"]["source_body_comparisons"][0]["same"] == 1
+    assert len({row["raw"]["circle_params_m"] for row in circles[:3]}) == 1
+    assert len({row["raw"]["trim_start_m"] for row in circles[:3]}) == 3
+    assert [row["raw"]["trim_u_min"] for row in circles[:3]] == [0.0, 0.4, 0.8]
+    assert all(row["raw"]["trim_sense"] is True for row in circles)
     assert all(
         set(row["raw"]["closest_points_m"]) == set(receipt["closest_point_queries_model_m"])
         for row in candidates
@@ -2297,8 +2389,8 @@ def test_stud_note_failure_inventory_distinguishes_duplicate_direct_native_match
     case.front.scan = ViewEdges("duplicate direct native note edge", (*case.front.scan.edges, item))
     receipt = _refuse_stud_note_source_with_inventory(case)
     assert receipt["predicate_match_count"] == 2
-    assert receipt["candidate_count"] == 6
-    assert [row["candidate_index"] for row in receipt["candidates"]] == list(range(6))
+    assert receipt["candidate_count"] == len(case.front.scan.edges)
+    assert [row["candidate_index"] for row in receipt["candidates"]] == list(range(len(case.front.scan.edges)))
     assert sum(row["raw"]["same_attached"] == 1 for row in receipt["candidates"]) == 2
 
 
@@ -2316,14 +2408,15 @@ def test_stud_note_unknown_direct_identity_is_observed_not_accepted_by_successfu
     )
     receipt = _refuse_stud_note_source_with_inventory(case)
     assert receipt["predicate_match_count"] == 0
-    assert all(row["raw"]["same_attached"] == native_state for row in receipt["candidates"])
-    assert receipt["candidates"][0]["view_forward_reverse"]["same_attached"] == 1
+    circles = [row for row in receipt["candidates"] if row["scan_circle_mm"] is not None]
+    assert all(row["raw"]["same_attached"] == native_state for row in circles)
+    assert circles[0]["view_forward_reverse"]["same_attached"] == 1
 
 
 @pytest.mark.parametrize(
     "fault",
     ["reverse_null", "forward_null", "reverse_error", "forward_error", "curve_error",
-     "trim_error", "body_error", "source_bodies_error", "body_same_error", "configuration_error"],
+     "trim_error", "body_error", "source_bodies_error", "body_same_error"],
 )
 def test_stud_note_diagnostic_nulls_and_native_getter_errors_never_mask_original_refusal(
     monkeypatch, fault,
@@ -2359,18 +2452,9 @@ def test_stud_note_diagnostic_nulls_and_native_getter_errors_never_mask_original
             return original_same(left, right)
 
         case.app.IsSame = same
-    elif fault == "configuration_error":
-        original_bind = bolt_drawing._early_bound
-
-        def bind(value, kind):
-            if kind == "IConfigurationManager":
-                raise cause
-            return original_bind(value, kind)
-
-        monkeypatch.setattr(bolt_drawing, "_early_bound", bind)
     receipt = _refuse_stud_note_source_with_inventory(case)
     assert receipt["predicate_match_count"] == 0
-    assert len(receipt["candidates"]) == 5
+    assert len(receipt["candidates"]) == len(case.front.scan.edges)
     if fault == "reverse_null":
         assert receipt["attached"]["source_reverse_null"] is True
         assert all(row["source_reverse_null"] is True for row in receipt["candidates"])
@@ -2410,19 +2494,242 @@ def test_stud_note_diagnostic_sink_failure_cannot_replace_original_native_guard(
         )
 
 
-def test_stud_note_unique_direct_identity_does_not_read_diagnostic_mapping(monkeypatch):
+def test_stud_note_unique_direct_identity_uses_source_proof_without_failure_inventory(monkeypatch):
     case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
 
     def unexpected(*_args, **_kwargs):
-        pytest.fail("successful strict direct identity must not invoke diagnostic correspondence")
+        pytest.fail("successful strict direct identity must not invoke failure inventory")
 
     monkeypatch.setattr(bolt_drawing, "_record_purchased_note_source_failure", unexpected)
     record, _box, landing = bolt_drawing._purchased_note_geometry(
         case.adapter, case.front, case.note, text=case.note_text,
     )
-    assert record["physical_top_circle_mm"] == case.top_item.circle
+    assert record["physical_head_edge"]["start_m"] == case.note_trim.StartPoint
     assert landing == case.note_landing
     assert not any(name == "drawing.stud_purchased_note_source_inventory" for name, _ in case.events)
+
+
+def test_stud_original_noncircular_note_uses_native_source_and_full_xyz_without_forward_requirement(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+
+    def forbidden(*_args):
+        pytest.fail("forward correspondence is not a universal native acceptance predicate")
+
+    case.front.GetCorrespondingEntity = forbidden
+    record, _box, landing = bolt_drawing._purchased_note_geometry(
+        case.adapter, case.front, case.note, text=case.note_text,
+    )
+    assert case.note_edge.GetCurve().IsCircle() is False
+    assert case.note_edge.GetCurve().IsLine() is False
+    assert record["physical_head_edge"]["start_m"] == case.note_trim.StartPoint
+    assert record["physical_head_edge"]["end_m"] == case.note_trim.EndPoint
+    assert case.note_projection_inputs[-1] == case.note_trim.StartPoint
+    assert landing[2] == case.note_trim.StartPoint[2] * case.front.ScaleDecimal > 0
+    assert landing == case.note_landing
+    assert not case.rebuilds
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ["missing", "duplicate", "same_geometry_impostor", "inverse_null", "foreign_body",
+     "null_body", "no_bodies", "duplicate_bodies", "wrong_source", "relative_source",
+     "source_type", "source_configuration", "stock_configuration", "raw_trim",
+     "missing_endpoint", "ambiguous_endpoint", "curve_null", "trim_null", "nonfinite_u",
+     "reversed_u", "invalid_sense", "invalid_kind", "utility_null", "transform_null",
+     "point_null", "transform_result_null",
+     "projection_nonfinite", "projection_z", "leader_z"],
+)
+def test_stud_actual_noncircular_note_source_and_native_xyz_refuse_corruption(monkeypatch, fault):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    bolt_drawing._purchased_note_geometry(case.adapter, case.front, case.note, text=case.note_text)
+    if fault == "missing":
+        case.front.scan = ViewEdges(
+            "missing original native note edge",
+            tuple(item for item in case.front.scan.edges if item.edge is not case.note_edge),
+        )
+    elif fault == "duplicate":
+        item = next(item for item in case.front.scan.edges if item.edge is case.note_edge)
+        case.front.scan = ViewEdges("duplicate original native note edge", (*case.front.scan.edges, item))
+    elif fault == "same_geometry_impostor":
+        impostor, _canonical = case.install_note_edge(SimpleNamespace(**vars(case.note_trim)), 3006)
+        case.front.scan = ViewEdges(
+            "equal geometry is not original native identity",
+            tuple(
+                replace(item, edge=impostor) if item.edge is case.note_edge else item
+                for item in case.front.scan.edges
+            ),
+        )
+    elif fault == "inverse_null":
+        case.note_source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "foreign_body":
+        case.note_model_edge.body = object()
+    elif fault == "null_body":
+        case.note_model_edge.body = None
+    elif fault == "no_bodies":
+        case.note_source.GetBodies2 = lambda _kind, _visible: ()
+    elif fault == "duplicate_bodies":
+        case.note_source.GetBodies2 = lambda _kind, _visible: (case.note_source_body, case.note_source_body)
+    elif fault == "wrong_source":
+        case.note_source.GetPathName = lambda: str(bolt_drawing.SOURCE.with_name("foreign.SLDPRT").resolve())
+    elif fault == "relative_source":
+        case.note_source.GetPathName = lambda: bolt_drawing.SOURCE.name
+    elif fault == "source_type":
+        case.note_source.GetType = lambda: 2
+    elif fault == "source_configuration":
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = "FOREIGN"
+    elif fault == "stock_configuration":
+        case.front.ReferencedConfiguration = bolt.SUPPLIER_STOCK_CONFIGURATION
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = bolt.SUPPLIER_STOCK_CONFIGURATION
+    elif fault == "raw_trim":
+        case.note_edge.trim = SimpleNamespace(**vars(case.note_trim))
+        case.note_edge.trim.EndPoint = (case.note_trim.EndPoint[0] + 0.001, *case.note_trim.EndPoint[1:])
+    elif fault == "missing_endpoint":
+        case.note_trim.StartPoint = (case.note_trim.StartPoint[0] + 0.001, *case.note_trim.StartPoint[1:])
+    elif fault == "ambiguous_endpoint":
+        case.note_trim.EndPoint = case.note_trim.StartPoint
+    elif fault == "curve_null":
+        case.note_model_edge.curve = None
+    elif fault == "trim_null":
+        case.note_model_edge.trim = None
+    elif fault == "nonfinite_u":
+        case.note_trim.UMinValue = float("nan")
+    elif fault == "reversed_u":
+        case.note_trim.UMinValue, case.note_trim.UMaxValue = case.note_trim.UMaxValue, case.note_trim.UMinValue
+    elif fault == "invalid_sense":
+        case.note_trim.Sense = None
+    elif fault == "invalid_kind":
+        case.note_edge.curve.kind = None
+    elif fault == "utility_null":
+        case.app.GetMathUtility = lambda: None
+    elif fault == "transform_null":
+        case.front.ModelToViewTransform = None
+    elif fault == "point_null":
+        case.note_math_utility.CreatePoint = lambda _data: None
+    elif fault == "transform_result_null":
+        case.note_math_utility.CreatePoint = lambda _data: SimpleNamespace(MultiplyTransform=lambda _transform: None)
+    elif fault in ("projection_nonfinite", "projection_z"):
+        coordinates = (*case.note_landing[:2], float("nan") if fault == "projection_nonfinite" else case.note_landing[2] + 0.001)
+        case.note_math_utility.CreatePoint = lambda _data: SimpleNamespace(
+            MultiplyTransform=lambda _transform: SimpleNamespace(ArrayData=coordinates),
+        )
+    elif fault == "leader_z":
+        case.note_landing = (*case.note_landing[:2], case.note_landing[2] + 0.001)
+    else:
+        raise AssertionError(f"unknown original note source corruption {fault}")
+    with pytest.raises(RuntimeError, match="Purchased Screw Note"):
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+
+
+@pytest.mark.parametrize("getter", ["GetCurve", "GetCurveParams3"])
+def test_stud_original_native_note_descriptor_getter_failure_retains_cause(monkeypatch, getter):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    cause = OSError(f"actual original native {getter} failed")
+
+    def fail():
+        raise cause
+
+    setattr(case.note_model_edge, getter, fail)
+    with pytest.raises(RuntimeError, match="native head-top curve/trim") as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert error.value.__cause__ is cause
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("field", ["curve_type", "trim_curve_type", "start", "end", "u_min", "u_max", "sense"])
+def test_stud_original_native_note_trim_descriptor_is_immutable_and_freshly_reproved(
+    monkeypatch, tmp_path, phase, field,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    captured = dict(case.purchased_note_proof["edge_descriptor"])
+    if field == "curve_type":
+        case.note_edge.curve.kind += 1
+    elif field == "trim_curve_type":
+        case.note_trim.CurveType += 1
+    elif field == "start":
+        case.note_trim.StartPoint = (case.note_trim.StartPoint[0] + 0.000001, *case.note_trim.StartPoint[1:])
+    elif field == "end":
+        case.note_trim.EndPoint = (case.note_trim.EndPoint[0] + 0.000001, *case.note_trim.EndPoint[1:])
+    elif field == "u_min":
+        case.note_trim.UMinValue += 0.0000001
+    elif field == "u_max":
+        case.note_trim.UMaxValue += 0.0000001
+    elif field == "sense":
+        case.note_trim.Sense = not case.note_trim.Sense
+    else:
+        raise AssertionError(f"unknown native trim descriptor field {field}")
+    assert case.purchased_note_proof["edge_descriptor"] == captured
+    with pytest.raises(RuntimeError, match="physical head-top"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
+
+
+def test_stud_note_source_configuration_getter_failure_is_not_ignored(monkeypatch):
+    case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+    cause = OSError("actual native source configuration getter failed")
+    original_bind = bolt_drawing._early_bound
+
+    def bind(value, kind):
+        if kind == "IConfigurationManager":
+            raise cause
+        return original_bind(value, kind)
+
+    monkeypatch.setattr(bolt_drawing, "_early_bound", bind)
+    with pytest.raises(OSError) as error:
+        bolt_drawing._purchased_note_geometry(
+            case.adapter, case.front, case.note, text=case.note_text,
+        )
+    assert error.value is cause
+
+
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("fault", ["configuration", "body", "inverse", "path"])
+def test_stud_original_note_source_is_freshly_reproved_after_capture(
+    monkeypatch, tmp_path, phase, fault,
+):
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    if fault == "configuration":
+        case.note_source.ConfigurationManager.ActiveConfiguration.Name = "FOREIGN"
+    elif fault == "body":
+        case.note_model_edge.body = object()
+    elif fault == "inverse":
+        case.note_source.Extension.GetCorrespondingEntity2 = lambda _entity: None
+    elif fault == "path":
+        case.note_source.GetPathName = lambda: str(bolt_drawing.SOURCE.with_name("foreign.SLDPRT").resolve())
+    else:
+        raise AssertionError(f"unknown captured source corruption {fault}")
+    with pytest.raises(RuntimeError, match="physical head-top source"):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
 
 
 def _shelve_stud_paper(case):
@@ -2674,17 +2981,22 @@ def test_stud_saved_paper_uses_only_fresh_native_reads_not_live_shelf_closures(m
 
 
 @pytest.mark.parametrize("phase", ["settled", "saved"])
-def test_stud_note_keeps_actual_original_crown_boundary_without_changing_height_outer_rim(
+def test_stud_note_preserves_actual_noncircular_boundary_and_independent_height_outer_rim(
     monkeypatch, tmp_path, phase,
 ):
     if phase == "saved":
-        case = _saved_stud_height_case(monkeypatch, tmp_path, note_on_crown=True)
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
     else:
         case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
-        case.note_annotation.attached = case.crown_item.edge
         _shelve_stud_paper(case)
-    assert case.purchased_note_proof["circle_mm"] == case.crown_item.circle
-    assert case.purchased_note_proof["circle_mm"][6] != bolt.HEAD_AF / 2
+    descriptor = case.purchased_note_proof["edge_descriptor"]
+    assert descriptor["start_m"] == case.note_trim.StartPoint
+    assert descriptor["end_m"] == case.note_trim.EndPoint
+    assert descriptor["u"] == (case.note_trim.UMinValue, case.note_trim.UMaxValue)
+    assert descriptor["sense"] is case.note_trim.Sense
+    assert not case.note_edge.GetCurve().IsCircle()
+    assert not case.note_edge.GetCurve().IsLine()
+    assert case.note_annotation.attached is case.note_edge
     assert case.annotation.attached[1] is case.top
     if phase == "saved":
         bolt_drawing._assert_saved_physical_references(
@@ -2696,11 +3008,6 @@ def test_stud_note_keeps_actual_original_crown_boundary_without_changing_height_
         assert case.adapter.currentModel is case.previous_model
     else:
         case.note_check()
-        # An equally valid OTHER physical top boundary is not this original
-        # note's entity/descriptor, even though its projected landing is shared.
-        case.note_annotation.attached = case.top
-        with pytest.raises(RuntimeError, match="original physical head-top source descriptor"):
-            case.note_check()
 
 
 def test_stud_note_cold_read_requires_exact_actual_serialized_annotation_name(monkeypatch, tmp_path):
@@ -2716,27 +3023,51 @@ def test_stud_note_cold_read_requires_exact_actual_serialized_annotation_name(mo
     assert case.adapter.currentModel is case.previous_model
 
 
-@pytest.mark.parametrize("note_on_crown", [False, True])
-def test_stud_cold_note_rejects_another_valid_top_boundary_with_the_same_projected_landing(
-    monkeypatch, tmp_path, note_on_crown,
+@pytest.mark.parametrize("phase", ["settled", "saved"])
+@pytest.mark.parametrize("replacement", ["circle", "other_trim", "foreign_same_geometry"])
+def test_stud_note_refuses_other_native_target_despite_identical_projected_head_top_landing(
+    monkeypatch, tmp_path, phase, replacement,
 ):
-    case = _saved_stud_height_case(monkeypatch, tmp_path, note_on_crown=note_on_crown)
-    case.note_annotation.attached = case.top if note_on_crown else case.crown_item.edge
-    with pytest.raises(RuntimeError, match="original physical head-top source descriptor"):
-        bolt_drawing._assert_saved_physical_references(
-            case.adapter, case.identities, case.configurations,
-            serialized_full_names=case.serialized_full_names,
-            purchased_note=case.purchased_note_proof,
+    if phase == "saved":
+        case = _saved_stud_height_case(monkeypatch, tmp_path)
+    else:
+        case = _stud_paper_fixture(_settled_stud_height_case(monkeypatch), monkeypatch)
+        _shelve_stud_paper(case)
+    original_landing = case.note_landing
+    if replacement == "circle":
+        case.note_annotation.attached = case.top
+    else:
+        trim = SimpleNamespace(**vars(case.note_trim))
+        if replacement == "other_trim":
+            trim.EndPoint = (trim.EndPoint[0] + 0.001, *trim.EndPoint[1:])
+        raw, canonical = case.install_note_edge(trim, 3006)
+        if replacement == "foreign_same_geometry":
+            canonical.body = object()
+        case.front.scan = ViewEdges(
+            "different original-note target",
+            (*case.front.scan.edges, ViewEdge(edge=raw, line=None, circle=None, vertices=None)),
         )
-    assert case.close_calls == ["finished-stud.SLDDRW"]
-    assert case.adapter.currentModel is case.previous_model
+        case.note_annotation.attached = raw
+    # Every replacement retains the same complete projected top endpoint.
+    assert case.note_landing == original_landing
+    message = "source body" if replacement == "foreign_same_geometry" else "source descriptor"
+    with pytest.raises(RuntimeError, match=message):
+        if phase == "saved":
+            bolt_drawing._assert_saved_physical_references(
+                case.adapter, case.identities, case.configurations,
+                serialized_full_names=case.serialized_full_names,
+                purchased_note=case.purchased_note_proof,
+            )
+        else:
+            case.note_check()
+    if phase == "saved":
+        assert case.close_calls == ["finished-stud.SLDDRW"]
+        assert case.adapter.currentModel is case.previous_model
 
 
-def _saved_stud_height_case(monkeypatch, tmp_path, *, note_on_crown=False):
+def _saved_stud_height_case(monkeypatch, tmp_path):
     case = _settled_stud_height_case(monkeypatch)
     _stud_paper_fixture(case, monkeypatch)
-    if note_on_crown:
-        case.note_annotation.attached = case.crown_item.edge
     _shelve_stud_paper(case)
     case.scans.clear()
     case.events.clear()

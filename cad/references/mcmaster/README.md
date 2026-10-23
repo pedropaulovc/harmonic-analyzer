@@ -923,8 +923,10 @@ Catalog specifications checked on September 10, 2026:
   The complete caption and adjacent purchased-note text still require independent
   full-sheet PDF-ink clearance; a native axial or shelf proof is not paper approval.
   A separate after-save native `IsSame` census captures the purchased note's
-  actual annotation `GetName`. Cold paper checks retain its original physical
-  top-boundary descriptor and landing, not identity inferred from linked text.
+  actual annotation `GetName`. The original head-top attachment is a trimmed
+  noncircular boundary, not an assumed circle. Fresh all-edge identity and source
+  ownership checks retain its actual trim endpoints, parameter bounds, sense
+  and top-station landing during settled and cold exact-name paper readback.
 - [96659A104](https://www.mcmaster.com/96659A104/) supplies the new
   `sm-vn-knife-hanger-washer`, **MHA-SM-VN-54**, two; the retired 1/2-inch
   washer's MHA-VN-026 Number is never reused. Live on 2026-10-13: 18-8
@@ -1142,9 +1144,11 @@ Catalog specifications checked on September 10, 2026:
   native centre mark require fresh full-sheet clearance, not a native-value-only
   approval.
   The purchased note's name is captured independently from the original native
-  annotation after saving. A multi-jog route is accepted only when its actual
-  strokes and arrow remain visible to the unchanged shared audit and survive
-  cold reopening with the exact saved note identity and physical landing.
+  annotation after saving. Native `ITextFormat.LineLength` wraps the unchanged
+  property-linked text without inserted line breaks or font compression. Its
+  straight leader retains the exact trimmed head-top landing; actual complete
+  text and published native strokes must clear the measured neighbouring ink,
+  views and border, including a fresh exact-name cold readback.
 - [91794A055](https://www.mcmaster.com/91794A055/) (`pd-vn-transgear-disc-screw`,
   MHA-PD-VN-55, three) joins the brass disc hub's flange to the 120T disc: each
   head sits on the flange and the thread enters one of the disc's through
