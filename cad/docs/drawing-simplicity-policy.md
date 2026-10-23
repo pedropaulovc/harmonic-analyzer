@@ -159,7 +159,7 @@ cannot ask for what the authors were told to leave out.
   the six oblique-jig screws opt into `_purchased_title_fit`: it fits their
   existing linked Name, authoritative Material field and DWG. NO. notes inside
   their actual native ruled cells. The captured-pivot recipes retain
-  `MaterialSpecification`; the six oblique-jig recipes use their actual
+  `Material Specification`; the six oblique-jig recipes use their actual
   `Material` property, without adding or swapping source-property aliases.
   Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
   an unfit complete value refuses export, never truncates it.
