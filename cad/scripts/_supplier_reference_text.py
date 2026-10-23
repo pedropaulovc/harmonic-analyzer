@@ -153,12 +153,14 @@ def _offset_text_path_indices(
     physical: list[Segment],
     tips: tuple[tuple[float, float], ...],
     texts: Collection[Mapping[str, Any]],
+    *,
+    font_bottom: float,
 ) -> tuple[int, int] | None:
     """Recognize one complete native horizontal offset-text path, not its ink area.
 
-    Native lower-left, unrotated text supplies the full baseline advance. Its
-    connector starts at the arrow midpoint; its separate underline starts at
-    that same baseline. Unknown or competing representations stay physical.
+    The lowest native lower-left, unrotated fragment supplies the full baseline
+    advance. Its connector starts at the arrow midpoint; its separate underline
+    starts at that same baseline. Unknown or competing paths stay physical.
     These are indices of distinct raw primitives: never clip their intervals
     out of other, possibly overlapping, physical dimension-line primitives.
     """
@@ -183,7 +185,12 @@ def _offset_text_path_indices(
             continue
         baseline = tuple(float(value) for value in raw["pos"][:2])
         advance = (baseline[0] + float(raw["w"]), baseline[1])
-        if baseline[0] <= tips[1][0]:
+        # This supported fragment's baseline is its own measured lower edge;
+        # it must be the global font bottom, not an arbitrary higher text row.
+        if (
+            abs(baseline[1] - font_bottom) > _POSITION_TOLERANCE_M
+            or baseline[0] <= tips[1][0]
+        ):
             continue
         for connector_index, connector in enumerate(physical):
             connector_ends = oriented(connector, midpoint, baseline)
@@ -197,6 +204,18 @@ def _offset_text_path_indices(
                     underline_ends is None
                     or dist(connector_ends[1], underline_ends[0])
                     > _POSITION_TOLERANCE_M
+                ):
+                    continue
+                # Endpoint-to-fragment and fragment-to-bottom allowances must
+                # not stack. Prove the actual text-path endpoints directly
+                # against the global font bottom with the same radial bound.
+                if any(
+                    dist(point, expected) > _POSITION_TOLERANCE_M
+                    for point, expected in (
+                        (connector_ends[1], (baseline[0], font_bottom)),
+                        (underline_ends[0], (baseline[0], font_bottom)),
+                        (underline_ends[1], (advance[0], font_bottom)),
+                    )
                 ):
                     continue
                 remaining = [
@@ -226,9 +245,12 @@ def measure_reference_text(
     disjoint axial union as ``(normal_low, normal_high, axial_low, axial_high)``;
     actual normal bounds are not snapped to the arrow support line. Both use
     the existing readback tolerance, without padding their stored endpoints.
-    Exactly coincident text-format ink has no proven native discriminator and
-    is conservatively physical. This is a read, not a rebuild; callers needing
-    settled pre-transition data must rebuild first. The shelf core does that.
+    Coincident text-format ink stays conservatively physical except for one
+    positively identified complete native offset-text path: live True mode,
+    the lowest supported baseline and a unique midpoint connector/full-advance
+    underline pair. Only those raw primitives are excluded, never an overlapping
+    physical interval. This is a read, not a rebuild; callers needing settled
+    pre-transition data must rebuild first. The shelf core does that.
     """
     if isinstance(axis, bool) or not isinstance(axis, int) or axis not in (0, 1):
         raise ValueError(f"{label}: reference axis must be 0 or 1")
@@ -298,7 +320,9 @@ def measure_reference_text(
     # OffsetText can add a connector/underline exactly ON the support line.
     # Remove only one positively explained pair; all other ink stays physical.
     if offset_text and axis == 0:
-        text_path = _offset_text_path_indices(physical, tips, texts)
+        text_path = _offset_text_path_indices(
+            physical, tips, texts, font_bottom=text.ymin
+        )
         if text_path is not None:
             physical = [
                 run for index, run in enumerate(physical) if index not in text_path
