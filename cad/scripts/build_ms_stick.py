@@ -154,14 +154,14 @@ def _assert_numeral_cut(adapter) -> None:
         raise RuntimeError(f"numeral cuts disagree on draft direction: {senses}")
 
 
-# FeatureCut4 forms tried on the first stroke layer, in order. On the 2026
-# seat (revision 34) the adapter's undrafted single-ended FeatureCut4 cuts
-# these imported sketches, but every drafted form returned None (runs
-# 20261023T200553835Z-02d5bd36 and 20261023T203610712Z-4012d9c4); Ddir1's
-# inward sense is also seat-specific (diag_mcmaster_phillips_flat_head: True
-# flared). If none cuts, discriminating probes are reported. The
-# removed volume, not the flags, decides: the first layer's V is pinned to
-# 1e-4 by its closed form, and a flared or straight cut removes 2-3x as much.
+# FeatureCut3 forms tried on the first stroke layer, in order. On the 2026
+# seat (revision 34) FeatureCut4 returns None on these imported sketches even
+# undrafted (run 20261023T204652498Z-9ac53a38); the adapter's blind cut that
+# works here is its FeatureCut3 fallback (double-ended, D2 = D1). Ddir1's
+# inward sense is seat-specific (diag_mcmaster_phillips_flat_head: True
+# flared). The removed volume, not the flags, decides: the first layer's V is
+# pinned to 1e-4 by its closed form, and a flared or straight cut removes 2-3x
+# as much. If none cuts, discriminating probes are reported.
 V_CUT_VARIANTS = (
     ("double-ended, Ddir1 False", False, False),
     ("double-ended, Ddir1 True", False, True),
@@ -172,43 +172,38 @@ V_CUT_VARIANTS = (
 
 def _v_cut_args(single_ended: bool, ddir1: bool, *, half_angle_deg: float | None = None,
                 depth_mm: float = NUMERAL_DEPTH, drafted: bool = True) -> tuple:
-    """FeatureCut4's 27 arguments for a blind V cut into the bar."""
+    """FeatureCut3's 26 arguments for a blind V cut into the bar."""
     half = NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0 if half_angle_deg is None else half_angle_deg
+    depth = depth_mm / 1000.0
     return (
         single_ended, False, False,  # Sd, Flip, Dir (default: into the bar)
-        0, 0, depth_mm / 1000.0, 0.0,  # T1/T2 blind, D1, D2
+        0, 0, depth, depth,  # T1/T2 blind, D1, D2 (the adapter's form)
         drafted, False, ddir1, False,  # Dchk1, Dchk2, Ddir1, Ddir2
         math.radians(half), 0.0,  # Dang1, Dang2
         False, False, False, False, False,  # offsets, translate, NormalCut
         False, True, False, False, False,  # scope, auto-select, assembly flags
-        0, 0.0, False, False,  # T0 sketch plane, StartOffset, FlipStartOffset, OptimizeGeometry
+        0, 0.0, False,  # T0 sketch plane, StartOffset, FlipStartOffset
     )
 
 
-def _feature_cut4(adapter, sketch_name: str, args: tuple, region_xy: tuple | None = None) -> object:
-    """FeatureCut4 on the named sketch (or on one of its regions)."""
+def _feature_cut3(adapter, sketch_name: str, args: tuple) -> object:
+    """FeatureCut3 on the named sketch; the feature, or the refusal as an exception."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
     model.ClearSelection2(True)
-    if region_xy is None:
-        selected = model.Extension.SelectByID2(sketch_name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0)
-    else:
-        x, y = region_xy
-        selected = model.Extension.SelectByID2(
-            "", "SKETCHREGION", x / 1000.0, y / 1000.0, 0.0, False, 1, null_callout(), 0)
-    if not selected:
-        raise RuntimeError(f"select {sketch_name!r} {region_xy or ''} failed")
-    feature, error = adapter._attempt_with_error(lambda: model.FeatureManager.FeatureCut4(*args))
+    if not model.Extension.SelectByID2(sketch_name, "SKETCH", 0.0, 0.0, 0.0, False, 0, null_callout(), 0):
+        raise RuntimeError(f"select sketch {sketch_name!r} failed")
+    feature, error = adapter._attempt_with_error(lambda: model.FeatureManager.FeatureCut3(*args))
     model.ClearSelection2(True)
-    return feature or RuntimeError(f"FeatureCut4 returned None ({error})")
+    return feature or RuntimeError(f"FeatureCut3 returned None ({error})")
 
 
-async def _try_cut(adapter, sketch_name: str, args: tuple, region_xy: tuple | None = None) -> str:
+async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     """Diagnostic: make one cut, report what it removed, and undo it."""
     pre = await _volume_mm3(adapter)
     try:
-        feature = _feature_cut4(adapter, sketch_name, args, region_xy)
+        feature = _feature_cut3(adapter, sketch_name, args)
     except Exception as exc:  # noqa: BLE001 - a diagnostic reports, never raises
         feature = exc
     if isinstance(feature, Exception):
@@ -221,13 +216,13 @@ async def _try_cut(adapter, sketch_name: str, args: tuple, region_xy: tuple | No
     return result
 
 
-async def _first_v_cut(adapter, sketch_name: str, first_rect_center: tuple) -> tuple:
+async def _first_v_cut(adapter, sketch_name: str) -> tuple:
     """Find the form that removes exactly the first layer's V; undo the rest."""
     pre = await _volume_mm3(adapter)
     tried = []
     for label, single_ended, ddir1 in V_CUT_VARIANTS:
         args = _v_cut_args(single_ended, ddir1)
-        feature = _feature_cut4(adapter, sketch_name, args)
+        feature = _feature_cut3(adapter, sketch_name, args)
         if isinstance(feature, Exception):
             tried.append(f"{label}: {feature}")
             continue
@@ -242,47 +237,38 @@ async def _first_v_cut(adapter, sketch_name: str, first_rect_center: tuple) -> t
         if abs(restored) > 1e-6:
             raise RuntimeError(f"undo of the {label} V cut left {restored:.4f} mm^3 removed; tried {tried}")
     # Discriminate the refusal: the undrafted control, a shallow (wide-root)
-    # V, a gentle draft, and the full V on a single stroke region.
+    # V and a gentle draft.
     probes = {
-        "undrafted": _v_cut_args(True, False, drafted=False),
-        **{f"15 deg 0.10 deep Ddir1 {d}": _v_cut_args(True, d, depth_mm=0.10) for d in (False, True)},
-        **{f"5 deg Ddir1 {d}": _v_cut_args(True, d, half_angle_deg=5.0) for d in (False, True)},
+        "undrafted": _v_cut_args(False, False, drafted=False),
+        **{f"15 deg 0.10 deep Ddir1 {d}": _v_cut_args(False, d, depth_mm=0.10) for d in (False, True)},
+        **{f"5 deg Ddir1 {d}": _v_cut_args(False, d, half_angle_deg=5.0) for d in (False, True)},
     }
     for label, args in probes.items():
         tried.append(f"probe {label}: {await _try_cut(adapter, sketch_name, args)}")
-    for d in (False, True):
-        result = await _try_cut(adapter, sketch_name, _v_cut_args(True, d), first_rect_center)
-        tried.append(f"probe one region Ddir1 {d}: {result}")
     raise RuntimeError(
-        f"no FeatureCut4 form removed the first layer's {NUMERAL_FIRST_LAYER_VOLUME_MM3:.4f} mm^3 V: "
+        f"no FeatureCut3 form removed the first layer's {NUMERAL_FIRST_LAYER_VOLUME_MM3:.4f} mm^3 V: "
         + "; ".join(tried)
     )
 
 
-def _first_rect_center() -> tuple[float, float]:
-    """Model (x, y) mm inside the first layer's first stroke rectangle."""
-    from _dxf_text import read_lwpolylines
-
-    ring, _closed = read_lwpolylines(NUMERAL_LAYER_DXFS[0].read_text(encoding="ascii"))[0]
-    return (sum(x for x, _ in ring) / len(ring), sum(y for _, y in ring) / len(ring))
-
-
 async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None) -> tuple:
     """Blind V cut of one imported stroke layer, read back at once; returns
-    the FeatureCut4 form, found on the first layer and reused after it."""
+    the FeatureCut3 form, found on the first layer and reused after it."""
     sketch = f"{name}Sketch"
     if args is None:
-        args = await _first_v_cut(adapter, sketch, _first_rect_center())
+        args = await _first_v_cut(adapter, sketch)
     else:
-        feature = _feature_cut4(adapter, sketch, args)
+        feature = _feature_cut3(adapter, sketch, args)
         if isinstance(feature, Exception):
             raise RuntimeError(f"{name}: {feature}")
     name_last_feature(adapter, name)
-    # Rename the one dimension reading the depth (the draft adds an angle).
+    # D1 is the direction-1 blind depth (D2 repeats it for the unused second
+    # direction, as on the adapter's cut); the draft adds an angle dimension.
     rows = dump_dimensions(adapter, name)
-    depth_rows = [row["index"] for row in rows if abs(row["value_mm"] - NUMERAL_DEPTH) < 1e-6]
+    depth_rows = [row["index"] for row in rows
+                  if str(row["full_name"]).startswith("D1@") and abs(row["value_mm"] - NUMERAL_DEPTH) < 1e-6]
     if len(depth_rows) != 1:
-        raise RuntimeError(f"{name}: expected one dimension reading {NUMERAL_DEPTH} mm, found {rows}")
+        raise RuntimeError(f"{name}: expected D1 reading {NUMERAL_DEPTH} mm, found {rows}")
     name_dimensions(adapter, name, [None] * depth_rows[0] + ["NumeralDepth"])
     drive_jobs.append((f"NumeralDepth@{name}", '"NumeralDepth"'))
     _assert_one_numeral_cut(adapter, name)

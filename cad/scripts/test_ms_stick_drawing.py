@@ -795,15 +795,15 @@ class _NumeralDefinition:
 
 
 class _CutSeat:
-    """Late-bound seat fake: FeatureCut4 removes a volume chosen per form."""
+    """Seat fake: FeatureCut3 removes a volume chosen per form."""
 
-    def __init__(self, removed_by_form, arity=27):
+    def __init__(self, removed_by_form, arity=26):
         self.removed_by_form, self.arity = removed_by_form, arity
         self.volume, self.cuts, self.selected, self.undone = 4800.0, [], [], 0
         seat = self
 
         class Model:
-            FeatureManager = SimpleNamespace(FeatureCut4=seat.cut)
+            FeatureManager = SimpleNamespace(FeatureCut3=seat.cut)
             Extension = SimpleNamespace(SelectByID2=lambda *args: seat.selected.append(args[:2]) or True)
 
             @staticmethod
@@ -846,8 +846,9 @@ def _patch_cut_bookkeeping(monkeypatch, names):
     monkeypatch.setattr(builder, "_feature_by_name", lambda actual, name: feature)
     monkeypatch.setattr(builder, "name_last_feature", lambda actual, name: name)
     monkeypatch.setattr(builder, "dump_dimensions", lambda actual, name: [
-        {"index": 0, "full_name": f"D2@{name}", "value_mm": 0.0},
+        {"index": 0, "full_name": f"D3@{name}", "value_mm": 261.8},
         {"index": 1, "full_name": f"D1@{name}", "value_mm": spec.NUMERAL_DEPTH},
+        {"index": 2, "full_name": f"D2@{name}", "value_mm": spec.NUMERAL_DEPTH},
     ])
     monkeypatch.setattr(builder, "name_dimensions", lambda actual, feature, values: names.append((feature, values)))
 
@@ -865,7 +866,7 @@ def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> N
     assert seat.undone == 1 and seat.selected[0] == ("NumeralsSketch", "SKETCH")
     assert form == builder._v_cut_args(False, True)
     args = seat.cuts[-1]
-    assert args[:7] == (False, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, 0.0)
+    assert args[:7] == (False, False, False, 0, 0, spec.NUMERAL_DEPTH / 1000.0, spec.NUMERAL_DEPTH / 1000.0)
     assert args[7] is True and args[11] == pytest.approx(math.radians(15.0))
     assert names == [("Numerals", [None, "NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
@@ -879,16 +880,15 @@ def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> N
 def test_no_form_that_removes_the_v_fails_with_discriminating_probes(monkeypatch) -> None:
     seat = _CutSeat({(False, False): 3.0, (True, False): 5.0})
     _patch_cut_bookkeeping(monkeypatch, [])
-    with pytest.raises(RuntimeError, match="no FeatureCut4 form removed") as raised:
+    with pytest.raises(RuntimeError, match="no FeatureCut3 form removed") as raised:
         asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None))
     message = str(raised.value)
     assert "double-ended, Ddir1 False: removed 3.0000" in message
-    assert "double-ended, Ddir1 True: FeatureCut4 returned None" in message
-    for probe in ("undrafted", "15 deg 0.10 deep Ddir1 False", "5 deg Ddir1 True", "one region Ddir1 False"):
+    assert "double-ended, Ddir1 True: FeatureCut3 returned None" in message
+    for probe in ("undrafted", "15 deg 0.10 deep Ddir1 False", "5 deg Ddir1 True"):
         assert f"probe {probe}: " in message
-    # Every probe that cut was undone; the region probe selected a stroke region.
+    # Every cut a form or probe made was undone.
     assert seat.volume == 4800.0
-    assert ("", "SKETCHREGION") in seat.selected
 
 
 def test_numeral_readback_requires_one_draft_sense(monkeypatch) -> None:
