@@ -11,6 +11,7 @@ import pytest
 import build_dt_cone_tip_block as part
 import dt_cone_tip_block_spec
 import draw_dt_cone_tip_block as drawing
+from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import SEAT_UM
@@ -130,7 +131,7 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     # 52.66 block prints 52.7.
     assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.154, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.26, abs=1e-6)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.720, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.350, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -267,8 +268,8 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     """Every marked dimension lands on one view; the bottom view carries the
     hold-down tap's two stations (2026-09-29).  The slit's depth runs to a
-    floor inside the bore that no view draws, so it stays marked but
-    unprinted (machinist review of e04fd60ab)."""
+    floor inside the bore that no view draws, so the part no longer marks it
+    (machinist review of e04fd60ab)."""
     adjuster_axis = {"AxisHeight", "PassageCenter"}
     kept = [
         *drawing.FRONT_KEEP,
@@ -284,15 +285,9 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
         for name in names
     }
     assert sorted(kept) == sorted(set(kept))
-    assert drawing.UNPRINTED_DIMENSIONS == {"SlitDepth"}
-    assert drawing.UNPRINTED_DIMENSIONS <= marked
-    assert set(kept) == marked - drawing.UNPRINTED_DIMENSIONS
-    # The native precision check reads only what prints: an unprinted
-    # dimension never reaches the sheet (farm run 20261023T181434160Z).
-    assert set(drawing.PRINTED_PRECISION) == set(kept)
-    assert "assert_imported_precision(adapter, annotations, PRINTED_PRECISION)" in Path(
-        drawing.__file__
-    ).read_text(encoding="utf-8")
+    assert set(kept) == marked
+    assert "SlitDepth" not in marked
+    assert "SlitDepth" not in dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert set(drawing.TOP_KEEP) == {"Depth"}
     assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
 
@@ -570,15 +565,33 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
 # (DRAWING_PRECISION) and the title block's general bands, never read back
 # from the spec's stack constants, so each test states the property itself.
 # The machinist review of d84a42ca7 dropped the explicit +/-0.10 bands: every
-# dimension prints the title block's general band for its places.
+# dimension prints the title block's general band for its places, except the
+# width, which prints its own one-sided band (machinist review of 83e3370f9).
 _GENERAL = {1: 0.8, 2: 0.51, 3: 0.13}
+_BANDED = {"Width": (0.0, -0.5)}  # (upper, lower) as the sheet prints it
 _DRILLED_PLUS = 0.10
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:
+    if name in _BANDED:
+        upper, lower = _BANDED[name]
+        return nominal + lower, nominal + upper
     places = dt_cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
     band = _GENERAL[places]
     return round(nominal, places) - band, round(nominal, places) + band
+
+
+def test_width_carries_a_one_sided_band_that_holds_containment() -> None:
+    """Rules 4 and 19 (machinist review of 83e3370f9): the width only has to
+    keep its +X face inside the plate's west edge, so it may only come in from
+    17.0; the model carries that band natively on Width@BlockProfile."""
+    spec = dt_cone_tip_block_spec
+    assert spec.BLOCK_WIDTH_BAND == _BANDED["Width"]
+    assert spec.BLOCK_WIDTH_LIMITS == pytest.approx(_printed("Width", spec.BLOCK_X))
+    assert spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
+    assert model_toleranced_dimensions(part)[("BlockProfile", "Width")] == (
+        "*deviations(BLOCK_WIDTH_BAND)"
+    )
 
 
 def _worst_near_jaw_wall() -> float:
@@ -673,7 +686,9 @@ def test_every_three_place_size_names_its_mate_at_its_dimension() -> None:
     for name in ("FootTapX", "FootTapZ"):
         texts[name] = drawing.FOOT_TAP_QUALIFIER
     three_place = {name for name, places in grades.items() if places == 3}
-    assert three_place == {"Width", "Depth", "PassageCenter", "FootTapX", "FootTapZ"}
+    assert three_place == {"Depth", "PassageCenter", "FootTapX", "FootTapZ"}
+    # The width's band is its own, one-sided; its reason still names the edge.
+    assert "MHA-DT-20" in texts["Width"]
     for name in three_place:
         assert re.search(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", texts[name]), name
     # SolidWorks drops multi-line text placed above a dimension.
@@ -722,19 +737,17 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
     )
 
 
-def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
-    """With the heights at .X the model's slit floor (SlitDepth down from the
-    top, an unprinted overcut) must still open into the adjuster's tap drill
-    (AxisHeight up from the foot) by 0.25, or the jaws never grip the thread;
-    the print states the extent itself (SLOT INTO BORE)."""
+def test_slit_floor_stands_inside_the_adjuster_tap_drill() -> None:
+    """The slit must open into the adjuster's tap drill or the jaws never grip
+    the thread.  The print says SLOT INTO BORE instead of a depth because the
+    modelled floor lies wholly inside the drill, leaving no face to measure."""
     spec = dt_cone_tip_block_spec
-    floor_max = _printed("BlockHt", spec.BLOCK_HEIGHT)[1] - _printed(
-        "SlitDepth", spec.SLIT_DEPTH
-    )[0]
-    crown_min = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)[0] + (
-        spec.ADJUSTER_BORE_DIA / 2.0
-    )
-    assert crown_min - floor_max >= 0.25
+    radius = spec.ADJUSTER_BORE_DIA / 2.0
+    below_axis = spec.ADJUSTER_AXIS_HEIGHT - spec.SLIT_FLOOR
+    assert radius + below_axis >= 0.25
+    assert math.hypot(below_axis, spec.SLIT_W / 2.0) < radius
+    assert spec.WORST_SLIT_BREAKTHROUGH_MM == pytest.approx(radius + below_axis)
+    assert drawing.DIMENSION_CALLOUTS_ABOVE["SlitW"] == "SLOT INTO BORE"
 
 
 # --- r3, round two: the 17 block, the 5/8 pinch screw, the -X datum ---------
@@ -774,24 +787,24 @@ def _worst_far_wall_from_head() -> float:
 def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
     """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
     1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    6.26 (2.20D) at the printed worst case, the width's band on the head's
-    side under the -X datum, Width and PassageCenter at .XXX."""
+    6.39 (2.25D) at the printed worst case: the width's one-sided band tops
+    out at 17.0 on the head's side under the -X datum, PassageCenter .XXX."""
     spec = dt_cone_tip_block_spec
     engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
     assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(6.26)
+    assert engagement == pytest.approx(6.39)
 
 
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     """Regression pin (the 1/2 screw passed it too): at the width's lower
-    limit the 5/8 screw's tip stays 0.25 inside the far face; Width at .XXX
-    leaves 0.995."""
+    limit the 5/8 screw's tip stays 0.25 inside the far face; the one-sided
+    band's 16.5 leaves 0.625."""
     spec = dt_cone_tip_block_spec
     recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
-    assert recess == pytest.approx(0.995)
+    assert recess == pytest.approx(0.625)
 
 
 def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:

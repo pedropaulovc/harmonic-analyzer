@@ -69,17 +69,22 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
         )
 
 
-def test_block_width_needs_its_three_place_band_for_containment() -> None:
-    """The width prints .XXX: at .XX its band on the +X face leaves less than
-    the print-worst margin over the plate's narrow west edge."""
+def test_block_width_one_sided_band_holds_containment() -> None:
+    """The width's band may only bring the +X face in (machinist review of
+    83e3370f9, rules 4 and 19): its 17.0 upper limit keeps the print-worst
+    margin over the plate's narrow west edge, where a symmetric .X or .XX
+    band would let the face overhang it."""
     import build_dt_drive_train_assembly as bdt
     import dt_cone_tip_block_spec as block
 
-    assert block.BLOCK_WIDTH_PLACES == 3
-    widened = dict(bdt.TIP_WORST_HALF_WIDTHS_MM)
-    widened["+X"] += block.printed_band_mm(2) - block.printed_band_mm(3)
-    with pytest.raises(AssertionError, match="overhang"):
-        bdt.tip_block_print_worst_containment_mm(widened)
+    assert block.BLOCK_WIDTH_BAND == (0.0, -0.5)
+    assert block.BLOCK_WIDTH_LIMITS[1] == pytest.approx(block.BLOCK_X)
+    bdt.tip_block_print_worst_containment_mm(bdt.TIP_WORST_HALF_WIDTHS_MM)
+    for places in (1, 2):
+        widened = dict(bdt.TIP_WORST_HALF_WIDTHS_MM)
+        widened["+X"] += block.printed_band_mm(places)
+        with pytest.raises(AssertionError, match="overhang"):
+            bdt.tip_block_print_worst_containment_mm(widened)
 
 
 def test_hold_down_hole_stands_under_the_block_foot_tap() -> None:

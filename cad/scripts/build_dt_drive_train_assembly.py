@@ -1295,6 +1295,7 @@ from dt_cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_EMBED as TIP_ADJ_EMBED,
     ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
     AXIS_HEIGHT_TOL_MM as TIP_AXIS_HEIGHT_TOL_MM,
+    BLOCK_WIDTH_LIMITS as TIP_BLOCK_WIDTH_LIMITS,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
     DRAWING_PRECISION_BY_NAME as TIP_DRAWING_PRECISION,
@@ -1564,8 +1565,8 @@ TIP_TAP_LATERAL_BAND_MM = (
 )
 # Each side face's worst distance from the plate centreline: the tap stands
 # at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X
-# face the width on from there.
-_TIP_WIDTH_MAX = TIP_BLOCK_X + tip_printed_band_mm(TIP_DRAWING_PRECISION["Width"])
+# face the width on from there (its one-sided band's upper limit).
+_TIP_WIDTH_MAX = TIP_BLOCK_WIDTH_LIMITS[1]
 TIP_WORST_HALF_WIDTHS_MM = {
     "-X": TIP_FOOT_TAP_X - PLAT_HOLDDOWN_LOCAL_X + TIP_TAP_LATERAL_BAND_MM,
     "+X": _TIP_WIDTH_MAX - TIP_FOOT_TAP_X + PLAT_HOLDDOWN_LOCAL_X + TIP_TAP_LATERAL_BAND_MM,

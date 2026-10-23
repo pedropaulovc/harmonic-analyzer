@@ -160,10 +160,10 @@ ROUND_OUT = 0.0001
 # right of the hole with its ADJUSTER ENTRY name over it (review: named above
 # the thread callout it describes): the name's top keeps the height it took
 # an arrow clearance (plus half an arrowhead) under the slit floor's depth
-# witness, which no longer prints (machinist review of e04fd60ab; see
-# UNPRINTED_DIMENSIONS), so the right-hand views keep their measured places,
-# and the callout a text clearance under the name.  Its leader leaves the
-# shoulder's left end at
+# witness, which no longer prints (machinist review of e04fd60ab: the floor
+# stands inside the bore, dt_cone_tip_block_spec), so the right-hand views
+# keep their measured places, and the callout a text clearance under the
+# name.  Its leader leaves the shoulder's left end at
 # ADJUSTER_LEADER_ANGLE: at 45 deg the run over the part is 4.4 mm longer
 # than the hole's approach, past Main's ~4 mm brief (swing's RD2 fix,
 # 4dda16fd5, left 3.8); at 3:2, 40 deg made it 3.2.  At 2:1 the hole's
@@ -219,21 +219,6 @@ BACK_CENTER = (RIGHT_CENTER[0] + 2.0 * VIEW_ROW_PITCH, FRONT_CENTER[1])
 # row prints under PassageCenter's line with text clearance between them.
 SLIT_LINE_RISE = 0.008
 SLIT_ROW_LEFT = SLIT_W * _S / 2.0 + 0.0064 + TEXT_CLEARANCE + ROUND_OUT
-# Marked on the part (dt_cone_tip_block_spec.DRAWING_DIMENSIONS) but not
-# printed.  Machinist review of e04fd60ab (clarity, gating): SlitDepth's
-# floor stands inside the Ø4.04 bore, so its lower extension line ended on no
-# drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore centre.
-# The slit only has to open into the bore (the spec's breakthrough stack
-# holds the model's overcut at the printed heights), so the slot width says
-# SLOT INTO BORE and no depth prints.  The spec keeps the mark so this
-# drawing-only fix re-keys neither the part nor the assemblies reading it.
-UNPRINTED_DIMENSIONS = frozenset({"SlitDepth"})
-# Every printed dimension must still arrive at its part-authored places.
-PRINTED_PRECISION = {
-    name: places
-    for name, places in DRAWING_PRECISION_BY_NAME.items()
-    if name not in UNPRINTED_DIMENSIONS
-}
 # Machinist review of d84a42ca7 (rules 3/4): a three-place size given a
 # function names its mate and what it holds at its own dimension.  Above a
 # value the text keeps to one line (SolidWorks drops multi-line text placed
@@ -252,8 +237,11 @@ DIMENSION_CALLOUTS_ABOVE = {
     # review of c4c0e848a: "STAYS ON" named no feature).
     "Width": "WITHIN MHA-DT-20 EDGE",
     "PassageCenter": "LOCATES MHA-DT-04 TIP",
-    # The slit's extent instead of a depth to a floor no view draws
-    # (UNPRINTED_DIMENSIONS).
+    # Machinist review of e04fd60ab (clarity, gating): the slit depth's floor
+    # stands inside the Ø4.04 bore, so its lower extension line ended on no
+    # drawn edge and its 15.2 read against 52.7 - 38.10 = 14.6 to the bore
+    # centre.  The slit only has to open into the bore, so the part no longer
+    # marks its depth and the slot width states the extent.
     "SlitW": "SLOT INTO BORE",
 }
 # Callout text measured on the d84a42ca7 render: SLOT DEPTH's ten glyphs
@@ -1694,7 +1682,7 @@ async def build(adapter: Any) -> dict[str, str]:
         },
     )
     offset_dimension_text(adapter, top_annotations, TOP_TEXT_OFFSETS)
-    assert_imported_precision(adapter, annotations, PRINTED_PRECISION)
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     for view, label in (
         (front, "adjuster entry elevation"),
