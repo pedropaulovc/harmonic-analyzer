@@ -364,6 +364,7 @@ HOLE_TABLE_SIZE_COLUMN = 3
 HOLE_TABLE_SIZE_HEADING = "DRILL"
 
 
+@_telemetry.traced("drawing.rocker_support.hole_table_process")
 def _name_hole_table_process(adapter: Any, table: Any) -> None:
     """Retitle the native SIZE column with the foot holes' process."""
     column = HOLE_TABLE_SIZE_COLUMN
