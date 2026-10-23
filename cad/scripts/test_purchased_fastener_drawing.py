@@ -10022,11 +10022,18 @@ def _washer_paint_native(monkeypatch, case):
             assert len(templates) == 2
             paint.offset_path_indices = (len(lines), len(lines) + 1)
             lines.extend(copy.deepcopy(row) for row in templates)
-        # These fixtures' native texts have unrotated lower-left anchors. The
-        # lowest actual fragment supplies its baseline and complete advance;
-        # do not estimate glyph ink or call the production path classifier.
-        baseline = min(graphics["texts"], key=lambda text: text["pos"][1])
-        start = baseline["pos"]
+        # These fixtures' native texts have unrotated lower-left anchors. Match
+        # the independently validated raw full-block topology: lowest baseline,
+        # leftmost text anchor, and rightmost complete native advance. Never
+        # shorten the path to one limit fragment to satisfy a core classifier.
+        texts = graphics["texts"]
+        lowest = min(texts, key=lambda text: text["pos"][1])
+        start = [
+            min(text["pos"][0] for text in texts),
+            lowest["pos"][1],
+            lowest["pos"][2],
+        ]
+        advance = max(text["pos"][0] + text["w"] for text in texts)
         tips = graphics["arrows"]
         midpoint = [
             tips[0][coordinate] + (tips[1][coordinate] - tips[0][coordinate]) / 2
@@ -10035,7 +10042,7 @@ def _washer_paint_native(monkeypatch, case):
         connector, underline = (lines[index] for index in paint.offset_path_indices)
         connector[4:7], connector[7:10] = midpoint, list(start)
         underline[4:7] = list(start)
-        underline[7:10] = [start[0] + baseline["w"], start[1], start[2]]
+        underline[7:10] = [advance, start[1], start[2]]
 
     def position(label, x, y, _z):
         item = case.imports[label]
