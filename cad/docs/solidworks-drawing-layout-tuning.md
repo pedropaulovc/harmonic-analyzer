@@ -1958,6 +1958,10 @@ The proof has two deliberately distinct stages:
   tolerance. Retain their actual offsets and pen radii for collision checks;
   endpoint fragments cannot stand in for a missing middle. Compare the finish
   and neck paint against each other as well as preexisting dimensions.
+  Head coverage intervals do not clip head paint: retain complete attributable
+  endpoints, allowed displacement and pen radii for every distance/intersection
+  proof. Refuse an ambiguous longitudinal head overhang beyond the existing
+  attribution band rather than guessing a shortened triangle.
   A shared symbol root exempts only a point junction, never positive-length
   collinear overlap; this applies to native and printed routes alike.
   This is semantic ownership of the reader-observed ring/slash, not forensic

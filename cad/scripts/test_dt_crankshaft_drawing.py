@@ -3334,3 +3334,64 @@ def test_split_reversed_pdf_leader_preserves_the_one_actual_native_root(neck_dim
 
     f.pdf.mutate = mutate
     _neck_proof(f, "after_pdf_save")
+
+
+def test_owned_pdf_heads_preserve_complete_allowed_displacement_and_pen() -> None:
+    native = (
+        drawing.Segment(0.170, 0.190, 0.174, 0.190),
+        drawing.Segment(0.174, 0.190, 0.172, 0.194),
+        drawing.Segment(0.172, 0.194, 0.170, 0.190),
+    )
+    strokes = tuple(
+        (drawing.Segment(edge.x0 + 0.00003, edge.y0 + 0.00002,
+                         edge.x1 + 0.00003, edge.y1 + 0.00002), 0.000065 + index * 0.00001)
+        for index, edge in enumerate(native)
+    )
+    owned = drawing._neck_pdf_owned_heads(strokes, native, label="translated head")
+    assert owned == {edge: (stroke,) for edge, stroke in zip(native, strokes)}
+
+
+@pytest.mark.parametrize("target", ["glyph", "primitive"], ids=["two-mm-glyph-gap", "paint-intersection"])
+def test_complete_native_head_coverage_cannot_hide_allowed_actual_paint_overhang(target) -> None:
+    native = (
+        drawing.Segment(0.170, 0.190, 0.174, 0.190),
+        drawing.Segment(0.174, 0.190, 0.172, 0.194),
+        drawing.Segment(0.172, 0.194, 0.170, 0.190),
+    )
+    tail = drawing.Segment(native[0].x0, native[0].y0, native[0].x1 + 0.00008, native[0].y1)
+    strokes = ((tail, 0.000065), *((edge, 0.000065) for edge in native[1:]))
+    route_owned = drawing._neck_pdf_owned_lines(strokes, native, label="coverage intervals")
+    head_owned = drawing._neck_pdf_owned_heads(strokes, native, label="complete head paint")
+    assert head_owned[native[0]] == ((tail, 0.000065),)
+    if target == "glyph":
+        boxes = (drawing.InkBox(0.1761, 0.1899, 0.177, 0.1901),)
+        paths = ()
+        threshold = drawing.ARROW_TEXT_CLEARANCE_M
+    else:
+        boxes = ()
+        paths = ((drawing.Segment(0.17407, 0.1899, 0.17407, 0.1901), 0.000001),)
+        threshold = 0.0
+    assert drawing._neck_pdf_head_clearance(native, route_owned, boxes, paths) > threshold
+    assert drawing._neck_pdf_head_clearance(native, head_owned, boxes, paths) < threshold
+
+
+@pytest.mark.parametrize("which", ["finish", "neck"])
+def test_actual_pdf_refuses_ambiguous_overlong_head_paint_even_with_full_native_coverage(
+    neck_dimension_fakes, which,
+) -> None:
+    from dataclasses import replace
+
+    f = neck_dimension_fakes
+    row = f.finish_arrows[0] if which == "finish" else f.arrow_rows[1]
+    edge = drawing.arrowhead_segments(row)[0]
+    ux, uy = (edge.x1 - edge.x0) / edge.length, (edge.y1 - edge.y0) / edge.length
+
+    def mutate(spans, strokes, token):
+        for index, stroke in enumerate(strokes):
+            if (stroke.x0, stroke.y0, stroke.x1, stroke.y1) == (edge.x0, edge.y0, edge.x1, edge.y1):
+                strokes[index] = replace(stroke, x1=stroke.x1 + ux * 0.002, y1=stroke.y1 + uy * 0.002)
+
+    f.pdf.mutate = mutate
+    _neck_proof(f, "final settling rebuild")
+    with pytest.raises(RuntimeError, match="ambiguous actual head stroke extends beyond its native edge"):
+        _neck_proof(f, "after_pdf_save")

@@ -1830,6 +1830,30 @@ def _neck_pdf_owned_lines(
     return owned
 
 
+def _neck_pdf_owned_heads(
+    strokes: tuple[tuple[Segment, float], ...], native: tuple[Segment, ...], *, label: str,
+) -> dict[Segment, tuple[tuple[Segment, float], ...]]:
+    """Bound coverage to the native edge, but never shorten actual head paint."""
+    owned = _neck_pdf_owned_lines(strokes, native, label=label)
+    for line in native:
+        ux, uy = (line.x1 - line.x0) / line.length, (line.y1 - line.y0) / line.length
+        matches = []
+        for segment, radius in strokes:
+            if _neck_pdf_line_overlap(segment, line) is None:
+                continue
+            projections = tuple(
+                (x - line.x0) * ux + (y - line.y0) * uy
+                for x, y in ((segment.x0, segment.y0), (segment.x1, segment.y1))
+            )
+            if min(projections) < -COLLINEAR_TOL_M or max(projections) > line.length + COLLINEAR_TOL_M:
+                raise RuntimeError(f"{label}: ambiguous actual head stroke extends beyond its native edge")
+            # Keep complete attributable endpoints, displacement and pen radius,
+            # including allowed overhang: all of it participates in clearance.
+            matches.append((segment, radius))
+        owned[line] = tuple(matches)
+    return owned
+
+
 def _neck_pdf_diameter_paths(
     strokes: tuple[tuple[Segment, float], ...], prefix: InkBox, bay: InkBox,
 ) -> tuple[tuple[Segment, float], ...]:
@@ -2008,8 +2032,8 @@ def _assert_neck_pdf_presentation(
             token_strokes.append((segment, radius))
     actual_neck = _neck_pdf_owned_lines(tuple(strokes), lines, label="collar-side neck PDF")
     actual_finish = _neck_pdf_owned_lines(tuple(strokes), finish_lines, label="collar rear finish PDF")
-    actual_heads = _neck_pdf_owned_lines(tuple(strokes), finish_heads, label="collar rear finish PDF head")
-    actual_neck_heads = _neck_pdf_owned_lines(tuple(strokes), heads, label="collar-side neck PDF head")
+    actual_heads = _neck_pdf_owned_heads(tuple(strokes), finish_heads, label="collar rear finish PDF head")
+    actual_neck_heads = _neck_pdf_owned_heads(tuple(strokes), heads, label="collar-side neck PDF head")
     actual_foreign = _neck_pdf_owned_lines(tuple(strokes), foreign_lines, label="preexisting dimension PDF")
     owned_lines = (*lines, *finish_lines, *heads, *finish_heads, *foreign_lines)
     unowned = tuple(
