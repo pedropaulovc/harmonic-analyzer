@@ -516,12 +516,11 @@ def test_nut_flag_rejects_competing_key_beside_template_zone(
         settled()
 
 
-@pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed", "duplicate"])
+@pytest.mark.parametrize("geometry", ["missing", "wrong-end", "trimmed"])
 def test_nut_flag_rejects_nonbearing_geometry(nut_installation_native, geometry):
     state = nut_installation_native
     state.edges = {
         "missing": [], "wrong-end": [state.decoys[0]], "trimmed": [state.decoys[2]],
-        "duplicate": [state.target, state.Edge(endpoints=state.target.endpoints)],
     }[geometry]
     with pytest.raises(RuntimeError):
         state.flags.add_supplier_nut_installation_flag(
@@ -529,6 +528,27 @@ def test_nut_flag_rejects_nonbearing_geometry(nut_installation_native, geometry)
             bearing_point_mm=state.bearing_point_mm,
         )
     assert not state.authored
+
+
+def test_nut_flag_rejects_rebound_bearing_identity_on_coincident_geometry(
+    nut_installation_native,
+):
+    state = nut_installation_native
+    state.edges = [state.target]
+    settled = state.flags.add_supplier_nut_installation_flag(
+        state.adapter, state.right, artifact_stem=state.artifact_stem,
+        bearing_point_mm=state.bearing_point_mm,
+    )
+    state.add_legend()
+    # Repeated sightings of the original native edge retain the authoring
+    # identity. Equal coordinates alone do not grant a replacement that identity.
+    state.edges = [state.target, state.target]
+    settled()
+    replacement = state.Edge(endpoints=state.target.endpoints)
+    state.edges = [replacement, state.target]
+    with pytest.raises(RuntimeError, match="bearing edge lost native identity"):
+        settled()
+    assert len(state.authored) == 1
 
 
 @pytest.mark.parametrize("key", ["", "2 "])
