@@ -11,9 +11,10 @@ and every bought dimension) belongs to
 ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers.
 
-Material and stock: 6061-T6 aluminium flat bar 1/2 x 3/4 in (12.70 x 19.05),
-sawn and faced to ``leadscrew.BRACKET_LENGTH`` 68.9. Width and thickness stay
-as bought and print "STOCK".
+Material and stock: aluminium flat bar 1/2 x 3/4 in (12.70 x 19.05), e.g.
+6061-T6, sawn and faced to ``leadscrew.BRACKET_LENGTH`` 68.9. Width and
+thickness stay as bought and print "STOCK". Only the taps need the metal, so
+the title block names the flat-bar family, not a grade (rule 2).
 
 Frame (SolidWorks model, and the ``PRECHIPS_SOLIDS`` frame; the leadscrew
 spec's): origin on the bottom face at the inner end (toward the rail),
