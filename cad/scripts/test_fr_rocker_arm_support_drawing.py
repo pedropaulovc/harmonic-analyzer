@@ -44,7 +44,6 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "CavWidth",
         "PocketRadius",
         "CavityRadius",
-        "PocketFloorRadius",
         "RimChamferSize",
         "SeatEastStation",
         "SeatWestStation",
@@ -59,13 +58,11 @@ def test_drawing_keeps_only_make_critical_model_dimensions() -> None:
         "CavityRadius": "4X",
         "CavWidth": "SQ CAVITY THRU",
         "RimChamferSize": RIM_CHAMFER_CALLOUT,
-        "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
         "PocketEndStation": "BOTH SIDES",
         "PocketBottomStation": "BOTH SIDES",
         "TopFlatPlusZStation": "BOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB",
     }
     part_owned = {
-        "PocketFloorRadius",
         "RimChamferSize",
         "SeatEastStation",
         "SeatWestStation",
@@ -538,21 +535,23 @@ def _floor_spandrel_quarter_turn_volume(r: float, wall_radius: float) -> float:
     return total
 
 
-def test_pocket_floor_fillet_is_the_printed_max_and_its_volume_closed_form() -> None:
-    """Main's r8 ruling on the r7 review's unstated pocket floor corner: R0.8
-    MAX, modelled AT the limit (swTolMAX) on both pockets' floor loops."""
-    assert support.POCKET_FLOOR_R_MAX == 0.8
-    assert support.POCKET_FLOOR_R_BAND == (0.0, -0.8)
-    assert support.POCKET_FLOOR_R_TOL_TYPE == 6
-    assert f"{support.POCKET_FLOOR_R_MAX:.{support.POCKET_FLOOR_R_PLACES}f}" == "0.8"
-    # One edge per pocket, on the top rail's floor corner, +Z first (its
-    # size lands there: the section's upper right, under the top flat's +Z
-    # station).
+def test_pocket_floor_fillet_sits_under_the_title_block_and_its_volume_closed_form() -> (
+    None
+):
+    """The r7 review's unstated pocket floor corner is the title block's
+    INSIDE CORNERS R1.0 MAX; a local R0.8 MAX named no mate or function
+    (ENFORCE review 2026-10-23), so the sheet prints none and the model's
+    R0.8 lies within the ceiling."""
+    assert support.POCKET_FLOOR_R == 0.8
+    assert support.POCKET_FLOOR_R <= _config.title_block("inside_corner")["radius_mm"]
+    assert "PocketFloorFillet" not in support.DRAWING_DIMENSIONS
+    assert "PocketFloorFillet" not in support.DRAWING_PRECISION
+    # One edge per pocket, on the top rail's floor corner, +Z first.
     assert support.POCKET_FLOOR_FILLET_EDGES == [
         [0.0, support.BIG, support.WEB],
         [0.0, support.BIG, -support.WEB],
     ]
-    r = support.POCKET_FLOOR_R_MAX
+    r = support.POCKET_FLOOR_R
     straight = 4.0 * (2.0 * support.BIG - 2.0 * support.POCKET_FILLET_R)
     per_pocket = (1.0 - math.pi / 4.0) * r**2 * straight + 4.0 * (
         _floor_spandrel_quarter_turn_volume(r, support.POCKET_FILLET_R)
@@ -713,7 +712,6 @@ def _imported(name: str, places: int) -> SimpleNamespace:
 @pytest.mark.parametrize(
     "name",
     [
-        "PocketFloorRadius",
         "RimChamferSize",
         "SeatEastStation",
         "SeatWestStation",
@@ -728,7 +726,7 @@ def _imported(name: str, places: int) -> SimpleNamespace:
 def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
     monkeypatch: pytest.MonkeyPatch, name: str
 ) -> None:
-    """Review findings: the R0.8 MAX's, the chamfer's and the seat REF
+    """Review findings: the chamfer's and the seat REF
     stations' places were rewritten on the sheet. The part build authors
     them, and the locations' (PR #1469 r4 review); the sheet reads them back,
     never SetPrecision3, and fails closed when the import lost them."""
@@ -738,7 +736,6 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
     import _drawing_dimensions
 
     assert support.DRAWING_PRECISION == {
-        "PocketFloorFillet": {"PocketFloorRadius": support.POCKET_FLOOR_R_PLACES},
         "RimChamfer": {"RimChamferSize": support.RIM_CHAMFER_PLACES},
         "SeatStationReference": {
             "SeatEastStation": support.SEAT_STATION_PLACES,
@@ -756,14 +753,13 @@ def test_part_owned_places_are_the_parts_and_the_sheet_reads_them_back(
         },
     }
     assert (
-        support.POCKET_FLOOR_R_PLACES,
         support.RIM_CHAMFER_PLACES,
         support.SEAT_STATION_PLACES,
         support.CAVITY_LOCATION_PLACES,
         support.POCKET_END_PLACES,
         support.SECTION_LOCATION_PLACES,
         seats.TOP_FLAT_PLACES,
-    ) == (1, 1, 2, 1, 2, 2, 2)
+    ) == (1, 2, 1, 2, 2, 2)
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in inspect.getsource(
         support.build
     )
@@ -1064,7 +1060,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
     web_pick_y = -(support.BIG + support.CAV) / 2.0
     for z, y in web:
         assert z == support.WEB
-        assert -(support.BIG - support.POCKET_FLOOR_R_MAX) < y
+        assert -(support.BIG - support.POCKET_FLOOR_R) < y
         assert y < -(support.CAV + support.CHAMFER)
         assert abs(y - web_pick_y) > 2.0
     # Owner Q13d: each flat edge off its nearer web face, a real surface. The
@@ -1077,7 +1073,7 @@ def test_cavity_pocket_and_web_locations_run_from_real_features(
         for z, y in right_chords[f"{name}FaceChord"]:
             assert z == row.face_u
             assert support.CAV + support.CHAMFER < y
-            assert y < support.BIG - support.POCKET_FLOOR_R_MAX
+            assert y < support.BIG - support.POCKET_FLOOR_R
         start, end = right_chords[f"{name}Chord"]
         assert start == (row.edge_u, support.HALF_Y) and end[1] == support.HALF_Y
         assert support.WEB < abs(end[0]) < abs(start[0])
@@ -1220,36 +1216,6 @@ def test_seat_station_texts_stand_above_view_b_outboard_of_its_ends() -> None:
     assert west[0] > pocket_x + 0.003
     pocket = _text_box("165.1\nSQ POCKET BOTH SIDES", drawing.FRONT_KEEP["WinWidth"])
     assert _boxes_clear(west, pocket, 0.003)
-
-
-def test_pocket_floor_radius_text_stands_right_of_the_section_level_with_its_corner() -> (
-    None
-):
-    """The R0.8 MAX lands on its first edge, the +Z pocket's floor corner:
-    the section's upper right, under the top flat's +Z station and its
-    reason rows (PR #1469 r4 review; owner Q13d)."""
-    scale = drawing.VIEW_SCALE / 1000
-    assert support.POCKET_FLOOR_FILLET_EDGES[0] == [0.0, support.BIG, support.WEB]
-    radius = _text_box(
-        "R0.8 MAX\nPOCKET FLOOR\nCORNERS", drawing.RIGHT_KEEP["PocketFloorRadius"]
-    )
-    top_y = drawing.RIGHT_CENTER[1] + support.HALF_Y * scale
-    # Below the 177.8's top extension line, right of the slanted wall.
-    assert radius[3] < top_y - 0.002
-    for y in radius[1], radius[3]:
-        local_y = (y - drawing.RIGHT_CENTER[1]) / scale
-        wall_x = drawing.RIGHT_CENTER[0] + support._wall_half_z_at(local_y) * scale
-        assert radius[0] > wall_x + 0.002
-    assert radius[2] < drawing.RIGHT_KEEP["WallHeight"][0] - 0.002
-    for other in (
-        _text_box(FLAT_PLUS_TEXT, drawing.RIGHT_KEEP["TopFlatPlusZStation"]),
-        _text_box("177.8", drawing.RIGHT_KEEP["WallHeight"]),
-        _text_box("12.70", drawing.WEB_TEXT_XY),
-    ):
-        assert _boxes_clear(radius, other, 0.003)
-    # The text is level with the upper floor corner its leader lands on.
-    corner_y = drawing.RIGHT_CENTER[1] + support.BIG * scale
-    assert radius[1] < corner_y < radius[3] + 0.003
 
 
 FLAT_PLUS_TEXT = "2.12\nBOTH SIDES\nKEEPS MHA-CH-08\nSEAT TAPS IN WEB"
