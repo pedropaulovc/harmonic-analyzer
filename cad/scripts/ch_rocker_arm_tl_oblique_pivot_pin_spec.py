@@ -259,13 +259,23 @@ CALLOUTS_ABOVE = {"CollarDia": "2X"}
 PART_DATUMS = (
     PartDatum("A", CylinderFace(BEARING_DIA, contains_z_mm=BEARING_LENGTH / 2.0)),
 )
+# The drawing's frames print these strings; each is the retention stack's
+# stop-face variation bound at its two-place print (asserted below).
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "flange_lower_stop": "0.05",
+    "flange_upper_stop": "0.05",
+}
+if any(
+    zone != f"{STOP_FACE_VARIATION_MAX:.2f}" for zone in GEOMETRIC_TOLERANCES_MM.values()
+):
+    raise AssertionError("the stop-face runout zones must print STOP_FACE_VARIATION_MAX")
 GEOMETRIC_CONTROLS = (
     GeometricControl(
-        "flange_lower_stop", "total_runout", f"{STOP_FACE_VARIATION_MAX:.2f}",
+        "flange_lower_stop", "total_runout", GEOMETRIC_TOLERANCES_MM["flange_lower_stop"],
         PlanarFace((0.0, 0.0, -1.0), -FLANGE_BOTTOM_STATION), ("A",),
     ),
     GeometricControl(
-        "flange_upper_stop", "total_runout", f"{STOP_FACE_VARIATION_MAX:.2f}",
+        "flange_upper_stop", "total_runout", GEOMETRIC_TOLERANCES_MM["flange_upper_stop"],
         PlanarFace((0.0, 0.0, 1.0), FLANGE_TOP_STATION), ("A",),
     ),
 )
