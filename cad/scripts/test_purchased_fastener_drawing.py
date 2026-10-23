@@ -602,6 +602,78 @@ def _variant_sheet(monkeypatch, tmp_path, variants, quantities, total):
     return state
 
 
+@pytest.mark.parametrize("cut_to_suit", (False, True))
+@pytest.mark.parametrize("footer", ("omitted", None, "kit"))
+@pytest.mark.parametrize("drift", (None, "linked-text", "resolved-text", "extent"))
+def test_configured_footer_override_reaches_native_placement_and_settled_checks(
+    monkeypatch, tmp_path, cut_to_suit, footer, drift
+):
+    variants = (("InnerLink", "INNER"), ("OuterLink", "OUTER"))
+    state = _variant_sheet(
+        monkeypatch, tmp_path, variants, {"InnerLink": 34, "OuterLink": 33}, 67
+    )
+    custom = "REFERENCE VIEWS; [2]/[3] AS SUPPLIED; [1] REWORK PER SHEET 2."
+    expected = custom if footer == "kit" else purchased._GENERAL_TEXT[cut_to_suit]
+    notes = []
+
+    def literal_note(_adapter, text, x, y):
+        note = _Note(text, text, x, y)
+        notes.append(note)
+        return note
+
+    def linked_note(_adapter, name, x, y, *, char_height):
+        assert char_height == 0.003
+        value = {"Supplier": "Test supplier", "Supplier SKUs": "SKU-1"}[name]
+        return _Note(purchased.property_link(name), value, x, y)
+
+    # Run the actual footer author, not an argument-recording substitute.
+    monkeypatch.setattr(configured, "add_purchased_footer", purchased.add_purchased_footer)
+    monkeypatch.setattr(purchased, "_literal_note", literal_note)
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(purchased, "add_property_linked_note", linked_note)
+
+    def before_settle():
+        general = [note for note in notes if note.GetText() == expected]
+        assert len(general) == 1
+        note = general[0]
+        assert note.PropertyLinkedText == expected
+        assert note.GetPosition() == (purchased._NOTE_X, purchased._GENERAL_Y, 0.0)
+        if footer == "kit":
+            assert not any(
+                note.GetText() in purchased._GENERAL_TEXT.values() for note in notes
+            )
+        if drift == "linked-text":
+            note.PropertyLinkedText = "STALE GENERAL LINE"
+        elif drift == "resolved-text":
+            note._resolved_text = "STALE GENERAL LINE"
+        elif drift == "extent":
+            # Still inside the sheet border, but beyond the unchanged footer box.
+            note._extent = (
+                purchased._NOTE_X, purchased._GENERAL_BOTTOM, 0.0,
+                purchased._FOOTER_RIGHT + 0.001, purchased._GENERAL_Y, 0.0,
+            )
+
+    state.before_settle = before_settle
+    options = {"cut_to_suit": cut_to_suit}
+    if footer != "omitted":
+        options["general_text"] = custom if footer == "kit" else None
+
+    def build():
+        return asyncio.run(configured.build_purchased_variant_drawing(
+            state.adapter, state.spec, variants=variants, item="TEST KIT",
+            purchase_unit="KIT", **options,
+        ))
+
+    if drift is None:
+        assert build() == {"pdf": str(state.spec.outputs["pdf"])}
+        assert state.finalized
+    else:
+        message = "reserved space" if drift == "extent" else "did not resolve"
+        with pytest.raises(RuntimeError, match=message):
+            build()
+        assert not state.finalized
+
+
 @pytest.mark.parametrize(
     ("variants", "quantities", "total"),
     [
@@ -676,6 +748,109 @@ def test_configured_sheet_accepts_complete_consistent_native_members(
         )
     )
     assert state.finalized
+
+
+@pytest.mark.parametrize("drift", [None, "reference-view", "reference-activation"])
+def test_configured_sheet_appends_rework_sheets_before_single_guarded_finalization(
+    monkeypatch, tmp_path, drift
+):
+    variants = (("HoldDownStud", "STUD"), ("TNut", "T-NUT"), ("FlangeNut", "FLANGE NUT"))
+    state = _variant_sheet(
+        monkeypatch, tmp_path, variants, dict.fromkeys((name for name, _ in variants), 4), 12
+    )
+    events = []
+    active = ["HARDWARE"]
+    new_drawing = configured.new_project_drawing
+
+    def create(adapter, *, layout):
+        draw, sheet = new_drawing(adapter, layout=layout)
+        sheet.GetName = lambda: "HARDWARE"
+
+        def activate(name):
+            if drift == "reference-activation" and name == "HARDWARE" and state.views:
+                return False
+            active[0] = name
+            events.append(("activate", name))
+            return True
+
+        draw.ActivateSheet = activate
+        return draw, sheet
+
+    def blank(_adapter, names, *, label):
+        assert not state.views, "extra sheets must copy the blank template, not reference views"
+        events.append(("blank", tuple(names)))
+
+    def annotate(_adapter, configuration, cells, views):
+        def settled():
+            assert active[0] == "HARDWARE"
+            events.append(("member", configuration))
+        return (settled,)
+
+    def append(adapter):
+        assert len(state.views) == 12
+        assert adapter.currentModel.ActivateSheet("REWORK")
+        events.append(("append",))
+
+        def settled():
+            assert adapter.currentModel.ActivateSheet("MEASURE-AND-FIT")
+            events.append(("rework-settled",))
+        return (settled,)
+
+    finalizations = []
+
+    async def finalize(_adapter, outputs, *, settled_checks, **kwargs):
+        finalizations.append(kwargs)
+        if drift == "reference-view":
+            state.views.pop()
+        for settled in settled_checks:
+            settled()
+        state.finalized = True
+        return {"pdf": str(outputs.pdf)}
+
+    monkeypatch.setattr(configured, "new_project_drawing", create)
+    monkeypatch.setattr(configured, "create_blank_drawing_sheets", blank)
+    monkeypatch.setattr(
+        configured, "iter_views",
+        lambda _adapter: iter(state.views if active[0] == "HARDWARE" else ()),
+    )
+    monkeypatch.setattr(configured, "finalize_drawing", finalize)
+    scales = {"REWORK": (2.0, 1.0), "MEASURE-AND-FIT": (2.0, 1.0)}
+
+    def build():
+        return asyncio.run(configured.build_purchased_variant_drawing(
+            state.adapter, state.spec, variants=variants, item="PM KIT",
+            purchase_unit="52-PIECE KIT", annotate_member=annotate,
+            additional_sheet_scales=scales, append_sheets=append,
+        ))
+
+    if drift:
+        with pytest.raises(RuntimeError):
+            build()
+        assert not state.finalized
+    else:
+        build()
+        assert state.finalized
+        assert len(finalizations) == 1
+        assert finalizations[0]["expected_sheet_names"] == ("HARDWARE", *scales)
+        assert finalizations[0]["sheet_scales"] == {"HARDWARE": (1, 1), **scales}
+        assert events[0] == ("blank", ("HARDWARE", *scales))
+        assert events[-4:] == [
+            ("member", "TNut"), ("member", "FlangeNut"),
+            ("activate", "MEASURE-AND-FIT"), ("rework-settled",),
+        ]
+
+
+@pytest.mark.parametrize("scales, author", [
+    ({"REWORK": (2.0, 1.0)}, None),
+    (None, lambda _adapter: ()),
+    ({}, lambda _adapter: ()),
+])
+def test_configured_sheet_refuses_incomplete_append_contract_before_native_calls(scales, author):
+    with pytest.raises(ValueError):
+        asyncio.run(configured.build_purchased_variant_drawing(
+            object(), object(), variants=(), item="KIT", purchase_unit="KIT",
+            additional_sheet_scales=scales, append_sheets=author,
+        ))
 
 
 @pytest.mark.parametrize(
@@ -3137,9 +3312,10 @@ def test_kit_stud_reference_measures_real_end_rims_and_rejects_drift(
         def IsCircle(self):
             return True
 
-    radius = (kit.stud.RADIUS - kit.stud.END_CHAMFER) / 1000
-    rims = [Rim(kit.stud.LENGTH / 1000, radius), Rim(0.0, radius)]
-    land = Rim(kit.stud.END_CHAMFER / 1000, kit.stud.RADIUS / 1000)
+    lower_radius = (kit.stud.RADIUS - kit.stud.LOWER_FACTORY_CHAMFER) / 1000
+    cut_radius = (kit.stud.RADIUS - kit.stud.CUT_END_CHAMFER_MAX) / 1000
+    rims = [Rim(kit.stud.LENGTH / 1000, cut_radius), Rim(0.0, lower_radius)]
+    land = Rim(kit.stud.LOWER_FACTORY_CHAMFER / 1000, kit.stud.RADIUS / 1000)
     state = SimpleNamespace(display=None)
     projection_events = []
 
@@ -3650,6 +3826,7 @@ class _KitFlagNativeNote:
 @pytest.fixture
 def kit_installation_native(monkeypatch):
     """Keep recipe validation real; replace only the native COM boundary."""
+    import build_sh_vn_clamping_kit_hardware as producer
     import draw_sh_vn_clamping_kit_hardware as kit
     import _drawing_attachment as attachment
     from _drawing_edges import ViewEdge, ViewEdges
@@ -3674,6 +3851,7 @@ def kit_installation_native(monkeypatch):
             key=key,
             title=title,
             spec=spec,
+            source_properties=dict(producer.MEMBER_NOTE_PROPERTIES),
             cells=cells,
             active=prior_view,
             sheet="KitSheet",
@@ -3786,7 +3964,7 @@ def kit_installation_native(monkeypatch):
             ]
         else:
             radius = (
-                (spec.RADIUS - spec.END_CHAMFER) / 1000
+                (spec.RADIUS - spec.LOWER_FACTORY_CHAMFER) / 1000
                 if configuration == "HoldDownStud"
                 else spec.FLANGE_DIA / 2000
             )
@@ -3809,7 +3987,7 @@ def kit_installation_native(monkeypatch):
                 else spec.HEIGHT / 1000
             )
             chamfer_y = (
-                spec.END_CHAMFER / 1000 if configuration == "HoldDownStud" else 0.0005
+                spec.LOWER_FACTORY_CHAMFER / 1000 if configuration == "HoldDownStud" else 0.0005
             )
             chamfer_radius = (
                 spec.RADIUS / 1000
@@ -4214,7 +4392,7 @@ def _kit_flag_finish_builder_notes(state):
     member = f"{state.key} {state.title}"
     state.legend = _Note(
         f"{member}: {state.kit.property_link(f'{state.configuration} Manufacturing Notes')}",
-        f"{member}: {state.spec.DRAWING_NOTES}",
+        f"{member}: {state.source_properties[f'{state.configuration} Manufacturing Notes']}",
         state.cells[0][2][0],
         0.105,
     )
@@ -4316,37 +4494,55 @@ def test_kit_installation_keys_attach_to_unique_native_features_and_settle(
     )
 
 
-@pytest.mark.parametrize(
-    ("configuration", "requirement"),
-    (
-        (
-            "HoldDownStud",
-            "THREAD NOT MODELLED; BOTTOMS IN THE T-NUT, FLUSH WITH ITS FOOT.",
-        ),
-        (
-            "TNut",
-            "FOOT UNDER THE SLOT UNDERCUT; VERIFY THE FIT IN THE TABLE SLOT ON RECEIPT.",
-        ),
-        ("FlangeNut", "FLANGE FACE DOWN ON THE BASE BAR."),
-    ),
-)
-def test_kit_installation_labels_preserve_the_exact_existing_requirement(
-    kit_installation_native, configuration, requirement
+@pytest.mark.parametrize("source_drift", (False, True), ids=("current", "stale-property"))
+def test_stud_installation_legend_consumes_the_builder_stamped_property(
+    kit_installation_native, monkeypatch, source_drift,
 ):
-    state = kit_installation_native(configuration)
-    assert state.kit.VARIANTS == (
-        ("HoldDownStud", "[1] HOLD-DOWN STUD"),
-        ("TNut", "[2] T-NUT"),
-        ("FlangeNut", "[3] FLANGE NUT"),
+    import _drawing_marks
+    import build_sh_vn_clamping_kit_hardware as producer
+    from _test_stubbed_build import offline_adapter, stub_seat
+
+    property_name = "HoldDownStud Manufacturing Notes"
+    if source_drift:
+        monkeypatch.setattr(
+            producer, "MEMBER_NOTE_PROPERTIES",
+            {**producer.MEMBER_NOTE_PROPERTIES, property_name: "UNRELATED SOURCE NOTE"},
+        )
+    seat = stub_seat(
+        monkeypatch, producer, keep=("build", "apply_drawing_properties"),
     )
-    assert state.spec.DRAWING_NOTES == requirement
+    stamped = {}
+    monkeypatch.setattr(
+        _drawing_marks, "apply_custom_properties",
+        lambda _adapter, properties: stamped.update(properties),
+    )
+    seat.save_member_part.return_value = {"part": "offline"}
+    assert asyncio.run(producer.build(offline_adapter())) == {"part": "offline"}
+
+    state = kit_installation_native("HoldDownStud")
+    state.source_properties = stamped
     settled = state.kit._installation_flag(
-        state.adapter, configuration, state.cells, state.views
+        state.adapter, state.configuration, state.cells, state.views,
     )
     _kit_flag_finish_builder_notes(state)
-    assert state.legend.GetText() == f"{state.key} {state.title}: {requirement}"
+    if source_drift:
+        with pytest.raises(RuntimeError, match="unchanged linked legend"):
+            settled()
+        return
     settled()
-    assert state.spec.DRAWING_NOTES == requirement
+
+    installation = stamped[property_name]
+    assert len(installation.splitlines()) == 1
+    for requirement in (
+        "THREAD NOT MODELLED", "BOTTOMS IN THE T-NUT", "FLUSH WITH ITS FOOT",
+    ):
+        assert requirement in installation
+    member_properties = {
+        call.args[2]: call.args[4] for call in seat.apply_member_properties.call_args_list
+    }
+    assert member_properties["HoldDownStud"]["Manufacturing Notes"] == installation
+    assert stamped["HoldDownStud Rework Stock Note"] == state.spec.STOCK_NOTE
+    assert stamped["HoldDownStud Rework Lower End Note"] == state.spec.LOWER_END_NOTE
 
 
 @pytest.mark.parametrize("configuration", ("HoldDownStud", "TNut", "FlangeNut"))
@@ -4696,12 +4892,13 @@ def test_kit_installation_legend_normalizes_crlf_without_rewriting_requirements(
     wrapped_requirement = original_requirement.replace("; ", ";\n", 1)
     source_contract = SimpleNamespace(
         RADIUS=state.spec.RADIUS,
-        END_CHAMFER=state.spec.END_CHAMFER,
+        LOWER_FACTORY_CHAMFER=state.spec.LOWER_FACTORY_CHAMFER,
         LENGTH=state.spec.LENGTH,
         DRAWING_NOTES=wrapped_requirement,
     )
     monkeypatch.setattr(state.kit, "stud", source_contract)
     state.spec = source_contract
+    state.source_properties[f"{state.configuration} Manufacturing Notes"] = wrapped_requirement
     settled = state.kit._installation_flag(
         state.adapter, state.configuration, state.cells, state.views
     )
@@ -6831,6 +7028,388 @@ def test_supplier_chord_rejects_same_length_in_wrong_final_frame(
         reference._assert_line_frame(adapter, "chord", (0.0, 0.0), (6.35, 0.0))
 
 
+def _supplier_reference_solver(monkeypatch):
+    """Small witness solver: shared point identity carries native constraints."""
+    import _supplier_screw_reference as reference
+    import _sketch
+
+    monkeypatch.setattr(reference, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        reference, "set_sketch_direct_db", lambda adapter, enabled: None
+    )
+    case = SimpleNamespace(
+        lines={}, points={}, emitted=[], overdefined=False, unreadable=None,
+        selected=[], native_angles=[],
+    )
+
+    def success(data=None):
+        return SimpleNamespace(is_success=True, data=data, error=None)
+
+    class Point:
+        def __init__(self, x, y):
+            self.X, self.Y, self.Z = x / 1000.0, y / 1000.0, 0.0
+            self.axes = set()
+
+        @property
+        def Status(self):
+            solve()
+            if case.unreadable is not None:
+                if isinstance(case.unreadable, Exception):
+                    raise case.unreadable
+                return case.unreadable
+            if case.overdefined:
+                return 4  # swOverConstrained, never equivalent to fully constrained.
+            return 3 if len(self.axes) == 2 else 2
+
+    def point(x, y):
+        return case.points.setdefault((x, y), Point(x, y))
+
+    class Line:
+        ConstructionGeometry = False
+
+        def __init__(self, start, end):
+            self.start, self.end = start, end
+            self.orientation = None
+            self.sized = False
+
+        def GetStartPoint2(self):
+            return self.start
+
+        def GetEndPoint2(self):
+            return self.end
+
+        def GetSketch(self):
+            return case.sketch
+
+    def solve():
+        # A sized oriented line transfers its anchored end's position to the
+        # other end; a sized oblique ray still has one free rotational DOF.
+        for _ in range(len(case.lines) + 1):
+            for line in case.lines.values():
+                if line.sized and line.orientation:
+                    if len(line.start.axes) == 2 or len(line.end.axes) == 2:
+                        line.start.axes.update(("x", "y"))
+                        line.end.axes.update(("x", "y"))
+
+    def resolve(ref):
+        entity, endpoint = ref.rsplit(".", 1)
+        return getattr(case.lines[entity], endpoint)
+
+    async def add_line(x1, y1, x2, y2):
+        name = f"line{len(case.lines)}"
+        case.lines[name] = Line(point(x1, y1), point(x2, y2))
+        return success(name)
+
+    async def constraint(left, right, kind):
+        if kind in ("horizontal", "vertical"):
+            case.lines[left].orientation = kind
+        elif kind == "coincident":
+            if right == "origin":
+                resolve(left).axes.update(("x", "y"))
+            else:
+                entity, endpoint = right.rsplit(".", 1)
+                setattr(case.lines[entity], endpoint, resolve(left))
+        elif kind in ("horizontal_points", "vertical_points"):
+            resolve(left).axes.add("y" if kind == "horizontal_points" else "x")
+        else:
+            raise AssertionError(f"unexpected witness relation {kind}")
+        solve()
+        return success()
+
+    async def dimension(left, right, kind, value):
+        case.emitted.append((left, right, kind, value))
+        if right == "origin":
+            target = resolve(left)
+            if len(target.axes) == 2:
+                case.overdefined = True
+            target.axes.add("x" if kind == "horizontal_distance" else "y")
+        else:
+            entity = left.rsplit(".", 1)[0]
+            case.lines[entity].sized = True
+        solve()
+        return success(f"D{len(case.emitted)}")
+
+    async def definition():
+        solve()
+        state = (
+            "over_defined" if case.overdefined else
+            "fully_defined" if all(
+                len(p.axes) == 2
+                for line in case.lines.values() for p in (line.start, line.end)
+            ) else "under_defined"
+        )
+        return success({"definition_state": state})
+
+    async def over_relations():
+        return success(["redundant origin anchor"])
+
+    case.adapter = SimpleNamespace(
+        _sketch_entities=case.lines, add_line=add_line,
+        add_sketch_constraint=constraint, add_sketch_dimension=dimension,
+        check_sketch_fully_defined=definition,
+        get_over_defining_relations=over_relations,
+    )
+    case.reference = reference
+    case.dimensions = _sketch.SketchDims()
+    case.point = point
+    case.solve = solve
+    case.ensure = lambda: asyncio.run(
+        reference.ensure_fully_defined(case.adapter, "SupplierReference")
+    )
+    case.linear = lambda name, value, orientation, start: asyncio.run(
+        reference._linear(
+            case.adapter, case.dimensions, name, value, orientation, start
+        )
+    )
+    return case
+
+
+def test_supplier_reference_linear_independent_witness_needs_origin_anchor(monkeypatch):
+    case = _supplier_reference_solver(monkeypatch)
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    case.ensure()
+    assert case.emitted == [
+        ("line0.start", "line0.end", "horizontal_distance", 6.0),
+        ("line0.start", "origin", "horizontal_distance", 2.0),
+        ("line0.start", "origin", "vertical_distance", 3.0),
+    ]
+    assert case.dimensions._rows == [
+        ("Diameter", None), ("DiameterStartX", None), ("DiameterStartY", None),
+    ]
+    assert case.lines["line0"].ConstructionGeometry is True
+
+
+def test_supplier_reference_linear_shared_end_inherits_spigot_anchor(monkeypatch):
+    case = _supplier_reference_solver(monkeypatch)
+    case.linear("Spigot", 5.0, "vertical", (8.0, -2.0))
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    case.ensure()
+    spigot, witness = case.lines.values()
+    assert witness.end is spigot.end
+    assert (witness.start.Status, witness.end.Status) == (3, 3)
+    assert case.emitted == [
+        ("line0.start", "line0.end", "vertical_distance", 5.0),
+        ("line0.start", "origin", "horizontal_distance", 8.0),
+        ("line0.start", "origin", "vertical_distance", 2.0),
+        ("line1.start", "line1.end", "horizontal_distance", 6.0),
+    ]
+    assert case.dimensions._rows == [
+        ("Spigot", None), ("SpigotStartX", None), ("SpigotStartY", None),
+        ("Diameter", None),
+    ]
+    assert not case.overdefined
+
+
+@pytest.mark.parametrize("status", [None, "3", RuntimeError("native Status unavailable")])
+def test_supplier_reference_linear_unreadable_status_fails_without_anchors(
+    monkeypatch, status
+):
+    case = _supplier_reference_solver(monkeypatch)
+    # None is an unreadable native property too; use a separate property for it.
+    if status is None:
+        case.point(2.0, 3.0).__class__.Status = property(lambda self: None)
+    else:
+        case.unreadable = status
+    with pytest.raises(RuntimeError, match="status is unreadable|Status unavailable"):
+        case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert case.emitted == [
+        ("line0.start", "line0.end", "horizontal_distance", 6.0),
+    ]
+    assert case.dimensions._rows == [("Diameter", None)]
+
+
+def test_supplier_reference_linear_overdefined_status_cannot_skip_anchor_or_guard(
+    monkeypatch,
+):
+    case = _supplier_reference_solver(monkeypatch)
+    case.overdefined = True
+    case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert [row[1] for row in case.emitted] == ["line0.end", "origin", "origin"]
+    assert case.dimensions._rows[-2:] == [
+        ("DiameterStartX", None), ("DiameterStartY", None),
+    ]
+    with pytest.raises(RuntimeError, match="OVER-defined"):
+        case.ensure()
+
+
+@pytest.mark.parametrize("fault", ["reflected", "translated"])
+def test_supplier_reference_linear_constrained_wrong_frame_is_rejected(
+    monkeypatch, fault
+):
+    case = _supplier_reference_solver(monkeypatch)
+    original = case.adapter.add_sketch_dimension
+
+    async def displaced(*args):
+        result = await original(*args)
+        if args[1] != "origin":
+            line = case.lines["line0"]
+            line.start.axes.update(("x", "y"))
+            line.end.axes.update(("x", "y"))
+            if fault == "reflected":
+                line.end.X = line.start.X - (line.end.X - line.start.X)
+            else:
+                line.start.X += 0.001
+                line.end.X += 0.001
+        return result
+
+    case.adapter.add_sketch_dimension = displaced
+    with pytest.raises(RuntimeError, match="final-frame coordinates"):
+        case.linear("Diameter", 6.0, "horizontal", (2.0, 3.0))
+    assert case.dimensions._rows == [("Diameter", None)]
+    assert len(case.emitted) == 1  # No anchor should hide the bad solved frame.
+
+
+def _supplier_reference_angle_solver(monkeypatch, defect=None):
+    import math
+    import solidworks_mcp.adapters.com_variant as variants
+    import solidworks_mcp.adapters.solidworks.sketch as sdk_sketch
+
+    case = _supplier_reference_solver(monkeypatch)
+    case.angle_text = None
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            self.ArrayData = tuple(coordinates)
+
+        def MultiplyTransform(self, transform):
+            return MathPoint(transform(self.ArrayData))
+
+    # Rotated/translated owning plane: sketch +Y is model +Z, not model +Y.
+    # Native AddSpecificDimension takes MODEL metres even in an active sketch.
+    def sketch_to_model(xyz):
+        x, y, z = xyz
+        return (0.020 + x, 0.030 - z, 0.040 + y)
+
+    case.sketch = SimpleNamespace(
+        ModelToSketchTransform=SimpleNamespace(Inverse=lambda: sketch_to_model)
+    )
+    case.adapter.swApp = SimpleNamespace(
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=MathPoint)
+    )
+    monkeypatch.setattr(variants, "double_array", lambda values: values)
+
+    def select(adapter, entities, mark):
+        case.selected = [adapter._sketch_entities[name] for name in entities]
+
+    monkeypatch.setattr(sdk_sketch, "_select_sketch_entities", select)
+
+    class Angle:
+        def __init__(self, attachments, value):
+            self.attachments = attachments
+            self.SystemValue = value
+            self._driven = 1
+
+        @property
+        def DrivenState(self):
+            return self._driven
+
+        @DrivenState.setter
+        def DrivenState(self, state):
+            if defect == "not-driving":
+                return
+            self._driven = state
+            if state == 2 and len(self.attachments) == 2:
+                baseline, ray = self.attachments
+                if baseline.start is ray.start and baseline.orientation:
+                    ray.orientation = "included-angle"
+                    case.solve()
+
+    def add_specific(x, y, z, kind, options):
+        attachments = tuple(case.selected)
+        assert len(attachments) == 2
+        assert all(hasattr(line, "GetEndPoint2") for line in attachments)
+        baseline, ray = attachments
+        a = (
+            baseline.end.X - baseline.start.X,
+            baseline.end.Y - baseline.start.Y,
+        )
+        b = (ray.end.X - ray.start.X, ray.end.Y - ray.start.Y)
+        value = math.acos(
+            (a[0] * b[0] + a[1] * b[1]) / (math.hypot(*a) * math.hypot(*b))
+        )
+        # Invert the actual non-Front placement. A sketch-space text point
+        # cannot pass either the plane test or the interior-wedge test.
+        local = (x - 0.020, z - 0.040, 0.030 - y)
+        dx, dy = local[0] - baseline.start.X, local[1] - baseline.start.Y
+        assert local[2] == pytest.approx(0.0, abs=1e-12)
+        assert math.atan2(dy, dx) == pytest.approx(value / 2.0)
+        assert math.hypot(dx, dy) == pytest.approx(0.0005)
+        assert (kind, options) == (3, 0)
+        case.angle_text = (x, y, z)
+        if defect == "supplement":
+            value = math.pi - value
+        native = Angle(
+            attachments,
+            value + math.radians(0.01) if defect == "wrong-value" else value,
+        )
+        case.native_angles.append(native)
+        case.emitted.append((baseline, ray, "native-angular", native))
+        return SimpleNamespace(
+            Type2=2 if defect == "wrong-type" else 3,
+            GetDimension2=lambda index: native,
+        ), 0
+
+    case.adapter.currentModel = SimpleNamespace(
+        ClearSelection2=lambda all_marks: case.selected.clear(),
+        Extension=SimpleNamespace(AddSpecificDimension=add_specific),
+    )
+    case.angle = lambda: asyncio.run(
+        case.reference._angle(
+            case.adapter, case.dimensions, "Included", 82.0, (2.0, 3.0)
+        )
+    )
+    return case
+
+
+def test_supplier_reference_angle_drives_both_rays_in_native_owning_plane(monkeypatch):
+    import math
+
+    case = _supplier_reference_angle_solver(monkeypatch)
+    case.angle()
+    case.ensure()
+    baseline, ray = case.lines.values()
+    assert baseline.start is ray.start
+    assert baseline.sized and ray.sized
+    assert baseline.ConstructionGeometry and ray.ConstructionGeometry
+    assert len(case.lines) == 2
+    assert case.native_angles[0].attachments == (baseline, ray)
+    assert case.native_angles[0].DrivenState == 2
+    assert case.native_angles[0].SystemValue == pytest.approx(math.radians(82.0))
+    assert case.angle_text is not None
+    assert case.selected == []
+    assert [row[2] for row in case.emitted] == [
+        "horizontal_distance", "horizontal_distance", "vertical_distance",
+        "distance", "native-angular",
+    ]
+    assert case.dimensions._rows == [
+        ("IncludedBaselineLength", None),
+        ("IncludedStartX", None), ("IncludedStartY", None),
+        ("IncludedRayLength", None), ("Included", None),
+    ]
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        ("wrong-type", "not a native angular dimension"),
+        ("wrong-value", "not the specified 82 degrees"),
+        ("supplement", "not the specified 82 degrees"),
+        ("not-driving", "not an exact driving control"),
+    ],
+)
+def test_supplier_reference_angle_rejects_invalid_native_control(
+    monkeypatch, defect, message
+):
+    case = _supplier_reference_angle_solver(monkeypatch, defect)
+    with pytest.raises(RuntimeError, match=message):
+        case.angle()
+    assert ("Included", None) not in case.dimensions._rows
+    assert case.native_angles[0].DrivenState != 2
+    assert case.selected == []
+    with pytest.raises(RuntimeError, match="not fully defined"):
+        case.ensure()
+
+
 def test_supplier_exact_fraction_keeps_native_value_and_refuses_fraction_rounding(
     monkeypatch,
 ):
@@ -8220,3 +8799,235 @@ def test_source_checkpoint_failure_capture_cannot_replace_primary(
         purchased._retain_supplier_source_failure(spec, original, [])
     assert caught.value is original
     assert "secondary capture interruption" in "\n".join(original.__notes__)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expression"),
+    [
+        ('$PRPSHEET:"SW-Title(Title)"', '$PRPSHEET:"SW-Title(Title)"'),
+        (
+            '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+            '$PRPSHEET:"SW-Title(Title)"',
+        ),
+        ('<FONT size=15.5PTS>$PRPSHEET:"Material"', '$PRPSHEET:"Material"'),
+        ('<FONT size=0.5PTS>$PRPSHEET:"Material"', '$PRPSHEET:"Material"'),
+    ],
+)
+def test_source_property_expression_accepts_only_the_optional_font_wrapper(
+    raw: str, expression: str
+) -> None:
+    from _purchased_title_fit import source_property_expression
+
+    assert source_property_expression(raw) == expression
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        '$PRP:"SW-Title(Title)"',
+        'NAME $PRPSHEET:"SW-Title(Title)"',
+        '$PRPSHEET:"SW-Title(Title)" suffix',
+        ' $PRPSHEET:"SW-Title(Title)"',
+        '$PRPSHEET:"SW-Title(Title)" ',
+        '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
+        '$PRPSHEET:"SW-Title(Title)"\n$PRPSHEET:"Material"',
+        '$PRPSHEET:"SW-Title(Title)"\n',
+        '$PRPSHEET:"SW-Title(Title)',
+        '$PRPSHEET:SW-Title(Title)',
+        '<B>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"</FONT>',
+        '<FONT size=15PTS><FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS> $PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRP:"SW-Title(Title)"',
+        '<FONT size=15PTS>literal',
+        '<FONT size=0PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=-15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=+15PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=1e1PTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=NaNPTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=infPTS>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PX>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size="15PTS">$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS color=red>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
+        '<font size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+    ],
+)
+def test_source_property_expression_refuses_noncontract_content(raw: str) -> None:
+    from _purchased_title_fit import source_property_expression
+
+    assert source_property_expression(raw) is None
+
+
+def test_linked_value_preserves_captured_name_when_native_format_strips_font() -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    # Captured native SetTextFormat readback: only FONT disappears; the full
+    # source property and resolved Name remain intact. This is not a COM echo.
+    assert_linked_value(
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        '$PRPSHEET:"SW-Title(Title)"',
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        label="Name",
+    )
+
+
+def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    # Synthetic identity control, not native after-fix evidence.
+    assert_linked_value(
+        '<FONT size=15PTS>$PRPSHEET:"Material"',
+        "ALLOY STEEL",
+        '$PRPSHEET:"Material"',
+        "ALLOY STEEL",
+        label="Material",
+    )
+
+
+@pytest.mark.parametrize(
+    ("actual_link", "actual_text"),
+    [
+        pytest.param(
+            '$PRPSHEET:"Title"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="different-property-even-with-identical-resolved-text",
+        ),
+        pytest.param(
+            '$PRP:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="different-property-owner",
+        ),
+        pytest.param(
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="literal-replacement",
+        ),
+        pytest.param(
+            'NAME $PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="extra-prefix",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)" suffix',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="extra-suffix",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="second-link",
+        ),
+        pytest.param(
+            '<B>$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="unsupported-markup",
+        ),
+        pytest.param(
+            '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            id="malformed-font",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot",
+            id="truncated-full-value",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin ",
+            id="value-whitespace-is-not-normalized",
+        ),
+        pytest.param(
+            '$PRPSHEET:"SW-Title(Title)"',
+            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-CLEVIS-PIN",
+            id="value-case-is-not-normalized",
+        ),
+    ],
+)
+def test_linked_value_refuses_true_identity_or_full_value_changes(
+    actual_link: str, actual_text: str
+) -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    expected_link = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
+    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    with pytest.raises(RuntimeError) as caught:
+        assert_linked_value(
+            expected_link, expected_text, actual_link, actual_text, label="Name"
+        )
+    message = str(caught.value)
+    for raw in (expected_link, expected_text, actual_link, actual_text):
+        assert repr(raw) in message
+
+
+@pytest.mark.parametrize(
+    "invalid_link",
+    [
+        'NAME $PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=0PTS>$PRPSHEET:"SW-Title(Title)"',
+        '$PRP:"SW-Title(Title)"',
+        "literal",
+    ],
+)
+def test_linked_value_refuses_invalid_expected_link_even_when_unchanged(
+    invalid_link: str,
+) -> None:
+    from _purchased_title_fit import assert_linked_value
+
+    text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    with pytest.raises(RuntimeError) as caught:
+        assert_linked_value(invalid_link, text, invalid_link, text, label="Name")
+    assert repr(invalid_link) in str(caught.value)
+    assert repr(text) in str(caught.value)
+
+
+def test_note_fits_cell_refuses_captured_native_name_overflow() -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    box = (0.310260575, 0.032472074, 0.409863405, 0.042956582)
+    ruled_cell = (0.3083506, 0.035906, 0.4191, 0.0475164)
+    inset = 0.0006
+    limit = (
+        ruled_cell[0] + inset,
+        ruled_cell[1] + inset,
+        ruled_cell[2] - inset,
+        ruled_cell[3] - inset,
+    )
+    assert not note_fits_cell(box, 2, limit)
+    # The captured bottom edge also fails independently of its two-row state.
+    assert not note_fits_cell(box, 1, limit)
+
+
+@pytest.mark.parametrize(
+    ("box", "fits"),
+    [
+        pytest.param((2.0, 3.0, 8.0, 7.0), True, id="interior"),
+        pytest.param((1.0, 2.0, 9.0, 8.0), True, id="all-four-boundaries"),
+        pytest.param((0.999, 3.0, 8.0, 7.0), False, id="left-overflow"),
+        pytest.param((2.0, 1.999, 8.0, 7.0), False, id="bottom-overflow"),
+        pytest.param((2.0, 3.0, 9.001, 7.0), False, id="right-overflow"),
+        pytest.param((2.0, 3.0, 8.0, 8.001), False, id="top-overflow"),
+        pytest.param((0.0, 1.0, 10.0, 9.0), False, id="center-inside-edges-outside"),
+    ],
+)
+def test_note_fits_cell_synthetic_four_edge_predicate_controls(
+    box: tuple[float, ...], fits: bool
+) -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    # Mathematical predicate controls only, never native after-fix proof.
+    assert note_fits_cell(box, 1, (1.0, 2.0, 9.0, 8.0)) is fits
+
+
+@pytest.mark.parametrize("rows", [-1, 0, 1, 2, 3])
+def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> None:
+    from _purchased_title_fit import note_fits_cell
+
+    # Mathematical predicate controls only, never native after-fix proof.
+    assert note_fits_cell((2.0, 3.0, 8.0, 7.0), rows, (1.0, 2.0, 9.0, 8.0)) is (
+        rows == 1
+    )

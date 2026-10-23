@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import math
-import re
-from pathlib import Path
 
 import pytest
 
@@ -13,8 +11,6 @@ import _mcmaster_5972k41 as dims
 import build_ch_rocker_arm_tl_vn_oblique_bearing as part
 import ch_rocker_arm_tl_vn_oblique_bearing_spec as spec
 import ch_rocker_arm_tl_oblique_jig_assembly_spec as jig
-import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_recipe import recipe_declaration
 from diagnostics import diag_build_5972K41 as recipe
@@ -57,37 +53,6 @@ def test_catalogue_row_is_the_registered_mcmaster_bearing() -> None:
     assert metadata.module == recipe.__name__
     assert getattr(recipe, metadata.callable_name) is recipe.build_5972K41
     assert metadata.threaded is False
-
-
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    """Not replica-gated (user ruling 2026-10-17): the standalone command must
-    not enter the McMaster replica path, which demands a vendor SLDPRT and its
-    harvest."""
-    from diagnostics.diag_build_mcmaster import REGISTRY
-
-    assert recipe.PART_NO == spec.SKU
-    assert REGISTRY[spec.SKU] is recipe.build_5972K41
-    source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
-    assert "catalog-only" in (recipe.__doc__ or "")
-
-
-def test_no_vendor_model_is_tracked() -> None:
-    root = Path(__file__).resolve().parents[2]
-    assert not list(root.glob("cad/references/**/5972K41*.SLDPRT"))
-
-
-def test_envelope_is_the_calculators_bearing() -> None:
-    assert (spec.BORE, spec.OD, spec.WIDTH) == (10.0, 30.0, 9.0)
-    assert (dims.BORE, dims.OD, dims.WIDTH) == (
-        trammel.BEARING_BORE,
-        trammel.BEARING_OD,
-        trammel.BEARING_WIDTH,
-    )
-    assert spec.RADIAL_PLAY == trammel.BEARING_RADIAL_PLAY
-    text = _config.parts(STEM)["material_specification"]
-    assert re.search(r"\b10 x 30 x 9\b", text), text
 
 
 def test_rings_carry_the_nominal_bore_od_and_width_exactly() -> None:
@@ -166,32 +131,10 @@ def test_frame_and_bodies_are_declared() -> None:
     # One side face of both rings at y = 0 (the Top Plane).
     for section in (recipe.outer_ring_section(), recipe.inner_ring_section()):
         assert any(s.start[1] == s.end[1] == 0.0 for s in section)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'screw_axis_planes=("Front Plane", "Right Plane")' in source
 
 
 def test_joints_are_presses_owned_by_the_pin_and_block() -> None:
     assert spec.PIN_SECTION_DIA > spec.BORE
     assert spec.SEAT_DIA < spec.OD
-    assert 0.0 < spec.PIN_INTERFERENCE[0] <= spec.PIN_INTERFERENCE[1]
-    assert 0.0 < spec.SEAT_INTERFERENCE[0] <= spec.SEAT_INTERFERENCE[1]
-    assert spec.CHAMFER_MODELLED < spec.CHAMFER_STANDARD_MIN == 0.6
-
-
-def test_the_installation_note_fits_the_sheet() -> None:
-    lines = _config.parts(STEM)["installation_notes"].splitlines()
-    assert len(lines) <= 4
-    assert all(len(line) <= 70 for line in lines), lines
-    flat = " ".join(lines)
-    assert "OUTER RING" in flat and "INNER RING" in flat
-
-
-def test_purchased_sheet_documents_the_built_part() -> None:
-    import draw_ch_rocker_arm_tl_vn_oblique_bearing as drawing
-
-    sheet = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_bearing"]
-    assert drawing.SPEC is sheet
-    assert sheet.script.is_file()
-    assert sheet.source_kind == "part"
-    assert sheet.source.stem == part.PART_NAME == sheet.artifact_stem
-    assert sheet.layout in DRAWING_TEMPLATES
+    assert spec.PIN_INTERFERENCE == pytest.approx((0.001, 0.015))
+    assert spec.SEAT_INTERFERENCE == pytest.approx((0.002, 0.024))

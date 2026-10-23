@@ -777,7 +777,11 @@ async def build(adapter) -> dict[str, str]:
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     apply_drawing_properties(
-        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
+        adapter,
+        PART_NAME,
+        {
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)

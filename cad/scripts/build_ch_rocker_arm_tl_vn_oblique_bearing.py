@@ -2,7 +2,7 @@ r"""Purchased MHA-CH-06-TL-VN-52 oblique-trammel pivot bearing: McMaster 5972K41
 
 A sealed 6200-2RS deep-groove ball bearing, 10 x 30 x 9
 (``ch_rocker_arm_tl_vn_oblique_bearing_spec``); a pair is pressed into each pivot
-block's N6 seats, and the pivot pin's p6 section is pressed through both inner
+block's N6 seats, and the pivot pin's k5 section is pressed through both inner
 rings.  The stock recipe ``diagnostics/diag_build_5972K41.py`` models the
 vendor model's eleven bodies (two rings, two seals, seven balls), read for
 dimensions only (not replica-gated, user ruling 2026-10-17); its standalone
