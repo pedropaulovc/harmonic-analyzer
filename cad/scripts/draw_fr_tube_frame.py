@@ -59,6 +59,7 @@ from fr_tube_frame_spec import (
     COLUMN_LENGTH,
     CROSS_HOLE_CALLOUT as CROSS_HOLE_CALLOUT_TEXT,
     CROSS_HOLE_DIAMETER,
+    CROSS_HOLE_MATES_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH_FIT_CALLOUT,
@@ -311,6 +312,10 @@ async def build(adapter: Any) -> dict[str, str]:
         display.SetText(4, "")
         if str(display.GetText(4) or ""):
             raise RuntimeError("failed to clear underlined below-dimension callout")
+        # Each station's match-drill mate, on the value line (rule 7).
+        display.SetText(2, CROSS_HOLE_MATES_SUFFIX)
+        if str(display.GetText(2) or "") != CROSS_HOLE_MATES_SUFFIX:
+            raise RuntimeError("cross-hole mates suffix did not persist")
         display = _early_bound(display, "IDisplayDimension")
         hole_dimension = _early_bound(display.GetDimension2(0), "IDimension")
         if "CrossHoleProfile" not in str(hole_dimension.FullName):

@@ -103,14 +103,12 @@ LENGTH_FIT_CALLOUT = "\n".join(
 # drawing-guidelines.md rule 7 (flag it where it applies): each station's
 # match-drill mate rides on the cross-hole callout itself, so the sheet needs
 # no free note. Marking, height setting and the match-cut sequence are
-# MHA-FR-00 steps 1-4 (rule 24).
-CROSS_HOLE_CALLOUT = "\n".join(
-    (
-        "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS",
-        "AT ASSEMBLY: UPPER STA WITH MHA-FR-02,",
-        "LOWER STA WITH MHA-FR-01",
-    )
-)
+# MHA-FR-00 steps 1-4 (rule 24). Both lanes stay one line: a multi-line
+# above-lane on this broken-leader diametric drew its shoulder as if the text
+# were one 280 mm line (layout audit, run 20261023T231525949Z-3bf8c768).
+CROSS_HOLE_CALLOUT = "2 STA; MATCH-DRILL THRU BOTH WALLS AT ASSEMBLY"
+CROSS_HOLE_MATES_SUFFIX = " UPPER WITH MHA-FR-02, LOWER WITH MHA-FR-01"
+
 END_VIEW_NOTE = "END VIEW SCALE 2:1"
 LENGTH_VIEW_NOTE = "LENGTH VIEW SCALE 1:5"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:10"
