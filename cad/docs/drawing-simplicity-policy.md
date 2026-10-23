@@ -115,8 +115,10 @@ cannot ask for what the authors were told to leave out.
   explicit truncation counts. The initial settled check can include both raw
   measurements; later read-only proofs retain only original station vectors,
   so unavailable original raw data is identified rather than reconstructed.
-  Diagnostics add no native reads, change no predicate and never mask the
-  original failure if formatting fails.
+  Diagnostics add no native reads, change no predicate, and re-raise the original
+  failure object even if formatting or attaching either diagnostic note raises
+  a secondary `BaseException`. This shield applies only after a primary failure;
+  normal measurement and native getter failures still propagate.
   Every reported text fragment participates,
   including both fraction parts, all three nominal-major rows, and measured
   empty/whitespace BSTR advances. The shared native bounds reader normalizes all
