@@ -170,6 +170,36 @@ def test_supplier_references_are_the_drop_in_interface() -> None:
     assert chord("SupplierHolePitchDiameter") == ((0.0, -spec.HOLE_PCD / 2.0), (0.0, spec.HOLE_PCD / 2.0))
 
 
+def test_short_chords_shelve_their_text_outward_and_the_length_keeps_its_own() -> None:
+    from _supplier_screw_layout import supplier_screw_lane_plan
+
+    lanes = supplier_screw_lane_plan(
+        spec.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=spec.SUPPLIER_REFERENCE_PLANES,
+        sides=spec.SUPPLIER_REFERENCE_SIDES,
+    )
+    rows = {name: orientation for name, _, orientation in spec.SUPPLIER_REFERENCE_DIMENSIONS}
+    # The 15 mm length (7.5 mm at 1:2) is the one chord whose text fits
+    # between its own witnesses; the native farm audit found it clear.
+    assert set(draw.TEXT_SHELVES) == set(rows) - {"SupplierLength"}
+    for name, side in draw.TEXT_SHELVES.items():
+        assert side in ("left", "right")
+        if rows[name] == "vertical":
+            # Away from the view, beyond the lane's own dimension line.
+            assert side == lanes[name][0], name
+
+
+def test_shelf_gap_measures_clearance_on_the_shelf_side() -> None:
+    from types import SimpleNamespace
+
+    text = SimpleNamespace(xmin=0.070, xmax=0.095)
+    actual = {"left": 0.097, "right": 0.108, "text": text}
+    assert draw._shelf_gap("SupplierHolePitchDiameter", actual) == pytest.approx(0.002)
+    text = SimpleNamespace(xmin=0.135, xmax=0.160)
+    actual = {"left": 0.118, "right": 0.133, "text": text}
+    assert draw._shelf_gap("SupplierMountingHoleDiameter", actual) == pytest.approx(0.002)
+
+
 # Native ``GetOutline`` at farm run 20261023T163903809Z (e04fd60ab): every
 # orthographic view measured its model extent times the scale plus a constant
 # 11.176 mm of sheet-space padding (Front/Right 22 x 15, Top 22 x 22 mm).

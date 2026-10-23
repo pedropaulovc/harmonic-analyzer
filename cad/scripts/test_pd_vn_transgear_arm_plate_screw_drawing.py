@@ -458,3 +458,18 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
         drawing._printed_rows()
 
 
+def test_sheet_callouts_keep_spec_presentation_and_shelve_top_text(monkeypatch) -> None:
+    formats = drawing._printed_formats()
+    assert set(formats) == set(drawing.PRINTED_REFERENCES)
+    for name, (precision, presentation, denominator, callout) in formats.items():
+        source = screw.SUPPLIER_REFERENCE_FORMATS[name]
+        assert (precision, presentation, denominator) == source[:3]
+        assert callout == drawing.PRINTED_CALLOUTS.get(name, source[3])
+    assert formats["SupplierStockLength"][3] is None
+    assert formats["SupplierNominalThreadMajor"][3] == "8-32"
+    assert "supplier_top" in drawing.build.__code__.co_consts
+    monkeypatch.setattr(drawing, "PRINTED_CALLOUTS", {"SupplierCrownHeight": "REF"})
+    with pytest.raises(ValueError, match="SupplierCrownHeight"):
+        drawing._printed_formats()
+
+

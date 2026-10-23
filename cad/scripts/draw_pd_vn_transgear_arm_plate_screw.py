@@ -32,6 +32,9 @@ ITEM = "#8-32 x 1 OVAL HEAD SLOTTED SCREW"
 PRINTED_REFERENCES = (
     "SupplierStockLength", "SupplierHeadDiameter", "SupplierNominalThreadMajor",
 )
+# Below-callouts cut to what a replacement needs. The installation note already
+# says 1 IN STOCK; NOMINAL THREAD SIZE overlapped the stock length's text.
+PRINTED_CALLOUTS = {"SupplierStockLength": None, "SupplierNominalThreadMajor": "8-32"}
 
 
 def _printed_rows() -> tuple[tuple[str, float, str], ...]:
@@ -46,7 +49,21 @@ def _printed(settings: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in settings.items() if name in PRINTED_REFERENCES}
 
 
+def _printed_formats() -> dict[str, tuple[int, str, int | None, str | None]]:
+    formats = _printed(SUPPLIER_REFERENCE_FORMATS)
+    unprinted = sorted(set(PRINTED_CALLOUTS) - set(formats))
+    if unprinted:
+        raise ValueError(f"callouts name unprinted references: {unprinted}")
+    for name, callout in PRINTED_CALLOUTS.items():
+        formats[name] = (*formats[name][:3], callout)
+    return formats
+
+
 async def build(adapter: Any) -> dict[str, str]:
+    # At the standard layout's short Top cell the Top view only fits at 1:2,
+    # stacking the stock-length and thread text. The taller supplier Top cell
+    # fits 1:1 and shelves the head diameter's text beside its arrows.
+    view_layout = "supplier_top"
     supplier_checks = []
     callback_count = 0
     settled = False
@@ -63,11 +80,12 @@ async def build(adapter: Any) -> dict[str, str]:
             adapter,
             views_by_orientation,
             dimensions=dimensions,
-            formats=_printed(SUPPLIER_REFERENCE_FORMATS),
+            formats=_printed_formats(),
             starts=_printed(SUPPLIER_REFERENCE_STARTS),
             planes=planes,
             sides=sides,
             settled_checks=supplier_checks,
+            layout=view_layout,
         )
 
     def assert_supplier_dimensions_settled():
@@ -78,7 +96,7 @@ async def build(adapter: Any) -> dict[str, str]:
         settled = True
 
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=True,
+        adapter, SPEC, item=ITEM, cut_to_suit=True, view_layout=view_layout,
         supplier_margins=supplier_screw_margins(dimensions, planes=planes, sides=sides),
         supplier_dimensions=supplier_dimensions,
         settled_checks=(assert_supplier_dimensions_settled,),

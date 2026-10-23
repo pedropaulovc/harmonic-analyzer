@@ -76,18 +76,19 @@ OUTPUTS = DrawingOutputs(**SPEC.outputs)
 # chamfer added nothing a machinist needs.
 SHEET_SCALE = (5.0, 1.0)
 ISO_SCALE = (3.0, 1.0)
-FRONT_CENTER = (0.100, 0.18625)
+FRONT_CENTER = (0.100, 0.1805)
 ISO_CENTER = (0.310, 0.213)
-# The cut end sits about 0.078 below the view centre (half the 31.3 at 5:1);
-# the centre rose 0.00475 with the 1.9 mm longer shank and 0.0015 more with
-# the 0.6 mm the plate's thickest limit added (code review C10), so the end,
-# its deburr dimensions and the notes keep their 28.8-era stations; the
-# eye's top stands ~2 mm under the top border.
-# The deburr's value and callout hang right of the shank, clear of their own
-# extension lines (review r8: centred under the 2.3 mm leg they were struck)
-# and above the notes.
+# The settled front view's native outline is the 31.3 part plus SolidWorks'
+# boundary pad: 0.0848 half-height about the centre (run 0c4519c5 read
+# y 0.1014..0.2711 at centre 0.18625), and it must stay inside the B sheet's
+# 12.7 mm top zone border (y 0.2667). Centred at 0.1805 its top is 0.2653 and
+# its bottom 0.0957, clear of the 0.0651 notes band; the eye crown stands at
+# 0.2593. The cut end (0.078 below the centre) drops 5.75 mm to 0.1023 while
+# the deburr texts keep their reviewed stations: still right of the shank,
+# clear of their own extension lines (review r8: centred under the 2.3 mm leg
+# they were struck) and above the notes.
 FRONT_KEEP = {
-    "FinishedOverall": (0.042, 0.18625),
+    "FinishedOverall": (0.042, FRONT_CENTER[1]),
     "ChamferWidth": (0.168, 0.100),
     "ChamferAngle": (0.124, 0.117),
 }
@@ -270,6 +271,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
+    # Footer notes belong to the sheet. The curates leave the front view
+    # active, and a note added there is view-owned ink its cell polices (the
+    # Supplier row at y 0.060 sits below the 0.0651 cell floor).
+    drawing = _early_bound(draw, "IDrawingDoc")
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter spring anchor sheet context for its notes")
     add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
     add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)

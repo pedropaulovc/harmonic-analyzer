@@ -185,8 +185,16 @@ def test_settled_thread_reference_is_the_one_native_supplier_dimension(monkeypat
             drawing._verify_supplier_references(*arguments)
 
 
-@pytest.mark.parametrize("fault", [None, "lost_view", "outside"])
-def test_settled_layout_checks_every_finished_view_in_the_ink_cell(monkeypatch, fault):
+def _footer_note(owner, extent):
+    annotation = SimpleNamespace(OwnerType=owner)
+    return SimpleNamespace(GetAnnotation=lambda: annotation, GetExtent=lambda: extent)
+
+
+@pytest.mark.parametrize(
+    "fault", [None, "lost_view", "outside", "view_owned_note", "note_off_sheet"]
+)
+def test_settled_layout_checks_view_ink_cell_and_sheet_owned_footer(monkeypatch, fault):
+    """Views/dimensions stay above the footer; footer notes are the sheet's."""
     case = _settled_sheet(monkeypatch)
     region = SimpleNamespace(xmin=0.01, ymin=0.01, xmax=0.41, ymax=0.287)
     sheet = SimpleNamespace(GetProperties2=lambda: (0, 0, 1, 1, 0, 0.42, 0.297))
@@ -202,12 +210,23 @@ def test_settled_layout_checks_every_finished_view_in_the_ink_cell(monkeypatch, 
         checked.append((view.name, cell))
 
     monkeypatch.setattr(drawing, "assert_supplier_view_fits", fits)
+    # The native r1 Supplier extent: below the view-ink cell, inside the border.
+    supplier = (0.01574, 0.05630, 0.0, 0.04481, 0.06011, 0.0)
+    notes = [
+        ("Supplier", _footer_note(1, supplier)),
+        ("Stock Name", _footer_note(1, (0.016, 0.045, 0.0, 0.06, 0.049, 0.0))),
+    ]
+    assert supplier[1] < drawing.INK_CELL_YMIN
     if fault == "lost_view":
         case.views.pop()
+    elif fault == "view_owned_note":
+        notes[0] = ("Supplier", _footer_note(0, supplier))
+    elif fault == "note_off_sheet":
+        notes[1] = ("Stock Name", _footer_note(1, (0.016, 0.005, 0.0, 0.06, 0.009, 0.0)))
     if fault is None:
-        drawing._verify_supplier_layout(adapter, case.names)
+        drawing._verify_supplier_layout(adapter, case.names, notes)
         cell = (region.xmin, drawing.INK_CELL_YMIN, region.xmax, region.ymax)
         assert checked == [(name, cell) for name in case.names]
     else:
         with pytest.raises(RuntimeError):
-            drawing._verify_supplier_layout(adapter, case.names)
+            drawing._verify_supplier_layout(adapter, case.names, notes)

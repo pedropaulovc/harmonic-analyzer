@@ -26,7 +26,7 @@ from _drawing_hidden_sketches import (
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
-from _purchased_fastener_drawing import assert_supplier_view_fits
+from _purchased_fastener_drawing import _box, _inside, assert_supplier_view_fits
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
     assert_supplier_reference_dimension, supplier_reference_dimension,
@@ -59,8 +59,9 @@ SOURCE = SPEC.source
 OUTPUTS = DrawingOutputs(**SPEC.outputs)
 SHEET_SCALE = (4.0, 1.0)
 ISO_SCALE = (2.0, 1.0)
-# Bottom of the cell the settled view/dimension ink must stay inside: clear of
-# the property-linked supplier and manufacturing notes below the front view.
+# Bottom of the cell for settled view-owned ink (views, dimensions): 5 mm above
+# the Supplier / Supplier SKUs footer row, whose text tops out at y 0.060. The
+# footer notes are sheet-owned and checked against the sheet border instead.
 INK_CELL_YMIN = 0.0651
 # The jam-nut shank (#1189) is 3.8 longer, 15 mm on the sheet: the view sits
 # high enough that the cut-end chamfer dimensions clear the notes below it.
@@ -167,8 +168,8 @@ def _verify_supplier_references(adapter, refs, view_names, configuration):
             raise RuntimeError(f"{contract['label']}: nominal model attachment changed")
 
 
-def _verify_supplier_layout(adapter, view_names):
-    """Inspect complete native view/dimension ink inside the usable sheet cell."""
+def _verify_supplier_layout(adapter, view_names, notes):
+    """View-owned ink in its cell; sheet-owned footer notes inside the border."""
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(drawing.GetCurrentSheet(), "ISheet")
     properties = tuple(sheet.GetProperties2())
@@ -183,6 +184,13 @@ def _verify_supplier_layout(adapter, view_names):
         view = views[name]
         view.UpdateViewDisplayGeometry()
         assert_supplier_view_fits(adapter, view, cell, label="counter anchor finished sheet")
+    border = (region.xmin, region.ymin, region.xmax, region.ymax)
+    for property_name, note in notes:
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        if int(annotation.OwnerType) != 1:  # swAnnotationOwner_DrawingSheet
+            raise RuntimeError(f"{property_name}: footer note is no longer sheet-owned")
+        if not _inside(_box(note.GetExtent(), label=property_name, kind="note"), border):
+            raise RuntimeError(f"{property_name}: footer note leaves the usable sheet")
 
 
 def _verify_source_state(adapter, source_model, finished_configuration):
@@ -245,13 +253,22 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CHAMFER_CALLOUT)
     _verify_controls(annotations)
     refs = _supplier_references(adapter, front)
-    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
-    add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.016, NOTES_Y, char_height=0.003
-    )
+    # Footer notes belong to the sheet. The curates leave the front view
+    # active, and a note added there is view-owned ink that its cell polices.
+    drawing = _early_bound(draw, "IDrawingDoc")
+    drawing.ActivateView("")  # False is documented for sheet context.
+    if drawing.GetEditSheet() is not True or drawing.ActiveDrawingView is not None:
+        raise RuntimeError("cannot enter counter anchor sheet context for its notes")
+    notes = [
+        (name, _early_bound(add_property_linked_note(adapter, name, x, y, **text), "INote"))
+        for name, x, y, text in (
+            ("Supplier", 0.016, 0.060, {"char_height": 0.003}),
+            ("Supplier SKUs", 0.080, 0.060, {"char_height": 0.003}),
+            ("Stock Name", 0.016, 0.049, {"char_height": 0.003}),
+            ("Isometric View Note", 0.275, 0.163, {}),
+            ("Manufacturing Notes", 0.016, NOTES_Y, {"char_height": 0.003}),
+        )
+    ]
     # Re-assert after annotating: a real mode change regenerates the edge set.
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
@@ -267,7 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda: _verify_supplier_references(
                 adapter, refs, view_names, finished_configuration
             ),
-            lambda: _verify_supplier_layout(adapter, view_names),
+            lambda: _verify_supplier_layout(adapter, view_names, notes),
             lambda: _verify_source_state(adapter, source_model, finished_configuration),
         ),
     )

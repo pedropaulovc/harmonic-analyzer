@@ -230,6 +230,7 @@ def test_sheet_prints_only_the_replacement_sizes(monkeypatch) -> None:
         sides=drawing._printed(spec.SUPPLIER_REFERENCE_SIDES),
     )
     assert set(plan) == set(drawing.PRINTED_REFERENCES)
+    assert "supplier_top" in drawing.build.__code__.co_consts
     monkeypatch.setattr(drawing, "PRINTED_REFERENCES", ("SupplierLength", "SupplierMissing"))
     with pytest.raises(ValueError, match="SupplierMissing"):
         drawing._printed_rows()

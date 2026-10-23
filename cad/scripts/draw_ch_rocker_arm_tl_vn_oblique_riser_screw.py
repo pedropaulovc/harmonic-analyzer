@@ -39,6 +39,9 @@ def _printed(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    # The .112 in thread and .212 in head chords are narrower than their text:
+    # shelve it beside the arrows instead of between the extension lines.
+    view_layout = "supplier_top"
     checks = []
     dimensions = _printed_rows()
     planes = _printed(supplier.SUPPLIER_REFERENCE_PLANES)
@@ -50,6 +53,7 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         number_fit=NumberFit.SHRINK_TO_CELL,
+        view_layout=view_layout,
         supplier_dimensions=partial(
             annotate_supplier_screw,
             dimensions=dimensions,
@@ -58,6 +62,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=planes,
             sides=sides,
             settled_checks=checks,
+            layout=view_layout,
         ),
         supplier_margins=supplier_screw_margins(dimensions, planes=planes, sides=sides),
         settled_checks=checks,
