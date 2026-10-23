@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 import tomllib
@@ -18,6 +19,7 @@ from pypdf.generic import DecodedStreamObject
 
 import cut_release
 import trim_renders
+from _part_configuration_exports import member_configurations
 
 
 def test_release_refuses_an_incomplete_or_stale_comparison_gallery(
@@ -727,45 +729,116 @@ def test_release_notes_count_shared_member_files_not_part_documents() -> None:
     assert "plus 7 per-configuration STLs" not in notes
 
 
-def _byte_record(path: Path) -> dict:
+def _byte_record(path: Path, out: Path) -> dict:
     content = path.read_bytes()
     return {
-        "source": f"cad/out/{path.parent.name}/{path.name}",
+        "source": f"cad/out/{path.relative_to(out).as_posix()}",
         "bytes": len(content),
         "sha256": hashlib.sha256(content).hexdigest(),
     }
+
+
+def _refuse_release_host_action(*_args, **_kwargs):
+    raise AssertionError("release fixture reached a host-action collaborator")
 
 
 @pytest.fixture
 def feature_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> Path:
-    """Real baseline/feature copies and ZIP; isolate unrelated release producers."""
+    """Real registry, scene/member coverage, certified copies, feature gates and ZIP.
+
+    Only producer/native-source identity and unrelated release content are fake.
+    Every declared feature part keeps its real members: their scene mesh keys,
+    physical neutral paths and certificate must agree before later gates run.
+    All output roots are temporary; subprocesses, publication and render/build
+    collaborators refuse, while git/GH fakes permit only metadata reads.
+    """
     import export_features
     import export_models
+    from _part_configuration_exports import configuration_export_paths
     from test_features_bound import bound_output
 
+    # Install refusals before generating data or allowing bundle() past coverage.
+    for name in ("run", "Popen"):
+        monkeypatch.setattr(subprocess, name, _refuse_release_host_action)
+    for name in ("publish", "render_diff", "extract_release_pdfs", "_start_release_log"):
+        monkeypatch.setattr(cut_release, name, _refuse_release_host_action)
+    monkeypatch.setattr(export_models, "run_build", _refuse_release_host_action)
+    monkeypatch.setattr(
+        trim_renders, "regenerate_readme_images", _refuse_release_host_action,
+    )
+
+    def git_metadata(*args, **_kwargs):
+        assert args in (
+            ("config", "--get", "remote.origin.url"),
+            ("config", "--get", "user.name"),
+            ("config", "--get", "user.email"),
+        ), f"unexpected git operation: {args!r}"
+        return "https://github.com/example/offline-fixture.git"
+
+    def published_releases(*args):
+        assert args == (
+            "api", "repos/example/offline-fixture/releases?per_page=100&page=1",
+        ), f"unexpected GitHub operation: {args!r}"
+        return "[]"
+
+    monkeypatch.setattr(cut_release, "_git", git_metadata)
+    monkeypatch.setattr(cut_release, "_gh", published_releases)
     out = bound_output(tmp_path)
+    for name in ("STEP", "STL", "PNG", "SLDPRT", "SLDASM", "GLTF", "BOXES", "FEATURES"):
+        monkeypatch.setattr(export_models, f"OUT_{name}", out / name.lower())
+    parts = list(export_features.SUPPORTED_PARTS)
+    components = []
+    for stem in parts:
+        dashed = stem.replace("_", "-")
+        members = configuration_export_paths(stem, out)
+        entries = [
+            (configuration, paths["stl"].stem)
+            for configuration, paths in members.items()
+        ] or [("Default", dashed)]
+        components.extend(
+            {"part": dashed, "cfg": configuration, "mesh": mesh}
+            for configuration, mesh in entries
+        )
+        for paths in members.values():
+            # The bare member STEP already carries the real feature labels.
+            step = paths["step"]
+            if not step.exists():
+                step.write_bytes((out / "step" / f"{dashed}.STEP").read_bytes())
+
     scene = out / "boxes" / f"{cut_release.TOP_ASSEMBLY}.json"
     scene.parent.mkdir()
-    scene.write_bytes(b'{"unit":"mm"}')
-    # The full export certifies its own bytes; the feature gate never reads this.
+    scene.write_text(json.dumps({"unit": "mm", "components": components}), encoding="utf-8")
+    assemblies = [cut_release.TOP_ASSEMBLY]
+    scene_meshes = export_models.all_scene_part_meshes(set(assemblies))
+    inventory = export_models._release_inventory(parts, assemblies, scene_meshes, set(assemblies))
+    for relative, path in inventory.items():
+        if path.exists():
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.suffix == ".png":
+            Image.new("RGB", (2, 2), "blue").save(path)
+        elif path.suffix == ".STL":
+            path.write_text(
+                "solid fixture\nfacet normal 0 0 1\nouter loop\n"
+                "vertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\n"
+                "endloop\nendfacet\nendsolid fixture\n", encoding="ascii",
+            )
+        else:
+            path.write_bytes(f"offline fixture:{relative}".encode())
+    # The full-export certificate binds these exact bytes, independently of the
+    # scoped feature manifests. Do not replace either production coverage guard.
     certificate_path = out / "reports" / "release-neutral.json"
     certificate_path.parent.mkdir()
     certificate = {
         "schema": export_models.NEUTRAL_SCHEMA,
         "exporter": hashlib.md5(b"offline exporter identity").hexdigest(),
         "sources": {},
-        "files": {
-            f"{path.parent.name}/{path.name}": _byte_record(path)
-            for path in (*sorted((out / "step").iterdir()), scene)
-        },
+        "files": {relative: _byte_record(path, out) for relative, path in inventory.items()},
+        "part_configurations": export_models._release_member_inventory(parts),
     }
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    inventory = {
-        destination: tmp_path / record["source"]
-        for destination, record in certificate["files"].items()
-    }
     prepared = out / "release" / "native"
     native = prepared / "solidworks"
     drawings = prepared / "slddrw"
@@ -785,27 +858,91 @@ def feature_release(
     monkeypatch.setattr(export_models, "REPO", tmp_path)
     monkeypatch.setattr(export_models, "NEUTRAL_MANIFEST", certificate_path)
     monkeypatch.setattr(export_models, "_exporter_digest", lambda: certificate["exporter"])
-    monkeypatch.setattr(export_models, "part_stems", lambda: list(export_features.SUPPORTED_PARTS))
-    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
-    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _assemblies: {})
+    monkeypatch.setattr(export_models, "part_stems", lambda: parts)
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", tuple(assemblies))
     monkeypatch.setattr(export_models, "_release_sources", lambda *_args: {})
-    monkeypatch.setattr(export_models, "_release_inventory", lambda *_args: inventory)
     monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
     monkeypatch.setattr(cut_release, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(cut_release, "RELEASE_DIR", out / "release")
     monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
+    monkeypatch.setattr(cut_release, "OUT_SLDASM", out / "sldasm")
+    monkeypatch.setattr(cut_release, "LOGS_DIR", out / "logs")
+    monkeypatch.setattr(cut_release, "COMPARISONS_DIR", tmp_path / "comparisons")
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", tmp_path / "release.yaml")
+    monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_DIR", prepared)
+    monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_FILE", prepared / "native-package.json")
+    monkeypatch.setattr(cut_release._process_plans, "PROCESS_ROOT", tmp_path / "process")
+    monkeypatch.setattr(cut_release._process_plans, "TRAVELER_STEMS", ())
     monkeypatch.setattr(cut_release, "DRAWING_OUTPUTS", {})
     monkeypatch.setattr(cut_release, "drawing_note_texts", set)
     monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
     monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
     monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
-    monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")
-    monkeypatch.setattr(cut_release, "_gh", lambda *_args: "[]")
     monkeypatch.setattr(
         cut_release, "_git_provenance",
         lambda _version: {"commit_short": "offline", "tree_clean": True},
     )
     return out
+
+
+def test_feature_release_refuses_host_action_collaborators(feature_release: Path) -> None:
+    """Prove the tripwires refuse without starting a process or publication."""
+    import export_models
+
+    calls = (
+        lambda: subprocess.run(["git", "tag", "fixture-must-not-exist"]),
+        lambda: subprocess.Popen(["gh", "release", "create", "fixture-must-not-exist"]),
+        lambda: cut_release.publish("v38", feature_release / "unused.zip", {}, False),
+        lambda: cut_release.render_diff(feature_release, "v37"),
+        lambda: export_models.run_build(None),
+        lambda: cut_release.extract_release_pdfs({}, feature_release / "unused"),
+        lambda: trim_renders.regenerate_readme_images(feature_release),
+    )
+    for call in calls:
+        with pytest.raises(AssertionError, match="host-action collaborator"):
+            call()
+    with pytest.raises(AssertionError, match="unexpected git operation"):
+        cut_release._git("tag", "fixture-must-not-exist")
+    with pytest.raises(AssertionError, match="unexpected GitHub operation"):
+        cut_release._gh("release", "create", "fixture-must-not-exist")
+    assert not (feature_release / "release" / "harmonic-analyzer-v38").exists()
+
+
+@pytest.mark.parametrize(
+    "configuration", member_configurations("sh_vn_clamping_kit_hardware"),
+)
+@pytest.mark.parametrize("fault", ["scene-member", "certificate-member"])
+def test_feature_release_preserves_member_coverage_refusals(
+    feature_release: Path, configuration: str, fault: str,
+) -> None:
+    """Each real kit member is mandatory in both scene and certificate."""
+    out = feature_release
+    stem = "sh-vn-clamping-kit-hardware"
+    if fault == "scene-member":
+        scene = cut_release.SCENE_JSON
+        content = json.loads(scene.read_bytes())
+        content["components"] = [
+            component for component in content["components"]
+            if (component["part"], component["cfg"]) != (stem, configuration)
+        ]
+        scene.write_text(json.dumps(content), encoding="utf-8")
+        expected = "member scene coverage missing"
+    else:
+        certificate_path = out / "reports" / "release-neutral.json"
+        certificate = json.loads(certificate_path.read_bytes())
+        del certificate["part_configurations"][stem][configuration]
+        certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
+        expected = "member inventory drifted"
+
+    with pytest.raises(RuntimeError, match=expected):
+        cut_release.bundle("v38")
+
+    stage = out / "release" / "harmonic-analyzer-v38"
+    assert (stage / "solidworks" / "fixture.SLDPRT").is_file()
+    assert not (stage / "step").exists()
+    assert not (stage / "features").exists()
+    assert not (stage / "PROVENANCE.json").exists()
+    assert not stage.with_suffix(".zip").exists()
 
 
 def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path) -> None:
@@ -856,6 +993,13 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
                 assert digest == manifest["step_sha256"] == sums[f"step/{manifest['step']}"]
                 assert digest == sums[f"{directory}/{manifest['step']}"]
                 assert manifest["drawing"]["revision"] == "v38"
+        certificate = json.loads(before_certificate)
+        for members in certificate["part_configurations"].values():
+            for paths in members.values():
+                for relative in paths.values():
+                    content = (out / relative).read_bytes()
+                    assert archive.read(relative) == content
+                    assert sums[relative] == hashlib.sha256(content).hexdigest()
     assert set(facts["features"]) == set(expected)
     drawing_asset = Path(facts["drawing_diff"]["asset_path"])
     assert drawing_asset == zip_path.with_name("harmonic-analyzer-v38-drawing-diff.zip")
@@ -875,16 +1019,17 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     feature_release: Path,
 ) -> None:
     from _export_feature_faces import face_name
+    from features_bound import FeaturesBoundError
     from test_features_bound import _add_full_face
 
     out = feature_release
     full_step = _add_full_face(out, "ch_rocker_arm", face_name("pivot_bore", 2))
     certificate_path = out / "reports" / "release-neutral.json"
     certificate = json.loads(certificate_path.read_bytes())
-    certificate["files"]["step/ch-rocker-arm.STEP"] = _byte_record(full_step)
+    certificate["files"]["step/ch-rocker-arm.STEP"] = _byte_record(full_step, out)
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(FeaturesBoundError):
         cut_release.bundle("v38")
 
     stage = out / "release" / "harmonic-analyzer-v38"
@@ -917,12 +1062,18 @@ def test_release_stages_enrolled_travelers_after_feature_binding(
 def test_release_never_seals_a_failed_traveler_verification(
     feature_release: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def refuse_travelers(_out: Path, _stage: Path) -> list[Path]:
-        raise RuntimeError("traveler STEP digest mismatch")
+    failure = RuntimeError("traveler verification refused by fixture")
+
+    def refuse_travelers(out: Path, stage: Path) -> list[Path]:
+        assert out == feature_release
+        assert (stage / "step" / "ch-rocker-arm.STEP").is_file()
+        assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
+        raise failure
 
     monkeypatch.setattr(cut_release._process_plans, "stage_travelers", refuse_travelers)
-    with pytest.raises(RuntimeError, match="traveler STEP digest mismatch"):
+    with pytest.raises(RuntimeError) as caught:
         cut_release.bundle("v38")
+    assert caught.value is failure
     assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
 
 
@@ -1204,12 +1355,28 @@ def test_postpublish_partial_revision_install_names_all_recovery_paths(
 def test_drawing_baseline_failure_blocks_bundle_before_publication(
     feature_release: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def unavailable(*_args: str) -> str:
-        raise RuntimeError("GitHub release API unavailable")
+    failure = RuntimeError("drawing baseline lookup refused by fixture")
+    calls = []
+
+    def unavailable(*args: str) -> str:
+        assert args == (
+            "api", "repos/example/offline-fixture/releases?per_page=100&page=1",
+        )
+        calls.append(args)
+        stage = feature_release / "release" / "harmonic-analyzer-v38"
+        assert (stage / "step" / "ch-rocker-arm.STEP").is_file()
+        assert (stage / "features" / "ch_rocker_arm" / "features.toml").is_file()
+        raise failure
 
     monkeypatch.setattr(cut_release, "_gh", unavailable)
-    with pytest.raises(RuntimeError, match="GitHub release API unavailable"):
+    with pytest.raises(RuntimeError) as caught:
         cut_release.bundle("v38")
+    assert caught.value is failure
+    assert len(calls) == 1
+    stage = feature_release / "release" / "harmonic-analyzer-v38"
+    assert not (stage / "PROVENANCE.json").exists()
+    assert not (stage / "SHA256SUMS.txt").exists()
+    assert not stage.with_name("harmonic-analyzer-v38-drawing-diff.zip").exists()
     assert not (feature_release / "release" / "harmonic-analyzer-v38.zip").exists()
 
 
