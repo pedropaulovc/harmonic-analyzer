@@ -79,7 +79,7 @@ def test_relocated_row_changes_joint_reference_not_neck_hook_or_body_pose() -> N
     assert arm.NECK == (40.0, 979.7, -173.51)
     assert arm.HOOK == pytest.approx((150.0 - math.hypot(8.95, 4.5), 919.7, -173.51))
     assert joint.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
-    assert joint.SIDE_PLATE_Y == (-6.35, 6.35)
+    assert joint.SIDE_PLATE_Y == (-5.5, 5.5)
     assert joint.SIDE_PLATE_FRONT_Z == pytest.approx(
         joint.SEAT_PLANE_Z - 3.175,
     )
@@ -128,9 +128,14 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
         joint.BRACKET_ORIGIN[1] + edge for edge in joint.SIDE_PLATE_Y
     )
     nominal_edge = min(arm.JOINT[1] - lower, upper - arm.JOINT[1])
-    assert nominal_edge == pytest.approx(5.64)
-    nearest_edge = nominal_edge - joint.POSITION_BAND
-    assert nearest_edge == pytest.approx(5.59)
+    assert nominal_edge == pytest.approx(4.79)
+    row_from_lower = arm.JOINT[1] - lower
+    nearest_edge = min(
+        row_from_lower - joint.POSITION_BAND,
+        joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - row_from_lower - joint.POSITION_BAND,
+    )
+    assert nearest_edge == pytest.approx(4.74)
     assert arm.JOINT_PRYING_ARM_Y == pytest.approx(nearest_edge)
     expected_tension = (
         abs(arm.JOINT_MX) / (2.0 * nearest_edge)
@@ -151,6 +156,33 @@ def test_shifted_row_uses_nearer_flange_edge_for_prying_and_actual_torque_for_sh
     assert arm.JOINT_PRELOAD_MARGIN == pytest.approx(
         arm.SCREW_PRELOAD_N / expected_tension,
     )
+
+
+def test_prying_demand_bounds_every_accepted_foot_width_and_row_corner() -> None:
+    # The lower-edge ordinate and overall .X width are independent controls.
+    # Width variation is not a symmetric displacement of both nominal edges.
+    corner_arms = [
+        min(row_from_lower, width - row_from_lower)
+        for width, row_from_lower in itertools.product(
+            (10.2, 11.8), (4.74, 4.84),
+        )
+    ]
+    assert (min(corner_arms), max(corner_arms)) == pytest.approx((4.74, 4.84))
+    corner_tensions = [
+        abs(arm.JOINT_MX) / (2.0 * edge_arm)
+        + abs(arm.JOINT_MY) / 13.7
+        for edge_arm in corner_arms
+    ]
+    assert arm.JOINT_PRYING_ARM_Y == pytest.approx(min(corner_arms))
+    assert arm.JOINT_TENSION_INCREMENT_N == pytest.approx(max(corner_tensions))
+    assert all(
+        demand <= arm.JOINT_TENSION_INCREMENT_N + 1e-9
+        for demand in corner_tensions
+    )
+    assert max(corner_tensions) < arm.SCREW_PRELOAD_N
+    # A stale 12.70 mm foot arm would underpredict the new tension demand.
+    old_foot_tension = abs(arm.JOINT_MX) / (2.0 * 5.59) + abs(arm.JOINT_MY) / 13.7
+    assert arm.JOINT_TENSION_INCREMENT_N > old_foot_tension
 
 
 def test_deflection_grows_with_span_and_respects_superposition() -> None:

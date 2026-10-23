@@ -14,6 +14,7 @@ import math
 from _hole_spec import DRILL_POINT_H, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_deviations
 from mg_magnifying_bracket_spec import DRAWING_PRECISION, FOOT_GRIP_TOL
+from mg_lever_thread_joint import NOSE_R
 import sm_summing_lever_spec as lever
 
 SCREW_SKU = "91794A078"
@@ -33,7 +34,7 @@ LEVER_ORIGIN_X = -15.0
 LEVER_FRONT_LOCAL_Z = -76.2
 SEAT_PLANE_Z = -73.11241221957347
 SIDE_PLATE_THICKNESS = 3.175
-SIDE_PLATE_HEIGHT = 12.7
+SIDE_PLATE_HEIGHT = 2.0 * NOSE_R  # owner: match neck width; no lateral root ledge
 SIDE_PLATE_MACHINE_X = (-8.0, 46.25)  # user-approved +5 free end; mounts/neck stay fixed
 # Physical acceptance follows the printed rounded size, not the hidden nominal.
 SIDE_PLATE_LENGTH_DEVIATIONS = printed_deviations(
@@ -146,6 +147,20 @@ COUNTERBORE_HEIGHT_WALL_MIN = min(
     - (COUNTERBORE_DIA + DRILLED_DIAMETER_PLUS) / 2.0
     for _x, y, _z in BRACKET_HOLE_POINTS
 )
+# The actual clearance hole follows the printed DRILLED HOLES +0.10/0 row.
+# Keep this distinct from the larger conservative screw-head clearance circle.
+CLEARANCE_HOLE_RADIUS_MAX = (
+    round(CLEARANCE_DIA, 2) + DRILLED_DIAMETER_PLUS
+) / 2.0
+CLEARANCE_HOLE_HEIGHT_WALL_MIN = min(
+    min(
+        SIDE_PLATE_HEIGHT + SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - (y - SIDE_PLATE_Y[0]) - POSITION_BAND,
+        y - SIDE_PLATE_Y[0] - POSITION_BAND,
+    ) - CLEARANCE_HOLE_RADIUS_MAX
+    for _x, y, _z in BRACKET_HOLE_POINTS
+)
+
 
 
 def receiver_material_wall_margin(
@@ -240,6 +255,7 @@ if HEAD_FLOAT_MIN < HEAD_POSITION_MISMATCH_MAX:
     raise AssertionError("magnifying bracket counterbore loses head float")
 if min(
     GRIP_MIN, COUNTERBORE_END_WALL_MIN, COUNTERBORE_HEIGHT_WALL_MIN,
+    CLEARANCE_HOLE_HEIGHT_WALL_MIN,
 ) < 1.5:
     raise AssertionError("magnifying bracket joint loses a drawing-guidelines.md rule 17 (walls and webs) wall")
 

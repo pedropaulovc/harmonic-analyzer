@@ -47,9 +47,11 @@ def test_part_recipe_seat_literals_match_the_live_installation() -> None:
     assert "magnifying_bracket_joint_layout" not in names
 
 
-def test_side_plate_is_flush_and_taller_without_moving_the_arm() -> None:
+def test_side_plate_is_flush_and_matches_neck_width_without_moving_the_arm() -> None:
     assert bracket.FLANGE_X == joint.SIDE_PLATE_X == (-48.0, bracket.NECK_HALF_X)
-    assert bracket.FLANGE_Y == joint.SIDE_PLATE_Y == (-6.35, 6.35)
+    assert bracket.FLANGE_Y == joint.SIDE_PLATE_Y == (-5.5, 5.5)
+    assert joint.SIDE_PLATE_HEIGHT == 2.0 * bracket.NOSE_R == 11.0
+    assert joint.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
     assert bracket.FLANGE_Z == joint.SIDE_PLATE_Z
     back = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[1]
     front = joint.BRACKET_ORIGIN[2] + bracket.FLANGE_Z[0]
@@ -108,8 +110,11 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     head_radius = (joint.COUNTERBORE_DIA + joint.DRILLED_DIAMETER_PLUS) / 2.0
     row_from_lower = joint.RECEIVER_ROW_Y - joint.SIDE_PLATE_Y[0]
     lower_wall = row_from_lower - joint.POSITION_BAND - head_radius
-    upper_wall = joint.SIDE_PLATE_HEIGHT - joint.LINEAR_BAND - row_from_lower - joint.POSITION_BAND - head_radius
-    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((5.64, 3.64, 4.55))
+    upper_wall = (
+        joint.SIDE_PLATE_HEIGHT + joint.SIDE_PLATE_HEIGHT_DEVIATIONS[0]
+        - row_from_lower - joint.POSITION_BAND - head_radius
+    )
+    assert (row_from_lower, lower_wall, upper_wall) == pytest.approx((4.79, 2.79, 3.41))
     assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(min(lower_wall, upper_wall))
     assert joint.HEAD_PROTRUSION == pytest.approx(2.1082)
     # A flush head would run the screw past the tap's full thread.
@@ -125,6 +130,31 @@ def test_side_by_side_stations_have_head_clearance_and_head_bearing() -> None:
     # Receiver stations follow the lever's real free edge: its width band
     # adds a whole-part translation relative to the pivot/knife line.
     assert head_air - joint.POSITION_BAND - 2.0 * joint.LINEAR_BAND == pytest.approx(0.452)
+
+
+def test_accepted_foot_corners_retain_head_bearing_and_clearance_hole_material() -> None:
+    # MountingY is from the actual lower edge: width variation moves the
+    # opposite edge, not half of each edge about the nominal centreline.
+    lower_head_walls, upper_head_walls = [], []
+    lower_hole_walls, upper_hole_walls = [], []
+    for width in (10.2, 11.8):
+        for row_from_lower in (4.74, 4.84):
+            # The 3.8 circle plus its .10 allowance is a conservative screen,
+            # not an invented catalog head-major maximum.
+            lower_head_walls.append(row_from_lower - 3.90 / 2.0)
+            upper_head_walls.append(width - row_from_lower - 3.90 / 2.0)
+            # Native 2.591 prints 2.59 +.10/0: the accepted hole is 2.69 MAX.
+            lower_hole_walls.append(row_from_lower - 2.69 / 2.0)
+            upper_hole_walls.append(width - row_from_lower - 2.69 / 2.0)
+    assert (min(lower_head_walls), min(upper_head_walls)) == pytest.approx((2.79, 3.41))
+    assert (min(lower_hole_walls), min(upper_hole_walls)) == pytest.approx((3.395, 4.015))
+    assert joint.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(
+        min(*lower_head_walls, *upper_head_walls),
+    )
+    assert joint.CLEARANCE_HOLE_RADIUS_MAX == pytest.approx(1.345)
+    assert joint.CLEARANCE_HOLE_HEIGHT_WALL_MIN == pytest.approx(
+        min(*lower_hole_walls, *upper_hole_walls),
+    )
 
 
 def test_stock_screw_and_blind_tap_are_one_joint_stack() -> None:
@@ -175,6 +205,19 @@ def _joint_with_values(**values):
     namespace = {}
     exec(compile(ast.fix_missing_locations(tree), str(joint.__file__), "exec"), namespace)
     return namespace
+
+
+def test_width_shortfall_can_make_upper_edge_the_limiting_material_wall() -> None:
+    # Deliberately beyond the ordinary -.8 corner, but still above the wall
+    # floor: make the upper edge active so a lower-only budget cannot pass.
+    narrowed = _joint_with_values(SIDE_PLATE_HEIGHT_DEVIATIONS=(-2.0, 0.8))
+    assert narrowed["COUNTERBORE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - 4.84 - 1.95)
+    assert narrowed["CLEARANCE_HOLE_HEIGHT_WALL_MIN"] == pytest.approx(9.0 - 4.84 - 1.345)
+    for name in (
+        "BRACKET_ORIGIN", "SIDE_PLATE_Y", "BRACKET_HOLE_POINTS", "LEVER_HOLE_POINTS",
+        "SCREW_POSITIONS", "GRIP", "ENGAGEMENT_MIN", "SCREW_TIP_GAP_MIN",
+    ):
+        assert narrowed[name] == getattr(joint, name)
 
 
 @pytest.mark.parametrize("values,failure", [

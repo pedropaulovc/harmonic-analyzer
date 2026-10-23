@@ -8,6 +8,7 @@ and a true concentric semicircle.
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
@@ -22,8 +23,13 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
 from _fit_deviations import deviations
+from _gtol_cylinder import CylinderFace
+from _gtol_face_read import face_geometry
+from _gtol_face_resolve import resolve_faces
+from _gtol_planar import PlanarFace
 from _holes import wizard_holes
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -31,7 +37,9 @@ from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_p
 from _sketch_chains import define_rectilinear_chain
 from magnifying_bracket_joint_layout import BRACKET_HOLE_POINTS, CLEARANCE_DIA, CLEARANCE_SPEC, POSITION_BAND, SIDE_PLATE_X as FLANGE_X, SIDE_PLATE_Y as FLANGE_Y, SIDE_PLATE_Z as FLANGE_Z, SIDE_PLATE_THICKNESS
 from mg_lever_thread_joint import HOLE_LOCATION_TOL, MOUTH_CHAMFER, MOUTH_CHAMFER_BAND, MOUTH_CHAMFER_MAX, NECK_HALF_X, NECK_THICKNESS, NOSE_R, NOSE_R_TOL, TAP_DRILL_DIA, TAP_SPEC
-from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, FOOT_GRIP_TOL, ISOMETRIC_VIEW_NOTE, ROOT_R
+from mg_magnifying_bracket_spec import DIMENSION_CALLOUTS, DRAWING_DIMENSIONS, DRAWING_PRECISION, FOOT_CORNER_R, FOOT_GRIP_TOL, ISOMETRIC_VIEW_NOTE
+from mg_magnifying_bracket_finish_spec import SURFACE_FINISHES
+import _telemetry
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"
@@ -128,6 +136,62 @@ async def _coordinates(adapter, jobs) -> None:
 
 
 
+def _assert_matched_width_topology(adapter) -> None:
+    """Prove the real foot sides are flush and no upright corner was rounded."""
+    neck_z = FLANGE_Z[0] / 2.0
+    foot_z = sum(FLANGE_Z) / 2.0
+    foot_x = (FLANGE_X[0] - NECK_HALF_X) / 2.0
+    requests = {"nose": CylinderFace(2.0 * NOSE_R, contains_z_mm=-NOSE_R / 2.0)}
+    probes = []
+    for sign in (-1, 1):
+        normal = (0.0, float(sign), 0.0)
+        requests[f"neck_{sign}"] = PlanarFace(
+            normal, NOSE_R, contains_x_mm=0.0, contains_z_mm=neck_z
+        )
+        requests[f"foot_{sign}"] = PlanarFace(
+            normal, NOSE_R, contains_x_mm=foot_x, contains_z_mm=foot_z
+        )
+        # These are physical sharp head corners, not points on an untrimmed
+        # surface. An accidental full-length FootCorners fillet removes them.
+        probes.extend(
+            (f"neck_{sign}", (x, sign * NOSE_R, neck_z))
+            for x in (-NECK_HALF_X, NECK_HALF_X)
+        )
+        probes.extend(
+            (f"neck_{sign}", (0.0, sign * NOSE_R, FLANGE_Z[0] + delta))
+            for delta in (-FOOT_CORNER_R, 0.0, FOOT_CORNER_R)
+        )
+        probes.append((f"foot_{sign}", (foot_x, sign * NOSE_R, foot_z)))
+        probes.extend(
+            ("nose", (x, sign * NOSE_R / math.sqrt(2.0), -NOSE_R / math.sqrt(2.0)))
+            for x in (-NECK_HALF_X, NECK_HALF_X)
+        )
+    faces = resolve_faces(adapter.currentModel, requests)
+    nose = face_geometry(faces["nose"])
+    if (
+        nose is None or len(nose.parameters) != 7
+        or not all(math.isfinite(float(value)) for value in nose.parameters)
+        or math.dist((abs(nose.parameters[3]), *nose.parameters[4:6]), (1.0, 0.0, 0.0)) > 1e-8
+        or math.hypot(*nose.parameters[1:3]) > 1e-8
+        or abs(nose.parameters[6] * 1000.0 - NOSE_R) > 1e-5
+    ):
+        raise RuntimeError("matched-width cut changed the native head radius or axis")
+    records = []
+    for label, point in probes:
+        raw = faces[label].GetClosestPointOn(*(value / 1000.0 for value in point))
+        if raw is None or len(raw) != 5 or not all(math.isfinite(float(v)) for v in raw):
+            raise RuntimeError(f"{label}: matched-width native closest point is unavailable")
+        nearest = tuple(float(value) * 1000.0 for value in raw[:3])
+        gap = math.dist(point, nearest)
+        if gap > 1e-5:
+            raise RuntimeError(
+                f"{label}: foot step or altered head corner at {point}; native gap {gap:g} mm"
+            )
+        records.append({"face": label, "point_mm": point, "nearest_mm": nearest, "gap_mm": gap})
+    evidence = json.dumps(records, sort_keys=True)
+    _telemetry.info(f"matched-width native topology: {evidence}", auditJSON=evidence)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
@@ -177,11 +241,13 @@ async def build(adapter) -> dict[str, str]:
 
     check("foot inside X root", await adapter.add_fillet(FOOT_CORNER_R, [[-NECK_HALF_X, 0.0, FLANGE_Z[0]]], propagate=False))
     name_last_feature(adapter, "InsideRoot")
-    check("smooth axial roots", await adapter.add_fillet(ROOT_R, [[0.0, y, FLANGE_Z[0]] for y in (-NOSE_R, NOSE_R)], propagate=False))
-    name_last_feature(adapter, "AxialRoots")
+    # The foot and upright now share Y sides; the former side-root edges
+    # and their R0.60 bridge do not exist.
     check("tangent outside foot edges", await adapter.add_fillet(FOOT_CORNER_R, [[(FLANGE_X[0] - NECK_HALF_X) / 2.0, y, FLANGE_Z[0]] for y in FLANGE_Y], propagate=False))
     name_last_feature(adapter, "FootTopEdges")
-    check("rounded parallel foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[x, y, sum(FLANGE_Z) / 2.0] for x in FLANGE_X for y in FLANGE_Y], propagate=False))
+    # Only the two free-end edges remain foot corners. At +X the old picks
+    # now lie on full-length upright edges and must never receive a fillet.
+    check("rounded free-end foot corners", await adapter.add_fillet(FOOT_CORNER_R, [[FLANGE_X[0], y, sum(FLANGE_Z) / 2.0] for y in FLANGE_Y], propagate=False))
     name_last_feature(adapter, "FootCorners")
     name_dimensions(adapter, "FootCorners", ["FootCornerR"])
     wizard_holes(adapter, CLEARANCE_SPEC, BRACKET_HOLE_POINTS, (0.0, 0.0, -1.0), "relocated plate-tap mounting holes", name="MountingHoles", expect_dia_mm=CLEARANCE_DIA, placement_dims=[((None, None), (None, None)) for _ in BRACKET_HOLE_POINTS])
@@ -225,9 +291,11 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_sketches(adapter, ("MountingCoordinates", "TapCoordinates"))
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, (0.12, 0.12, 0.13))  # blued, not bare steel
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE})
     await report_mass_properties(adapter)
     await force_rebuild(adapter)
+    _assert_matched_width_topology(adapter)
     await volume_check(adapter, "final native dimensions preserve L bracket", expected, 10.0)
     return await save_part_and_images(adapter, PART_NAME)
 

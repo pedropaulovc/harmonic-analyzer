@@ -33,9 +33,13 @@ def test_foot_joins_flush_without_changing_mounting_grip_or_pattern() -> None:
     )
     assert mounting.SIDE_PLATE_X == (-48.0, 6.25)
     assert tuple(point[0] - part.FLANGE_X[0] for point in mounting.BRACKET_HOLE_POINTS) == (9.0, 22.7)
-    # The two root arcs share the same tangent point, with no flat ledge.
-    assert spec.ROOT_R + spec.FOOT_CORNER_R == pytest.approx(mounting.SIDE_PLATE_HEIGHT / 2.0 - joint.NOSE_R)
-    assert spec.ROOT_R <= 1.0
+    assert part.FLANGE_Y == mounting.SIDE_PLATE_Y == (-joint.NOSE_R, joint.NOSE_R)
+    assert part.FLANGE_Y == (-5.5, 5.5)
+    assert part.FLANGE_X[1] - part.FLANGE_X[0] == pytest.approx(54.25)
+    assert joint.NECK_THICKNESS == 12.5 and joint.NOSE_R == 5.5
+    assert mounting.SIDE_PLATE_THICKNESS == mounting.GRIP == 3.175
+    assert mounting.SCREW_MACHINE_X == (1.0, 14.7)
+    assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
 
 
 def test_model_precision_and_functional_bands_have_one_authority() -> None:
@@ -60,12 +64,12 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
 
 def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry() -> None:
     assert mounting.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
-    assert mounting.SIDE_PLATE_HEIGHT == 12.7
+    assert mounting.SIDE_PLATE_HEIGHT == 11.0
     assert mounting.SIDE_PLATE_LENGTH_DEVIATIONS == pytest.approx((-0.85, 0.75))
     assert mounting.SIDE_PLATE_HEIGHT_DEVIATIONS == pytest.approx((-0.8, 0.8))
     assert mounting.LINEAR_BAND == 0.51  # receiver/depth authority is unchanged
     assert mounting.COUNTERBORE_END_WALL_MIN == pytest.approx(7.0)
-    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(3.64)
+    assert mounting.COUNTERBORE_HEIGHT_WALL_MIN == pytest.approx(2.79)
     assert mounting.GRIP_MIN == pytest.approx(3.045)
     assert mounting.GRIP + mounting.GRIP_BAND == pytest.approx(3.305)
 
@@ -135,7 +139,7 @@ def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault, 
 
 def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
     assert mounting.RECEIVER_ROW_Y == pytest.approx(-0.71)
-    assert mounting.SIDE_PLATE_Y == (-6.35, 6.35)
+    assert mounting.SIDE_PLATE_Y == (-5.5, 5.5)
     assert mounting.CLEARANCE_SPEC.kind == "clearance"
     assert mounting.CLEARANCE_SPEC.size == "#2"
     assert mounting.CLEARANCE_SPEC.fit == "normal"
@@ -583,58 +587,13 @@ def test_native_process_rows_preserve_all_hole_variables_and_mate(monkeypatch, t
         assert "THRU" not in text.splitlines()  # No standalone literal repeat.
 
 
-@pytest.mark.parametrize("fault", (None, "missing_edge", "ambiguous_edge", "wrong_attachment", "wrong_value", "basic", "precision"))
-def test_neck_location_uses_straight_physical_faces_away_from_smooth_root(monkeypatch, fault):
-    import _drawing_edge_dimensions as edge_dimensions
-
-    neck_edge, foot_edge = object(), object()
-    neck = ViewEdge(neck_edge, ((joint.NECK_HALF_X, -joint.NOSE_R, 0.0), (joint.NECK_HALF_X, -joint.NOSE_R, mounting.SIDE_PLATE_Z[0] - spec.ROOT_R)), None, None)
-    foot = ViewEdge(foot_edge, ((joint.NECK_HALF_X - spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Y[0], mounting.SIDE_PLATE_Z[0] + spec.FOOT_CORNER_R), (joint.NECK_HALF_X - spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Y[0], mounting.SIDE_PLATE_Z[1])), None, None)
-    edges = [neck] if fault == "missing_edge" else [neck, foot]
-    if fault == "ambiguous_edge":
-        edges.append(ViewEdge(object(), foot.line, None, None))
-    attached = (neck_edge, object() if fault == "wrong_attachment" else foot_edge)
-    annotation = SimpleNamespace(GetAttachedEntities3=lambda: attached, GetAttachedEntityTypes=lambda: (1, 1), IsDangling=lambda: False)
-    expected = -joint.NOSE_R - mounting.SIDE_PLATE_Y[0]
-    native = SimpleNamespace(Name="RD1", SystemValue=(expected + (0.1 if fault == "wrong_value" else 0.0)) / 1000.0, Tolerance=SimpleNamespace(Type=1 if fault == "basic" else 0))
-    display = SimpleNamespace(GetAnnotation=lambda: annotation, GetDimension2=lambda _i: native, ShowParenthesis=True, precision=0)
-    display.SetPrecision3 = lambda primary, *_rest: setattr(display, "precision", 0 if fault == "precision" else primary)
-    display.GetPrimaryPrecision2 = lambda: display.precision
-    selected = {}
-
-    def insert(_adapter, _view, **kwargs):
-        selected.update(kwargs)
-        return display
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag", lambda value, *_args: value)
-    monkeypatch.setattr(drawing, "add_edge_dimension", insert)
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (0.228 - p[1], 0.2124488 - p[2]))
-    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
-    side = SimpleNamespace(GetOutline=lambda: (0.216062, 0.1064632, 0.239938, 0.2235368))
-    if fault:
-        with pytest.raises(RuntimeError):
-            drawing._neck_to_foot_side(adapter, side, ViewEdges("physical side edges", tuple(edges)))
-    else:
-        assert drawing._neck_to_foot_side(adapter, side, ViewEdges("physical side edges", tuple(edges))) is annotation
-        assert selected["entities"] == (neck_edge, foot_edge)
-        assert selected["orientation"] == "horizontal"
-        assert abs(selected["p0"][0] - selected["p1"][0]) * 1000.0 == pytest.approx(expected)
-        assert native.Name == "NeckToFootSide" and native.Tolerance.Type == 0
-        assert display.precision == 2 and display.ShowParenthesis is False
-        # Witnesses land midway along actual straight faces, not on the root
-        # arc, its vanished flat ledge, or an invented silhouette segment.
-        assert selected["p0"][1] > .150 and selected["p1"][1] < .115
-
-
 @pytest.mark.parametrize("fault", (None, "missing_seat", "wrong_nose_plane", "wrong_attachment", "arc_rejected", "centre_value", "banded", "precision", "reference_prefix"))
 def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_band(monkeypatch, fault):
     import _drawing_dimensions as dimension_text
     import _drawing_edge_dimensions as edge_dimensions
 
     seat_edge, nose_edge = object(), object()
-    seat = ViewEdge(seat_edge, ((joint.NECK_HALF_X, -6.10, mounting.SIDE_PLATE_Z[1]), (joint.NECK_HALF_X, 6.10, mounting.SIDE_PLATE_Z[1])), None, None)
+    seat = ViewEdge(seat_edge, ((joint.NECK_HALF_X, mounting.SIDE_PLATE_Y[0] + spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Z[1]), (joint.NECK_HALF_X, mounting.SIDE_PLATE_Y[1] - spec.FOOT_CORNER_R, mounting.SIDE_PLATE_Z[1])), None, None)
     nose = ViewEdge(nose_edge, None, ((-1 if fault == "wrong_nose_plane" else 1) * joint.NECK_HALF_X, 0.0, 0.0, 1.0, 0.0, 0.0, joint.NOSE_R), None)
     edges = ViewEdges("visible physical seat and nose", tuple([nose] if fault == "missing_seat" else [seat, nose]))
     geometry = {seat_edge: seat, nose_edge: nose}
@@ -712,14 +671,15 @@ def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_
         assert position[-1][:2] == drawing.OVERALL_REFERENCE_XY
 
 
-@pytest.mark.parametrize("row_mm", (5.64, 6.35))
-@pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "lateral_name", "overall_name"))
+@pytest.mark.parametrize("row_mm", (4.79, 5.64))
+@pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "overall_name"))
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault, row_mm):
-    """R7 head ink plus historical foot witnesses; new moves are simulations.
+    """Simulate current 4.79 and historical 5.64 foot rows with R7 head ink.
 
-    R2 did not capture MountingY0's final primitive. Its extra mode-created
-    shoulder is a stale-geometry control, NOT its native trace. R7 did capture
-    the head's real rows, tap leader and outward arrow flanks below.
+    Neither row is native post-cutover geometry proof. R2 did not capture
+    MountingY0's final primitive: its extra mode-created shoulder is a
+    stale-geometry control, not a native trace. R7 did capture the head's
+    real rows, retained tap leader and outward arrow flanks below.
     """
     rows = {
         "NeckThickness": [("12.5", .1070212, .185, .012)],
@@ -733,7 +693,6 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "MountingY0": [(f"{row_mm:.2f} ±0.05", .0177281, .0772219, .0245438)],
         "SeatToAxis": [("100.40", .1875951, .1622219, .0168097)],
         "FlangeWidth": [("54.2", .0718882, .0952219, .0142236)],
-        "NeckToFootSide": [("0.85", .247, .096, .010)],
         "NoseR": [
             ("R5.50 ±0.05", .2536042, .229, .0247917),
             ("RETAINS TAP WALL", .245683, .2234437, .040634),
@@ -763,7 +722,6 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         "MountingY0": [(.057375, .080 - row_mm / 1000.0, .029, .080 - row_mm / 1000.0), (.0535796, .080, .029, .080), (.030, .080 - row_mm / 1000.0, .030, .080 - 2.0 * row_mm / 1000.0), (.030, .080, .030, .080 + row_mm / 1000.0)],
         "SeatToAxis": [(.2215, .1120512, .195, .1120512), (.2340527, .2124488, .195, .2124488), (.196, .1120512, .196, .1622219), (.196, .2124488, .196, .1677781)],
         "FlangeWidth": [(.054375, .1110512, .054375, .0942219), (.103625, .1110512, .103625, .0942219), (.054375, .0952219, .103625, .0952219)],
-        "NeckToFootSide": [(.2335, .110, .2335, .095), (.23435, .110, .23435, .095), (.2335, .096, .257, .096)],
         "OverallHeight": [(.228, .1120512, .173, .1120512), (.228, .2179488, .173, .2179488), (.174, .1120512, .174, .181), (.174, .2179488, .174, .189)],
         "NoseR": [
             (.2325415, .2155511, .2440955, .2234438),
@@ -811,7 +769,6 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     items = {name: SimpleNamespace(name=name, dx=0.0, dy=0.0, CenterText=True, OffsetText=False) for name in rows}
     for item in items.values():
         item.GetSpecificAnnotation = lambda item=item: item
-    items["NeckToFootSide"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "lateral_name" else "NeckToFootSide")
     items["OverallHeight"].GetDimension2 = lambda _index: SimpleNamespace(Name="D1" if fault == "overall_name" else "OverallHeight")
     state = SimpleNamespace(modes_settled=False)
     mode_shoulder_y = .080 + row_mm / 1000.0 + .00445
@@ -883,10 +840,9 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "annotation_display", native_display)
-    # R32 created and measured this native edge dimension successfully, but
-    # later model-item name discovery did not find it. Its retained handle
-    # must still receive the same real ink and neighbour-clearance checks.
-    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("NeckToFootSide", "OverallHeight", "LeverTapCallout") else item.name)
+    # Retained overall-reference and tap-callout handles must receive the
+    # same ink checks even when model-item name discovery does not find them.
+    monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("OverallHeight", "LeverTapCallout") else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
     monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
@@ -894,7 +850,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
     front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
     # Historical frozen witnesses cross both horizontal size text boxes and
-    # the row text at Y80. The 5.64 case changes the actual measured Y span.
+    # the row text at Y80. Each simulated row changes the measured Y span.
     for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1]), ("TapFromSide", lines["TapFromSide"][0])):
         box = Box(*drawing._dimension_layout_ink(object(), items[name], label=name).text)
         assert segment_box_overlap_length(Segment(*line), box) > 0.0
@@ -906,11 +862,11 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     tip_reason = Box(.165366 + .00015, .2204437 + .00015, .206 - .00015, .2239437 - .00015)
     assert segment_box_overlap_length(Segment(*lines["TapFromTip"][5]), tip_reason) > .0009
     if fault:
-        message = "retained native dimension name" if fault in ("lateral_name", "overall_name") else ("did not settle" if fault == "ignored_move" else ("own native line" if fault in ("own_crossing", "unsettled_modes") else "neighbouring native line"))
+        message = "retained native dimension name" if fault == "overall_name" else ("did not settle" if fault == "ignored_move" else ("own native line" if fault in ("own_crossing", "unsettled_modes") else "neighbouring native line"))
         with pytest.raises(RuntimeError, match=message):
-            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight", "LeverTapCallout")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
+            drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("OverallHeight", "LeverTapCallout")], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
     else:
-        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("NeckToFootSide", "OverallHeight", "LeverTapCallout")], lateral_location=items["NeckToFootSide"], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
+        drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("OverallHeight", "LeverTapCallout")], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
         ink = {name: drawing._dimension_layout_ink(object(), item, label=name) for name, item in items.items()}
         assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
         assert items["NeckThickness"].OffsetText
@@ -942,7 +898,7 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         assert ink["TapFromTip"].text[1] == pytest.approx(.2242988 + .004)
         assert items["TapFromTip"].OffsetText
         assert items["LeverTapCallout"].dx == items["LeverTapCallout"].dy == 0.0
-    if fault not in ("lateral_name", "overall_name", "ignored_move"):
+    if fault not in ("overall_name", "ignored_move"):
         stages = [json.loads(fields["auditJSON"]) for _message, fields in messages if "auditJSON" in fields]
         assert [record["stage"] for record in stages] == ["before_text_modes", "settled_text_modes", "placed"]
         final = stages[-1]["dimensions"]
@@ -954,6 +910,164 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         if fault == "unsettled_modes":
             inner = Box(actual.text[0] + .00015, actual.text[1] + .00015, actual.text[2] - .00015, actual.text[3] - .00015)
             assert segment_box_overlap_length(Segment(.030, mode_shoulder_y, .051, mode_shoulder_y), inner) > 0.0
+
+
+@pytest.mark.parametrize("fault", (
+    None, "foot_step", "rounded_root", "rounded_head", "trimmed_nose",
+    "missing_point", "short_point", "nonfinite_point", "missing_nose",
+    "short_nose", "nose_axis", "nose_center", "nose_radius", "nonfinite_nose",
+))
+def test_matched_width_guard_probes_trimmed_root_head_and_nose(monkeypatch, fault):
+    from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
+
+    probes, messages = [], []
+    neck_z = part.FLANGE_Z[0] / 2.0
+    foot_z = sum(part.FLANGE_Z) / 2.0
+    foot_x = (part.FLANGE_X[0] - joint.NECK_HALF_X) / 2.0
+    geometry = {}
+
+    def closest(label, x, y, z):
+        probes.append((label, (x * 1000.0, y * 1000.0, z * 1000.0)))
+        if fault == "missing_point":
+            return None
+        if fault == "short_point":
+            return (x, y, z)
+        if fault == "nonfinite_point":
+            return (x, y, math.nan, 0.0, 0.0)
+        if fault == "foot_step" and label.startswith("foot"):
+            y += math.copysign(0.00085, y)
+        if fault == "rounded_root" and label.startswith("neck") and z > neck_z / 1000.0:
+            y -= math.copysign(0.0001, y)
+        if fault == "rounded_head" and label.startswith("neck") and abs(x) > 0.006:
+            x -= math.copysign(0.0001, x)
+        if fault == "trimmed_nose" and label == "nose":
+            x -= math.copysign(0.0001, x)
+        return (x, y, z, 0.0, 0.0)
+
+    faces = {
+        label: SimpleNamespace(GetClosestPointOn=lambda *xyz, label=label: closest(label, *xyz))
+        for label in ("nose", "neck_-1", "neck_1", "foot_-1", "foot_1")
+    }
+    geometry["nose"] = FaceGeometry(
+        faces["nose"], SURFACE_CYLINDER,
+        (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, .0055), None,
+        (-.00625, -.0055, -.0055, .00625, .0055, 0.0),
+    )
+    for sign in (-1, 1):
+        for kind, x, z in (("neck", 0.0, neck_z), ("foot", foot_x, foot_z)):
+            label = f"{kind}_{sign}"
+            geometry[label] = FaceGeometry(
+                faces[label], SURFACE_PLANE,
+                (0.0, float(sign), 0.0, x / 1000.0, sign * .0055, z / 1000.0),
+                (0.0, float(sign), 0.0),
+                ((-.00625 if kind == "neck" else part.FLANGE_X[0] / 1000.0),
+                 sign * .0055, (0.0 if kind == "neck" else part.FLANGE_Z[0] / 1000.0),
+                 .00625, sign * .0055,
+                 part.FLANGE_Z[1] / 1000.0),
+            )
+    model = object()
+
+    def resolve(actual_model, requests):
+        assert actual_model is model
+        assert all(selector.matches(geometry[label]) for label, selector in requests.items())
+        return faces
+
+    def read_geometry(face):
+        assert face is faces["nose"]
+        if fault == "missing_nose":
+            return None
+        parameters = list(geometry["nose"].parameters)
+        if fault == "short_nose":
+            parameters.pop()
+        elif fault == "nose_axis":
+            parameters[3:6] = (0.0, 0.0, 1.0)
+        elif fault == "nose_center":
+            parameters[1] = .0001
+        elif fault == "nose_radius":
+            parameters[6] = .0054
+        elif fault == "nonfinite_nose":
+            parameters[6] = math.nan
+        return SimpleNamespace(parameters=tuple(parameters))
+
+    monkeypatch.setattr(part, "resolve_faces", resolve)
+    monkeypatch.setattr(part, "face_geometry", read_geometry)
+    monkeypatch.setattr(part._telemetry, "info", lambda message, **fields: messages.append(fields))
+    adapter = SimpleNamespace(currentModel=model)
+    if fault:
+        with pytest.raises(RuntimeError, match="matched-width|foot step|head corner"):
+            part._assert_matched_width_topology(adapter)
+    else:
+        part._assert_matched_width_topology(adapter)
+        for sign in (-1, 1):
+            neck_points = [point for label, point in probes if label == f"neck_{sign}"]
+            assert sorted(point[0] for point in neck_points if math.isclose(point[2], neck_z)) == pytest.approx([-6.25, 6.25])
+            assert sorted(point[2] - part.FLANGE_Z[0] for point in neck_points if point[0] == 0.0) == pytest.approx([-.25, 0.0, .25])
+            foot_points = [point for label, point in probes if label == f"foot_{sign}"]
+            assert len(foot_points) == 1
+            assert foot_points[0] == pytest.approx((foot_x, sign * 5.5, foot_z))
+        nose_points = [point for label, point in probes if label == "nose"]
+        assert {point[0] for point in nose_points} == {-6.25, 6.25}
+        assert all(math.hypot(point[1], point[2]) == pytest.approx(5.5) for point in nose_points)
+        records = json.loads(messages[-1]["auditJSON"])
+        assert len(records) == len(probes) == 16
+        assert all(record["gap_mm"] == pytest.approx(0.0, abs=1e-12) for record in records)
+
+
+@pytest.mark.parametrize("fault", (None, "wrong_seat", "wrong_side", "duplicate", "missing", "outside", "crowded"))
+def test_foot_finish_uses_unique_visible_back_seat_and_checks_native_ink(monkeypatch, fault):
+    from _gtol_face import FaceGeometry, SURFACE_PLANE
+
+    adapter, front, selected, annotation, dimension = (object() for _ in range(5))
+    z = mounting.SIDE_PLATE_Z[0] if fault == "wrong_seat" else mounting.SIDE_PLATE_Z[1]
+    y = -5.5 if fault == "wrong_side" else 5.5
+    edge = ViewEdge(selected, ((-40.0, y, z), (-10.0, y, z)), None, None)
+    edges = [] if fault == "missing" else [edge]
+    if fault == "duplicate":
+        edges.append(ViewEdge(object(), edge.line, None, None))
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda *_a, **_kw: ViewEdges("visible seat", tuple(edges)))
+    calls, projected = [], []
+
+    def project(actual_adapter, actual_view, point, **_kwargs):
+        assert actual_adapter is adapter and actual_view is front
+        projected.append(point)
+        return (.100, .150)
+
+    def add(actual_adapter, actual_view, **kwargs):
+        assert actual_adapter is adapter and actual_view is front
+        calls.append(kwargs)
+        return SimpleNamespace(GetAnnotation=lambda: annotation)
+
+    box = (.001, .140, .010, .145) if fault == "outside" else (.080, .140, .095, .145)
+
+    def native_box(actual_adapter, actual_annotation, **_kwargs):
+        assert actual_adapter is adapter and actual_annotation is annotation
+        return box
+
+    monkeypatch.setattr(drawing, "model_point_in_view", project)
+    monkeypatch.setattr(drawing, "add_surface_finish", add)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(drawing, "gdt_box", native_box)
+    monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
+    monkeypatch.setattr(drawing, "_dimension_layout_ink", lambda *_a, **_kw: SimpleNamespace(text=box if fault == "crowded" else (.200, .200, .220, .205)))
+    if fault:
+        with pytest.raises(RuntimeError):
+            drawing._add_foot_finish(adapter, front, [dimension])
+        if fault in ("wrong_seat", "wrong_side", "duplicate", "missing"):
+            assert not calls and not projected
+    else:
+        drawing._add_foot_finish(adapter, front, [dimension])
+        assert projected == [(-.025, .0055, mounting.SIDE_PLATE_Z[1] / 1000.0)]
+        assert len(calls) == 1 and calls[0]["edge_entity"] is selected
+        assert calls[0]["leader_attach_xy"] == (.100, .150)
+        assert calls[0]["symbol_xy"] == pytest.approx((.090, .142))
+        control = calls[0]["control"]
+        for normal, point, matches in (
+            ((0.0, 0.0, 1.0), (0.0, 0.0, mounting.SIDE_PLATE_Z[1] / 1000.0), True),
+            ((0.0, 0.0, -1.0), (0.0, 0.0, mounting.SIDE_PLATE_Z[0] / 1000.0), False),
+            ((0.0, 1.0, 0.0), (0.0, .0055, mounting.SIDE_PLATE_Z[1] / 1000.0), False),
+        ):
+            geometry = FaceGeometry(object(), SURFACE_PLANE, (*normal, *point), normal, ())
+            assert control.face.matches(geometry) is matches
 
 
 

@@ -5,9 +5,8 @@ from __future__ import annotations
 from _printed_tolerance import printed_band_mm
 
 
-# Nominal tangent root geometry; the title block owns inside R1.0 MAX.
-# R0.60 plus the ordinary R0.25 outer edge round fills the 0.85 side offset.
-ROOT_R = 0.60
+# The matched-width foot has no lateral ledge or axial bridge fillet.
+# Applicable inside X-root and free-foot rounds follow the title-block limits.
 FOOT_CORNER_R = 0.25
 DRAWING_DIMENSIONS = {
     "NeckProfile": {"NoseR", "SeatToAxis"},
@@ -43,9 +42,7 @@ DIMENSION_CALLOUTS = {
         "MountingY0": MOUNTING_MATE_FLAG,
     },
 }
-DRAWING_EDGE_PRECISION = {"NeckToFootSide": 2}
 DRAWING_REFERENCE_PRECISION = {"OverallHeight": 2}
 TAP_PROCESS = "MATES MHA-MG-03 LEVER"
 MOUNTING_HOLE_PROCESS = f"{MOUNTING_MATE_FLAG} MATES MHA-SM-03 TAPPED HOLES"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
-SURFACE_FINISHES = ()

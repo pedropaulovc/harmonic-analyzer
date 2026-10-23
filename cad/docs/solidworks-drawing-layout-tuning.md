@@ -1769,8 +1769,9 @@ requires native redraw and Codex machinist review; approval is not print proof.
 The foot prints explicit **3.175±0.13** with
 `MHA-MG-VN-53` / `SCREW GRIP` below it: full engagement3.305 exceeds3.2766,
 with0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that
-joint. One-place overall foot length/width change precision, not model geometry;
-their own printed-size intervals must not loosen receiver/rib/depth bands.
+joint. Foot length/width retain their own one-place printed-size intervals;
+the later owner-approved width cut below changes only nominal Y width and must
+not loosen the grip, receiver, rib or depth bands.
 The blued material is generic low-carbon steel, matching the existing native
 Plain Carbon Steel assignment. The generic-steel qualification below owns
 the fitted-band load-demand screen and its unverified material assumptions.
@@ -2087,23 +2088,45 @@ belongs in the production recipe. Its nominal12.50 neck now prints12.5; the
 native3.175 foot carries explicit±0.13 and the real screw-grip reference. The
 prior no-qualifier direction was superseded by the owner choice above.
 Inside corners follow the actual title-blockR1.0 MAX default, not a bespoke
-R0.25 inside restriction. The nominal root uses tangentR0.60 inside andR0.25
-outside arcs across the0.85 offset, with no flat ledge; verify the actual native
-root at enlarged scale. The user-approved5mm free-end extension changes only
-machineX−3 to−8 (local−43 to−48), foot49.25 to54.25 and setbacks4/17.70 to
-9/22.70; that extension alone leaves both mounting axes, seat, width, thickness
-and lever pose fixed. The separate 2026-10-22 plate-tap relocation lowers the
-matched receiver, bracket-clearance and screw row to local Y−0.71 / machine Y978.99,
-retaining machine X1/14.7 and the body/seat/threaded-lever pose. Its native row
-dimensions are 3.25±0.05 below the actual coefficient top and 5.64±0.05 above
-the actual foot lower edge. The fixed-top 7.00±0.51 plate backs the receiver
-pilot beyond the uniform 5.00±0.51 ribs; retain one native `3X 5.00` rib dimension.
-Do not restore superseded rib-only containment or a finished-thread envelope.
-Pass the actual drawing-created lateral dimension annotation to its layout
-checks; retain its measured two-edge attachments, native name and ordinary band.
-Do not rediscover that annotation through an imported-model dimension name
-reader. R32 passed its constructor checks but failed that later rediscovery;
-the exact native legacy-reader behavior was not captured.
+R0.25 inside restriction. The later explicit owner ruling on PR1856
+(comment6367964749) narrows the foot's **Y width12.70→11.00**, centred at zero
+to match the unchanged neckY±5.50. It does not widen the neck, alter its head
+controls or merely hide the former0.85 dimension. Delete that physical
+lateral-offset dimension and its inventory/precision/attachment machinery.
+The vanished side ledges have no axial root edges: remove theirR0.60 bridge
+fillets. Keep the applicableR0.25 inside X root and free-foot outer rounds,
+but round only the **two free-end corners at localX−48**. The former+6.25
+corner picks now lie on full-length upright edges; rounding them would
+unauthorisedly change the head. The final part proves actual flushY planes
+through the root, retained sharp upright corners, and the unchanged native
+R5.50 nose axis/radius/extent using qualified faces and closest-point readback.
+Native success still requires enlarged visual inspection of the new root.
+
+The previous5mm free-end extension remains: machineX−8..46.25,
+localX−48..+6.25, length54.25 and setbacks9.00/22.70. The matched receiver,
+bracket-clearance and screw axes remain localY−0.71 / machineY978.99 and
+machineX1/14.7, with unchanged seat/threaded-lever pose. The receiver row is
+still3.25±0.05 below the coefficient top; the narrowed foot's native lower-edge
+ordinate is now **4.79±0.05**, not5.64. Foot11.0 retains ordinary`.X`±0.8:
+the conservative head-clearance-circle ligaments are **2.79 /3.41** lower/upper,
+and actual printedØ2.69MAX clearance-hole walls are **3.395 /4.015**.
+The minimum foot-edge prying arm becomes **4.74**, charged to the same actual
+width/location intervals. Do not substitute the receiver's unrelated±0.51.
+The fixed-top7.00±0.51 plate backs the receiver pilot beyond the uniform
+5.00±0.51 ribs; retain one native `3X 5.00` rib dimension. No receiver, grip or
+engagement band changes with the foot cut.
+
+The SM-facing **+Z foot back**, the physical origin of100.40, is a static
+locating seat under rule6. Its part-owned `foot_seat` control is **Ra3.2µm**
+(`SEAT_UM`), qualified by the real plane at `SIDE_PLATE_Z[1]`; it is not a
+general all-faces grade, screw-head-bearing-front finish or new exception.
+`mg_magnifying_bracket_finish_spec` keeps this derived face contract outside
+the joint's dimensional-spec import cycle. Author it natively in the part,
+then attach the drawing symbol to a visible edge adjacent to that exact face,
+with controlled-face validation and native attachment/landing readback.
+The title block's `CAST/MACHINED` row and `blued` finish specify no roughness
+grade and do not replace the symbol. RV-02/RV-03 cover neither this seat nor
+the mounting flags or line clearance.
 For the12.5 thickness, jog its text beyond the outermost actual
 native vertical witness plus4mm and above the front outline. R33 reported an
 own-line crossing at the former qualified text's Xstation; the exact crossing
@@ -2121,10 +2144,10 @@ modes first, then derive the existing two-axis jog from the settled native
 text/line geometry. Preserve all own-line, neighbour, silhouette and sheet
 guards. Capture native text runs, raw lines/arrows and decoded boxes/segments
 before modes, after their rebuild and for every final annotation before any
-layout guard can fail. This same measured placement applies to the child's
-5.64 and parent's 6.35 row without changing either model.
-Offline historical-witness and simulated mode-transition controls cover both
-rows, including a stale-target crossing and strict rejection. They are not a
+layout guard can fail. The current4.79 row and historical5.64 row retain the
+same measured-placement algorithm without changing their model authorities.
+Offline historical-witness and simulated mode-transition controls cover both,
+including a stale-target crossing and strict rejection. They are not a
 replay of the uncaptured R2 primitive or proof that a new native sheet clears;
 the combined native drawing run and whole-sheet audit remain required.
 
