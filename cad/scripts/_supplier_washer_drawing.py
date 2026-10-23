@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import hashlib
 import json
-from math import cos, dist, isfinite, sin
+from math import dist, isfinite
 from pathlib import Path
 from typing import Any, Literal
 
@@ -29,7 +29,7 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_precision import _named_dimensions
 from _drawing_layout_audit import annotation_display
 from _drawing_leaders import set_near_side_diameter
-from _layout_audit import annotation_geometry, calibrate_sheet_advance, display_box
+from _layout_audit import annotation_geometry, calibrate_sheet_advance
 from _layout_geometry import segment_box_distance, segment_box_overlap_length
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
@@ -38,6 +38,7 @@ from _supplier_dimensions import (
 from _supplier_reference_text import (
     assert_reference_text_stations,
     measure_reference_text,
+    measured_native_text_bounds,
     shelve_reference_text,
 )
 from _supplier_washer_model import (
@@ -317,37 +318,16 @@ def _face_outline(view: Any) -> tuple[float, ...]:
 def _diameter_caption(adapter: Any, display: Any, *, label: str) -> tuple[Any, tuple[Any, ...], Any]:
     """Measure every native caption fragment, including Ø, limits and below text.
 
-    As in draw_pd_support_bar, normalize swTextPosition_e before display_box;
-    never estimate missing widths or use the numeric annotation anchor as ink.
+    Reuse the shared SDK-anchor bounds reader; never estimate missing widths
+    or use the numeric annotation anchor as ink.
     """
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     data, errors = annotation_display(adapter, annotation)
     if errors:
         raise RuntimeError(f"{label}: refused washer caption display reads: {errors!r}")
-    texts = []
-    for raw in data.get("texts", ()):
-        at = tuple(float(value) for value in raw.get("pos", ()))
-        width, height, angle = (float(raw.get(key) or 0.0) for key in ("w", "h", "ang"))
-        reference = raw.get("ref")
-        if (
-            len(at) != 3 or not all(map(isfinite, (*at, width, height, angle)))
-            or width <= 0.0 or height <= 0.0 or raw.get("ang") is None
-            or type(reference) is not int or reference not in range(6)
-        ):
-            raise RuntimeError(f"{label}: unreadable native washer caption fragment: {raw!r}")
-        dx, dy = {
-            0: (0.0, -height), 1: (0.0, 0.0),
-            2: (-width / 2, -height / 2), 3: (-width, -height),
-            4: (-width, 0.0), 5: (-width / 2, -height),
-        }[reference]
-        texts.append({
-            **raw, "ref": 1,
-            "pos": (at[0] + cos(angle) * dx - sin(angle) * dy,
-                    at[1] + sin(angle) * dx + cos(angle) * dy, at[2]),
-        })
-    text = display_box({"texts": texts})
-    if text is None or not all(map(isfinite, (text.xmin, text.ymin, text.xmax, text.ymax))):
-        raise RuntimeError(f"{label}: washer caption has no finite measured native text")
+    text, fragments = measured_native_text_bounds(
+        data.get("texts", ()), label=f"{label}: washer caption",
+    )
     for kind, rows in data.items():
         if kind != "texts" and any(
             not row or not all(isfinite(float(value)) for value in row) for row in rows
@@ -371,7 +351,6 @@ def _diameter_caption(adapter: Any, display: Any, *, label: str) -> tuple[Any, t
         for run in geometry.segments
     ):
         raise RuntimeError(f"{label}: unreadable native washer caption leader")
-    fragments = tuple(display_box({"texts": [raw]}) for raw in texts)
     return text, fragments, geometry
 
 
