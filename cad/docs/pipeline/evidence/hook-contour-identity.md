@@ -1117,6 +1117,32 @@ claimed. The independent same-family code-review route is explicitly
 authorized because Claude is quota-exhausted; it is not cross-vendor or
 mutation-verified review.
 
+### Actual focused gate and foreign-identity fixture correction
+
+The corrected whole-PR source `a8b97a4c1c1244b084762a4f1c7127a57122dac6`
+received static closure of all seven review findings. Its one actual
+focused gate (`artifact://5946`) passed the 149-adapter/128-native-binding
+source census and four-file F821 check, but pytest reported **8 failed,
+1336 passed in 13.04s**. Fail-fast stopped before whitespace checking.
+This failure is retained, not relabelled as a successful full suite.
+The complete eight-file failed receipt set is under
+`C:/temp/ha-hook-contour-identity-evidence-20261023/strict-source-normalization/a8b97-failed-focused-checks/`.
+
+All eight failures used the two purported foreign-source/foreign-owner
+mutations after fresh wrappers legitimately inherited native identity.
+Those mutation copies also inherited the same fake `native_id`, so their
+fake native comparison correctly returned SAME=1: they were aliases,
+not foreign objects. The correction gives only those two negative
+mutations fresh identities and asserts NOT SAME=0 before invoking the
+unchanged production validator. Positive fresh-wrapper aliases keep
+their native identity; expected refusal assertions are not rewritten.
+This is a test-fixture correction, not a loosened production predicate.
+
+Main authorizes rerunning only the failed/affected cases and the
+previously unexecuted pinned whitespace check, not the 1336 passing
+cases or unchanged SDK census. Result counts must be composed honestly
+across their exact producing sources, not reported as a new full-suite run.
+
 ## Evidence boundary
 
 The focused offline tests replay observed native circle parameters, invalidate

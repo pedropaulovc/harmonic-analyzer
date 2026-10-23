@@ -3602,6 +3602,8 @@ def _mutate_stock_profile(scene, fault, index=0):
         scene.segments.append(source)
     elif fault == "foreign-source":
         foreign = _StockSourceCurve(**vars(source))
+        foreign.native_id = object()
+        assert scene.adapter.swApp.IsSame(foreign, source) == 0
         scene.segments[index] = foreign
         instance = scene.make_instance(foreign)
         instance.Color = 0
@@ -3609,7 +3611,11 @@ def _mutate_stock_profile(scene, fault, index=0):
     elif fault == "foreign-instance":
         scene.reverse[id(mapped)] = scene.segments[(index + 1) % 9]
     elif fault == "foreign-owner":
-        scene.reverse[id(mapped.GetSketch())] = SimpleNamespace(**vars(source.GetSketch()))
+        owner = source.GetSketch()
+        foreign = SimpleNamespace(**vars(owner))
+        foreign.native_id = object()
+        assert scene.adapter.swApp.IsSame(foreign, owner) == 0
+        scene.reverse[id(mapped.GetSketch())] = foreign
     elif fault == "foreign-view":
         scene.stock = _StockView(**vars(scene.stock))
     elif fault == "geometry":
