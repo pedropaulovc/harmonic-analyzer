@@ -752,7 +752,8 @@ X=129.3085mm. At the new text shelf the actual glyph left edge is
 133.5972mm. Conservatively allowing half the widest recorded0.35mm ink
 stroke gives a4.1137mm gap, exceeding the3.5mm native text height.
 The smaller proposal with only0.0972mm paint clearance was rejected.
-Final whole-annotation and neighbor clearance still require actual paper.
+The actual `652d25a02` paper subsequently passes whole-page inspection,
+native audit and three independent automated machinist runs, as recorded below.
 
 ### SM complete diameter callout and stock ink
 
@@ -801,6 +802,79 @@ endpoints within0.000048mm. The raw findings are retained. There is no
 decimalization, suppression or unauthorized shared-classifier change.
 This report-mode classification does not excuse a real profile-coverage
 or presentation failure.
+
+## Actual `652d25a02` normal native and paper outcomes
+
+The complete source-bound normal run
+`20261023T045810374Z-da4e1e246e0b4642a9578f421ab04d2d` has one success and
+one failure. Its immutable source is
+`652d25a02e2d0ae87102128690505d64e457fb2f`, admitted against
+`6ec6814301593b85853db9786e7d33c69ec44ac8`. The canonical complete handoff is
+`C:/ha-release-manager-20261023/runs/repair-fleet/hook1853-652d25a02-final-paper-close-native-handoff.json`.
+Neither a later main merge nor a source-only closure relabels this native
+execution as proof from a newer source or runtime.
+
+### CH: successful native output and two-sheet SHIP
+
+CH completed the normal native save, PDF/export and close path. All four
+actual exports are present. The complete native layout audit reports two
+sheets, zero gating findings, no findings and empty read errors. The PDF is
+453,694 bytes, SHA-256
+`76a7756127f5ef9ae8cfbd9eeb10a68297c4acbec2e711387fe76c6a57d22930`.
+This includes the strict settled, after-save and after-PDF observations in
+the still-open drawing; it is not a cold reopen persistence experiment.
+
+The whole released-v44 comparison has one changed FINISHED page and one
+added SUPPLIER-STOCK page, with no removed pages or drawings. Both complete
+overlays and the actual two-sheet paper were inspected. The actual CH
+automated `gpt-6-astra` medium machinist review ran once, three independent
+blind runs with zero retries: **SHIP / SHIP / SHIP**, zero findings. All runs
+reviewed both sheets and the exact PDF hash above. They apply existing
+owner exception RV-01, not a new waiver. The configured judge correctly
+skipped execution because all valid runs returned zero findings; no raw
+judge output is claimed.
+
+The separate paper evidence root is
+`C:/ha-release-manager-20261023/runs/repair-fleet/hook1853-652d-paper-proof/ch-actual/`.
+It contains the hashbound four actual exports, full native audit,
+`qualification.json`, raw reviewer attempts and reports, exact command and
+execution receipt, both whole-page overlays and
+`v44-to-652d-whole-ch-diff.zip`. Aggregate SHA-256 is
+`cdbfe160b2b649f452255b73482c0b35cd66626e32644c86a1e5fa245ffbe082`;
+whole-diff ZIP SHA-256 is
+`6eae0934b95f5f3633e7e22daa861adaba33133458548988cc0626b5f02f865a`.
+
+### SM: new pre-save selection-identity refusal, not qualified output
+
+SM fails at `_blacken_supplier_stock_profile` before native save or export:
+`supplier nominal stock black profile: selection is not the exact mapped native curve`.
+The actual raw receipt is
+`hook1853-652d25a02-terminal-sm_vn_boss_hook-worker-task.log`, lines47–78,
+SHA-256
+`9e42b6eb12b37cc7d6ba8fa67a4d1d179726dc716a28078f47b7e44d82916c0d`,
+under the same farm evidence root. All four SM controller exports are
+absent. This is not the historical `9bb6e4e` close failure and there is no
+actual final black-profile or SM paper qualification.
+
+The reached guard proves that the nine source/mapped native curve and
+distinctness guards, active/select-data view identity, successful
+`Select4`, and strict one type24 selection passed. The current message
+still conflates a null selection-manager return with exact native
+`IsSame(selected,mapped)==0`. Integer2/3 or a noninteger equality result
+would raise the different existing `unknown native IsSame` refusal.
+Neither the selected object nor its source/drawing context is proved by
+this message. The SDK also does not guarantee positive equality support
+for every sketch/context combination.
+
+One bounded, failure-only receipt is authorized at this original refusal
+to distinguish those missing primitives. It reports the already acquired
+nine native source/mapped identities, selected-null status first, raw
+identity and owner/view controls, and exact source/configuration context.
+It does not change the original selection, acceptance, exception,
+geometry, style, configuration or save path. Per-field reporting failures
+must not mask the original exception. This diagnostic is not a repair or
+qualified output; wrong, missing, duplicate or unrelated native contours
+remain refused.
 
 ## Current session review route
 

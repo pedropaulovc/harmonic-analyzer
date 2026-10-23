@@ -1,6 +1,7 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
 from dataclasses import FrozenInstanceError, replace
+import json
 import math
 from types import SimpleNamespace
 
@@ -2355,6 +2356,444 @@ def _blacken_stock(scene, capture):
     return drawing._blacken_supplier_stock_profile(scene.adapter, scene.stock, scene.source, capture)
 
 
+@pytest.fixture
+def stock_identity_failure_scene(stock_source_scene, monkeypatch):
+    """Existing stock scene with independently represented raw/typed selection."""
+    scene = stock_source_scene
+    capture = _stock_capture(scene)
+    mapped_owner = SimpleNamespace(context="drawing profile")
+    selected_owner = SimpleNamespace(context="selected drawing profile")
+    active_configuration = SimpleNamespace(Name="OriginalFinished", GetID=lambda: 11)
+    scene.source.ConfigurationManager = SimpleNamespace(ActiveConfiguration=active_configuration)
+    scene.model.GetPathName = lambda: "D:/output/sm_vn_boss_hook.SLDDRW"
+    scene.stock.GetName2 = lambda: scene.stock.Name
+    reverse_reads, selected_view_reads, receipts, emitted_selected, none_binds = [], [], [], [], []
+    for index, source in enumerate(scene.segments):
+        source.GetID = lambda index=index: (101, index)
+        source.GetSketch = lambda: scene.sketch
+        mapped = scene.mapped[id(source)]
+        # Deliberately different pairs across contexts: never assert preservation.
+        mapped.GetID = lambda index=index: (201, index)
+        mapped.GetSketch = lambda: mapped_owner
+    typed = scene.make_instance(scene.circles[0])
+    typed.GetID = lambda: (301, 0)
+    typed.GetSketch = lambda: selected_owner
+    raw = _StockSourceCurve(**vars(typed))
+
+    def reverse(owner):
+        reverse_reads.append(owner)
+        assert owner is mapped_owner or owner is selected_owner
+        return scene.sketch
+
+    def selected_view(index, mark):
+        selected_view_reads.append((index, mark, scene.state.selected))
+        assert (index, mark) == (1, -1) and scene.state.selected is not None
+        return scene.stock
+
+    scene.model.Extension.GetCorresponding2 = reverse
+    scene.model.SelectionManager.GetSelectedObjectsDrawingView2 = selected_view
+    original_bind = drawing._early_bound
+
+    def bind(value, interface):
+        if value is None:
+            none_binds.append(interface)
+            raise AssertionError("never bind a null diagnostic prerequisite")
+        if value is raw and interface == "ISketchSegment":
+            return typed
+        return original_bind(value, interface)
+
+    def emit(message):
+        prefix = "supplier stock selection identity REPORTING ONLY / NO MUTATING PROBES: "
+        assert message.startswith(prefix)
+        receipts.append(json.loads(message[len(prefix):]))
+        emitted_selected.append(scene.state.selected)
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(drawing._telemetry, "progress", emit)
+    scene.state.after_select = lambda _mapped: setattr(scene.state, "selected", raw)
+    return SimpleNamespace(
+        scene=scene, capture=capture, raw=raw, typed=typed, mapped_owner=mapped_owner,
+        selected_owner=selected_owner, active_configuration=active_configuration,
+        reverse_reads=reverse_reads, selected_view_reads=selected_view_reads,
+        receipts=receipts, emitted_selected=emitted_selected, none_binds=none_binds,
+    )
+
+
+def _stock_identity_receipt(diagnostic):
+    context, = (entry["fields"] for entry in diagnostic.receipts if entry["section"] == "context")
+    rows = [entry["fields"] for entry in diagnostic.receipts if entry["section"] == "row"]
+    assert len(rows) == 9
+    return context, rows
+
+
+def test_selection_identity_receipt_is_null_safe_and_still_refuses(stock_identity_failure_scene):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    scene.state.after_select = lambda _mapped: setattr(scene.state, "selected", None)
+    same = scene.adapter.swApp.IsSame
+    null_comparisons = []
+
+    def no_null_same(first, second):
+        if first is None or second is None:
+            null_comparisons.append((first, second))
+            raise AssertionError("null is not a native selected identity")
+        return same(first, second)
+
+    scene.adapter.swApp.IsSame = no_null_same
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    context, rows = _stock_identity_receipt(diagnostic)
+    assert context["selectedNone"] == {"value": True, "python_type": "builtins.bool", "error": None}
+    assert context["selected.typed"]["value"] is None
+    assert context["selected.raw.GetType"]["error"] == "not queried: null or unavailable prerequisite"
+    assert all(row["selected.raw_to_mapped.forward"]["value"] is None for row in rows)
+    assert diagnostic.none_binds == diagnostic.selected_view_reads == null_comparisons == []
+    assert scene.colors == [] and scene.state.selected is None
+
+
+def test_selection_identity_refusal_reports_all_nine_exact_inputs_before_cleanup(stock_identity_failure_scene):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    context, rows = _stock_identity_receipt(diagnostic)
+    assert context["selectedNone"]["value"] is False
+    assert context["original_error"]["value"] == (
+        "supplier nominal stock black profile: selection is not the exact mapped native curve"
+    )
+    assert (context["Select4"]["value"], context["selection_count"]["value"],
+            context["selection_type"]["value"], context["expected_index"]["value"]) == (True, 1, 24, 0)
+    assert [row["index"]["value"] for row in rows] == list(range(9))
+    assert [row["index"]["value"] for row in rows if row["expected"]["value"]] == [0]
+    for index, row in enumerate(rows):
+        assert row["source.GetID"]["value"] == [101, index]
+        assert row["mapped.GetID"]["value"] == [201, index]
+        assert row["source.GetID"]["python_type"] == "builtins.tuple"
+        assert row["source.GetID[0]"]["python_type"] == "builtins.int"
+        assert row["source.GetType"]["value"] == row["mapped.GetType"]["value"] == (1 if index < 3 else 0)
+        for name in ("source.self", "mapped.self", "source.owner.self",
+                     "source.owner.to_authoritative.forward", "mapped.owner.reverse.self",
+                     "mapped.owner.reverse.to_authoritative.forward"):
+            assert row[name]["value"] == 1 and row[name]["error"] is None
+        for name in ("source_to_mapped.forward", "source_to_mapped.reverse",
+                     "selected.raw_to_mapped.forward", "selected.raw_to_mapped.reverse",
+                     "selected.raw_to_source.forward", "selected.raw_to_source.reverse",
+                     "mapped.owner.to_authoritative.forward"):
+            assert row[name]["value"] == 0 and row[name]["error"] is None
+    assert context["selected.raw.GetID"]["value"] == context["selected.typed.GetID"]["value"] == [301, 0]
+    assert context["selected.raw_to_typed.forward"]["value"] == 1
+    assert context["selected.raw.self"]["value"] == context["selected.typed.self"]["value"] == 1
+    assert context["selected.raw.owner.reverse.to_authoritative.forward"]["value"] == 1
+    assert context["drawing.GetPathName"]["value"] == "D:/output/sm_vn_boss_hook.SLDDRW"
+    assert context["source.GetPathName"]["value"] == str(scene.source_path.resolve())
+    assert context["capture.source_path"]["value"] == diagnostic.capture.source_path
+    assert context["capture.configuration_id"]["value"] == 23
+    assert context["source.active_configuration.Name"]["value"] == "OriginalFinished"
+    assert context["source.active_configuration.GetID"]["value"] == 11
+    assert context["source.expected_configuration.Name"]["value"] == drawing.SUPPLIER_STOCK_CONFIGURATION
+    assert context["source.expected_configuration.GetID"]["value"] == 23
+    assert context["source.active_to_expected_configuration.forward"]["value"] == 0
+    for name in ("stock_view", "active_view", "data_view", "selected_view"):
+        assert context[f"{name}.to_expected.forward"]["value"] == 1
+        assert context[f"{name}.ReferencedDocument.to_source.forward"]["value"] == 1
+        assert context[f"{name}.GetName2"]["value"] == scene.stock.Name
+        assert context[f"{name}.GetReferencedModelName"]["value"] == str(scene.source_path.resolve())
+        assert context[f"{name}.ReferencedConfiguration"]["value"] == drawing.SUPPLIER_STOCK_CONFIGURATION
+    for name in ("source", "mapped", "selected.raw", "selected.typed"):
+        assert context[f"candidate.{name}.GetLength.finite"]["value"] is True
+        assert context[f"candidate.{name}.GetRadius.finite"]["value"] is True
+        assert context[f"candidate.{name}.center.X"]["value"] == 0.0
+    assert all(value is diagnostic.raw for value in diagnostic.emitted_selected)
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("raw_result", (0, 1, 2, 3))
+def test_selection_identity_raw_controls_record_all_native_codes_without_accepting(
+    stock_identity_failure_scene, raw_result,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    mapped = scene.mapped[id(scene.circles[0])]
+    same = scene.adapter.swApp.IsSame
+
+    def observed(first, second):
+        if first is diagnostic.raw and (second is diagnostic.raw or second is scene.circles[0]):
+            return raw_result
+        if first is mapped and second is diagnostic.raw:
+            return raw_result
+        if first is diagnostic.typed and second is mapped:
+            return 1  # Even a typed-interface match cannot rescue raw inequality.
+        return same(first, second)
+
+    scene.adapter.swApp.IsSame = observed
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    context, rows = _stock_identity_receipt(diagnostic)
+    for field in (
+        context["selected.raw.self"], rows[0]["selected.raw_to_source.forward"],
+        rows[0]["selected.raw_to_mapped.reverse"],
+    ):
+        assert field == {"value": raw_result, "python_type": "builtins.int", "error": None}
+    assert rows[0]["selected.raw_to_mapped.forward"]["value"] == 0
+    assert rows[0]["selected.typed_to_mapped.forward"]["value"] == 1
+    assert scene.colors == [] and scene.state.selected is None
+
+
+def test_selection_identity_receipt_isolates_geometry_owner_and_view_getter_errors(
+    stock_identity_failure_scene, monkeypatch,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+
+    def fail(message):
+        raise OSError(message)
+
+    class PartialPoint:
+        X = property(lambda _self: fail("selected X getter failed"))
+        Y = float("nan")
+        Z = 0.125
+
+    class Data:
+        def __init__(self):
+            self.view = None
+
+        @property
+        def View(self):
+            if scene.state.selected is not None:
+                fail("data View getter failed")
+            return self.view
+
+        @View.setter
+        def View(self, value):
+            self.view = value
+
+    class Drawing:
+        def __getattr__(self, name):
+            if name == "ActiveDrawingView" and scene.state.selected is not None:
+                fail("active View getter failed")
+            return getattr(scene.model, name)
+
+    original_bind = drawing._early_bound
+    document = Drawing()
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: (
+        document if value is scene.model and interface == "IDrawingDoc"
+        else original_bind(value, interface)
+    ))
+    scene.model.SelectionManager.CreateSelectData = Data
+    scene.model.SelectionManager.GetSelectedObjectsDrawingView2 = lambda *_args: fail("selected View getter failed")
+    reverse = scene.model.Extension.GetCorresponding2
+    scene.model.Extension.GetCorresponding2 = lambda owner: (
+        fail("selected reverse owner failed") if owner is diagnostic.selected_owner else reverse(owner)
+    )
+    diagnostic.raw.GetType = lambda: fail("raw type getter failed")
+    diagnostic.raw.GetID = lambda: fail("raw ID getter failed")
+    diagnostic.raw.GetLength = lambda: fail("raw length getter failed")
+    diagnostic.typed.center = PartialPoint()
+    diagnostic.typed.radius = float("inf")
+    scene.circles[0].GetSketch = lambda: fail("source owner getter failed")
+    scene.mapped[id(scene.circles[1])].GetSketch = lambda: None
+    scene.mapped[id(scene.circles[2])].GetID = lambda: fail("mapped ID getter failed")
+    same = scene.adapter.swApp.IsSame
+
+    def bad_control(first, second):
+        if first is diagnostic.raw and second is scene.circles[1]:
+            fail("raw comparison failed")
+        return same(first, second)
+
+    scene.adapter.swApp.IsSame = bad_control
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    context, rows = _stock_identity_receipt(diagnostic)
+    for name, message in (
+        ("selected.raw.GetType", "raw type getter failed"),
+        ("selected.raw.GetID", "raw ID getter failed"),
+        ("candidate.selected.raw.GetLength", "raw length getter failed"),
+        ("candidate.selected.typed.center.X", "selected X getter failed"),
+        ("selected.raw.owner.GetCorresponding2", "selected reverse owner failed"),
+        ("active_view.raw", "active View getter failed"),
+        ("data_view.raw", "data View getter failed"),
+        ("selected_view.raw", "selected View getter failed"),
+    ):
+        assert context[name]["value"] is None
+        assert context[name]["error"] == f"OSError: {message}"
+    assert context["candidate.selected.typed.center.Y"]["value"] == "nan"
+    assert context["candidate.selected.typed.center.Y"]["python_type"] == "builtins.float"
+    assert context["candidate.selected.typed.center.Y.finite"]["value"] is False
+    assert context["candidate.selected.typed.center.Z"]["value"] == 0.125
+    assert context["candidate.selected.typed.GetRadius"]["value"] == "inf"
+    assert context["candidate.selected.typed.GetRadius.finite"]["value"] is False
+    assert context["selected.typed.GetType"]["value"] == 1
+    assert rows[0]["source.GetSketch"]["error"] == "OSError: source owner getter failed"
+    assert rows[1]["mapped.GetSketch"] == {"value": None, "python_type": "builtins.NoneType", "error": None}
+    assert rows[1]["selected.raw_to_source.forward"]["error"] == "OSError: raw comparison failed"
+    assert rows[1]["selected.raw_to_source.reverse"]["value"] == 0
+    assert rows[2]["mapped.GetID"]["error"] == "OSError: mapped ID getter failed"
+    assert rows[2]["mapped.GetType"]["value"] == 1
+    assert rows[8]["mapped.owner.reverse.to_authoritative.forward"]["value"] == 1
+    assert scene.colors == [] and scene.state.selected is None
+
+
+@pytest.mark.parametrize("guard_result", (0, 2, 3))
+def test_selection_identity_reporter_failure_preserves_original_guard_error(
+    stock_identity_failure_scene, monkeypatch, guard_result,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    mapped = scene.mapped[id(scene.circles[0])]
+    same = scene.adapter.swApp.IsSame
+    scene.adapter.swApp.IsSame = lambda first, second: (
+        guard_result if first is diagnostic.raw and second is mapped else same(first, second)
+    )
+
+    def broken_reporter(*_args):
+        raise KeyboardInterrupt("reporter failed")
+
+    monkeypatch.setattr(drawing, "_report_supplier_selection_identity", broken_reporter)
+    with pytest.raises(RuntimeError) as caught:
+        _blacken_stock(scene, diagnostic.capture)
+    expected = (
+        "selection is not the exact mapped native curve" if guard_result == 0
+        else f"unknown native IsSame={guard_result}"
+    )
+    assert str(caught.value) == f"supplier nominal stock black profile: {expected}"
+    assert scene.colors == [] and scene.state.selected is None
+
+
+def test_selection_identity_emitter_failure_preserves_original_exception_object(
+    stock_identity_failure_scene, monkeypatch,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    mapped = scene.mapped[id(scene.circles[0])]
+    same = scene.adapter.swApp.IsSame
+    primary = OSError("native selected identity getter failed")
+    attempts = []
+
+    def selected_identity(first, second):
+        if first is diagnostic.raw and second is mapped:
+            raise primary
+        return same(first, second)
+
+    def broken_emitter(message):
+        attempts.append(message)
+        raise OSError("receipt log unavailable")
+
+    scene.adapter.swApp.IsSame = selected_identity
+    monkeypatch.setattr(drawing._telemetry, "progress", broken_emitter)
+    with pytest.raises(OSError) as caught:
+        _blacken_stock(scene, diagnostic.capture)
+    assert caught.value is primary
+    assert len(attempts) == 10  # Context plus every bounded row, despite log failures.
+    assert scene.colors == [] and scene.state.selected is None
+
+
+def test_selection_identity_receipt_never_reenumerates_repicks_styles_or_changes_configuration(
+    stock_identity_failure_scene,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    before = [
+        (drawing._supplier_profile_curve(source, "before"), drawing._supplier_profile_curve(mapped, "before"),
+         mapped.Color, mapped.Width, mapped.Style, mapped.Layer)
+        for source in scene.segments
+        for mapped in (scene.mapped[id(source)],)
+    ]
+    calls_before = len(scene.calls)
+    prohibited = []
+
+    def forbid(name):
+        def call(*_args, **_kwargs):
+            prohibited.append(name)
+            raise AssertionError(f"diagnostic must not call {name}")
+        return call
+
+    def selected(_mapped):
+        scene.state.selected = diagnostic.raw
+        scene.sketch.GetSketchSegments = forbid("GetSketchSegments")
+        scene.stock.GetCorresponding = forbid("GetCorresponding")
+        scene.source.ShowConfiguration2 = forbid("ShowConfiguration2")
+        scene.source.Save3 = forbid("source.Save3")
+        scene.source.SaveAs3 = forbid("source.SaveAs3")
+        scene.model.Save3 = forbid("drawing.Save3")
+        scene.model.SaveAs3 = forbid("drawing.SaveAs3")
+        scene.model.SetLineColor = forbid("SetLineColor")
+        scene.model.EditRebuild3 = forbid("EditRebuild3")
+        scene.model.Extension.SelectByID2 = forbid("SelectByID2")
+
+    scene.state.after_select = selected
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    _stock_identity_receipt(diagnostic)
+    assert prohibited == []
+    assert len(scene.selections) == 1 and scene.colors == []
+    assert scene.correspondences == scene.segments
+    assert scene.state.active == "OriginalFinished" and scene.state.selected is None
+    assert scene.stock.ReferencedConfiguration == drawing.SUPPLIER_STOCK_CONFIGURATION
+    assert scene.feature.Visible == scene.thread.Visible == 1
+    assert not any(
+        isinstance(call, tuple) and call[0] in ("show", "source-rebuild", "blank")
+        for call in scene.calls[calls_before:]
+    )
+    assert [
+        (drawing._supplier_profile_curve(source, "after"), drawing._supplier_profile_curve(mapped, "after"),
+         mapped.Color, mapped.Width, mapped.Style, mapped.Layer)
+        for source in scene.segments
+        for mapped in (scene.mapped[id(source)],)
+    ] == before
+
+
+def test_successful_exact_stock_selection_never_reports_or_uses_diagnostic_getters(
+    stock_identity_failure_scene, monkeypatch,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    scene.state.after_select = None
+    reports = []
+
+    def forbidden_report(*args):
+        reports.append(args)
+        raise AssertionError("the successful path must bypass reporting")
+
+    monkeypatch.setattr(drawing, "_report_supplier_selection_identity", forbidden_report)
+    assert _blacken_stock(scene, diagnostic.capture) is None
+    assert reports == diagnostic.receipts == diagnostic.reverse_reads == diagnostic.selected_view_reads == []
+    assert len(scene.selections) == len(scene.colors) == 9
+    assert scene.state.active == "OriginalFinished" and scene.state.selected is None
+
+
+@pytest.mark.parametrize("expected_index", (3, 8))
+def test_selection_identity_receipt_marks_later_line_candidate_without_repairing_selection(
+    stock_identity_failure_scene, expected_index,
+):
+    diagnostic = stock_identity_failure_scene
+    scene = diagnostic.scene
+    rejected = scene.mapped[id(scene.segments[expected_index])]
+
+    def selected(mapped):
+        if mapped is rejected:
+            # Even the wrong primitive kind is merely reported, never repicked.
+            scene.state.selected = diagnostic.raw
+
+    scene.state.after_select = selected
+    with pytest.raises(RuntimeError, match="selection is not the exact mapped native curve"):
+        _blacken_stock(scene, diagnostic.capture)
+    context, rows = _stock_identity_receipt(diagnostic)
+    assert context["expected_index"]["value"] == expected_index
+    assert [row["index"]["value"] for row in rows if row["expected"]["value"]] == [expected_index]
+    source = scene.segments[expected_index]
+    assert context["candidate.source.start.X"]["value"] == source.start.X
+    assert context["candidate.source.end.Y"]["value"] == source.end.Y
+    assert context["candidate.mapped.start.X.finite"]["value"] is True
+    assert context["candidate.mapped.end.Y.finite"]["value"] is True
+    assert context["candidate.selected.raw.ISketchLine"]["error"] == (
+        "TypeError: native object does not expose ISketchLine"
+    )
+    assert len(scene.selections) == expected_index + 1
+    assert len(scene.colors) == expected_index
+    assert rejected.Color == diagnostic.raw.Color == diagnostic.typed.Color == 0x808080
+    assert scene.state.selected is None and scene.state.active == "OriginalFinished"
+
+
 def test_black_stock_profile_changes_only_all_nine_exact_drawing_instance_colors(stock_source_scene):
     scene = stock_source_scene
     capture = _stock_capture(scene)
@@ -2510,7 +2949,7 @@ def test_black_profile_selected_object_must_be_exact_mapped_native_identity(stoc
     assert scene.colors == [] and scene.state.selected is None
 
 
-@pytest.mark.parametrize("same", (True, False, -1, 2, 1.0, "1", None))
+@pytest.mark.parametrize("same", (True, False, -1, 2, 3, 1.0, "1", None))
 def test_black_profile_never_coerces_native_issame_results(stock_source_scene, same):
     scene = stock_source_scene
     capture = _stock_capture(scene)
