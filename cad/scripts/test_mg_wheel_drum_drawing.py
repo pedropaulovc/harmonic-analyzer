@@ -16,7 +16,6 @@ import mg_wheel_drum_geom
 import mg_wheel_drum_spec as spec
 from _drawing_contract import model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import SEAT_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -88,7 +87,7 @@ def test_each_band_states_its_need_on_its_callout() -> None:
     bore = drawing.DIMENSION_CALLOUTS["DrumBore"].splitlines()
     assert bore == [
         "REAM THRU",
-        "PRESS ON MG-MAGNIFYING-WHEEL",
+        "PRESS ON MHA-MG-05 WHEEL",
         "SPIGOT, HARD AGAINST BOSS",
         "0.005-0.034 DIAMETRAL INTERFERENCE",
     ]
@@ -96,6 +95,8 @@ def test_each_band_states_its_need_on_its_callout() -> None:
         "FRONT FACE 0.00-0.20 BELOW",
         "WHEEL SPIGOT FACE",
     ]
+    # The mate's drawing number is the wheel's registry number.
+    assert _config.parts("mg-magnifying-wheel")["number"] == "MHA-MG-05"
 
 
 def test_registry_row() -> None:
@@ -143,9 +144,12 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     assert missing == []
 
 
-def test_bore_carries_the_seat_finish_and_no_gdt() -> None:
+def test_pressed_bore_carries_no_finish_and_no_gdt() -> None:
+    # drawing-guidelines.md rule 6: a pressed bore neither runs nor slides.
     names = set(_calls(drawing.__file__))
-    assert not names & {"add_datum_feature", "add_feature_control_frame"}
-    assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
-        ("mg_drum_bore", SEAT_UM)
-    ]
+    assert not names & {
+        "add_datum_feature",
+        "add_feature_control_frame",
+        "add_surface_finish",
+    }
+    assert spec.SURFACE_FINISHES == ()

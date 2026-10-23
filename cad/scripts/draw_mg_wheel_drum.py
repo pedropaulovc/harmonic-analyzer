@@ -28,23 +28,21 @@ from _drawing_dimensions import (
     move_model_dimension,
     set_dimension_callouts,
 )
-from _drawing_finish import add_surface_finish
-from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_registry import DRAWINGS_BY_NAME
-from _gear_drawing_entities import visible_circle_edge
-from _surface_finish import surface_finish_by_key
 from mg_wheel_drum_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    DRUM_BORE,
     DRUM_LEN,
     PRESS_CALLOUT,
     RECESS_CALLOUT,
-    SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_drum"]
@@ -101,17 +99,6 @@ DIMENSION_CALLOUTS = {
     "DrumBore": f"REAM THRU\n{PRESS_CALLOUT}",
     "DrumLen": RECESS_CALLOUT,
 }
-# The bore's seat finish (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)) lands on the bore up-left, clear of
-# the Ø line that runs up-right to its callout and through the centre to the
-# lower-left rim; the symbol stands outside the O.D. on the same bearing
-# (sheet metres from the landing).  Model x and y are the face view's.
-_FINISH_LANDING_MODEL = (
-    -DRUM_BORE / 2000.0 * 0.5**0.5,
-    DRUM_BORE / 2000.0 * 0.5**0.5,
-    0.0,
-)
-_FINISH_SYMBOL_OFFSET = (-0.012, 0.012)
-FINISH_CHAR_HEIGHT = 0.0025
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -183,23 +170,9 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # The template centre-marks the bore as the view is placed; run 11's
     # explicit AutoInsertCenterMarks2 printed a second, identical mark (the
-    # layout audit's duplicate-annotation finding).
-    landing = model_point_in_view(
-        adapter, front, _FINISH_LANDING_MODEL, label="drum bore finish landing"
-    )
-    add_surface_finish(
-        adapter,
-        front,
-        edge_entity=visible_circle_edge(adapter, front, DRUM_BORE),
-        symbol_xy=(
-            landing[0] + _FINISH_SYMBOL_OFFSET[0],
-            landing[1] + _FINISH_SYMBOL_OFFSET[1],
-        ),
-        control=surface_finish_by_key(SURFACE_FINISHES, "mg_drum_bore"),
-        label="drum bore finish",
-        leader_attach_xy=landing,
-        char_height=FINISH_CHAR_HEIGHT,
-    )
+    # layout audit's duplicate-annotation finding).  The pressed bore takes
+    # no roughness symbol (drawing-guidelines.md rule 6): it neither runs nor
+    # slides, and the ream and the stated interference control the fit.
 
     return await finalize_drawing(
         adapter,
