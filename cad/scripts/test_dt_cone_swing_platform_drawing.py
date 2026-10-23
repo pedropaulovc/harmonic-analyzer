@@ -2030,7 +2030,7 @@ def test_pivot_section_uses_profile_station_and_native_end_only_style():
     assert projections == [(profile, (0.0, 0.0, 0.0))]
     assert args[1] is profile
     assert kwargs.pop("line_start") == pytest.approx((0.029, 0.126724))
-    assert kwargs.pop("line_end") == pytest.approx((0.123, 0.126724))
+    assert kwargs.pop("line_end") == pytest.approx((0.094, 0.126724))
     assert kwargs == {
         "view_xy": drawing.SECTION_CENTER, "section_label": "A",
         "scale": (2, 1), "label": "pivot bearing section",
@@ -2044,7 +2044,7 @@ def test_profile_a_a_saved_envelope_clears_post_mount_witnesses():
     still prove the actual section line, arrows, and attachment geometry.
     """
     left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.048
+    right = drawing.PROFILE_CENTER[0] + 0.019
     stubs = ((left, left + 0.006), (right - 0.006, right))
     old_stubs = ((0.1574343, 0.1634343), (0.1965657, 0.2025657))
     witnesses = ((0.129, 0.1806485), (0.1806485, 0.226))
@@ -2053,7 +2053,15 @@ def test_profile_a_a_saved_envelope_clears_post_mount_witnesses():
     for stub in stubs:
         for start, end in witnesses:
             assert stub[1] < start or stub[0] > end
-    assert witnesses[0][0] - right == pytest.approx(0.006)
+    # Looking south, each end's arrow rises to its letter (31547443 render:
+    # the left end at x 0.029 printed its A over x 0.0262..0.0322).  At x
+    # 0.123 the right letter stood beside HOLE LOCATIONS' 202.84 line
+    # (x 0.1294) and read as that view's cut (machinist review, confirmed);
+    # now it stands by the plate, clear of C-C's right arrow (x 0.0834).
+    letter = (right - 0.0028, right + 0.0032)
+    assert witnesses[0][0] - letter[1] > 0.02
+    assert letter[0] - 0.0834 > 0.005
+    assert 0.1294 - (0.123 + 0.0032) < 0.005  # positive control: old end
 
 
 def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
@@ -2070,7 +2078,7 @@ def test_profile_radius_saved_envelopes_clear_a_a_and_c_c():
     r10_box = (r10[0] - 0.0072358, r10[1] - 0.0027781,
                r10[0] + 0.0072357, r10[1] + 0.0007219)
     left = drawing.PROFILE_CENTER[0] - 0.046
-    right = drawing.PROFILE_CENTER[0] + 0.048
+    right = drawing.PROFILE_CENTER[0] + 0.019
     assert r10_box[0] - (left + 0.006) > 0.002
     # Positive control: the original profile end would nearly touch R10.
     assert 0.0524343 - r10_box[2] < 0.002

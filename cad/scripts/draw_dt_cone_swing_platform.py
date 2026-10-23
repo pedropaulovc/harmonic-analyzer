@@ -1988,10 +1988,13 @@ async def build(adapter: Any) -> dict[str, str]:
     section = create_section_view(
         adapter,
         profile,
-        # Wider end-only ends clear R10's text on the left and R8's leader
-        # on the right, with 6 mm before the feature plan's Z witness.
+        # End-only ends: the left one clears R10's text.  The right one
+        # stands 18 mm off the plate's edge (R8's leader runs ~8 mm under
+        # its stub): at x 0.123 its sheet-up arrow and letter stood beside
+        # HOLE LOCATIONS' 202.84 line and read as that view's cut (machinist
+        # review of 31547443, confirmed r1-r3).
         line_start=(PROFILE_CENTER[0] - 0.046, profile_section_pivot[1]),
-        line_end=(PROFILE_CENTER[0] + 0.048, profile_section_pivot[1]),
+        line_end=(PROFILE_CENTER[0] + 0.019, profile_section_pivot[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=(2, 1),
