@@ -105,7 +105,7 @@ SUPPLIER_REFERENCE_SIDES = {
     "SupplierHeadHeight": "left",
     "SupplierThreadDiameter": "bottom",
     "SupplierDriveWidth": "bottom",
-    "SupplierThreadLength": "right",
+    "SupplierThreadLength": "left",
 }
 SUPPLIER_REFERENCE_FORMATS = {
     "SupplierLength": (3, "length", None, None),

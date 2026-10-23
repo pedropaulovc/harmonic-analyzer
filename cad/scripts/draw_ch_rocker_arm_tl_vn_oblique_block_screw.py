@@ -38,6 +38,7 @@ def _assert_supplier_minimums(displays: dict[str, Any]) -> None:
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    view_layout = "supplier_top"
     proofs: list[Callable[[], None]] = []
     callback_count = 0
 
@@ -54,6 +55,7 @@ async def build(adapter: Any) -> dict[str, str]:
             starts=supplier.SUPPLIER_REFERENCE_STARTS,
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            layout=view_layout,
         )
         _assert_supplier_minimums(displays)
 
@@ -64,6 +66,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
                 formats=supplier.SUPPLIER_REFERENCE_FORMATS,
                 planes=supplier.SUPPLIER_REFERENCE_PLANES,
+                layout=view_layout,
             )
             _assert_supplier_minimums(fresh)
 
@@ -79,7 +82,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         SPEC,
         item=ITEM,
-        view_layout="supplier_top",
+        view_layout=view_layout,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=supplier_screw_margins(
             supplier.SUPPLIER_REFERENCE_DIMENSIONS,

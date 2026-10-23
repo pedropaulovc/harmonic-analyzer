@@ -22,12 +22,13 @@ ITEM = "#8-32 X 3/4 SHCS"
 
 
 async def build(adapter: Any) -> dict[str, str]:
+    view_layout = "supplier_top"
     checks = []
     return await build_purchased_fastener_drawing(
         adapter,
         SPEC,
         item=ITEM,
-        view_layout="supplier_top",
+        view_layout=view_layout,
         supplier_dimensions=partial(
             annotate_supplier_screw,
             dimensions=supplier.SUPPLIER_REFERENCE_DIMENSIONS,
@@ -36,6 +37,7 @@ async def build(adapter: Any) -> dict[str, str]:
             planes=supplier.SUPPLIER_REFERENCE_PLANES,
             sides=supplier.SUPPLIER_REFERENCE_SIDES,
             settled_checks=checks,
+            layout=view_layout,
         ),
         supplier_margins=supplier_screw_margins(
             supplier.SUPPLIER_REFERENCE_DIMENSIONS,

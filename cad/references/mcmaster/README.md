@@ -1608,6 +1608,10 @@ and physical witness before import. Only the drawing-local display is formatted,
 including its tolerance-display precision; source values and tolerance bands
 are never written. The drawing checks the independently mapped witness in its
 actual view, then rechecks the original source after dressing and final rebuild.
+The shared pin stations reserve room for the dressed reference text: dowel
+diameters clear the end-view center marks, and spring-pin application-hole
+labels sit to the right of their circle so the leader approaches outside the
+multiline qualifier. These are drawing-only moves within the existing lanes.
 
 Read-only supplier presentation refusals identify the first mismatched field
 and its actual/expected values, preserving native getter order and stopping
@@ -1630,18 +1634,52 @@ existing capacity. Native outline padding is measured at each candidate scale;
 it is not scaled with the part, and the settled view/annotation guards remain
 authoritative. Recorded R38 outlines provide offline fit regressions, not proof
 that the repaired drawing has passed a fresh native run.
+After supplier formatting settles, this same selected layout offsets short
+head-height text left and AF/diameter text right of the measured native line
+ends, using the existing 2 mm clearance. Arrow tips, witness spans and physical
+dimension-line stations must remain unchanged; the full ink audit still sees
+the offset leader. The block screw's thread-length lane is left of the part,
+opposite its overall length. Recorded R44 paint-data replays cover the observed
+collisions and refusal paths; they do not qualify a fresh native export.
 
 Washer ownership failures collect bounded, independent read-only context only
 after an ordinary native exception. Missing readers remain unavailable, never
 measured zero or acceptance. `KeyboardInterrupt` and `SystemExit` abort without
-starting or continuing optional observations. The failing ownership predicate
-remains strict; this evidence capture is not a claim that its native cause is fixed.
+starting or continuing optional observations. Identity refusals remain strict;
+optional observations do not license acceptance.
 
 Nut chord endpoints and washer witness points/segments attach in the drawing's
 namespace. Their independently checked part entities are mapped through the
 exact owning view's `GetCorresponding`; native one-to-one identity, distinct
 endpoints and no extra attachments are required there. Direct comparison
 between a part object and a drawing object is not an attachment proof.
+Both part displays and drawing imports require native `IDimension` identity
+with the dimension independently enumerated from the source feature and exact
+`model.Parameter("Dimension@Feature")`. Missing or different dimensions fail
+even when their names, values and types match. Feature-owner wrappers are not
+dimension identity: native R47/R49 returned unequal feature handles while all
+three canonical dimension identities were one. The reason for the wrapper
+discrepancy remains unproven. `GetFeatureOwner` and mapped-feature observations
+remain failure-only diagnostics, not an alternative acceptance path. Exact
+typed source-to-view entity mapping, physical geometry, source identity,
+configuration, values, tolerance bands and source-preservation guards remain
+required independently. Native R50 freshly qualified this unified contract on
+the five previously refused washer sheets, each with 18 clean, read-only,
+unchanged-hash source checkpoints. This is source/identity proof, not blanket
+layout acceptance: its CH thrust sheet retained an actual outer-rim strike
+through the OD reference's opening parenthesis.
+
+The shared washer drawing author settles the complete formatted thickness
+limits stack in native linear `OffsetText` mode, then measures its text and
+physical witnesses before placing the text on a right-hand shelf. Both full
+diameter value/qualifier blocks use the same measured placement beyond the face
+outline, without the unsupported diameter `OffsetText` mode. All use the
+existing 2 mm clearance plus 0.2 mm placement allowance and retain physical
+dimension stations, exact native/source identities and supplier bands.
+This drawing-only rule affects all seven washer sheets: R49/R50 native records
+show every OD block requires a move under that rule. Those retained records
+provide behavioral replays, not proof of the new settled native leader routes;
+all seven changed drawing outputs require fresh native visual qualification.
 
 Creating these diagram configurations rebuilds each original member before
 recording its preservation baseline. The native guard requires identical
