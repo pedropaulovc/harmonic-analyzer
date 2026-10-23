@@ -1,6 +1,7 @@
 """Offline manufacturing boundaries for the modified purchased anchor."""
 
 import asyncio
+import contextlib
 import math
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ import pytest
 
 import _config
 import _stock_trim_drawing as trim_drawing
+import _telemetry
 import build_sm_vn_boss_hook as part
 import sm_vn_boss_hook_spec as spec
 import draw_sm_vn_boss_hook as drawing
@@ -54,14 +56,25 @@ def test_deburr_band_clears_receiver_and_retains_full_threads():
 def test_lead_in_drives_the_restored_deburr_to_the_spec_nominal(monkeypatch, fault):
     """The shared trim restores the factory leg; the anchor drives its own."""
     calls = []
+    spans = []
+
+    @contextlib.asynccontextmanager
+    async def aspan(name, **_attributes):
+        spans.append(name)
+        try:
+            yield None
+        finally:
+            spans.append(f"/{name}")
+
+    monkeypatch.setattr(_telemetry, "aspan", aspan)
 
     class Dimension:
         def SetSystemValue3(self, value, which, names):
-            calls.append(("set", value, which))
+            calls.append(("set", value, which, list(spans)))
             return 2 if fault == "rejected" else 0
 
     async def rebuild(_adapter):
-        calls.append(("rebuild",))
+        calls.append(("rebuild", list(spans)))
 
     monkeypatch.setattr(
         part,
@@ -81,10 +94,16 @@ def test_lead_in_drives_the_restored_deburr_to_the_spec_nominal(monkeypatch, fau
     adapter = SimpleNamespace(currentModel=object())
     if fault is None:
         asyncio.run(part._size_lead_in(adapter))
-        assert calls == [("set", spec.CHAMFER_WIDTH_MM / 1000, 2), ("rebuild",)]
+        inside = ["stock.shank.lead_in"]
+        assert calls == [
+            ("set", spec.CHAMFER_WIDTH_MM / 1000, 2, inside),
+            ("rebuild", inside),
+        ]
     else:
         with pytest.raises(RuntimeError):
             asyncio.run(part._size_lead_in(adapter))
+    # One operation span, closed on success and on refusal alike.
+    assert spans == ["stock.shank.lead_in", "/stock.shank.lead_in"]
 
 
 @pytest.mark.parametrize(

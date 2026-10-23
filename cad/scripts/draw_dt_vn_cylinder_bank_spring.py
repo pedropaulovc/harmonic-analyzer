@@ -43,8 +43,6 @@ from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_leaders import (
     COLLINEAR_TOLERANCE,
     assert_leaders_clear,
-    dimension_segments,
-    distance_to_box,
     distance_to_line,
     set_near_side_diameter,
 )
@@ -61,6 +59,7 @@ from _supplier_disc_spring_drawing import (
     supplier_disc_reference_features,
     supplier_disc_spring_dimensions,
 )
+from _supplier_screw_dimensions import _assert_supplier_top_stations
 from _supplier_screw_layout import supplier_top_text_geometry
 from _supplier_spring_drawing import (
     build_supplier_spring_drawing,
@@ -93,7 +92,6 @@ TEXT_SIDES = {
     },
     "free_top": {ID_NAME: -1, OD_NAME: 1},
 }
-_STATION_FIELDS = ("tips", "witnesses", "physical_lines")
 # Line ends this close are joined; lines this close to a common line print as
 # one stroke (_drawing_leaders.COLLINEAR_TOLERANCE).
 _JOIN_M = 1e-5
@@ -204,18 +202,6 @@ def assert_plan_leaders(
     )
 
 
-def stations_match(prior: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
-    return all(
-        len(prior[field]) == len(current[field])
-        and all(
-            len(before) == len(after)
-            and all(abs(a - b) <= 1e-5 for a, b in zip(before, after, strict=True))
-            for before, after in zip(prior[field], current[field], strict=True)
-        )
-        for field in _STATION_FIELDS
-    )
-
-
 def _text_record(adapter: Any, display: Any, *, label: str) -> dict[str, Any]:
     reader = _Reader(adapter)
     record = _dump_annotation(reader, display.GetAnnotation())
@@ -289,11 +275,30 @@ def lines_through_own_text(
 
 
 def _size_records(adapter: Any, displays: Mapping[str, Any]) -> dict[str, Any]:
+    """One native snapshot of the four size dimensions; every check reads it."""
     return {
         name: _text_record(adapter, displays[name], label=name)
         for sides in TEXT_SIDES.values()
         for name in sides
     }
+
+
+def height_stations(records: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Each height's native tips, witnesses and dimension lines, plus its text."""
+    return {
+        name: supplier_top_text_geometry(records[name], horizontal=False)
+        for name in TEXT_SIDES["free_front"]
+    }
+
+
+def assert_height_stations(
+    records: Mapping[str, Any], baseline: Mapping[str, Mapping[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """The shared supplier-Top station check against the pre-mutation baseline."""
+    current = height_stations(records)
+    for name, geometry in current.items():
+        _assert_supplier_top_stations(name, baseline[name], geometry)
+    return current
 
 
 def _segments(record: Mapping[str, Any]) -> list[tuple[tuple[float, float], ...]]:
@@ -303,20 +308,45 @@ def _segments(record: Mapping[str, Any]) -> list[tuple[tuple[float, float], ...]
     ]
 
 
+def _is_shoulder(stroke: tuple, text: Any, tip_x: float) -> bool:
+    """A level stroke on the text's baseline under all of the text, ending at
+    the text's far edge (away from the arrow), as SolidWorks draws it."""
+    (ax, ay), (bx, by) = stroke
+    low, high = min(ax, bx), max(ax, bx)
+    far_end = abs(high - text.xmax) if tip_x < text.xmin else abs(low - text.xmin)
+    return (
+        abs(ay - by) <= 1e-7
+        and abs(ay - text.ymin) <= _SHOULDER_REACH_M
+        and low <= text.xmin + COLLINEAR_TOLERANCE
+        and high >= text.xmax - COLLINEAR_TOLERANCE
+        and far_end <= COLLINEAR_TOLERANCE
+    )
+
+
 def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
-    """A one-arrow diameter's lines as (longest simple path from the arrow tip, rest)."""
+    """A one-arrow diameter's lines as (arrow tip -> text shoulder, every other).
+
+    The chain is anchored at both ends: it starts at the arrow tip and its last
+    stroke is the shoulder under the text. Of several such paths the one with
+    fewest strokes is the leader; a stroke past the shoulder or any detour is
+    left over for ``stray_leader_lines``.
+    """
     arrows = record["display"].get("arrows") or ()
     if len(arrows) != 1:
         raise RuntimeError(
             f"{record.get('name')}: near-side diameter has {len(arrows)} arrows"
         )
     segments = _segments(record)
-    best: list[int] = []
+    text = display_box({"texts": record["display"]["texts"]})
+    tip = (float(arrows[0][0]), float(arrows[0][1]))
+    best: list[int] | None = None
 
     def walk(point: tuple[float, float], used: list[int]) -> None:
         nonlocal best
-        if len(used) > len(best):
-            best = list(used)
+        if used and _is_shoulder(segments[used[-1]], text, tip[0]):
+            if best is None or len(used) < len(best):
+                best = list(used)
+            return
         for index, (a, b) in enumerate(segments):
             if index in used:
                 continue
@@ -325,7 +355,11 @@ def leader_chain(record: Mapping[str, Any]) -> tuple[list, list]:
             elif math.dist(b, point) <= _JOIN_M:
                 walk(a, [*used, index])
 
-    walk((float(arrows[0][0]), float(arrows[0][1])), [])
+    walk(tip, [])
+    if best is None:
+        raise RuntimeError(
+            f"{record.get('name')}: leader does not reach its text shoulder"
+        )
     chain = [segments[index] for index in best]
     rest = [segment for index, segment in enumerate(segments) if index not in best]
     return chain, rest
@@ -367,12 +401,9 @@ def stray_leader_lines(record: Mapping[str, Any]) -> list[tuple[float, ...]]:
 
 
 def shoulder_y(record: Mapping[str, Any]) -> float:
-    """The y of a diameter's horizontal shoulder: the longest level chain stroke."""
+    """The y of a diameter's text shoulder, the last stroke of its leader chain."""
     chain, _rest = leader_chain(record)
-    level = [stroke for stroke in chain if abs(stroke[0][1] - stroke[1][1]) <= 1e-7]
-    if not level:
-        raise RuntimeError(f"{record.get('name')}: leader has no horizontal shoulder")
-    return max(level, key=lambda stroke: math.dist(*stroke))[0][1]
+    return chain[-1][0][1]
 
 
 def diameter_seat_move(
@@ -403,13 +434,6 @@ def assert_diameter_ink(
     stray = stray_leader_lines(record)
     if stray:
         raise RuntimeError(f"{label}: lines off its leader chain {stray!r}")
-    chain, _rest = leader_chain(record)
-    box = (text.xmin, text.ymin, text.xmax, text.ymax)
-    if (
-        not chain
-        or min(distance_to_box(stroke, box) for stroke in chain) > _SHOULDER_REACH_M
-    ):
-        raise RuntimeError(f"{label}: leader does not reach its text")
     ink = display_box(record["display"])
     x0, y0, x1, y1 = FREE_TOP_CELL
     if not (x0 <= ink.xmin and ink.xmax <= x1 and y0 <= ink.ymin and ink.ymax <= y1):
@@ -419,18 +443,18 @@ def assert_diameter_ink(
 
 
 def _assert_heights(
-    adapter: Any,
     displays: Mapping[str, Any],
-    stations: Mapping[str, Mapping[str, Any]],
+    records: Mapping[str, Any],
+    baseline: Mapping[str, Mapping[str, Any]],
 ) -> None:
-    records = _size_records(adapter, displays)
-    for name, side in TEXT_SIDES["free_front"].items():
-        geometry = supplier_top_text_geometry(records[name], horizontal=False)
-        if displays[name].OffsetText is not True or not stations_match(
-            stations[name], geometry
-        ):
-            raise RuntimeError(f"{name}: offset text moved its native lines")
-        assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
+    for name, geometry in assert_height_stations(records, baseline).items():
+        if displays[name].OffsetText is not True:
+            raise RuntimeError(f"{name}: native offset text was lost")
+        assert_height_text_clear(
+            geometry,
+            TEXT_SIDES["free_front"][name],
+            label=f"{supplier_spec.SKU} {name}",
+        )
     struck = lines_through_own_text(records, TEXT_SIDES["free_front"])
     if struck:
         raise RuntimeError(
@@ -439,21 +463,16 @@ def _assert_heights(
 
 
 def _assert_diameters(
-    adapter: Any,
-    displays: Mapping[str, Any],
+    records: Mapping[str, Any],
     plan: tuple[float, float, float, float],
     placement: PlanPlacement,
 ) -> None:
-    records = _size_records(adapter, displays)
     for name, side in placement.sides.items():
         assert_diameter_ink(
             records[name], plan, side, label=f"{supplier_spec.SKU} {name}"
         )
     assert_plan_leaders(
-        {
-            name: dimension_segments(displays[name].GetAnnotation())
-            for name in placement.sides
-        },
+        {name: _segments(records[name]) for name in placement.sides},
         plan,
         label=f"{supplier_spec.SKU} plan diameters",
     )
@@ -469,23 +488,28 @@ def _seat_diameters(
     displays: Mapping[str, Any],
     plan: tuple[float, float, float, float],
     placement: PlanPlacement,
-) -> None:
-    """Move both texts to the placement, re-reading after each rebuild."""
-    for _ in range(_SEAT_PASSES):
-        moves = {}
-        for name, side in placement.sides.items():
-            record = _text_record(adapter, displays[name], label=name)
-            moves[name] = (
-                record,
-                diameter_seat_move(record, plan, side, level=name in placement.level),
+) -> dict[str, Any]:
+    """Move both texts to the placement; return the converged native snapshot.
+
+    Every move is followed by a rebuild and a fresh read, the last one too, so
+    a placement that settles on its final permitted move is accepted.
+    """
+    for moved in range(_SEAT_PASSES + 1):
+        records = _size_records(adapter, displays)
+        moves = {
+            name: diameter_seat_move(
+                records[name], plan, side, level=name in placement.level
             )
+            for name, side in placement.sides.items()
+        }
         if all(
-            abs(dx) <= _SEATED_M and abs(dy) <= _SEATED_M
-            for _record, (dx, dy) in moves.values()
+            abs(dx) <= _SEATED_M and abs(dy) <= _SEATED_M for dx, dy in moves.values()
         ):
-            return
-        for name, (record, (dx, dy)) in moves.items():
-            _move_text(displays[name], record, dx, dy, label=name)
+            return records
+        if moved == _SEAT_PASSES:
+            break
+        for name, (dx, dy) in moves.items():
+            _move_text(displays[name], records[name], dx, dy, label=name)
         rebuild_drawing(adapter, label=f"cylinder bank spring plan: {placement.label}")
     raise RuntimeError(f"text did not settle in {_SEAT_PASSES} moves")
 
@@ -499,8 +523,8 @@ def choose_plan_placement(
     rejected = []
     for placement in PLAN_PLACEMENTS:
         try:
-            _seat_diameters(adapter, displays, plan, placement)
-            _assert_diameters(adapter, displays, plan, placement)
+            records = _seat_diameters(adapter, displays, plan, placement)
+            _assert_diameters(records, plan, placement)
         except RuntimeError as error:
             rejected.append(f"{placement.label}: {error}")
             _telemetry.info(
@@ -525,21 +549,29 @@ def place_size_texts(
 ) -> Callable[[], None]:
     """Move the four size texts off their lines; return their settled check."""
     displays = _size_displays(adapter, views)
+    # Every height station is compared with this read, taken before any
+    # position, offset or style change, after each stage below.
+    records = _size_records(adapter, displays)
+    baseline = height_stations(records)
     for name in TEXT_SIDES["free_top"]:
         set_near_side_diameter(
             displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}"
         )
     # Pin each height's dimension line at its own station before offset mode;
     # from then on SetPosition2 moves only the text (R48 washer sequence).
-    anchors = {}
-    for name in TEXT_SIDES["free_front"]:
-        record = _text_record(adapter, displays[name], label=name)
-        tips = supplier_top_text_geometry(record, horizontal=False)["tips"]
-        anchors[name] = (sum(tip[0] for tip in tips) / 2.0, float(record["pos"][1]))
+    anchors = {
+        name: (
+            sum(tip[0] for tip in geometry["tips"]) / 2.0,
+            float(records[name]["pos"][1]),
+        )
+        for name, geometry in baseline.items()
+    }
+    for name, anchor in anchors.items():
         annotation = _early_bound(displays[name].GetAnnotation(), "IAnnotation")
-        if not annotation.SetPosition2(*anchors[name], 0.0):
+        if not annotation.SetPosition2(*anchor, 0.0):
             raise RuntimeError(f"{name}: dimension line station was rejected")
     rebuild_drawing(adapter, label="cylinder bank spring height stations")
+    assert_height_stations(_size_records(adapter, displays), baseline)
     for name, anchor in anchors.items():
         display = displays[name]
         display.OffsetText = True
@@ -547,31 +579,25 @@ def place_size_texts(
         if display.OffsetText is not True or not annotation.SetPosition2(*anchor, 0.0):
             raise RuntimeError(f"{name}: native offset text was rejected")
     rebuild_drawing(adapter, label="cylinder bank spring offset height text")
-    plan = reference_bounds("free_top")
+    records = _size_records(adapter, displays)
     shifts = {}
-    for name, side in TEXT_SIDES["free_front"].items():
-        record = _text_record(adapter, displays[name], label=name)
-        geometry = supplier_top_text_geometry(record, horizontal=False)
-        shifts[name] = height_text_shift(geometry, side)
-        _move_text(displays[name], record, shifts[name], label=name)
+    for name, geometry in assert_height_stations(records, baseline).items():
+        shifts[name] = height_text_shift(geometry, TEXT_SIDES["free_front"][name])
+        _move_text(displays[name], records[name], shifts[name], label=name)
     rebuild_drawing(adapter, label="cylinder bank spring height text shelves")
-    stations = {
-        name: supplier_top_text_geometry(
-            _text_record(adapter, displays[name], label=name), horizontal=False
-        )
-        for name in TEXT_SIDES["free_front"]
-    }
     _telemetry.info(
         f"{supplier_spec.SKU}: height texts moved "
         + ", ".join(f"{name} {dx * 1000:+.2f} mm" for name, dx in shifts.items())
     )
-    _assert_heights(adapter, displays, stations)
+    _assert_heights(displays, _size_records(adapter, displays), baseline)
+    plan = reference_bounds("free_top")
     placement = choose_plan_placement(adapter, displays, plan)
 
     def settled() -> None:
         current = _size_displays(adapter, views)
-        _assert_heights(adapter, current, stations)
-        _assert_diameters(adapter, current, plan, placement)
+        snapshot = _size_records(adapter, current)
+        _assert_heights(current, snapshot, baseline)
+        _assert_diameters(snapshot, plan, placement)
 
     settled()
     return settled
