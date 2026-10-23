@@ -9561,6 +9561,14 @@ def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
         f"{name}@{feature}": sources[label].native
         for label, (feature, name) in washer.SOURCE_DIMENSIONS.items()
     }
+    # Distinct part/import Python wrappers can denote the same native IDimension.
+    # Foreign lookalikes are not registered and retain their own identity.
+    canonical_dimensions = {
+        id(case.native): sources[label].native
+        for collection in (sources, imports) for label, case in collection.items()
+    }
+    adapter.swApp.IsSame = lambda left, right: int(
+        canonical_dimensions.get(id(left), left) is canonical_dimensions.get(id(right), right))
     model.Parameter = parameters.get
     monkeypatch.setattr(model_helpers, "_named_dimensions", lambda _adapter, _feature, names, **_kwargs: {
         name: (sources[label].display, sources[label].native)
@@ -9630,18 +9638,30 @@ def test_washer_import_never_repairs_source_or_import_value_band_and_geometry(mo
         assert case.imported_calls == []
 
 
+@pytest.mark.parametrize("label", (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+))
+@pytest.mark.parametrize("axis", ("y", "z"))
 @pytest.mark.parametrize("defect", ["missing", "duplicate", "foreign", "raw_source", "extra"])
-def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypatch, defect):
-    case = _washer_import_native(monkeypatch)
-    label = case.helper.THICKNESS
+def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypatch, defect, label, axis):
+    case = _washer_import_native(monkeypatch, axis=axis)
     imported = case.imports[label]
     entities = list(imported.annotation.entities)
+    source = case.sources[label]
+    feature, dimension = case.source_helper.SOURCE_DIMENSIONS[label]
+    assert imported.native.FullName == source.native.FullName
+    assert imported.native.SystemValue == source.native.SystemValue
+    assert case.adapter.swApp.IsSame(imported.native, source.native) == 1
+    assert case.adapter.swApp.IsSame(imported.native, case.model.Parameter(f"{dimension}@{feature}")) == 1
     if defect == "missing":
         case.mapped.pop(id(case.entities[label][0]))
     elif defect == "duplicate":
-        case.mapped[id(case.entities[label][1])] = entities[0]
+        if label == case.helper.THICKNESS:
+            case.mapped[id(case.entities[label][1])] = entities[0]
+        else:
+            entities.append(entities[0])
     elif defect == "foreign":
-        entities[0] = SimpleNamespace()
+        entities[0] = SimpleNamespace(**vars(entities[0]))
     elif defect == "raw_source":
         entities = list(case.entities[label])
     else:
@@ -9649,6 +9669,6 @@ def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypat
     imported.annotation.entities = tuple(entities)
     with pytest.raises(RuntimeError):
         case.source_helper.assert_supplier_washer_source_attachment(
-            case.adapter, case.model, imported.display, view=case.views["*Front"],
-            label=label, axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+            case.adapter, case.model, imported.display, view=imported.annotation.Owner,
+            label=label, axis=axis, bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
         )

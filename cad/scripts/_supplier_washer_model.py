@@ -172,8 +172,9 @@ def assert_supplier_washer_source_attachment(
 
     A diameter must attach to its exact construction circle. Thickness must
     attach to the two points of the sole line at the physical OD flank.
-    ``view=None`` checks canonical part-dimension identity. A drawing import
-    instead maps the checked source entities and feature into its exact view.
+    Both part and drawing dimensions must match the independently enumerated
+    source IDimension and exact model parameter. Drawing attachments additionally
+    map the checked physical source entities into their exact view.
     """
     feature_name, dimension_name = SOURCE_DIMENSIONS[label]
     parameter_name = f"{dimension_name}@{feature_name}"
@@ -192,23 +193,14 @@ def assert_supplier_washer_source_attachment(
         if native is None or source_native is None:
             raise RuntimeError(f"{label}: missing native dimension for its named model witness")
         full_name = str(native.FullName or "")
-        if view is None:
-            part_parameter = _early_bound(
-                _early_bound(model, "IModelDoc2").Parameter(parameter_name), "IDimension")
-            part_parameter_read = True
-            identity_proven = (
-                part_parameter is not None
-                and int(adapter.swApp.IsSame(native, source_native)) == 1
-                and int(adapter.swApp.IsSame(native, part_parameter)) == 1
-            )
-        else:
-            owner = native.GetFeatureOwner()
-            mapped_owner = _early_bound(view, "IView").GetCorresponding(feature)
-            expected_owner = None if mapped_owner is None else _early_bound(mapped_owner, "IFeature")
-            identity_proven = (
-                owner is not None and expected_owner is not None
-                and int(adapter.swApp.IsSame(owner, expected_owner)) == 1
-            )
+        part_parameter = _early_bound(
+            _early_bound(model, "IModelDoc2").Parameter(parameter_name), "IDimension")
+        part_parameter_read = True
+        identity_proven = (
+            part_parameter is not None
+            and int(adapter.swApp.IsSame(native, source_native)) == 1
+            and int(adapter.swApp.IsSame(native, part_parameter)) == 1
+        )
         if (
             not identity_proven
             or full_name.split("@")[:2] != [dimension_name, feature_name]
@@ -248,16 +240,12 @@ def assert_supplier_washer_source_attachment(
             source_document = observe("source_document_handle", lambda: _early_bound(model, "IModelDoc2"))
             source_path = observe("source_path", lambda: None if source_document is None else
                                   source_document.GetPathName())
-            if view is None:
-                if part_parameter_read:
-                    parameter = observe("model_parameter_handle", lambda: part_parameter)
-                else:
-                    parameter = None
-                    fields["model_parameter_handle_state"] = "UNAVAILABLE"
-                    fields["model_parameter_handle_reason"] = "source-part parameter lookup did not complete"
+            if part_parameter_read:
+                parameter = observe("model_parameter_handle", lambda: part_parameter)
             else:
-                parameter = observe("model_parameter_handle", lambda: None if source_document is None else
-                                    _early_bound(source_document.Parameter(parameter_name), "IDimension"))
+                parameter = None
+                fields["model_parameter_handle_state"] = "UNAVAILABLE"
+                fields["model_parameter_handle_reason"] = "source-part parameter lookup did not complete"
             loaded_document = observe("loaded_document_handle", lambda: None if source_path is None else
                                       _early_bound(adapter.swApp.GetOpenDocumentByName(source_path), "IModelDoc2"))
             configuration_manager = observe("source_configuration_manager_handle", lambda: None
