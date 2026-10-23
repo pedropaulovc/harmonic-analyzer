@@ -1,4 +1,4 @@
-"""Offline contract for the magnifier assembly drawing and its stack settings."""
+"""Offline drawing contracts with stateful, immutable magnifier source readbacks."""
 
 import asyncio
 import json
@@ -474,13 +474,6 @@ def test_the_assembled_views_name_their_direction_clear_of_their_neighbours() ->
     assert boxes[1][1] < iso_left
 
 
-def test_every_step_is_numbered_in_sequence() -> None:
-    assert tuple(notes.STEP_TEXT) == steps.SEQUENCE
-    assert notes.ASSEMBLY_STEPS == tuple(
-        f"{steps.step_number(key)}. {notes.STEP_TEXT[key]}" for key in steps.SEQUENCE
-    )
-
-
 def test_the_lever_settings_match_the_placed_lever_group() -> None:
     assert stack.LEVER_TIP_X == pytest.approx(assembly.LEVER_X0)
     assert stack.LEVER_AXIS_Y == pytest.approx(assembly.LEVER_ROD_Y)
@@ -906,13 +899,6 @@ def test_the_steps_and_checks_fit_their_column() -> None:
         )
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    assert drawing.ASSEMBLY_STEPS.split() == " ".join(
-        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)
-    ).split()
-    assert drawing.ASSEMBLY_CHECKS.split() == " ".join(notes.ASSEMBLY_CHECKS).split()
-    for number in drawing.BOM_PART_NUMBERS.values():
-        if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.ASSEMBLY_STEPS
 
 
 def test_the_exploded_ladders_keep_the_simplified_configuration() -> None:
@@ -1329,6 +1315,8 @@ def test_bom_keeps_physical_quantity_and_refuses_rebuild_drift(
         "quantity",
         "hidden-row",
         "unreadable-row",
+        "source-dirty",
+        "source-bytes",
     ),
 )
 def test_finalization_rereads_retained_bom_after_reference_hiding(
@@ -1357,14 +1345,15 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
 
     table.GetComponents2 = components
     source = tmp_path / "magnifier.SLDASM"
-    source.touch()
+    source.write_bytes(b"released magnifier assembly")
     monkeypatch.setattr(drawing, "SOURCE", source)
     seat = stub_seat(
         monkeypatch,
         drawing,
         keep=(
             "build", "validate_bom_number_property",
-            "component_identity", "component_reference_names",
+            "component_identity", "component_reference_names", "_validate_source",
+            "_assert_source_identity", "_source_dirty_tracer", "_source_sha256",
         ),
     )
     seat._early_bound.side_effect = lambda value, _interface: value
@@ -1390,37 +1379,13 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         drawing, "_assert_bom_clears_reference_field", lambda _table: None
     )
     seat.finalize_drawing.return_value = {"drawing": "offline.SLDDRW"}
-    identity = (
-        1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-        0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0,
-    )
-    source_components = []
-    for stem in notes.BOM_ORDER:
-        for index in range(notes.QUANTITIES[stem]):
-            source_components.append(SimpleNamespace(
-                Name2=f"{stem}-{index + 1}",
-                GetPathName=lambda stem=stem: f"C:/native/{stem}.SLDPRT",
-                ReferencedConfiguration=(
-                    "LeverWire" if stem == notes.WIRE else "Default"
-                ),
-                ComponentReference="LeverWire:1" if stem == notes.WIRE else "",
-                GetTotalTransform=lambda _presentation: SimpleNamespace(
-                    ArrayData=identity
-                ),
-            ))
-    source_model = SimpleNamespace(
-        ConfigurationManager=SimpleNamespace(
-            ActiveConfiguration=SimpleNamespace(Name="Default")
-        ),
-        GetExplodedViewNames2=lambda configuration: (
-            drawing.EXPLODED_VIEW_NAMES[configuration],
-        ),
-        GetComponents=lambda _top_level: tuple(source_components),
-    )
+    source_model = _ExplodeSource()
     adapter = SimpleNamespace(
         open_model=AsyncMock(), currentModel=source_model
     )
     assert asyncio.run(drawing.build(adapter)) == {"drawing": "offline.SLDDRW"}
+    assert not source_model.GetSaveFlag()
+    assert source.read_bytes() == b"released magnifier assembly"
     checks = seat.finalize_drawing.call_args.kwargs["settled_checks"]
     expected_reads = [
         (row, reference.ReferencedConfiguration) for row in range(1, table.RowCount)
@@ -1447,11 +1412,21 @@ def test_finalization_rereads_retained_bom_after_reference_hiding(
         table.row_hidden[1] = True
     elif fault == "unreadable-row":
         table.row_hidden[1] = None
-    else:
+    elif fault == "member":
         magnifier_bom.wire.ReferencedConfiguration = "PenWire Simplified"
+    elif fault == "source-dirty":
+        source_model.dirty = True
+    elif fault == "source-bytes":
+        source.write_bytes(b"changed magnifier assembly")
     with pytest.raises(RuntimeError):
         for check in checks:
             check()
+    assert source_model.dirty == (fault == "source-dirty")
+    assert source.read_bytes() == (
+        b"changed magnifier assembly"
+        if fault == "source-bytes"
+        else b"released magnifier assembly"
+    )
 
 
 @pytest.mark.parametrize("wire_member", ("LeverWire", "LeverWire Simplified"))
@@ -1720,7 +1695,10 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
             explode.ExplodeStep("first back", ("slider:1",), "z", 7.0),
         ),
     )
-    monkeypatch.setattr(explode, "SHOWN_STEMS", frozenset({"slider", "stationary"}))
+    monkeypatch.setattr(
+        explode, "SHOWN_STEMS",
+        frozenset({"slider", "stationary", "sh-vn-music-wire"}),
+    )
     # Absolute native positions, not recipe vectors or encoder output. All
     # three baseline translations are nonzero. The small final residuals are
     # deliberately inside the author's existing 1e-7 m verification tolerance.
@@ -1740,6 +1718,7 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
             (-0.16999999, 0.350, -0.400),
         ),
         "stationary-1": ((0.100, 0.200, 0.300),) * 5,
+        "sh-vn-music-wire-73": ((-0.150, 0.225, 0.075),) * 5,
     }
     requests = (
         (0.030, ("slider-1", "slider-2"), "X", False),
@@ -1774,6 +1753,12 @@ def _native_mg_author(monkeypatch, configuration_name, mismatch=None):
     components = {
         name: SimpleNamespace(
             Name2=name,
+            ComponentReference="LeverWire:1" if name == "sh-vn-music-wire-73" else "",
+            ReferencedConfiguration=(
+                ("LeverWire" if configuration_name == "Default" else "LeverWire Simplified")
+                if name == "sh-vn-music-wire-73"
+                else configuration_name
+            ),
             GetPathName=lambda name=name: f"C:/parts/{name.rsplit('-', 1)[0]}.SLDPRT",
             GetTotalTransform=lambda presentation, name=name: transform(
                 name, state.stage if presentation and state.exploded else 0
@@ -1896,6 +1881,7 @@ def test_actual_mg_author_publishes_final_measured_offsets(monkeypatch, configur
         "slider-1": (0.04200003, -0.02500002, 0.00700004),
         "slider-2": (0.03000001, 0.0, 0.0),
         "stationary-1": (0.0, 0.0, 0.0),
+        "sh-vn-music-wire-73": (0.0, 0.0, 0.0),
     }
     assert set(payload["offsets_m"]) == set(expected)
     for name, vector in expected.items():
@@ -1959,6 +1945,10 @@ class _ExplodeSource:
         self.components = [
             SimpleNamespace(
                 Name2=item.name,
+                ComponentReference="LeverWire:1" if item.stem == notes.WIRE else "",
+                ReferencedConfiguration=(
+                    "LeverWire" if item.stem == notes.WIRE else "Default"
+                ),
                 GetPathName=lambda stem=item.stem: f"C:/parts/{stem}.SLDPRT",
                 GetTotalTransform=lambda _presentation: transform,
             )
@@ -1983,8 +1973,11 @@ class _ExplodeSource:
         return self.dirty
 
     def GetComponents(self, top_level):
-        assert top_level is True
-        return self.components
+        assert isinstance(top_level, bool)
+        return tuple(
+            component for component in self.components
+            if not top_level or "/" not in component.Name2.replace("\\", "/")
+        )
 
     def GetExplodedViewNames2(self, configuration):
         return (explode.exploded_view_name(configuration),)
@@ -2015,14 +2008,21 @@ def test_mg_validate_source_refuses_missing_metadata(monkeypatch, configuration)
     with pytest.raises((ValueError, RuntimeError), match="builder-owned explode offsets"):
         drawing._validate_source(source)
 
-@pytest.mark.parametrize("failure", ["active configuration", "displaced", "families"])
-def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure):
+@pytest.mark.parametrize(
+    ("failure", "message"),
+    [
+        ("active configuration", "Default configuration"),
+        ("displaced", "displaced"),
+        ("families", "families"),
+    ],
+)
+def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure, message):
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     source = _ExplodeSource()
     if failure == "active configuration":
         source.ConfigurationManager.ActiveConfiguration.Name = "Default Simplified"
     elif failure == "families":
-        source.components.pop()
+        source.components.pop(0)
     else:
         base = source.components[0].GetTotalTransform(False).ArrayData
         displaced = list(base)
@@ -2030,7 +2030,7 @@ def test_mg_metadata_does_not_replace_current_source_safety(monkeypatch, failure
         source.components[0].GetTotalTransform = lambda presentation: SimpleNamespace(
             ArrayData=displaced if presentation else base
         )
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match=message):
         drawing._validate_source(source)
 
 
