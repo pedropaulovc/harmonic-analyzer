@@ -59,10 +59,21 @@ colocation alone is not a printed-callout drift check.
 `faces` contains the existing geometry selectors;
 `requirements` preserves the ordered acceptance-field names, including explicit
 unknowns. Each `fields` entry is `(value, sources)`: a string source names a
-symbol in `<stem>_spec`, while `(module, NAME)` cites a symbol in another module.
+symbol in the part's feature spec (normally `<stem>_spec`), while `(module, NAME)`
+cites a symbol in another module.
 Shared-helper sources name their defining module, such as
 `("_drawing_hole_callout", "add_native_hole_callout")`; the lifecycle-only
 `_drawing_common` module is not the authority for helpers extracted from it.
+
+A configured shared producer may declare one literal `FEATURE_SPEC_MODULE` in
+its drawing to name the actual saved/default member's spec instead. For example,
+`sh_vn_clamping_kit_hardware` names `sh_vn_clamping_kit_hold_down_stud_spec`,
+whose `CONFIGURATION` must match the registry's `default_configuration`
+(`HoldDownStud`). Do not invent an aggregate spec or re-export member facts to
+match the producer stem. The feature source closure includes the drawing, the
+selected spec and both transitive Python dependency closures without importing
+them; config reads from those sources remain feature-leaf inputs.
+
 Part-level fields, geometry frames and drawing datums use colocated
 `part_metadata` declarations with the same `(value, sources)` pairs; explicit
 `model_sources` and `precision_sources` cite the shared frame and displayed
