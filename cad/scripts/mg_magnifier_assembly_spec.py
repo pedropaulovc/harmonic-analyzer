@@ -52,14 +52,19 @@ BAR_FRONT_Z = _bar.BAR_FRONT_Z
 
 PRESS_GAUGE = _pin.PRESS_GAUGE
 PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL
-# The wheel-group stack needs BOTH press-gauge limits (mg_wheel_group corners).
-# Low: the shortest gauge whose full thread still runs past the locknut's outer
-# face at the thick-stack corner (LOCKNUT_THREAD_MARGIN) -- 38.048. High: the
-# tightest of three upper limits, at the thin-stack corner: at most
-# THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut (38.183), the first nut
-# clear of the die run-out (38.361) and the step inside the hub (38.807). The
-# printed band must sit inside that window, and the callout names the
-# thread-past-locknut limit as the high side's function, so it must govern.
+# The press gauge prints as a REFERENCE nominal, (38.10): its acceptance is
+# the function it serves, checked at the nuts once they are set and printed
+# on its callout (machinist review of 179705ff2: a ±0.05 band on a hand press
+# is unneeded precision when the function itself is checkable). The stack
+# shows a press to nominal passes that check. PRESS_GAUGE_TOL is the press
+# allocation the wheel-group stack spends (mg_wheel_group corners), inside
+# this window. Low: the shortest gauge whose full thread still runs past the
+# locknut's outer face at the thick-stack corner (LOCKNUT_THREAD_MARGIN) --
+# 38.048. High: the tightest of three upper limits, at the thin-stack corner:
+# at most THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut (38.183), the
+# first nut clear of the die run-out (38.361) and the step inside the hub
+# (38.807). The callout names the thread-past-locknut limit as the high
+# side's acceptance, so it must govern.
 PRESS_GAUGE_LOW_LIMIT = PRESS_GAUGE - PRESS_GAUGE_TOL - _group.LOCKNUT_THREAD_MARGIN
 _PRESS_GAUGE_HIGH_LIMITS = {
     "thread past locknut": _group.THREAD_PAST_LOCKNUT_LIMIT
@@ -82,7 +87,7 @@ if not (
     < PRESS_GAUGE + PRESS_GAUGE_TOL
     <= PRESS_GAUGE_HIGH_LIMIT
 ):
-    raise AssertionError("the press-gauge band leaves the wheel-group stack window")
+    raise AssertionError("the press allocation leaves the wheel-group stack window")
 # The modelled endshake sits mid-band, so its band prints symmetric.
 ENDSHAKE = _group.ENDSHAKE
 ENDSHAKE_TOL = _group.ENDSHAKE_MAX - _group.ENDSHAKE
@@ -104,10 +109,13 @@ PRESS_GAUGE_DIMENSION = "PressGauge"
 ENDSHAKE_DIMENSION = "Endshake"
 DRAWING_PRECISION = {FEATURE: {PRESS_GAUGE_DIMENSION: 2, ENDSHAKE_DIMENSION: 2}}
 TOLERANCE_PRECISION = 2
-DIMENSION_TOLERANCES = {
-    PRESS_GAUGE_DIMENSION: PRESS_GAUGE_TOL,
-    ENDSHAKE_DIMENSION: ENDSHAKE_TOL,
-}
+DIMENSION_TOLERANCES = {ENDSHAKE_DIMENSION: ENDSHAKE_TOL}
+# Printed as (value) through the native prefix/suffix channel, no band.
+REFERENCE_DIMENSIONS = frozenset({PRESS_GAUGE_DIMENSION})
+if REFERENCE_DIMENSIONS | set(DIMENSION_TOLERANCES) != set(
+    DRAWING_PRECISION[FEATURE]
+) or REFERENCE_DIMENSIONS & set(DIMENSION_TOLERANCES):
+    raise AssertionError("each stack setting is either banded or a reference")
 
 # --- The lever group's settings (LEVER_FEATURE, Front plane: sketch x is
 # machine x, sketch y machine y) ---------------------------------------------
@@ -151,13 +159,13 @@ INSTALLED_FULL_ENGAGEMENT_MIN = _lever.INSTALLED_FULL_ENGAGEMENT_MIN
 # but prints none of the callout (run 20261012T185729782Z). Below ones can wrap.
 SETTING_CALLOUTS = {
     FEATURE: {
-        # The wheel-group stack needs both gauge limits (PRESS_GAUGE_LOW_LIMIT,
-        # PRESS_GAUGE_HIGH_LIMIT); name what each protects, in the axle
+        # The reference gauge's acceptance, both sides of the stack window
+        # (PRESS_GAUGE_LOW_LIMIT, PRESS_GAUGE_HIGH_LIMIT), in the axle
         # drawing's thread-length wording (mg_wheel_group).
         PRESS_GAUGE_DIMENSION: (
             3,
-            "MIN: LOCKNUT ON FULL THREAD; MAX: END "
-            f"{_group.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST LOCKNUT",
+            "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END "
+            f"{_group.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST IT",
         ),
         ENDSHAKE_DIMENSION: (
             4,

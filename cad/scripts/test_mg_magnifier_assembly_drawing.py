@@ -22,7 +22,6 @@ import mg_wheel_axle_spec
 import mg_wheel_group
 from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
-from _printed_tolerance import printed_band_mm
 
 # The LANDSCAPE sheet's free field right of the isometric: inside the border
 # (about 13 mm in from the trim) and above the title block (sheet metres).
@@ -97,29 +96,29 @@ def test_the_stack_dimensions_are_marked_banded_and_called_out() -> None:
     names = {stack.PRESS_GAUGE_DIMENSION, stack.ENDSHAKE_DIMENSION}
     assert notes.DRAWING_DIMENSIONS == {stack.FEATURE: names}
     assert set(stack.DRAWING_PRECISION[stack.FEATURE]) == names
-    assert set(stack.DIMENSION_TOLERANCES) == names
-    assert stack.DIMENSION_TOLERANCES[stack.PRESS_GAUGE_DIMENSION] == 0.05
+    assert set(stack.DIMENSION_TOLERANCES) == {stack.ENDSHAKE_DIMENSION}
+    assert stack.REFERENCE_DIMENSIONS == {stack.PRESS_GAUGE_DIMENSION}
     assert stack.DIMENSION_TOLERANCES[stack.ENDSHAKE_DIMENSION] == pytest.approx(0.05)
     # One detail imports each setting.
     assert set(drawing.PRESSED_KEEP) == {stack.PRESS_GAUGE_DIMENSION}
     assert set(drawing.ENDSHAKE_KEEP) == {stack.ENDSHAKE_DIMENSION}
 
 
-def test_the_press_gauge_band_needs_both_limits_and_names_them() -> None:
-    # Machinist review of e04fd60ab: a tight two-sided band needs a function
-    # for each limit. The wheel-group stack sets both.
+def test_the_press_gauge_is_a_reference_accepted_at_the_nuts() -> None:
+    # Machinist reviews of e04fd60ab and 179705ff2: a ±0.05 band on a hand
+    # press is unneeded precision; the gauge prints as a reference and its
+    # callout states the acceptance. A press to nominal within the stack's
+    # allocation passes it at every corner.
     low = stack.PRESS_GAUGE - stack.PRESS_GAUGE_TOL
     high = stack.PRESS_GAUGE + stack.PRESS_GAUGE_TOL
     assert stack.PRESS_GAUGE_LOW_LIMIT == pytest.approx(38.0484, abs=1e-4)
     assert stack.PRESS_GAUGE_HIGH_LIMIT == pytest.approx(38.1834, abs=1e-4)
     assert stack.PRESS_GAUGE_LOW_LIMIT <= low < high <= stack.PRESS_GAUGE_HIGH_LIMIT
-    # Neither limit could relax to the title block's .XX band.
-    xx = printed_band_mm(2)
-    assert stack.PRESS_GAUGE - xx < stack.PRESS_GAUGE_LOW_LIMIT
-    assert stack.PRESS_GAUGE_HIGH_LIMIT < stack.PRESS_GAUGE + xx
     part, text = stack.SETTING_CALLOUTS[stack.FEATURE][stack.PRESS_GAUGE_DIMENSION]
     assert part == 3 and "\n" not in text
-    assert text == "MIN: LOCKNUT ON FULL THREAD; MAX: END 2.9 MAX PAST LOCKNUT"
+    assert text == "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END 2.9 MAX PAST IT"
+    # The acceptance is checked once both nuts are set.
+    assert "AXLE AS PRESSED ACCEPTANCE" in notes.STEP_TEXT[steps.LOCKNUT_JAMMED_KEY]
     # The one-line callout centres over the value: at the 2.7 mm a capital
     # measured on the e04fd60ab sheet it stays inside the right border.
     x, _y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
@@ -342,6 +341,8 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
             return SimpleNamespace(FeatureByName=lambda name: name)
         if iface == "IFeature":
             return SimpleNamespace(Visible=1 if entity in blanked else 2)
+        if iface == "IDimensionTolerance":
+            return entity
         return SimpleNamespace(ConstructionGeometry=False)
 
     async def set_global(adapter, name, expression):
@@ -372,7 +373,20 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         "_author_setting_callouts",
     ):
         monkeypatch.setattr(builder, name, lambda *a, **kw: None)
-    monkeypatch.setattr(builder, "_named_dimension", lambda *a: (object(), None))
+    references = {}
+
+    def named_dimension(_adapter, feature, name):
+        parts = {}
+        display = SimpleNamespace(
+            ShowParenthesis=True,
+            SetText=parts.__setitem__,
+            GetText=lambda part: parts.get(part, ""),
+        )
+        dimension = SimpleNamespace(Tolerance=SimpleNamespace(Type=4))
+        references[(feature, name)] = (display, dimension, parts)
+        return display, dimension
+
+    monkeypatch.setattr(builder, "_named_dimension", named_dimension)
     monkeypatch.setattr(
         builder,
         "set_dimension_symmetric_tolerance",
@@ -411,6 +425,17 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
         (feature, name, band) for name, band in stack.DIMENSION_TOLERANCES.items()
     ]
     assert blanked == [feature]
+    # The press gauge is a bare reference, (value) with no band; the banded
+    # endshake gets no affixes.
+    for (_feature, name), (display, dimension, parts) in references.items():
+        if name in stack.REFERENCE_DIMENSIONS:
+            assert dimension.Tolerance.Type == 0
+            assert display.ShowParenthesis is False
+            assert parts == {1: "(", 2: ")"}
+        else:
+            assert parts == {}
+    assert stack.REFERENCE_DIMENSIONS <= {name for _f, name in references}
+
 
 def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last() -> None:
     assert drawing.SHEET_NAMES[-1] == "ASSEMBLY STEPS"
@@ -3257,12 +3282,16 @@ def test_mg_settings_only_read_inherited_native_callouts(
     for name, (part, text) in callouts.items():
         text_parts[name] = {part: text.replace("\n", "\r\n")}
         band_m = stack.DIMENSION_TOLERANCES.get(name, 0.0) / 1000.0
+        reference = group == "stack" and name in stack.REFERENCE_DIMENSIONS
+        if reference:
+            text_parts[name].update({1: "(", 2: ")"})
         tolerance = SimpleNamespace(
-            Type=4,
+            Type=0 if reference else 4,
             GetMaxValue=lambda band=band_m: band,
             GetMinValue=lambda band=band_m: -band,
         )
         display = SimpleNamespace(
+            ShowParenthesis=False,
             SetText=forbidden,
             GetText=lambda part, name=name: text_parts[name].get(part, ""),
             GetPrimaryPrecision2=lambda name=name: precision[name],
