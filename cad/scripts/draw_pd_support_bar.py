@@ -1462,6 +1462,9 @@ async def build(adapter: Any) -> dict[str, str]:
             lambda: _assert_slot_marker_clear(
                 adapter, slot_section, slot_section_line, back_annotations
             ),
+            lambda: _assert_slot_callout_clear(
+                adapter, detail_annotations, slot_section, back_annotations
+            ),
             lambda: _assert_slot_depth_callout_clear(
                 adapter,
                 slot_section,
