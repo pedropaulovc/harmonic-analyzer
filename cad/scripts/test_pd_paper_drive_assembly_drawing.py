@@ -4557,6 +4557,114 @@ def test_pd_balloon_configuration_guard_reads_actual_state_without_forcing_it(mo
             drawing._assert_bom_balloon_configuration(View(), label="post-operation view")
 
 
+def _exploded_member_scene(monkeypatch, *, view_configuration="Default Simplified"):
+    """A shown simplified platen and a hidden spare; natives own both members."""
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_: obj)
+    monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_: obj)
+    scene = SimpleNamespace(leaves=[])
+
+    def native(stem, number):
+        def configuration(name, parent=None):
+            return SimpleNamespace(
+                Name=name, BOMPartNoSource=1, AlternateName="",
+                UseAlternateNameInBOM=False, Description=stem,
+                UseDescriptionInBOM=False, GetParent=lambda: parent,
+            )
+
+        parent = configuration("Default")
+        configurations = {
+            "Default": parent,
+            "Default Simplified": configuration("Default Simplified", parent),
+        }
+        properties = {("", "Number"): number}
+        return SimpleNamespace(
+            configurations=configurations, properties=properties,
+            GetConfigurationByName=configurations.get,
+            GetCustomInfoValue=lambda name, key: properties.get((name, key), ""),
+        )
+
+    for stem, visible in (("pd-platen", True), ("sh-vn-brass-fillister-screw", True),
+                          ("sh-vn-clamp-screw", False)):
+        model = native(stem, drawing.BOM_PART_NUMBERS[stem])
+        component = SimpleNamespace(
+            ReferencedConfiguration="Default Simplified",
+            GetPathName=lambda stem=stem: f"C:\\out\\{stem}.SLDPRT",
+            GetModelDoc2=lambda model=model: model,
+        )
+        scene.leaves.append(SimpleNamespace(
+            name=f"{stem}-1", path=f"{stem}-1", component=component, visible=visible,
+            model=model,
+        ))
+    monkeypatch.setattr(
+        drawing, "_view_component_leaves", lambda _adapter, _view, *, label: scene.leaves
+    )
+    scene.view = SimpleNamespace(ReferencedConfiguration=view_configuration)
+    return scene
+
+
+def test_exploded_balloon_members_prove_simplified_identity(monkeypatch):
+    scene = _exploded_member_scene(monkeypatch)
+    assert drawing._prove_exploded_balloon_members(None, scene.view, label="x") == 2
+
+
+@pytest.mark.parametrize(
+    "fault, message",
+    (
+        ("view-default", "exploded view configuration 'Default'"),
+        ("member-number", r"Numbers \("),
+        ("identity", "BOM identity"),
+        ("unknown-stem", "matches BOM rows"),
+        ("no-simplified", "no simplified member"),
+    ),
+)
+def test_exploded_balloon_members_refuse_unproven_identity(monkeypatch, fault, message):
+    scene = _exploded_member_scene(
+        monkeypatch,
+        view_configuration="Default" if fault == "view-default" else "Default Simplified",
+    )
+    platen = scene.leaves[0]
+    if fault == "member-number":
+        platen.model.properties[("Default Simplified", "Number")] = "MHA-PD-99"
+    elif fault == "identity":
+        platen.model.configurations["Default Simplified"].BOMPartNoSource = 8
+    elif fault == "unknown-stem":
+        platen.component.GetPathName = lambda: "C:\\out\\pd-unlisted.SLDPRT"
+    elif fault == "no-simplified":
+        for leaf in scene.leaves:
+            leaf.component.ReferencedConfiguration = "Default"
+    with pytest.raises(RuntimeError, match=message):
+        drawing._prove_exploded_balloon_members(None, scene.view, label="x")
+
+
+def test_balloon_configuration_exemption_is_only_the_exploded_view():
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(drawing))
+    balloons = {"add_component_bom_balloons", "_create_component_bom_balloon"}
+    calls = {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            calls[node.name] = {
+                call.func.id
+                for call in ast.walk(node)
+                if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+            }
+    ballooning = {name for name, called in calls.items() if called & balloons}
+    exempt = {
+        name for name in ballooning
+        if "_assert_bom_balloon_configuration" not in calls[name]
+    }
+    assert exempt == {"_place_exploded_sheet"}
+    assert "_prove_exploded_balloon_members" in calls["_place_exploded_sheet"]
+    assert {
+        name for name, called in calls.items()
+        if "_prove_exploded_balloon_members" in called
+    } == {"_place_exploded_sheet", "build"}
+    assert drawing.EXPLODED_BALLOON_CONFIGURATION == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    assert drawing.BOM_CONFIGURATION == "Default"
+
+
 @pytest.mark.parametrize("changed_item", [None, "*", "1"], ids=("stable", "star", "wrong-item"))
 def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     monkeypatch, changed_item,
@@ -4613,7 +4721,13 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
         landings, pieces[0], items, pieces, snapshot,
     ))
     monkeypatch.setattr(drawing, "_balloon_assembled_sheet", lambda *_: [])
-    monkeypatch.setattr(drawing, "_place_exploded_sheet", lambda *_: [])
+    exploded = object()
+    monkeypatch.setattr(drawing, "_place_exploded_sheet", lambda *_: ([], exploded))
+    proofs = []
+    monkeypatch.setattr(
+        drawing, "_prove_exploded_balloon_members",
+        lambda _adapter, view, *, label: proofs.append((view, label)) or 1,
+    )
 
     async def finalize(actual_adapter, _outputs, *, settled_checks, **_options):
         assert actual_adapter.currentModel.EditRebuild3() is True
@@ -4625,6 +4739,7 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     if changed_item is None:
         assert asyncio.run(drawing.build(adapter)) == {"settled": "passed"}
+        assert proofs == [(exploded, "settled paper-drive platen BOM coverage")]
         with pytest.raises(RuntimeError, match="no native components"):
             drawing._assert_bom_pieces(
                 pieces, header_count=1, total_rows=44,
