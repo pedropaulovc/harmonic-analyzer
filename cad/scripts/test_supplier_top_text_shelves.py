@@ -271,12 +271,23 @@ def test_unaffected_layouts_do_not_read_or_change_offset_text(monkeypatch, layou
 
 
 def _settled_block_replay(monkeypatch):
-    """Keep real placement/final callbacks; isolate unrelated source COM readers."""
+    """Keep source/binding, placement and final guards over native-shaped records."""
+    import _supplier_reference_text as core
+    import _supplier_screw_reference_text as reference_text
     import draw_ch_rocker_arm_tl_vn_oblique_block_screw as block
+    from test_purchased_fastener_drawing import _Model, _supplier_native
 
     displays = _displays("block")
     views = {}
     supplier = block.supplier
+    source = Path(__file__).with_name("stock.SLDPRT")
+    model = _Model(source)
+    model.GetConfigurationByName = lambda name: model if name == "Default" else None
+    parameters, features = {}, {}
+    model.Parameter = parameters.get
+    model.FeatureByName = features.get
+    adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+    values = {name: value for name, value, _ in supplier.SUPPLIER_REFERENCE_DIMENSIONS}
     for plane, feature in screws.FEATURE_BY_PLANE.items():
         rows = [
             displays[name] for name, _value, _orientation in supplier.SUPPLIER_REFERENCE_DIMENSIONS
@@ -284,32 +295,79 @@ def _settled_block_replay(monkeypatch):
         ]
         if not rows:
             continue
-        for display in rows:
-            name = display.record["name"]
-            native = SimpleNamespace(
-                FullName=f"{name}@{feature}@stock.SLDPRT",
-                Tolerance=SimpleNamespace(
-                    Type=5 if name in supplier.SUPPLIER_REFERENCE_MINIMUMS else 0,
-                    GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0,
-                ),
-            )
-            display.GetDimension2 = lambda _index, native=native: native
-            display.GetType = lambda: 4
-            display.GetSpecificAnnotation = lambda display=display: display
-            display.GetPrimaryTolPrecision2 = lambda: 3
         outline = _RECORDED["block"][f"*{plane}"]["outline"]
-        views[f"*{plane}"] = SimpleNamespace(
-            name=plane, rows=rows,
+        view = SimpleNamespace(
+            name=plane, rows=rows, ReferencedDocument=model, ReferencedConfiguration="Default",
+            GetReferencedModelName=lambda: str(source),
             GetOrientationName=lambda plane=plane: f"*{plane}",
             GetOutline=lambda outline=outline: outline,
             UpdateViewDisplayGeometry=lambda: None,
             GetAnnotations=lambda rows=rows: rows,
         )
-    monkeypatch.setattr(block, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(screws, "_binding", lambda _adapter, view: (view.name, "stock.SLDPRT", "Default"))
-    monkeypatch.setattr(screws, "_assert_source", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(screws, "supplier_reference_dimension", lambda _adapter, display, **_kwargs: display)
-    monkeypatch.setattr(screws, "assert_supplier_reference_dimension", lambda *_args, **_kwargs: None)
+        views[f"*{plane}"] = view
+        source_points = tuple(object() for _ in range(2 * len(rows)))
+        drawing_points = tuple(object() for _ in source_points)
+        mapped = dict(zip(source_points, drawing_points, strict=True))
+        view.GetCorresponding = mapped.get
+        sketch = SimpleNamespace(
+            GetSketchPoints2=lambda points=source_points: points,
+            GetSketchSegments=lambda: (),
+        )
+        source_displays = []
+        owner = SimpleNamespace(
+            Name=feature, GetTypeName2=lambda: "ProfileFeature",
+            GetSpecificFeature2=lambda sketch=sketch: sketch,
+            GetFirstDisplayDimension=lambda rows=source_displays: rows[0],
+        )
+        features[feature] = owner
+        for index, display in enumerate(rows):
+            name = display.record["name"]
+            case = _supplier_native(
+                monkeypatch, value=abs(values[name]) / 1000.0,
+                kind=11 if display.horizontal else 12,
+            )
+            native = case.native
+            native.FullName = f"{name}@{feature}@stock.SLDPRT"
+            native.GetFeatureOwner = lambda owner=owner: owner
+            native.GetSystemValue3 = lambda _which, _configuration, native=native: (
+                native.SystemValue,
+            )
+            native.Tolerance = SimpleNamespace(
+                Type=5 if name in supplier.SUPPLIER_REFERENCE_MINIMUMS else 0,
+                GetMinValue=lambda: 0.0, GetMaxValue=lambda: 0.0,
+            )
+            source_dimension = SimpleNamespace(
+                FullName=native.FullName, SystemValue=native.SystemValue,
+            )
+            parameters[f"{name}@{feature}"] = source_dimension
+            source_displays.append(SimpleNamespace(
+                GetDimension2=lambda _index, dimension=source_dimension: dimension,
+            ))
+            # Reuse native value/format I/O; the R44 replay owns physical paint.
+            vars(display).update(vars(case.display))
+            display.native = native
+            display.source_dimension = source_dimension
+            display.GetAnnotation = lambda display=display: display
+            display.GetSpecificAnnotation = lambda display=display: display
+            display.GetType = lambda: 4
+            display.GetPrimaryTolPrecision2 = lambda: 3
+            display.Visible, display.OwnerType, display.Owner = 1, 0, view
+            display.IsDangling = lambda: False
+            attached = drawing_points[2 * index:2 * index + 2]
+            display.GetAttachedEntities3 = lambda attached=attached: attached
+            display.GetAttachedEntityCount3 = lambda: 2
+            display.GetAttachedEntityTypes = lambda: (11, 11)
+        following = {
+            id(row): source_displays[index + 1] if index + 1 < len(source_displays) else None
+            for index, row in enumerate(source_displays)
+        }
+        owner.GetNextDisplayDimension = lambda row, following=following: following[id(row)]
+
+    # Substitute only native I/O, not the adapter's by-value binding alias or
+    # source membership, attachment, value/format and station/clearance guards.
+    for module in (block, reference_text, core):
+        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
     monkeypatch.setattr(screws, "iter_views", lambda _adapter: list(views.values()))
     monkeypatch.setattr(screws, "view_name", lambda _adapter, view: view.name)
     monkeypatch.setattr(screws, "dimension_name", lambda _adapter, display: display.record["name"])
@@ -317,10 +375,19 @@ def _settled_block_replay(monkeypatch):
         screws, "model_points_in_view",
         lambda _adapter, view, _points, **_kwargs: [display.GetPosition()[:2] for display in view.rows],
     )
+
+    def curate(_adapter, view, *, keep, **_kwargs):
+        for display in view.rows:
+            assert display.SetPosition2(*keep[display.record["name"]], 0.0)
+        return view.rows
+
+    monkeypatch.setattr(screws, "curate_view_dimensions", curate)
+    monkeypatch.setattr(core, "rebuild_drawing", lambda _adapter, *, label: None)
+    monkeypatch.setattr(core, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: []))
     monkeypatch.setattr(
-        screws, "curate_view_dimensions", lambda _adapter, view, **_kwargs: view.rows
+        core, "_dump_annotation", lambda _reader, display: copy.deepcopy(display.record),
     )
-    return block, views, displays
+    return block, adapter, views, displays
 
 
 @pytest.mark.parametrize("callback", ("shared", "block"))
@@ -328,11 +395,24 @@ def _settled_block_replay(monkeypatch):
 def test_final_callbacks_retain_native_stations_even_when_text_stays_clear(
     native_replay, monkeypatch, callback, defect,
 ):
-    block, views, displays = _settled_block_replay(monkeypatch)
-    source_state = {name: display.source_state for name, display in displays.items()}
+    block, adapter, views, displays = _settled_block_replay(monkeypatch)
+
+    def source_state():
+        return {
+            name: (
+                display.native.FullName, display.native.SystemValue,
+                display.native.Tolerance.Type,
+                display.native.Tolerance.GetMinValue(), display.native.Tolerance.GetMaxValue(),
+                display.source_dimension.FullName, display.source_dimension.SystemValue,
+            )
+            for name, display in displays.items()
+        }
+
+    before_source = source_state()
 
     def exercise(final_check):
         final_check()  # Healthy final readback must succeed before the mutation.
+        assert source_state() == before_source
         if defect is None:
             return
         display = displays["SupplierDriveWidth"]
@@ -355,15 +435,25 @@ def test_final_callbacks_retain_native_stations_even_when_text_stays_clear(
             else:
                 raise AssertionError("recorded native mutation target is absent")
         # Fresh clearance alone still accepts this final-rebuild drift.
-        screws._assert_supplier_top_shelves(None, displays)
-        with pytest.raises(RuntimeError):
+        if callback == "shared":
+            screws._assert_supplier_top_shelves(adapter, displays)
+        else:
+            from _supplier_reference_text import measure_reference_text
+
+            actual = measure_reference_text(
+                adapter, display, axis=0, label="SupplierDriveWidth",
+            )
+            assert display.OffsetText is True
+            assert actual["text"].xmin - actual["reach"] >= CLEAR_GAP_M
+        field = {"station": "tips", "witness": "witnesses", "physical_line": "physical_lines"}[defect]
+        with pytest.raises(RuntimeError, match=f"native {field}"):
             final_check()
-        assert {name: display.source_state for name, display in displays.items()} == source_state
+        assert source_state() == before_source
 
     if callback == "shared":
         checks = []
         screws.annotate_supplier_screw(
-            None, views,
+            adapter, views,
             dimensions=block.supplier.SUPPLIER_REFERENCE_DIMENSIONS,
             formats=block.supplier.SUPPLIER_REFERENCE_FORMATS,
             starts=block.supplier.SUPPLIER_REFERENCE_STARTS,
@@ -374,9 +464,11 @@ def test_final_callbacks_retain_native_stations_even_when_text_stays_clear(
         exercise(checks[0])
     else:
         async def build_reference_sheet(adapter, _spec, **kwargs):
+            assert adapter is replay_adapter
             kwargs["supplier_dimensions"](adapter, views)
             exercise(kwargs["settled_checks"][0])
             return {}
 
+        replay_adapter = adapter
         monkeypatch.setattr(block, "build_purchased_fastener_drawing", build_reference_sheet)
-        assert asyncio.run(block.build(None)) == {}
+        assert asyncio.run(block.build(adapter)) == {}

@@ -83,6 +83,40 @@ zero real findings in those classes. Do not switch the whole fleet to `GATE`,
 demote a genuine collision, loosen thresholds, or add a runtime allowance to
 get one drawing through.
 
+### Purchased screw end views and fixed native outline padding
+
+An annotated end view can exhaust the standard scale ladder without any scale
+or centering defect. On source `6bdd304e8f12`, the carriage screw's 24 native fit
+events (2026-10-22, worker `swmaker00000a@10`) rejected Top at all eight scales.
+Its standard Top band is 64 mm high; the two existing 26 mm annotation lanes
+leave a 12 mm geometry cell. The refreshed Top outline is 18.176 mm at 1:1,
+14.676 mm at 1:2, 12.926 mm at 1:4 and 12.051 mm at 1:8: a scaled 7 mm end
+profile plus 11.176 mm of fixed native padding. Even the smallest permitted
+scale exceeds the cell by 0.051 mm. No centering move was attempted.
+
+The six oblique-jig carriage, block, bracket, rail, clamp and lever screw
+recipes instead select the existing ANSI B portrait template and
+`portrait_reference` layout. Their 88.4 mm Top band retains both 26 mm
+annotation lanes, leaving a 36.4 mm geometry cell; Front has a 173 mm band
+and retains its 46 mm annotation reserve, leaving 127 mm for geometry.
+Projected model origins are aligned after fitting and before annotations.
+The shared clamp-screw sheet separately retains `tall_top` and its own
+46 mm Top reserve, leaving 50 mm in that sheet's 96 mm Top band.
+The rejected six-screw landscape `tall_top` experiment left only 27 mm for
+Front geometry: native fit succeeded, but all six machinist reviews rejected
+the resulting small views. Do not restore that allocation to solve Top
+exhaustion. Measure all orthographic views together at the standard scales;
+actual captions, full printed sheets and automated machinist reviews, not
+fit success alone, decide readability and acceptance.
+Keep the lane budgets, independent-scale readback, strict native containment,
+caption checks and supplier-source preservation guards unchanged. Do not
+shrink fixed outline padding, alter coordinate units, add a scale below 1:8,
+or suppress exhaustion to make the old 12 mm allocation pass.
+When a build has already failed, failure capture and supplemental diagnostic
+formatting/notes are best-effort: a secondary reporting exception, including
+cancellation or interruption, must not replace the original primary failure.
+With no primary failure, a source-preservation error still fails normally.
+
 ### Measured native supplier-reference text shelves
 
 `_supplier_reference_text.shelve_reference_text` extracts the proven shared
@@ -110,6 +144,19 @@ allowlist or test all strokes against that union. The caller still owns source,
 attachment, value and format checks, complete cell/caption containment, its
 settled layout checks and post-export inspection/audit using actual PDF ink.
 Native shelf separation alone does not prove body or foreign-line clearance.
+
+The carriage screw's `SupplierDriveWidth` alone opts into local dimension
+`VerticalJustification=1` (`swVerticalJustificationTop`, not document Top=0)
+before shelving. Read back that native setting after redraw and retain the
+original arrow/witness/physical-line stations, complete font and document/local
+font binding through every fresh proof. A display dimension has one text format;
+`GetUseDocTextFormat` uses index 0, not one index per font field.
+Do not substitute a broken-leader style: on source `a04f81128058`, mode 3 moved
+both arrow stations by 2.7781 mm while leaving the glyphs and annotation origin
+fixed. The station guard must reject that movement, not adopt it as a baseline.
+Local justification is not an SDK guarantee of printed clearance: the exported
+PDF must show neither parenthesis intersecting its own offset underline, as well
+as satisfying the existing full-sheet/caption/source checks.
 
 ### Magnifier CHECK block placement (combined 0fb89)
 

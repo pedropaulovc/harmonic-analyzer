@@ -1176,6 +1176,2051 @@ def test_footer_notes_hold_rule_seven_budget():
     )
 
 
+@pytest.fixture
+def purchased_footer_document(monkeypatch):
+    import _drawing_notes as linked_notes
+
+    class FooterNote(_Note):
+        OwnerType = 1
+
+        def __init__(self, text, resolved, x, y):
+            super().__init__(text, resolved, x, y)
+            self.format = SimpleNamespace(CharHeight=0.003)
+
+        def GetTextFormat(self, _index):
+            return self.format
+
+        def SetTextFormat(self, _index, _use_document, text_format):
+            self.format = text_format
+            return True
+
+        def GetExtent(self):
+            x, y, _z = self.GetPosition()
+            lines = self.GetText().splitlines()
+            # Synthetic native text, not a claim about rendered glyph ink.
+            width = max(map(len, lines)) * self.format.CharHeight / 2
+            height = self.format.CharHeight + (len(lines) - 1) * 0.0045
+            return (x, y - height, 0.0, x + width, y, 0.0)
+
+    document = SimpleNamespace(
+        properties={"Supplier": "Test supplier", "Supplier SKUs": "SKU-1"},
+        notes=[],
+    )
+
+    def insert_note(_adapter, text, x, y):
+        links = {
+            purchased.property_link(name): value
+            for name, value in document.properties.items()
+        }
+        links.update(
+            {f'$PRP:"{name}"': value for name, value in document.properties.items()}
+        )
+        note = FooterNote(text, links.get(text, text), x, y)
+        document.notes.append(note)
+        return note
+
+    def write_properties(_adapter, properties, *, model):
+        model.properties.update(properties)
+
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(linked_notes, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(purchased, "add_note", insert_note)
+    monkeypatch.setattr(linked_notes, "add_note", insert_note)
+    monkeypatch.setattr(purchased, "apply_custom_properties", write_properties)
+    return document
+
+
+@pytest.mark.parametrize(
+    "offset_options,offset",
+    [
+        pytest.param({}, 0.0, id="unchanged-default"),
+        pytest.param({"y_offset": 0.0}, 0.0, id="explicit-zero"),
+        pytest.param({"y_offset": 0.060}, 0.060, id="portrait"),
+        pytest.param({"y_offset": -0.005}, -0.005, id="finite-downward"),
+        pytest.param(
+            {"general_text": "KIT FASTENERS, USE AS SHOWN."},
+            0.0,
+            id="literal-override-default-geometry",
+        ),
+        pytest.param(
+            {"general_text": "KIT FASTENERS, USE AS SHOWN.", "y_offset": 0.060},
+            0.060,
+            id="literal-override-portrait-geometry",
+        ),
+    ],
+)
+def test_purchased_footer_translates_native_anchors_and_every_reservation(
+    purchased_footer_document, offset_options, offset
+):
+    document = purchased_footer_document
+    notes = "CHECK FACE\nINSTALL DRY"
+    data = "SUPPLIER OPERATING DATA (REFERENCE):\nTORQUE 2 N m"
+    general = offset_options.get(
+        "general_text", "PURCHASED PART, USED AS SUPPLIED. VIEWS ARE REFERENCE ONLY."
+    )
+    placed = purchased.add_purchased_footer(
+        object(),
+        document,
+        document.properties,
+        item="#4-40 TEST SCREW",
+        notes=notes,
+        supplier_data=("TORQUE 2 N m",),
+        label="footer",
+        **offset_options,
+    )
+    # Literal landscape coordinates protect the default, not just translation
+    # relative to a second invocation of the same implementation.
+    expected = [
+        (notes, (0.018, 0.0655), (0.015, 0.0545, 0.2155, 0.0665)),
+        (data, (0.018, 0.079), (0.015, 0.069, 0.2155, 0.080)),
+        (general, (0.018, 0.054), (0.015, 0.047, 0.2155, 0.055)),
+        ("ITEM:", (0.018, 0.044), (0.015, 0.037, 0.050, 0.045)),
+        ("#4-40 TEST SCREW", (0.052, 0.044), (0.050, 0.037, 0.2155, 0.045)),
+        ("SUPPLIER:", (0.018, 0.034), (0.015, 0.027, 0.050, 0.035)),
+        ("Test supplier", (0.052, 0.034), (0.050, 0.027, 0.2155, 0.035)),
+        ("SKU:", (0.018, 0.024), (0.015, 0.017, 0.050, 0.025)),
+        ("SKU-1", (0.052, 0.024), (0.050, 0.017, 0.2155, 0.025)),
+    ]
+    assert len(placed) == len(document.notes) == len(expected)
+    for (note, link, resolved, box), (text, anchor, reservation) in zip(
+        placed, expected, strict=True
+    ):
+        assert note.GetText() == resolved == text
+        assert note.PropertyLinkedText == link
+        assert note.GetPosition() == pytest.approx(
+            (anchor[0], anchor[1] + offset, 0.0)
+        )
+        assert note.GetTextFormat(0).CharHeight == 0.003
+        assert box == pytest.approx(
+            (
+                reservation[0],
+                reservation[1] + offset,
+                reservation[2],
+                reservation[3] + offset,
+            )
+        )
+        assert purchased._inside(
+            purchased._box(note.GetExtent(), label=text, kind="note"), box
+        )
+    assert placed[0][1] == '$PRP:"Installation Notes"'
+    assert placed[6][1] == '$PRPSHEET:"Supplier"'
+    assert placed[8][1] == '$PRPSHEET:"Supplier SKUs"'
+    assert document.properties["Installation Notes"] == notes
+
+
+@pytest.mark.parametrize(
+    "notes,data,top,band",
+    [
+        pytest.param("", (), 0.054, 0.073, id="empty-title-block-floor"),
+        pytest.param("A", (), 0.061, 0.073, id="one-note-title-block-floor"),
+        pytest.param("A\nB\nC", (), 0.070, 0.081, id="notes-lift-captions"),
+        pytest.param("", ("TEMP 80 C",), 0.0655, 0.0765, id="data-without-notes"),
+        pytest.param("A\nB", ("TORQUE 2 N m",), 0.079, 0.090, id="notes-and-data"),
+    ],
+)
+@pytest.mark.parametrize("offset", (0.0, 0.060, -0.005))
+def test_purchased_footer_top_and_caption_band_translate_empty_and_nonempty_content(
+    purchased_footer_document, notes, data, top, band, offset
+):
+    options = {"label": "footer", "supplier_data": data, "y_offset": offset}
+    assert purchased.footer_top(notes, **options) == pytest.approx(top + offset)
+    assert purchased.view_band_bottom(notes, **options) == pytest.approx(band + offset)
+    placed = purchased.add_purchased_footer(
+        object(),
+        purchased_footer_document,
+        purchased_footer_document.properties,
+        item="TEST SCREW",
+        notes=notes,
+        **options,
+    )
+    assert max(note.GetPosition()[1] for note, *_rest in placed) == pytest.approx(
+        top + offset
+    )
+    caption_bottom = purchased.view_band_bottom(notes, **options) - 0.006
+    assert caption_bottom > max(box[3] for _note, _link, _text, box in placed)
+    if data and not notes:
+        assert placed[0][3] == pytest.approx(
+            (0.015, 0.0545 + offset, 0.2155, top + 0.001 + offset)
+        )
+
+
+@pytest.mark.parametrize("offset", (float("nan"), float("inf"), -float("inf")))
+def test_purchased_footer_rejects_nonfinite_offset_before_native_notes(
+    purchased_footer_document, offset
+):
+    document = purchased_footer_document
+    options = {"label": "footer", "supplier_data": ("TEMP 80 C",), "y_offset": offset}
+    for measure in (purchased.footer_top, purchased.view_band_bottom):
+        with pytest.raises(ValueError, match="purchased footer y_offset must be finite"):
+            measure("CHECK FACE", **options)
+    with pytest.raises(ValueError, match="purchased footer y_offset must be finite"):
+        purchased.add_purchased_footer(
+            object(),
+            document,
+            document.properties,
+            item="TEST SCREW",
+            notes="CHECK FACE",
+            **options,
+        )
+    assert document.notes == []
+    assert "Installation Notes" not in document.properties
+
+
+# Exact maintenance census fields: 17 font members, with document-default
+# ownership captured separately by the zone guard (18 style values per format).
+_ZONE_FONT_VALUES = (
+    ("TypeFaceName", "Arial"),
+    ("CharHeight", 0.00635),
+    ("CharHeightInPts", 18.0),
+    ("IsHeightSpecifiedInPts", False),
+    ("Bold", False),
+    ("Italic", False),
+    ("Underline", False),
+    ("Strikeout", False),
+    ("WidthFactor", 1.0),
+    ("CharSpacingFactor", 1.0),
+    ("LineSpacing", 1.0),
+    ("LineLength", 0.0),
+    ("Escapement", 0),
+    ("ObliqueAngle", 0.0),
+    ("BackWards", False),
+    ("UpsideDown", False),
+    ("Vertical", False),
+)
+
+
+class _ZoneTextFormat:
+    """Native properties and the one method; no callable/property fallback."""
+
+    def __init__(self, **changes):
+        values = dict(_ZONE_FONT_VALUES)
+        values.update(changes)
+        self.height_in_points = values.pop("IsHeightSpecifiedInPts")
+        self.height_mode_reads = 0
+        for name, value in values.items():
+            setattr(self, name, value)
+
+    def IsHeightSpecifiedInPts(self):
+        self.height_mode_reads += 1
+        return self.height_in_points
+
+
+@pytest.fixture
+def portrait_zone_native(monkeypatch):
+    """Eight native-shaped column notes with live position-dependent links.
+
+    Historical 08a indices 42..49 supply the anchors and zone-3/neighbour
+    extents, not current zone-4 bounds. Bottom 4's asymmetric box is a synthetic
+    guard control: its fresh runtime GetExtent and six new PDFs remain required.
+    The full formats below are preservation controls, not measured font values.
+    License/foreign notes are added only as explicit untouched controls.
+    """
+    import math
+
+    # name, original anchor, complete native extent. Top 3 is an independent
+    # note, not a second spelling of bottom 3 and never a move candidate.
+    records = (
+        ("DetailItem398", (0.034925, 0.009488, 0.0),
+         (0.032525, 0.0015, -1e-16, 0.037125, 0.0097, -2e-16)),
+        ("DetailItem399", (0.034925, 0.4285879999999999, 0.0),
+         (0.03266429220056183, 0.4206640973956244, -3.090129753153126e-15,
+          0.03715867828768041, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem400", (0.104775, 0.009488, 0.0),
+         (0.10250013755425047, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.10699452364136905, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem401", (0.10477499999999998, 0.4285879999999999, 0.0),
+         (0.10250013755425047, 0.4206640973956244, -3.090129753153126e-15,
+          0.10699452364136905, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem402", (0.17462499999999997, 0.009488, 0.0),
+         (0.1723359829079391, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.1768303689950577, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem403", (0.17462499999999997, 0.42858799999999997, 0.0),
+         (0.1723359829079391, 0.4206640973956244, -3.090129753153126e-15,
+          0.1768303689950577, 0.4284428425464065, -3.1444484402202708e-15)),
+        ("DetailItem404", (0.244475, 0.009488000000000002, 0.0),
+         (0.24217182826162775, 0.0016490252734925326, -1.6416314313625982e-16,
+          0.24666621434874636, 0.009600631427625406, -2.1968891213823e-16)),
+        ("DetailItem405", (0.244475, 0.42858799999999997, 0.0),
+         (0.24217182826162775, 0.4206640973956244, -3.090129753153126e-15,
+          0.24666621434874636, 0.4284428425464065, -3.1444484402202708e-15)),
+    )
+    state = SimpleNamespace(
+        notes=[], frozen=False, rebuilds=0, on_rebuild=None, on_move=None,
+        zoom=None, zooms=[], restores=0, extent_reads=[],
+        properties=(0.0, 0.0, 1.0, 1.0, 0.0, 0.2794, 0.4318, 1.0),
+        margins=[0.0127] * 4, distribution=(1, 4, 4), region=1,
+        events=[],
+    )
+
+    class NativeNote:
+        def __init__(self, name, anchor, extent, *, link="<ZONEC>"):
+            self.name = name
+            self.anchor = tuple(anchor)
+            self.extent = tuple(extent)
+            self._link = link
+            self.OwnerType = 2
+            self.Angle = 0.0
+            self.horizontal = 2
+            self.vertical = 2
+            self.formats = [_ZoneTextFormat()]
+            self.document_defaults = [False]
+            self.moves = []
+            self.setter_result = True
+            self.ignore_move = False
+            self.position_offset = (0.0, 0.0, 0.0)
+            self.text_override = None
+
+        @property
+        def PropertyLinkedText(self):
+            return self._link
+
+        @PropertyLinkedText.setter
+        def PropertyLinkedText(self, _value):
+            raise AssertionError("the zone source token must never be rewritten")
+
+        def GetText(self):
+            if self.text_override is not None:
+                return self.text_override
+            if self._link != "<ZONEC>":
+                return "3"
+            x = self.anchor[0]
+            if not math.isfinite(x):
+                return "3"  # Let the finite-position guard diagnose bad geometry.
+            left, right = (
+                (state.margins[3], state.properties[5] - state.margins[2])
+                if state.region == 0 else (0.0, state.properties[5])
+            )
+            column = int((x - left) / ((right - left) / 4))
+            return str(4 - min(3, max(0, column)))
+
+        def GetName(self):
+            return self.name
+
+        def GetAnnotation(self):
+            return self
+
+        def GetNext(self):
+            index = state.notes.index(self)
+            return state.notes[index + 1] if index + 1 < len(state.notes) else None
+
+        def GetPosition(self):
+            return self.anchor
+
+        def GetExtent(self):
+            assert state.zoom is not None, "native bounds require the isolated zoom"
+            state.extent_reads.append((self.name, state.zoom, self.extent))
+            return self.extent
+
+        def GetTextFormatCount(self):
+            return len(self.formats)
+
+        def GetTextFormat(self, index):
+            return self.formats[index]
+
+        def GetUseDocTextFormat(self, index):
+            return self.document_defaults[index]
+
+        def GetTextJustification(self):
+            return self.horizontal
+
+        def GetTextVerticalJustification(self):
+            return self.vertical
+
+        def SetTextFormat(self, *_args):
+            raise AssertionError("local zone placement must not reformat any note")
+
+        def translate(self, position):
+            delta = tuple(
+                actual - old
+                for actual, old in zip(position, self.anchor, strict=True)
+            )
+            self.extent = tuple(
+                value + delta[index % 3] for index, value in enumerate(self.extent)
+            )
+            self.anchor = tuple(position)
+
+        def SetPosition2(self, x, y, z):
+            assert not state.frozen, "settled zone proof moved an annotation"
+            assert len(state.extent_reads) >= 2, "measure both boxes before either write"
+            assert all(math.isfinite(value) for value in (x, y, z))
+            self.moves.append((x, y, z))
+            if self.setter_result is True and not self.ignore_move:
+                self.translate(tuple(
+                    value + offset for value, offset in
+                    zip((x, y, z), self.position_offset, strict=True)
+                ))
+                if state.on_move is not None:
+                    state.on_move()
+            return self.setter_result
+
+    class NativeDrawing:
+        def GetFirstView(self):
+            return SimpleNamespace(
+                GetFirstNote2=lambda: state.notes[0] if state.notes else None
+            )
+
+        def EditRebuild3(self):
+            assert not state.frozen, "settled zone proof rebuilt the drawing"
+            state.rebuilds += 1
+            if state.on_rebuild is not None:
+                state.on_rebuild()
+            return True
+
+        def ViewZoomTo2(self, *box):
+            assert state.zoom is None
+            state.zoom = tuple(box)
+            state.zooms.append(state.zoom)
+            # Native VT_VOID: successful zoom returns None.
+
+        def ViewZoomtofit2(self):
+            state.zoom = None
+            state.restores += 1
+
+    state.notes = [NativeNote(*record) for record in records]
+    state.bottom = state.notes[2]
+    state.top = state.notes[3]
+    state.four = state.notes[0]
+    state.owned = (state.bottom, state.four)
+    state.make_note = NativeNote
+    state.draw = NativeDrawing()
+    state.sheet = SimpleNamespace(
+        GetProperties2=lambda: state.properties,
+        GetZoneMargin=lambda code: state.margins[code],
+        GetZoneSizeDistribution=lambda: state.distribution,
+        GetZoneSizeRegion=lambda: state.region,
+    )
+    state.adapter = SimpleNamespace(currentModel=state.draw)
+    state.align = lambda: purchased._align_portrait_bottom_zones(
+        state.adapter, state.draw, state.sheet, label="portrait native zone"
+    )
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        purchased._telemetry, "event",
+        lambda event, **fields: state.events.append((event, fields)),
+    )
+    return state
+
+
+def _zone_snapshot(note):
+    return (
+        note.GetName(), note.PropertyLinkedText, note.GetText(), note.OwnerType,
+        note.GetPosition(), note.extent, purchased._note_text_style(note),
+        tuple(note.document_defaults), note.Angle,
+        note.GetTextJustification(), note.GetTextVerticalJustification(),
+    )
+
+
+def test_note_text_style_reads_all_native_members_and_all_formats(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    first = _ZoneTextFormat()
+    second = _ZoneTextFormat(
+        TypeFaceName="Arial Narrow", CharHeight=0.002, CharHeightInPts=5.669291,
+        IsHeightSpecifiedInPts=True, Bold=True, Italic=True, Underline=True,
+        Strikeout=True, WidthFactor=0.9, CharSpacingFactor=1.1, LineSpacing=1.2,
+        LineLength=0.025, Escapement=15, ObliqueAngle=0.1, BackWards=True,
+        UpsideDown=True, Vertical=True,
+    )
+    requested = []
+
+    def get_format(index):
+        requested.append(index)
+        return (first, second)[index]
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 2, GetTextFormat=get_format
+    )
+    actual = purchased._note_text_style(annotation)
+    expected_second = tuple(
+        (name, second.height_in_points if name == "IsHeightSpecifiedInPts"
+         else getattr(second, name))
+        for name, _value in _ZONE_FONT_VALUES
+    )
+    assert actual == (_ZONE_FONT_VALUES, expected_second)
+    assert requested == [0, 1]
+    assert first.height_mode_reads == second.height_mode_reads == 1
+    assert type(actual) is tuple
+    assert all(type(row) is tuple and all(type(pair) is tuple for pair in row)
+               for row in actual)
+    second.Bold = False
+    assert dict(actual[1])["Bold"] is True  # Snapshot, not live native wrappers.
+
+
+@pytest.mark.parametrize("field", tuple(name for name, _value in _ZONE_FONT_VALUES))
+def test_note_text_style_refuses_nonprimitive_members_without_fallback(
+    monkeypatch, field
+):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    text_format = _ZoneTextFormat()
+    if field == "IsHeightSpecifiedInPts":
+        text_format.height_in_points = object()
+    else:
+        setattr(text_format, field, object())
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=lambda _index: text_format
+    )
+    with pytest.raises(TypeError, match=field):
+        purchased._note_text_style(annotation)
+
+
+def test_note_text_style_propagates_native_read_errors(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    failure = RuntimeError("native format access failed")
+
+    def refuse(_index):
+        raise failure
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=refuse
+    )
+    with pytest.raises(RuntimeError) as exc:
+        purchased._note_text_style(annotation)
+    assert exc.value is failure
+
+
+def test_portrait_bottom_zones_centre_both_complete_boxes_in_original_cells(
+    portrait_zone_native,
+):
+    case = portrait_zone_native
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    grid = (case.properties, tuple(case.margins), case.distribution, case.region)
+    verify = case.align()
+    target = case.bottom
+    left = (before["DetailItem398"][4][0] + before[target.name][4][0]) / 2
+    right = (before[target.name][4][0] + before["DetailItem402"][4][0]) / 2
+    midpoint = (left + right) / 2
+    box = target.extent
+    assert (left, right) == pytest.approx((0.06985, 0.1397))
+    assert (box[0] + box[3]) / 2 == pytest.approx((midpoint + right) / 2)
+    assert midpoint + 0.0006 < box[0] < box[3] < right - 0.0006
+    assert target.anchor[0] == pytest.approx(0.12226516940219024)
+    assert target.anchor[1:] == before[target.name][4][1:]
+    assert (box[1], box[2], box[4], box[5]) == (
+        before[target.name][5][1], before[target.name][5][2],
+        before[target.name][5][4], before[target.name][5][5],
+    )
+    assert box[1] >= 0.0006 and box[4] <= case.margins[3] - 0.0006
+    assert len(target.moves) == 1
+    assert target.PropertyLinkedText == "<ZONEC>" and target.GetText() == "3"
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    four = case.four
+    four_before = before[four.name]
+    strip = (0.0006, case.margins[3] - 0.0006)
+    assert (four.extent[0] + four.extent[3]) / 2 == pytest.approx(sum(strip) / 2)
+    assert strip[0] < four.extent[0] < four.extent[3] < strip[1]
+    assert four.moves == [(
+        four_before[4][0] + sum(strip) / 2
+        - (four_before[5][0] + four_before[5][3]) / 2,
+        *four_before[4][1:],
+    )]
+    four_after = _zone_snapshot(four)
+    assert four_after[:4] == four_before[:4]
+    assert four_after[6:] == four_before[6:]
+    assert four.anchor[1:] == four_before[4][1:]
+    assert (four.extent[1], four.extent[2], four.extent[4], four.extent[5]) == (
+        four_before[5][1], four_before[5][2], four_before[5][4], four_before[5][5],
+    )
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+            assert note.moves == []
+    assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
+    assert case.rebuilds >= 1
+    assert case.extent_reads[0][2] == before[target.name][5]
+    assert case.extent_reads[1][2] == before[four.name][5]
+    assert case.extent_reads[-2][2] == target.extent
+    assert case.extent_reads[-1][2] == four.extent
+    for note in case.owned:
+        assert len({zoom for name, zoom, _box in case.extent_reads
+                    if name == note.name}) == 1
+
+    # The returned proof may reread native state/zoom, never move, reformat,
+    # rebuild or repair it. It must still succeed when every mutator refuses.
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    rebuilds = case.rebuilds
+    case.frozen = True
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+    assert case.rebuilds == rebuilds
+    assert len(target.moves) == 1
+    assert len(four.moves) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.fixture
+def portrait_zone_native_block_lever(portrait_zone_native):
+    """Frozen 6eafd block/lever zone-3 geometry; zone 4 remains synthetic."""
+    case = portrait_zone_native
+    case.properties = (
+        12.0, 13.0, 2.0, 1.0, 0.0, 0.2794, 0.43179999999999996, 0.0,
+    )
+    assert case.bottom.anchor == (0.104775, 0.009488, 0.0)
+    # The root receipt has four XY extent edges, not a measured after box.
+    # Retain the existing fixture's native Z noise; translate the complete box
+    # synthetically below rather than claiming a failed native run exported it.
+    old = case.bottom.extent
+    case.bottom.extent = (
+        0.10250848082595869, 0.0016109144542772874, old[2],
+        0.10693849557522123, 0.00954373156342183, old[5],
+    )
+    return case
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+def test_portrait_zone_three_accepts_measured_block_lever_one_ulp_roundtrip(
+    portrait_zone_native_block_lever, phase,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    target = case.bottom
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    grid = (case.properties, tuple(case.margins), case.distribution, case.region)
+    requested = (0.12228901179941004, 0.009488, 0.0)
+    roundtrip = (0.12228901179941006, 0.009488000000000002, 0.0)
+    assert roundtrip == (
+        math.nextafter(requested[0], math.inf),
+        math.nextafter(requested[1], math.inf), requested[2],
+    )
+    assert all(
+        abs(actual - wanted) <= 1e-7
+        for actual, wanted in zip(roundtrip, requested, strict=True)
+    )
+
+    def native_roundtrip():
+        target.translate(roundtrip)
+
+    if phase == "rebuild":
+        case.on_rebuild = native_roundtrip
+    verify = case.align()
+    # Exact setter arguments are independent of the tolerated native readback.
+    assert target.moves == [requested]
+    assert target.moves[0][1:] == before[target.name][4][1:]
+    assert case.rebuilds == 1
+    case.frozen = True
+    if phase == "final":
+        assert target.anchor == requested
+        native_roundtrip()
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+
+    assert target.anchor == roundtrip
+    box = target.extent
+    setter_delta = tuple(
+        wanted - original
+        for wanted, original in zip(requested, before[target.name][4], strict=True)
+    )
+    roundtrip_delta = tuple(
+        actual - wanted
+        for actual, wanted in zip(roundtrip, requested, strict=True)
+    )
+    expected_box = tuple(
+        (value + setter_delta[index % 3]) + roundtrip_delta[index % 3]
+        for index, value in enumerate(before[target.name][5])
+    )
+    assert box == expected_box
+    assert 0.104775 < box[0] < box[3] < 0.1391
+    assert 0.0006 < box[1] < box[4] < 0.0121
+    assert box[2] == before[target.name][5][2]
+    assert box[5] == before[target.name][5][5]
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+            assert note.moves == []
+    assert len(case.four.moves) == 1
+    assert case.four.anchor == case.four.moves[0]
+    assert case.four.anchor[1:] == before[case.four.name][4][1:]
+    assert case.four.GetText() == "4"
+    assert grid == (case.properties, tuple(case.margins), case.distribution, case.region)
+    assert target.moves == [requested]
+    assert case.rebuilds == 1
+    assert case.extent_reads[0][2] == before[target.name][5]
+    assert case.extent_reads[-2][2] == box
+    for note in case.owned:
+        assert len({zoom for name, zoom, _box in case.extent_reads
+                    if name == note.name}) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_three_refuses_just_outside_existing_xyz_bound(
+    portrait_zone_native_block_lever, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    requested = (0.12228901179941004, 0.009488, 0.0)
+
+    def mutate():
+        position = list(case.bottom.anchor)
+        position[axis] = math.nextafter(
+            requested[axis] + direction * 1e-7, direction * math.inf,
+        )
+        assert abs(position[axis] - requested[axis]) > 1e-7
+        case.bottom.translate(tuple(position))
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            verify()
+    assert case.bottom.moves == [requested]
+    assert len(case.four.moves) == 1
+    assert all(not note.moves for note in case.notes if note not in case.owned)
+    assert case.rebuilds == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize(
+    "name",
+    (
+        "DetailItem399", "DetailItem401", "DetailItem402",
+        "DetailItem403", "DetailItem404", "DetailItem405",
+    ),
+)
+def test_portrait_bottom_zones_refuse_one_ulp_drift_of_every_six_untouched_columns(
+    portrait_zone_native_block_lever, phase, axis, name,
+):
+    import math
+
+    case = portrait_zone_native_block_lever
+    other = next(note for note in case.notes if note.name == name)
+    before = _zone_snapshot(other)
+
+    def mutate():
+        position = list(other.anchor)
+        position[axis] = math.nextafter(position[axis], math.inf)
+        assert 0.0 < position[axis] - before[4][axis] < 1e-7
+        other.translate(tuple(position))
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="other column position changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="other column position changed"):
+            verify()
+    after = _zone_snapshot(other)
+    assert after[:4] == before[:4]
+    assert after[6:] == before[6:]
+    assert after[4][axis] == math.nextafter(before[4][axis], math.inf)
+    assert case.bottom.moves == [(0.12228901179941004, 0.009488, 0.0)]
+    assert len(case.four.moves) == 1
+    assert all(not note.moves for note in case.notes if note not in case.owned)
+    assert case.rebuilds == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("count", (0, -1, True, 1.0, "1", None))
+def test_note_text_style_refuses_invalid_native_format_count(monkeypatch, count):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+
+    def unexpected_format(_index):
+        raise AssertionError("invalid count must refuse before native format access")
+
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: count, GetTextFormat=unexpected_format
+    )
+    with pytest.raises(RuntimeError, match="native format count"):
+        purchased._note_text_style(annotation)
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf"), -float("inf")))
+def test_note_text_style_refuses_nonfinite_primitive_values(monkeypatch, value):
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1,
+        GetTextFormat=lambda _index: _ZoneTextFormat(WidthFactor=value),
+    )
+    with pytest.raises(ValueError, match="WidthFactor.*nonfinite"):
+        purchased._note_text_style(annotation)
+
+
+def test_note_text_style_refuses_missing_native_format(monkeypatch):
+    monkeypatch.setattr(purchased, "_early_bound", lambda value, _interface: value)
+    annotation = SimpleNamespace(
+        GetTextFormatCount=lambda: 1, GetTextFormat=lambda _index: None
+    )
+    with pytest.raises(RuntimeError, match="missing native text format 0"):
+        purchased._note_text_style(annotation)
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("duplicate-target", "duplicate column inventory"),
+        ("missing-target", "incomplete column inventory"),
+        ("missing-top", "incomplete column inventory"),
+        ("top-only", "incomplete column inventory"),
+        ("wrong-owner", "column inventory identity"),
+        ("wrong-token", "incomplete column inventory"),
+        ("wrong-resolved-column", "duplicate column inventory"),
+        ("duplicate-native-name", "column inventory identity"),
+        ("bottom-in-top-band", "duplicate column inventory"),
+        ("top-in-drawing-field", "native border band"),
+        ("misaligned-top", "does not match native grid"),
+        ("nonfinite-anchor-x", "nonfinite native zone position"),
+        ("nonfinite-anchor-y", "nonfinite native zone position"),
+        ("nonfinite-anchor-z", "nonfinite native zone position"),
+        ("short-anchor", "invalid native zone position"),
+    ),
+)
+def test_portrait_bottom_zones_refuse_unproven_native_inventory_before_writing(
+    portrait_zone_native, owned, defect, message,
+):
+    case = portrait_zone_native
+    target = getattr(case, owned)
+    top = case.top if owned == "bottom" else case.notes[1]
+    original = target.anchor
+    if defect == "duplicate-target":
+        case.notes.append(case.make_note("DuplicateZone", target.anchor, target.extent))
+    elif defect == "missing-target":
+        case.notes.remove(target)
+    elif defect == "missing-top":
+        case.notes.remove(top)
+    elif defect == "top-only":
+        case.notes[:] = case.notes[1::2]
+    elif defect == "wrong-owner":
+        target.OwnerType = 1
+    elif defect == "wrong-token":
+        target._link = "<ZONEC>3"
+    elif defect == "wrong-resolved-column":
+        target.text_override = "2"
+    elif defect == "duplicate-native-name":
+        top.name = target.name
+    elif defect == "bottom-in-top-band":
+        target.anchor = top.anchor
+    elif defect == "top-in-drawing-field":
+        top.anchor = (top.anchor[0], 0.200, 0.0)
+    elif defect == "misaligned-top":
+        top.anchor = (top.anchor[0] + 0.001, top.anchor[1], 0.0)
+    elif defect.startswith("nonfinite-anchor-"):
+        axis = "xyz".index(defect[-1])
+        target.anchor = tuple(
+            float("nan") if index == axis else value
+            for index, value in enumerate(original)
+        )
+    elif defect == "short-anchor":
+        target.anchor = original[:2]
+    with pytest.raises(RuntimeError, match=message):
+        case.align()
+    assert all(not note.moves for note in case.notes)
+    assert case.rebuilds == 0
+    assert case.zoom is None
+    assert not case.events
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize(
+    "result", (False, None, 1, "True", pytest.param(object(), id="truthy-object"))
+)
+def test_portrait_bottom_zones_require_native_setposition2_strict_bool(
+    portrait_zone_native, owned, result,
+):
+    case = portrait_zone_native
+    target = getattr(case, owned)
+    original = _zone_snapshot(target)
+    target.setter_result = result
+    with pytest.raises(RuntimeError, match="SetPosition2 refused"):
+        case.align()
+    assert len(target.moves) == 1
+    assert _zone_snapshot(target) == original
+    assert case.rebuilds == 0
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize(
+    "defect", ("ignored", "clamped-x", "clamped-y", "clamped-z", "nan", "short")
+)
+def test_portrait_bottom_zones_check_finite_three_axis_position_readback(
+    portrait_zone_native, owned, defect,
+):
+    case = portrait_zone_native
+    target = getattr(case, owned)
+    if defect == "ignored":
+        target.ignore_move = True
+    elif defect.startswith("clamped-"):
+        axis = "xyz".index(defect[-1])
+        target.position_offset = tuple(
+            2e-7 if index == axis else 0.0 for index in range(3)
+        )
+    else:
+        def corrupt_readback():
+            if target.moves:
+                target.anchor = (
+                    (float("nan"), 0.009488, 0.0) if defect == "nan"
+                    else target.anchor[:2]
+                )
+        case.on_move = corrupt_readback
+    with pytest.raises(RuntimeError, match="position readback"):
+        case.align()
+    assert len(target.moves) == 1
+    assert case.rebuilds == 0
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize(
+    "field", tuple(name for name, _value in _ZONE_FONT_VALUES)
+)
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+def test_portrait_bottom_zones_preserve_every_native_format_field(
+    portrait_zone_native, owned, field, phase,
+):
+    case = portrait_zone_native
+    target = getattr(case, owned)
+    # An extra format with different values makes index-0-only snapshots fail.
+    target.formats.append(_ZoneTextFormat(TypeFaceName="Arial Narrow"))
+    target.document_defaults.append(True)
+
+    def mutate():
+        text_format = target.formats[1]
+        if field == "IsHeightSpecifiedInPts":
+            text_format.height_in_points = not text_format.height_in_points
+            return
+        old = getattr(text_format, field)
+        changed = (
+            not old if type(old) is bool else
+            old + " changed" if type(old) is str else old + 0.125
+        )
+        setattr(text_format, field, changed)
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match="style or identity changed"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="style or identity changed"):
+            verify()
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert case.rebuilds == 1
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("missing-target", "incomplete column inventory"),
+        ("missing-other", "incomplete column inventory"),
+        ("duplicate-target", "duplicate column inventory"),
+        ("token", "incomplete column inventory"),
+        ("owner", "column inventory identity"),
+        ("resolved-column", "duplicate column inventory"),
+        ("name", "style or identity changed"),
+        ("extra-format", "style or identity changed"),
+        ("document-default", "style or identity changed"),
+        ("angle", "style or identity changed"),
+        ("horizontal", "style or identity changed"),
+        ("vertical", "style or identity changed"),
+        ("target-y", "position readback changed"),
+        ("target-z", "position readback changed"),
+        ("other-bottom-position", "other column position changed"),
+        ("other-top-position", "other column position changed"),
+        ("other-top-style", "style or identity changed"),
+        ("column-membership", "duplicate column inventory"),
+        ("sheet-width", "grid changed"),
+        ("zone-margin", "grid changed"),
+        ("zone-distribution", "grid changed"),
+        ("zone-region", "grid changed"),
+    ),
+)
+def test_portrait_bottom_zones_recheck_native_identity_grid_and_membership_readonly(
+    portrait_zone_native, owned, phase, defect, message,
+):
+    case = portrait_zone_native
+
+    def mutate():
+        target = getattr(case, owned)
+        if defect == "missing-target":
+            case.notes.remove(target)
+        elif defect == "missing-other":
+            case.notes.remove(case.top)
+        elif defect == "duplicate-target":
+            case.notes.append(case.make_note(
+                "DuplicateZone", target.anchor, target.extent
+            ))
+        elif defect == "token":
+            target._link = "3"
+        elif defect == "owner":
+            target.OwnerType = 1
+        elif defect == "resolved-column":
+            target.text_override = "2"
+        elif defect == "name":
+            target.name = "ForeignZone"
+        elif defect == "extra-format":
+            target.formats.append(_ZoneTextFormat())
+            target.document_defaults.append(False)
+        elif defect == "document-default":
+            target.document_defaults[0] = not target.document_defaults[0]
+        elif defect == "angle":
+            target.Angle += 0.1
+        elif defect == "horizontal":
+            target.horizontal = 1
+        elif defect == "vertical":
+            target.vertical = 1
+        elif defect in ("target-y", "target-z"):
+            axis = 1 if defect == "target-y" else 2
+            target.anchor = tuple(
+                value + 2e-7 if index == axis else value
+                for index, value in enumerate(target.anchor)
+            )
+        elif defect == "other-bottom-position":
+            other = case.notes[4]
+            other.anchor = (other.anchor[0] + 0.001, *other.anchor[1:])
+        elif defect == "other-top-position":
+            case.top.anchor = (case.top.anchor[0] + 0.001, *case.top.anchor[1:])
+        elif defect == "other-top-style":
+            case.top.formats[0].Italic = True
+        elif defect == "column-membership":
+            # Live resolution crosses the original cell boundary; no canned
+            # value masks that drift. Zone 4 enters 3; zone 3 enters 2.
+            boundary = 0.1397 if owned == "bottom" else 0.06985
+            target.anchor = (boundary + 0.001, *target.anchor[1:])
+        elif defect == "sheet-width":
+            values = list(case.properties)
+            values[5] += 0.001
+            case.properties = tuple(values)
+        elif defect == "zone-margin":
+            case.margins[1] += 0.001
+        elif defect == "zone-distribution":
+            case.distribution = (1, 5, 4)
+        elif defect == "zone-region":
+            case.region = 0
+
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=message):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=message):
+            verify()
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert all(not note.moves for note in case.notes if note not in case.owned)
+    assert case.rebuilds == 1
+    assert case.zoom is None
+
+
+@pytest.mark.parametrize("phase", ("before", "rebuild", "final"))
+@pytest.mark.parametrize("edge", ("left", "right", "bottom", "top", "right-half"))
+def test_portrait_zone_three_rejects_full_native_padding_escape_not_anchor_fit(
+    portrait_zone_native, phase, edge,
+):
+    case = portrait_zone_native
+    original_anchor = case.bottom.anchor
+
+    def mutate():
+        box = list(case.bottom.extent)
+        # Each failure keeps a plausible anchor and the live resolved value 3.
+        # Only one complete native extent edge violates the intended inset.
+        if edge == "left":
+            box[0] = 0.06985 + 0.0006 - 0.000001
+        elif edge == "right":
+            box[3] = 0.1397 - 0.0006 + 0.000001
+        elif edge == "bottom":
+            box[1] = 0.0006 - 0.000001
+        elif edge == "top":
+            box[4] = case.margins[1] - 0.0006 + 0.000001
+        else:
+            # Before placement a full box may legitimately straddle the
+            # original centre. Make it too wide for the right-half target;
+            # afterwards leave it within the full cell, but outside its half.
+            box[0], box[3] = (
+                (0.080, 0.12955) if phase == "before" else (0.100, 0.130)
+            )
+        case.bottom.extent = tuple(box)
+
+    expected = "right half" if edge == "right-half" and phase != "before" else (
+        "leaves its original cell"
+    )
+    if phase == "before":
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            verify()
+    assert case.bottom.GetText() == "3"
+    assert case.bottom.anchor[1:] == original_anchor[1:]
+    assert case.zoom is None
+    if phase == "before":
+        assert all(not note.moves for note in case.notes)
+        assert case.rebuilds == 0
+    else:
+        assert len(case.bottom.moves) == 1
+        assert case.rebuilds == 1
+    assert [fields["phase"] for _event, fields in case.events] == (
+        ["before", "before", "after", "after"] if phase == "final"
+        else ["before", "before"]
+    )
+
+
+
+@pytest.mark.parametrize("owned", ("bottom", "four"), ids=("zone-3", "zone-4"))
+@pytest.mark.parametrize("phase", ("before", "rebuild", "final"))
+@pytest.mark.parametrize("defect", ("nan", "infinite-z", "short", "inverted"))
+def test_portrait_bottom_zones_refuse_unreadable_complete_native_extent(
+    portrait_zone_native, owned, phase, defect,
+):
+    case = portrait_zone_native
+    target = getattr(case, owned)
+
+    def mutate():
+        box = list(target.extent)
+        if defect == "nan":
+            box[0] = float("nan")
+        elif defect == "infinite-z":
+            # Native z noise is retained and validated, not silently discarded
+            # before deciding whether GetExtent supplied a usable native box.
+            box[2] = float("inf")
+        elif defect == "short":
+            box.pop()
+        else:
+            box[3] = box[0] - 0.001
+        target.extent = tuple(box)
+
+    expected = "empty or inverted native extent" if defect == "inverted" else (
+        "invalid native extent"
+    )
+    if phase == "before":
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+        assert all(not note.moves for note in case.notes) and case.rebuilds == 0
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=expected):
+            case.align()
+        assert all(len(note.moves) == 1 for note in case.owned) and case.rebuilds == 1
+    else:
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=expected):
+            verify()
+        assert all(len(note.moves) == 1 for note in case.owned) and case.rebuilds == 1
+    assert case.zoom is None
+    assert case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("region", (0, 1), ids=("margin-grid", "whole-sheet-grid"))
+def test_portrait_bottom_zones_derive_cells_and_strip_from_native_grid(
+    portrait_zone_native, region,
+):
+    case = portrait_zone_native
+    # A different native pitch forces a different displacement. Preserve each
+    # measured glyph's padding/size and only move its original grid station.
+    case.properties = (*case.properties[:5], 0.300, *case.properties[6:])
+    case.region = region
+    grid_left, grid_right = (
+        (case.margins[3], case.properties[5] - case.margins[2])
+        if region == 0 else (0.0, case.properties[5])
+    )
+    pitch = (grid_right - grid_left) / 4
+    for index, note in enumerate(case.notes):
+        note.translate((
+            grid_left + (index // 2 + 0.5) * pitch, *note.anchor[1:]
+        ))
+    # An unlinked literal 3 at the same station is not the source-owned zone.
+    decoy = case.make_note(
+        "UnlinkedThree", case.bottom.anchor, case.bottom.extent, link="3"
+    )
+    decoy.OwnerType = 1
+    case.notes.append(decoy)
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    original_anchor = case.bottom.anchor
+    left = (case.notes[0].anchor[0] + original_anchor[0]) / 2
+    right = (original_anchor[0] + case.notes[4].anchor[0]) / 2
+    expected_centre = ((left + right) / 2 + right) / 2
+
+    if region == 0:
+        # The original margin-grid cell starts at the left margin: there is
+        # no same-cell strip before that margin, so neither move is allowed.
+        with pytest.raises(RuntimeError, match="infeasible native target lane"):
+            case.align()
+        assert all(not note.moves for note in case.notes)
+        assert case.rebuilds == 0
+        assert tuple(note.name for note in case.notes) == tuple(before)
+        assert all(_zone_snapshot(note) == before[note.name] for note in case.notes)
+        return
+
+    verify = case.align()
+    box = case.bottom.extent
+    assert (box[0] + box[3]) / 2 == pytest.approx(expected_centre)
+    assert (left + right) / 2 < box[0] < box[3] < right - 0.0006
+    assert case.bottom.anchor[1:] == original_anchor[1:]
+    assert case.bottom.GetText() == "3"
+    assert len(case.bottom.moves) == 1
+    strip = (grid_left + 0.0006, case.margins[3] - 0.0006)
+    box_four = case.four.extent
+    assert (box_four[0] + box_four[3]) / 2 == pytest.approx(sum(strip) / 2)
+    assert strip[0] < box_four[0] < box_four[3] < strip[1]
+    assert len(case.four.moves) == 1
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+            assert not note.moves
+    case.frozen = True
+    verify()
+
+
+@pytest.mark.parametrize("phase", ("immediate", "rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_four_accepts_one_ulp_xyz_roundtrip_without_moving_six_others(
+    portrait_zone_native, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native
+    target = case.four
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    box = target.extent
+    strip_centre = (0.0006 + case.margins[3] - 0.0006) / 2
+    requested = (
+        target.anchor[0] + strip_centre - (box[0] + box[3]) / 2,
+        *target.anchor[1:],
+    )
+    roundtrip = tuple(
+        math.nextafter(value, direction * math.inf) if index == axis else value
+        for index, value in enumerate(requested)
+    )
+
+    def native_roundtrip():
+        if target.moves:
+            target.translate(roundtrip)
+
+    if phase == "immediate":
+        case.on_move = native_roundtrip
+    elif phase == "rebuild":
+        case.on_rebuild = native_roundtrip
+    verify = case.align()
+    assert target.moves == [requested]
+    assert requested[1:] == before[target.name][4][1:]
+    if phase == "final":
+        assert target.anchor == requested
+        native_roundtrip()
+    case.frozen = True
+    settled = tuple(_zone_snapshot(note) for note in case.notes)
+    verify()
+    verify()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == settled
+    assert target.anchor == roundtrip
+    assert all(abs(actual - wanted) <= 1e-7
+               for actual, wanted in zip(roundtrip, requested, strict=True))
+    assert 0.0006 < target.extent[0] < target.extent[3] < case.margins[3] - 0.0006
+    assert 0.0006 < target.extent[1] < target.extent[4] < case.margins[1] - 0.0006
+    after = _zone_snapshot(target)
+    assert after[:4] == before[target.name][:4]
+    assert after[6:] == before[target.name][6:]
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+            assert not note.moves
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert case.rebuilds == 1
+    for note in case.owned:
+        assert len({zoom for name, zoom, _extent in case.extent_reads
+                    if name == note.name}) == 1
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("immediate", "rebuild", "final"))
+@pytest.mark.parametrize("axis", (0, 1, 2), ids=("x", "y", "z"))
+@pytest.mark.parametrize("direction", (-1, 1), ids=("below", "above"))
+def test_portrait_zone_four_refuses_just_outside_existing_xyz_bound(
+    portrait_zone_native, phase, axis, direction,
+):
+    import math
+
+    case = portrait_zone_native
+    target = case.four
+    original = target.anchor
+    box = target.extent
+    strip_centre = (0.0006 + case.margins[3] - 0.0006) / 2
+    requested = (
+        original[0] + strip_centre - (box[0] + box[3]) / 2, *original[1:],
+    )
+
+    def mutate():
+        if target.moves:
+            position = list(requested)
+            position[axis] = math.nextafter(
+                requested[axis] + direction * 1e-7, direction * math.inf,
+            )
+            assert abs(position[axis] - requested[axis]) > 1e-7
+            target.translate(tuple(position))
+
+    if phase == "immediate":
+        case.on_move = mutate
+    elif phase == "rebuild":
+        case.on_rebuild = mutate
+    if phase == "final":
+        verify = case.align()
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match="position readback changed"):
+            verify()
+    else:
+        with pytest.raises(RuntimeError, match="position readback"):
+            case.align()
+    assert target.moves == [requested]
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert all(not note.moves for note in case.notes if note not in case.owned)
+    assert case.rebuilds == (0 if phase == "immediate" else 1)
+    assert [fields["phase"] for event, fields in case.events
+            if event == "drawing.purchased_bottom_zone_four.state"] == (
+        ["before", "after"] if phase == "final" else ["before"]
+    )
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        ("cell-left", "leaves its original cell"),
+        ("cell-right", "leaves its original cell"),
+        ("bottom", "leaves its original cell"),
+        ("top", "leaves its original cell"),
+        ("too-wide-for-strip", "leaves its original cell"),
+        ("empty-strip", "infeasible native target lane"),
+        ("strip-outside-cell", "infeasible native target lane"),
+    ),
+)
+def test_portrait_zone_four_full_native_preflight_refuses_before_either_write(
+    portrait_zone_native, defect, message,
+):
+    case = portrait_zone_native
+    box = list(case.four.extent)
+    if defect == "cell-left":
+        box[0] = 0.0006 - 0.000001
+    elif defect == "cell-right":
+        box[3] = 0.06985 - 0.0006 + 0.000001
+    elif defect == "bottom":
+        box[1] = 0.0006 - 0.000001
+    elif defect == "top":
+        box[4] = case.margins[1] - 0.0006 + 0.000001
+    elif defect == "too-wide-for-strip":
+        # It fits the original full cell; only the proposed complete box fails.
+        box[0], box[3] = 0.025, 0.037
+    elif defect == "empty-strip":
+        case.margins[3] = 0.001
+    else:
+        case.margins[3] = 0.080
+    case.four.extent = tuple(box)
+    before = tuple(_zone_snapshot(note) for note in case.notes)
+    with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+        case.align()
+    assert tuple(_zone_snapshot(note) for note in case.notes) == before
+    assert all(not note.moves for note in case.notes)
+    assert case.rebuilds == 0
+    assert [name for name, _zoom, _extent in case.extent_reads] == [
+        case.bottom.name, case.four.name,
+    ]
+    assert [fields["phase"] for _event, fields in case.events] == ["before", "before"]
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("phase", ("rebuild", "final"))
+@pytest.mark.parametrize(
+    "edge", ("cell-left", "cell-right", "bottom", "top", "strip-left", "strip-right")
+)
+def test_portrait_zone_four_rechecks_fresh_full_box_not_merely_its_anchor(
+    portrait_zone_native, phase, edge,
+):
+    case = portrait_zone_native
+    requested = None
+
+    def mutate():
+        box = list(case.four.extent)
+        if edge in ("cell-left", "strip-left"):
+            box[0] = 0.0006 - 0.000001
+        elif edge == "cell-right":
+            box[3] = 0.06985 - 0.0006 + 0.000001
+        elif edge == "bottom":
+            box[1] = 0.0006 - 0.000001
+        elif edge == "top":
+            box[4] = case.margins[1] - 0.0006 + 0.000001
+        else:
+            # Still in the original cell, but beyond the native-derived strip.
+            box[3] = case.margins[3] - 0.0006 + 0.000001
+        case.four.extent = tuple(box)
+
+    message = "native left strip" if edge == "strip-right" else "original cell"
+    if phase == "rebuild":
+        case.on_rebuild = mutate
+        with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+            case.align()
+    else:
+        verify = case.align()
+        requested = case.four.anchor
+        case.frozen = True
+        mutate()
+        with pytest.raises(RuntimeError, match=f"bottom zone 4: .*{message}"):
+            verify()
+    assert case.four.anchor == case.four.moves[0]
+    if requested is not None:
+        assert case.four.anchor == requested
+    assert case.four.GetText() == "4"
+    assert all(len(note.moves) == 1 for note in case.owned)
+    assert case.rebuilds == 1
+    assert [fields["phase"] for _event, fields in case.events] == (
+        ["before", "before", "after", "after"] if phase == "final"
+        else ["before", "before"]
+    )
+    reads = [extent for name, _zoom, extent in case.extent_reads
+             if name == case.four.name]
+    assert reads[-1] == case.four.extent
+    assert reads[0] != reads[-1]
+    assert case.zoom is None and case.restores == len(case.zooms)
+
+
+@pytest.mark.parametrize("left_margin", (0.009, 0.017, 0.025))
+def test_portrait_zone_four_uses_native_margin_and_asymmetric_full_box(
+    portrait_zone_native, left_margin,
+):
+    case = portrait_zone_native
+    case.margins[3] = left_margin
+    # Synthetic native font padding changes the anchor/box-centre relationship.
+    box = list(case.four.extent)
+    box[0], box[3] = case.four.anchor[0] - 0.001, case.four.anchor[0] + 0.003
+    case.four.extent = tuple(box)
+    original = case.four.anchor
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    verify = case.align()
+    wanted_centre = (0.0006 + left_margin - 0.0006) / 2
+    expected = original[0] + wanted_centre - (box[0] + box[3]) / 2
+    assert case.four.moves == [(expected, *original[1:])]
+    assert (case.four.extent[0] + case.four.extent[3]) / 2 == pytest.approx(wanted_centre)
+    assert 0.0006 < case.four.extent[0] < case.four.extent[3] < left_margin - 0.0006
+    assert case.four.anchor[1:] == original[1:]
+    assert case.four.GetText() == "4"
+    for note in case.notes:
+        if note not in case.owned:
+            assert _zone_snapshot(note) == before[note.name]
+    case.frozen = True
+    verify()
+
+
+def test_portrait_bottom_zones_emit_distinct_actual_states_with_joint_inventory(
+    portrait_zone_native,
+):
+    import json
+
+    case = portrait_zone_native
+    before = {note.name: _zone_snapshot(note) for note in case.notes}
+    verify = case.align()
+    after = {note.name: _zone_snapshot(note) for note in case.notes}
+    case.frozen = True
+    verify()
+    assert [(event, fields["phase"]) for event, fields in case.events] == [
+        (event, phase)
+        for phase in ("before", "after", "final")
+        for event in (
+            "drawing.purchased_bottom_zone_three.state",
+            "drawing.purchased_bottom_zone_four.state",
+        )
+    ]
+    for event, fields in case.events:
+        state = json.loads(fields["state"])
+        zone = "3" if "three" in event else "4"
+        note = case.bottom if zone == "3" else case.four
+        snapshot = before if fields["phase"] == "before" else after
+        assert state["zone"] == zone
+        assert state["grid"] == [
+            list(case.properties), list(case.margins), list(case.distribution), case.region,
+        ]
+        cell = (0.06985, 0.0, 0.1397, 0.0127) if zone == "3" else (
+            0.0, 0.0, 0.06985, 0.0127,
+        )
+        assert state["cell"] == pytest.approx(cell)
+        assert state["inset"] == pytest.approx((
+            cell[0] + 0.0006, 0.0006, cell[2] - 0.0006, cell[3] - 0.0006,
+        ))
+        assert state["target_lane"] == pytest.approx(
+            (0.104775, 0.0006, 0.1391, 0.0121) if zone == "3" else
+            (0.0006, 0.0006, 0.0121, 0.0121)
+        )
+        extent = snapshot[note.name][5]
+        assert state["extent"] == [extent[0], extent[1], extent[3], extent[4]]
+        assert {(row["side"], row["value"]) for row in state["columns"]} == {
+            (side, str(value)) for side in ("bottom", "top") for value in range(1, 5)
+        }
+        assert len(state["columns"]) == 8
+        for row in state["columns"]:
+            identity = row["identity"]
+            original = snapshot[identity[0]]
+            assert row["position"] == list(original[4])
+            assert identity == json.loads(json.dumps((
+                original[0], original[3], original[1], original[2], original[6],
+                original[7], original[8], original[9], original[10],
+            )))
+            if fields["phase"] != "before" and identity[0] not in {
+                owned.name for owned in case.owned
+            }:
+                assert row["position"] == list(before[identity[0]][4])
+
+
+@pytest.mark.parametrize("phase", ("success", "before", "rebuild", "final"))
+def test_portrait_bottom_zones_never_modify_foreign_or_license_controls(
+    portrait_zone_native, phase,
+):
+    case = portrait_zone_native
+    foreign = case.make_note(
+        "UnlinkedFour", case.four.anchor, case.four.extent, link="4",
+    )
+    foreign.OwnerType = 1
+    foreign.text_override = "4"
+    license_note = case.make_note(
+        "LicenseControl", (0.020, 0.008, 0.0),
+        (0.015, 0.001, 0.0, 0.250, 0.010, 0.0), link="license-control",
+    )
+    license_note.text_override = "unchanged license control"
+    license_note.formats = [_ZoneTextFormat(Italic=True, CharHeight=0.002)]
+    controls = (foreign, license_note)
+    case.notes.extend(controls)
+    before = tuple(_zone_snapshot(note) for note in controls)
+
+    def infeasible():
+        box = list(case.four.extent)
+        box[4] = case.margins[1]
+        case.four.extent = tuple(box)
+
+    if phase == "before":
+        infeasible()
+        with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+            case.align()
+        assert all(not note.moves for note in case.notes)
+    elif phase == "rebuild":
+        case.on_rebuild = infeasible
+        with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+            case.align()
+    else:
+        verify = case.align()
+        case.frozen = True
+        if phase == "final":
+            infeasible()
+            with pytest.raises(RuntimeError, match="bottom zone 4: .*original cell"):
+                verify()
+        else:
+            verify()
+    assert tuple(_zone_snapshot(note) for note in controls) == before
+    assert all(not note.moves for note in controls)
+    assert all(name not in {note.name for note in controls}
+               for name, _zoom, _extent in case.extent_reads)
+
+
+@pytest.mark.parametrize(
+    "layout,offset,expected",
+    [
+        (
+            None,
+            0.0,
+            (
+                (0.025, 0.077, 0.205, 0.182),
+                (0.025, 0.198, 0.205, 0.262),
+                (0.225, 0.077, 0.405, 0.182),
+                (0.225, 0.192, 0.415, 0.262),
+            ),
+        ),
+        (
+            "standard",
+            0.0,
+            (
+                (0.025, 0.077, 0.205, 0.182),
+                (0.025, 0.198, 0.205, 0.262),
+                (0.225, 0.077, 0.405, 0.182),
+                (0.225, 0.192, 0.415, 0.262),
+            ),
+        ),
+        (
+            "tall_top",
+            0.0,
+            (
+                (0.025, 0.077, 0.205, 0.150),
+                (0.025, 0.166, 0.205, 0.262),
+                (0.225, 0.077, 0.405, 0.150),
+                (0.225, 0.160, 0.415, 0.262),
+            ),
+        ),
+        (
+            "portrait_reference",
+            0.060,
+            (
+                (0.025, 0.137, 0.135, 0.310),
+                (0.025, 0.326, 0.135, 0.4144),
+                (0.144, 0.137, 0.262, 0.292),
+                (0.144, 0.302, 0.262, 0.4144),
+            ),
+        ),
+    ],
+    ids=("implicit-standard", "standard", "tall-top", "portrait"),
+)
+def test_purchased_view_cells_preserve_defaults_and_portrait_caption_clearance(
+    layout, offset, expected
+):
+    from itertools import combinations
+
+    from _layout_geometry import Box
+
+    caption_y = purchased.view_band_bottom("", label="cells", y_offset=offset)
+    cells = purchased.fastener_view_cells(
+        caption_y, **({} if layout is None else {"layout": layout})
+    )
+    assert [name for name, _center, _box in cells] == [
+        "*Front",
+        "*Top",
+        "*Right",
+        "*Isometric",
+    ]
+    rectangles = []
+    captions = []
+    for (_name, center, bounds), wanted in zip(cells, expected, strict=True):
+        assert bounds == pytest.approx(wanted)
+        assert center == pytest.approx(
+            ((wanted[0] + wanted[2]) / 2, (wanted[1] + wanted[3]) / 2)
+        )
+        rectangles.append(Box(*bounds))
+        captions.append(Box(bounds[0], bounds[1] - 0.010, bounds[2], bounds[1] - 0.003))
+    portrait = layout == "portrait_reference"
+    border = (
+        (0.0127, 0.0127, 0.2667, 0.4191)
+        if portrait
+        else (0.0127, 0.0127, 0.4191, 0.2667)
+    )
+    template = purchased.DRAWING_TEMPLATES[
+        DrawingLayout.PORTRAIT if portrait else DrawingLayout.LANDSCAPE
+    ]
+    title = Box(
+        template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m
+    )
+    for box in (*rectangles, *captions):
+        assert purchased._inside((box.xmin, box.ymin, box.xmax, box.ymax), border)
+        assert box.overlaps(title, tol=0.0) is None
+    for first, second in combinations((*rectangles, *captions), 2):
+        assert first.overlaps(second, tol=0.0) is None
+
+
+@pytest.fixture
+def portrait_native_scene(monkeypatch, tmp_path):
+    import math
+    from itertools import product
+
+    import _drawing_projection as projection
+    import sh_vn_clamp_screw_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    class MathPoint:
+        def __init__(self, coordinates):
+            self.ArrayData = tuple(coordinates)
+
+        def MultiplyTransform(self, rows):
+            return MathPoint(
+                sum(row[i] * self.ArrayData[i] for i in range(3)) + row[3]
+                for row in rows
+            )
+
+    def invoke(target, _interface, member, *args):
+        value = getattr(target, member)
+        return value(*args) if callable(value) else value
+
+    monkeypatch.setattr(projection, "_com_invoke", invoke)
+    monkeypatch.setattr(projection, "double_array", tuple)
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    utility = SimpleNamespace(CreatePoint=MathPoint)
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            GetMathUtility=lambda: utility, IsSame=lambda left, right: int(left is right)
+        )
+    )
+    bases = {
+        "*Front": ((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+        "*Top": ((1, 0, 0), (0, 0, 1), (0, -1, 0)),
+        "*Right": ((0, 0, -1), (0, 1, 0), (1, 0, 0)),
+        "*Isometric": (
+            (math.sqrt(0.5), 0, -math.sqrt(0.5)),
+            (1 / math.sqrt(6), math.sqrt(2 / 3), 1 / math.sqrt(6)),
+            (1 / math.sqrt(3), -1 / math.sqrt(3), 1 / math.sqrt(3)),
+        ),
+    }
+    padding_bias = {
+        "*Front": (0.003, -0.004),
+        "*Top": (-0.002, 0.002),
+        "*Right": (0.004, 0.002),
+        "*Isometric": (0.003, -0.002),
+    }
+    # Native Position is a movable view anchor, not the transform's projected
+    # model origin. Distinct frame offsets expose Position-based alignment.
+    origin_offsets = {
+        "*Front": (0.009, -0.006),
+        "*Top": (-0.004, 0.005),
+        "*Right": (0.006, 0.003),
+        "*Isometric": (0.002, -0.007),
+    }
+
+    class NativeView(_View):
+        """Affine native projection, asymmetric padding and refreshed bounds."""
+
+        def __init__(self, name, center, vertices):
+            self.scale_writes = []
+            super().__init__(name, tmp_path / "clamp.SLDPRT", center)
+            self.vertices = vertices
+            self.moves = []
+            self.setter_mode = None
+            self.projection_nan = False
+            self.padding = 0.011176
+            self.display = None
+            self.UpdateViewDisplayGeometry()
+
+        @property
+        def ScaleRatio(self):
+            return self._ratio
+
+        @ScaleRatio.setter
+        def ScaleRatio(self, value):
+            self._ratio = tuple(value)
+            self.scale_writes.append(self._ratio)
+
+        @property
+        def Position(self):
+            return self._center
+
+        @property
+        def ModelToViewTransform(self):
+            x, y = self._display_position
+            dx, dy = origin_offsets[self._orientation]
+            position = (x + dx, y + dy, 0.0)
+            if self.projection_nan:
+                position = (float("nan"), position[1], position[2])
+            return tuple(
+                (*(value * self._display_ratio for value in axis), translation)
+                for axis, translation in zip(
+                    bases[self._orientation], position, strict=True
+                )
+            )
+
+        def UpdateViewDisplayGeometry(self):
+            self._display_position = self.Position
+            self._display_ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+
+        def GetOutline(self):
+            points = [
+                MathPoint(vertex).MultiplyTransform(self.ModelToViewTransform).ArrayData
+                for vertex in self.vertices
+            ]
+            dx, dy = padding_bias[self._orientation]
+            return (
+                min(point[0] for point in points) + dx - self.padding / 2,
+                min(point[1] for point in points) + dy - self.padding / 2,
+                max(point[0] for point in points) + dx + self.padding / 2,
+                max(point[1] for point in points) + dy + self.padding / 2,
+            )
+
+        def SetViewPosition(self, position, move_children):
+            assert move_children is False
+            self.moves.append(tuple(position))
+            if self.setter_mode == "false":
+                return False
+            if self.setter_mode != "ignored":
+                self._center = tuple(position)
+            return True
+
+        def GetFirstDisplayDimension6(self):
+            return self.display
+
+        def GetAnnotations(self):
+            return ()
+
+    def make_scene(*, width=0.006858):
+        # The 4dcfee clamp's three orthographic size terms, plus the same
+        # 11.176 mm fixed native padding used in the existing fit regression.
+        # Off-centre model coordinates and asymmetric padding make Position
+        # and outline centres unsuitable substitutes for projected origins.
+        size = (width, 0.006858, 0.036145592231561)
+        model_center = (0.004, 0.006, 0.012)
+        vertices = tuple(
+            tuple(
+                center + sign * length / 2
+                for center, sign, length in zip(model_center, signs, size, strict=True)
+            )
+            for signs in product((-1, 1), repeat=3)
+        )
+        outer = purchased.fastener_view_cells(
+            purchased.view_band_bottom("", label="portrait", y_offset=0.060),
+            layout="portrait_reference",
+        )
+        margins = supplier_screw_margins(
+            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+        )
+        fitted = purchased.supplier_fit_cells(outer, margins, label="portrait")
+        views = [NativeView(name, center, vertices) for name, center, _bounds in outer]
+        state = SimpleNamespace(
+            adapter=adapter,
+            outer=outer,
+            fitted=fitted,
+            margins=margins,
+            views=views,
+            by_name={view.GetOrientationName(): view for view in views},
+            rebuilds=0,
+            drift=None,
+        )
+
+        def rebuild():
+            state.rebuilds += 1
+            if state.drift == "scale":
+                state.by_name["*Top"].ScaleRatio = (1, 1)
+            elif state.drift == "sheet-scale":
+                state.by_name["*Isometric"].UseSheetScale = 1
+            return True
+
+        state.draw = SimpleNamespace(EditRebuild3=rebuild)
+        state.scales = purchased._fit_views(state.draw, views, fitted)
+        return state
+
+    return make_scene
+
+
+def _portrait_origins(scene):
+    return {
+        view.GetOrientationName(): purchased.model_point_in_view(
+            scene.adapter, view, (0.0, 0.0, 0.0), label="portrait origin"
+        )
+        for view in scene.views
+    }
+
+
+def test_portrait_alignment_uses_projected_model_origins_and_keeps_independent_scales(
+    portrait_native_scene,
+):
+    scene = portrait_native_scene()
+    before = _portrait_origins(scene)
+    positions = {name: view.Position for name, view in scene.by_name.items()}
+    rebuilds = scene.rebuilds
+    assert scene.scales == {
+        "*Front": (1, 2),
+        "*Top": (1, 2),
+        "*Right": (1, 2),
+        "*Isometric": (2, 1),
+    }
+    assert before["*Top"][0] != pytest.approx(before["*Front"][0])
+    assert before["*Right"][1] != pytest.approx(before["*Front"][1])
+    assert before["*Top"][0] - before["*Front"][0] != pytest.approx(
+        positions["*Top"][0] - positions["*Front"][0]
+    )
+    assert before["*Right"][1] - before["*Front"][1] != pytest.approx(
+        positions["*Right"][1] - positions["*Front"][1]
+    )
+    purchased._align_orthographic_views(
+        scene.adapter,
+        scene.draw,
+        scene.views,
+        scene.fitted,
+        scales=scene.scales,
+        label="portrait",
+    )
+    after = _portrait_origins(scene)
+    assert after["*Front"] == before["*Front"]
+    assert after["*Isometric"] == before["*Isometric"]
+    assert after["*Top"] == pytest.approx((before["*Front"][0], before["*Top"][1]))
+    assert after["*Right"] == pytest.approx((before["*Right"][0], before["*Front"][1]))
+    assert scene.by_name["*Top"].Position == pytest.approx(
+        (
+            positions["*Top"][0] + before["*Front"][0] - before["*Top"][0],
+            positions["*Top"][1],
+        )
+    )
+    assert scene.by_name["*Right"].Position == pytest.approx(
+        (
+            positions["*Right"][0],
+            positions["*Right"][1] + before["*Front"][1] - before["*Right"][1],
+        )
+    )
+    assert scene.by_name["*Front"].Position == positions["*Front"]
+    assert scene.by_name["*Isometric"].Position == positions["*Isometric"]
+    assert scene.rebuilds == rebuilds + 1
+    for view, (name, _center, bounds) in zip(scene.views, scene.fitted, strict=True):
+        assert tuple(view.ScaleRatio) == scene.scales[name]
+        assert view.UseSheetScale == 0
+        assert purchased._inside(view.GetOutline(), bounds)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        ("setter-false", "failed to align purchased view"),
+        ("setter-ignored", "native projected origin failed to align"),
+        ("nonfinite-origin", "invalid projected origin"),
+        ("scale", "alignment changed fitted view scale"),
+        ("sheet-scale", "alignment changed fitted view scale"),
+        ("containment", "aligned native view leaves its fitted cell"),
+    ],
+)
+def test_portrait_alignment_refuses_native_failure_without_refitting(
+    portrait_native_scene, defect, message
+):
+    # A wider but valid fitted body has less than 5 mm of horizontal spare
+    # room. Correct origin alignment must refuse, not silently downscale it.
+    scene = portrait_native_scene(width=0.090 if defect == "containment" else 0.006858)
+    top = scene.by_name["*Top"]
+    if defect.startswith("setter-"):
+        top.setter_mode = defect.removeprefix("setter-")
+    elif defect == "nonfinite-origin":
+        top.projection_nan = True
+    elif defect in ("scale", "sheet-scale"):
+        scene.drift = defect
+    scale_writes = {name: len(view.scale_writes) for name, view in scene.by_name.items()}
+    with pytest.raises(RuntimeError, match=message):
+        purchased._align_orthographic_views(
+            scene.adapter,
+            scene.draw,
+            scene.views,
+            scene.fitted,
+            scales=scene.scales,
+            label="portrait",
+        )
+    for name, view in scene.by_name.items():
+        # The scale-drift case includes the one native rebuild mutation.
+        assert len(view.scale_writes) == scale_writes[name] + int(
+            defect == "scale" and name == "*Top"
+        )
+    if defect == "containment":
+        bounds = next(bounds for name, _center, bounds in scene.fitted if name == "*Top")
+        assert not purchased._inside(top.GetOutline(), bounds)
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    [
+        (None, None),
+        ("body", "settled supplier view leaves its cell"),
+        ("caption", "settled caption/footer changed owner/text/space"),
+        ("footer", "settled caption/footer changed owner/text/space"),
+    ],
+)
+def test_portrait_settled_layout_checks_actual_body_caption_and_shifted_footer(
+    monkeypatch, portrait_native_scene, purchased_footer_document, defect, message
+):
+    scene = portrait_native_scene()
+    purchased._align_orthographic_views(
+        scene.adapter,
+        scene.draw,
+        scene.views,
+        scene.fitted,
+        scales=scene.scales,
+        label="portrait",
+    )
+    origins = _portrait_origins(scene)
+    sources = {
+        name: (
+            str(Path(view.GetReferencedModelName()).resolve()),
+            view.ReferencedConfiguration,
+        )
+        for name, view in scene.by_name.items()
+    }
+    # Replace only native display-data acquisition. Production display_box and
+    # the full settled body/annotation/caption/footer containment guards run.
+    for name, view in scene.by_name.items():
+        if name not in scene.margins:
+            continue
+        native = _supplier_native(monkeypatch)
+        native.annotation.Owner = view
+        native.display.GetNext5 = lambda: None
+        view.display = native.display
+        bounds = next(bounds for key, _center, bounds in scene.outer if key == name)
+        native.annotation.geometry = {
+            "texts": [
+                {
+                    "t": "(REF)",
+                    "pos": (bounds[0] + 0.010, bounds[1] + 0.010, 0.0),
+                    "h": 0.003,
+                    "w": 0.008,
+                    "ang": 0.0,
+                    "ref": 2,
+                }
+            ]
+        }
+    monkeypatch.setattr(purchased, "iter_views", lambda _adapter: iter(scene.views))
+    monkeypatch.setattr(
+        purchased,
+        "annotation_display",
+        lambda _adapter, annotation: (annotation.geometry, {}),
+    )
+    document = purchased_footer_document
+    front_cell = scene.outer[0][2]
+    caption_y = front_cell[1] - 0.004
+    text = "FRONT  1:2"
+    caption = purchased._literal_note(scene.adapter, text, scene.outer[0][1][0], caption_y)
+    caption_record = (
+        caption,
+        text,
+        text,
+        (front_cell[0], caption_y - 0.006, front_cell[2], caption_y + 0.001),
+    )
+    footer = purchased.add_purchased_footer(
+        scene.adapter,
+        document,
+        document.properties,
+        item="TEST SCREW",
+        label="portrait",
+        y_offset=0.060,
+    )
+    if defect == "body":
+        scene.by_name["*Top"].padding = 0.100
+    elif defect == "caption":
+        x, y, z = caption.GetPosition()
+        caption.SetPosition(x, y - 0.007, z)
+    elif defect == "footer":
+        x, _y, z = footer[-1][0].GetPosition()
+        footer[-1][0].SetPosition(x, 0.024, z)
+    options = dict(
+        label="portrait",
+        margins=scene.margins,
+        scales=scene.scales,
+        origins=origins,
+        sources=sources,
+        sheet_notes=(caption_record, *footer),
+    )
+    if message is None:
+        purchased._assert_supplier_layout(scene.adapter, scene.outer, **options)
+    else:
+        with pytest.raises(RuntimeError, match=message):
+            purchased._assert_supplier_layout(scene.adapter, scene.outer, **options)
+
+
 def test_center_marks_lose_their_extension_lines(monkeypatch):
     class Mark:
         def __init__(self, following=None):
@@ -6460,10 +8505,6 @@ def test_supplier_final_inventory_reacquires_and_rejects_source_or_inventory_dri
         if original_attachment_error is not None:
             assert caught.value is original_attachment_error
             assert census == {}
-            assert context["attachment_error"] == {
-                "error_type": "RuntimeError",
-                "message": str(original_attachment_error),
-            }
         elif drift == "attachment-type-count":
             assert census == {}
             assert "lost its source sketch attachments" in str(caught.value)
@@ -6669,6 +8710,144 @@ def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room
         assert purchased._inside(view.GetOutline(), bounds)
 
 
+@pytest.mark.parametrize(
+    "member", ("carriage", "block", "bracket", "rail", "clamp", "lever")
+)
+def test_oblique_portrait_registered_cells_preserve_full_supplier_lane_budgets(member):
+    from importlib import import_module
+
+    from _layout_geometry import Box
+    from _supplier_screw_layout import supplier_screw_margins
+
+    recipe = import_module(f"draw_ch_rocker_arm_tl_vn_oblique_{member}_screw")
+    supplier = recipe.supplier
+    template = purchased.DRAWING_TEMPLATES[recipe.SPEC.layout]
+    notes = str(
+        purchased._config.parts(recipe.SPEC.artifact_stem).get("installation_notes", "")
+    )
+    assert purchased.note_lines(notes, label=member) == ()
+    offset = (
+        template.title_block_top_m
+        + purchased._CAPTION_CLEARANCE
+        - min(y - purchased._FOOTER_ROW_BELOW for _, y in purchased._FOOTER_ROWS)
+    )
+    caption_y = purchased.view_band_bottom(notes, label=member, y_offset=offset)
+    cells = purchased.fastener_view_cells(caption_y, layout="portrait_reference")
+    sides = (
+        recipe._REFERENCE_SIDES
+        if member == "block"
+        else supplier.SUPPLIER_REFERENCE_SIDES
+    )
+    fitted = purchased.supplier_fit_cells(
+        cells,
+        supplier_screw_margins(
+            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES,
+            sides=sides,
+        ),
+        label=member,
+    )
+    bounds = {name: cell for name, _, cell in fitted}
+    assert offset == pytest.approx(0.060)
+    assert caption_y == pytest.approx(0.133)
+    assert bounds["*Top"][3] - bounds["*Top"][1] == pytest.approx(0.0364)
+    assert bounds["*Front"][3] - bounds["*Front"][1] == pytest.approx(0.127)
+    assert bounds["*Front"][2] - bounds["*Front"][0] == pytest.approx(
+        0.050 if member == "block" else 0.058
+    )
+    border = (0.0127, 0.0127, template.width_m - 0.0127, template.height_m - 0.0127)
+    title = Box(template.title_block_left_m, 0.0127, border[2], template.title_block_top_m)
+    for name, _, cell in cells:
+        assert purchased._inside(cell, border), name
+        caption = (cell[0], cell[1] - purchased._CAPTION_TO_CELL - purchased._CAPTION_BELOW,
+                   cell[2], cell[1] - purchased._CAPTION_TO_CELL + 0.001)
+        assert purchased._inside(caption, border), name
+        assert min(Box(*cell).penetration(title)) < 0.0, name
+        assert min(Box(*caption).penetration(title)) < 0.0, name
+    # Real registry paper and full lane geometry, not captured callback kwargs.
+    # New portrait native outlines and actual printed legibility remain gates.
+
+
+def test_carriage_recorded_padding_floor_preserves_standard_scale_choices(monkeypatch, tmp_path):
+    import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as supplier
+    from _supplier_screw_layout import supplier_screw_margins
+
+    # Actual 24 precenter events from source 6bdd304e8f12, worker swmaker00000a@10,
+    # 2026-10-22T17:08:04..06Z, drawing:ch_rocker_arm_tl_vn_oblique_carriage_screw.
+    # This reproduces their measured outline-size law, not physical-body bounds.
+    class CarriageView(_View):
+        @property
+        def Position(self):
+            return self._center
+
+        def GetOutline(self):
+            ratio = self.ScaleRatio[0] / self.ScaleRatio[1]
+            width = 0.007 * ratio + 0.011176
+            profile = 0.007 if self._orientation == "*Top" else 0.0243131355832212
+            height = profile * ratio + 0.011176
+            x, y = self._center
+            return x - width / 2, y - height / 2, x + width / 2, y + height / 2
+
+        def SetViewPosition(self, position, move_children):
+            assert move_children is False
+            self._center = tuple(position)
+            return True
+
+    records = _native_fit_records(monkeypatch)
+    margins = supplier_screw_margins(
+        supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+        planes=supplier.SUPPLIER_REFERENCE_PLANES,
+        sides=supplier.SUPPLIER_REFERENCE_SIDES,
+    )
+    notes = str(
+        purchased._config.parts("ch-rocker-arm-tl-vn-oblique-carriage-screw").get(
+            "installation_notes", ""
+        )
+    )
+
+    def members(layout, *, footer_offset=0.0):
+        caption_y = purchased.view_band_bottom(
+            notes, label="carriage", y_offset=footer_offset
+        )
+        outer = purchased.fastener_view_cells(caption_y, layout=layout)[:3]
+        fitted = purchased.supplier_fit_cells(outer, margins, label="carriage")
+        return [
+            (CarriageView(name, tmp_path / "carriage.SLDPRT", center), cell)
+            for (name, center, _), cell in zip(outer, fitted, strict=True)
+        ]
+
+    standard = members("standard")
+    with pytest.raises(RuntimeError, match="no project-standard scale"):
+        purchased._fit_group(_Drawing(), standard)
+    rejected = [
+        state
+        for name, state in records
+        if name == "drawing.purchased_fit_candidate" and state["view_key"] == "*Top"
+    ]
+    assert len(records) == 24 and len(rejected) == len(purchased._SCALES)
+    assert all(state["reason"] == "precenter_size" for state in rejected)
+    assert rejected[-1]["height_m"] == pytest.approx(0.012051)
+    assert rejected[-1]["height_excess_m"] == pytest.approx(0.000051)
+    tall = members("tall_top")
+    assert purchased._fit_group(_Drawing(), tall) == (1, 2)
+    for view, (_name, center, bounds) in tall:
+        outline = view.GetOutline()
+        assert purchased._inside(outline, bounds)
+        assert ((outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2) == (
+            pytest.approx(center)
+        )
+    # Reuse these frozen measured sizes in the new physical allocation; this
+    # is a fitter regression control, not new portrait GetOutline/render proof.
+    portrait = members("portrait_reference", footer_offset=0.060)
+    assert purchased._fit_group(_Drawing(), portrait) == (2, 1)
+    for view, (_name, center, bounds) in portrait:
+        outline = view.GetOutline()
+        assert purchased._inside(outline, bounds)
+        assert ((outline[0] + outline[2]) / 2, (outline[1] + outline[3]) / 2) == (
+            pytest.approx(center)
+        )
+
+
 @pytest.mark.parametrize("layout", ("standard", "supplier_top", "tall_top"))
 def test_fastener_cells_and_captions_clear_border_title_block_and_each_other(layout):
     from itertools import combinations
@@ -6702,57 +8881,6 @@ def test_fastener_cells_and_captions_clear_border_title_block_and_each_other(lay
     assert captions["*Top"].ymin - front.ymax >= 0.006 - 1e-12
     assert captions["*Front"].ymin - title.ymax >= 0.0019 - 1e-12
     assert captions["*Right"].ymin - title.ymax >= 0.0019 - 1e-12
-
-
-@pytest.mark.parametrize("axis", (0, 1), ids=("horizontal", "vertical"))
-@pytest.mark.parametrize("tail_extension", (0.0, 0.004))
-def test_clamp_shelf_follows_measured_text_and_arrow_reach(axis, tail_extension):
-    import draw_sh_vn_clamp_screw as clamp
-    from _layout_geometry import Box, Segment, segment_box_distance
-
-    # Representative settled-mode geometry, not native after-fix evidence.
-    # Horizontal text includes the whole nominal-diameter/thread-ID block.
-    text = Box(0.1029, 0.2192, 0.1271, 0.2288)
-    reach = 0.135 if axis == 0 else 0.245
-    reach += tail_extension
-    position = (0.115, 0.222, 0.0)
-    geometry = dict(axis=axis, text=text, reach=reach)
-    target = clamp._shelf_target(geometry, position, position[1 - axis])
-    dx, dy = (target[index] - position[index] for index in (0, 1))
-    moved = Box(text.xmin + dx, text.ymin + dy, text.xmax + dx, text.ymax + dy)
-    assert target[1 - axis] == position[1 - axis]
-    assert (moved.xmin if axis == 0 else moved.ymin) - reach == pytest.approx(
-        clamp.CLEAR_GAP_M + clamp.PLACE_SETTLE_M
-    )
-    line = (
-        Segment(0.108, 0.222, reach, 0.222)
-        if axis == 0
-        else Segment(0.115, 0.215, 0.115, reach)
-    )
-    assert segment_box_distance(line, moved) >= clamp.CLEAR_GAP_M
-    cell = Box(0.025, 0.166, 0.205, 0.262)
-    assert purchased._inside(
-        (moved.xmin, moved.ymin, moved.xmax, moved.ymax),
-        (cell.xmin, cell.ymin, cell.xmax, cell.ymax),
-    )
-
-
-@pytest.mark.parametrize("key", ("tips", "witnesses"))
-def test_clamp_shelving_rejects_native_line_station_drift(key):
-    import draw_sh_vn_clamp_screw as clamp
-
-    original = dict(
-        tips=((0.1, 0.2), (0.1, 0.204)),
-        witnesses=((0.2, 0.099, 0.11), (0.204, 0.099, 0.11)),
-    )
-    clamp._assert_stations("head", original, copy.deepcopy(original))
-    moved = copy.deepcopy(original)
-    moved[key] = (
-        tuple(value + 0.0001 for value in original[key][0]),
-        *original[key][1:],
-    )
-    with pytest.raises(RuntimeError, match=f"native {key} moved"):
-        clamp._assert_stations("head", original, moved)
 
 
 @pytest.fixture
@@ -6939,84 +9067,61 @@ def _clamp_recovered_head_height():
     }
 
 
-def test_clamp_native_geometry_distinguishes_offset_ink_from_real_witnesses(
-    monkeypatch,
+@pytest.fixture
+def clamp_supplier_annotation_replay(
+    monkeypatch, clamp_native_supplier_inventory, request
 ):
-    import draw_sh_vn_clamp_screw as clamp
+    import _dimensions
+    import _supplier_reference_text as reference_text
+    import _supplier_screw_dimensions as screws
+    from _layout_geometry import Box
+    from solidworks_mcp.adapters import sw_type_info
 
-    record = _clamp_recovered_head_height()
-    monkeypatch.setattr(
-        clamp, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
-    )
-    monkeypatch.setattr(clamp, "_dump_annotation", lambda *_args: record)
-    display = SimpleNamespace(GetAnnotation=lambda: object())
-    original_record = copy.deepcopy(record)
-    before = clamp._native_geometry(None, display, "SupplierHeadHeight")
-    assert before["axis"] == 1
-    assert before["tips"] == (
-        (0.1029834, 0.2347655),
-        (0.1029834, 0.2352608),
-    )
-    assert before["witnesses"] == (
-        (0.2347655, 0.1019834, 0.1135714),
-        (0.2352608, 0.1019834, 0.1135714),
-    )
-    assert before["reach"] == pytest.approx(0.2416108)
-    assert before["text"].width > 0.015
-    assert record == original_record
+    case = clamp_native_supplier_inventory
+    clamp = case.clamp
+    case.defect = getattr(request, "param", None)
+    case.writes, case.rebuilds = [], []
 
-    z = record["pos"][2]
-    # Native OffsetText uses display-data paths, not registered leaders. The
-    # perpendicular underline is NOT at either arrow-tip station; the diagonal
-    # connector is NOT a witness even when its start touches an arrow tip.
-    offset_rows = [
-        [0, 0, 0, 0, 0.0916157, 0.250, z, 0.1143511, 0.250, z],
-        [0, 0, 0, 0, 0.1029834, 0.2352608, z, 0.0916157, 0.250, z],
-    ]
-    record["display"]["lines"].extend(offset_rows)
-    for row in record["display"]["lines"][:2]:
-        row[4:7], row[7:10] = row[7:10], row[4:7]
-    with_offset = copy.deepcopy(record)
-    after = clamp._native_geometry(None, display, "SupplierHeadHeight")
-    for key in ("tips", "witnesses", "reach"):
-        assert after[key] == before[key]
-    assert after["record"] == with_offset
-    assert after["record"]["display"]["lines"][-2:] == offset_rows
-    assert record == with_offset  # No pruning of ink before the full audit.
+    # Native replay migrated from immutable 65a820602e2b5ed6e0ea2e188596c29b1c12ea30:
+    # retain its four translated rows, shared-station audit control and frozen
+    # settled reads. Extend only the native boundary so real screw authoring,
+    # source/value proof and exact inventory run instead of their former stubs.
+    class Display(SimpleNamespace):
+        def __init__(self, name, feature, axis, span, offset):
+            value = next(
+                abs(value)
+                for candidate, value, _orientation
+                in clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+                if candidate == name
+            )
+            native = _supplier_native(monkeypatch, value=value / 1000)
+            super().__init__(**vars(native.display))
+            self.native, self.annotation = native.native, native.annotation
+            self.state, self.text = native.state, native.text
+            self.GetAnnotation = lambda: self.annotation
+            self.GetDimension = lambda: self.native
+            self.annotation.GetSpecificAnnotation = lambda: self
+            self.annotation.GetPosition = self.GetPosition
+            self.annotation.SetPosition2 = self.SetPosition2
+            self.name, self.axis, self.feature = name, axis, feature
+            self.frozen = False
+            for method_name in ("SetUnits2", "SetPrecision3", "SetText"):
+                method = getattr(self, method_name)
 
-    del record["display"]["lines"][0]
-    with pytest.raises(RuntimeError, match="witness"):
-        clamp._native_geometry(None, display, "SupplierHeadHeight")
-    record = copy.deepcopy(with_offset)
-    record["display"]["lines"][0][5] += 0.0001
-    record["display"]["lines"][0][8] += 0.0001
-    with pytest.raises(RuntimeError, match="witness"):
-        clamp._native_geometry(None, display, "SupplierHeadHeight")
-    record = copy.deepcopy(with_offset)
-    record["display"]["lines"][0][4] -= 0.0001
-    changed = clamp._native_geometry(None, display, "SupplierHeadHeight")
-    with pytest.raises(RuntimeError, match="native witnesses moved"):
-        clamp._assert_stations("SupplierHeadHeight", before, changed)
+                def native_write(*args, method=method, method_name=method_name):
+                    assert not self.frozen, f"{name}: settled guard wrote {method_name}"
+                    case.writes.append((name, method_name, args))
+                    return method(*args)
 
-
-@pytest.mark.parametrize(
-    "defect", (None, "ignored-seed", "ignored-shelf", "station-drift")
-)
-def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
-    monkeypatch, defect
-):
-    import draw_sh_vn_clamp_screw as clamp
-    from _layout_geometry import Box, segment_box_distance
-
-    # Bounded native-shaped model, following the thumb measured-offset fixture:
-    # text moves independently; enabling OffsetText snaps the native line to
-    # its seeded transverse anchor, then later text moves leave it fixed.
-    # The vertical short row uses recovered HeadHeight primitives verbatim.
-    class Display:
-        def __init__(self, name, axis, span):
-            self.name, self.axis = name, axis
+                setattr(self, method_name, native_write)
+            self.native.Name = name
+            self.native.FullName = f"{name}@{feature}@sh-vn-clamp-screw.Part"
+            self.native.GetSystemValue3 = lambda _which, _configuration: (
+                self.native.SystemValue,
+            )
             self.record = _clamp_recovered_head_height()
             self.record["name"] = name
+            self.annotation.record = self.record
             data = self.record["display"]
             if axis == 0:
                 for row in data["lines"]:
@@ -7045,8 +9150,6 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
                     },
                 ]
             if span is not None:
-                # Long vertical reference: enough native span for its text,
-                # not an outside-arrow short row that should enter offset mode.
                 data["arrows"][0][1] = 0.210
                 data["arrows"][1][1] = 0.260
                 data["lines"][0][5] = data["lines"][0][8] = 0.210
@@ -7056,23 +9159,27 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
                     [0, 0, 0, 0, 0.1029834, 0.242, 0, 0.1029834, 0.260, 0],
                 ]
                 data["texts"][0]["t"] = "(1.25 in)"
-            self.position = tuple(self.record["pos"])
+            dx, dy = offset
+            for row in data["lines"]:
+                row[4] += dx
+                row[7] += dx
+                row[5] += dy
+                row[8] += dy
+            for row in data["arrows"]:
+                row[0] += dx
+                row[1] += dy
+            for row in data["texts"]:
+                x, y, z = row["pos"]
+                row["pos"] = (x + dx, y + dy, z)
+            x, y, z = self.record["pos"]
+            self.position = (x + dx, y + dy, z)
+            self.record["pos"] = self.position
             self.original_position = self.position
             self._offset = False
-            dimensions = clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
-            values = {name: value for name, value, _orientation in dimensions}
-            value = values[name]
-            self.native = SimpleNamespace(
-                Name=name,
-                FullName=f"{name}@SupplierReference@clamp.SLDPRT",
-                SystemValue=value / 1000,
-            )
+            self.next = None
 
-        def GetAnnotation(self):
-            return self
-
-        def GetDimension2(self, _index):
-            return self.native
+        def GetNext5(self):
+            return self.next
 
         def GetPosition(self):
             return self.position
@@ -7083,6 +9190,8 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
 
         @OffsetText.setter
         def OffsetText(self, enabled):
+            assert not self.frozen, f"{self.name}: settled guard wrote offset mode"
+            case.writes.append((self.name, "OffsetText", enabled))
             if enabled and not self._offset:
                 transverse = 1 - self.axis
                 delta = (
@@ -7100,80 +9209,208 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
                 row[axis] += delta
 
         def SetPosition2(self, x, y, z):
-            if self.name == "SupplierThreadDiameter" and (
-                (defect == "ignored-seed" and not self.OffsetText)
-                or (defect == "ignored-shelf" and self.OffsetText)
-            ):
-                return True  # Native success is not proof of a settled move.
+            assert not self.frozen, f"{self.name}: settled guard moved text"
+            case.writes.append((self.name, "SetPosition2", (x, y, z)))
             delta = (x - self.position[0], y - self.position[1])
             for row in self.record["display"]["texts"]:
                 px, py, pz = row["pos"]
                 row["pos"] = (px + delta[0], py + delta[1], pz)
             self.position = (x, y, z)
             self.record["pos"] = self.position
-            if (
-                defect == "station-drift"
-                and self.OffsetText
-                and abs(delta[self.axis]) > 0.001
-            ):
-                self.shift_stations(self.axis, 0.0001)
             return True
 
-    displays = {
-        name: Display(name, axis, span)
-        for name, axis, span in (
-            ("SupplierHeadHeight", 1, None),
-            ("SupplierThreadDiameter", 0, None),
-            ("SupplierLength", 1, 0.050),
-        )
+    # The immutable migration's same-station defect passes each row's core
+    # shelf proof but puts HeadHeight's text across Length's native line.
+    length_dx = 0.0 if case.defect == "shared-station" else 0.150 - 0.1029834
+    placements = {
+        "SupplierHeadHeight": (1, None, (0.0, 0.0)),
+        "SupplierThreadDiameter": (0, None, (0.0, 0.0)),
+        "SupplierLength": (1, 0.050, (length_dx, 0.0)),
+        "SupplierHeadDiameter": (0, None, (0.0, -0.05)),
     }
-    adapter = object()
-    views = {
-        "*Top": SimpleNamespace(
-            GetOrientationName=lambda: "*Top",
-            GetName2=lambda: "Top",
-            GetOutline=lambda: (0.01, 0.01, 0.40, 0.27),
-        )
+    case.displays = {
+        name: Display(name, feature, *placements[name])
+        for name, feature, _owner in case.identities
     }
-    checks, audited = [], []
+    case.parameters = {
+        f"{name}@{feature}": case.displays[name].native
+        for name, feature, _owner in case.identities
+    }
+    case.features, case.feature_displays = {}, {}
+    source_path = r"C:\fixture\sh-vn-clamp-screw.SLDPRT"
+    case.model = SimpleNamespace(
+        GetType=lambda: 1,
+        GetPathName=lambda: source_path,
+        GetConfigurationByName=lambda name: object() if name == "Default" else None,
+        Parameter=lambda name: case.parameters.get(name),
+        FeatureByName=lambda name: case.features.get(name),
+    )
+    outlines = {
+        "*Front": (0.02, 0.02, 0.40, 0.08),
+        "*Top": (0.02, 0.09, 0.40, 0.27),
+        "*Right": (0.280, 0.080, 0.300, 0.100),
+        "*Isometric": (0.300, 0.170, 0.340, 0.200),
+    }
+    for owner, view in case.views.items():
+        view.displays = [
+            case.displays[name]
+            for name, _feature, expected_owner in case.identities
+            if owner == expected_owner
+        ]
+        view.GetName2 = lambda owner=owner: owner.removeprefix("*")
+        view.GetOutline = lambda owner=owner: outlines[owner]
+        view.GetAnnotations = lambda view=view: [
+            display.GetAnnotation() for display in view.displays
+        ]
+        view.UpdateViewDisplayGeometry = lambda: None
+        view.GetReferencedModelName = lambda: source_path
+        view.ReferencedConfiguration = "Default"
+        view.ReferencedDocument = case.model
+        points = (object(), object())
+        mapped = (object(), object())
+        mapping = dict(zip(points, mapped, strict=True))
+        view.GetCorresponding = mapping.get
+        for display in view.displays:
+            display.annotation.Owner = view
+            display.annotation.entities = mapped
+        if not view.displays:
+            continue
+        feature_name = view.displays[0].feature
+        sketch = SimpleNamespace(
+            GetSketchPoints2=lambda points=points: points,
+            GetSketchSegments=lambda: (),
+        )
+        members = [
+            SimpleNamespace(GetDimension2=display.GetDimension2)
+            for display in view.displays
+        ]
+        case.feature_displays[feature_name] = members
+        feature = SimpleNamespace(
+            Name=feature_name,
+            GetTypeName2=lambda: "ProfileFeature",
+            GetSpecificFeature2=lambda sketch=sketch: sketch,
+            GetFirstDisplayDimension=lambda members=members: members[0],
+            GetNextDisplayDimension=lambda display, members=members: (
+                members[members.index(display) + 1]
+                if members.index(display) + 1 < len(members)
+                else None
+            ),
+        )
+        case.features[feature_name] = feature
+        for display in view.displays:
+            display.native.GetFeatureOwner = lambda feature=feature: feature
 
-    def source_callback():
-        pass
+    case.adapter = SimpleNamespace(
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+        _get_attr_or_call=lambda target, name: (
+            getattr(target, name)()
+            if callable(getattr(target, name))
+            else getattr(target, name)
+        ),
+        _attempt=lambda action, **_kwargs: action(),
+    )
 
-    def shared_annotate(actual_adapter, actual_views, **settings):
-        assert actual_adapter is adapter and actual_views is views
-        assert settings["dimensions"] is clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
-        assert settings["formats"] is clamp.supplier.SUPPLIER_REFERENCE_FORMATS
-        assert settings["settled_checks"] is checks
-        settings["settled_checks"].append(source_callback)
+    def native_member(target, _interface, name, *args):
+        value = getattr(target, name)
+        return value(*args) if callable(value) else value
 
-    monkeypatch.setattr(clamp, "annotate_supplier_screw", shared_annotate)
-    monkeypatch.setattr(clamp, "rebuild_drawing", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(clamp, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(clamp, "_supplier_displays", lambda _adapter: dict(displays))
-    monkeypatch.setattr(clamp, "iter_views", lambda _adapter: iter(views.values()))
+    def native_import(_adapter, view, *, keep, dimensions_by_feature, **_kwargs):
+        expected = {display.name for display in view.displays}
+        assert set(keep) == expected
+        assert dimensions_by_feature == {view.displays[0].feature: expected}
+        return view.GetAnnotations()
+
+    def native_projection(_adapter, view, points, **_kwargs):
+        assert len(points) == len(view.displays)
+        rows = [
+            name
+            for name, _value, _orientation
+            in clamp.supplier.SUPPLIER_REFERENCE_DIMENSIONS
+            if f"*{clamp.supplier.SUPPLIER_REFERENCE_PLANES.get(name, 'Front')}"
+            == view.orientation
+        ]
+        return [case.displays[name].position[:2] for name in rows]
+
+    monkeypatch.setattr(_dimensions, "_com_invoke", native_member)
+    monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "iter_views", lambda _adapter: iter(case.views.values()))
+    monkeypatch.setattr(screws, "curate_view_dimensions", native_import)
+    monkeypatch.setattr(screws, "model_points_in_view", native_projection)
+    monkeypatch.setattr(sw_type_info, "early_bound_or_flag", lambda obj, *_args: obj)
+    monkeypatch.setattr(reference_text, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(
-        clamp, "sheet_region", lambda _adapter: Box(0.01, 0.01, 0.42, 0.27)
+        reference_text, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
     )
     monkeypatch.setattr(
-        clamp, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
-    )
-    monkeypatch.setattr(
-        clamp,
+        reference_text,
         "_dump_annotation",
         lambda _reader, annotation: copy.deepcopy(annotation.record),
     )
-    # Isolate the native shelf contract from the separate full-sheet collision
-    # rules; the real final layout guard still reacquires and measures each row.
-    monkeypatch.setattr(clamp, "audit_dump", lambda dump: audited.append(dump) or [])
-    transverse_before = {
-        name: tuple(
-            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
+    monkeypatch.setattr(
+        reference_text,
+        "rebuild_drawing",
+        lambda _adapter, *, label: case.rebuilds.append(label),
+    )
+    monkeypatch.setattr(
+        clamp, "sheet_region", lambda _adapter: Box(0.01, 0.01, 0.42, 0.27)
+    )
+    case.reference_text = reference_text
+    settled = dict(case.displays)
+
+    def recaptured(name):
+        """Replace a settled native display in both actual inventories."""
+        old = settled[name]
+        # SimpleNamespace's copy reduction reruns Display.__init__ on Python 3.14.
+        # Allocate a fresh wrapper without reauthoring its settled native state.
+        replacement = SimpleNamespace.__new__(Display)
+        SimpleNamespace.__init__(replacement, **vars(old))
+        replacement.record = copy.deepcopy(old.record)
+        replacement.annotation = SimpleNamespace(**vars(old.annotation))
+        replacement.annotation.record = replacement.record
+        replacement.annotation.GetPosition = replacement.GetPosition
+        replacement.annotation.SetPosition2 = replacement.SetPosition2
+        replacement.annotation.GetSpecificAnnotation = lambda: replacement
+        replacement.GetAnnotation = lambda: replacement.annotation
+        assert replacement is not old
+        assert replacement.annotation is not old.annotation
+        assert replacement.GetDimension2(0) is old.GetDimension2(0)
+        case.displays[name] = replacement
+        owner = next(
+            owner
+            for candidate, _feature, owner in case.identities
+            if candidate == name
         )
-        for name, display in displays.items()
-    }
+        displays = case.views[owner].displays
+        index = next(
+            index for index, display in enumerate(displays) if display.name == name
+        )
+        displays[index] = replacement
+        return replacement
+
+    case.recaptured = recaptured
+    return case
+
+
+@pytest.mark.parametrize(
+    "clamp_supplier_annotation_replay",
+    (None, "shared-station"),
+    indirect=True,
+    ids=("clear", "shared-station"),
+)
+def test_clamp_annotation_hook_shelves_native_text_and_audits_settled_sheet(
+    clamp_supplier_annotation_replay,
+):
+    from _layout_audit import annotation_geometry, calibrate_sheet_advance
+    from _layout_geometry import segment_box_distance
+
+    case = clamp_supplier_annotation_replay
+    core = case.reference_text
+    displays = case.displays
     before = {
-        name: clamp._native_geometry(adapter, display, name)
+        name: core.measure_reference_text(
+            case.adapter, display, axis=display.axis, label=name
+        )
         for name, display in displays.items()
     }
     native_before = {
@@ -7184,43 +9421,51 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
         row["t"]
         for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
     )
-    if defect:
-        message = {
-            "ignored-seed": "anchor did not settle",
-            "ignored-shelf": "text crowds its native line",
-            "station-drift": "native (tips|witnesses) moved",
-        }[defect]
-        with pytest.raises(RuntimeError, match=message):
-            clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
+    checks = []
+    if case.defect == "shared-station":
+        with pytest.raises(
+            RuntimeError, match="clamp supplier paths are not clear"
+        ) as exc:
+            case.clamp._annotate_supplier_dimensions(
+                case.adapter, case.views, settled_checks=checks
+            )
+        assert "[text-on-line]" in str(exc.value)
+        assert "SupplierHeadHeight" in str(exc.value)
+        assert "SupplierLength" in str(exc.value)
         return
 
-    clamp._annotate_supplier_dimensions(adapter, views, settled_checks=checks)
-    assert checks[0] is source_callback
-    assert checks[-1].func is clamp._assert_supplier_layout
-    assert audited
+    case.clamp._annotate_supplier_dimensions(
+        case.adapter, case.views, settled_checks=checks
+    )
+    assert len(checks) == 2  # Real source/value proof, then shelf/layout proof.
+    assert set(case.clamp._supplier_displays(case.adapter)) == set(displays)
     for name, display in displays.items():
-        after = clamp._native_geometry(adapter, display, name)
-        assert (display.native.FullName, display.native.SystemValue) == native_before[
-            name
-        ]
+        after = core.measure_reference_text(
+            case.adapter, display, axis=display.axis, label=name
+        )
+        assert (display.native.FullName, display.native.SystemValue) == native_before[name]
         for key in ("tips", "witnesses"):
             assert after[key] == before[name][key]
-        # Geometric ink clearance, not a tautological assertion about the target
-        # helper: the entire text block must clear every physical native run,
-        # including witnesses and arrowheads, on both short and long rows.
-        ink = clamp.annotation_geometry(
+        # The whole measured text block clears every native physical run,
+        # including witnesses and arrowheads, on short and long references.
+        ink = annotation_geometry(
             after["record"],
             owner=name,
-            advance=clamp.calibrate_sheet_advance((after["record"],)),
+            advance=calibrate_sheet_advance((after["record"],)),
         )
         assert ink is not None and ink.segments
         assert all(
-            segment_box_distance(segment, after["text"]) >= clamp.CLEAR_GAP_M
+            segment_box_distance(segment, after["text"]) >= core.CLEAR_GAP_M
             for segment in ink.segments
         )
         assert tuple(
-            row["pos"][1 - display.axis] for row in display.record["display"]["texts"]
-        ) == pytest.approx(transverse_before[name])
+            row["pos"][1 - display.axis] for row in after["record"]["display"]["texts"]
+        ) == pytest.approx(
+            tuple(
+                row["pos"][1 - display.axis]
+                for row in before[name]["record"]["display"]["texts"]
+            )
+        )
         if name == "SupplierLength":
             assert display.OffsetText is False
             assert display.position == display.original_position
@@ -7228,29 +9473,110 @@ def test_clamp_annotation_hook_shelves_native_text_and_rechecks_late_drift(
             axis = display.axis
             low = after["text"].xmin if axis == 0 else after["text"].ymin
             assert display.OffsetText is True
-            assert low - after["reach"] >= clamp.CLEAR_GAP_M
+            assert low - after["reach"] >= core.CLEAR_GAP_M
             assert display.position[1 - axis] == display.original_position[1 - axis]
             assert display.position[axis] != display.original_position[axis]
-    assert (
-        tuple(
-            row["t"]
-            for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
-        )
-        == thread_text
-    )
+    assert tuple(
+        row["t"]
+        for row in displays["SupplierThreadDiameter"].record["display"]["texts"]
+    ) == thread_text
     assert "8-32" in thread_text
-    checks[-1]()  # Execute, not merely inspect, the registered late guard.
-    old = displays["SupplierHeadHeight"]
-    replacement = copy.copy(old)
-    replacement.record = copy.deepcopy(old.record)
+
+    # The immutable migration's late guard is read-only and must reacquire:
+    # a captured old display would pass these later native changes.
+    for display in displays.values():
+        display.frozen = True
+    writes, rebuilds = list(case.writes), list(case.rebuilds)
+    for check in checks:
+        check()
+    replacement = case.recaptured("SupplierHeadHeight")
     replacement.record["display"]["texts"][0]["pos"] = (0.0916157, 0.232235, 0)
-    displays[old.name] = replacement
     with pytest.raises(RuntimeError, match="text crowds its native line"):
-        checks[-1]()  # Must reacquire; a captured old display would still pass.
-    replacement.record = copy.deepcopy(old.record)
+        checks[-1]()
+    replacement = case.recaptured("SupplierHeadHeight")
     replacement.shift_stations(replacement.axis, 0.0001)
     with pytest.raises(RuntimeError, match="native (tips|witnesses) moved"):
         checks[-1]()
+
+    # The unchanged long row is not shelved: only the complete caller audit
+    # rejects its text dropped onto its own line, not the core station proof.
+    case.recaptured("SupplierHeadHeight")
+    replacement = case.recaptured("SupplierLength")
+    text = replacement.record["display"]["texts"][0]
+    text["pos"] = (text["pos"][0], 0.2255, text["pos"][2])
+    with pytest.raises(
+        RuntimeError, match="clamp supplier paths are not clear"
+    ) as exc:
+        checks[-1]()
+    assert "[dim-line-through-own-text]" in str(exc.value)
+    assert "SupplierLength" in str(exc.value)
+    assert case.writes == writes and case.rebuilds == rebuilds
+
+
+@pytest.mark.parametrize(
+    "defect,message",
+    (
+        # Unique real clamp source/value/inventory boundaries absent from the
+        # immutable shelf/audit replay; no duplicate shared-core algorithm cases.
+        ("native-value", "!= exact expected"),
+        ("source-parameter", "native model/feature owner"),
+        ("feature-membership", "native model/feature owner"),
+        ("source-path", "source/configuration"),
+        ("source-configuration", "source/configuration"),
+        ("missing-display", "inventory changed"),
+        ("wrong-feature", "inventory changed"),
+    ),
+)
+def test_clamp_settled_consumer_reacquires_and_refuses_source_or_inventory_changes(
+    clamp_supplier_annotation_replay, defect, message
+):
+    case = clamp_supplier_annotation_replay
+    checks = []
+    case.clamp._annotate_supplier_dimensions(
+        case.adapter, case.views, settled_checks=checks
+    )
+    for check in checks:
+        check()
+    replacement = case.recaptured("SupplierHeadHeight")
+    top = case.views["*Top"]
+    # A clean replacement proves that both closures accept fresh native handles.
+    for check in checks:
+        check()
+    check = checks[-1]
+    if defect == "native-value":
+        replacement.native.SystemValue += 0.0001
+        check = checks[0]
+    elif defect == "source-parameter":
+        case.parameters.pop(f"{replacement.name}@{replacement.feature}")
+        check = checks[0]
+    elif defect == "feature-membership":
+        member = next(
+            member
+            for member in case.feature_displays[replacement.feature]
+            if member.GetDimension2(0) is replacement.native
+        )
+        member.GetDimension2 = lambda _index: copy.copy(replacement.native)
+        check = checks[0]
+    elif defect == "source-path":
+        top.GetReferencedModelName = lambda: r"C:\fixture\foreign.SLDPRT"
+        check = checks[0]
+    elif defect == "source-configuration":
+        top.ReferencedConfiguration = "Foreign"
+        check = checks[0]
+    elif defect == "missing-display":
+        top.displays.remove(replacement)
+    elif defect == "wrong-feature":
+        replacement.native.FullName = (
+            f"{replacement.name}@SupplierReference@sh-vn-clamp-screw.Part"
+        )
+    writes, rebuilds = list(case.writes), list(case.rebuilds)
+    records = {
+        name: copy.deepcopy(display.record) for name, display in case.displays.items()
+    }
+    with pytest.raises(RuntimeError, match=message):
+        check()
+    assert case.writes == writes and case.rebuilds == rebuilds
+    assert {name: display.record for name, display in case.displays.items()} == records
 
 
 def test_supplier_angle_converts_native_radians_to_degrees(monkeypatch):
@@ -9067,6 +11393,1642 @@ def test_source_checkpoint_failure_capture_cannot_replace_primary(
         purchased._retain_supplier_source_failure(spec, original, [])
     assert caught.value is original
     assert "secondary capture interruption" in "\n".join(original.__notes__)
+
+
+@pytest.mark.parametrize(
+    "primary_type", (RuntimeError, asyncio.CancelledError, KeyboardInterrupt)
+)
+@pytest.mark.parametrize("reporter_type", (ValueError, KeyboardInterrupt))
+@pytest.mark.parametrize("failure", ("str", "add_note"))
+def test_source_failure_capture_reporting_preserves_primary_identity(
+    monkeypatch, tmp_path, primary_type, reporter_type, failure
+):
+    attempted_notes = []
+    reporting_error = reporter_type("secondary reporting failure")
+
+    class Primary(primary_type):
+        def add_note(self, note):
+            attempted_notes.append(note)
+            raise reporting_error
+
+    class CaptureFailure(RuntimeError):
+        def __str__(self):
+            if failure == "str":
+                raise reporting_error
+            return "secondary capture failure"
+
+    original = Primary("primary native failure")
+    capture_calls = []
+
+    def failed_capture(*_args, exception, **_kwargs):
+        capture_calls.append(exception)
+        raise CaptureFailure()
+
+    monkeypatch.setattr(
+        purchased._seat_forensics, "capture_com_failure", failed_capture
+    )
+    spec = SimpleNamespace(
+        artifact_stem="supplier",
+        source=tmp_path / "supplier.SLDPRT",
+        outputs={key: tmp_path / key for key in ("slddrw", "pdf", "png")},
+    )
+    with pytest.raises(primary_type) as caught:
+        purchased._retain_supplier_source_failure(spec, original, [])
+    assert caught.value is original
+    assert capture_calls == [original]
+    assert len(attempted_notes) == (failure == "add_note")
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring"))
+@pytest.mark.parametrize(
+    "primary_type", (RuntimeError, asyncio.CancelledError, KeyboardInterrupt)
+)
+@pytest.mark.parametrize("reporter_type", (ValueError, KeyboardInterrupt))
+@pytest.mark.parametrize("failure", ("repr", "add_note"))
+def test_public_build_source_reporting_preserves_primary_identity(
+    monkeypatch, tmp_path, lane, primary_type, reporter_type, failure
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    reporting_error = reporter_type("secondary reporting failure")
+    attempted_notes = []
+
+    class Primary(primary_type):
+        def add_note(self, note):
+            attempted_notes.append(note)
+            raise reporting_error
+
+    class PreservationFailure(OSError):
+        def __repr__(self):
+            if failure == "repr":
+                raise reporting_error
+            return "PreservationFailure('source unreadable')"
+
+    original = Primary("primary native failure")
+    preservation_error = PreservationFailure("source unreadable")
+    hash_calls = []
+    captured = []
+
+    def failed_hash(source):
+        hash_calls.append(source)
+        raise preservation_error
+
+    def fail(phase):
+        if phase == "layout":
+            monkeypatch.setattr(purchased, "_source_file_sha256", failed_hash)
+            raise original
+
+    case.on_phase = fail
+    monkeypatch.setattr(
+        purchased._seat_forensics,
+        "capture_com_failure",
+        lambda *_args, exception, **_kwargs: captured.append(exception),
+    )
+    with pytest.raises(primary_type) as caught:
+        case.run()
+    assert caught.value is original
+    assert case.phases[-1] == "layout"
+    assert hash_calls == [case.source]
+    assert captured == [original]
+    assert len(attempted_notes) == (failure == "add_note")
+
+
+@pytest.mark.parametrize("lane", ("fastener", "spring"))
+def test_public_build_without_primary_keeps_source_preservation_failure(
+    monkeypatch, tmp_path, lane
+):
+    case = _purchased_source_lifecycle(monkeypatch, tmp_path, lane)
+    original = OSError("supplier source unreadable")
+    captured = []
+
+    def failed_hash(_source):
+        raise original
+
+    def finish(phase):
+        if phase == "layout":
+            monkeypatch.setattr(purchased, "_source_file_sha256", failed_hash)
+
+    case.on_phase = finish
+    monkeypatch.setattr(
+        purchased._seat_forensics,
+        "capture_com_failure",
+        lambda *_args, exception, **_kwargs: captured.append(exception),
+    )
+    with pytest.raises(OSError) as caught:
+        case.run()
+    assert caught.value is original
+    assert case.phases[-1] == "drawing-close"
+    assert captured == [original]
+
+
+def test_purchased_title_hook_refuses_a_second_number_fitter_before_native_access(
+    tmp_path,
+):
+    from functools import partial
+
+    from _purchased_title_fit import fit_purchased_title_block
+
+    class NoNativeAccess:
+        def __getattr__(self, name):
+            raise AssertionError(f"conflicting Number ownership touched native {name}")
+
+    spec = SimpleNamespace(
+        artifact_stem="title-owner",
+        source=tmp_path / "title-owner.SLDPRT",
+        layout=DrawingLayout.LANDSCAPE,
+    )
+    with pytest.raises(ValueError, match="owns Number; a second Number fitter"):
+        asyncio.run(
+            purchased._build_reference_sheet(
+                NoNativeAccess(),
+                spec,
+                properties={},
+                finish="As purchased",
+                item="PURCHASED SCREW",
+                number_fit=purchased.NumberFit.SHRINK_TO_CELL,
+                title_block_setup=partial(
+                    fit_purchased_title_block, spec=spec, material_property="Material"
+                ),
+            )
+        )
+
+
+class _PurchasedTitleExportBoundary(Exception):
+    """Stop before native save; reaching here is not a successful drawing export."""
+
+
+@pytest.fixture
+def purchased_title_consumer(monkeypatch, tmp_path):
+    """Real public builder/fitter/finalizer through the first export boundary.
+
+    Reuse the title tests' detached native-format/display graph, not their audit
+    results. Links start unresolved and only a rebuild after CustomPropertyView
+    selects the source can supply their text. No native audit is replaced.
+    """
+    from functools import partial
+
+    import _custom_properties as custom
+    import _drawing_common as common
+    import _drawing_layout_audit as layout
+    import _drawing_view_display as view_display
+    import _purchased_title_fit as title
+    from test_purchased_title_drawing import _Drawing as NativeTitleDrawing
+    from test_purchased_title_drawing import _Note as NativeTitleNote
+
+    class TitleNote(NativeTitleNote):
+        def __init__(self, expression, cell, *, material=False):
+            super().__init__(expression, "", cell, material=material)
+            self.annotation.GetType = lambda: 6
+            self.annotation.GetSpecificAnnotation = lambda: self
+
+        @NativeTitleNote.PropertyLinkedText.setter
+        def PropertyLinkedText(self, value):
+            self._link = value
+
+    stem = "ch-rocker-arm-tl-oblique-carriage-screw"
+    source = tmp_path / f"{stem}.SLDPRT"
+    source.write_bytes(b"unchanged purchased source")
+    properties = dict.fromkeys(purchased._PROPERTIES, "source value")
+    properties.update(
+        Title=stem,
+        Number="HA-CH-OBLIQUE-SCREW-106",
+        Material="ALLOY STEEL, BLACK OXIDE",
+        **{"Stock Name": "Purchased screw", "Supplier": "Supplier", "Supplier SKUs": "SKU-1"},
+    )
+    properties.update(dict.fromkeys(common.TITLE_BLOCK_TOLERANCE_PROPERTIES, "0.1"))
+    properties[common.TITLE_BLOCK_REVISION_PROPERTY] = common._config.release_revision()
+    properties[common.TITLE_BLOCK_COPYRIGHT_PROPERTY] = "2026"
+    model = _Model(source)
+    model.GetCustomInfoValue = lambda _configuration, name: properties.get(name, "")
+    adapter = _Adapter(source)
+    adapter.swApp.GetOpenDocumentByName = lambda _path: model
+
+    def member(target, name):
+        value = getattr(target, name)
+        return value() if callable(value) else value
+
+    adapter._get_attr_or_call = member
+    adapter._attempt = lambda operation, default=None: operation()
+    adapter._attempt_with_error = lambda operation: (operation(), None)
+
+    notes = [
+        TitleNote('<FONT size=15PTS>' + title.property_link("SW-Title(Title)"),
+                  (0.230, 0.045, 0.310, 0.060)),
+        TitleNote(title.property_link("Material"),
+                  (0.230, 0.025, 0.280, 0.040), material=True),
+        TitleNote(title.property_link("Number"), (0.320, 0.045, 0.370, 0.060)),
+        TitleNote(title.property_link("Finish"), (0.290, 0.025, 0.370, 0.040)),
+    ]
+    draw = NativeTitleDrawing(notes)
+    sheet = _Sheet()
+    sheet.GetTemplateSketch = draw.sheet.GetTemplateSketch
+    draw.sheet = sheet
+    views = []
+    sheet.GetViews = lambda: tuple(views)
+    sheet.GetZoneMargin = lambda _code: 0.0127
+
+    def set_scale(numerator, denominator, _positions, _text):
+        values = list(sheet.GetProperties2())
+        values[2:4] = [numerator, denominator]
+        sheet.SetProperties2(*values)
+        return True
+
+    sheet.SetScale = set_scale
+    draw.sheet_view.GetAnnotations = lambda: tuple(note.annotation for note in notes)
+    draw.GetSheetNames = lambda: ("Sheet1",)
+    draw.ActivateSheet = lambda name: name == "Sheet1"
+    draw.Sheet = lambda _name: sheet
+    draw.GetPathName = lambda: ""
+    draw.GetType = lambda: 3
+    draw.IsOpenedReadOnly = lambda: False
+    draw.GetSaveFlag = lambda: True
+    summary, drawing_properties = {}, {}
+    draw.SetSummaryInfo = lambda field, value: summary.update({field: value})
+    draw.SummaryInfo = lambda field: summary[field]
+    draw.GetCustomInfoValue = lambda _configuration, name: drawing_properties.get(name, "")
+    manager = SimpleNamespace(
+        Add3=lambda name, _kind, value, _option: drawing_properties.update({name: value})
+    )
+    draw.Extension = SimpleNamespace(CustomPropertyManager=lambda _configuration: manager)
+    spec = SimpleNamespace(
+        artifact_stem=stem,
+        source=source,
+        source_kind="part",
+        layout=DrawingLayout.LANDSCAPE,
+        outputs={key: tmp_path / f"{stem}.{suffix}" for key, suffix in (
+            ("slddrw", "SLDDRW"), ("pdf", "pdf"), ("png", "png"),
+        )},
+    )
+    state = SimpleNamespace(
+        adapter=adapter, spec=spec, draw=draw, sheet=sheet, notes=notes,
+        name=notes[0], material=notes[1], number=notes[2], properties=properties,
+        source=source, views=views, exports=[], drift=None, finalizing=False,
+        finalizer_before=None, formats_at_final_rebuild=None, resolved_at=None,
+        anchors=tuple(note.anchor for note in notes[:3]),
+    )
+
+    def snapshot():
+        return tuple((
+            note.PropertyLinkedText, note.GetText(), note.anchor,
+            note.annotation._format.CharHeight, note.annotation._format.LineLength,
+            note.annotation._format.TypeFaceName, note.annotation.use_doc,
+            note.rows, note.extent,
+        ) for note in notes[:3])
+
+    def rebuild():
+        if views and sheet.CustomPropertyView == views[0].GetName2():
+            for note in notes:
+                expression = title.source_property_expression(note.PropertyLinkedText)
+                if expression is not None:
+                    name = expression.removeprefix('$PRPSHEET:"').removesuffix('"')
+                    note._text = properties["Title" if name == "SW-Title(Title)" else name]
+                elif note.PropertyLinkedText == '$PRP:"Finish"':
+                    note._text = drawing_properties["Finish"]
+            if state.resolved_at is None:
+                state.resolved_at = draw.rebuilds + 1
+        if state.finalizing:
+            state.finalizer_before = snapshot()
+            state.formats_at_final_rebuild = tuple(
+                len(note.annotation.formats) for note in notes[:3]
+            )
+            if state.drift == "text":
+                state.number._text += " "
+            elif state.drift == "format":
+                state.number.annotation._format.CharHeight -= 0.00001
+            elif state.drift == "wrap":
+                state.number.forced_rows = 2
+            elif state.drift == "anchor":
+                x, y, z = state.number.anchor
+                state.number.anchor = (x + 0.00001, y, z)
+        return NativeTitleDrawing.EditRebuild3(draw)
+
+    draw.EditRebuild3 = rebuild
+    draw.ClearSelection2 = lambda _append: setattr(state, "finalizing", True)
+
+    def new_drawing(actual_adapter, *, layout, checkpoint):
+        actual_adapter.currentModel = draw
+        checkpoint("after_new_document")
+        return draw, sheet
+
+    def place_view(_adapter, path, orientation, _x, _y, *, scale):
+        view = _RefreshedOutlineView(Path(path), display_ratio=1.0)
+        view.GetName2 = lambda: orientation[1:]
+        view.GetOrientationName = lambda: orientation
+        view.GetFirstCenterMark2 = lambda: None
+        view.ReferencedDocument = model
+
+        def display_mode(parent, mode, _faceted, edges, threads):
+            view.display = (parent, mode, edges, threads)
+            return True
+
+        view.SetDisplayMode4 = display_mode
+        view.GetUseParentDisplayMode = lambda: view.display[0]
+        view.GetDisplayMode2 = lambda: view.display[1]
+        view.GetDisplayEdgesInShadedMode = lambda: view.display[2]
+        view.GetCThreadQuality = lambda: view.display[3]
+        views.append(view)
+        return view
+
+    def export_boundary(_adapter, path, *, pdf_path, artifact_context):
+        state.exports.append((Path(path), Path(pdf_path)))
+        raise _PurchasedTitleExportBoundary
+
+    for module in (purchased, title, layout, common, custom, view_display):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(
+        common._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
+    monkeypatch.setattr(purchased, "double_array", tuple)
+    monkeypatch.setattr(purchased, "new_project_drawing", new_drawing)
+    monkeypatch.setattr(purchased, "place_view", place_view)
+    # Unrelated footer/caption ink uses the existing small native note fake.
+    monkeypatch.setattr(
+        purchased, "_literal_note", lambda _adapter, text, x, y: _Note(text, text, x, y)
+    )
+    monkeypatch.setattr(
+        purchased, "add_property_linked_note",
+        lambda _adapter, name, x, y, **_kwargs: _Note(
+            purchased.property_link(name), properties[name], x, y
+        ),
+    )
+    for module in (purchased, common):
+        monkeypatch.setattr(module, "iter_views", lambda _adapter: iter(views))
+        monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.GetName2())
+    monkeypatch.setattr(purchased, "fastener", lambda _stem: SimpleNamespace(
+        part_name=stem, stock_name=properties["Stock Name"],
+        supplier=properties["Supplier"], skus=(properties["Supplier SKUs"],),
+    ))
+    monkeypatch.setattr(purchased._config, "parts", lambda _stem: {
+        "number": properties["Number"], "title": "Purchased screw",
+        "material": properties["Material"], "finish": "As purchased",
+    })
+    monkeypatch.setattr(common, "_build_id", lambda: "inert-title-consumer")
+    monkeypatch.setattr(common, "save_drawing", export_boundary)
+    state.snapshot = snapshot
+    state.run = lambda: asyncio.run(purchased.build_purchased_fastener_drawing(
+        adapter, spec, title_block_setup=partial(
+            title.fit_purchased_title_block, spec=spec, material_property="Material"
+        ),
+    ))
+    return state
+
+
+def test_purchased_title_consumer_fits_resolved_links_and_owns_number_once(
+    purchased_title_consumer,
+):
+    state = purchased_title_consumer
+    assert all(note.GetText() == "" for note in state.notes)
+    with pytest.raises(_PurchasedTitleExportBoundary):
+        state.run()
+
+    assert state.resolved_at is not None
+    assert state.finalizer_before is not None
+    assert state.snapshot() == state.finalizer_before
+    assert tuple(note.anchor for note in state.notes[:3]) == state.anchors
+    assert tuple(note.GetText() for note in state.notes[:3]) == (
+        state.spec.artifact_stem, state.properties["Material"], state.properties["Number"]
+    )
+    assert state.material.PropertyLinkedText == purchased.property_link("Material")
+    assert state.number.PropertyLinkedText == purchased.property_link("Number")
+    for note, floor in zip(state.notes[:3], (0.003, 0.002, 0.003), strict=True):
+        assert note.rows == 1
+        assert floor <= note.annotation._format.CharHeight < 0.004
+        assert note.annotation.use_doc is False
+    assert tuple(len(note.annotation.formats) for note in state.notes[:3]) == (
+        state.formats_at_final_rebuild
+    )
+    assert state.exports == [(state.spec.outputs["slddrw"], state.spec.outputs["pdf"])]
+    assert state.source.read_bytes() == b"unchanged purchased source"
+
+
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("text", "source property expression|complete resolved value"),
+        ("format", "linked title-cell fit did not persist"),
+        ("wrap", "linked title-cell fit did not persist"),
+        ("anchor", "linked title-cell fit did not persist"),
+    ),
+)
+def test_purchased_title_consumer_rejects_finalizer_number_drift_before_export(
+    purchased_title_consumer, drift, message,
+):
+    state = purchased_title_consumer
+    state.drift = drift
+    with pytest.raises(RuntimeError, match=message):
+        state.run()
+
+    assert state.finalizer_before is not None
+    assert state.finalizer_before[2][1] == state.properties["Number"]
+    assert state.finalizer_before[2][7] == 1
+    assert state.snapshot() != state.finalizer_before
+    assert tuple(len(note.annotation.formats) for note in state.notes[:3]) == (
+        state.formats_at_final_rebuild
+    )
+    assert state.exports == []
+    assert all(not path.exists() for path in state.spec.outputs.values())
+    assert state.source.read_bytes() == b"unchanged purchased source"
+
+
+@pytest.fixture
+def screw_reference_shelf_native_consumer(monkeypatch, tmp_path, request):
+    """Real screw annotation, source readback and shelving over native-shaped data."""
+    import _supplier_reference_text as core
+    import _supplier_screw_dimensions as screws
+    import _supplier_screw_reference_text as consumer
+    from _supplier_screw_reference_names import FEATURE_BY_PLANE
+
+    carriage = getattr(request, "param", None) == "carriage"
+    if carriage:
+        import ch_rocker_arm_tl_vn_oblique_carriage_screw_spec as spec
+
+        dimension = next(
+            row for row in spec.SUPPLIER_REFERENCE_DIMENSIONS
+            if row[0] == "SupplierDriveWidth"
+        )
+        name, millimetres, orientation = dimension
+        formats = {name: spec.SUPPLIER_REFERENCE_FORMATS[name]}
+        units = {name: spec.SUPPLIER_REFERENCE_UNITS[name]}
+        plane = spec.SUPPLIER_REFERENCE_PLANES[name]
+        sides = {name: spec.SUPPLIER_REFERENCE_SIDES[name]}
+        value, rendered = millimetres / 1000.0, "3"
+    else:
+        name, value, orientation = "HeadHeight", 0.0039624, "vertical"
+        dimension = (name, value * 1000.0, orientation)
+        formats, units, sides, plane = {name: (3, "length", None, "MIN")}, {}, {}, "Front"
+        rendered = "0.156"
+    axis = 0 if orientation == "horizontal" else 1
+    feature_name = FEATURE_BY_PLANE[plane]
+
+    source = tmp_path / "stock.SLDPRT"
+    model = _Model(source)
+    model.GetConfigurationByName = lambda name: (
+        model if name in {"Default", "Other"} else None
+    )
+    view = _View(f"*{plane}", source, (0.103, 0.235))
+    view.GetName2 = lambda: "Drawing View1"
+    view.ReferencedDocument = model
+    source_points = tuple(SimpleNamespace(native_identity=object()) for _ in range(2))
+    drawing_points = tuple(SimpleNamespace(native_identity=object()) for _ in range(2))
+    mapped = {
+        id(original): drawing
+        for original, drawing in zip(source_points, drawing_points, strict=True)
+    }
+    view.GetCorresponding = lambda original: mapped.get(id(original))
+    source_sketch = SimpleNamespace(
+        GetSketchPoints2=lambda: source_points,
+        GetSketchSegments=lambda: (),
+    )
+    full_name = f"{name}@{feature_name}@stock.SLDPRT"
+    source_dimension = SimpleNamespace(FullName=full_name, SystemValue=value)
+    source_display = SimpleNamespace(GetDimension2=lambda _index: source_dimension)
+    source_feature = SimpleNamespace(
+        Name=feature_name,
+        GetTypeName2=lambda: "ProfileFeature",
+        GetSpecificFeature2=lambda: source_sketch,
+        GetFirstDisplayDimension=lambda: source_display,
+        GetNextDisplayDimension=lambda _display: None,
+    )
+    model.Parameter = lambda name: (
+        source_dimension if name == full_name.rsplit("@", 1)[0] else None
+    )
+    model.FeatureByName = lambda name: (
+        source_feature if name == feature_name else None
+    )
+
+    def same(left, right):
+        # Imported dimension/source wrappers can be unsupported cross-context;
+        # actual source-feature membership and mapped drawing points must prove it.
+        if (left is source_dimension and getattr(right, "drawing_dimension", False)) or (
+            right is source_dimension and getattr(left, "drawing_dimension", False)
+        ):
+            return 2
+        return int(
+            getattr(left, "native_identity", left)
+            is getattr(right, "native_identity", right)
+        )
+
+    adapter = SimpleNamespace(views=[view], swApp=SimpleNamespace(IsSame=same))
+    state = SimpleNamespace(
+        adapter=adapter, view=view, model=model, source=source,
+        source_dimension=source_dimension, source_display=source_display,
+        source_points=source_points, drawing_points=drawing_points,
+        consumer=consumer, core=core, checks=[], rebuilds=[], captures=[],
+        dimensions=(dimension,), formats=formats, units=units, sides=sides,
+        name=name, axis=axis, plane=plane, style_calls=[], writes=[], redraws=0,
+        justification=0, getter_error=None, setter_error=None,
+        font_calls=[], style_effect=None, style_drift=None, rebuild_drift=None,
+    )
+
+    def native_display(previous=None):
+        case = _supplier_native(monkeypatch, value=value, kind=11 if axis == 0 else 12)
+        case.stale = False
+        case.native.FullName = full_name
+        case.native.drawing_dimension = True
+        case.native.GetFeatureOwner = lambda: source_feature
+        case.native.GetSystemValue3 = lambda _which, _configuration: (
+            case.native.SystemValue,
+        )
+        case.annotation.Owner = view
+        # Fresh attachment wrappers retain the same native drawing-point owners.
+        case.annotation.entities = tuple(
+            SimpleNamespace(native_identity=point.native_identity)
+            for point in drawing_points
+        )
+        case.annotation.record = (
+            copy.deepcopy(previous.annotation.record)
+            if previous is not None else _clamp_recovered_head_height()
+        )
+        case.annotation.record["name"] = name
+        if previous is None and carriage:
+            # Synthetic horizontal metric geometry over the recovered primitives,
+            # not after-fix native/PDF evidence. Preserve every line and witness.
+            data = case.annotation.record["display"]
+            delta = value * 0.125 - (data["arrows"][1][1] - data["arrows"][0][1])
+            for index in (1, 3):
+                data["lines"][index][5] += delta
+                data["lines"][index][8] += delta
+            data["arrows"][1][1] += delta
+            for row in data["lines"]:
+                row[4], row[5] = row[5], row[4]
+                row[7], row[8] = row[8], row[7]
+            for row in data["arrows"]:
+                row[0], row[1] = row[1], row[0]
+                row[3], row[4] = row[4], row[3]
+            x, y, z = case.annotation.record["pos"]
+            case.annotation.record["pos"] = (y, x, z)
+            for row in data["texts"]:
+                x, y, z = row["pos"]
+                row["pos"] = (y, x, z)
+                row["t"] = rendered
+        if previous is None and not carriage:
+            case.annotation.record["display"]["texts"].append({
+                "t": "MIN", "pos": (0.099, 0.226635, 0.0000125),
+                "h": 0.0035, "w": 0.008, "ref": 1, "ang": 0.0,
+            })
+        if previous is not None:
+            vars(case.state).update(vars(previous.state))
+            case.text.update(previous.text)
+            case.native.SystemValue = previous.native.SystemValue
+            case.native.FullName = previous.native.FullName
+            case.display.ShowDimensionValue = previous.display.ShowDimensionValue
+            case.display.ShowParenthesis = previous.display.ShowParenthesis
+        case.display.OffsetText = (
+            previous.display.OffsetText if previous is not None else False
+        )
+        case.annotation.position = tuple(case.annotation.record["pos"])
+        case.justification = (
+            previous.justification if previous is not None else state.justification
+        )
+        case.fonts = (
+            copy.deepcopy(previous.fonts) if previous is not None else [
+                SimpleNamespace(
+                    TypeFaceName="Arial", CharHeight=0.0035, CharHeightInPts=10,
+                    IsHeightSpecifiedInPts=lambda: False, Bold=False, Italic=False,
+                    Underline=False, Strikeout=False, WidthFactor=1.0,
+                    CharSpacingFactor=1.0, LineSpacing=1.0, LineLength=0.0,
+                    Escapement=0, ObliqueAngle=0.0, BackWards=False,
+                    UpsideDown=False, Vertical=False,
+                ),
+            ]
+        )
+        case.use_doc_fonts = (
+            list(previous.use_doc_fonts) if previous is not None else [True]
+        )
+
+        class NativeDisplay(SimpleNamespace):
+            @property
+            def VerticalJustification(self):
+                assert not case.stale, "stale display supplied justification"
+                state.style_calls.append(("get", id(self)))
+                if state.getter_error is not None:
+                    raise state.getter_error
+                return case.justification
+
+            @VerticalJustification.setter
+            def VerticalJustification(self, value):
+                assert not case.stale, "stale display received justification"
+                state.style_calls.append(("set", id(self), value))
+                state.writes.append("justification")
+                if state.setter_error is not None:
+                    raise state.setter_error
+                if state.style_effect != "ignored":
+                    case.justification = value
+                if state.style_effect == "wrong-value":
+                    case.justification = 2
+                elif state.style_effect == "noninteger":
+                    case.justification = 1.0
+                elif state.style_effect == "boolean":
+                    case.justification = True
+                if state.style_drift:
+                    mutate(state.style_drift, case)
+
+        # Preserve the complete native/source methods supplied by _supplier_native.
+        case.display = NativeDisplay(**vars(case.display))
+        case.annotation.GetSpecificAnnotation = lambda: case.display
+
+        def font_count():
+            assert not case.stale, "stale annotation supplied font count"
+            state.font_calls.append(("count", id(case.annotation)))
+            return len(case.fonts)
+
+        def font(index):
+            assert not case.stale, "stale annotation supplied font"
+            assert index == 0
+            state.font_calls.append(("font", id(case.annotation), index))
+            return case.fonts[index]
+
+        def use_doc_font(index):
+            assert not case.stale, "stale annotation supplied font inheritance"
+            assert index == 0
+            state.font_calls.append(("inheritance", id(case.annotation), index))
+            return case.use_doc_fonts[index]
+
+        case.annotation.GetTextFormatCount = font_count
+        case.annotation.GetTextFormat = font
+        case.annotation.GetUseDocTextFormat = use_doc_font
+
+        def annotation():
+            assert not case.stale, "creation/rebuild display handle was reused"
+            return case.annotation
+
+        def dimension(_index):
+            assert not case.stale, "creation/rebuild dimension handle was reused"
+            return case.native
+
+        def move(x, y, z):
+            assert not case.stale, "stale annotation was moved"
+            state.writes.append("position")
+            dx, dy = x - case.annotation.position[0], y - case.annotation.position[1]
+            data = case.annotation.record["display"]
+            for row in data["texts"]:
+                px, py, pz = row["pos"]
+                row["pos"] = (px + dx, py + dy, pz)
+            if not case.display.OffsetText:
+                # The native transverse line follows its annotation until
+                # OffsetText decouples text from its physical stations.
+                shift = dx if axis == 1 else dy
+                for row in data["lines"]:
+                    row[5 - axis] += shift
+                    row[8 - axis] += shift
+                for row in data["arrows"]:
+                    row[1 - axis] += shift
+            case.annotation.position = (x, y, z)
+            case.annotation.record["pos"] = (x, y, z)
+            return True
+
+        def text(index, content):
+            assert not case.stale, "stale dimension text was edited"
+            state.writes.append("text")
+            case.text[index] = content
+            rows = case.annotation.record["display"]["texts"]
+            rows[0]["t"] = f"{case.text.get(1, '')}{rendered}{case.text.get(2, '')}"
+            if not carriage:
+                rows[1]["t"] = case.text.get(4, "")
+
+        case.display.GetAnnotation = annotation
+        case.display.GetDimension2 = dimension
+        case.display.SetText = text
+        case.annotation.GetPosition = lambda: case.annotation.position
+        case.annotation.SetPosition2 = move
+        for method in ("SetUnits2", "SetPrecision3"):
+            original = getattr(case.display, method)
+
+            def write_format(*args, original=original, method=method):
+                assert not case.stale, "stale display format was edited"
+                state.writes.append(method)
+                return original(*args)
+
+            setattr(case.display, method, write_format)
+        return case
+
+    def mutate(drift, case=None):
+        case = state.current if case is None else case
+        data = case.annotation.record["display"]
+        if drift == "justification":
+            case.justification = 2
+        elif drift == "font-inheritance":
+            case.use_doc_fonts[0] = not case.use_doc_fonts[0]
+        elif drift == "font-type-only":
+            assert case.fonts[0].Bold is False
+            case.fonts[0].Bold = 0  # Equal value, different native primitive type.
+        elif drift.startswith("font:"):
+            field = drift.split(":", 1)[1]
+            original = getattr(case.fonts[0], field)
+            if field == "IsHeightSpecifiedInPts":
+                case.fonts[0].IsHeightSpecifiedInPts = lambda: True
+            else:
+                setattr(
+                    case.fonts[0], field,
+                    not original if type(original) is bool else (
+                        original + " Narrow" if type(original) is str else original + 1
+                    ),
+                )
+        elif drift == "raw-text":
+            data["texts"][0]["t"] += " "
+        elif drift == "captured-normal-shift":
+            # Actual a04 style transition: 2.7781 mm transverse arrow movement.
+            # Keep model-side witness endpoints held, never shift the baseline.
+            for row in data["arrows"]:
+                row[1 - axis] += 0.0027781
+            for index in (0, 1):
+                data["lines"][index][8 - axis] += 0.0027781
+            for index in (2, 3):
+                data["lines"][index][5 - axis] += 0.0027781
+                data["lines"][index][8 - axis] += 0.0027781
+        elif drift == "physical-tail":
+            # Add 100 um to an existing free tail, retaining arrows/witnesses.
+            data["lines"][2][7 + axis] += 0.0001
+        elif drift == "source":
+            view._source = model._path = source.with_name("other.SLDPRT")
+        elif drift == "configuration":
+            view.ReferencedConfiguration = "Other"
+        elif drift == "attachment":
+            case.annotation.entities = (
+                SimpleNamespace(native_identity=object()), case.annotation.entities[1],
+            )
+        elif drift == "value":
+            case.native.SystemValue += 0.0001
+        elif drift == "format":
+            case.state.precision += 1
+        elif drift == "full-ref":
+            case.text[2] = ""
+        elif drift == "tips":
+            for row in data["lines"]:
+                row[4 + axis] += 0.0001
+                row[7 + axis] += 0.0001
+            for row in data["arrows"]:
+                row[axis] += 0.0001
+        elif drift == "witnesses":
+            # Extend an actual witness endpoint without changing its arrow tip,
+            # axis station, attachment, or the other witness's endpoint.
+            data["lines"][0][5 - axis] += 0.0001
+        elif drift == "transverse":
+            point = list(case.annotation.position)
+            point[1 - axis] += 0.0001
+            case.annotation.position = tuple(point)
+        elif drift == "axis-clearance":
+            for row in data["texts"]:
+                point = list(row["pos"])
+                point[axis] -= 0.020
+                row["pos"] = tuple(point)
+        else:
+            raise AssertionError(f"unknown native drift: {drift}")
+
+    def replace():
+        previous = state.current
+        state.current = native_display(previous)
+        previous.stale = True
+
+    def redraw():
+        state.redraws += 1
+        state.writes.append("redraw")
+
+    adapter.currentModel = SimpleNamespace(GraphicsRedraw2=redraw)
+
+    state.current = state.creation = native_display()
+    view.GetAnnotations = lambda: (state.current.annotation,)
+
+    def rebuild(_adapter, *, label):
+        replace()
+        state.rebuilds.append(label)
+        state.writes.append("rebuild")
+        if state.rebuild_drift and label.endswith(state.rebuild_drift[0]):
+            mutate(state.rebuild_drift[1])
+
+    def capture(_adapter, _label, _message, **context):
+        state.captures.append(context)
+        raise context["exception"]
+
+    # Only application boundaries are substituted: COM binding, view enumeration,
+    # projection/import creation, native display-data acquisition and rebuilds.
+    # Binding validation, feature membership, attachment correspondence, value/
+    # format readback, measurement, station preservation and shelving stay real.
+    for module in (screws, core, consumer):
+        monkeypatch.setattr(module, "_early_bound", lambda obj, _interface: obj)
+    import _purchased_fastener_drawing as purchased
+    monkeypatch.setattr(purchased, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "_bind", lambda obj, _interface: obj)
+    monkeypatch.setattr(screws, "iter_views", lambda actual: iter(actual.views))
+    monkeypatch.setattr(screws, "view_name", lambda _adapter, actual: actual.GetName2())
+    monkeypatch.setattr(
+        screws, "dimension_name",
+        lambda _adapter, annotation: (
+            annotation.GetSpecificAnnotation().GetDimension2(0).FullName.split("@")[0]
+        ),
+    )
+    monkeypatch.setattr(
+        screws, "model_points_in_view",
+        lambda _adapter, _view, points, **_kwargs: (
+            tuple((0.103 + x, 0.235 + y) for x, y, _z in points)
+        ),
+    )
+    monkeypatch.setattr(
+        screws, "curate_view_dimensions",
+        lambda _adapter, _view, **_kwargs: (state.current.annotation,),
+    )
+    monkeypatch.setattr(screws._seat_forensics, "capture_com_failure", capture)
+    monkeypatch.setattr(core, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(consumer, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(
+        core, "_Reader", lambda _adapter: SimpleNamespace(take_errors=lambda: {})
+    )
+    monkeypatch.setattr(
+        core, "_dump_annotation",
+        lambda _reader, annotation: copy.deepcopy(annotation.record),
+    )
+
+    def snapshot():
+        case = state.current
+        return (
+            copy.deepcopy(case.annotation.record), case.annotation.position,
+            case.native.FullName, case.native.SystemValue, dict(case.text),
+            dict(vars(case.state)), case.display.OffsetText,
+            case.display.ShowDimensionValue, case.display.ShowParenthesis,
+            tuple(point.native_identity for point in case.annotation.entities),
+            source_dimension.FullName, source_dimension.SystemValue,
+            len(state.rebuilds),
+            case.justification, tuple(tuple(vars(font).items()) for font in case.fonts),
+            tuple(case.use_doc_fonts), state.redraws, len(state.writes),
+        )
+
+    def settle():
+        for check in state.checks:
+            check()
+
+    state.snapshot = snapshot
+    state.settle = settle
+    state.mutate = mutate
+    state.replace = replace
+
+    def run(**kwargs):
+        return consumer.annotate_supplier_screw_with_shelves(
+            adapter, {f"*{plane}": view}, dimensions=state.dimensions,
+            formats=state.formats, units=state.units, sides=state.sides,
+            planes={name: plane}, settled_checks=state.checks,
+            label="purchased screw", **kwargs,
+        )
+
+    state.run = run
+    return state
+
+
+@pytest.mark.parametrize(
+    "drift,message", (
+        (None, None),
+        ("source", "changed source/configuration/orientation"),
+        ("configuration", "changed source/configuration/orientation"),
+        ("view-orientation", "changed source/configuration/orientation"),
+        ("source-carrier", "changed native model/feature owner"),
+        ("attachment", "attachment changed source sketch"),
+        ("native-value", "!= exact expected"),
+        ("MIN", "native supplier presentation differs from its source"),
+        ("native-stations", "native tips moved"),
+    ),
+)
+def test_screw_reference_shelf_consumer_preserves_native_state_and_refuses_late_drift(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    from _layout_audit import annotation_geometry, calibrate_sheet_advance
+    from _layout_geometry import segment_box_distance
+
+    state = screw_reference_shelf_native_consumer
+    before = state.core.measure_reference_text(
+        state.adapter, state.current.display, axis=1, label="HeadHeight"
+    )
+    original_position = state.current.annotation.position
+    returned = state.consumer.annotate_supplier_screw_with_shelves(
+        state.adapter, {"*Front": state.view},
+        dimensions=state.dimensions, formats=state.formats,
+        settled_checks=state.checks, label="purchased screw",
+    )
+    case = state.current
+    assert returned["HeadHeight"] is case.display
+    assert returned["HeadHeight"] is not state.creation.display
+    assert state.creation.stale and state.creation.display.OffsetText is False
+    assert case.display.OffsetText is True
+    assert state.style_calls == []
+    assert state.redraws == 0
+    assert len(state.rebuilds) == 4
+    after = state.core.measure_reference_text(
+        state.adapter, returned["HeadHeight"], axis=1, label="HeadHeight"
+    )
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert case.annotation.position[0] == original_position[0]
+    assert case.annotation.position[1] > original_position[1]
+    assert after["text"].ymin - after["reach"] >= state.core.CLEAR_GAP_M
+    ink = annotation_geometry(
+        after["record"], owner="HeadHeight",
+        advance=calibrate_sheet_advance((after["record"],)),
+    )
+    assert ink is not None and ink.segments
+    assert all(
+        segment_box_distance(segment, after["text"]) >= state.core.CLEAR_GAP_M
+        for segment in ink.segments
+    )
+    assert tuple(row["t"] for row in after["record"]["display"]["texts"]) == (
+        "(0.156 in)", "MIN",
+    )
+    assert tuple(row["h"] for row in after["record"]["display"]["texts"]) == (
+        tuple(row["h"] for row in before["record"]["display"]["texts"])
+    )
+    assert case.native.FullName == state.source_dimension.FullName
+    assert case.native.SystemValue == state.source_dimension.SystemValue == 0.0039624
+    assert case.text == {1: "(", 2: " in)", 4: "MIN"}  # No numeric-text replacement.
+    assert (case.state.unit, case.state.precision, case.state.fraction) == (3, 3, 1)
+    assert tuple(point.native_identity for point in case.annotation.entities) == (
+        tuple(point.native_identity for point in state.drawing_points)
+    )
+    settled = state.snapshot()
+    state.settle()
+    assert state.snapshot() == settled  # Final proofs neither repair nor rebuild.
+    if drift is None:
+        return
+
+    if drift == "source":
+        # The replacement source is internally valid; only the ORIGINAL binding
+        # distinguishes it from a successful re-baseline to the current source.
+        state.view._source = state.model._path = state.source.with_name("other.SLDPRT")
+    elif drift == "configuration":
+        state.view.ReferencedConfiguration = "Other"  # Also exists in the model.
+    elif drift == "view-orientation":
+        state.view._orientation = "*Top"  # Keep the native view name unchanged.
+    elif drift == "source-carrier":
+        impostor = SimpleNamespace(**vars(state.source_dimension))
+        state.source_display.GetDimension2 = lambda _index: impostor
+    elif drift == "attachment":
+        case.annotation.entities = (
+            SimpleNamespace(native_identity=object()), case.annotation.entities[1],
+        )
+    elif drift == "native-value":
+        case.native.SystemValue += 0.0001
+    elif drift == "MIN":
+        case.display.SetText(4, "")
+    else:
+        # A valid native line/witness record translated along the measured axis:
+        # source/format/attachments still pass, but the shelf's station proof must
+        # reject it rather than adopting freshly measured stations as authority.
+        for row in case.annotation.record["display"]["lines"]:
+            row[5] += 0.0001
+            row[8] += 0.0001
+        for row in case.annotation.record["display"]["arrows"]:
+            row[1] += 0.0001
+    mutated = state.snapshot()
+    if drift == "native-stations":
+        with pytest.raises(RuntimeError, match=message):
+            state.settle()
+    else:
+        # Exercise each actual proof independently: the generic shelf proof must
+        # also preserve original bindings, not rely on an earlier guard to catch
+        # a current-source re-baseline or a stale display's unmutated native state.
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match=message):
+                check()
+    assert state.snapshot() == mutated
+
+
+@pytest.mark.parametrize("options", ({}, {"top_justified": ()}))
+def test_screw_reference_shelf_empty_style_default_adds_no_native_calls(
+    screw_reference_shelf_native_consumer, options,
+):
+    state = screw_reference_shelf_native_consumer
+    returned = state.run(**options)
+    assert returned == {"HeadHeight": state.current.display}
+    assert state.style_calls == []
+    assert state.font_calls == []
+    assert state.redraws == 0
+    assert state.rebuilds == [
+        "purchased screw reference text measured",
+        "purchased screw reference offset anchors",
+        "purchased screw reference native offset mode",
+        "purchased screw measured reference text shelves",
+    ]
+    settled = state.snapshot()
+    state.settle()
+    assert state.snapshot() == settled
+    assert state.style_calls == []
+    assert state.font_calls == []
+
+
+def test_screw_reference_shelf_rejects_unknown_top_justified_before_native_access():
+    from _supplier_screw_reference_text import annotate_supplier_screw_with_shelves
+
+    class NoNativeAccess:
+        def __getattr__(self, name):
+            raise AssertionError(f"unknown justification selection touched native {name}")
+
+    with pytest.raises(ValueError, match="must name actual references"):
+        annotate_supplier_screw_with_shelves(
+            NoNativeAccess(), {"*Front": NoNativeAccess()},
+            dimensions=(("HeadHeight", 3.9624, "vertical"),),
+            formats={"HeadHeight": (3, "length", None, "MIN")},
+            settled_checks=[], label="purchased screw",
+            top_justified=("SupplierDriveWidth",),
+        )
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("replace_final_wrapper", (False, True))
+@pytest.mark.parametrize("initial", (0, 1, 2, 3))
+def test_carriage_top_justified_preserves_exact_native_reference_and_readonly_proofs(
+    screw_reference_shelf_native_consumer, replace_final_wrapper, initial,
+):
+    # Legal fake state proves driver controls, not native or printed clearance.
+    state = screw_reference_shelf_native_consumer
+    state.current.justification = initial
+    before = state.core.measure_reference_text(
+        state.adapter, state.current.display, axis=state.axis, label=state.name
+    )
+    original_position = state.current.annotation.position
+    returned = state.run(top_justified=(state.name,))
+    case = state.current
+    assert returned == {"SupplierDriveWidth": case.display}
+    assert case.display is not state.creation.display
+    assert state.creation.stale
+    assert case.justification == 1
+    setters = [row for row in state.style_calls if row[0] == "set"]
+    getters = [row for row in state.style_calls if row[0] == "get"]
+    assert len(setters) == (0 if initial == 1 else 1)
+    if setters:
+        assert setters[0][2:] == (1,)  # VOID property setter, no status.
+        assert getters[0][1] == setters[0][1]
+        assert getters[1][1] != setters[0][1]
+    assert len(getters) == 7
+    assert state.font_calls
+    assert state.redraws == 1
+    assert state.rebuilds == [
+        "purchased screw original reference text stations",
+        "purchased screw local top-justified reference text",
+        "purchased screw reference text measured",
+        "purchased screw reference offset anchors",
+        "purchased screw reference native offset mode",
+        "purchased screw measured reference text shelves",
+    ]
+    after = state.core.measure_reference_text(
+        state.adapter, case.display, axis=state.axis, label=state.name
+    )
+    assert after["tips"] == before["tips"]
+    assert after["witnesses"] == before["witnesses"]
+    assert after["physical_lines"] == before["physical_lines"]
+    assert all(len(witness) == 3 for witness in after["witnesses"])
+    assert case.annotation.position[1] == original_position[1]
+    assert after["text"].xmin - after["reach"] >= state.core.CLEAR_GAP_M
+    assert case.display.OffsetText is True
+    assert tuple(row["t"] for row in after["record"]["display"]["texts"]) == ("(3 mm)",)
+    assert tuple(row["h"] for row in after["record"]["display"]["texts"]) == (
+        tuple(row["h"] for row in before["record"]["display"]["texts"])
+    )
+    assert case.native.SystemValue == state.source_dimension.SystemValue == 0.003
+    assert case.native.FullName == state.source_dimension.FullName == (
+        "SupplierDriveWidth@SupplierTopReference@stock.SLDPRT"
+    )
+    assert case.text == {1: "(", 2: " mm)", 4: ""}
+    assert (case.state.unit, case.state.precision, case.state.fraction) == (0, 0, 1)
+    assert tuple(point.native_identity for point in case.annotation.entities) == (
+        tuple(point.native_identity for point in state.drawing_points)
+    )
+    if replace_final_wrapper:
+        state.replace()
+        assert case.stale and state.current.display is not returned[state.name]
+    settled = state.snapshot()
+    state.settle()
+    assert state.snapshot() == settled  # No setters, formatting, rebuild or redraw.
+    assert len([row for row in state.style_calls if row[0] == "set"]) == (
+        0 if initial == 1 else 1
+    )
+    assert len([row for row in state.style_calls if row[0] == "get"]) == 9
+    assert state.style_calls[-1][1] == id(state.current.display)
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("initial", (False, True, -1, 4, 0.0, None, "0"))
+def test_carriage_top_justified_refuses_invalid_initial_getter_before_write(
+    screw_reference_shelf_native_consumer, initial,
+):
+    state = screw_reference_shelf_native_consumer
+    state.current.justification = initial
+    with pytest.raises(RuntimeError):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get"]
+    assert state.redraws == 0
+    assert len(state.rebuilds) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("effect", ("ignored", "wrong-value", "noninteger", "boolean"))
+def test_carriage_top_justified_refuses_unapplied_or_mismatched_local_style(
+    screw_reference_shelf_native_consumer, effect,
+):
+    state = screw_reference_shelf_native_consumer
+    state.style_effect = effect
+    with pytest.raises(RuntimeError):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get", "set", "get"]
+    assert state.redraws == 1
+    assert len(state.rebuilds) == 2
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+def test_carriage_top_justified_setter_exception_is_original(
+    screw_reference_shelf_native_consumer,
+):
+    state = screw_reference_shelf_native_consumer
+    error = ValueError("native property put unavailable")
+    state.setter_error = error
+    with pytest.raises(ValueError) as refused:
+        state.run(top_justified=(state.name,))
+    assert refused.value is error
+    assert [row[0] for row in state.style_calls] == ["get", "set"]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("initial", "fresh", "final"))
+@pytest.mark.parametrize("error_type", (AttributeError, NotImplementedError, ValueError))
+def test_carriage_top_justified_getter_exception_is_original_without_retry(
+    screw_reference_shelf_native_consumer, phase, error_type, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    error = error_type("native justification getter unavailable")
+    if phase == "initial":
+        state.getter_error = error
+    elif phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def fail_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.getter_error = error
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", fail_fresh)
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.getter_error = error
+    before_calls = len(state.style_calls)
+    before_writes = len(state.writes)
+    if phase == "final":
+        for check in state.checks:
+            before_calls = len(state.style_calls)
+            with pytest.raises(error_type) as refused:
+                check()
+            assert refused.value is error
+            assert len(state.style_calls) == before_calls + 1
+            assert len(state.writes) == before_writes
+    else:
+        with pytest.raises(error_type) as refused:
+            state.run(top_justified=(state.name,))
+        assert refused.value is error
+        assert [row[0] for row in state.style_calls] == (
+            ["get"] if phase == "initial" else ["get", "set", "get"]
+        )
+        assert len(state.rebuilds) == (1 if phase == "initial" else 2)
+        assert state.redraws == (0 if phase == "initial" else 1)
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("source", "changed source/configuration/orientation"),
+        ("configuration", "changed source/configuration/orientation"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
+    ),
+)
+def test_carriage_top_justified_refuses_style_transition_source_or_station_drift(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.style_drift = drift
+    with pytest.raises(RuntimeError, match=message):
+        state.run(top_justified=(state.name,))
+    assert len(state.rebuilds) == 2
+    assert state.redraws == 1
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("drift", ("tips", "witnesses", "captured-normal-shift"))
+@pytest.mark.parametrize("logging_error", (None, ValueError, KeyboardInterrupt))
+def test_carriage_top_justified_station_failure_retains_native_evidence_and_rethrows(
+    screw_reference_shelf_native_consumer, monkeypatch, drift, logging_error,
+):
+    import _supplier_screw_reference_text as consumer
+
+    state = screw_reference_shelf_native_consumer
+    state.style_drift = drift
+    events = []
+    failures = []
+    strict = consumer.assert_reference_text_stations
+
+    def capture_failure(before, after, *, label):
+        try:
+            strict(before, after, label=label)
+        except RuntimeError as error:
+            failures.append(error)
+            raise
+
+    def record_event(name, **attributes):
+        events.append((name, attributes))
+        if logging_error and name == "drawing.supplier_screw_text_justification_station_failure":
+            raise logging_error("diagnostic sink unavailable")
+
+    monkeypatch.setattr(consumer, "assert_reference_text_stations", capture_failure)
+    monkeypatch.setattr(consumer._telemetry, "event", record_event)
+    moved = "tips" if drift == "captured-normal-shift" else drift
+    with pytest.raises(RuntimeError, match=f"native {moved} moved") as refused:
+        state.run(top_justified=(state.name,))
+    assert refused.value is failures[0]
+    diagnostic = [
+        attributes for name, attributes in events
+        if name == "drawing.supplier_screw_text_justification_station_failure"
+    ]
+    assert len(diagnostic) == 1
+    actual = diagnostic[0]
+    assert actual["reference"] == "SupplierDriveWidth"
+    assert actual["original_justification"] == 0
+    assert actual["actual_justification"] == 1
+    assert actual["original_font"] == actual["actual_font"]
+    assert actual["coordinate_basis"] == "held native audit record, metres, 0.1 um"
+    assert actual["native_array_order"] == "unchanged IDisplayData index order"
+    before, after = actual["before"], actual["after"]
+    assert before["axis"] == after["axis"] == 0
+    assert before["record"]["name"] == after["record"]["name"] == state.name
+    assert before["record"]["pos"] == after["record"]["pos"]
+    # Native primitive order and coordinates remain available for role matching;
+    # reporting the already-normalized tips alone would lose this evidence.
+    assert after["record"]["display"] == state.current.annotation.record["display"]
+    assert set(before) == set(after) == {
+        "axis", "tips", "witnesses", "physical_lines", "record",
+    }
+    if drift == "tips":
+        assert [new[0] - old[0] for old, new in zip(
+            before["tips"], after["tips"], strict=True,
+        )] == pytest.approx([0.0001, 0.0001])
+    elif drift == "captured-normal-shift":
+        assert [new[1] - old[1] for old, new in zip(
+            before["tips"], after["tips"], strict=True,
+        )] == pytest.approx([0.0027781, 0.0027781])
+        assert [point[0] for point in before["tips"]] == [
+            point[0] for point in after["tips"]
+        ]
+        assert before["witnesses"] != after["witnesses"]
+    else:
+        assert before["tips"] == after["tips"]
+        assert before["witnesses"] != after["witnesses"]
+        assert before["record"]["display"]["arrows"] == after["record"]["display"]["arrows"]
+    assert len(state.rebuilds) == 2
+    assert state.redraws == 1
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "reference text measured",
+        "reference offset anchors",
+        "reference native offset mode",
+        "measured reference text shelves",
+    ),
+)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("justification", "justif"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
+    ),
+)
+def test_carriage_top_justified_and_original_stations_survive_every_core_reacquire(
+    screw_reference_shelf_native_consumer, phase, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.rebuild_drift = (phase, drift)
+    with pytest.raises(RuntimeError, match=message):
+        state.run(top_justified=(state.name,))
+    assert state.rebuilds[-1].endswith(phase)
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("justification", "justif"),
+        ("source", "changed source/configuration/orientation"),
+        ("configuration", "changed source/configuration/orientation"),
+        ("attachment", "attachment changed source sketch"),
+        ("value", "!= exact expected"),
+        ("format", "native supplier presentation differs from its source"),
+        ("full-ref", "native supplier presentation differs from its source"),
+        ("tips", "native tips moved"),
+        ("witnesses", "native witnesses moved"),
+        ("physical-tail", "physical"),
+        ("captured-normal-shift", "native tips moved"),
+    ),
+)
+def test_carriage_top_justified_every_final_proof_refuses_fresh_wrapper_drift_readonly(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    returned = state.run(top_justified=(state.name,))
+    state.replace()
+    assert state.current.display is not returned[state.name]
+    state.mutate(drift)
+    mutated = state.snapshot()
+    assert len(state.checks) == 2
+    for check in state.checks:
+        with pytest.raises(RuntimeError, match=message):
+            check()
+        assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "drift,message", (
+        ("transverse", "supplier reference transverse position moved"),
+        ("axis-clearance", "supplier reference text crowds its native line"),
+    ),
+)
+def test_carriage_top_justified_retains_generic_transverse_and_axis_clearance_guards(
+    screw_reference_shelf_native_consumer, drift, message,
+):
+    state = screw_reference_shelf_native_consumer
+    state.run(top_justified=(state.name,))
+    state.replace()
+    state.mutate(drift)
+    mutated = state.snapshot()
+    with pytest.raises(RuntimeError, match=message):
+        state.checks[-1]()
+    assert state.snapshot() == mutated
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize(
+    "field",
+    (
+        "TypeFaceName", "CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts",
+        "Bold", "Italic", "Underline", "Strikeout", "WidthFactor",
+        "CharSpacingFactor", "LineSpacing", "LineLength", "Escapement",
+        "ObliqueAngle", "BackWards", "UpsideDown", "Vertical",
+        "font-inheritance", "font-type-only", "raw-text",
+    ),
+)
+@pytest.mark.parametrize(
+    "phase",
+    (
+        "transition", "reference text measured", "reference offset anchors",
+        "reference native offset mode", "measured reference text shelves", "final",
+    ),
+)
+def test_carriage_top_justified_preserves_full_native_font_and_text_at_every_checkpoint(
+    screw_reference_shelf_native_consumer, field, phase,
+):
+    state = screw_reference_shelf_native_consumer
+    drift = (
+        field if field in ("font-inheritance", "font-type-only", "raw-text")
+        else f"font:{field}"
+    )
+    message = (
+        "supplier reference native text changed"
+        if field == "raw-text" else "supplier reference native font/binding changed"
+    )
+    if phase == "transition":
+        state.style_drift = drift
+    elif phase != "final":
+        state.rebuild_drift = (phase, drift)
+    if phase != "final":
+        with pytest.raises(RuntimeError, match=message):
+            state.run(top_justified=(state.name,))
+    else:
+        returned = state.run(top_justified=(state.name,))
+        previous = state.current
+        state.replace()
+        assert state.current.display is not returned[state.name]
+        assert state.current.fonts[0] is not previous.fonts[0]
+        assert state.current.use_doc_fonts is not previous.use_doc_fonts
+        before_fields = dict(vars(state.current.fonts[0]))
+        state.mutate(drift)
+        if field == "font-inheritance":
+            assert vars(state.current.fonts[0]) == before_fields
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match=message):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("flag", (0, 1, None, "True"))
+def test_carriage_top_justified_refuses_nonboolean_initial_font_inheritance_before_write(
+    screw_reference_shelf_native_consumer, flag,
+):
+    state = screw_reference_shelf_native_consumer
+    state.current.use_doc_fonts[0] = flag
+    with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+        state.run(top_justified=(state.name,))
+    assert not [row for row in state.style_calls if row[0] == "set"]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("count", (0, 2))
+def test_carriage_top_justified_refuses_unsupported_dimension_format_count_before_write(
+    screw_reference_shelf_native_consumer, count,
+):
+    state = screw_reference_shelf_native_consumer
+    state.current.fonts = [
+        copy.deepcopy(state.current.fonts[0]) for _ in range(count)
+    ]
+    with pytest.raises(RuntimeError, match="unsupported native dimension format count"):
+        state.run(top_justified=(state.name,))
+    assert not [row for row in state.style_calls if row[0] == "set"]
+    assert not [row for row in state.font_calls if row[0] in ("font", "inheritance")]
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("fresh", "final"))
+@pytest.mark.parametrize("value", (False, True, -1, 4, 1.0, None, "1"))
+def test_carriage_top_justified_refuses_invalid_fresh_and_final_getter_readonly(
+    screw_reference_shelf_native_consumer, phase, value, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    if phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def corrupt_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.current.justification = value
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", corrupt_fresh)
+        with pytest.raises(RuntimeError, match="unreadable native vertical justification"):
+            state.run(top_justified=(state.name,))
+        assert len(state.rebuilds) == 2 and state.redraws == 1
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.current.justification = value
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match="unreadable native vertical justification"):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("phase", ("fresh", "final"))
+@pytest.mark.parametrize("flag", (0, 1, None, "True"))
+def test_carriage_top_justified_refuses_nonboolean_fresh_font_inheritance_readonly(
+    screw_reference_shelf_native_consumer, phase, flag, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    if phase == "fresh":
+        rebuild = state.consumer.rebuild_drawing
+
+        def corrupt_fresh(adapter, *, label):
+            rebuild(adapter, label=label)
+            if label.endswith("local top-justified reference text"):
+                state.current.use_doc_fonts[0] = flag
+
+        monkeypatch.setattr(state.consumer, "rebuild_drawing", corrupt_fresh)
+        with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+            state.run(top_justified=(state.name,))
+        assert len(state.rebuilds) == 2 and state.redraws == 1
+    else:
+        state.run(top_justified=(state.name,))
+        state.replace()
+        state.current.use_doc_fonts[0] = flag
+        mutated = state.snapshot()
+        for check in state.checks:
+            with pytest.raises(RuntimeError, match="unreadable native font inheritance"):
+                check()
+            assert state.snapshot() == mutated
+    assert len([row for row in state.style_calls if row[0] == "set"]) == 1
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+@pytest.mark.parametrize("invalid", (object(), float("nan")))
+def test_carriage_top_justified_runs_genuine_complete_font_reader_before_write(
+    screw_reference_shelf_native_consumer, invalid,
+):
+    state = screw_reference_shelf_native_consumer
+    # A late census field ensures the real 17-field reader is exercised.
+    state.current.fonts[0].LineLength = invalid
+    with pytest.raises((TypeError, ValueError), match="ITextFormat.LineLength"):
+        state.run(top_justified=(state.name,))
+    assert [row[0] for row in state.style_calls] == ["get"]
+    assert any(row[0] == "font" for row in state.font_calls)
+    assert len(state.rebuilds) == 1 and state.redraws == 0
+
+
+@pytest.mark.parametrize("screw_reference_shelf_native_consumer", ["carriage"], indirect=True)
+def test_carriage_top_justified_refuses_exact_captured_a04_native_transform(
+    screw_reference_shelf_native_consumer, monkeypatch,
+):
+    state = screw_reference_shelf_native_consumer
+    consumer = state.consumer
+    # Bounded inline copy of actual a04 event's before/after native records,
+    # 2026-10-23T13:03:43.594537Z. No runtime artifact dependency or ink claim.
+    before_record = {
+        "type": 4, "name": "SupplierDriveWidth", "visible": 1, "owner_type": 0,
+        "pos": [0.08, 0.351612, 0.0165131], "layer": "",
+        "display": {
+            "lines": [
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3692, 0.0165131, 0.077, 0.3478339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.083, 0.3692, 0.0165131, 0.083, 0.3478339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3488339, 0.0165131, 0.07065, 0.3488339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.077, 0.3488339, 0.0165131, 0.083, 0.3488339, 0.0165131],
+                [0.0, 0.0, 0.0, 0.0, 0.083, 0.3488339, 0.0165131, 0.08935, 0.3488339, 0.0165131],
+            ],
+            "arrows": [
+                [0.077, 0.3488339, 0.0165131, -1.0, -0.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+                [0.083, 0.3488339, 0.0165131, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+            ],
+            "texts": [{
+                "t": " (3 mm) ", "pos": [0.0706715, 0.3488339, 0.0165131],
+                "h": 0.0035, "ref": 1, "ang": 0.0, "font": "Century Gothic",
+                "ls": 0.001, "w": 0.0186569,
+            }],
+        },
+        "dim": {"hole_callout": False},
+    }
+    after_record = copy.deepcopy(before_record)
+    after_record["display"]["lines"] = [
+        [0.0, 0.0, 0.0, 0.0, 0.077, 0.3692, 0.0165131, 0.077, 0.350612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.083, 0.3692, 0.0165131, 0.083, 0.350612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.077, 0.351612, 0.0165131, 0.07065, 0.351612, 0.0165131],
+        [0.0, 0.0, 0.0, 0.0, 0.083, 0.351612, 0.0165131, 0.08935, 0.351612, 0.0165131],
+    ]
+    after_record["display"]["arrows"] = [
+        [0.077, 0.351612, 0.0165131, -1.0, -0.0, -0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+        [0.083, 0.351612, 0.0165131, 1.0, 0.0, 0.0, 0.003556, 0.000762, 0.0, 0.0, 0.0, 1.0],
+    ]
+    state.current.annotation.record = copy.deepcopy(before_record)
+    state.current.annotation.position = tuple(before_record["pos"])
+    state.current.fonts[0].TypeFaceName = "Century Gothic"
+    rebuild = consumer.rebuild_drawing
+    strict = consumer.assert_reference_text_stations
+    failures, events = [], []
+
+    def transition(adapter, *, label):
+        rebuild(adapter, label=label)
+        if label.endswith("local top-justified reference text"):
+            state.current.annotation.record = copy.deepcopy(after_record)
+
+    def capture_failure(before, after, *, label):
+        try:
+            strict(before, after, label=label)
+        except RuntimeError as error:
+            failures.append(error)
+            raise
+
+    monkeypatch.setattr(consumer, "rebuild_drawing", transition)
+    monkeypatch.setattr(consumer, "assert_reference_text_stations", capture_failure)
+    monkeypatch.setattr(
+        consumer._telemetry, "event",
+        lambda name, **attributes: events.append((name, attributes)),
+    )
+    # Only this regression directly drives the style helper at the native
+    # boundary. The other cases retain full annotate/source ownership checks.
+    with pytest.raises(RuntimeError, match="native tips moved") as refused:
+        consumer._top_justify_reference_text(
+            state.adapter, reacquire=lambda: {state.name: state.current.display},
+            axes={state.name: 0}, names=(state.name,), label="purchased screw",
+        )
+    assert refused.value is failures[0]
+    diagnostic = [
+        attributes for name, attributes in events
+        if name == "drawing.supplier_screw_text_justification_station_failure"
+    ]
+    assert len(diagnostic) == 1
+    held = diagnostic[0]
+    assert held["original_justification"] == 0
+    assert held["actual_justification"] == 1
+    assert held["before"]["record"] == before_record
+    assert held["after"]["record"] == after_record
+    assert held["before"]["tips"] == ((0.077, 0.3488339), (0.083, 0.3488339))
+    assert held["after"]["tips"] == ((0.077, 0.351612), (0.083, 0.351612))
+    assert held["before"]["witnesses"] == (
+        (0.077, 0.3478339, 0.3692), (0.083, 0.3478339, 0.3692),
+    )
+    assert held["after"]["witnesses"] == (
+        (0.077, 0.350612, 0.3692), (0.083, 0.350612, 0.3692),
+    )
+    assert len(held["before"]["record"]["display"]["lines"]) == 5
+    assert len(held["after"]["record"]["display"]["lines"]) == 4
+    assert held["before"]["record"]["pos"] == held["after"]["record"]["pos"]
+    assert held["before"]["record"]["display"]["texts"] == (
+        held["after"]["record"]["display"]["texts"]
+    )
+    assert len(state.rebuilds) == 2 and state.redraws == 1
+    assert [row[0] for row in state.style_calls] == ["get", "set", "get"]
 
 
 @pytest.mark.parametrize(

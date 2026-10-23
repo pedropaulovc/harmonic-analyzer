@@ -762,8 +762,11 @@ def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotat
 ):
     import asyncio
     import importlib
+    from itertools import combinations
 
     import _purchased_fastener_drawing as purchased
+    from _layout_geometry import Box
+    from _supplier_screw_layout import supplier_screw_margins
     from test_purchased_fastener_drawing import _Drawing, _View
 
     # Recorded R38 native GetOutline sizes at 1:2 and 1:1. Interpolating these
@@ -774,6 +777,17 @@ def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotat
         "*Top": ((head_half, head_half), (head_one, head_one)),
         "*Right": ((head_half, front_half), (head_one, front_one)),
     }
+    size_terms = {
+        name: tuple(
+            (2 * (full - small) / 1000.0, (2 * small - full) / 1000.0)
+            for small, full in zip(half, one, strict=True)
+        )
+        for name, (half, one) in sizes.items()
+    }
+    for terms in size_terms.values():
+        for slope, padding in terms:
+            assert slope > 0.0
+            assert padding == pytest.approx(0.011176)
 
     class NativeView(_View):
         @property
@@ -799,12 +813,42 @@ def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotat
         f"draw_ch_rocker_arm_tl_vn_oblique_{family}_screw"
     )
 
-    async def fit_native(_adapter, spec, *, view_layout, supplier_margins, **_kwargs):
+    expected_result = {}
+
+    async def fit_native(
+        _adapter, spec, *, view_layout, align_orthographic, supplier_margins, **kwargs,
+    ):
+        assert spec is consumer.SPEC
+        assert view_layout == "portrait_reference"
+        assert align_orthographic is True
+        assert spec.layout is purchased.DrawingLayout.PORTRAIT
+        template = purchased.DRAWING_TEMPLATES[spec.layout]
+        assert (template.width_m, template.height_m) == pytest.approx((0.2794, 0.4318))
+        supplier = consumer.supplier
+        sides = (
+            consumer._REFERENCE_SIDES if family == "block"
+            else supplier.SUPPLIER_REFERENCE_SIDES
+        )
+        assert supplier_margins == supplier_screw_margins(
+            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+            planes=supplier.SUPPLIER_REFERENCE_PLANES, sides=sides,
+        )
         stock = purchased.fastener(spec.artifact_stem)
         notes = str(purchased._config.parts(stock.part_name).get("installation_notes", ""))
-        caption_y = purchased.view_band_bottom(notes, label=spec.artifact_stem)
+        supplier_data = kwargs.get("supplier_data", ())
+        # The real sheet builder lifts the complete footer from its lowest row
+        # to the registered portrait title block, not a captured mock constant.
+        footer_offset = (
+            template.title_block_top_m + purchased._CAPTION_CLEARANCE
+            - min(y - purchased._FOOTER_ROW_BELOW for _, y in purchased._FOOTER_ROWS)
+        )
+        assert footer_offset == pytest.approx(0.060)
 
         def fit(layout):
+            caption_y = purchased.view_band_bottom(
+                notes, label=spec.artifact_stem, supplier_data=supplier_data,
+                y_offset=footer_offset if layout == "portrait_reference" else 0.0,
+            )
             outer = purchased.fastener_view_cells(caption_y, layout=layout)
             fitted = purchased.supplier_fit_cells(
                 outer, supplier_margins, label=spec.artifact_stem,
@@ -821,7 +865,21 @@ def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotat
         with pytest.raises(RuntimeError, match="no project-standard scale"):
             fit("standard")
         scale, outer, members = fit(view_layout)
-        assert scale == (1, 2)
+        # Independently solve the recorded size laws against the real inset
+        # cells. The fitter must choose the first feasible project scale;
+        # portrait's 36.4 mm Top geometry band already accommodates 1:1.
+        ratio_limit = min(
+            ((cell[axis + 2] - cell[axis]) - padding) / slope
+            for _view, (name, _center, cell) in members
+            for axis, (slope, padding) in enumerate(size_terms[name])
+        )
+        assert ratio_limit >= 1.0
+        expected_scale = next(
+            candidate for candidate in purchased._SCALES
+            if candidate[0] / candidate[1] <= ratio_limit
+        )
+        assert scale == expected_scale
+        expected_result["orthographic"] = expected_scale
         outer_bounds = {name: box for name, _, box in outer}
         for view, (name, _center, geometry_cell) in members:
             bounds = view.GetOutline()
@@ -832,7 +890,32 @@ def test_ch_supplier_screw_consumers_fit_actual_padded_outlines_and_keep_annotat
                 bounds[2] + right, bounds[3] + top,
             )
             assert purchased._inside(complete, outer_bounds[name])
+        border = (
+            0.0127, 0.0127, template.width_m - 0.0127, template.height_m - 0.0127,
+        )
+        title = Box(
+            template.title_block_left_m, border[1], border[2], template.title_block_top_m,
+        )
+        footer_top = purchased.footer_top(
+            notes, label=spec.artifact_stem, supplier_data=supplier_data,
+            y_offset=footer_offset,
+        )
+        regions = []
+        for name, _center, cell in outer:
+            caption_at = cell[1] - purchased._CAPTION_TO_CELL
+            caption = (
+                cell[0], caption_at - purchased._CAPTION_BELOW,
+                cell[2], caption_at + 0.001,
+            )
+            assert caption[1] > footer_top, name
+            for bounds in (cell, caption):
+                assert purchased._inside(bounds, border), name
+                region = Box(*bounds)
+                assert region.overlaps(title, tol=0.0) is None, name
+                regions.append(region)
+        for first, second in combinations(regions, 2):
+            assert first.overlaps(second, tol=0.0) is None
         return {"orthographic": scale}
 
     monkeypatch.setattr(consumer, "build_purchased_fastener_drawing", fit_native)
-    assert asyncio.run(consumer.build(object())) == {"orthographic": (1, 2)}
+    assert asyncio.run(consumer.build(object())) == {"orthographic": expected_result["orthographic"]}

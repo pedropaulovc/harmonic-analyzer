@@ -23,6 +23,7 @@ stock name, which restates the material, is read and checked but not printed.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import math
 from collections.abc import Mapping, Sequence
@@ -83,15 +84,16 @@ _PROPERTIES = (
     *TITLE_BLOCK_TOLERANCE_PROPERTIES,
 )
 
-# Footer geometry, ASME B landscape (431.8 x 279.4), sheet metres.  The border
-# is 12.7 mm in; the title block fills x >= 215.9 mm below y = 65.1 mm, so every
-# footer row stops at _FOOTER_RIGHT.  Note y is the text's top edge; 3 mm text
-# advances at most _LINE_PITCH a line.
+# Base footer geometry, ASME B landscape (431.8 x 279.4), sheet metres.  The
+# border is 12.7 mm in; every row stops at _FOOTER_RIGHT, left of the landscape
+# title block. Portrait translates every anchor and reserved box together.
+# Note y is the text's top edge; 3 mm text advances at most _LINE_PITCH a line.
 _NOTE_X = 0.018
 _VALUE_X = 0.052
 _FOOTER_RIGHT = 0.2155
 _LINE_PITCH = 0.0045
 _FOOTER_ROWS = (("ITEM:", 0.044), ("SUPPLIER:", 0.034), ("SKU:", 0.024))
+_FOOTER_ROW_BELOW = 0.007
 _GENERAL_Y = 0.054
 # The general line's box bottom; the notes above it end at or over this.
 _GENERAL_BOTTOM = _GENERAL_Y - 0.007
@@ -506,10 +508,13 @@ def _retain_supplier_source_failure(
         )
     except BaseException as capture_error:
         if capture_error is not error:
-            error.add_note(
-                "source lifecycle capture also failed: "
-                f"{type(capture_error).__name__}: {capture_error}"
-            )
+            try:
+                error.add_note(
+                    "source lifecycle capture also failed: "
+                    f"{type(capture_error).__name__}: {capture_error}"
+                )
+            except BaseException:
+                pass  # Reporting must not replace the already-caught primary.
     raise error
 
 
@@ -540,6 +545,417 @@ def _inside(box: tuple[float, ...], container: tuple[float, ...]) -> bool:
 def _rebuild(draw: Any, *, phase: str) -> None:
     if not draw.EditRebuild3():
         raise RuntimeError(f"purchased drawing rebuild failed: {phase}")
+
+
+def _note_text_style(
+    annotation: Any,
+) -> tuple[tuple[tuple[str, str | bool | int | float], ...], ...]:
+    """Snapshot every native format using the template-maintenance font fields.
+
+    ``IsHeightSpecifiedInPts`` is a method; the other fields are properties.
+    Keep the native primitive values, not mutable COM format objects, and let
+    native read failures propagate rather than manufacturing a partial style.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("note style: missing native annotation")
+    count = annotation.GetTextFormatCount()
+    if type(count) is not int or count <= 0:
+        raise RuntimeError(f"note style: invalid native format count {count!r}")
+    formats = []
+    for index in range(count):
+        text_format = _early_bound(annotation.GetTextFormat(index), "ITextFormat")
+        if text_format is None:
+            raise RuntimeError(f"note style: missing native text format {index}")
+        fields = []
+        # Exact _FONT_FIELDS from maintain_drawing_templates, in census order.
+        for name in (
+            "TypeFaceName",
+            "CharHeight",
+            "CharHeightInPts",
+            "IsHeightSpecifiedInPts",
+            "Bold",
+            "Italic",
+            "Underline",
+            "Strikeout",
+            "WidthFactor",
+            "CharSpacingFactor",
+            "LineSpacing",
+            "LineLength",
+            "Escapement",
+            "ObliqueAngle",
+            "BackWards",
+            "UpsideDown",
+            "Vertical",
+        ):
+            value = (
+                text_format.IsHeightSpecifiedInPts()
+                if name == "IsHeightSpecifiedInPts"
+                else getattr(text_format, name)
+            )
+            if type(value) not in (str, bool, int, float):
+                raise TypeError(
+                    f"ITextFormat.{name} returned {type(value).__name__}, "
+                    "expected a primitive font value"
+                )
+            if type(value) is float and not math.isfinite(value):
+                raise ValueError(f"ITextFormat.{name} returned nonfinite {value!r}")
+            fields.append((name, value))
+        formats.append(tuple(fields))
+    return tuple(formats)
+
+
+def _align_portrait_bottom_zones(
+    adapter: Any, draw: Any, sheet: Any, *, label: str
+) -> Callable[[], None]:
+    """Jointly place bottom ``<ZONEC>`` 3/4 in their original native cells.
+
+    Keep 3's complete box in its cell's right half; centre 4's complete box
+    in the strip between its cell's left inset and the native left margin.
+    Measure and prove both targets before either write. One original inventory
+    then guards both intentional X moves and the six exact untouched anchors,
+    including at final rebuild. No template, font, grid or license is edited.
+    """
+    drawing = _early_bound(draw, "IDrawingDoc")
+    sheet = _early_bound(sheet, "ISheet")
+    prefix = f"{label}: bottom zones 3/4"
+    tolerance = _NUMBER_HEIGHT_TOL
+    clearance = 0.0006
+
+    def numbers(value: Any, count: int, *, field: str) -> tuple[float, ...]:
+        if not isinstance(value, (tuple, list)) or len(value) != count:
+            raise RuntimeError(f"{prefix}: invalid native {field}: {value!r}")
+        if any(type(item) not in (int, float) for item in value):
+            raise RuntimeError(f"{prefix}: nonnumeric native {field}: {value!r}")
+        result = tuple(float(item) for item in value)
+        if not all(map(math.isfinite, result)):
+            raise RuntimeError(f"{prefix}: nonfinite native {field}: {value!r}")
+        return result
+
+    def grid_state() -> tuple[Any, ...]:
+        properties = numbers(sheet.GetProperties2(), 8, field="sheet properties")
+        margins = numbers(
+            tuple(sheet.GetZoneMargin(index) for index in range(4)),
+            4,
+            field="zone margins",
+        )
+        distribution = sheet.GetZoneSizeDistribution()
+        region = sheet.GetZoneSizeRegion()
+        if (
+            not isinstance(distribution, tuple)
+            or len(distribution) != 3
+            or any(type(value) is not int for value in distribution)
+            or distribution[0] != 1  # swZoneSizeDistribution_EvenlySized
+            or distribution[1] <= 0
+            or distribution[2] != 4
+            or type(region) is not int
+            or region not in (0, 1)  # swRegionTypeMargins / swRegionTypeSheet
+        ):
+            raise RuntimeError(
+                f"{prefix}: invalid native zone grid: {distribution!r}, {region!r}"
+            )
+        width, height = properties[5:7]
+        top, bottom, right, left = margins
+        if (
+            not 0.0 < width < height
+            or min(margins) <= 0.0
+            or left + right >= width
+            or top + bottom >= height
+        ):
+            raise RuntimeError(f"{prefix}: invalid native border band: {margins!r}")
+        return properties, margins, distribution, region
+
+    def columns(grid: tuple[Any, ...]) -> dict[tuple[str, str], tuple[Any, ...]]:
+        properties, margins, _distribution, _region = grid
+        width, height = properties[5:7]
+        top, bottom, _right, _left = margins
+        view = _early_bound(drawing.GetFirstView(), "IView")
+        if view is None:
+            raise RuntimeError(f"{prefix}: missing first sheet view")
+        result = {}
+        names = set()
+        raw_note = view.GetFirstNote2()
+        while raw_note is not None:
+            note = _early_bound(raw_note, "INote")
+            if note.PropertyLinkedText == "<ZONEC>":
+                annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+                if annotation is None:
+                    raise RuntimeError(f"{prefix}: missing native zone annotation")
+                name = note.GetName()
+                owner = annotation.OwnerType
+                text = note.GetText()
+                position = numbers(annotation.GetPosition(), 3, field="zone position")
+                if (
+                    type(name) is not str
+                    or not name
+                    or name in names
+                    or type(owner) is not int
+                    or owner != 2  # swAnnotationOwner_DrawingTemplate
+                    or type(text) is not str
+                    or text not in ("1", "2", "3", "4")
+                    or not 0.0 < position[0] < width
+                ):
+                    raise RuntimeError(f"{prefix}: invalid column inventory identity")
+                if 0.0 < position[1] < bottom:
+                    side = "bottom"
+                elif height - top < position[1] < height:
+                    side = "top"
+                else:
+                    raise RuntimeError(
+                        f"{prefix}: column inventory leaves its native border band"
+                    )
+                key = side, text
+                if key in result:
+                    raise RuntimeError(f"{prefix}: duplicate column inventory {key!r}")
+                style = _note_text_style(annotation)
+                use_doc = tuple(
+                    annotation.GetUseDocTextFormat(index) for index in range(len(style))
+                )
+                angle = note.Angle
+                horizontal = note.GetTextJustification()
+                vertical = note.GetTextVerticalJustification()
+                if (
+                    any(type(value) is not bool for value in use_doc)
+                    or type(angle) not in (int, float)
+                    or not math.isfinite(angle)
+                    or type(horizontal) is not int
+                    or type(vertical) is not int
+                ):
+                    raise RuntimeError(f"{prefix}: invalid native zone text style")
+                identity = (
+                    name,
+                    owner,
+                    note.PropertyLinkedText,
+                    text,
+                    style,
+                    use_doc,
+                    angle,
+                    horizontal,
+                    vertical,
+                )
+                result[key] = note, annotation, position, identity
+                names.add(name)
+            raw_note = note.GetNext()
+        expected = {
+            (side, str(value))
+            for side in ("bottom", "top")
+            for value in range(1, 5)
+        }
+        if set(result) != expected:
+            raise RuntimeError(
+                f"{prefix}: incomplete column inventory: {tuple(sorted(result))!r}"
+            )
+        return result
+
+    grid = grid_state()
+    original = columns(grid)
+    properties, margins, _distribution, region = grid
+    width, _height = properties[5:7]
+    _top, bottom, right, left = margins
+    centres = [original["bottom", str(value)][2][0] for value in (4, 3, 2, 1)]
+    pitch = (centres[2] - centres[0]) / 2.0
+    grid_left, grid_right = (left, width - right) if region == 0 else (0.0, width)
+    if pitch <= 0.0 or any(
+        abs(actual - expected) > tolerance
+        for actual, expected in (
+            (centres[1], centres[0] + pitch),
+            (centres[3], centres[0] + 3.0 * pitch),
+            (centres[0] - pitch / 2.0, grid_left),
+            (centres[3] + pitch / 2.0, grid_right),
+            *(
+                (original["top", str(value)][2][0], centre)
+                for value, centre in zip((4, 3, 2, 1), centres, strict=True)
+            ),
+        )
+    ):
+        raise RuntimeError(f"{prefix}: column inventory does not match native grid")
+    cells = {
+        ("bottom", "3"): (
+            (centres[0] + centres[1]) / 2.0,
+            0.0,
+            (centres[1] + centres[2]) / 2.0,
+            bottom,
+        ),
+        ("bottom", "4"): (
+            grid_left,
+            0.0,
+            (centres[0] + centres[1]) / 2.0,
+            bottom,
+        ),
+    }
+    insets = {
+        key: (cell[0] + clearance, clearance, cell[2] - clearance, bottom - clearance)
+        for key, cell in cells.items()
+    }
+    middle = (cells["bottom", "3"][0] + cells["bottom", "3"][2]) / 2.0
+    lanes = {
+        ("bottom", "3"): (
+            middle, clearance, insets["bottom", "3"][2], bottom - clearance
+        ),
+        ("bottom", "4"): (
+            insets["bottom", "4"][0], clearance, left - clearance, bottom - clearance
+        ),
+    }
+
+    def zone_prefix(key: tuple[str, str]) -> str:
+        return f"{label}: bottom zone {key[1]}"
+
+    def measure(
+        current: dict[tuple[str, str], tuple[Any, ...]],
+    ) -> dict[tuple[str, str], tuple[float, ...]]:
+        boxes = {}
+        for key, cell in cells.items():
+            # Reuse this note's original-cell zoom before, after and at final.
+            centre = ((cell[0] + cell[2]) / 2.0, bottom / 2.0)
+            half = max((cell[2] - cell[0]) / 2.0, bottom)
+            with _zoomed_on(adapter, centre, half):
+                boxes[key] = _box(
+                    current[key][0].GetExtent(), label=zone_prefix(key), kind="note"
+                )
+        return boxes
+
+    def emit(
+        current: dict[tuple[str, str], tuple[Any, ...]],
+        boxes: dict[tuple[str, str], tuple[float, ...]],
+        phase: str,
+    ) -> None:
+        for key, event in (
+            (("bottom", "3"), "drawing.purchased_bottom_zone_three.state"),
+            (("bottom", "4"), "drawing.purchased_bottom_zone_four.state"),
+        ):
+            _telemetry.event(
+                event,
+                label=label,
+                phase=phase,
+                state=json.dumps(
+                    {
+                        "zone": key[1],
+                        "grid": grid,
+                        "cell": cells[key],
+                        "inset": insets[key],
+                        "target_lane": lanes[key],
+                        "extent": boxes[key],
+                        "columns": [
+                            {
+                                "side": side,
+                                "value": value,
+                                "position": record[2],
+                                "identity": record[3],
+                            }
+                            for (side, value), record in sorted(current.items())
+                        ],
+                    },
+                    sort_keys=True,
+                ),
+            )
+
+    def inside_cell(key: tuple[str, str], box: tuple[float, ...]) -> None:
+        inset = insets[key]
+        if not (
+            inset[0] < box[0] < box[2] < inset[2]
+            and inset[1] < box[1] < box[3] < inset[3]
+        ):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: leaves its original cell: {box!r}, {inset!r}"
+            )
+
+    def inside_lane(key: tuple[str, str], box: tuple[float, ...]) -> None:
+        lane = lanes[key]
+        if not (
+            lane[0] < box[0] < box[2] < lane[2]
+            and lane[1] < box[1] < box[3] < lane[3]
+        ):
+            destination = "cell's right half" if key[1] == "3" else "native left strip"
+            raise RuntimeError(
+                f"{zone_prefix(key)}: full native box leaves its {destination}: "
+                f"{box!r}, {lane!r}"
+            )
+
+    before = measure(original)
+    emit(original, before, "before")
+    targets = {}
+    for key, box in before.items():
+        inside_cell(key, box)
+        lane = lanes[key]
+        inset = insets[key]
+        if not (
+            inset[0] <= lane[0] < lane[2] <= inset[2]
+            and inset[1] <= lane[1] < lane[3] <= inset[3]
+        ):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: infeasible native target lane: {lane!r}"
+            )
+        anchor = original[key][2]
+        lane_centre = (lane[0] + lane[2]) / 2.0
+        if key[1] == "3":
+            # Preserve the original right-half complete-box centring algorithm.
+            lane_centre = (middle + cells[key][2]) / 2.0
+        target = (
+            anchor[0] + lane_centre - (box[0] + box[2]) / 2.0,
+            anchor[1],
+            anchor[2],
+        )
+        if not all(map(math.isfinite, target)):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: nonfinite requested position: {target!r}"
+            )
+        delta = target[0] - anchor[0]
+        translated = (box[0] + delta, box[1], box[2] + delta, box[3])
+        inside_cell(key, translated)
+        inside_lane(key, translated)
+        targets[key] = target
+
+    # Both full native boxes have feasible targets before the first mutation.
+    for key, target in targets.items():
+        annotation = original[key][1]
+        if annotation.SetPosition2(*target) is not True:
+            raise RuntimeError(f"{zone_prefix(key)}: SetPosition2 refused {target!r}")
+        readback = numbers(annotation.GetPosition(), 3, field="position readback")
+        if any(
+            abs(actual - wanted) > tolerance
+            for actual, wanted in zip(readback, target, strict=True)
+        ):
+            raise RuntimeError(
+                f"{zone_prefix(key)}: position readback {readback!r} != {target!r}"
+            )
+    _rebuild(draw, phase=f"{prefix} placement")
+
+    def prove(phase: str) -> None:
+        fresh_grid = grid_state()
+        if fresh_grid != grid:
+            raise RuntimeError(f"{prefix}: grid changed: {fresh_grid!r} != {grid!r}")
+        current = columns(fresh_grid)
+        for column, record in current.items():
+            original_record = original[column]
+            if record[3] != original_record[3]:
+                raise RuntimeError(f"{prefix}: style or identity changed for {column!r}")
+            if column in targets:
+                # Original Y/Z are requested unchanged for both owned notes.
+                # All three native doubles retain the existing readback bound.
+                if any(
+                    abs(actual - wanted) > tolerance
+                    for actual, wanted in zip(record[2], targets[column], strict=True)
+                ):
+                    raise RuntimeError(
+                        f"{zone_prefix(column)}: position readback changed: {record[2]!r}"
+                    )
+            elif record[2] != original_record[2]:
+                raise RuntimeError(
+                    f"{prefix}: other column position changed for {column!r}"
+                )
+        boxes = measure(current)
+        for key, box in boxes.items():
+            inside_cell(key, box)
+            inside_lane(key, box)
+        # No after/final state is published if either owned guard failed.
+        emit(current, boxes, phase)
+
+    prove("after")
+
+    def settled() -> None:
+        prove("final")
+
+    return settled
 
 
 def note_lines(notes: str, *, label: str) -> tuple[str, ...]:
@@ -582,24 +998,44 @@ def _supplier_data_lines(data: Sequence[str], *, label: str) -> tuple[str, ...]:
     return ("SUPPLIER OPERATING DATA (REFERENCE):", *lines) if lines else ()
 
 
-def footer_top(notes: str, *, label: str, supplier_data: Sequence[str] = ()) -> float:
-    """The top edge of installation notes and separate supplier operating data."""
+def footer_top(
+    notes: str,
+    *,
+    label: str,
+    supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
+) -> float:
+    """The top edge of installation notes/data, translated with the footer."""
+    if not math.isfinite(y_offset):
+        raise ValueError(f"{label}: purchased footer y_offset must be finite")
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
     if not lines and not data:
-        return _GENERAL_Y
+        return _GENERAL_Y + y_offset
     gap = _LINE_PITCH if lines and data else 0.0
-    return _NOTES_BOTTOM + (len(lines) + len(data)) * _LINE_PITCH + gap + 0.001
+    return (
+        _NOTES_BOTTOM
+        + (len(lines) + len(data)) * _LINE_PITCH
+        + gap
+        + 0.001
+        + y_offset
+    )
 
 
 def view_band_bottom(
-    notes: str, *, label: str, supplier_data: Sequence[str] = ()
+    notes: str,
+    *,
+    label: str,
+    supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
 ) -> float:
     """Bottom-row captions clear the complete footer and title block."""
     return max(
-        footer_top(notes, label=label, supplier_data=supplier_data)
+        footer_top(
+            notes, label=label, supplier_data=supplier_data, y_offset=y_offset
+        )
         + _CAPTION_CLEARANCE,
-        _LOWEST_CAPTION_Y,
+        _LOWEST_CAPTION_Y + y_offset,
     )
 
 
@@ -610,7 +1046,11 @@ def _cell(
 
 
 def fastener_view_cells(
-    caption_y: float, *, layout: Literal["standard", "supplier_top", "tall_top"] = "standard"
+    caption_y: float,
+    *,
+    layout: Literal[
+        "standard", "supplier_top", "tall_top", "portrait_reference"
+    ] = "standard",
 ) -> tuple:
     """Third-angle Front/Top/Right with the Isometric upper right.
 
@@ -622,10 +1062,19 @@ def fastener_view_cells(
     ``supplier_top`` has 70 mm: two 26 mm annotation lanes leave 18 mm for
     its native outline. ``tall_top`` gives 96 mm. Both lower the bottom-row
     cells and Isometric together without changing the standard layout.
+    ``portrait_reference`` uses the existing ANSI B portrait sheet, with a
+    separate tall Right band and an independent Isometric band.
     """
-    if layout not in ("standard", "supplier_top", "tall_top"):
+    if layout not in ("standard", "supplier_top", "tall_top", "portrait_reference"):
         raise ValueError(f"unknown purchased fastener view layout: {layout!r}")
     bottom = caption_y + _CAPTION_TO_CELL
+    if layout == "portrait_reference":
+        return (
+            _cell("*Front", 0.025, bottom, 0.135, 0.310),
+            _cell("*Top", 0.025, 0.326, 0.135, 0.4144),
+            _cell("*Right", 0.144, bottom, 0.262, 0.292),
+            _cell(_ISOMETRIC, 0.144, 0.302, 0.262, 0.4144),
+        )
     if layout == "tall_top":
         row_top, top_bottom, isometric_bottom = 0.150, 0.166, 0.160
     elif layout == "supplier_top":
@@ -1040,6 +1489,70 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> dict[str, tuple[int
     return scales
 
 
+@_telemetry.traced("drawing.purchased_align_orthographic", label_param="label")
+def _align_orthographic_views(
+    adapter: Any,
+    draw: Any,
+    views: list[Any],
+    cells: tuple,
+    *,
+    scales: dict[str, tuple[int, int]],
+    label: str,
+) -> None:
+    """Align actual model origins after fitting, without changing scale/cells."""
+    by_name = {
+        name: view for view, (name, _, _) in zip(views, cells, strict=True)
+    }
+    origins: dict[str, tuple[float, float]] = {}
+    for name in ("*Front", "*Top", "*Right"):
+        view = by_name[name]
+        view.UpdateViewDisplayGeometry()
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} alignment origin"
+        )
+        if not all(map(math.isfinite, origin)):
+            raise RuntimeError(f"{label} {name}: invalid projected origin {origin!r}")
+        origins[name] = origin
+    front = origins["*Front"]
+    aligned = {
+        "*Front": front,
+        "*Top": (front[0], origins["*Top"][1]),
+        "*Right": (origins["*Right"][0], front[1]),
+    }
+    for name in ("*Top", "*Right"):
+        view = by_name[name]
+        position = tuple(float(value) for value in view.Position)
+        if len(position) != 2 or not all(map(math.isfinite, position)):
+            raise RuntimeError(f"{label} {name}: invalid native view position {position!r}")
+        target = [
+            position[i] + aligned[name][i] - origins[name][i] for i in range(2)
+        ]
+        if not view.SetViewPosition(double_array(target), False):
+            raise RuntimeError(f"{label} {name}: failed to align purchased view")
+    _rebuild(draw, phase="align purchased orthographic origins")
+    for view, (name, _, cell) in zip(views, cells, strict=True):
+        box, _outlines = _refreshed_native_fit_bounds(view, label=f"{label} {name}")
+        if tuple(view.ScaleRatio) != scales[name] or view.UseSheetScale != 0:
+            raise RuntimeError(f"{label} {name}: alignment changed fitted view scale")
+        if not _inside(box, cell):
+            raise RuntimeError(
+                f"{label} {name}: aligned native view leaves its fitted cell: {box!r}"
+            )
+        if name == _ISOMETRIC:
+            continue
+        origin = model_point_in_view(
+            adapter, view, (0.0, 0.0, 0.0), label=f"{label} {name} aligned origin"
+        )
+        if not all(map(math.isfinite, origin)) or any(
+            abs(actual - expected) > 1e-6
+            for actual, expected in zip(origin, aligned[name], strict=True)
+        ):
+            raise RuntimeError(
+                f"{label} {name}: native projected origin failed to align: "
+                f"{origin!r}, expected {aligned[name]!r}"
+            )
+
+
 @_telemetry.traced("drawing.purchased_center_marks")
 def _center_marks_without_lines(views: list[Any], cells: tuple) -> dict[str, int]:
     """Drop the extension lines of every template-inserted centre mark.
@@ -1358,6 +1871,7 @@ def add_purchased_footer(
     general_text: str | None = None,
     label: str,
     supplier_data: Sequence[str] = (),
+    y_offset: float = 0.0,
 ) -> list[tuple[Any, str, str, tuple[float, float, float, float]]]:
     """Notes, general line, ITEM, SUPPLIER and SKU rows, bottom-left of the sheet.
 
@@ -1366,7 +1880,10 @@ def add_purchased_footer(
     cut at assembly (its note says where); otherwise the default general line
     says it is used as supplied. A literal override uses the same reserved
     single-line space and native text/extent checks.
+    ``y_offset`` translates every annotation anchor and its reserved box equally.
     """
+    if not math.isfinite(y_offset):
+        raise ValueError(f"{label}: purchased footer y_offset must be finite")
     item = check_item(item, label=label)
     lines = note_lines(notes, label=label)
     data = _supplier_data_lines(supplier_data, label=label)
@@ -1378,48 +1895,74 @@ def add_purchased_footer(
         apply_custom_properties(adapter, {"Installation Notes": text}, model=draw)
         # $PRP (this drawing), not $PRPSHEET (the model in view).
         link = '$PRP:"Installation Notes"'
-        top = footer_top(text, label=label)
+        top = footer_top(text, label=label, y_offset=y_offset)
         note = _literal_note(adapter, link, _NOTE_X, top)
         placed.append(
             (
                 note,
                 link,
                 text,
-                (0.015, _NOTES_BOTTOM - 0.001, _FOOTER_RIGHT, top + 0.001),
+                (0.015, _NOTES_BOTTOM - 0.001 + y_offset, _FOOTER_RIGHT, top + 0.001),
             )
         )
     if data:
         text = "\n".join(data)
-        top = footer_top(notes, label=label, supplier_data=supplier_data)
+        top = footer_top(
+            notes, label=label, supplier_data=supplier_data, y_offset=y_offset
+        )
         bottom = (
-            footer_top(notes, label=label) + _LINE_PITCH if lines else _NOTES_BOTTOM
+            footer_top(notes, label=label, y_offset=y_offset) + _LINE_PITCH
+            if lines
+            else _NOTES_BOTTOM + y_offset
         )
         note = _literal_note(adapter, text, _NOTE_X, top)
         placed.append(
             (note, text, text, (0.015, bottom - 0.001, _FOOTER_RIGHT, top + 0.001))
         )
     general = _GENERAL_TEXT[cut_to_suit] if general_text is None else general_text
-    note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y)
+    note = _literal_note(adapter, general, _NOTE_X, _GENERAL_Y + y_offset)
     placed.append(
         (
             note,
             general,
             general,
-            (0.015, _GENERAL_BOTTOM, _FOOTER_RIGHT, _GENERAL_Y + 0.001),
+            (
+                0.015,
+                _GENERAL_BOTTOM + y_offset,
+                _FOOTER_RIGHT,
+                _GENERAL_Y + 0.001 + y_offset,
+            ),
         )
     )
     for row, y in _FOOTER_ROWS:
-        row_note = _literal_note(adapter, row, _NOTE_X, y)
+        row_note = _literal_note(adapter, row, _NOTE_X, y + y_offset)
         placed.append(
-            (row_note, row, row, (0.015, y - 0.007, _VALUE_X - 0.002, y + 0.001))
+            (
+                row_note,
+                row,
+                row,
+                (
+                    0.015,
+                    y - _FOOTER_ROW_BELOW + y_offset,
+                    _VALUE_X - 0.002,
+                    y + 0.001 + y_offset,
+                ),
+            )
         )
-        box = (_VALUE_X - 0.002, y - 0.007, _FOOTER_RIGHT, y + 0.001)
+        box = (
+            _VALUE_X - 0.002,
+            y - _FOOTER_ROW_BELOW + y_offset,
+            _FOOTER_RIGHT,
+            y + 0.001 + y_offset,
+        )
         if row == "ITEM:":
-            value = _literal_note(adapter, item, _VALUE_X, y)
+            value = _literal_note(adapter, item, _VALUE_X, y + y_offset)
             placed.append((value, item, item, box))
             continue
         name = "Supplier" if row == "SUPPLIER:" else "Supplier SKUs"
-        value = add_property_linked_note(adapter, name, _VALUE_X, y, char_height=0.003)
+        value = add_property_linked_note(
+            adapter, name, _VALUE_X, y + y_offset, char_height=0.003
+        )
         placed.append(
             (_early_bound(value, "INote"), property_link(name), properties[name], box)
         )
@@ -1433,13 +1976,17 @@ async def build_purchased_fastener_drawing(
     item: str | None = None,
     cut_to_suit: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
-    view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    view_layout: Literal[
+        "standard", "supplier_top", "tall_top", "portrait_reference"
+    ] = "standard",
+    align_orthographic: bool = False,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
     configuration: str | None = None,
     settled_checks: Sequence[Callable[[], None]] = (),
     supplier_data: Sequence[str] = (),
     title_block_setup: Callable[[Any], Callable[[], None]] | None = None,
+    saved_check: Callable[[Any, Path], None] | None = None,
 ) -> dict[str, str]:
     """Export Front/Top/Right plus Isometric without fabrication dimensions or PMI.
 
@@ -1454,11 +2001,21 @@ async def build_purchased_fastener_drawing(
     ``view_layout="supplier_top"`` reserves the supplier screw family's Top
     annotation lanes; ``"tall_top"`` gives a longer axial Top view. Neither
     changes annotation margins or the standard-scale fitting contract.
+    ``portrait_reference`` requires the existing ANSI B portrait template.
+    ``align_orthographic`` aligns Top's projected model-origin X and Right's Y
+    with Front after fitting, before supplier annotations capture their origins.
     Supplier hooks import native reference sizes after fitting; explicit margins
     reserve their annotation space before scale selection. Pass the same mutable
     settled-check list the hook populates, or a predeclared read-only assertion.
     Final checks run after the finalizer's last rebuild, without refitting.
+    ``title_block_setup`` uses the existing linked Name/Material/Number fitter
+    and returns its final-rebuild proof; it replaces, rather than combines
+    with, the separate opt-in ``number_fit``.
+    ``saved_check`` optionally reads the saved native drawing after the finalizer
+    closes it, while the supplier-source byte-preservation guard still owns it.
     """
+    if saved_check is not None and not callable(saved_check):
+        raise TypeError("purchased saved drawing check must be callable")
     stock = fastener(spec.artifact_stem)
     source = spec.source
 
@@ -1499,7 +2056,7 @@ async def build_purchased_fastener_drawing(
                         f"{stock.part_name}: stale source {name} {properties[name]!r} != {value!r}"
                     )
 
-        return await _build_reference_sheet(
+        artifacts = await _build_reference_sheet(
             adapter,
             spec,
             properties=properties,
@@ -1510,6 +2067,7 @@ async def build_purchased_fastener_drawing(
             document_title=str(registry["title"]),
             number_fit=number_fit,
             view_layout=view_layout,
+            align_orthographic=align_orthographic,
             supplier_dimensions=supplier_dimensions,
             supplier_margins=supplier_margins,
             configuration=configuration,
@@ -1526,6 +2084,13 @@ async def build_purchased_fastener_drawing(
                 configuration=configuration,
             ),
         )
+        if saved_check is not None:
+            result = saved_check(adapter, Path(artifacts["drawing"]))
+            if result is not None:
+                if inspect.iscoroutine(result):
+                    result.close()
+                raise TypeError("saved_check must be synchronous and return None")
+        return artifacts
     except BaseException as error:
         primary = error
         raise
@@ -1540,9 +2105,12 @@ async def build_purchased_fastener_drawing(
                 )
         except BaseException as preservation_error:
             if primary is not None:
-                primary.add_note(
-                    f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
-                )
+                try:
+                    primary.add_note(
+                        f"{stock.part_name}: supplier source file preservation also failed: {preservation_error!r}"
+                    )
+                except BaseException:
+                    pass  # Reporting must not replace the already-caught primary.
             else:
                 _retain_supplier_source_failure(
                     spec, preservation_error, source_evidence
@@ -1619,9 +2187,12 @@ async def build_purchased_spring_drawing(
                 )
         except BaseException as preservation_error:
             if primary is not None:
-                primary.add_note(
-                    f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
-                )
+                try:
+                    primary.add_note(
+                        f"{spec.artifact_stem}: supplier source file preservation also failed: {preservation_error!r}"
+                    )
+                except BaseException:
+                    pass  # Reporting must not replace the already-caught primary.
             else:
                 _retain_supplier_source_failure(
                     spec, preservation_error, source_evidence
@@ -1642,7 +2213,10 @@ async def _build_reference_sheet(
     cut_to_suit: bool = False,
     document_title: str | None = None,
     spring: bool = False,
-    view_layout: Literal["standard", "supplier_top", "tall_top"] = "standard",
+    view_layout: Literal[
+        "standard", "supplier_top", "tall_top", "portrait_reference"
+    ] = "standard",
+    align_orthographic: bool = False,
     number_fit: NumberFit = NumberFit.TEMPLATE,
     supplier_dimensions: SupplierDimensions | None = None,
     supplier_margins: SupplierMargins | None = None,
@@ -1659,11 +2233,37 @@ async def _build_reference_sheet(
     check_item(item, label=label)
     if not isinstance(number_fit, NumberFit):
         raise TypeError(f"{label}: number_fit must be a NumberFit: {number_fit!r}")
+    if type(align_orthographic) is not bool:
+        raise TypeError(f"{label}: align_orthographic must be a bool")
+    if title_block_setup is not None:
+        if not callable(title_block_setup):
+            raise TypeError(f"{label}: title block setup must be callable")
+        if number_fit is not NumberFit.TEMPLATE:
+            raise ValueError(
+                f"{label}: title block setup owns Number; a second Number fitter is not allowed"
+            )
+    footer_y_offset = 0.0
+    if view_layout == "portrait_reference":
+        if (
+            spring
+            or spec.layout is not DrawingLayout.PORTRAIT
+            or (template.width_m, template.height_m) != (0.2794, 0.4318)
+        ):
+            raise ValueError(
+                f"{label}: portrait_reference requires the ANSI B portrait fastener template"
+            )
+        footer_y_offset = (
+            template.title_block_top_m
+            + _CAPTION_CLEARANCE
+            - min(y - _FOOTER_ROW_BELOW for _, y in _FOOTER_ROWS)
+        )
     if configuration is not None and (
         not isinstance(configuration, str) or not configuration.strip()
     ):
         raise ValueError(f"{label}: source configuration must be a nonempty name")
-    caption_y = view_band_bottom(notes, label=label, supplier_data=supplier_data)
+    caption_y = view_band_bottom(
+        notes, label=label, supplier_data=supplier_data, y_offset=footer_y_offset
+    )
     cells = (
         spring_view_cells(caption_y)
         if spring
@@ -1744,6 +2344,10 @@ async def _build_reference_sheet(
             view.UseSheetScale = 0
             view.ScaleRatio = double_array([1.0, 1.0])
     scales = _fit_views(draw, views, fit_cells)
+    if align_orthographic:
+        _align_orthographic_views(
+            adapter, draw, views, fit_cells, scales=scales, label=label
+        )
     fitted_origins: dict[str, tuple[float, float]] = {}
     fitted_sources: dict[str, tuple[str, str]] = {}
     if supplier_dimensions is not None:
@@ -1859,6 +2463,7 @@ async def _build_reference_sheet(
                 cut_to_suit=cut_to_suit,
                 label=label,
                 supplier_data=supplier_data,
+                y_offset=footer_y_offset,
             )
         )
     with _telemetry.span("drawing.purchased_native_contract"):
@@ -1890,7 +2495,19 @@ async def _build_reference_sheet(
                 ),
             )
         if title_block_setup is not None:
-            final_checks = (*final_checks, title_block_setup(adapter))
+            title_check = title_block_setup(adapter)
+            if not callable(title_check):
+                if inspect.iscoroutine(title_check):
+                    title_check.close()
+                raise TypeError(
+                    f"{label}: title block setup must synchronously return a settled check"
+                )
+            final_checks = (*final_checks, title_check)
+        if view_layout == "portrait_reference":
+            final_checks = (
+                *final_checks,
+                _align_portrait_bottom_zones(adapter, draw, sheet, label=label),
+            )
         actual = list(iter_views(adapter))
         orientations = tuple(view.GetOrientationName() for view in actual)
         if len(actual) != 4 or set(orientations) != {name for name, _, _ in cells}:
