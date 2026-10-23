@@ -1800,6 +1800,7 @@ def test_full_preexisting_inventory_cannot_drift_at_any_normal_proof(neck_dimens
         f.side.GetAnnotations.return_value = (f.right_annotation, f.annotation)
     elif drift == "extra":
         extra = SimpleNamespace(
+            name="Extra",
             GetType=lambda: 4, GetSpecificAnnotation=lambda: SimpleNamespace(
                 GetDimension2=lambda index: SimpleNamespace(FullName="Extra", SystemValue=0.0, DrivenState=0),
             ),
