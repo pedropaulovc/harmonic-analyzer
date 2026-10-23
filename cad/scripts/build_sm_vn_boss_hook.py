@@ -94,6 +94,7 @@ from sm_vn_boss_hook_spec import (
 )
 from diagnostics.diag_build_9490T1 import build_9490T1
 from stock_anchor_geom import ANCHOR_9490T1
+import _telemetry
 
 PART_NAME = "sm-vn-boss-hook"
 SPEC = fastener(PART_NAME)
@@ -170,6 +171,7 @@ def _manufacturing_controls(adapter) -> None:
     )
 
 
+@_telemetry.traced("stock.shank.lead_in")
 async def _size_lead_in(adapter) -> None:
     """Drive the restored factory deburr's leg to the tap-clearing lead-in.
 

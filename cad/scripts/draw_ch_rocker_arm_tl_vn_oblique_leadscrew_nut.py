@@ -61,6 +61,29 @@ _HORIZONTAL = {
 }
 
 
+def projection_margins(
+    margins: Mapping[str, tuple[float, float, float, float]],
+) -> dict[str, tuple[float, float, float, float]]:
+    """Refuse lane reserves that would move a view off its projection axis.
+
+    The builder centres each view in its cell less its reserves. Front shares
+    its vertical axis with Top and its horizontal axis with the unannotated
+    (cell-centred) Right, so Front's reserves must match left/right and
+    bottom/top, and Top's left/right. The riser screw widens the smaller side
+    instead (``_aligned_margins``); here that would cost the 1:1 Front row
+    (spec lane budget), so the spec authors balanced lanes and this refuses
+    any other arrangement.
+    """
+    pairs = {"*Front": ((0, 2), (1, 3)), "*Top": ((0, 2),)}
+    for name, lanes in margins.items():
+        for a, b in pairs.get(name, ()):
+            if abs(lanes[a] - lanes[b]) > 1e-12:
+                raise ValueError(
+                    f"{name}: supplier lane reserves {lanes!r} leave the projection axis"
+                )
+    return dict(margins)
+
+
 def _measure(adapter: Any, display: Any, name: str) -> dict[str, Any]:
     return supplier_top_text_geometry(
         _supplier_top_record(adapter, display), horizontal=_HORIZONTAL[name]
@@ -179,10 +202,12 @@ async def build(adapter: Any) -> dict[str, str]:
         SPEC,
         item=ITEM,
         supplier_dimensions=partial(_annotate, checks=checks),
-        supplier_margins=supplier_screw_margins(
-            supplier.SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=supplier.SUPPLIER_REFERENCE_PLANES,
-            sides=supplier.SUPPLIER_REFERENCE_SIDES,
+        supplier_margins=projection_margins(
+            supplier_screw_margins(
+                supplier.SUPPLIER_REFERENCE_DIMENSIONS,
+                planes=supplier.SUPPLIER_REFERENCE_PLANES,
+                sides=supplier.SUPPLIER_REFERENCE_SIDES,
+            )
         ),
         settled_checks=checks,
         title_block_setup=TITLE_BLOCK_SETUP,

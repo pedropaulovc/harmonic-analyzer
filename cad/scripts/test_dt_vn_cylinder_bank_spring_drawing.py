@@ -426,15 +426,25 @@ def test_plan_leaders_refuse_lines_through_the_centre() -> None:
 
 
 def test_settled_heights_refuse_a_moved_native_station() -> None:
-    import draw_dt_vn_cylinder_bank_spring as drawing
-    from _supplier_screw_layout import supplier_top_text_geometry
+    """The pre-mutation b344192 stations are the baseline every stage, and the
+    settled check, compare against with the shared supplier-Top checker."""
+    import copy
 
-    geometry = supplier_top_text_geometry(
-        B344192["SupplierThickness"], horizontal=False
-    )
-    assert drawing.stations_match(geometry, geometry)
-    tips = tuple((x + 1e-4, y) for x, y in geometry["tips"])
-    assert not drawing.stations_match(geometry, {**geometry, "tips": tips})
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    baseline = drawing.height_stations(B344192)
+    for placed in (R86053, P4):
+        drawing.assert_height_stations(placed, baseline)
+    moved = copy.deepcopy(P4)
+    for line in moved["SupplierThickness"]["display"]["lines"][2:4]:
+        line[4] += 1e-4
+        line[7] += 1e-4
+    for arrow in moved["SupplierThickness"]["display"]["arrows"]:
+        arrow[0] += 1e-4
+    with pytest.raises(
+        RuntimeError, match="SupplierThickness: supplier Top shelf moved native"
+    ):
+        drawing.assert_height_stations(moved, baseline)
 
 
 # Native size records of farm run 20261023T190403512Z-86053b8e (head 1325aeba):
@@ -514,6 +524,74 @@ def _without_stray(records):
     clean = copy.deepcopy(records)
     del clean["SupplierOD"]["display"]["lines"][0]
     return clean
+
+
+# Native size records of pass 4, farm run 20261023T203408226Z-6bb26ab5 (head
+# 33ec8552), where "as placed" won and the OD printed no stray.
+P4 = {
+    "SupplierThickness": _native_record(
+        "SupplierThickness",
+        (0.0862323, 0.1335),
+        [
+            (0.1305, 0.133373, 0.0998, 0.133373),
+            (0.1305, 0.133627, 0.0998, 0.133627),
+            (0.1008, 0.133373, 0.1008, 0.127023),
+            (0.1008, 0.133627, 0.1008, 0.139977),
+            (0.1008, 0.1335, 0.0976, 0.1307219),
+            (0.0976, 0.1307219, 0.0748646, 0.1307219),
+        ],
+        [(" (0.005 in) ", 0.0748646, 0.1307219, 0.0227354)],
+        [(0.1008, 0.133373, 0.0, -1.0), (0.1008, 0.133627, 0.0, 1.0)],
+    ),
+    "SupplierFreeHeight": _native_record(
+        "SupplierFreeHeight",
+        (0.1767677, 0.1335),
+        [
+            (0.1198, 0.13223, 0.1632, 0.13223),
+            (0.1198, 0.13477, 0.1632, 0.13477),
+            (0.1622, 0.13223, 0.1622, 0.12588),
+            (0.1622, 0.13477, 0.1622, 0.14112),
+            (0.1622, 0.1335, 0.1654, 0.1307219),
+            (0.1654, 0.1307219, 0.1881354, 0.1307219),
+        ],
+        [(" (0.050 in) ", 0.1654, 0.1307219, 0.0227354)],
+        [(0.1622, 0.13223, 0.0, -1.0), (0.1622, 0.13477, 0.0, 1.0)],
+    ),
+    "SupplierID": _native_record(
+        "SupplierID",
+        (0.0932934, 0.227),
+        [
+            (0.1218905, 0.2251869, 0.116634, 0.2241951),
+            (0.116634, 0.2241951, 0.0715403, 0.2241951),
+        ],
+        _diameter_texts(0.0715403, "0.385 \u00b10.010 in) "),
+        [(0.1218905, 0.2251869, -0.9826622, -0.1854051)],
+    ),
+    "SupplierOD": _native_record(
+        "SupplierOD",
+        (0.1697066, 0.227),
+        [
+            (0.1439798, 0.2246454, 0.146366, 0.2241951),
+            (0.146366, 0.2241951, 0.1914597, 0.2241951),
+        ],
+        _diameter_texts(0.1479535, "0.500 \u00b10.010 in) "),
+        [(0.1439798, 0.2246454, 0.9826622, -0.1854051)],
+    ),
+}
+
+
+def _od_with(*extra):
+    import copy
+
+    od = copy.deepcopy(P4["SupplierOD"])
+    od["display"]["lines"].extend(
+        [0.0, 0.0, 0.0, 0.0, x0, y0, 0.0, x1, y1, 0.0] for x0, y0, x1, y1 in extra
+    )
+    return od
+
+
+_OD_TIP = (0.1439798, 0.2246454)
+_OD_SHOULDER_END = (0.1914597, 0.2241951)
 
 
 def test_86053_stray_od_line_is_refused_by_both_settled_guards() -> None:
@@ -649,7 +727,9 @@ def test_seat_move_levels_the_shoulder_on_the_plan_centre() -> None:
     )
 
 
-def test_diameter_ink_refuses_a_leader_short_of_its_text_or_leaving_the_cell() -> None:
+def test_diameter_ink_refuses_a_leader_short_of_its_text_or_leaving_the_cell(
+    monkeypatch,
+) -> None:
     import copy
 
     import draw_dt_vn_cylinder_bank_spring as drawing
@@ -660,10 +740,11 @@ def test_diameter_ink_refuses_a_leader_short_of_its_text_or_leaving_the_cell() -
     del short["display"]["lines"][1]
     with pytest.raises(RuntimeError, match="does not reach its text"):
         drawing.assert_diameter_ink(short, B344192_PLAN, 1, label="OD")
-    wide = copy.deepcopy(clean)
-    wide["display"]["lines"][1][7] = drawing.FREE_TOP_CELL[2] + 0.001
+    # The shoulder already ends at the text, so narrow the cell under it instead.
+    x0, y0, _x1, y1 = drawing.FREE_TOP_CELL
+    monkeypatch.setattr(drawing, "FREE_TOP_CELL", (x0, y0, 0.190, y1))
     with pytest.raises(RuntimeError, match="leaves the TOP cell"):
-        drawing.assert_diameter_ink(wide, B344192_PLAN, 1, label="OD")
+        drawing.assert_diameter_ink(clean, B344192_PLAN, 1, label="OD")
 
 
 def test_free_top_cell_is_the_finalizers_outer_cell_for_any_caption() -> None:
@@ -698,10 +779,10 @@ def _scripted_placement(monkeypatch, verdicts):
     monkeypatch.setattr(
         drawing,
         "_seat_diameters",
-        lambda _a, _d, _p, placement: seated.append(placement.label),
+        lambda _a, _d, _p, placement: seated.append(placement.label) or {},
     )
 
-    def check(_adapter, _displays, _plan, placement):
+    def check(_records, _plan, placement):
         checked.append(placement.label)
         if not verdicts[placement.label]:
             raise RuntimeError("lines off its leader chain")
@@ -733,6 +814,116 @@ def test_no_passing_placement_refuses_the_sheet(monkeypatch) -> None:
         drawing.choose_plan_placement(object(), {}, B344192_PLAN)
     assert checked == labels
     assert all(label in str(refused.value) for label in labels)
+
+
+def _offset_displays(on=True):
+    from types import SimpleNamespace
+
+    return {
+        name: SimpleNamespace(OffsetText=on)
+        for name in ("SupplierThickness", "SupplierFreeHeight")
+    }
+
+
+def test_pass4_snapshot_is_accepted_and_the_stray_still_refused() -> None:
+    """One snapshot serves both checks; neither reads COM (no adapter given)."""
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    baseline = drawing.height_stations(B344192)
+    as_placed = drawing.PLAN_PLACEMENTS[0]
+    drawing._assert_heights(_offset_displays(), P4, baseline)
+    drawing._assert_diameters(P4, B344192_PLAN, as_placed)
+    with pytest.raises(RuntimeError, match="lines off its leader chain"):
+        drawing._assert_diameters(R86053, B344192_PLAN, as_placed)
+    with pytest.raises(RuntimeError, match="offset text was lost"):
+        drawing._assert_heights(_offset_displays(False), P4, baseline)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        # A stroke joined to the shoulder's far end.
+        ((*_OD_SHOULDER_END, 0.1950, 0.2200),),
+        # The shoulder run on, collinear, past the text.
+        ((*_OD_SHOULDER_END, 0.1935, 0.2241951),),
+        # A stray in three pieces chained on from the shoulder end.
+        (
+            (*_OD_SHOULDER_END, 0.1960, 0.2230),
+            (0.1960, 0.2230, 0.2000, 0.2220),
+            (0.2000, 0.2220, 0.2040, 0.2210),
+        ),
+        # A stray from the arrow tip in four pieces, longer than the leader.
+        (
+            (*_OD_TIP, 0.1587, 0.2219),
+            (0.1587, 0.2219, 0.1735, 0.2191),
+            (0.1735, 0.2191, 0.1882, 0.2163),
+            (0.1882, 0.2163, 0.2029, 0.2135),
+        ),
+    ],
+    ids=[
+        "joined-to-shoulder-end",
+        "past-shoulder",
+        "split-after-shoulder",
+        "split-from-tip",
+    ],
+)
+def test_leader_chain_runs_arrow_to_shoulder_and_refuses_every_other_stroke(
+    extra,
+) -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    od = _od_with(*extra)
+    chain, _rest = drawing.leader_chain(od)
+    assert chain == drawing.leader_chain(P4["SupplierOD"])[0]
+    assert drawing.stray_leader_lines(od) == [pytest.approx(stroke) for stroke in extra]
+    with pytest.raises(RuntimeError, match="lines off its leader chain"):
+        drawing.assert_diameter_ink(od, B344192_PLAN, 1, label="OD")
+
+
+def _scripted_seating(monkeypatch, settles_after):
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    reads, moves = [], []
+    monkeypatch.setattr(drawing, "_size_records", lambda _a, _d: reads.append(1) or P4)
+    monkeypatch.setattr(
+        drawing,
+        "diameter_seat_move",
+        lambda *_args, **_kwargs: (
+            (0.0, 0.0) if len(reads) > settles_after else (1e-3, 0.0)
+        ),
+    )
+    monkeypatch.setattr(
+        drawing, "_move_text", lambda _d, _r, dx, dy, *, label: moves.append(label)
+    )
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    return drawing, reads, moves
+
+
+def test_a_placement_settling_on_its_last_permitted_move_is_read_back(
+    monkeypatch,
+) -> None:
+    import draw_dt_vn_cylinder_bank_spring as module
+
+    # Settles only on the read after the last permitted move.
+    drawing, reads, moves = _scripted_seating(monkeypatch, module._SEAT_PASSES)
+    displays = dict.fromkeys(("SupplierID", "SupplierOD"))
+    snapshot = drawing._seat_diameters(
+        object(), displays, B344192_PLAN, drawing.PLAN_PLACEMENTS[0]
+    )
+    assert snapshot is P4
+    assert len(reads) == drawing._SEAT_PASSES + 1
+    assert len(moves) == 2 * drawing._SEAT_PASSES
+
+
+def test_a_placement_still_moving_after_its_last_move_is_refused(monkeypatch) -> None:
+    drawing, reads, moves = _scripted_seating(monkeypatch, 99)
+    displays = dict.fromkeys(("SupplierID", "SupplierOD"))
+    with pytest.raises(RuntimeError, match="did not settle"):
+        drawing._seat_diameters(
+            object(), displays, B344192_PLAN, drawing.PLAN_PLACEMENTS[0]
+        )
+    assert len(reads) == drawing._SEAT_PASSES + 1
+    assert len(moves) == 2 * drawing._SEAT_PASSES
 
 
 def test_installation_note_fits_the_sheet() -> None:

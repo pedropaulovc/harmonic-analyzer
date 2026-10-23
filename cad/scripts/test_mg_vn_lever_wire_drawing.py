@@ -50,11 +50,6 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
     import mg_magnifier_assembly_sheet as magnifier_sheet
     import pn_pen_assembly_sheet as pen_sheet
 
-    assert drawing.ASSEMBLY_NOTE == (
-        "CUT TO LENGTH AND FORM AT ASSEMBLY:\n"
-        "LEVER WIRE: MHA-MG-00 SHEET 4, STEPS 10-11\n"
-        "PEN WIRE: MHA-PN-00 SHEET 3, STEPS 2 AND 8"
-    )
     numbers = {
         stem: yaml.safe_load(
             (_ASSEMBLIES / f"{stem}.yaml").read_text(encoding="utf-8")
@@ -66,25 +61,45 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         "pn-pen": drawing.PEN_DRAWING_NUMBER,
     }
     # Each assembly prints its sequence on its ASSEMBLY STEPS sheet.
-    assert (
-        magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1
-        == drawing.MAGNIFIER_STEPS_SHEET
-    )
-    assert pen.SHEET_NAMES.index("ASSEMBLY STEPS") + 1 == drawing.PEN_STEPS_SHEET
-    steps = magnifier_sheet.STEP_TEXT
-    for key in (
-        drawing.magnifier_steps.WIRE_HOOKED_KEY,
-        drawing.magnifier_steps.WIRE_TIED_KEY,
-    ):
-        assert "WIRE" in steps[key] and "TRIM THE TAIL" in steps[key]
-    pen_steps = {
-        int(text.split(".", 1)[0]): text
-        for text in pen_sheet.ASSEMBLY_STEPS
-        if text[:1].isdigit()
+    sheets = {
+        "mg-magnifier": magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1,
+        "pn-pen": pen.SHEET_NAMES.index("ASSEMBLY STEPS") + 1,
     }
-    first, last = drawing.PEN_WIRE_STEPS
-    assert "PEN WIRE" in pen_steps[first] and "TRIM THE TAIL" in pen_steps[first]
-    assert "PEN WIRE" in pen_steps[last] and "TIE TO THE WHEEL" in pen_steps[last]
+    # The lever wire's steps are the keyed sequence's hook and tie steps.
+    lever_steps = tuple(
+        drawing.magnifier_steps.step_number(key)
+        for key in (
+            drawing.magnifier_steps.WIRE_HOOKED_KEY,
+            drawing.magnifier_steps.WIRE_TIED_KEY,
+        )
+    )
+    assert all(
+        "WIRE" in magnifier_sheet.STEP_TEXT[key]
+        for key in (
+            drawing.magnifier_steps.WIRE_HOOKED_KEY,
+            drawing.magnifier_steps.WIRE_TIED_KEY,
+        )
+    )
+    # The pen sheet has no keyed sequence: its numbered steps naming the pen
+    # wire are the ones the pointer must cite.
+    pen_steps = tuple(
+        int(text.split(".", 1)[0])
+        for text in pen_sheet.ASSEMBLY_STEPS
+        if text[:1].isdigit() and "PEN WIRE" in text
+    )
+    assert pen_steps == drawing.PEN_WIRE_STEPS
+    cited = {
+        "mg-magnifier": lever_steps,
+        "pn-pen": pen_steps,
+    }
+    lines = drawing.ASSEMBLY_NOTE.splitlines()
+    for stem, number in numbers.items():
+        [line] = [line for line in lines if number in line]
+        tokens = {
+            int(value) for value in re.findall(r"\b\d+\b", line.replace(number, ""))
+        }
+        assert tokens == {sheets[stem], *cited[stem]}, (stem, line)
+        assert re.search(rf"\bSHEET {sheets[stem]}\b", line), line
 
 
 def test_end_view_and_isometric_labels_state_their_scales_inside_their_fields() -> None:
