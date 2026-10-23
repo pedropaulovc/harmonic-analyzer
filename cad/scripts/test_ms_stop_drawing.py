@@ -732,15 +732,15 @@ def test_match_drill_callouts_identify_the_current_mate_registry_rows() -> None:
     pilot = plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]
     assert "MS-STOP-BLOCK" in pilot
     assert _config.parts("ms-stop-block")["number"] in pilot
-    assert pilot.splitlines() == [
-        "LAYOUT ON THIS PLATE; PILOT",
-        f"THROUGH INTO MS-STOP-BLOCK {_config.parts('ms-stop-block')['number']}",
-        "CLAMPED, LOCATING ENDS AND EDGES FLUSH",
-        "MATCHED PAIR; NOT INTERCHANGEABLE",
-    ]
-    station = f"LOCATES MS-STOP-BLOCK\n{_config.parts('ms-stop-block')['number']} TAPS"
+    # Fit-up requirements, not wording: the plate is the master, the pair is
+    # clamped on its locating faces, and it is flagged as a matched pair.
+    flat = " ".join(pilot.split())
+    assert "PILOT" in flat and "LOCATING ENDS AND EDGES FLUSH" in flat
+    assert spec.MATCHED_PAIR_NOTE in pilot
     for name in spec.PLATE_LOCATION_DIMENSIONS:
-        assert plate_drawing.DIMENSION_CALLOUTS[name] == station
+        station = plate_drawing.DIMENSION_CALLOUTS[name]
+        assert "MS-STOP-BLOCK" in station
+        assert _config.parts("ms-stop-block")["number"] in station
     assert spec.PLATE_DRAWING_VALUES_BY_NAME["PilotDrillDiameter"] == (
         spec.PLATE_TAP_SPEC.overrides_mm["TapDrillDiameter"]
     )

@@ -11,7 +11,7 @@ from _com import _early_bound
 from _dimensions import name_dimensions
 from _feature_tree import name_last_feature
 from _sketch import (
-    SketchDims, anchor_point_to_origin, dimension_between,
+    SketchDims, add_line_chain, anchor_point_to_origin, dimension_between,
     ensure_fully_defined, set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
@@ -158,12 +158,10 @@ async def back_wall_reference(adapter: Any) -> list[tuple[str, str]]:
     """
     feature = "BackWallReference"
     check(feature, await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    line = check(feature, await adapter.add_line(
-        -spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX,
-        -spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX,
-    ))
-    set_sketch_direct_db(adapter, False)
+    # add_line_chain restores AddToDB even when the line is refused.
+    (line,) = await add_line_chain(adapter, [
+        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX),
+    ], close=False)
     segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not segment.ConstructionGeometry:
