@@ -1379,6 +1379,19 @@ class _Table:
         ]
         self.hidden = [False] * 4 + [True]
         self.number_property = "Number"
+        # One Quantity column per configuration; the jig binds "Default Simplified"
+        # (k=1), so "Default"'s Quantity column is latent.
+        self.configurations = ("Default", "Default Simplified")
+        self.selected_configuration = "Default Simplified"
+        self.BomFeature = SimpleNamespace(
+            GetConfigurations=lambda _only_visible, _unused: (
+                self.configurations,
+                tuple(
+                    name == self.selected_configuration
+                    for name in self.configurations
+                ),
+            )
+        )
 
     @property
     def RowCount(self):
@@ -1399,7 +1412,18 @@ class _Table:
 
     @property
     def TotalColumnCount(self):
-        return len(self.column_types)
+        return len(self.column_types) + len(self.configurations) - 1
+
+    def _visibility_physical(self, column):
+        """Map a 0-based visibility index to typed storage; None for latent/out-of-range."""
+        quantity = next(i for i, t in enumerate(self.column_types) if t[0] == 203)
+        before = self.configurations.index(self.selected_configuration)
+        if 0 <= column < quantity:
+            return column
+        if quantity <= column < quantity + before:
+            return None
+        physical = column - before
+        return physical if physical < len(self.column_types) else None
 
     def _physical_column(self, column, include_hidden=True):
         columns = [
@@ -1428,8 +1452,9 @@ class _Table:
         return (-1, None, 0) if physical is None else self.column_types[physical]
 
     def ColumnHidden(self, column):
-        # Visibility PROPERTY indices are 1-based; storage remains physical.
-        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
+        # Native visibility indices are 0-based and include latent Quantity columns.
+        physical = self._visibility_physical(column)
+        return False if physical is None else self.hidden[physical]
 
     def GetColumnCustomProperty(self, column):
         if not 0 <= column < len(self.column_types):
@@ -1617,6 +1642,7 @@ def test_bom_prints_registry_numbers_one_line_a_row(
     assert table.DisplayedText(0, 3) == "QTY."
     assert table.GetColumnType3(3, True)[0] == 203
     assert table.GetColumnType3(3, False)[0] == 203
+    # Visibility domain: typed 0-2, latent "Default" QTY at 3, QTY at 4, hidden 201 at 5.
     assert table.ColumnHidden(5) is True
     assert table.ColumnHidden(4) is False
     proof = drawing.validate_bom_number_property(

@@ -585,6 +585,42 @@ def test_an_uncrossed_ring_keeps_its_slots() -> None:
     assert drawing.uncrossed_ring_slots(centres[:2], attachments[1::-1]) == [1, 0]
 
 
+@pytest.mark.parametrize("offset_m", (-5e-5, 0.0, 5e-5, 1.15e-4))
+def test_the_inner_ring_knob_pair_from_run_222629_swaps_when_touching(offset_m) -> None:
+    """Run 20261023T222629630Z's audit: inner-view balloons 36 (knob shaft) and
+    40 (cup pin) crossed 0.115 mm past 36's attachment after the final rebuild;
+    within the 0.1 mm touch tolerance at uncross time no swap was made."""
+    from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+
+    start_40, end_40 = (0.2453, 0.1719), (0.2317, 0.1763)
+    dx, dy = end_40[0] - start_40[0], end_40[1] - start_40[1]
+    norm = math.hypot(dx, dy)
+    # 36's attachment on 40's leader, displaced normally by offset_m.
+    t = 0.9
+    attach_36 = (
+        start_40[0] + t * dx - dy / norm * offset_m,
+        start_40[1] + t * dy + dx / norm * offset_m,
+    )
+    centres = [(0.2414, 0.1586), (0.2462, 0.1716)]
+    attachments = [attach_36, end_40]
+    unswapped = [
+        LeaderSegment("36", "balloon", *centres[0], *attach_36),
+        LeaderSegment("40", "balloon", *centres[1], *end_40),
+    ]
+    if abs(offset_m) < 1e-4:
+        assert not find_leader_leader_crossings(unswapped)  # The audit's touch.
+    slots = drawing.uncrossed_ring_slots(centres, attachments)
+    assert slots == [1, 0]
+    swapped = [
+        LeaderSegment("36", "balloon", *centres[1], *attach_36),
+        LeaderSegment("40", "balloon", *centres[0], *end_40),
+    ]
+    assert not find_leader_leader_crossings(swapped, tol=0.0, shared_terminus=0.0)
+    assert drawing._leader_clearance(
+        (*centres[1], *attach_36), (*centres[0], *end_40)
+    ) >= drawing._UNCROSS_CLEARANCE_M
+
+
 def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
     """Run 20261015T082822796Z's audit: isometric balloons 14 and 16, leaders
     (circle edge -> attachment), crossed at (372.9, 178.4) mm. Their slots
@@ -2292,7 +2328,7 @@ def test_chain_pattern_rebuild_refuses_unsafe_pose_rebinding(
 _PD_NATIVE_PART_WIDTH = 0.046824451973134076
 
 
-def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
+def _pd_bom_fixture(monkeypatch, *, native_columns=False):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(_com, "_early_bound", lambda obj, *_args: obj)
     monkeypatch.setattr(_component_references, "_early_bound", lambda obj, *_args: obj)
@@ -2344,6 +2380,9 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
                 values.get((selected, property_name), "")
             ),
             GetConfigurationByName=native_configurations.get,
+            # The drawing's views load the simplified members (native PD evidence).
+            active_configuration=components_by_key[key][0].ReferencedConfiguration,
+            written=[],
         )
         for component in components_by_key[key]:
             component.GetModelDoc2 = lambda native=native: native
@@ -2402,7 +2441,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     }
     state = SimpleNamespace(
         columns=columns, native_rows=native_rows, row_keys=list(keys), cells=cells,
-        advertised_extra=advertised_extra, hidden_rows=set(), requested_heights={},
+        hidden_rows=set(), requested_heights={}, materialized=[], quantity=columns[3],
         configuration=drawing.SIMPLIFIED_VIEW_CONFIGURATION,
         members_by_configuration=members_by_configuration,
     )
@@ -2447,9 +2486,28 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     type(table).ColumnCount = PropertyMock(
         side_effect=lambda: sum(not column.hidden for column in columns)
     )
-    type(table).TotalColumnCount = PropertyMock(
-        side_effect=lambda: len(columns) + state.advertised_extra
-    )
+    type(table).TotalColumnCount = PropertyMock(side_effect=lambda: len(visibility_domain()))
+
+    def visibility_domain():
+        """Native 0-based ColumnHidden domain: one Quantity column per configuration.
+
+        Deselected configurations' Quantity columns stay latent: earlier ones sit
+        just before the selected Quantity, later ones after the last typed column.
+        """
+        selected = available.index(state.configuration)
+        latent = [
+            name for name in available
+            if name != state.configuration and name not in state.materialized
+        ]
+        before = [("latent", name) for name in latent if available.index(name) < selected]
+        after = [("latent", name) for name in latent if available.index(name) > selected]
+        domain = []
+        for column in columns:
+            if column is state.quantity:
+                domain.extend(before)
+                before = []
+            domain.append(("column", column))
+        return domain + before + after
 
     def raw_index(index, include_hidden):
         indices = (
@@ -2480,28 +2538,31 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
             return ""
         return columns[index].property_name
 
+    def linked_text(group, property_name):
+        values = set()
+        for component in group:
+            native = component.GetModelDoc2()
+            configuration = (
+                native.GetConfigurationByName(component.ReferencedConfiguration)
+                if property_name == "Description"
+                else None
+            )
+            values.add(str(
+                configuration.Description
+                if configuration is not None and configuration.UseDescriptionInBOM
+                else (
+                    native.GetCustomInfoValue(
+                        component.ReferencedConfiguration, property_name
+                    )
+                    or native.GetCustomInfoValue("", property_name)
+                    or ""
+                )
+            ).strip())
+        return "; ".join(sorted(values))
+
     def bind_property(index, property_name):
         for row, group in enumerate(native_rows, 1):
-            values = set()
-            for component in group:
-                native = component.GetModelDoc2()
-                configuration = (
-                    native.GetConfigurationByName(component.ReferencedConfiguration)
-                    if property_name == "Description"
-                    else None
-                )
-                values.add(str(
-                    configuration.Description
-                    if configuration is not None and configuration.UseDescriptionInBOM
-                    else (
-                        native.GetCustomInfoValue(
-                            component.ReferencedConfiguration, property_name
-                        )
-                        or native.GetCustomInfoValue("", property_name)
-                        or ""
-                    )
-                ).strip())
-            cells[row][index] = "; ".join(sorted(values))
+            cells[row][index] = linked_text(group, property_name)
 
     def set_custom_property(index, property_name):
         if not 0 <= index < len(columns) or columns[index].kind != 204:
@@ -2543,13 +2604,37 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         return True
 
     def hide_column(index, hidden):
-        if type(index) is not int or not 1 <= index <= len(columns):
+        if type(index) is not int:
             raise IndexError(index)
         if type(hidden) is not bool:
             raise TypeError(hidden)
-        columns[index - 1].hidden = hidden
-        # ITableAnnotation.SetColumnHidden is VOID, not a success flag.
+        domain = visibility_domain()
+        if not 0 <= index < len(domain):
+            raise IndexError(index)
+        role, target = domain[index]
+        if role == "column":
+            target.hidden = hidden
+            # ITableAnnotation.SetColumnHidden is VOID, not a success flag.
+            return None
+        # Native v45 PD: writing a latent Quantity materializes it as a typed column.
+        position = sum(entry_role == "column" for entry_role, _target in domain[:index])
+        columns.insert(position, SimpleNamespace(
+            kind=203, property_name="", raw_property_data="", hidden=hidden, width=0.0,
+            latent_configuration=target,
+        ))
+        state.materialized.append(target)
+        for row_index, row in enumerate(cells):
+            row.insert(position, "QTY." if row_index == 0 else str(
+                len(members_by_configuration[target][row_index - 1])
+            ))
         return None
+
+    def column_hidden(index):
+        domain = visibility_domain()
+        if type(index) is not int or not 0 <= index < len(domain):
+            return False
+        role, target = domain[index]
+        return target.hidden if role == "column" else False
 
     def set_column_type(index, kind, include_hidden, property_name):
         index = raw_index(index, include_hidden)
@@ -2583,6 +2668,17 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         physical = raw_index(index, include_hidden)
         if physical is None:
             raise IndexError(index)
+        column = columns[physical]
+        if row and column.kind == 204 and column.property_name:
+            # Native PD 2026-10-23: a property-bound cell edit (even a bogus
+            # property) writes into each part's active configuration; the
+            # cell then re-reads its member's configuration.
+            group = native_rows[row - 1]
+            for native in {id(c.GetModelDoc2()): c.GetModelDoc2() for c in group}.values():
+                native.properties[(native.active_configuration, column.property_name)] = text
+                native.written.append((native.active_configuration, column.property_name))
+            cells[row][physical] = linked_text(group, column.property_name)
+            return
         cells[row][physical] = text
 
 
@@ -2591,7 +2687,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         return 0.0 if physical is None else columns[physical].width
 
     def set_width(index, width, _options):
-        # Widths are a separate unversioned API, never PROPERTY1..N.
+        # Widths are a separate unversioned API, never the visibility domain.
         physical = raw_index(index, False)
         if physical is None:
             raise IndexError(index)
@@ -2611,9 +2707,7 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
     table.MoveColumn.side_effect = move_column
     table.InsertColumn2.side_effect = insert_column
     table.SetColumnHidden.side_effect = hide_column
-    table.ColumnHidden.side_effect = lambda index: (
-        columns[index - 1].hidden if 1 <= index <= len(columns) else False
-    )
+    table.ColumnHidden.side_effect = column_hidden
     table.GetColumnWidth.side_effect = get_width
     table.GetColumnType3.side_effect = column_type
     table.SetColumnType3.side_effect = set_column_type
@@ -2652,7 +2746,10 @@ def _pd_bom_fixture(monkeypatch, *, native_columns=False, advertised_extra=0):
         for row in cells:
             row.append(row[1])
         bind_property(1, "Number")
-        hide_column(len(columns), True)
+        hide_column(next(
+            index for index, (_role, target) in enumerate(visibility_domain())
+            if target is columns[-1]
+        ), True)
     adapter = SimpleNamespace(currentModel=SimpleNamespace(EditRebuild3=lambda: True))
     return model, components, table, adapter, cells, keys
 
@@ -2867,9 +2964,9 @@ def test_bom_rechecks_members_and_quantities_after_the_last_rebuild(
     table.SetText2.assert_not_called()
 
 
-def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
+def _pd_bom_insertion_fixture(monkeypatch, *, configuration=None):
     model, components, table, adapter, cells, keys = _pd_bom_fixture(
-        monkeypatch, native_columns=True, advertised_extra=advertised_extra
+        monkeypatch, native_columns=True
     )
     monkeypatch.setattr(_drawing_tables._sw_type_info, "early_bound", lambda obj, *_: obj)
     monkeypatch.setattr(_drawing_tables._sw_type_info, "is_early_bound", lambda *_: True)
@@ -2896,6 +2993,7 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
             component_identities=drawing.BOM_COMPONENT_IDENTITIES,
             part_number_property="Number",
             configuration_grouping="same-name",
+            configuration=configuration,
             label="paper-drive",
         )
 
@@ -2906,7 +3004,7 @@ def _pd_bom_insertion_fixture(monkeypatch, *, advertised_extra=0):
 
 
 def test_native_visibility_fixture_keeps_property_text_and_width_domains_distinct(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     table = scene.insert()
     native = scene.state.columns[-1]
     quantity = scene.state.columns[3]
@@ -2949,7 +3047,7 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
         drawing.BOM_COLUMN_WIDTHS[key]
         for key in ("item", "part", "description", "quantity")
     ))
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     table = scene.insert()
     before = _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
@@ -3020,7 +3118,7 @@ def test_pd_all_visible_authoring_preserves_visible_quantities_and_native_snapsh
 def test_pd_width_authoring_sets_physical_columns_and_preserves_untargeted_widths(
     monkeypatch, with_sku
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     table = scene.insert()
     if with_sku:
         assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
@@ -3274,16 +3372,22 @@ def test_pd_width_authoring_restores_after_an_unhide_exception_with_native_side_
     assert columns[-1].hidden is True
 
 
-@pytest.mark.parametrize("advertised_extra", (0, 1), ids=("accurate-count", "native-2291"))
+@pytest.mark.parametrize(
+    "configuration",
+    (drawing.SIMPLIFIED_VIEW_CONFIGURATION, drawing.BOM_CONFIGURATION),
+    ids=("latent-before", "latent-after"),
+)
 @pytest.mark.parametrize("number_source", ("configuration", "document"))
 def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
-    monkeypatch, number_source, advertised_extra
+    monkeypatch, number_source, configuration
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=advertised_extra)
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
     counts = drawing._source_family_counts(scene.model)
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    suffix = " Simplified" if configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION else ""
+    # ("Default", "Default Simplified"): the other configuration's Quantity is latent.
+    latent_before = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION).index(configuration)
     gear_row = scene.keys.index("pd-transgear-removable") + 1
-    gear_components = tuple(scene.table.GetComponents2(gear_row, configuration))
+    gear_components = tuple(scene.state.members_by_configuration[configuration][gear_row - 1])
     native = gear_components[0].GetModelDoc2()
     if number_source == "configuration":
         native.properties[("", "Number")] = "WRONG-DOCUMENT-FALLBACK"
@@ -3291,7 +3395,7 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         for component in gear_components:
             native.properties[(component.ReferencedConfiguration, "Number")] = ""
     assert scene.table.ColumnCount == 4
-    assert scene.table.TotalColumnCount == 4 + advertised_extra
+    assert scene.table.TotalColumnCount == 4 + 1
     assert _drawing_tables._bom_physical_columns(scene.table, label="paper-drive") == (
         (202, False), (201, False), (204, False), (203, False)
     )
@@ -3308,7 +3412,7 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
             assert table.InsertColumn2(3, description_column, "PURCHASE SKU", 0) is True
         visible = 5 if with_sku else 4
         assert table.ColumnCount == visible
-        assert table.TotalColumnCount == visible + 1 + advertised_extra
+        assert table.TotalColumnCount == visible + 1 + 1
         physical = _drawing_tables._bom_physical_columns(table, label="paper-drive")
         assert len(physical) == visible + 1
         assert physical[-1] == (201, True)
@@ -3330,11 +3434,11 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         visible_headers = tuple(table.DisplayedText(0, index) for index in range(visible))
         assert visible_headers.count("PART NUMBER") == 1
         assert visible_headers.count("QTY.") == 1
-        # PROPERTY of the last real column collides with the first typed-invalid
-        # physical integer. Its mapped beyond-prefix PROPERTY is still False.
-        assert table.ColumnHidden(visible + 1) is True
+        # The retained native column's visibility index shifts only past an
+        # earlier configuration's latent Quantity; the next index reads False.
+        assert table.ColumnHidden(visible + latent_before) is True
         assert table.GetColumnType3(visible + 1, True) == (-1, None, 0)
-        assert table.ColumnHidden(visible + 2) is False
+        assert table.ColumnHidden(visible + latent_before + 1) is False
         snapshot = _drawing_tables.validate_bom_number_property(
             table, configuration=configuration, label="paper-drive", expected_rows=44,
             occurrence_quantities=True,
@@ -3358,11 +3462,11 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
         assert table.DisplayedText2(gear_row, quantity_column, False) == "3"
         assert tuple(table.GetComponents2(gear_row, configuration)) == gear_components
         assert {component.ReferencedConfiguration for component in gear_components} == {
-            "T12 Simplified", "T18 Simplified", "T24 Simplified"
+            f"T12{suffix}", f"T18{suffix}", f"T24{suffix}"
         }
         for key, quantity, member in (
-            ("sh-vn-chain-link--InnerLink", "34", "InnerLink Simplified"),
-            ("sh-vn-chain-link--OuterLink", "33", "OuterLink Simplified"),
+            ("sh-vn-chain-link--InnerLink", "34", f"InnerLink{suffix}"),
+            ("sh-vn-chain-link--OuterLink", "33", f"OuterLink{suffix}"),
         ):
             row = scene.keys.index(key) + 1
             assert table.DisplayedText2(row, 1, True) == drawing.BOM_PART_NUMBERS[key]
@@ -3388,13 +3492,17 @@ def test_bom_insertion_retains_grouped_native_members_through_pd_consumer(
 
 
 @pytest.mark.parametrize("with_sku", (False, True))
-@pytest.mark.parametrize("advertised_extra", (0, 1))
+@pytest.mark.parametrize(
+    "configuration",
+    (drawing.SIMPLIFIED_VIEW_CONFIGURATION, drawing.BOM_CONFIGURATION),
+    ids=("latent-before", "latent-after"),
+)
 def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_visible_qty(
-    monkeypatch, with_sku, advertised_extra
+    monkeypatch, with_sku, configuration
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=advertised_extra)
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
     table = scene.insert()
-    configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    latent_before = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION).index(configuration)
     if with_sku:
         assert table.InsertColumn2(3, 2, "PURCHASE SKU", 0) is True
     before = _drawing_tables.validate_bom_number_property(
@@ -3404,13 +3512,200 @@ def test_pd_hidden_native_property_collision_accepts_zero_width_without_losing_v
     native_column = len(scene.state.columns) - 1
     scene.state.columns[native_column].width = 0.0
     assert table.GetColumnType3(native_column + 1, True) == (-1, None, 0)
-    assert table.ColumnHidden(native_column + 1) is True
-    assert table.ColumnHidden(native_column + 2) is False
+    assert table.ColumnHidden(native_column + latent_before) is True
+    assert table.ColumnHidden(native_column + latent_before + 1) is False
     assert _drawing_tables._bom_physical_columns(table, label="paper-drive")[-1] == (201, True)
     assert _drawing_tables.validate_bom_number_property(
         table, configuration=configuration, label="paper-drive",
         expected_rows=44, occurrence_quantities=True,
     ) == before
+
+
+def _pd_description_writes(scene):
+    return {
+        write
+        for group in scene.state.native_rows
+        for component in group
+        for write in component.GetModelDoc2().written
+    }
+
+
+def test_default_bom_descriptions_do_not_write_back_to_simplified_members(monkeypatch):
+    # Native run 20261023T190254133Z: the linked DESCRIPTION write landed in
+    # sh-vn-clamp-screw's active "Default Simplified" while the Default row
+    # re-read "Default": '' != 'FILLISTER SCREW, MCMASTER 90280A201'.
+    configuration = drawing.BOM_CONFIGURATION
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    table = scene.insert()
+    assert table.GetColumnCustomProperty(2) == ""
+    assert table.GetColumnTitle2(2, False) == "DESCRIPTION"
+    assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
+        (202, False), (204, False), (204, False), (203, False), (201, True)
+    )
+    assert _pd_description_writes(scene) == set()
+    assert {
+        key: scene.cells[row][2] for row, key in enumerate(scene.state.row_keys, 1)
+    } == drawing.BOM_DESCRIPTIONS
+
+
+def _rebind_to_bogus_property(_adapter, table, column, *, label):
+    # Native run 20261023T192129678Z: rebinding to a nonexistent property kept
+    # the write-back ($PRP:"HARMONIC BOM DESCRIPTION TEXT").
+    assert table.SetColumnCustomProperty(column, "HARMONIC BOM DESCRIPTION TEXT")
+    assert table.SetColumnTitle2(column, "DESCRIPTION", True)
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    (lambda *_, **__: None, _rebind_to_bogus_property),
+    ids=("linked", "rebound"),
+)
+@pytest.mark.parametrize("recheck", (True, False), ids=("rechecked", "control"))
+def test_default_bom_refuses_property_bound_description_write_back(
+    monkeypatch, replacement, recheck,
+):
+    # Any property-bound column writes back; the pre-authoring recheck refuses
+    # it before SetText2, and without the recheck the write-back is observed.
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    monkeypatch.setattr(
+        _drawing_tables, "_unlink_bom_description_column", replacement
+    )
+    if recheck:
+        with pytest.raises(RuntimeError, match="still reads property .* before authoring"):
+            scene.insert()
+        assert _pd_description_writes(scene) == set()
+        return
+    monkeypatch.setattr(_drawing_tables, "_require_unlinked_bom_column", lambda *_, **__: None)
+    with pytest.raises(RuntimeError, match="BOM description did not persist: ''"):
+        scene.insert()
+    writes = _pd_description_writes(scene)
+    assert writes
+    assert all(name.endswith(" Simplified") for name, _prop in writes)
+
+
+def test_description_unlink_refuses_binding_restored_by_rebuild(monkeypatch):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    native_rebuild = _drawing_tables.rebuild_drawing
+
+    def rebuild(adapter, *, label):
+        if label == "unlink_bom_description_column":
+            assert scene.table.SetColumnCustomProperty(2, "Description") is True
+        return native_rebuild(adapter, label=label)
+
+    monkeypatch.setattr(_drawing_tables, "rebuild_drawing", rebuild)
+    with pytest.raises(RuntimeError, match="still reads property 'Description'.* after rebuild"):
+        scene.insert()
+    assert _pd_description_writes(scene) == set()
+
+
+def test_view_configuration_bom_unlinks_description_column(monkeypatch):
+    # Codjiflo P1 on #1895: view-derived callers' writes also landed in the
+    # component models' active configurations; the drawing now owns the text.
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    table = scene.insert()
+    assert table.GetColumnCustomProperty(2) == ""
+    assert scene.state.configuration == drawing.SIMPLIFIED_VIEW_CONFIGURATION
+    assert _pd_description_writes(scene) == set()
+    assert {
+        key: scene.cells[row][2] for row, key in enumerate(scene.state.row_keys, 1)
+    } == drawing.BOM_DESCRIPTIONS
+
+
+@pytest.mark.parametrize("configuration", (None, "Default"))
+def test_bom_refuses_plain_description_without_row_text(monkeypatch, configuration):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    descriptions = {
+        key: text for key, text in drawing.BOM_DESCRIPTIONS.items() if key != "pd-platen"
+    }
+    with pytest.raises(RuntimeError, match="DESCRIPTION column left 1 of 43 rows blank"):
+        _drawing_tables.insert_bom_table(
+            scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
+            expected_components=tuple(drawing.BOM_PART_NUMBERS),
+            descriptions=descriptions,
+            component_identities=drawing.BOM_COMPONENT_IDENTITIES,
+            part_number_property="Number", configuration_grouping="same-name",
+            configuration=configuration, label="paper-drive",
+        )
+
+
+@pytest.mark.parametrize("blank", ("", "   ", None))
+def test_bom_refuses_blank_descriptions_before_any_mutation(monkeypatch, blank):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    descriptions = dict(drawing.BOM_DESCRIPTIONS) | {"pd-platen": blank}
+    before = [vars(column).copy() for column in scene.state.columns]
+    with pytest.raises(ValueError, match=r"descriptions are blank for \['pd-platen'\]"):
+        _drawing_tables.insert_bom_table(
+            scene.adapter, scene.view, anchor_xy=drawing.BOM_ANCHOR,
+            expected_components=tuple(drawing.BOM_PART_NUMBERS),
+            descriptions=descriptions,
+            component_identities=drawing.BOM_COMPONENT_IDENTITIES,
+            part_number_property="Number", configuration_grouping="same-name",
+            configuration=drawing.BOM_CONFIGURATION, label="paper-drive",
+        )
+    assert [vars(column) for column in scene.state.columns] == before
+
+
+@pytest.mark.parametrize("configuration", ("Default", "Default Simplified"))
+def test_visibility_mutation_refuses_beyond_typed_prefix(monkeypatch, configuration):
+    # Codjiflo P2 on #1895: with Default selected, physical len(typed) maps onto
+    # the latent Quantity, which SetColumnHidden would materialize.
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    table = scene.insert()
+    typed = len(scene.state.columns)
+    # Diagnostic reads still map the beyond-prefix index.
+    _drawing_tables._bom_visibility_index(table, typed, label="pd")
+    with pytest.raises(ValueError, match=f"physical column {typed} is not one of its {typed}"):
+        _drawing_tables._set_bom_column_hidden(table, typed, True, label="pd")
+    assert scene.state.materialized == []
+    assert len(scene.state.columns) == typed
+
+
+@pytest.mark.parametrize("fault", ("status", "readback"))
+def test_default_bom_refuses_linked_description_column_left_bound(monkeypatch, fault):
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=drawing.BOM_CONFIGURATION)
+    native = scene.table.SetColumnCustomProperty.side_effect
+
+    def set_custom_property(index, property_name):
+        if property_name:
+            return native(index, property_name)
+        return False if fault == "status" else True  # Readback keeps Description.
+
+    scene.table.SetColumnCustomProperty.side_effect = set_custom_property
+    with pytest.raises(RuntimeError, match="DESCRIPTION (unlink failed|column still reads)"):
+        scene.insert()
+    assert scene.table.GetColumnCustomProperty(2) == "Description"
+    assert _pd_description_writes(scene) == set()
+
+
+def test_default_bom_hides_native_column_without_materializing_latent_quantity(monkeypatch):
+    # v45 run 20261023T163903809Z: Default selected, so the Default Simplified
+    # Quantity is latent AFTER the native column. Typed+1 wrote that latent.
+    configuration = drawing.BOM_CONFIGURATION
+    assert configuration == "Default"
+    scene = _pd_bom_insertion_fixture(monkeypatch, configuration=configuration)
+    table = scene.insert()
+    native_column = len(scene.state.columns) - 1
+    assert _drawing_tables._bom_visibility_index(table, native_column, label="pd") == native_column
+    assert table.ColumnCount == native_column
+    assert table.TotalColumnCount == native_column + 2
+    assert scene.state.materialized == []
+    assert _drawing_tables._bom_physical_columns(table, label="paper-drive") == (
+        (202, False), (204, False), (204, False), (203, False), (201, True)
+    )
+    assert [table.GetColumnTitle2(index, False) for index in range(table.ColumnCount)] == [
+        "ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."
+    ]
+    _drawing_tables.validate_bom_number_property(
+        table, configuration=configuration, label="paper-drive",
+        expected_rows=44, occurrence_quantities=True,
+    )
+
+    # The former index materializes the latent Quantity; the census refuses it.
+    assert table.SetColumnHidden(native_column + 1, True) is None
+    assert scene.state.materialized == [drawing.SIMPLIFIED_VIEW_CONFIGURATION]
+    assert table.TotalColumnCount == native_column + 2
+    with pytest.raises(RuntimeError, match="Quantity columns do not match its configurations"):
+        _drawing_tables._bom_physical_columns(table, label="paper-drive")
 
 
 @pytest.mark.parametrize("with_sku", (False, True))
@@ -3502,7 +3797,7 @@ def test_pd_consumer_refuses_wrong_visible_projection_despite_unchanged_physical
 
 @pytest.mark.parametrize("fault", ("lost-spare", "changed-quantity"))
 def test_inserted_pd_bom_refuses_gear_damage_after_sku_shift(monkeypatch, fault):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     counts = drawing._source_family_counts(scene.model)
     configuration = drawing.SIMPLIFIED_VIEW_CONFIGURATION
     table = scene.insert()
@@ -3572,7 +3867,7 @@ def test_default_balloon_is_ineligible_for_simplified_only_bom(monkeypatch):
 
 
 def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number_binding(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     configuration = drawing.BOM_CONFIGURATION
     before_members = {
         key: tuple(id(component) for component in group)
@@ -3751,7 +4046,8 @@ def test_bom_insertion_refuses_nonbool_property_setter_success(monkeypatch, resu
 
     def set_custom_property(index, property_name):
         assert native_set(index, property_name) is True
-        return result
+        # The DESCRIPTION unlink ("") keeps its native status; Number gets ``result``.
+        return result if property_name == "Number" else True
 
     scene.table.SetColumnCustomProperty.side_effect = set_custom_property
     with pytest.raises(RuntimeError):
@@ -3841,7 +4137,7 @@ def test_bom_number_proof_uses_binding_getter_not_raw_property_data(monkeypatch)
 def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
     monkeypatch, invalid_status
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     original_type = scene.table.GetColumnType3.side_effect
 
     def column_type(index, include_hidden):
@@ -3912,7 +4208,7 @@ def test_bom_column_census_accepts_matching_complete_empty_native_fingerprints(
 def test_bom_column_census_refuses_invalid_native_slot_without_mutating(
     monkeypatch, index, member, mode, value
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     accessor = getattr(scene.table, member)
     original = accessor.side_effect
 
@@ -3945,7 +4241,7 @@ def test_bom_column_census_refuses_invalid_native_slot_without_mutating(
 def test_bom_column_census_does_not_normalize_distinct_invalid_statuses(
     monkeypatch, statuses
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     original_type = scene.table.GetColumnType3.side_effect
 
     def column_type(index, include_hidden):
@@ -3965,7 +4261,7 @@ def test_bom_column_census_does_not_normalize_distinct_invalid_statuses(
 
 
 def test_bom_column_census_refuses_empty_interior_before_later_typed_column(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     original_type = scene.table.GetColumnType3.side_effect
     original_title = scene.table.GetColumnTitle2.side_effect
     original_text = scene.table.DisplayedText2.side_effect
@@ -3998,7 +4294,7 @@ def test_bom_column_census_refuses_empty_interior_before_later_typed_column(monk
 def test_bom_insertion_refuses_actual_preexisting_hidden_zero_width_column(
     monkeypatch, kind
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     scene.state.columns.append(SimpleNamespace(
         kind=kind, property_name="Audit" if kind == 204 else "",
         raw_property_data="Audit" if kind == 204 else "", hidden=True, width=0.0,
@@ -4039,23 +4335,35 @@ def test_bom_column_census_refuses_bad_metadata_beyond_diagnostic_display_cap(
 ):
     scene = _pd_bom_insertion_fixture(monkeypatch)
     type(scene.table).TotalColumnCount = PropertyMock(return_value=16)
+    # 4 typed + 12 latent columns: 13 configurations, the selected one second,
+    # so the latent guard holds and the census reaches the advertised tail.
+    names = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION) + tuple(
+        f"Extra {number}" for number in range(11)
+    )
+    scene.table.BomFeature.GetConfigurations = lambda only_visible, _visibility: (
+        names, tuple(name == drawing.SIMPLIFIED_VIEW_CONFIGURATION for name in names)
+    )
+    assert _drawing_tables._bom_physical_columns(scene.table, label="paper-drive") == (
+        (202, False), (201, False), (204, False), (203, False)
+    )
     original_property = scene.table.GetColumnCustomProperty.side_effect
     scene.table.GetColumnCustomProperty.side_effect = lambda column: (
         "Audit" if column == index else original_property(column)
     )
     before_columns = [vars(column).copy() for column in scene.state.columns]
-    before_members = tuple(tuple(row) for row in scene.state.native_rows)
     before_cells = tuple(tuple(row) for row in scene.cells)
-    with pytest.raises(RuntimeError):
-        scene.insert()
+    with pytest.raises(
+        RuntimeError, match=f"nonempty unsupported column at physical index {index}$"
+    ):
+        _drawing_tables._bom_physical_columns(scene.table, label="paper-drive")
     assert [vars(column) for column in scene.state.columns] == before_columns
-    assert tuple(tuple(row) for row in scene.state.native_rows) == before_members
     assert tuple(tuple(row) for row in scene.cells) == before_cells
 
 
 def test_native_column_fixture_keeps_visible_and_physical_indices_distinct(monkeypatch):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
-    assert scene.table.SetColumnHidden(2, True) is None
+    scene = _pd_bom_insertion_fixture(monkeypatch)
+    # Typed columns before the selected Quantity share the visibility index.
+    assert scene.table.SetColumnHidden(1, True) is None
     assert scene.table.ColumnCount == 3
     assert scene.table.TotalColumnCount == 5
     assert scene.table.GetColumnType3(1, True) == (201, None, 0)
@@ -4073,7 +4381,7 @@ def test_native_column_fixture_keeps_visible_and_physical_indices_distinct(monke
 def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
     monkeypatch, index
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     before_columns = [vars(column).copy() for column in scene.state.columns]
     before_members = tuple(tuple(row) for row in scene.state.native_rows)
     before_cells = tuple(tuple(row) for row in scene.cells)
@@ -4084,7 +4392,8 @@ def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
     assert scene.table.SetColumnCustomProperty(index, "Number") is False
     assert scene.table.SetColumnTitle2(index, "PART NUMBER", True) is False
     with pytest.raises(IndexError):
-        scene.table.SetColumnHidden(index + 1, True)
+        # Typed index -1 or past the end: below/above the visibility domain.
+        scene.table.SetColumnHidden(index if index < 0 else index + 1, True)
     with pytest.raises(IndexError):
         scene.table.SetColumnWidth(index, 0.025, 0)
     with pytest.raises(IndexError):
@@ -4111,7 +4420,7 @@ def test_native_column_fixture_refuses_nonaddressable_mutation_destinations(
 def test_bom_column_census_refuses_accessor_errors_without_mutating(
     monkeypatch, failure, member, mode
 ):
-    scene = _pd_bom_insertion_fixture(monkeypatch, advertised_extra=1)
+    scene = _pd_bom_insertion_fixture(monkeypatch)
     accessor = getattr(scene.table, member)
     original = accessor.side_effect
 

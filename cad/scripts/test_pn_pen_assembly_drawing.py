@@ -167,6 +167,14 @@ class _PenBomTable:
         self.title_writes = []
         self.number_property = "Number"
         self.GetComponents2 = components
+        # Pen binds "Default Simplified" (k=1): one latent Default Quantity column.
+        self.configurations = ("Default", drawing.SIMPLIFIED_VIEW_CONFIGURATION)
+        self.BomFeature = SimpleNamespace(
+            GetConfigurations=lambda _only_visible, _unused: (
+                self.configurations,
+                tuple(name == drawing.SIMPLIFIED_VIEW_CONFIGURATION for name in self.configurations),
+            )
+        )
 
     @property
     def RowCount(self):
@@ -187,7 +195,7 @@ class _PenBomTable:
 
     @property
     def TotalColumnCount(self):
-        return len(self.column_types)
+        return len(self.column_types) + len(self.configurations) - 1
 
     def _physical_column(self, column, include_hidden=True):
         columns = [
@@ -201,8 +209,12 @@ class _PenBomTable:
         return (-1, None, 0) if physical is None else self.column_types[physical]
 
     def ColumnHidden(self, column):
-        # Visibility PROPERTY indices are 1-based; storage remains physical.
-        return self.hidden[column - 1] if 1 <= column <= len(self.hidden) else False
+        # 0-based visibility domain; the latent Default Quantity sits just before the typed 203 column.
+        quantity = next(i for i, kind in enumerate(self.column_types) if kind[0] == 203)
+        if column == quantity:
+            return False
+        physical = column if column < quantity else column - 1
+        return self.hidden[physical] if 0 <= physical < len(self.hidden) else False
 
     def GetColumnWidth(self, column):
         physical = self._physical_column(column, False)
