@@ -2164,8 +2164,9 @@ def test_preexisting_inventory_receipt_failure_preserves_original_refusal(
             raise RuntimeError("actual owner getter failed")
 
     baseline = ((*f.preexisting[0][:4], UnreadableOwner()),)
-    with pytest.raises(RuntimeError, match="^receipt: preexisting dimension inventory missing/extra entries$") as exc:
+    with pytest.raises(RuntimeError) as exc:
         drawing._assert_preexisting_neck_inventory(f.adapter, [], baseline, label="receipt")
+    assert str(exc.value) == "receipt: preexisting dimension inventory missing/extra entries"
     assert exc.value.__cause__ is None
     assert exc.value.__notes__ == [
         "receipt: preexisting inventory receipt getter failed: RuntimeError: actual owner getter failed"
