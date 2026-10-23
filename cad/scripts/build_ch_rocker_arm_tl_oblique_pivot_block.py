@@ -18,6 +18,9 @@ to X = -13), which section B-B cuts (``_cbore_floor_reference``).
 The two nut-bracket screw counterbores (PR C4) are a second, drilled along Y
 from the +Y face; their printed stations, from the -X end and the bottom
 face, live on the hidden Top-plane sketch ``SideScrewReference``.
+The hidden ``WingAxisReference`` measures the actual bearing-profile centre
+to the wing-profile step; its ordinary two-place span is the wing's +X
+manufacturing authority. The internal wing length derives from that reach.
 
 Run (SolidWorks already open)::
 
@@ -32,6 +35,7 @@ from collections.abc import Callable
 from typing import Any
 
 from _appearance import apply_material
+from _bore_axis import name_bore_axis
 from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
@@ -97,6 +101,21 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     SIDE_SCREW_HOLE_SPEC,
     SIDE_SCREW_HOLES,
     SIDE_SCREW_REFERENCE,
+    BEARING_AXIS_NAME,
+    CAP_TAP_HOLE_SPEC,
+    CAP_TAP_POINTS,
+    CAP_TAP_REFERENCE,
+    CAP_REGISTER_DEPTH,
+    CAP_REGISTER_DIA,
+    CAP_REGISTER_DIA_BAND,
+    CAP_REGISTER_FEATURE,
+    CAP_REGISTER_POINTS,
+    CAP_REGISTER_PROFILE,
+    WING_AXIS_REACH,
+    WING_AXIS_REFERENCE,
+    WING_LENGTH,
+    WING_WIDTH,
+    WING_X1,
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-pivot-block"
@@ -114,7 +133,9 @@ THROUGH_CUT_DEPTH = 2.0 * BLOCK_HEIGHT
 _R_BORE = BORE_DIA / 2.0
 _R_SHOULDER = SHOULDER_HOLE_DIA / 2.0
 
-V_BLOCK = (BLOCK_X1 - BLOCK_X0) * BLOCK_WIDTH * BLOCK_HEIGHT
+V_CORE = (BLOCK_X1 - BLOCK_X0) * BLOCK_WIDTH * BLOCK_HEIGHT
+V_WING_ADDED = WING_LENGTH * (WING_WIDTH - BLOCK_WIDTH) * BLOCK_HEIGHT
+V_BLOCK = V_CORE + V_WING_ADDED
 V_BORE = math.pi * _R_BORE**2 * BORE_DEPTH
 V_SHOULDER_HOLE = math.pi * _R_SHOULDER**2 * SHOULDER
 # A concave corner fillet ADDS its (1 - pi/4) r^2 section, swept (Pappus) at
@@ -122,6 +143,10 @@ V_SHOULDER_HOLE = math.pi * _R_SHOULDER**2 * SHOULDER
 _FILLET_AREA = (1.0 - math.pi / 4.0) * SEAT_FILLET_RADIUS**2
 _FILLET_INSET = (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * SEAT_FILLET_RADIUS
 V_SEAT_FILLETS = 2.0 * 2.0 * math.pi * (_R_BORE - _FILLET_INSET) * _FILLET_AREA
+V_CAP_REGISTERS = (
+    len(CAP_REGISTER_POINTS) * math.pi * (CAP_REGISTER_DIA / 2.0) ** 2
+    * CAP_REGISTER_DEPTH
+)
 
 
 def _max_limit(adapter: Any, feature: str, dimension_name: str) -> None:
@@ -292,12 +317,12 @@ async def _side_screw_reference(adapter: Any) -> SketchDims:
 
 async def _bore_sketch(
     adapter: Any, plane: str, z: float, names: tuple[str, str], label: str
-) -> SketchDims:
-    """One bearing-seat circle at the bore axis; returns its sketch dims."""
+) -> tuple[SketchDims, Any]:
+    """One bearing-seat circle at the bore axis; returns dims and native circle."""
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane))
     at = _xy_mapper(adapter, z, label)
-    await define_circle(
+    circle = await define_circle(
         adapter,
         *at(BORE_X, 0.0),
         _R_BORE,
@@ -306,12 +331,13 @@ async def _bore_sketch(
         names=(names[0], None, names[1]),
         drives=('"BoreX"', None, '"BoreDia"'),
     )
+    bearing_circle = adapter._sketch_entities[circle]
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
-    return dims
+    return dims, bearing_circle
 
 
-async def _top_seat_sketch(adapter: Any) -> SketchDims:
+async def _top_seat_sketch(adapter: Any) -> tuple[SketchDims, Any]:
     """The top seat's circle, located from the block's faces, plus the
     construction points every printed station dimensions to (rule 10).
 
@@ -394,9 +420,10 @@ async def _top_seat_sketch(adapter: Any) -> SketchDims:
     await station(f"{row}.end", "horizontal_distance", "HoleColumn2X")
     await station(f"{row}.end", "vertical_distance", "HoleRow1Y")
     await station(f"{upper}.start", "vertical_distance", "HoleRow2Y")
+    bearing_circle = adapter._sketch_entities[circle]
     await ensure_fully_defined(adapter, label)
     check(f"exit_sketch {label}", await adapter.exit_sketch())
-    return dims
+    return dims, bearing_circle
 
 
 async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
@@ -472,6 +499,176 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     return jobs + dims.apply(adapter, feature)
 
 
+async def _wing_axis_reference(
+    adapter: Any, bearing_circle: Any, wing_step: Any
+) -> tuple[SketchDims, tuple[Any, Any]]:
+    """Measure physical, already-defined geometry without a redundant driver.
+
+    Both construction points are coincident to retained native profile points,
+    not independently located copies. The bottom seat and wing share Front;
+    the bottom seat is the bearing datum. The horizontal span owns the step's
+    shop ink; the vertical span locates the opposed wing faces (2X).
+    """
+    label = WING_AXIS_REFERENCE
+    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    at = _xy_mapper(adapter, 0.0, label)
+    bearing_ref = adapter._register_sketch_entity("Circle", bearing_circle)
+    step_ref = adapter._register_sketch_entity("Line", wing_step)
+    centre = _add_reference_point(adapter, at(BORE_X, 0.0), "wing bearing axis")
+    edge = _add_reference_point(adapter, at(WING_X1, WING_WIDTH / 2.0), "wing step")
+    for point, physical in ((centre, f"{bearing_ref}.center"), (edge, f"{step_ref}.end")):
+        check(
+            f"{label} association to {physical}",
+            await adapter.add_sketch_constraint(point, physical, "coincident"),
+        )
+    await ensure_fully_defined(adapter, label)
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    model.ClearSelection2(True)
+    manager = _early_bound(model.SelectionManager, "ISelectionMgr")
+    data = _early_bound(manager.CreateSelectData(), "ISelectData")
+    points = tuple(
+        _early_bound(adapter._sketch_entities[ref], "ISketchPoint")
+        for ref in (centre, edge)
+    )
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    dims = SketchDims()
+    for name, kind, x, y in (
+        ("WingAxisReach", 11, (BORE_X + WING_X1) / 2.0, WING_WIDTH / 2.0 + 7.0),
+        ("WingHalfWidth", 12, WING_X1 + 7.0, WING_WIDTH / 4.0),
+    ):
+        # swHorLinearDimension / swVertLinearDimension, same associated points.
+        for index, point in enumerate(points):
+            if not point.Select4(index > 0, data):
+                raise RuntimeError(f"{label}: cannot select associated point {index}")
+        display, status = extension.AddSpecificDimension(x / 1000.0, y / 1000.0, 0.0, kind, 0)
+        model.ClearSelection2(True)
+        if display is None:
+            raise RuntimeError(f"{label}: {name} AddSpecificDimension failed ({status})")
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension2(0), "IDimension")
+        dimension.DrivenState = 1  # Geometry is already constrained.
+        display.ShowParenthesis = False  # Manufacturing control, not REF.
+        await ensure_fully_defined(adapter, label)
+        dims.record(name)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims, points
+
+
+def _require_wing_axis_dimension(
+    adapter: Any, points: tuple[Any, Any], name: str = "WingAxisReach"
+) -> None:
+    """Read back the rebuilt native span, ink state and exact attachments."""
+    display, dimension = _named_dimension(adapter, WING_AXIS_REFERENCE, name)
+    measured = float(dimension.SystemValue) * 1000.0
+    expected = DRAWING_VALUES[name]
+    if not math.isclose(measured, expected, rel_tol=0.0, abs_tol=1e-6):
+        raise RuntimeError(f"{name} measures {measured:g}, expected {expected:g}")
+    if int(dimension.DrivenState) != 1 or bool(display.ShowParenthesis):
+        raise RuntimeError(f"{name} lost its measured manufacturing control")
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    attached = list(annotation.GetAttachedEntities3() or ())
+    if bool(annotation.IsDangling()) or len(attached) != 2:
+        raise RuntimeError("wing axis reach lost its native point associations")
+    for point in points:
+        match = next(
+            (index for index, entity in enumerate(attached)
+             if entity is not None and int(adapter.swApp.IsSame(entity, point)) == 1),
+            None,
+        )
+        if match is None:
+            raise RuntimeError("wing axis reach attached to the wrong native point")
+        attached.pop(match)
+
+
+async def _cap_tap_reference(adapter: Any) -> SketchDims:
+    """Locate all four tap axes directly from the actual bearing-axis knobs.
+
+    These are not edge ordinates. The printed X/Y distances start on the
+    bearing centre; the other pattern points share native row/column relations.
+    """
+    label = "cap tap bearing-axis reference"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("TopFace"))
+    at = _xy_mapper(adapter, BLOCK_HEIGHT, label)
+    centre = _add_reference_point(adapter, at(BORE_X, 0.0), "bearing axis")
+    await anchor_point_to_origin(adapter, centre, *at(BORE_X, 0.0), label)
+    dims.record("CapPatternBearingX", '"BoreX"')
+    refs = [
+        _add_reference_point(adapter, at(x, y), f"cap tap {index}")
+        for index, (x, y) in enumerate(CAP_TAP_POINTS, start=1)
+    ]
+    left_lower, left_upper, right_lower, right_upper = refs
+    for first, second, relation in (
+        (left_lower, left_upper, "vertical_points"),
+        (right_lower, right_upper, "vertical_points"),
+        (left_lower, right_lower, "horizontal_points"),
+        (left_upper, right_upper, "horizontal_points"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    for ref, kind, name, expression in (
+        (left_lower, "horizontal_distance", "CapTapLeftX", '"CapTapX"'),
+        (right_lower, "horizontal_distance", "CapTapRightX", '"CapTapX"'),
+        (left_lower, "vertical_distance", "CapTapLowerY", '"CapTapY"'),
+        (left_upper, "vertical_distance", "CapTapUpperY", '"CapTapY"'),
+    ):
+        await dimension_between(adapter, centre, ref, kind, DRAWING_VALUES[name], name)
+        dims.record(name, expression)
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
+
+
+async def _cap_register_sketch(adapter: Any, bearing_circle: Any) -> SketchDims:
+    """Two receiver circles dimensioned from the actual bearing-seat circle.
+
+    Retain and re-register the TopBoreProfile circle's native centre, so these
+    XY dimensions reference the physical bearing axis across sketches. No
+    independent origin point or loose outer-edge chain stands in for it.
+    The consumed profile stays hidden; its blind cut makes real planar floors.
+    """
+    label = "cap register recesses"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch("TopFace"))
+    at = _xy_mapper(adapter, BLOCK_HEIGHT, label)
+    bearing_ref = adapter._register_sketch_entity("Circle", bearing_circle)
+    centre = f"{bearing_ref}.center"
+    for index, ((x, y), x_name, y_name) in enumerate(
+        zip(
+            CAP_REGISTER_POINTS,
+            ("CapRegisterLeftX", "CapRegisterRightX"),
+            ("CapRegisterLowerY", "CapRegisterUpperY"),
+            strict=True,
+        ),
+        start=1,
+    ):
+        manager = adapter.currentSketchManager
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = check(
+                f"{label} circle {index}",
+                await adapter.add_circle(*at(x, y), CAP_REGISTER_DIA / 2.0),
+            )
+        finally:
+            manager.AddToDB = previous
+        for kind, name, expression in (
+            ("horizontal_distance", x_name, '"CapRegisterX"'),
+            ("vertical_distance", y_name, '"CapRegisterY"'),
+        ):
+            await dimension_between(
+                adapter, centre, f"{circle}.center", kind, DRAWING_VALUES[name], name
+            )
+            dims.record(name, expression)
+        check(
+            f"{label} diameter {index}",
+            await adapter.add_sketch_dimension(circle, None, "diameter", CAP_REGISTER_DIA),
+        )
+        dims.record(f"CapRegister{index}Dia", '"CapRegisterDia"')
+    await ensure_fully_defined(adapter, label)
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    return dims
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
@@ -481,7 +678,8 @@ async def build(adapter) -> dict[str, str]:
     # in document units. The printed stations are driven from the knobs
     # (_STATION_DRIVES), so they take no globals of their own.
     for name, value in {**DRAWING_VALUES, **MODEL_KNOBS}.items():
-        if name not in _STATION_DRIVES:
+        # The half-width is measured from retained physical points, never driven.
+        if name not in _STATION_DRIVES and name != "WingHalfWidth":
             await set_global(adapter, name, f"{value}mm")
 
     # --- Block: Front-plane rectangle, extruded +Z ----------------------------
@@ -518,7 +716,34 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "Block", ["BlockHeight"])[0], '"BlockHeight"')
     )
-    volume = await volume_check(adapter, "block", V_BLOCK, 0.002 * V_BLOCK)
+    volume = await volume_check(adapter, "block core", V_CORE, 0.002 * V_CORE)
+
+    # Integral wing from the same bar: its overlap with the original-width
+    # core merges into one body; the original tail and bracket grip stay 40.
+    wing = SketchDims()
+    check("create_sketch wing", await adapter.create_sketch("Front"))
+    at_front = _xy_mapper(adapter, 0.0, "wing profile")
+    points = [
+        at_front(BLOCK_X0, -WING_WIDTH / 2.0),
+        at_front(WING_X1, -WING_WIDTH / 2.0),
+        at_front(WING_X1, WING_WIDTH / 2.0),
+        at_front(BLOCK_X0, WING_WIDTH / 2.0),
+    ]
+    lines = await add_line_chain(adapter, points)
+    await define_rectilinear_chain(
+        adapter, lines, points, label="integral wing", dims=wing,
+        names=["WingLength", "WingWidth", "WingEndX", "WingSideY"],
+        drives=['"BlockEndX" - "BoreX" + "WingAxisReach"', '"WingWidth"', '"BlockEndX"', '"WingSideY"'],
+    )
+    await ensure_fully_defined(adapter, "integral wing")
+    wing_step = adapter._sketch_entities[lines[1]]
+    check("exit_sketch wing", await adapter.exit_sketch())
+    name_last_feature(adapter, "WingProfile")
+    drive_jobs += wing.apply(adapter, "WingProfile")
+    check("extrude integral wing", await adapter.create_extrusion(ExtrusionParameters(depth=BLOCK_HEIGHT)))
+    name_last_feature(adapter, "Wing")
+    drive_jobs.append((name_dimensions(adapter, "Wing", ["WingHeight"])[0], '"BlockHeight"'))
+    volume = await volume_check(adapter, "integral wing", V_BLOCK, 0.002 * V_BLOCK)
 
     # --- The top face plane ----------------------------------------------------
     check(
@@ -537,7 +762,7 @@ async def build(adapter) -> dict[str, str]:
 
     # --- Bearing seats: from the top, then the same from the bottom -----------
     # A cut on a plane runs against its normal by default: down from TopFace.
-    top = await _top_seat_sketch(adapter)
+    top, bearing_circle = await _top_seat_sketch(adapter)
     name_last_feature(adapter, "TopBoreProfile")
     drive_jobs += top.apply(adapter, "TopBoreProfile")
     check(
@@ -550,7 +775,7 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(adapter, "top seat", volume - V_BORE, 0.01 * V_BORE)
 
-    bottom = await _bore_sketch(
+    bottom, bottom_bearing_circle = await _bore_sketch(
         adapter, "Front", 0.0, ("BottomBoreX", "BoreDia2"), "bottom seat"
     )
     name_last_feature(adapter, "BottomBoreProfile")
@@ -676,6 +901,53 @@ async def build(adapter) -> dict[str, str]:
         volume - len(SIDE_SCREW_HOLES) * v_side,
         0.01 * len(SIDE_SCREW_HOLES) * v_side,
     )
+    # Native THRU taps in the wing, separate from all original holes.
+    cap_taps = wizard_holes(
+        adapter, CAP_TAP_HOLE_SPEC,
+        [[x, y, BLOCK_HEIGHT] for x, y in CAP_TAP_POINTS],
+        (0.0, 0.0, 1.0), "cap receiver taps", name="CapTaps",
+        placement_dims=[
+            (
+                (f"CapTap{index}X", f'"BoreX" {"+" if x < BORE_X else "-"} "CapTapX"'),
+                (f"CapTap{index}Y", '"CapTapY"'),
+            )
+            for index, (x, _y) in enumerate(CAP_TAP_POINTS, start=1)
+        ],
+    )
+    drive_jobs += cap_taps.placement_drive_jobs
+    removed = len(CAP_TAP_POINTS) * math.pi * (cap_taps.hole_dia_mm / 2.0) ** 2 * BLOCK_HEIGHT
+    volume = await volume_check(adapter, "cap receiver taps", volume - removed, 0.01 * removed)
+    reference, wing_reference_points = await _wing_axis_reference(
+        adapter, bottom_bearing_circle, wing_step
+    )
+    name_last_feature(adapter, WING_AXIS_REFERENCE)
+    drive_jobs += reference.apply(adapter, WING_AXIS_REFERENCE)
+    reference = await _cap_tap_reference(adapter)
+    name_last_feature(adapter, CAP_TAP_REFERENCE)
+    drive_jobs += reference.apply(adapter, CAP_TAP_REFERENCE)
+    registers = await _cap_register_sketch(adapter, bearing_circle)
+    name_last_feature(adapter, CAP_REGISTER_PROFILE)
+    drive_jobs += registers.apply(adapter, CAP_REGISTER_PROFILE)
+    check(
+        "cut flat-bottom cap register recesses",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=CAP_REGISTER_DEPTH)),
+    )
+    name_last_feature(adapter, CAP_REGISTER_FEATURE)
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, CAP_REGISTER_FEATURE, ["CapRegisterDepth"])[0],
+            '"CapRegisterDepth"',
+        )
+    )
+    volume = await volume_check(
+        adapter, "flat-bottom cap register recesses",
+        volume - V_CAP_REGISTERS, 0.01 * V_CAP_REGISTERS,
+    )
+    await name_bore_axis(
+        adapter, "Right Plane", BORE_X, "Top Plane", 0.0,
+        "bearing axis", drive_a='"BoreX"', drive_jobs=drive_jobs,
+    )
+    name_last_feature(adapter, BEARING_AXIS_NAME)
     _require_one_solid_body(adapter, label="pivot block")
     drive_jobs += await _cbore_floor_reference(adapter)
     reference = await _side_screw_reference(adapter)
@@ -690,6 +962,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven pivot block (equations neutral)", volume, 0.002 * V_BLOCK
     )
     _require_one_solid_body(adapter, label="driven pivot block")
+    for name in ("WingAxisReach", "WingHalfWidth"):
+        _require_wing_axis_dimension(adapter, wing_reference_points, name)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
@@ -699,6 +973,12 @@ async def build(adapter) -> dict[str, str]:
     # their single MAX limit.
     set_dimension_bilateral_tolerance(
         adapter, "TopBoreProfile", "BoreDia", *deviations(BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, CAP_REGISTER_PROFILE, "CapRegister1Dia", *deviations(CAP_REGISTER_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, CAP_REGISTER_PROFILE, "CapRegister2Dia", *deviations(CAP_REGISTER_DIA_BAND)
     )
     _max_limit(adapter, "SeatFillets", "SeatFilletR")
     apply_drawing_precision(adapter, DRAWING_PRECISION)
