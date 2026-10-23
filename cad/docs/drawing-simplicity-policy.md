@@ -69,6 +69,17 @@ cannot ask for what the authors were told to leave out.
   matching names or values alone cannot prove membership. `IFeature` wrapper
   equality is diagnostic only: drawing-context owners can compare unequal
   even when the original model dimension is identical.
+  Shared supplier-reference text shelving retains the original perpendicular
+  witness coverage as a canonical interval union, not merely its outside
+  endpoints: equivalent fragmentation or ordering is harmless, but a new
+  interior gap fails the same settled proof. Every reported text fragment
+  participates, including all fraction parts. The shared native bounds reader
+  normalizes all six SDK anchor positions and their rotation using measured
+  font-box dimensions, never estimated glyph widths; unreadable or unknown
+  fragment references fail before forming their union. Native station/extent
+  proof is not exact glyph or foreign-line clearance proof: retain every line,
+  including fraction bars, and inspect the actual PDF ink, whole sheet and
+  automated machinist result after regeneration.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;
