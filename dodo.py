@@ -82,9 +82,12 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Any
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from doit.tools import config_changed
+from doit.loader import generate_tasks
+from doit.task import Task, dict_to_task
 from filelock import FileLock, Timeout  # noqa: E402
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
@@ -2815,6 +2818,23 @@ def _stable_artefact_digest(path: str) -> str | None:
     return digest
 
 
+def _part_task(stem: str) -> dict[str, Any]:
+    script = SCRIPTS_DIR / f"build_{stem}.py"
+    return {
+        "name": stem,
+        "file_dep": _part_file_deps(script, stem),
+        "targets": _canonical_targets(f"part:{stem}"),
+        "uptodate": [
+            _ExecutionIdentityTracker(_part_execution_token(stem)),
+            not _cache.forced_refresh(f"part:{stem}"),
+        ],
+        # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
+        "actions": [(_cached_part_action, [stem, script])],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
 def task_part():
     """One task per part stem; addressable as ``part:<stem>``.
 
@@ -2824,25 +2844,8 @@ def task_part():
     order (``_seat_part_order``) as a best-effort scheduling hint so two cold
     builders diverge and split the fleet cache.
     """
-    scripts = {s.stem.removeprefix("build_"): s for s in part_scripts()}
     for stem in _seat_part_order():
-        script = scripts[stem]
-        yield {
-            "name": stem,
-            "file_dep": _part_file_deps(script, stem),
-            "targets": [
-                _sldprt(stem), _part_execution_token(stem),
-                *(str(path.resolve()) for path in _part_configuration_outputs(stem)),
-            ],
-            "uptodate": [
-                _ExecutionIdentityTracker(_part_execution_token(stem)),
-                not _cache.forced_refresh(f"part:{stem}"),
-            ],
-            # Remote-cache shortcut + COM seat lock wrap the build (_cached_part_action).
-            "actions": [(_cached_part_action, [stem, script])],
-            "clean": True,
-            "verbosity": 2,
-        }
+        yield _part_task(stem)
 
 
 # --- Recipe-change detection (the refresh tier), robust to failed tasks.
@@ -3122,6 +3125,33 @@ def _clean_assembly(stem):
             _force_remove(variant)
 
 
+def _assembly_task(stem: str) -> dict[str, Any]:
+    # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
+    # vs a part-only refresh: the assembly script, its hooks, its helper
+    # closure, AND the config docs THIS assembly reads (a placement like
+    # channels.station_pitch_mm changing must re-insert components at new
+    # coordinates, which an in-place reload cannot do; codex review #2).
+    # Factored into _recipe_files so build_or_refresh computes the identical
+    # digest.
+    recipe_files = _recipe_files(stem)
+    return {
+        "name": stem,
+        "file_dep": _assembly_file_deps(stem),
+        "targets": _canonical_targets(f"assembly:{stem}"),
+        "uptodate": [
+            _RecipeTracker(stem, recipe_files),
+            _ExecutionIdentityTracker(_assembly_execution_token(stem)),
+            not _cache.forced_refresh(f"assembly:{stem}"),
+        ],
+        # No spine: ordering (parts + sub-assemblies before this one) comes from
+        # the real file_dep on their targets above; SolidWorks serialization is
+        # the COM seat lock inside build_or_refresh.
+        "actions": [(build_or_refresh, [stem])],
+        "clean": [(_clean_assembly, [stem])],
+        "verbosity": 2,
+    }
+
+
 def task_assembly():
     """One task per assembly stem (``assembly:<stem>``).
 
@@ -3131,35 +3161,24 @@ def task_assembly():
     parts changed -> refresh).
     """
     for stem in ASSEMBLY_ORDER:
-        # Recipe = the files whose change forces a FULL rebuild (re-insert/re-mate)
-        # vs a part-only refresh: the assembly script, its hooks, its helper
-        # closure, AND the config docs THIS assembly reads (a placement like
-        # channels.station_pitch_mm changing must re-insert components at new
-        # coordinates, which an in-place reload cannot do; codex review #2).
-        # Factored into _recipe_files so build_or_refresh computes the identical
-        # digest.
-        recipe_files = _recipe_files(stem)
-        yield {
-            "name": stem,
-            "file_dep": _assembly_file_deps(stem),
-            "targets": [_sldasm(stem), _assembly_execution_token(stem)],
-            "uptodate": [
-                _RecipeTracker(stem, recipe_files),
-                _ExecutionIdentityTracker(_assembly_execution_token(stem)),
-                not _cache.forced_refresh(f"assembly:{stem}"),
-            ],
-            # No spine: ordering (parts + sub-assemblies before this one) comes from
-            # the real file_dep on their targets above; SolidWorks serialization is
-            # the COM seat lock inside build_or_refresh.
-            "actions": [(build_or_refresh, [stem])],
-            "clean": [(_clean_assembly, [stem])],
-            "verbosity": 2,
-        }
+        yield _assembly_task(stem)
 
 
 def _clean_drawing(stem: str) -> None:
     for target in _drawing_cache_outputs(stem):
         _force_remove(target)
+
+
+def _drawing_task(stem: str) -> dict[str, Any]:
+    return {
+        "name": stem,
+        "file_dep": _drawing_file_deps(stem),
+        "targets": _canonical_targets(f"drawing:{stem}"),
+        "uptodate": [not _cache.forced_refresh(f"drawing:{stem}")],
+        "actions": [(_cached_drawing_action, [stem])],
+        "clean": [(_clean_drawing, [stem])],
+        "verbosity": 2,
+    }
 
 
 def task_drawing():
@@ -3171,15 +3190,35 @@ def task_drawing():
     ``drawing:<stem>`` and deliberately excluded from ``build_bare``.
     """
     for stem in _drawing_order():
-        yield {
-            "name": stem,
-            "file_dep": _drawing_file_deps(stem),
-            "targets": [str(path) for path in _drawing_cache_outputs(stem)],
-            "uptodate": [not _cache.forced_refresh(f"drawing:{stem}")],
-            "actions": [(_cached_drawing_action, [stem])],
-            "clean": [(_clean_drawing, [stem])],
-            "verbosity": 2,
-        }
+        yield _drawing_task(stem)
+
+
+def _verify_soundness_task(stem: str) -> dict[str, Any]:
+    name = stem.replace("_", "-")
+    deps = _soundness_file_deps(stem)
+    stamp = str(REPORTS / f"verify-soundness-{name}.ok")
+    cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
+    return {
+        "name": stem,
+        "file_dep": deps,
+        "targets": _canonical_targets(f"verify_soundness:{stem}"),
+        "uptodate": [not _cache.forced_refresh(f"verify_soundness:{stem}")],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    f"verify_soundness:{stem}",
+                    cmd,
+                    deps,
+                    [Path(stamp)],
+                    f"verify-soundness-{name}",
+                    stamp,
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
 
 
 def task_verify_soundness():
@@ -3192,24 +3231,60 @@ def task_verify_soundness():
     child stamps, preserving the existing CLI and release dependency.
     """
     for stem in ASSEMBLY_ORDER:
-        name = stem.replace("_", "-")
-        deps = _soundness_file_deps(stem)
-        stamp = str(REPORTS / f"verify-soundness-{name}.ok")
-        cmd = [sys.executable, str(VERIFY_PY), name, "--suite", "soundness"]
-        yield {
-            "name": stem,
+        yield _verify_soundness_task(stem)
+
+
+def _verify_task(name: str) -> dict[str, Any]:
+    if name == "soundness":
+        child_stamps = [
+            str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
+            for stem in ASSEMBLY_ORDER
+        ]
+        soundness_stamp = str(REPORTS / "verify-soundness.ok")
+        return {
+            "name": "soundness",
+            # The child stamps are targets of the verify_soundness:* tasks, so doit
+            # derives the real producer edges from file_dep alone. The task_dep repeats
+            # them for the FARM: the graph a worker receives is the task_dep CLOSURE of
+            # the packaged scopes (doit's tasks_and_deps_iter walks task_dep, never
+            # file_dep), so without it every dispatched verify_soundness:<stem> leaf is
+            # refused as "not in the packaged graph".
+            "task_dep": [f"verify_soundness:{stem}" for stem in ASSEMBLY_ORDER],
+            "file_dep": [
+                str(VERIFY_PY),
+                str(POSTBUILD_PY),
+                *_bank_retention_file_deps(),
+                *child_stamps,
+            ],
+            "targets": _canonical_targets(f"verify:{name}"),
+            "actions": [(_write_stamp, ["verify soundness", soundness_stamp])],
+            "clean": True,
+            "verbosity": 2,
+        }
+    if name == "kinematics":
+
+        # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
+        # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
+        # assembly left in a worktree must not be verified (codex review). kinematics
+        # targets the pen + magnifier subs (verify.py's own defaults), no names.
+        deps = _kinematics_file_deps()
+        stamp = str(REPORTS / "verify-kinematics.ok")
+        return {
+            "name": "kinematics",
             "file_dep": deps,
-            "targets": [stamp],
-            "uptodate": [not _cache.forced_refresh(f"verify_soundness:{stem}")],
+            "targets": _canonical_targets(f"verify:{name}"),
+            "uptodate": [not _cache.forced_refresh("verify:kinematics")],
+            # No spine: the file_dep on the built .SLDASM orders this after the
+            # assemblies; the COM seat lock (inside _cached_com_action) serializes it.
             "actions": [
                 (
                     _cached_com_action,
                     [
-                        f"verify_soundness:{stem}",
-                        cmd,
+                        "verify:kinematics",
+                        [sys.executable, str(VERIFY_PY), "--suite", "kinematics"],
                         deps,
                         [Path(stamp)],
-                        f"verify-soundness-{name}",
+                        "verify-kinematics",
                         stamp,
                     ],
                 )
@@ -3217,6 +3292,7 @@ def task_verify_soundness():
             "clean": True,
             "verbosity": 2,
         }
+    raise ValueError(f"unknown canonical task: verify:{name}")
 
 
 def task_verify():
@@ -3227,61 +3303,8 @@ def task_verify():
     output. The ``verify:`` prefix marks them SolidWorks-dependent (vs the
     SolidWorks-free ``check:`` tasks).
     """
-    child_stamps = [
-        str(REPORTS / f"verify-soundness-{stem.replace('_', '-')}.ok")
-        for stem in ASSEMBLY_ORDER
-    ]
-    soundness_stamp = str(REPORTS / "verify-soundness.ok")
-    yield {
-        "name": "soundness",
-        # The child stamps are targets of the verify_soundness:* tasks, so doit
-        # derives the real producer edges from file_dep alone. The task_dep repeats
-        # them for the FARM: the graph a worker receives is the task_dep CLOSURE of
-        # the packaged scopes (doit's tasks_and_deps_iter walks task_dep, never
-        # file_dep), so without it every dispatched verify_soundness:<stem> leaf is
-        # refused as "not in the packaged graph".
-        "task_dep": [f"verify_soundness:{stem}" for stem in ASSEMBLY_ORDER],
-        "file_dep": [
-            str(VERIFY_PY),
-            str(POSTBUILD_PY),
-            *_bank_retention_file_deps(),
-            *child_stamps,
-        ],
-        "targets": [soundness_stamp],
-        "actions": [(_write_stamp, ["verify soundness", soundness_stamp])],
-        "clean": True,
-        "verbosity": 2,
-    }
-
-    # Pass the graph's assemblies EXPLICITLY (dashed names) rather than letting
-    # verify.py glob every *.SLDASM under cad/out/sldasm -- a stray/scratch
-    # assembly left in a worktree must not be verified (codex review). kinematics
-    # targets the pen + magnifier subs (verify.py's own defaults), no names.
-    deps = _kinematics_file_deps()
-    stamp = str(REPORTS / "verify-kinematics.ok")
-    yield {
-        "name": "kinematics",
-        "file_dep": deps,
-        "targets": [stamp],
-        "uptodate": [not _cache.forced_refresh("verify:kinematics")],
-        # No spine: the file_dep on the built .SLDASM orders this after the
-        # assemblies; the COM seat lock (inside _cached_com_action) serializes it.
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "verify:kinematics",
-                    [sys.executable, str(VERIFY_PY), "--suite", "kinematics"],
-                    deps,
-                    [Path(stamp)],
-                    "verify-kinematics",
-                    stamp,
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
+    for name in _VERIFY_NAMES:
+        yield _verify_task(name)
 
 
 # Review inputs are independent of the draw recipe and registry. The CLI
@@ -3521,37 +3544,34 @@ def _reviewed_drawings() -> tuple[tuple[str, MachinistReviewMode], ...]:
     )
 
 
+def _machinist_review_task(
+    stem: str, mode: MachinistReviewMode, profile: ReviewProfile
+) -> dict[str, Any]:
+    deps = _machinist_review_file_deps(stem)
+    return {
+        "name": f"machinist_review:{stem}",
+        "file_dep": deps,
+        # The real producer edge is the PDF file_dep. Repeating it in the
+        # packaged task closure keeps a selected review's drawing admitted.
+        "task_dep": [f"drawing:{stem}"],
+        "uptodate": [
+            config_changed({
+                "mode": mode.value, "inputs": [_rel_tag(dep) for dep in deps],
+                "profile": profile._asdict(),
+            }),
+            not _cache.forced_refresh(f"check:machinist_review:{stem}"),
+        ],
+        "targets": _canonical_targets(f"check:machinist_review:{stem}"),
+        "actions": [(_cached_machinist_review_action, [stem, mode, profile])],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
 def _machinist_review_tasks():
     profile = _machinist_review_profile()
     for stem, mode in _reviewed_drawings():
-        deps = _machinist_review_file_deps(stem)
-        directory = _machinist_review_dir(stem)
-        yield {
-            "name": f"machinist_review:{stem}",
-            "file_dep": deps,
-            # The real producer edge is the PDF file_dep. Repeating it in the
-            # packaged task closure keeps a selected review's drawing admitted.
-            "task_dep": [f"drawing:{stem}"],
-            "uptodate": [
-                config_changed({
-                    "mode": mode.value, "inputs": [_rel_tag(dep) for dep in deps],
-                    "profile": profile._asdict(),
-                }),
-                not _cache.forced_refresh(f"check:machinist_review:{stem}"),
-            ],
-            "targets": [
-                str(_machinist_review_stamp(stem)),
-                str(directory / f"{stem}.aggregate.json"),
-                str(directory / f"{stem}.aggregate.md"),
-                *(
-                    str(directory / stem / "runs" / f"r{run}" / f"{stem}.json")
-                    for run in range(1, 4)
-                ),
-            ],
-            "actions": [(_cached_machinist_review_action, [stem, mode, profile])],
-            "clean": True,
-            "verbosity": 2,
-        }
+        yield _machinist_review_task(stem, mode, profile)
 
 
 def _executed_closure(cmd: list[str]) -> set[str]:
@@ -3567,32 +3587,19 @@ def _executed_closure(cmd: list[str]) -> set[str]:
     }
 
 
-def task_check():
-    """SolidWorks-FREE checks -- host-budgeted independently of remote leaves.
-
-    ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
-    runs those two without connecting to SolidWorks); ``check:graph`` /
-    ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
-    pytest. None takes the COM seat lock; each reserves local CPU-worker slots.
-    """
+def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     import _process_plans
 
-    config_py = str((SCRIPTS_DIR / "_config.py").resolve())
-    # The tolerance audit (check:config) scans every build_*.py for PART_NAME, so a
-    # part script added/renamed without touching the config YAML must still
-    # invalidate the stamp (codex review).
-    part_script_deps = [str(p.resolve()) for p in part_scripts()]
-    # These gates never use --lf/--ff. Disable the shared pytest cache: its
-    # atomic pytest-cache-files-* -> .pytest_cache rename races a sibling's
-    # Windows collection lstat when doit fans checks out under -n.
-    pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
     recipe_tests = [
         SCRIPTS_DIR / "test_dodo_recipe.py",
+        SCRIPTS_DIR / "test_selected_factories.py",
         # Source-only, per-hub part recipe boundaries (issue #1638).
         SCRIPTS_DIR / "test_recipe_subsystem_isolation.py",
         SCRIPTS_DIR / "test_local_check.py",
         SCRIPTS_DIR / "test_farm_admission.py",
         SCRIPTS_DIR / "test_machinist_review_leaf.py",
+        # The selected execution loader is an offline, fenced root-level regression.
+        REPO_ROOT / "tests" / "test_selected_execution.py",
         # Which recorded-input changes may skip the insert/mate loop (the
         # explode tier), and the in-place explode re-authoring against fakes.
         SCRIPTS_DIR / "test_refresh_tier.py",
@@ -3974,6 +3981,69 @@ def task_check():
             ),
         }
     )
+    return {
+        # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
+        # _config.parts(), and module_deps_of tracks _config.py but not the
+        # YAML documents it loads -- without these deps a finish/material
+        # edit would leave the stamp valid and the guard silently stale
+        # (codex review #361).
+        "file_dep": [
+            str((REPO_ROOT / "dodo.py").resolve()),
+            str((REPO_ROOT / "build.py").resolve()),
+            # Pytest hooks/child startup sit outside the cad/scripts import
+            # map, so the executed closure cannot discover these inputs.
+            str((REPO_ROOT / "conftest.py").resolve()),
+            str((REPO_ROOT / "tests" / "_child_guard" / "sitecustomize.py").resolve()),
+            str(
+                (REPO_ROOT / "tests" / "_child_guard" / "harmonic_solidworks_guard.py")
+                .resolve()
+            ),
+            *recipe_test_deps,
+            *_CONFIG_YAMLS,
+            *sorted(
+                str(template.path.resolve())
+                for template in DRAWING_TEMPLATES.values()
+            ),
+        ],
+        # Repo-relative (the gate runs with cwd=REPO_ROOT): ~290 absolute
+        # paths under a farm-run snapshot root exceed Windows' 32,767-char
+        # command line (WinError 206), failing the gate before pytest runs.
+        "cmd": [
+            *pytest_cmd,
+            # Fixed explicit inventory: skip repeated parent-directory
+            # virtualenv-marker probes, not general discovery exclusions.
+            "--collect-in-virtualenv",
+            # Request up to eight workers; local admission reduces this
+            # to available host CPU slots. Remote leaves have their own budget.
+            # Steal individual tests to avoid a dominant-file tail.
+            "-n",
+            "8",
+            "--dist",
+            "worksteal",
+            *(
+                str(path.resolve().relative_to(REPO_ROOT.resolve()))
+                for path in recipe_tests
+            ),
+        ],
+        # A deleted/renamed source drops out of file_dep without comparison.
+        # Keep inventories for both the adapter and source-scanning recipe
+        # guards so additions/removals cannot leave an old green stamp.
+        "uptodate": [
+            config_changed(
+                {
+                    "submodule_sources": [
+                        _rel_tag(path) for path in adapter_contract_deps
+                    ],
+                    "recipe_scanned_sources": [
+                        _rel_tag(path) for path in sorted(scanned_by_binding_gate)
+                    ],
+                }
+            )
+        ],
+    }
+
+
+def _check_undefined_names_spec(pytest_cmd: list[str]) -> dict[str, Any]:
     tracked_python = [
         str((REPO_ROOT / path).resolve())
         for path in subprocess.check_output(
@@ -3991,429 +4061,469 @@ def task_check():
         ).decode("utf-8").split("\0")
         if path.endswith(".py")
     ]
-    specs = {
-        "undefined_names": {
-            # Ruff scans the entire scripts tree, not only import-reachable modules.
-            # Depend on every tracked Python input so a fresh typo invalidates the stamp.
-            "file_dep": sorted(
-                {
-                    *tracked_python,
-                    str((SCRIPTS_DIR / "test_undefined_names.py").resolve()),
-                }
+    return {
+        # Ruff scans the entire scripts tree, not only import-reachable modules.
+        # Depend on every tracked Python input so a fresh typo invalidates the stamp.
+        "file_dep": sorted(
+            {
+                *tracked_python,
+                str((SCRIPTS_DIR / "test_undefined_names.py").resolve()),
+            }
+        ),
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_undefined_names.py")],
+    }
+
+
+def _check_math_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    config_py = str((SCRIPTS_DIR / "_config.py").resolve())
+    return {
+        # The import closure of verify.py (truth_model, the base-footprint
+        # build modules and the *_spec.py single-source modules they import,
+        # build_summing_assembly for the counter-spring hang, ...) is derived
+        # below from the command's entry point, like every gate's. Only the
+        # YAML layer truth_model reads outside the _config accessors is
+        # declared here (codex review).
+        "file_dep": [config_py, *_CONFIG_YAMLS],
+        "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
+    }
+
+
+def _check_config_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    config_py = str((SCRIPTS_DIR / "_config.py").resolve())
+    part_script_deps = [str(p.resolve()) for p in part_scripts()]
+    return {
+        "file_dep": [
+            str(VERIFY_PY),
+            str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
+            config_py,
+            *_CONFIG_YAMLS,
+            *part_script_deps,
+        ],
+        "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
+    }
+
+
+def _check_graph_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    config_py = str((SCRIPTS_DIR / "_config.py").resolve())
+    part_script_deps = [str(p.resolve()) for p in part_scripts()]
+    return {
+        # test_config_accessor_coverage reads _config.py, so a new accessor
+        # added there (without an entry in _buildgraph) must invalidate this
+        # stamp -- else the "fails loud" coverage test silently never re-runs
+        # and the perf benefit is lost (codex review #193).
+        "file_dep": [
+            str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+            str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
+            str((SCRIPTS_DIR / "test_part_coverage.py").resolve()),
+            *part_script_deps,
+            *(str(script_for(stem).resolve()) for stem in ASSEMBLY_ORDER),
+            # test_assembly_sheet_isolation walks every builder's import
+            # closure and scans the sheet/steps sources; it imports none.
+            *(
+                dep
+                for stem in ASSEMBLY_ORDER
+                for dep in module_deps_of(script_for(stem))
             ),
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_undefined_names.py")],
-        },
-        "math": {
-            # The import closure of verify.py (truth_model, the base-footprint
-            # build modules and the *_spec.py single-source modules they import,
-            # build_summing_assembly for the counter-spring hang, ...) is derived
-            # below from the command's entry point, like every gate's. Only the
-            # YAML layer truth_model reads outside the _config accessors is
-            # declared here (codex review).
-            "file_dep": [config_py, *_CONFIG_YAMLS],
-            "cmd": [sys.executable, str(VERIFY_PY), "--suite", "math"],
-        },
-        "config": {
-            "file_dep": [
-                str(VERIFY_PY),
-                str((SCRIPTS_DIR / "gen_dimensions.py").resolve()),
-                config_py,
-                *_CONFIG_YAMLS,
-                *part_script_deps,
-            ],
-            "cmd": [sys.executable, str(VERIFY_PY), "--suite", "config"],
-        },
-        "graph": {
-            # test_config_accessor_coverage reads _config.py, so a new accessor
-            # added there (without an entry in _buildgraph) must invalidate this
-            # stamp -- else the "fails loud" coverage test silently never re-runs
-            # and the perf benefit is lost (codex review #193).
-            "file_dep": [
+            *(
+                str(path.resolve())
+                for pattern in ("*_assembly_sheet.py", "*_steps.py")
+                for path in sorted(SCRIPTS_DIR.glob(pattern))
+            ),
+            config_py,
+        ],
+        "cmd": [
+            *pytest_cmd,
+            str(SCRIPTS_DIR / "test_buildgraph.py"),
+            str(SCRIPTS_DIR / "test_part_coverage.py"),
+            str(SCRIPTS_DIR / "test_assembly_sheet_isolation.py"),
+        ],
+    }
+
+
+def _check_nameplate_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The plate outline, notched field and engraving are all vendored
+        # geometry; any contour or its pinned area/bbox must invalidate this
+        # SolidWorks-free integrity gate.
+        "file_dep": [
+            str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
+            str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
+            str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
+            str(
+                (
+                    REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
+                ).resolve()
+            ),
+            str(
+                (
+                    REPO_ROOT / "cad" / "references" / "fr-nameplate-outline.dxf"
+                ).resolve()
+            ),
+            str(
+                (
+                    REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
+                ).resolve()
+            ),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_fr_nameplate_geometry.py")],
+    }
+
+
+def _check_numerals_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # Guards the GENERATED numerals DXF the ms-stick build imports:
+        # byte-identical regeneration from gen_ms_stick_numerals_dxf,
+        # closed-loop census, clearance from every tick, and the area/bbox
+        # the build pins.
+        # Deps: the test, the asset, the generator/build/font-render modules it
+        # imports (module_deps_of) AND the cad/config files those modules read
+        # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
+        # scale) -- so a layout-constant OR scale-config edit that forgot to
+        # regenerate the DXF fails this gate instead of reusing its stamp.
+        "file_dep": [
+            str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
+            *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
+            *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
+            str(
+                (
+                    REPO_ROOT
+                    / "cad"
+                    / "references"
+                    / "ms-stick-numerals.dxf"
+                ).resolve()
+            ),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
+    }
+
+
+def _check_cache_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The artefact-cache provenance/observability unit tests (issue #73):
+        # key derivation, event log, store-skip-on-hit drift. Pure python.
+        "file_dep": [
+            str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
+            str((SCRIPTS_DIR / "test_artifact_cache.py").resolve()),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
+    }
+
+
+def _check_telemetry_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The OTel observability spine: severity split, no-gap span status,
+        # log<->trace correlation, cross-process propagation, plus the release
+        # neutral-export aggregate/event shape. Pure python, so it runs as an
+        # offline gate -- without this the spine or release observability could
+        # regress while the required checks stay green.
+        "file_dep": [
+            str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+            str((SCRIPTS_DIR / "cut_release.py").resolve()),
+            str((SCRIPTS_DIR / "export_models.py").resolve()),
+            str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
+            str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
+        ],
+        "cmd": [
+            *pytest_cmd,
+            str(SCRIPTS_DIR / "test_telemetry.py"),
+            str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
+        ],
+    }
+
+
+def _check_watchdog_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The COM crash/hang watchdog (_watchdog.py): a NEW sldexitapp.exe
+        # (SolidWorks' crash-report dialog) or 15 min of telemetry silence
+        # hard-exits the COM subprocess (releasing the seat via the doit
+        # parent); a hung SW window only warns. Pure python, injectable
+        # probes -- so the fatal/log-only contract can't silently regress.
+        # The test's closure (_session, _paths, _com, ...) is a dep because
+        # the gate also pins the INTEGRATION (run_build arms/disarms the
+        # watchdog, CAD_ROOT steers seat parking): an edit there must re-run
+        # this gate, not reuse the old stamp (codex #344).
+        "file_dep": [
+            *module_deps_of(SCRIPTS_DIR / "test_watchdog.py"),
+            str((SCRIPTS_DIR / "_watchdog.py").resolve()),
+            str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+            # run_build's teardown (seat parking) lives in the recipe-inert
+            # module, which no module_deps_of closure reaches.
+            str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
+            str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
+    }
+
+
+def _check_verify_telemetry_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The verify-gate span SHAPE, driven by a mock SolidWorks whose COM
+        # calls sleep at durations calibrated from the release logs: the
+        # per-component dof.check / per-target whats_wrong floods stay
+        # collapsed, and the slow gates (over-constrained / gear-ratios /
+        # component-count / open) keep their child spans -- no gate regresses
+        # back into one opaque 80-90 s span. Pure python (no SolidWorks).
+        "file_dep": [
+            str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+            str((SCRIPTS_DIR / "_assembly.py").resolve()),
+            str((SCRIPTS_DIR / "verify.py").resolve()),
+            str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve()),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
+    }
+
+
+def _check_freshness_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # verify.py's standalone-staleness guard: reuses doit's .doit.db ledger
+        # + ContentChecker to refuse scoring a stale tree (the gap that let a
+        # never-rebuilt 8-component frame trip component-count). Pure python ->
+        # offline gate, so the guard can't regress while required checks stay green.
+        "file_dep": [
+            str(VERIFY_PY),
+            str((REPO_ROOT / "dodo.py").resolve()),
+            str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+            str((SCRIPTS_DIR / "test_verify_freshness.py").resolve()),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
+    }
+
+
+def _check_flagonly_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
+        # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
+        # wired here so a regression in _com._flag_only fails an offline gate.
+        "file_dep": [
+            str((SCRIPTS_DIR / "_com.py").resolve()),
+            str((SCRIPTS_DIR / "test_flag_only.py").resolve()),
+        ],
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
+    }
+
+
+def _check_partiso_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    part_script_deps = [str(p.resolve()) for p in part_scripts()]
+    return {
+        # Guards the three-tier submodule digest: parts must never import the
+        # assembly/motion + drawing modules the PART recipe excludes, AND assemblies
+        # must never import the drawing module the ASSEMBLY recipe excludes
+        # (_submodule_part_digest / _submodule_assembly_digest), else that exclusion
+        # could silently skip a real rebuild. Derives its forbidden sets from dodo's
+        # exclude lists, so it depends on dodo.py + every part AND assembly script
+        # AND the transitive repo-local helper closure the test actually scans
+        # (module_deps_of): a helper like _gear.py gaining a forbidden import while
+        # no build script changes must still re-run this gate, else the invariant
+        # goes stale unnoticed (codex #191). The entry point of any new forbidden
+        # import is always in this set -- a part/assembly script (caught) or a helper
+        # already in its closure (caught) -- so it is self-healing. Pure python ->
+        # offline.
+        "file_dep": sorted(
+            {
+                str((REPO_ROOT / "dodo.py").resolve()),
                 str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                str((SCRIPTS_DIR / "test_buildgraph.py").resolve()),
-                str((SCRIPTS_DIR / "test_part_coverage.py").resolve()),
+                str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
                 *part_script_deps,
-                *(str(script_for(stem).resolve()) for stem in ASSEMBLY_ORDER),
-                # test_assembly_sheet_isolation walks every builder's import
-                # closure and scans the sheet/steps sources; it imports none.
+                *(dep for p in part_scripts() for dep in module_deps_of(p)),
+                *(
+                    str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
+                    for s in ASSEMBLY_ORDER
+                ),
                 *(
                     dep
-                    for stem in ASSEMBLY_ORDER
-                    for dep in module_deps_of(script_for(stem))
+                    for s in ASSEMBLY_ORDER
+                    for dep in module_deps_of(
+                        SCRIPTS_DIR / f"build_{s}_assembly.py"
+                    )
                 ),
-                *(
-                    str(path.resolve())
-                    for pattern in ("*_assembly_sheet.py", "*_steps.py")
-                    for path in sorted(SCRIPTS_DIR.glob(pattern))
-                ),
-                config_py,
-            ],
-            "cmd": [
-                *pytest_cmd,
-                str(SCRIPTS_DIR / "test_buildgraph.py"),
-                str(SCRIPTS_DIR / "test_part_coverage.py"),
-                str(SCRIPTS_DIR / "test_assembly_sheet_isolation.py"),
-            ],
-        },
-        "nameplate": {
-            # The plate outline, notched field and engraving are all vendored
-            # geometry; any contour or its pinned area/bbox must invalidate this
-            # SolidWorks-free integrity gate.
-            "file_dep": [
-                str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
-                str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
-                str((SCRIPTS_DIR / "build_fr_nameplate.py").resolve()),
-                str(
-                    (
-                        REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
-                    ).resolve()
-                ),
-                str(
-                    (
-                        REPO_ROOT / "cad" / "references" / "fr-nameplate-outline.dxf"
-                    ).resolve()
-                ),
-                str(
-                    (
-                        REPO_ROOT / "cad" / "references" / "fr-nameplate-field.dxf"
-                    ).resolve()
-                ),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_fr_nameplate_geometry.py")],
-        },
-        "numerals": {
-            # Guards the GENERATED numerals DXF the ms-stick build imports:
-            # byte-identical regeneration from gen_ms_stick_numerals_dxf,
-            # closed-loop census, clearance from every tick, and the area/bbox
-            # the build pins.
-            # Deps: the test, the asset, the generator/build/font-render modules it
-            # imports (module_deps_of) AND the cad/config files those modules read
-            # (_config_deps -> machine/amplitude.yaml, which now owns the engraved
-            # scale) -- so a layout-constant OR scale-config edit that forgot to
-            # regenerate the DXF fails this gate instead of reusing its stamp.
-            "file_dep": [
-                str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
-                *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
-                *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
-                str(
-                    (
-                        REPO_ROOT
-                        / "cad"
-                        / "references"
-                        / "ms-stick-numerals.dxf"
-                    ).resolve()
-                ),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
-        },
-        "recipe": {
-            # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
-            # _config.parts(), and module_deps_of tracks _config.py but not the
-            # YAML documents it loads -- without these deps a finish/material
-            # edit would leave the stamp valid and the guard silently stale
-            # (codex review #361).
-            "file_dep": [
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((REPO_ROOT / "build.py").resolve()),
-                # Pytest hooks/child startup sit outside the cad/scripts import
-                # map, so the executed closure cannot discover these inputs.
-                str((REPO_ROOT / "conftest.py").resolve()),
-                str((REPO_ROOT / "tests" / "_child_guard" / "sitecustomize.py").resolve()),
-                str(
-                    (REPO_ROOT / "tests" / "_child_guard" / "harmonic_solidworks_guard.py")
-                    .resolve()
-                ),
-                *recipe_test_deps,
-                *_CONFIG_YAMLS,
-                *sorted(
-                    str(template.path.resolve())
-                    for template in DRAWING_TEMPLATES.values()
-                ),
-            ],
-            # Repo-relative (the gate runs with cwd=REPO_ROOT): ~290 absolute
-            # paths under a farm-run snapshot root exceed Windows' 32,767-char
-            # command line (WinError 206), failing the gate before pytest runs.
-            "cmd": [
-                *pytest_cmd,
-                # Fixed explicit inventory: skip repeated parent-directory
-                # virtualenv-marker probes, not general discovery exclusions.
-                "--collect-in-virtualenv",
-                # Request up to eight workers; local admission reduces this
-                # to available host CPU slots. Remote leaves have their own budget.
-                # Steal individual tests to avoid a dominant-file tail.
-                "-n",
-                "8",
-                "--dist",
-                "worksteal",
-                *(
-                    str(path.resolve().relative_to(REPO_ROOT.resolve()))
-                    for path in recipe_tests
-                ),
-            ],
-            # A deleted/renamed source drops out of file_dep without comparison.
-            # Keep inventories for both the adapter and source-scanning recipe
-            # guards so additions/removals cannot leave an old green stamp.
-            "uptodate": [
-                config_changed(
-                    {
-                        "submodule_sources": [
-                            _rel_tag(path) for path in adapter_contract_deps
-                        ],
-                        "recipe_scanned_sources": [
-                            _rel_tag(path) for path in sorted(scanned_by_binding_gate)
-                        ],
-                    }
-                )
-            ],
-        },
-        "cache": {
-            # The artefact-cache provenance/observability unit tests (issue #73):
-            # key derivation, event log, store-skip-on-hit drift. Pure python.
-            "file_dep": [
-                str((SCRIPTS_DIR / "_artifact_cache.py").resolve()),
-                str((SCRIPTS_DIR / "test_artifact_cache.py").resolve()),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_artifact_cache.py")],
-        },
-        "telemetry": {
-            # The OTel observability spine: severity split, no-gap span status,
-            # log<->trace correlation, cross-process propagation, plus the release
-            # neutral-export aggregate/event shape. Pure python, so it runs as an
-            # offline gate -- without this the spine or release observability could
-            # regress while the required checks stay green.
-            "file_dep": [
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                str((SCRIPTS_DIR / "cut_release.py").resolve()),
-                str((SCRIPTS_DIR / "export_models.py").resolve()),
-                str((SCRIPTS_DIR / "test_telemetry.py").resolve()),
-                str((SCRIPTS_DIR / "test_cut_release_telemetry.py").resolve()),
-            ],
-            "cmd": [
-                *pytest_cmd,
-                str(SCRIPTS_DIR / "test_telemetry.py"),
-                str(SCRIPTS_DIR / "test_cut_release_telemetry.py"),
-            ],
-        },
-        "watchdog": {
-            # The COM crash/hang watchdog (_watchdog.py): a NEW sldexitapp.exe
-            # (SolidWorks' crash-report dialog) or 15 min of telemetry silence
-            # hard-exits the COM subprocess (releasing the seat via the doit
-            # parent); a hung SW window only warns. Pure python, injectable
-            # probes -- so the fatal/log-only contract can't silently regress.
-            # The test's closure (_session, _paths, _com, ...) is a dep because
-            # the gate also pins the INTEGRATION (run_build arms/disarms the
-            # watchdog, CAD_ROOT steers seat parking): an edit there must re-run
-            # this gate, not reuse the old stamp (codex #344).
-            "file_dep": [
-                *module_deps_of(SCRIPTS_DIR / "test_watchdog.py"),
-                str((SCRIPTS_DIR / "_watchdog.py").resolve()),
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                # run_build's teardown (seat parking) lives in the recipe-inert
-                # module, which no module_deps_of closure reaches.
-                str((SCRIPTS_DIR / "_seat_forensics.py").resolve()),
-                str((SCRIPTS_DIR / "test_watchdog.py").resolve()),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_watchdog.py")],
-        },
-        "verify_telemetry": {
-            # The verify-gate span SHAPE, driven by a mock SolidWorks whose COM
-            # calls sleep at durations calibrated from the release logs: the
-            # per-component dof.check / per-target whats_wrong floods stay
-            # collapsed, and the slow gates (over-constrained / gear-ratios /
-            # component-count / open) keep their child spans -- no gate regresses
-            # back into one opaque 80-90 s span. Pure python (no SolidWorks).
-            "file_dep": [
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                str((SCRIPTS_DIR / "_assembly.py").resolve()),
-                str((SCRIPTS_DIR / "verify.py").resolve()),
-                str((SCRIPTS_DIR / "test_verify_telemetry.py").resolve()),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_telemetry.py")],
-        },
-        "freshness": {
-            # verify.py's standalone-staleness guard: reuses doit's .doit.db ledger
-            # + ContentChecker to refuse scoring a stale tree (the gap that let a
-            # never-rebuilt 8-component frame trip component-count). Pure python ->
-            # offline gate, so the guard can't regress while required checks stay green.
-            "file_dep": [
-                str(VERIFY_PY),
+            }
+        ),
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
+    }
+
+
+def _check_inert_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    scanned_by_binding_gate = {
+        *(str(_resolved(path)) for path in SCRIPTS_DIR.glob("*.py")),
+        *(str(_resolved(path)) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+    }
+    return {
+        # Recipe-inert modules (_buildgraph.RECIPE_INERT_MODULES) are in no
+        # cache key, so they must never change a saved artefact: pinned call
+        # sites only, no COM mutator before a save, pinned reads of tracked
+        # code (test_recipe_inert.py). The gate scans every local module for
+        # call sites, so every one is a dep, inert modules included.
+        "file_dep": sorted(
+            {
                 str((REPO_ROOT / "dodo.py").resolve()),
                 str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                str((SCRIPTS_DIR / "test_verify_freshness.py").resolve()),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_verify_freshness.py")],
-        },
-        "flagonly": {
-            # The targeted late-binding flag helper (_flag_only, issue #87) -- pure
-            # dispatch glue. Was merged WITHOUT a check task, so it never ran in CI;
-            # wired here so a regression in _com._flag_only fails an offline gate.
-            "file_dep": [
-                str((SCRIPTS_DIR / "_com.py").resolve()),
-                str((SCRIPTS_DIR / "test_flag_only.py").resolve()),
-            ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_flag_only.py")],
-        },
-        "partiso": {
-            # Guards the three-tier submodule digest: parts must never import the
-            # assembly/motion + drawing modules the PART recipe excludes, AND assemblies
-            # must never import the drawing module the ASSEMBLY recipe excludes
-            # (_submodule_part_digest / _submodule_assembly_digest), else that exclusion
-            # could silently skip a real rebuild. Derives its forbidden sets from dodo's
-            # exclude lists, so it depends on dodo.py + every part AND assembly script
-            # AND the transitive repo-local helper closure the test actually scans
-            # (module_deps_of): a helper like _gear.py gaining a forbidden import while
-            # no build script changes must still re-run this gate, else the invariant
-            # goes stale unnoticed (codex #191). The entry point of any new forbidden
-            # import is always in this set -- a part/assembly script (caught) or a helper
-            # already in its closure (caught) -- so it is self-healing. Pure python ->
-            # offline.
-            "file_dep": sorted(
-                {
-                    str((REPO_ROOT / "dodo.py").resolve()),
-                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                    str((SCRIPTS_DIR / "test_part_isolation.py").resolve()),
-                    *part_script_deps,
-                    *(dep for p in part_scripts() for dep in module_deps_of(p)),
-                    *(
-                        str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
-                        for s in ASSEMBLY_ORDER
-                    ),
-                    *(
-                        dep
-                        for s in ASSEMBLY_ORDER
-                        for dep in module_deps_of(
-                            SCRIPTS_DIR / f"build_{s}_assembly.py"
-                        )
-                    ),
-                }
-            ),
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_part_isolation.py")],
-        },
-        "inert": {
-            # Recipe-inert modules (_buildgraph.RECIPE_INERT_MODULES) are in no
-            # cache key, so they must never change a saved artefact: pinned call
-            # sites only, no COM mutator before a save, pinned reads of tracked
-            # code (test_recipe_inert.py). The gate scans every local module for
-            # call sites, so every one is a dep, inert modules included.
-            "file_dep": sorted(
-                {
-                    str((REPO_ROOT / "dodo.py").resolve()),
-                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                    str((SCRIPTS_DIR / "test_recipe_inert.py").resolve()),
-                    *scanned_by_binding_gate,
-                }
-            ),
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_recipe_inert.py")],
-        },
-        "budget": {
-            # The coefficient-error budget (cad/docs/tolerance-policy.md): the
-            # sensitivity model's linear gains agree with the exact channel
-            # kinematics, the calibrated readout cancels common-mode error, the
-            # nominal-design residual is corrected below 0.05 % MAE, every
-            # toleranced nominal still resolves to the spec constant the CAD
-            # builds from, the drawing limits equal the budget's, and the Monte
-            # Carlo of error_budget.yaml lands inside its targets. Pure python.
-            # Deps: the model, its config, every spec module the model OR the
-            # test imports (the test lazily imports the notes/spec modules whose
-            # drawing lines it pins to the budget -- a note edit must re-run
-            # the gate, not reuse the stamp; Codex #742), and the three builders
-            # the test reads as TEXT (they import SolidWorks so cannot be
-            # imported offline: the assembly for its shared stations, the stick
-            # for its spec import, the cylinder gear for its NotchPhase
-            # tolerance call): module_deps_of cannot see them.
-            "file_dep": sorted(
-                {
-                    str((SCRIPTS_DIR / "error_budget.py").resolve()),
-                    str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
-                    str((SCRIPTS_DIR / "build_ch_channel_assembly.py").resolve()),
-                    str((SCRIPTS_DIR / "build_dt_cylinder_gear.py").resolve()),
-                    str((SCRIPTS_DIR / "build_ms_stick.py").resolve()),
-                    # config: derived from the accessor scan of the model's and
-                    # the test's import closures (the same _config_deps every
-                    # part uses), never hand-listed -- a hand list missed
-                    # machine/gear_train.yaml, which cylinder_gear_spec reads
-                    # for the pitch the mesh-lag check converts at (Codex).
-                    *_config_deps(SCRIPTS_DIR / "error_budget.py"),
-                    *_config_deps(SCRIPTS_DIR / "test_error_budget.py"),
-                    str((CONFIG_DIR / "error_budget.yaml").resolve()),
-                    *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
-                    *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
-                }
-            ),
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
-        },
-        "joint_retention": {
-            # Writes cad/out/reports/joint-retention.{json,md}. The joint table
-            # is checked against the parts each assembly script references
-            # (_buildgraph.references_of reads the scripts as TEXT, so the
-            # import graph cannot see them).
-            "file_dep": sorted(
-                {
-                    str((REPO_ROOT / "dodo.py").resolve()),
-                    # references_of runs here, but module_deps_of skips
-                    # _buildgraph itself, so name it.
-                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
-                    *(
-                        str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
-                        for s in ASSEMBLY_ORDER
-                    ),
-                }
-            ),
-            "cmd": [sys.executable, str(SCRIPTS_DIR / "joint_retention.py")],
-            # The reports are outputs too: deleting one reruns the check.
-            "targets": [
-                str(REPORTS / "joint-retention.json"),
-                str(REPORTS / "joint-retention.md"),
-            ],
-        },
-        "features_bound": {
-            "file_dep": [
-                str((SCRIPTS_DIR / "features_bound.py").resolve()),
-                *(str(path) for path in _feature_bundle_outputs()),
-                *(str((CAD_OUT / "step" / path.name).resolve())
-                  for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
-            ],
-            "task_dep": ["package:features", "export"],
-            "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
-                    "--out", str(CAD_OUT)],
-        },
+                str((SCRIPTS_DIR / "test_recipe_inert.py").resolve()),
+                *scanned_by_binding_gate,
+            }
+        ),
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_recipe_inert.py")],
     }
-    # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
-    # spec added here without the matching name (or vice versa) would silently never run
-    # in the default paths -- exactly the gap Codex caught on freshness/flagonly. Keep
-    # the two in lockstep.
-    _all_check_names = set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES)
-    assert set(specs) == _all_check_names, (
-        f"check specs vs check-names drift: {set(specs) ^ _all_check_names}"
-    )
-    for name, spec in specs.items():
-        stamp = str(REPORTS / f"check-{name}.ok")
-        # A gate's stamp must go stale whenever code or config it EXECUTES changes,
-        # so every .py entry point on its command line contributes its local import
-        # closure (lazy imports included) and the config that closure reads. Hand
-        # lists drifted: check:math never listed build_summing_assembly.py or
-        # gooseneck_geom.py, so a gooseneck edit left it green without running
-        # (2026-09-23). The hand-listed deps above stay for what an import graph
-        # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
-        # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
-        executed = _executed_closure(spec["cmd"])
-        yield {
-            "name": name,
-            "file_dep": sorted({
-                *spec["file_dep"], *executed, str(Path(_local_check.__file__).resolve()),
-            }),
-            "task_dep": spec.get("task_dep", []),
-            "uptodate": spec.get("uptodate", []),
-            "targets": [stamp, *spec.get("targets", [])],
-            "actions": [
-                (_run_stamped, [
-                    spec["cmd"], spec.get("label", f"check {name}"),
-                    stamp, f"check:{name}",
-                ])
-            ],
-            "clean": True,
-            "verbosity": 2,
-        }
+
+
+def _check_budget_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # The coefficient-error budget (cad/docs/tolerance-policy.md): the
+        # sensitivity model's linear gains agree with the exact channel
+        # kinematics, the calibrated readout cancels common-mode error, the
+        # nominal-design residual is corrected below 0.05 % MAE, every
+        # toleranced nominal still resolves to the spec constant the CAD
+        # builds from, the drawing limits equal the budget's, and the Monte
+        # Carlo of error_budget.yaml lands inside its targets. Pure python.
+        # Deps: the model, its config, every spec module the model OR the
+        # test imports (the test lazily imports the notes/spec modules whose
+        # drawing lines it pins to the budget -- a note edit must re-run
+        # the gate, not reuse the stamp; Codex #742), and the three builders
+        # the test reads as TEXT (they import SolidWorks so cannot be
+        # imported offline: the assembly for its shared stations, the stick
+        # for its spec import, the cylinder gear for its NotchPhase
+        # tolerance call): module_deps_of cannot see them.
+        "file_dep": sorted(
+            {
+                str((SCRIPTS_DIR / "error_budget.py").resolve()),
+                str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
+                str((SCRIPTS_DIR / "build_ch_channel_assembly.py").resolve()),
+                str((SCRIPTS_DIR / "build_dt_cylinder_gear.py").resolve()),
+                str((SCRIPTS_DIR / "build_ms_stick.py").resolve()),
+                # config: derived from the accessor scan of the model's and
+                # the test's import closures (the same _config_deps every
+                # part uses), never hand-listed -- a hand list missed
+                # machine/gear_train.yaml, which cylinder_gear_spec reads
+                # for the pitch the mesh-lag check converts at (Codex).
+                *_config_deps(SCRIPTS_DIR / "error_budget.py"),
+                *_config_deps(SCRIPTS_DIR / "test_error_budget.py"),
+                str((CONFIG_DIR / "error_budget.yaml").resolve()),
+                *module_deps_of(SCRIPTS_DIR / "error_budget.py"),
+                *module_deps_of(SCRIPTS_DIR / "test_error_budget.py"),
+            }
+        ),
+        "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
+    }
+
+
+def _check_joint_retention_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        # Writes cad/out/reports/joint-retention.{json,md}. The joint table
+        # is checked against the parts each assembly script references
+        # (_buildgraph.references_of reads the scripts as TEXT, so the
+        # import graph cannot see them).
+        "file_dep": sorted(
+            {
+                str((REPO_ROOT / "dodo.py").resolve()),
+                # references_of runs here, but module_deps_of skips
+                # _buildgraph itself, so name it.
+                str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                *(
+                    str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
+                    for s in ASSEMBLY_ORDER
+                ),
+            }
+        ),
+        "cmd": [sys.executable, str(SCRIPTS_DIR / "joint_retention.py")],
+    }
+
+
+def _check_features_bound_spec(pytest_cmd: list[str]) -> dict[str, Any]:
+    return {
+        "file_dep": [
+            str((SCRIPTS_DIR / "features_bound.py").resolve()),
+            *(str(path) for path in _feature_bundle_outputs()),
+            *(str((CAD_OUT / "step" / path.name).resolve())
+              for path in _feature_bundle_outputs() if path.suffix == ".STEP"),
+        ],
+        "task_dep": ["package:features", "export"],
+        "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
+                "--out", str(CAD_OUT)],
+    }
+
+
+_CHECK_SPEC_BUILDERS = {
+    "undefined_names": _check_undefined_names_spec,
+    "math": _check_math_spec,
+    "config": _check_config_spec,
+    "graph": _check_graph_spec,
+    "nameplate": _check_nameplate_spec,
+    "numerals": _check_numerals_spec,
+    "recipe": _check_recipe_spec,
+    "cache": _check_cache_spec,
+    "telemetry": _check_telemetry_spec,
+    "watchdog": _check_watchdog_spec,
+    "verify_telemetry": _check_verify_telemetry_spec,
+    "freshness": _check_freshness_spec,
+    "flagonly": _check_flagonly_spec,
+    "partiso": _check_partiso_spec,
+    "inert": _check_inert_spec,
+    "budget": _check_budget_spec,
+    "joint_retention": _check_joint_retention_spec,
+    "features_bound": _check_features_bound_spec,
+}
+
+
+def _check_spec(name: str) -> dict[str, Any]:
+    builder = _CHECK_SPEC_BUILDERS.get(name)
+    if builder is None:
+        raise ValueError(f"unknown canonical task: check:{name}")
+    # Parallel gates must not contend on pytest's shared cache directory.
+    pytest_cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"]
+    return builder(pytest_cmd)
+
+
+def _check_task(name: str) -> dict[str, Any]:
+    spec = _check_spec(name)
+    stamp = str(REPORTS / f"check-{name}.ok")
+    # A gate's stamp must go stale whenever code or config it EXECUTES changes,
+    # so every .py entry point on its command line contributes its local import
+    # closure (lazy imports included) and the config that closure reads. Hand
+    # lists drifted: check:math never listed build_summing_assembly.py or
+    # gooseneck_geom.py, so a gooseneck edit left it green without running
+    # (2026-09-23). The hand-listed deps above stay for what an import graph
+    # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
+    # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
+    executed = _executed_closure(spec["cmd"])
+    return {
+        "name": name,
+        "file_dep": sorted({
+            *spec["file_dep"], *executed, str(Path(_local_check.__file__).resolve()),
+        }),
+        "task_dep": spec.get("task_dep", []),
+        "uptodate": spec.get("uptodate", []),
+        "targets": _canonical_targets(f"check:{name}"),
+        "actions": [
+            (_run_stamped, [
+                spec["cmd"], spec.get("label", f"check {name}"),
+                stamp, f"check:{name}",
+            ])
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def _check_task_names() -> tuple[str, ...]:
+    names = tuple(_CHECK_SPEC_BUILDERS)
+    # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES,
+    # so a registered spec without a matching required/optional name (or vice
+    # versa) would silently never run in the default paths -- exactly the gap
+    # Codex caught on freshness/flagonly. Keep enrollment and specs in lockstep.
+    expected = set(_CHECK_NAMES) | set(_OPTIONAL_CHECK_NAMES)
+    assert set(names) == expected, f"check specs vs check-names drift: {set(names) ^ expected}"
+    return names
+
+
+def task_check():
+    """SolidWorks-FREE checks -- host-budgeted independently of remote leaves.
+
+    ``check:math`` / ``check:config`` wrap ``verify.py --suite ...`` (verify.py
+    runs those two without connecting to SolidWorks); ``check:graph`` /
+    ``check:nameplate`` / ``check:recipe`` wrap the pure-python unit tests via
+    pytest. None takes the COM seat lock; each reserves local CPU-worker slots.
+    """
+    for name in _check_task_names():
+        yield _check_task(name)
     yield from _machinist_review_tasks()
 
 
@@ -4455,71 +4565,73 @@ def _fail_prechips_inventory(label: str, inventory: str, diagnostic: str) -> Non
         raise RuntimeError(f"{label}: {inventory}: {diagnostic}")
 
 
-def task_prechips():
-    """Strict, SolidWorks-free travelers for enrolled parts (requires FreeCAD)."""
+def _prechips_task(stem: str) -> dict[str, Any]:
     import _process_plans
     from export_features import SUPPORTED_PARTS, bundle_paths
 
+    assert stem in SUPPORTED_PARTS, f"traveler stem is not exported: {stem}"
+    label = f"prechips:{stem}"
+    stamp = str(REPORTS / f"prechips-{stem}.ok")
+    cmd = [
+        sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
+        stem, "--out", str(CAD_OUT),
+    ]
+    diagnostic = None
+    try:
+        specs = [
+            SCRIPTS_DIR / f"{module}.py"
+            for module in _process_plans.shop_spec_modules()
+        ]
+        for spec in specs:
+            if not spec.is_file():
+                raise _process_plans.PlanBindError(
+                    f"missing CAD fixture spec: {spec.resolve()}; "
+                    "add the spec file or correct the inventory cad stem"
+                )
+    except _process_plans.PlanBindError as exc:
+        specs = []
+        diagnostic = str(exc)
+    actions = [(_run_stamped, [cmd, label, stamp, label])]
+    uptodate = [
+        (_process_plans.traveler_complete, [stem, CAD_OUT]),
+        _PrechipsKernelTracker(),
+    ]
+    if diagnostic is not None:
+        actions = [(
+            _fail_prechips_inventory,
+            [label, str(_process_plans.shop_paths()[0].resolve()), diagnostic],
+        )]
+        uptodate = [False]
+    # A captured shop error must fail without first exporting scoped geometry.
+    bundles = bundle_paths(stem, CAD_OUT) if diagnostic is None else ()
+    return {
+        "name": stem,
+        "file_dep": sorted({
+            str(_process_plans.plan_path(stem).resolve()),
+            *(str(path.resolve()) for path in _process_plans.shop_paths()),
+            *(str(path.resolve()) for path in bundles),
+            *(path for spec in specs for path in _executed_closure([str(spec)])),
+            str((REPO_ROOT / "pyproject.toml").resolve()),
+            str((REPO_ROOT / "uv.lock").resolve()),
+            str((REPO_ROOT / "dodo.py").resolve()),
+            str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+            *_executed_closure(cmd),
+        }),
+        "task_dep": [f"package:features:{stem}"] if diagnostic is None else [],
+        "targets": _canonical_targets(f"prechips:{stem}"),
+        "uptodate": uptodate,
+        "actions": actions,
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def task_prechips():
+    """Strict, SolidWorks-free travelers for enrolled parts (requires FreeCAD)."""
+    import _process_plans
+
     for stem in _process_plans.TRAVELER_STEMS:
-        assert stem in SUPPORTED_PARTS, f"traveler stem is not exported: {stem}"
-        label = f"prechips:{stem}"
-        directory = _process_plans.traveler_dir(stem, CAD_OUT)
-        stamp = str(REPORTS / f"prechips-{stem}.ok")
-        cmd = [
-            sys.executable, str(SCRIPTS_DIR / "prechips_traveler.py"),
-            stem, "--out", str(CAD_OUT),
-        ]
-        diagnostic = None
-        try:
-            specs = [
-                SCRIPTS_DIR / f"{module}.py"
-                for module in _process_plans.shop_spec_modules()
-            ]
-            for spec in specs:
-                if not spec.is_file():
-                    raise _process_plans.PlanBindError(
-                        f"missing CAD fixture spec: {spec.resolve()}; "
-                        "add the spec file or correct the inventory cad stem"
-                    )
-        except _process_plans.PlanBindError as exc:
-            specs = []
-            diagnostic = str(exc)
-        actions = [(_run_stamped, [cmd, label, stamp, label])]
-        uptodate = [
-            (_process_plans.traveler_complete, [stem, CAD_OUT]),
-            _PrechipsKernelTracker(),
-        ]
-        if diagnostic is not None:
-            actions = [(
-                _fail_prechips_inventory,
-                [label, str(_process_plans.shop_paths()[0].resolve()), diagnostic],
-            )]
-            uptodate = [False]
-        # A captured shop error must fail without first exporting scoped geometry.
-        bundles = bundle_paths(stem, CAD_OUT) if diagnostic is None else ()
-        yield {
-            "name": stem,
-            "file_dep": sorted({
-                str(_process_plans.plan_path(stem).resolve()),
-                *(str(path.resolve()) for path in _process_plans.shop_paths()),
-                *(str(path.resolve()) for path in bundles),
-                *(path for spec in specs for path in _executed_closure([str(spec)])),
-                str((REPO_ROOT / "pyproject.toml").resolve()),
-                str((REPO_ROOT / "uv.lock").resolve()),
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
-                *_executed_closure(cmd),
-            }),
-            "task_dep": [f"package:features:{stem}"] if diagnostic is None else [],
-            "targets": [
-                stamp, str(directory / "plan.toml"),
-                str(directory / "report.json"), str(directory / "traveler.html"),
-            ],
-            "uptodate": uptodate,
-            "actions": actions,
-            "clean": True,
-            "verbosity": 2,
-        }
+        yield _prechips_task(stem)
 
 
 def task_export():
@@ -4544,10 +4656,7 @@ def task_export():
     deps = _export_file_deps()
     return {
         "file_dep": deps,
-        "targets": [
-            str((CAD_OUT / "boxes" / "ha-harmonic-analyzer.json").resolve()),
-            str((REPORTS / "release-neutral.json").resolve()),
-        ],
+        "targets": _canonical_targets("export"),
         # Named STEP copies require the complete produced feature inventory;
         # native neutral formats also require soundness and kinematics.
         "task_dep": ["verify:soundness", "verify:kinematics", "package:features"],
@@ -4599,7 +4708,7 @@ def task_gallery():
                 )
             ),
         ],
-        "targets": [str((REPORTS / "comparison-gallery.json").resolve())],
+        "targets": _canonical_targets("gallery"),
         # Always run: the gallery's own --stale-only pass is the cheap freshness
         # check, and a pair whose render was deleted must be regenerated.
         "uptodate": [False],
@@ -4635,7 +4744,7 @@ def task_preflight():
     stamp = str(REPORTS / "preflight.ok")
     return {
         "file_dep": deps,
-        "targets": [stamp],
+        "targets": _canonical_targets("preflight"),
         "uptodate": [False],
         "actions": [
             (
@@ -4647,6 +4756,64 @@ def task_preflight():
                     [Path(stamp)],
                     "preflight",
                     stamp,
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def _package_feature_task(stem: str) -> dict[str, Any]:
+    deps = _feature_export_file_deps(stem)
+    outputs = _feature_export_outputs(stem)
+    return {
+        "name": f"features:{stem}",
+        "file_dep": deps,
+        "targets": [str(path) for path in outputs],
+        # Always probe the cache so existing but tampered/partial bundles repair.
+        "uptodate": [False],
+        "actions": [(_cached_com_action, [
+            f"package:features:{stem}",
+            [sys.executable, str(EXPORT_PY), "--features", stem],
+            deps, outputs, f"features-{stem.replace('_', '-')}",
+        ])],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+
+def _package_features_task() -> dict[str, Any]:
+    from export_features import SUPPORTED_PARTS
+
+    return {
+        "name": "features",
+        "task_dep": [f"package:features:{stem}" for stem in SUPPORTED_PARTS],
+        "file_dep": [str(path) for path in _feature_bundle_outputs()],
+        "actions": [],
+        "verbosity": 2,
+    }
+
+
+def _package_release_task() -> dict[str, Any]:
+    deps = _package_file_deps()
+    native = _package_cache_outputs()[0]
+    return {
+        "name": "release",
+        "file_dep": deps,
+        "targets": _canonical_targets("package:release"),
+        # Always run: a native member deleted from the prepared tree (with the CAD
+        # inputs unchanged) must be repaired, which a target-only check would skip.
+        "uptodate": [False],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "package:release",
+                    [sys.executable, str(PACKAGE_NATIVE_PY)],
+                    deps,
+                    [native],
+                    "package-release",
                 ],
             )
         ],
@@ -4674,56 +4841,9 @@ def task_package():
     from export_features import SUPPORTED_PARTS
 
     for stem in SUPPORTED_PARTS:
-        deps = _feature_export_file_deps(stem)
-        outputs = _feature_export_outputs(stem)
-        yield {
-            "name": f"features:{stem}",
-            "file_dep": deps,
-            "targets": [str(path) for path in outputs],
-            # Always probe the cache so existing but tampered/partial bundles repair.
-            "uptodate": [False],
-            "actions": [(_cached_com_action, [
-                f"package:features:{stem}",
-                [sys.executable, str(EXPORT_PY), "--features", stem],
-                deps, outputs, f"features-{stem.replace('_', '-')}",
-            ])],
-            "clean": True,
-            "verbosity": 2,
-        }
-
-
-    yield {
-        "name": "features",
-        "task_dep": [f"package:features:{stem}" for stem in SUPPORTED_PARTS],
-        "file_dep": [str(path) for path in _feature_bundle_outputs()],
-        "actions": [],
-        "verbosity": 2,
-    }
-
-    deps = _package_file_deps()
-    native = _package_cache_outputs()[0]
-    yield {
-        "name": "release",
-        "file_dep": deps,
-        "targets": [str(native / "native-package.json")],
-        # Always run: a native member deleted from the prepared tree (with the CAD
-        # inputs unchanged) must be repaired, which a target-only check would skip.
-        "uptodate": [False],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "package:release",
-                    [sys.executable, str(PACKAGE_NATIVE_PY)],
-                    deps,
-                    [native],
-                    "package-release",
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
+        yield _package_feature_task(stem)
+    yield _package_features_task()
+    yield _package_release_task()
 
 
 def _run_release(relargs):
@@ -4822,6 +4942,315 @@ def task_build_bare():
             + [f"assembly:{s}" for s in ASSEMBLY_ORDER]
         ),
     }
+
+
+_CANONICAL_FAMILIES = (
+    "part", "assembly", "drawing", "verify_soundness", "verify", "check",
+    "prechips", "package",
+)
+
+
+def _canonical_subtask_names(family: str) -> list[str]:
+    """Enumerate names without constructing task dictionaries or input closures."""
+    if family == "part":
+        return _seat_part_order()
+    if family in ("assembly", "verify_soundness"):
+        return list(ASSEMBLY_ORDER)
+    if family == "drawing":
+        return _drawing_order()
+    if family == "verify":
+        return list(_VERIFY_NAMES)
+    if family == "check":
+        return [
+            *_check_task_names(),
+            *(f"machinist_review:{stem}" for stem, _mode in _reviewed_drawings()),
+        ]
+    if family == "prechips":
+        import _process_plans
+
+        return list(_process_plans.TRAVELER_STEMS)
+    if family == "package":
+        from export_features import SUPPORTED_PARTS
+
+        return [*(f"features:{stem}" for stem in SUPPORTED_PARTS), "features", "release"]
+    raise ValueError(f"unknown canonical task family: {family}")
+
+
+def _canonical_targets(name: str) -> list[str]:
+    """The shared, dependency-free target definition used by factories and indexing."""
+    family, _separator, subname = name.partition(":")
+    if family == "part":
+        return [
+            _sldprt(subname), _part_execution_token(subname),
+            *(str(path.resolve()) for path in _part_configuration_outputs(subname)),
+        ]
+    if family == "assembly":
+        return [_sldasm(subname), _assembly_execution_token(subname)]
+    if family == "drawing":
+        return [str(path) for path in _drawing_cache_outputs(subname)]
+    if family == "verify_soundness":
+        return [str(REPORTS / f"verify-soundness-{subname.replace('_', '-')}.ok")]
+    if family == "verify":
+        return [str(REPORTS / f"verify-{subname}.ok")]
+    if family == "check":
+        if subname.startswith("machinist_review:"):
+            stem = subname.removeprefix("machinist_review:")
+            directory = _machinist_review_dir(stem)
+            return [
+                str(_machinist_review_stamp(stem)),
+                str(directory / f"{stem}.aggregate.json"),
+                str(directory / f"{stem}.aggregate.md"),
+                *(
+                    str(directory / stem / "runs" / f"r{run}" / f"{stem}.json")
+                    for run in range(1, 4)
+                ),
+            ]
+        targets = [str(REPORTS / f"check-{subname}.ok")]
+        if subname == "joint_retention":
+            targets.extend([
+                str(REPORTS / "joint-retention.json"),
+                str(REPORTS / "joint-retention.md"),
+            ])
+        return targets
+    if family == "prechips":
+        import _process_plans
+
+        directory = _process_plans.traveler_dir(subname, CAD_OUT)
+        return [
+            str(REPORTS / f"prechips-{subname}.ok"), str(directory / "plan.toml"),
+            str(directory / "report.json"), str(directory / "traveler.html"),
+        ]
+    if family == "package":
+        if subname.startswith("features:"):
+            # The feature factory already computes these outputs for its action;
+            # both paths use this same cheap output-only helper.
+            return [str(path) for path in _feature_export_outputs(subname.removeprefix("features:"))]
+        if subname == "release":
+            return [str(_package_cache_outputs()[0] / "native-package.json")]
+        if subname == "features":
+            return []
+    if name == "export":
+        return [
+            str((CAD_OUT / "boxes" / "ha-harmonic-analyzer.json").resolve()),
+            str((REPORTS / "release-neutral.json").resolve()),
+        ]
+    if name == "gallery":
+        return [str((REPORTS / "comparison-gallery.json").resolve())]
+    if name == "preflight":
+        return [str(REPORTS / "preflight.ok")]
+    raise ValueError(f"unknown canonical target definition: {name}")
+
+
+def _canonical_subtask_definition(family: str, subname: str) -> dict[str, Any]:
+    if family == "part":
+        return _part_task(subname)
+    if family == "assembly":
+        return _assembly_task(subname)
+    if family == "drawing":
+        return _drawing_task(subname)
+    if family == "verify_soundness":
+        return _verify_soundness_task(subname)
+    if family == "verify":
+        return _verify_task(subname)
+    if family == "check":
+        if subname.startswith("machinist_review:"):
+            stem = subname.removeprefix("machinist_review:")
+            return _machinist_review_task(
+                stem, dict(_reviewed_drawings())[stem], _machinist_review_profile(),
+            )
+        return _check_task(subname)
+    if family == "prechips":
+        return _prechips_task(subname)
+    if family == "package":
+        if subname.startswith("features:"):
+            return _package_feature_task(subname.removeprefix("features:"))
+        if subname == "features":
+            return _package_features_task()
+        if subname == "release":
+            return _package_release_task()
+    raise ValueError(f"unknown canonical task: {family}:{subname}")
+
+
+def canonical_tasks(names: Iterable[str]) -> list[Task]:
+    """Construct exactly these live doit tasks, never filtering fully built generators.
+
+    The caller supplies the complete dependency closure. No task edge, freshness
+    tracker, value saver or action is removed here. Conversion mirrors doit's
+    loader: subtasks have their real basename, and groups retain every child edge
+    and their generator's documentation without constructing those children.
+    """
+    requested = list(names)
+    if any(not isinstance(name, str) or not name for name in requested):
+        raise ValueError("canonical task names must be nonempty strings")
+    if len(set(requested)) != len(requested):
+        raise ValueError("duplicate canonical task name")
+    singletons = {
+        "export": task_export, "gallery": task_gallery, "preflight": task_preflight,
+        "release": task_release, "build": task_build, "build_bare": task_build_bare,
+        "cache_status": task_cache_status,
+    }
+    family_names: dict[str, list[str]] = {}
+    for name in requested:
+        family, separator, subname = name.partition(":")
+        if not separator and name in singletons:
+            continue
+        if family not in _CANONICAL_FAMILIES:
+            raise ValueError(f"unknown canonical task: {name}")
+        if family not in family_names:
+            family_names[family] = _canonical_subtask_names(family)
+        if separator and subname not in family_names[family]:
+            raise ValueError(f"unknown canonical task: {name}")
+
+    tasks: list[Task] = []
+    for name in requested:
+        family, separator, subname = name.partition(":")
+        if not separator and name in singletons:
+            creator = singletons[name]
+            tasks.extend(generate_tasks(name, creator(), creator.__doc__))
+        elif not separator:
+            creator = globals()[f"task_{family}"]
+            task = Task(name, None, doc=creator.__doc__, has_subtask=True)
+            task.task_dep.extend(f"{family}:{child}" for child in family_names[family])
+            tasks.append(task)
+        else:
+            definition = _canonical_subtask_definition(family, subname)
+            definition["name"] = name
+            task = dict_to_task(definition)
+            task.subtask_of = family
+            tasks.append(task)
+    return tasks
+
+
+def _ownership_namespace_has_aliases(
+    directory: Path, *, filenames: frozenset[str], suffixes: frozenset[str] = frozenset(),
+) -> bool:
+    """Inspect only the two levels at which these families declare targets.
+
+    A skipped feature/traveler namespace may contain a junction or file symlink
+    into a queried namespace. In that case its real inventory must be consulted.
+    Never recurse into native outputs, report trees, or arbitrary descendants.
+    """
+    if directory.is_symlink() or directory.is_junction():
+        return True
+    try:
+        stems = os.scandir(directory)
+    except FileNotFoundError:
+        # Clean leaves have no output namespace to alias another target.
+        return False
+    with stems:
+        for stem in stems:
+            path = Path(stem.path)
+            if stem.is_symlink() or path.is_junction():
+                return True
+            if not stem.is_dir(follow_symlinks=False):
+                continue
+            try:
+                outputs = os.scandir(path)
+            except FileNotFoundError:
+                # A vanished sibling must not hide an alias in a later stem.
+                continue
+            with outputs:
+                for output in outputs:
+                    target = Path(output.path)
+                    if (
+                        target.name.lower() in filenames
+                        or target.suffix.lower() in suffixes
+                    ) and (output.is_symlink() or target.is_junction()):
+                        return True
+    return False
+
+
+def canonical_target_owners(paths: Iterable[str] | None = None) -> dict[str, str]:
+    """Index live owners of requested paths, or all declared targets with no query.
+
+    Queries contain every genuine selected target and file_dep, not graph data.
+    Heavy feature, traveler and review enrollment is evaluated only when its
+    canonical namespace or an existing alias can own a queried path. Drawing
+    output metadata is always consulted, including relocated outputs/collisions.
+    Returned keys use OS path identity, not serialized path spelling.
+    """
+    from cad.scripts._selected_execution import _path_identity, _workspace_path
+
+    workspace = REPO_ROOT.resolve(strict=False)
+    requested = None if paths is None else {
+        _path_identity(_workspace_path(workspace, str(path))) for path in paths
+    }
+    owners: dict[str, str] = {}
+
+    def normalized(target: str | Path) -> str:
+        return _path_identity(_workspace_path(workspace, str(target)))
+
+    def queried_namespace(directory: Path) -> bool:
+        if requested is None:
+            return True
+        prefix = normalized(directory)
+        return any(path == prefix or path.startswith(prefix + "/") for path in requested)
+
+    def include(name: str, targets: Iterable[str] | None = None) -> None:
+        for target in _canonical_targets(name) if targets is None else targets:
+            relative = normalized(target)
+            if requested is not None and relative not in requested:
+                continue
+            previous = owners.setdefault(relative, name)
+            if previous != name:
+                raise ValueError(f"duplicate canonical target {relative}: {previous}, {name}")
+
+    # Native/model and gate inventories are already cheap source metadata.
+    # Normalize every declared native path so aliases cannot hide a producer.
+    for stem in part_stems():
+        include(f"part:{stem}")
+    for stem in ASSEMBLY_ORDER:
+        include(f"assembly:{stem}")
+        include(f"verify_soundness:{stem}")
+    for stem in DRAWINGS_BY_NAME:
+        include(f"drawing:{stem}")
+    for name in _VERIFY_NAMES:
+        include(f"verify:{name}")
+    for name in _check_task_names():
+        include(f"check:{name}")
+    for name in ("export", "gallery", "preflight", "package:release"):
+        include(name)
+
+    # Potential review paths are entirely determined by loaded drawing metadata.
+    # Membership still comes from the real review enrollment, never a filename.
+    reviewed = None
+    for stem in DRAWINGS_BY_NAME:
+        name = f"check:machinist_review:{stem}"
+        targets = _canonical_targets(name)
+        if requested is not None and not any(normalized(target) in requested for target in targets):
+            continue
+        if reviewed is None:
+            reviewed = dict(_reviewed_drawings())
+        if stem in reviewed:
+            include(name, targets)
+
+    feature_root = CAD_OUT / "features"
+    if queried_namespace(feature_root) or _ownership_namespace_has_aliases(
+        feature_root, filenames=frozenset({"features.toml"}), suffixes=frozenset({".step"}),
+    ):
+        from export_features import SUPPORTED_PARTS
+
+        for stem in SUPPORTED_PARTS:
+            include(f"package:features:{stem}")
+
+    traveler_root = CAD_OUT / "travelers"
+    stamp_prefix = normalized(REPORTS) + "/prechips-"
+    traveler_stamp = requested is None or any(
+        path.startswith(stamp_prefix) and path.endswith(".ok") for path in requested
+    )
+    if (
+        queried_namespace(traveler_root)
+        or traveler_stamp
+        or _ownership_namespace_has_aliases(
+            traveler_root, filenames=frozenset({"plan.toml", "report.json", "traveler.html"}),
+        )
+        or any(path.is_symlink() for path in REPORTS.glob("prechips-*.ok"))
+    ):
+        import _process_plans
+
+        for stem in _process_plans.TRAVELER_STEMS:
+            include(f"prechips:{stem}")
+    return owners
 
 
 # --- Cache diagnostic (issue #73): explain any miss in ONE command.

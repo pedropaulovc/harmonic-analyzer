@@ -614,6 +614,85 @@ explicit way to stop a run, `-Cancel` (see
   anything is created. A new path under the drive root, such as
   `C:/farm-runs/knife-hanger`, is valid even if only `C:/` exists yet.
 
+### Validated selective worker execution
+
+Selective execution is an internal worker path, not a different recipe or a
+`--single` shortcut. The committed `build.py` literal
+`SELECTIVE_EXECUTION_CAPABILITY = "canonical-closure-v1"` declares support; the
+pool reads it without importing the producer and records it in the trusted graph.
+An environment variable or invocation argument cannot declare that capability.
+Supported older immutable sources without the declaration retain the explicit
+`canonical-full-v1` loader. A missing, forged or mismatching graph, an unsupported
+declaration, or a canonical validation error never falls back to the full loader.
+
+The normal generators and selective loader reuse the same per-name builders.
+The latter constructs exactly the exported dependency closure as genuine doit
+Tasks, including checks, verification, package and export dependencies. It retains
+trackers, value savers, wrappers, action results, hooks, stamps, refresh behavior
+and group/subtask metadata. Validation runs after an isolated `TaskControl` pass
+has inferred task dependencies from file dependencies. It compares task names,
+task/file dependencies, targets and Python callable identities against the trusted
+graph, and checks live target ownership so an existing output cannot hide an
+omitted producer.
+Path ownership and comparison of file dependencies and targets use OS-normalized
+path identity; serialized paths and graph hashes retain their original spelling.
+On Windows this uses `normcase`, not per-directory case-sensitivity detection, so
+case-sensitive directories may conservatively reject distinct output claims.
+Task names, callable names and action arguments remain case-sensitive.
+
+The selective loader first imports `dodo` under the caller's working directory.
+It then validates that the provider's `REPO_ROOT` matches its workspace and
+changes to that workspace before loading doit configuration or invoking the
+canonical task/ownership providers and task actions. Factory inputs and actions
+therefore use workspace-relative paths; module import has no such cwd guarantee.
+The authority check itself does not change cwd when it refuses a provider.
+
+Serialized Python is never executed. Action arguments come from the live
+canonical factories, not graph JSON; the producer deliberately does not duplicate
+the pool's action-argument normalizer. This contract is currently bound to graph
+schema **3**, farm protocol **7**, and the exact exported task/action record shapes.
+Changing any of those requires an explicit paired producer/exporter migration,
+not field stripping, an environment opt-in or a validation fallback. The existing
+source/request/lock/Git/environment checks and requested-result-key probe/forced
+execution flow remain required.
+
+Trusted graph export alone uses the pool's `canonical-farm-v1` profile: build-order
+seed `farm`, machinist reviewer `claude`, local executor, read-only remote cache,
+and no inherited refresh carrier. This does **not** pin live action arguments or
+remove supported runtime reviewer overrides. Actual worker execution keeps its
+writable-cache policy and request-scoped refresh contract.
+
+Activation requires the companion pool worker implementation: it reads the
+committed declaration and supplies all three internal
+`--farm-execution-{graph,task,identity}` options to a local, serial worker run.
+The normal farm launcher does not supply those options. Older workers continue
+their ordinary full-loader invocation; the new worker release and the explicitly
+selected `PoolHome` must match under existing fleet-identity admission before
+selective farm execution is available. No controller wire change is required.
+
+This staged feature leaves ordinary farm submission and lifecycle handling
+unchanged. It adds no preparation-publication API or publisher-configuration
+requirement; preparation transport is a separate change.
+
+### Interpreting selective execution measurements
+
+Worker markers separate dependency/build import, dodo import, task construction,
+ownership indexing and control validation. `first_action` marks the first actual
+doit action; `selected_action` marks the requested root's action, so dependency
+restoration can lie between them. A head-only loader harness stops at the
+loader/TaskControl handoff: its readiness marker is not an observed action or
+live-leaf head and excludes dependency-status/DB work, restoration, body and COM.
+Use independent ordinary-generator snapshots, identical committed source and graph,
+the same locked interpreter/cache conditions, paired repeated processes and spread
+as well as medians. Do not infer end-to-end savings from a body-contaminated run.
+
+For file-only comparison runs, pass explicit empty strings for
+`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` and
+`OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` before Python imports. Absent variables can
+re-enable default discovery; use a launcher that preserves empty child values.
+Existing COM-free `check:math` component measurements do not establish native
+output equivalence or the whole-farm **25% overhead-reduction target**.
+
 ### Parameters
 
 | parameter | required | meaning |
