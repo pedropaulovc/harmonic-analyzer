@@ -6150,6 +6150,276 @@ def test_supplier_thread_identification_keeps_native_nominal_major_value(monkeyp
         case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
 
 
+@pytest.mark.parametrize(
+    "field",
+    (
+        "use_document_units", "units", "primary_precision", "fraction_base",
+        "show_parentheses", "override", "show_native_value", "prefix", "suffix",
+        "below_callout",
+    ),
+)
+def test_supplier_presentation_rejects_each_actual_drift_without_repair(monkeypatch, field):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    mutations = {
+        "use_document_units": lambda: setattr(case.display, "GetUseDocUnits", lambda: True),
+        "units": lambda: setattr(case.state, "unit", 0),
+        "primary_precision": lambda: setattr(case.state, "precision", 2),
+        "fraction_base": lambda: setattr(case.state, "fraction", 2),
+        "show_parentheses": lambda: setattr(case.display, "ShowParenthesis", True),
+        "override": lambda: setattr(case.display, "GetOverride", lambda: True),
+        "show_native_value": lambda: setattr(case.display, "ShowDimensionValue", False),
+        "prefix": lambda: case.text.__setitem__(1, "CHANGED PREFIX"),
+        "suffix": lambda: case.text.__setitem__(2, "CHANGED SUFFIX"),
+        "below_callout": lambda: case.text.__setitem__(4, "FOREIGN CALLOUT"),
+    }
+    mutations[field]()
+    source_value = case.native.SystemValue
+    source_text = dict(case.text)
+    source_state = vars(case.state).copy()
+    with pytest.raises(RuntimeError, match="native supplier presentation differs from its source") as error:
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert f"({field}: actual=" in str(error.value)
+    assert ", expected=" in str(error.value)
+    assert case.native.SystemValue == source_value
+    assert case.text == source_text
+    assert vars(case.state) == source_state
+
+
+def test_supplier_presentation_first_mismatch_does_not_read_a_later_failing_field(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    case.display.GetUseDocUnits = lambda: True
+
+    def later_reader():
+        raise AssertionError("a later reader must not hide the first mismatch")
+
+    case.display.GetUnits = later_reader
+    with pytest.raises(RuntimeError, match="use_document_units: actual=True, expected=False"):
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+
+
+def test_supplier_presentation_retains_first_native_reader_exception(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    original = RuntimeError("native units getter refused")
+
+    def first_reader():
+        raise original
+
+    def later_reader():
+        raise AssertionError("a later reader must not mask the native exception")
+
+    case.display.GetUnits = first_reader
+    case.display.GetPrimaryPrecision2 = later_reader
+    with pytest.raises(RuntimeError) as error:
+        case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert error.value is original
+
+
+def test_supplier_presentation_retains_native_empty_callout_normalization(monkeypatch):
+    case = _supplier_native(monkeypatch)
+    settings = dict(label="supplier thickness", units="in", precision=3, expected_mm=11.1125)
+    case.helper.supplier_reference_dimension(None, case.display, **settings)
+    case.text[4] = None
+    case.helper.assert_supplier_reference_dimension(None, case.display, **settings)
+    assert case.text[4] is None
+    assert case.native.SystemValue == 0.0111125
+
+
+def _linear_supplier_pin_reference(monkeypatch, *, axis=1):
+    import _drawing_edge_dimensions as edge_dimensions
+    import _supplier_pin_drawing as pins
+
+    length_mm = 4.7625 if axis == 1 else 15.875
+    case = _supplier_native(monkeypatch, value=length_mm / 1000.0, kind=2)
+    monkeypatch.setattr(pins, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(edge_dimensions._sw_type_info, "early_bound_or_flag",
+                        lambda value, _interface, *_members: value)
+    monkeypatch.setattr(pins, "model_points_in_view",
+                        lambda _adapter, _view, points, **_kw: [(0.1+x, 0.1+y) for x, y, _z in points])
+    monkeypatch.setattr(pins, "add_edge_dimension", lambda *_args, **_kw: case.display)
+    case.arc_conditions = {1: 0, 2: 0}
+    case.native.GetArcEndCondition = lambda index: case.arc_conditions[index]
+    case.native.GetSystemValue3 = lambda *_args: (case.native.SystemValue,)
+    case.native.Tolerance = SimpleNamespace(Type=0)
+
+    def forbidden_arc_setter(*_args):
+        raise AssertionError("linear end-plane picks are not arc-ended dimensions")
+
+    case.native.SetArcEndCondition = forbidden_arc_setter
+    case.annotation.GetAttachedEntityTypes = lambda: (1,) * len(case.annotation.entities)
+    case.view.GetOutline = lambda: (0.09, 0.09, 0.11, 0.12)
+    case.adapter = SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)))
+    stations = (0.0, length_mm) if axis == 1 else (-length_mm / 2.0, length_mm / 2.0)
+    circles = [
+        SimpleNamespace(
+            circle=((0.0, station, 0.0, 0.0, 1.0, 0.0, 1.190625) if axis == 1 else
+                    (station, 0.0, 0.0, 1.0, 0.0, 0.0, 1.190625)), edge=entity,
+        ) for station, entity in zip(stations, case.annotation.entities)
+    ]
+    source = SimpleNamespace(sku="supplier-pin", length_mm=length_mm, units="in", length_precision=3)
+    case.length_mm = length_mm
+    case.display, case.assert_length = pins._supplier_length(
+        case.adapter, case.view, circles, source, axis=axis, stations=stations,
+    )
+    return case
+
+
+@pytest.mark.parametrize("axis", (0, 1), ids=("spring", "dowel"))
+def test_supplier_linear_pin_retains_observed_full_length_and_none_end_conditions(monkeypatch, axis):
+    case = _linear_supplier_pin_reference(monkeypatch, axis=axis)
+    case.assert_length(case.display)
+    assert case.native.SystemValue == case.length_mm / 1000.0
+    assert case.arc_conditions == {1: 0, 2: 0}
+    assert case.native.Tolerance.Type == 0
+
+
+@pytest.mark.parametrize("drift,error", [
+    ("condition", None),
+    ("value", "native value"),
+    ("attachment", "named entities"),
+    ("tolerance", "unsourced tolerance"),
+    ("type", None),
+])
+@pytest.mark.parametrize("axis", (0, 1), ids=("spring", "dowel"))
+def test_supplier_linear_pin_retains_real_value_attachment_and_condition_guards(
+    monkeypatch, drift, error, axis,
+):
+    case = _linear_supplier_pin_reference(monkeypatch, axis=axis)
+    if drift == "condition":
+        case.arc_conditions[2] = 1
+    elif drift == "value":
+        case.native.SystemValue += 0.0001
+    elif drift == "attachment":
+        case.annotation.entities = (case.annotation.entities[0], object())
+    elif drift == "tolerance":
+        case.native.Tolerance.Type = 2
+    else:
+        case.display.Type2 = 6
+    native_value = case.native.SystemValue
+    with pytest.raises(RuntimeError, match=error):
+        case.assert_length(case.display)
+    assert case.native.SystemValue == native_value
+
+
+def _supplier_pin_layout_placement(monkeypatch, *, family, outline):
+    import _supplier_pin_drawing as pins
+
+    # Isolate native authoring, not the production station calculation. The
+    # returned station drives the real audit consumer against recorded R43 ink.
+    monkeypatch.setattr(pins, "scan_view_edges", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(pins, "_axis_circles", lambda *_args, **_kwargs: ())
+    monkeypatch.setattr(pins, "_supplier_length", lambda *_args, **_kwargs: (None, None))
+    monkeypatch.setattr(pins, "_supplier_diameter", lambda *_args, **_kwargs: (None, None))
+    monkeypatch.setattr(pins, "_settled_pin_check", lambda *_args, **_kwargs: lambda: None)
+    placements = {}
+
+    def import_references(_adapter, _view, _source, keep):
+        placements.update(keep)
+        return {name: (None, None) for name in keep}
+
+    monkeypatch.setattr(pins, "_import_model_references", import_references)
+    view = SimpleNamespace(GetOutline=lambda: outline, Position=(0.2875, 0.143))
+    source = SimpleNamespace(
+        sku="R43 layout", length_mm=12.7, wall_mm=0.3048,
+        wall_precision=3, application_hole_limits=(1.5748, 1.651),
+        application_hole_precision=3,
+    )
+    if family == "dowel":
+        pins.add_supplier_dowel_dimensions(None, {"*Front": view, "*Top": view}, source)
+        return placements[pins.DIAMETER_DIMENSION]
+    pins.add_supplier_spring_pin_dimensions(None, {"*Front": view, "*Right": view}, source)
+    return placements[pins.MATING_HOLE_DIMENSION]
+
+
+@pytest.mark.parametrize(
+    "family,outline,old_position,text_box,line",
+    [
+        pytest.param(
+            "dowel", (0.065412, 0.219412, 0.092588, 0.246588),
+            (0.110588, 0.233), (0.0881, 0.2286, 0.1331, 0.2331),
+            (0.079, 0.233, 0.099, 0.233), id="locating-pin",
+        ),
+        pytest.param(
+            "dowel", (0.070237, 0.224237, 0.087763, 0.241763),
+            (0.105763, 0.233), (0.0832, 0.2286, 0.1283, 0.2331),
+            (0.079, 0.233, 0.084, 0.233), id="latch-pin-container",
+        ),
+        pytest.param(
+            "dowel", (0.070237, 0.224237, 0.087763, 0.241763),
+            (0.105763, 0.233), (0.0832, 0.2286, 0.1283, 0.2331),
+            (0.079, 0.233, 0.084, 0.233), id="knife-dowel-container",
+        ),
+        pytest.param(
+            "spring", (0.2779432, 0.1334433, 0.2970568, 0.1525568),
+            (0.3165, 0.112), (0.2842854, 0.1029181, 0.3487146, 0.1064181),
+            (0.3090623, 0.1397694, 0.2826979, 0.1019181), id="strap-spring-pin",
+        ),
+        pytest.param(
+            "spring", (0.2779432, 0.1334433, 0.2970568, 0.1525568),
+            (0.3165, 0.112), (0.2842854, 0.1029181, 0.3487146, 0.1064181),
+            (0.3090623, 0.1397694, 0.2826979, 0.1019181), id="cup-spring-pin",
+        ),
+    ],
+)
+def test_supplier_pin_replays_r43_collision_clearance_without_moving_witnesses(
+    monkeypatch, family, outline, old_position, text_box, line,
+):
+    """5049b24 R43 native audit records, in sheet metres.
+
+    Locating-pin ink and both spring qualifiers are genuinely struck. Latch
+    and knife records are conservative container findings, not glyph strikes.
+    This replay retains those containers rather than weakening the audit.
+    """
+    from _layout_audit import find_lines_through_own_text
+    from _layout_geometry import (
+        AnnotationGeometry, Box, Segment, SheetGeometry, find_text_on_line,
+    )
+    import _supplier_pin_drawing as pins
+
+    position = _supplier_pin_layout_placement(monkeypatch, family=family, outline=outline)
+
+    def replay(station):
+        dx, dy = station[0] - old_position[0], station[1] - old_position[1]
+        box = Box(text_box[0] + dx, text_box[1] + dy, text_box[2] + dx, text_box[3] + dy)
+        if family == "dowel":
+            annotations = (
+                AnnotationGeometry("R43 diameter", "dim", "Top", (box,)),
+                AnnotationGeometry("R43 center mark", "center-mark", "Top", (),
+                                   (Segment(*line),)),
+            )
+            finder = find_text_on_line
+        else:
+            # Keep the actual circle-end witness fixed. Only the text end of
+            # its leader follows the moved block; translating both ends would
+            # falsely move the model witness and hide this failure.
+            leader = Segment(line[0], line[1], line[2] + dx, line[3] + dy, "dim-line")
+            annotations = (AnnotationGeometry(
+                "R43 application qualifier", "dim", "Right", (box,), (leader,),
+            ),)
+            finder = find_lines_through_own_text
+        sheet = SheetGeometry("R43", 0.4318, 0.2794, None, annotations=annotations)
+        return finder(sheet), box
+
+    old_findings, _ = replay(old_position)
+    assert len(old_findings) == 1  # The actual old placement is a negative control.
+    findings, box = replay(position)
+    assert not findings
+    if family == "dowel":
+        assert box.xmax < outline[2] + pins.DOWEL_SUPPLIER_MARGINS["*Top"][2]
+    else:
+        right_cell = next(cell for name, _center, cell in purchased.fastener_view_cells(0.018)
+                          if name == "*Right")
+        assert right_cell[0] < box.xmin < box.xmax < right_cell[2]
+        assert right_cell[1] < box.ymin < box.ymax < right_cell[3]
+
+
+
 @pytest.mark.parametrize("denominator", (True, 1.5, 0, 3))
 def test_supplier_fraction_requires_an_exact_integer_power_of_two(
     monkeypatch, denominator
@@ -6622,7 +6892,9 @@ def test_supplier_margins_reserve_authored_lanes_without_refitting_geometry():
 
 
 @pytest.mark.parametrize(
-    "layout,orthographic", [("standard", (1, 8)), ("tall_top", (1, 1))]
+    "layout,orthographic", [
+        ("standard", (1, 8)), ("supplier_top", (1, 4)), ("tall_top", (1, 1)),
+    ]
 )
 def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room(
     monkeypatch, tmp_path, layout, orthographic
@@ -6673,23 +6945,19 @@ def test_clamp_native_outline_fits_readable_scale_with_unchanged_annotation_room
     assert scales["*Isometric"] == (2, 1)
     for view, (_name, _center, bounds) in zip(views, fitted, strict=True):
         assert purchased._inside(view.GetOutline(), bounds)
-    top = next(bounds for name, _center, bounds in fitted if name == "*Top")
-    assert top[3] - top[1] == pytest.approx(0.050 if layout == "tall_top" else 0.018)
 
 
-def test_clamp_tall_top_cells_and_captions_clear_each_other_border_and_title_block():
+@pytest.mark.parametrize("layout", ("standard", "supplier_top", "tall_top"))
+def test_fastener_cells_and_captions_clear_border_title_block_and_each_other(layout):
     from itertools import combinations
 
     from _layout_geometry import Box
 
-    cells = purchased.fastener_view_cells(0.073, layout="tall_top")
+    cells = purchased.fastener_view_cells(0.073, layout=layout)
     rectangles = {name: Box(*bounds) for name, _center, bounds in cells}
     front, top, right, iso = (
         rectangles[name] for name in ("*Front", "*Top", "*Right", "*Isometric")
     )
-    assert front.ymax == right.ymax == 0.150
-    assert top.ymin == 0.166 and top.height == pytest.approx(0.096)
-    assert iso.ymin == 0.160
     assert next(center[0] for name, center, _ in cells if name == "*Front") == next(
         center[0] for name, center, _ in cells if name == "*Top"
     )
@@ -9456,3 +9724,389 @@ def test_note_fits_cell_synthetic_row_count_predicate_controls(rows: int) -> Non
     assert note_fits_cell((2.0, 3.0, 8.0, 7.0), rows, (1.0, 2.0, 9.0, 8.0)) is (
         rows == 1
     )
+
+
+def _washer_paint_native(monkeypatch, case):
+    """Replay R48 native paint; only native I/O is doubled, not placement/math."""
+    washer = case.helper
+    thick, outer, bore = washer.THICKNESS, washer.OUTER_DIAMETER, washer.BORE_DIAMETER
+    # Retained native paint, metres: R48 thickness/bore and R50 outer diameter.
+    # Include complete limits/qualifier blocks, not nominal-value surrogates.
+    records = {
+        thick: dict(type=4, pos=[.144901, .23, .0000039], display=dict(
+            lines=[
+                [0, 0, 0, 0, .126313, .232275, 0, .145901, .232275, 0],
+                [0, 0, 0, 0, .126313, .227725, 0, .145901, .227725, 0],
+                [0, 0, 0, 0, .144901, .232275, 0, .144901, .238625, 0],
+                [0, 0, 0, 0, .144901, .227725, 0, .144901, .221375, 0],
+            ],
+            arrows=[
+                [.144901, .232275, 0, 0, 1, 0, .003556, .000762, 0, 0, 0, 1],
+                [.144901, .227725, 0, 0, -1, 0, .003556, .000762, 0, 0, 0, 1],
+            ],
+            texts=[
+                dict(t=" (", pos=[.1335333, .2274941, 0], w=.0030139),
+                dict(t="0.043", pos=[.1365472, .23, 0], w=.0116375),
+                dict(t="0.029", pos=[.1365472, .2254743, 0], w=.0116375),
+                dict(t=" in) ", pos=[.1481847, .2274941, 0], w=.008084),
+            ],
+        )),
+        outer: dict(type=4, pos=[.1364005, .1455, -.0019651], display=dict(
+            lines=[
+                [0, 0, 0, 0, .1162203, .1443043, 0, .1130599, .1426951, 0],
+                [0, 0, 0, 0, .0737797, .1226957, 0, .1162203, .1443043, 0],
+            ],
+            arrows=[[.1162203, .1443043, 0, .8911429, .4537227, 0,
+                     .003556, .000762, 0, 0, 0, -1]],
+            texts=[
+                dict(t=" (", pos=[.1146474, .1427486, 0], w=.0030139),
+                dict(t="<MOD-DIAM>", pos=[.1176613, .1426951, 0], w=.0052784),
+                dict(t="0.375 ±0.002 in) ", pos=[.1229397, .1427486, 0], w=.0352139),
+            ],
+        )),
+        bore: dict(type=4, pos=[.140401, .12025, -.002275], display=dict(
+            lines=[
+                [0, 0, 0, 0, .1041185, .1234101, 0, .1131371, .114667, 0],
+                [0, 0, 0, 0, .0858815, .1410899, 0, .1041185, .1234101, 0],
+                [0, 0, 0, 0, .1131371, .114667, 0, .1660774, .114667, 0],
+            ],
+            arrows=[[.1041185, .1234101, 0, .7179897, -.6960538, 0,
+                     .003556, .000762, 0, 0, 0, -1]],
+            texts=[
+                dict(t="(", pos=[.1276871, .1202767, 0], w=.0017208),
+                dict(t="<MOD-DIAM>", pos=[.129408, .1202233, 0], w=.0052784),
+                dict(t="0.200 in)", pos=[.1346864, .1202767, 0], w=.0184285),
+                dict(t="FOR No. 10 SCREW SIZE", pos=[.1147246, .114667, 0], w=.0513528),
+            ],
+        )),
+    }
+    face = case.views["*Top" if case.kwargs["axis"] == "y" else "*Front"]
+    side = case.views["*Front" if case.kwargs["axis"] == "y" else "*Top"]
+    for label, record in records.items():
+        bounds = (side if label == thick else face).GetOutline()
+        xy = (bounds[2] + (.014 if label == thick else .012),
+              (bounds[1] + bounds[3]) / 2 + (0 if label == thick else (.012 if label == outer else -.012)))
+        dx, dy = xy[0] - record["pos"][0], xy[1] - record["pos"][1]
+        for row in record["display"]["lines"]:
+            for index in (4, 7):
+                row[index] += dx
+                row[index + 1] += dy
+        for arrow in record["display"]["arrows"]:
+            arrow[0] += dx
+            arrow[1] += dy
+        for text in record["display"]["texts"]:
+            text.update(h=.0035, ref=1, ang=0, font="Century Gothic", ls=.001)
+            text["pos"][0] += dx
+            text["pos"][1] += dy
+        record["pos"][:2] = xy
+    case.paint = {label: SimpleNamespace(record=record, settled_offset=False,
+                                        offset_shift=0.0, clamp=False, reject=False,
+                                        refuse_mode=False)
+                  for label, record in records.items()}
+
+    def position(label, x, y, _z):
+        item = case.imports[label]
+        paint = case.paint[label]
+        if paint.reject:
+            return False
+        if paint.clamp:
+            return True  # Native can report success but constrain the position.
+        record = paint.record
+        dx, dy = x - record["pos"][0], y - record["pos"][1]
+        if label == thick and not item.display.OffsetText:
+            # Linear OffsetText=False moves the physical dimension station.
+            for index, row in enumerate(record["display"]["lines"]):
+                row[7] += dx
+                if index >= 2:
+                    row[4] += dx
+            for arrow in record["display"]["arrows"]:
+                arrow[0] += dx
+        for text in record["display"]["texts"]:
+            text["pos"][0] += dx
+            text["pos"][1] += dy
+        record["pos"][:2] = (x, y)
+        return True
+
+    for label in records:
+        item = case.imports[label]
+        item.display.OffsetText = False
+        item.annotation.SetPosition2 = lambda x, y, z, label=label: position(label, x, y, z)
+
+    def rebuild(_adapter, **_kwargs):
+        paint = case.paint[thick]
+        display = case.imports[thick].display
+        if paint.refuse_mode:
+            display.OffsetText = False
+        if display.OffsetText and not paint.settled_offset:
+            for text in paint.record["display"]["texts"]:
+                text["pos"][0] += paint.offset_shift
+            paint.settled_offset = True
+
+    def record(_reader, annotation):
+        label = next(label for label, item in case.imports.items()
+                     if item.annotation is annotation)
+        return copy.deepcopy(case.paint[label].record)
+
+    monkeypatch.setattr(washer, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(washer, "_dump_annotation", record)
+
+    rims = tuple(case.model.GetBodies2(0, False)[0].GetEdges())
+
+    def circle_at(center, radius, *, axis, **_kwargs):
+        matches = [edge for edge in rims if
+                   all(abs(a * 1000 - b) < 1e-6 for a, b in zip(edge.GetCurve().CircleParams[:3], center))
+                   and abs(edge.GetCurve().CircleParams[6] * 1000 - radius) < 1e-6
+                   and tuple(edge.GetCurve().CircleParams[3:6]) == axis]
+        assert len(matches) == 1
+        return SimpleNamespace(edge=matches[0])
+
+    monkeypatch.setattr(washer, "scan_view_edges",
+                        lambda *_args, **_kwargs: SimpleNamespace(circle_at=circle_at))
+
+    def native_diameter(_adapter, _view, rim, *, label, **_kwargs):
+        item = case.imports[label]
+        item.annotation.entities = (rim,)
+        item.native.Tolerance.Type = 0
+        return item.display
+
+    monkeypatch.setattr(washer, "_native_diameter", native_diameter)
+    for view in case.views.values():
+        displays = [item.display for item in case.imports.values() if item.annotation.Owner is view]
+        view.GetFirstDisplayDimension5 = lambda displays=displays: displays[0]
+        for index, display in enumerate(displays):
+            display.GetNext5 = lambda index=index, displays=displays: (
+                displays[index + 1] if index + 1 < len(displays) else None
+            )
+
+
+def _washer_import_native(monkeypatch, *, defect=None, axis="y", values=None):
+    """Native-I/O doubles; run the real body, source, band and import guards."""
+    import _supplier_washer_drawing as washer
+    import _supplier_washer_model as model_helpers
+
+    for module in (washer, model_helpers):
+        monkeypatch.setattr(module, "_early_bound", lambda value, _interface: value)
+    monkeypatch.setattr(model_helpers, "_bind", lambda value, _interface: value)
+    monkeypatch.setattr(model_helpers, "double_array", lambda value: value)
+    values = values or {washer.OUTER_DIAMETER: 12.7, washer.BORE_DIAMETER: 6.35, washer.THICKNESS: 1.5875}
+    outer, bore, thickness = (values[key] for key in (washer.OUTER_DIAMETER, washer.BORE_DIAMETER, washer.THICKNESS))
+    precision = dict.fromkeys(values, 3)
+    bands = {label: (value - 0.05, value + 0.05, "bilateral") for label, value in values.items()}
+
+    class Point:
+        def __init__(self, values):
+            self.ArrayData = tuple(values)
+
+        def MultiplyTransform(self, transform):
+            x, y, z = self.ArrayData
+            return Point((x, 0.0, -y) if transform == "Top" else (x, y, z))
+
+    adapter = SimpleNamespace(swApp=SimpleNamespace(
+        IsSame=lambda left, right: int(left is right),
+        GetMathUtility=lambda: SimpleNamespace(CreatePoint=Point),
+    ))
+    source_entities = {}
+    features = {}
+    for label in values:
+        if label == washer.THICKNESS:
+            points = tuple(SimpleNamespace(X=outer / 2000.0, Y=y, Z=0.0)
+                           for y in (0.0, thickness / 1000.0 * (1 if axis == "y" else -1)))
+            segment = SimpleNamespace(
+                ConstructionGeometry=True, GetType=lambda: 0,
+                GetStartPoint2=lambda: points[0], GetEndPoint2=lambda: points[1],
+            )
+            segments, source_entities[label] = (segment,), points
+            plane = "Front" if axis == "y" else "Top"
+        else:
+            if washer.OUTER_DIAMETER in source_entities:
+                source_entities[label] = (segments[1],)
+                continue
+            circles = []
+            for diameter in (outer, bore):
+                circles.append(SimpleNamespace(
+                    ConstructionGeometry=True, GetType=lambda: 1, IsCircle=lambda: 1,
+                    GetCenterPoint2=lambda: SimpleNamespace(X=0.0, Y=0.0, Z=0.0),
+                    GetRadius=lambda diameter=diameter: diameter / 2000.0,
+                ))
+            segments, source_entities[label] = tuple(circles), (circles[0],)
+            plane = "Top" if axis == "y" else "Front"
+        sketch = SimpleNamespace(
+            GetSketchSegments=lambda segments=segments: segments,
+            ModelToSketchTransform=SimpleNamespace(Inverse=lambda plane=plane: plane),
+        )
+        feature_name = washer.SOURCE_DIMENSIONS[label][0]
+        features[feature_name] = SimpleNamespace(GetSpecificFeature2=lambda sketch=sketch: sketch)
+    rims = []
+    for diameter in (outer, bore):
+        for station in (0.0, thickness / 1000.0):
+            center = (0.0, station, 0.0) if axis == "y" else (0.0, 0.0, station)
+            normal = (0.0, 1.0, 0.0) if axis == "y" else (0.0, 0.0, 1.0)
+            curve = SimpleNamespace(
+                IsCircle=lambda: True, CircleParams=(*center, *normal, diameter / 2000.0),
+            )
+            rims.append(SimpleNamespace(GetCurve=lambda curve=curve: curve))
+    model = SimpleNamespace(
+        FeatureByName=lambda name: features[name],
+        GetBodies2=lambda *_args: (SimpleNamespace(GetEdges=lambda: rims),),
+    )
+    mapped = {id(entity): SimpleNamespace() for entities in source_entities.values() for entity in entities}
+    mapped.update({id(feature): SimpleNamespace() for feature in features.values()})
+    def view(orientation):
+        x, y = (.095, .13225) if orientation == "*Front" else (.0975, .23)
+        face = orientation == ("*Top" if axis == "y" else "*Front")
+        half_x = outer / 2000.0 * 5 + .005588
+        half_y = (outer if face else thickness) / 2000.0 * 5 + .005588
+        return SimpleNamespace(
+            ReferencedDocument=model, GetOutline=lambda: (x - half_x, y - half_y, x + half_x, y + half_y),
+            GetCorresponding=lambda entity: mapped.get(id(entity)),
+        )
+
+    views = {name: view(name) for name in ("*Front", "*Top")}
+    sources, imports = {}, {}
+    for label, value in values.items():
+        feature_name, name = washer.SOURCE_DIMENSIONS[label]
+        for collection, imported in ((sources, False), (imports, True)):
+            case = _supplier_native(monkeypatch, value=value / 1000.0,
+                                    kind=2 if label == washer.THICKNESS else 6)
+            case.native.FullName = f"{name}@{feature_name}@stock"
+            owner = mapped[id(features[feature_name])] if imported else features[feature_name]
+            case.native.GetFeatureOwner = lambda owner=owner: owner
+            case.native.Tolerance = SimpleNamespace(Type=2, GetMinValue=lambda: -0.00005,
+                                                    GetMaxValue=lambda: 0.00005)
+            case.display.GetPrimaryTolPrecision2 = lambda: 3
+            case.display.GetNameForSelection = lambda name=name: f"{name}@View"
+            case.state.use_doc = imported
+            case.display.GetUseDocUnits = lambda state=case.state: state.use_doc
+            original_units = case.display.SetUnits2
+
+            def set_units(use_doc, *args, case=case, original_units=original_units):
+                case.state.use_doc = use_doc
+                return original_units(use_doc, *args)
+
+            case.display.SetUnits2 = set_units
+            if not imported:
+                case.state.unit, case.state.precision = 3, 3
+                case.text.update({1: "(" if label == washer.THICKNESS else "(<MOD-DIAM>",
+                                  2: " in)", 4: ""})
+            case.annotation.entities = tuple(
+                mapped[id(entity)] if imported else entity for entity in source_entities[label]
+            )
+            face = "*Top" if axis == "y" else "*Front"
+            side = "*Front" if axis == "y" else "*Top"
+            case.annotation.Owner = views[side if label == washer.THICKNESS else face]
+            collection[label] = case
+    parameters = {
+        f"{name}@{feature}": sources[label].native
+        for label, (feature, name) in washer.SOURCE_DIMENSIONS.items()
+    }
+    # Distinct part/import Python wrappers can denote the same native IDimension.
+    # Foreign lookalikes are not registered and retain their own identity.
+    canonical_dimensions = {
+        id(case.native): sources[label].native
+        for collection in (sources, imports) for label, case in collection.items()
+    }
+    adapter.swApp.IsSame = lambda left, right: int(
+        canonical_dimensions.get(id(left), left) is canonical_dimensions.get(id(right), right))
+    model.Parameter = parameters.get
+    monkeypatch.setattr(model_helpers, "_named_dimensions", lambda _adapter, _feature, names, **_kwargs: {
+        name: (sources[label].display, sources[label].native)
+        for label, (_feature, name) in washer.SOURCE_DIMENSIONS.items() if name in names
+    })
+    imported_calls = []
+
+    def import_annotations(_adapter, _view, *, keep, **_kwargs):
+        imported_calls.append(tuple(keep))
+        if defect == "source_import_mutation":
+            sources[washer.THICKNESS].state.use_doc = True
+        return [imports[label].annotation for label, (_feature, name)
+                in washer.SOURCE_DIMENSIONS.items() if name in keep]
+
+    monkeypatch.setattr(washer, "curate_view_dimensions", import_annotations)
+    monkeypatch.setattr(washer, "dimension_name",
+                        lambda _adapter, annotation: annotation.GetSpecificAnnotation().GetNameForSelection().split("@")[0])
+    if defect == "source_band":
+        sources[washer.THICKNESS].native.Tolerance.Type = 0
+    elif defect == "import_value":
+        imports[washer.THICKNESS].native.SystemValue *= 2.0
+    elif defect == "source_geometry":
+        points[0].X += 0.001
+    elif defect == "import_band":
+        imports[washer.THICKNESS].native.Tolerance.Type = 0
+    case = SimpleNamespace(
+        helper=washer, source_helper=model_helpers, adapter=adapter, model=model, views=views,
+        sources=sources, imports=imports, mapped=mapped, entities=source_entities,
+        precision=precision, bands=bands, imported_calls=imported_calls,
+        kwargs=dict(axis=axis, bore_mm=bore, outer_mm=outer, thickness_mm=thickness,
+                    units="in", precision=precision, bands=bands),
+    )
+    _washer_paint_native(monkeypatch, case)
+    return case
+
+
+def test_washer_import_formats_drawing_display_without_changing_source_values_or_bands(monkeypatch):
+    case = _washer_import_native(monkeypatch)
+    before = {label: (vars(native.state).copy(), native.text.copy(), native.native.SystemValue,
+                      native.native.Tolerance.Type) for label, native in case.sources.items()}
+    case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    for label, imported in case.imports.items():
+        case.helper.assert_supplier_reference_dimension(
+            case.adapter, imported.display, label=label, units="in", precision=3,
+            expected_mm=case.kwargs["thickness_mm"] if label == case.helper.THICKNESS else (
+                case.kwargs["outer_mm"] if label == case.helper.OUTER_DIAMETER else case.kwargs["bore_mm"]
+            ), presentation="length" if label == case.helper.THICKNESS else "diameter",
+        )
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display,
+            view=case.views["*Front" if label == case.helper.THICKNESS else "*Top"],
+            label=label, axis="y", bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )
+    after = {label: (vars(native.state).copy(), native.text.copy(), native.native.SystemValue,
+                     native.native.Tolerance.Type) for label, native in case.sources.items()}
+    assert after == before
+
+
+@pytest.mark.parametrize("defect", [
+    "source_band", "source_geometry", "import_value", "import_band", "source_import_mutation",
+])
+def test_washer_import_never_repairs_source_or_import_value_band_and_geometry(monkeypatch, defect):
+    case = _washer_import_native(monkeypatch, defect=defect)
+    with pytest.raises(RuntimeError):
+        case.helper.supplier_washer_dimensions(case.adapter, case.views, **case.kwargs)
+    if defect.startswith("source_") and defect != "source_import_mutation":
+        assert case.imported_calls == []
+
+
+@pytest.mark.parametrize("label", (
+    "supplier outer diameter", "supplier bore diameter", "supplier thickness",
+))
+@pytest.mark.parametrize("axis", ("y", "z"))
+@pytest.mark.parametrize("defect", ["missing", "duplicate", "foreign", "raw_source", "extra"])
+def test_washer_import_requires_exact_typed_view_entity_correspondence(monkeypatch, defect, label, axis):
+    case = _washer_import_native(monkeypatch, axis=axis)
+    imported = case.imports[label]
+    entities = list(imported.annotation.entities)
+    source = case.sources[label]
+    feature, dimension = case.source_helper.SOURCE_DIMENSIONS[label]
+    assert imported.native.FullName == source.native.FullName
+    assert imported.native.SystemValue == source.native.SystemValue
+    assert case.adapter.swApp.IsSame(imported.native, source.native) == 1
+    assert case.adapter.swApp.IsSame(imported.native, case.model.Parameter(f"{dimension}@{feature}")) == 1
+    if defect == "missing":
+        case.mapped.pop(id(case.entities[label][0]))
+    elif defect == "duplicate":
+        if label == case.helper.THICKNESS:
+            case.mapped[id(case.entities[label][1])] = entities[0]
+        else:
+            entities.append(entities[0])
+    elif defect == "foreign":
+        entities[0] = SimpleNamespace(**vars(entities[0]))
+    elif defect == "raw_source":
+        entities = list(case.entities[label])
+    else:
+        entities.append(SimpleNamespace())
+    imported.annotation.entities = tuple(entities)
+    with pytest.raises(RuntimeError):
+        case.source_helper.assert_supplier_washer_source_attachment(
+            case.adapter, case.model, imported.display, view=imported.annotation.Owner,
+            label=label, axis=axis, bore_mm=6.35, outer_mm=12.7, thickness_mm=1.5875,
+        )

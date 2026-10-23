@@ -3829,6 +3829,10 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         SCRIPTS_DIR / "test_supplier_reference_text.py",
         SCRIPTS_DIR / "test_supplier_nut_saved_readback.py",
         SCRIPTS_DIR / "test_supplier_spring_dimensions.py",
+        SCRIPTS_DIR / "test_purchased_title_fit.py",
+        SCRIPTS_DIR / "test_supplier_native_contracts.py",
+        SCRIPTS_DIR / "test_supplier_native_repair.py",
+        SCRIPTS_DIR / "test_supplier_top_text_shelves.py",
         SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         # Supplier pose facts must stay independent of native replica recipes.
@@ -3953,6 +3957,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            # Supplier native regressions read captured paint and shelf facts.
+            str((SCRIPTS_DIR / "test_supplier_washer_native_paint.json").resolve()),
+            str((SCRIPTS_DIR / "testdata" / "supplier_top_r44.json").resolve()),
             # Migrated/enrolled revision and label contracts read plans at runtime.
             *(
                 str(_process_plans.plan_path(stem).resolve())

@@ -15,7 +15,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from _com import _early_bound
+from _com import _bind, _early_bound
 from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_edges import ViewEdge, scan_view_edges
 from _drawing_precision import _named_dimensions
