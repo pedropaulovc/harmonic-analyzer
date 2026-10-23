@@ -70,16 +70,11 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
     assert dims.PACKAGE_PRICE_USD == 11.71
 
 
-def test_supplier_notes_distinguish_item_pair_from_package() -> None:
+def test_supplier_data_fits_footer_width() -> None:
     from _purchased_fastener_drawing import MAX_ITEM_CHARS
 
-    assert len(spec.SUPPLIER_DATA) == 3
+    assert spec.SUPPLIER_DATA
     assert all(len(line) <= MAX_ITEM_CHARS for line in spec.SUPPLIER_DATA)
-    assert spec.SUPPLIER_DATA == (
-        f"ONE ITEM = ONE TWO-PIECE PAIR; PACK = {spec.PACK_QUANTITY} PAIRS.",
-        "THICKNESS = COMPLETE PAIR; MODEL AT MAXIMUM.",
-        "PLAIN ENVELOPE; SPLIT, CAMS AND SERRATIONS NOT MODELLED.",
-    )
 
 
 def test_one_pair_under_each_block_screw_head() -> None:

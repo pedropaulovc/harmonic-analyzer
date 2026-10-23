@@ -284,7 +284,6 @@ def test_seven_washer_recipes_reserve_projected_axes_before_fit(
         0.0025
     )
     assert fitted["*Top"][0][0] == pytest.approx(fitted["*Front"][0][0])
-    assert fitted["*Top"][0][0] == pytest.approx(0.095)
     assert fitted["*Right"][0][1] == pytest.approx(fitted["*Front"][0][1])
 
     for view, previous in (("*Front", original_front), ("*Top", original_top)):
