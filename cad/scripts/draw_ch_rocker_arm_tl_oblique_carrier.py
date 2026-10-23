@@ -1,19 +1,20 @@
 r"""Create the drawing for the oblique-trammel jig's carrier plate (MHA-CH-06-TL-21).
 
 The top view at 1:2 carries the outline, the reamed pin holes, the two
-centre-drill spots and every tap station. Datums: X from the HUB spot's axis
-(the plate's centreline, 260.0 from the left end), A1 by 225.07 from it and
-B1 from A1 by the spacing; Y from the A1-B1 pin line (the reamed pair's own
-axes), 45.00 above the -Y edge. Every location dimension stands outside the
-outline in its own lane: X stations above and below, Y stations left and
-right, so no extension line crosses a text.
-Section A-A at 3:1 cuts along the pin line, which crosses the whole plate,
-is cropped to A1, and carries the finished thickness and the underside chamfer
-that clears the pivot pin's collar fillet. It is a FULL section (carrier-diag:
-the partial one imported nothing), its cut direction SolidWorks' own. It
-stands lower left, under the bottom lanes, its caption, thickness, slab and
-chamfer text on one row; the shaded isometric stands right of it, above the
-title block.
+centre-drill spots and every tap station. Position chains: X from the HUB
+spot's axis (the plate's centreline, 260.0 from the left end), A1 by 225.07
+from it and B1 from A1 by the spacing; Y from the A1-B1 pin line (the reamed
+pair's own axes), 45.00 above the -Y edge. Every location dimension stands
+outside the outline in its own lane: X stations above and below, Y stations
+left and right, so no extension line crosses a text.
+Section A-A at 3:1 cuts along the pin line, is cropped to A1, and carries
+the finished thickness and underside chamfer. A native reference dimension
+measures the actual straight bore wall; its complete 10.50 MIN callout stands
+outside the section on independently offset text, not over the bore or hatch.
+The real underside edge is identified below the section. The complete resultant
+axis-shift acceptance belongs to the native 4X REAM callout, not a separate
+leader. Native geometry readbacks use that underside plane's normal for all
+four bore-axis vectors. The shaded isometric stands above the title block.
 
 One sheet holds it: the left lanes need ~75 mm of the 79 between the outline
 and the border, the right lanes ~63 of 67.
@@ -38,6 +39,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 from _check import check
 from _com import _early_bound
+from _drawing_attachment import _assert_attached_to, _assert_leader_lands
 from _drawing_common import (
     rebuild_drawing,
     DrawingOutputs,
@@ -49,8 +51,16 @@ from _drawing_common import (
 from _drawing_detail_projection import settle_detail_projection
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_dimension_import import import_cosmetic_threads
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import scan_view_edges
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,6 +75,9 @@ from _feature_requirements import part_metadata, requirement
 from _printed_limits import limits
 from _gtol_cone import ConeFace
 from _gtol_cylinder import CylinderFace
+from _gtol_face import unit_vector
+from _gtol_face_read import face_geometry
+from _gtol_face_resolve import resolve_faces
 from _gtol_planar import PlanarFace
 from ch_rocker_arm_tl_oblique_carrier_spec import (
     CALLOUT_PREFIXES,
@@ -129,11 +142,25 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     "A1X": _xy(-112.0, -136.4),  # lane y 104
     "PinSpacing": _xy(172.0, -170.3),  # lane y 81.5
     "A2DX": _xy(-193.0, 110.7),  # lane y 222
-    "B2DX": _xy(191.0, -133.3),  # lane y 100, clear of the outline (r11)
+    # Review 88c6d (r1/r2/r3.clarity.1): centred on its 3.6 mm span, B2DX's
+    # three rows were struck by both B1/B2 extension lines. Its rows stand
+    # wholly outboard of them and of the 520.0's +X extension line (sheet x
+    # 352), text ~358..386 x 131..147, above the isometric (top ~121) and
+    # below the 130.0's lower extension line (152.5); only its dimension line
+    # runs out under the text, crossing extension lines (rule 14 allows).
+    "B2DX": _xy(300.0, -72.0),
     # Carrier r11: A2DY's text crossed the top border; it stands ~17 under it.
     "A2DY": _xy(_LEFT[1], 139.0),
     "B2DY": _xy(_RIGHT[1], 70.7),
-    "PinHoleDia": _xy(-332.0, -74.3),
+    # B9e4's complete native/PDF glyph block reaches y 164.57, not merely
+    # the shoulder at 111.10: the 45.00 text/arrow and its y 152.5 witness
+    # strike the size/limits and first REAM row. Lower the WHOLE block 16
+    # sheet mm, retaining the previous 3.5 mm left move. Its conditional
+    # upper ink is now y 148.57 and its shoulder x 17.13..89.46, y 95.10.
+    # The diameter approach may cross genuine witness extensions (rule 14),
+    # but never a dimension line, another text row or the shoulder's text.
+    # The next native export must confirm the regenerated route and glyphs.
+    "PinHoleDia": _xy(-339.0, -106.3),
     # The spots: each its own diameter callout; HUB by Y right, CL by X
     # below and Y left.
     "SpotDia": _xy(50.0, 98.0),
@@ -204,6 +231,17 @@ _SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
 # thickness text (lane x 79), the slab (91..145 x 27..63) and the chamfer
 # text (~150..209, left of the title block at x 216).
 SECTION_CENTER = (0.118, 0.045)
+# B9e4's full REF/land block overprinted the top edge and arrow. Keep its
+# actual dimension line 3 sheet mm outside the slab's right edge (145).
+# Captured-ink replay at x149 left its lower arrow only 1.897 mm from the
+# complete chamfer glyph box; x148 predicts 2.897 mm. Offset ALL four rows.
+# Captured glyphs predict x 162..190, y 51..72, below the 520.0 lane at 75.
+PIN_LAND_LINE_XY = (0.148, 0.045)
+PIN_LAND_TEXT_XY = (0.176, 0.061)
+# The native straight leader must approach the right end of UNDERSIDE from
+# the right, not turn back through its E. This also clears the chamfer's
+# left-running dimension line; the actual underside attachment is unchanged.
+UNDERSIDE_LABEL_OFFSET = (-0.035, -0.007)
 _STOCK_TEXT_DX = 13.0  # A1's axis to the thickness lane, model mm (-X side)
 SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
     "StockThick": (_A1[0] - _STOCK_TEXT_DX, -part_spec.THICKNESS / 2.0, 0.0),
@@ -257,7 +295,7 @@ requirement(
 )
 
 requirement(
-    "pin_collar_seat",
+    "bottom_face",
     kind="face",
     # PlanarFace.offset_mm is n·p: the underside (y = -12) along -Y is +12.
     faces=(PlanarFace((0.0, -1.0, 0.0), part_spec.THICKNESS),),
@@ -327,8 +365,22 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "dia_nominal": (part_spec.PIN_HOLE_DIA, ("PIN_HOLE_DIA",)),
             "thru": (True, ("PIN_HOLE_CALLOUT",)),
             "note": (
-                " ".join(part_spec.PIN_HOLE_CALLOUT.splitlines()),
-                ("PIN_HOLE_CALLOUT", "PIN_MATE"),
+                " ".join(
+                    (
+                        part_spec.CALLOUTS_BELOW["PinHoleDia"]
+                        + "\n"
+                        + part_spec.PIN_LAND_CALLOUT
+                    ).splitlines()
+                ),
+                (
+                    "CALLOUTS_BELOW",
+                    "PIN_HOLE_CALLOUT",
+                    "PIN_MATE",
+                    "PIN_AXIS_CALLOUT",
+                    "PIN_LAND_CALLOUT",
+                    "PIN_AXIS_DEVIATION_MAX",
+                    "PIN_AXIS_MEASUREMENT_SPAN",
+                ),
             ),
             **_chain,
         },
@@ -456,6 +508,273 @@ def _circle_edge(
                 continue
             return edge
     raise RuntimeError(f"carrier view shows no {label}")
+
+
+def _assert_pin_axis_geometry(source_model: Any) -> dict[str, float]:
+    """Read actual bore vectors/straight lands against the actual underside.
+
+    The allowable tilt is atan(deviation/normal height). Independent X/Z
+    comparisons would admit sqrt(2) times the resultant shift at 45 degrees.
+    Circular trim rims, not the cylinder's approximate bounding box, define
+    the true straight land clear of the chamfer.
+    """
+    underside = PlanarFace((0.0, -1.0, 0.0), part_spec.THICKNESS)
+    faces = resolve_faces(
+        source_model,
+        {
+            "underside": underside,
+            **{
+                key: CylinderFace(
+                    part_spec.PIN_HOLE_DIA, contains_x_mm=x, contains_z_mm=-y
+                )
+                for key, (x, y) in part_spec.PIN_HOLES.items()
+            },
+        },
+    )
+    plane = face_geometry(faces["underside"])
+    if plane is None or not underside.matches(plane):
+        raise RuntimeError("pin-axis control lost its native underside plane")
+    normal = unit_vector(plane.outward_normal)
+    if not all(math.isfinite(value) for value in (*normal, *plane.parameters)):
+        raise RuntimeError("pin-axis control has an unreadable underside plane")
+    angle_max = math.atan(
+        part_spec.PIN_AXIS_DEVIATION_MAX / part_spec.PIN_AXIS_MEASUREMENT_SPAN
+    )
+    lands = {}
+    for key in part_spec.PIN_HOLES:
+        geometry = face_geometry(faces[key])
+        if geometry is None or len(geometry.parameters) != 7:
+            raise RuntimeError(f"{key}: unreadable native pin-bore cylinder")
+        origin = geometry.parameters[:3]
+        axis = unit_vector(geometry.parameters[3:6])
+        if not all(math.isfinite(value) for value in geometry.parameters):
+            raise RuntimeError(f"{key}: nonfinite native pin-bore cylinder")
+        dot = abs(sum(a * n for a, n in zip(axis, normal)))
+        cross = (
+            axis[1] * normal[2] - axis[2] * normal[1],
+            axis[2] * normal[0] - axis[0] * normal[2],
+            axis[0] * normal[1] - axis[1] * normal[0],
+        )
+        angle = math.atan2(math.hypot(*cross), dot)
+        if angle > angle_max + 1e-12:
+            raise RuntimeError(
+                f"{key}: native axis exceeds resultant shift "
+                f"{part_spec.PIN_AXIS_DEVIATION_MAX:g} per "
+                f"{part_spec.PIN_AXIS_MEASUREMENT_SPAN:g} normal height"
+            )
+        stations = []
+        for raw_edge in _early_bound(faces[key], "IFace2").GetEdges() or ():
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            circle = tuple(float(value) for value in curve.CircleParams)
+            if len(circle) != 7 or not all(math.isfinite(v) for v in circle):
+                raise RuntimeError(f"{key}: unreadable straight-land rim")
+            rim_axis = unit_vector(circle[3:6])
+            if (
+                abs(circle[6] - geometry.parameters[6]) > 1e-8
+                or abs(sum(a * b for a, b in zip(axis, rim_axis))) < 1.0 - 1e-8
+            ):
+                raise RuntimeError(f"{key}: straight-land rim is not on its cylinder")
+            station = sum((p - o) * a for p, o, a in zip(circle[:3], origin, axis))
+            if not any(abs(station - other) <= 1e-8 for other in stations):
+                stations.append(station)
+        if len(stations) != 2:
+            raise RuntimeError(f"{key}: expected two actual straight-land rim stations")
+        land = abs(stations[1] - stations[0]) * 1000.0
+        if land + 1e-8 < part_spec.PIN_AXIS_MEASUREMENT_SPAN:
+            raise RuntimeError(f"{key}: native straight land {land:g} is below 10.50 MIN")
+        lands[key] = land
+    return lands
+
+
+def _assert_ream_control(adapter: Any, annotation: Any) -> None:
+    """The complete acceptance must remain on the real banded bore dimension."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    owner = _early_bound(dimension.GetFeatureOwner(), "IFeature")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        str(owner.Name) != "PinHoleProfile"
+        or str(dimension.FullName).split("@")[:2] != ["PinHoleDia", "PinHoleProfile"]
+        or int(display.Type2) != 6  # swDiameterDimension
+        or not math.isclose(
+            float(dimension.SystemValue), part_spec.PIN_HOLE_DIA / 1000.0,
+            abs_tol=1e-12, rel_tol=0.0,
+        )
+        or not math.isclose(
+            float(tolerance.GetMinValue()), part_spec.PIN_HOLE_BAND[1] / 1000.0,
+            abs_tol=1e-12, rel_tol=0.0,
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), part_spec.PIN_HOLE_BAND[0] / 1000.0,
+            abs_tol=1e-12, rel_tol=0.0,
+        )
+        or not display.ShowDimensionValue
+        or int(annotation.Visible) != 1
+        or annotation.IsDangling()
+        or str(display.GetText(8) or "") != CALLOUTS_BELOW["PinHoleDia"]
+        or str(display.GetText(4) or "") != CALLOUTS_BELOW["PinHoleDia"]
+    ):
+        raise RuntimeError("4X REAM lost its native bore size, fit or complete axis control")
+
+
+def _assert_land_control(adapter: Any, display: Any, vertices: tuple[Any, Any]) -> None:
+    """A native, unbanded REF measures actual wall endpoints, not 10.50."""
+    display = _early_bound(display, "IDisplayDimension")
+    if int(display.Type2) not in (2, 11, 12):
+        raise RuntimeError("straight-land reference is not a native linear dimension")
+    assert_dimension_measures(
+        adapter, display, expected_mm=part_spec.PIN_STRAIGHT_LAND,
+        label="pin straight land", entities=vertices, entity_types=("VERTEX", "VERTEX"),
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    if (
+        int(tolerance.Type) != 0
+        or int(dimension.DrivenState) != 1
+        or not display.ShowDimensionValue
+        or int(_early_bound(display.GetAnnotation(), "IAnnotation").Visible) != 1
+        or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
+        or int(display.GetPrimaryPrecision2())
+        != part_spec.DRAWING_REFERENCE_PRECISION["PinStraightLand"]
+        or str(display.GetText(8) or "") != part_spec.PIN_LAND_CALLOUT
+        or str(display.GetText(4) or "") != part_spec.PIN_LAND_CALLOUT
+    ):
+        raise RuntimeError("straight land lost its native reference or 4X minimum acceptance")
+
+
+def _assert_land_layout(display: Any, projected: list[tuple[float, float]]) -> None:
+    """Offset all land text without dragging the actual line or arrow tips."""
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    offset = bool(display.OffsetText)
+    error_m = (
+        math.dist(position[:2], PIN_LAND_TEXT_XY)
+        if len(position) >= 2 and all(math.isfinite(value) for value in position[:2])
+        else math.inf
+    )
+    if (
+        not offset
+        or len(position) != 3
+        or not all(math.isfinite(value) for value in position)
+        or error_m > 0.00005
+    ):
+        raise RuntimeError(
+            "straight-land native offset text did not retain its exterior lane: "
+            f"OffsetText={offset!r}, actual={position!r}, "
+            f"requested={PIN_LAND_TEXT_XY!r}, error_m={error_m!r}"
+        )
+    _assert_land_line(display, projected, phase="after-text-offset")
+
+
+def _assert_land_line(
+    display: Any, projected: list[tuple[float, float]], *, phase: str
+) -> None:
+    """Read the same physical dimension-end arrows before and after offsetting."""
+    requested = tuple((PIN_LAND_LINE_XY[0], y) for _x, y in projected)
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    tips = []
+    for index in range(int(data.GetArrowHeadCount())):
+        raw = tuple(float(value) for value in (data.GetArrowHeadAtIndex2(index) or ()))
+        if len(raw) != 12 or not all(math.isfinite(value) for value in raw):
+            raise RuntimeError(
+                f"straight-land native dimension line phase={phase}: "
+                f"unreadable arrow index={index}, actual={raw!r}, requested={requested!r}"
+            )
+        tips.append(raw[:2])
+    actual = tuple(tips)
+    for expected in requested:
+        match = next(
+            (index for index, tip in enumerate(tips) if math.dist(tip, expected) <= 0.00005),
+            None,
+        )
+        if match is None:
+            raise RuntimeError(
+                f"straight-land native dimension line phase={phase}: "
+                f"requested={requested!r}, actual={actual!r}, missing={expected!r}"
+            )
+        tips.pop(match)
+
+
+def _add_pin_land_control(adapter: Any, section: Any):
+    """Dimension the actual straight wall and identify the physical underside."""
+    edges = scan_view_edges(section, label="carrier straight land and underside")
+    wall_x = _A1[0] + part_spec.PIN_HOLE_DIA / 2.0
+    points = (
+        (wall_x, 0.0, 0.0),
+        (wall_x, -part_spec.THICKNESS + part_spec.PIN_CHAMFER, 0.0),
+    )
+    vertices = tuple(
+        edges.exact_vertex_at(point, label="A1 straight-wall endpoint") for point in points
+    )
+    projected = model_points_in_view(
+        adapter, section, [_metres(point) for point in points], label="A1 straight land"
+    )
+    line_xy = PIN_LAND_LINE_XY
+    display = _early_bound(
+        add_edge_dimension(
+            adapter, section, p0=projected[0], p1=projected[1], text_xy=line_xy,
+            label="pin straight land", orientation="vertical",
+            entities=vertices, entity_types=("VERTEX", "VERTEX"),
+        ),
+        "IDisplayDimension",
+    )
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    dimension.DrivenState = 1
+    set_reference_dimension(adapter, display.GetAnnotation(), label="pin straight land")
+    display.SetPrecision3(part_spec.DRAWING_REFERENCE_PRECISION["PinStraightLand"], -1, -1, -1)
+    display.SetText(4, part_spec.PIN_LAND_CALLOUT)
+    _assert_land_control(adapter, display, vertices)
+    land_annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in (land_annotation.GetPosition() or ()))
+    if len(position) != 3 or not all(math.isfinite(value) for value in position):
+        raise RuntimeError("straight-land native dimension-line anchor is unreadable")
+    # Reset any inherited offset before moving the line. As on the jig's
+    # CL-tip reference, OffsetText then moves only the complete text block.
+    display.OffsetText = False
+    if bool(display.OffsetText) or not land_annotation.SetPosition2(*line_xy, position[2]):
+        raise RuntimeError("failed to position straight-land native dimension line")
+    rebuild_drawing(adapter, label="carrier straight-land dimension-line anchor")
+    _assert_land_line(display, projected, phase="before-text-offset")
+    offset_dimension_text(
+        adapter, [land_annotation], {dimension_name(adapter, land_annotation): PIN_LAND_TEXT_XY}
+    )
+    _assert_land_layout(display, projected)
+
+    x_axis, _y_axis = _section_axes(adapter, section)
+    underside_point = (
+        _A1[0] - math.copysign(7.0, x_axis[0]), -part_spec.THICKNESS, 0.0
+    )
+    underside = edges.exact_line_through(
+        underside_point, label="actual underside-plane section edge"
+    ).edge
+    under_xy = model_point_in_view(
+        adapter, section, _metres(underside_point), label="underside label"
+    )
+    note = add_attached_note(
+        adapter, section, text="UNDERSIDE", entity_xy=under_xy, attached_to=underside,
+        note_xy=tuple(a + b for a, b in zip(under_xy, UNDERSIDE_LABEL_OFFSET, strict=True)),
+        label="carrier underside plane",
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+
+    def settled() -> None:
+        if str(note.GetText() or "") != "UNDERSIDE" or int(annotation.Visible) != 1:
+            raise RuntimeError("carrier underside plane lost its visible native label")
+        _assert_land_control(adapter, display, vertices)
+        _assert_land_layout(display, projected)
+        _assert_attached_to(
+            adapter, annotation, underside, entity_type="EDGE",
+            what="underside-plane label", label="carrier underside plane",
+        )
+        _assert_leader_lands(
+            annotation, under_xy, what="underside-plane label", label="carrier underside plane"
+        )
+
+    return settled
 
 
 _THREAD_LABEL_LAYER = "OBLIQUE-CARRIER-THREAD-LABEL-HIDDEN"
@@ -802,7 +1121,7 @@ def _reposition_section_dimensions(
     return placed
 
 
-def _pin_section(adapter: Any, source_model: Any, top: Any) -> list[Any]:
+def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], Any]:
     """Full section A-A along the pin line, cropped to A1's slab, carrying the
     finished thickness and the chamfer leg, both from SectionReference.
 
@@ -853,7 +1172,7 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> list[Any]:
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )
-    return annotations
+    return annotations, section
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -872,6 +1191,7 @@ async def build(adapter: Any) -> dict[str, str]:
     read_required_properties(
         adapter.currentModel, ("Revision", "Title", *required), required=required
     )
+    _assert_pin_axis_geometry(source_model)
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -904,20 +1224,26 @@ async def build(adapter: Any) -> dict[str, str]:
     on_top = _view_mapper(adapter, top)
     # The spot stations and Ø3 live on SpotReference, a sketch the part saves
     # hidden: _drawing_hidden_sketches shows it in the view that imports it.
-    annotations = [
-        *hidden_sketches.curate_view_dimensions(
-            adapter,
-            top,
-            keep={name: on_top(xyz) for name, xyz in TOP_KEEP.items()},
-            view_label="top view",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *_pin_section(adapter, source_model, top),
-    ]
+    annotations = hidden_sketches.curate_view_dimensions(
+        adapter,
+        top,
+        keep={name: on_top(xyz) for name, xyz in TOP_KEEP.items()},
+        view_label="top view",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section_annotations, section = _pin_section(adapter, source_model, top)
+    annotations.extend(section_annotations)
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _set_callout_texts(adapter, annotations, CALLOUT_PREFIXES, part=1)
     _set_callout_texts(adapter, annotations, CALLOUT_SUFFIXES, part=2)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    ream = [
+        item for item in annotations if dimension_name(adapter, item) == "PinHoleDia"
+    ]
+    if len(ream) != 1:
+        raise RuntimeError("expected one actual 4X REAM size dimension")
+    _assert_ream_control(adapter, ream[0])
+    land_settled = _add_pin_land_control(adapter, section)
 
     # Native Hole Wizard callouts, no process words (the base bar's TL-20
     # convention: "4X Ø2.26 THRU ALL / #4-40 UNC THRU ALL"); the riser taps'
@@ -965,12 +1291,18 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (top, iso):
         _hide_thread_labels(adapter, view)
 
+    def pin_controls_settled() -> None:
+        _assert_pin_axis_geometry(source_model)
+        _assert_ream_control(adapter, ream[0])
+        land_settled()
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Rocker Oblique Trammel Carrier Plate Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(pin_controls_settled,),
     )
 
 

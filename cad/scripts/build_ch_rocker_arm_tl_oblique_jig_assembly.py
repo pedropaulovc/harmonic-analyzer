@@ -111,6 +111,11 @@ _PARTS = (
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
     ("ch-rocker-arm-tl-oblique-nut-bracket", "ch-rocker-arm-tl-oblique-nut-bracket"),
+    ("ch-rocker-arm-tl-oblique-pivot-cap", "ch-rocker-arm-tl-oblique-pivot-cap"),
+    (
+        "ch-rocker-arm-tl-oblique-pivot-retainer",
+        "ch-rocker-arm-tl-oblique-pivot-retainer",
+    ),
     ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
     ("ch-rocker-arm-tl-vn-oblique-bearing", "ch-rocker-arm-tl-vn-oblique-bearing"),
@@ -168,6 +173,22 @@ _PARTS = (
     (
         "ch-rocker-arm-tl-vn-oblique-lever-washer",
         "ch-rocker-arm-tl-vn-oblique-lever-washer",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+    ),
+    (
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
     ),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
@@ -512,10 +533,31 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
                 raise RuntimeError(f"{view_name}: cannot remove auto step {index}")
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
             raise RuntimeError(f"{view_name}: auto steps remain")
-        for step_index, (label, stems, key, distance_mm) in enumerate(
+        for step_index, (label, selectors, key, distance_mm) in enumerate(
             spec.EXPLODE_STEPS, 1
         ):
-            moved = [component for stem in stems for component in groups[stem]]
+            moved = []
+            for selector in selectors:
+                if selector in groups:
+                    moved.extend(groups[selector])
+                elif selector in (
+                    spec.instance_name(spec.BEARING, index)
+                    for index in range(spec.QUANTITIES[spec.BEARING])
+                ):
+                    # Only upper/lower bearing steps split a family. Resolve
+                    # its full native name, never GetComponents enumeration order.
+                    occurrences = [
+                        component for component in groups[spec.BEARING]
+                        if str(component.Name2) == selector
+                    ]
+                    if len(occurrences) != 1:
+                        raise RuntimeError(
+                            f"{label}: expected one bearing occurrence {selector!r}, "
+                            f"got {len(occurrences)}"
+                        )
+                    moved.extend(occurrences)
+                else:
+                    raise RuntimeError(f"{label}: unknown explode selector {selector!r}")
             distance = distance_mm / 1000.0
             with _telemetry.span(
                 "assembly.jig_explode.step", label=label, moved=len(moved)

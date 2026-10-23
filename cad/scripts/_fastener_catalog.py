@@ -496,6 +496,35 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91812A230",
         material="AISI 316 Stainless Steel Sheet (SS)",
     ),
+    # VN-72 is retired. The captured-pivot cartridge uses actual non-McMaster
+    # supplier identities; source dimensions live in retention_hardware_spec.
+    "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+        "Predrilled Socket Head Cap Screw",
+        "NAS1352N5H12",
+        material="AISI 304",  # native rendering surrogate; purchased alloy is A286
+        supplier="CBS Fasteners",
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "Headed Clevis Pin",
+        "CLPS6-0187-1250D",
+        material="AISI 316 Annealed Stainless Steel Bar (SS)",  # native entry; purchased condition remains supplier authority
+        supplier="Huyett",
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-cotter": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+        "Split Cotter Pin",
+        "CP-062-0500",
+        supplier="Huyett",
+    ),
+    "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire": _stock(
+        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
+        "Stainless Safety Wire",
+        "05-02685",
+        material="AISI 304",
+        supplier="Aircraft Spruce",
+    ),
 }
 
 

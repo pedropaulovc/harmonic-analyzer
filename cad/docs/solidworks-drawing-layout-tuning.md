@@ -165,6 +165,337 @@ seat cases and requires full 4 mm padding for each.
 Text, wrapping, font, scales, geometry and native guards stay unchanged.
 Fresh exact-head native audit and printed-sheet acceptance remain necessary:
 these translations do not certify the Y260.5 output.
+### TL-00 instruction-sheet source references
+
+The oblique-jig assembly's `ASSEMBLY STEPS` reference at source `a0ba383f2b70`
+measured 45.422 mm high at 1:20 in a 42.250 mm reserved region. A projected
+model box is not the native view outline, and native outline padding need not
+shrink in proportion to the view scale.
+
+Keep the instruction text, caption reservation and title-block clearance.
+Try only the reference's bounded 1:20, 1:25 and 1:30 scale ladder, rebuilding
+and measuring both native outline dimensions at every rung. Centre the actual
+outline and retain the strict final region/title-block check; exhausting the
+ladder still refuses the drawing. The reference caption and finalizer's
+per-sheet scale both report the measured-fit scale. The visible collapsed
+model view remains the live source of the instruction sheet's properties.
+
+The TL-00 C2A functional section in farm run
+`20261021T104559405Z-fe8717a1858740b59ae5521c62b90d19` created all 23 native
+lines but printed them at 1/20 size near the sheet origin, outside the border,
+while its labels remained in the intended area. `CreateLine` takes coordinates
+in the active drawing sketch, not paper metres. Obtain the sheet's own
+`IView` from `IDrawingDoc.GetFirstView`, then its `GetSketch()` and live
+`ModelToSketchTransform`; map the requested paper endpoints before creation.
+Do not hard-code a ×20 correction or change the reference's measured-fit scale
+to conceal it. Model-view insertion can also auto-drift the native sheet scale:
+pin and read back the fitted reference ratio **before** reading the sketch
+transform or creating the lines. This is the same ratio the finalizer re-pins,
+including when the reference needs 1:25 or 1:30 rather than 1:20.
+
+The recipe now requires every segment to belong to that sheet sketch and
+remain non-construction geometry. Both native endpoints inverse-map to their
+individual intended paper points within 0.1 µm, with their full bounds inside
+the reserved schematic region. Independently match every authored line,
+including feature-label arrows, against the sheet view's native `GetLines4`
+display ink, using `GetXform` for its paper origin and scale. Model
+`GetPolylines` data excludes these user-drawn segments.
+Repeat the proofs after the finalizer re-pins the sheet scales and rebuilds,
+also requiring the authored native scale to remain unchanged. The subsequent
+`e9aa2521665e` native run proved all 23 lines at placement but correctly refused
+finalization when their paper coordinates shrank by exactly four. Its old log
+did not record the initial sheet ratio; creation at an auto-drifted 1:5 followed
+by finalization at 1:20 is consistent with that factor, not yet a measured
+ratio. Creation, placement and settled checks now log the actual sheet
+properties, sheet-view transform, sketch transform and first raw endpoint.
+A count of successful `CreateLine` returns or a broad region-containment check
+alone cannot prove a full-sized, correctly located schematic. Offline
+regressions exercise nonidentity scale, rotation and origin; scaled, displaced
+and missing display ink; an inserted-view sheet-scale drift; and finalization
+at each fitted scale. Fresh native export and all-ten-sheet visual inspection
+remain required.
+
+The cf3 assembly review found that C2A's loose caption list did not identify
+its ink. Keep separate pointers to the pin, block, feeler, mounting plane and
+ground bridge, and put the spec-owned `0.50 MIN` beside the recess bracket
+between the pin-tip witness and Z=0. These native sheet-sketch arrows use the
+same exact endpoint/display proof as the section. The BOM's explicit native
+top-left anchor must leave visible air on both border sides; retain the native
+row/column bounds and reference/title-block keep-outs. The exploded lock wire
+stays near its drilled screw heads, separately from the withdrawn cotter, with
+the existing real-edge balloon ownership and settled-landing guards unchanged.
+
+Keep pointer starts clear of the labels' complete line boxes, not just their
+text anchors. The C2A PIN/BLOCK/FEELER checks exposed a 0.025 mm overlap;
+moving the PIN/BLOCK labels up and the FEELER pointer start down by 2.5 mm
+leaves 2.475 mm vertical air under the conservative text model. Keep the
+feature endpoints fixed and retain both the offline overlap checks and native
+endpoint/display proofs.
+
+The e12 review required the capture presentation to use the available sheet
+width. The 808 review then showed why a second identical exploded cartridge
+was not useful: both bearings still hid behind the block, and the clevis had
+followed the retainer lift instead of its pin's cross-hole. Keep one coherent
+native exploded cartridge on the left. Select upper/lower bearing occurrences
+separately so C1 reads pin/upper bearing, upper seat, then lower bearing;
+attach item 14 to both actual bearings. Correct only the clevis/cotter's
+vertical presentation to follow the pin, retaining their axial withdrawals.
+Preserve every-instance translation/rotation readbacks and the proof that
+collapse restores the operational assembly; these are presentation changes,
+not changes to mating geometry or fit-up criteria.
+
+Replace the unballooned twin with a visible assembled plan locator, a genuine
+longitudinal section A-A through the pivot and clevis axes, and a small
+bolt-seat section B-B for the underhead point that the centre plane cannot cut.
+Reuse native `create_section_view` and the existing assembly `Crop2` pattern,
+explicitly isolating the parent and each child. Keep their section/crop,
+configuration, visible-occurrence, scale, attachment and paper-field
+readbacks through the final rebuild. The exploded view stays first for the
+sheet's live property association; the assembled inspection views carry no
+additional BOM balloons. Do not run whole-sheet ring relaxation on a view
+reserved to the left field. Retain real-edge ownership, ring uncrossing and
+settled-landing proofs, with exactly the two intended bearing attachments.
+`IDrSection.GetLineInfo` returns parent-sketch/model-space XYZ endpoints, not
+paper coordinates. Read the parent's current sketch transform on every replay;
+compare full endpoints in either order and their model-space length. Arrow and
+text positions remain sheet-space. Author crop circles with protected
+`AddToDB=True` and select the closed profile explicitly. Retain that exact native
+segment and read its centre, model radius and current `ISketchSegment.GetSketch`
+owner after moves/rebuilds: `Crop2` consumes the profile, so enumerating
+`IView.GetSketch` is not authoritative. The retained segment must remain
+accessible; do not invent a crop-feature getter or fallback if it does not.
+Set assembled views' final scales before authoring their crops (locator 1:4,
+A-A 1:2, B-B 1:2); do not walk a scale ladder after `Crop2`. Refresh native display
+geometry after HLR/scale changes before measuring the outline. `GetOutline` is
+a padded view extent, not an exact crop circle box. The locator's 54 x 43 mm
+field accommodates its measured 43.884 x 41.516 mm native extent; its caption
+moves down with the field's lower edge, without moving neighboring labels.
+If a view does not fit, retain its native scale, position, outline, overflow and
+selected profile geometry/owner transform in the refusal. Keep strict native
+outline, label-clearance and geometry tolerances.
+
+Inspection callouts identify the existing C-step reading points and limits:
+chamber excess is chamber height minus flange thickness, not a third gap.
+Neither a centre section nor a static nominal pose replaces the prescribed
+whole-face, endplay, clocking and motion inspections.
+Assembly-section edge listings can be empty while the native sheet pick finds
+the drawn edge. Use the existing narrow-zoom pick on that native edge:
+require exactly one native EDGE, with any other selection only the same
+activated drawing view. A bare plan owner must match the unique visible leaf's
+full model path case-exactly, have no native parent, and reference the same
+part file as the leaf's component. A section owner must have exactly one native
+parent: its file must be the authored source assembly used to create the views,
+and the owner name must equal that parent's native name plus the exact leaf
+path. Compare nonempty file paths after resolution. Drawing-component names
+can carry a synthetic `SectionAssembly` root and are not source-owner identity;
+never decide occurrence identity from a basename or suffix. Reselect only the
+verified edge and prove native identity before creating its attached note.
+Section witnesses retain the existing `1e-8 mm²` part-local closest-point bound,
+so a nearby rim, floor or roof cannot substitute for the intended land.
+At the two C4 bore mouths, the retainer top corner and loaded clevis meet.
+Acquire the natively proved vertical bore edge at midheight, then retain the
+original top-corner closest-point, attachment and settled leader-landing
+checks. The acquisition point is not a changed inspection station or a retry.
+The loaded clevis also coincides with the upper cross-hole boundary. Point its
+label to the text-side corner of that same boundary at the unchanged upper-hole
+height, acquiring the pin's outer journal wall above the hole and below the
+tip chamfer. Require that pin-owned edge to pass through the corner, then keep
+the native attachment and settled landing proofs; do not hide components.
+
+The C5B plan note identifies the cotter eye/prong regions and points to the
+manual motion/feeler inspection; it is not a static clearance dimension.
+The visible prong and obscured eye can share a plan projection at different
+depths. Preserve its exact occurrence, attachment and existing 2D leader-landing
+proof without inventing a 3D gap witness or changing the inspection criterion.
+
+After the reading-label rebuild, compare freshly enumerated visible occurrence
+paths with the exact installed set. On refusal, record all four views' sorted
+expected, actual, missing and extra paths plus offending drawing-name/path/
+visibility tuples before changing identity or isolation rules. Successful
+edge selection does not prove settled component visibility.
+Native section-tree `IDrawingComponent.Visible` flags can remain true for all
+110 parts while `IView.GetHiddenComponents` correctly retains the same 95
+excluded occurrences throughout isolation, orientation, crop and label rebuild.
+For sections, derive the visible inventory from that native hidden list, not
+the generated tree flags. Match every hidden owner to one exact view leaf using
+the existing part-file/source-parent proof; reject unknown, duplicate or
+unreadable identities. Ordinary-view visibility and the exact installed-set
+comparison remain unchanged. Do not guess root names or reapply hiding.
+Bind notes returned by `IView.GetNotes` to `INote` before calling `GetText` or
+`IsBomBalloon`; raw dispatch can materialize those zero-argument members as a
+string or Boolean. Keep exact caption/uniqueness and balloon-count/native-identity
+checks rather than guessing callable forms.
+
+`INote.GetExtent` also encloses an attached leader; it is not a text-only box.
+For capture-label ink checks, use native `IDisplayData` text runs with positive
+finite widths/heights, positions, angles and all six text-reference anchors,
+following the kit's measured-text pattern and shared `display_box`. Missing or
+zero native width is a refusal with all run metadata, never a font-width estimate.
+Keep whole-note extent containment and the separate leader checks as well.
+
+The pivot-capture native PDF exposed a 2.463 mm C5A/C3A block gap below the
+3.234 mm row pitch and a cotter leader crossing the A cut line after the
+glyph guards passed. Move the reading text, not its physical criterion anchor.
+Replay the original PDF's vector strokes as well as the cached audit JSON,
+which retains only their count, before checking neighboring ink. Translated
+label previews predict native junction routing; the unchanged native guards
+and final PDF audit must still qualify the result.
+
+On refusal at the four final layout guards, report all indexed glyph and
+whole-note rectangles, outside-field entries and overlapping pairs, not only the first
+conflict. Field gaps are left/bottom/right/top; pair gaps are horizontal/vertical,
+in metres, with negative values denoting overlap or field overrun. Include
+the existing leader segments/crossings and the three reading-view outlines
+(or their read errors), without masking the original refusal. Move labels only
+from measured bounds and neighboring clearances; do not relax layout guards.
+Earlier reading-field and other-view leader checks retain their fail-fast order.
+
+The C2A schematic and its exact sheet-scale/endpoint/display proof travel with
+the bench procedure to sheet 8; feed checks, cap seating and carrier capture
+have distinct headings in that print order, without new acceptance criteria.
+
+For the assembly's imported CL-tip reference, curate the native dimension at
+a near-tip **dimension-line anchor**, reset inherited `OffsetText`, then use
+`offset_dimension_text` for the separate clear text lane. Moving the whole
+dimension into that text lane first leaves unnecessarily long witnesses even
+if the value's position reads back correctly. Require the native display's
+arrow tips to remain at the projected model endpoints on the near-tip line
+both immediately and after finalization; retain the native model value,
+reference brackets, precision and no-tolerance contract.
+
+Apply that separation to the complete native annotation, not just its leader.
+The `b9e4d6b45` carrier cleared the enforced leader crossings while its 45.00
+dimension still struck the REAM tolerance stack and callout rows. Retain every
+captured text row, arrow edge and neighboring annotation in layout regressions;
+an arrow tip alone can miss a clearance violation by the arrow's flank.
+These replays budget a proposed placement; the regenerated PDF remains the
+evidence of the actual layout.
+
+When a placement guard refuses, report the stage, requested and actual
+annotation origins, native arrow tips, `OffsetText`, tolerances and differences.
+Keep unavailable probes as explicit read errors and preserve the original
+exception. A combined “line moved or text missed” error cannot distinguish a
+setter refusal from a clamped position, and does not justify loosening a guard.
+
+For the oblique block's multiline linear captions, after enabling `OffsetText`
+and moving the text, the final line landed at the prior annotation origin,
+not the false-mode arrow Y. Calibrating that arrow first moved the final line
+by 19.447 mm. Set the false-mode annotation origin to the desired line anchor
+once, enable offset text, then move the text and check the settled arrows,
+witnesses and text origin. Source `f441b8b25` passed the native guards with
+this handoff; do not replace it with an iteration or a hard-coded correction.
+
+The second cartridge uses the same capture-part families on the other
+support, so its identification does not need duplicate BOM balloons. Explain
+that the capture parts are identical at both supports in the existing
+reserved exploded-view footer, alongside the BOM/assembly-sequence references.
+Do not introduce a free-floating caption beneath the ring: that area is not
+reserved text space. The existing footer width, on-sheet/title-block bounds,
+ring separation and native layout-audit checks remain in force.
+### TL-22 pivot-block callout lanes
+
+The native drawing at `6dd691486` refused three enforced findings. On
+**Bearing and carriage**, the carriage-hole callout leader
+`(172.2,216.6) -> (158.1,238.8)` mm crossed both the removed-view **C**
+pointer's text box `[161.8,228.9]..[165.1,232.5]` mm and its leader
+`(165.6,230.9) -> (163.4,222.0)` mm. C is a view-owned viewing pointer,
+not a datum-feature symbol. Keep its tip and the callout's selected counterbore
+edge; move the callout text anchor from `(188,250)` to `(212,250)` mm.
+The projected text-end route is then right of C rather than through it.
+
+On **Register recesses**, the complete native `CapRegister2Dia` block's
+horizontal shoulder at Y233.9 mm crossed `CapRegisterUpperY` at X294.5 mm,
+whose offending line ended at Y238.0 mm. Raise the diameter text from model
+Y27 to Y33 mm: at 2:1 this allocates 12 mm more sheet height and projects the
+shoulder to Y245.9 mm, above the unchanged Y24 station. Keep the imported
+diameter, its source tolerance, both register locations and native leader style.
+
+The offline tests replay those measured conflicts and the requested text
+translations; they are not native after-fix proof. Parent validation must
+rebuild and inspect the full text blocks, leaders and border clearance on both
+sheets, with the existing layout enforcement unchanged.
+
+The five-sheet `7f008ec06db9` PDF also exposed native text/ownership traps.
+The diagonal D-D cut through the staggered receivers really produces an
+approximately 6° oblique section; it is not a view-angle error. A square
+depth section can cut the first receiver at constant model X, with the
+existing `2X` depth applying to both recesses in the same cut feature.
+Project its cutting endpoints through the parent view, but pass keeper and
+section-owned linked-caption positions directly in **sheet coordinates**.
+Reusing the plan's paper anchors leaves the depth text and caption beneath
+the plan even when their native owner is the section.
+
+Allocate lanes for complete callouts, not just values: the 9.000 mate block
+overprinted the web-hole callout, and the 74.50 wall qualifier printed in
+A-A's hatch. On the same export, `CboreFloor`'s audit text already contained
+the M4 engagement qualifier above 15.600, but the PDF omitted that multiline
+qualifier. `GetText` is therefore not printed-ink proof. Keep the accepted
+short-engagement fact attached to the native floor dimension and inspect
+its full exported text, witnesses and neighbouring ink.
+
+Retain the D-D depth line, text shelf and projected witnesses for a read-only
+check after the final rebuild, along with all three capture-wing offset
+line/text placements on sheet 2. Keep the f441 origin handoff and existing
+placement guards; the settled checks must refuse drift, not reposition it.
+The `cf3fd16025ab` native leaf also exposed a wrong witness-gap origin:
+`HoleRow1Y` ends at the carriage row's `BOLT_X`, not the block's +X face.
+The accepted gap therefore started the witness 10.5 paper mm short of its
+clear lane. Compute it from that actual row endpoint; still require the
+rebuilt witness to clear the complete A letter by 2 mm and remain visible.
+
+### TL-30 capture-cap functional sheets
+
+The `d349b99300c6` native cap drawing imported all 32 model dimensions, including
+the real `RegisterEndChamfer`, but packed their complete manufacturing callouts
+into seven views on one sheet. Its log recorded 108 gating findings. The
+enforced pair was `WireWidth`'s shoulder `(217.5,83.7) -> (137,83.7)` mm crossing
+`PocketDepth`'s witness `(215,87) -> (215,80.6)` mm. The failed leaf published no
+paper/audit artifacts, and the worker's next source preparation had removed
+them: the remaining 107 records cannot honestly be classified from that log.
+
+Keep the full source text and 1:1 scale, with these separate ASME B sheets:
+
+| Sheet | Native dimension ownership |
+| --- | --- |
+| `ACCESS` | Outline, aperture coordinates/size, head and wire access, mouth depths |
+| `SECTIONS` | Underside pocket size/corner coordinates, A-A pocket section and cap thickness |
+| `BOLT-LOCATIONS` | Through-clearance size and all eight actual pocket-axis bolt coordinates |
+| `REGISTERS` | Both bosses' size/coordinates/projection, root-radius maximum and no-undercut requirement |
+
+The formerly explicit circular-rim chamfer imported in `*Top`, not `*Right`;
+native transfer to `*Right` refused. Do not preserve its extra XZ view or marked
+MAX dimension after the free-end chamfer adopts the general 0.25 mm edge-break
+limit. Keep the native 45-degree feature and geometry readback, and charge that
+whole general limit to the coupled register-engagement bound. The unmirrored
+`*Front`/`*Right` context owns the projection; separate `*Back` views retain
+visible native pocket-axis witnesses.
+Every sheet takes precision and complete callouts from the same part-spec maps.
+
+Remove the unconditional second `auto_center_marks` pass. The existing template
+inserts centre marks; the replacement census requires one for the central bore
+and each visible pattern feature (five in `*Front`, seven in `*Back`), refusing
+missing or duplicate marks. The 12 duplicate records are consistent with that
+second pass, but their individual native records were not recovered. Fresh
+native validation must confirm the census and inspect **all four** printed
+sheets and the full audit, not only the formerly enforced pair. Requested
+coordinates and offline routing tests are not zero-collision native evidence;
+all existing audit kinds, fit guards and model-owned tolerance controls remain.
+
+### Stock allowances and local drawing-number fit
+
+When the native model shows a fitted part rather than its supply blank,
+attach `SUPPLY n.n MIN THICK` to the real thickness's REF callout (TL-31).
+Do not dimension an undrawn blank or retain an annotation-only sketch that
+leaves a witness in empty paper. Keep the actual fitted acceptance and its
+running-face finish; the stock allowance is not a finished-size band.
+For a round washer, the filing-button convention moves the genuine imported
+OD from the circular face to `*Right` with `move_model_dimension`.
+
+A purchased drawing whose Number overruns the REV divider opts into
+`NumberFit.SHRINK_TO_CELL` in its own recipe (VN-52). This measures and fits
+the linked native note locally; do not change the shared template or rename
+the part. Inspect the fresh native witnesses, callouts and Number/REV gap:
+source positions alone are not after-fix evidence.
 
 ### Rocker R19 regression and local placement contract
 
@@ -954,6 +1285,15 @@ Keep that refusal. Resolve the part-owned finish-control face on the view's
 `ReferencedDocument` and attach as a FACE with the pre-insertion selection
 point (`draw_dt_pinion_arbor`): `IsSame` proves
 the actual cylinder and the 1 mm landing readback still pins its flank.
+
+An entity-attached `InsertNote` can use the same pre-insertion selection-point
+pattern. On the oblique hold-down stud, coordinate hit-testing missed the
+resolved factory-rim edge. Selecting that exact edge, setting
+`SetSelectionPoint2` and then inserting the note succeeded on `f441b8b25`.
+Both rim and barrel-outline notes passed exact attachment identity/type and
+settled leader-tip checks within 1 mm. This differs from the unattached
+`add_leader_note` pointer above; do not move an attached tip after insertion
+and assume its ownership survived.
 
 **j. A fresh detail view whose readbacks lag its ink.**
 Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred

@@ -113,10 +113,16 @@ replica-gated and no copy is kept here:
 
 - [5972K41](https://www.mcmaster.com/5972K41/) (`ch-rocker-arm-tl-vn-oblique-bearing`,
   MHA-CH-06-TL-VN-52, four: a pair in each oblique-trammel jig pivot block) was
-  read live on October 17, 2026: steel ball bearing, sealed (Buna-N both
-  sides), trade no. 6200-2RS, ID 10 mm -0.008/0, OD 30 mm -0.009/0, width
-  9 mm -0.12/0, ABEC 1, C3 radial clearance 0.008-0.023 mm, DIN 625-1. The
-  vendor model was downloaded from the product page on October 17, 2026
+  read live on October 17, 2026 and rechecked in the live Product Detail table
+  on October 21, 2026: steel ball bearing, sealed (Buna-N), trade no. 6200-2RS,
+  ID 10 mm -0.008/0, OD 30 mm -0.009/0, width 9 mm -0.12/0, ABEC 1,
+  C3 radial clearance 0.008-0.023 mm, DIN 625-1. These are SKU-specific
+  supplier dimensions, not tolerances inferred from the ABEC label or CAD.
+  `_mcmaster_5972k41` owns the pure purchased size bands; the pin and block
+  fits consume its bore and OD deviations. The supplier's generic Width
+  does not separately specify race widths or bound internal axial play.
+  No whole-bearing captured-motion enclosure follows from that width.
+  The vendor model was downloaded from the product page on October 17, 2026
   (`5972K41_Steel Ball Bearing.SLDPRT`, SHA-256
   `c27c3a1b09e8ca34e3191b2c345dd0b963297e5af1eb90e7d106441043c89ca9`; its
   STEP, SHA-256
@@ -138,7 +144,19 @@ replica-gated and no copy is kept here:
   It also supplies `fixtures.trammel-6200-2rs`; the inventory records the
   sourcing ruling on per-bearing internal play and the rejected C0 upgrade
   (combined play, mounting fits and alignment are not bounded by it).
-  Receipt verification remains required.
+  The VN-52 purchased drawing owns OD 29.991–30.000 mm, width 8.88–9.00 mm
+  and the function-required intact full-circumference cylindrical OD land,
+  including its axial mid-plane, for the TL-22 pivot-block capture. Before
+  pressing, trace the actual bearing's identity to valid supplier dimensional
+  authority and physically inspect that land. Catalogue size authority can
+  establish those bands without redundant micrometer records of every
+  catalogue dimension; CAD alone cannot accept the delivered profile, and no
+  maximum supplied chamfer is asserted. Assembly C1 uses qualified VN-52
+  bearings and retains the ring-loading press actions, not repeated part
+  tolerances. Capture qualification still requires explicit receiving status
+  and evidence for the same actual support on both passes. Possession and
+  receiving qualification remain unconfirmed; the inventory is not marked
+  accepted by this catalogue recheck.
 - [91595A452](https://www.mcmaster.com/91595A452/) (`ch-rocker-arm-tl-vn-oblique-cl-dowel`,
   MHA-CH-06-TL-VN-53, one: the oblique trammel jig carrier's CL locator) was
   read live on October 17, 2026: 52100 alloy steel dowel pin, 6 mm diameter
@@ -219,6 +237,18 @@ replica-gated and no copy is kept here:
   bands (ASME B18.3's -0.04 in length tolerance, TL-22's width and counterbore
   bands, the pair's 0.080-0.100 in stack) it engages TL-29 7.83 to 10.63, over
   1.5 D and inside the 12 full thread and its own 7/8 in thread.
+  TL-29's unused upper material is cut to 33.3 mm height at the ordinary
+  .X ±0.8 mm band, independent of the raised carrier: nominal bottom/top
+  Z = 27.4/60.7 mm. Its XY placement, nut axis Z = 40.4 mm, side holes,
+  3/4 × 2 in stock and leadline are unchanged, as are this screw and washer
+  pair. F1/F2 on TL-00's cartridge sheet require the actual TL-22 side-hole axes at least
+  5.0 mm below the actual TL-29 top before transfer punching, and the
+  entire actual bracket top, including high corners, at least 2.35 mm below
+  the actual TL-22 cap mounting plane after free-feed alignment and final
+  tightening throughout travel. Do not force nut/screw alignment to obtain
+  this gap or substitute invented HGH/KP08/end-bracket STOCK height bands.
+  See the [captured-pivot fit-up acceptance](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling);
+  this material cut is not a new native certificate or a cap relief.
   The page gives no socket depth, so the model takes ASME B18.3's minimum key
   engagement for #8, 0.077 in (the 91251A108 convention).
   `diag_build_91251A188.py` builds it from those catalogue values on the 91251A
@@ -419,6 +449,45 @@ unmodelled split/cams/serrations in the plain envelope. Existing dimensions,
 tolerance bands, construction references, quantities and physical geometry
 are unchanged. The current live captures show a `2-D PDF` control; they do
 not by themselves prove that a PDF was downloaded.
+
+### Non-McMaster captured-pivot hardware
+
+The oblique jig's new positive-capture hardware is **not** McMaster stock.
+Primary supplier pages were read on October 20, 2026; dimensions and source
+URLs are owned by
+[`ch_rocker_arm_tl_oblique_retention_hardware_spec.py`](../../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py).
+The native solids represent catalogue/installed envelopes, not harvested
+vendor CAD, replica-gate evidence or a load rating.
+
+| Number | Quantity in jig | Supplier identity and primary source |
+|---|---:|---|
+| MHA-CH-06-TL-VN-73 | 8 | CBS Fasteners [NAS1352N5H12](https://cbsfasteners.com/nas-fastener-inventory/), listed “5/16-18 X 3/4 SHC A286 DRLD”; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
+| MHA-CH-06-TL-VN-74 | 2 | Huyett [CLPS6-0187-1250D](https://www.huyett.com/clps6-0187-1250d), headed clevis pin, 3/16 × 1-1/4 in, 316 stainless, plain finish |
+| MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter pin |
+| MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless safety wire, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
+
+Purchase TL-VN-73 as the listed **A286** NAS1352N5H12; the native AISI 304
+material-library surrogate is a rendering representation only, not a material
+substitution or purchasing authority. The retention hardware provider owns
+the catalogue limits. The native fully threaded solid and the overall
+3/4 in length do not certify complete full-form engagement: inspect actual
+screws and THRU receiving threads for ≥1.5D = 11.90625 mm physical overlap.
+For assembly, use clean, dry, free-running actual screws; seat cross-pattern
+at 0.50 ±0.05 N·m with the cap seated on all faces, cap/block base gap
+≤0.05 mm over the whole mounting footprint, and independently underhead gap
+≤0.05 mm over the whole accessible head bearing footprint. Spend these
+independent allowances separately; then pair-wire in the tightening direction.
+This engineering seating torque establishes neither minimum preload
+nor force/strength certification.
+
+The clevis pin's native material entry is exactly
+`AISI 316 Annealed Stainless Steel Bar (SS)`; the purchased supplier's
+316 grade and condition remain authoritative, not the library entry's
+bar/annealed designation. Its actual diameter limits, not the listing's
+rounded 0.188 in nominal, control the fitted top-washer stack. The wire
+quantity counts installed formed pieces, not four spools. TL-VN-72 remains retired. See
+[captured-pivot authority and service instructions](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling)
+for the two-retainer pass change and destructive upward-extraction replacement.
 
 Live catalogue verification on October 12, 2026:
 

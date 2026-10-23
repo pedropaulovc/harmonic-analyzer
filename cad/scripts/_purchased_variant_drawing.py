@@ -7,7 +7,7 @@ configuration's quantity is never interpreted as a number of chains or kits.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,7 @@ from _drawing_common import (
 from _drawing_notes import property_link
 from _drawing_registry import DRAWING_TEMPLATES, DrawingSpec
 from _drawing_sheet_region import sheet_drawable_region
+from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _purchased_fastener_drawing import (
     _CAPTION_BELOW,
@@ -87,11 +88,14 @@ async def build_purchased_variant_drawing(
     item: str,
     purchase_unit: str,
     cut_to_suit: bool = False,
+    general_text: str | None = None,
     annotate_member: Callable[
         [Any, str, tuple, list[Any]], tuple[Callable[[], None], ...]
     ] | None = None,
+    additional_sheet_scales: Mapping[str, tuple[float, float]] | None = None,
+    append_sheets: Callable[[Any], tuple[Callable[[], None], ...]] | None = None,
 ) -> dict[str, str]:
-    """Draw every configured member of one purchase without fabrication PMI.
+    """Draw purchased-member references, with separately scoped rework sheets.
 
     ``variants`` pairs exact native configuration names with short member labels.
     The source stamps ``<configuration> Manufacturing Notes`` at document scope,
@@ -101,7 +105,16 @@ async def build_purchased_variant_drawing(
     their reserved band; an insertion point alone is not proof of containment.
     A caller may add member-specific native reference annotations after fitting;
     its returned readbacks run again after the final drawing rebuild.
+    Additional sheets, when requested, are duplicated while the template is
+    still blank and authored before the same single finalization. Their checks
+    follow (and never replace) the complete purchased-reference sheet checks.
+    ``general_text`` overrides only the footer's general line, retaining its
+    native text/extent checks; None keeps the ``cut_to_suit``-selected default.
     """
+    if (additional_sheet_scales is None) != (append_sheets is None):
+        raise ValueError("additional sheets require both scales and an author")
+    if additional_sheet_scales is not None and not additional_sheet_scales:
+        raise ValueError("additional sheet scales must not be empty")
     configurations = tuple(configuration for configuration, _ in variants)
     if len(set(configurations)) != len(configurations):
         raise ValueError("purchased-member configurations must be unique")
@@ -146,6 +159,17 @@ async def build_purchased_variant_drawing(
             )
 
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
+    reference_sheet_name = None
+    package_sheet_names = None
+    package_sheet_scales = None
+    if additional_sheet_scales is not None:
+        reference_sheet_name = str(adapter._get_attr_or_call(sheet, "GetName"))
+        package_sheet_names = (reference_sheet_name, *additional_sheet_scales)
+        create_blank_drawing_sheets(
+            adapter, package_sheet_names, label=f"{spec.artifact_stem} package"
+        )
+        if not _early_bound(draw, "IDrawingDoc").ActivateSheet(reference_sheet_name):
+            raise RuntimeError("failed to restore purchased-reference sheet")
     title_notes = _purchased_title_block(
         adapter,
         draw,
@@ -153,13 +177,20 @@ async def build_purchased_variant_drawing(
         finish=properties["Finish"],
         material_property="Material Specification",
     )
-    title = f"{row['title']} — Configured Purchased Part Reference Drawing"
+    title = (
+        f"{row['title']} — Configured Purchased Part Reference"
+        f"{' and Member Rework' if append_sheets is not None else ''} Drawing"
+    )
     stamp_drawing_summary(
         adapter,
         draw,
         {
             0: title,
-            1: "Harmonic Analyzer purchased-part identification; reference only",
+            1: (
+                "Harmonic Analyzer purchased-part identification and member rework"
+                if append_sheets is not None
+                else "Harmonic Analyzer purchased-part identification; reference only"
+            ),
             2: "Harmonic Analyzer Project",
             3: (
                 f"{spec.artifact_stem}; {properties['Supplier']}; "
@@ -279,6 +310,7 @@ async def build_purchased_variant_drawing(
             properties,
             item=item,
             cut_to_suit=cut_to_suit,
+            general_text=general_text,
             label=spec.artifact_stem,
         )
     )
@@ -300,6 +332,10 @@ async def build_purchased_variant_drawing(
     sheet.CustomPropertyView = first_view_name
 
     def assert_reference_sheet() -> None:
+        if reference_sheet_name is not None and not _early_bound(
+            draw, "IDrawingDoc"
+        ).ActivateSheet(reference_sheet_name):
+            raise RuntimeError("failed to activate purchased-reference sheet for readback")
         values = tuple(adapter._get_attr_or_call(sheet, "GetProperties2"))
         if (
             len(values) != 8
@@ -364,11 +400,20 @@ async def build_purchased_variant_drawing(
                     f"extent_m={box!r}, reserved_m={cell!r}, border_m={border!r}"
                 )
 
+    additional_checks = ()
+    if append_sheets is not None:
+        package_sheet_scales = {
+            reference_sheet_name: sheet_scale, **additional_sheet_scales,
+        }
+        additional_checks = append_sheets(adapter)
+
     return await finalize_drawing(
         adapter,
         DrawingOutputs(**spec.outputs),
         layout=spec.layout,
         pdf_title=title,
         scale=sheet_scale,
-        settled_checks=(assert_reference_sheet, *member_checks),
+        expected_sheet_names=package_sheet_names,
+        sheet_scales=package_sheet_scales,
+        settled_checks=(assert_reference_sheet, *member_checks, *additional_checks),
     )

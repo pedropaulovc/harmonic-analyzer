@@ -58,6 +58,12 @@ cannot ask for what the authors were told to leave out.
   carrier. Source bands remain model-owned. Reference sketches are authored in
   the final transformed stock frame by `_supplier_screw_reference`; only
   threaded builders import the separate `_supplier_screw_save` saver.
+  Connected linear witnesses reuse an existing anchor only after both native
+  endpoints report `swFullyConstrained`; independent witnesses retain their
+  origin anchors. Included angles select both existing rays and use native
+  angular type, exact-value and driving-state readback, with text placement
+  transformed through the owning sketch plane. Final-frame coordinate and
+  fully-defined-sketch guards remain mandatory.
   Source ownership requires native `IDimension` identity both with the source
   parameter and with a dimension enumerated from the intended model feature;
   matching names or values alone cannot prove membership. `IFeature` wrapper
@@ -130,6 +136,25 @@ cannot ask for what the authors were told to leave out.
   title-block keep-out; the machinist review judges containment, balance and
   fit of every visible element. An eye pass never substitutes for it (merge
   gate 3 in the root `AGENTS.md`).
+  Purchased drawings may opt into a recipe-local title-block setup after the
+  source links resolve, returning final-rebuild checks through the existing
+  `settled_checks` contract. Only the TL-VN-73/74/75/76 captured-pivot purchases
+  opt into `_purchased_title_fit`: it fits their existing linked Name, Material
+  and DWG. NO. notes inside their actual native ruled cells on one row.
+  Readable native-height floors are 3 mm for Name/Number and 2 mm for Material;
+  an unfit complete value refuses export, never truncates it.
+  `SetTextFormat` can remove a leading native `<FONT size=15PTS>` tag. The
+  identity guard permits only that supported size-tag syntax around the same
+  exact `$PRPSHEET` expression and still requires the full resolved value.
+  Font, anchor and whole-cell bounds remain independently checked after the
+  final rebuild. No saved template, purchase identity, grade or reference-view
+  scale changes. These four registry Material Specifications contain the
+  physical material/condition and applicable standard, not duplicated catalogue
+  prose. PASSIVATED and ZINC CLEAR remain in Finish; the complete CBS screw
+  description is in ITEM. Supplier, SKU, clevis 3/16 x 1-1/4 and wire .032 stay
+  in the existing procurement rows. The fixture's Material `LineLength` write
+  was observed to persist without widening its wrapped text, so that ineffective
+  write is removed for Material only; actual native bounds still decide fit.
 - **Fit-up at assembly (rule 19) is a last resort.** Slots, shims, cut-to-fit
   and match-drilling open space for sloppy work, so avoid them as much as
   possible: prefer geometry whose loose bands hold the stack at the worst

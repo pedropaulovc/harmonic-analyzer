@@ -40,8 +40,6 @@ PINNED = {
     # The jig stack: BEARING_SHOULDER 4 (r4) makes the pivot block 24 high.
     "PIVOT_BLOCK_HEIGHT": (trammel.PIVOT_BLOCK_HEIGHT, 24.0),
     "PIVOT_BLOCK_TOP_Z": (trammel.PIVOT_BLOCK_TOP_Z, 64.7),
-    "CARRIER_UNDERSIDE_Z": (trammel.CARRIER_UNDERSIDE_Z, 67.7),
-    "CARRIER_TOP_Z": (trammel.CARRIER_TOP_Z, 79.7),
 }
 
 

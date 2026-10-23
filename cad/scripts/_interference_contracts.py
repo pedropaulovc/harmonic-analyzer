@@ -64,6 +64,8 @@ from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT as _PINION_BLOCK_HEIGHT
 from dt_vn_slotted_screw_spec import SHANK_DIA as _BLOCK_SCREW_DIA
 from dt_vn_slotted_screw_spec import SHANK_LEN as _BLOCK_SCREW_LENGTH
 from dt_vn_slotted_screw_spec import THREAD as _BLOCK_SCREW_THREAD
+import ch_rocker_arm_tl_oblique_retention_hardware_spec as _JIG_CAP_HARDWARE
+import ch_rocker_arm_tl_oblique_retention_spec as _JIG_CAP_RETENTION
 
 
 def _smooth_annulus_limit_mm3(
@@ -934,6 +936,14 @@ JIG_NUT_SCREW_THREAD = (2.8448, 2.261, 9.2)  # #4-40 into the nut bracket
 JIG_RISER_SCREW_THREAD = (2.8448, 2.261, 10.401409)  # #4-40 into the carrier
 JIG_CLAMP_SCREW_THREAD = (6.35, 5.105, 12.0)  # 1/4-20 through the carrier
 JIG_LEVER_SCREW_THREAD = (7.9375, 6.528, 10.414)  # 5/16-18 into the carrier
+JIG_PIVOT_CAP_SCREW_THREAD = (
+    _JIG_CAP_HARDWARE.SCREW_MAJOR_DIA,
+    TAP_DRILL_MM[_JIG_CAP_HARDWARE.SCREW_THREAD],
+    _JIG_CAP_HARDWARE.SCREW_LENGTH
+    - (_JIG_CAP_RETENTION.CAP_HEIGHT - _JIG_CAP_RETENTION.CAP_COUNTERBORE_DEPTH),
+)
+# Only the actual 5/16-18 major-envelope/tap-drill annulus is necessary
+# overlap; cap, screw heads and safety wire receive no blanket exception.
 JIG_T_NUT_THREAD = (12.7, 10.716, 14.0)  # 1/2-13 stud in its T-nut
 JIG_FLANGE_NUT_THREAD = (12.7, 10.716, 13.0)  # 1/2-13 stud in its flange nut
 JIG_LEADSCREW_NUT_THREAD = (8.0, 6.0, 15.0)  # Tr8 screw in its flanged nut
@@ -1072,6 +1082,23 @@ _ROCKER_OBLIQUE_JIG_ALLOWED_PAIRS = {
         range(3, 5),
         f"{_JIG}-pivot-block",
         _smooth_annulus_limit_mm3(*JIG_BEARING_IN_BLOCK),
+        second_number=2,
+    ),
+    # Eight NAS1352N5H12 cap screws, four per block. Only the smooth 5/16-18
+    # major envelope inside the tap-drill bore is material overlap. The
+    # flange/cap/floor, clevis/pin, retainer/clevis, cotter/hole and routed
+    # safety wire are clear or nominal tangencies, not blanket exceptions.
+    **_numbered_pairs(
+        f"{_JIG_VENDOR}-pivot-cap-screw",
+        range(1, 5),
+        f"{_JIG}-pivot-block",
+        _smooth_annulus_limit_mm3(*JIG_PIVOT_CAP_SCREW_THREAD),
+    ),
+    **_numbered_pairs(
+        f"{_JIG_VENDOR}-pivot-cap-screw",
+        range(5, 9),
+        f"{_JIG}-pivot-block",
+        _smooth_annulus_limit_mm3(*JIG_PIVOT_CAP_SCREW_THREAD),
         second_number=2,
     ),
 }
