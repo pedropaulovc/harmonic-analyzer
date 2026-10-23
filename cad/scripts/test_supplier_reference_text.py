@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import gc
+import json
 import weakref
 from math import cos, isfinite, pi, sin
 from types import SimpleNamespace
@@ -571,22 +572,235 @@ def test_native_bounds_preserve_every_fragment_in_raw_order():
     assert texts == original
 
 
+def test_native_bounds_preserve_historical_4fd_pd_thickness_caption():
+    # Historical actual4fd PD thickness readback, not the current 5da failure.
+    # The second BSTR has no visible ink but has measured font advance.
+    texts = [
+        {"t": text, "pos": (x, y, 0.0), "w": width,
+         "h": 0.0035, "ref": 1, "ang": 0.0}
+        for text, x, y, width in (
+            (" (0.50 ", 0.1060793, 0.1403535, 0.0133583),
+            (" ", 0.1195665, 0.1448257, 0.0012931),
+            ("-", 0.1194377, 0.1403, 0.0015507),
+            ("0.00", 0.1209883, 0.1448257, 0.0090514),
+            ("0.05", 0.1209883, 0.1403, 0.0090514),
+            (" mm) ", 0.1300397, 0.1403535, 0.0130569),
+        )
+    ]
+    original = copy.deepcopy(texts)
+    expected = (
+        (0.1060793, 0.1403535, 0.1194376, 0.1438535),
+        (0.1195665, 0.1448257, 0.1208596, 0.1483257),
+        (0.1194377, 0.1403, 0.1209884, 0.1438),
+        (0.1209883, 0.1448257, 0.1300397, 0.1483257),
+        (0.1209883, 0.1403, 0.1300397, 0.1438),
+        (0.1300397, 0.1403535, 0.1430966, 0.1438535),
+    )
+    bounds, fragments = core.measured_native_text_bounds(texts, label=_LABEL)
+
+    assert isinstance(fragments, tuple)
+    assert len(fragments) == 6
+    for fragment, box in zip(fragments, expected, strict=True):
+        assert (fragment.xmin, fragment.ymin, fragment.xmax, fragment.ymax) == pytest.approx(box)
+    assert fragments[1].width == pytest.approx(0.0012931)
+    assert fragments[1].height == pytest.approx(0.0035)
+    assert (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax) == pytest.approx(
+        (0.1060793, 0.1403, 0.1430966, 0.1483257)
+    )
+    assert texts == original
+
+
+@pytest.mark.parametrize("text", ("", " "), ids=("empty-bstr", "space-bstr"))
+def test_native_bounds_blank_font_advance_expands_full_union(text):
+    texts = [
+        _nut_text("visible", (0.1, 0.2, 0.0), 0.01),
+        _nut_text(text, (0.08, 0.19, 0.0), 0.05),
+    ]
+    texts[1]["h"] = 0.02
+    original = copy.deepcopy(texts)
+    bounds, fragments = core.measured_native_text_bounds(texts, label=_LABEL)
+
+    assert len(fragments) == 2
+    assert (fragments[0].xmin, fragments[0].ymin,
+            fragments[0].xmax, fragments[0].ymax) == pytest.approx(
+        (0.1, 0.2, 0.11, 0.2035)
+    )
+    assert (fragments[1].xmin, fragments[1].ymin,
+            fragments[1].xmax, fragments[1].ymax) == pytest.approx(
+        (0.08, 0.19, 0.13, 0.21)
+    )
+    # The blank alone extends all four sides beyond the visible run.
+    assert bounds.xmin < fragments[0].xmin
+    assert bounds.ymin < fragments[0].ymin
+    assert bounds.xmax > fragments[0].xmax
+    assert bounds.ymax > fragments[0].ymax
+    assert (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax) == pytest.approx(
+        (0.08, 0.19, 0.13, 0.21)
+    )
+    assert texts == original
+
+
+@pytest.mark.parametrize(
+    "defect", ("missing", "none", "integer", "boolean", "bytes", "list")
+)
+def test_native_bounds_refuse_unreadable_native_text_in_later_fragment(defect):
+    texts = _nut_rd1()["display"]["texts"]
+    if defect == "missing":
+        del texts[1]["t"]
+    else:
+        texts[1]["t"] = {
+            "none": None, "integer": 1, "boolean": True,
+            "bytes": b"1", "list": ["1"],
+        }[defect]
+    with pytest.raises(RuntimeError, match="unreadable native text") as exc:
+        core.measured_native_text_bounds(texts, label=_LABEL)
+    assert str(exc.value).startswith(f"{_LABEL} fragment 1 ref=")
+
+
+def test_measure_fontbox_failure_note_uses_held_whitespace_fragment(
+    native_reads, monkeypatch
+):
+    record = _nut_rd1()
+    bad = record["display"]["texts"][1]
+    bad["t"] = " "
+    bad["w"] = float("nan")
+    later_record = _recovered_head_height()
+    later_record["name"] = "different second-generation annotation"
+    records = iter((record, later_record))
+    monkeypatch.setattr(core, "_dump_annotation", lambda *_args: next(records))
+
+    with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref=") as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    prefix = "supplier_reference_native_fontbox_fields "
+    note, = exc.value.__notes__
+    assert note.startswith(prefix)
+    census = json.loads(note[len(prefix):])
+    assert census["label"] == _LABEL
+    assert census["axis"] == 0
+    assert census["annotation"] == {
+        "type": 4, "name": "RD1", "owner_type": 0,
+        "pos": {"items": [0.115, 0.1661689, -0.0059531], "omitted_items": 0},
+        "visible": 1, "layer": "",
+    }
+    assert census["fragment_count"] == 5
+    assert census["omitted_fragments"] == 0
+    assert [fragment["index"] for fragment in census["fragments"]] == list(range(5))
+    assert census["fragments"][1] == {
+        "index": 1,
+        "raw": {
+            "fields": {
+                "t": " ",
+                "pos": {"items": [0.11045, 0.1689983, -0.0059531],
+                        "omitted_items": 0},
+                "h": 0.0035, "ref": 1, "ang": 0.0,
+                "font": "Century Gothic", "ls": 0.001,
+                "w": {"non_finite": "nan"},
+            },
+            "omitted_fields": 0,
+        },
+        "reference_python_type": "int",
+    }
+    # The census belongs to the failing read, not a reacquired annotation.
+    assert next(records) is later_record
+
+
+def test_measure_fontbox_failure_note_never_reprs_opaque_native_text(native_reads):
+    class OpaqueText:
+        def __repr__(self):
+            raise AssertionError("native text must not be inspected")
+
+    record = _nut_rd1()
+    record["display"]["texts"][1]["t"] = OpaqueText()
+    with pytest.raises(RuntimeError, match="unreadable native text") as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    assert str(exc.value).startswith(f"{_LABEL} fragment 1 ref=")
+    note, = exc.value.__notes__
+    prefix = "supplier_reference_native_fontbox_fields "
+    assert note.startswith(prefix)
+    census = json.loads(note[len(prefix):])
+    assert census["fragments"][1]["raw"]["fields"]["t"] == {
+        "unreadable_type": "OpaqueText"
+    }
+
+
+def test_measure_fontbox_failure_note_reports_bounded_text_and_fragment_omissions(
+    native_reads,
+):
+    record = _nut_rd1()
+    texts = record["display"]["texts"]
+    texts[1]["t"] = "x" * 145
+    texts[1]["w"] = 0.0
+    texts.extend(copy.deepcopy(texts[0]) for _ in range(12))
+    with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref=") as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    note, = exc.value.__notes__
+    prefix = "supplier_reference_native_fontbox_fields "
+    assert note.startswith(prefix)
+    census = json.loads(note[len(prefix):])
+    assert census["fragment_count"] == 17
+    assert census["omitted_fragments"] == 1
+    assert [fragment["index"] for fragment in census["fragments"]] == list(range(16))
+    assert census["fragments"][1]["raw"]["fields"]["t"] == {
+        "prefix": "x" * 128, "omitted_characters": 17
+    }
+
+
+def test_measure_fontbox_census_formatting_failure_retains_primary_error(
+    native_reads, monkeypatch
+):
+    record = _nut_rd1()
+    record["display"]["texts"][1]["w"] = 0.0
+    with pytest.raises(RuntimeError) as primary:
+        core.measured_native_text_bounds(record["display"]["texts"], label=_LABEL)
+
+    def fail_census(*_args, **_kwargs):
+        raise ValueError("diagnostic formatting fault")
+
+    monkeypatch.setattr(core, "_fontbox_failure_note", fail_census)
+    with pytest.raises(RuntimeError) as exc:
+        core.measure_reference_text(None, _static(record), axis=0, label=_LABEL)
+
+    assert str(exc.value) == str(primary.value)
+    assert type(exc.value.__cause__) is type(primary.value.__cause__)
+    assert str(exc.value.__cause__) == str(primary.value.__cause__)
+    assert exc.value.__notes__ == [
+        "supplier reference fontbox field census formatting failed "
+        "(ValueError); original failure retained"
+    ]
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
-    (("w", 0.0), ("h", float("nan")), ("pos", (0.1, 0.2)), ("ang", None), ("ref", 6)),
+    (
+        ("w", 0.0), ("w", -0.001), ("w", float("nan")), ("w", float("inf")),
+        ("h", 0.0), ("h", -0.001), ("h", float("nan")), ("h", float("inf")),
+        ("pos", (0.1, 0.2)),
+        ("pos", (float("nan"), 0.2, 0.0)),
+        ("pos", (0.1, float("inf"), 0.0)),
+        ("pos", (0.1, 0.2, float("nan"))),
+        ("ang", None), ("ang", float("nan")), ("ang", float("inf")),
+        ("ref", None), ("ref", -1), ("ref", 6),
+        ("ref", True), ("ref", 1.0), ("ref", "1"),
+    ),
 )
-def test_native_bounds_refuse_unreadable_later_fragment_with_identity(field, value):
+@pytest.mark.parametrize("text", ("1", "", " "), ids=("visible", "empty-bstr", "space-bstr"))
+def test_native_bounds_refuse_unreadable_later_fragment_with_identity(field, value, text):
     texts = _nut_rd1()["display"]["texts"]
+    texts[1]["t"] = text
     texts[1][field] = value
     with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref="):
         core.measured_native_text_bounds(texts, label=_LABEL)
 
 
 @pytest.mark.parametrize("reference", (1, 3), ids=("hull-overflow", "anchor-overflow"))
-def test_native_bounds_refuse_nonfinite_derived_fragment_before_union(reference):
+@pytest.mark.parametrize("text", ("later", "", " "), ids=("visible", "empty-bstr", "space-bstr"))
+def test_native_bounds_refuse_nonfinite_derived_fragment_before_union(reference, text):
     texts = [_nut_rd1()["display"]["texts"][0]]
     coordinate = 1e308 if reference == 1 else -1e308
-    later = _nut_text("later", (coordinate, coordinate, 0.0), 1e308)
+    later = _nut_text(text, (coordinate, coordinate, 0.0), 1e308)
     later.update(h=1e308, ref=reference)
     texts.append(later)
     with pytest.raises(RuntimeError, match=f"{_LABEL} fragment 1 ref={reference}"):
