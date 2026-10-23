@@ -17,7 +17,6 @@ from _drawing_edges import scan_view_edges
 from _drawing_layout_audit import _OWNER_DRAWING_TEMPLATE, annotation_display
 from _drawing_leader_notes import add_attached_note
 from _drawing_projection import model_points_in_view
-from _layout_audit import display_box
 from _layout_geometry import Box
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -26,6 +25,7 @@ from _purchased_fastener_drawing import (
     fastener_view_cells, view_band_bottom,
 )
 from _supplier_nut_drawing import add_supplier_nut_dimensions, assert_saved_supplier_nut_nominal
+from _supplier_reference_text import measured_native_text_bounds
 from _supplier_screw_layout import supplier_screw_margins
 import sm_vn_boss_hook_jam_nut_spec as supplier
 
@@ -112,22 +112,9 @@ def _installation_flag(adapter: Any, right: Any) -> Callable[[], None]:
         )
         geometry, refused = annotation_display(adapter, annotation)
         texts = geometry.get("texts", ())
-        if refused or not texts or any(
-            not all(
-                math.isfinite(float(text.get(field) or 0))
-                and float(text.get(field) or 0) > 0
-                for field in ("w", "h")
-            )
-            or len(text.get("pos") or ()) != 3
-            or not all(math.isfinite(float(value)) for value in text["pos"])
-            or text.get("ang") is None
-            or not math.isfinite(float(text["ang"]))
-            for text in texts
-        ):
+        if refused or not texts:
             raise RuntimeError(f"{label}: native key text is unreadable")
-        bounds = display_box({"texts": texts})
-        if bounds is None:
-            raise RuntimeError(f"{label}: native key text is missing")
+        bounds, _ = measured_native_text_bounds(texts, label=f"{label} native key")
         text_box = (bounds.xmin, bounds.ymin, bounds.xmax, bounds.ymax)
         if (
             not all(math.isfinite(value) for value in text_box)

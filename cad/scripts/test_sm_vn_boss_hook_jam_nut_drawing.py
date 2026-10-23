@@ -357,7 +357,15 @@ def boss_installation_native(monkeypatch):
                 data.GetTextInBoxWidthAtIndex = refused_width
             elif state.text_fault == "nonfinite-position":
                 data.GetTextPositionAtIndex = lambda _i: (math.nan, center[1], 0.0)
-            elif state.text_fault.startswith("later-"):
+            elif state.text_fault == "upper-left-equivalent":
+                position = data.GetTextPositionAtIndex
+                data.GetTextPositionAtIndex = lambda i: (
+                    position(i)[0], position(i)[1] + self.height, position(i)[2],
+                )
+                data.GetTextRefPositionAtIndex = lambda _i: 0
+            elif state.text_fault == "lower-right-reference":
+                data.GetTextRefPositionAtIndex = lambda _i: 4
+            elif state.text_fault is not None and state.text_fault.startswith("later-"):
                 # A finite first fragment must not conceal malformed later
                 # geometry in Box.union or a short-position rendering skip.
                 data.GetTextCount = lambda: 2
@@ -445,6 +453,18 @@ def test_boss_flag_targets_actual_z0_and_checks_settled_readonly(
     )
 
 
+def test_boss_flag_preserves_actual_ink_with_an_equivalent_upper_left_reference(
+    boss_installation_native,
+):
+    state = boss_installation_native
+    settled = state.drawing._installation_flag(state.adapter, state.right)
+    state.add_legend()
+    state.text_fault = "upper-left-equivalent"
+    before = state.note.GetExtent(), tuple(state.note.annotation.moves)
+    settled()
+    assert (state.note.GetExtent(), tuple(state.note.annotation.moves)) == before
+
+
 def test_boss_flag_distinguishes_template_border_zone_from_authored_key(
     boss_installation_native,
 ):
@@ -497,6 +517,7 @@ def test_boss_flag_rejects_nonbearing_geometry(boss_installation_native, geometr
     "nonfinite-position", "duplicate-key", "foreign-key", "replaced-key",
     "later-short-position", "later-missing-z", "later-nonfinite-position",
     "later-nonfinite-z", "later-nonfinite-angle",
+    "right-reference-hides-view-strike",
     "missing-legend", "changed-legend", "unlinked-legend", "duplicate-legend",
     "duplicate-literal-instruction", "duplicate-unkeyed-instruction",
     "duplicate-template-legend", "duplicate-template-instruction",
@@ -561,6 +582,18 @@ def test_boss_flag_rejects_settled_native_drift(boss_installation_native, fault)
         # but the actual text-to-outline gap is 1 mm, not the required 2 mm.
         x0, y0, x1, y1 = note._text_bounds()
         state.right.outline = (x0 - 0.005, y0, x0 - 0.001, y1)
+    elif fault == "right-reference-hides-view-strike":
+        # The native insertion/reference point clears the view, but a
+        # lower-right anchored glyph extends left into the physical outline.
+        state.text_fault = "lower-right-reference"
+        _x, y, z = annotation.position
+        annotation.position = (
+            state.right.outline[2] + 0.003 - note.ink_offset[0], y, z,
+        )
+        x0, y0, _x1, y1 = note._text_bounds()
+        assert x0 > state.right.outline[2] + 0.002
+        assert x0 - note.width < state.right.outline[2]
+        note.extent_override = (x0 - note.width, y0, z, x0, y1, z)
     elif fault in (
         "unreadable-display", "empty-text", "unreadable-width", "nonfinite-position",
         "later-short-position", "later-missing-z", "later-nonfinite-position",
