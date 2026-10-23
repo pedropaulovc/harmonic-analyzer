@@ -25,7 +25,7 @@ DRAWING_PRECISION = {
     "MountingCoordinates": {"MountingX0": 2, "MountingX1": 2, "MountingY0": 2},
     "TapCoordinates": {"TapFromTip": 2, "TapFromSide": 2},
 }
-# Owner, 2026-10-22: preserve geometry and explain these structural controls.
+# Owner decision: preserve geometry and explain these structural controls.
 # They retain tap material and the real screw-grip stack, not a profile fit.
 HEAD_MATERIAL_TOL = 0.05
 FOOT_GRIP_TOL = printed_band_mm(DRAWING_PRECISION["FlangeProfile"]["FlangeDepth"])

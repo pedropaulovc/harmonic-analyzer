@@ -1628,11 +1628,12 @@ clearance is0.525 and minimum tip projection0.740. Rod length variation moves
 the fitted free tip; it does not define a second fixed-position joint proof.
 There is no press-fit force/finish/elastic-yield contract or added lock.
 
-The owner chose **“Keep geometry; explain controls” on2026-10-22**, superseding
+The owner chose **“Keep geometry; explain controls”**, superseding
 the earlier removal of structural qualifiers. Keep all three radius/location
 ±0.05 bands and import their source-owned `RETAINS TAP WALL` below-text. This
-is material retention, not an invented outside-profile fit; package RV-03
-records that specific acceptance. The foot prints explicit **3.175±0.13** with
+is material retention, not an invented outside-profile fit. The choice
+authorizes annotations, not a new machinist exception; the annotated sheet
+must be reviewed on its merits. The foot prints explicit **3.175±0.13** with
 `MHA-MG-VN-53` / `SCREW GRIP` below it: full engagement3.305 exceeds3.2766,
 with0.0075 minimum tip clearance. Rounding it to3.18 at`.XX`±0.51 loses that
 joint. One-place overall foot length/width change precision, not model geometry;
@@ -1951,7 +1952,7 @@ Keep the ordinary end view and real native1/4-20 UNC THRU ALL callout; no A-A,
 cutting arrows, orphan section marks or section-thread display/ink machinery
 belongs in the production recipe. Its nominal12.50 neck now prints12.5; the
 native3.175 foot carries explicit±0.13 and the real screw-grip reference. The
-prior no-qualifier direction was superseded by the2026-10-22 owner choice above.
+prior no-qualifier direction was superseded by the owner choice above.
 Inside corners follow the actual title-blockR1.0 MAX default, not a bespoke
 R0.25 inside restriction. The nominal root uses tangentR0.60 inside andR0.25
 outside arcs across the0.85 offset, with no flat ledge; verify the actual native
