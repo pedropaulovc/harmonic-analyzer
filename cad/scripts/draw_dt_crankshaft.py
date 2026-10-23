@@ -1005,8 +1005,9 @@ def _outboard_neck_silhouettes(adapter: Any, side: Any) -> tuple[Any, tuple[Any,
     """Find exactly the two real outlines on the spec-owned left-hand short land."""
     source_face = _outboard_neck_source_face(side)
     matches: dict[int, list[Any]] = {-1: [], 1: []}
-    for _component, entities in visible_component_entities(adapter, side, 4):
-        for entity in entities:
+    view = _early_bound(side, "IView")
+    for component in view.GetVisibleComponents() or ():
+        for entity in visible_component_entities(view, component, 4):
             points = _neck_silhouette_points(entity, label="collar-side neck enumeration")
             for sign in (-1, 1):
                 expected = (

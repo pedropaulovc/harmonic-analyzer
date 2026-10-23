@@ -1687,8 +1687,12 @@ identifies the two real `ISilhouetteEdge` objects at
 separation is the full 9.525 mm. Endpoint order reverses between the two;
 the endpoints are `MathPoint` evidence, **not** selectable `IVertex` objects.
 Resolve exactly one lower and one upper outline from FRONT's native
-kind-4 silhouette inventory; a long shank, right neck, journal flank,
-duplicate lower flank or screen-space pick is not an alternative.
+kind-4 silhouette inventory. Enumerate `IView.GetVisibleComponents()`, then
+call `visible_component_entities(view, component, 4)` for each component:
+the helper returns a flat list of bound entities, not component/entity pairs,
+and its first argument is the view, never the adapter. A long shank, right
+neck, journal flank, duplicate lower flank or screen-space pick is not an
+alternative.
 
 Independently resolve exactly one physical short-neck cylinder from all
 bodies of FRONT's referenced part. Require native cylindrical-surface

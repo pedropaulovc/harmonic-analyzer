@@ -11,6 +11,8 @@ from unittest.mock import Mock, call
 
 import pytest
 
+from solidworks_mcp.adapters.solidworks import drawing as native_drawing
+
 import build_dt_crankshaft as part
 import _sprocket_seat_geometry as seat_geometry
 import dt_crank_hub_geometry as geometry
@@ -1077,6 +1079,9 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         edge_dimensions._sw_type_info, "early_bound_or_flag",
         lambda value, interface, *members: value,
     )
+    monkeypatch.setattr(
+        native_drawing._sw_type_info, "early_bound", lambda value, interface: value,
+    )
     for module in (drawing, edge_dimensions, selection_helpers):
         monkeypatch.setattr(module, "view_name", Mock(return_value="FRONT"))
     source_face, view_face, canonical_face = _neck_face(), _neck_face(), _neck_face()
@@ -1092,8 +1097,10 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         GetCorrespondingEntity=Mock(side_effect=AssertionError("no forward-map requirement")),
     )
     lower, upper = (_neck_silhouette(side, view_face, sign) for sign in (-1, 1))
-    visible = Mock(return_value=(("component", (lower, upper)),))
-    monkeypatch.setattr(drawing, "visible_component_entities", visible)
+    component = object()
+    side.GetVisibleComponents = Mock(return_value=(component,))
+    visible = Mock(return_value=[lower, upper])
+    side.GetVisibleEntities2 = visible
     projection = Mock(side_effect=lambda adapter, view, points, **kwargs: [
         (drawing._sheet_x(point[1] * 1000.0), drawing._sheet_y(point[2] * 1000.0))
         for point in points
@@ -1205,7 +1212,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     factory = Mock(wraps=drawing.add_edge_dimension)
     monkeypatch.setattr(drawing, "add_edge_dimension", factory)
     return SimpleNamespace(
-        adapter=adapter, model=model, side=side, source=source, body=body,
+        adapter=adapter, model=model, side=side, component=component, source=source, body=body,
         source_face=source_face, view_face=view_face, canonical_face=canonical_face,
         canonical=canonical, lower=lower, upper=upper, visible=visible, projection=projection,
         native=native, display=display, annotation=annotation, texts=texts,
@@ -1220,6 +1227,99 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             (station_native, station_native.FullName, 0.0, 0),
         ),
     )
+
+
+def test_neck_resolver_binds_visible_entities_to_actual_view_and_component(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Run the owned resolver through the real SDK helper and raw-fetch chain."""
+    events = []
+
+    class NotAView:
+        def __getattr__(self, name):
+            if name in ("ReferencedDocument", "GetVisibleComponents", "GetVisibleEntities2"):
+                raise AssertionError(f"{type(self).__name__} cannot receive IView.{name}")
+            raise AttributeError(name)
+
+    class Component(NotAView):
+        pass
+
+    class Adapter(NotAView):
+        pass
+
+    components = (Component(), Component())
+
+    class View:
+        def GetVisibleComponents(self):
+            assert self is view
+            events.append(("components", self))
+            return components
+
+        def GetVisibleEntities2(self, component, kind):
+            assert self is view
+            assert type(kind) is int and kind == 4
+            assert component is components[0] or component is components[1]
+            events.append(("entities", self, component, kind))
+            # Flat native entity arrays; never (component, entities) pairs.
+            return (lower,) if component is components[0] else (upper,)
+
+    view = View()
+    source_face, view_face = _neck_face(), _neck_face()
+    body = SimpleNamespace(GetFaces=Mock(return_value=(source_face,)))
+    canonical = Mock(side_effect=lambda face: source_face if face is view_face else None)
+    extension = SimpleNamespace(GetCorrespondingEntity2=canonical)
+    source = SimpleNamespace(
+        GetType=Mock(return_value=1), GetBodies2=Mock(return_value=(body,)),
+        Extension=extension,
+    )
+    view.ReferencedDocument = source
+    lower, upper = (_neck_silhouette(view, view_face, sign) for sign in (-1, 1))
+    adapter = Adapter()
+    adapter.swApp = SimpleNamespace(IsSame=Mock(side_effect=lambda left, right: int(left is right)))
+    allowed = {
+        "IView": (view,), "IModelDoc2": (source,), "IPartDoc": (source,),
+        "IBody2": (body,), "IFace2": (source_face, view_face),
+        "ISurface": (source_face.GetSurface.return_value, view_face.GetSurface.return_value),
+        "IModelDocExtension": (extension,), "ISilhouetteEdge": (lower, upper),
+        "IMathPoint": (
+            lower.GetStartPoint.return_value, lower.GetEndPoint.return_value,
+            upper.GetStartPoint.return_value, upper.GetEndPoint.return_value,
+        ),
+    }
+    bindings = []
+
+    def bind(value, interface):
+        assert any(value is candidate for candidate in allowed[interface]), (
+            f"wrong receiver for {interface}: {type(value).__name__}"
+        )
+        bindings.append((value, interface))
+        return value
+
+    def project(actual_adapter, actual_view, points, *, label):
+        assert actual_adapter is adapter
+        assert actual_view is view
+        assert label == "collar-side neck source"
+        return [
+            (drawing._sheet_x(point[1] * 1000.0), drawing._sheet_y(point[2] * 1000.0))
+            for point in points
+        ]
+
+    monkeypatch.setattr(drawing, "_early_bound", bind)
+    monkeypatch.setattr(native_drawing._sw_type_info, "early_bound", bind)
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    # Neither visible_component_entities nor raw_visible_entities is replaced.
+    # The pre-fix adapter/view argument swap therefore fails receiver binding.
+    assert drawing.visible_component_entities is native_drawing.visible_component_entities
+    physical, pair = drawing._outboard_neck_silhouettes(adapter, view)
+    assert physical is source_face
+    assert pair[0] is lower and pair[1] is upper
+    assert events == [
+        ("components", view),
+        ("entities", view, components[0], 4),
+        ("entities", view, components[1], 4),
+    ]
+    assert all(receiver is view for receiver, interface in bindings if interface == "IView")
+    assert canonical.call_args_list == [call(view_face), call(view_face)]
 
 
 def _create_neck_dimension(f):
@@ -1297,7 +1397,8 @@ def test_opposite_neck_factory_measures_native_full_width_with_symbol_only(
     f.adapter.swApp.IsSame.assert_any_call(f.source_face, f.canonical_face)
     f.adapter.swApp.IsSame.assert_any_call(f.canonical_face, f.source_face)
     f.source.GetBodies2.assert_called_with(-1, False)
-    f.visible.assert_called_with(f.adapter, f.side, 4)
+    f.side.GetVisibleComponents.assert_called_with()
+    f.visible.assert_called_with(f.component, 4)
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.model.Extension.SelectByID2.assert_not_called()
     f.side.GetCorrespondingEntity.assert_not_called()
@@ -1325,8 +1426,9 @@ def test_neck_geometry_and_inverse_identity_refuse_at_every_boundary(
             "off-normal": (0.001, y, z),
         }[failure]
     elif failure in ("missing-upper", "duplicate-lower"):
-        f.visible.return_value = (("component", (f.lower,) if failure == "missing-upper"
-                                   else (f.lower, f.lower, f.upper)),)
+        f.visible.return_value = (
+            [f.lower] if failure == "missing-upper" else [f.lower, f.lower, f.upper]
+        )
     elif failure.startswith("wrong-source"):
         replacement = _neck_face(
             radius=spec.JOURNAL_DIA / 2000.0 if failure.endswith("radius") else None,
