@@ -3,18 +3,24 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 import _supplier_wire_stock_drawing as section
 import build_sh_vn_music_wire as part
 import draw_sh_vn_music_wire as drawing
 import sh_vn_music_wire_lever_geom as geom
+import sh_vn_music_wire_pen_geom as pen_geom
 
 CONFIGURATION = "LeverWire"
 STEM = "sh-vn-music-wire"
+_DIMENSION_TEXT = re.compile(r"Ø|<MOD-DIAM>|\bIN\b|\bMM\b|\d\.\d")
+_ASSEMBLIES = Path(__file__).resolve().parents[1] / "config" / "assemblies"
 
 
 def test_wire_registry_quantities_count_installed_members() -> None:
@@ -31,14 +37,49 @@ def test_balloon_station_is_midway_along_the_free_run() -> None:
     assert part.BALLOON_RING_STATION == geom.WIRE_LEN / 2.0
 
 
-def test_package_note_names_the_purchase_without_dimension_text() -> None:
+def test_package_notes_carry_no_dimension_text() -> None:
     # The diameter is the native supplier dimension; notes carry no sizes.
     assert part.DRAWING_NOTES == "PURCHASED WIRE: McMASTER-CARR 9666K56"
-    assert not re.search(r"Ø|<MOD-DIAM>|\bIN\b|\bMM\b|\d\.\d", part.DRAWING_NOTES)
+    for text in (part.DRAWING_NOTES, drawing.ASSEMBLY_NOTE, drawing.ISO_LABEL):
+        assert not _DIMENSION_TEXT.search(text), text
 
 
-def test_section_label_states_the_view_scale_inside_its_field() -> None:
-    assert section.STOCK_LABEL == "WIRE SECTION SCALE 20:1"
+def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_member():
+    import draw_mg_magnifier_assembly as magnifier
+    import draw_pn_pen_assembly as pen
+    import mg_magnifier_assembly_sheet as magnifier_sheet
+    import pn_pen_assembly_sheet as pen_sheet
+
+    assert drawing.ASSEMBLY_NOTE == (
+        "CUT TO LENGTH AND FORM AT ASSEMBLY:\n"
+        "LEVER WIRE: MHA-MG-00 SHEET 4, STEPS 10-11\n"
+        "PEN WIRE: MHA-PN-00 SHEET 3, STEPS 2 AND 8"
+    )
+    numbers = {
+        stem: yaml.safe_load((_ASSEMBLIES / f"{stem}.yaml").read_text(encoding="utf-8"))["number"]
+        for stem in ("mg-magnifier", "pn-pen")
+    }
+    assert numbers == {
+        "mg-magnifier": drawing.magnifier_steps.DRAWING_NUMBER,
+        "pn-pen": drawing.PEN_DRAWING_NUMBER,
+    }
+    # Each assembly prints its sequence on its ASSEMBLY STEPS sheet.
+    assert magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1 == drawing.MAGNIFIER_STEPS_SHEET
+    assert pen.SHEET_NAMES.index("ASSEMBLY STEPS") + 1 == drawing.PEN_STEPS_SHEET
+    steps = magnifier_sheet.STEP_TEXT
+    for key in (drawing.magnifier_steps.WIRE_HOOKED_KEY, drawing.magnifier_steps.WIRE_TIED_KEY):
+        assert "WIRE" in steps[key] and "TRIM THE TAIL" in steps[key]
+    pen_steps = {
+        int(text.split(".", 1)[0]): text
+        for text in pen_sheet.ASSEMBLY_STEPS if text[:1].isdigit()
+    }
+    first, last = drawing.PEN_WIRE_STEPS
+    assert "PEN WIRE" in pen_steps[first] and "TRIM THE TAIL" in pen_steps[first]
+    assert "PEN WIRE" in pen_steps[last] and "TIE TO THE WHEEL" in pen_steps[last]
+
+
+def test_end_view_and_isometric_labels_state_their_scales_inside_their_fields() -> None:
+    assert section.STOCK_LABEL == "WIRE END VIEW SCALE 20:1"
     assert section.STOCK_SCALE == (20, 1)
     field = section.STOCK_FIELD
     for x, y in (section.STOCK_CENTER, section.STOCK_TEXT, section.STOCK_LABEL_XY):
@@ -46,6 +87,12 @@ def test_section_label_states_the_view_scale_inside_its_field() -> None:
     # The label's top stays under the 20:1 circle's padded native outline
     # (radius 7.9 mm plus SolidWorks' ~5.6 mm outline padding).
     assert section.STOCK_LABEL_XY[1] < section.STOCK_CENTER[1] - 0.0136
+    assert drawing.ISO_LABEL.startswith("ISOMETRIC SCALE 2:1\n")
+    assert "NOT TO LENGTH" in drawing.ISO_LABEL
+    assert drawing.ISO_SCALE == (2, 1)
+    assert drawing.ISO_FIELD[0] >= section.STOCK_FIELD[2]
+    assert drawing.ISO_FIELD[1] >= drawing._TITLE_BLOCK[3]
+    assert drawing.ISO_FIELD[3] <= drawing._BORDER[3]
 
 
 class _Note:
@@ -56,15 +103,54 @@ class _Note:
         return self.text
 
     def GetExtent(self):
-        return (self.x, self.y - 0.004, 0.0, self.x + 0.1, self.y, 0.0)
+        lines = self.text.splitlines()
+        width = max(map(len, lines)) * 0.0022
+        return (self.x, self.y - len(lines) * 0.0045, 0.0, self.x + width, self.y, 0.0)
 
 
-def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None):
+class _IsoView:
+    """An end-origin member: reconfiguration displaces its real outline."""
+
+    def __init__(self, source, x, y, scale, fault):
+        self.source, self.Position, self.fault = source, (x, y), fault
+        self.ScaleRatio = tuple(scale)
+        self.ReferencedConfiguration = "LeverWire"
+        self.UseSheetScale = 1
+        self.mode, self.edges = 2, False
+
+    def GetReferencedModelName(self):
+        return self.source
+
+    def GetOrientationName(self):
+        return "*Isometric"
+
+    def GetDisplayMode2(self):
+        return self.mode
+
+    def GetDisplayEdgesInShadedMode(self):
+        return self.edges
+
+    def GetOutline(self):
+        offset = (0.012, -0.040) if self.ReferencedConfiguration == "PenWire" else (0.0, 0.0)
+        half = (0.007, pen_geom.WIRE_LEN / 1000 * math.sqrt(2 / 3) + 0.0056)
+        cx, cy = (self.Position[i] + offset[i] for i in range(2))
+        return (cx - half[0], cy - half[1], cx + half[0], cy + half[1])
+
+    def SetViewPosition(self, position, _move_children):
+        if self.fault != "ignored-recenter":
+            self.Position = tuple(position)
+        return True
+
+
+def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None, iso_fault=None,
+             settled_fault=None):
     source = tmp_path / f"{STEM}.SLDPRT"
     source.write_bytes(b"offline native-path fixture")
     monkeypatch.setattr(drawing, "SOURCE", source)
-    calls = SimpleNamespace(sections=[], settled=[], notes=[], finalize={})
-    document = object()
+    calls = SimpleNamespace(sections=[], settled=[], notes=[], views=[], finalize={})
+    document = SimpleNamespace(
+        ActivateView=lambda _name: True, GetEditSheet=lambda: True, ActiveDrawingView=None,
+    )
     adapter = SimpleNamespace(currentModel=None)
 
     async def open_model(path):
@@ -86,9 +172,18 @@ def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None):
 
     def wire_section(target, model_source):
         assert target is adapter and adapter.currentModel is document
-        assert model_source == source
+        assert model_source == source and not calls.views
         calls.sections.append(model_source)
         return lambda: calls.settled.append("section")
+
+    def place(_adapter, model_source, orientation, x, y, *, scale):
+        assert orientation == "*Isometric" and calls.sections
+        view = _IsoView(model_source, x, y, scale, iso_fault)
+        calls.views.append(view)
+        return view
+
+    def shade(_adapter, view, *, label):
+        view.mode, view.edges = 3, True
 
     def linked_note(_adapter, key, x, y):
         assert key == "Manufacturing Notes"
@@ -97,8 +192,20 @@ def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None):
         calls.notes.append(note)
         return note
 
+    def literal_note(_adapter, text, x, y):
+        note = _Note(text, x, y)
+        calls.notes.append(note)
+        return note
+
     async def finalize(_adapter, _outputs, **kwargs):
         calls.finalize = kwargs
+        view = calls.views[0]
+        if settled_fault == "configuration":
+            view.ReferencedConfiguration = "LeverWire"
+        elif settled_fault == "wireframe":
+            view.mode = 2
+        elif settled_fault == "scale":
+            view.ScaleRatio = (1, 1)
         for settled in kwargs["settled_checks"]:
             settled()
         return {"pdf": "offline-export"}
@@ -106,21 +213,37 @@ def _package(monkeypatch, tmp_path, *, note_text=None, note_at=None):
     adapter.open_model = open_model
     monkeypatch.setattr(drawing, "check", lambda _label, value: value)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _kind: obj)
+    monkeypatch.setattr(drawing, "double_array", tuple)
     monkeypatch.setattr(drawing, "read_required_properties", read_properties)
     monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
     monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *args: None)
     monkeypatch.setattr(drawing, "add_wire_section", wire_section)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args: None)
+    monkeypatch.setattr(drawing, "set_high_quality_shaded_with_edges", shade)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(drawing, "add_property_linked_note", linked_note)
+    monkeypatch.setattr(drawing, "add_note", literal_note)
     monkeypatch.setattr(drawing, "finalize_drawing", finalize)
     return adapter, calls
 
 
-def test_one_sheet_carries_the_section_and_the_purchase_note(monkeypatch, tmp_path):
+def test_one_sheet_carries_end_view_isometric_and_notes(monkeypatch, tmp_path):
     adapter, calls = _package(monkeypatch, tmp_path)
     assert asyncio.run(drawing.build(adapter)) == {"pdf": "offline-export"}
     assert calls.sections == [drawing.SOURCE]
     assert calls.settled == ["section"]
-    assert [(note.x, note.y) for note in calls.notes] == [drawing.NOTES_XY]
+    [iso] = calls.views
+    assert iso.ReferencedConfiguration == pen_geom.CONFIGURATION
+    assert iso.ScaleRatio == drawing.ISO_SCALE and iso.UseSheetScale == 0
+    assert (iso.mode, iso.edges) == (3, True)
+    box = iso.GetOutline()
+    assert ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2) == pytest.approx(drawing.ISO_CENTER)
+    assert [(note.text, (note.x, note.y)) for note in calls.notes] == [
+        (part.DRAWING_NOTES, drawing.NOTES_XY),
+        (drawing.ASSEMBLY_NOTE, drawing.ASSEMBLY_NOTE_XY),
+        (drawing.ISO_LABEL, drawing.ISO_LABEL_XY),
+    ]
     assert calls.finalize["scale"] == section.STOCK_SCALE
     assert "expected_sheet_names" not in calls.finalize
 
@@ -128,10 +251,23 @@ def test_one_sheet_carries_the_section_and_the_purchase_note(monkeypatch, tmp_pa
 @pytest.mark.parametrize(
     "fault",
     ({"note_text": "PURCHASED WIRE: OTHER"}, {"note_at": (0.300, 0.060)},
-     {"note_at": (-0.020, 0.075)}),
-    ids=("text", "title-block", "off-sheet"),
+     {"note_at": (-0.020, 0.075)}, {"note_at": (0.020, 0.103)},
+     {"note_at": (0.120, 0.170)}),
+    ids=("text", "title-block", "off-sheet", "on-assembly-note", "on-end-view"),
 )
 def test_purchase_note_fails_closed_after_final_rebuild(monkeypatch, tmp_path, fault):
     adapter, _calls = _package(monkeypatch, tmp_path, **fault)
-    with pytest.raises(RuntimeError, match="linked note"):
+    with pytest.raises(RuntimeError, match="purchase note|assembly pointer note"):
+        asyncio.run(drawing.build(adapter))
+
+
+@pytest.mark.parametrize(
+    "fault",
+    ({"iso_fault": "ignored-recenter"}, {"settled_fault": "configuration"},
+     {"settled_fault": "wireframe"}, {"settled_fault": "scale"}),
+    ids=("ignored-recenter", "configuration", "wireframe", "scale"),
+)
+def test_isometric_fails_closed_after_final_rebuild(monkeypatch, tmp_path, fault):
+    adapter, _calls = _package(monkeypatch, tmp_path, **fault)
+    with pytest.raises(RuntimeError, match="wire isometric"):
         asyncio.run(drawing.build(adapter))

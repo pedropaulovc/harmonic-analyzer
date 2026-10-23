@@ -1,4 +1,4 @@
-"""The labelled supplier wire section: the package's one native dimension."""
+"""The labelled supplier wire end view: the package's one native dimension."""
 
 from __future__ import annotations
 
@@ -38,12 +38,14 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # its Ø text up-right on the leader, the view label under the padded outline.
 STOCK_CENTER = (0.150, 0.170)
 STOCK_TEXT = (0.175, 0.183)
-STOCK_LABEL = f"WIRE SECTION SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
+# An unhatched end view, not a section: the sheet has no cutting plane.
+STOCK_LABEL = f"WIRE END VIEW SCALE {STOCK_SCALE[0]}:{STOCK_SCALE[1]}"
 STOCK_LABEL_XY = (0.121, 0.152)
 STOCK_FIELD = (0.100, 0.130, 0.260, 0.220)
 # The supplier circle is model construction geometry (the zero-body diagram
-# contract). This package prints nothing else, so its construction curves draw
-# as the section's solid visible outline: DP_LineFont, this SLDDRW only.
+# contract). The package's other view is a shaded solid with its sketches
+# blanked, so construction curves draw only this end view's solid visible
+# outline: DP_LineFont, this SLDDRW only.
 _CONSTRUCTION_LINE_FONT = (
     ("swLineFontConstructionCurvesStyle", "swLineCONTINUOUS"),
     ("swLineFontConstructionCurvesThickness", "swLW_THICK"),

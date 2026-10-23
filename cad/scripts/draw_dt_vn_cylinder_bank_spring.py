@@ -13,6 +13,15 @@ the two plan diameters crossing at the centre with their text on the OD rim.
 moves only presentation: the heights take native offset text shelved beyond
 their own lines (the R48 washer pattern), and the diameters take one
 near-side arrow with their text a text height clear of the OD rim.
+
+Native run 86053b8e then printed a stray SupplierOD line: from the OD rim at
+the text's height, parallel to its leader and through its own "(". The same
+line is in the main renders of the sibling 9714K24 and 9715K43 ODs, so it is
+not the text move. [INFERENCE: SolidWorks's arc extension of the circle's
+closed arc.] The diameters turn ``ArcExtensionLineOrOppositeSide`` off, and
+the settled check refuses any size line through its own text (the layout
+audit's ``find_lines_through_own_text``) and any diameter line that is not
+on its one leader chain from the arrow.
 """
 
 from __future__ import annotations
@@ -35,7 +44,12 @@ from _drawing_leaders import (
     dimension_segments,
     set_near_side_diameter,
 )
-from _layout_audit import display_box
+from _layout_audit import (
+    annotation_geometry,
+    calibrate_sheet_advance,
+    display_box,
+    find_lines_through_own_text,
+)
 from _session import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
 from _supplier_disc_spring_drawing import (
@@ -196,27 +210,73 @@ def _move_text(display: Any, record: Mapping[str, Any], dx: float, *, label: str
         raise RuntimeError(f"{label}: text placement was rejected")
 
 
+def lines_through_own_text(records: Mapping[str, Mapping[str, Any]]) -> list[str]:
+    """The layout audit's own-text finder over these dimensions' native ink."""
+    advance = calibrate_sheet_advance(tuple(records.values()))
+    sheet = SimpleNamespace(
+        name=supplier_spec.SKU,
+        annotations=[
+            annotation_geometry(record, owner="view", advance=advance)
+            for record in records.values()
+        ],
+    )
+    return [finding.detail for finding in find_lines_through_own_text(sheet)]
+
+
+def stray_leader_lines(record: Mapping[str, Any]) -> list[tuple[float, ...]]:
+    """A one-arrow diameter's lines that are not its chain from the arrow tip."""
+    data = record["display"]
+    arrows = data.get("arrows") or ()
+    if len(arrows) != 1:
+        raise RuntimeError(f"{record.get('name')}: near-side diameter has {len(arrows)} arrows")
+    lines = [
+        (float(line[4]), float(line[5]), float(line[7]), float(line[8]))
+        for line in data.get("lines") or ()
+    ]
+    reached = [(float(arrows[0][0]), float(arrows[0][1]))]
+    chained = True
+    while chained:
+        chained = False
+        for line in list(lines):
+            ends = ((line[0], line[1]), (line[2], line[3]))
+            if any(math.dist(end, point) <= 1e-5 for end in ends for point in reached):
+                lines.remove(line)
+                reached.extend(ends)
+                chained = True
+    return lines
+
+
 def _assert_size_texts(
     adapter: Any,
     displays: Mapping[str, Any],
     plan: tuple[float, float, float, float],
     stations: Mapping[str, Mapping[str, Any]],
 ) -> None:
+    records = {
+        name: _text_record(adapter, displays[name], label=name)
+        for sides in TEXT_SIDES.values()
+        for name in sides
+    }
     for name, side in TEXT_SIDES["free_front"].items():
         display = displays[name]
-        geometry = supplier_top_text_geometry(
-            _text_record(adapter, display, label=name), horizontal=False
-        )
+        geometry = supplier_top_text_geometry(records[name], horizontal=False)
         if display.OffsetText is not True or not stations_match(stations[name], geometry):
             raise RuntimeError(f"{name}: offset text moved its native lines")
         assert_height_text_clear(geometry, side, label=f"{supplier_spec.SKU} {name}")
     groups = {}
     for name, side in TEXT_SIDES["free_top"].items():
-        record = _text_record(adapter, displays[name], label=name)
-        text = display_box({"texts": record["display"]["texts"]})
+        text = display_box({"texts": records[name]["display"]["texts"]})
         assert_diameter_text_clear(text, plan, side, label=f"{supplier_spec.SKU} {name}")
+        if displays[name].ArcExtensionLineOrOppositeSide is not False:
+            raise RuntimeError(f"{name}: arc extension line came back")
+        stray = stray_leader_lines(records[name])
+        if stray:
+            raise RuntimeError(f"{name}: lines off its leader chain {stray!r}")
         groups[name] = dimension_segments(displays[name].GetAnnotation())
     assert_plan_leaders(groups, plan, label=f"{supplier_spec.SKU} plan diameters")
+    struck = lines_through_own_text(records)
+    if struck:
+        raise RuntimeError(f"{supplier_spec.SKU}: size text struck by its own line: {struck}")
 
 
 def place_size_texts(
@@ -229,6 +289,9 @@ def place_size_texts(
     displays = _size_displays(adapter, views)
     for name in TEXT_SIDES["free_top"]:
         set_near_side_diameter(displays[name].GetAnnotation(), f"{supplier_spec.SKU} {name}")
+        displays[name].ArcExtensionLineOrOppositeSide = False
+        if displays[name].ArcExtensionLineOrOppositeSide is not False:
+            raise RuntimeError(f"{name}: arc extension line was not turned off")
     # Pin each height's dimension line at its own station before offset mode;
     # from then on SetPosition2 moves only the text (R48 washer sequence).
     anchors = {}

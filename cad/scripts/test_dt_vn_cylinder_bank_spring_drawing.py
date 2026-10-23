@@ -384,6 +384,96 @@ def test_settled_heights_refuse_a_moved_native_station() -> None:
     assert not drawing.stations_match(geometry, {**geometry, "tips": tips})
 
 
+# Native size records of farm run 20261023T190403512Z-86053b8e (head 1325aeba):
+# the placed state. SupplierOD's first line is the stray: OD rim at the text's
+# height, parallel to its leader, through its own "(".
+_DIAMETER_TEXT_ROWS = ((" (", 0.0030139), ("<MOD-DIAM>", 0.0052784))
+
+
+def _diameter_texts(x, value):
+    """The three native runs of a "(Ø... in)" text, laid end to end from ``x``."""
+    rows = []
+    for text, width in (*_DIAMETER_TEXT_ROWS, (value, 0.0352139)):
+        rows.append((text, x, 0.2242486, width))
+        x += width
+    return rows
+
+
+R86053 = {
+    "SupplierThickness": _native_record(
+        "SupplierThickness", (0.0862323, 0.1335),
+        [(0.1305, 0.133373, 0.0998, 0.133373), (0.1305, 0.133627, 0.0998, 0.133627),
+         (0.1008, 0.133373, 0.1008, 0.127023), (0.1008, 0.133627, 0.1008, 0.139977),
+         (0.1008, 0.1335, 0.0976, 0.130722), (0.0976, 0.130722, 0.074865, 0.130722)],
+        [(" (0.005 in) ", 0.0748646, 0.1307219, 0.0227354)],
+        [(0.1008, 0.133373, 0.0, -1.0), (0.1008, 0.133627, 0.0, 1.0)],
+    ),
+    "SupplierFreeHeight": _native_record(
+        "SupplierFreeHeight", (0.1767677, 0.1335),
+        [(0.1198, 0.13223, 0.1632, 0.13223), (0.1198, 0.13477, 0.1632, 0.13477),
+         (0.1622, 0.13223, 0.1622, 0.12588), (0.1622, 0.13477, 0.1622, 0.14112),
+         (0.1622, 0.1335, 0.1654, 0.130722), (0.1654, 0.130722, 0.188135, 0.130722)],
+        [(" (0.050 in) ", 0.1654, 0.1307219, 0.0227354)],
+        [(0.1622, 0.13223, 0.0, -1.0), (0.1622, 0.13477, 0.0, 1.0)],
+    ),
+    "SupplierID": _native_record(
+        "SupplierID", (0.0932934, 0.227),
+        [(0.1218905, 0.2251869, 0.116634, 0.224195), (0.116634, 0.224195, 0.07154, 0.224195)],
+        _diameter_texts(0.0715403, "0.385 \u00b10.010 in) "),
+        [(0.1218905, 0.2251869, -0.9826622, -0.1854051)],
+    ),
+    "SupplierOD": _native_record(
+        "SupplierOD", (0.1697066, 0.227),
+        [(0.1442, 0.227, 0.190346, 0.218293),
+         (0.1439798, 0.2246454, 0.146366, 0.224195), (0.146366, 0.224195, 0.19146, 0.224195)],
+        _diameter_texts(0.1479535, "0.500 \u00b10.010 in) "),
+        [(0.1439798, 0.2246454, 0.9826622, -0.1854051)],
+    ),
+}
+
+
+def _without_stray(records):
+    import copy
+
+    clean = copy.deepcopy(records)
+    del clean["SupplierOD"]["display"]["lines"][0]
+    return clean
+
+
+def test_86053_stray_od_line_is_refused_by_both_settled_guards() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    struck = drawing.lines_through_own_text(R86053)
+    assert len(struck) == 1 and "SupplierOD" in struck[0]
+    assert drawing.stray_leader_lines(R86053["SupplierOD"]) == [(0.1442, 0.227, 0.190346, 0.218293)]
+    assert drawing.stray_leader_lines(R86053["SupplierID"]) == []
+
+
+def test_86053_placement_without_the_stray_passes_the_own_text_guard() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    clean = _without_stray(R86053)
+    assert drawing.lines_through_own_text(clean) == []
+    assert drawing.stray_leader_lines(clean["SupplierOD"]) == []
+
+
+def test_own_text_guard_catches_the_b344192_struck_heights() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    struck = drawing.lines_through_own_text(B344192)
+    assert any("SupplierThickness" in detail for detail in struck)
+    assert any("SupplierFreeHeight" in detail for detail in struck)
+
+
+def test_diameters_turn_the_arc_extension_off_before_the_text_move() -> None:
+    import draw_dt_vn_cylinder_bank_spring as drawing
+
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    body = source[source.index("def place_size_texts("):]
+    off = body.index("ArcExtensionLineOrOppositeSide = False")
+    assert body.index("set_near_side_diameter(") < off < body.index("rebuild_drawing(")
+
+
 def test_installation_note_fits_the_sheet() -> None:
     lines = _config.parts(STEM)["installation_notes"].splitlines()
     assert len(lines) <= 4
