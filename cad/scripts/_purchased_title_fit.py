@@ -161,6 +161,8 @@ def _fit_title_note(
     label_use_doc = value_use_doc = ()
     right_region = None
     accepted_style = None
+    verified_height = height
+    expected_height_in_points = None
 
     def layout_state(item: Any) -> tuple[float, int, int]:
         angle = item.Angle
@@ -207,11 +209,16 @@ def _fit_title_note(
             raise RuntimeError(f"{label}: MATERIAL label must occupy the same valid ruled cell")
         label_style = _note_text_style(label_annotation)
         value_style = _note_text_style(annotation)
+        expected_height_in_points = dict(value_style[0])["IsHeightSpecifiedInPts"]
+        if type(expected_height_in_points) is not bool:
+            raise RuntimeError(f"{label}: unreadable native height-unit mode")
         label_layout, value_layout = layout_state(label_note), layout_state(note)
         label_use_doc = use_doc_state(label_annotation, len(label_style))
         value_use_doc = use_doc_state(annotation, len(value_style))
 
-    def check_label_right_state(*, phase: str, formatted: bool) -> None:
+    def check_label_right_state(
+        *, phase: str, formatted: bool,
+    ) -> tuple[tuple[tuple[str, Any], ...], ...] | None:
         if alignment != "label_right":
             return
         actual_label_anchor = tuple(
@@ -220,8 +227,8 @@ def _fit_title_note(
         actual_anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
         actual_style = _note_text_style(annotation)
         # Only format zero's two height representations belong to the existing
-        # height ladder. Every other format field, including the authority
-        # method and LineLength, remains exactly as authored.
+        # ladder. Its mode changes only after a verified owned metre-height
+        # write; all other fields/formats retain the immutable original style.
         protected_style = tuple(
             tuple(
                 (name, value) for name, value in native_format
@@ -231,7 +238,9 @@ def _fit_title_note(
         )
         original_protected_style = tuple(
             tuple(
-                (name, value) for name, value in native_format
+                (name, expected_height_in_points if (
+                    index == 0 and name == "IsHeightSpecifiedInPts"
+                ) else value) for name, value in native_format
                 if index != 0 or name not in ("CharHeight", "CharHeightInPts")
             )
             for index, native_format in enumerate(value_style)
@@ -257,7 +266,8 @@ def _fit_title_note(
             or use_doc_state(label_annotation, len(label_style)) != label_use_doc
             or use_doc_state(annotation, len(actual_style)) != expected_use_doc
             or (accepted_style is not None and actual_style != accepted_style)
-            or abs(dict(actual_style[0])["CharHeight"] - height) > _FORMAT_TOL
+            or abs(dict(actual_style[0])["CharHeight"] - verified_height) > _FORMAT_TOL
+            or dict(actual_style[0])["IsHeightSpecifiedInPts"] is not expected_height_in_points
         ):
             # Diagnose only a refused candidate. Keep the predicate above and
             # its accepted-path native read surface unchanged; baseline styles
@@ -340,13 +350,14 @@ def _fit_title_note(
                 for index, (before, after) in enumerate(zip(expected, actual)):
                     collect_difference(f"{field}[{index}]", before, after)
             collect_difference(
-                "material.height_m", height, dict(actual_style[0])["CharHeight"],
+                "material.height_m", verified_height, dict(actual_style[0])["CharHeight"],
                 tolerance=_FORMAT_TOL,
             )
             raise RuntimeError(
                 f"{label}: MATERIAL label or protected value style/anchor changed; "
                 f"phase={phase!r}, formatted={formatted!r}, differences={differences!r}"
             )
+        return actual_style
 
     def measure(phase: str, *, formatted: bool = True) -> tuple[tuple[float, ...], int]:
         nonlocal right_region
@@ -357,7 +368,7 @@ def _fit_title_note(
             raise RuntimeError(
                 f"{exc}; phase={phase!r}, native={_number_state(adapter, note, annotation)}"
             ) from exc
-        check_label_right_state(phase=phase, formatted=formatted)
+        actual_style = check_label_right_state(phase=phase, formatted=formatted)
         with _zoomed_on(adapter, centre, half):
             box = _box(note.GetExtent(), label=label, kind="note")
             display, refused = annotation_display(adapter, annotation)
@@ -383,6 +394,13 @@ def _fit_title_note(
                     f"{label}: MATERIAL label has no valid inset right region; "
                     f"label_extent={label_box!r}, cell={cell!r}"
                 )
+        height_mode = (
+            {
+                "expected_height_in_points": expected_height_in_points,
+                "actual_height_in_points": dict(actual_style[0])["IsHeightSpecifiedInPts"],
+            }
+            if actual_style is not None else {}
+        )
         _telemetry.event(
             "drawing.purchased_title_fit.candidate",
             label=label,
@@ -401,6 +419,7 @@ def _fit_title_note(
                 ) else None
             ),
             label_gap_m=box[0] - label_box[2] if label_box is not None else None,
+            **height_mode,
         )
         return box, rows
 
@@ -408,13 +427,58 @@ def _fit_title_note(
         measure("before-title-fit", formatted=False)
     # Measure every candidate; no source text is rewritten or cut. The material
     # property's semantic content is owned by the registry, not by this fitter.
+    formatted = False
     while True:
+        height_write = alignment == "label_right" and height != verified_height
+        if height_write:
+            assert_linked_value(
+                link, text, note.PropertyLinkedText, note.GetText(), label=label,
+            )
+            check_label_right_state(phase="before-height-write", formatted=formatted)
         if line_length is not None:
             text_format.LineLength = line_length
-        text_format.CharHeight = height
+        # Even an identical CharHeight assignment changes authored points to
+        # metre mode. Leave the original-height label-right candidate untouched.
+        if alignment != "label_right" or height_write:
+            text_format.CharHeight = height
         if annotation.SetTextFormat(0, False, text_format) is not True:
             raise RuntimeError(f"{label}: local text format setter refused")
         _rebuild(draw, phase=f"{label} title-cell fit")
+        formatted = True
+        if height_write:
+            actual_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+            if actual_format is None:
+                raise RuntimeError(
+                    f"{label}: local height setter did not persist; missing native format zero"
+                )
+            actual_height = actual_format.CharHeight
+            actual_height_in_points = actual_format.IsHeightSpecifiedInPts()
+            if (
+                type(actual_height) not in (int, float)
+                or not math.isfinite(actual_height)
+                or abs(actual_height - height) > _FORMAT_TOL
+                or actual_height_in_points is not False
+            ):
+                raise RuntimeError(
+                    f"{label}: local height setter did not persist; "
+                    f"requested_height_m={height!r}, actual_height_m={actual_height!r}, "
+                    f"expected_height_in_points=False, "
+                    f"actual_height_in_points={actual_height_in_points!r}, "
+                    f"height_tolerance_m={_FORMAT_TOL!r}"
+                )
+            _telemetry.event(
+                "drawing.purchased_title_fit.height_write",
+                label=label,
+                previous_height_m=verified_height,
+                requested_height_m=height,
+                actual_height_m=actual_height,
+                previous_height_in_points=expected_height_in_points,
+                expected_height_in_points=False,
+                actual_height_in_points=actual_height_in_points,
+                height_tolerance_m=_FORMAT_TOL,
+            )
+            verified_height = actual_height
+            expected_height_in_points = False
         box, rows = measure("after-fit-rebuild")
         if alignment == "label_right" and (
             box[2] - box[0] <= right_region[2] - right_region[0]
@@ -465,7 +529,7 @@ def _fit_title_note(
         height = max(minimum, round(height - _HEIGHT_STEP, 7))
 
     if alignment == "label_right":
-        accepted_style = _note_text_style(annotation)
+        accepted_style = check_label_right_state(phase="before-accepted-freeze", formatted=True)
     def settled() -> None:
         actual_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
         actual_anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))

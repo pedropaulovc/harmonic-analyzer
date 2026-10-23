@@ -98,9 +98,12 @@ cannot ask for what the authors were told to leave out.
   is centred in the actual ruled cell's region to the right of its measured
   static MATERIAL label. Both complete boxes retain 0.6 mm cell/foreign-text
   clearance; the label's identity, anchor and full native style stay unchanged.
-  The value retains its original font when it fits, with the same 2 mm floor
-  and all non-height style/source content preserved. Other title consumers
-  retain fixed alignment by default. Native title-state refusals report changed
+  The value retains its original font and native height-unit mode when it fits,
+  with the same 2 mm floor. Only a genuine existing-ladder reduction may select
+  metre-height mode, after a successful native setter and strict height/mode
+  readback; the complete accepted style is then frozen. All other style and
+  source content remain unchanged. Other title consumers retain fixed alignment
+  by default. Native title-state refusals report changed
   fields with expected/observed values and the existing comparison tolerance;
   diagnostic output never relaxes the protected state or fitting guards.
   Scale selection still tries the existing standard scales against complete

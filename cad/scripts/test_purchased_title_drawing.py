@@ -62,6 +62,67 @@ class _Format:
         return self._points_mode
 
 
+class _HeightModeFormat:
+    """Detached native height-unit semantics, only for the measured mode cases.
+
+    ITextFormat.CharHeight is a metre DOUBLE put selecting False mode;
+    CharHeightInPts is an INTEGER put selecting True mode. Retain the supplied
+    integer readback without inventing conversion, DPI or native rounding.
+    Copy native storage directly: copying a points-mode format is not a put.
+    """
+
+    __slots__ = tuple(
+        name for name in _STYLE_FIELDS
+        if name not in ("CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts")
+    ) + ("_height_m", "_height_points", "_points_mode", "height_writes", "point_writes")
+
+    def __init__(self, original, *, points_mode):
+        for name in _STYLE_FIELDS:
+            if name not in ("CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts"):
+                setattr(self, name, getattr(original, name))
+        self._height_m = original.CharHeight
+        self._height_points = original.CharHeightInPts
+        assert type(self._height_points) is int
+        self._points_mode = points_mode
+        self.height_writes = ()
+        self.point_writes = ()
+
+    @property
+    def CharHeight(self):
+        return self._height_m
+
+    @CharHeight.setter
+    def CharHeight(self, value):
+        self._height_m = value
+        self._points_mode = False
+        self.height_writes += (value,)
+
+    @property
+    def CharHeightInPts(self):
+        return self._height_points
+
+    @CharHeightInPts.setter
+    def CharHeightInPts(self, value):
+        assert type(value) is int, "native point-size puts require an INTEGER"
+        self._height_points = value
+        self._points_mode = True
+        self.point_writes += (value,)
+
+    def IsHeightSpecifiedInPts(self):
+        return self._points_mode
+
+    def __copy__(self):
+        detached = type(self)(self, points_mode=self._points_mode)
+        detached.height_writes = self.height_writes
+        detached.point_writes = self.point_writes
+        return detached
+
+    def __deepcopy__(self, memo):
+        detached = self.__copy__()
+        memo[id(self)] = detached
+        return detached
+
+
 class _Line:
     def __init__(self, x1, y1, x2, y2):
         self.start = SimpleNamespace(X=x1, Y=y1)
@@ -526,6 +587,38 @@ def _assert_readonly_material_proof(scene, settled):
         ) == before
 
 
+def _with_native_material_height_mode(scene, *, points_mode, needs_reduction=False):
+    note = scene.material
+    note.annotation._format = _HeightModeFormat(
+        note.annotation._format, points_mode=points_mode,
+    )
+    # Actual 18ab native metre readback, seeded without authoring either unit.
+    note.annotation._format._height_m = 0.0023812499999999997
+    scene.header.annotation._format = _HeightModeFormat(
+        scene.header.annotation._format, points_mode=True,
+    )
+    for item in (note, scene.header):
+        item.annotation.extra_formats = [
+            _HeightModeFormat(_Format(height=0.0019, face="Arial Narrow"), points_mode=True),
+        ]
+        item.annotation.extra_use_doc = [False]
+    if needs_reduction:
+        left, _, right, top = note.reference_box
+        note.reference_box = (left, top - 0.007, right, top)
+    note.refresh()
+    return scene
+
+
+@pytest.fixture
+def material_fit_events(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        title._telemetry, "event",
+        lambda name, **fields: events.append((name, fields)),
+    )
+    return events
+
+
 @pytest.mark.parametrize(
     "alignment", (None, False, True, 0, 1, "", "centered", "center", "Label_right", (), {}),
 )
@@ -814,6 +907,313 @@ def test_label_right_shrinks_only_when_complete_value_needs_unchanged_floor(
     )
     _assert_inside(note, _right_region(scene.header))
     _assert_readonly_material_proof(scene, settled)
+
+
+@pytest.mark.parametrize("points_mode", (True, False), ids=("original-points", "original-metres"))
+def test_label_right_native_height_mode_preserves_original_fitting_font_without_height_put(
+    measured_material_title, material_fit_events, points_mode,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"), points_mode=points_mode,
+    )
+    note, header = scene.material, scene.header
+    annotation = note.annotation
+    original = _material_readback(note)
+    header_before = _material_readback(header)
+    source_before = [
+        (title.source_property_expression(item.PropertyLinkedText), item.GetText())
+        for item in scene.notes if item is not header
+    ]
+    fixed_anchors = (scene.name.anchor, scene.number.anchor)
+    for detached in (copy.copy(annotation._format), copy.deepcopy(annotation._format)):
+        assert detached.IsHeightSpecifiedInPts() is points_mode
+        assert detached.CharHeight == dict(original[5][0])["CharHeight"]
+        assert not detached.height_writes and not detached.point_writes
+        detached.CharHeight = detached.CharHeight
+        assert detached.IsHeightSpecifiedInPts() is False
+        assert annotation._format.IsHeightSpecifiedInPts() is points_mode
+        assert not annotation._format.height_writes
+
+    settled = _fit_label_right(scene)
+
+    assert _styles(annotation) == original[5]  # Every field of every native format.
+    assert annotation._format.CharHeight == 0.0023812499999999997
+    assert annotation._format.IsHeightSpecifiedInPts() is points_mode
+    assert not annotation._format.height_writes and not annotation._format.point_writes
+    assert len(annotation.formats) == len(annotation.positions) == 1
+    assert annotation.GetUseDocTextFormat(0) is False
+    assert annotation.extra_use_doc == [False]
+    assert _material_readback(note)[:4] == original[:4]
+    assert _material_readback(note)[6:9] == original[6:9]
+    assert _material_readback(header) == header_before
+    assert not header.annotation.formats and not header.annotation.positions
+    assert (scene.name.anchor, scene.number.anchor) == fixed_anchors
+    assert [
+        (title.source_property_expression(item.PropertyLinkedText), item.GetText())
+        for item in scene.notes if item is not header
+    ] == source_before
+    _assert_inside(note, _right_region(header))
+    _assert_inside(header, _material_limit())
+    assert note.GetExtent()[0] - header.GetExtent()[3] >= 0.0006
+    assert not [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.height_write"
+    ]
+    candidates = [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.candidate"
+        and fields["alignment"] == "label_right"
+    ]
+    assert candidates
+    assert all(
+        fields["expected_height_in_points"] is points_mode
+        and fields["actual_height_in_points"] is points_mode
+        for fields in candidates
+    )
+    scene.draw.EditRebuild3()
+    _assert_readonly_material_proof(scene, settled)
+    assert _styles(annotation) == original[5]
+
+
+@pytest.mark.parametrize("points_mode", (True, False), ids=("original-points", "original-metres"))
+def test_label_right_native_height_reduction_verifies_owned_metres_transition_and_freezes_style(
+    measured_material_title, material_fit_events, points_mode,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"),
+        points_mode=points_mode, needs_reduction=True,
+    )
+    note, header = scene.material, scene.header
+    annotation = note.annotation
+    original = _material_readback(note)
+    header_before = _material_readback(header)
+    foreign_before = tuple(_material_readback(item) for item in (scene.name, scene.number))
+    assert note.GetExtent()[4] - note.GetExtent()[1] == pytest.approx(0.007, abs=1e-12)
+
+    settled = _fit_material_only(scene)
+
+    heights = [fmt.CharHeight for fmt in annotation.formats]
+    assert heights[0] == 0.0023812499999999997
+    assert 0.002 <= heights[-1] < heights[0]
+    assert all(
+        later == max(0.002, round(earlier - 0.0001, 7))
+        for earlier, later in zip(heights, heights[1:])
+    )
+    assert annotation.formats[0].IsHeightSpecifiedInPts() is points_mode
+    assert not annotation.formats[0].height_writes
+    assert all(fmt.IsHeightSpecifiedInPts() is False for fmt in annotation.formats[1:])
+    actual = annotation.GetTextFormat(0)
+    assert actual.CharHeight == heights[-1]
+    assert actual.IsHeightSpecifiedInPts() is False
+    assert actual.height_writes == tuple(heights[1:])
+    assert all(not fmt.point_writes for fmt in annotation.formats)
+    after = _material_readback(note)
+    assert after[:4] == original[:4]
+    assert after[6:9] == original[6:9]
+    assert after[9] == (False, *original[9][1:])
+    for index, (before_style, after_style) in enumerate(zip(original[5], after[5], strict=True)):
+        owned = ("CharHeight", "CharHeightInPts", "IsHeightSpecifiedInPts") if index == 0 else ()
+        assert tuple(field for field in after_style if field[0] not in owned) == tuple(
+            field for field in before_style if field[0] not in owned
+        )
+    assert _material_readback(header) == header_before
+    assert tuple(_material_readback(item) for item in (scene.name, scene.number)) == foreign_before
+    assert not header.annotation.formats and not header.annotation.positions
+    _assert_inside(note, _right_region(header))
+    _assert_inside(header, _material_limit())
+    assert note.GetExtent()[0] - header.GetExtent()[3] >= 0.0006
+    transitions = [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.height_write"
+    ]
+    assert len(transitions) == len(heights) - 1
+    for index, transition in enumerate(transitions):
+        assert transition == {
+            "label": "Material",
+            "previous_height_m": heights[index],
+            "requested_height_m": heights[index + 1],
+            "actual_height_m": heights[index + 1],
+            "previous_height_in_points": points_mode if index == 0 else False,
+            "expected_height_in_points": False,
+            "actual_height_in_points": False,
+            "height_tolerance_m": 1e-7,
+        }
+    frozen_style = _styles(annotation)
+    scene.draw.EditRebuild3()
+    _assert_readonly_material_proof(scene, settled)
+    assert _styles(annotation) == frozen_style
+    assert annotation.GetTextFormat(0).IsHeightSpecifiedInPts() is False
+
+
+def test_label_right_native_external_mode_flip_before_reduction_is_not_an_owned_transition(
+    measured_material_title, material_fit_events, monkeypatch,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"), points_mode=True, needs_reduction=True,
+    )
+    note, annotation = scene.material, scene.material.annotation
+    original = _material_readback(note)
+    header_before = _material_readback(scene.header)
+    native_extent = note.GetExtent
+    changed = False
+
+    def extent_with_external_mode_change():
+        nonlocal changed
+        extent = native_extent()
+        if scene.draw.rebuilds == 1 and not changed:
+            # The first candidate's fresh style has already been checked.
+            # Native extent collection observes an external mode-only edit;
+            # the next candidate genuinely needs a smaller metre height.
+            region = _right_region(scene.header)
+            assert extent[4] - extent[1] > region[3] - region[1]
+            annotation._format._points_mode = False
+            changed = True
+        return extent
+
+    monkeypatch.setattr(note, "GetExtent", extent_with_external_mode_change)
+    with pytest.raises(
+        RuntimeError, match="MATERIAL label or protected value style/anchor changed",
+    ) as refused:
+        _fit_material_only(scene)
+    assert changed
+    message = str(refused.value)
+    assert "phase='before-height-write', formatted=True" in message
+    assert ast.literal_eval(message.split("differences=", 1)[1]) == {
+        "material.protected_style[0].IsHeightSpecifiedInPts": {
+            "expected": True, "actual": False, "tolerance": 0,
+        },
+    }
+    assert annotation._format.CharHeight == dict(original[5][0])["CharHeight"]
+    assert not annotation._format.height_writes and not annotation._format.point_writes
+    assert len(annotation.formats) == 1 and not annotation.positions
+    assert _material_readback(note)[:4] == original[:4]
+    assert _material_readback(scene.header) == header_before
+    assert not [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.height_write"
+    ]
+
+
+@pytest.mark.parametrize("result", (False, None, 1), ids=("false", "none", "integer-one"))
+def test_label_right_native_reduction_requires_boolean_setter_before_authorizing_mode(
+    measured_material_title, material_fit_events, monkeypatch, result,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"), points_mode=True, needs_reduction=True,
+    )
+    annotation = scene.material.annotation
+    original = _material_readback(scene.material)
+    header_before = _material_readback(scene.header)
+    native_setter = annotation.SetTextFormat
+
+    def refuse_reduction(index, use_doc, text_format):
+        if text_format.CharHeight < dict(original[5][0])["CharHeight"]:
+            annotation.setter_result = result
+        return native_setter(index, use_doc, text_format)
+
+    monkeypatch.setattr(annotation, "SetTextFormat", refuse_reduction)
+    with pytest.raises(RuntimeError, match="local text format setter refused"):
+        _fit_material_only(scene)
+    assert len(annotation.formats) == 2
+    assert annotation.formats[-1].CharHeight < annotation.formats[0].CharHeight
+    assert annotation.formats[-1].IsHeightSpecifiedInPts() is False
+    assert _styles(annotation) == original[5]
+    assert annotation.GetUseDocTextFormat(0) is False  # Only the original candidate persisted.
+    assert not annotation.positions
+    assert _material_readback(scene.material)[:4] == original[:4]
+    assert _material_readback(scene.header) == header_before
+    assert not [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.height_write"
+    ]
+
+
+@pytest.mark.parametrize(
+    "fault", ("ignored-format", "ignored-height", "wrong-height", "retained-points-mode"),
+)
+def test_label_right_native_reduction_refuses_lying_height_or_mode_readback_before_move(
+    measured_material_title, material_fit_events, monkeypatch, fault,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"), points_mode=True, needs_reduction=True,
+    )
+    annotation = scene.material.annotation
+    original = _material_readback(scene.material)
+    original_height = dict(original[5][0])["CharHeight"]
+    header_before = _material_readback(scene.header)
+    native_setter = annotation.SetTextFormat
+
+    def misapply_reduction(index, use_doc, text_format):
+        reduction = text_format.CharHeight < original_height
+        annotation.ignore_setter = reduction and fault == "ignored-format"
+        result = native_setter(index, use_doc, text_format)
+        if reduction:
+            if fault == "ignored-height":
+                annotation._format._height_m = original_height
+            elif fault == "wrong-height":
+                annotation._format._height_m = text_format.CharHeight + 2e-7
+            elif fault == "retained-points-mode":
+                annotation._format._points_mode = True
+        return result
+
+    monkeypatch.setattr(annotation, "SetTextFormat", misapply_reduction)
+    with pytest.raises(RuntimeError, match="local height setter did not persist"):
+        _fit_material_only(scene)
+    assert len(annotation.formats) == 2
+    requested = annotation.formats[-1]
+    assert requested.CharHeight == max(0.002, round(original_height - 0.0001, 7))
+    assert requested.IsHeightSpecifiedInPts() is False
+    actual = annotation.GetTextFormat(0)
+    expected_height = (
+        original_height if fault in ("ignored-format", "ignored-height") else
+        requested.CharHeight + (2e-7 if fault == "wrong-height" else 0)
+    )
+    assert actual.CharHeight == expected_height
+    assert actual.IsHeightSpecifiedInPts() is (
+        fault in ("ignored-format", "retained-points-mode")
+    )
+    assert not actual.point_writes
+    assert not annotation.positions
+    assert scene.material.anchor == original[4]
+    assert _material_readback(scene.material)[:4] == original[:4]
+    assert _material_readback(scene.header) == header_before
+    assert not [
+        fields for event, fields in material_fit_events
+        if event == "drawing.purchased_title_fit.height_write"
+    ]
+
+
+@pytest.mark.parametrize("needs_reduction", (False, True), ids=("original-font", "owned-reduction"))
+def test_label_right_native_final_frozen_mode_refuses_an_external_flip_readonly(
+    measured_material_title, needs_reduction,
+):
+    scene = _with_native_material_height_mode(
+        measured_material_title("Material"),
+        points_mode=True, needs_reduction=needs_reduction,
+    )
+    settled = _fit_material_only(scene)
+    annotation = scene.material.annotation
+    accepted_mode = not needs_reduction
+    assert annotation.GetTextFormat(0).IsHeightSpecifiedInPts() is accepted_mode
+    _assert_inside(scene.material, _right_region(scene.header))
+    _assert_inside(scene.header, _material_limit())
+    frozen_style = _styles(annotation)
+    annotation._format._points_mode = not accepted_mode
+    scene.draw.EditRebuild3()
+    with pytest.raises(
+        RuntimeError, match="MATERIAL label or protected value style/anchor changed",
+    ) as refused:
+        _assert_readonly_material_proof(scene, settled)
+    message = str(refused.value)
+    assert "phase='settled', formatted=True" in message
+    differences = ast.literal_eval(message.split("differences=", 1)[1])
+    assert differences == {
+        f"material.{kind}[0].IsHeightSpecifiedInPts": {
+            "expected": accepted_mode, "actual": not accepted_mode, "tolerance": 0,
+        }
+        for kind in ("protected_style", "accepted_style")
+    }
+    assert _styles(annotation)[1:] == frozen_style[1:]
 
 
 def test_label_right_refuses_a_native_header_leaving_no_right_value_region(measured_material_title):
