@@ -243,7 +243,18 @@ def _root_name(node: ast.AST) -> str | None:
     return node.id if isinstance(node, ast.Name) else None
 
 
-def _require_no_member_writes(nodes: Iterable[ast.AST], name: str) -> None:
+def _root_member(node: ast.AST) -> str | None:
+    member = None
+    while isinstance(node, (ast.Attribute, ast.Subscript)):
+        if isinstance(node, ast.Attribute):
+            member = node.attr
+        node = node.value
+    return member
+
+
+def _require_no_member_writes(
+    nodes: Iterable[ast.AST], name: str, *, methods_member: str | None = None,
+) -> None:
     for node in nodes:
         if isinstance(node, (ast.Attribute, ast.Subscript)) and isinstance(
             node.ctx, (ast.Store, ast.Del)
@@ -252,6 +263,7 @@ def _require_no_member_writes(nodes: Iterable[ast.AST], name: str) -> None:
         if isinstance(node, ast.Call):
             assert not (
                 isinstance(node.func, ast.Attribute) and _root_name(node.func) == name
+                and (methods_member is None or _root_member(node.func) == methods_member)
             ), f"{name}: unproven method call on part-owned controls"
             assert not (
                 (
@@ -261,6 +273,65 @@ def _require_no_member_writes(nodes: Iterable[ast.AST], name: str) -> None:
                 )
                 and node.args and _root_name(node.args[0]) == name
             ), f"{name}: drawing mutates part-owned controls"
+
+
+def _require_attribute_reads(scope: ast.AST, name: str) -> None:
+    """A row may supply fields, not escape into aliases or opaque mutators."""
+    parents = {child: parent for node in ast.walk(scope) for child in ast.iter_child_nodes(node)}
+    for node in ast.walk(scope):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id == name:
+            parent = parents[node]
+            assert isinstance(parent, ast.Attribute) and parent.value is node, (
+                f"{name}: row escapes the bounded field projection"
+            )
+
+
+def _require_tuple_reads(scope: ast.AST, name: str, row_name: str) -> None:
+    """Only length, field-reading comprehensions and bound row selection."""
+    parents = {child: parent for node in ast.walk(scope) for child in ast.iter_child_nodes(node)}
+    for node in ast.walk(scope):
+        if not (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id == name):
+            continue
+        parent = parents[node]
+        if isinstance(parent, ast.Call):
+            assert (
+                isinstance(parent.func, ast.Name) and parent.func.id == "len"
+                and parent.args == [node] and not parent.keywords
+            ), f"{name}: tuple escapes into an unproven call"
+        elif isinstance(parent, ast.comprehension) and parent.iter is node:
+            assert isinstance(parent.target, ast.Name)
+            _require_attribute_reads(scope, parent.target.id)
+        else:
+            assert isinstance(parent, ast.Subscript) and parent.value is node
+            assignment = parents[parent]
+            assert isinstance(assignment, (ast.Assign, ast.AnnAssign)) and assignment.value is parent
+            targets = assignment.targets if isinstance(assignment, ast.Assign) else [assignment.target]
+            assert len(targets) == 1 and isinstance(targets[0], ast.Name) and targets[0].id == row_name, (
+                f"{name}: selected row escapes its proven binding"
+            )
+
+
+def _require_controls_source_reads(tree: ast.Module, source: ast.AST) -> None:
+    """Outside the proven local binding, only field-reading row loops exist."""
+    parents = {child: parent for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    for node in ast.walk(tree):
+        matches = (
+            isinstance(source, ast.Name) and isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Load) and node.id == source.id
+        ) or (
+            isinstance(source, ast.Attribute) and isinstance(node, ast.Attribute)
+            and node.attr == source.attr and isinstance(node.value, ast.Name)
+            and node.value.id == source.value.id
+        )
+        if not matches or node is source:
+            continue
+        parent = parents[node]
+        assert isinstance(parent, ast.For) and parent.iter is node, (
+            "part controls escape the proven binding or a field-reading loop"
+        )
+        assert isinstance(parent.target, ast.Name)
+        _require_attribute_reads(tree, parent.target.id)
+        _require_no_member_writes(ast.walk(tree), parent.target.id)
 
 
 def _require_no_closure_rebinding(scope: ast.AST, name: str) -> None:
@@ -313,7 +384,9 @@ def _require_import(
         isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names)
         for node in nodes
     ), "star import makes typed control ownership ambiguous"
-    _require_no_member_writes(nodes, name)
+    _require_no_member_writes(
+        nodes, name, methods_member="GEOMETRIC_CONTROLS" if member is None else None,
+    )
     if member is None:
         parents = {child: parent for parent in nodes for child in ast.iter_child_nodes(parent)}
         assert all(
@@ -402,6 +475,8 @@ def _require_part_control_projection(
     assert _bindings(_scope_nodes(scope), control_name) == targets, "control is shadowed/rebound"
     _require_no_closure_rebinding(scope, control_name)
     _require_no_member_writes(ast.walk(scope), control_name)
+    _require_attribute_reads(scope, control_name)
+    _require_tuple_reads(scope, controls_name, control_name)
     value = assignment.value
     assert (
         isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name)
@@ -418,6 +493,7 @@ def _require_part_control_projection(
     else:
         assert isinstance(source, ast.Name)
         _require_import(tree, source.id, spec_module, "GEOMETRIC_CONTROLS")
+    _require_controls_source_reads(tree, source)
     _require_typed_controls(spec_tree)
 
 
@@ -531,6 +607,15 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
     )
 
 
+def test_typed_projection_allows_unrelated_spec_text_methods() -> None:
+    tree = ast.parse(
+        _TYPED_DRAWING_SOURCE + '\npart_spec.DIMENSION_CALLOUTS["label"].splitlines()\n',
+    )
+    _require_part_control_projection(
+        tree, _fcf_calls(tree)[0], ast.parse(_TYPED_SPEC_SOURCE), "sample_spec",
+    )
+
+
 @pytest.mark.parametrize(("old", "new"), [
     ("control.tolerance)", "'0.125')"),
     ("control.tolerance)", "0.125)"),
@@ -552,6 +637,9 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
     ("control = controls[index]", "control = controls[index]\n        control.tolerance = '0.125'"),
     ("control = controls[index]", "control = controls[index]\n        object.__setattr__(control, 'tolerance', '9.9')"),
     ("control = controls[index]", "control = controls[index]\n        object.__delattr__(control, 'tolerance')"),
+    ("control = controls[index]", "control = controls[index]\n        borrowed = control\n        object.__setattr__(borrowed, 'tolerance', '9.9')"),
+    ("control = controls[index]", "control = controls[index]\n        mutate(control)"),
+    ("control = controls[index]", "control = controls[index]\n        vars(control)['tolerance'] = '9.9'"),
     ("control = controls[index]", "control = controls[index]\n        del control.tolerance"),
     ("control = controls[index]", "control = controls[index]\n        setattr(control, 'tolerance', '0.125')"),
     ("control = controls[index]", "control = controls[index]\n        import other as control"),
@@ -562,6 +650,12 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    controls = local_controls"),
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    controls[0] = fake_control"),
     ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    controls.append(fake_control)"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = controls"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = controls[0]"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = [row for row in controls]"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    mutate(controls)"),
+    ("controls = part_spec.GEOMETRIC_CONTROLS", "controls = part_spec.GEOMETRIC_CONTROLS\n    borrowed = part_spec.GEOMETRIC_CONTROLS[0]"),
+    ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec.GEOMETRIC_CONTROLS.append(fake_control)"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\npart_spec = local_spec"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\nimport other as part_spec"),
     ("import sample_spec as part_spec", "import sample_spec as part_spec\ndef part_spec(): pass"),
@@ -622,7 +716,7 @@ def test_typed_projection_accepts_bound_aliases(old: str, new: str) -> None:
     ),
 ])
 def test_typed_projection_rejects_drawing_owned_or_unbound_rows(old: str, new: str) -> None:
-    tree = ast.parse(_TYPED_DRAWING_SOURCE.replace(old, new))
+    tree = ast.parse(_TYPED_DRAWING_SOURCE.replace(old, new, 1))
     with pytest.raises(AssertionError):
         _require_part_control_projection(
             tree, _fcf_calls(tree)[0], ast.parse(_TYPED_SPEC_SOURCE), "sample_spec",
