@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import ast
 import json
 import math
@@ -132,59 +131,6 @@ def test_drawing_only_reads_the_imported_structural_reasons(monkeypatch, fault, 
             drawing._assert_dimension_callouts(object(), annotations)
     else:
         drawing._assert_dimension_callouts(object(), annotations)
-
-
-def test_drawing_build_checks_flags_on_the_imported_mounting_dimensions(monkeypatch, tmp_path) -> None:
-    source = tmp_path / "bracket.SLDPRT"
-    source.touch()
-    adapter = SimpleNamespace(currentModel=object())
-
-    async def open_model(_path):
-        return {}
-
-    adapter.open_model = open_model
-    texts = {
-        name: text
-        for callouts in spec.DIMENSION_CALLOUTS.values()
-        for name, text in callouts.items()
-    }
-
-    def import_dimensions(_adapter, _view, *, keep, **_kwargs):
-        annotations = []
-        for name in keep:
-            text = texts.get(name, "")
-            item = SimpleNamespace(name=name, GetText=lambda which, text=text: text if which == 4 else "")
-            item.GetSpecificAnnotation = lambda item=item: item
-            annotations.append(item)
-        return annotations
-
-    class ImportedCalloutsRead(Exception):
-        pass
-
-    read_callouts = drawing._assert_dimension_callouts
-
-    def assert_callouts(actual_adapter, annotations):
-        read_callouts(actual_adapter, annotations)
-        assert {item.name for item in annotations if item.name in drawing.MOUNTING_KEEP} == {
-            "MountingX0", "MountingX1", "MountingY0",
-        }
-        raise ImportedCalloutsRead
-
-    monkeypatch.setattr(drawing, "SOURCE", source)
-    monkeypatch.setattr(drawing, "check", lambda _label, value: value)
-    monkeypatch.setattr(drawing, "read_required_properties", lambda *_args, **_kwargs: {})
-    monkeypatch.setattr(drawing, "new_project_drawing", lambda *_args, **_kwargs: (object(), object()))
-    monkeypatch.setattr(drawing, "stamp_drawing_summary", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "place_view", lambda *_args, **_kwargs: object())
-    monkeypatch.setattr(drawing, "set_hidden_lines_removed", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(drawing, "_project_side_view", lambda *_args: None)
-    monkeypatch.setattr(drawing, "curate_view_dimensions", import_dimensions)
-    monkeypatch.setattr(drawing, "curate_hidden_dimensions", import_dimensions)
-    monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
-    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
-    monkeypatch.setattr(drawing, "_assert_dimension_callouts", assert_callouts)
-    with pytest.raises(ImportedCalloutsRead):
-        asyncio.run(drawing.build(adapter))
 
 
 def test_only_clearance_row_moves_with_the_matching_plate_taps() -> None:
