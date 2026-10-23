@@ -25,14 +25,20 @@ def test_finished_overall_preserves_factory_thread_datum():
 
 
 def test_deburr_band_clears_receiver_and_retains_full_threads():
-    # The lead-in carries the printed two-place title-block band, never a
-    # tighter one; the governing stack below must hold across that band.
-    printed = _config.title_block("linear_2pl")["display"]
-    assert printed == f"±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.2f}"
+    # The lead-in is a one-place chamfer under the printed .X title-block band,
+    # never a tighter one; the governing stack below must hold across it.
+    printed = _config.title_block("linear_1pl")["display"]
+    assert printed == f"±{spec.CHAMFER_WIDTH_TOLERANCE_MM:.1f}"
+    assert spec.DIMENSION_PRECISION["ChamferWidth"] == 1
+    assert spec.CHAMFER_WIDTH_MM == round(spec.CHAMFER_WIDTH_MM, 1)
     assert spec.DIMENSION_TOLERANCE_TYPES["ChamferWidth"] == 11  # swTolGeneral
     minimum = spec.CHAMFER_WIDTH_MM - spec.CHAMFER_WIDTH_TOLERANCE_MM
     maximum = spec.CHAMFER_WIDTH_MM + spec.CHAMFER_WIDTH_TOLERANCE_MM
     assert anchor.thread_major_dia_mm - 2 * minimum < TAP_DRILL_MM[anchor.thread_size]
+    # The next one-place nominal down would put the short leg's end over the drill.
+    assert anchor.thread_major_dia_mm - 2 * (minimum - 0.1) >= TAP_DRILL_MM[anchor.thread_size]
+    # The long leg still leaves an end flat: the deburr cannot reach the axis.
+    assert anchor.thread_major_radius_mm - maximum > 0.2
     # Include the adverse angular corner, not only the nominal 45-degree leg.
     maximum_axial = maximum / math.tan(
         math.radians(spec.CHAMFER_ANGLE_DEG - spec.CHAMFER_ANGLE_TOLERANCE_DEG)
