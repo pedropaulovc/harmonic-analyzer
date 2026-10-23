@@ -106,7 +106,7 @@ _NOTE_POSITIONS = {
     ),
     "PenWire": (
         ("Manufacturing Notes", 0.016, 0.080),
-        ("Elevation View Note", 0.040, 0.087),
+        ("Elevation View Note", 0.040, 0.088),
         ("Isometric View Note", 0.270, 0.100),
     ),
 }
