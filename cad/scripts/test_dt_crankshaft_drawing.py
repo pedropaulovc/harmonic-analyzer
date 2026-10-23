@@ -1077,6 +1077,154 @@ def test_collar_side_neck_refuses_unreadable_circle_parameters(
         drawing._outboard_neck_rim(adapter, side)
 
 
+class _FreshNeckView:
+    """Counted native view with an observable, potentially refused transition."""
+
+    def __init__(self) -> None:
+        self.GetDimensionCount4 = Mock(return_value=0)
+        self.GetAnnotationCount = Mock(return_value=0)
+        self.GetAnnotations = Mock(return_value=None)
+        self.mode = True
+        self.transition_readback = False
+        self.writes = []
+        self.ScaleRatio = (2.0, 1.0)
+        self.ScaleDecimal = 2.0
+
+    @property
+    def ProjectedDimensions(self):
+        return self.mode
+
+    @ProjectedDimensions.setter
+    def ProjectedDimensions(self, value):
+        self.writes.append(value)
+        self.mode = self.transition_readback
+
+
+@pytest.fixture
+def fresh_neck_view(monkeypatch: pytest.MonkeyPatch) -> _FreshNeckView:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    return _FreshNeckView()
+
+
+@pytest.mark.parametrize("array", [None, (), []])
+def test_fresh_neck_view_initializes_only_after_both_native_empty_inventories(
+    fresh_neck_view: _FreshNeckView, array: object,
+) -> None:
+    view = fresh_neck_view
+    view.GetAnnotations.return_value = array
+    trace = Mock()
+    for name in ("GetDimensionCount4", "GetAnnotationCount", "GetAnnotations"):
+        trace.attach_mock(getattr(view, name), name)
+    drawing._initialize_neck_true_measurements(view)
+    assert trace.mock_calls == [
+        call.GetDimensionCount4(), call.GetAnnotationCount(), call.GetAnnotations(),
+    ]
+    assert view.writes == [False]
+    assert view.ProjectedDimensions is False
+
+
+def test_fresh_neck_view_retains_automatic_non_dimension_marks(
+    fresh_neck_view: _FreshNeckView,
+) -> None:
+    view = fresh_neck_view
+    note = SimpleNamespace(GetType=Mock(return_value=6))
+    view.GetAnnotationCount.return_value = 1
+    view.GetAnnotations.return_value = (note,)
+    drawing._initialize_neck_true_measurements(view)
+    assert view.writes == [False]
+    note.GetType.assert_called_once_with()
+    assert view.GetAnnotations.return_value == (note,)
+
+
+@pytest.mark.parametrize("count", [None, False, True, -1, 1, 0.0, "0", 2147483648, Mock()])
+def test_fresh_neck_view_refuses_invalid_or_populated_dimension_count_before_setter(
+    fresh_neck_view: _FreshNeckView, count: object,
+) -> None:
+    view = fresh_neck_view
+    view.GetDimensionCount4.return_value = count
+    with pytest.raises(RuntimeError, match="expected native dimension count 0"):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == []
+    view.GetAnnotationCount.assert_not_called()
+
+
+@pytest.mark.parametrize("count", [None, False, True, -1, 0.0, "0", 2147483648, Mock()])
+def test_fresh_neck_view_refuses_invalid_annotation_count_before_setter(
+    fresh_neck_view: _FreshNeckView, count: object,
+) -> None:
+    view = fresh_neck_view
+    view.GetAnnotationCount.return_value = count
+    with pytest.raises(RuntimeError, match="invalid native annotation count"):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == []
+    view.GetAnnotations.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "count, array",
+    [
+        (1, None), (0, False), (0, 0), (0, ""), (0, {}),
+        (1, ()), (0, (None,)), (1, (None,)),
+    ],
+)
+def test_fresh_neck_view_refuses_null_malformed_or_mismatched_annotation_arrays(
+    fresh_neck_view: _FreshNeckView, count: int, array: object,
+) -> None:
+    view = fresh_neck_view
+    view.GetAnnotationCount.return_value = count
+    view.GetAnnotations.return_value = array
+    with pytest.raises(RuntimeError, match="native annotation"):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == []
+
+
+@pytest.mark.parametrize(
+    "kind", [None, False, True, 4.0, "4", -2147483649, 2147483648, Mock(), 4]
+)
+def test_fresh_neck_view_refuses_invalid_types_or_a_type_four_dimension_before_setter(
+    fresh_neck_view: _FreshNeckView, kind: object,
+) -> None:
+    view = fresh_neck_view
+    view.GetAnnotationCount.return_value = 1
+    view.GetAnnotations.return_value = (SimpleNamespace(GetType=Mock(return_value=kind)),)
+    with pytest.raises(RuntimeError, match="annotation type|type-4 dimension exists"):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == []
+
+
+@pytest.mark.parametrize("member", ["GetDimensionCount4", "GetAnnotationCount", "GetAnnotations", "GetType"])
+@pytest.mark.parametrize("missing", [False, True])
+def test_fresh_neck_view_never_turns_an_unavailable_native_getter_into_empty_evidence(
+    fresh_neck_view: _FreshNeckView, member: str, missing: bool,
+) -> None:
+    view = fresh_neck_view
+    target = view
+    if member == "GetType":
+        target = SimpleNamespace(GetType=Mock(return_value=6))
+        view.GetAnnotationCount.return_value = 1
+        view.GetAnnotations.return_value = (target,)
+    if missing:
+        delattr(target, member)
+        failure = AttributeError
+    else:
+        getattr(target, member).side_effect = RuntimeError("native inventory getter failed")
+        failure = RuntimeError
+    with pytest.raises(failure):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == []
+
+
+@pytest.mark.parametrize("readback", [True, None, 0, 1, "", Mock()])
+def test_fresh_neck_view_refuses_a_non_false_transition_readback(
+    fresh_neck_view: _FreshNeckView, readback: object,
+) -> None:
+    view = fresh_neck_view
+    view.transition_readback = readback
+    with pytest.raises(RuntimeError, match="did not read back False"):
+        drawing._initialize_neck_true_measurements(view)
+    assert view.writes == [False]
+
+
 @pytest.fixture
 def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     # Native neck-selection-context-matrix-1 at 60665f1b: the target's
@@ -1103,7 +1251,7 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     side.GetCorrespondingEntity = forward
     side.SelectEntity = Mock(return_value=True)
     native = SimpleNamespace(
-        SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=2,
+        SystemValue=spec.SHAFT_DIA / 1000.0, DrivenState=1,
         FullName="RD1@FRONT@Drawing1", Tolerance=SimpleNamespace(Type=0),
     )
     texts = {1: "<MOD-DIAM>", 2: "", 3: "", 4: ""}
@@ -1151,8 +1299,21 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         name="NeckDiaDim", GetType=Mock(return_value=4),
         GetSpecificAnnotation=Mock(return_value=right_display),
     )
+    station_native = SimpleNamespace(
+        SystemValue=0.0, DrivenState=0, FullName="Depth@Stations@dt-crankshaft",
+    )
+    station_display = SimpleNamespace(GetDimension2=Mock(return_value=station_native))
+    station_annotation = SimpleNamespace(
+        name="Depth", GetType=Mock(return_value=4),
+        GetSpecificAnnotation=Mock(return_value=station_display),
+    )
     unrelated_note = SimpleNamespace(GetType=Mock(return_value=6))
-    side.GetAnnotations = Mock(return_value=(unrelated_note, right_annotation, annotation))
+    imported_annotations = (unrelated_note, right_annotation, station_annotation)
+    side.GetAnnotations = Mock(return_value=(*imported_annotations, annotation))
+    side.GetAnnotationCount = Mock(side_effect=lambda: len(side.GetAnnotations.return_value))
+    side.ProjectedDimensions = False
+    side.ScaleRatio = (2.0, 1.0)
+    side.ScaleDecimal = 2.0
     selection = SimpleNamespace(
         GetSelectedObjectCount2=Mock(return_value=1),
         GetSelectedObject6=Mock(return_value=view_rim),
@@ -1195,7 +1356,25 @@ def neck_dimension_fakes(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         selected_owner=selected_owner, annotation_owner=annotation_owner,
         native_tolerance=native.Tolerance, right_tolerance=right_native.Tolerance,
         arrow_data=arrow_data, arrow_tip=arrow_tip,
+        imported_annotations=imported_annotations, station_native=station_native,
+        station_annotation=station_annotation, station_display=station_display,
+        imported=(
+            (right_native, right_native.FullName, spec.SHAFT_DIA / 1000.0, 2),
+            (station_native, station_native.FullName, 0.0, 0),
+        ),
     )
+
+
+def _create_neck_dimension(f: SimpleNamespace):
+    """Expose the new annotation only once the real factory has been called."""
+    def annotations():
+        if not f.model.Extension.AddSpecificDimension.called:
+            return f.imported_annotations
+        return f.side.GetAnnotations.return_value
+
+    f.side.GetAnnotations.side_effect = annotations
+    f.side.GetAnnotationCount.side_effect = lambda: len(annotations())
+    return drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
 
 
 def test_neck_fixture_retains_native_target_control_correspondence_boundary(
@@ -1246,10 +1425,10 @@ def test_neck_null_forward_map_keeps_required_reverse_identity_at_every_checkpoi
     f.native.DrivenState = 1
     f.display.ShowParenthesis = False
     if phase in ("after_drawing_save", "after_pdf_save"):
-        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
     else:
         drawing._assert_outboard_neck_dimension(
-            f.adapter, f.side, f.native, 2, phase=phase
+            f.adapter, f.side, f.native, 2, f.imported, phase=phase
         )
     f.canonical.assert_called_once_with(f.view_rim)
     f.adapter.swApp.IsSame.assert_any_call(f.canonical_rim, f.rim)
@@ -1298,7 +1477,7 @@ def test_new_neck_dimension_is_a_real_driven_diameter_not_numeric_text(
 
     f.model.Extension.AddSpecificDimension.side_effect = add
     f.rebuild.side_effect = rebuilt
-    assert drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side) == (f.native, 2)
+    assert _create_neck_dimension(f) == (f.native, 2, f.imported)
     f.model.Extension.AddSpecificDimension.assert_called_once_with(
         *drawing.OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0
     )
@@ -1344,13 +1523,13 @@ def test_new_neck_refuses_unqualified_native_view_selection_before_api6(
     f = neck_dimension_fakes
     getattr(getattr(f, target), member).return_value = result
     with pytest.raises(RuntimeError, match=message):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.canonical.assert_not_called()
     f.display.SetPrecision3.assert_not_called()
     f.rebuild.assert_not_called()
     f.select.assert_not_called()
-    assert f.native.DrivenState == 2
+    assert f.native.DrivenState == 1
 
 
 @pytest.mark.parametrize(
@@ -1392,15 +1571,15 @@ def test_neck_requires_reverse_physical_identity_at_every_phase(
         )
     with pytest.raises(RuntimeError, match=message):
         if phase == "before-api6":
-            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+            _create_neck_dimension(f)
         else:
             f.native.DrivenState = 1
             f.display.ShowParenthesis = False
             if phase in ("after_drawing_save", "after_pdf_save"):
-                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
             else:
                 drawing._assert_outboard_neck_dimension(
-                    f.adapter, f.side, f.native, 2, phase=phase
+                    f.adapter, f.side, f.native, 2, f.imported, phase=phase
                 )
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.display.SetPrecision3.assert_not_called()
@@ -1418,7 +1597,7 @@ def test_neck_correspondence_access_errors_are_not_suppressed(
     )
     native.side_effect = RuntimeError("native correspondence access failed")
     with pytest.raises(RuntimeError, match="native correspondence access failed"):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.select.assert_not_called()
 
@@ -1453,15 +1632,15 @@ def test_neck_requires_exact_front_owner_at_every_phase(
         )
     with pytest.raises(RuntimeError, match="owner is not FRONT"):
         if before:
-            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+            _create_neck_dimension(f)
         else:
             f.native.DrivenState = 1
             f.display.ShowParenthesis = False
             if phase in ("after_drawing_save", "after_pdf_save"):
-                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+                drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
             else:
                 drawing._assert_outboard_neck_dimension(
-                    f.adapter, f.side, f.native, 2, phase=phase
+                    f.adapter, f.side, f.native, 2, f.imported, phase=phase
                 )
     f.canonical.assert_not_called()
     f.model.Extension.AddSpecificDimension.assert_not_called()
@@ -1498,9 +1677,9 @@ def test_neck_direct_source_identity_cannot_replace_required_reverse_corresponde
         f.annotation.GetAttachedEntities3.return_value = (f.rim,)
     with pytest.raises(RuntimeError, match="no source correspondence"):
         if phase == "before-api6":
-            drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+            _create_neck_dimension(f)
         else:
-            drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
+            drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
     f.model.Extension.AddSpecificDimension.assert_not_called()
     f.forward.assert_not_called()
 
@@ -1512,7 +1691,7 @@ def test_new_neck_dimension_refuses_unsuccessful_creation(
     f = neck_dimension_fakes
     f.model.Extension.AddSpecificDimension.return_value = f.display, status
     with pytest.raises(RuntimeError, match="edge-on circle rejected"):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.display.SetPrecision3.assert_not_called()
     f.rebuild.assert_not_called()
 
@@ -1524,7 +1703,7 @@ def test_new_neck_dimension_refuses_precision_problem_status(
     f = neck_dimension_fakes
     f.display.SetPrecision3.return_value = status
     with pytest.raises(RuntimeError, match="precision assignment failed"):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.rebuild.assert_not_called()
 
 
@@ -1576,7 +1755,7 @@ def test_neck_contract_refuses_native_or_post_save_drift(
         setattr(obj, member, value)
     with pytest.raises(RuntimeError, match=message):
         drawing._assert_outboard_neck_dimension(
-            f.adapter, f.side, f.native, 2, phase="after_drawing_save"
+            f.adapter, f.side, f.native, 2, f.imported, phase="after_drawing_save"
         )
     f.display.SetPrecision3.assert_not_called()
 
@@ -1594,7 +1773,7 @@ def test_neither_neck_can_ship_a_quantity_literal_or_reference_decoration(
     (f.texts if neck == "new" else f.right_texts)[part] = text
     with pytest.raises(RuntimeError, match="unexpected native diameter text"):
         drawing._assert_outboard_neck_dimension(
-            f.adapter, f.side, f.native, 2, phase="after_drawing_save"
+            f.adapter, f.side, f.native, 2, f.imported, phase="after_drawing_save"
         )
 
 
@@ -1607,7 +1786,7 @@ def test_native_diameter_attachment_does_not_assume_note_leader_count(
     f.display.ShowParenthesis = False
     f.annotation.GetLeaderCount.return_value = leaders
     drawing._assert_outboard_neck_dimension(
-        f.adapter, f.side, f.native, 2, phase="final settling rebuild"
+        f.adapter, f.side, f.native, 2, f.imported, phase="final settling rebuild"
     )
 
 
@@ -1623,12 +1802,12 @@ def test_neck_checkpoint_rechecks_existing_save_boundaries_without_opening(
     f = neck_dimension_fakes
     verify = Mock()
     monkeypatch.setattr(drawing, "_assert_outboard_neck_dimension", verify)
-    drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, phase)
-    verify.assert_called_once_with(f.adapter, f.side, f.native, 2, phase=phase)
+    drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
+    verify.assert_called_once_with(f.adapter, f.side, f.native, 2, f.imported, phase=phase)
     for unused in (
         "before_drawing_save", "before_pdf_save", "before_drawing_close", "after_drawing_close"
     ):
-        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, unused)
+        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, unused)
     verify.assert_called_once()
 
 
@@ -1644,6 +1823,27 @@ def test_build_wires_neck_settled_and_save_readbacks_without_value_writes() -> N
     keywords = {item.arg: item.value for item in finalizer.keywords}
     assert "_assert_outboard_neck_dimension" in ast.unparse(keywords["settled_checks"])
     assert "_outboard_neck_checkpoint" in ast.unparse(keywords["checkpoint"])
+    assert "imported_side_dimensions" in ast.unparse(keywords["settled_checks"])
+    assert "imported_side_dimensions" in ast.unparse(keywords["checkpoint"])
+    initialization = next(
+        index for index, item in enumerate(build.body)
+        if isinstance(item, ast.Expr) and isinstance(item.value, ast.Call)
+        and ast.unparse(item.value.func) == "_initialize_neck_true_measurements"
+    )
+    assert ast.unparse(build.body[initialization - 1]) == "native_side = _early_bound(side, 'IView')"
+    assert ast.unparse(build.body[initialization + 1]) == "native_side.Angle = SIDE_VIEW_ANGLE"
+    angle_rebuild = next(
+        index for index, item in enumerate(build.body)
+        if isinstance(item, ast.Expr) and isinstance(item.value, ast.Call)
+        and ast.unparse(item.value.func) == "drawing_model.EditRebuild3"
+    )
+    assert ast.unparse(build.body[angle_rebuild + 1].value.func) == "_assert_neck_measurement_domain"
+    imports = [
+        index for index, item in enumerate(build.body)
+        if isinstance(item, ast.Assign) and isinstance(item.value, ast.Call)
+        and ast.unparse(item.value.func) == "curate_view_dimensions"
+    ]
+    assert imports and all(index > angle_rebuild for index in imports)
     added = next(
         item for item in tree.body
         if isinstance(item, ast.FunctionDef) and item.name == "_add_outboard_neck_dimension"
@@ -1668,7 +1868,7 @@ def test_new_neck_dimension_refuses_missing_native_objects(
         f.display.GetDimension2.return_value = None
         message = "no native IDimension"
     with pytest.raises(RuntimeError, match=message):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.display.SetPrecision3.assert_not_called()
     f.rebuild.assert_not_called()
 
@@ -1688,7 +1888,7 @@ def test_neck_contract_requires_both_native_view_dimensions(
     f.side.GetAnnotations.return_value = annotations[which]
     with pytest.raises(RuntimeError, match="expected one"):
         drawing._assert_outboard_neck_dimension(
-            f.adapter, f.side, f.native, 2, phase="after_drawing_save"
+            f.adapter, f.side, f.native, 2, f.imported, phase="after_drawing_save"
         )
 
 
@@ -1704,7 +1904,7 @@ def test_new_neck_rebuild_readback_uses_the_view_not_a_stale_creation_handle(
 
     f.rebuild.side_effect = drift
     with pytest.raises(RuntimeError, match="primary places"):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
 
 
 def test_neck_save_checkpoint_propagates_attachment_loss(
@@ -1715,7 +1915,9 @@ def test_neck_save_checkpoint_propagates_attachment_loss(
     f.display.ShowParenthesis = False
     f.annotation.GetAttachedEntities3.return_value = ()
     with pytest.raises(RuntimeError, match="physical rim attachment"):
-        drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, "after_drawing_save")
+        drawing._outboard_neck_checkpoint(
+            f.adapter, f.side, f.native, 2, f.imported, "after_drawing_save"
+        )
 
 
 @pytest.mark.parametrize("axis", [(1.0, 0.0, 0.0), (0.0, 0.5, 0.0), (0.0, 1.0, 0.01)])
@@ -1750,7 +1952,7 @@ def test_neck_contract_refuses_a_type_four_annotation_without_specific_data(
     f.side.GetAnnotations.return_value = (invalid, f.right_annotation, f.annotation)
     with pytest.raises(RuntimeError, match="type-4 annotation has no native display"):
         drawing._assert_outboard_neck_dimension(
-            f.adapter, f.side, f.native, 2, phase="after_drawing_save"
+            f.adapter, f.side, f.native, 2, f.imported, phase="after_drawing_save"
         )
 
 
@@ -1760,7 +1962,13 @@ def test_new_neck_preserves_the_actual_imported_driven_state(
 ) -> None:
     f = neck_dimension_fakes
     f.right_native.DrivenState = state
-    assert drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side) == (f.native, state)
+    identity, actual_state, imported = _create_neck_dimension(f)
+    assert identity is f.native
+    assert actual_state == state
+    assert imported == (
+        (f.right_native, f.right_native.FullName, spec.SHAFT_DIA / 1000.0, state),
+        f.imported[1],
+    )
     assert f.right_native.DrivenState == state
 
 
@@ -1768,9 +1976,11 @@ def test_neck_identity_follows_live_full_name_after_save_as(
     neck_dimension_fakes: SimpleNamespace,
 ) -> None:
     f = neck_dimension_fakes
-    identity, state = drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+    identity, state, imported = _create_neck_dimension(f)
     f.native.FullName = "RD1@FRONT@dt-crankshaft.SLDDRW"
-    drawing._outboard_neck_checkpoint(f.adapter, f.side, identity, state, "after_drawing_save")
+    drawing._outboard_neck_checkpoint(
+        f.adapter, f.side, identity, state, imported, "after_drawing_save"
+    )
 
 
 @pytest.mark.parametrize(
@@ -1839,7 +2049,7 @@ def test_neck_display_is_redrawn_before_rendered_arrow_readback(
         return f.arrow_data
 
     f.display.GetDisplayData.side_effect = display_data
-    drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+    _create_neck_dimension(f)
     assert events == ["redraw", "display"]
 
 
@@ -1849,7 +2059,7 @@ def test_neck_display_redraw_failure_is_not_suppressed(
     f = neck_dimension_fakes
     f.model.GraphicsRedraw2.side_effect = RuntimeError("native redraw failed")
     with pytest.raises(RuntimeError, match="native redraw failed"):
-        drawing._add_outboard_neck_dimension(f.adapter, f.model, f.side)
+        _create_neck_dimension(f)
     f.display.GetDisplayData.assert_not_called()
 
 
@@ -1921,3 +2131,207 @@ def test_neck_arrow_rejects_zero_projected_direction(
     )
     with pytest.raises(RuntimeError, match="unreadable native arrow direction"):
         drawing._assert_neck_arrow_landing(f.display, label="neck")
+
+
+@pytest.mark.parametrize("value", [0.01905, 0.0095, None, False, True, float("nan"), float("inf")])
+def test_new_neck_immediately_refuses_wrong_native_value_before_any_dimension_writes(
+    neck_dimension_fakes: SimpleNamespace, value: object,
+) -> None:
+    f = neck_dimension_fakes
+    events = []
+
+    class ImmediateDimension:
+        @property
+        def SystemValue(self):
+            events.append("value")
+            return value
+
+        @property
+        def DrivenState(self):
+            return 1
+
+        @DrivenState.setter
+        def DrivenState(self, state):
+            raise AssertionError("wrote driven state before qualifying the factory value")
+
+    f.display.GetDimension2.return_value = ImmediateDimension()
+    with pytest.raises(RuntimeError, match="immediate native value"):
+        _create_neck_dimension(f)
+    assert events == ["value"]
+    f.display.GetDimension2.assert_called_once_with(0)
+    f.display.SetPrecision3.assert_not_called()
+    assert f.display.ShowParenthesis is True
+    f.rebuild.assert_not_called()
+    assert f.model.ClearSelection2.call_args_list == [call(True)]
+
+
+@pytest.mark.parametrize(
+    "member, value",
+    [
+        ("SystemValue", None), ("SystemValue", False), ("SystemValue", True),
+        ("SystemValue", "0"), ("SystemValue", float("nan")), ("SystemValue", float("inf")),
+        ("DrivenState", None), ("DrivenState", False), ("DrivenState", 0.0),
+        ("DrivenState", "0"), ("DrivenState", 2147483648),
+        ("FullName", None), ("FullName", ""),
+    ],
+)
+def test_full_imported_inventory_requires_native_finite_values_and_integer_states_before_factory(
+    neck_dimension_fakes: SimpleNamespace, member: str, value: object,
+) -> None:
+    f = neck_dimension_fakes
+    setattr(f.station_native, member, value)
+    with pytest.raises(RuntimeError, match="imported"):
+        _create_neck_dimension(f)
+    f.model.Extension.AddSpecificDimension.assert_not_called()
+    f.display.SetPrecision3.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "phase",
+    ["after insertion rebuild", "final settling rebuild", "after_drawing_save", "after_pdf_save"],
+)
+@pytest.mark.parametrize(
+    "drift",
+    ["value", "state", "null-value", "bool-state", "missing", "extra", "replacement", "wrong-live-name"],
+)
+def test_full_imported_inventory_refuses_every_old_dimension_change_at_all_four_proofs(
+    neck_dimension_fakes: SimpleNamespace, phase: str, drift: str,
+) -> None:
+    f = neck_dimension_fakes
+    f.display.ShowParenthesis = False
+    if drift == "value":
+        f.station_native.SystemValue = 0.000001
+    elif drift == "state":
+        f.station_native.DrivenState = 1
+    elif drift == "null-value":
+        f.station_native.SystemValue = None
+    elif drift == "bool-state":
+        f.station_native.DrivenState = False
+    elif drift == "missing":
+        f.side.GetAnnotations.return_value = (
+            f.right_annotation, f.annotation,
+        )
+    elif drift == "extra":
+        extra = SimpleNamespace(
+            GetType=lambda: 4,
+            GetSpecificAnnotation=lambda: SimpleNamespace(
+                GetDimension2=lambda index: SimpleNamespace(
+                    FullName="Extra@Stations@dt-crankshaft", SystemValue=0.0, DrivenState=0,
+                )
+            ),
+        )
+        f.side.GetAnnotations.return_value = (*f.side.GetAnnotations.return_value, extra)
+    else:
+        replacement = SimpleNamespace(**vars(f.station_native))
+        f.station_display.GetDimension2.return_value = replacement
+        if drift == "wrong-live-name":
+            replacement.FullName = "Wrong@Stations@dt-crankshaft"
+            same = f.adapter.swApp.IsSame.side_effect
+            f.adapter.swApp.IsSame.side_effect = (
+                lambda a, b: 1
+                if (a is replacement and b is f.station_native)
+                or (a is f.station_native and b is replacement)
+                else same(a, b)
+            )
+    with pytest.raises(RuntimeError, match="imported"):
+        if phase in ("after_drawing_save", "after_pdf_save"):
+            drawing._outboard_neck_checkpoint(
+                f.adapter, f.side, f.native, 2, f.imported, phase,
+            )
+        else:
+            drawing._assert_outboard_neck_dimension(
+                f.adapter, f.side, f.native, 2, f.imported, phase=phase,
+            )
+    f.display.SetPrecision3.assert_not_called()
+    f.rebuild.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "phase",
+    ["after insertion rebuild", "final settling rebuild", "after_drawing_save", "after_pdf_save"],
+)
+def test_full_imported_inventory_preserves_zero_and_unknown_state_with_live_saved_names(
+    neck_dimension_fakes: SimpleNamespace, phase: str,
+) -> None:
+    f = neck_dimension_fakes
+    f.display.ShowParenthesis = False
+    f.station_native.FullName = "Depth@Stations@dt-crankshaft.SLDDRW"
+    drawing._assert_outboard_neck_dimension(
+        f.adapter, f.side, f.native, 2, f.imported, phase=phase,
+    )
+    assert f.station_native.SystemValue == 0.0
+    assert f.station_native.DrivenState == 0
+    f.rebuild.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "crankshaft SIDE after angle rebuild", "after insertion rebuild",
+        "final settling rebuild", "after_drawing_save", "after_pdf_save",
+    ],
+)
+@pytest.mark.parametrize("mode", [True, None, 0, 1, "", Mock()])
+def test_true_measurement_mode_drift_refuses_without_another_setter(
+    neck_dimension_fakes: SimpleNamespace, phase: str, mode: object,
+) -> None:
+    f = neck_dimension_fakes
+    f.side.ProjectedDimensions = mode
+    with pytest.raises(RuntimeError, match="ProjectedDimensions must remain False"):
+        if phase == "crankshaft SIDE after angle rebuild":
+            drawing._assert_neck_measurement_domain(f.side, label=phase)
+        elif phase in ("after_drawing_save", "after_pdf_save"):
+            drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
+        else:
+            drawing._assert_outboard_neck_dimension(
+                f.adapter, f.side, f.native, 2, f.imported, phase=phase,
+            )
+    assert f.side.ProjectedDimensions is mode
+    f.model.GraphicsRedraw2.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "member, value",
+    [
+        ("ScaleRatio", None), ("ScaleRatio", False), ("ScaleRatio", (2.0,)),
+        ("ScaleRatio", (1.0, 1.0)), ("ScaleRatio", (4.0, 2.0)),
+        ("ScaleRatio", (2.0, True)), ("ScaleRatio", (float("nan"), 1.0)),
+        ("ScaleDecimal", None), ("ScaleDecimal", True), ("ScaleDecimal", 1.0),
+        ("ScaleDecimal", float("inf")),
+    ],
+)
+@pytest.mark.parametrize(
+    "phase",
+    ["after insertion rebuild", "final settling rebuild", "after_drawing_save", "after_pdf_save"],
+)
+def test_neck_proofs_refuse_any_drift_from_the_intended_native_two_to_one_scale(
+    neck_dimension_fakes: SimpleNamespace, member: str, value: object, phase: str,
+) -> None:
+    f = neck_dimension_fakes
+    setattr(f.side, member, value)
+    with pytest.raises(RuntimeError, match="native scale must remain 2:1 / 2"):
+        if phase in ("after_drawing_save", "after_pdf_save"):
+            drawing._outboard_neck_checkpoint(f.adapter, f.side, f.native, 2, f.imported, phase)
+        else:
+            drawing._assert_outboard_neck_dimension(
+                f.adapter, f.side, f.native, 2, f.imported, phase=phase,
+            )
+
+
+@pytest.mark.parametrize("member, changed", [("SystemValue", 0.000001), ("DrivenState", 1)])
+def test_factory_side_effect_on_an_old_imported_dimension_fails_the_real_insertion_proof(
+    neck_dimension_fakes: SimpleNamespace, member: str, changed: object,
+) -> None:
+    f = neck_dimension_fakes
+
+    def factory(*args):
+        setattr(f.station_native, member, changed)
+        return f.display, 0
+
+    f.model.Extension.AddSpecificDimension.side_effect = factory
+    with pytest.raises(RuntimeError, match="imported dimension .* changed value/state"):
+        _create_neck_dimension(f)
+    f.model.Extension.AddSpecificDimension.assert_called_once_with(
+        *drawing.OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0,
+    )
+    f.rebuild.assert_called_once_with(f.adapter, label="collar-side neck")

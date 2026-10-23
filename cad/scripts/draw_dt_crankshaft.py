@@ -23,7 +23,6 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import sys
 from typing import Any, Callable, Sequence
@@ -946,12 +945,74 @@ def _assert_outboard_neck_view_rim(
         )
 
 
+def _native_neck_annotations(side: Any, *, label: str) -> tuple[tuple[Any, int], ...]:
+    """Read the counted native array; absent or malformed evidence is not empty."""
+    view = _early_bound(side, "IView")
+    count = view.GetAnnotationCount()
+    if type(count) is not int or not 0 <= count <= 2147483647:
+        raise RuntimeError(f"{label}: invalid native annotation count {count!r}")
+    raw = view.GetAnnotations()
+    if raw is None:
+        if count != 0:
+            raise RuntimeError(f"{label}: native annotation count {count} returned no array")
+        return ()
+    if type(raw) not in (tuple, list):
+        raise RuntimeError(f"{label}: invalid native annotation array {raw!r}")
+    if len(raw) != count:
+        raise RuntimeError(f"{label}: native annotation array length {len(raw)} != count {count}")
+    annotations = []
+    for index, item in enumerate(raw):
+        if item is None:
+            raise RuntimeError(f"{label}: native annotation #{index} is null")
+        annotation = _early_bound(item, "IAnnotation")
+        kind = annotation.GetType()
+        if type(kind) is not int or not -2147483648 <= kind <= 2147483647:
+            raise RuntimeError(f"{label}: invalid native annotation type {kind!r}")
+        annotations.append((annotation, kind))
+    return tuple(annotations)
+
+
+def _initialize_neck_true_measurements(side: Any) -> None:
+    """Change the measurement domain only at the proven empty-view boundary."""
+    label = "crankshaft fresh SIDE"
+    view = _early_bound(side, "IView")
+    count = view.GetDimensionCount4()
+    if type(count) is not int or count != 0:
+        raise RuntimeError(f"{label}: expected native dimension count 0, got {count!r}")
+    annotations = _native_neck_annotations(view, label=label)
+    if any(kind == 4 for _annotation, kind in annotations):  # swDisplayDimension
+        raise RuntimeError(f"{label}: type-4 dimension exists before measurement initialization")
+    # SDK: changing ProjectedDimensions deletes existing dimensions. Never
+    # reach this setter on a populated or unqualified template view.
+    view.ProjectedDimensions = False
+    if view.ProjectedDimensions is not False:
+        raise RuntimeError(f"{label}: ProjectedDimensions did not read back False")
+
+
+def _assert_neck_measurement_domain(side: Any, *, label: str) -> None:
+    """Retain true measurements without changing the intended 2:1 paper scale."""
+    view = _early_bound(side, "IView")
+    if view.ProjectedDimensions is not False:
+        raise RuntimeError(f"{label}: ProjectedDimensions must remain False")
+    ratio = view.ScaleRatio
+    decimal = view.ScaleDecimal
+    if (
+        type(ratio) not in (tuple, list)
+        or len(ratio) != 2
+        or any(type(value) not in (int, float) or not math.isfinite(value) for value in ratio)
+        or tuple(ratio) != VIEW_SCALE
+        or type(decimal) not in (int, float)
+        or not math.isfinite(decimal)
+        or decimal != VIEW_SCALE[0] / VIEW_SCALE[1]
+    ):
+        raise RuntimeError(f"{label}: native scale must remain 2:1 / 2, got {ratio!r} / {decimal!r}")
+
+
 def _native_neck_view_dimensions(side: Any, *, label: str) -> list[tuple[Any, Any, Any]]:
     """Bind real view dimensions; a type-4 annotation without native data refuses."""
     dimensions = []
-    for item in _early_bound(side, "IView").GetAnnotations() or ():
-        annotation = _early_bound(item, "IAnnotation")
-        if int(annotation.GetType()) != 4:  # swDisplayDimension
+    for annotation, kind in _native_neck_annotations(side, label=label):
+        if kind != 4:  # swDisplayDimension
             continue
         specific = annotation.GetSpecificAnnotation()
         if specific is None:
@@ -962,6 +1023,52 @@ def _native_neck_view_dimensions(side: Any, *, label: str) -> list[tuple[Any, An
             raise RuntimeError(f"{label}: no native IDimension")
         dimensions.append((annotation, display, _early_bound(native, "IDimension")))
     return dimensions
+
+
+def _neck_dimension_record(native: Any, *, label: str) -> tuple[Any, str, float, int]:
+    """Retain native identity and the complete imported scalar/state record."""
+    name = native.FullName
+    value = native.SystemValue
+    state = native.DrivenState
+    if not isinstance(name, str) or not name:
+        raise RuntimeError(f"{label}: imported native dimension has no FullName")
+    if type(value) not in (int, float) or not math.isfinite(value):
+        raise RuntimeError(f"{label}: imported dimension {name!r} has invalid value {value!r}")
+    if type(state) is not int or not -2147483648 <= state <= 2147483647:
+        raise RuntimeError(f"{label}: imported dimension {name!r} has invalid driven state {state!r}")
+    return native, name, float(value), state
+
+
+def _assert_imported_neck_inventory(
+    adapter: Any, current: list[Any], imported: tuple[tuple[Any, str, float, int], ...],
+    *, label: str,
+) -> None:
+    """Require every old dimension, and no extra dimension, without position guards."""
+    if len(current) != len(imported):
+        raise RuntimeError(f"{label}: imported dimension inventory missing/extra entries")
+    matched = set()
+    for reference, captured_name, value, state in imported:
+        # SaveAs may update the native reference's title component. Match its
+        # live FullName and native identity, not the captured spelling alone.
+        live_name = reference.FullName
+        if not isinstance(live_name, str) or not live_name:
+            raise RuntimeError(f"{label}: imported dimension {captured_name!r} lost its FullName")
+        matches = [
+            index for index, native in enumerate(current)
+            if native.FullName == live_name
+            and int(adapter.swApp.IsSame(native, reference)) == 1
+            and int(adapter.swApp.IsSame(reference, native)) == 1
+        ]
+        if len(matches) != 1 or matches[0] in matched:
+            raise RuntimeError(f"{label}: expected one preserved imported dimension {captured_name!r}")
+        index = matches[0]
+        matched.add(index)
+        _native, _name, actual_value, actual_state = _neck_dimension_record(current[index], label=label)
+        if actual_value != value or actual_state != state:
+            raise RuntimeError(
+                f"{label}: imported dimension {captured_name!r} changed value/state "
+                f"from {(value, state)!r} to {(actual_value, actual_state)!r}"
+            )
 
 
 def _assert_plain_neck_size(
@@ -1036,358 +1143,9 @@ def _assert_neck_arrow_landing(display: Any, *, label: str) -> None:
     _telemetry.info(f"{label}: native diameter arrows={arrows}, neck={OUTBOARD_NECK_ARROW_WINDOW}")
 
 
-class _NeckMeasurementCensus:
-    """Temporary read-only failure census; never supplies production proof."""
-
-    PHASES = (
-        "immediate_factory_before_setters",
-        "after_setters_before_clear_rebuild",
-        "after_existing_rebuild_redraw_reacquire",
-    )
-
-    def __init__(
-        self, adapter: Any, drawing_model: Any, side: Any,
-        right: tuple[Any, Any, Any], rim: Any,
-    ) -> None:
-        # Retain existing handles only: construction performs no native reads.
-        self.adapter, self.drawing_model, self.side = adapter, drawing_model, side
-        self.right, self.rim = right, rim
-        self.snapshots = {
-            phase: {"phase": phase, "status": "not_reached"} for phase in self.PHASES
-        }
-
-    @staticmethod
-    def _typed(value: Any) -> dict[str, Any]:
-        kind = f"{type(value).__module__}.{type(value).__qualname__}"
-        if value is None or type(value) in (str, bool, int):
-            raw = value
-        elif type(value) is float:
-            raw = value if math.isfinite(value) else repr(value)
-        elif isinstance(value, (tuple, list)):
-            raw = [_NeckMeasurementCensus._typed(item) for item in value]
-        else:
-            # Do not stringify COM objects or mistake wrapper identity for
-            # native identity. All comparisons below use ISldWorks.IsSame.
-            raw = {"interface_object": True}
-        return {"python_type": kind, "raw": raw}
-
-    @classmethod
-    def _error(cls, exc: Exception) -> dict[str, Any]:
-        return {
-            "status": "error",
-            "exception_type": f"{type(exc).__module__}.{type(exc).__qualname__}",
-            "message": str(exc),
-            "args": cls._typed(exc.args),
-        }
-
-    @classmethod
-    def _read(cls, result: dict[str, Any], key: str, getter: Callable[[], Any]) -> Any:
-        try:
-            value = getter()
-            result[key] = {
-                "status": "null" if value is None else "ok", **cls._typed(value)
-            }
-            return value
-        except Exception as exc:
-            result[key] = cls._error(exc)
-            return None
-
-    @staticmethod
-    def _unsupported(message: str) -> Any:
-        raise TypeError(message)
-
-    def _same(self, left: Any, right: Any) -> Any:
-        if left is None or right is None:
-            raise ValueError("native IsSame comparison unavailable: null operand")
-        return self.adapter.swApp.IsSame(left, right)
-
-    def _both(self, result: dict[str, Any], key: str, left: Any, right: Any) -> None:
-        comparison: dict[str, Any] = {}
-        result[key] = comparison
-        self._read(comparison, "left_to_right", lambda: self._same(left, right))
-        self._read(comparison, "right_to_left", lambda: self._same(right, left))
-
-    def _body(self, result: dict[str, Any], body: Any) -> None:
-        self._read(result, "IBody2.GetType", lambda: _early_bound(body, "IBody2").GetType())
-        self._read(result, "IBody2.Name", lambda: _early_bound(body, "IBody2").Name)
-
-    def _geometry(
-        self, result: dict[str, Any], entity: Any, selection_type: Any, *, context: str
-    ) -> Any:
-        result["context"] = context
-        result["selection_type"] = self._typed(selection_type)
-        curve = body = None
-        # Dispatch only by the actual documented swSelectType_e entry. An
-        # imported model dimension is not required to attach like the new one.
-        interface = {1: "IEdge", 10: "ISketchSegment", 24: "ISketchSegment",
-                     46: "ISilhouetteEdge"}.get(selection_type)
-        if interface is not None:
-            curve = self._read(
-                result, f"{interface}.GetCurve",
-                lambda: _early_bound(entity, interface).GetCurve(),
-            )
-        else:
-            self._read(result, "GetCurve", lambda: self._unsupported(
-                f"no direct curve getter for actual attachment type {selection_type!r}"
-            ))
-        # Each curve getter is independent, including when IsCircle fails.
-        self._read(result, "ICurve.CircleParams",
-                   lambda: _early_bound(curve, "ICurve").CircleParams)
-        self._read(result, "ICurve.Identity",
-                   lambda: _early_bound(curve, "ICurve").Identity())
-        self._read(result, "ICurve.IsCircle",
-                   lambda: _early_bound(curve, "ICurve").IsCircle())
-        if selection_type in (1, 2):
-            body_interface = "IEdge" if selection_type == 1 else "IFace2"
-            body = self._read(
-                result, f"{body_interface}.GetBody",
-                lambda: _early_bound(entity, body_interface).GetBody(),
-            )
-        elif selection_type == 46:  # swSelSILHOUETTES
-            face = self._read(result, "ISilhouetteEdge.GetFace",
-                             lambda: _early_bound(entity, "ISilhouetteEdge").GetFace())
-            body = self._read(result, "IFace2.GetBody",
-                             lambda: _early_bound(face, "IFace2").GetBody())
-        else:
-            self._read(result, "GetBody", lambda: self._unsupported(
-                f"no documented GetBody on actual attachment type {selection_type!r}"
-            ))
-        body_result: dict[str, Any] = {}
-        result["owning_body"] = body_result
-        self._body(body_result, body)
-        if selection_type in (10, 24, 11, 25):
-            sketch_interface = (
-                "ISketchSegment" if selection_type in (10, 24) else "ISketchPoint"
-            )
-            sketch = self._read(
-                result, f"{sketch_interface}.GetSketch",
-                lambda: _early_bound(entity, sketch_interface).GetSketch(),
-            )
-            transform = self._read(
-                result, "ISketch.ModelToSketchTransform",
-                lambda: _early_bound(sketch, "ISketch").ModelToSketchTransform,
-            )
-            self._read(result, "model_to_sketch_raw",
-                       lambda: _early_bound(transform, "IMathTransform").ArrayData)
-            result["curve_coordinate_context"] = "native sketch space; not source-model space"
-        if selection_type in (2, 3):  # swSelFACES / swSelVERTICES
-            edge_interface = "IFace2" if selection_type == 2 else "IVertex"
-            edges = self._read(result, f"{edge_interface}.GetEdges",
-                               lambda: _early_bound(entity, edge_interface).GetEdges())
-            result["owning_edges"] = []
-            for edge in edges if isinstance(edges, (tuple, list)) else ():
-                edge_result: dict[str, Any] = {}
-                result["owning_edges"].append(edge_result)
-                self._geometry(edge_result, edge, 1, context=f"{context}: owning edge")
-        return body
-
-    def _document(self, result: dict[str, Any], document: Any) -> None:
-        for key in ("GetType", "GetPathName", "GetUnits"):
-            self._read(result, f"IModelDoc2.{key}",
-                       lambda key=key: getattr(_early_bound(document, "IModelDoc2"), key)())
-        manager = self._read(
-            result, "IModelDoc2.ConfigurationManager",
-            lambda: _early_bound(document, "IModelDoc2").ConfigurationManager,
-        )
-        configuration = self._read(
-            result, "IConfigurationManager.ActiveConfiguration",
-            lambda: _early_bound(manager, "IConfigurationManager").ActiveConfiguration,
-        )
-        self._read(result, "IConfiguration.Name",
-                   lambda: _early_bound(configuration, "IConfiguration").Name)
-
-    def _dimension(
-        self, result: dict[str, Any], display: Any, native: Any, annotation: Any,
-        configuration: Any, extension: Any, rim_body: Any,
-    ) -> None:
-        for key in ("FullName", "DrivenState"):
-            self._read(result, f"IDimension.{key}",
-                       lambda key=key: getattr(_early_bound(native, "IDimension"), key))
-        self._read(result, "IDimension.GetType",
-                   lambda: _early_bound(native, "IDimension").GetType())
-        # swThisConfiguration=1 ignores Config_names; swSpecifyConfiguration=3
-        # accepts a single BSTR in OLE. Retain both raw results/errors, in SI.
-        result["GetSystemValue3_this_args"] = self._typed((1, None))
-        self._read(result, "GetSystemValue3_this",
-                   lambda: _early_bound(native, "IDimension").GetSystemValue3(1, None))
-        result["GetSystemValue3_view_args"] = self._typed((3, configuration))
-        def view_value() -> Any:
-            if not isinstance(configuration, str) or not configuration:
-                raise ValueError("explicit view configuration BSTR unavailable")
-            return _early_bound(native, "IDimension").GetSystemValue3(3, configuration)
-        self._read(result, "GetSystemValue3_view", view_value)
-        for key in ("Type2", "Scale2", "Diametric", "DisplayAsLinear"):
-            self._read(result, f"IDisplayDimension.{key}",
-                       lambda key=key: getattr(_early_bound(display, "IDisplayDimension"), key))
-        if annotation is None:
-            annotation = self._read(
-                result, "IDisplayDimension.GetAnnotation",
-                lambda: _early_bound(display, "IDisplayDimension").GetAnnotation(),
-            )
-        else:
-            result["reacquired_annotation"] = self._typed(annotation)
-        owner = self._read(result, "IAnnotation.Owner",
-                           lambda: _early_bound(annotation, "IAnnotation").Owner)
-        self._read(result, "IAnnotation.OwnerType",
-                   lambda: _early_bound(annotation, "IAnnotation").OwnerType)
-        self._both(result, "owner_vs_intended_FRONT", owner, self.side)
-        self._read(result, "IAnnotation.GetAttachedEntityCount3",
-                   lambda: _early_bound(annotation, "IAnnotation").GetAttachedEntityCount3())
-        types = self._read(result, "IAnnotation.GetAttachedEntityTypes",
-                           lambda: _early_bound(annotation, "IAnnotation").GetAttachedEntityTypes())
-        entities = self._read(result, "IAnnotation.GetAttachedEntities3",
-                              lambda: _early_bound(annotation, "IAnnotation").GetAttachedEntities3())
-        self._read(result, "IAnnotation.IsDangling",
-                   lambda: _early_bound(annotation, "IAnnotation").IsDangling())
-        result["attachments"] = []
-        for index, entity in enumerate(entities if isinstance(entities, (tuple, list)) else ()):
-            attached: dict[str, Any] = {"index": index, "entity": self._typed(entity)}
-            result["attachments"].append(attached)
-            kind = types[index] if isinstance(types, (tuple, list)) and index < len(types) else None
-            geometry: dict[str, Any] = {}
-            attached["actual_geometry"] = geometry
-            self._read(attached, "geometry_capture",
-                       lambda: self._geometry(geometry, entity, kind,
-                                              context="actual annotation attachment context"))
-            # Only the source inverse is compared to the source-model rim.
-            # No source edge == drawing-view edge assumption is made.
-            def source_inverse() -> Any:
-                if kind not in (1, 2, 3):
-                    raise TypeError(
-                        f"source inverse supports vertex/face/edge, not attachment type {kind!r}"
-                    )
-                if entity is None:
-                    raise ValueError("source inverse unavailable: actual attachment is null")
-                return _early_bound(extension, "IModelDocExtension").GetCorrespondingEntity2(entity)
-            canonical = self._read(
-                attached, "source_inverse_GetCorrespondingEntity2",
-                source_inverse,
-            )
-            attached["inverse_documented_domain"] = (
-                "vertex/face/edge" if kind in (1, 2, 3)
-                else "outside documented vertex/face/edge domain; explicit unsupported error"
-            )
-            self._both(attached, "canonical_vs_physical_rim_SOURCE_CONTEXT", canonical, self.rim)
-            canonical_geometry: dict[str, Any] = {}
-            attached["canonical_source_geometry"] = canonical_geometry
-            canonical_body = self._read(
-                attached, "canonical_geometry_capture",
-                lambda: self._geometry(canonical_geometry, canonical, kind,
-                                       context="source inverse result; source-model context"),
-            )
-            self._both(attached, "canonical_body_vs_physical_rim_body_SOURCE_CONTEXT",
-                       canonical_body, rim_body)
-        data = self._read(result, "IDisplayDimension.GetDisplayData",
-                          lambda: _early_bound(display, "IDisplayDimension").GetDisplayData())
-        count = self._read(result, "IDisplayData.GetTextCount",
-                           lambda: _early_bound(data, "IDisplayData").GetTextCount())
-        result["expanded_native_text"] = []
-        for index in range(count if type(count) is int and count >= 0 else 0):
-            text: dict[str, Any] = {"index": index}
-            result["expanded_native_text"].append(text)
-            self._read(text, "IDisplayData.GetTextAtIndex",
-                       lambda index=index: _early_bound(data, "IDisplayData").GetTextAtIndex(index))
-
-    def capture(self, phase: str, display: Any, annotation: Any = None) -> None:
-        snapshot: dict[str, Any] = {"phase": phase, "status": "capturing"}
-        self.snapshots[phase] = snapshot
-        try:
-            new: dict[str, Any] = {}
-            snapshot["new_reference_dimension"] = new
-            # FIRST native operations after the factory's status guard:
-            # GetDimension2(0), bind IDimension, raw SystemValue. In particular
-            # no owner, view, geometry, right-control or display-data reads.
-            native = self._read(
-                new, "IDisplayDimension.GetDimension2",
-                lambda: _early_bound(display, "IDisplayDimension").GetDimension2(0),
-            )
-            self._read(new, "IDimension.SystemValue",
-                       lambda: _early_bound(native, "IDimension").SystemValue)
-            right_annotation, right_display, right_identity = self.right
-            right: dict[str, Any] = {}
-            snapshot["right_imported_model_dimension"] = right
-            right_native = self._read(
-                right, "IDisplayDimension.GetDimension2",
-                lambda: _early_bound(right_display, "IDisplayDimension").GetDimension2(0),
-            )
-            self._read(right, "IDimension.SystemValue",
-                       lambda: _early_bound(right_native, "IDimension").SystemValue)
-            self._both(right, "native_vs_original_right_identity", right_native, right_identity)
-            self._both(new, "native_self_control", native, native)
-            self._both(right, "native_self_control", right_native, right_native)
-            self._both(snapshot, "new_vs_original_right_IDimension", native, right_identity)
-            self._both(snapshot, "new_vs_reacquired_right_IDimension", native, right_native)
-            physical: dict[str, Any] = {}
-            snapshot["independent_physical_rim"] = physical
-            rim_body = self._read(
-                physical, "geometry_capture",
-                lambda: self._geometry(physical, self.rim, 1,
-                                       context="independent physical source-model rim; raw SI"),
-            )
-            view: dict[str, Any] = {}
-            snapshot["view"] = view
-            for key in ("Type", "ScaleRatio", "ScaleDecimal", "UseSheetScale",
-                        "ProjectedDimensions", "ReferencedConfiguration"):
-                self._read(view, f"IView.{key}",
-                           lambda key=key: getattr(_early_bound(self.side, "IView"), key))
-            configuration = self._read(view, "IView.ReferencedConfiguration_for_value",
-                                       lambda: _early_bound(self.side, "IView").ReferencedConfiguration)
-            self._read(view, "IView.GetName2",
-                       lambda: _early_bound(self.side, "IView").GetName2())
-            transform = self._read(view, "IView.ModelToViewTransform",
-                                   lambda: _early_bound(self.side, "IView").ModelToViewTransform)
-            self._read(view, "IMathTransform.ArrayData",
-                       lambda: _early_bound(transform, "IMathTransform").ArrayData)
-            source = self._read(view, "IView.ReferencedDocument",
-                                lambda: _early_bound(self.side, "IView").ReferencedDocument)
-            extension = self._read(view, "source_IModelDoc2.Extension",
-                                   lambda: _early_bound(source, "IModelDoc2").Extension)
-            active = self._read(snapshot, "ISldWorks.ActiveDoc",
-                                lambda: self.adapter.swApp.ActiveDoc)
-            for key, document in (("source_document", source),
-                                  ("drawing_document", self.drawing_model),
-                                  ("active_document", active)):
-                context: dict[str, Any] = {}
-                snapshot[key] = context
-                self._read(context, "document_capture",
-                           lambda context=context, document=document: self._document(context, document))
-            snapshot["display_data_freshness"] = (
-                "read after existing rebuild/redraw; no additional refresh"
-                if phase == self.PHASES[2]
-                else "pre-existing native display buffer; may be stale; no diagnostic refresh"
-            )
-            for result, dd, dim, ann in (
-                (new, display, native, annotation),
-                (right, right_display, right_native, right_annotation),
-            ):
-                self._read(result, "dimension_capture",
-                           lambda result=result, dd=dd, dim=dim, ann=ann: self._dimension(
-                               result, dd, dim, ann, configuration, extension, rim_body
-                           ))
-            snapshot["status"] = "captured_with_individual_results"
-        except Exception as exc:
-            snapshot["capture_error"] = self._error(exc)
-            snapshot["status"] = "capture_error_did_not_interrupt_production"
-
-    def emit(self) -> None:
-        try:
-            print(
-                "NECK_MEASUREMENT_CENSUS_JSON=" + json.dumps(
-                    {"units": "raw native SI; no normalization",
-                     "snapshots": [self.snapshots[phase] for phase in self.PHASES]},
-                    separators=(",", ":"), ensure_ascii=True, allow_nan=False,
-                ),
-                flush=True,
-            )
-        except Exception:
-            # A logging/serialization failure must never replace the original
-            # production exception or authorize any continuation.
-            pass
-
-
 def _assert_outboard_neck_dimension(
-    adapter: Any, side: Any, identity: Any, right_driven_state: int, *, phase: str,
-    measurement_census: _NeckMeasurementCensus | None = None,
+    adapter: Any, side: Any, identity: Any, right_driven_state: int,
+    imported: tuple[tuple[Any, str, float, int], ...], *, phase: str,
 ) -> None:
     """Re-read the view's native dimension and physical attachment, without writes.
 
@@ -1396,6 +1154,7 @@ def _assert_outboard_neck_dimension(
     its native measured value establish the dimension's correspondence.
     """
     label = f"collar-side neck ({phase})"
+    _assert_neck_measurement_domain(side, label=label)
     reference = _early_bound(identity, "IDimension")
     # Read the live FullName from the captured native object: SaveAs may
     # update its model/title component. A stale selection-name string is
@@ -1409,16 +1168,21 @@ def _assert_outboard_neck_dimension(
     _early_bound(adapter.currentModel, "IModelDoc2").GraphicsRedraw2()
     matches: list[tuple[Any, Any]] = []
     inboard: list[Any] = []
+    current_imported: list[Any] = []
     for annotation, display, native in _native_neck_view_dimensions(side, label=label):
         if dimension_name(adapter, annotation) == "NeckDiaDim":
             inboard.append(display)
-        if native.FullName == full_name and int(adapter.swApp.IsSame(native, reference)) == 1:
+        if (
+            native.FullName == full_name
+            and int(adapter.swApp.IsSame(native, reference)) == 1
+            and int(adapter.swApp.IsSame(reference, native)) == 1
+        ):
             matches.append((annotation, display))
+        else:
+            current_imported.append(native)
     if len(matches) != 1:
         raise RuntimeError(f"{label}: expected one native view dimension {full_name!r}")
     annotation, display = matches[0]
-    if measurement_census is not None:
-        measurement_census.capture(measurement_census.PHASES[2], display, annotation)
     owner = annotation.Owner
     if (
         int(annotation.OwnerType) != 0  # swAnnotationOwner_DrawingView
@@ -1434,6 +1198,7 @@ def _assert_outboard_neck_dimension(
         inboard[0], label=f"right-hand NeckDiaDim ({phase})",
         expected_driven_state=right_driven_state,
     )
+    _assert_imported_neck_inventory(adapter, current_imported, imported, label=label)
     rim = _outboard_neck_rim(adapter, side)
     attached = tuple(annotation.GetAttachedEntities3() or ())
     count = int(annotation.GetAttachedEntityCount3())
@@ -1459,7 +1224,7 @@ def _assert_outboard_neck_dimension(
 
 def _add_outboard_neck_dimension(
     adapter: Any, drawing_model: Any, side: Any
-) -> tuple[Any, int]:
+) -> tuple[Any, int, tuple[tuple[Any, str, float, int], ...]]:
     """Add only a native driven measurement; never write a diameter value."""
     label = "collar-side neck"
     original = [
@@ -1499,8 +1264,9 @@ def _add_outboard_neck_dimension(
         adapter, side, selected, rim, label=f"{label} selection"
     )
     extension = _early_bound(drawing_model.Extension, "IModelDocExtension")
-    measurement_census = _NeckMeasurementCensus(
-        adapter, drawing_model, side, original[0], rim
+    imported = tuple(
+        _neck_dimension_record(native, label=label)
+        for _annotation, _display, native in _native_neck_view_dimensions(side, label=label)
     )
     display, status = extension.AddSpecificDimension(
         *OUTBOARD_NECK_DIAMETER_XY, 0.0, 6, 0  # swDiameterDimension; out status
@@ -1510,38 +1276,50 @@ def _add_outboard_neck_dimension(
             f"{label}: physical edge-on circle rejected native diameter (status={status!r}); "
             "no note or doubled-linear fallback is permitted"
         )
-    try:
-        measurement_census.capture(measurement_census.PHASES[0], display)
-        display = _early_bound(display, "IDisplayDimension")
-        native = display.GetDimension2(0)
-        if native is None:
-            raise RuntimeError(f"{label}: new display has no native IDimension")
-        dimension = _early_bound(native, "IDimension")
-        dimension.DrivenState = 1  # swDimensionDriven; only the new drawing dimension
-        status = display.SetPrecision3(
-            DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
-        )
-        if type(status) is not int or status != 0:
-            raise RuntimeError(f"{label}: native precision assignment failed ({status!r})")
-        # Driven is not a presentation setting: retain a plain, general-band
-        # callout like the existing NeckDiaDim, not a parenthesized reference.
-        display.ShowParenthesis = False
-        measurement_census.capture(measurement_census.PHASES[1], display)
-        if not isinstance(dimension.FullName, str) or not dimension.FullName:
-            raise RuntimeError(f"{label}: new native dimension has no FullName")
-        drawing_model.ClearSelection2(True)
-        rebuild_drawing(adapter, label=label)
-        _assert_outboard_neck_dimension(
-            adapter, side, dimension, right_driven_state, phase="after insertion rebuild",
-            measurement_census=measurement_census,
-        )
-        return dimension, right_driven_state
-    finally:
-        measurement_census.emit()
+    display = _early_bound(display, "IDisplayDimension")
+    native = display.GetDimension2(0)
+    if native is None:
+        raise RuntimeError(f"{label}: new display has no native IDimension")
+    dimension = _early_bound(native, "IDimension")
+    value = dimension.SystemValue  # FIRST native value read, before any new-dimension writes
+    actual_type = display.Type2
+    mode = _early_bound(side, "IView").ProjectedDimensions
+    _telemetry.info(
+        f"{label}: factory type={actual_type!r}, status={status!r}, "
+        f"SystemValue={value!r}, ProjectedDimensions={mode!r}"
+    )
+    if (
+        type(value) not in (int, float)
+        or not math.isfinite(value)
+        or abs(value * 1000.0 - SHAFT_DIA) > 1e-5
+    ):
+        raise RuntimeError(f"{label}: immediate native value {value!r} m, expected {SHAFT_DIA} mm")
+    if type(actual_type) is not int or actual_type != 6:
+        raise RuntimeError(f"{label}: factory native display is not a diameter")
+    if mode is not False:
+        raise RuntimeError(f"{label}: factory ProjectedDimensions must remain False")
+    dimension.DrivenState = 1  # swDimensionDriven; only the new drawing dimension
+    status = display.SetPrecision3(
+        DRAWING_REFERENCE_PRECISION["OutboardNeckDia"], -1, -1, -1
+    )
+    if type(status) is not int or status != 0:
+        raise RuntimeError(f"{label}: native precision assignment failed ({status!r})")
+    # Driven is not a presentation setting: retain a plain, general-band
+    # callout like the existing NeckDiaDim, not a parenthesized reference.
+    display.ShowParenthesis = False
+    if not isinstance(dimension.FullName, str) or not dimension.FullName:
+        raise RuntimeError(f"{label}: new native dimension has no FullName")
+    drawing_model.ClearSelection2(True)
+    rebuild_drawing(adapter, label=label)
+    _assert_outboard_neck_dimension(
+        adapter, side, dimension, right_driven_state, imported, phase="after insertion rebuild",
+    )
+    return dimension, right_driven_state, imported
 
 
 def _outboard_neck_checkpoint(
-    adapter: Any, side: Any, identity: Any, right_driven_state: int, phase: str
+    adapter: Any, side: Any, identity: Any, right_driven_state: int,
+    imported: tuple[tuple[Any, str, float, int], ...], phase: str,
 ) -> None:
     """Use the finalizer's existing save boundaries; never reopen the drawing."""
     if phase in (
@@ -1549,7 +1327,7 @@ def _outboard_neck_checkpoint(
         "after_pdf_save",
     ):
         _assert_outboard_neck_dimension(
-            adapter, side, identity, right_driven_state, phase=phase
+            adapter, side, identity, right_driven_state, imported, phase=phase
         )
 
 
@@ -1747,10 +1525,12 @@ async def build(adapter: Any) -> dict[str, str]:
     end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=VIEW_SCALE)
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
     native_side = _early_bound(side, "IView")
+    _initialize_neck_true_measurements(native_side)
     native_side.Angle = SIDE_VIEW_ANGLE
     if abs(math.remainder(float(native_side.Angle) - SIDE_VIEW_ANGLE, 2.0 * math.pi)) > 1e-9:
         raise RuntimeError("failed to lay the crankshaft profile horizontal")
     drawing_model.EditRebuild3()
+    _assert_neck_measurement_domain(native_side, label="crankshaft SIDE after angle rebuild")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (end, side, iso):
         set_hidden_lines_removed(adapter, view)
@@ -1805,9 +1585,9 @@ async def build(adapter: Any) -> dict[str, str]:
             continue
         set_reference_dimension(adapter, matches[0], label=f"crankshaft {name}")
 
-    outboard_neck_dimension, right_neck_driven_state = _add_outboard_neck_dimension(
-        adapter, drawing_model, side
-    )
+    (
+        outboard_neck_dimension, right_neck_driven_state, imported_side_dimensions,
+    ) = _add_outboard_neck_dimension(adapter, drawing_model, side)
 
     # SolidWorks classifies a solid circular end silhouette under the same
     # AutoInsertCenterMarks2 "hole" bit as a bored circle; the end view gets the
@@ -1947,11 +1727,12 @@ async def build(adapter: Any) -> dict[str, str]:
         settled_checks=(
             lambda: _assert_outboard_neck_dimension(
                 adapter, side, outboard_neck_dimension, right_neck_driven_state,
-                phase="final settling rebuild",
+                imported_side_dimensions, phase="final settling rebuild",
             ),
         ),
         checkpoint=lambda phase: _outboard_neck_checkpoint(
-            adapter, side, outboard_neck_dimension, right_neck_driven_state, phase
+            adapter, side, outboard_neck_dimension, right_neck_driven_state,
+            imported_side_dimensions, phase
         ),
     )
 

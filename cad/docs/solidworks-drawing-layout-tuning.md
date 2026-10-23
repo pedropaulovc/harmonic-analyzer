@@ -1672,9 +1672,9 @@ witness, shaft geometry, tolerances or the declared RV-02 rim shortfall.
 
 The right-hand imported `NeckDiaDim` no longer carries `2X`: its native
 callout-above text is explicitly cleared and read back. Its value, precision,
-band and placement are not rewritten. The collar-side neck, between the
-collar's rear face and the left journal, gets a separate native drawing
-diameter measured from the actual core circle at `(0, JOURNAL_START, 0)`,
+band and placement are not rewritten. The bounded candidate adds a separate
+native drawing diameter to the collar-side neck, between the collar's rear
+face and the left journal, measured from the actual core circle at `(0, JOURNAL_START, 0)`,
 radius `SHAFT_DIA / 2`. Resolve exactly one physical model `IEdge` from
 FRONT's referenced part's solid/sheet bodies, including hidden bodies, using
 the unchanged `ICurve.IsCircle` and `CircleParams` predicates. Membership in
@@ -1704,14 +1704,44 @@ target/control cross-identity is 0 and every non-null self-identity is 1.
 The offline fixture retains that matrix. This falsifies a universal forward
 roundtrip requirement, not the required non-null reverse map or explicit
 FRONT owner. It does not establish native diameter creation: that invocation
-refused before API 6 and produced no saved PDF. No temporary census remains
-in the production recipe.
+refused before API 6 and produced no saved PDF. The later three-checkpoint
+measurement receipt at
+`D:/farm-runs/rolling-main-post-v44-20261021/crankshaft-neck-leader-proof/measurement-census-383868ad-raw-copy-0.json`
+and `383-measurement-census-assessment.md` records the wrong value at creation:
+new native `SystemValue=0.01905` m before setters, unchanged after setters and
+the existing rebuild, with actual text `19.1`. The correct physical rim and
+FRONT owner remained attached; the original right-hand value stayed
+`0.009525` m. That view reported `ProjectedDimensions=True` at native scale
+2:1. These observations motivate a true-measurement-domain candidate, not a
+proved root fix. The temporary collector and its JSON/scaffolding are removed;
+the out-of-tree evidence is retained.
+
+Immediately after binding the freshly placed SIDE `IView`, **before** its
+`Angle` setter, the existing rebuild or either model-dimension import, require
+actual integer `GetDimensionCount4() == 0` and a strict counted annotation
+inventory. `GetAnnotationCount` must be a nonnegative native I4;
+`GetAnnotations=None` is valid only with count zero, otherwise require an
+actual tuple/list of exactly the reported length, with no null annotation
+and an actual native I4 from each `IAnnotation.GetType`. There must be zero
+type-4 dimensions; automatic non-dimension marks need not be absent or removed.
+Only then set `IView.ProjectedDimensions=False`, whose SDK meaning is **true**
+measurements. Changing this property deletes existing dimensions: a populated
+template, missing getter or malformed inventory must refuse before the setter,
+never assume empty. Require strict `is False` readback immediately and after
+the existing angle rebuild; add no control rebuild. Never set the property
+on the populated view. Each of the four diameter proofs also requires strict
+false mode and the unchanged native `ScaleRatio=(2, 1)` / `ScaleDecimal=2`;
+the sheet/view scales and labels are not a measurement-value workaround.
 
 `IModelDocExtension.AddSpecificDimension(..., 6, status)` requests
 `swDiameterDimension`; type 15 is a doubled linear distance, not a substitute.
-Require a non-null native display and clean status 0. Only the new
-`IDimension.DrivenState` is set to 1, and only its display precision is
-assigned: `DRAWING_REFERENCE_PRECISION["OutboardNeckDia"]` is a source-owned
+Require a non-null native display and clean status 0. The first
+`GetDimension2(0)` / `IDimension.SystemValue` read must already measure
+9.525 mm, **before** any driven-state or presentation write. Log the actual
+factory type/status/value/mode concisely; do not divide a doubled value or
+try presentation setters to repair it. Only the new `IDimension.DrivenState`
+is set to 1, and only its display precision is assigned:
+`DRAWING_REFERENCE_PRECISION["OutboardNeckDia"]` is a source-owned
 places statement defined from `NECK_DIA_PLACES`, not an alias for a size.
 There is no authored model dimension to import for this physical left-hand
 edge measurement. The derived display remains unparenthesized, without
@@ -1727,9 +1757,17 @@ type, actual unrounded size, driven state, places, read-only
 `IAnnotation.Owner == FRONT` with native identity in both directions.
 Require exactly one non-null EDGE attachment, not dangling, and the same
 required reverse canonical-to-physical-rim identity in both directions.
-Capture the original right-hand driven state and require it
-unchanged (do not assume an imported reference sketch dimension is driving).
-Read back its value/places/band and empty quantity at the same boundaries.
+Immediately before the native factory, retain the **full** imported SIDE
+inventory as native `IDimension` references plus `FullName`, finite native
+numeric `SystemValue` and native I4 `DrivenState`. Zero scalar values and
+state 0 are valid records, not missing evidence; the original right-hand
+neck retains its separate existing state-1/2 guard. At all four proofs exclude
+only the new dimension by live `FullName` and actual native identity in both
+directions, then require every old dimension exactly once, no extras, and
+exactly unchanged values/states. Match captured native references by their
+live names across SaveAs, not stale drawing-title strings. No old position
+guard is introduced: settling moves are expected. Continue reading the
+right-hand neck's value/places/band and empty quantity at those boundaries.
 `GetLeaderCount` is diagnostic, not a note's one-leader contract. Callbacks
 perform no extra opens, no redundant before-save rescans and no close check
 that could prevent `CloseDoc`.
@@ -1750,14 +1788,17 @@ projected arrow direction and reject journal-side positive-X approach
 points from the tip back toward the shaft/base (125/125 unambiguous arrows
 on six PDFs). Vertical or left-side approach and native two-arrow diameter
 bracketing are allowed; no note leader or one-arrow assumption is introduced.
-No existing diameter is moved. Native positive
-control is still required: the SDK documents diameter creation in drawings
-but does not guarantee a circle projected edge-on will be accepted. Refuse a
-type mismatch, missing/ambiguous rim, detached dimension or altered band;
-do not replace failure with a literal, unassociated leader or free graphics.
-Inspect the complete exported sheet for both neck landings and clearance
-from the collar, running fit and finish leaders. Preserve centre permission,
-the dome/witness, geometry, tolerance limits and RV-02 unchanged.
+No existing diameter is moved. Native qualification of this initialization
+candidate is still pending: the SDK documents true measurements and diameter
+creation but does not guarantee that this edge-on circle will produce the
+correct native result. Refuse a wrong immediate value, type mismatch,
+missing/ambiguous rim, detached dimension or altered band; do not replace
+failure with a literal, type-15 dimension, unassociated leader or free graphics.
+Acceptance still requires exact-source native success, unchanged drawing
+scales/labels, inspection of the **whole** exported PDF for both neck landings
+and clearance from the collar, running fit and finish leaders, and machinist
+review. Preserve centre permission, the dome/witness, geometry, tolerance
+limits and RV-02 unchanged.
 
 ## Synchronous builds and session hygiene
 
