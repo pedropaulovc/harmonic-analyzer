@@ -10,6 +10,8 @@ read-back behavior and late native mutation.
 from __future__ import annotations
 
 import copy
+import gc
+import weakref
 from math import cos, isfinite, pi, sin
 from types import SimpleNamespace
 
@@ -1258,6 +1260,191 @@ def test_shelve_requires_every_axis_name_in_reacquire(native_reads):
         core.shelve_reference_text(
             None, reacquire=lambda: dict(displays), axes=axes, label=_LABEL
         )
+
+
+# --------------------------------------------------------------------------
+# same-checkpoint raw records for the caller's read-only layout audit
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def native_record_checkpoints(native_reads, monkeypatch):
+    found, axes = _fleet()
+    case = SimpleNamespace(
+        found=found,
+        axes={name: axes[name] for name in ("SupplierLength", "SupplierHeadHeight", "RD1")},
+        generation=0,
+        source_valid=True,
+        dumps=[],
+        audits=[],
+        layout_error=RuntimeError("long supplier reference text crosses native line"),
+    )
+    dump = core._dump_annotation
+
+    def reacquire():
+        if not case.source_valid:
+            raise RuntimeError("supplier source identity changed")
+        case.generation += 1
+        fresh = {}
+        for name, display in case.found.items():
+            replacement = copy.copy(display)
+            replacement.record = copy.deepcopy(display.record)
+            fresh[name] = replacement
+        case.found.clear()
+        case.found.update(fresh)
+        return dict(fresh)
+
+    def native_dump(reader, annotation):
+        assert annotation is case.found[annotation.name]
+        record = dump(reader, annotation)
+        case.dumps.append((case.generation, record["name"], record))
+        return record
+
+    def primitive(value):
+        if isinstance(value, dict):
+            assert all(isinstance(key, str) for key in value)
+            for child in value.values():
+                primitive(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                primitive(child)
+        else:
+            assert type(value) in (str, int, float, bool, type(None))
+
+    def audit_records(records):
+        current = [
+            (name, record) for generation, name, record in case.dumps
+            if generation == case.generation
+        ]
+        assert len(current) == len(case.axes)
+        assert set(records) == set(case.axes)
+        for name, record in current:
+            assert records[name] is record  # No second read or expensive raw copy.
+        primitive(records)
+        case.audits.append((case.generation, records))
+
+        # A real caller-only layout constraint: the long row is not shelved,
+        # so its unchanged stations alone cannot prove its text clear.
+        record = records["SupplierLength"]
+        ink = annotation_geometry(
+            record, owner="SupplierLength", advance=calibrate_sheet_advance((record,))
+        )
+        assert ink is not None
+        text = _text_box(record)
+        if any(
+            segment.role == "dim-line" and segment_box_distance(segment, text) == 0.0
+            for segment in ink.segments
+        ):
+            raise case.layout_error
+
+    monkeypatch.setattr(core, "_dump_annotation", native_dump)
+    case.reacquire = reacquire
+    case.audit_records = audit_records
+    return case
+
+
+def test_record_audit_reuses_fresh_checkpoint_and_releases_old_native_handles(
+    native_record_checkpoints,
+):
+    case = native_record_checkpoints
+    proof = core.shelve_reference_text(
+        None, reacquire=case.reacquire, axes=case.axes, label=_LABEL,
+        audit_records=case.audit_records,
+    )
+    assert len(case.audits) == 1
+    # Existing four batched inventories: full measurement, anchor read-back,
+    # enabled-mode measurement, and final proof. The audit adds none.
+    assert case.generation == 4
+    assert len(case.dumps) == 2 * len(case.axes) + 2
+    initial_generation, initial_records = case.audits[0]
+    initial_text_count = len(initial_records["RD1"]["display"]["texts"])
+    previous_handles = [weakref.ref(display) for display in case.found.values()]
+
+    texts = case.found["RD1"].record["display"]["texts"]
+    far = max(row["pos"][0] + row["w"] for row in texts)
+    texts.append(_nut_text("later", (far + 0.001, texts[0]["pos"][1], 0.0), 0.004))
+    dumps_before = len(case.dumps)
+    assert proof() is None
+    generation, records = case.audits[-1]
+    assert len(case.audits) == 2
+    assert generation == initial_generation + 1
+    assert len(case.dumps) - dumps_before == len(case.axes)
+    assert records is not initial_records
+    assert all(records[name] is not initial_records[name] for name in case.axes)
+    assert len(records["RD1"]["display"]["texts"]) == initial_text_count + 1
+    assert len(initial_records["RD1"]["display"]["texts"]) == initial_text_count
+    gc.collect()
+    assert all(handle() is None for handle in previous_handles)
+
+
+@pytest.mark.parametrize("phase", ("initial", "later"))
+def test_record_audit_propagates_native_layout_failure(native_record_checkpoints, phase):
+    case = native_record_checkpoints
+    if phase == "later":
+        proof = core.shelve_reference_text(
+            None, reacquire=case.reacquire, axes=case.axes, label=_LABEL,
+            audit_records=case.audit_records,
+        )
+    row = case.found["SupplierLength"].record["display"]["texts"][0]
+    row["pos"] = (row["pos"][0], 0.2255, row["pos"][2])
+    with pytest.raises(RuntimeError, match="text crosses native line") as error:
+        if phase == "initial":
+            core.shelve_reference_text(
+                None, reacquire=case.reacquire, axes=case.axes, label=_LABEL,
+                audit_records=case.audit_records,
+            )
+        else:
+            proof()
+    assert error.value is case.layout_error
+    assert len(case.audits) == (1 if phase == "initial" else 2)
+
+
+@pytest.mark.parametrize(
+    ("defect", "message"),
+    (
+        ("source", "source identity"),
+        ("inventory", "inventory changed"),
+        ("station", "native tips moved"),
+        ("gap", "native witnesses moved"),
+        ("shelf", "crowds its native line"),
+        ("offset", "crowds its native line"),
+        ("transverse", "transverse position moved"),
+        ("fragment", "native reference position"),
+    ),
+)
+def test_record_audit_waits_for_every_strict_native_guard(
+    native_record_checkpoints, defect, message
+):
+    case = native_record_checkpoints
+    proof = core.shelve_reference_text(
+        None, reacquire=case.reacquire, axes=case.axes, label=_LABEL,
+        audit_records=case.audit_records,
+    )
+    assert len(case.audits) == 1
+    display = case.found["RD1"]
+    if defect == "source":
+        case.source_valid = False
+    elif defect == "inventory":
+        del case.found["SupplierLength"]
+    elif defect == "station":
+        display.shift_stations(0, 0.0001)
+    elif defect == "gap":
+        lines = display.record["display"]["lines"]
+        lines[1:2] = _witness_pieces(lines[1], 0, ((0.0, 0.3), (0.6, 1.0)))
+    elif defect == "shelf":
+        display.move_text(-0.1, 0.0)
+    elif defect == "offset":
+        display._offset = False
+    elif defect == "transverse":
+        display.move_text(0.0, 0.0001)
+        x, y, z = display.position
+        display.position = (x, y + 0.0001, z)
+        display.record["pos"] = display.position
+    else:
+        display.record["display"]["texts"][1]["ref"] = 6
+    with pytest.raises(RuntimeError, match=message):
+        proof()
+    assert len(case.audits) == 1
 
 
 # --------------------------------------------------------------------------

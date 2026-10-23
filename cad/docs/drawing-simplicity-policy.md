@@ -80,6 +80,17 @@ cannot ask for what the authors were told to leave out.
   proof is not exact glyph or foreign-line clearance proof: retain every line,
   including fraction bars, and inspect the actual PDF ink, whole sheet and
   automated machinist result after regeneration.
+  A consumer's read-only native path audit can use `audit_records`: after all
+  strict station and shelf checks, the core passes that checkpoint's same
+  freshly measured record mapping once, without a second annotation dump.
+  The audit must not mutate native state or records; failures propagate.
+  Initial and later proofs each collect their own records, never a cached
+  snapshot from before a rebuild or save.
+  Separately opted-in purchased recipes align projected model origins before
+  supplier annotation capture: only Top X and Right Y move. Each native view's
+  independent scale and refreshed cell containment must survive unchanged;
+  the operation does not refit views. Other recipes retain the default-off
+  alignment behavior.
   The purchased-sheet hook reserves annotation lanes before fitting and runs
   source/configuration, native attachment/value/inventory and cell/ink checks
   after the final rebuild. The rendered supplier comparison remains necessary;

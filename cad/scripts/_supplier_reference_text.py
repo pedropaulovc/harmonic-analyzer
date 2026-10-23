@@ -242,6 +242,7 @@ def shelve_reference_text(
     axes: Mapping[str, int],
     label: str,
     force: Collection[str] = (),
+    audit_records: Callable[[Mapping[str, Mapping[str, Any]]], None] | None = None,
 ) -> Callable[[], None]:
     """Shelve short references in the +axis direction; return a read-only proof.
 
@@ -253,7 +254,11 @@ def shelve_reference_text(
     The sequence retains the proven shared-clamp measurement rebuild and three
     batched transition rebuilds. The returned proof performs no writes or
     rebuilds; its original measured stations stay private to the closure.
-    Callers separately retain complete native/PDF layout collision enforcement.
+    ``audit_records``, if supplied, receives the same freshly measured raw
+    records once every row passes the settled proof, initially and on each
+    later invocation. It must be read-only: no native or record mutation.
+    Records are local to that checkpoint, never copied or cached by this core.
+    Callers retain complete native/PDF layout collision enforcement.
     """
     axes = dict(axes)
     if not axes or any(
@@ -337,12 +342,14 @@ def shelve_reference_text(
 
     def settled() -> None:
         found = current_displays()
+        records = {}
         for name, original in stations.items():
             display = _early_bound(found[name], "IDisplayDimension")
             actual = measure_reference_text(
                 adapter, display, axis=axes[name], label=f"{label} {name}"
             )
             assert_reference_text_stations(original, actual, label=f"{label} {name}")
+            records[name] = actual["record"]
             if name not in positions:
                 continue
             axis = axes[name]
@@ -354,6 +361,8 @@ def shelve_reference_text(
             position = _position(annotation, label=f"{label} {name}")
             if abs(position[1 - axis] - positions[name][1 - axis]) > _POSITION_TOLERANCE_M:
                 raise RuntimeError(f"{label} {name}: supplier reference transverse position moved")
+        if audit_records is not None:
+            audit_records(records)
 
     settled()
     return settled
