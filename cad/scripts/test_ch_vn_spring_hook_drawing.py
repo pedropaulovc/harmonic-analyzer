@@ -1406,11 +1406,10 @@ def test_build_retains_controls_and_refuses_native_save_physical_drift(
         if module is boss_drawing else (None, [])
     )
     monkeypatch.setattr(trim_drawing, "_early_bound", lambda value, _kind: value)
-    monkeypatch.setattr(trim_drawing, "dimension_name", lambda _adapter, annotation: annotation.name)
     imported_controls = []
     for name, (nominal, lower, upper) in module.EXPECTED_CONTROLS.items():
         dimension = SimpleNamespace(
-            DrivenState=2, SystemValue=nominal,
+            Name=name, DrivenState=2, SystemValue=nominal,
             Tolerance=SimpleNamespace(
                 Type=module.DIMENSION_TOLERANCE_TYPES[name],
                 GetMinValue=lambda lower=lower: lower,
