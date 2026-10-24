@@ -226,6 +226,19 @@ def test_steps_sheet_text_clears_the_title_block() -> None:
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
 
 
+def test_a_blank_line_separates_each_numbered_step() -> None:
+    steps_printed = 0
+    for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
+        lines = block.splitlines()
+        starts = [i for i, line in enumerate(lines) if line[:1].isdigit()]
+        assert starts[0] in (0, 1)  # no blank line under a heading
+        assert all(lines[i - 1] == "" for i in starts[1:])
+        assert lines.count("") == len(starts) - 1
+        if block is not drawing.ASSEMBLY_CHECKS:
+            steps_printed += len(starts)
+    assert steps_printed == len(notes.ASSEMBLY_STEPS)
+
+
 @pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),
                                 (0.6, -0.8, 0.0), (0.0, -0.8, 0.6)))
 def test_native_ha_final_guard_uses_nested_screw_root_transform(monkeypatch, axis) -> None:
