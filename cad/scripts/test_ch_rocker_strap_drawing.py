@@ -19,6 +19,7 @@ import ch_rocker_strap_spec as spec
 import draw_ch_rocker_strap as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
@@ -157,6 +158,115 @@ def test_drawing_quality_and_no_gdt() -> None:
     ]
     assert notes.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:2"
     assert drawing.ISO_SCALE == (1, 2)
+
+
+def test_overall_length_is_a_one_place_reference_and_enforced() -> None:
+    # ENFORCE r3: the 292.5 overall printed only as two 146.25 offsets (rule 10).
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
+    assert spec.DRAWING_REFERENCE_PRECISION == {"OverallLength": 1}
+    offsets = 2 * round(spec.ROD_TIP_X, notes.DRAWING_PRECISION_BY_NAME["RodTipX"])
+    overall = round(
+        2 * spec.ROD_TIP_X, spec.DRAWING_REFERENCE_PRECISION["OverallLength"]
+    )
+    # One place, so the reference agrees with the offsets' printed sum.
+    assert overall == pytest.approx(round(offsets, 1))
+    # Outermost: above the offsets' row.
+    assert drawing.OVERALL_LINE_Y > drawing.TIP_LINE_Y
+    functions = {
+        node.name: node
+        for node in ast.walk(ast.parse(Path(drawing.__file__).read_text("utf-8")))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+    def called(function: str) -> set[str]:
+        return {
+            node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+            for node in ast.walk(functions[function])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, (ast.Name, ast.Attribute))
+        }
+
+    # The sheet places it (the helper's behaviour is the next test's).
+    assert "_add_overall_length" in called("build")
+
+
+class _OverallDoubles:
+    """Records what ``_add_overall_length`` asks of the sheet; the display
+    dimension prints whatever places it is set to, or ``applied`` if given."""
+
+    def __init__(self, applied: int | None = None) -> None:
+        self.applied = applied
+        self.vertex_points: list[tuple[float, float, float]] = []
+        self.added: dict = {}
+        self.measured: dict = {}
+        self.referenced: list[str] = []
+        self.precision: int | None = None
+
+    # scan_view_edges(...).exact_vertex_at(point, label=...)
+    def exact_vertex_at(self, point, *, label):
+        self.vertex_points.append(point)
+        return ("vertex", point)
+
+    # The display dimension and its annotation.
+    def GetAnnotation(self):
+        return self
+
+    def SetPrecision3(self, primary, *_rest):
+        self.precision = primary
+
+    def GetPrimaryPrecision2(self):
+        return self.precision if self.applied is None else self.applied
+
+
+def _patch_overall(monkeypatch, doubles: _OverallDoubles) -> None:
+    def add_edge_dimension(_adapter, _view, **kwargs):
+        doubles.added = kwargs
+        return doubles
+
+    def assert_dimension_measures(_adapter, dimension, **kwargs):
+        assert dimension is doubles
+        doubles.measured = kwargs
+        return kwargs["expected_mm"]
+
+    def set_reference_dimension(_adapter, annotation, *, label):
+        assert annotation is doubles
+        doubles.referenced.append(label)
+        return doubles
+
+    monkeypatch.setattr(drawing, "scan_view_edges", lambda _view, *, label: doubles)
+    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
+    monkeypatch.setattr(drawing, "assert_dimension_measures", assert_dimension_measures)
+    monkeypatch.setattr(drawing, "set_reference_dimension", set_reference_dimension)
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+
+
+def test_overall_length_spans_both_tip_corners_as_a_one_place_reference(
+    monkeypatch,
+) -> None:
+    doubles = _OverallDoubles()
+    _patch_overall(monkeypatch, doubles)
+    drawing._add_overall_length(object(), object())
+    # Both +Z-face tip corners, the outermost points of the mirrored outline.
+    corners = [
+        (-spec.ROD_TIP_X, spec.ROD_TIP_Y, spec.ARM_THICKNESS / 2.0),
+        (spec.ROD_TIP_X, spec.ROD_TIP_Y, spec.ARM_THICKNESS / 2.0),
+    ]
+    assert doubles.vertex_points == corners
+    vertices = tuple(("vertex", point) for point in corners)
+    assert doubles.added["entities"] == vertices
+    assert doubles.added["entity_types"] == ("VERTEX", "VERTEX")
+    assert doubles.added["orientation"] == "horizontal"
+    assert doubles.added["text_xy"] == (drawing.FRONT_CENTER[0], drawing.OVERALL_LINE_Y)
+    assert doubles.measured["entities"] == vertices
+    assert doubles.measured["expected_mm"] == pytest.approx(2.0 * spec.ROD_TIP_X)
+    assert doubles.referenced == ["strap overall length"]
+    assert doubles.precision == spec.DRAWING_REFERENCE_PRECISION["OverallLength"]
+
+
+def test_overall_length_refuses_unapplied_places(monkeypatch) -> None:
+    _patch_overall(monkeypatch, _OverallDoubles(applied=2))
+    with pytest.raises(RuntimeError, match="prints 2 decimal places, not 1"):
+        drawing._add_overall_length(object(), object())
 
 
 def test_registry_row() -> None:

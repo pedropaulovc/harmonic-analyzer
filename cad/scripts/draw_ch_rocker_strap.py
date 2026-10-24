@@ -6,7 +6,9 @@ of its one profile sketch, located from the Ø10.200 H7 hub hole's centre
 (rule 10): the top edge's height over the hole with the MHA-CH-06 band and
 mate, the R800 top edge (its centre, ~808 mm off the sheet, stated on it as
 above the hole), the bottom edge's depth under the hole, both tip corners'
-and both taper feet's offsets, and the 2X radial tip land. The hole's H7 band
+and both taper feet's offsets, and the 2X radial tip land; the parenthesised
+overall length across the tip corners ties the two offsets together (rule 10:
+the overall size is conspicuous). The hole's H7 band
 names the MHA-CH-12 hub and the fit (rule 4) and keeps both its edges sharp
 (the title block's break would groove the pressed root); the 2.500 thickness,
 on the end view, names the rod fork it runs in. One property-linked note names
@@ -39,10 +41,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
+from _drawing_edges import scan_view_edges
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from ch_rocker_strap_notes import (
@@ -50,7 +59,18 @@ from ch_rocker_strap_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
-from ch_rocker_strap_spec import BOT_END_X, PIVOT_MID_Y, ROD_TIP_X, TOP_END_Y
+from ch_rocker_strap_spec import (
+    ARM_THICKNESS,
+    BOT_END_X,
+    DRAWING_REFERENCE_PRECISION,
+    PIVOT_MID_Y,
+    ROD_TIP_X,
+    ROD_TIP_Y,
+    TOP_END_Y,
+)
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_strap"]
 PART_STEM = SPEC.artifact_stem
@@ -106,6 +126,10 @@ _HOLE = _front(0.0, PIVOT_MID_Y)
 # its leader up to the top arc clears those rows (top ~0.171).
 TIP_LINE_Y = 0.232
 FOOT_LINE_Y = 0.125
+# The overall length (ENFORCE r3: only the two 146.25 offsets gave it) on its
+# own row above the offsets' line, the longest outermost, under the border
+# (~0.267).
+OVERALL_LINE_Y = 0.249
 FRONT_KEEP = {
     "TailTipX": (FRONT_CENTER[0] - ROD_TIP_X / 2000.0, TIP_LINE_Y),
     "RodTipX": (FRONT_CENTER[0] + ROD_TIP_X / 2000.0, TIP_LINE_Y),
@@ -156,6 +180,62 @@ def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
         remaining.remove(name)
     if remaining:
         raise RuntimeError(f"strap radius dimensions missing: {sorted(remaining)}")
+
+
+@_telemetry.traced("drawing.strap_overall_length")
+def _add_overall_length(adapter: Any, front: Any) -> None:
+    """Parenthesised overall length across both tip corners (rule 10), a
+    native vertex-to-vertex sheet dimension (draw_ch_rocker_arm's overall
+    width): a band-free restatement of the two offsets, so no band and no
+    second model size."""
+    label = "OverallLength"
+    # The +Z face's tip corners: the strap is extruded mid-plane in Z.
+    tips = (
+        (-ROD_TIP_X, ROD_TIP_Y, ARM_THICKNESS / 2.0),
+        (ROD_TIP_X, ROD_TIP_Y, ARM_THICKNESS / 2.0),
+    )
+    edges = scan_view_edges(front, label="strap front outline")
+    vertices = tuple(
+        edges.exact_vertex_at(point, label=f"strap tip corner {index}")
+        for index, point in enumerate(tips)
+    )
+    # The vertices are selected as entities and the dimension is forced
+    # horizontal, so add_edge_dimension never reads p0/p1: the 1:1 view's
+    # nominal sheet points stand in, no COM projection needed (codjiflo P3).
+    dimension = add_edge_dimension(
+        adapter,
+        front,
+        p0=_front(-ROD_TIP_X, ROD_TIP_Y),
+        p1=_front(ROD_TIP_X, ROD_TIP_Y),
+        text_xy=(FRONT_CENTER[0], OVERALL_LINE_Y),
+        label="strap overall length",
+        orientation="horizontal",
+        entities=vertices,
+        entity_types=("VERTEX", "VERTEX"),
+    )
+    dimension = _early_bound(dimension, "IDisplayDimension")
+    assert_dimension_measures(
+        adapter,
+        dimension,
+        expected_mm=2.0 * ROD_TIP_X,
+        label="strap overall length",
+        entities=vertices,
+        entity_types=("VERTEX", "VERTEX"),
+    )
+    annotation = _early_bound(dimension.GetAnnotation(), "IAnnotation")
+    if annotation is None:
+        raise RuntimeError("strap overall length has no native annotation")
+    display = set_reference_dimension(adapter, annotation, label="strap overall length")
+    # Its places are the spec's (drawing-simplicity-policy.md: a pure
+    # reference dimension); -1 leaves the dual and tolerance places alone.
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    applied = int(display.GetPrimaryPrecision2())
+    if applied != DRAWING_REFERENCE_PRECISION[label]:
+        raise RuntimeError(
+            f"strap overall length prints {applied} decimal places, "
+            f"not {DRAWING_REFERENCE_PRECISION[label]}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -225,6 +305,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _exterior_radius_leaders(adapter, front_annotations)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _add_overall_length(adapter, front)
     # The template centre-marks the hub hole as the view is placed
     # (draw_mg_wheel_drum: a second AutoInsertCenterMarks2 printed a duplicate).
     add_property_linked_note(adapter, "Isometric View Note", *ISO_CAPTION_XY)
