@@ -6,10 +6,11 @@ foot, an R3.3 bend up to a blade leaning back over the foot's bend, then an
 R3.3 crest turning 25 deg out to a short free flat.  The solid is the installed shape;
 the front view also shows the part's hidden FreeForm reference sketch as the
 phantom free form; the bend and the free crest are baselined from the pad
-hole's axis (the screw) on it, and the kink's angle printed there.  The
-projected top view carries the blank's pad (its wing also from the hole's
-axis), its bend relief, the strip width and the hole; a 5:1 detail
-carries the crest.
+hole's axis (the screw) on it.  The projected top view carries the blank's
+pad (its wing also from the hole's axis), its bend relief, the strip width
+and the hole; a 5:1 detail carries the installed crest's radius and flat and,
+on the phantom free crest beside it, the kink's included angle between its
+drawn legs.
 
 Run with SolidWorks open::
 
@@ -61,6 +62,7 @@ from dt_pinion_spring_geometry import (
     FOOT_END,
     FOOT_TAN,
     FREE_FLAT_TIP,
+    FREE_KINK_EXIT,
     FREE_KINK_INCLUDED_BISECTOR,
     FREE_KINK_START,
     FREE_KINK_VERTEX,
@@ -125,13 +127,18 @@ ISO_CENTER = (0.350, 0.150)
 DETAIL_CENTER = (0.240, 0.184)
 DETAIL_SCALE = (5, 1)
 DETAIL_RATIO = DETAIL_SCALE[0] / DETAIL_SCALE[1]
-# The kink detail's fence: centred between the kink centre and the free tip,
-# large enough to take the whole kink arc and the flat (3.06 at R3.3).
+# The kink detail's fence takes both crests: the phantom free crest, whose
+# kink angle prints between its drawn blade and flat (machinist review
+# 69eda6e4c: at 2:1 the 155 deg vertex floated on a faint phantom and its
+# extension lines followed no drawn edge), and the installed crest with its
+# radius and flat.  Centred between the free vertex and the installed crest's
+# centre, it holds both, the free legs out past the angle's arc and the
+# installed flat's tip (test_kink_crop_holds_its_dimensions_and_labels...).
 DETAIL_FOCUS = (
-    (KINK_C[0] + FLAT_TIP[0]) / 2.0,
-    (KINK_C[1] + FLAT_TIP[1]) / 2.0,
+    (FREE_KINK_VERTEX[0] + KINK_C[0]) / 2.0,
+    (FREE_KINK_VERTEX[1] + KINK_C[1]) / 2.0,
 )
-DETAIL_RADIUS_MM = 3.5
+DETAIL_RADIUS_MM = 5.0
 DETAIL_CROP_RADIUS = DETAIL_RATIO * DETAIL_RADIUS_MM / 1000.0
 DETAIL_LETTER = "A"
 # A model view has no native label the API can show, so the label is a note
@@ -208,12 +215,22 @@ def callout_half_width(name: str) -> float:
 
 TEXT_TO_EXTENSION_GAP = 0.003
 _KINK_TEXT_X = _HOLE_AXIS_X + TEXT_TO_EXTENSION_GAP + callout_half_width("FreeKinkH")
-# The kink angle's text (and so its arc) this far from the vertex along the
-# included wedge's bisector, the crest's convex mid-normal (sheet metres):
-# "155°" stands west of the phantom crest, and the arc's ends on the blade's
-# line carried up and the flat's carried down stay under FreeKinkH's
-# dimension line and 2 mm west of its extension line from the kink start.
-KINK_ANGLE_TEXT_RADIUS = 0.012
+# The kink angle's text (and so its arc) this far from the free vertex in
+# detail A (sheet metres, 2.2 model mm at 5:1), down the bisector of the
+# segments' own included wedge, between the blade running down and the flat
+# running up: the arc ends ON both drawn phantom legs (past the flat's start,
+# short of its tip), so it needs no extension line, and "155°" stands in the
+# open bay between the free crest and the installed one.
+KINK_ANGLE_TEXT_RADIUS = 0.011
+# The legs' included wedge opens away from the crest's convex side.
+KINK_ARC_BISECTOR = (-FREE_KINK_INCLUDED_BISECTOR[0], -FREE_KINK_INCLUDED_BISECTOR[1])
+# The arc ends on the drawn flat, between its start and its tip (sheet
+# metres, the free vertex's distances to them at the detail's scale); the
+# blade, below, is drawn far longer than either.
+KINK_ARC_RADIUS_RANGE = tuple(
+    math.dist(FREE_KINK_VERTEX, point) * DETAIL_RATIO / 1000.0
+    for point in (FREE_KINK_EXIT, FREE_FLAT_TIP)
+)
 # The arc must centre on the vertex and every drawn point lie within this of
 # the wedge's bisector (half the wedge plus room for outside arrows); the
 # acute wedges' arcs reach 102.5 deg off it, the opposite included one's more.
@@ -234,17 +251,6 @@ FRONT_KEEP = {
     # fit between its extension lines.  The top view stands clear above it
     # (spring r1: the row's text met the pad's edge).
     "FreeKinkH": (_KINK_TEXT_X, _PROFILE_TOP + 0.032),
-    # The kink's included angle, blade to flat, on the phantom: in the wedge
-    # on the crest's convex side, west of it, where no other extension line
-    # runs (FreeKinkH's rises from the kink start east of the blade's line
-    # carried up; FreeKinkV's runs east from the kink start to its dimension
-    # line, through the opposite included wedge).
-    FREE_KINK_ANGLE: (
-        _front_x(FREE_KINK_VERTEX[0])
-        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_INCLUDED_BISECTOR[0],
-        _front_y(FREE_KINK_VERTEX[1])
-        + KINK_ANGLE_TEXT_RADIUS * FREE_KINK_INCLUDED_BISECTOR[1],
-    ),
 }
 # The vertical extension lines each qualified row's text sits among: its own
 # two, the hole axis's being the east one of both horizontal rows.
@@ -276,11 +282,29 @@ TOP_KEEP = {
     # line up the wing's west edge and of the strip width's lines above.
     "PadReliefR": (_WING_WEST - 0.015, _TOP_PAD_FWD - 0.0055),
 }
+
+
+def _detail_xy(model_mm: tuple[float, float]) -> tuple[float, float]:
+    """Where a front-plane model point (mm) prints in detail A (sheet metres)."""
+    return (
+        DETAIL_CENTER[0] + (model_mm[0] - DETAIL_FOCUS[0]) * DETAIL_RATIO / 1000.0,
+        DETAIL_CENTER[1] + (model_mm[1] - DETAIL_FOCUS[1]) * DETAIL_RATIO / 1000.0,
+    )
+
+
+_DETAIL_KINK_C = _detail_xy(KINK_C)
+_DETAIL_FREE_VERTEX = _detail_xy(FREE_KINK_VERTEX)
 DETAIL_KEEP = {
     # The flick turns right (east) in this view: the radius leader goes
-    # upper-left of the fence, the flat's length to its right.
-    "KinkR": (0.205, 0.232),
-    "FlatLen": (0.282, 0.200),
+    # upper-left of the fence, the flat's length to its right, each where
+    # 69eda6e4c printed it relative to the installed crest.
+    "KinkR": (_DETAIL_KINK_C[0] - 0.0405, _DETAIL_KINK_C[1] + 0.056),
+    "FlatLen": (_DETAIL_KINK_C[0] + 0.0365, _DETAIL_KINK_C[1] + 0.024),
+    # The free crest's included angle, between its drawn legs.
+    FREE_KINK_ANGLE: (
+        _DETAIL_FREE_VERTEX[0] + KINK_ANGLE_TEXT_RADIUS * KINK_ARC_BISECTOR[0],
+        _DETAIL_FREE_VERTEX[1] + KINK_ANGLE_TEXT_RADIUS * KINK_ARC_BISECTOR[1],
+    ),
 }
 HOLE_END_TEXT_XY = (_front_x(FOOT_END[0] - HOLE_FROM_END / 2.0), _TOP_AFT + 0.0095)
 # East of the pad, inboard of PadWidth: west, its extension lines ran from the
@@ -473,7 +497,8 @@ def _placed_kink_view(adapter: Any) -> Any:
     """Detail A, uncropped: a standalone 5:1 *Front model view, moved so the
     kink focus lands on DETAIL_CENTER (checked to DETAIL_POSITION_TOL_M).
 
-    The part hides FreeForm, so the view shows the installed crest alone.
+    The part hides FreeForm, so the view shows the installed crest until its
+    curation shows the phantom free crest in it (_dimension_then_crop_kink_view).
     It is dimensioned before _crop_kink_view crops it: pc-r14 (6aebefd18,
     leaf 20260927T005429Z-1-555a9662) imported into the cropped view and got
     FlatLen but not KinkR, where the uncropped *Front imports both.
@@ -563,14 +588,16 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
 
 
 def _dimension_then_crop_kink_view(adapter: Any, detail: Any) -> list[Any]:
-    """Import and curate detail A's pair while it is uncropped, then crop it.
+    """Import and curate detail A's dimensions while it is uncropped, then crop.
 
-    The dimension names are read back before and after the crop and recorded
-    as one ``kink_detail.crop`` event, so the log shows whether a crop keeps
-    dimensions already attached; either of the pair missing afterwards raises.
-    Returns the curated annotations.
+    The free kink angle lives in the part-hidden FreeForm sketch, so the
+    detail takes the opt-in curation that shows that sketch (the phantom free
+    crest) in this view.  The dimension names are read back before and after
+    the crop and recorded as one ``kink_detail.crop`` event, so the log shows
+    whether a crop keeps dimensions already attached; any kept one missing
+    afterwards raises.  Returns the curated annotations.
     """
-    annotations = curate_view_dimensions(
+    annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         detail,
         keep=DETAIL_KEEP,
@@ -722,22 +749,29 @@ def kink_arc_faults(
     arcs: list[tuple[tuple[float, float], list[tuple[float, float]]]],
     vertex: tuple[float, float],
 ) -> list[str]:
-    """Why the kink angle's drawn arcs do not read as the included wedge on
-    the crest's convex side of the blade/flat crossing
-    (draw_dt_cone_gear.clock_arc_faults' reading): centred on the crossing,
-    every point within KINK_ARC_HALF_SPREAD_DEG of the wedge's bisector and
-    spanning it.  Empty when they do."""
+    """Why the kink angle's drawn arcs do not read as the included wedge
+    between the free form's drawn legs, the blade running down and the flat
+    running up from their crossing (draw_dt_cone_gear.clock_arc_faults'
+    reading): centred on the crossing, every point within
+    KINK_ARC_HALF_SPREAD_DEG of the wedge's bisector, spanning it, at a
+    radius that ends the arc on the drawn flat (KINK_ARC_RADIUS_RANGE), so
+    no extension line runs off the legs.  Empty when they do."""
     if not arcs:
         return ["no arc"]
-    bisector = math.atan2(
-        FREE_KINK_INCLUDED_BISECTOR[1], FREE_KINK_INCLUDED_BISECTOR[0]
-    )
+    bisector = math.atan2(KINK_ARC_BISECTOR[1], KINK_ARC_BISECTOR[0])
+    low, high = KINK_ARC_RADIUS_RANGE
     faults = []
     offsets = []
     for centre, points in arcs:
         off = math.dist(centre, vertex)
         if off > KINK_ARC_CENTRE_TOL:
             faults.append(f"arc centred {off * 1000:.2f} mm off the vertex")
+        radius = math.dist(points[0], centre) if points else 0.0
+        if not low < radius < high:
+            faults.append(
+                f"arc radius {radius * 1000:.2f} mm ends off the drawn flat "
+                f"({low * 1000:.2f}-{high * 1000:.2f} mm)"
+            )
         for x, y in points:
             turn = math.atan2(y - vertex[1], x - vertex[0]) - bisector
             offsets.append(math.degrees((turn + math.pi) % (2.0 * math.pi) - math.pi))
@@ -757,11 +791,9 @@ def kink_arc_summary(
     vertex: tuple[float, float],
 ) -> str:
     """Each drawn arc's centre offset and radius (mm) and its first, last,
-    least and greatest direction off the included wedge's bisector (deg),
-    for the leaf log."""
-    bisector = math.atan2(
-        FREE_KINK_INCLUDED_BISECTOR[1], FREE_KINK_INCLUDED_BISECTOR[0]
-    )
+    least and greatest direction off the legs' wedge bisector (deg), for the
+    leaf log."""
+    bisector = math.atan2(KINK_ARC_BISECTOR[1], KINK_ARC_BISECTOR[0])
     parts = []
     for centre, points in arcs:
         offsets = [
@@ -827,18 +859,18 @@ def _kink_arcs(
     return arcs
 
 
-def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -> None:
-    """Fail unless the printed kink angle draws its arc in the included wedge
-    on the crest's convex side of the free form's blade/flat crossing.  The
-    angle drives the free form, so the only turn allowed is to the
-    vertically opposite wedge, the same 155 deg (the value is read back
-    after the turn).  The sketch's dimension measures the segments' own
-    wedge, across the crest (spring r10: blade down to flat up, with an
-    extension arc out to the text), so it is turned the way the setting
-    bar's flank angle is (draw_ch_rocker_arm_tl_trammel_setting_bar): the
-    dimension selected alone in its view by name -- unselected, the turn
-    returned True and drew nothing new (r10) -- turned, its text re-seated
-    at its keep, and the drawing rebuilt."""
+def _assert_kink_angle_wedge(adapter: Any, detail: Any, annotations: list[Any]) -> None:
+    """Fail unless detail A's kink angle draws its arc in the included wedge
+    between the free form's drawn legs (kink_arc_faults).  The angle drives
+    the free form, so the only turn allowed is to the vertically opposite
+    wedge, the same 155 deg (the value is read back after the turn).  The
+    sketch's dimension measures the segments' own wedge (spring r10: blade
+    down to flat up), so an import that lands across the crossing is turned
+    the way the setting bar's flank angle is
+    (draw_ch_rocker_arm_tl_trammel_setting_bar): the dimension selected alone
+    in its view by name -- unselected, the turn returned True and drew
+    nothing new (r10) -- turned, its text re-seated at its keep, and the
+    drawing rebuilt."""
     matches = [
         item for item in annotations if dimension_name(adapter, item) == FREE_KINK_ANGLE
     ]
@@ -854,7 +886,7 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     rebuild_drawing(adapter, label="kink angle wedge")
     vertex = model_point_in_view(
         adapter,
-        front,
+        detail,
         (FREE_KINK_VERTEX[0] / 1000.0, FREE_KINK_VERTEX[1] / 1000.0, 0.0),
         label="free kink vertex",
     )
@@ -863,7 +895,7 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
     placed = f"{kink_arc_summary(arcs, vertex)}; faults {faults}"
     turned = False
     if faults:
-        _activate_view(adapter, front, label="front view")
+        _activate_view(adapter, detail, label="kink detail")
         if not model.Extension.SelectByID2(
             selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
         ):
@@ -873,7 +905,7 @@ def _assert_kink_angle_wedge(adapter: Any, front: Any, annotations: list[Any]) -
         if not flipped:
             raise RuntimeError(f"{FREE_KINK_ANGLE}: VerticallyOppositeAngle refused")
         turned = True
-        if not annotation.SetPosition2(*FRONT_KEEP[FREE_KINK_ANGLE], 0.0):
+        if not annotation.SetPosition2(*DETAIL_KEEP[FREE_KINK_ANGLE], 0.0):
             raise RuntimeError(f"failed to re-seat {FREE_KINK_ANGLE}")
         rebuild_drawing(adapter, label="kink angle turned")
         arcs = _kink_arcs(display)
@@ -1090,18 +1122,19 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The kink detail is created and dimensioned FIRST, while nothing is on
     # the sheet: KinkR and FlatLen live in SpringProfile with the profile's
-    # FootLen and BendR, so the profile's targeted import delivers them too.
-    # pc-r10 (37495ac47) ran the profile first and deleted the pair; the
-    # detail's import then brought KinkR back but not FlatLen.  A dimension
-    # already on the sheet is never imported again (the arbor's detail A
-    # imports first for the same reason), so the profile's import now skips
-    # the pair the detail holds.  The detail is dimensioned uncropped and
-    # cropped after (_placed_kink_view says why).
+    # FootLen and BendR, and the free kink angle in FreeForm with FreeKinkH
+    # and FreeKinkV, so the targeted import delivers those too.  pc-r10
+    # (37495ac47) ran the profile first and deleted the pair; the detail's
+    # import then brought KinkR back but not FlatLen.  A dimension already on
+    # the sheet is never imported again (the arbor's detail A imports first
+    # for the same reason), so the profile's import now skips what the detail
+    # holds and takes back what the detail deleted.  The detail is
+    # dimensioned uncropped and cropped after (_placed_kink_view says why).
     detail = _placed_kink_view(adapter)
     set_hidden_lines_removed(adapter, detail)
     detail_annotations = _dimension_then_crop_kink_view(adapter, detail)
-    # The front view imports the part-hidden FreeForm reference sketch, so it
-    # takes the opt-in curation that shows it (the phantom) in this view only.
+    # The front view imports the part-hidden FreeForm reference sketch too, so
+    # it takes the same opt-in curation that shows it (the phantom) there.
     front_annotations = hidden_sketches.curate_view_dimensions(
         adapter,
         front,
@@ -1119,7 +1152,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _assert_kink_angle_wedge(adapter, front, front_annotations)
+    _assert_kink_angle_wedge(adapter, detail, detail_annotations)
     # The fence and the labels go on once every import is done, so nothing
     # of the front view's own sketch is near its import.
     mark = _mark_kink_on_front(adapter, front)
