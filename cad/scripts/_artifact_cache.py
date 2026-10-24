@@ -1265,23 +1265,169 @@ def _phase(name: str, **attributes):
         yield sp
 
 
-class _TimedCredential:
-    """Delegating token credential that spans each token fetch (``cache.credential``).
+def _token_request_identity(value):
+    """Freeze request options without logging their potentially secret contents."""
+    if isinstance(value, dict):
+        return (dict, frozenset(
+            (_token_request_identity(key), _token_request_identity(item))
+            for key, item in value.items()
+        ))
+    if isinstance(value, (list, tuple)):
+        return (type(value), tuple(_token_request_identity(item) for item in value))
+    if isinstance(value, (set, frozenset)):
+        return (type(value), frozenset(_token_request_identity(item) for item in value))
+    return (type(value), value)
 
-    The storage pipeline fetches a token lazily INSIDE the first request, so without
-    this a managed-identity or CLI round trip is indistinguishable from the download
-    it precedes. The SDK caches the token afterwards, so this fires about once per
-    process; everything else is delegated untouched."""
+
+class _ObservedCredentialLink:
+    """Forward a chain link unchanged while retaining typed, per-thread outcomes."""
+
+    def __init__(self, inner, observation):
+        self._inner = inner
+        self._observation = observation
+
+    @property
+    def __class__(self):
+        # Azure includes this name in its original aggregate exception diagnostics.
+        return self._inner.__class__
+
+    def __getattr__(self, name):
+        member = getattr(self._inner, name)
+        if name not in ("get_token", "get_token_info"):
+            return member
+
+        def observed(*args, **kwargs):
+            from azure.identity import CredentialUnavailableError
+
+            outcomes = getattr(self._observation, "outcomes", None)
+            try:
+                token = member(*args, **kwargs)
+            except Exception as exc:
+                if outcomes is not None:
+                    outcomes.append(isinstance(exc, CredentialUnavailableError))
+                raise
+            if outcomes is not None:
+                outcomes.append(False)
+            return token
+
+        return observed
+
+
+class _TimedCredential:
+    """Share expiring tokens across the process's memoized blob client's pipelines.
+
+    Azure's individual bearer policies cache tokens, but separate blob pipelines
+    can still fetch independently, and AzureCliCredential does not cache at all.
+    Serialize refreshes here and span the actual acquisition (``cache.credential``),
+    reusing only the same interface, scopes and complete request options. Refresh
+    five minutes before expiry, or at ``refresh_on`` if earlier. Only credential
+    unavailability is retried, at most three attempts with 1 s / 2 s backoff;
+    authentication failures and exhausted unavailability retain their exceptions.
+    """
 
     def __init__(self, inner):
         self._inner = inner
+        self._tokens = {}
+        self._token_lock = threading.Lock()
+        self._inflight = {}
+        self._observation = threading.local()
+        from azure.identity import ChainedTokenCredential
+
+        self._chain_size = 0
+        if isinstance(inner, ChainedTokenCredential):
+            # Do not reimplement Azure's traversal or sticky-success behavior.
+            # Its aggregate auth error discards types/causes, so observe links
+            # before that information is lost, without changing their exceptions.
+            inner.credentials = tuple(
+                _ObservedCredentialLink(link, self._observation)
+                for link in inner.credentials
+            )
+            self._chain_size = len(inner.credentials)
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
 
-    def get_token(self, *scopes, **kwargs):
+    def _get_token(self, method, scopes, kwargs):
+        try:
+            identity = (method, scopes, _token_request_identity(kwargs))
+            hash(identity)
+        except TypeError:
+            # Opaque SDK options are valid inputs, just not safe cache keys.
+            return self._acquire(method, scopes, kwargs)
+        with self._token_lock:
+            saved = self._tokens.get(identity)
+            if saved is not None:
+                refresh_at = saved.expires_on - 300
+                refresh_on = getattr(saved, "refresh_on", None)
+                if refresh_on is not None:
+                    refresh_at = min(refresh_at, refresh_on)
+                if time.time() < refresh_at:
+                    return saved
+            pending = self._inflight.get(identity)
+            owner = pending is None
+            if owner:
+                pending = concurrent.futures.Future()
+                self._inflight[identity] = pending
+        if not owner:
+            return pending.result()
+        try:
+            token = self._acquire(method, scopes, kwargs)
+            with self._token_lock:
+                self._tokens[identity] = token
+            pending.set_result(token)
+            return token
+        except BaseException as exc:
+            pending.set_exception(exc)
+            raise
+        finally:
+            with self._token_lock:
+                del self._inflight[identity]
+
+    def _acquire(self, method, scopes, kwargs):
+        from azure.core.exceptions import ClientAuthenticationError
+        from azure.identity import CredentialUnavailableError
+
         with _phase("cache.credential", credential=type(self._inner).__name__):
-            return self._inner.get_token(*scopes, **kwargs)
+            for attempt in range(1, 4):
+                self._observation.outcomes = []
+                try:
+                    return getattr(self._inner, method)(*scopes, **kwargs)
+                except ClientAuthenticationError as exc:
+                    outcomes = self._observation.outcomes
+                    unavailable = isinstance(exc, CredentialUnavailableError) or (
+                        self._chain_size > 0
+                        and len(outcomes) == self._chain_size
+                        and all(outcomes)
+                    )
+                    if not unavailable or attempt == 3:
+                        raise
+                    self._retry_notice(exc, attempt)
+                finally:
+                    self._observation.outcomes = None
+                # The singleflight future, not a held lock, owns this request.
+                time.sleep(attempt)
+
+    def _retry_notice(self, exc, attempt):
+        # A bare pool probe must not configure OTel just to report a retry.
+        telemetry = sys.modules.get("_telemetry")
+        if telemetry is None:
+            return
+        cause = exc.__cause__ or exc.__context__
+        cause_type = type(cause).__name__ if cause is not None else ""
+        with contextlib.suppress(Exception):
+            telemetry.warn(
+                f"[cache] credential unavailable; retry {attempt}/2 in {attempt}s "
+                f"(cause={cause_type or 'none'})"
+            )
+            telemetry.event(
+                "cache.credential.retry", label="", key="",
+                credential=type(self._inner).__name__,
+                attempt=attempt, delay_s=attempt,
+                error_type=type(exc).__name__, cause_type=cause_type,
+            )
+
+    def get_token(self, *scopes, **kwargs):
+        return self._get_token("get_token", scopes, kwargs)
 
 
 class _TimedTokenInfoCredential(_TimedCredential):
@@ -1289,8 +1435,7 @@ class _TimedTokenInfoCredential(_TimedCredential):
     (azure-core prefers it when present, so the proxy must expose it only then)."""
 
     def get_token_info(self, *scopes, **kwargs):
-        with _phase("cache.credential", credential=type(self._inner).__name__):
-            return self._inner.get_token_info(*scopes, **kwargs)
+        return self._get_token("get_token_info", scopes, kwargs)
 
 
 def _make_backend() -> _BlobBackend | None:
@@ -1332,7 +1477,7 @@ _PREWARM_JOIN_S = 2.0
 
 
 def _backend() -> _BlobBackend | None:
-    """Memoized ContainerClient (one credential handshake per process). Returns
+    """Memoized ContainerClient with a shared expiry-aware token credential. Returns
     None when unconfigured / SDK absent, so the caller treats it as a miss. The
     first call's SDK import and client construction are ``cache.connect``.
 
@@ -1380,20 +1525,20 @@ def _warm() -> None:
     try:
         with contextlib.suppress(Exception), _phase("cache.prewarm"):
             with _BACKEND_LOCK:
-                backend = None if isinstance(_BACKEND, _Unset) else _BACKEND
-            if backend is None:
-                import azure.storage.blob  # noqa: F401 -- absent SDK: stay unset
-
-                with _phase("cache.connect"):
-                    built = _make_backend()
-                if built is None:
+                if not isinstance(_BACKEND, _Unset):
                     return
-                with _BACKEND_LOCK:
-                    if isinstance(_BACKEND, _Unset):
-                        _BACKEND = built
-                    backend = _BACKEND
-            if backend is not None:
-                backend.exists("prewarm")
+            import azure.storage.blob  # noqa: F401 -- absent SDK: stay unset
+
+            with _phase("cache.connect"):
+                backend = _make_backend()
+            if backend is None:
+                return
+            # Keep the speculative credential private while acquiring its token.
+            # A real probe past the wait bound must never queue behind this HEAD.
+            backend.exists("prewarm")
+            with _BACKEND_LOCK:
+                if isinstance(_BACKEND, _Unset):
+                    _BACKEND = backend
     finally:
         if warming is not None:
             warming.set()

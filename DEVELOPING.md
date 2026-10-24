@@ -38,6 +38,13 @@ infrastructure such as telemetry. Build leaves always pass `--force`, so bypasse
 PDF-diff implementation, identity-pairing inputs, and the precheck prompt/schema
 do not invalidate their review cache.
 
+Both review CLIs use a **120-second** sheets MCP startup budget, capped by the
+per-attempt timeout. The runner sets Claude's `MCP_TIMEOUT` (milliseconds) and
+Codex's `mcp_servers.sheets.startup_timeout_sec` to that budget rather than relying
+on their shorter independent defaults. Startup and review still share one
+overall attempt timeout. A failed connection remains a provider/runner error,
+never a cached verdict.
+
 ### Selecting the build-gate reviewer and judge
 
 Build-gate reviews default to **Claude / `claude-opus-5-5` / `medium`** for both
@@ -1905,6 +1912,25 @@ drive. Auth is **keyless** via `DefaultAzureCredential`:
 - **dev box** → your `az login` token. Run `az login` once.
 - **builder (`vm-solidworks`)** → its system-assigned managed identity
   (granted *Storage Blob Data Contributor*); nothing to log in.
+
+Each process shares its cache credential and reuses tokens across blob clients
+for matching token requests. Refresh is singleflight per request identity and
+starts five minutes before expiry (or at the token's earlier `refresh_on` time).
+Backoff does not hold a lock or delay unrelated identities. Speculative prewarm
+keeps a private client until it succeeds, so the first real probe can proceed
+independently after its bounded prewarm wait.
+
+Only credential unavailability is retried: at most three acquisition attempts,
+with one- then two-second backoffs. This includes a chained credential's
+`ClientAuthenticationError` only when typed observations of its attempted links
+show they were all unavailable; genuine authentication failures fail immediately.
+Unhashable request options bypass token reuse without preventing acquisition.
+Every retry emits a `cache.credential.retry` span event and warning when telemetry
+is already loaded; a bare pool probe never imports/configures telemetry for this.
+Exception/cause types are recorded, but no token or claims. Exhausted credential
+failures retain their original exception and follow the existing restore/store
+error path. In particular, a farm success still requires a successful restore of
+the exact key: credential failure cannot make `cache_missing` pass.
 
 A machine without the data-plane RBAC role is **fail-soft**: its push is denied
 and the build proceeds normally (a miss/error never fails a build).
