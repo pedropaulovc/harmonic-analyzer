@@ -165,9 +165,7 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
     # ~36 characters) printed over the dome radius, and its upper limit
     # (~7 mm over the anchor) inside the outline.
     dia_x, dia_y = keep["ShaftDia"]
-    dia_widest = max(
-        len(line) for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
-    )
+    dia_widest = max(len(line) for line in drawing.SHAFT_DIA_CALLOUT_ROWS.splitlines())
     dome_x, _ = keep["DomeRadius"]
     assert dome_x + len("2X (SR3.18)") * char / 2.0 + 0.005 <= dia_x - dia_widest * char
     assert dia_y + 0.007 + 0.003 <= drawing._SHAFT_BOTTOM_Y
@@ -185,6 +183,11 @@ def test_side_view_texts_stand_clear_of_extension_lines() -> None:
         ch_fulcrum_shaft_spec.ACROSS_FLAT_CALLOUT,
     ):
         assert all(line[-1].isalnum() for line in callout.splitlines())
+    # Post-v46 review: the final E of the widest Ø row still met that line;
+    # every printed row carries two trailing spaces of ink air.
+    assert drawing.SHAFT_DIA_CALLOUT_ROWS.splitlines() == [
+        f"{line}  " for line in ch_fulcrum_shaft_spec.SHAFT_DIA_CALLOUT.splitlines()
+    ]
 
 
 def test_three_place_sizes_name_their_mates() -> None:
@@ -202,7 +205,7 @@ def test_three_place_sizes_name_their_mates() -> None:
     assert "MHA-CH-02" in spec.SHAFT_DIA_CALLOUT
     assert "MHA-CH-VN-55" in spec.ACROSS_FLAT_CALLOUT
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert '"ShaftDia": SHAFT_DIA_CALLOUT' in source
+    assert '"ShaftDia": SHAFT_DIA_CALLOUT_ROWS' in source
     assert '"AcrossFlat": ACROSS_FLAT_CALLOUT' in source
     assert "1/4 IN GROUND STOCK OK." in spec.DRAWING_NOTES
 

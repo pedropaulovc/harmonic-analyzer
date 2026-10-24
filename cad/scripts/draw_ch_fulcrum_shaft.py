@@ -102,6 +102,12 @@ FINISH_SYMBOL = (RIGHT_CENTER[0] + 0.075, AXIS_Y - 0.024)
 # The fleet's routine finish height, not the dimension height (r1: the
 # symbol was drawn far larger than the other annotation text).
 FINISH_CHAR_HEIGHT = 0.0025
+# The Ø block hangs left of its own vertical dimension line and SOLIDWORKS
+# sets the widest row's last glyph against that line: the v46 re-render
+# struck the final E of "DIAMETRAL CLEARANCE" (machinist review, rule 14).
+# Two trailing spaces on every row stop the ink short of the line and its
+# shelf, as draw_dt_crank_drive_gear does for its chamfer block.
+SHAFT_DIA_CALLOUT_ROWS = "\n".join(f"{row}  " for row in SHAFT_DIA_CALLOUT.splitlines())
 RIGHT_KEEP = {
     "FlatFromEnd": (_LEFT_TIP_X - 0.0065, _ROW_1),
     "FlatLength": (_RIGHT_FLAT_INNER_X - 0.0105, _ROW_1),
@@ -201,7 +207,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         curated,
-        {"ShaftDia": SHAFT_DIA_CALLOUT, "AcrossFlat": ACROSS_FLAT_CALLOUT},
+        {"ShaftDia": SHAFT_DIA_CALLOUT_ROWS, "AcrossFlat": ACROSS_FLAT_CALLOUT},
     )
     _set_dome_reference(adapter, curated)
 
