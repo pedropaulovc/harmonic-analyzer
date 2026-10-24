@@ -781,6 +781,23 @@ TRANSGEAR_BALLOON_ANCHORS = {
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
 }
+# Seen from above, the arm's rounds lie edge-on along its face lines and,
+# turned -32.56 deg with the hanger, the walk's points on them are not the
+# lines' ends. Farm run 20261024T014330502Z: the leader on the pivot round's
+# rear edge (-10.633, 6.572, 7.938) re-solved 0.85 mm along it. The upper
+# straight edge on the front face is a true-length line from above; station
+# 12 is between the pivot round and the knob shaft, the arm's topmost ink there.
+TRANSGEAR_EXPLODED_ARM_STATION = 12.0
+TRANSGEAR_EXPLODED_BALLOON_ANCHORS = {
+    **TRANSGEAR_BALLOON_ANCHORS,
+    "pd-transgear-arm": BalloonAnchor(
+        point_mm=(
+            TRANSGEAR_EXPLODED_ARM_STATION,
+            arm_geometry.edge_half_width(TRANSGEAR_EXPLODED_ARM_STATION),
+            0.0,
+        ),
+    ),
+}
 
 
 def transgear_balloon_items(
@@ -2873,7 +2890,7 @@ def _place_transgear_exploded_sheet(
         adapter,
         view,
         items=exploded_items,
-        anchors=TRANSGEAR_BALLOON_ANCHORS,
+        anchors=TRANSGEAR_EXPLODED_BALLOON_ANCHORS,
         label=balloons_label,
         margin=BALLOON_MARGIN,
     )

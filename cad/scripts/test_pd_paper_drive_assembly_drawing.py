@@ -388,6 +388,35 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     assert "30DP" not in text and "%" not in text
 
 
+def test_the_exploded_arm_balloon_lands_on_its_true_length_upper_edge() -> None:
+    """Run 20261024T014330502Z: from above, the walk's point on the arm's
+    edge-on pivot round re-solved 0.85 mm along it."""
+    anchor = drawing.TRANSGEAR_EXPLODED_BALLOON_ANCHORS["pd-transgear-arm"]
+    station, offset, z = anchor.point_mm
+    arm = joints.ARM
+    # On the upper straight edge, on the front face.
+    assert arm.PIVOT_TANGENT_X < station < arm.TIP_STATION
+    assert offset == pytest.approx(arm.edge_half_width(station))
+    assert z == 0.0 and assembly.ARM_Z0 == arm.FRONT_FACE_MACHINE_Z
+    # Past the pivot round's reach and short of the knob shaft, so seen from
+    # above it is the topmost ink at its x.
+    x, _y = assembly._on_arm(station, offset)
+    assert x > assembly.PIVOT_XY[0] + arm.PIVOT_END_R
+    assert x < assembly.KNOB_SHAFT_XY[0] - knob_shaft.OUTSIDE_DIA / 2.0
+    # Only the explode's arm is pinned; sheet 2's isometric still walks.
+    others = {
+        stem: anchor
+        for stem, anchor in drawing.TRANSGEAR_EXPLODED_BALLOON_ANCHORS.items()
+        if stem != "pd-transgear-arm"
+    }
+    assert others == {
+        stem: anchor
+        for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
+        if stem != "pd-transgear-arm"
+    }
+    assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-arm"].point_mm is None
+
+
 def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     expected = {
         f"{stem}-{index}"
