@@ -314,7 +314,7 @@ for _ok, _what in (
 # Marked dimensions, all on the one revolve profile: the tenon, the reamed bore,
 # the stations from the tenon end face, the grip diameters and the end round,
 # the counterbore, the two inside corners' single limits, and the
-# tangency-fixed radii as references.
+# tangency-fixed radii and the S-curve's tangent-point diameter as references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HandleProfile": {
         "PivotBoreDia",
@@ -324,6 +324,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "WaistStation",
         "WaistDia",
         "InflectionStation",
+        "InflectionDia",
         "PeakStation",
         "PeakDia",
         "CrestDia",
@@ -361,6 +362,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
 # Driven by the tangencies: references.
 REFERENCE_RADII = frozenset({"FlareR", "SConcaveR", "SConvexR", "DomeR"})
+# The tangent point the inflection station ends on, where the S-curve's
+# concave arc meets its convex one: its diameter, fixed by the tangencies,
+# prints as a reference so the turner reads the template point there
+# (MHA-DT-08 machinist review of 69eda6e4c).  The convex arc meets the dome
+# at the swell, on the peak station, whose diameter already prints.
+TANGENT_POINT_DIAMETERS = frozenset({"InflectionDia"})
 # Every axial station reads from the tenon's end face, the one faced end, so
 # the oak's overall (for stock cut-off) is a marked dimension of its own.
 OVERALL_LENGTH = OAK_END_X - TENON_X0

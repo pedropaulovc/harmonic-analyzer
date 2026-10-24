@@ -86,6 +86,7 @@ from dt_crank_handle_spec import (
     S_CONVEX_CENTER,
     S_CONVEX_R,
     SHOULDER_X,
+    TANGENT_POINT_DIAMETERS,
     TENON_FIT_NOTE,
     TENON_R,
     TENON_ROOT_CALLOUT,
@@ -180,15 +181,20 @@ FRONT_KEEP = {
     # keep leaves 5.4 mm of air and separates it from the end-round callout.
     "DomeR": (_front_x(OAK_END_X) - 0.0125, 0.185),
     "EndRoundR": _on_radius(END_ROUND_CENTER, 8.1, 42.5),
-    # Diameters across their own cut.  The shoulder and waist shelves sit
-    # under the section; the fitted tenon's and the counterbore's callout
-    # blocks stand below them, above the title block, and the reamed bore's
-    # lower still between them, clear of the swell.  The counterbore's
-    # five-line block stands near its floor, clear of the end view.
+    # Diameters across their own cut.  The shoulder, waist and S-curve
+    # tangent-point shelves sit under the section; the fitted tenon's and the
+    # counterbore's callout blocks stand below them, above the title block,
+    # and the reamed bore's lower still between them, clear of the swell.
+    # The counterbore's five-line block stands near its floor, clear of the
+    # end view.
     "ShoulderDia": (_front_x(SHOULDER_X) + _SHELF, _BELOW),
     "WaistDia": (_front_x(WAIST_X) + _SHELF, _BELOW),
+    "InflectionDia": (_front_x(INFLECTION[0]) + _SHELF, _BELOW),
     "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
-    "PivotBoreDia": (0.140, 0.068),
+    # The reamed bore's dimension line stands 12 mm right of the tangent
+    # point's: the reference "( Ø12.6)" shelf (about 17 mm wide) ends clear
+    # of it, and the block's right edge stays 12 mm left of the title block.
+    "PivotBoreDia": (0.152, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
         _CALLOUT_ROW + 0.0015,
@@ -382,8 +388,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
     front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
     # The tenon and the counterbore are fitted to the ferrule and cup (their
-    # to-suit callouts), so their sizes print as references.
-    for name in sorted(REFERENCE_DIMENSIONS):
+    # to-suit callouts), and the S-curve's tangent point is fixed by its
+    # arcs, so their sizes print as references.
+    for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):
         set_reference_dimension(
             adapter,
             front_by_name[name],

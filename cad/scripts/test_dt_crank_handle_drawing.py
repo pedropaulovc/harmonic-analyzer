@@ -209,7 +209,30 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert not hasattr(spec, "BORE_RUNOUT_TIR")
     assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
+    assert (
+        "for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):"
+        in drawing_source
+    )
+
+
+def test_s_curve_tangent_point_prints_a_driven_reference_diameter() -> None:
+    # MHA-DT-08 machinist review of 69eda6e4c: the inflection station ends on
+    # the S-curve's tangent point, so its diameter prints there as a driven
+    # reference; the convex arc meets the dome on the peak station, at the
+    # printed swell diameter.
+    spec = dt_crank_handle_spec
+    assert spec.TANGENT_POINT_DIAMETERS == {"InflectionDia"}
+    assert spec.TANGENT_POINT_DIAMETERS <= spec.DRAWING_DIMENSIONS["HandleProfile"]
+    assert not spec.TANGENT_POINT_DIAMETERS & spec.REFERENCE_DIMENSIONS
+    assert spec.INFLECTION[0] - spec.TENON_X0 == pytest.approx(18.0)
+    assert round(2.0 * spec.INFLECTION[1], 1) == pytest.approx(12.6)
+    assert spec.S_CONVEX_CENTER[0] == spec.DOME_CENTER[0] == spec.PEAK_X
+    build_source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert "inflection_dimension.DrivenState = 1" in build_source
+    assert (
+        drawing.FRONT_KEEP["InflectionDia"][0]
+        < drawing.FRONT_KEEP["PivotBoreDia"][0] - 0.017
+    )
 
 
 def test_inside_corners_print_a_max_radius_their_mates_chamfers_clear() -> None:
