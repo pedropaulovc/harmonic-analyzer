@@ -74,6 +74,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _session import run_build
 from _simplified_names import simplified_name
+from stock_anchor_geom import ANCHOR_9490T1
 
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
@@ -219,8 +220,20 @@ BOM_NORMALIZED_ALIASES = {
     alias.casefold(): stem for alias, stem in BOM_IDENTITY_ALIASES.items()
 }
 # One balloon per BOM row, each on its own family's visible edge: every family
-# is separated from its neighbours in the explode.
-BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS}
+# is separated from its neighbours in the explode. The eyebolt's walked
+# anchor was its shank's cut end, so leader 6 ran beside the jam nut's leader
+# 7 (machinist review on main and #1945); it is pinned to the open eye
+# instead: the eye tip's dome-root circle, on its +Z side, which faces the
+# +X+Y+Z isometric viewer (the eyebolt is placed unrotated, so part and
+# machine axes agree).
+EYEBOLT_BALLOON_POINT_MM = (
+    ANCHOR_9490T1.eye_open_tip_mm[0],
+    ANCHOR_9490T1.eye_open_tip_mm[1],
+    ANCHOR_9490T1.wire_radius_mm,
+)
+BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in BOM_COMPONENTS} | {
+    spec.BOSS_HOOK: BalloonAnchor(point_mm=EYEBOLT_BALLOON_POINT_MM)
+}
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.EXPLODED_VIEW_NAME,

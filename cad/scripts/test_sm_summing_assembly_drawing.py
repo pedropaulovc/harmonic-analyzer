@@ -19,6 +19,9 @@ from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from _cone_axis_constants import SUMMING_Z
+import sm_summing_lever_spec
+import sm_vn_boss_hook_jam_nut_spec as jam_nut
+from stock_anchor_geom import ANCHOR_9490T1
 
 
 def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
@@ -111,6 +114,32 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
     mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
     for distance in slide.values():
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
+
+
+def test_jam_nut_explodes_threaded_on_the_eyebolt_shank() -> None:
+    # Fitted, the nut's underside is on the boss top face, ANCHOR_H above the
+    # eyebolt's cut end (flush with the boss underside).
+    seated_above_cut_end = sm_summing_lever_spec.ANCHOR_H
+    drop = explode.BOSS_HOOK_LIFT - explode.BOSS_JAM_NUT_LIFT
+    assert drop > 0.0, "the nut moves down the shank, off its seat"
+    # Still threaded: a full nut thickness of shank under it.
+    assert seated_above_cut_end - drop > jam_nut.THICKNESS
+    # The cut end itself clears the boss top face.
+    assert explode.BOSS_HOOK_LIFT > sm_summing_lever_spec.ANCHOR_H
+
+
+def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
+    anchor = ANCHOR_9490T1
+    point = drawing.EYEBOLT_BALLOON_POINT_MM
+    offset = [p - c for p, c in zip(point, anchor.eye_open_tip_mm)]
+    # On the eye tip's dome-root circle: in the cap plane, one wire radius out.
+    assert sum(o * n for o, n in zip(offset, anchor.eye_open_tip_normal)) == (
+        pytest.approx(0.0, abs=1e-9)
+    )
+    assert math.hypot(*offset) == pytest.approx(anchor.wire_radius_mm)
+    # Its outward normal faces the +X+Y+Z isometric viewer.
+    assert sum(offset) > 0.0
+    assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:
