@@ -117,7 +117,7 @@ BOM_DESCRIPTIONS = {
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
+EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 4-5"
 
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.

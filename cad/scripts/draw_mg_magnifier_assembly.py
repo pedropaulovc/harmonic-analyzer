@@ -1,4 +1,4 @@
-r"""Create the four-sheet magnifier fitter package (MHA-MG-00).
+r"""Create the five-sheet magnifier fitter package (MHA-MG-00).
 
 Sheet 1, ASSEMBLED + SETTINGS: the preserved back, left and back-top-left
 views at 1:4, and every assembly setting printed as the assembly's own model
@@ -25,9 +25,12 @@ BOM (part number, description, vendor SKU, quantity) and one balloon per
 family. Sheet 3, LEVER GROUP: the same explode with only the lever group
 shown, ballooned from the same BOM. Sheet 4, ASSEMBLY STEPS: the finished
 assembly with the lever wire ballooned, beside the numbered sequence
-(mg_magnifier_assembly_steps) and the checks. The instruction column uses
-the left 190 mm; the finished view is centred in the remaining right field.
-The checks wrap more narrowly where they sit beside the title block.
+(mg_magnifier_assembly_steps), one blank line between steps. The instruction
+column uses the left 190 mm; the finished view is centred in the remaining
+right field. The spaced sequence no longer fits that column above the title
+block, so sheet 5, WIRE STEPS + CHECKS, continues it in the same column under
+ASSEMBLY SEQUENCE (CONT.): the two whole lever-wire steps, then the checks,
+beside an unballooned finished view laid out as sheet 4's.
 Step text names the settings and never values them. This recipe never edits
 the source assembly or its explodes.
 """
@@ -55,6 +58,7 @@ import _config
 import _telemetry
 import mg_magnifier_assembly_sheet as notes
 import mg_magnifier_assembly_spec as stack
+import mg_magnifier_assembly_steps as steps
 import mg_magnifier_explode_spec as explode
 import sh_vn_music_wire_lever_geom
 import sh_vn_music_wire_lever_spec
@@ -142,6 +146,7 @@ SHEET_NAMES = (
     "WHEEL GROUP + BOM",
     "LEVER GROUP",
     "ASSEMBLY STEPS",
+    "WIRE STEPS + CHECKS",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the magnifier sheet coordinates are landscape")
@@ -163,6 +168,7 @@ SHEET_SCALES = {
     SHEET_NAMES[1]: EXPLODED_SCALE,
     SHEET_NAMES[2]: EXPLODED_SCALE,
     SHEET_NAMES[3]: SHEET_SCALE,
+    SHEET_NAMES[4]: SHEET_SCALE,
 }
 FRONT_CENTER = (0.070, 0.150)
 # Right sits 18 mm further right than r5's 0.150 so the fixture drop's
@@ -299,6 +305,7 @@ STEPS_LINE_WIDTH = 80  # characters; default-format note text (as MHA-MS-00)
 # R22 sheet 4: the full CHECK note's extent still crosses the tolerance
 # panel when the clamp check uses 80 columns. Wrap all checks at 72 so the
 # entire five-row note clears the panel, without moving it or the steps.
+# (The checks now print on sheet 5 and keep the same rows.)
 CHECKS_LINE_WIDTH = 72
 # Default-format note line pitch (the MHA-PD-00 stake note measured 0.0045).
 NOTE_LINE_PITCH = 0.0046
@@ -323,6 +330,8 @@ FINISHED_CENTER = (
 FINISHED_SCALE_LADDER = (SHEET_SCALE, (1.0, 5.0), (1.0, 6.0))
 FINISHED_LABEL = "finished assembly"
 FINISHED_CAPTION = "FINISHED ASSEMBLY"
+# Sheet 5's unballooned finished view: same field, ladder and caption.
+CHECKS_VIEW_LABEL = "checks finished assembly"
 # Machinist review r4 (run 20261016T123712799Z-1710842d83c44076818f6a515121cce5):
 # the wire's only model edges were its two end circles, so balloon 19 landed
 # on the drum end inside the wheel and read as pointing at a spoke. MHA-SH-VN-56
@@ -501,11 +510,18 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block."""
+    """Wrap each numbered line under its own number; one note per block.
+
+    One blank line separates consecutive numbered steps; a heading and wrapped
+    continuation rows stay tight."""
     out = [heading] if heading else []
+    stepped = False
     for line in lines:
         number, sep, rest = line.partition(". ")
         if sep and number.isdigit():
+            if stepped:
+                out.append("")
+            stepped = True
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -525,16 +541,39 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
+# The spaced sequence's native box runs ~12 mm right of the title block's left
+# edge (run 20261024T041027643Z: x 17.6-227.8 mm), so on both instruction
+# sheets every block must end above the title block. With all eleven steps
+# sheet 4's box reached y 25.3 mm, so the two whole lever-wire steps continue
+# on sheet 5 (MHA-HA-00 cites them there), followed by the checks.
+STEPS_SPLIT = steps.step_number(steps.WIRE_HOOKED_KEY) - 1
+CONTINUED_HEADING = "ASSEMBLY SEQUENCE (CONT.)"
 ASSEMBLY_STEPS = _wrapped(
-    notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+    notes.ASSEMBLY_STEPS[:STEPS_SPLIT],
+    width=STEPS_LINE_WIDTH,
+    heading="ASSEMBLY SEQUENCE",
+)
+ASSEMBLY_STEPS_CONTINUED = _wrapped(
+    notes.ASSEMBLY_STEPS[STEPS_SPLIT:],
+    width=STEPS_LINE_WIDTH,
+    heading=CONTINUED_HEADING,
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=CHECKS_LINE_WIDTH)
 CHECKS_XY = (
     STEPS_XY[0],
-    STEPS_XY[1] - (ASSEMBLY_STEPS.count("\n") + 1) * NOTE_LINE_PITCH - 2 * _PAD,
+    STEPS_XY[1]
+    - (ASSEMBLY_STEPS_CONTINUED.count("\n") + 1) * NOTE_LINE_PITCH
+    - 2 * _PAD,
 )
-if CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH < INNER_BORDER[1]:
-    raise AssertionError("the assembly sequence and checks overrun the sheet")
+if any(
+    top - (block.count("\n") + 1) * NOTE_LINE_PITCH < TITLE_BLOCK[3] + _PAD
+    for block, top in (
+        (ASSEMBLY_STEPS, STEPS_XY[1]),
+        (ASSEMBLY_STEPS_CONTINUED, STEPS_XY[1]),
+        (ASSEMBLY_CHECKS, CHECKS_XY[1]),
+    )
+):
+    raise AssertionError("an assembly instruction note runs down beside the title block")
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
@@ -1497,12 +1536,19 @@ def _grown(box: Box, by: float) -> Box:
     return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
 
 
-def _assert_instruction_clearance(adapter: Any, sequence: Any, checks: Any) -> None:
-    """Read the settled native note boxes, not character-count width estimates."""
-    _activate_sheet(adapter, SHEET_NAMES[3])
-    adapter.currentModel.GraphicsRedraw2()
+def _assert_instruction_clearance(
+    adapter: Any, sequence: Any, continued: Any, checks: Any
+) -> None:
+    """Read the settled native note boxes, not character-count width estimates:
+    steps 1-9 on sheet 4; the wire steps and the checks on sheet 5."""
     bounds: dict[str, Box] = {}
-    for label, note in (("assembly sequence", sequence), ("assembly checks", checks)):
+    for label, sheet_name, note in (
+        ("assembly sequence", SHEET_NAMES[3], sequence),
+        ("assembly sequence, continued", SHEET_NAMES[4], continued),
+        ("assembly checks", SHEET_NAMES[4], checks),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        adapter.currentModel.GraphicsRedraw2()
         extent = tuple(
             float(value) for value in (_early_bound(note, "INote").GetExtent() or ())
         )
@@ -1531,15 +1577,19 @@ def _assert_instruction_clearance(adapter: Any, sequence: Any, checks: Any) -> N
                 f"{_PAD * 1000:.1f} mm title-block clearance"
             )
         bounds[label] = box
-    gap = bounds["assembly sequence"][1] - bounds["assembly checks"][3]
+    gap = bounds["assembly sequence, continued"][1] - bounds["assembly checks"][3]
     if gap < _PAD:
         raise RuntimeError(
-            f"magnifier assembly checks: native gap below the sequence is "
+            f"magnifier assembly checks: native gap below the continued sequence is "
             f"{gap * 1000:.3f} mm, under {_PAD * 1000:.1f} mm"
         )
     _telemetry.info(
         f"magnifier instruction native note boxes={bounds!r}, "
-        f"sequence-to-checks gap_mm={gap * 1000:.3f}"
+        f"continued-sequence-to-checks gap_mm={gap * 1000:.3f}, title-block air mm="
+        + ", ".join(
+            f"{label}: {(box[1] - TITLE_BLOCK[3]) * 1000:.3f}"
+            for label, box in bounds.items()
+        )
     )
 
 
@@ -2384,6 +2434,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, SHEET_NAMES[3], FINISHED_FIELD, SHEET_SCALE, label=FINISHED_LABEL
     )
     source_step(f"{FINISHED_LABEL} view configuration")
+    checks_view = _place_collapsed_view(
+        adapter, SHEET_NAMES[4], FINISHED_FIELD, SHEET_SCALE, label=CHECKS_VIEW_LABEL
+    )
+    source_step(f"{CHECKS_VIEW_LABEL} view configuration")
     assert_full_detail_view(adapter, label=PDF_TITLE)
 
     # The reference carries no balloons, so its ring is its outline: fit the
@@ -2429,6 +2483,13 @@ async def build(adapter: Any) -> dict[str, str]:
             FINISHED_SCALE_LADDER,
             FINISHED_FIELD,
             FINISHED_LABEL,
+        ),
+        (
+            SHEET_NAMES[4],
+            checks_view,
+            FINISHED_SCALE_LADDER,
+            FINISHED_FIELD,
+            CHECKS_VIEW_LABEL,
         ),
     ):
         _activate_sheet(adapter, sheet_name)
@@ -2518,21 +2579,33 @@ async def build(adapter: Any) -> dict[str, str]:
         label="lever caption",
     )
     source_step("lever caption")
-    finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[FINISHED_LABEL])})"
-    _add_note_block(
-        adapter,
-        SHEET_NAMES[3],
-        finished_caption,
-        caption_over(_view_outline(finished, label=FINISHED_LABEL), finished_caption),
-        label="finished caption",
-    )
-    source_step("finished caption")
+    for sheet_name, view, label in (
+        (SHEET_NAMES[3], finished, FINISHED_LABEL),
+        (SHEET_NAMES[4], checks_view, CHECKS_VIEW_LABEL),
+    ):
+        finished_caption = f"{FINISHED_CAPTION} (SCALE {scale_text(scales[label])})"
+        _add_note_block(
+            adapter,
+            sheet_name,
+            finished_caption,
+            caption_over(_view_outline(view, label=label), finished_caption),
+            label=f"{label} caption",
+        )
+        source_step(f"{label} caption")
     sequence_note = _add_note_block(
         adapter, SHEET_NAMES[3], ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
     )
     source_step("assembly sequence")
+    continued_note = _add_note_block(
+        adapter,
+        SHEET_NAMES[4],
+        ASSEMBLY_STEPS_CONTINUED,
+        STEPS_XY,
+        label="assembly sequence, continued",
+    )
+    source_step("assembly sequence, continued")
     checks_note = _add_note_block(
-        adapter, SHEET_NAMES[3], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
+        adapter, SHEET_NAMES[4], ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
     )
     source_step("assembly checks")
     _activate_sheet(adapter, SHEET_NAMES[1])
@@ -2570,12 +2643,15 @@ async def build(adapter: Any) -> dict[str, str]:
                 SHEET_NAMES[1]: scales[WHEEL_LABEL],
                 SHEET_NAMES[2]: scales[LEVER_LABEL],
                 SHEET_NAMES[3]: scales[FINISHED_LABEL],
+                SHEET_NAMES[4]: scales[CHECKS_VIEW_LABEL],
             },
             settled_checks=(
                 *settled_checks,
                 bom_settled,
                 lambda: assert_balloon_landings(adapter, landings),
-                lambda: _assert_instruction_clearance(adapter, sequence_note, checks_note),
+                lambda: _assert_instruction_clearance(
+                    adapter, sequence_note, continued_note, checks_note
+                ),
                 lambda: _assert_source_identity(
                     source_model,
                     source_sha256,
