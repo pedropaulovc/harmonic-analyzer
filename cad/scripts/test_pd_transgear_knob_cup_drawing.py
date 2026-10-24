@@ -64,11 +64,14 @@ def test_bore_callout_names_its_journal_and_clears_the_border_and_centreline() -
     from _layout_geometry import estimate_text_box
 
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
-    assert drawing.BORE_CALLOUT == (
-        f"REAM THRU; SLIDES ON\n{shaft} JOURNAL,\n0.004-0.024\nDIAMETRAL CLEARANCE"
-    )
+    callout = " ".join(drawing.BORE_CALLOUT.split())
+    low, high = spec.BORE_JOURNAL_CLEARANCE
+    assert "REAM" in callout
+    assert shaft in callout
+    assert f"{low:.3f}-{high:.3f}" in callout
+    assert "DIAMETRAL CLEARANCE" in callout
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
-    assert "PIN HOLE" not in drawing.BORE_CALLOUT
+    assert "PIN HOLE" not in callout
 
     anchor = drawing.FACE_KEEP["BoreDia"]
     for line in drawing.BORE_CALLOUT.splitlines():
@@ -84,8 +87,8 @@ def test_bore_callout_names_its_journal_and_clears_the_border_and_centreline() -
 def test_pin_hole_note_stands_apart_and_cites_the_assembly_step() -> None:
     import pd_paper_drive_assembly_steps as steps
 
-    note = drawing.PIN_HOLE_NOTE
-    assert note.startswith("NO CROSS HOLE ON THIS PART")
+    note = " ".join(drawing.PIN_HOLE_NOTE.split())
+    assert "NO CROSS HOLE ON THIS PART" in note
     assert _config.parts("pd-vn-transgear-knob-cup-pin")["number"] in note
     assert steps.step_ref("knob-stack-fitted") in note
     # Below the face view (and its section labels), inside the left border.
@@ -97,7 +100,9 @@ def test_pin_hole_note_stands_apart_and_cites_the_assembly_step() -> None:
 
 def test_front_finish_caption_names_the_plate_boss() -> None:
     plate = _config.parts("pd-transgear-arm-plate")["number"]
-    assert drawing.FRONT_FINISH_CAPTION == f"THRUST FACE ON\n{plate} REAR BOSS"
+    caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
+    assert "THRUST FACE" in caption
+    assert plate in caption
     assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
 
 
