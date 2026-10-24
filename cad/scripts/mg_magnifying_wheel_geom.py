@@ -20,20 +20,27 @@ from __future__ import annotations
 
 import math
 
+from _printed_tolerance import printed_band_mm
 from mg_wheel_drum_geom import (
     DRUM_BORE,
     DRUM_BORE_BAND,
     DRUM_LEN,
     DRUM_LEN_BAND,
+    DRUM_OD,
+    DRUM_OD_PLACES,
     DRUM_WIRE_R,
+    LEVER_WIRE_DIA,
 )
 
 import _mg_wheel_rim_geometry as _rim
 
 WIRE_RATIO = _rim.RIM_WIRE_R / DRUM_WIRE_R  # 4.995, the wheel's magnification
 
-# --- hub: Ø25 boss, then the drum spigot -----------------------------------------
-HUB_DIA = 25.0
+# --- hub: Ø28.5 boss, then the drum spigot ---------------------------------------
+# The boss holds TIE 1's 2.0 wall at the title block's .XX on both its Ø and
+# TIE 1's radius, plus drill wander (mg_magnifying_wheel_spec.TIE1_HUB_WALL):
+# the Ø25 boss held it only by banding both.
+HUB_DIA = 28.5
 HUB_LEN = 19.6  # back face to spigot front face, both faced
 # The hub sits off-centre toward the pen, its back face 0.09 proud of the
 # rim's back face (RIM_AXIAL / 2), so the lever wire's slant down to the drum
@@ -50,7 +57,6 @@ DRUM_MID_Z = round((HUB_STEP_Z + HUB_FRONT_Z) / 2.0, 6)  # -11.01, where the dru
 BORE_DIA = round(0.1890 * 25.4, 6)  # 4.8006
 
 # Printed bands, (upper, lower) deviations.
-HUB_DIA_BAND = (0.10, -0.10)
 HUB_LEN_BAND = (0.10, -0.10)
 # Spigot length plus-only against the drum's minus-only length: the drum,
 # pressed to the boss, never stands proud of the spigot face, so the front
@@ -79,7 +85,7 @@ SPOKE_OVERLAP = 1.0  # the sketched spoke runs this far into the hub and rim
 # Taper: the sketched root end (inside the hub) and tip end (inside the rim).
 SPOKE_ROOT_WIDTH = 6.5
 SPOKE_TIP_WIDTH = 5.0
-SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 11.5
+SPOKE_X0 = HUB_DIA / 2.0 - SPOKE_OVERLAP  # 13.25
 SPOKE_X1 = _rim.RIM_INNER_DIA / 2.0 + SPOKE_OVERLAP  # 45.0
 HUB_FILLET_R = 3.0
 RIM_FILLET_R = 4.0
@@ -95,10 +101,33 @@ CAST_ROUND_R = 0.80
 # Both ties are drilled: the title block's DRILLED HOLES row governs their
 # size (mg_magnifying_wheel_spec takes its plus in every wall).
 TIE_HOLE_DIA = 1.0
-TIE_POSITION_TOL = 0.05
-# TIE 1 (lever wire): straight axial hole through the Ø25 boss on the drum's
-# wire-centre radius, 6 o'clock from the front at rest.
-TIE1_R = DRUM_WIRE_R  # 9.85
+# drawing-guidelines.md rule 17 (walls and webs): a drilled axis may wander
+# this far off true over its depth (the fleet's mg_magnifying_clamp_geom and
+# fr_top_frame_spec figure); the walls charge it at the hole's far end.
+DRILL_WANDER_DEG = 0.3
+# TIE 1 (lever wire): straight axial hole through the boss, 6 o'clock from the
+# front at rest.  Its radius prints at .XX under the title block (no band of
+# its own).  The drum, pressed hard against the boss step, covers that face
+# out to its O.D., so the hole stands outboard of the drum's wire-centre
+# radius: at the largest printed drum (.X), the hole's innermost printed
+# station and its drill wander, the smallest drilled hole still opens a full
+# wire diameter beyond the drum for the wire's end.
+TIE1_R_PLACES = 2
+TIE1_POSITION_BAND = printed_band_mm(TIE1_R_PLACES)  # 0.51
+TIE1_DEPTH_MAX = (HUB_LEN + HUB_LEN_BAND[0]) - (SPIGOT_LEN + SPIGOT_LEN_BAND[1])  # 10.7
+TIE1_WANDER = TIE1_DEPTH_MAX * math.tan(math.radians(DRILL_WANDER_DEG))  # 0.056
+TIE1_R = 10.75
+TIE1_DRUM_OPENING = (
+    TIE1_R
+    - TIE1_POSITION_BAND
+    - TIE1_WANDER
+    + TIE_HOLE_DIA / 2.0
+    - (DRUM_OD + printed_band_mm(DRUM_OD_PLACES)) / 2.0
+)  # 0.834
+if TIE1_DRUM_OPENING < LEVER_WIRE_DIA:
+    raise AssertionError(
+        f"the drum covers TIE 1: {TIE1_DRUM_OPENING:.3f} open < {LEVER_WIRE_DIA} wire"
+    )
 TIE1_CLOCK_DEG = -90.0
 # TIE 2 (pen wire): radial hole, groove bottom to rim ID, about 4:30 from the
 # front (photographed); 2 deg short of it so the worst printed casting keeps a
