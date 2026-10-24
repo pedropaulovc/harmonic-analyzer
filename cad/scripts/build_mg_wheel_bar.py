@@ -149,75 +149,122 @@ def author_dimension_callouts(adapter) -> None:
 async def _author_bore_row(adapter) -> list[tuple[str, str]]:
     """The bore row as model dimensions (the dt_cone_tip_block reference-sketch
     pattern): a Hole Wizard placement sketch cannot dimension from the bar's end
-    or top face, so one construction chain on the row carries the printed
-    stations from the left end and a drop at the right end carries the row's
-    distance from the top face. The stations drive from the same globals as
-    the Hole Wizard placement points, so each print dimension moves with its
+    or top face, so construction chains on the row carry the printed stations
+    from the left end, and a drop at each end carries a row's distance from the
+    top face. The row is two chains: the hanger hole and the axle bore from
+    the left end (title-block band), the clamp pair to the right end (the
+    MHA-SH-02 taps' band). The stations drive from the same globals as the
+    Hole Wizard placement points, so each print dimension moves with its
     hole."""
     right_end_x = BAR_LENGTH / 2.0
     top_y = BAR_TOP_ABOVE_ROW
-    row_xs = (LEFT_END_X, SCREW_HOLE_X, *CLAMP_HOLE_X, right_end_x)
+    left_xs = (LEFT_END_X, SCREW_HOLE_X, AXLE_BORE_X)
+    right_xs = (*CLAMP_HOLE_X, right_end_x)
     row = SketchDims()
     check("create_sketch bore row", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     try:
-        rise = check(
-            "bore row rise",
+        left_rise = check(
+            "bore row left rise",
+            await adapter.add_line(LEFT_END_X, top_y, LEFT_END_X, 0.0),
+        )
+        right_rise = check(
+            "bore row right rise",
             await adapter.add_line(right_end_x, top_y, right_end_x, 0.0),
         )
-        legs = [
-            check(f"bore row leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0))
-            for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
+        left_legs = [
+            check(
+                f"bore row left leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0)
+            )
+            for index, (x0, x1) in enumerate(zip(left_xs, left_xs[1:]))
+        ]
+        right_legs = [
+            check(
+                f"bore row right leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0)
+            )
+            for index, (x0, x1) in enumerate(zip(right_xs, right_xs[1:]))
         ]
     finally:
         set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, rise, "bore row rise")
-    check(
-        "bore row rise vertical",
-        await adapter.add_sketch_constraint(rise, None, "vertical"),
-    )
-    for index, leg in enumerate(legs):
+    for rise, label in ((left_rise, "left"), (right_rise, "right")):
+        _as_construction(adapter, rise, f"bore row {label} rise")
+        check(
+            f"bore row {label} rise vertical",
+            await adapter.add_sketch_constraint(rise, None, "vertical"),
+        )
+    for index, leg in enumerate((*left_legs, *right_legs)):
         _as_construction(adapter, leg, f"bore row leg {index}")
         check(
             f"bore row leg {index} horizontal",
             await adapter.add_sketch_constraint(leg, None, "horizontal"),
         )
-    for index, (leg, after) in enumerate(zip(legs, [*legs[1:], None])):
-        end = f"{rise}.end" if after is None else f"{after}.start"
+    # The left chain hangs off its rise; the right chain runs on to its rise.
+    chain = [
+        (f"{left_rise}.end", f"{left_legs[0]}.start"),
+        *(
+            (f"{leg}.end", f"{after}.start")
+            for leg, after in zip(left_legs, left_legs[1:])
+        ),
+        *(
+            (f"{leg}.end", f"{after}.start")
+            for leg, after in zip(right_legs, right_legs[1:])
+        ),
+        (f"{right_legs[-1]}.end", f"{right_rise}.end"),
+    ]
+    for index, (point, other) in enumerate(chain):
         check(
-            f"bore row leg {index} chained",
-            await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
+            f"bore row link {index} coincident",
+            await adapter.add_sketch_constraint(point, other, "coincident"),
         )
     await anchor_point_to_origin(
-        adapter, f"{rise}.start", right_end_x, top_y, "bar top right corner"
-    )
-    row.record("RowEndX", '"BarLength" / 2')
-    row.record("RowTopY", '"BarTop"')
-    await dimension_between(
-        adapter,
-        f"{rise}.start",
-        f"{rise}.end",
-        "vertical_distance",
-        BORE_ROW_FROM_TOP,
-        "bore row from top",
-    )
-    row.record("BoreRowFromTop", '"BarTop"')
-    start = f"{legs[0]}.start"
-    await dimension_between(
-        adapter, start, "origin", "horizontal_distance", -LEFT_END_X, "bar left end"
+        adapter, f"{left_rise}.start", LEFT_END_X, top_y, "bar top left corner"
     )
     row.record("RowStartX", '"BarLength" / 2')
-    # Each hole ends one leg; the last leg runs on to the rise.
-    for leg, station, name in zip(
-        legs[:-1],
-        (HANGER_STATION, *CLAMP_STATIONS),
-        ("HangerStation", "ClampStation1", "ClampStation2"),
-        strict=True,
+    row.record("RowStartTopY", '"BarTop"')
+    await dimension_between(
+        adapter,
+        f"{left_rise}.start",
+        f"{left_rise}.end",
+        "vertical_distance",
+        BORE_ROW_FROM_TOP,
+        "hanger and axle row from top",
+    )
+    row.record("BoreRowFromTop", '"BarTop"')
+    await anchor_point_to_origin(
+        adapter, f"{right_rise}.start", right_end_x, top_y, "bar top right corner"
+    )
+    row.record("RowEndX", '"BarLength" / 2')
+    row.record("RowEndTopY", '"BarTop"')
+    await dimension_between(
+        adapter,
+        f"{right_rise}.start",
+        f"{right_rise}.end",
+        "vertical_distance",
+        BORE_ROW_FROM_TOP,
+        "clamp row from top",
+    )
+    row.record("ClampRowFromTop", '"BarTop"')
+    start = f"{left_legs[0]}.start"
+    for point, station, name, drive in (
+        (f"{left_legs[0]}.end", HANGER_STATION, "HangerStation", '"HangerStation"'),
+        (
+            f"{left_legs[1]}.end",
+            AXLE_BORE_STATION,
+            "RowAxleStation",
+            '"AxleBoreStation"',
+        ),
+        (
+            f"{right_legs[0]}.start",
+            CLAMP_STATIONS[0],
+            "ClampStation1",
+            '"ClampStation1"',
+        ),
+        (f"{right_legs[0]}.end", CLAMP_STATIONS[1], "ClampStation2", '"ClampStation2"'),
     ):
         await dimension_between(
-            adapter, start, f"{leg}.end", "horizontal_distance", station, name
+            adapter, start, point, "horizontal_distance", station, name
         )
-        row.record(name, f'"{name}"')
+        row.record(name, drive)
     await ensure_fully_defined(adapter, "bore row sketch")
     check("exit_sketch bore row", await adapter.exit_sketch())
     name_last_feature(adapter, "BoreRowReference")
@@ -441,9 +488,10 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)
     )
-    # The row and the clamp stations carry the MHA-SH-02 taps' band.
+    # The clamp row and stations carry the MHA-SH-02 taps' band; the hanger
+    # and axle row is the title block's.
     set_dimension_symmetric_tolerance(
-        adapter, "BoreRowReference", "BoreRowFromTop", CLAMP_POSITION_BAND
+        adapter, "BoreRowReference", "ClampRowFromTop", CLAMP_POSITION_BAND
     )
     set_dimension_symmetric_tolerance(
         adapter, "BoreRowReference", "ClampStation1", CLAMP_POSITION_BAND

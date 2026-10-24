@@ -81,7 +81,9 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
-FRONT_CENTER = (0.155, 0.175)
+# The front view stands far enough right that the hanger row's drop, off the
+# bar's left end, clears the frame.
+FRONT_CENTER = (0.161, 0.175)
 # The end view stands far enough right that the height's callout runs
 # between it and the bar end.
 RIGHT_CENTER = (0.340, 0.175)
@@ -113,14 +115,17 @@ FRONT_KEEP = {
     "ClampStation1": (LEFT_END + 0.082, _BAR_BOTTOM - 0.038),
     "ClampStation2": (LEFT_END + 0.152, _BAR_BOTTOM - 0.046),
     "Length": (FRONT_CENTER[0], _BAR_BOTTOM - 0.054),
-    # The bar height and the row's drop from the top face off the right end,
-    # in the open sheet between the bar and the end view: off the left end
-    # their text sat on the border's zone letter and frame line. Both share
-    # the top face's extension line: the shorter row nearer the bar, its text
-    # (the band and its mate) above the top face; the height's line outside
-    # it, its text under the bottom face.
+    # The bar height and the clamp row's drop from the top face off the right
+    # end, in the open sheet between the bar and the end view: off the left
+    # end the height's text sat on the border's zone letter and frame line.
+    # Both share the top face's extension line: the shorter row nearer the
+    # bar, its text (the band and its mate) above the top face; the height's
+    # line outside it, its text under the bottom face.
     "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
-    "BoreRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
+    "ClampRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
+    # The hanger and axle row's drop off the left end, its text above the top
+    # face and left of the bar, clear of the hanger callout's leader.
+    "BoreRowFromTop": (LEFT_END - 0.018, _BAR_TOP + 0.008),
     # The reamed Ø up and right of the bore, the press lines standing clear
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
@@ -307,9 +312,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     )
 
-    # x <= 0.235 keeps the ~55 mm label fully left of the title-block keep-out
-    # (x >= 0.264) -- the first run landed it 25.6 x 4.5 mm into the block.
-    add_property_linked_note(adapter, "Isometric View Note", 0.180, 0.070)
+    # Beside the isometric, over its lower-right run (the view falls from
+    # its upper-left end): clear of the title block below and of the depth's
+    # callout above.
+    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.118)
 
     return await finalize_drawing(
         adapter,

@@ -81,7 +81,13 @@ def test_screw_hole_stations_are_model_dimensions_from_the_left_end() -> None:
     import mg_wheel_bar_geom as geom
 
     row = mg_wheel_bar_spec.DRAWING_DIMENSIONS["BoreRowReference"]
-    assert row == {"BoreRowFromTop", "HangerStation", "ClampStation1", "ClampStation2"}
+    assert row == {
+        "BoreRowFromTop",
+        "ClampRowFromTop",
+        "HangerStation",
+        "ClampStation1",
+        "ClampStation2",
+    }
     assert row <= set(drawing.FRONT_KEEP)
     left_end = -geom.BAR_LENGTH / 2.0
     assert geom.HANGER_STATION == pytest.approx(geom.SCREW_HOLE_X - left_end) == 5.0
@@ -114,13 +120,18 @@ def test_station_rows_stack_shortest_nearest_under_the_bar() -> None:
     for name in ("AxleBoreStation", "ClampStation1", "ClampStation2", "Length"):
         assert drawing.LEFT_END < drawing.FRONT_KEEP[name][0]
         assert drawing.FRONT_KEEP[name][0] < drawing.LEFT_END + spans[name] / 1000.0
-    # Off the right end the row's drop nests inside the bar height (baseline
-    # on the top face): its line nearer the bar, its text above the bar, the
-    # height's below.
-    row_x, row_y = drawing.FRONT_KEEP["BoreRowFromTop"]
+    # Off the right end the clamp row's drop nests inside the bar height
+    # (baseline on the top face): its line nearer the bar, its text above the
+    # bar, the height's below.
+    row_x, row_y = drawing.FRONT_KEEP["ClampRowFromTop"]
     side_x, side_y = drawing.FRONT_KEEP["Side"]
     assert drawing.RIGHT_END + 0.016 < row_x < side_x
     assert side_y < bar_bottom < bar_top < row_y
+    # The hanger and axle row's drop stands off the left end, above the top
+    # face, its text left of the bar and inside the frame.
+    left_x, left_y = drawing.FRONT_KEEP["BoreRowFromTop"]
+    assert 0.020 < left_x < drawing.LEFT_END - 0.012
+    assert bar_top < left_y < drawing.HANGER_CALLOUT_XY[1] - 0.015
 
 
 def test_the_sheet_carries_no_general_notes() -> None:
@@ -139,20 +150,22 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
     assert callouts.authored_by_name() == {
         "AxleBoreDia": {callouts.CALLOUT_BELOW: callouts.AXLE_BORE_CALLOUT},
         "BarDepth": {callouts.CALLOUT_BELOW: callouts.BAR_DEPTH_CALLOUT},
-        "BoreRowFromTop": {callouts.CALLOUT_BELOW: callouts.BORE_ROW_CALLOUT},
+        "ClampRowFromTop": {callouts.CALLOUT_BELOW: callouts.CLAMP_ROW_CALLOUT},
     }
     # The literals keep the wheel group and the axle out of the part recipe;
     # the mate is named by its number (rule 4).
     axle = _config.parts("mg-wheel-axle")["number"]
     assert callouts.AXLE_BORE_CALLOUT == (
         f"REAM THRU\nPRESS FIT {axle} AXLE\n"
-        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} INTERFERENCE"
+        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} DIAMETRAL\nINTERFERENCE"
     )
     assert callouts.BAR_DEPTH_CALLOUT == (
         f"{axle} AXLE BACK END\n"
         f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK"
     )
-    assert "MHA-SH-02" in callouts.BORE_ROW_CALLOUT
+    assert callouts.CLAMP_ROW_CALLOUT.startswith("2X CLAMP HOLES")
+    assert "MHA-SH-02" in callouts.CLAMP_ROW_CALLOUT
+    assert "DIAMETRAL INTERFERENCE" in callouts.AXLE_BORE_CALLOUT.replace("\n", " ")
     assert "MHA-SH-02" in callouts.CLAMP_HOLE_CALLOUT
     texts = [*callouts.authored_by_name().values()]
     for lanes in texts:
@@ -198,28 +211,39 @@ def test_every_bore_keeps_a_two_mm_wall_from_the_top_face_row() -> None:
     assert (
         mg_wheel_bar_spec.AXLE_BORE_STATION == geom.AXLE_BORE_X + geom.BAR_LENGTH / 2.0
     )
-    # The height has no band: the title block's .X (+/-0.8) governs it.
+    # The height has no band: the title block's .X (+/-0.8) governs it. The
+    # hanger hole and the axle bore sit at the title block's .XX (+/-0.51)
+    # from the top face, the clamp pair at the taps' +/-0.18.
     side_min = geom.BAR_SIDE - 0.8
-    drop, band = (
-        mg_wheel_bar_spec.BORE_ROW_FROM_TOP,
-        mg_wheel_bar_spec.CLAMP_POSITION_BAND,
-    )
+    drop = mg_wheel_bar_spec.BORE_ROW_FROM_TOP
     assert drop == geom.BAR_TOP_ABOVE_ROW
-    radii = {
-        "axle bore": (geom.AXLE_BORE_DIA + geom.AXLE_BORE_BAND[0]) / 2.0,
-        "pen-hanger hole": (geom.PEN_HANGER_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
-        "clamp holes": (geom.CLAMP_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
+    bores = {
+        "axle bore": ((geom.AXLE_BORE_DIA + geom.AXLE_BORE_BAND[0]) / 2.0, 0.51),
+        "pen-hanger hole": (
+            (geom.PEN_HANGER_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
+            0.51,
+        ),
+        "clamp holes": (
+            (geom.CLAMP_HOLE_DIA + geom.DRILLED_HOLE_PLUS) / 2.0,
+            mg_wheel_bar_spec.CLAMP_POSITION_BAND,
+        ),
     }
-    top = {bore: drop - band - radius for bore, radius in radii.items()}
-    bottom = {bore: side_min - drop - band - radius for bore, radius in radii.items()}
-    walls = {bore: min(top[bore], bottom[bore]) for bore in radii}
+    top = {bore: drop - band - radius for bore, (radius, band) in bores.items()}
+    bottom = {
+        bore: side_min - drop - band - radius for bore, (radius, band) in bores.items()
+    }
+    walls = {bore: min(top[bore], bottom[bore]) for bore in bores}
     assert walls == pytest.approx(mg_wheel_bar_spec.BORE_ROW_WALLS)
-    assert walls["clamp holes"] == pytest.approx(2.281)
+    assert walls == pytest.approx(
+        {"axle bore": 2.116, "pen-hanger hole": 2.154, "clamp holes": 2.281},
+        abs=1e-3,
+    )
     assert bottom["clamp holes"] == pytest.approx(2.481)
     assert min(walls.values()) >= 2.0
-    # The photographed 10 bar at the same bands leaves the clamp holes 1.48
-    # under them: the height grew rather than its band tightening.
-    assert 10.0 - 0.8 - drop - band - radii["clamp holes"] == pytest.approx(1.481)
+    # The photographed 10 bar leaves the clamp holes 1.48 under them even at
+    # the taps' band: the height grew rather than a band tightening.
+    radius, band = bores["clamp holes"]
+    assert 10.0 - 0.8 - drop - band - radius == pytest.approx(1.481)
 
 
 def test_axle_bore_is_a_marked_reamed_cut() -> None:
@@ -234,6 +258,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
         "AxleBoreStation": 2,
         "BarDepth": 2,
         "BoreRowFromTop": 2,
+        "ClampRowFromTop": 2,
         "HangerStation": 2,
         "ClampStation1": 2,
         "ClampStation2": 2,
@@ -241,7 +266,7 @@ def test_axle_bore_is_a_marked_reamed_cut() -> None:
     assert model_toleranced_dimensions(part) == {
         ("Bar", "BarDepth"): "*deviations(BAR_DEPTH_BAND)",
         ("AxleBoreProfile", "AxleBoreDia"): "*deviations(AXLE_BORE_BAND)",
-        ("BoreRowReference", "BoreRowFromTop"): "CLAMP_POSITION_BAND",
+        ("BoreRowReference", "ClampRowFromTop"): "CLAMP_POSITION_BAND",
         ("BoreRowReference", "ClampStation1"): "CLAMP_POSITION_BAND",
         ("BoreRowReference", "ClampStation2"): "CLAMP_POSITION_BAND",
     }

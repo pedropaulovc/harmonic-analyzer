@@ -38,39 +38,47 @@ from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
 # every hole station reads from that end.
 AXLE_BORE_STATION = AXLE_BORE_X - LEFT_END_X  # 61.0
 
-# The height prints at .X under the title block: no mate bounds it.
+# Height 10 -> 11, grown downward, for 2.0 walls round the clamp holes at
+# the title-block bands (owner ruling 2026-10-24; mg_wheel_bar_geom): a 10
+# bar at .X leaves the clamp holes 1.48 under them even with the row at
+# +/-0.18. The height prints at .X under the title block: no mate bounds it.
 BAR_SIDE_PLACES = 1
 # The bore row reads from the TOP face, the face the pen-hanger strap's top is
-# flush with and the top assembly sets the bar by.
+# flush with and the top assembly sets the bar by. It prints twice, from each
+# end: the hanger hole and the axle bore at the title block's .XX, the clamp
+# pair with the taps' band below.
 BORE_ROW_FROM_TOP = BAR_TOP_ABOVE_ROW  # 5.0
+BORE_ROW_PLACES = 2
 # The clamp holes' position band, a fixed-fastener stack as on the support bar
 # (build_pd_support_bar.CLAMP_POSITION_BAND): each #8-32 clamp screw stands in
 # its MHA-SH-02 back-arc tap (+/-0.1 station and height, sh_column_clamp_fit)
 # and passes this bar's #8 clearance hole, whose least size clears the screw
 # major by 0.812. A +/-band on a hole's row height and station is a diametral
 # zone of 2*sqrt(2)*band; with the taps' 0.283 it must stay inside the 0.812:
-# +/-0.18 at .XX (0.509 + 0.283 = 0.792). The row and both clamp stations
-# carry it. A literal, so the clamp's geometry stays out of this part's recipe
-# (test_mg_wheel_bar_drawing derives it from the clamp's own modules).
+# +/-0.18 at .XX (0.509 + 0.283 = 0.792). The clamp row and both clamp
+# stations carry it. A literal, so the clamp's geometry stays out of this
+# part's recipe (test_mg_wheel_bar_drawing derives it from the clamp's own
+# modules).
 CLAMP_POSITION_BAND = 0.18
 CLAMP_POSITION_PLACES = 2
 
 BORE_MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target, worst case
-# Worst wall above and below each bore: the row at its band from the top face,
+# Worst wall above and below each bore: its row at its band from the top face,
 # the bar at its title-block least height, the bore at its largest.
 BAR_SIDE_MIN = BAR_SIDE - printed_band_mm(BAR_SIDE_PLACES)  # 10.2
-BORE_MAX_RADII = {
-    "axle bore": (AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0,
-    "pen-hanger hole": (PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
-    "clamp holes": (CLAMP_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0,
-}
+_ROW_BAND = printed_band_mm(BORE_ROW_PLACES)  # 0.51
+BORE_BANDS = {
+    "axle bore": ((AXLE_BORE_DIA + AXLE_BORE_BAND[0]) / 2.0, _ROW_BAND),
+    "pen-hanger hole": ((PEN_HANGER_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0, _ROW_BAND),
+    "clamp holes": ((CLAMP_HOLE_DIA + DRILLED_HOLE_PLUS) / 2.0, CLAMP_POSITION_BAND),
+}  # bore -> (largest radius, row band)
 BORE_ROW_WALLS = {
     bore: min(
-        BORE_ROW_FROM_TOP - CLAMP_POSITION_BAND - radius,
-        BAR_SIDE_MIN - BORE_ROW_FROM_TOP - CLAMP_POSITION_BAND - radius,
+        BORE_ROW_FROM_TOP - band - radius,
+        BAR_SIDE_MIN - BORE_ROW_FROM_TOP - band - radius,
     )
-    for bore, radius in BORE_MAX_RADII.items()
-}  # 2.446, 2.484, 2.281: every top wall governs
+    for bore, (radius, band) in BORE_BANDS.items()
+}  # 2.116, 2.154, 2.281: every top wall governs
 for _bore, _wall in BORE_ROW_WALLS.items():
     if _wall < BORE_MIN_WALL:
         raise AssertionError(f"wheel-bar {_bore} wall {_wall:.3f} < {BORE_MIN_WALL}")
@@ -81,7 +89,7 @@ for _bore, _wall in BORE_ROW_WALLS.items():
 # The reamed axle bore is a sketch-cut whose diameter (with its reamer band)
 # and station from the left end are model dimensions.  The three screw bores
 # are native Hole Wizard clearance holes (sizes on their native callouts);
-# their stations from the left end and the row's drop from the top face
+# their stations from the left end and the two rows' drops from the top face
 # ride the hidden BoreRowReference sketch, driven by the same equations as the
 # Hole Wizard placement points. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -90,12 +98,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "AxleBoreProfile": {"AxleBoreDia", "AxleBoreStation"},
     "BoreRowReference": {
         "BoreRowFromTop",
+        "ClampRowFromTop",
         "HangerStation",
         "ClampStation1",
         "ClampStation2",
     },
 }
-# The length and the height print .X; the depth, the row, the stations and
+# The length and the height print .X; the depth, the rows, the stations and
 # the bore station .XX; the reamed bore .XXX.  The hanger station's .XX is the
 # title block's row: at .X (+/-0.8) its end wall would fall to 1.86
 # (mg_wheel_bar_geom.require_hanger_end_wall).
@@ -104,7 +113,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Bar": {"BarDepth": 2},
     "AxleBoreProfile": {"AxleBoreDia": 3, "AxleBoreStation": 2},
     "BoreRowReference": {
-        "BoreRowFromTop": CLAMP_POSITION_PLACES,
+        "BoreRowFromTop": BORE_ROW_PLACES,
+        "ClampRowFromTop": CLAMP_POSITION_PLACES,
         "HangerStation": PEN_HANGER_STATION_PLACES,
         "ClampStation1": CLAMP_POSITION_PLACES,
         "ClampStation2": CLAMP_POSITION_PLACES,

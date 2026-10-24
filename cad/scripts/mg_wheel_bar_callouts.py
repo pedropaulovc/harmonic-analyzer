@@ -17,12 +17,14 @@ from __future__ import annotations
 
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 # The reamed bore names its press fit on the axle by number (rule 4).
-AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT MHA-MG-07 AXLE\n0.010-0.030 INTERFERENCE"
+AXLE_BORE_CALLOUT = (
+    "REAM THRU\nPRESS FIT MHA-MG-07 AXLE\n0.010-0.030 DIAMETRAL\nINTERFERENCE"
+)
 # The depth's band places the pressed axle's back end on the back face.
 BAR_DEPTH_CALLOUT = "MHA-MG-07 AXLE BACK END\n0.35 PROUD TO 1.55 SUNK"
-# One row for every bore; its band is the clamp holes' on the MHA-SH-02 taps
+# The clamp pair's row: its band is the MHA-SH-02 taps'
 # (mg_wheel_bar_spec.CLAMP_POSITION_BAND).
-BORE_ROW_CALLOUT = "ALL BORES;\nCLAMP HOLES TO\nMHA-SH-02 TAPS"
+CLAMP_ROW_CALLOUT = "2X CLAMP HOLES TO\nMHA-SH-02 TAPS"
 # Under the drawing's own native 2X clamp-hole callout: the taps the banded
 # stations and row locate the holes to.  A drawing annotation, not an
 # imported model dimension, so the sheet writes it.
@@ -33,7 +35,7 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
     CALLOUT_BELOW: {
         ("AxleBoreProfile", "AxleBoreDia"): AXLE_BORE_CALLOUT,
         ("Bar", "BarDepth"): BAR_DEPTH_CALLOUT,
-        ("BoreRowReference", "BoreRowFromTop"): BORE_ROW_CALLOUT,
+        ("BoreRowReference", "ClampRowFromTop"): CLAMP_ROW_CALLOUT,
     },
 }
 
