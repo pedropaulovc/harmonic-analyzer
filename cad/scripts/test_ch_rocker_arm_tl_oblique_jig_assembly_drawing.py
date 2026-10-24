@@ -266,16 +266,21 @@ def _cluster_outline(cluster, center=(0.2, 0.15), *, scale=None):
 
 def test_sheets_are_landscape_with_their_scales() -> None:
     assert len(drawing.SHEET_NAMES) == len(set(drawing.SHEET_NAMES))
-    assert drawing.SHEET_NAMES[7:10] == (
+    assert drawing.SHEET_NAMES[6:11] == (
+        drawing.STEPS_SHEET, drawing.STEPS_CONTINUED_SHEET,
         drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
     )
-    assert len(drawing.SHEET_NAMES) == 10
+    assert len(drawing.SHEET_NAMES) == 11
     assert set(drawing.SHEET_LAYOUTS.values()) == {drawing.DrawingLayout.LANDSCAPE}
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     assert drawing.SHEET_SCALES[drawing.ASSEMBLED_SHEET] == drawing.ASSEMBLED_SCALE
     assert drawing.SHEET_SCALES[drawing.BOM_SHEET] == drawing.REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.CAPTURE_SHEET] == drawing.ISOMETRIC_SCALE
     assert drawing.SHEET_SCALES[drawing.STEPS_SHEET] == drawing.NOTES_REFERENCE_SCALE
+    assert (
+        drawing.SHEET_SCALES[drawing.STEPS_CONTINUED_SHEET]
+        == drawing.NOTES_REFERENCE_SCALE
+    )
     assert drawing.SHEET_SCALES[drawing.CARTRIDGE_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert drawing.SHEET_SCALES[drawing.TOP_CAPTURE_SHEET] == drawing.NOTES_REFERENCE_SCALE
     assert all(
@@ -462,30 +467,53 @@ def test_exploded_captions_fit_their_text_region() -> None:
 
 def test_sheet_text_wraps_within_its_layout_width() -> None:
     # Split only between complete labelled steps or sub-steps.
-    if drawing.ASSEMBLY_STEPS_CONTINUED:
-        label = drawing.ASSEMBLY_STEPS_CONTINUED.split(". ", 1)[0]
+    steps = drawing.STEPS_LAYOUT
+    if steps.continued:
+        label = steps.continued.split(". ", 1)[0]
         assert drawing._STEP_LABEL.fullmatch(label)
-    cartridge = drawing.CARTRIDGE_LAYOUT
-    top_capture = drawing.TOP_CAPTURE_LAYOUT
-    capture = drawing.CAPTURE_LAYOUT
-    for text, width in (
+    texts = [
         (drawing.ASSEMBLED_CAPTION, drawing.CAPTION_WIDTH),
         (drawing.ALIGNMENT_NOTE, drawing.ALIGNMENT_WIDTH),
-        (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
-        (drawing.ASSEMBLY_CHECKS, drawing.STEPS_LINE_WIDTH),
-        (cartridge.steps, drawing.STEPS_LINE_WIDTH),
-        (cartridge.continued, drawing.STEPS_LINE_WIDTH),
-        (top_capture.steps, drawing.STEPS_LINE_WIDTH),
-        (top_capture.continued, drawing.STEPS_LINE_WIDTH),
-        (capture.steps, drawing.STEPS_LINE_WIDTH),
-        (capture.continued, drawing.STEPS_LINE_WIDTH),
-        (capture.checks, drawing.STEPS_LINE_WIDTH),
+    ]
+    for layout in (
+        steps, drawing.STEPS_CONTINUED_LAYOUT, drawing.CARTRIDGE_LAYOUT,
+        drawing.TOP_CAPTURE_LAYOUT, drawing.CAPTURE_LAYOUT,
     ):
+        for text in (layout.steps, layout.continued, layout.checks):
+            if text:
+                texts.append((text, drawing.STEPS_LINE_WIDTH))
+    for text, width in texts:
         assert max(len(line) for line in text.split("\n")) <= width
     # Each alignment station prints whole on one line.
     for line in spec.ALIGNMENT_NOTE_LINES[1:]:
         assert line in drawing.ALIGNMENT_NOTE.split("\n")
+
+
+def test_a_blank_line_parts_each_top_level_step() -> None:
+    text = drawing._wrapped(
+        ("1. FIRST.", "7A. SUB A.", "7B. SUB B.", "GROUP:", "C3. THIRD.",
+         "C3A. SUB.", "C4. FOURTH.", "CHECK: LOOSE."),
+        width=drawing.STEPS_LINE_WIDTH, heading="HEAD", spaced=True,
+    )
+    assert text.split("\n") == [
+        "HEAD", "1. FIRST.", "", "7A. SUB A.", "7B. SUB B.", "", "GROUP:",
+        "C3. THIRD.", "C3A. SUB.", "", "C4. FOURTH.", "CHECK: LOOSE.",
+    ]
+
+
+def test_sequence_continues_whole_with_step_13_over_its_checks() -> None:
+    first, cont = drawing.STEPS_LAYOUT, drawing.STEPS_CONTINUED_LAYOUT
+    heading = f"{drawing.STEPS_HEADING} (CONT.)"
+    assert not first.checks
+    assert cont.steps.startswith(f"{heading}\n13A.")
+    # 13C cites "THE CHECKS BELOW": they print under step 13, not beside it.
+    assert cont.checks_xy[0] == drawing.STEPS_XY[0]
+    assert cont.checks_xy[1] < drawing.STEPS_XY[1] - _lines(cont.steps) * LINE_M
+    printed = "\n".join((first.steps, first.continued, cont.steps, cont.checks))
+    printed = printed.removeprefix(drawing.STEPS_HEADING).replace(heading, "")
+    assert printed.split() == " ".join(
+        (*spec.ASSEMBLY_STEPS, *spec.ASSEMBLY_CHECKS)
+    ).split()
 
 
 def test_assembled_sheet_regions_fit_apart() -> None:
@@ -956,6 +984,7 @@ def _lines(text: str) -> int:
 
 def test_steps_sheet_regions_fit_apart() -> None:
     _assert_steps_sheet_fits(drawing.STEPS_LAYOUT)
+    _assert_steps_sheet_fits(drawing.STEPS_CONTINUED_LAYOUT)
     _assert_steps_sheet_fits(drawing.CARTRIDGE_LAYOUT)
     _assert_steps_sheet_fits(drawing.TOP_CAPTURE_LAYOUT)
 
@@ -964,6 +993,7 @@ def test_steps_sheet_regions_fit_apart() -> None:
     "sheet,layout",
     (
         (drawing.STEPS_SHEET, drawing.STEPS_LAYOUT),
+        (drawing.STEPS_CONTINUED_SHEET, drawing.STEPS_CONTINUED_LAYOUT),
         (drawing.CARTRIDGE_SHEET, drawing.CARTRIDGE_LAYOUT),
         (drawing.TOP_CAPTURE_SHEET, drawing.TOP_CAPTURE_LAYOUT),
     ),
@@ -1242,8 +1272,9 @@ def test_steps_cite_every_screw_by_item_number() -> None:
     steps = "\n".join(
         text
         for layout in (
-            drawing.STEPS_LAYOUT, drawing.CARTRIDGE_LAYOUT,
-            drawing.TOP_CAPTURE_LAYOUT, drawing.CAPTURE_LAYOUT,
+            drawing.STEPS_LAYOUT, drawing.STEPS_CONTINUED_LAYOUT,
+            drawing.CARTRIDGE_LAYOUT, drawing.TOP_CAPTURE_LAYOUT,
+            drawing.CAPTURE_LAYOUT,
         )
         for text in (layout.steps, layout.continued)
     )
@@ -2377,6 +2408,7 @@ def native_property_package(monkeypatch, native_bom_bindings):
         "LEADSCREW FEED EXPLODED",
         "CARRIER EXPLODED",
         "ASSEMBLY STEPS",
+        "ASSEMBLY STEPS CONTINUED",
         "CARTRIDGEASSEMBLY",
         "TOPCAPTUREFIT",
         "CAPTUREANDOPERATION",
@@ -3374,7 +3406,7 @@ def test_every_physical_sheet_links_to_its_actual_live_model_view(
 @pytest.mark.parametrize(
     "sheet",
     (
-        drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET,
+        drawing.STEPS_SHEET, drawing.STEPS_CONTINUED_SHEET, drawing.CARTRIDGE_SHEET,
         drawing.TOP_CAPTURE_SHEET, drawing.CAPTURE_SHEET,
     ),
 )
@@ -3515,7 +3547,10 @@ def test_c2a_is_authored_at_fitted_scale_before_real_finalizer_repins_it(
 
 @pytest.mark.parametrize(
     "sheet",
-    (drawing.STEPS_SHEET, drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET),
+    (
+        drawing.STEPS_SHEET, drawing.STEPS_CONTINUED_SHEET,
+        drawing.CARTRIDGE_SHEET, drawing.TOP_CAPTURE_SHEET,
+    ),
 )
 def test_instruction_reference_refuses_a_native_outline_outside_its_room(
     native_property_package, sheet,
