@@ -8,9 +8,9 @@ fr-top-frame:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-hanger slot position frames and the knife-hanger crossbar centring frame"
-      finding: "position frames over-specified (rule 5)"
-      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds the hanger axes' shift off the crossbar median while retaining the screw/slot and side webs (owner-accepted knife-edge-system control)"
+      where: "sheet 6: the two knife-hanger dowel-slot position frames, ⌖ 0.05 | B | C▷ 'SLOT WIDTH ON B' (front slot) and ⌖ 0.05 | C | B▷ 'SLOT WIDTH ON C' (rear slot), with section F-F's toleranced 2X 15.264 ±0.13 MATCHES MHA-SM-02 slot station; and sheet 3's knife-hanger crossbar centring frame (2X HANGER AXES ON D)"
+      finding: "position frames over-specified (rule 5); and the slot frames read as incomplete or missing their basics because no boxed basic dimension locates the slot: 2X 15.264 prints as an ordinary ±0.13 dimension, not basic (rule 5)"
+      reason: "owner ruling 2026-10-24 under ASME Y14.5-2018: each sheet-6 slot frame controls only the slot WIDTH, its median plane centred on its own round hole (datum B front, datum C rear) at an implied basic 0 and an implied basic 90 deg to the B-C line, which need no printed basic; the toleranced 2X 15.264 ±0.13 sets the slot's position ALONG the slot and is the band the slot-travel (3.820 min against 3.795 required) and 2.0 wall stacks charge, so a basic along-slot dimension is not required and the frames are complete as drawn. The frames keep both knife mounts' dowel lines square to the knife-edge line and bound the hanger axes' shift off the crossbar median while retaining the screw/slot and side webs (owner-accepted knife-edge-system control)"
     - id: "RV-02"
       kind: "accept"
       where: "sheet 3 general note 'INSIDE CORNERS R3.0 MAX UNLESS NOTED'"
