@@ -847,6 +847,56 @@ def _conditional_b9e4_layout():
     )
 
 
+def test_cde5928_native_ream_block_has_only_rule14_crossings() -> None:
+    """The regenerated REAM block on the actual native sheet, not a replay.
+
+    The fixture is the native sheet dump that the layout audit of farm run
+    20261023T221615220Z-ecf9bdf512a4457e989c2c7ec5d79601 (cde5928fa) read,
+    with that run's complete PDF ink (text spans and all 1357 strokes,
+    re-extracted from the machinist-reviewed PDF). Its REAM rows must still be
+    the spec's, so a wording change must be captured again from a fresh run.
+    """
+    import json
+    from collections import Counter
+    from _layout_audit import audit_dump
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures" / "ch_rocker_arm_tl_oblique_carrier_cde5928.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert fixture["commit"].startswith("cde5928fa")
+    assert fixture["pdf_sha256"] == (
+        "8d488c7fd3bfbb1b37c763a5d56421d343166a5bfa6f9e2119d92aa60ea431dc"
+    )
+    sheet = fixture["sheet"]
+    assert len(sheet["ink"]["strokes"]) == 1357
+    (raw,) = [
+        annotation for annotation in sheet["views"][0]["annotations"]
+        if annotation["name"] == "PinHoleDia"
+    ]
+    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
+        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    )
+    findings = audit_dump(sheet)
+    # Coverage: offline, the audit reproduces the farm run's own report
+    # exactly, so every view has its printed edges and all text its ink (no
+    # view-edges-missing, text-unmatched or pdf-text-unclaimed finding).
+    assert Counter(finding.kind for finding in findings) == {
+        "dim-line-crosses-extension": 25,
+        "leader-crosses-line": 2,
+        "leader-over-part": 1,
+        "text-separation": 1,
+    }
+    ream = [
+        finding for finding in findings
+        if " PinHoleDia " in f" {finding.a} " or " PinHoleDia " in f" {finding.b} "
+    ]
+    # Its diameter approach crosses witness extensions only (rule 14): no
+    # text, leader, arrow, edge, border or unmatched-ink finding.
+    assert ream and {finding.kind for finding in ream} == {"dim-line-crosses-extension"}
+
+
 def test_b9e4_complete_native_rows_record_the_actual_three_layout_defects() -> None:
     from _layout_geometry import Box, segment_box_overlap_length
 
@@ -855,9 +905,11 @@ def test_b9e4_complete_native_rows_record_the_actual_three_layout_defects() -> N
     raw = _b9e4_annotation(layout, "PinHoleDia")
     assert len(raw["display"]["texts"]) == 14
     assert len(ream.text_boxes) == 10  # +.015 row, diameter/.000, all eight below
-    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
-        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
-    )
+    # b9e4 printed the earlier nine-row block; the replay below translates it
+    # as recorded. The regenerated block is checked on its own native capture
+    # (test_cde5928_native_ream_block_has_only_rule14_crossings).
+    fit_rows = spec.PIN_HOLE_CALLOUT.splitlines()
+    assert [run["t"] for run in raw["display"]["texts"][6 : 6 + len(fit_rows)]] == fit_rows
     assert not [item for item in layout.unmatched if "PinHoleDia" in item[0]]
     near_y = _b9e4_named(layout, "PlateNearY")
     assert "45.00" in near_y.label

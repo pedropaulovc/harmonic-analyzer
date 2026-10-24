@@ -11,8 +11,8 @@ Section A-A at 3:1 cuts along the pin line, is cropped to A1, and carries
 the finished thickness and underside chamfer. A native reference dimension
 measures the actual straight bore wall; its complete 10.50 MIN callout stands
 outside the section on independently offset text, not over the bore or hatch.
-The real underside edge is identified below the section. The complete resultant
-axis-shift acceptance belongs to the native 4X REAM callout, not a separate
+The real underside edge is identified below the section. The complete axis-lean
+acceptance belongs to the native 4X REAM callout, not a separate
 leader. Native geometry readbacks use that underside plane's normal for all
 four bore-axis vectors. The shaded isometric stands above the title block.
 
@@ -66,6 +66,7 @@ from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -86,6 +87,9 @@ from ch_rocker_arm_tl_oblique_carrier_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_carrier"]
 PART_STEM = SPEC.artifact_stem

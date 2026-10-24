@@ -82,14 +82,15 @@ I = 130·12³/12: 0.02 mm under its own weight and 0.015 mm under 10 N of
 cutting load at mid-span (``SAG_SELF_WEIGHT``, ``SAG_CUTTING_LOAD``) - far
 inside the cut's own tolerance, so nothing need bear under the plate.
 
-Each pin-hole axis is inspected against the underside-plane normal in every
-azimuth before assembly. PIN_AXIS_CALLOUT belongs to the native 4X REAM
-dimension: its resultant lateral shift per normal height bounds the actual
-vector angle by atan(0.05/10.50), not each projected component independently.
+Each pin-hole axis is inspected against the underside before assembly.
+PIN_AXIS_CALLOUT belongs to the native 4X REAM dimension: its 0.05 MAX lean
+in 10.50 of land, in any direction, bounds the actual axis vector's angle by
+atan(0.05/10.50), not each projected component independently.
 Section A-A measures the actual straight land as a native reference (11.7
 nominal); PIN_LAND_CALLOUT separately requires 10.50 MIN of straight land.
 The process row gives the surface-plate, fitted-arbor and indicator setup.
-No geometric frame, reamed fit or chamfer geometry changes.
+No geometric frame (no ``machinist_exceptions`` accept entry), reamed fit or
+chamfer geometry changes.
 
 Rule 17 (walls) at worst case: the lever tap's thread major to the -45 edge
 is 3.03 nominal, 2.01 at the stations' and the edge's .XX bands
@@ -379,14 +380,14 @@ POSITION_BANDED = ("PinSpacing", "A2DX", "A2DY", "B2DX", "B2DY")
 # read as one spot).
 SPOT_CALLOUT = "CENTRE DRILL SPOT"
 # The full orientation acceptance is on the actual reamed diameter, never on
-# a separate leader note. "Resultant" controls the lateral vector magnitude;
-# normal height makes its bound exactly atan(deviation/span), in any azimuth.
+# a separate leader note. The lean is the axis's lateral change over the
+# measurement span in its own direction, so its bound is exactly
+# atan(deviation/span) in any azimuth, not a per-direction allowance.
 CAP_NUMBER = _config.parts("ch-rocker-arm-tl-oblique-pivot-cap")["number"]
 PIN_AXIS_CALLOUT = (
-    "AXES TO UNDERSIDE NORMAL:\n"
-    "RESULTANT LATERAL SHIFT:\n"
-    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX PER {PIN_AXIS_MEASUREMENT_SPAN:.2f}\n"
-    "NORMAL HEIGHT, ALL AZIMUTHS\n"
+    "AXES SQUARE TO UNDERSIDE:\n"
+    f"{PIN_AXIS_DEVIATION_MAX:.2f} MAX LEAN IN {PIN_AXIS_MEASUREMENT_SPAN:.2f} OF\n"
+    "LAND, ANY DIRECTION, SO PIN\n"
     f"CLEARS {CAP_NUMBER} CAP"
 )
 PIN_LAND_CALLOUT = f"4X STRAIGHT\nLAND\n{PIN_AXIS_MEASUREMENT_SPAN:.2f} MIN"

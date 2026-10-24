@@ -3953,6 +3953,10 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         *(str(_resolved(path)) for path in SCRIPTS_DIR.glob("*.py")),
         *(str(_resolved(path)) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
     }
+    # Drawing regressions read captured native sheet dumps at runtime.
+    captured_fixtures = sorted(
+        str(path.resolve()) for path in (SCRIPTS_DIR / "fixtures").glob("*.json")
+    )
     recipe_test_deps = sorted(
         {
             # Pytest discovers shared fixtures outside the import closure.
@@ -3991,6 +3995,7 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
             str(
                 (REPO_ROOT / "cad" / "config" / "current-identity-map.json").resolve()
             ),
+            *captured_fixtures,
         }
     )
     return {
@@ -4048,6 +4053,9 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
                     ],
                     "recipe_scanned_sources": [
                         _rel_tag(path) for path in sorted(scanned_by_binding_gate)
+                    ],
+                    "recipe_captured_fixtures": [
+                        _rel_tag(path) for path in captured_fixtures
                     ],
                 }
             )
