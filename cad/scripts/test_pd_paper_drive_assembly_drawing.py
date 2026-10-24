@@ -127,12 +127,17 @@ def _unit_step_notes() -> drawing.StepNotes:
 
 
 def _step_body(key: str) -> str:
-    """The printed text of one step, from its head to the next head."""
-    text = _unit_step_notes().fitup_steps
+    """The printed text of one step, from its head to the blank line that
+    separates it from the next step (or its column's end)."""
+    notes = _unit_step_notes()
+    text = "\n\n".join(
+        (notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes, *notes.chain_notes)
+    )
     heads = list(STEP_HEAD.finditer(text))
     index = steps.step_number(key) - 1
     end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
-    return " ".join(text[heads[index].end() : end].split())
+    body = text[heads[index].end() : end].split("\n\n")[0]
+    return " ".join(body.split())
 
 
 def _number(stem: str) -> str:
@@ -161,10 +166,31 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     notes = _unit_step_notes()
     printed = [
         int(n)
-        for text in (notes.platen_steps, *notes.fitup_notes, *notes.chain_notes)
+        for text in (
+            notes.platen_steps,
+            *notes.fitup_notes,
+            *notes.fitup_continued_notes,
+            *notes.chain_notes,
+        )
         for n in STEP_HEAD.findall(text)
     ]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
+
+
+def test_one_blank_line_separates_consecutive_steps_and_none_splits_a_step() -> None:
+    notes = _unit_step_notes()
+    for text in (
+        notes.platen_steps,
+        *notes.fitup_notes,
+        *notes.fitup_continued_notes,
+        *notes.chain_notes,
+    ):
+        lines = text.splitlines()
+        heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
+        assert lines[heads[0] - 1] != ""  # the heading runs straight into the first step
+        for previous, head in zip(heads, heads[1:]):
+            assert lines[head - 1] == "" and lines[head - 2] != ""
+            assert "" not in lines[previous : head - 1]
 
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
@@ -199,6 +225,12 @@ def test_the_steps_fit_their_fields() -> None:
     fields = (
         *zip(
             notes.fitup_notes,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
+        *zip(
+            notes.fitup_continued_notes,
             drawing.FITUP_NOTE_XY,
             drawing.FITUP_NOTE_LIMITS,
             strict=True,
@@ -1949,11 +1981,12 @@ def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     domain = _unit_operating_domain()
     notes = drawing.format_step_notes(operating_domain=domain)
     assert drawing.engaged_feed_text(domain) in notes.fitup_steps.replace("\n   ", " ")
-    assert (notes.platen_steps, notes.fitup_notes, notes.chain_notes) == drawing._step_columns(
-        operating_domain=domain
-    )
-    assert drawing.sheet_texts(notes)[:5] == (
-        notes.platen_steps, *notes.fitup_notes, *notes.chain_notes,
+    assert (
+        notes.platen_steps, notes.fitup_notes, notes.fitup_continued_notes, notes.chain_notes,
+    ) == drawing._step_columns(operating_domain=domain)
+    assert drawing.sheet_texts(notes)[:7] == (
+        notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes,
+        *notes.chain_notes,
     )
 
 

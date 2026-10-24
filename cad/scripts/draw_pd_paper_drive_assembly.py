@@ -1,4 +1,4 @@
-r"""Create the seven-sheet paper-drive assembly drawing (MHA-PD-00).
+r"""Create the eight-sheet paper-drive assembly drawing (MHA-PD-00).
 
 Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
 balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
@@ -8,10 +8,10 @@ the disc cluster and the knob stack apart along their axes on
 PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
 Sheet 4 balloons the bar, its clamps and the platen group on
 PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
-assembly steps; sheet 6 prints the chain fit-up (CONTRACT-paper-drive.md
-§13.2). Sheet 7 carries the complete native BOM, split horizontally into two
-pieces at measured row heights, and an assembly reference. The BOM identifies
-the current inch
+assembly steps and sheet 6 continues them; sheet 7 prints the chain fit-up
+(CONTRACT-paper-drive.md §13.2). Sheet 8 carries the complete native BOM,
+split horizontally into two pieces at measured row heights, and an assembly
+reference. The BOM identifies the current inch
 reducer, finite stock-form integral pinions and rack/backer; sheet 1 gives the
 selected chain ratio's reference paper travel. Gear cutting data stays on the
 gear sheets. The chain fit-up includes the actual loaded collar/disc overlap
@@ -161,6 +161,7 @@ SHEET_NAMES = (
     "TRANSGEAR EXPLODED",
     "PLATEN AND SUPPORT",
     "ASSEMBLY AND FIT-UP",
+    "ASSEMBLY AND FIT-UP (CONT.)",
     "CHAIN FIT-UP",
     "BILL OF MATERIALS",
 )
@@ -189,7 +190,7 @@ ISO_SCALE_LADDER = (ASSEMBLED_SCALE, (1.0, 5.0))
 ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
-# --- sheet 7: full qualified Numbers and two native BOM pieces ---------------
+# --- sheet 8: full qualified Numbers and two native BOM pieces ---------------
 # f353's 22 mm Number column wrapped the identities: the native audit measured
 # the unsplit table 437.2384 mm high, not the requested rows' nominal height.
 # Use the drive-train's proven column widths without changing table text size;
@@ -234,7 +235,7 @@ TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
 TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
 TRANSGEAR_CAPTION_XY = (0.222, 0.082)
-# Sheet 2 retains the established model fields when the BOM moves to sheet 7.
+# Sheet 2 retains the established model fields when the BOM moves to sheet 8.
 # Its balloon circles still clear the drawing border and caption fields.
 SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
@@ -519,20 +520,23 @@ PLATEN_NOTE_XY = (0.018, 0.262)
 PLATEN_NOTE_RIGHT = 0.222
 EXPLODED_RING_LIMITS = (PLATEN_NOTE_RIGHT + 0.003, 0.069, 0.418, 0.267)
 
-# --- sheets 5 and 6: ordered steps in two columns, same note-field budgets ----
+# --- sheets 5 to 7: ordered steps in two columns, same note-field budgets ----
 FITUP_SCALE = (1.0, 10.0)
 FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # Each column's top-left corner, then its right limit and lowest y: the left
 # column stops above sheet 5's reference view; the right column stops above
-# the title block (top 0.066). Sheet 6 retains the same field clearances.
+# the title block (top 0.066). Sheets 6 and 7 retain the same field clearances.
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# Sheet 5 splits after the disc's match-centre/transfer inspection so the
-# knob, mesh and hook operations stay together. Sheet 6 begins with the
+# With a blank line between steps the transgear takes four columns, one
+# sub-assembly each: sheet 5 the hanger, then the disc cluster; sheet 6 the
+# knob stack, then the latch with its mesh and hook. Sheet 7 begins with the
 # loaded full-stroke inspection and splits after the fitted collar rear face.
 FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
-FITUP_SECOND_COLUMN_KEY = "disc-screws-cut"
+FITUP_SECOND_COLUMN_KEY = "disc-cluster-assembled"
+FITUP_CONTINUED_KEY = "collar-pins-pressed"
+FITUP_CONTINUED_SECOND_KEY = "latch-hook-fitted"
 FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 
@@ -542,6 +546,7 @@ SHEET_SCALES = {
     "TRANSGEAR EXPLODED": TRANSGEAR_EXPLODED_SCALE,
     "PLATEN AND SUPPORT": EXPLODED_SCALE,
     "ASSEMBLY AND FIT-UP": FITUP_SCALE,
+    "ASSEMBLY AND FIT-UP (CONT.)": FITUP_SCALE,
     "CHAIN FIT-UP": FITUP_SCALE,
     "BILL OF MATERIALS": BOM_REFERENCE_SCALE,
 }
@@ -1515,13 +1520,16 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
 
 
 def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
+    """The heading, then each numbered step with one blank line between steps."""
     lines = textwrap.wrap(
         heading,
         width=FITUP_LINE_WIDTH,
         break_on_hyphens=False,
         break_long_words=False,
     )
-    for key in keys:
+    for index, key in enumerate(keys):
+        if index:
+            lines.append("")
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
@@ -1535,19 +1543,23 @@ def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> s
 
 def _step_columns(
     *, operating_domain: RackOperatingDomain,
-) -> tuple[str, tuple[str, str], tuple[str, str]]:
-    """Sheet 4's platen steps, then the two columns on sheets 5 and 6."""
+) -> tuple[str, tuple[str, str], tuple[str, str], tuple[str, str]]:
+    """Sheet 4's platen steps, then the two columns on each of sheets 5 to 7."""
     text = _step_text(operating_domain=operating_domain)
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
     first = steps.step_number(FITUP_FIRST_COLUMN_KEY) - 1
     second = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
+    continued = steps.step_number(FITUP_CONTINUED_KEY) - 1
+    continued_second = steps.step_number(FITUP_CONTINUED_SECOND_KEY) - 1
     chain_start = steps.step_number(FITUP_CHAIN_KEY) - 1
     chain_second = steps.step_number(CHAIN_SECOND_COLUMN_KEY) - 1
+    fitup_sheet = SHEET_NAMES.index("ASSEMBLY AND FIT-UP") + 1
+    continued_sheet = SHEET_NAMES.index("ASSEMBLY AND FIT-UP (CONT.)") + 1
     return (
         _step_column(
             f"PLATEN AND SUPPORT; STEP {steps.step_number(FITUP_FIRST_COLUMN_KEY)} "
-            f"ON: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}",
+            f"ON: SHEET {fitup_sheet}",
             steps.SEQUENCE[:first],
             text,
         ),
@@ -1557,7 +1569,24 @@ def _step_columns(
                 (
                     _step_column(
                         "THE TRANSGEAR, CONTINUED",
-                        steps.SEQUENCE[second:chain_start],
+                        steps.SEQUENCE[second:continued],
+                        text,
+                    ),
+                    "",
+                    f"THE TRANSGEAR (CONT.): SHEET {continued_sheet}, "
+                    f"STEP {steps.step_number(FITUP_CONTINUED_KEY)} ON",
+                )
+            ),
+        ),
+        (
+            _step_column(
+                "THE TRANSGEAR (CONT.)", steps.SEQUENCE[continued:continued_second], text
+            ),
+            "\n".join(
+                (
+                    _step_column(
+                        "THE TRANSGEAR, CONTINUED",
+                        steps.SEQUENCE[continued_second:chain_start],
                         text,
                     ),
                     "",
@@ -1568,9 +1597,8 @@ def _step_columns(
         ),
         (
             _step_column(
-                "CHAIN FIT-UP, TRANSGEAR DONE PER SHEET "
-                f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}; "
-                f"CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
+                f"CHAIN FIT-UP, TRANSGEAR DONE PER SHEETS {fitup_sheet} AND "
+                f"{continued_sheet}; CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
                 steps.SEQUENCE[chain_start:chain_second],
                 text,
             ),
@@ -1587,12 +1615,20 @@ class StepNotes:
 
     platen_steps: str
     fitup_notes: tuple[str, str]
+    fitup_continued_notes: tuple[str, str]
     chain_notes: tuple[str, str]
 
     @property
     def fitup_steps(self) -> str:
-        """Each sheet's columns read left to right; sheet 6 continues sheet 5."""
-        return "\n".join((self.platen_steps, *self.fitup_notes, *self.chain_notes))
+        """Each sheet's columns read left to right; sheets 6 and 7 continue sheet 5."""
+        return "\n".join(
+            (
+                self.platen_steps,
+                *self.fitup_notes,
+                *self.fitup_continued_notes,
+                *self.chain_notes,
+            )
+        )
 
     @property
     def exploded_caption_xy(self) -> tuple[float, float]:
@@ -1646,7 +1682,7 @@ TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
     f"EXPLODED: SHEET {SHEET_NAMES.index('TRANSGEAR EXPLODED') + 1};\n"
     f"ASSEMBLY AND FIT-UP: SHEETS {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} "
-    f"AND {SHEET_NAMES.index('CHAIN FIT-UP') + 1}; "
+    f"TO {SHEET_NAMES.index('CHAIN FIT-UP') + 1}; "
     f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
 )
 # Sheet 3's caption, right of the knob-stack view and under the cluster's.
@@ -1658,7 +1694,7 @@ TRANSGEAR_EXPLODED_CAPTION = "\n".join(
         "AXIS IN THE ORDER IT GOES ON. HANGER PIVOT: SECTION A-A, SHEET "
         f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}; LATCH HOOK: SHEET "
         f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}. ASSEMBLY: SHEETS "
-        f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} AND "
+        f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} TO "
         f"{SHEET_NAMES.index('CHAIN FIT-UP') + 1}; BOM: SHEET "
         f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
         width=TRANSGEAR_EXPLODED_CAPTION_WIDTH,
@@ -1676,6 +1712,7 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
     return (
         notes.platen_steps,
         *notes.fitup_notes,
+        *notes.fitup_continued_notes,
         *notes.chain_notes,
         *EXPLODED_CAPTIONS.values(),
         *ASSEMBLED_CAPTIONS.values(),
@@ -2474,7 +2511,7 @@ def _place_bom_sheet(
     """BOM of the whole drive; the transgear isometric balloons every
     transgear family it can reach. Returns landings, the logical table, its
     (stem: item) numbers, pieces and validated snapshot."""
-    _activate_sheet(adapter, SHEET_NAMES[6])
+    _activate_sheet(adapter, SHEET_NAMES[7])
     reference = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_CENTER,
         scale=BOM_REFERENCE_SCALE,
@@ -2488,7 +2525,7 @@ def _place_bom_sheet(
     ):
         raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
     _place_sheet_note(
-        adapter, SHEET_NAMES[6], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        adapter, SHEET_NAMES[7], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
@@ -2534,7 +2571,7 @@ def _place_bom_sheet(
         expected_rows=len(BOM_PART_NUMBERS) + 1,
         occurrence_quantities=True,
     )
-    _activate_sheet(adapter, SHEET_NAMES[6])
+    _activate_sheet(adapter, SHEET_NAMES[7])
     pieces = _split_bom(
         adapter, table, configuration=bom_configuration,
         expected_snapshot=bom_snapshot,
@@ -3033,7 +3070,8 @@ def _place_exploded_sheet(
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
         (SHEET_NAMES[4], step_notes.fitup_notes),
-        (SHEET_NAMES[5], step_notes.chain_notes),
+        (SHEET_NAMES[5], step_notes.fitup_continued_notes),
+        (SHEET_NAMES[6], step_notes.chain_notes),
     ):
         _activate_sheet(adapter, sheet_name)
         view = place_view(
