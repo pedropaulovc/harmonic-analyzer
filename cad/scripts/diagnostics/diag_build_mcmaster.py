@@ -43,7 +43,6 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     REPORTS_DIR,
     run_replica,
 )
-from diagnostics.diag_build_5972K41 import build_5972K41  # noqa: E402
 from diagnostics.diag_build_90114A511 import build_90114A511  # noqa: E402
 from diagnostics.diag_build_90126A211 import build_90126A211  # noqa: E402
 from diagnostics.diag_build_90280A108 import build_90280A108  # noqa: E402
@@ -57,7 +56,6 @@ from diagnostics.diag_build_90280A837 import build_90280A837  # noqa: E402
 from diagnostics.diag_build_91247A720 import build_91247A720  # noqa: E402
 from diagnostics.diag_build_91251A108 import build_91251A108  # noqa: E402
 from diagnostics.diag_build_91251A150 import build_91251A150  # noqa: E402
-from diagnostics.diag_build_91251A188 import build_91251A188  # noqa: E402
 from diagnostics.diag_build_91251A196 import build_91251A196  # noqa: E402
 from diagnostics.diag_build_91251A197 import build_91251A197  # noqa: E402
 from diagnostics.diag_build_91251A541 import build_91251A541  # noqa: E402
@@ -132,11 +130,9 @@ REGISTRY = {
     "90325A174": build_90325A174,
     "91794A055": build_91794A055,
     "97431A260": build_97431A260,
-    "5972K41": build_5972K41,
     "91595A452": build_91595A452,
     "91251A197": build_91251A197,
     "91251A196": build_91251A196,
-    "91251A188": build_91251A188,
     "91290A168": build_91290A168,
     "91251A150": build_91251A150,
     "91251A108": build_91251A108,

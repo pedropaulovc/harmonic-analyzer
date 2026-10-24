@@ -50,7 +50,7 @@ def test_catalogue_row_is_the_registered_olander_screw() -> None:
 
 
 def test_quantity_thread_and_length_are_the_fastener_tables() -> None:
-    row = fasteners.NUT_TO_NUT_BRACKET
+    row = fasteners.NUT_TO_FEED_BLOCK
     assert spec.ROW is row
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == row.count
     assert (dims.THREAD, dims.LENGTH_TEXT, fasteners.BHCS) == (

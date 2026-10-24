@@ -168,8 +168,7 @@ def _slit_removed() -> float:
 
 def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
     """One sketch point straight into the sketch DB (no inference snap),
-    registered for the adapter's dimension refs
-    (build_ch_rocker_arm_tl_oblique_nut_bracket's idiom)."""
+    registered for the adapter's dimension refs."""
     sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
     previous = bool(sketch_manager.AddToDB)
     sketch_manager.AddToDB = True

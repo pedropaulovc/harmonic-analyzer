@@ -3,12 +3,14 @@ ch-rocker-arm-tl-oblique-end-bracket:
   # Shop fixture: the parent MHA-CH-06 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-06-TL-28
   # The bracket only holds four #8-32 and two #6-32 tapped holes for SHCS and
-  # keeps its stock width and thickness: no grade or temper is functional, so
+  # keeps its stock width and height: no grade or temper is functional, so
   # the title block names the aluminium flat-bar family (rule 2; machinist
-  # review ENFORCE); 6061-T6 stays the example source.
-  material: ALUMINUM FLAT BAR 1/2 x 3/4 in
-  material_specification: Aluminum flat bar (e.g. 6061-T6 or 6082-T6), 1/2 x 3/4 in; width and thickness as supplied
+  # review ENFORCE); the owned OnlineMetals 1165 6061-T6511 bar is the source.
+  material: ALUMINUM FLAT BAR 1/2 x 1 in
+  material_specification: Aluminum flat bar (e.g. 6061-T6 or 6082-T6; owned OnlineMetals 1165 6061-T6511), 1/2 x 1 in on edge; 12.70 along screw, 25.40 high, as supplied
   finish: as machined
   quantity: 2
   tolerance_class: machined_block
   process: "saw and face to length; drill and tap the four #8-32 and the two #6-32 holes through; break edges"
+  # KP08 axial foot width 13 is unverified; nominal overhang is 0.15 each side.
+  # Reallocate bought 1165 leftover after TL-26; 1164 half-by-three-quarter is spare.

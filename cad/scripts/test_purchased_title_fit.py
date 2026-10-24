@@ -13,7 +13,7 @@ from _drawing_notes import property_link
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
-_FAMILIES = (("block", "63"), ("bracket", "62"), ("carriage", "64"),
+_FAMILIES = (("bracket", "62"), ("carriage", "64"),
              ("clamp", "68"), ("lever", "69"), ("rail", "61"))
 # Name/number rules are the existing landscape-template measurements. The
 # Material cell and font-dependent extents below are synthetic stress geometry;
@@ -205,7 +205,7 @@ def test_fitter_refuses_native_format_setter_failure(monkeypatch):
 def test_material_census_requires_one_exact_declared_source_field(
     monkeypatch, declared, defect
 ):
-    adapter, spec, notes, values = _sheet(monkeypatch, "block", "63", declared)
+    adapter, spec, notes, values = _sheet(monkeypatch, "bracket", "62", declared)
     other = "Material" if declared == "Material Specification" else "Material Specification"
     if defect == "wrong-link":
         notes[1].PropertyLinkedText = property_link(other)
