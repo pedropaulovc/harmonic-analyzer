@@ -69,8 +69,8 @@ async def build(adapter) -> dict[str, str]:
             layout=view_layout,
             shelf_stations=stations,
         )
-        move_supplier_lane(adapter, displays["SupplierShoulderLength"], -SHOULDER_LANE_SHIFT,
-                           label="SupplierShoulderLength")
+        move_supplier_lane(adapter, displays["SupplierShoulderLength"], views["*Top"],
+                           lane_shift=SHOULDER_LANE_SHIFT, label="SupplierShoulderLength")
         _assert_supplier_bands(displays)
 
         def assert_references():

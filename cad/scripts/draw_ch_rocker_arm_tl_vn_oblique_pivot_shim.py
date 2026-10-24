@@ -65,7 +65,8 @@ async def build(adapter) -> dict[str, str]:
             sides=SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
-        move_supplier_lane(adapter, displays["SupplierThickness"], -LANE_SHIFT, label="SupplierThickness")
+        move_supplier_lane(adapter, displays["SupplierThickness"], views["*Top"],
+                           lane_shift=LANE_SHIFT, label="SupplierThickness")
         _assert_supplier_bands(displays)
 
         def assert_references():

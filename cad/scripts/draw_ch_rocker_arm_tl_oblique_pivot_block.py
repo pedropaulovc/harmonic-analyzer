@@ -75,8 +75,11 @@ NUT_KEEP = {
     'NutTap3Z':(.1724,.150),'NutAxisZ':(.178,.157),'NutTap4Z':(.1837,.164),
     'NutSeatDia':(.140,.075),'NutClearanceDia':(.245,.110),
 }
-NUT_SECTION_XY = (.300,.125)
-NUT_SECTION_KEEP = {'NutSeatDepth':(.334,.123)}
+# C-C at 1:1 (x 284..346, y 106..194; X mirrors, so the lug's -X face with
+# the 1.5 seat step prints at x 313.25, the seat at y 119): the depth text
+# stands right of that face.
+NUT_SECTION_XY = (.315,.150)
+NUT_SECTION_KEEP = {'NutSeatDepth':(.326,.120)}
 NUT_CALLOUT_XY = (.245,.088)
 NUT_ISO_XY = (.380,.215)
 
@@ -132,13 +135,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # Removed section: only the lug strip across the seat (Y -68..-40), not
-        # the whole block's Z=12.4 slice that ran into the title block.
+        # 1:1 keeps the full Z=12.4 slice (the removed, partial form imports no
+        # NutSeat depth) right of the callouts and clear of the title block.
         nut_section = create_section_view(adapter,nut,
             line_start=_project(adapter,nut,(contract.NUT_FACE_X,-70,contract.NUT_AXIS_Z),'nut cut start'),
             line_end=_project(adapter,nut,(contract.NUT_FACE_X,-40,contract.NUT_AXIS_Z),'nut cut end'),
-            view_xy=NUT_SECTION_XY,section_label='C',scale=(2,1),partial=True,
-            label='nut spigot seat depth')
+            view_xy=NUT_SECTION_XY,section_label='C',scale=(1,1),label='nut spigot seat depth')
         nut_annotations += curate_view_dimensions(adapter,nut_section,
             keep=NUT_SECTION_KEEP,view_label='C-C nut seat',
             dimensions_by_feature=contract.DRAWING_DIMENSIONS)
@@ -150,7 +152,11 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
                                 label='four nut flange taps',process='4X DRILL TO PRINT\n')
         annotations += nut_annotations
-    precision = {name:places for dims in contract.DRAWING_PRECISION.values() for name,places in dims.items()}
+    # Every printed dimension keeps its part-authored places; the repeated
+    # row/column locations left off the sheet print nothing to check.
+    kept = {*plan_keep, *side_keep, *FLOOR_KEEP, *((*NUT_KEEP, *NUT_SECTION_KEEP) if is_feed else ())}
+    precision = {name:places for dims in contract.DRAWING_PRECISION.values()
+                 for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
