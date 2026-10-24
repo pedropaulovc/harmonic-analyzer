@@ -19,16 +19,18 @@ their own 56 mm column. Sheets 3 to 6 show the builder-owned ``JIG_EXPLODED``
 presentation with one sub-assembly's families only. Sheet 4 also has a collapsed
 plan locator and two real assembled sections; both separated bearings carry
 item 14 on the left exploded view's single balloon ring. Other families are
-ballooned once. Sheet 7 is the assembly order, whose steps cite fasteners by
-item number. Sheet 8 carries the cartridge bench work in print order (C2A,
+ballooned once. Sheets 7 and 8 are the assembly order, whose steps cite
+fasteners by item number; one blank line parts each top-level step, and
+Sheet 8 continues with step 13 and the checks under it. Sheet 9 carries the
+cartridge bench work in print order (C2A,
 C1-C2), with its signed functional inspection schematic, followed by feed
-checks F1-F2. Sheet 9 carries cap seating/wiring (C3-C3C), then the actual
+checks F1-F2. Sheet 10 carries cap seating/wiring (C3-C3C), then the actual
 carrier and top capture fit (C4-C5D). The schematic is not a manufacturing
-view or dimension. These three instruction sheets retain a small, visible
+view or dimension. These four instruction sheets retain a small, visible
 collapsed reference isometric at the largest measured fit from 1:20, 1:25
 and 1:30 below the right-column text:
 their native model views supply the live ``$PRPSHEET`` title-block links.
-Sheet 10 carries operation/service (C6-C7), the hold-down stud measurement,
+Sheet 11 carries operation/service (C6-C7), the hold-down stud measurement,
 limits and installed acceptance (HD1-HD3), tooling clearance (C8) and machine acceptance, with the
 finished isometric below the right-column checks at 1:15. Every
 view is one the builder named in the machine frame (``spec.VIEW_AXES``), its
@@ -131,6 +133,7 @@ PNG = OUTPUTS.png
 ASSEMBLED_SHEET = "ASSEMBLED AT INNER PASS"
 BOM_SHEET = "BILL OF MATERIALS"
 STEPS_SHEET = "ASSEMBLY STEPS"
+STEPS_CONTINUED_SHEET = "ASSEMBLY STEPS CONTINUED"
 CARTRIDGE_SHEET = "CARTRIDGEASSEMBLY"
 TOP_CAPTURE_SHEET = "TOPCAPTUREFIT"
 CAPTURE_SHEET = "CAPTUREANDOPERATION"
@@ -234,6 +237,7 @@ SHEET_NAMES = (
     BOM_SHEET,
     *(cluster.sheet for cluster in CLUSTERS),
     STEPS_SHEET,
+    STEPS_CONTINUED_SHEET,
     CARTRIDGE_SHEET,
     TOP_CAPTURE_SHEET,
     CAPTURE_SHEET,
@@ -243,12 +247,13 @@ BOM_SHEET_NUMBER = SHEET_NAMES.index(BOM_SHEET) + 1
 STEPS_SHEET_NUMBER = SHEET_NAMES.index(STEPS_SHEET) + 1
 TOP_CAPTURE_SHEET_NUMBER = SHEET_NAMES.index(TOP_CAPTURE_SHEET) + 1
 # The spec's steps type their instruction sheets' numbers, and the stud drawing
-# prints spec.HOLD_DOWN_REFERENCE: sheets 8-10 must keep these places.
+# prints spec.HOLD_DOWN_REFERENCE: sheets 8-11 must keep these places.
 if (
+    SHEET_NAMES.index(STEPS_CONTINUED_SHEET) + 1,
     SHEET_NAMES.index(CARTRIDGE_SHEET) + 1,
     TOP_CAPTURE_SHEET_NUMBER,
     SHEET_NAMES.index(CAPTURE_SHEET) + 1,
-) != (8, 9, spec.OPERATION_SHEET_NUMBER):
+) != (8, 9, 10, spec.OPERATION_SHEET_NUMBER):
     raise AssertionError("the steps' typed instruction-sheet numbers moved")
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the jig's primary sheet must remain landscape")
@@ -291,6 +296,7 @@ def package_sheet_scales(
         ASSEMBLED_SHEET: ASSEMBLED_SCALE,
         BOM_SHEET: REFERENCE_SCALE,
         STEPS_SHEET: NOTES_REFERENCE_SCALE,
+        STEPS_CONTINUED_SHEET: NOTES_REFERENCE_SCALE,
         CARTRIDGE_SHEET: NOTES_REFERENCE_SCALE,
         TOP_CAPTURE_SHEET: NOTES_REFERENCE_SCALE,
         CAPTURE_SHEET: ISOMETRIC_SCALE,
@@ -457,9 +463,10 @@ CAPTURE_NOTE_HEIGHT = 0.002
 
 # Sheet 7: the assembly sequence in two columns of one width, the heading and
 # as many whole steps as fit the left column, which runs down beside the
-# title block; the rest atop the right column, the checks under them.
-# Sheets 8 and 9 reuse that layout for cartridge assembly and actual top
-# capture fit. Sheet 10 separates operation and acceptance, leaving real
+# title block; the rest atop the right column. Sheet 8 continues it with the
+# last step and the checks under it. One blank line parts each top-level step.
+# Sheets 9 and 10 reuse that layout for cartridge assembly and actual top
+# capture fit. Sheet 11 separates operation and acceptance, leaving real
 # bottom-right room for the finished isometric.
 # 4.525 mm line pitch and about 2.9 mm a character.
 NOTE_LINE_M = 0.004525
@@ -647,16 +654,40 @@ _UNBROKEN = re.compile(r"\bITEM (?=\d)|(?<=\d) (?=N·m|IN·LBF)")
 _GLUE = "\x00"
 # A step's label: its number, or a sub-step's ("7A").
 _STEP_LABEL = re.compile(r"\d+[A-Z]?")
+# Any labelled line's top-level step: "7" of 7A, "C3" of C3B, "HD1" itself.
+_STEP_GROUP = re.compile(r"([A-Z]*\d+)[A-Z]?")
 
 
-def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
+def _step_group(line: str) -> str | None:
+    number, sep, _rest = line.partition(". ")
+    match = _STEP_GROUP.fullmatch(number) if sep else None
+    return match[1] if match else None
+
+
+def _wrapped(
+    lines: tuple[str, ...],
+    *,
+    width: int,
+    heading: str | None = None,
+    spaced: bool = False,
+) -> str:
     """Wrap each numbered line (a step or sub-step) under its own label; one
     note per block. A hyphenated word (HOLD-DOWNS, A1-B1), an item citation
-    (ITEM 22) and a torque (3.5 N·m) stay whole on their line."""
+    (ITEM 22) and a torque (3.5 N·m) stay whole on their line. ``spaced``
+    parts consecutive top-level steps (6 then 7A, C3 then C4) with one blank
+    line; sub-steps (7B, C3A) and unlabelled lines stay tight, and a group
+    heading ("...:") takes the blank above its first step."""
     out = [heading] if heading else []
+    previous = None  # the last printed step's group; None opening a group
     for line in (
         _UNBROKEN.sub(lambda m: m.group(0).replace(" ", _GLUE), text) for text in lines
     ):
+        group = _step_group(line)
+        opens = group is None and line.endswith(":")
+        if spaced and previous is not None and (opens or group not in (None, previous)):
+            out.append("")
+        if opens or group is not None:
+            previous = group
         number, sep, rest = line.partition(". ")
         if sep and _STEP_LABEL.fullmatch(number):
             out += textwrap.wrap(
@@ -685,46 +716,70 @@ def _note_height(text: str) -> float:
 
 @dataclass(frozen=True)
 class StepsLayout:
-    """Two-column instructions, with checks below the continuation."""
+    """Two-column instructions, with checks below the steps they follow."""
 
     steps: str  # the heading and the steps the left column holds
     continued: str  # the rest, atop the right column; "" when none
     checks: str
     checks_xy: tuple[float, float]
+    room_top: float  # the right column's free room starts below its text
 
 
 def steps_sheet_layout(
     steps: Sequence[str], checks: Sequence[str], *, heading: str = STEPS_HEADING
 ) -> StepsLayout:
     """Lay out the heading and whole steps above ``STEPS_FLOOR`` in the left
-    column, the rest atop the right column, and the checks below them.
+    column, the rest atop the right column, and the checks below them: under
+    the left column when every step fits it and so do they, else in the right.
     The reference views use the unused right-column room without reflowing text."""
     for count in range(len(steps), 0, -1):
         # Keep an instruction-group heading with its first complete step.
         if count < len(steps) and steps[count - 1].endswith(":"):
             continue
         left = _wrapped(
-            tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading
+            tuple(steps[:count]), width=STEPS_LINE_WIDTH, heading=heading, spaced=True
         )
         if _note_height(left) <= STEPS_XY[1] - STEPS_FLOOR:
             break
     else:
         raise ValueError("the first assembly step overruns the steps' left column")
-    continued = _wrapped(tuple(steps[count:]), width=STEPS_LINE_WIDTH)
-    checks_text = _wrapped(tuple(checks), width=STEPS_LINE_WIDTH)
+    continued = _wrapped(tuple(steps[count:]), width=STEPS_LINE_WIDTH, spaced=True)
+    checks_text = _wrapped(tuple(checks), width=STEPS_LINE_WIDTH, spaced=True)
     x, top = STEPS_CONTINUED_XY
+    below_left = STEPS_XY[1] - _note_height(left) - REGION_GAP
+    if (
+        checks_text
+        and not continued
+        and below_left - _note_height(checks_text) >= STEPS_FLOOR
+    ):
+        return StepsLayout(
+            left, "", checks_text, (STEPS_XY[0], below_left), top - REGION_GAP
+        )
     if continued:
         top -= _note_height(continued) + REGION_GAP
     if top - _note_height(checks_text) < TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE:
         raise ValueError("instruction checks overrun the right column")
-    return StepsLayout(left, continued, checks_text, (x, top))
+    return StepsLayout(
+        left,
+        continued,
+        checks_text,
+        (x, top),
+        top - _note_height(checks_text) - REGION_GAP,
+    )
 
 
-STEPS_LAYOUT = steps_sheet_layout(spec.ASSEMBLY_STEPS, spec.ASSEMBLY_CHECKS)
-ASSEMBLY_STEPS = STEPS_LAYOUT.steps
-ASSEMBLY_STEPS_CONTINUED = STEPS_LAYOUT.continued
-ASSEMBLY_CHECKS = STEPS_LAYOUT.checks
-CHECKS_XY = STEPS_LAYOUT.checks_xy
+# Spaced, steps 10-13D and the checks would leave the sheet 7 reference too
+# little room, so sheet 8 continues the sequence: step 13 (13A-13D) moves
+# whole, with the checks its 13C cites below it.
+_FINAL_STEP = [_step_group(step) for step in spec.ASSEMBLY_STEPS].index(
+    _step_group(spec.ASSEMBLY_STEPS[-1])
+)
+STEPS_LAYOUT = steps_sheet_layout(spec.ASSEMBLY_STEPS[:_FINAL_STEP], ())
+STEPS_CONTINUED_LAYOUT = steps_sheet_layout(
+    spec.ASSEMBLY_STEPS[_FINAL_STEP:],
+    spec.ASSEMBLY_CHECKS,
+    heading=f"{STEPS_HEADING} (CONT.)",
+)
 CARTRIDGE_LAYOUT = steps_sheet_layout(
     (*spec.CARTRIDGE_STEPS, "FEED FIT-UP CHECKS (F1-F2):", *spec.FEED_STEPS),
     (),
@@ -750,7 +805,7 @@ FINISHED_REGION = (
     STEPS_CONTINUED_XY[0],
     TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
     SHEET_INNER_BORDER[2],
-    CAPTURE_LAYOUT.checks_xy[1] - _note_height(CAPTURE_LAYOUT.checks) - REGION_GAP,
+    CAPTURE_LAYOUT.room_top,
 )
 
 # draw_dt_drive_train_assembly._reference_iso keeps an actual collapsed model
@@ -764,10 +819,11 @@ NOTES_REFERENCE_REGIONS = {
         STEPS_CONTINUED_XY[0],
         TITLE_BLOCK[3] + BOM_SHEET_CLEARANCE + NOTE_LINE_M + VIEW_LABEL_GAP,
         SHEET_INNER_BORDER[2],
-        layout.checks_xy[1] - _note_height(layout.checks) - REGION_GAP,
+        layout.room_top,
     )
     for sheet, layout in (
         (STEPS_SHEET, STEPS_LAYOUT),
+        (STEPS_CONTINUED_SHEET, STEPS_CONTINUED_LAYOUT),
         (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT),
         (TOP_CAPTURE_SHEET, TOP_CAPTURE_LAYOUT),
     )
@@ -3392,25 +3448,10 @@ def _balloon_cluster(
     return landings
 
 
-def _place_steps_notes(adapter: Any) -> None:
-    _add_note_block(
-        adapter, STEPS_SHEET, ASSEMBLY_STEPS, STEPS_XY, label="assembly sequence"
-    )
-    if ASSEMBLY_STEPS_CONTINUED:
-        _add_note_block(
-            adapter,
-            STEPS_SHEET,
-            ASSEMBLY_STEPS_CONTINUED,
-            STEPS_CONTINUED_XY,
-            label="assembly sequence, continued",
-        )
-    _add_note_block(
-        adapter, STEPS_SHEET, ASSEMBLY_CHECKS, CHECKS_XY, label="assembly checks"
-    )
-
-
-def _place_capture_notes(adapter: Any) -> None:
+def _place_instruction_notes(adapter: Any) -> None:
     for sheet, layout, label in (
+        (STEPS_SHEET, STEPS_LAYOUT, "assembly sequence"),
+        (STEPS_CONTINUED_SHEET, STEPS_CONTINUED_LAYOUT, "assembly sequence (cont.)"),
         (CARTRIDGE_SHEET, CARTRIDGE_LAYOUT, "cartridge assembly"),
         (TOP_CAPTURE_SHEET, TOP_CAPTURE_LAYOUT, "actual top capture fit"),
         (CAPTURE_SHEET, CAPTURE_LAYOUT, "operation and installed-machine acceptance"),
@@ -3582,8 +3623,7 @@ def _place_package(
         landing for landing in landings if landing.stem in capture_cluster.stems
     ]
     _assert_capture_sheet(adapter, capture_views, capture_scales, capture_records, capture_landings, crop_profiles=capture_profiles)
-    _place_steps_notes(adapter)
-    _place_capture_notes(adapter)
+    _place_instruction_notes(adapter)
     # The fitted reference can select 1:25 or 1:30. Author paper-only sketch
     # geometry at that final native sheet scale, not the initial 1:20; the
     # finalizer later re-pins this same ratio without rescaling the schematic.

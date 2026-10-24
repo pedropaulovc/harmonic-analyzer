@@ -129,7 +129,7 @@ def cut_end_chamfer_callout(angle_radians: float) -> str:
 
 
 # REWORK carries the native fabrication controls and their title-block band.
-# MHA-CH-06-TL-00, steps HD1-HD3 on sheet 10, qualifies the actual installed
+# MHA-CH-06-TL-00, steps HD1-HD3 on sheet 11, qualifies the actual installed
 # setup against that band; it does not substitute a different cut-length range.
 # The drawing imports that assembly's reference for installed acceptance only;
 # no duplicate saved note properties compete with it. The conditional helper
