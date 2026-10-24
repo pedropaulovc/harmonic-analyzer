@@ -649,19 +649,24 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
 def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     knob, cluster = (group.ring_limits for group in drawing.TRANSGEAR_EXPLODED_GROUPS)
-    # Both fields inside the border; the knob stack's left of the title block,
-    # the cluster's above the caption, and the two never meet.
+    # Both fields inside the border and clear of each other; the knob stack's
+    # stops above the title block, the cluster's above the caption.
     for left, bottom, right, top in (knob, cluster):
         assert left > 0.0127 and bottom > drawing.SHEET_INNER_BORDER_BOTTOM
         assert right < 0.420 and top < 0.270
-    assert knob[2] < 0.218 and knob[2] < cluster[0]
-    # Estimated 1:1 isometric extents plus both balloon rings fit each field.
+    assert knob[2] < cluster[0]
+    assert knob[1] > template.title_block_top_m
+    # Run 20261024T025815061Z's 1:1 knob-stack outline (its projected box,
+    # 247.3 x 226.8 mm) and the cluster's box from the builder's stations
+    # (137.6 x 132.0 mm), at the sheet's scale with both rings, fit.
+    scale = drawing.TRANSGEAR_EXPLODED_SCALE[0] / drawing.TRANSGEAR_EXPLODED_SCALE[1]
     reach = 2 * drawing.BALLOON_RING_REACH
     for (width, height), (left, bottom, right, top) in (
-        ((0.152, 0.106), knob),
-        ((0.097, 0.061), cluster),
+        ((0.2473, 0.2268), knob),
+        ((0.1376, 0.1320), cluster),
     ):
-        assert width + reach < right - left and height + reach < top - bottom
+        assert width * scale + reach < right - left
+        assert height * scale + reach < top - bottom
     for group in drawing.TRANSGEAR_EXPLODED_GROUPS:
         left, bottom, right, top = group.ring_limits
         assert left < group.center[0] < right and bottom < group.center[1] < top
@@ -669,12 +674,12 @@ def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration()
     # and above the title block.
     x, y = drawing.TRANSGEAR_EXPLODED_CAPTION_XY
     lines = drawing.TRANSGEAR_EXPLODED_CAPTION.splitlines()
-    assert lines[0].startswith("TRANSGEAR EXPLODED, ISOMETRIC, 1:1")
+    assert lines[0].startswith("TRANSGEAR EXPLODED, ISOMETRIC, 2:3")
     assert x > knob[2] and y < cluster[1]
     assert x + max(map(len, lines)) * NOTE_CHAR_WIDTH < 0.420
     assert y - len(lines) * NOTE_LINE_PITCH > template.title_block_top_m
     assert drawing.TRANSGEAR_EXPLODED_ORIENTATION == "*Isometric"
-    assert drawing.TRANSGEAR_EXPLODED_SCALE == (1.0, 1.0)
+    assert drawing.TRANSGEAR_EXPLODED_SCALE == drawing.TRANSGEAR_VIEW_SCALE
     assert drawing.SHEET_SCALES["TRANSGEAR EXPLODED"] == drawing.TRANSGEAR_EXPLODED_SCALE
 
 

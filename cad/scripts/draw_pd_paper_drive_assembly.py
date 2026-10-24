@@ -433,11 +433,13 @@ CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # left of the title block, the disc cluster on its pin above the caption.
 # Only those transgear instances show: the pivot stack is SECTION A-A's and
 # the latch hook stays on the bar. The views are full-detail for the same
-# reason as sheet 4's (the Default BOM), drawn 1:1 only (drawing guidelines
-# rule 15: never scale a view down to fit a sheet); an outline past its field
-# is refused, not shrunk.
+# reason as sheet 4's (the Default BOM). Both are drawn at 2:3, sheet 2's
+# transgear scale, and never rescaled (drawing guidelines rule 15); an outline
+# past its field is refused, not shrunk. An isometric's native outline is its
+# projected box, not its ink: farm run 20261024T025815061Z read the knob
+# stack and hanger's at 1:1 as 247.3 x 226.8 mm, past any 1:1 field here.
 TRANSGEAR_EXPLODED_ORIENTATION = "*Isometric"
-TRANSGEAR_EXPLODED_SCALE = (1.0, 1.0)
+TRANSGEAR_EXPLODED_SCALE = (2.0, 3.0)
 if (
     view_configuration(TRANSGEAR_EXPLODED_SCALE, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
     != BOM_CONFIGURATION
@@ -471,25 +473,26 @@ class ExplodedGroup:
     ring_limits: Box
 
 
-# Iso estimates at 1:1 from the builder's stations and the explode: the knob
-# stack and hanger 152 x 106 mm, the cluster 97 x 61 mm, before their rings.
-# The title block spans x 218 to 420, y 13 to 66 mm.
+# The knob stack and hanger's ring at 2:3 is about 199 x 185 mm (run
+# 20261024T025815061Z's outline scaled), the cluster's about 135 x 130 mm
+# (its projected box from the builder's stations). The title block spans x
+# 218 to 420, y 13 to 66 mm, so the left field stops above it.
 TRANSGEAR_EXPLODED_GROUPS = (
     ExplodedGroup(
         "knob stack and hanger exploded",
         explode.TRANSGEAR_SHOWN_STEMS - CLUSTER_STEMS,
-        (0.116, 0.141),
-        (0.018, 0.015, 0.215, 0.267),
+        (0.140, 0.168),
+        (0.018, 0.070, 0.262, 0.267),
     ),
     ExplodedGroup(
         "disc cluster exploded",
         CLUSTER_STEMS,
-        (0.318, 0.195),
-        (0.222, 0.122, 0.415, 0.267),
+        (0.341, 0.193),
+        (0.268, 0.120, 0.415, 0.267),
     ),
 )
-TRANSGEAR_EXPLODED_CAPTION_XY = (0.225, 0.112)
-TRANSGEAR_EXPLODED_CAPTION_WIDTH = 68  # characters, above the title block
+TRANSGEAR_EXPLODED_CAPTION_XY = (0.270, 0.112)
+TRANSGEAR_EXPLODED_CAPTION_WIDTH = 52  # characters, above the title block
 
 # --- sheet 4: the platen-and-support steps, the ballooned exploded view -----
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
