@@ -237,6 +237,23 @@ def test_nested_hidden_record_fails_closed(tmp_path):
     _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
 
 
+def test_marker_crossing_from_header_into_text_fails_closed(tmp_path):
+    # codjiflo #1964: a record starting inside a BYTE-length header must not be
+    # skipped as the outer string's text.
+    outer = (b"\xff\xfe" + _record("hidden000.SLDPRT", 0)).ljust(512, b"\x00")
+    _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
+
+
+def test_tag_bytes_wholly_inside_a_dword_length_header_are_not_nested(tmp_path):
+    header = _string("p" * 0xFFFE)[:10]
+    assert (
+        header.find(b"\xff\xfe\xff", 1) == 5
+    )  # the header's own WORD 0xFFFF + DWORD 0xFFFE
+    gate.assert_saved_display_data(
+        _save(tmp_path, _stream(_string("p" * 0xFFFE) + _record()))
+    )
+
+
 def test_container_markers_inside_stored_payload_are_not_entries(tmp_path):
     unrelated = _envelope(MARKER + b"damaged nested header", "Other")
     gate.assert_saved_display_data(_save(tmp_path, unrelated + _stream(_record())))

@@ -129,8 +129,12 @@ def _assert_flags(data: bytes, stream_offset: int) -> str | None:
         end = start + 2 * units
         if end > len(data):
             raise ValueError(f"{context}: truncated UTF-16 string")
-        # The parsed length header may itself contain the tag bytes.
-        if data.find(_STRING_MARKER, start, end) != -1:
+        # A long-form length header may itself contain the tag bytes; exempt
+        # only markers wholly inside it, not ones crossing into the text.
+        nested = data.find(_STRING_MARKER, offset + 1, end)
+        while nested != -1 and nested + len(_STRING_MARKER) <= start:
+            nested = data.find(_STRING_MARKER, nested + 1, end)
+        if nested != -1:
             raise ValueError(f"{context}: nested or overlapping serialized string")
         try:
             text = data[start:end].decode("utf-16le")
