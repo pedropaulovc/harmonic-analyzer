@@ -584,7 +584,8 @@ def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
 
 
 # The isometric never balloons these: farm run 20261001T051043622Z found no
-# reachable isometric ink for the sleeve. Sheet 3's explode balloons them.
+# reachable isometric ink for the sleeve; the pin, front bushing and retaining
+# ring meet on the pin nose. Sheet 3's explode balloons them.
 HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-feed-pinion",
     "pd-transgear-knob-shaft",
@@ -595,6 +596,9 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-vn-transgear-arm-plate-locating-pin",
     "pd-vn-transgear-latch-pin",
     "pd-transgear-rear-bushing",
+    "pd-transgear-pin",
+    "pd-transgear-front-bushing",
+    "pd-vn-transgear-retaining-ring",
 }
 
 
@@ -1375,6 +1379,21 @@ def test_each_chain_link_balloon_lands_on_a_free_run_clear_of_both_wheels(
         x, y, _z = assembly._chain_station_point(pin)
         assert math.dist((x, y), assembly.KNOB_SHAFT_XY) - chain.KNOB_TIP_R > 20.0
         assert math.dist((x, y), crank) - chain.CRANK_TIP_R > 20.0
+
+
+def test_the_inner_and_connecting_link_anchors_are_frozen() -> None:
+    """Run 20261024T124144759Z: the walk's seat-dependent ray probe put
+    balloon 43 on a covered point. Both anchors are the points main's walk
+    proved drawn, whatever seat probes them."""
+    anchors = drawing.ASSEMBLED_BALLOON_ANCHORS
+    inner = anchors["sh-vn-chain-link--InnerLink"]
+    assert inner.point_mm == drawing.CHAIN_INNER_BALLOON_POINT_MM
+    assert inner.point_mm == (4.946, -0.867, 1.650)
+    connecting = anchors["pd-vn-chain-connecting-link"]
+    assert connecting.point_mm == drawing.CONNECTING_LINK_BALLOON_POINT_MM
+    assert connecting.point_mm == (-2.042, -1.262, -3.550)
+    assert connecting.instance is None  # The one connecting link.
+    assert anchors["sh-vn-chain-link--OuterLink"].point_mm is None
 
 
 def test_every_bom_item_is_ballooned_on_some_sheet() -> None:

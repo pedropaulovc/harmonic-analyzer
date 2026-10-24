@@ -796,8 +796,11 @@ TRANSGEAR_INSTANCES = frozenset(
 # 20261001T051043622Z found none for the feed sleeve: its extreme-point picks
 # missed, and its gear edges exceeded the fallback's edge budget. The rear
 # bushing behind the reducer disc and the knob drive and hanger hardware are
-# obscured by their neighbours. Sheet 3's explode shows and balloons them,
-# with every other family it draws apart.
+# obscured by their neighbours. The pin, front bushing and retaining ring
+# attach within 3.5 mm of each other on the pin nose, so their three leaders
+# met there with overlapping arrowheads (machinist review, run
+# 20261024T124144759Z). Sheet 3's explode shows and balloons them all, with
+# every other family it draws apart.
 ISO_HIDDEN_STEMS = frozenset(
     {
         "pd-transgear-feed-pinion",
@@ -809,6 +812,9 @@ ISO_HIDDEN_STEMS = frozenset(
         "pd-vn-transgear-arm-plate-locating-pin",
         "pd-vn-transgear-latch-pin",
         "pd-transgear-rear-bushing",
+        "pd-transgear-pin",
+        "pd-transgear-front-bushing",
+        "pd-vn-transgear-retaining-ring",
     }
 )
 if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
@@ -1012,14 +1018,26 @@ CHAIN_INNER_BALLOON_STATION = 24
 CHAIN_OUTER_BALLOON_STATION = 51
 if CHAIN_INNER_BALLOON_STATION % 2 or not CHAIN_OUTER_BALLOON_STATION % 2:
     raise AssertionError("inner links take even loop stations, outer links odd")
+# The inner and connecting links' anchors are frozen at the body extreme
+# points the walk proved drawn on rolling main (swmaker00000A, run
+# 20261024T091056564Z). The walk's ray probe is seat-dependent: on
+# swmaker000005 (run 20261024T124144759Z) the same 12 rays over 349 bodies hit
+# 98 times, not 138, so it took a covered connecting-link point under the
+# transgear arm, and balloon 43's leader crossed the bar to it. A point that
+# is drawn stays drawn on a seat that misses occluders.
+CHAIN_INNER_BALLOON_POINT_MM = (4.946, -0.867, 1.650)
+CONNECTING_LINK_BALLOON_POINT_MM = (-2.042, -1.262, -3.550)
 ASSEMBLED_BALLOON_ANCHORS = {
     "sh-vn-chain-link--InnerLink": BalloonAnchor(
-        instance=f"@InnerLink:{CHAIN_INNER_BALLOON_STATION // 2 + 1}"
+        point_mm=CHAIN_INNER_BALLOON_POINT_MM,
+        instance=f"@InnerLink:{CHAIN_INNER_BALLOON_STATION // 2 + 1}",
     ),
     "sh-vn-chain-link--OuterLink": BalloonAnchor(
         instance=f"@OuterLink:{CHAIN_OUTER_BALLOON_STATION // 2 + 1}"
     ),
-    "pd-vn-chain-connecting-link": BalloonAnchor(),
+    "pd-vn-chain-connecting-link": BalloonAnchor(
+        point_mm=CONNECTING_LINK_BALLOON_POINT_MM
+    ),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 4's exploded view balloons every family it shows.
