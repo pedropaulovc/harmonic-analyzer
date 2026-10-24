@@ -1434,6 +1434,13 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[3] == "PLATEN AND SUPPORT"
     assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
+    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar.
+    pinned = {
+        stem: anchor.instance
+        for stem, anchor in drawing.PLATEN_BALLOON_ANCHORS.items()
+        if anchor.instance is not None
+    }
+    assert pinned == {"pd-guide-lock": "pd-guide-lock-2"}
 
 
 def _explode_instances() -> list[explode.Instance]:

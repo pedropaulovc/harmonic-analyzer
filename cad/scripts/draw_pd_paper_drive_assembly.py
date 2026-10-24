@@ -1020,8 +1020,19 @@ ASSEMBLED_BALLOON_ANCHORS = {
     "pd-vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
-# Sheet 4's exploded view balloons every family it shows.
-PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS}
+# Sheet 4's exploded view balloons every family it shows. The builder places
+# each lock station's top plate, then its bottom plate, so pd-guide-lock-1 is
+# the first station's top plate: exploded, it still stands behind the bar, and
+# the default (lowest-named) landing put balloon 8 on the bar's lower edge
+# (machinist review of run 20261024T082548908Z-cf4349b5). The bottom plate
+# hangs free under the bar.
+PLATEN_GUIDE_LOCK_INSTANCE = "pd-guide-lock-2"
+PLATEN_BALLOON_ANCHORS = {
+    stem: BalloonAnchor(instance=PLATEN_GUIDE_LOCK_INSTANCE)
+    if stem == "pd-guide-lock"
+    else BalloonAnchor()
+    for stem in explode.SHOWN_STEMS
+}
 
 
 def _in_item_order(
