@@ -349,38 +349,28 @@ def test_plate_locates_from_the_fork_face_and_prints_its_thickness() -> None:
     assert text_x - widest * 0.0025 / 2.0 > 0.013 + 0.005
 
 
-def test_inside_corners_are_one_modelled_radius_printed_max() -> None:
+def test_inside_corners_are_one_modelled_radius_under_the_title_block() -> None:
     """#982 review r1 (drawing-guidelines.md rule 16): the slot floor, the
     fork's root step and the shank's run onto the ring had sharp inside
-    corners. One fillet carries them all, R MAX, the model value the printed
-    maximum, and stands under the arm's least clearance over the slot floor."""
+    corners. One fillet carries them all. The ENFORCE review found the
+    printed all-corners R0.5 MAX a needless tightening of the title block's
+    INSIDE CORNERS R1.0 MAX, so the title block governs; that ceiling still
+    stands under the arm's least clearance over the slot floor."""
+    import _config
     import ch_rod_pivot_pin_spec as pin
 
     spec = ch_connecting_rod_spec
-    assert spec.INSIDE_CORNER_R == 0.5
-    assert spec.INSIDE_CORNER_BAND == (0.0, -spec.INSIDE_CORNER_R)
-    assert spec.INSIDE_CORNER_TOL_TYPE == 6  # swTolMAX
-    assert spec.INSIDE_CORNER_R < pin.BUDGET["crotch_clearance_min"]
-    assert 2.0 * spec.INSIDE_CORNER_R < spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[1]
+    ceiling = float(_config.title_block("inside_corner")["radius_mm"])
+    assert spec.INSIDE_CORNER_R <= ceiling
+    assert ceiling < pin.BUDGET["crotch_clearance_min"]
+    assert 2.0 * ceiling < spec.FORK_SLOT_WIDTH + spec.FORK_SLOT_BAND[1]
     source = Path(rod.__file__).read_text(encoding="utf-8")
     assert source.count("add_fillet(") == 1
     assert 'name_last_feature(adapter, "InsideCorners")' in source
-    assert "tolerance.Type = INSIDE_CORNER_TOL_TYPE" in source
-    assert "_inside_corner_max_limit(adapter)" in source
-    assert ch_connecting_rod_notes.DRAWING_DIMENSIONS["InsideCorners"] == {"InsideCornerR"}
-    assert drawing.FRONT_CALLOUTS["InsideCornerR"] == "ALL INSIDE CORNERS"
-    # The text stands up-right of the shank's +X flank onto the ring (the
-    # fillet's first edge), below the note and left of the bore's finish.
-    junction = drawing._sheet_xy(
-        spec.SHANK_WIDTH / 2.0,
-        math.sqrt(spec.RING_OUTER_RADIUS**2 - (spec.SHANK_WIDTH / 2.0) ** 2),
-    )
-    text_x, text_y = drawing.FRONT_KEEP["InsideCornerR"]
-    assert text_x > junction[0] and text_y > junction[1]
-    assert text_y < drawing.NOTES_XY[1] - 0.015
-    assert text_y > drawing.BORE_FINISH_SYMBOL[1] + 0.015
-    # Right of the shank's flank: the text never sits on the part.
-    assert text_x - 0.025 > drawing._sheet_xy(spec.SHANK_WIDTH / 2.0, 0.0)[0]
+    assert "_inside_corner_max_limit" not in source
+    assert "InsideCorners" not in ch_connecting_rod_notes.DRAWING_DIMENSIONS
+    assert "InsideCornerR" not in drawing.FRONT_KEEP
+    assert "InsideCornerR" not in drawing.FRONT_CALLOUTS
 
 
 def test_overall_length_is_a_side_view_reference() -> None:
@@ -435,21 +425,52 @@ def test_datum_a_tag_stands_clear_of_the_centre_distance_witness() -> None:
     assert symbol_x + half_box < 0.216
 
 
-def test_pin_offset_basic_runs_on_the_shank_below_the_fork_head() -> None:
+def test_pin_offset_basic_runs_on_the_shank_below_the_ream_callout() -> None:
     """#982 review r3: inside the head the 4.00 BASIC crowded the hole and
-    the ream callout's leader crossed it. Below the root its line meets the
-    flank (datum B) inside the flank's run, left of the pin axis, where the
-    leader (pin rim to the callout, down-right) has already moved right."""
+    the ream callout's leader crossed it; just below the fork root the
+    leader still crossed its right-hand arrow (ENFORCE review). Below the
+    callout's lowest line the leader, rising from that line to the hole,
+    cannot reach it; its line meets the flank (datum B) above B's tag."""
     spec = ch_connecting_rod_spec
     text_x, text_y = drawing.PIN_OFFSET_TEXT_XY
     root_y = drawing._sheet_xy(0.0, spec.FORK_BASE_Y)[1]
-    assert root_y - 0.010 < text_y < root_y - 0.003
-    assert text_y > drawing.DATUM_B_EDGE[1]
-    assert text_y > drawing.FRONT_KEEP["ShankWidthDim"][1] + 0.040
-    pin_x, pin_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
     callout_x, callout_y = drawing.FRONT_KEEP["PinHoleDia"]
-    assert callout_x > pin_x and callout_y < text_y < pin_y
+    # The callout's three lines under its two-row value hang ~14 mm below
+    # its keep point (farm render).
+    assert text_y < callout_y - 0.020 < root_y
+    assert text_y > drawing.DATUM_B_SYMBOL[1] + 0.015
+    pin_x, _pin_y = drawing._sheet_xy(0.0, spec.CENTER_DISTANCE)
+    assert callout_x > pin_x
     assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
+
+
+def test_datum_b_is_basic_from_datum_a() -> None:
+    """ENFORCE review: nothing placed datum B (the shank's left flank)
+    sideways from datum A (the bore axis), so the frame was incomplete. A
+    4.00 BASIC from A's bore to B's flank, on the shank above the ring and
+    clear over the Ø40.80 text, completes it."""
+    spec = ch_connecting_rod_spec
+    text_x, text_y = drawing.DATUM_B_FROM_A_TEXT_XY
+    ring_top = drawing._sheet_xy(0.0, spec.RING_OUTER_RADIUS)[1]
+    assert ring_top < text_y < drawing.DATUM_B_SYMBOL[1] - 0.015
+    assert text_y > drawing.FRONT_KEEP["RingOuterDia"][1] + 0.012
+    assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    # The A-to-B locator's own block: centre-anchored, value-checked at half
+    # the shank width, then boxed (not satisfied by the B-to-pin check).
+    start = source.index("datum_b_offset = add_edge_dimension(")
+    end = source.index(
+        'set_basic_dimension(adapter, datum_b_offset, label="datum B from datum A")'
+    )
+    block = source[start:end]
+    assert "p1=ring_rim," in block
+    assert 'set_arc_endpoints_to_center(adapter, datum_b_offset, label="datum B from datum A")' in block
+    assert (
+        "assert_dimension_measures(\n"
+        "        adapter,\n"
+        "        datum_b_offset,\n"
+        "        expected_mm=SHANK_WIDTH / 2.0,\n"
+    ) in block
 
 
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
@@ -484,7 +505,6 @@ def test_fork_print_is_three_place_and_model_owned() -> None:
             "SlotWidth": 3,
             "RingFaceNear": 3,
         },
-        "InsideCorners": {"InsideCornerR": 1},
         "PinHoleProfile": {"PinHoleDia": 3},
     }
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
@@ -526,8 +546,7 @@ def test_reamed_pin_hole_is_a_native_three_place_dimension() -> None:
         "assert_imported_precision(\n"
         "        adapter,\n"
         "        front_annotations,\n"
-        '        {**DRAWING_PRECISION["PinHoleProfile"], '
-        '**DRAWING_PRECISION["InsideCorners"]},\n'
+        '        DRAWING_PRECISION["PinHoleProfile"],\n'
         "    )" in source
     )
     # The Ø text stands right of the fork, below the FCF's level leader (so
@@ -628,6 +647,13 @@ def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
     source = Path(d.__file__).read_text(encoding="utf-8")
     assert "detail = _fork_detail(adapter, left)" in source
     assert "set_hidden_lines_visible" not in source
+    # ENFORCE farm runs: the inferred fence snapped in screen space (12.4,
+    # then 9.7 mm, off the rod axis); it is authored direct-to-DB and read
+    # back, with AddToDB restored in a finally block.
+    detail_source = source[source.index("def _fork_detail") : source.index("async def build")]
+    assert "manager.AddToDB = True" in detail_source
+    assert "finally:\n        manager.AddToDB = previous_add_to_db" in detail_source
+    assert "the fork detail fence moved from where it was placed" in detail_source
 
 
 def test_detail_texts_stand_outside_their_witness_lines() -> None:
@@ -695,7 +721,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK STRAP BORE, RING FACES, PIN HOLE AND FORK SLOT; "
+        "BLACK ENAMEL; MASK BORE, PLATE FACES, PIN HOLE AND FORK SLOT; "
         "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
