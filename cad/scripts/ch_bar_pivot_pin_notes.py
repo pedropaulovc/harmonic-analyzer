@@ -8,10 +8,12 @@ data there would re-key them on every sheet edit. Imported ONLY by
 ``build_ch_bar_pivot_pin``, ``draw_ch_bar_pivot_pin`` and the offline tests.
 
 drawing-guidelines.md rule 7 (notes: few, flagged, never a method). The model
-is the INSTALLED pin, so the blank's cut length prints from a blanked
-reference sketch (drawing-simplicity-policy.md `How the repository implements
-the guidelines`: its band rides that model dimension, never note text) and the
-one note says the views show the installed state. Machinist round 1 (#1305):
+is the INSTALLED pin, so the blank -- its ends drawn thin dashed beyond the
+installed outline -- and its cut length print from a blanked reference sketch
+(drawing-simplicity-policy.md `How the repository implements the guidelines`:
+its band rides that model dimension, never note text), and the one note says
+which outline is which (ENFORCE review 2026-10-23: the blank was dimensioned
+but never drawn). Machinist round 1 (#1305):
 the mates and the drill-rod stock moved from the notes to the diameter they
 govern, the flush ends to the installed length; the press/punch line was a
 method and left. The title block owns the drill rod (MATERIAL) and its finish.
@@ -64,7 +66,7 @@ if {name for names in DRAWING_DIMENSIONS.values() for name in names} != set(
 # hangs under its value: SOLIDWORKS drops a multi-line callout stacked above a
 # value from the print (r1: the diameter's never reached the PDF). The
 # installed length's stays narrower than the 63.5 mm pin at 10:1, clear of
-# both length rows' witnesses; note 1 says the views are the installed pin.
+# both length rows' witnesses; note 1 names the solid and dashed outlines.
 DIAMETER_CALLOUT = (
     "5/64 DRILL ROD, AS SUPPLIED\n"
     f"PRESS FIT IN {BAR_NUMBER}\n"
@@ -76,4 +78,6 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "BlankLen": "BLANK",
 }
 
-DRAWING_NOTES = "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."
+DRAWING_NOTES = (
+    "1. SOLID OUTLINE IS THE INSTALLED PIN; THIN DASHED ENDS SHOW THE BLANK."
+)

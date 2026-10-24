@@ -99,6 +99,31 @@ def test_blank_length_is_a_model_dimension_on_a_hidden_sketch() -> None:
     assert drawing.FRONT_KEEP["BlankLen"][1] < drawing.FRONT_KEEP["PinLen"][1] - 0.015
 
 
+def test_blank_ends_run_from_the_pin_corners_to_the_blank_length() -> None:
+    """ENFORCE review 2026-10-23: the 7.5 BLANK witnesses rose from empty
+    space past the installed outline. The blank's two ends (construction
+    geometry, drawn dashed on the sheet) leave the installed pin's corners,
+    stand at the blank's cut length, span its diameter, and lie wholly
+    outside the installed outline, so the cut length has drawn geometry to
+    dimension between."""
+    pin_r, half_len = spec.PIN_DIA / 2.0, spec.PIN_INSTALLED_LENGTH / 2.0
+    chains = part.BLANK_END_CHAINS
+    assert set(chains) == {"left", "right"}
+    end_xs = []
+    for side, sign in (("left", -1.0), ("right", 1.0)):
+        start, top, bottom, finish = chains[side]
+        assert start == pytest.approx((sign * half_len, pin_r))
+        assert finish == pytest.approx((sign * half_len, -pin_r))
+        # Stubs along the pin's edges, the end line square across them.
+        assert start[1] == top[1] and bottom[1] == finish[1]
+        assert top[0] == bottom[0]
+        assert top[1] - bottom[1] == pytest.approx(spec.PIN_DIA)
+        assert abs(top[0]) > half_len
+        end_xs.append(top[0])
+    assert end_xs[1] - end_xs[0] == pytest.approx(spec.PIN_BLANK_LENGTH)
+    assert end_xs[0] == pytest.approx(-end_xs[1])
+
+
 def test_precision_and_band_are_authored_on_the_part() -> None:
     assert notes.DRAWING_PRECISION_BY_NAME == {"PinDia": 3, "PinLen": 2, "BlankLen": 1}
     assert "draw_ch_bar_pivot_pin.py" in PRECISION_MIGRATED_DRAWINGS
@@ -136,7 +161,7 @@ def test_one_note_and_the_mates_at_their_dimensions() -> None:
     govern; the drill-rod stock explains the tight grind band. Each now rides
     its dimension; one note says what the views show."""
     assert notes.DRAWING_NOTES.splitlines() == [
-        "1. VIEWS SHOW THE INSTALLED PIN; CUT THE BLANK SHOWN."
+        "1. SOLID OUTLINE IS THE INSTALLED PIN; THIN DASHED ENDS SHOW THE BLANK."
     ]
     assert "PUNCH" not in notes.DRAWING_NOTES and "DRESS" not in notes.DRAWING_NOTES
     assert notes.DIMENSION_CALLOUTS == {
