@@ -228,12 +228,14 @@ def test_rows_stack_shortest_nearest_the_bar() -> None:
 
     face = heights(drawing.FRONT_KEEP, (*sheet_spec.HANGER_STATION_NAMES, "Length"))
     back = heights(drawing.BACK_KEEP, sheet_spec.CLAMP_STATION_NAMES)
-    for rows, bar_bottom in (
-        (face, drawing.FACE_BOTTOM),
-        (back, drawing.BACK_BOTTOM),
+    # The front face's long rows step 6 and 7 mm so the 440.50 line clears
+    # detail C's counterbore-width callout under it (machinist review).
+    for rows, bar_bottom, step in (
+        (face, drawing.FACE_BOTTOM, 0.008),
+        (back, drawing.BACK_BOTTOM, 0.006),
     ):
         assert all(y < bar_bottom for y in rows)
-        assert all(a - b >= 0.008 - 1e-9 for a, b in zip(rows, rows[1:]))
+        assert all(a - b >= step - 1e-9 for a, b in zip(rows, rows[1:]))
     # Long-row texts stay between their extension lines.
     for name, span in zip(
         (*sheet_spec.HANGER_STATION_NAMES[1:], "Length"),
@@ -518,8 +520,10 @@ def test_slot_views_frame_the_slots() -> None:
     assert drawing.DETAIL_LABEL_XY[1] > drawing.DETAIL_KEEP["ClampSlotWidth"][1]
 
 
-@pytest.mark.parametrize("collision", ["clear", "text", "leader"])
-def test_slot_callout_refuses_text_or_leader_on_section(monkeypatch, collision) -> None:
+@pytest.mark.parametrize("collision", ["clear", "text", "leader", "station"])
+def test_slot_callout_refuses_section_or_station_crowding(
+    monkeypatch, collision
+) -> None:
     from _drawing_annotation_extent import CalloutInk
     from _drawing_layout_check import LeaderSegment
 
@@ -530,21 +534,36 @@ def test_slot_callout_refuses_text_or_leader_on_section(monkeypatch, collision) 
     line = (0.106, 0.048, 0.106, 0.056)
     if collision == "leader":
         line = (0.053, 0.048, 0.106, 0.056)
+    # The native text reaches 3 mm over the shoulder-mirrored estimate (its
+    # stacked upper limit). The 440.50 line clears the native text by 3 mm,
+    # or clears the estimate by 4.5 mm but the native upper limit by 1.5 mm.
+    native = (text[0], text[1], text[2], text[3] + 0.003)
+    station_y = 0.0845 if collision == "station" else 0.086
     ink = CalloutInk(
         "slot counterbore width",
         text,
         (LeaderSegment("width", "dim", *line, ""),),
     )
-    annotation = object()
+    width = SimpleNamespace(name="ClampSlotCboreWidth")
+    station = SimpleNamespace(name="ClampStation4")
     section = SimpleNamespace(GetOutline=lambda: section_box)
-    monkeypatch.setattr(drawing, "dimension_name", lambda *_: "ClampSlotCboreWidth")
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _adapter, annotation: annotation.name
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
     monkeypatch.setattr(drawing, "callout_ink", lambda *_args, **_kwargs: ink)
+    monkeypatch.setattr(drawing, "_native_text_box", lambda *_args, **_kwargs: native)
+    monkeypatch.setattr(
+        drawing,
+        "dimension_segments",
+        lambda _annotation: [((0.060, station_y), (0.290, station_y))],
+    )
     if collision == "clear":
-        drawing._assert_slot_callout_clear(None, [annotation], section)
+        drawing._assert_slot_callout_clear(None, [width], section, [station])
     else:
-        with pytest.raises(RuntimeError, match="section B-B"):
-            drawing._assert_slot_callout_clear(None, [annotation], section)
+        match = "440.50" if collision == "station" else "section B-B"
+        with pytest.raises(RuntimeError, match=match):
+            drawing._assert_slot_callout_clear(None, [width], section, [station])
 
 
 @pytest.fixture

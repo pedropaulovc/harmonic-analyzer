@@ -140,14 +140,22 @@ DIMENSION_CALLOUTS = {
     # callout counts holes (r6 machinist review, rule 12).
     "PivotCskDia": f"{_CSK} BOTH FACES,\nMHA-PD-VN-57 BEARS OUTSIDE",
     "BracketCskDia": f"2X {_CSK}\nBOTH FACES, {BRACKET_TAP_SPEC.size} TAPS",
-    # The west slots (rule 4: each band names its mate): the slots' width,
-    # run and stations take up the pitch of the MHA-SH-02 clamp taps the
-    # screws land in (build_pd_support_bar.clamp_slot_closure_margin), so
-    # their limits and stations set how much they take up (the r6 machinist
-    # read "take up" as licence to loosen them); the counterbore's width and
-    # run hold the MHA-SH-VN-53 head (clamp_slot_head_clearance). Short lines:
-    # detail C is 2:1 in a corner.
-    "ClampSlotWidth": "THRU, LIMITS AND\nSTATIONS SET THE\nMHA-SH-02 TAKE-UP",
+    # The west slots (rule 4: each band names its mate): the slots' run and
+    # stations take up the pitch of the MHA-SH-02 clamp taps the screws land
+    # in (build_pd_support_bar.clamp_slot_closure_margin), and the whole
+    # travel is spent on that pitch, so their limits and stations keep the
+    # full take-up (the r6 machinist read "take up" as licence to loosen
+    # them, the 2026-10-23 review as travel needing only to be "enough").
+    # The slot width's upper limit is the head's: wider, the MHA-SH-VN-53
+    # head bears on less floor than over a round hole (CLAMP_HEAD_BEARING_MIN)
+    # and nears the counterbore's wall (clamp_slot_head_clearance); the
+    # 2026-10-23 review read the take-up reason alone as no reason for the
+    # width's band. The counterbore's width and run hold the MHA-SH-VN-53
+    # head. Short lines: detail C is 2:1 in a corner.
+    "ClampSlotWidth": (
+        "THRU, MAX SEATS\nMHA-SH-VN-53 HEADS;\nTRAVEL AND STATIONS\n"
+        "KEEP THE FULL TAKE-UP\nOF MHA-SH-02 PITCH"
+    ),
     "ClampSlotCboreWidth": "C'BORE FOR\nMHA-SH-VN-53",
     "ClampSlotCboreDepth": "MHA-SH-VN-53\nHEADS BELOW\nSLIDE FACE",
 }
