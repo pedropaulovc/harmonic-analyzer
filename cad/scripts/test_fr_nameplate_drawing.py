@@ -327,6 +327,55 @@ def test_reference_point_goes_straight_to_the_db_and_restores_it(
     assert manager.AddToDB is False
 
 
+class _HoleCalloutDisplay:
+    """swDimensionTextCalloutBelow (4) writes CalloutBelowDefinition (8)."""
+
+    def __init__(self, below: str) -> None:
+        self.texts = {5: "DRILL ", 6: "<MOD-DIAM><hw-diam>", 7: "<hw-thru>", 8: below}
+
+    def GetText(self, part: int) -> str:  # noqa: N802
+        return self.texts[part]
+
+    def SetText(self, part: int, text: str) -> None:  # noqa: N802
+        assert part == 4
+        self.texts[8] = text.replace("\n", "\r\n")
+
+
+@pytest.mark.parametrize(
+    ("below", "expected"),
+    [
+        ("", print_spec.HOLE_LIGAMENT_NOTE),
+        ("NATIVE ROW\r\n", f"NATIVE ROW\n{print_spec.HOLE_LIGAMENT_NOTE}"),
+    ],
+)
+def test_hole_ligament_statement_keeps_the_native_callout(
+    monkeypatch: pytest.MonkeyPatch, below: str, expected: str
+) -> None:
+    # codjiflo P2 on 9171754: a native below-row must survive the statement.
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    display = _HoleCalloutDisplay(below)
+    drawing._state_hole_ligament(display)
+    assert display.texts[8].replace("\r", "") == expected
+    assert [display.texts[part] for part in (5, 6, 7)] == [
+        "DRILL ",
+        "<MOD-DIAM><hw-diam>",
+        "<hw-thru>",
+    ]
+
+
+def test_hole_ligament_statement_refuses_a_lost_native_definition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Clobbering(_HoleCalloutDisplay):
+        def SetText(self, part: int, text: str) -> None:  # noqa: N802
+            super().SetText(part, text)
+            self.texts[7] = ""
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._state_hole_ligament(Clobbering(""))
+
+
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
     assert model_toleranced_dimensions(part) == {}
 

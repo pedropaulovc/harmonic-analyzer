@@ -210,13 +210,27 @@ def _state_hole_ligament(display: Any) -> None:
 
     Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
     #1971): a rule-20 fact under the callout it qualifies, the dt-crankshaft
-    rim's pattern. ``SetText`` reports nothing, so it is read back.
+    rim's pattern. swDimensionTextCalloutBelowDefinition (8) pairs with the
+    writable swDimensionTextCalloutBelow (4): any native below-row is kept and
+    the statement appended under it, and the prefix, size and depth
+    definitions (5, 6, 7) must read back unchanged, so the Hole Wizard
+    variables stay associative (draw_pd_guide_lock._set_hole_callout_below).
+    ``SetText`` reports nothing, so all four are read back.
     """
     display = _early_bound(display, "IDisplayDimension")
-    display.SetText(4, HOLE_LIGAMENT_NOTE)  # swDimensionTextCalloutBelow
-    applied = str(display.GetText(4) or "").replace("\r", "")
-    if applied != HOLE_LIGAMENT_NOTE:
-        raise RuntimeError(f"hole ligament statement did not persist: {applied!r}")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{HOLE_LIGAMENT_NOTE}" if below else HOLE_LIGAMENT_NOTE
+    display.SetText(4, updated)  # swDimensionTextCalloutBelow
+    readback = [str(display.GetText(part) or "") for part in (5, 6, 7, 8)]
+    if readback[3].replace("\r", "") != updated or readback[:3] != [
+        definitions[part] for part in (5, 6, 7)
+    ]:
+        raise RuntimeError(
+            "hole ligament statement or native callout definitions did not "
+            f"persist: {readback!r}"
+        )
 
 
 # Section A-A: a cut across the whole plate at SECTION_Y (plate-local, the
