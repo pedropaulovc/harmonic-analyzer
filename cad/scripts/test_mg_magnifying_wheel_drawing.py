@@ -17,7 +17,7 @@ import mg_magnifying_wheel_spec
 from _drawing_contract import model_toleranced_dimensions
 from _printed_tolerance import printed_band_mm
 from _drawing_registry import DRAWINGS_BY_NAME
-from _surface_finish import MACHINED_UM, SEAT_UM
+from _surface_finish import MACHINED_UM
 
 
 def _called_names(path: str) -> list[str]:
@@ -83,29 +83,42 @@ def test_every_marked_dimension_has_model_places() -> None:
 
 
 def test_tight_bands_sit_on_the_model_dimensions() -> None:
+    # The boss Ø and TIE 1's radius ride the title block's .XX: the boss is
+    # sized for TIE 1's wall, so neither carries a band of its own.
     assert model_toleranced_dimensions(part) == {
-        ("HubProfile", "HubDia"): "*deviations(HUB_DIA_BAND)",
         ("HubProfile", "HubLength"): "*deviations(HUB_LEN_BAND)",
         ("HubProfile", "SpigotLength"): "*deviations(SPIGOT_LEN_BAND)",
         ("GrooveProfile", "GrooveR"): "*deviations(GROOVE_R_BAND)",
         ("GrooveProfile", "GrooveBottomDia"): "*deviations(GROOVE_BOTTOM_BAND)",
-        ("Tie1Profile", "Tie1Y"): "TIE_POSITION_TOL",
     }
+    assert mg_magnifying_wheel_spec.DRAWING_PRECISION["HubProfile"]["HubDia"] == 2
+    assert mg_magnifying_wheel_spec.DRAWING_PRECISION["Tie1Profile"]["Tie1Y"] == 2
 
 
 def test_walls_and_groove_hold_at_the_printed_bands() -> None:
     spec = mg_magnifying_wheel_spec
-    # TIE 1's boss wall sits on the 2.0 target with the ties drilled to the
-    # title block's +0.10/0.
+    # TIE 1's boss wall holds the 2.0 target at the title block's .XX on the
+    # boss Ø and on TIE 1's radius, the ties drilled to the title block's
+    # +0.10/0, plus 0.3 deg drill wander over the boss.
     assert min(spec.WALLS.values()) >= spec.MIN_WALL - 1e-9
     assert spec.MIN_WALL == 2.0
-    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(2.0, abs=1e-9)
-    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.681, abs=1e-3)
-    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.063, abs=1e-3)
+    wander = (19.7 - 9.0) * math.tan(math.radians(0.3))
+    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(
+        (28.5 - 0.51) / 2.0 - (10.75 + 0.51 + wander) - 0.55
+    )
+    assert spec.WALLS["tie1_to_hub_od"] == pytest.approx(2.129, abs=1e-3)
+    assert spec.WALLS["tie2_to_rim_fillet"] == pytest.approx(2.693, abs=1e-3)
+    assert spec.WALLS["tie1_to_hub_fillet"] == pytest.approx(2.335, abs=1e-3)
+    # TIE 1 stands outboard of the drum it sits behind: the smallest hole,
+    # innermost and wandered, still opens a wire diameter past the largest drum.
+    assert geom.TIE1_DRUM_OPENING == pytest.approx(
+        10.75 - 0.51 - wander + 0.5 - (18.9 + 0.8) / 2.0
+    )
+    assert geom.TIE1_DRUM_OPENING >= geom.LEVER_WIRE_DIA
     # TIE 2 breaks into the bore at mid-width: its ligament ends at the
     # rim-bore rounds, R0.8 MAX (no model band), on a rim 8.0 wide at .X
     # (7.2 at least).
-    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.200, abs=1e-3)
+    assert spec.WALLS["tie2_to_rim_faces"] == pytest.approx(2.222, abs=1e-3)
     assert geom.CAST_ROUND_R == 0.80
     assert not hasattr(geom, "CAST_ROUND_BAND")
     assert spec.DRAWING_REFERENCE_PRECISION == {
@@ -130,7 +143,7 @@ def test_walls_and_groove_hold_at_the_printed_bands() -> None:
 def test_drawing_contract_is_split_from_the_assembly_nominals() -> None:
     # The hub stations the assembly imports live in the drawing-FREE geom
     # module, so a print-note edit cannot enter the assembly recipe.
-    assert (rim.RIM_OUTER_DIA, geom.HUB_DIA, geom.SPOKE_COUNT) == (100.0, 25.0, 6)
+    assert (rim.RIM_OUTER_DIA, geom.HUB_DIA, geom.SPOKE_COUNT) == (100.0, 28.5, 6)
     assembly = Path(part.__file__).with_name("build_mg_magnifier_assembly.py").read_text(
         encoding="utf-8"
     )
@@ -185,16 +198,25 @@ def test_linked_notes_specify_the_spokes_and_ties() -> None:
     # Each fit prints on its own diameter: the mate and the stated fit.
     assert "PRESS FIT" not in notes and "RUNS ON" not in notes
     assert drawing.DIMENSION_CALLOUTS["BoreDiaDim"] == (
-        "REAM THRU\n0.033-0.053 DIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE"
+        "REAM THRU\n0.033-0.053 DIAMETRAL\nCLEARANCE ON\nMG-WHEEL-AXLE MHA-MG-07"
     )
     assert drawing.DIMENSION_CALLOUTS["SpigotDia"] == (
-        "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM"
+        "0.005-0.034\nDIAMETRAL\nINTERFERENCE IN\nMG-WHEEL-DRUM\nMHA-MG-10"
     )
+    # Each groove band names the wire it seats, at its own callout.
+    assert (
+        drawing.DIMENSION_CALLOUTS["GrooveBottomDia"] == "PEN-WIRE SEAT\nMHA-SH-VN-56"
+    )
+    assert drawing.CALLOUTS_ABOVE["GrooveR"] == "PEN-WIRE SEAT\nMHA-SH-VN-56"
     assert drawing.ROUND_CALLOUT.endswith("\nHOLDS TIE 2 WALL")
-    assert drawing.CALLOUTS_ABOVE["HubLength"] == "LOCKNUT ON FULL THREAD"
+    assert drawing.CALLOUTS_ABOVE["HubLength"] == (
+        "LOCKNUT ON FULL THREAD OF\nMG-WHEEL-AXLE MHA-MG-07"
+    )
     assert drawing.CALLOUTS_ABOVE["SpigotLength"] == "DRUM NOT PROUD"
     assert drawing.CALLOUTS_ABOVE["HubFrontZ"] == "WEB & RIM CENTER"
     assert drawing.DIMENSION_CALLOUTS["RimOuterDiaDim"].startswith("HOLDS PEN WIRE")
+    # TIE 1 stands off the drum; the note says so without a number.
+    assert "CLEAR OF MG-WHEEL-DRUM" in notes and "BAND" not in notes
     assert "DO NOT" not in notes and "RELEASE" not in notes
     assert "GRAY-IRON" not in notes and "BLACK" not in notes
     assert "DEBURR" not in notes and "BREAK SHARP" not in notes
@@ -207,16 +229,13 @@ def test_no_gdt_frames_and_one_sheet_dimension() -> None:
     calls = _called_names(drawing.__file__)
     assert calls.count("add_datum_feature") == 0
     assert calls.count("add_feature_control_frame") == 0
-    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade, the pressed
-    # spigot the seat grade.
+    # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the running bore takes the machined grade; the
+    # spigot is pressed into the drum and takes none.
     finishes = {
         control.key: control.roughness_um
         for control in mg_magnifying_wheel_spec.SURFACE_FINISHES
     }
-    assert finishes == {
-        "mg_wheel_bore": MACHINED_UM,
-        "mg_wheel_spigot": SEAT_UM,
-    }
+    assert finishes == {"mg_wheel_bore": MACHINED_UM}
     # Only the rim's axial width is added on the sheet.
     assert calls.count("add_edge_dimension") == 1
     assert not hasattr(mg_magnifying_wheel_spec, "GEOMETRIC_TOLERANCES_MM")

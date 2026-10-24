@@ -21,7 +21,7 @@ import math
 
 from _gtol_cylinder import CylinderFace
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_band_mm
-from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _mg_wheel_rim_geometry import (
     GROOVE_BOTTOM_BAND,
     GROOVE_BOTTOM_DIA,
@@ -36,9 +36,9 @@ import sh_vn_music_wire_lever_geom as _lever
 from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     BORE_DIA,
     CAST_ROUND_R,
+    DRILL_WANDER_DEG,
     HUB_BACK_Z,
     HUB_DIA,
-    HUB_DIA_BAND,
     HUB_FILLET_R,
     HUB_FRONT_Z,
     RIM_FILLET_R,
@@ -49,10 +49,12 @@ from mg_magnifying_wheel_geom import (  # noqa: F401 (re-export)
     SPOKE_ROOT_WIDTH,
     SPOKE_TIP_WIDTH,
     TIE1_CLOCK_DEG,
+    TIE1_POSITION_BAND,
     TIE1_R,
+    TIE1_R_PLACES,
+    TIE1_WANDER,
     TIE2_CLOCK_DEG,
     TIE_HOLE_DIA,
-    TIE_POSITION_TOL,
     clock_to_local_deg,
     fillet,
 )
@@ -97,7 +99,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubFillets": {"HubFilletR": 1},
     "RimFillets": {"RimFilletR": 1},
     "GrooveProfile": {"GrooveR": 2, "GrooveBottomDia": 2},
-    "Tie1Profile": {"Tie1Y": 2, "Tie1HoleDia": 2},
+    "Tie1Profile": {"Tie1Y": TIE1_R_PLACES, "Tie1HoleDia": 2},
     "Tie2Profile": {"Tie2HoleDia": 2, "Tie2Angle": 0},
 }
 # Matched fits (drawing-guidelines.md rule 4 (tighten only for function, and name the mate)): the spigot is turned to the stated
@@ -121,25 +123,23 @@ ROUND_TEXT_SUFFIX = " MAX"
 # clocking is a 0 deg relation no dimension can show: the seed spoke lies on
 # local +X, so two spokes lie on the face view's horizontal centerline, the
 # one TIE 2's angle is measured from, and TIE 1 on the vertical one falls
-# midway between two (both asserted below).  TIE 1's 9.85 keeps a tight
-# band for the boss wall (TIE1_HUB_WALL); the need rides TIE 1's note
-# without a number (a note never carries a dimension, drawing-guidelines.md rule 7 (notes: few, flagged, never a method)): no callout
-# line fits between that dimension's extension lines 9.85 apart, and a
-# longer TIE 1 hole block steepens its leader onto the A-A line (run 18).
+# midway between two (both asserted below).  TIE 1's radius rides the title
+# block: the boss is sized so its wall holds at .XX (TIE1_HUB_WALL), and its
+# note says why the hole stands off the drum (mg_magnifying_wheel_geom
+# TIE1_DRUM_OPENING) without a number.
 MIN_WALL = 2.0  # drawing-guidelines.md rule 17 (walls and webs) target
 DRAWING_NOTES = "\n".join(
     (
         f"{SPOKE_COUNT} TAPERED SPOKES EQUALLY SPACED, TWO ON THE HORIZONTAL CENTERLINE.",
-        "TIE 1: LEVER-WIRE TIE HOLE THRU BOSS; ITS RADIUS BAND HOLDS THE BOSS WALL.",
+        "TIE 1: LEVER-WIRE TIE HOLE THRU BOSS, CLEAR OF MG-WHEEL-DRUM.",
         "TIE 2: PEN-WIRE TIE HOLE, GROOVE BOTTOM TO RIM BORE.",
     )
 )
-# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle; the spigot is the static
-# seat the drum is pressed onto.  The boss step the drum butts against is a
-# register face and carries no symbol.
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running journal on the axle.  The spigot is
+# pressed into the drum and the boss step the drum butts against is a
+# register face: neither carries a symbol.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl("mg_wheel_bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-    SurfaceFinishControl("mg_wheel_spigot", SEAT_UM, CylinderFace(SPIGOT_DIA)),
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
@@ -168,17 +168,24 @@ _RIM_AXIAL_MIN = RIM_AXIAL - printed_band_mm(
 )
 # R0.8 MAX: the R's single limit is its nominal.
 _CAST_ROUND_MAX = CAST_ROUND_R
-_HUB_DIA = (HUB_DIA + HUB_DIA_BAND[1], HUB_DIA + HUB_DIA_BAND[0])
+_HUB_DIA = _printed(HUB_DIA, "HubDia")
 # The ties are drilled to the title block's DRILLED HOLES row (+0.10/0).
-_TIE_R_MAX = (TIE_HOLE_DIA + drilled_oversize_mm()) / 2.0 + TIE_POSITION_TOL
+_TIE_R_MAX = (TIE_HOLE_DIA + drilled_oversize_mm()) / 2.0
+# TIE 1's axis may stand off its nominal by its printed .XX radius band and
+# its drill wander over the boss (mg_magnifying_wheel_geom): a disk about it.
+_TIE1_OFFSET_MAX = TIE1_POSITION_BAND + TIE1_WANDER
+# TIE 2 drills from the groove bottom into the rim bore; it breaks out at the
+# rim ID, where both its walls are judged, after its deepest run.
+_TIE2_WANDER = (
+    (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[0] - _RIM_ID[0]) / 2.0
+) * math.tan(math.radians(DRILL_WANDER_DEG))
 _SPOKE_PITCH = 360.0 / SPOKE_COUNT
 if clock_to_local_deg(0.0) % _SPOKE_PITCH or TIE1_CLOCK_DEG % 180.0 != 90.0:
     raise AssertionError("the spokes no longer lie on the horizontal centerline")
 
-# TIE 1 to the boss OD (12.45 - 9.85 - 0.60 = 2.00, on the target).  At the
-# title block's .XX (+/-0.51) the wall would be 1.54 and at .X (+/-0.8)
-# 1.25, so TIE 1's 9.85 keeps its +/-0.05 (its need is in the notes).
-TIE1_HUB_WALL = _HUB_DIA[0] / 2.0 - TIE1_R - _TIE_R_MAX
+# TIE 1 to the boss OD, every size at the title block's .XX (+/-0.51):
+# 13.995 - (10.75 + 0.51 + 0.056) - 0.55 = 2.129.
+TIE1_HUB_WALL = _HUB_DIA[0] / 2.0 - (TIE1_R + _TIE1_OFFSET_MAX) - _TIE_R_MAX
 # TIE 1 to the nearest hub-fillet foot: the hole sits midway between two
 # spokes, at +30 deg from the seed (+X) spoke in its frame.
 _TIE1_OFF = math.radians(
@@ -193,9 +200,10 @@ TIE1_FILLET_WALL = (
         for hub, r, root, tip in itertools.product(_HUB_DIA, _HUB_FILLET, _ROOT, _TIP)
     )
     - _TIE_R_MAX
+    - _TIE1_OFFSET_MAX
 )
 # TIE 1 to the bore it runs beside, at the largest finished bore.
-TIE1_BORE_WALL = TIE1_R - _TIE_R_MAX - WHEEL_BORE_MAX / 2.0
+TIE1_BORE_WALL = TIE1_R - _TIE1_OFFSET_MAX - _TIE_R_MAX - WHEEL_BORE_MAX / 2.0
 # TIE 2 to the nearest rim-fillet foot, where the hole breaks out at the rim
 # ID: its angle off the nearest spoke, less the printed angular band.
 _tie2_local = clock_to_local_deg(TIE2_CLOCK_DEG)
@@ -220,22 +228,23 @@ TIE2_SPOKE_WALL = (
         for corner in itertools.product(_RIM_ID, _RIM_FILLET, _ROOT, _TIP)
     )
     - _TIE_R_MAX
+    - _TIE2_WANDER
 )
 # TIE 2 to the rim's side faces: it breaks into the bore at mid-width, where
 # the faces end at the rim-bore rounds' tangent line (R0.8 MAX: 3.6 - 0.8 -
-# 0.60 = 2.20).
-TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX
+# 0.55 - 0.03 = 2.22).
+TIE2_FACE_WALL = _RIM_AXIAL_MIN / 2.0 - _CAST_ROUND_MAX - _TIE_R_MAX - _TIE2_WANDER
 # Spigot to bore at the smallest finished spigot and the largest finished
 # bore, and the groove floor to the rim ID.
 SPIGOT_WALL = (SPIGOT_DIA_MIN - WHEEL_BORE_MAX) / 2.0
 GROOVE_FLOOR_WALL = (GROOVE_BOTTOM_DIA + GROOVE_BOTTOM_BAND[1] - _RIM_ID[1]) / 2.0
 
 WALLS = {
-    "tie1_to_hub_od": TIE1_HUB_WALL,  # 2.000
-    "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.063
-    "tie1_to_bore": TIE1_BORE_WALL,  # 6.840
-    "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.681
-    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.200
+    "tie1_to_hub_od": TIE1_HUB_WALL,  # 2.129
+    "tie1_to_hub_fillet": TIE1_FILLET_WALL,  # 2.335
+    "tie1_to_bore": TIE1_BORE_WALL,  # 7.224
+    "tie2_to_rim_fillet": TIE2_SPOKE_WALL,  # 2.693
+    "tie2_to_rim_faces": TIE2_FACE_WALL,  # 2.222
     "spigot_to_bore": SPIGOT_WALL,  # 4.592
     "groove_floor": GROOVE_FLOOR_WALL,  # 4.350
 }

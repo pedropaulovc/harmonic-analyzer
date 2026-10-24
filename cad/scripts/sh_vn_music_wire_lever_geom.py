@@ -117,7 +117,7 @@ def run_gaps(
     start: tuple[float, float, float], end: tuple[float, float, float], n: int = 4001
 ) -> dict[str, float]:
     """Surface gaps from a straight run to the wheel's pen-side faces it passes:
-    the rim ring, the spokes and the Ø25 boss (each where the run is radially
+    the rim ring, the spokes and the hub boss (each where the run is radially
     over it, wire r + clearance widened), and the drum lane's two ends at the
     drum end. Positive = clear."""
     face = {
