@@ -945,7 +945,9 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
 
     assert fitup.SHAFT_DRILL_STEP.split("\n") == [
         "SHAFT DRILL SET: MATCH-DRILL MHA-DT-19 THRU MHA-DT-14 CROSS HOLES, 2 PL,",
-        "MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-0.10,",
+        "MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-0.10",
+        "(SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 AND ITS FRONT END CLEARANCE",
+        "TO MHA-DT-16),",
         "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP,",
         "0.45 FEELER AT MHA-DT-01 FRONT END; DRIVE MHA-DT-VN-63 PINS,",
         "BOTH ENDS 0 TO 2.8 BELOW THE MHA-DT-14 EDGES.",
@@ -956,6 +958,17 @@ def test_drum_runs_in_the_shim_the_straps_were_drilled_on() -> None:
     assert rig.TORQUE_SHAFT_BACK_BEARING_STACK["MHA-DT-19 rear end flush set"] == -0.10
     assert rig.TORQUE_SHAFT_BEARING_STACK["MHA-DT-19 drum end shim set error"] == -0.10
     assert rig.LIFT_ROD_SEAT_STACK["MHA-DT-19 drum end shim set error"] == -0.10
+    # The band the step names is load-bearing: one more band of shortfall
+    # takes the back-block bearing and the lever's air to the shaft's front
+    # end under floor plus spare, so the flush setting cannot loosen to an
+    # ordinary "flush to 0.5 short" without re-sizing the rig.
+    back_floor = rig.BACK_BLOCK_MIN_BEARING + rig.BLOCK_BEARING_MARGIN
+    assert sum(rig.TORQUE_SHAFT_BACK_BEARING_STACK.values()) - rig.FLUSH_SET_ERROR < (
+        back_floor
+    )
+    assert rig.LEVER_TO_SHAFT_FRONT_WORST - rig.FLUSH_SET_ERROR < (
+        rig.LEVER_THROW_MIN_AIR + rig.RIG_MARGIN_SPARE
+    )
 
 
 class _SketchFeature:

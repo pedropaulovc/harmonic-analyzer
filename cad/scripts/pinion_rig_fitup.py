@@ -150,12 +150,19 @@ COLLAR_SET_STEP = (
 # proud, since the west end faces the MHA-DT-23 collar across 0.38 of air, and
 # neither end deeper than dt_vn_pinion_strap_pin_spec.PIN_SUB_FLUSH_MAX, which keeps
 # a pin diameter of grip in each strap wall.
+# The flush band is not idle (machinist review of 69eda6e4c asked what it
+# protects): the pins freeze the shaft where it is drilled, and the worst
+# stacks keep only 0.04-0.09 over their floors plus spare -- bearing in the
+# back block and the lever's air to the front end (short), bearing in the
+# front block (proud) -- so the step names those clearances, not a size.
 SHAFT_DRILL_NAME = "SHAFT DRILL SET"
 STRAP_PIN_NUMBER = "MHA-DT-VN-63"
 SHAFT_DRILL_STEP = "\n".join(
     (
         f"{SHAFT_DRILL_NAME}: MATCH-DRILL MHA-DT-19 THRU MHA-DT-14 CROSS HOLES, 2 PL,",
-        f"MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-{FLUSH_SET_ERROR:.2f},",
+        f"MHA-DT-19 REAR END FLUSH WITH MHA-DT-18 REAR FACE +/-{FLUSH_SET_ERROR:.2f}",
+        "(SETS MHA-DT-19 BEARING IN BOTH MHA-DT-18 AND ITS FRONT END CLEARANCE",
+        "TO MHA-DT-16),",
         "STRAPS ON BACK STOP, MHA-DT-01 ON BACK STRAP,",
         f"{DRUM_END_SHIM:.2f} FEELER AT MHA-DT-01 FRONT END; DRIVE {STRAP_PIN_NUMBER} PINS,",
         f"BOTH ENDS 0 TO {PIN_SUB_FLUSH_MAX:.1f} BELOW THE MHA-DT-14 EDGES.",
