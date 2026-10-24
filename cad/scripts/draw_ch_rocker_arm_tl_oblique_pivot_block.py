@@ -216,7 +216,6 @@ REGISTER_CUT_END = (_REGISTER_CUT[0], _REGISTER_CUT_Y_CLEARANCE)
 # its line 7.5 mm (15 mm on paper) left of that end, text centred on it.
 OVERALL_HEIGHT_PICK_X = BLOCK_X0 + 5.0
 OVERALL_HEIGHT_LINE_X = BLOCK_X0 - 7.5
-_SW_UNITS_LINEAR_DECIMAL_PLACES = 49  # swUserPreferenceIntegerValue_e
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # In A-A, the carriage seat is model Z0, not the counterbored top face.
     "SideScrewRowZ": (BLOCK_X1 + 60.0, 0.0, -10.5),
@@ -1438,18 +1437,19 @@ def _overall_height_reference(adapter: Any, plan: Any, on_plan: Any) -> None:
         adapter, _early_bound(display, "IDisplayDimension").GetAnnotation(), label=label
     )
     # A fresh drawing dimension follows the document's linear places
-    # (new_project_drawing's two): GetPrimaryPrecision2 then reads -1
-    # (swPrecisionFollowsDocumentSetting), so read the document setting.
+    # (new_project_drawing's two): GetPrimaryPrecision2 reads -2
+    # (swPrecisionFollowsDocumentSetting), so read the drawing's linear
+    # default, as draw_ch_pivot_bracket and draw_sm_summing_lever do
+    # (swDetailingLinearDimPrecision = 24, swDetailingLinearDimension = 206).
     places = int(display.GetPrimaryPrecision2())
-    document_places = int(
-        adapter.currentModel.GetUserPreferenceIntegerValue(_SW_UNITS_LINEAR_DECIMAL_PLACES)
-    )
-    printed = document_places if places == -1 else places
+    printed = places
+    if places == -2:
+        extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+        printed = int(extension.GetUserPreferenceInteger(24, 206))
     if printed != part_spec.WING_HALF_WIDTH_PLACES:
         raise RuntimeError(
-            f"{label} prints {printed} places (dimension {places}, document "
-            f"{document_places}), not the 36.00 halves' "
-            f"{part_spec.WING_HALF_WIDTH_PLACES}"
+            f"{label} prints {printed} places (dimension {places}), not the "
+            f"36.00 halves' {part_spec.WING_HALF_WIDTH_PLACES}"
         )
 
 
