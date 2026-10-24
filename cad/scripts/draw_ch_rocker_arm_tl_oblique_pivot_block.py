@@ -30,7 +30,13 @@ from _drawing_common import (
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_dimension_import import curate_view_dimensions
 import _drawing_hidden_sketches as hidden_sketches
-from _drawing_dimensions import assert_imported_precision, offset_dimension_text, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measures
 from _drawing_hole_callout import (
     add_native_hole_callout,
     compose_hole_callout_prefix,
@@ -47,6 +53,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import limits
 from _section_axis import position_section_caption
@@ -76,6 +83,8 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     SIDE_SCREW_HOLES,
     SIDE_SCREW_REFERENCE,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_pivot_block"]
 PART_STEM = SPEC.artifact_stem
@@ -147,7 +156,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # its own column, 12 mm apart on paper; retain every baseline attachment.
     "BoreStationY": (38.0, -10.0, _H),
     "HoleRow2Y": (46.0, -3.5, _H),
-    "BlockWidth": (52.0, 8.0, _H),
+    # ENFORCE review: at X52 the 33.000 line (X46) struck the centred
+    # "SETS C'BORE / WALL 2.10 MIN" rows (~27 mm wide on paper). X60 stands
+    # the whole block right of that line with ~7 mm of air.
+    "BlockWidth": (60.0, 8.0, _H),
     "BoreDia": (BLOCK_X0 - 15.5, 15.5, _H),
 }
 # The 9 mm witnesses stay with A-A; its complete bracket identity has an
@@ -187,15 +199,23 @@ REGISTER_KEEP: dict[str, tuple[float, float, float]] = {
     # above the upper-Y station's witness/line (native top Y238 mm).
     "CapRegister2Dia": (BLOCK_X1 + 10.0, 33.0, _H),
 }
-# Paper offsets from the first register's projected mid-depth, after fitting.
-# The native dimension LINE is pinned here; its text has a separate shelf.
-REGISTER_SECTION_KEEP = {"CapRegisterDepth": (0.0, -0.012)}
-# A constant-X plane cuts the first register diametrically, not both skewed
+# Paper offsets from the cut register's projected mid-depth, after fitting:
+# the line stands this far OUTBOARD of the register (away from the bearing
+# bore), so both witnesses stay short. Its text has a separate shelf.
+REGISTER_SECTION_KEEP = {"CapRegisterDepth": (0.0, 0.012)}
+# A constant-X plane cuts one register diametrically, not both skewed
 # stations. The unchanged common cut depth still controls both recesses (2X).
-_REGISTER_FIRST = part_spec.CAP_REGISTER_POINTS[0]
+# ENFORCE review: through register 1, the depth's native floor witness rose
+# from register 2's uncut floor, ~45 mm up the section across the bearing
+# bore. Cut the register whose floor the native depth dimension references.
+_REGISTER_CUT = part_spec.CAP_REGISTER_POINTS[1]
 _REGISTER_CUT_Y_CLEARANCE = max(BLOCK_WIDTH, part_spec.WING_WIDTH) / 2.0 + 7.0
-REGISTER_CUT_START = (_REGISTER_FIRST[0], -_REGISTER_CUT_Y_CLEARANCE)
-REGISTER_CUT_END = (_REGISTER_FIRST[0], _REGISTER_CUT_Y_CLEARANCE)
+REGISTER_CUT_START = (_REGISTER_CUT[0], -_REGISTER_CUT_Y_CLEARANCE)
+REGISTER_CUT_END = (_REGISTER_CUT[0], _REGISTER_CUT_Y_CLEARANCE)
+# Sheet 4's (72.00) overall: picked 5 mm in from the -X end on each wing face,
+# its line 7.5 mm (15 mm on paper) left of that end, text centred on it.
+OVERALL_HEIGHT_PICK_X = BLOCK_X0 + 5.0
+OVERALL_HEIGHT_LINE_X = BLOCK_X0 - 7.5
 SECTION_A_KEEP: dict[str, tuple[float, float, float]] = {
     # In A-A, the carriage seat is model Z0, not the counterbored top face.
     "SideScrewRowZ": (BLOCK_X1 + 60.0, 0.0, -10.5),
@@ -228,7 +248,9 @@ SIDE_KEEP: dict[str, tuple[float, float, float]] = {
     "SideScrew1X": (-29.5, _HW, -4.0),
     "SideScrew2X": (-24.5, _HW, -8.0),
     # Height stays to the right; its carriage-seat datum is named in A-A.
-    "BlockHeight": (BLOCK_X1 + 4.0, _HW, _H / 2.0),
+    # ENFORCE review: 4 mm out, the centred "24.00" touched the +X outline;
+    # 12 mm (18 mm on paper) stands the text clear of the part.
+    "BlockHeight": (BLOCK_X1 + 12.0, _HW, _H / 2.0),
 }
 _OTHER_SHEET_DIMENSIONS = (
     set(CAPTURE_KEEP) | set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
@@ -1159,12 +1181,17 @@ def _fit_register_section(adapter: Any, section: Any) -> tuple[float, ...]:
 def _register_section_layout(
     outline: tuple[float, ...], register_xy: tuple[float, float]
 ) -> tuple[dict[str, tuple[float, float]], dict[str, tuple[float, float]], tuple[float, float]]:
-    """Paper anchors following the fitted outline and the actual cut register."""
+    """Paper anchors following the fitted outline and the actual cut register.
+
+    The line stands outboard of the register (toward the nearer outline end,
+    away from the bore); the text shelf stands inboard of it, right of the
+    outline."""
+    outboard = 1.0 if register_xy[1] >= (outline[1] + outline[3]) / 2.0 else -1.0
     keep = {
-        name: (register_xy[0] + dx, register_xy[1] + dy)
+        name: (register_xy[0] + dx, register_xy[1] + outboard * dy)
         for name, (dx, dy) in REGISTER_SECTION_KEEP.items()
     }
-    text = {"CapRegisterDepth": (outline[2] + 0.030, register_xy[1] + 0.020)}
+    text = {"CapRegisterDepth": (outline[2] + 0.030, register_xy[1] - outboard * 0.020)}
     caption = ((outline[0] + outline[2]) / 2.0, outline[1])
     return keep, text, caption
 
@@ -1383,6 +1410,50 @@ def _position_register_depth(
     return check_layout
 
 
+@_telemetry.traced("drawing.pivot_block.overall_height_reference")
+def _overall_height_reference(adapter: Any, plan: Any, on_plan: Any) -> None:
+    """The body's (72.00) overall, wing face to wing face (rule 10).
+
+    ENFORCE review: the overall height printed nowhere; only the 2X 36.00
+    from the bearing axis (sheet 2), which still control both faces. This
+    plan has no other dimensions, so the reference stands clear left of the
+    -X end, its witnesses on the two wing faces' -X corners. It prints at the
+    sheet's default places, read back equal to the 36.00 halves it sums."""
+    label = "pivot block overall height reference"
+    half = part_spec.WING_WIDTH / 2.0
+    display = add_edge_dimension(
+        adapter, plan,
+        p0=on_plan((OVERALL_HEIGHT_PICK_X, half, _H)),
+        p1=on_plan((OVERALL_HEIGHT_PICK_X, -half, _H)),
+        text_xy=on_plan((OVERALL_HEIGHT_LINE_X, 0.0, _H)),
+        label=label,
+        orientation="vertical",
+    )
+    # Value-only: the two coordinate picks land on the wing's only Y-extreme
+    # edges at this X, and no other edge pair spans 72 mm vertically.
+    assert_dimension_measures(
+        adapter, display, expected_mm=part_spec.WING_WIDTH, label=label
+    )
+    display = set_reference_dimension(
+        adapter, _early_bound(display, "IDisplayDimension").GetAnnotation(), label=label
+    )
+    # A fresh drawing dimension follows the document's linear places
+    # (new_project_drawing's two): GetPrimaryPrecision2 reads -2
+    # (swPrecisionFollowsDocumentSetting), so read the drawing's linear
+    # default, as draw_ch_pivot_bracket and draw_sm_summing_lever do
+    # (swDetailingLinearDimPrecision = 24, swDetailingLinearDimension = 206).
+    places = int(display.GetPrimaryPrecision2())
+    printed = places
+    if places == -2:
+        extension = _early_bound(adapter.currentModel.Extension, "IModelDocExtension")
+        printed = int(extension.GetUserPreferenceInteger(24, 206))
+    if printed != part_spec.WING_HALF_WIDTH_PLACES:
+        raise RuntimeError(
+            f"{label} prints {printed} places (dimension {places}), not the "
+            f"36.00 halves' {part_spec.WING_HALF_WIDTH_PLACES}"
+        )
+
+
 def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
     """Return D-D's note-census parent and its retained native layout check."""
     plan = place_view(
@@ -1402,7 +1473,7 @@ def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
     outline = _fit_register_section(adapter, section)
     on_section = _view_mapper(adapter, section)
     register_xy = on_section(
-        (*_REGISTER_FIRST, _H - part_spec.CAP_REGISTER_DEPTH / 2.0)
+        (*_REGISTER_CUT, _H - part_spec.CAP_REGISTER_DEPTH / 2.0)
     )
     keep, text_positions, caption_xy = _register_section_layout(outline, register_xy)
     annotations = curate_view_dimensions(
@@ -1421,12 +1492,15 @@ def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
         line_xy=keep["CapRegisterDepth"],
         text_positions=text_positions,
         witnesses=(
-            on_section((*_REGISTER_FIRST, _H)),
-            on_section((*_REGISTER_FIRST, _H - part_spec.CAP_REGISTER_DEPTH)),
+            on_section((*_REGISTER_CUT, _H)),
+            on_section((*_REGISTER_CUT, _H - part_spec.CAP_REGISTER_DEPTH)),
         ),
     )
     position_section_caption(adapter, section, caption_xy, label="pivot block D")
-    if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
+    _overall_height_reference(adapter, plan, on_plan)
+    # ENFORCE review: at the top-left (0.025, 0.260) the note's final "3"
+    # touched the D-D cutting line's upper end; the lower-left corner is clear.
+    if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.045) is None:
         raise RuntimeError("failed to identify the register-ordinate sheet")
     return plan, check_depth
 
