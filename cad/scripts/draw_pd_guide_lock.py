@@ -156,6 +156,19 @@ HOLE_CALLOUT_BELOW = "\n".join(
         f"{SCREW_NUMBER} SCREWS",
     )
 )
+# The coordinates baseline both holes from the plate's corner, so the 4.000
+# and the shared 2X Y are as much the pattern as the 18.000: hole 1's X and
+# the holes' common line are what land on the guide's tap row (the R9-49 set
+# window spends each coordinate's band, pd_vn_guide_lock_screw_spec
+# .POSITION_RADIAL; ±0.065 is refused). Each carries the mate at its own
+# value (machinist review ENFORCE at 2056e3344: the hole callout alone left
+# the edge locations without one). Two short rows keep each block inside its
+# value's width, the hole Y's left of the 4.000 and the 4.000's left of the
+# plate's left-edge extension line.
+DIMENSION_CALLOUTS_BELOW = {
+    "Hole1X": f"MATCHES\n{GUIDE_NUMBER}",
+    "Hole1Y": f"MATCHES\n{GUIDE_NUMBER}",
+}
 
 
 def _set_dimension_prefixes(
@@ -265,6 +278,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="above")
+    set_dimension_callouts(
+        adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

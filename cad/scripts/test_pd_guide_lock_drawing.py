@@ -134,6 +134,30 @@ def test_the_drill_callout_names_the_mate_its_location_bands_serve() -> None:
     assert max(len(row) for row in rows) <= len("2X DRILL Ø3.18 THRU ALL")
 
 
+def test_the_edge_located_hole_coordinates_name_the_taps_they_match() -> None:
+    """Machinist review ENFORCE at 2056e3344 (blocker): the 4.000 and 2X
+    3.700 ±0.035 edge locations gave no function. The coordinates baseline
+    the pattern from the corner, and the set window spends each band
+    (±0.065 is refused), so each names the guide whose taps it matches."""
+    import _config
+
+    guide = _config.parts("pd-platen-guide")["number"]
+    assert drawing.DIMENSION_CALLOUTS_BELOW == {
+        "Hole1X": f"MATCHES\n{guide}",
+        "Hole1Y": f"MATCHES\n{guide}",
+    }
+    # Each block stays inside its value's width: the hole Y's (right-aligned
+    # at its dimension line) left of the 4.000, the 4.000's left of the
+    # plate's left-edge extension line.
+    width = max(len(row) for row in f"MATCHES\n{guide}".split("\n")) * _CHAR_WIDTH
+    y_x, _ = drawing.FRONT_KEEP["Hole1Y"]
+    y_centre = y_x - len("2X 3.700 ±0.035") * _CHAR_WIDTH / 2.0
+    x_x, _ = drawing.FRONT_KEEP["Hole1X"]
+    assert width <= len("4.000 ±0.035") * _CHAR_WIDTH
+    assert y_centre + width / 2.0 < x_x - len("4.000 ±0.035") * _CHAR_WIDTH / 2.0
+    assert x_x + width / 2.0 < drawing.LEFT_EDGE_X - 0.002
+
+
 def test_the_thickness_value_stands_outboard_of_its_extension_lines() -> None:
     """Machinist review ENFORCE r1-r3: centred between the 1/16 sheet's
     extension lines, the value's digits sat on them; it stands right of the
