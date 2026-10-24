@@ -881,7 +881,7 @@ def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> N
     names = []
     _patch_cut_bookkeeping(monkeypatch, names)
     jobs = []
-    form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals", None))
+    form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals", None, seat.volume))
     assert [(args[2], args[9]) for args in seat.cuts] == [(True, False), (True, True)]
     assert seat.undone == 1 and seat.selected[0] == ("NumeralsSketch", "SKETCH")
     assert form == builder._v_cut_args(True)
@@ -892,7 +892,7 @@ def test_first_layer_finds_the_form_that_removes_exactly_the_v(monkeypatch) -> N
     assert names == [("Numerals", [None, "NumeralDepth"])]
     assert jobs == [("NumeralDepth@Numerals", '"NumeralDepth"')]
     # Later layers reuse the proved form without re-probing.
-    builder_form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals2", form))
+    builder_form = asyncio.run(builder._cut_numerals(seat.adapter, jobs, "Numerals2", form, seat.volume))
     assert builder_form is form and seat.cuts[-1] == form
     assert seat.selected[-1] == ("Numerals2Sketch", "SKETCH")
     assert builder.numeral_feature_names() == ["Numerals", "Numerals2", "Numerals3"]
@@ -902,7 +902,7 @@ def test_no_form_that_removes_the_v_fails_with_discriminating_probes(monkeypatch
     seat = _CutSeat({(True, False, True): 3.0, (True, False, False): 3.1352})
     _patch_cut_bookkeeping(monkeypatch, [])
     with pytest.raises(RuntimeError, match="no FeatureCut3 form removed") as raised:
-        asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None))
+        asyncio.run(builder._cut_numerals(seat.adapter, [], "Numerals", None, seat.volume))
     message = str(raised.value)
     assert "single-ended reversed, Ddir1 False: removed 3.0000" in message
     assert "single-ended reversed, Ddir1 True: FeatureCut3 returned None" in message
@@ -944,9 +944,30 @@ def test_native_numeral_readback_refuses_square_or_wrong_v(monkeypatch, definiti
 
 @pytest.mark.parametrize("removed", [0.0, 2.0 * spec.NUMERAL_VOLUME_MM3])
 def test_numeral_volume_gate_refuses_missed_or_square_cuts(removed) -> None:
-    builder._check_numeral_volume("all numerals", spec.NUMERAL_VOLUME_MM3, spec.NUMERAL_VOLUME_MM3)
+    allowance = builder.NUMERAL_VOLUME_ALLOWANCE_MM3
+    builder._check_numeral_volume("all numerals", spec.NUMERAL_VOLUME_MM3, spec.NUMERAL_VOLUME_MM3, allowance)
     with pytest.raises(RuntimeError, match="V cut removed"):
-        builder._check_numeral_volume("all numerals", removed, spec.NUMERAL_VOLUME_MM3)
+        builder._check_numeral_volume("all numerals", removed, spec.NUMERAL_VOLUME_MM3, allowance)
+
+
+@pytest.mark.parametrize("layer", range(len(spec.NUMERAL_LAYER_VOLUMES_MM3)))
+def test_numeral_layer_gate_refuses_one_dropped_stroke(layer) -> None:
+    expected = spec.NUMERAL_LAYER_VOLUMES_MM3[layer]
+    allowance = builder.NUMERAL_LAYER_ALLOWANCES_MM3[layer]
+    # Run 20261024T020813087Z-49ce2da4: the seat read each layer within 7e-4.
+    builder._check_numeral_volume("layer", expected + 7e-4, expected, allowance)
+    builder._check_numeral_volume("layer", expected - 7e-4, expected, allowance)
+    with pytest.raises(RuntimeError, match="dropped stroke"):
+        builder._check_numeral_volume("layer", expected - spec.NUMERAL_LAYER_MIN_STROKE_MM3[layer], expected, allowance)
+    # The aggregate gate is no looser than its tightest layer.
+    assert builder.NUMERAL_VOLUME_ALLOWANCE_MM3 <= allowance
+
+
+def test_min_limit_refuses_a_nominal_that_is_not_the_printed_limit(monkeypatch) -> None:
+    dimension = SimpleNamespace(SystemValue=(spec.TICK_DEPTH + 0.1) / 1000.0, Tolerance=None)
+    monkeypatch.setattr(builder, "_named_dimension", lambda adapter, feature, name: (None, dimension))
+    with pytest.raises(RuntimeError, match="is not the limit"):
+        builder._min_limit(object(), "Tick0Cut", "TickDepth")
 
 
 @pytest.mark.parametrize("full_name,value", [

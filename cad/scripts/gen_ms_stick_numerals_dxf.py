@@ -277,6 +277,31 @@ def layer_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
     return tuple(after - before for before, after in zip([0.0, *cumulative], cumulative, strict=False))
 
 
+def _overlaps(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def min_stroke_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
+    """Per layer, the least removal any one stroke adds over the layers cut
+    before it and the rest of its own layer: dropping a stroke removes at
+    least that much less. A stroke's cut is zero outside its own bbox, so
+    only that bbox is integrated, with the strokes that reach into it."""
+    out = []
+    for i, layer in enumerate(split):
+        before = [rect for earlier in split[:i] for rect in earlier]
+        least = math.inf
+        for stroke in layer:
+            box = dxf.bbox([stroke])
+            near = [rect for rect in before + layer
+                    if rect is not stroke and _overlaps(box, dxf.bbox([rect]))]
+            xs, ys = np.meshgrid(np.arange(box[0], box[2], _GRID_MM) + _GRID_MM / 2.0,
+                                 np.arange(box[1], box[3], _GRID_MM) + _GRID_MM / 2.0)
+            added = _depth_field([*near, stroke], xs, ys) - _depth_field(near, xs, ys)
+            least = min(least, float(added.sum()) * _GRID_MM**2)
+        out.append(least)
+    return tuple(out)
+
+
 def _clusters(rects: list[Ring]) -> list[list[Ring]]:
     """Rectangles grouped by numeral (numerals are far apart along X)."""
     groups: list[list[Ring]] = []
@@ -298,11 +323,14 @@ def summary() -> dict[str, float | int]:
     rects = [rect for numeral in numerals for rect in numeral]
     x0, y0, x1, y1 = dxf.bbox(rects)
     split = layers()
+    by_layer = layer_volumes(split)
     return {
         "strokes": len(rects),
         "layers": len(split),
-        "layer_volumes_mm3": layer_volumes(split),
-        "volume_mm3": removed_volume(rects),
+        "layer_volumes_mm3": by_layer,
+        "min_stroke_volumes_mm3": min_stroke_volumes(split),
+        # The increments telescope to the union of every stroke.
+        "volume_mm3": sum(by_layer),
         "x0": x0,
         "y0": y0,
         "x1": x1,
@@ -323,6 +351,7 @@ def main() -> int:
     s = summary()
     print(f"strokes {s['strokes']} in {s['layers']} layers")
     print(f"removed volume {s['volume_mm3']:.4f} mm^3 (by layer {', '.join(f'{v:.4f}' for v in s['layer_volumes_mm3'])})")
+    print(f"least one-stroke removal by layer {', '.join(f'{v:.4f}' for v in s['min_stroke_volumes_mm3'])} mm^3")
     print(f"bbox x {s['x0']:.4f}..{s['x1']:.4f}  y {s['y0']:.4f}..{s['y1']:.4f}")
     return 0
 

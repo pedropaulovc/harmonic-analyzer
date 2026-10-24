@@ -12,6 +12,10 @@ drawings, not the generated build-input DXFs.
 The 2026-10-23 owner ruling V-engraves the numerals: single-stroke sans
 numerals cut as true 30-degree included V grooves (the model drafts every
 stroke wall 15 degrees). The square-bottom graduations stay fixed.
+The owner's Q2 ruling gives the tick lengths the title-block .XX band, so a
+full tick at 3.00 +0.51 and a half-division tick at 4.00 -0.51 could invert
+by 0.02 at opposite limits. That follows from the ruling and is kept: the
+length step is a reading aid, not a fit, and no band is added to hold it.
 """
 
 from __future__ import annotations
@@ -65,6 +69,9 @@ NUMERAL_VOLUME_MM3 = 2.6526
 # Each stroke layer's V removal over the layers cut before it (layers overlap
 # at stroke joints): gen_ms_stick_numerals_dxf.summary()["layer_volumes_mm3"].
 NUMERAL_LAYER_VOLUMES_MM3 = (1.5603, 0.9996, 0.0927)
+# Per layer, the least removal one stroke adds (a dropped stroke removes at
+# least this much less): gen_ms_stick_numerals_dxf.summary()["min_stroke_volumes_mm3"].
+NUMERAL_LAYER_MIN_STROKE_MM3 = (0.0128, 0.0169, 0.0142)
 
 # Width and thickness give the sliding clearance in the 8.4 x 3.4 stop
 # rebate; graduation positions set the amplitude-bar stations through the

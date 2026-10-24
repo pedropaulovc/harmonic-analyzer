@@ -84,6 +84,7 @@ from ms_stick_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     DRAWING_TOLERANCES,
+    DRAWING_VALUES_BY_NAME,
     DRAWING_NOTES,
     MIN_LIMIT_DEVIATIONS_MM,
     MIN_LIMIT_TOL_TYPE,
@@ -96,6 +97,7 @@ from ms_stick_spec import (
     NUMERAL_HEIGHT_MM,
     NUMERAL_GAP_MM,
     NUMERAL_DEPTH,
+    NUMERAL_LAYER_MIN_STROKE_MM3,
     NUMERAL_LAYER_VOLUMES_MM3,
     NUMERAL_V_INCLUDED_ANGLE_DEG,
     NUMERAL_VOLUME_MM3,
@@ -115,9 +117,13 @@ MATERIAL = "Brass"  # see _appearance.apply_material docstring
 
 # Removed-volume gates on the drafted numeral cuts. The pinned volumes are the
 # generator's integration of the drafted rectangles (the first layer's
-# disjoint prismatoids agree with the closed form to 1e-4); a straight-wall or
+# disjoint prismatoids agree with the closed form to 1e-4; the 2026 seat
+# matched every layer to 7e-4 in run 20261024T020813087Z-49ce2da4). Each
+# layer's allowance is half the least removal one of its strokes adds, so a
+# stroke the DXF import dropped fails its layer; a straight-wall or
 # outward-drafted cut removes over twice as much, a missed face nothing.
-NUMERAL_VOLUME_REL_TOL = 0.05
+NUMERAL_LAYER_ALLOWANCES_MM3 = tuple(0.5 * least for least in NUMERAL_LAYER_MIN_STROKE_MM3)
+NUMERAL_VOLUME_ALLOWANCE_MM3 = min(NUMERAL_LAYER_ALLOWANCES_MM3)
 
 
 def numeral_feature_names() -> list[str]:
@@ -228,9 +234,9 @@ async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     return result
 
 
-async def _first_v_cut(adapter, sketch_name: str) -> tuple:
-    """Find the form that removes exactly the first layer's V; undo the rest."""
-    pre = await _volume_mm3(adapter)
+async def _first_v_cut(adapter, sketch_name: str, pre: float) -> tuple:
+    """Find the form that removes exactly the first layer's V; undo the rest.
+    ``pre`` is the volume before the cut."""
     tried = []
     for label, ddir1 in V_CUT_VARIANTS:
         args = _v_cut_args(ddir1)
@@ -240,7 +246,7 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
             continue
         removed = pre - await _volume_mm3(adapter)
         expected = NUMERAL_LAYER_VOLUMES_MM3[0]
-        if abs(removed - expected) <= NUMERAL_VOLUME_REL_TOL * expected:
+        if abs(removed - expected) <= NUMERAL_LAYER_ALLOWANCES_MM3[0]:
             _telemetry.info(f"V cut form: {label} removed {removed:.4f} mm^3 (pinned {expected:.4f})")
             return args
         tried.append(f"{label}: removed {removed:.4f} mm^3")
@@ -262,12 +268,14 @@ async def _first_v_cut(adapter, sketch_name: str) -> tuple:
     )
 
 
-async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None) -> tuple:
+async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None,
+                        pre: float) -> tuple:
     """Blind V cut of one imported stroke layer, read back at once; returns
-    the FeatureCut3 form, found on the first layer and reused after it."""
+    the FeatureCut3 form, found on the first layer (from ``pre``, the volume
+    before the cut) and reused after it."""
     sketch = f"{name}Sketch"
     if args is None:
-        args = await _first_v_cut(adapter, sketch)
+        args = await _first_v_cut(adapter, sketch, pre)
     else:
         feature = _feature_cut3(adapter, sketch, args)
         if isinstance(feature, Exception):
@@ -290,7 +298,11 @@ def _min_limit(adapter, feature: str, name: str) -> None:
     """``name`` as the single limit "n.nn MIN" (swTolMIN prints the nominal
     plus MIN), read back; the model value is the printed minimum."""
     lower, upper = MIN_LIMIT_DEVIATIONS_MM[name]
+    limit = DRAWING_VALUES_BY_NAME[name]
     _, dimension = _named_dimension(adapter, feature, name)
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(f"{name}@{feature}: nominal {value * 1000.0:.7f} is not the limit {limit}")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = MIN_LIMIT_TOL_TYPE
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
@@ -311,13 +323,13 @@ async def _volume_mm3(adapter) -> float:
     return float(mass.data.volume)
 
 
-def _check_numeral_volume(label: str, removed: float, expected: float) -> None:
+def _check_numeral_volume(label: str, removed: float, expected: float, allowance: float) -> None:
     _telemetry.info(f"{label}: V cut removed {removed:.4f} mm^3 (pinned {expected:.4f})")
-    if abs(removed - expected) > NUMERAL_VOLUME_REL_TOL * expected:
+    if abs(removed - expected) > allowance:
         raise RuntimeError(
             f"{label}: V cut removed {removed:.4f} mm^3, expected {expected:.4f} "
-            f"+/-{NUMERAL_VOLUME_REL_TOL:.0%} -- check the draft direction, the DXF "
-            "import plane/placement, or re-pin the volumes from the generator"
+            f"+/-{allowance:.4f} -- check for a dropped stroke, the draft direction, "
+            "the DXF import plane/placement, or re-pin the volumes from the generator"
         )
 
 
@@ -680,9 +692,11 @@ async def build(adapter) -> dict[str, str]:
         if not path.is_file():
             raise RuntimeError(f"numerals DXF not found: {path}")
     pre = await _volume_mm3(adapter)
+    before = pre  # an imported sketch removes nothing, so this carries over
     cut_form = None  # found (and volume-proved) on the first layer
-    for path, name, layer_volume in zip(
-        NUMERAL_LAYER_DXFS, numeral_feature_names(), NUMERAL_LAYER_VOLUMES_MM3, strict=True
+    for path, name, layer_volume, allowance in zip(
+        NUMERAL_LAYER_DXFS, numeral_feature_names(), NUMERAL_LAYER_VOLUMES_MM3,
+        NUMERAL_LAYER_ALLOWANCES_MM3, strict=True
     ):
         check(
             f"import {path.name}",
@@ -700,12 +714,13 @@ async def build(adapter) -> dict[str, str]:
             ),
         )
         name_last_feature(adapter, f"{name}Sketch")
-        layer_pre = await _volume_mm3(adapter)
-        cut_form = await _cut_numerals(adapter, drive_jobs, name, cut_form)
+        cut_form = await _cut_numerals(adapter, drive_jobs, name, cut_form, before)
+        after = await _volume_mm3(adapter)
         # Each layer on its own: a stroke dropped from a small later layer
         # hides inside the combined allowance.
-        _check_numeral_volume(name, layer_pre - await _volume_mm3(adapter), layer_volume)
-    _check_numeral_volume("all numerals", pre - await _volume_mm3(adapter), NUMERAL_VOLUME_MM3)
+        _check_numeral_volume(name, before - after, layer_volume, allowance)
+        before = after
+    _check_numeral_volume("all numerals", pre - before, NUMERAL_VOLUME_MM3, NUMERAL_VOLUME_ALLOWANCE_MM3)
     numeral_sense = _assert_numeral_cut(adapter)
 
     await apply_material(adapter, MATERIAL)

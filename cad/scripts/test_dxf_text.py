@@ -123,6 +123,9 @@ def test_pinned_bbox_and_volumes_match_the_generator():
     for got, want in zip(s["layer_volumes_mm3"], part.NUMERAL_LAYER_VOLUMES_MM3, strict=True):
         assert abs(got - want) < 1e-3, s
     assert abs(sum(part.NUMERAL_LAYER_VOLUMES_MM3) - part.NUMERAL_VOLUME_MM3) < 1e-3
+    assert len(s["min_stroke_volumes_mm3"]) == len(part.NUMERAL_LAYER_MIN_STROKE_MM3)
+    for got, want in zip(s["min_stroke_volumes_mm3"], part.NUMERAL_LAYER_MIN_STROKE_MM3, strict=True):
+        assert abs(got - want) < 1e-4, s
 
 
 def test_first_layer_volume_is_the_closed_form_v():
