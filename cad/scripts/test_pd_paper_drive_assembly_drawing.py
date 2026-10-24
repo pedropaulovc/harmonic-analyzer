@@ -127,12 +127,17 @@ def _unit_step_notes() -> drawing.StepNotes:
 
 
 def _step_body(key: str) -> str:
-    """The printed text of one step, from its head to the next head."""
-    text = _unit_step_notes().fitup_steps
+    """The printed text of one step, from its head to the blank line that
+    separates it from the next step (or its column's end)."""
+    notes = _unit_step_notes()
+    text = "\n\n".join(
+        (notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes, *notes.chain_notes)
+    )
     heads = list(STEP_HEAD.finditer(text))
     index = steps.step_number(key) - 1
     end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
-    return " ".join(text[heads[index].end() : end].split())
+    body = text[heads[index].end() : end].split("\n\n")[0]
+    return " ".join(body.split())
 
 
 def _number(stem: str) -> str:
@@ -161,10 +166,31 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     notes = _unit_step_notes()
     printed = [
         int(n)
-        for text in (notes.platen_steps, *notes.fitup_notes, *notes.chain_notes)
+        for text in (
+            notes.platen_steps,
+            *notes.fitup_notes,
+            *notes.fitup_continued_notes,
+            *notes.chain_notes,
+        )
         for n in STEP_HEAD.findall(text)
     ]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
+
+
+def test_one_blank_line_separates_consecutive_steps_and_none_splits_a_step() -> None:
+    notes = _unit_step_notes()
+    for text in (
+        notes.platen_steps,
+        *notes.fitup_notes,
+        *notes.fitup_continued_notes,
+        *notes.chain_notes,
+    ):
+        lines = text.splitlines()
+        heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
+        assert lines[heads[0] - 1] != ""  # the heading runs straight into the first step
+        for previous, head in zip(heads, heads[1:]):
+            assert lines[head - 1] == "" and lines[head - 2] != ""
+            assert "" not in lines[previous : head - 1]
 
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
@@ -199,6 +225,12 @@ def test_the_steps_fit_their_fields() -> None:
     fields = (
         *zip(
             notes.fitup_notes,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
+        *zip(
+            notes.fitup_continued_notes,
             drawing.FITUP_NOTE_XY,
             drawing.FITUP_NOTE_LIMITS,
             strict=True,
@@ -596,6 +628,8 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-vn-transgear-latch-pin",
     "pd-transgear-rear-bushing",
 }
+# Hidden in the arm's counterbore from the isometric; Section A-A balloons them.
+BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
 
 
 def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None:
@@ -608,11 +642,19 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
     iso_stems = {stem for stem, _item in iso}
     exploded_stems = {stem for stem, _item in exploded}
     assert drawing.ISO_HIDDEN_STEMS == HIDDEN_BY_THE_ISOMETRIC
-    assert iso_stems == set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC
+    assert drawing.ISO_SECTION_ONLY_STEMS == BALLOONED_BY_SECTION_A_A
+    assert iso_stems == (
+        set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC - BALLOONED_BY_SECTION_A_A
+    )
     assert exploded_stems == explode.TRANSGEAR_SHOWN_STEMS
     assert HIDDEN_BY_THE_ISOMETRIC < exploded_stems
-    # Every transgear family is ballooned on sheet 2 or sheet 3.
-    assert iso_stems | exploded_stems == set(CONTRACT_TRANSGEAR_QUANTITIES)
+    # Every transgear family is ballooned on sheet 2 (isometric or Section
+    # A-A) or sheet 3.
+    section = {stem for stem, *_ in drawing.PIVOT_BALLOON_TIPS}
+    assert BALLOONED_BY_SECTION_A_A <= section
+    assert iso_stems | exploded_stems | BALLOONED_BY_SECTION_A_A == set(
+        CONTRACT_TRANSGEAR_QUANTITIES
+    )
     for balloons in (iso, exploded):
         assert all(items[stem] == item for stem, item in balloons)
         numbers = [int(item) for _stem, item in balloons]
@@ -1388,7 +1430,7 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
         exploded,
     )
     ballooned = [stem for plan in plans for stem, _item in plan]
-    assert set(ballooned) == set(drawing.BOM_PART_NUMBERS)
+    assert set(ballooned) | BALLOONED_BY_SECTION_A_A == set(drawing.BOM_PART_NUMBERS)
     for plan in plans:
         assert [int(item) for _stem, item in plan] == sorted(
             int(item) for _stem, item in plan
@@ -1434,6 +1476,13 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert drawing.SHEET_NAMES[3] == "PLATEN AND SUPPORT"
     assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
+    # Balloon 8 lands on a bottom lock plate, the one hanging free of the bar.
+    pinned = {
+        stem: anchor.instance
+        for stem, anchor in drawing.PLATEN_BALLOON_ANCHORS.items()
+        if anchor.instance is not None
+    }
+    assert pinned == {"pd-guide-lock": "pd-guide-lock-2"}
 
 
 def _explode_instances() -> list[explode.Instance]:
@@ -1932,11 +1981,12 @@ def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     domain = _unit_operating_domain()
     notes = drawing.format_step_notes(operating_domain=domain)
     assert drawing.engaged_feed_text(domain) in notes.fitup_steps.replace("\n   ", " ")
-    assert (notes.platen_steps, notes.fitup_notes, notes.chain_notes) == drawing._step_columns(
-        operating_domain=domain
-    )
-    assert drawing.sheet_texts(notes)[:5] == (
-        notes.platen_steps, *notes.fitup_notes, *notes.chain_notes,
+    assert (
+        notes.platen_steps, notes.fitup_notes, notes.fitup_continued_notes, notes.chain_notes,
+    ) == drawing._step_columns(operating_domain=domain)
+    assert drawing.sheet_texts(notes)[:7] == (
+        notes.platen_steps, *notes.fitup_notes, *notes.fitup_continued_notes,
+        *notes.chain_notes,
     )
 
 

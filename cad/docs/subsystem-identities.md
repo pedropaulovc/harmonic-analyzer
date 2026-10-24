@@ -342,7 +342,7 @@ The package recipes own sheet counts and locations:
   190 mm pieces. The reference isometric and scale metadata occupy separate
   fields below the first piece.
 - [`draw_pd_paper_drive_assembly.py`](../scripts/draw_pd_paper_drive_assembly.py)
-  retains sheets 1–5 and appends sheet 6 for the complete BOM. Its 48 mm Number
+  retains sheets 1–7 and appends sheet 8 for the complete BOM. Its 48 mm Number
   column and 118 mm description column form two 190 mm pieces, split using
   rebuilt native row heights. Every instruction sheet has a reference model
   view for title-block property links.
