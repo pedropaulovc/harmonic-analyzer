@@ -14,6 +14,7 @@ import pytest
 import _config
 import build_pd_transgear_removable as part
 import draw_pd_transgear_removable as drawing
+import pd_transgear_removable_callouts as callouts
 import pd_transgear_removable_notes as notes
 import pd_transgear_removable_spec as spec
 import _sprocket_seat_geometry as seat_geometry
@@ -56,8 +57,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The part marks exactly what the sheet imports.
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    # Every callout lands on a dimension the sheet keeps.
-    assert set(drawing.CALLOUTS_ABOVE) | set(drawing.CALLOUTS_BELOW) <= marked
+    # Every callout row lands on a dimension its feature marks and the sheet
+    # keeps.
+    for rows in callouts.CALLOUTS.values():
+        for feature, name in rows:
+            assert name in spec.DRAWING_DIMENSIONS[feature], (feature, name)
 
 
 def test_pin_locations_hold_the_shared_band_at_three_places() -> None:
@@ -338,15 +342,15 @@ def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() ->
         r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?"
         r"|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])"
     )
-    callouts = drawing.CALLOUTS_ABOVE | drawing.CALLOUTS_BELOW
+    below = callouts.callouts_by_name(callouts.CALLOUT_BELOW)
     for name in ("PinPosY", "PinNegY"):
-        assert set(number.findall(callouts[name])) == numbers, name
+        assert set(number.findall(below[name])) == numbers, name
     # The mates print at the band they explain, not in the general notes.
     assert not number.findall(notes.DRAWING_NOTES)
 
 
 def test_the_plate_band_names_the_chain_it_serves() -> None:
-    callout = (drawing.CALLOUTS_ABOVE | drawing.CALLOUTS_BELOW)["BlankWidth"]
+    callout = callouts.callouts_by_name(callouts.CALLOUT_BELOW)["BlankWidth"]
     assert "ANSI #25 CHAIN" in callout and "SUPPLIED" in callout
 
 
@@ -368,69 +372,118 @@ def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> Non
 
 
 class _CalloutDisplay:
-    def __init__(self, texts: dict[int, str]) -> None:
-        self._texts = texts
+    """A display dimension: ``SetText`` stores unless told the write fails."""
+
+    def __init__(self, texts: dict[int, str], *, stores: bool = True) -> None:
+        self._texts = dict(texts)
+        self._stores = stores
+
+    def SetText(self, part: int, text: str) -> None:
+        if self._stores:
+            self._texts[part] = text
 
     def GetText(self, part: int) -> str:
         return self._texts.get(part, "")
 
 
-def _callouts_read_back(monkeypatch, printed: dict[str, str]) -> None:
+def _imported(monkeypatch, printed: dict[tuple[int, str], str]) -> list[_Annotation]:
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
-    annotations = [
-        _Annotation(name, _CalloutDisplay({4: text})) for name, text in printed.items()
+    names = {name for _lane, name in printed}
+    return [
+        _Annotation(
+            name,
+            _CalloutDisplay(
+                {lane: text for (lane, owner), text in printed.items() if owner == name}
+            ),
+        )
+        for name in sorted(names)
     ]
-    drawing._assert_dimension_callouts(
-        None, annotations, drawing.CALLOUTS_BELOW, location="below"
-    )
 
 
-def test_callouts_read_back_through_crlf_and_trimmed_standoff(monkeypatch) -> None:
-    printed = {
-        name: text.replace("\n", "\r\n").strip()
-        for name, text in drawing.CALLOUTS_BELOW.items()
+def _part_rows() -> dict[tuple[int, str], str]:
+    return {
+        (lane, name): text
+        for lane in callouts.CALLOUTS
+        for name, text in callouts.callouts_by_name(lane).items()
     }
-    _callouts_read_back(monkeypatch, printed)
+
+
+def test_imported_callouts_read_back_through_crlf_and_trimmed_standoff(
+    monkeypatch,
+) -> None:
+    printed = {
+        key: text.replace("\n", "\r\n").strip() for key, text in _part_rows().items()
+    }
+    drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
 
 
 @pytest.mark.parametrize("lost", ["PinPosY", "PinNegY", "BlankWidth"])
-def test_a_mate_callout_the_writer_dropped_is_refused(monkeypatch, lost: str) -> None:
-    printed = dict(drawing.CALLOUTS_BELOW) | {lost: ""}
+def test_an_imported_dimension_missing_its_mate_row_is_refused(
+    monkeypatch, lost: str
+) -> None:
+    printed = _part_rows() | {(callouts.CALLOUT_BELOW, lost): ""}
     with pytest.raises(RuntimeError, match=lost):
-        _callouts_read_back(monkeypatch, printed)
+        drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
 
 
-class _Note:
-    def __init__(self, text: str, position: tuple[float, float, float]) -> None:
-        self._text = text
-        self._position = position
-
-    def GetAnnotation(self) -> SimpleNamespace:
-        return SimpleNamespace(GetPosition=lambda: self._position)
-
-    def GetText(self) -> str:
-        return self._text
+def test_a_callout_dimension_printed_twice_is_refused(monkeypatch) -> None:
+    annotations = _imported(monkeypatch, _part_rows())
+    with pytest.raises(RuntimeError, match="exactly once"):
+        drawing._assert_dimension_callouts(None, [*annotations, annotations[0]])
 
 
-def _label_front(monkeypatch, landed: tuple[float, float, float]) -> None:
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(drawing, "_activate_view", lambda *_args, **_kwargs: None)
-    note = _Note(drawing.MAIN_VIEW_LABEL, landed)
-    monkeypatch.setattr(drawing, "add_note", lambda _adapter, _text, _x, _y: note)
-    view = SimpleNamespace(GetNotes=lambda: (note,))
-    drawing._label_view(
-        None, view, drawing.MAIN_VIEW_LABEL, drawing.FRONT_LABEL_XY, label="face"
-    )
+def _author(monkeypatch, *, stores: bool) -> dict[tuple[str, str], _CalloutDisplay]:
+    displays: dict[tuple[str, str], _CalloutDisplay] = {}
+
+    def named(_adapter, feature: str, name: str):
+        display = displays.setdefault(
+            (feature, name), _CalloutDisplay({}, stores=stores)
+        )
+        return display, None
+
+    monkeypatch.setattr(part, "_named_dimension", named)
+    part.author_dimension_callouts(None)
+    return displays
 
 
-def test_a_view_label_at_its_place_is_accepted(monkeypatch) -> None:
-    _label_front(monkeypatch, (*drawing.FRONT_LABEL_XY, 0.0))
+def test_the_part_authors_every_callout_row_on_its_source_dimension(
+    monkeypatch,
+) -> None:
+    displays = _author(monkeypatch, stores=True)
+    for lane, rows in callouts.CALLOUTS.items():
+        for key, text in rows.items():
+            assert displays[key].GetText(lane) == text, (lane, key)
 
 
-def test_a_view_label_left_at_the_insertion_default_is_refused(monkeypatch) -> None:
-    with pytest.raises(RuntimeError, match="landed at"):
-        _label_front(monkeypatch, (0.0, 0.0, 0.0))
+def test_a_callout_the_part_failed_to_store_is_refused(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="did not persist"):
+        _author(monkeypatch, stores=False)
+
+
+def test_the_drawing_never_writes_dimension_text() -> None:
+    """Text set from the drawing writes through to the built part."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    called = {
+        getattr(node.func, "id", getattr(node.func, "attr", ""))
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+    }
+    assert not called & {"SetText", "set_dimension_callouts", "set_dimension_text"}
+
+
+def _settled_labels(landed: tuple[float, float, float]) -> None:
+    annotation = SimpleNamespace(GetPosition=lambda: landed)
+    drawing._assert_labels_in_place([(annotation, drawing.FRONT_LABEL_XY, "face")])
+
+
+def test_a_view_label_at_its_place_is_accepted() -> None:
+    _settled_labels((*drawing.FRONT_LABEL_XY, 0.0))
+
+
+def test_a_view_label_left_at_the_insertion_default_is_refused() -> None:
+    with pytest.raises(RuntimeError, match="sits at"):
+        _settled_labels((0.0, 0.0, 0.0))
 
 
 def test_gears_carry_no_frames_or_datums() -> None:

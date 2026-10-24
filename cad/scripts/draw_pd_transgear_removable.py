@@ -45,7 +45,6 @@ from _drawing_dimension_import import (
 )
 from _drawing_dimensions import (
     assert_imported_precision,
-    set_dimension_callouts,
     set_reference_dimensions,
 )
 from _drawing_notes import add_property_linked_note
@@ -55,6 +54,7 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from _sprocket_seat_geometry import PLATE
+import pd_transgear_removable_callouts as callouts
 from pd_transgear_removable_spec import (
     DEFAULT_CONFIG,
     DRAWING_DIMENSIONS,
@@ -110,28 +110,10 @@ TOP_KEEP = {
     "BlankDia": (TOP_CENTER[0], _TOP_EDGE_Y + 0.010),
     "BlankWidth": (TOP_CENTER[0] + 0.065, _TOP_EDGE_Y),
 }
-# The two pin holes share one size: the +Y hole's diameter prints for both.
-# Both holes and the bore are drilled through: the title block's DRILLED
-# HOLES row governs their sizes.
-# Each pin centre's band serves the drive pins pressed into the crankshaft
-# and the knob's drive collar, so each location names them in rows narrow
-# enough to stop short of the T12 / T18 labels.  The plate band serves the
-# chain's axial float on the supplied plate; its rows stand off the
-# thickness dimension's lower arrow by leading spaces.
-CRANKSHAFT_NUMBER = "MHA-DT-11"
-KNOB_COLLAR_NUMBER = "MHA-PD-22"
-PIN_LOCATION_CALLOUT = (
-    f"SLIP FIT OVER\nPINS IN\n{CRANKSHAFT_NUMBER} AND\n{KNOB_COLLAR_NUMBER}"
-)
-PLATE_CALLOUT = "   SUPPLIED PLATE; SETS\n   ANSI #25 CHAIN FLOAT"
-CALLOUTS_ABOVE = {"PinPosDia": "2X"}
-CALLOUTS_BELOW = {
-    "BoreDiaDim": "DRILL THRU",
-    "PinPosDia": "DRILL THRU",
-    "PinPosY": PIN_LOCATION_CALLOUT,
-    "PinNegY": PIN_LOCATION_CALLOUT,
-    "BlankWidth": PLATE_CALLOUT,
-}
+# Every callout row (the drilled holes' DRILL THRU, the pin holes' 2X, each
+# pin location's mates and the plate band's reason) is authored on the source
+# dimension by the part build and imported verbatim: text set here would
+# write through to the built part.  The sheet only reads the rows back.
 
 # The face and edge views draw the saved T24; each is labelled with it,
 # under the view and flush with its left tip like the configuration views.
@@ -310,71 +292,79 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
 
 def _label_view(
     adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
-) -> None:
+) -> Any:
     """Title a view with its configuration (and a configuration view's scale).
 
     A model view has no native label the API can show, so the label is a note
     inserted while the view is ACTIVE: the view owns it and moves with it.
-    Read back: the view carries that label exactly once, at ``xy`` (the
-    note's upper-left corner on the sheet): ``add_note`` returns the note
-    even when its placement failed and it sat at the default insertion spot.
+    Read back: the view carries that label exactly once.  Returns the note's
+    annotation for :func:`_assert_labels_in_place`.
     """
     _activate_view(adapter, view, label=label)
     note = add_note(adapter, text, *xy)
     if note is None:
         raise RuntimeError(f"failed to add the {label} view label")
-    annotation = _early_bound(
-        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
-    )
-    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
-    if len(position) != 3 or math.dist(position[:2], xy) > 1e-6:
-        raise RuntimeError(f"{label} view label landed at {position!r}, not at {xy!r}")
     owned = [
         str(_early_bound(owned_note, "INote").GetText() or "")
         for owned_note in (_early_bound(view, "IView").GetNotes() or ())
     ]
     if owned.count(text) != 1:
         raise RuntimeError(f"{label} view label did not land in its view: {owned!r}")
+    return _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
 
 
-_CALLOUT_LANES = {"above": 3, "below": 4}  # swDimensionTextCallout{Above,Below}
-
-
-def _callout_rows(text: str) -> tuple[str, ...]:
-    """A callout's rows, independent of CRLF and of the standoff spaces."""
-    return tuple(row.strip() for row in text.replace("\r", "").split("\n"))
-
-
-def _assert_dimension_callouts(
-    adapter: Any,
-    annotations: list[Any],
-    callouts: dict[str, str],
-    *,
-    location: str,
+@_telemetry.traced("drawing.pd_transgear_removable.view_labels")
+def _assert_labels_in_place(
+    labels: list[tuple[Any, tuple[float, float], str]],
 ) -> None:
-    """Read back every callout row a dimension must print.
+    """Each label's upper-left corner sits at its ``xy`` on the settled sheet.
 
-    The shared writer swallows a failed ``SetText``, and the pin mates and
-    the plate's chain float print nowhere else on the sheet.
+    ``add_note`` returns the note even when its placement failed and it sat at
+    the default insertion spot, and a later rebuild may move a view's notes.
     """
-    lane = _CALLOUT_LANES[location]
-    printed: dict[str, tuple[str, ...]] = {}
+    for annotation, xy, label in labels:
+        position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if len(position) != 3 or math.dist(position[:2], xy) > 1e-6:
+            raise RuntimeError(
+                f"{label} view label sits at {position!r}, not at {xy!r}"
+            )
+
+
+@_telemetry.traced("drawing.pd_transgear_removable.callouts")
+def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Every imported dimension prints the callout rows its part authored.
+
+    The pin mates and the plate's chain float print nowhere else on the
+    sheet, so a lost row must fail the drawing.  One pass over the
+    annotations reads each named dimension's identity once.
+    """
+    lanes = {lane: callouts.callouts_by_name(lane) for lane in callouts.CALLOUTS}
+    wanted = set().union(*lanes.values())
+    displays: dict[str, list[Any]] = {name: [] for name in wanted}
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
-        if name not in callouts:
-            continue
-        display = _early_bound(
-            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
-            "IDisplayDimension",
-        )
-        printed[name] = _callout_rows(str(display.GetText(lane) or ""))
+        if name in displays:
+            displays[name].append(
+                _early_bound(
+                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                    "IDisplayDimension",
+                )
+            )
+    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
+    if counts:
+        raise RuntimeError(f"callout dimensions not printed exactly once: {counts!r}")
+    printed = {
+        (lane, name): str(displays[name][0].GetText(lane) or "")
+        for lane, rows in lanes.items()
+        for name in rows
+    }
     wrong = {
-        name: printed.get(name)
-        for name, text in callouts.items()
-        if printed.get(name) != _callout_rows(text)
+        key: text
+        for key, text in printed.items()
+        if callouts.callout_rows(text) != callouts.callout_rows(lanes[key[0]][key[1]])
     }
     if wrong:
-        raise RuntimeError(f"{location} dimension callouts did not persist: {wrong!r}")
+        raise RuntimeError(f"imported callouts differ from the part's: {wrong!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -452,6 +442,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations = [*face, *edge]
     # The T24 edge view imports first, so its import keeps eliminating
     # duplicates; each configuration view then prints the same dimension again.
+    labels: list[tuple[Any, tuple[float, float], str]] = []
     for configuration, view in configuration_views.items():
         curated = _curate_repeated_dimensions(
             adapter,
@@ -462,19 +453,16 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimensions(adapter, curated, DRAWING_REFERENCE_DIMENSIONS)
         _assert_outside_diameter(adapter, curated, configuration)
         annotations += curated
-        _label_view(
-            adapter,
-            view,
-            configuration_label(configuration),
-            configuration_label_xy(configuration),
-            label=configuration,
-        )
-    _label_view(adapter, front, MAIN_VIEW_LABEL, FRONT_LABEL_XY, label="face")
-    _label_view(adapter, top, MAIN_VIEW_LABEL, TOP_LABEL_XY, label="edge")
-    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
-    _assert_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-    _assert_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
+        xy = configuration_label_xy(configuration)
+        text = configuration_label(configuration)
+        note = _label_view(adapter, view, text, xy, label=configuration)
+        labels.append((note, xy, configuration))
+    for view, xy, label in (
+        (front, FRONT_LABEL_XY, "face"),
+        (top, TOP_LABEL_XY, "edge"),
+    ):
+        note = _label_view(adapter, view, MAIN_VIEW_LABEL, xy, label=label)
+        labels.append((note, xy, label))
     # Decimal places and bands are part-authored; the sheet proves they
     # survived import.  Parenthesized supplied ODs claim no general tolerance.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -488,12 +476,18 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_XY, char_height=0.0025
     )
+    # The callout rows and the labels are proved on the drawing the last
+    # settling rebuild leaves, not as each was placed.
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Removable Chain Sprocket Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_dimension_callouts(adapter, annotations),
+            lambda: _assert_labels_in_place(labels),
+        ),
     )
 
 
