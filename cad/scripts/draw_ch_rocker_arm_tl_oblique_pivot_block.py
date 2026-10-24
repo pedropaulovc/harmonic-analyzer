@@ -109,16 +109,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         nut_annotations += curate_view_dimensions(adapter,nut_section,
             keep={'NutSeatDepth':(.330,.065)},view_label='C-C nut seat',
             dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # SolidWorks pins its own "#4-40 Tapped Hole" note beside the nut taps
-        # in each view that shows them; its leader crossed section line C
-        # and the callout below already states the thread. How many views
-        # carry one is SolidWorks' choice (2 and 3 on successive farm runs),
-        # so the sheet sweep counts at least one here and finalize proves
-        # none survives.
-        removed_tap_notes = remove_notes_matching(adapter,'#4-40 Tapped Hole')
-        if removed_tap_notes < 1:
-            raise RuntimeError('nut interface: no automatic #4-40 tapped-hole note to remove')
-        _telemetry.info(f'removed {removed_tap_notes} automatic #4-40 tapped-hole note(s)')
         # The callout picks the +Z column's tap, right of section line C at the
         # nut axis, so its leader up-right to the callout crosses neither the
         # line nor its label.
@@ -126,6 +116,15 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y+contract.NUT_TAP_DRILL/2,z),'nut tap mouth')
         add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=(.310,.255),
                                 label='four nut flange taps',process='4X DRILL TO PRINT\n')
+        # SolidWorks pins its own "#4-40 Tapped Hole" note beside the nut taps;
+        # its leader crossed section line C and the Hole Wizard callout above
+        # already states the thread. How many it adds varies by run (1-3 seen),
+        # some appearing after the views, so the sweep runs after the last
+        # annotation, needs at least one, and finalize proves none survives.
+        removed_tap_notes = remove_notes_matching(adapter,'#4-40 Tapped Hole')
+        if removed_tap_notes < 1:
+            raise RuntimeError('nut interface: no automatic #4-40 tapped-hole note to remove')
+        _telemetry.info(f'removed {removed_tap_notes} automatic #4-40 tapped-hole note(s)')
         annotations += nut_annotations
     precision = {name:places for dims in contract.DRAWING_PRECISION.values() for name,places in dims.items()}
     assert_imported_precision(adapter,annotations,precision)
