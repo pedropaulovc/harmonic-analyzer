@@ -421,32 +421,73 @@ def pivot_stake_note_xy(tip_x: float, front_side: float) -> tuple[float, float]:
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
-# --- sheet 3: the transgear drawn apart, seen from above ----------------------
+# --- sheet 3: the transgear drawn apart, two isometric views ------------------
 # PAPER_DRIVE_EXPLODED moves the hanger's plate, the disc cluster and the knob
-# stack along their own axes (machine Z, and the cup's cross pin along X);
-# looking down -Y they spread up and down the sheet in the order they go on,
-# with no wide part over another axis's parts. Only those transgear instances
-# show: the pivot stack is SECTION A-A's and the latch hook stays on the bar.
-# The view is full-detail for the same reason as sheet 4's (the Default BOM).
-# It is drawn 1:1 only (drawing guidelines rule 15: never scale a view down
-# to fit a sheet); an outline past its field is refused, not shrunk. Farm
-# run 20261024T014330502Z placed it at 1:1 inside the field.
-TRANSGEAR_EXPLODED_ORIENTATION = "*Top"
-TRANSGEAR_EXPLODED_SCALE_LADDER = ((1.0, 1.0),)
-if any(
-    view_configuration(scale, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
+# stack along their own axes (machine Z, and the cup's cross pin along X).
+# Farm runs 20261024T014330502Z and 20261024T021816733Z drew them from above:
+# every Z-axis circle and every round of the turned arm lay edge-on, and the
+# balloon leaders on them re-solved along the line (0.85 and 0.26 mm). The
+# isometric draws those circles as ellipses, as on sheet 2, but there the disc
+# would cover the knob stack (the two axes stand 29.5 mm apart on the sheet).
+# So each axis is its own view: the hanger and the knob stack on its shaft
+# left of the title block, the disc cluster on its pin above the caption.
+# Only those transgear instances show: the pivot stack is SECTION A-A's and
+# the latch hook stays on the bar. The views are full-detail for the same
+# reason as sheet 4's (the Default BOM), drawn 1:1 only (drawing guidelines
+# rule 15: never scale a view down to fit a sheet); an outline past its field
+# is refused, not shrunk.
+TRANSGEAR_EXPLODED_ORIENTATION = "*Isometric"
+TRANSGEAR_EXPLODED_SCALE = (1.0, 1.0)
+if (
+    view_configuration(TRANSGEAR_EXPLODED_SCALE, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
     != BOM_CONFIGURATION
-    for scale in TRANSGEAR_EXPLODED_SCALE_LADDER
 ):
-    raise AssertionError(
-        "a rescale on the transgear explode's ladder would leave the BOM configuration"
-    )
-TRANSGEAR_EXPLODED_CENTER = (0.116, 0.141)
-# Left of the title block (left edge 0.218), inside the border; the caption
-# takes the field to the right.
-TRANSGEAR_EXPLODED_RING_LIMITS = (0.018, 0.015, 0.215, 0.267)
-TRANSGEAR_EXPLODED_CAPTION_XY = (0.225, 0.262)
-TRANSGEAR_EXPLODED_CAPTION_WIDTH = 60  # characters, inside the right field
+    raise AssertionError("the transgear explode's scale would leave the BOM configuration")
+CLUSTER_STEMS = frozenset(
+    {
+        "pd-transgear-pin",
+        "pd-transgear-rear-bushing",
+        "pd-transgear-feed-pinion",
+        "pd-rack-pinion",
+        "pd-transgear-disc-hub",
+        "pd-vn-transgear-disc-screw",
+        "pd-transgear-front-bushing",
+        "pd-vn-transgear-retaining-ring",
+    }
+)
+if not CLUSTER_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
+    raise AssertionError("the disc cluster's view shows exploded transgear families")
+
+
+@dataclass(frozen=True)
+class ExplodedGroup:
+    """One sheet-3 view: its families, where it is placed and its ring field."""
+
+    label: str
+    stems: frozenset[str]
+    center: tuple[float, float]
+    ring_limits: Box
+
+
+# Iso estimates at 1:1 from the builder's stations and the explode: the knob
+# stack and hanger 152 x 106 mm, the cluster 97 x 61 mm, before their rings.
+# The title block spans x 218 to 420, y 13 to 66 mm.
+TRANSGEAR_EXPLODED_GROUPS = (
+    ExplodedGroup(
+        "knob stack and hanger exploded",
+        explode.TRANSGEAR_SHOWN_STEMS - CLUSTER_STEMS,
+        (0.116, 0.141),
+        (0.018, 0.015, 0.215, 0.267),
+    ),
+    ExplodedGroup(
+        "disc cluster exploded",
+        CLUSTER_STEMS,
+        (0.318, 0.195),
+        (0.222, 0.122, 0.415, 0.267),
+    ),
+)
+TRANSGEAR_EXPLODED_CAPTION_XY = (0.225, 0.112)
+TRANSGEAR_EXPLODED_CAPTION_WIDTH = 68  # characters, above the title block
 
 # --- sheet 4: the platen-and-support steps, the ballooned exploded view -----
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
@@ -493,7 +534,7 @@ CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 SHEET_SCALES = {
     "ASSEMBLED VIEWS": ASSEMBLED_SCALE,
     "TRANSGEAR VIEWS": TRANSGEAR_VIEW_SCALE,
-    "TRANSGEAR EXPLODED": TRANSGEAR_EXPLODED_SCALE_LADDER[0],
+    "TRANSGEAR EXPLODED": TRANSGEAR_EXPLODED_SCALE,
     "PLATEN AND SUPPORT": EXPLODED_SCALE,
     "ASSEMBLY AND FIT-UP": FITUP_SCALE,
     "CHAIN FIT-UP": FITUP_SCALE,
@@ -774,33 +815,23 @@ TRANSGEAR_EXPLODED_INSTANCES = frozenset(
 )
 if explode.KNOB_WHEEL_INSTANCE not in TRANSGEAR_EXPLODED_INSTANCES:
     raise AssertionError("the explode moves the mounted knob wheel it shows")
-# Seen from above, the collar's -Y drive dowel lies under the +Y one, the
-# builder's first (KNOB_DRIVE_PIN_XY, local +Y first).
+# The knob wheel is the mounted removable; the crank wheel and spare T18 are
+# sheet 1's.
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
     if stem == "pd-transgear-removable"
-    else BalloonAnchor(instance="pd-vn-transgear-knob-drive-pin-1")
-    if stem == "pd-vn-transgear-knob-drive-pin"
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
 }
-# Seen from above, the arm's rounds lie edge-on along its face lines and,
-# turned -32.56 deg with the hanger, the walk's points on them are not the
-# lines' ends. Farm run 20261024T014330502Z: the leader on the pivot round's
-# rear edge (-10.633, 6.572, 7.938) re-solved 0.85 mm along it. The upper
-# straight edge on the front face is a true-length line from above; station
-# 12 is between the pivot round and the knob shaft, the arm's topmost ink there.
-TRANSGEAR_EXPLODED_ARM_STATION = 12.0
-TRANSGEAR_EXPLODED_BALLOON_ANCHORS = {
-    **TRANSGEAR_BALLOON_ANCHORS,
-    "pd-transgear-arm": BalloonAnchor(
-        point_mm=(
-            TRANSGEAR_EXPLODED_ARM_STATION,
-            arm_geometry.edge_half_width(TRANSGEAR_EXPLODED_ARM_STATION),
-            0.0,
-        ),
-    ),
-}
+
+
+def exploded_group_instances(group: ExplodedGroup) -> frozenset[str]:
+    """The sheet-3 instances one view shows: its families' exploded instances."""
+    return frozenset(
+        name
+        for name in TRANSGEAR_EXPLODED_INSTANCES
+        if name.rsplit("-", 1)[0] in group.stems
+    )
 
 
 def transgear_balloon_items(
@@ -1587,25 +1618,22 @@ TRANSGEAR_CAPTION = (
     f"AND {SHEET_NAMES.index('CHAIN FIT-UP') + 1}; "
     f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
 )
-# Sheet 3's caption at each scale its view may take.
-TRANSGEAR_EXPLODED_CAPTIONS = {
-    scale: "\n".join(
-        textwrap.wrap(
-            f"TRANSGEAR EXPLODED, SEEN FROM ABOVE, {_scale_text(scale)}: THE HANGER "
-            "ARM AND ITS PLATE, THE DISC CLUSTER ON ITS PIN AND THE KNOB STACK ON "
-            "ITS SHAFT, EACH DRAWN APART ALONG ITS AXIS IN THE ORDER IT GOES ON. "
-            "HANGER PIVOT: SECTION A-A, SHEET "
-            f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}; LATCH HOOK: SHEET "
-            f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}. ASSEMBLY: SHEETS "
-            f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} AND "
-            f"{SHEET_NAMES.index('CHAIN FIT-UP') + 1}; BOM: SHEET "
-            f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
-            width=TRANSGEAR_EXPLODED_CAPTION_WIDTH,
-            break_on_hyphens=False,
-        )
+# Sheet 3's caption, right of the knob-stack view and under the cluster's.
+TRANSGEAR_EXPLODED_CAPTION = "\n".join(
+    textwrap.wrap(
+        f"TRANSGEAR EXPLODED, ISOMETRIC, {_scale_text(TRANSGEAR_EXPLODED_SCALE)}. "
+        "LEFT: THE HANGER ARM AND ITS PLATE, AND THE KNOB STACK ON ITS SHAFT. "
+        "ABOVE: THE DISC CLUSTER ON ITS PIN. EACH PART IS DRAWN APART ALONG ITS "
+        "AXIS IN THE ORDER IT GOES ON. HANGER PIVOT: SECTION A-A, SHEET "
+        f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}; LATCH HOOK: SHEET "
+        f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}. ASSEMBLY: SHEETS "
+        f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} AND "
+        f"{SHEET_NAMES.index('CHAIN FIT-UP') + 1}; BOM: SHEET "
+        f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
+        width=TRANSGEAR_EXPLODED_CAPTION_WIDTH,
+        break_on_hyphens=False,
     )
-    for scale in TRANSGEAR_EXPLODED_SCALE_LADDER
-}
+)
 FITUP_REFERENCE_CAPTION = (
     f"REFERENCE {FITUP_SCALE[0]:g}:{FITUP_SCALE[1]:g}; ITEMS: SHEETS 1 TO "
     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}"
@@ -1621,7 +1649,7 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         *EXPLODED_CAPTIONS.values(),
         *ASSEMBLED_CAPTIONS.values(),
         TRANSGEAR_CAPTION,
-        *TRANSGEAR_EXPLODED_CAPTIONS.values(),
+        TRANSGEAR_EXPLODED_CAPTION,
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
         PIVOT_CAPTION,
@@ -2856,52 +2884,58 @@ def _balloon_assembled_sheet(
 def _place_transgear_exploded_sheet(
     adapter: Any, table: Any, items: dict[str, str]
 ) -> list[Any]:
-    """The builder's PAPER_DRIVE_EXPLODED seen from above, only the hanger,
-    cluster and knob stack shown, each family ballooned once."""
+    """The builder's PAPER_DRIVE_EXPLODED in two isometric views, the hanger
+    and knob stack in one and the disc cluster in the other, each family
+    ballooned once. Both views fit their fields before any balloon exists."""
     sheet = SHEET_NAMES[2]
     _activate_sheet(adapter, sheet)
-    label = "transgear exploded"
-    placed = TRANSGEAR_EXPLODED_SCALE_LADDER[0]
-    view = place_view(
-        adapter,
-        str(SOURCE),
-        TRANSGEAR_EXPLODED_ORIENTATION,
-        *TRANSGEAR_EXPLODED_CENTER,
-        scale=placed,
-    )
-    set_high_quality_shaded_with_edges(adapter, view, label=label)
-    configuration = apply_view_configuration(
-        adapter, view, role=ViewRole.FULL_DETAIL, label=label
-    )
-    set_view_exploded_state(
-        adapter, view, True, configuration=configuration, label=label
-    )
-    _isolate_instances(adapter, view, TRANSGEAR_EXPLODED_INSTANCES, label=label)
-    scale, outline = step_down_to_fit(
-        _native_outline_at(adapter, view, placed, label=label),
-        TRANSGEAR_EXPLODED_SCALE_LADDER,
-        TRANSGEAR_EXPLODED_RING_LIMITS,
-        name=label,
-    )
-    shift = ring_fit_shift(outline, TRANSGEAR_EXPLODED_RING_LIMITS, name=label)
-    _shift_view(adapter, view, shift, label=f"{label} ring fit")
-    _link_view_to_bom(view, table, label=label)
-    balloons_label = "paper-drive transgear exploded BOM coverage"
-    _assert_bom_balloon_configuration(view, label=balloons_label)
+    views = []
+    for group in TRANSGEAR_EXPLODED_GROUPS:
+        label = group.label
+        view = place_view(
+            adapter,
+            str(SOURCE),
+            TRANSGEAR_EXPLODED_ORIENTATION,
+            *group.center,
+            scale=TRANSGEAR_EXPLODED_SCALE,
+        )
+        set_high_quality_shaded_with_edges(adapter, view, label=label)
+        configuration = apply_view_configuration(
+            adapter, view, role=ViewRole.FULL_DETAIL, label=label
+        )
+        set_view_exploded_state(
+            adapter, view, True, configuration=configuration, label=label
+        )
+        _isolate_instances(adapter, view, exploded_group_instances(group), label=label)
+        _scale, outline = step_down_to_fit(
+            _native_outline_at(adapter, view, TRANSGEAR_EXPLODED_SCALE, label=label),
+            (TRANSGEAR_EXPLODED_SCALE,),
+            group.ring_limits,
+            name=label,
+        )
+        shift = ring_fit_shift(outline, group.ring_limits, name=label)
+        _shift_view(adapter, view, shift, label=f"{label} ring fit")
+        _link_view_to_bom(view, table, label=label)
+        views.append((group, view))
     _iso_items, exploded_items = transgear_balloon_items(items)
-    landings = add_component_bom_balloons(
-        adapter,
-        view,
-        items=exploded_items,
-        anchors=TRANSGEAR_EXPLODED_BALLOON_ANCHORS,
-        label=balloons_label,
-        margin=BALLOON_MARGIN,
-    )
-    _uncross_ring(adapter, landings, label=balloons_label)
+    landings: list[Any] = []
+    for group, view in views:
+        balloons_label = f"paper-drive transgear {group.label} BOM coverage"
+        _assert_bom_balloon_configuration(view, label=balloons_label)
+        group_landings = add_component_bom_balloons(
+            adapter,
+            view,
+            items=tuple(pair for pair in exploded_items if pair[0] in group.stems),
+            anchors=TRANSGEAR_BALLOON_ANCHORS,
+            label=balloons_label,
+            margin=BALLOON_MARGIN,
+        )
+        _uncross_ring(adapter, group_landings, label=balloons_label)
+        landings += group_landings
     _place_sheet_note(
         adapter,
         sheet,
-        TRANSGEAR_EXPLODED_CAPTIONS[scale],
+        TRANSGEAR_EXPLODED_CAPTION,
         TRANSGEAR_EXPLODED_CAPTION_XY,
         label="transgear exploded caption",
     )

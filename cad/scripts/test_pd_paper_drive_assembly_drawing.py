@@ -391,35 +391,6 @@ def test_the_feed_setup_reference_uses_the_selected_ratios_and_reference_pitch()
     assert "30DP" not in text and "%" not in text
 
 
-def test_the_exploded_arm_balloon_lands_on_its_true_length_upper_edge() -> None:
-    """Run 20261024T014330502Z: from above, the walk's point on the arm's
-    edge-on pivot round re-solved 0.85 mm along it."""
-    anchor = drawing.TRANSGEAR_EXPLODED_BALLOON_ANCHORS["pd-transgear-arm"]
-    station, offset, z = anchor.point_mm
-    arm = joints.ARM
-    # On the upper straight edge, on the front face.
-    assert arm.PIVOT_TANGENT_X < station < arm.TIP_STATION
-    assert offset == pytest.approx(arm.edge_half_width(station))
-    assert z == 0.0 and assembly.ARM_Z0 == arm.FRONT_FACE_MACHINE_Z
-    # Past the pivot round's reach and short of the knob shaft, so seen from
-    # above it is the topmost ink at its x.
-    x, _y = assembly._on_arm(station, offset)
-    assert x > assembly.PIVOT_XY[0] + arm.PIVOT_END_R
-    assert x < assembly.KNOB_SHAFT_XY[0] - knob_shaft.OUTSIDE_DIA / 2.0
-    # Only the explode's arm is pinned; sheet 2's isometric still walks.
-    others = {
-        stem: anchor
-        for stem, anchor in drawing.TRANSGEAR_EXPLODED_BALLOON_ANCHORS.items()
-        if stem != "pd-transgear-arm"
-    }
-    assert others == {
-        stem: anchor
-        for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
-        if stem != "pd-transgear-arm"
-    }
-    assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-arm"].point_mm is None
-
-
 def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     expected = {
         f"{stem}-{index}"
@@ -434,11 +405,12 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-removable"].instance == (
         "pd-transgear-removable-1"
     )
-    # Seen from above, the +Y drive dowel (the builder's first) covers the -Y.
-    assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-vn-transgear-knob-drive-pin"].instance == (
-        "pd-vn-transgear-knob-drive-pin-1"
+    # Every other family walks its own body on the instance the view shows.
+    assert all(
+        anchor == drawing.BalloonAnchor()
+        for stem, anchor in drawing.TRANSGEAR_BALLOON_ANCHORS.items()
+        if stem != "pd-transgear-removable"
     )
-    assert assembly.KNOB_DRIVE_PIN_XY[0][1] > assembly.KNOB_DRIVE_PIN_XY[1][1]
 
 
 # Farm run 20261002T180658288Z's inner-view ring (its drawing.balloon_ring
@@ -660,28 +632,50 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
         "pd-latch-hook",
     ):
         assert stem not in exploded_stems
+    # Each family is drawn in exactly one of sheet 3's two views: the disc
+    # cluster on its pin in one, the hanger and knob stack in the other.
+    groups = drawing.TRANSGEAR_EXPLODED_GROUPS
+    assert len(groups) == 2
+    assert groups[0].stems | groups[1].stems == exploded_stems
+    assert not groups[0].stems & groups[1].stems
+    assert "pd-rack-pinion" in groups[1].stems and "pd-transgear-pin" in groups[1].stems
+    assert {"pd-transgear-arm", "pd-transgear-knob-shaft"} <= groups[0].stems
+    assert (
+        drawing.exploded_group_instances(groups[0])
+        | drawing.exploded_group_instances(groups[1])
+    ) == drawing.TRANSGEAR_EXPLODED_INSTANCES
 
 
-def test_the_transgear_explode_fits_its_sheet_at_the_bom_configuration() -> None:
+def test_the_transgear_explode_views_fit_their_fields_at_the_bom_configuration() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    left, bottom, right, top = drawing.TRANSGEAR_EXPLODED_RING_LIMITS
-    # Left of the title block, inside the border.
-    assert left > 0.0127 and bottom > drawing.SHEET_INNER_BORDER_BOTTOM
-    assert right < 0.218 and top < 0.270
-    ladder = drawing.TRANSGEAR_EXPLODED_SCALE_LADDER
-    assert [n / d for n, d in ladder] == sorted((n / d for n, d in ladder), reverse=True)
-    assert set(drawing.TRANSGEAR_EXPLODED_CAPTIONS) == set(ladder)
-    # The caption takes the field right of the ring, above the title block.
+    knob, cluster = (group.ring_limits for group in drawing.TRANSGEAR_EXPLODED_GROUPS)
+    # Both fields inside the border; the knob stack's left of the title block,
+    # the cluster's above the caption, and the two never meet.
+    for left, bottom, right, top in (knob, cluster):
+        assert left > 0.0127 and bottom > drawing.SHEET_INNER_BORDER_BOTTOM
+        assert right < 0.420 and top < 0.270
+    assert knob[2] < 0.218 and knob[2] < cluster[0]
+    # Estimated 1:1 isometric extents plus both balloon rings fit each field.
+    reach = 2 * drawing.BALLOON_RING_REACH
+    for (width, height), (left, bottom, right, top) in (
+        ((0.152, 0.106), knob),
+        ((0.097, 0.061), cluster),
+    ):
+        assert width + reach < right - left and height + reach < top - bottom
+    for group in drawing.TRANSGEAR_EXPLODED_GROUPS:
+        left, bottom, right, top = group.ring_limits
+        assert left < group.center[0] < right and bottom < group.center[1] < top
+    # The caption sits right of the knob stack's field, under the cluster's
+    # and above the title block.
     x, y = drawing.TRANSGEAR_EXPLODED_CAPTION_XY
-    assert x > right
-    for scale, caption in drawing.TRANSGEAR_EXPLODED_CAPTIONS.items():
-        lines = caption.splitlines()
-        assert lines[0].startswith(
-            f"TRANSGEAR EXPLODED, SEEN FROM ABOVE, {scale[0]:g}:{scale[1]:g}"
-        )
-        assert x + max(map(len, lines)) * NOTE_CHAR_WIDTH < 0.420
-        assert y - len(lines) * NOTE_LINE_PITCH > template.title_block_top_m
-    assert drawing.TRANSGEAR_EXPLODED_ORIENTATION == "*Top"
+    lines = drawing.TRANSGEAR_EXPLODED_CAPTION.splitlines()
+    assert lines[0].startswith("TRANSGEAR EXPLODED, ISOMETRIC, 1:1")
+    assert x > knob[2] and y < cluster[1]
+    assert x + max(map(len, lines)) * NOTE_CHAR_WIDTH < 0.420
+    assert y - len(lines) * NOTE_LINE_PITCH > template.title_block_top_m
+    assert drawing.TRANSGEAR_EXPLODED_ORIENTATION == "*Isometric"
+    assert drawing.TRANSGEAR_EXPLODED_SCALE == (1.0, 1.0)
+    assert drawing.SHEET_SCALES["TRANSGEAR EXPLODED"] == drawing.TRANSGEAR_EXPLODED_SCALE
 
 
 # The v40 sheet 2 (the same layout code as 594749aec) printed the transgear
