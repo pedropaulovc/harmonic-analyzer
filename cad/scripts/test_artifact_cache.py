@@ -1032,6 +1032,277 @@ def test_a_thread_that_cannot_start_is_no_prewarm(leaf, monkeypatch):
     assert leaf == []
 
 
+class _FakeTokenCredential:
+    """Token endpoints with deterministic outcomes, never a subprocess or network."""
+
+    def __init__(self, outcomes=()):
+        self.outcomes = list(outcomes)
+        self.calls = []
+
+    def _fetch(self, method, scopes, kwargs):
+        from azure.core.credentials import AccessToken, AccessTokenInfo
+
+        self.calls.append((method, scopes, kwargs))
+        if self.outcomes:
+            outcome = self.outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+        token = f"secret-token-{len(self.calls)}"
+        if method == "get_token_info":
+            return AccessTokenInfo(
+                token, int(time.time()) + 4000, refresh_on=int(time.time()) + 3000,
+            )
+        return AccessToken(token, int(time.time()) + 4000)
+
+    def get_token(self, *scopes, **kwargs):
+        return self._fetch("get_token", scopes, kwargs)
+
+    def get_token_info(self, *scopes, **kwargs):
+        return self._fetch("get_token_info", scopes, kwargs)
+
+
+@pytest.fixture
+def credential_runtime(monkeypatch):
+    now = [1000]
+    delays, warnings, events = [], [], []
+    monkeypatch.setattr(cache.time, "time", lambda: now[0])
+    monkeypatch.setattr(cache.time, "sleep", delays.append)
+    monkeypatch.setattr(cache, "_warn", warnings.append)
+    monkeypatch.setattr(
+        cache, "_event",
+        lambda name, label, key, **attrs: events.append((name, attrs)),
+    )
+    return types.SimpleNamespace(
+        now=now, delays=delays, warnings=warnings, events=events,
+    )
+
+
+def test_credential_reuses_tokens_across_independent_callers(credential_runtime):
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedCredential(inner)
+    first = proxy.get_token("scope", tenant_id="tenant")
+    for _ in range(5):
+        assert proxy.get_token("scope", tenant_id="tenant") is first
+    assert len(inner.calls) == 1
+    assert credential_runtime.delays == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+@pytest.mark.parametrize(
+    ("expires_on", "refresh_on", "refresh_at"),
+    [
+        (2000, None, 1700),  # refresh at the five-minute expiry boundary
+        (2000, 1500, 1500),  # refresh_on can bring refresh forward
+        (2000, 1900, 1700),  # refresh_on cannot bypass expiry skew
+        (1200, None, 1000),  # a newly fetched near-expiry token is not reusable
+    ],
+)
+def test_credential_refresh_deadlines(
+    credential_runtime, method, expires_on, refresh_on, refresh_at,
+):
+    from azure.core.credentials import AccessToken, AccessTokenInfo
+
+    first = (
+        AccessTokenInfo("secret", expires_on, refresh_on=refresh_on)
+        if method == "get_token_info" else AccessToken("secret", expires_on)
+    )
+    # AccessToken has no refresh_on; use the info interface for those cases.
+    if method == "get_token" and refresh_on is not None:
+        refresh_at = expires_on - 300
+    inner = _FakeTokenCredential([first])
+    proxy = cache._TimedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    assert fetch("scope") is first
+    if refresh_at > credential_runtime.now[0]:
+        credential_runtime.now[0] = refresh_at - 1
+        assert fetch("scope") is first
+    credential_runtime.now[0] = refresh_at
+    assert fetch("scope") is not first
+    assert len(inner.calls) == 2
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_keys_complete_request_semantics(credential_runtime, method):
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    requests = [
+        (("scope",), {}),
+        (("other-scope",), {}),
+        (("scope", "other-scope"), {}),
+        (("other-scope", "scope"), {}),
+        (("scope",), {"tenant_id": "tenant-a"}),
+        (("scope",), {"tenant_id": "tenant-b"}),
+        (("scope",), {"claims": "secret-claims-a"}),
+        (("scope",), {"claims": "secret-claims-b"}),
+        (("scope",), {"enable_cae": False}),
+        (("scope",), {"enable_cae": True}),
+        (("scope",), {"options": {"tenant_id": "a", "claims": "secret-a"}}),
+        (("scope",), {"options": {"tenant_id": "b", "claims": "secret-a"}}),
+        (("scope",), {"options": {"tenant_id": "a", "claims": "secret-b"}}),
+        (("scope",), {"options": {"enable_cae": True}}),
+        (("scope",), {"options": {"extra": {"items": [1, 2]}}}),
+        (("scope",), {"options": {"extra": {"items": [2, 1]}}}),
+    ]
+    tokens = [fetch(*scopes, **kwargs) for scopes, kwargs in requests]
+    assert len(inner.calls) == len(requests)
+    for (scopes, kwargs), token in zip(requests, tokens):
+        assert fetch(*scopes, **kwargs) is token
+    assert len(inner.calls) == len(requests)
+    assert credential_runtime.events == []
+
+
+def test_credential_snapshots_mutable_options(credential_runtime):
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedTokenInfoCredential(inner)
+    options = {"tenant_id": "a", "claims": "secret-a"}
+    first = proxy.get_token_info("scope", options=options)
+    options["claims"] = "secret-b"
+    second = proxy.get_token_info("scope", options=options)
+    assert second is not first
+    assert proxy.get_token_info(
+        "scope", options={"claims": "secret-a", "tenant_id": "a"},
+    ) is first
+    assert len(inner.calls) == 2
+
+
+def test_credential_keeps_token_and_info_interfaces_separate(credential_runtime):
+    from azure.core.credentials import AccessToken, AccessTokenInfo
+
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedTokenInfoCredential(inner)
+    token = proxy.get_token("scope")
+    info = proxy.get_token_info("scope")
+    assert isinstance(token, AccessToken)
+    assert isinstance(info, AccessTokenInfo)
+    assert proxy.get_token("scope") is token
+    assert proxy.get_token_info("scope") is info
+    assert len(inner.calls) == 2
+    bare = cache._TimedCredential(types.SimpleNamespace(get_token=inner.get_token))
+    assert not hasattr(bare, "get_token_info")
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_concurrent_refresh_is_singleflight(credential_runtime, method):
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedTokenInfoCredential(inner)
+    entered, release = threading.Event(), threading.Event()
+    original = getattr(inner, method)
+
+    def blocked(*scopes, **kwargs):
+        entered.set()
+        assert release.wait(5), "test did not release fake acquisition"
+        return original(*scopes, **kwargs)
+
+    setattr(inner, method, blocked)
+    fetch = getattr(proxy, method)
+    for now in (1000, 4700):
+        credential_runtime.now[0] = now
+        entered.clear()
+        release.clear()
+        start = threading.Barrier(8)
+
+        def request():
+            start.wait(5)
+            return fetch("scope")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(request) for _ in range(8)]
+            try:
+                assert entered.wait(5), "fake acquisition did not start"
+            finally:
+                release.set()
+            tokens = [future.result(timeout=5) for future in futures]
+        assert all(token is tokens[0] for token in tokens)
+    assert len(inner.calls) == 2
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_retries_unavailability_then_reuses_success(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    timeout = subprocess.TimeoutExpired("secret-command", 10)
+    unavailable = CredentialUnavailableError("secret-claims must not reach retry telemetry")
+    unavailable.__cause__ = timeout
+    invocation = CredentialUnavailableError("secret-invocation")
+    invocation.__context__ = OSError("secret-path")
+    inner = _FakeTokenCredential([unavailable, invocation])
+    proxy = cache._TimedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    token = fetch("scope", claims="secret-request-claims")
+    assert fetch("scope", claims="secret-request-claims") is token
+    assert len(inner.calls) == 3
+    assert credential_runtime.delays == [1, 2]
+    assert len(credential_runtime.warnings) == 2
+    assert [name for name, attrs in credential_runtime.events] == [
+        "cache.credential.retry", "cache.credential.retry",
+    ]
+    attrs = [attrs for name, attrs in credential_runtime.events]
+    assert [item["attempt"] for item in attrs] == [1, 2]
+    assert [item["delay_s"] for item in attrs] == [1, 2]
+    assert [item["cause_type"] for item in attrs] == ["TimeoutExpired", "OSError"]
+    assert all(item["error_type"] == "CredentialUnavailableError" for item in attrs)
+    assert "secret" not in repr(credential_runtime.warnings)
+    assert "secret" not in repr(credential_runtime.events)
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_retry_exhaustion_preserves_exception_and_cause(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    errors = [CredentialUnavailableError(f"unavailable-{i}") for i in range(3)]
+    cause = subprocess.TimeoutExpired("az", 10)
+    errors[-1].__cause__ = cause
+    inner = _FakeTokenCredential(errors)
+    proxy = cache._TimedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    with pytest.raises(CredentialUnavailableError) as caught:
+        fetch("scope")
+    assert caught.value is errors[-1]
+    assert caught.value.__cause__ is cause
+    assert len(inner.calls) == 3
+    assert credential_runtime.delays == [1, 2]
+    assert len(credential_runtime.events) == 2
+    # Exhaustion is not cached as a token or converted into cache disablement.
+    assert fetch("scope") is not None
+    assert len(inner.calls) == 4
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_never_retries_authentication_errors(credential_runtime, method):
+    from azure.core.exceptions import ClientAuthenticationError
+
+    failure = ClientAuthenticationError("permission denied")
+    inner = _FakeTokenCredential([failure])
+    proxy = cache._TimedTokenInfoCredential(inner)
+    with pytest.raises(ClientAuthenticationError) as caught:
+        getattr(proxy, method)("scope")
+    assert caught.value is failure
+    assert len(inner.calls) == 1
+    assert credential_runtime.delays == []
+    assert credential_runtime.events == []
+    assert credential_runtime.warnings == []
+
+
+@pytest.mark.parametrize("method", ["get_token", "get_token_info"])
+def test_credential_failed_refresh_never_returns_stale_token(credential_runtime, method):
+    from azure.identity import CredentialUnavailableError
+
+    inner = _FakeTokenCredential()
+    proxy = cache._TimedTokenInfoCredential(inner)
+    fetch = getattr(proxy, method)
+    stale = fetch("scope")
+    credential_runtime.now[0] = stale.expires_on
+    failures = [CredentialUnavailableError("unavailable") for _ in range(3)]
+    inner.outcomes.extend(failures)
+    with pytest.raises(CredentialUnavailableError) as caught:
+        fetch("scope")
+    assert caught.value is failures[-1]
+    assert len(inner.calls) == 4
+    assert credential_runtime.delays == [1, 2]
+
+
 @pytest.fixture
 def exported_cache_spans(monkeypatch):
     """Real SDK + in-memory exporter, not a mocked telemetry event echo."""

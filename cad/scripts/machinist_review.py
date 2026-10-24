@@ -514,6 +514,11 @@ async def _run_claude(
     failure: Exception | None = None
     timed_out = False
     startup_timeout = min(timeout, CLAUDE_MCP_STARTUP_TIMEOUT_S)
+    spawn_env = dict(os.environ if env is None else env)
+    # The CLI's independent MCP startup deadline defaults to 30,000 ms. Align it
+    # with our readiness budget, overriding inherited settings in a fresh map;
+    # this does not extend the enclosing whole-attempt asyncio timeout.
+    spawn_env["MCP_TIMEOUT"] = str(max(1, int(startup_timeout * 1000)))
 
     async def read_stdout() -> None:
         assert proc is not None and proc.stdout is not None
@@ -595,7 +600,7 @@ async def _run_claude(
             async with asyncio.timeout(startup_timeout):
                 proc = await asyncio.create_subprocess_exec(
                     *command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE, cwd=cwd, env=env,
+                    stderr=subprocess.PIPE, cwd=cwd, env=spawn_env,
                 )
                 readers = [
                     asyncio.create_task(read_stdout()),

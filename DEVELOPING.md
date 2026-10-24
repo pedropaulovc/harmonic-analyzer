@@ -38,6 +38,13 @@ infrastructure such as telemetry. Build leaves always pass `--force`, so bypasse
 PDF-diff implementation, identity-pairing inputs, and the precheck prompt/schema
 do not invalidate their review cache.
 
+Claude's private sheets MCP connection uses the same bounded startup budget as
+the submitter: **120 seconds**, capped by the per-attempt timeout.
+The runner sets the child CLI's `MCP_TIMEOUT` (milliseconds) to that budget;
+otherwise Claude's independent 30-second default can fail before the submitter's
+readiness deadline. Startup and review still share one overall attempt timeout.
+A failed connection remains a provider/runner error, never a cached verdict.
+
 ### Selecting the build-gate reviewer and judge
 
 Build-gate reviews default to **Claude / `claude-opus-5-5` / `medium`** for both
@@ -1905,6 +1912,18 @@ drive. Auth is **keyless** via `DefaultAzureCredential`:
 - **dev box** → your `az login` token. Run `az login` once.
 - **builder (`vm-solidworks`)** → its system-assigned managed identity
   (granted *Storage Blob Data Contributor*); nothing to log in.
+
+Each process shares its cache credential and reuses tokens across blob clients
+for matching token requests. Refresh is serialized and starts five minutes before
+expiry (or at the token's earlier `refresh_on` time). Only
+`CredentialUnavailableError` is retried: at most three acquisition attempts,
+with one- then two-second backoffs. Every retry emits a
+`cache.credential.retry` span event and warning, including the exception/cause
+types but no token or claims. Authentication errors are not retried; exhausted
+credential failures retain their original exception and follow the existing
+restore/store error path. In particular, a farm success still requires a
+successful restore of the exact key: credential failure cannot make
+`cache_missing` pass.
 
 A machine without the data-plane RBAC role is **fail-soft**: its push is denied
 and the build proceeds normally (a miss/error never fails a build).
