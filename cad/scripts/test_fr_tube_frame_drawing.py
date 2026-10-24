@@ -48,7 +48,10 @@ def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
     assert supply >= cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
     assert supply % 5.0 == 0.0
     assert supply - 5.0 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
-    assert f"{supply:.0f}" in fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT
+    # The value and its MIN limit are the requirement; the value comes from
+    # the spec, so a recomputed supply still passes.
+    assert fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT == f"SUPPLY {supply:.0f} MIN"
+    assert "CUT TO FIT" in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
     for mate in ("MHA-FR-01", "MHA-FR-02", "MHA-FR-VN-54"):
         assert mate in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
 
@@ -56,5 +59,9 @@ def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
 def test_cross_hole_callout_names_each_station_mate_on_single_line_lanes() -> None:
     callout = fr_tube_frame_spec.CROSS_HOLE_CALLOUT
     mates = fr_tube_frame_spec.CROSS_HOLE_MATES_SUFFIX
-    assert mates.index("MHA-FR-02") < mates.index("MHA-FR-01")  # upper, lower
+    assert "MATCH-DRILL" in callout
+    stations = dict(
+        clause.strip().split(" WITH ") for clause in mates.split(",")
+    )
+    assert stations == {"UPPER": "MHA-FR-02", "LOWER": "MHA-FR-01"}
     assert "\n" not in callout + mates
