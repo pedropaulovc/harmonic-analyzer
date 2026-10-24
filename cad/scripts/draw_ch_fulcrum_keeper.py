@@ -51,6 +51,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -59,8 +60,6 @@ from ch_fulcrum_keeper_spec import (
     BORE_CENTRE_CALLOUT,
     BORE_PAIR_CALLOUT,
     CBORE_DIA_MM,
-    CORNER_R_MAX,
-    CORNER_R_TOL_TYPE,
     CROWN_R,
     CROWN_ROUND_CALLOUT,
     CROWN_TOP_Y,
@@ -76,6 +75,10 @@ from ch_fulcrum_keeper_spec import (
     SUPPLY_HEIGHT_MIN,
     SUPPLY_HEIGHT_TOL_TYPE,
 )
+
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["ch_fulcrum_keeper"]
@@ -195,10 +198,10 @@ TOP_CALLOUTS = {
 # the notes; the finished height (a reference) left of the lug and the
 # supplied height (single limit MIN) outside it, the larger size outermost
 # (r4: the supply size alone left its extension line in empty space above
-# the drawn top); the foot height right of the foot tip; the foot-to-lug
-# corner's R MAX up in the open corner, ~16 mm along the foot and up the lug
-# (the ch_pivot_bracket placement), so its leader runs through the round's
-# centre onto the arc.
+# the drawn top); the foot height right of the foot tip. The foot-to-lug
+# corner prints no radius: the title block's INSIDE CORNERS R1.0 MAX governs
+# it (ENFORCE review 2026-10-24: a local "R1.0 max." restated that row,
+# rule 2).
 # The plan carries the crown tap's station off the inner lug face above the
 # plan, its text out to the left of the inner face's extension line
 # (MR-fleet r1: in the front view its extension line off the tap axis ended
@@ -215,7 +218,6 @@ FRONT_KEEP = {
     "FootRise": (0.140, 0.106),
     "OverallHeight": (0.080, FRONT_CENTER[1]),
     "SupplyHeight": (0.042, FRONT_CENTER[1]),
-    "CornerRadius": (0.1257, 0.130),
 }
 # The manufacturing notes' top-left corner's height (MR-fleet r4: 4 mm lower
 # to make room for the overall length above them).
@@ -304,22 +306,6 @@ def _require_single_limit(
         f"{name}: text {display.GetText(1)!r}, single-limit type {tol_type}"
     )
     return display
-
-
-@_telemetry.traced("drawing.fulcrum_keeper.corner_radius")
-def _dress_corner_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the front view's CornerRadius prints the part's R MAX and stop
-    its leader at the arc (draw_ch_pivot_bracket's corner radius).
-
-    ``ArcExtensionLineOrOppositeSide`` False keeps the leader from running on
-    through the arc into the part.
-    """
-    display = _require_single_limit(
-        adapter, annotations, "CornerRadius", CORNER_R_TOL_TYPE, CORNER_R_MAX
-    )
-    display.ArcExtensionLineOrOppositeSide = False
-    if bool(display.ArcExtensionLineOrOppositeSide):
-        raise RuntimeError("CornerRadius leader still runs to the opposite side")
 
 
 @_telemetry.traced("drawing.fulcrum_keeper.crown_radius")
@@ -613,7 +599,6 @@ async def build(adapter: Any) -> dict[str, str]:
     _dress_crown_radius(adapter, right_annotations)
     set_dimension_callouts(adapter, right_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, front_annotations, FRONT_CALLOUTS)
-    _dress_corner_radius(adapter, front_annotations)
     _require_single_limit(
         adapter,
         front_annotations,

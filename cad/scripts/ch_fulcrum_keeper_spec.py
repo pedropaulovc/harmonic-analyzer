@@ -377,19 +377,16 @@ FOOT_CBORE_LUG_CLEARANCE_MM = (
 )
 if FOOT_CBORE_LUG_CLEARANCE_MM <= 0.0:
     raise AssertionError("the keeper counterbore runs into the lug's outer face")
-# The foot-to-lug inside corner (drawing-guidelines.md rule 16): the largest
-# radius the shop may leave there, so it can pick a rigid cutter (machinist
-# review r1, MR-fleet 991a56e: the sharp corner was unstated). The
-# counterbore's nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM off
-# the lug's outer face, so the round's tangent line on the foot top must stop
-# short of it. The part models the corner AT the limit and prints it as the
-# single limit "R1.0 MAX" (swTolMAX prints the nominal, so nominal = limit;
-# the band runs from sharp up to it).
-CORNER_R_PLACES = 1
-CORNER_R_MAX = 1.0
-CORNER_R_BAND = (0.0, -CORNER_R_MAX)  # (upper, lower)
-CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R1.0 MAX"
-if not 0.0 < CORNER_R_MAX < FOOT_CBORE_LUG_CLEARANCE_MM:
+# The foot-to-lug inside corner (drawing-guidelines.md rule 16; machinist
+# review r1, MR-fleet 991a56e: the sharp corner was unstated). The title
+# block's INSIDE CORNERS R1.0 MAX governs it, so the sheet prints no local
+# limit (ENFORCE review 2026-10-24: a local "R1.0 MAX" restated that row,
+# rule 2). The part models the round at that ceiling. The counterbore's
+# nearest worst-case edge stands FOOT_CBORE_LUG_CLEARANCE_MM off the lug's
+# outer face, so the round's tangent line on the foot top must stop short of
+# it.
+CORNER_R = 1.0
+if not 0.0 < CORNER_R < FOOT_CBORE_LUG_CLEARANCE_MM:
     raise AssertionError("the foot-to-lug corner round reaches the counterbore")
 FOOT_SIDE_WALL_MM = min(
     SCREW_FROM_SIDE - _BAND_BY_PLACES[3] - _CBORE_MAX_RADIUS,
@@ -467,7 +464,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OverallHeightReference": {"OverallHeight"},
     "SupplyHeightReference": {"SupplyHeight"},
     "OverallLengthReference": {"OverallLength"},
-    "CornerFillet": {"CornerRadius"},
 }
 # Decimal places ARE the tolerance statement (drawing-simplicity-policy.md `How the repository implements the guidelines`), so the MODEL
 # owns them. One place is the general grade: the crown thread is sized at
@@ -485,9 +481,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # stated function (rule 4): the
 # side station centres the transferred MHA-FR-02 tap in its rail web
 # (KEEPER_SCREW_TRANSVERSE_BAND_MM, build_fr_top_frame). The references print
-# one place; the corner round prints its single limit at CORNER_R_PLACES, the
-# crown's radial reference the width's CROWN_R_PLACES and the supplied height
-# its own at SUPPLY_HEIGHT_PLACES.
+# one place; the crown's radial reference the width's CROWN_R_PLACES and the
+# supplied height its own at SUPPLY_HEIGHT_PLACES.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LugProfile": {"LugRise": 2},
     "LugBody": {"LugThickness": 2},
@@ -502,7 +497,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OverallHeightReference": {"OverallHeight": 1},
     "SupplyHeightReference": {"SupplyHeight": 1},
     "OverallLengthReference": {"OverallLength": 1},
-    "CornerFillet": {"CornerRadius": CORNER_R_PLACES},
 }
 # The function the three-place size serves, printed under it.
 FOOT_SCREW_SIDE_CALLOUT = "CENTERS MHA-FR-02\nTAP IN RAIL WEB"
