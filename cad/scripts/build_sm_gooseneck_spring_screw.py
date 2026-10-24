@@ -554,10 +554,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
     # implements the guidelines`): the relief diameter prints as the LIMIT
-    # band 2.20/2.15, under the die root and at the neck's pre-existing
-    # floor; its lead as a single MAX limit, short enough to keep the clamp
-    # seat flat inside the thread major.  Every other mark takes the title
-    # block's two-place band.
+    # band 2.35/2.15, capped under the die root and floored at the neck's
+    # pre-existing minimum; its lead as a single MAX limit, short enough to
+    # keep the clamp seat flat inside the thread major.  Every other mark
+    # takes the title block's two-place band.
     _limit_band(
         adapter,
         "ShankProfile",

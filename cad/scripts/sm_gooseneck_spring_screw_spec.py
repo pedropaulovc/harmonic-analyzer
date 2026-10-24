@@ -6,11 +6,13 @@ marked dimensions, their authored places, the callouts and the notes.
 
 The title block's band for each mark's places governs every size but the
 relief diameter and its 45-degree lead.  The relief Ø prints as the native
-LIMIT band 2.20/2.15: the die root caps it, and the design's pre-existing
-2.15 floor, unchanged here, keeps the neck's clamp-torque strength (its
-adequacy is tracked in #1951).  The lead prints as a single MAX limit (the
-model value is the limit) from the hidden ``LeadReference`` sketch on the
-profile's lower silhouette, driven by the profile's ``ReliefLead``.
+LIMIT band 2.35/2.15 about the model's 2.20.  The upper limit is derived from
+the estimated deepest #6-32 die root (geom's THREAD_MINOR_2A_MIN_EST, 2.38).
+The floor is the design's pre-existing 2.15, unchanged here, which keeps the
+neck's clamp-torque strength (its adequacy is tracked in #1951).  The lead
+prints as a single MAX limit (the model value is the limit) from the hidden
+``LeadReference`` sketch on the profile's lower silhouette, driven by the
+profile's ``ReliefLead``.
 """
 
 from __future__ import annotations
@@ -34,15 +36,15 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # reads them back; a drawing-side SetText can write through to the part,
 # #1942).  The lead's MAX and the relief's LIMIT band are tighter than the
 # title block, so each names what it serves (drawing-guidelines.md rule 4):
-# the flat under-head seat that clamps the counter spring's upper loop, and
-# the neck's strength under the clamp torque.
+# the flat under-head seat that clamps the counter spring's upper loop; the
+# die root that caps the relief and the clamp torque that floors it.
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
     "LeadReference": {
         "HeadLead": f"{CHAMFER_CALLOUT}\nFLAT SEAT FOR\n{COUNTER_SPRING_NUMBER} LOOP"
     },
     "ShankProfile": {
-        "ReliefDia": "MIN FOR\nCLAMP TORQUE",
+        "ReliefDia": "UNDER DIE ROOT,\nMIN FOR\nCLAMP TORQUE",
         "TipChamfer": CHAMFER_CALLOUT,
     },
 }

@@ -8,6 +8,8 @@ No drawing, prose, builder or COM dependencies belong in this module.
 
 from __future__ import annotations
 
+import math
+
 from _printed_tolerance import printed_deviations
 
 MM_PER_IN = 25.4
@@ -31,15 +33,15 @@ SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
 SLOT_DEPTH = 3.00  # From the uncut crown apex, not its cylindrical rim.
 SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
 # The die relief under the head mates with nothing (machinist review
-# 2026-10-23), so its largest size is the die root's: the model value 2.20 is
-# the upper limit, under the die's root so the die cuts full thread up to the
-# flank.  The neck carries the clamp torque and preload, so it keeps the
+# 2026-10-23).  It prints as the native LIMIT band 2.35/2.15 about the
+# unchanged model value 2.20.  The upper limit is derived, not picked: the
+# largest 0.05 step under the estimated deepest #6-32 die root
+# (THREAD_MINOR_2A_MIN_EST, 2.38), so the die still cuts full thread up to
+# the flank.  The neck carries the clamp torque and preload, so it keeps the
 # design's pre-existing floor, 2.15 (the former 2.20 +/-0.05), unchanged here;
-# its strength adequacy is tracked in #1951.  It prints as the native LIMIT
-# band 2.20/2.15.
+# its strength adequacy is tracked in #1951.
 RELIEF_DIA = 2.20
 RELIEF_DIA_MIN = 2.15
-RELIEF_DIA_LOWER, RELIEF_DIA_UPPER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6), 0.0
 RELIEF_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.
 RELIEF_WIDTH_LOWER, RELIEF_WIDTH_UPPER = printed_deviations(RELIEF_WIDTH, 2)
@@ -62,7 +64,9 @@ THREAD_PD_2A_MIN_IN = 0.1141
 # below the minimum 2A pitch diameter. The table publishes a minor MAXIMUM,
 # not this minimum. The largest relief must clear the estimated deeper root.
 THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * MM_PER_IN
-RELIEF_DIA_MAX = RELIEF_DIA + RELIEF_DIA_UPPER
+RELIEF_DIA_MAX = math.floor(THREAD_MINOR_2A_MIN_EST * 20.0) / 20.0
+RELIEF_DIA_LOWER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6)
+RELIEF_DIA_UPPER = round(RELIEF_DIA_MAX - RELIEF_DIA, 6)
 RELIEF_LEAD_MAX = RELIEF_LEAD
 RELIEF_FLOOR_MIN = RELIEF_WIDTH + RELIEF_WIDTH_LOWER - RELIEF_LEAD_MAX
 SEAT_FLAT_INNER_DIA_MAX = RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_MAX

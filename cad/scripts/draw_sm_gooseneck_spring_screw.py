@@ -1,10 +1,11 @@
 r"""Create the MHA-SM-04 gooseneck spring screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter and its
-45-degree lead print as the part's single MAX limits, and every other size is
-an ordinary model dimension at its part-authored places under the title
-block's .XX band.
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter
+prints as the part's stacked LIMIT band, its 45-degree lead as the part's
+single MAX limit, and every other size is an ordinary model dimension at its
+part-authored places under the title block's band for those places (.X for
+the tip chamfer, .XX for the rest).
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the crowned head
@@ -193,17 +194,20 @@ SIDE_KEEP = {
 # the text stays clear of the under-head and lead extension lines (layout
 # audit of farm run 20261010T190631112Z, 6c56fd769).  Its right end stops
 # short of the tip chamfer's extension lines and the Ø line stays below the
-# thread silhouette.  The block is the stacked 2.20/2.15 limits over the
-# two-line callout; its widest line, 'CLAMP TORQUE', is estimated from the
-# lead's rendered 2.84 mm per character (farm run 20261024T031009457Z), and
-# its last line ends about 16 mm below the anchor.
-RELIEF_DIA_TEXT_WIDTH = 0.035
-RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
-RELIEF_DIA_TEXT_BOTTOM_DROP = 0.016
+# thread silhouette.  The block is the stacked limits over the callout.  As
+# rendered in farm run 20261024T052013556Z (e71509a34), its upper limit's top
+# stood 9.8 mm above the anchor, where the shank's lower outline struck it;
+# 'CLAMP TORQUE' measured 35.8 mm (3.0 mm a character), and the underline of
+# the two-line callout sat 9.7 mm below the anchor at a 5.5 mm line pitch.
+# The three-line callout's widest line, 'UNDER DIE ROOT,', is scaled from
+# those, and its underline one more pitch down.
+RELIEF_DIA_TEXT_WIDTH = 0.046
+RELIEF_DIA_TEXT_TOP_ABOVE_ANCHOR = 0.010
+RELIEF_DIA_TEXT_BOTTOM_DROP = 0.0155
 RELIEF_DIA_LEADER_GAP = 0.0008
 RELIEF_DIA_TEXT_XY = (
     RELIEF_DIA_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
-    SIDE_CENTER[1] - 0.0155,
+    SIDE_CENTER[1] - 0.0205,
 )
 # The slot width reads right of the head-end view, left of the head Ø.
 END_KEEP = {
@@ -243,10 +247,15 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
     "OverallLength": (OVERALL_LENGTH, _TOL_NONE),
 }
-# The LIMIT band's (lower, upper) deviations, mm.
+# Every LIMIT row's (lower, upper) deviations, mm: a LIMIT row without its
+# band would skip the deviation readback, so the two must name the same rows.
 LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
     "ReliefDia": (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
 }
+if set(LIMIT_DEVIATIONS) != {
+    name for name, (_, kind) in PRINTED_DIMENSIONS.items() if kind == _TOL_LIMIT
+}:
+    raise AssertionError("MHA-SM-04 LIMIT rows and their deviations disagree")
 # Unprinted controls: the profile's lead (the printed lead's reference line
 # follows it by equation) and the thread major the callout defines.
 SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int]] = {

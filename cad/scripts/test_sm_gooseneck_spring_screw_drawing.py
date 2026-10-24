@@ -172,18 +172,30 @@ def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None
 
 
 def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
-    # The relief's LIMIT band tops out at the model value; the lead's single
-    # MAX is the model value.
-    assert geom.RELIEF_DIA_MAX == geom.RELIEF_DIA == pytest.approx(2.20)
+    # The relief's LIMIT band: its upper limit is the largest 0.05 step under
+    # the estimated deepest die root, about the unchanged model value 2.20;
+    # the lead's single MAX is the model value.
+    assert geom.RELIEF_DIA == pytest.approx(2.20)
+    assert geom.THREAD_MINOR_2A_MIN_EST == pytest.approx(2.3826, abs=1e-4)
+    assert geom.RELIEF_DIA_MAX == pytest.approx(2.35)
+    assert (
+        geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST < geom.RELIEF_DIA_MAX + 0.05
+    )
     # The design's pre-existing floor (the former 2.20 +/-0.05), #1951.
     assert geom.RELIEF_DIA_MIN == pytest.approx(2.15)
-    assert (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER) == pytest.approx((-0.05, 0.0))
+    assert (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER) == pytest.approx(
+        (-0.05, 0.15)
+    )
     assert geom.RELIEF_LEAD_MAX == geom.RELIEF_LEAD == pytest.approx(0.30)
-    assert geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST
     assert geom.RELIEF_FLOOR_MIN >= 1.5 * geom.PITCH
-    assert geom.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.80)
+    # The largest relief under the longest lead still leaves a flat seat.
+    assert geom.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.95)
     assert geom.SEAT_FLAT_INNER_DIA_MAX < geom.MAJOR_DIA
-    assert spec.DIMENSION_CALLOUTS_BY_NAME["ReliefDia"] == "MIN FOR\nCLAMP TORQUE"
+    assert spec.DIMENSION_CALLOUTS_BY_NAME["ReliefDia"].splitlines() == [
+        "UNDER DIE ROOT,",
+        "MIN FOR",
+        "CLAMP TORQUE",
+    ]
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
 
 
@@ -336,11 +348,11 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     right = text_x + drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
     assert left > drawing.RELIEF_DIA_X
     assert right <= drawing.THREAD_START_X - 0.002
-    text_height = 0.0035
+    # The stacked upper limit's top stays clear of the shank's lower outline
+    # (farm run 20261024T052013556Z struck it at 9.8 mm above the anchor).
     thread_bottom = drawing.SIDE_CENTER[1] - thread_half
-    assert text_y + 0.001 + text_height <= thread_bottom - 0.002
+    assert text_y + drawing.RELIEF_DIA_TEXT_TOP_ABOVE_ANCHOR <= thread_bottom - 0.002
     block_bottom = text_y - drawing.RELIEF_DIA_TEXT_BOTTOM_DROP
-    assert drawing.RELIEF_DIA_TEXT_BOTTOM_DROP > drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
     # The lead's extension line drops from the lead's foot on the lower
     # silhouette, left of the Ø's leader; its text block stands right of
     # that line with room to spare (the layout audit of farm run
@@ -410,7 +422,6 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     lead_callout = callouts["HeadLead"].splitlines()
     assert lead_callout == ["X 45 DEG", "FLAT SEAT FOR", "MHA-SM-VN-51 LOOP"]
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
-    assert callouts["ReliefDia"].splitlines() == ["MIN FOR", "CLAMP TORQUE"]
     for feature, names in spec.DIMENSION_CALLOUTS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
     assert part.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
