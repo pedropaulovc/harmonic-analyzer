@@ -16,6 +16,7 @@ import yaml
 import _sketch as sketch
 
 import _drawing_projection as drawing_projection
+import _dxf_text as dxf_text
 import build_ms_stick as builder
 import draw_ms_stick as drawing
 import ms_stick_callouts as callouts
@@ -126,7 +127,7 @@ def test_option_b_preserves_blank_and_grooves_and_relocates_whole_scale() -> Non
     assert spec.DIVISION_COUNT == 11 and spec.MINOR_PER_DIVISION == 10
     assert spec.SCALE_END_MARGIN == pytest.approx(3.5)
     assert spec.SCALE_START_X == pytest.approx(56.5)
-    assert spec.NUMERALS_BBOX == (57.300, 1.721, 197.700, 4.400)
+    assert spec.NUMERALS_BBOX == (57.300, 1.770, 197.700, 4.400)
     assert spec.SCALE_SPAN == pytest.approx(
         (spec.DIVISION_COUNT - 1) * spec.DIVISION_SPACING, rel=0.0, abs=1e-12,
     )
@@ -521,7 +522,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-        "_assert_imported_text_and_limits", "assert_manufacturing_dimensions",
+        "_assert_dimension_contract",
         "rebuild_drawing",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
@@ -1027,6 +1028,58 @@ def test_drawing_reads_back_part_callouts_and_min_limit_types(monkeypatch) -> No
             None, _imported(monkeypatch, {k: v for k, v in good.items() if k != "BodyWidth"}))
 
 
+def test_dimension_contract_refuses_a_hidden_dimension_and_reruns_the_audit(monkeypatch) -> None:
+    audited = []
+    monkeypatch.setattr(drawing, "_assert_imported_text_and_limits", lambda adapter, annotations: audited.append("text"))
+    monkeypatch.setattr(drawing, "assert_manufacturing_dimensions",
+                        lambda adapter, annotations, values, precision, *, bands: audited.append("values"))
+    shown = _imported(monkeypatch, {"BodyWidth": _TextDisplay(), "TickDepth": _TextDisplay()})
+    for annotation in shown:
+        annotation.Visible = 1
+    drawing._assert_dimension_contract(None, shown)
+    assert audited == ["text", "values"]
+    shown[1].Visible = 0
+    with pytest.raises(RuntimeError, match=r"hidden: \['TickDepth'\]"):
+        drawing._assert_dimension_contract(None, shown)
+
+
+class _Placed:
+    """Sketch, math point and transform fakes: model = sketch + offset (m)."""
+
+    def __init__(self, points_mm, offset_m=(0.0, 0.0)):
+        self.points = [SimpleNamespace(X=x / 1000.0, Y=y / 1000.0, Z=0.0) for x, y in points_mm]
+        self.offset = offset_m
+        self.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: "inverse")
+
+    def GetSpecificFeature2(self):
+        return self
+
+    def GetSketchPoints2(self):
+        return self.points
+
+    def CreatePoint(self, xyz):
+        x, y, z = xyz
+        return SimpleNamespace(MultiplyTransform=lambda inverse: SimpleNamespace(
+            ArrayData=(x + self.offset[0], y + self.offset[1], z)))
+
+
+def test_layer_placement_reads_back_the_imported_sketch(monkeypatch) -> None:
+    path = spec.NUMERAL_LAYER_DXFS[0]
+    rings = [ring for ring, _closed in dxf_text.read_lwpolylines(path.read_text(encoding="ascii"))]
+    vertices = [vertex for ring in rings for vertex in ring]
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(builder, "double_array", tuple)
+    for offset, ok in (((0.0, 0.0), True), ((0.0, 0.01e-3), False), ((0.5e-3, 0.0), False)):
+        placed = _Placed(vertices, offset)
+        monkeypatch.setattr(builder, "_feature_by_name", lambda adapter, name, p=placed: p)
+        adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda p=placed: p))
+        if ok:
+            builder._assert_layer_placement(adapter, "NumeralsSketch", path)
+        else:
+            with pytest.raises(RuntimeError, match="places it at"):
+                builder._assert_layer_placement(adapter, "NumeralsSketch", path)
+
+
 def _mass_seat(volume):
     async def mass():
         return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=volume))
@@ -1039,7 +1092,7 @@ def test_rebuild_and_save_hold_the_volume_to_one_stroke() -> None:
     asyncio.run(builder._check_volume_unchanged(_mass_seat(built + 1e-4), "driven", built))
     with pytest.raises(RuntimeError, match="moved from the as-built"):
         asyncio.run(builder._check_volume_unchanged(
-            _mass_seat(built + min(spec.NUMERAL_LAYER_MIN_STROKE_MM3)), "saved", built))
+            _mass_seat(built + spec.NUMERAL_FINAL_MIN_STROKE_MM3), "saved", built))
     with pytest.raises(RuntimeError, match="returned volume nan"):
         asyncio.run(builder._check_volume_unchanged(_mass_seat(math.nan), "saved", built))
 

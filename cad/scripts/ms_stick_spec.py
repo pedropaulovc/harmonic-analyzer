@@ -64,14 +64,31 @@ NUMERAL_DEPTH = 0.40
 NUMERAL_TIP_FLAT_MM = NUMERAL_STROKE_WIDTH_MM - 2.0 * NUMERAL_DEPTH * math.tan(
     math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0)
 )
-NUMERALS_BBOX = (57.300, 1.721, 197.700, 4.400)
-NUMERAL_VOLUME_MM3 = 2.6526
+# Each stroke's ends are the V bit's footprint, a half-round inscribed in this
+# many facets (gen_ms_stick_numerals_dxf), so joints reach the full depth.
+NUMERAL_END_FACETS = 8
+# The deepest V the fixed 0.24 face outline supports: past it the drafted end
+# facets meet and the cut collapses. NumeralDepth is editable only below it.
+NUMERAL_DEPTH_MAX_MM = (
+    NUMERAL_STROKE_WIDTH_MM / 2.0 * math.cos(math.pi / (2 * NUMERAL_END_FACETS))
+    / math.tan(math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
+)
+if not 0.0 < NUMERAL_DEPTH < NUMERAL_DEPTH_MAX_MM:
+    raise AssertionError(
+        f"NUMERAL_DEPTH {NUMERAL_DEPTH} must stay below {NUMERAL_DEPTH_MAX_MM:.3f}, where the "
+        f"{NUMERAL_STROKE_WIDTH_MM} face outline's drafted walls meet; widen the stroke to go deeper"
+    )
+NUMERALS_BBOX = (57.300, 1.770, 197.700, 4.400)
+NUMERAL_VOLUME_MM3 = 2.6765
 # Each stroke layer's V removal over the layers cut before it (layers overlap
 # at stroke joints): gen_ms_stick_numerals_dxf.summary()["layer_volumes_mm3"].
-NUMERAL_LAYER_VOLUMES_MM3 = (1.5603, 0.9996, 0.0927)
-# Per layer, the least removal one stroke adds (a dropped stroke removes at
-# least this much less): gen_ms_stick_numerals_dxf.summary()["min_stroke_volumes_mm3"].
-NUMERAL_LAYER_MIN_STROKE_MM3 = (0.0128, 0.0169, 0.0142)
+NUMERAL_LAYER_VOLUMES_MM3 = (1.7100, 0.8674, 0.0992)
+# Per layer, the least removal one stroke adds as its layer is cut (a dropped
+# stroke removes at least this much less): summary()["min_stroke_volumes_mm3"].
+NUMERAL_LAYER_MIN_STROKE_MM3 = (0.0186, 0.0134, 0.0129)
+# The least removal one stroke adds to the finished part, every layer cut
+# (later layers cover some of it): summary()["final_min_stroke_mm3"].
+NUMERAL_FINAL_MIN_STROKE_MM3 = 0.0056
 
 # Width and thickness give the sliding clearance in the 8.4 x 3.4 stop
 # rebate; graduation positions set the amplitude-bar stations through the

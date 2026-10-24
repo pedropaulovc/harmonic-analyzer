@@ -282,6 +282,22 @@ def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> No
         )
 
 
+def _assert_dimension_contract(adapter: Any, annotations: list[Any]) -> None:
+    """Text, limits, values, bands, precision, attachment and visibility of
+    every imported dimension: run after import and again once the drawing has
+    settled, so a later rebuild cannot hide, detach or rewrite one unseen."""
+    hidden = [dimension_name(adapter, annotation) for annotation in annotations
+              if int(_early_bound(annotation, "IAnnotation").Visible) != 1]
+    if hidden:
+        raise RuntimeError(f"imported manufacturing dimensions are hidden: {hidden}")
+    _assert_imported_text_and_limits(adapter, annotations)
+    assert_manufacturing_dimensions(
+        adapter, annotations, part.DRAWING_VALUES_BY_NAME, part.DRAWING_PRECISION_BY_NAME,
+        bands={**{name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
+               **part.MIN_LIMIT_DEVIATIONS_MM},
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source measuring stick missing: {SOURCE}")
@@ -401,19 +417,14 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations += curate_view_dimensions(adapter, depth, keep=DEPTH_KEEP,
                                            view_label="engraving depth detail",
                                            dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    _assert_imported_text_and_limits(adapter, annotations)
-    assert_manufacturing_dimensions(
-        adapter, annotations, part.DRAWING_VALUES_BY_NAME, part.DRAWING_PRECISION_BY_NAME,
-        bands={**{name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
-               **part.MIN_LIMIT_DEVIATIONS_MM},
-    )
+    _assert_dimension_contract(adapter, annotations)
     for view in (parent, detail, depth_parent, depth):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
                                   expected_sheet_names=SHEET_NAMES,
                                   sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
-                                  settled_checks=(lambda: _assert_imported_text_and_limits(adapter, annotations),))
+                                  settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),))
 
 
 if __name__ == "__main__":

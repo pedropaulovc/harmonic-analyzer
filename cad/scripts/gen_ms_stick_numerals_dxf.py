@@ -7,15 +7,19 @@ design: each stroke is a straight centreline, and the groove is that
 centreline's V. The drawing accepts any single-stroke sans font; these strokes
 are the model's representative shapes.
 
-Each straight stroke becomes a closed rectangle at the ruled face: the stroke
-width at the surface (``NUMERAL_STROKE_WIDTH_MM``) wide, mitred at interior
-corners and square-capped at free ends. ``build_ms_stick`` imports each layer
+Each straight stroke becomes the closed outline a V bit cuts along it at the
+ruled face: the stroke width at the surface (``NUMERAL_STROKE_WIDTH_MM``)
+wide, closed at each end by a faceted half-round of half that width around the
+end point (the cutter's footprint). ``build_ms_stick`` imports each layer
 onto the Front plane and cuts it ``NUMERAL_DEPTH`` deep with a 15-degree
-inward draft on every side, so each rectangle becomes a true 30-degree V whose
+inward draft on every side, so each outline becomes a true 30-degree V whose
 walls nearly meet (``NUMERAL_TIP_FLAT_MM`` remains, which keeps the native
-faces valid). A drafted cut needs disjoint profiles, so overlapping strokes of
-one numeral go to different LAYERS (one DXF and one cut each), coloured here
-with a fixed greedy order.
+faces valid). Consecutive strokes overlap in those round ends, so every joint
+reaches the full depth, as one continuous tool path does (square or mitred
+ends would be drafted too and leave a shallow saddle there). A drafted cut
+needs disjoint profiles, so overlapping strokes of one numeral go to
+different LAYERS (one DXF and one cut each), coloured here with a fixed
+greedy order.
 
 Placement is baked into the files because the Makers seat ignores the
 importer's scale/position; the build imports at scale 1, position (0, 0).
@@ -72,6 +76,7 @@ from ms_stick_spec import (  # noqa: E402
     DIVISION_COUNT,
     DIVISION_SPACING,
     NUMERAL_DEPTH,
+    NUMERAL_END_FACETS,
     NUMERAL_GAP_MM,
     NUMERAL_HEIGHT_MM,
     NUMERAL_LAYER_DXFS,
@@ -121,8 +126,10 @@ DIGIT_STROKES: dict[str, list[list[Point]]] = {
 CELL_HEIGHT = NUMERAL_HEIGHT_MM - NUMERAL_STROKE_WIDTH_MM
 CELL_WIDTH = 0.5 * NUMERAL_HEIGHT_MM
 DIGIT_SPACING = 0.35  # ink gap between the "1" and "0" of 10
-# Interior corners sharper than this get square caps instead of a long miter.
-_MITER_LIMIT_DEG = 100.0
+# Facets per half-round stroke end (inscribed: every vertex on the cutter's
+# face circle, so the outline never leaves the true V-bit path).
+END_FACETS = NUMERAL_END_FACETS
+CAPSULE_VERTICES = 2 * (END_FACETS + 1)
 # Strokes of one layer stay this far apart at the face (the importer merges
 # endpoints within 0.002 mm).
 LAYER_GAP_MM = 0.02
@@ -139,43 +146,27 @@ def _unit(p: Point, q: Point) -> Point:
     return ((q[0] - p[0]) / length, (q[1] - p[1]) / length)
 
 
-def _turn_deg(a: Point, b: Point) -> float:
-    return math.degrees(math.acos(max(-1.0, min(1.0, a[0] * b[0] + a[1] * b[1]))))
-
-
-def _extension(a: Point, b: Point) -> float:
-    """How far each of two strokes meeting at a corner runs past it."""
-    turn = _turn_deg(a, b)
+def _stroke_ring(p: Point, q: Point) -> Ring:
+    """The V-bit outline of the straight stroke p -> q at the face (mm)."""
+    d = _unit(p, q)
+    n = (-d[1], d[0])
     half = NUMERAL_STROKE_WIDTH_MM / 2.0
-    if turn > _MITER_LIMIT_DEG:
-        return half
-    return half * math.tan(math.radians(turn) / 2.0)
+    ring = []
+    for centre, start_deg in ((q, 90.0), (p, -90.0)):
+        for k in range(END_FACETS + 1):
+            angle = math.radians(start_deg - 180.0 * k / END_FACETS)
+            ring.append((centre[0] + half * (math.cos(angle) * d[0] + math.sin(angle) * n[0]),
+                         centre[1] + half * (math.cos(angle) * d[1] + math.sin(angle) * n[1])))
+    return ring
 
 
 def _stroke_rects(polyline: list[Point]) -> list[Ring]:
-    """Mitred, square-capped rectangles of one centreline polyline (mm)."""
-    closed = polyline[0] == polyline[-1]
-    points = polyline[:-1] if closed else polyline
-    count = len(points)
-    segments = [(points[i], points[(i + 1) % count]) for i in range(count if closed else count - 1)]
-    dirs = [_unit(p, q) for p, q in segments]
-    half = NUMERAL_STROKE_WIDTH_MM / 2.0
-    rects = []
-    for i, ((p, q), d) in enumerate(zip(segments, dirs, strict=True)):
-        before = dirs[i - 1] if (closed or i > 0) else None
-        after = dirs[(i + 1) % len(dirs)] if (closed or i < len(dirs) - 1) else None
-        start = half if before is None else _extension(before, d)
-        end = half if after is None else _extension(d, after)
-        a = (p[0] - d[0] * start, p[1] - d[1] * start)
-        b = (q[0] + d[0] * end, q[1] + d[1] * end)
-        n = (-d[1] * half, d[0] * half)
-        rects.append([(a[0] + n[0], a[1] + n[1]), (b[0] + n[0], b[1] + n[1]),
-                      (b[0] - n[0], b[1] - n[1]), (a[0] - n[0], a[1] - n[1])])
-    return rects
+    """One V-bit outline per straight segment of a centreline polyline (mm)."""
+    return [_stroke_ring(p, q) for p, q in zip(polyline, polyline[1:])]
 
 
 def _glyph_rects(text: str) -> list[Ring]:
-    """Rectangles of ``text`` in the glyph frame (u along the baseline, v up)."""
+    """Stroke outlines of ``text`` in the glyph frame (u along the baseline, v up)."""
     rects: list[Ring] = []
     advance = 0.0
     for char in text:
@@ -282,25 +273,33 @@ def _overlaps(a: tuple[float, float, float, float], b: tuple[float, float, float
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
+def _added_by(stroke: Ring, others: list[Ring]) -> float:
+    """The removal ``stroke`` adds to the cuts of ``others``. Its cut is zero
+    outside its own bbox, so only that bbox is integrated, with the strokes
+    that reach into it."""
+    box = dxf.bbox([stroke])
+    near = [rect for rect in others if rect is not stroke and _overlaps(box, dxf.bbox([rect]))]
+    xs, ys = np.meshgrid(np.arange(box[0], box[2], _GRID_MM) + _GRID_MM / 2.0,
+                         np.arange(box[1], box[3], _GRID_MM) + _GRID_MM / 2.0)
+    added = _depth_field([*near, stroke], xs, ys) - _depth_field(near, xs, ys)
+    return float(added.sum()) * _GRID_MM**2
+
+
 def min_stroke_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
     """Per layer, the least removal any one stroke adds over the layers cut
-    before it and the rest of its own layer: dropping a stroke removes at
-    least that much less. A stroke's cut is zero outside its own bbox, so
-    only that bbox is integrated, with the strokes that reach into it."""
-    out = []
-    for i, layer in enumerate(split):
-        before = [rect for earlier in split[:i] for rect in earlier]
-        least = math.inf
-        for stroke in layer:
-            box = dxf.bbox([stroke])
-            near = [rect for rect in before + layer
-                    if rect is not stroke and _overlaps(box, dxf.bbox([rect]))]
-            xs, ys = np.meshgrid(np.arange(box[0], box[2], _GRID_MM) + _GRID_MM / 2.0,
-                                 np.arange(box[1], box[3], _GRID_MM) + _GRID_MM / 2.0)
-            added = _depth_field([*near, stroke], xs, ys) - _depth_field(near, xs, ys)
-            least = min(least, float(added.sum()) * _GRID_MM**2)
-        out.append(least)
-    return tuple(out)
+    before it and the rest of its own layer: dropping a stroke as its layer
+    is cut removes at least that much less."""
+    return tuple(
+        min(_added_by(stroke, [rect for earlier in split[:i + 1] for rect in earlier]) for stroke in layer)
+        for i, layer in enumerate(split)
+    )
+
+
+def final_min_stroke_volume(split: list[list[Ring]]) -> float:
+    """The least removal any one stroke adds to all the others, every layer
+    cut: losing a stroke from the finished part removes at least that much."""
+    rings = [rect for layer in split for rect in layer]
+    return min(_added_by(stroke, rings) for stroke in rings)
 
 
 def _clusters(rects: list[Ring]) -> list[list[Ring]]:
@@ -324,6 +323,7 @@ class Summary(TypedDict):
     layers: int
     layer_volumes_mm3: tuple[float, ...]
     min_stroke_volumes_mm3: tuple[float, ...]
+    final_min_stroke_mm3: float
     volume_mm3: float
     x0: float
     y0: float
@@ -342,6 +342,7 @@ def summary() -> Summary:
         "layers": len(split),
         "layer_volumes_mm3": by_layer,
         "min_stroke_volumes_mm3": min_stroke_volumes(split),
+        "final_min_stroke_mm3": final_min_stroke_volume(split),
         # The increments telescope to the union of every stroke.
         "volume_mm3": sum(by_layer),
         "x0": x0,
@@ -364,7 +365,8 @@ def main() -> int:
     s = summary()
     print(f"strokes {s['strokes']} in {s['layers']} layers")
     print(f"removed volume {s['volume_mm3']:.4f} mm^3 (by layer {', '.join(f'{v:.4f}' for v in s['layer_volumes_mm3'])})")
-    print(f"least one-stroke removal by layer {', '.join(f'{v:.4f}' for v in s['min_stroke_volumes_mm3'])} mm^3")
+    print(f"least one-stroke removal by layer {', '.join(f'{v:.4f}' for v in s['min_stroke_volumes_mm3'])} mm^3"
+          f"; in the finished part {s['final_min_stroke_mm3']:.4f} mm^3")
     print(f"bbox x {s['x0']:.4f}..{s['x1']:.4f}  y {s['y0']:.4f}..{s['y1']:.4f}")
     return 0
 

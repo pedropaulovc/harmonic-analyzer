@@ -5,8 +5,8 @@ assets (``gen_ms_stick_numerals_dxf``); the build imports them blind and only
 bound-checks the removed volume on the live seat. These tests keep the files,
 the generator and the pure model dimensional contract in step without
 SolidWorks: the files regenerate byte-identical, parse back as closed
-rectangles that never touch within a layer, land inside the ruled band clear
-of every tick, and match the model-owned pinned bbox/volumes.
+round-ended stroke outlines that never touch within a layer, land inside the
+ruled band clear of every tick, and match the model-owned pinned bbox/volumes.
 """
 
 from __future__ import annotations
@@ -58,11 +58,11 @@ def test_dxf_headers_are_millimetre_r2000():
         assert text.endswith("  0\nEOF\n")
 
 
-def test_layers_are_closed_rectangles_that_never_touch():
+def test_layers_are_closed_stroke_outlines_that_never_touch():
     total = 0
     for path, layer in zip(part.NUMERAL_LAYER_DXFS, gen.layers(), strict=True):
         entities = dxf.read_lwpolylines(_read(path))
-        assert all(closed and len(ring) == 4 for ring, closed in entities), path.name
+        assert all(closed and len(ring) == gen.CAPSULE_VERTICES for ring, closed in entities), path.name
         rings = [ring for ring, _ in entities]
         assert len(rings) == len(layer)
         for a, b in zip(rings, layer, strict=True):
@@ -74,13 +74,48 @@ def test_layers_are_closed_rectangles_that_never_touch():
     assert total == sum(len(numeral) for numeral in gen.numeral_rects())
 
 
+def _edge_widths(ring):
+    """Per edge, the ring's extent across it (rotating calipers)."""
+    widths = []
+    for i in range(len(ring)):
+        (px, py), (qx, qy) = ring[i], ring[(i + 1) % len(ring)]
+        length = math.hypot(qx - px, qy - py)
+        widths.append(max(abs((x - px) * (qy - py) - (y - py) * (qx - px)) / length for x, y in ring))
+    return widths
+
+
+def _end_centres(ring):
+    """A stroke outline's two end centres: each arc runs between diametrically
+    opposite vertices of its face circle."""
+    f = gen.END_FACETS
+    return [((ring[i][0] + ring[j][0]) / 2.0, (ring[i][1] + ring[j][1]) / 2.0)
+            for i, j in ((0, f), (f + 1, 2 * f + 1))]
+
+
 def test_every_stroke_is_one_v_of_the_stated_width():
+    half = part.NUMERAL_STROKE_WIDTH_MM / 2.0
+    f = gen.END_FACETS
     for numeral in gen.numeral_rects():
-        for rect in numeral:
-            widths = sorted(math.dist(rect[i], rect[(i + 1) % 4]) for i in range(4))
-            assert abs(widths[0] - part.NUMERAL_STROKE_WIDTH_MM) < 1e-9, widths
+        for ring in numeral:
+            assert abs(min(_edge_widths(ring)) - part.NUMERAL_STROKE_WIDTH_MM) < 1e-9
+            # Round-ended: each end's vertices lie on the cutter's face circle.
+            q, p = _end_centres(ring)
+            assert all(abs(math.dist(v, q) - half) < 1e-9 for v in ring[: f + 1])
+            assert all(abs(math.dist(v, p) - half) < 1e-9 for v in ring[f + 1:])
     # The drafted walls nearly meet: a true V, not a flat-bottomed groove.
     assert 0.0 < part.NUMERAL_TIP_FLAT_MM < 0.15 * part.NUMERAL_STROKE_WIDTH_MM
+
+
+def test_every_joint_and_end_reaches_full_depth():
+    # A V bit cuts full depth all along its path. Drafted square or mitred
+    # caps left a shallow saddle at the joints (0.18 at the zero's chamfers).
+    import numpy as np
+
+    for k, numeral in enumerate(gen.numeral_rects()):
+        centres = [centre for ring in numeral for centre in _end_centres(ring)]
+        depth = gen._depth_field(numeral, np.array([x for x, _ in centres]), np.array([y for _, y in centres]))
+        assert np.all(np.abs(depth - part.NUMERAL_DEPTH) < 1e-9), (k, float(depth.min()))
+    assert part.NUMERAL_DEPTH < part.NUMERAL_DEPTH_MAX_MM
 
 
 def test_numerals_sit_in_the_ruled_band_clear_of_every_tick():
@@ -110,7 +145,9 @@ def test_numeral_height_matches_the_knob():
         x0, y0, x1, y1 = dxf.bbox(numeral)
         heights.append((x1 - x0) if part.NUMERAL_ROTATION_DEG == 90 else (y1 - y0))
     assert abs(heights[0] - part.NUMERAL_HEIGHT_MM) < 1e-6, heights[0]  # the flat "0" is exact
-    assert all(part.NUMERAL_HEIGHT_MM <= h <= 1.05 * part.NUMERAL_HEIGHT_MM for h in heights), heights
+    # A slanted free end's lowest facet vertex may sit a sagitta inside the circle.
+    sagitta = part.NUMERAL_STROKE_WIDTH_MM / 2.0 * (1.0 - math.cos(math.pi / (2 * gen.END_FACETS)))
+    assert all(part.NUMERAL_HEIGHT_MM - sagitta <= h <= 1.05 * part.NUMERAL_HEIGHT_MM for h in heights), heights
 
 
 def test_pinned_bbox_and_volumes_match_the_generator():
@@ -126,20 +163,35 @@ def test_pinned_bbox_and_volumes_match_the_generator():
     assert len(s["min_stroke_volumes_mm3"]) == len(part.NUMERAL_LAYER_MIN_STROKE_MM3)
     for got, want in zip(s["min_stroke_volumes_mm3"], part.NUMERAL_LAYER_MIN_STROKE_MM3, strict=True):
         assert abs(got - want) < 1e-4, s
+    assert abs(s["final_min_stroke_mm3"] - part.NUMERAL_FINAL_MIN_STROKE_MM3) < 1e-4, s
+    # Later layers only ever cover more of a stroke.
+    assert part.NUMERAL_FINAL_MIN_STROKE_MM3 <= min(part.NUMERAL_LAYER_MIN_STROKE_MM3)
+
+
+def _offset_area(ring, t):
+    """Area of the convex ``ring`` offset inward by ``t`` (exact until an
+    edge vanishes): A0 - P t + t^2 sum(tan(turn_i / 2))."""
+    area = abs(dxf.signed_area(ring))
+    perimeter, corners = 0.0, 0.0
+    for i in range(len(ring)):
+        a, b, c = ring[i - 1], ring[i], ring[(i + 1) % len(ring)]
+        perimeter += math.dist(b, c)
+        u = (b[0] - a[0], b[1] - a[1])
+        v = (c[0] - b[0], c[1] - b[1])
+        turn = math.atan2(abs(u[0] * v[1] - u[1] * v[0]), u[0] * v[0] + u[1] * v[1])
+        corners += math.tan(turn / 2.0)
+    return area - perimeter * t + corners * t * t
 
 
 def test_first_layer_volume_is_the_closed_form_v():
-    # Disjoint drafted rectangles: each is a prismatoid, D/6 (A0 + A1 + 4 Am).
+    # Disjoint drafted convex outlines: each is a prismatoid, D/6 (A0 + A1 + 4 Am).
     slope = math.tan(math.radians(part.NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
     depth = part.NUMERAL_DEPTH
-    exact = 0.0
-    for rect in gen.layers()[0]:
-        a, b = math.dist(rect[0], rect[1]), math.dist(rect[1], rect[2])
-
-        def area(z, a=a, b=b):
-            return (a - 2.0 * z * slope) * (b - 2.0 * z * slope)
-
-        exact += depth / 6.0 * (area(0.0) + area(depth) + 4.0 * area(depth / 2.0))
+    exact = sum(
+        depth / 6.0 * (_offset_area(ring, 0.0) + _offset_area(ring, depth * slope)
+                       + 4.0 * _offset_area(ring, depth * slope / 2.0))
+        for ring in gen.layers()[0]
+    )
     assert abs(exact - part.NUMERAL_LAYER_VOLUMES_MM3[0]) < 1e-3, exact
 
 
