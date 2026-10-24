@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -186,12 +187,23 @@ def test_each_face_symbol_names_its_thrust_mate_and_the_faced_end() -> None:
     targets = {
         control.key: control.production_method for control in spec.SURFACE_FINISHES
     }
-    assert hub.SLEEVE_NUMBER in targets["nose_face"]
-    assert pin.RING_NUMBER in targets["ring_face"]
+
+    def names(text: str, number: str) -> bool:
+        return re.search(rf"(?<![\w-]){re.escape(number)}(?![\w-])", text) is not None
+
+    assert names(targets["nose_face"], hub.SLEEVE_NUMBER)
+    assert names(targets["ring_face"], pin.RING_NUMBER)
     assert pin.RING_NUMBER == _config.parts("pd-vn-transgear-retaining-ring")["number"]
     assert "REAR" in targets["nose_face"]
     assert "REAR" not in targets["ring_face"]
-    assert "REAR" in drawing.DIMENSION_CALLOUTS["RingLength"]
+    # The facing instruction itself names the rear end, never the front.
+    facing = [
+        line
+        for line in drawing.DIMENSION_CALLOUTS["RingLength"].splitlines()
+        if "FACED TO FIT" in line
+    ]
+    assert len(facing) == 1
+    assert "REAR" in facing[0] and "FRONT" not in facing[0]
 
 
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
