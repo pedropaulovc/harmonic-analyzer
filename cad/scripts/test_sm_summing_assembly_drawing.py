@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -19,9 +20,12 @@ from _buildgraph import module_deps_of
 from _drawing_registry import DRAWINGS_BY_NAME
 from _sm_summing_explode import station_of, summing_exploded_view_name
 from _cone_axis_constants import SUMMING_Z
+import sm_summing_lever_spec
+import sm_vn_boss_hook_jam_nut_spec as jam_nut
+from stock_anchor_geom import ANCHOR_9490T1
 
 
-def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
+def test_package_keeps_registry_outputs_and_four_landscape_sheets() -> None:
     row = DRAWINGS_BY_NAME["sm_summing_assembly"]
     assert row.source_kind == "assembly"
     assert row.part == "sm_summing"
@@ -29,7 +33,7 @@ def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         row.outputs["slddrw"], row.outputs["pdf"], row.outputs["png"]
     )
-    assert len(drawing.SHEET_NAMES) == 3
+    assert len(drawing.SHEET_NAMES) == 4
     assert (
         set(drawing.SHEET_LAYOUTS)
         == set(drawing.SHEET_SCALES)
@@ -111,6 +115,32 @@ def test_station_slide_clears_the_hex_trunnion() -> None:
     mount_inner_face = builder.HEX_Z_MID - builder.knife_mount.SUPPORT_Z_THICK / 2.0
     for distance in slide.values():
         assert abs(distance) > builder.HEX_Z_OUTER - mount_inner_face
+
+
+def test_jam_nut_explodes_threaded_on_the_eyebolt_shank() -> None:
+    # Fitted, the nut's underside is on the boss top face, ANCHOR_H above the
+    # eyebolt's cut end (flush with the boss underside).
+    seated_above_cut_end = sm_summing_lever_spec.ANCHOR_H
+    drop = explode.BOSS_HOOK_LIFT - explode.BOSS_JAM_NUT_LIFT
+    assert drop > 0.0, "the nut moves down the shank, off its seat"
+    # Still threaded: a full nut thickness of shank under it.
+    assert seated_above_cut_end - drop > jam_nut.THICKNESS
+    # The cut end itself clears the boss top face.
+    assert explode.BOSS_HOOK_LIFT > sm_summing_lever_spec.ANCHOR_H
+
+
+def test_eyebolt_balloon_lands_on_the_eye_facing_the_viewer() -> None:
+    anchor = ANCHOR_9490T1
+    point = drawing.EYEBOLT_BALLOON_POINT_MM
+    offset = [p - c for p, c in zip(point, anchor.eye_open_tip_mm)]
+    # On the eye tip's dome-root circle: in the cap plane, one wire radius out.
+    assert sum(o * n for o, n in zip(offset, anchor.eye_open_tip_normal)) == (
+        pytest.approx(0.0, abs=1e-9)
+    )
+    assert math.hypot(*offset) == pytest.approx(anchor.wire_radius_mm)
+    # Its outward normal faces the +X+Y+Z isometric viewer.
+    assert sum(offset) > 0.0
+    assert drawing.BALLOON_ANCHORS[spec.BOSS_HOOK].point_mm == point
 
 
 def test_settings_are_derived_from_the_placed_geometry() -> None:
@@ -228,16 +258,34 @@ def test_hanger_fit_up_reach_matches_the_builder_band() -> None:
 
 
 def test_steps_and_checks_stay_above_the_inner_border() -> None:
-    lines = drawing.STEPS_AND_CHECKS.splitlines()
-    assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
-    bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
-    assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
+    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
+        lines = text.splitlines()
+        assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
+        bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
+        assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
     assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    assert drawing.STEPS_AND_CHECKS.split() == " ".join(
-        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS)
-    ).split()
+    assert (
+        drawing.STEPS_NOTE.split()
+        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)).split()
+    )
+    assert (
+        drawing.CHECKS_NOTE.split()
+        == " ".join(("ASSEMBLY SEQUENCE (CONT.)", *notes.ASSEMBLY_CHECKS)).split()
+    )
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.STEPS_AND_CHECKS
+            assert number in drawing.STEPS_NOTE
+
+
+def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
+    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
+        lines = text.splitlines()
+        starts = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
+        assert len(starts) > 1
+        for previous, start in zip(starts, starts[1:]):
+            assert lines[start - 1] == ""
+            assert "" not in lines[previous : start - 1]
+        # The heading runs straight into step 1.
+        assert lines[starts[0] - 1].endswith(("SEQUENCE", "CHECKS:"))
