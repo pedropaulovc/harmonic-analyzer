@@ -202,7 +202,7 @@ def test_truncated_trailing_string_is_not_ignored_after_good_record(tmp_path):
     _reject(tmp_path, _stream(_record() + b"\xff\xfe\xff"), "truncated string length")
 
 
-@pytest.mark.parametrize("units", [0xFF, 300, 0xFFFE, 0xFFFF, 70000])
+@pytest.mark.parametrize("units", [0xFF, 300, 0xFFFD, 0xFFFF, 70000])
 def test_long_part_paths_use_the_mfc_word_or_dword_length(tmp_path, units):
     path = "C:\\" + "p" * (units - len("C:\\.SLDPRT")) + ".SLDPRT"
     assert len(path) == units
@@ -244,13 +244,30 @@ def test_marker_crossing_from_header_into_text_fails_closed(tmp_path):
     _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
 
 
-def test_tag_bytes_wholly_inside_a_dword_length_header_are_not_nested(tmp_path):
-    header = _string("p" * 0xFFFE)[:10]
-    assert (
-        header.find(b"\xff\xfe\xff", 1) == 5
-    )  # the header's own WORD 0xFFFF + DWORD 0xFFFE
-    gate.assert_saved_display_data(
-        _save(tmp_path, _stream(_string("p" * 0xFFFE) + _record()))
+def test_record_hidden_in_a_dword_length_header_fails_closed(tmp_path):
+    # codjiflo #1964 round 2: the outer DWORD length is read through a part
+    # record that starts inside the header.
+    outer = (b"\xff\xfe\xff\xff\xff" + _record("一.SLDPRT", 0)).ljust(
+        10 + 2 * 0x8FFFE, b"\x00"
+    )
+    _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
+
+
+def test_tag_straddling_the_string_end_fails_closed(tmp_path):
+    # codjiflo #1964 round 2: the hidden record's tag starts one byte before
+    # the outer string ends.
+    data = b"\xff\xfe\xff\x01\x00" + _record("hidden.SLDPRT", 0) + _record()
+    _reject(tmp_path, _stream(data), "nested or overlapping")
+
+
+def test_dword_length_header_spelling_the_tag_fails_closed(tmp_path):
+    # 0xFFFE units: the header's WORD 0xFFFF + DWORD FE FF 00 00 spells the
+    # tag at +5. Refused rather than guessing which tag is real.
+    assert _string("p" * 0xFFFE)[:10].find(b"\xff\xfe\xff", 1) == 5
+    _reject(
+        tmp_path,
+        _stream(_string("p" * 0xFFFE) + _record()),
+        "nested or overlapping",
     )
 
 

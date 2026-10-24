@@ -98,7 +98,8 @@ def _string_span(data: bytes, offset: int, context: str) -> tuple[int, int]:
     below 0xFFFE; else 0xFF, WORD 0xFFFF and a DWORD. Face-identity records
     longer than 254 units use the WORD form. A second Unicode tag (WORD
     0xFFFE) and the 64-bit escape are not written after a tag, so both are
-    refused.
+    refused. A DWORD length whose own bytes spell the tag is refused by the
+    caller's overlap check: fail closed rather than guess which tag is real.
     """
     lengths = ((offset + 3, "<B"), (offset + 4, "<H"), (offset + 6, "<I"))
     for (at, layout), escape in zip(lengths, (0xFF, 0xFFFF, 0xFFFFFFFF), strict=True):
@@ -129,12 +130,9 @@ def _assert_flags(data: bytes, stream_offset: int) -> str | None:
         end = start + 2 * units
         if end > len(data):
             raise ValueError(f"{context}: truncated UTF-16 string")
-        # A long-form length header may itself contain the tag bytes; exempt
-        # only markers wholly inside it, not ones crossing into the text.
-        nested = data.find(_STRING_MARKER, offset + 1, end)
-        while nested != -1 and nested + len(_STRING_MARKER) <= start:
-            nested = data.find(_STRING_MARKER, nested + 1, end)
-        if nested != -1:
+        # Any tag starting after this one and before its end overlaps it,
+        # including one that crosses the end or lies in a long-form header.
+        if data.find(_STRING_MARKER, offset + 1, end + len(_STRING_MARKER) - 1) != -1:
             raise ValueError(f"{context}: nested or overlapping serialized string")
         try:
             text = data[start:end].decode("utf-16le")
