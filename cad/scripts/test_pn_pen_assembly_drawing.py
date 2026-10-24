@@ -974,18 +974,48 @@ def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
 
 def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
     keys = {detail.key for detail in drawing.DETAILS}
-    assert drawing.BOUNDED_ON_RIGHT <= keys
+    assert set(drawing.BOUNDED_ON) <= keys
+    assert drawing.LETTERED_LEFT <= set(drawing.BOUNDED_ON)
     for detail in drawing.DETAILS:
-        first = detail.title.splitlines()[0]
-        assert first.startswith(f"DETAIL {notes.DETAIL_LETTERS[detail.key]}")
-        # A detail circled on RIGHT enlarges what the circle holds: drawn from
-        # the right, unturned, its title naming no other direction.
-        if detail.key in drawing.BOUNDED_ON_RIGHT:
-            assert detail.orientation == "*Right" and detail.axis_points is None
-            assert " - FROM " not in first
+        lines = detail.title.splitlines()
+        assert lines[0].startswith(f"DETAIL {notes.DETAIL_LETTERS[detail.key]}")
+        # A circled detail enlarges what its circle holds: drawn from its
+        # parent view's direction, unturned, its title naming no other.
+        if detail.key in drawing.BOUNDED_ON:
+            assert detail.orientation == drawing.BOUNDED_ON[detail.key]
+            assert detail.axis_points is None and detail.turn_cw_deg is None
+            assert " - FROM " not in lines[0] and "ROTATED" not in detail.title
         else:
-            assert " - FROM " in first
+            # The turned plan, named by its viewing arrow: its title says
+            # which way it looks and how far it is turned.
+            assert detail is drawing.CARRIAGE_DETAIL
+            assert " - FROM ABOVE" in lines[0]
+            assert lines[1] == f"ROTATED {detail.turn_cw_deg:g} DEG CW"
     assert len(set(notes.DETAIL_LETTERS.values())) == len(drawing.DETAILS)
+
+
+def test_carriage_turn_is_the_marker_axis_angle_in_the_plan() -> None:
+    # The plan as placed draws machine X along sheet +x, machine -Z along +y.
+    (x0, _, z0), (x1, _, z1) = drawing.CARRIAGE_DETAIL.axis_points
+    angle = math.degrees(math.atan2(z0 - z1, x1 - x0))
+    assert drawing.CARRIAGE_DETAIL.turn_cw_deg == pytest.approx(angle, abs=1e-6)
+    assert 0.0 < angle < 90.0
+
+
+def test_carriage_viewing_arrow_points_down_onto_the_block_clear_of_d() -> None:
+    """Machinist review, farm run 20261024T091056564Z: C and D had no mark on
+    any parent view. D is circled on FRONT; C's arrow points down onto the
+    block top beside it."""
+    x, y, z = notes.CARRIAGE_ARROW_TIP
+    assert z == carriage.PEN_Z_MID
+    # Over the block top, nib-ward of the rod and its square.
+    assert y > carriage.BLOCK_TOP_Y
+    assert x < carriage.PEN_ROD_X - carriage.ROD_HALF_DIAGONAL
+    # FRONT projects Z away: the tip stands off D's circle by the clearance.
+    d = drawing.STIRRUP_DETAIL
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    gap = math.dist((x, y), d.model_centre[:2]) - d.radius_mm
+    assert gap * scale >= drawing.VIEW_ARROW_CIRCLE_CLEARANCE
 
 
 def test_stirrup_detail_shows_the_window_and_the_thumb_screw_tap_off_the_title_block() -> None:
