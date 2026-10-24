@@ -15,7 +15,7 @@ from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_
 from _supplier_screw_layout import supplier_screw_margins
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_hub_pin"]
-ITEM = 'CLASS Z MINUS GAUGE PIN, SIZE 10.2000 MM, 2 IN SUPPLY, CUT TO 20.0 MM'
+ITEM = 'CLASS Z MINUS GAUGE PIN, 10.2000 MM, CUT TO 20.0 MM'
 
 
 def _assert_supplier_bands(displays):

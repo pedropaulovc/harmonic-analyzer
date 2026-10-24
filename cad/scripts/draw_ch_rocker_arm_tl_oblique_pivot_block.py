@@ -125,7 +125,7 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                   # SolidWorks pins its own "#4-40 Tapped Hole" note beside the
                                   # nut taps' callout, which already states the thread; its
                                   # leader crossed section line C.
-                                  redundant_note_substrings=('Tapped Hole',) if is_feed else (),
+                                  redundant_note_substrings=('#4-40 Tapped Hole',) if is_feed else (),
                                   expected_redundant_notes=1 if is_feed else 0)
 
 

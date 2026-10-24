@@ -800,12 +800,11 @@ async def build(adapter) -> dict[str, str]:
     # the nut bracket locked to it; the carrier on the pins; its riders
     # locked to it.
     await _mate_carriages(adapter)
-    carried = [
-        stem for stem, (parent, _n) in spec.LOCKED_TO.items() if parent != spec.CARRIER
-    ]
-    riders = [
-        stem for stem, (parent, _n) in spec.LOCKED_TO.items() if parent == spec.CARRIER
-    ]
+    def _rides_carrier(parents: tuple[tuple[str, int], ...]) -> bool:
+        return any(parent == spec.CARRIER for parent, _n in parents)
+
+    carried = [stem for stem, parents in spec.LOCKED_TO.items() if not _rides_carrier(parents)]
+    riders = [stem for stem, parents in spec.LOCKED_TO.items() if _rides_carrier(parents)]
     await _lock_families(adapter, carried)
     await _mate_carrier(adapter)
     await _lock_families(adapter, riders)

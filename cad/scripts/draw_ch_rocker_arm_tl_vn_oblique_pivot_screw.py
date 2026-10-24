@@ -15,7 +15,7 @@ from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_
 from _supplier_screw_layout import supplier_screw_margins
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_screw"]
-ITEM = '18-8 STAINLESS STEEL PRECISION SHOULDER SCREW, 10 MM X 35 MM, M8 X 1.25'
+ITEM = '18-8 SS PRECISION SHOULDER SCREW, 10 MM X 35 MM, M8 X 1.25'
 
 
 def _assert_supplier_bands(displays):
