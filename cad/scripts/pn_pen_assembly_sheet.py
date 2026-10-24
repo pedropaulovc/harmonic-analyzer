@@ -118,9 +118,9 @@ if set(BOM_DESCRIPTIONS) != set(BOM_ORDER):
 # --- explode trails (machine mm, exploded): from the moved part back to where it
 # fits, along the move ---------------------------------------------------------------
 # The rod set screw: from its exploded cup back to its tap's mouth on the
-# exploded block's front face. Along the tap's axis the octant view draws the
-# screw's way out straight down the sheet; the trail lands it on the
-# front-face tap step 4 names.
+# exploded block's front face. Along the tap's axis the exploded view draws the
+# screw's way out down-left, off the face's verticals; the trail lands it on
+# the front-face tap step 4 names.
 ROD_SET_SCREW_TRAIL = (
     exploded_point(ROD_SET_SCREW, carriage.ROD_SET_SCREW_POS),
     exploded_point(
@@ -247,9 +247,9 @@ CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, CARRIAGE_END_MACHINE)
 
 # DETAIL D, from the front at 1:1: the stirrup on the block's paper end, its
 # window round the marker grip, and the thumb screw up through the bottom
-# rail's tap to the grip -- what step 3 assembles and the exploded view's
-# edge-on stirrup cannot show. Its crop runs from the thumb screw's head up
-# to the block top, centred on the stirrup's depth.
+# rail's tap to the grip -- what step 3 assembles and the exploded view, with
+# the stirrup and screw slid apart, cannot show in place. Its crop runs from
+# the thumb screw's head up to the block top, centred on the stirrup's depth.
 _THUMB_SCREW_HEAD_LOCAL_Y = carriage.MARKER_BOTTOM_LOCAL_Y - carriage.THUMB_SCREW_REACH
 STIRRUP_DETAIL_CENTRE = carriage.block_to_machine(
     (

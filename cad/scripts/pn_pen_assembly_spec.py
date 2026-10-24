@@ -1,5 +1,5 @@
 """Pure fitting contract for pn-pen.SLDASM (MHA-PN-00): inventory, the
-exploded view's octant and the three carriage settings.
+exploded view's camera and the three carriage settings.
 
 Builder data only: the builder (``build_pn_pen_assembly``) authors the
 settings as blanked construction sketches carrying driving, toleranced model
@@ -82,13 +82,43 @@ QUANTITIES = {stem: 1 for stem in BOM_ORDER}
 # --- exploded view -------------------------------------------------------------
 # The named explode and its steps live in pn_pen_explode_spec, which only the
 # builder's explode module and the drawing read (the EXPLODE refresh tier).
-# The exploded view's viewer octant (_named_views) stays here: the builder
-# names that octant view in the operational model. REAR-TOP-LEFT: the rod
-# set screw's tap opens on the yawed block's front face, whose normal is
-# machine (-X, -Z); the built-in *Isometric (+X+Y+Z) sees that face edge-on
-# from behind, so its set screw read as a part in the block's top bore. From
-# (-1, +1, -1) the face and the tap's axis come toward the reader.
-EXPLODED_OCTANT = (-1, 1, -1)
+# The exploded view's camera stays here: the builder names it in the
+# operational model. The rod set screw's tap opens on the yawed block's front
+# face, whose normal is machine (-X, -Z); the built-in *Isometric (+X+Y+Z)
+# sees that face edge-on from behind, so its set screw read as a part in the
+# block's top bore. The REAR-TOP-LEFT octant (-1, +1, -1) looks straight
+# down that normal's plan direction, so the screw's explode along it drew
+# straight down the sheet, parallel to model +Y, and read as a screw entering
+# the block's bottom face (machinist review, farm run 20261023T222629630Z).
+# The camera is that octant turned a further 20 deg about +Y (*Isometric
+# turned 200 deg): the block's front-face normal now runs down-left on the
+# sheet, 45 deg off its verticals, while the reader still sees the front face,
+# the top and the paper end, and the stirrup's window. The "ISO " prefix is
+# what marks a pictorial for the shared finalizer and layout audit
+# (_drawing_common.is_pictorial_orientation).
+EXPLODED_VIEW = "ISO PN EXPLODED"
+EXPLODED_VIEW_STANDARD = 7  # swStandardViews_e.swIsometricView: +X+Y+Z
+EXPLODED_VIEW_TURN_DEG = 200.0
+_TURN = math.radians(EXPLODED_VIEW_TURN_DEG)
+# The turn about +Y as the images of the model axes (rows), the
+# ``model_rotation`` convention of _assembly_named_views.name_standard_views.
+EXPLODED_VIEW_TURN = (
+    (math.cos(_TURN), 0.0, -math.sin(_TURN)),
+    (0.0, 1.0, 0.0),
+    (math.sin(_TURN), 0.0, math.cos(_TURN)),
+)
+_ISOMETRIC_AXES = (
+    (1.0 / math.sqrt(2.0), 0.0, -1.0 / math.sqrt(2.0)),
+    (-1.0 / math.sqrt(6.0), 2.0 / math.sqrt(6.0), -1.0 / math.sqrt(6.0)),
+    (1.0 / math.sqrt(3.0), 1.0 / math.sqrt(3.0), 1.0 / math.sqrt(3.0)),
+)
+# The exploded view's (sheet-right, sheet-up, toward-the-reader) axes in model
+# coordinates: *Isometric's axes (_named_views.octant_axes(1, 1, 1)) carried
+# by the turn.
+EXPLODED_VIEW_AXES = tuple(
+    tuple(sum(axis[k] * EXPLODED_VIEW_TURN[k][j] for k in range(3)) for j in range(3))
+    for axis in _ISOMETRIC_AXES
+)
 
 
 # --- settings ----------------------------------------------------------------

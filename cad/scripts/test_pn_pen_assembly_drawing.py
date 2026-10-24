@@ -1,5 +1,6 @@
 """Offline contract for the pen fitter package (MHA-PN-00)."""
 
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,13 +13,17 @@ import pn_pen_assembly_sheet as notes
 import pn_pen_assembly_spec as spec
 import pn_pen_explode_spec as explode
 import pn_pen_carriage_geom as carriage
+import pn_pen_frame_spec as frame
 import pn_pen_rod_spec as rod
 import pn_pen_v_block_spec as v_block
+import pn_vn_pen_marker_spec as marker
 import pn_vn_pen_rod_set_screw_spec as rod_set_screw
+import _mcmaster_99607a213 as thumb_screw
 from _buildgraph import module_deps_of
+from _drawing_common import is_pictorial_orientation
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
-from _named_views import octant_axes, octant_view_name
+from _named_views import octant_axes
 from _printed_tolerance import printed_band_mm
 from _simplified_names import simplified_name
 
@@ -708,15 +713,63 @@ def _block_axis(index: int, sign: float = 1.0) -> tuple[float, ...]:
     return tuple(sign * value for value in carriage.BLOCK_ROWS[index])
 
 
-def test_exploded_octant_faces_the_set_screw_tap_and_explodes_along_it() -> None:
-    assert drawing.EXPLODED_ORIENTATION == octant_view_name(*spec.EXPLODED_OCTANT)
+def _dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _sheet(direction: tuple[float, ...], axes=None) -> tuple[float, float]:
+    """``direction`` (model) on the exploded view's sheet: (right, up)."""
+    right, up, _toward = axes or spec.EXPLODED_VIEW_AXES
+    return _dot(direction, right), _dot(direction, up)
+
+
+def _placed(rows, local: tuple[float, ...]) -> tuple[float, ...]:
+    """A part-local direction in model coordinates (``rows``: images of the
+    local axes)."""
+    return tuple(sum(local[i] * rows[i][j] for i in range(3)) for j in range(3))
+
+
+def test_exploded_camera_is_the_isometric_turned_about_y() -> None:
+    assert drawing.EXPLODED_ORIENTATION == spec.EXPLODED_VIEW
+    # Placed, styled and audited as a pictorial.
+    assert is_pictorial_orientation(spec.EXPLODED_VIEW)
+    assert spec.EXPLODED_VIEW_STANDARD == 7
+    turn = spec.EXPLODED_VIEW_TURN
+    assert turn[1] == (0.0, 1.0, 0.0)
+    for axis, turned in zip(octant_axes(1, 1, 1), spec.EXPLODED_VIEW_AXES):
+        assert turned == pytest.approx(_placed(turn, axis), abs=1e-12)
+    right, up, toward = spec.EXPLODED_VIEW_AXES
+    # Orthonormal and right-handed, model +Y straight up the sheet.
+    for a in spec.EXPLODED_VIEW_AXES:
+        assert _dot(a, a) == pytest.approx(1.0)
+    assert _dot(right, up) == pytest.approx(0.0, abs=1e-12)
+    assert _dot(up, toward) == pytest.approx(0.0, abs=1e-12)
+    cross = (
+        up[1] * toward[2] - up[2] * toward[1],
+        up[2] * toward[0] - up[0] * toward[2],
+        up[0] * toward[1] - up[1] * toward[0],
+    )
+    assert cross == pytest.approx(right, abs=1e-12)
+    assert right[1] == pytest.approx(0.0, abs=1e-12) and up[1] > 0.0
+
+
+def test_exploded_view_draws_the_set_screw_way_out_off_the_vertical() -> None:
+    """Machinist review, farm run 20261023T222629630Z: from the REAR-TOP-LEFT
+    octant the screw's way out of the front-face tap drew straight down the
+    sheet, parallel to the block's verticals, and read as a screw entering
+    the block's bottom face."""
     # The tap opens on the block's front face (local -Z, BODY_Z0).
     normal = _block_axis(2, -1.0)
-    viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
-    assert sum(n * v for n, v in zip(normal, viewer)) > 0.5
+    assert _dot(normal, spec.EXPLODED_VIEW_AXES[2]) > 0.5
     # Straight out of the tap, and past the screw's own recess in it.
     length = _along(_moves((spec.ROD_SET_SCREW,)), normal)
     assert length > v_block.SET_SCREW_TAP_LENGTH + 2 * rod_set_screw.LENGTH
+    # On the sheet the way out runs well off the vertical model +Y draws.
+    x, y = _sheet(normal)
+    assert math.degrees(math.atan2(abs(x), abs(y))) > 30.0
+    # The old octant (the negative control) drew it vertical.
+    x, _y = _sheet(normal, octant_axes(-1, 1, -1))
+    assert x == pytest.approx(0.0, abs=1e-12)
 
 
 def test_rod_set_screw_trail_runs_up_the_tap_axis_to_its_mouth() -> None:
@@ -756,25 +809,25 @@ def test_stirrup_slides_off_the_paper_end_with_its_thumb_screw_on_its_tap() -> N
     assert frame_steps == {(spec.FRAME, spec.THUMB_SCREW)}
     off = _along(_moves((spec.FRAME, spec.THUMB_SCREW)), _block_axis(0, -1.0))
     assert off == pytest.approx(carriage.FRAME_ORIGIN_LOCAL[0] + explode.STIRRUP_CLEAR)
-    # In the octant view the slide-off axis lies in the sheet, running
-    # sheet-right: the stirrup stands off the block's paper end at full length.
-    sx, _sy, sz = spec.EXPLODED_OCTANT
-    viewer = octant_axes(*spec.EXPLODED_OCTANT)[2]
-    assert abs(sum(a * v for a, v in zip(_block_axis(0), viewer))) < 1e-12
-    assert _block_axis(0, -1.0)[0] * sz + _block_axis(0, -1.0)[2] * -sx > 0.0
+    # In the exploded view the slide-off axis runs sheet-right, nearly in the
+    # sheet, off the paper end the reader sees: the stirrup stands off the
+    # block's paper end at full length.
+    x, y = _sheet(_block_axis(0, -1.0))
+    assert x > 0.9 and abs(y) < 0.25
+    assert _dot(_block_axis(0, -1.0), spec.EXPLODED_VIEW_AXES[2]) > 0.0
     face, end = notes.STIRRUP_TRAIL
     trail = [b - a for a, b in zip(face, end)]
     assert _along(trail, _block_axis(0)) == pytest.approx(explode.STIRRUP_CLEAR)
 
 
-def test_wire_explodes_up_then_straight_to_the_sheet_left() -> None:
+def test_wire_explodes_up_then_to_the_sheet_left() -> None:
     moves = _moves((spec.WIRE,))
-    sx, _sy, sz = spec.EXPLODED_OCTANT
-    # The octant view's sheet-right is (sz, 0, -sx); the aside pair runs
-    # against it with no out-of-plane part.
+    # Up off the eye, then an equal horizontal X/-Z pair that draws to the
+    # reader's left, rising far less than it runs.
     assert moves[1] > 0.0
-    assert moves[0] * sz + moves[2] * -sx < 0.0
-    assert moves[0] * -sx + moves[2] * -sz == 0.0
+    assert moves[0] == -moves[2] > 0.0
+    x, y = _sheet((moves[0], 0.0, moves[2]))
+    assert x < 0.0 and abs(y) < abs(x) / 3.0
     assert drawing.BALLOON_ANCHORS[drawing.WIRE_ROW].point_mm is not None
 
 
@@ -801,11 +854,11 @@ def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
     import pn_pen_hanger_spec as hanger
 
     x, y, z = drawing.BALLOON_ANCHORS[spec.HANGER].point_mm
-    sx, _sy, sz = spec.EXPLODED_OCTANT
+    right = spec.EXPLODED_VIEW_AXES[0]
     # On the strap's sheet-rightmost long edge: the -x side's straight line
     # from the top corner to the foot corner, on the bar-seat face. The
-    # octant's sheet-right is (sz, 0, -sx), so -x and +z both run sheet-right.
-    assert (sz, -sx) == (-1, 1)
+    # view's sheet-right runs -x and +z.
+    assert right[0] < 0.0 < right[2]
     (top_x, top_y), (foot_x, foot_y) = hanger.STRAP_OUTLINE[1], hanger.STRAP_OUTLINE[2]
     assert top_x == min(hanger.STRAP_TOP_X) and foot_x == min(hanger.STRAP_BOT_X)
     t = (y - top_y) / (foot_y - top_y)
@@ -817,18 +870,86 @@ def test_hanger_balloon_lands_mid_strap_clear_of_the_hanger_screw() -> None:
     assert y > max(hanger.GUIDE_PLATE_YS) + hanger.GUIDE_PLATE_T + 30.0
 
 
-def test_rod_balloon_lands_low_on_its_viewer_corner() -> None:
-    """Final build b9ae: anchored 40 mm up the square, the rod's bearing from
-    the exploded view's centre sat just anticlockwise of thumb screw 6's tip,
-    so leader 2 crossed leader 6. 15 mm up turns it past the thumb screw's."""
+def test_rod_balloon_lands_on_its_sheet_right_corner() -> None:
+    """Machinist review, farm run 20261023T222629630Z: anchored 15 mm up the
+    square, leader 2 ran down across the v-block."""
     import pn_pen_rod_spec as rod
 
     x, y, z = drawing.BALLOON_ANCHORS[spec.ROD].point_mm
-    sx, _sy, sz = spec.EXPLODED_OCTANT
-    # The square's vertical corner nearest the viewer, on the square itself.
-    assert (x, z) == (sx * rod.ROD_SECTION / 2.0, sz * rod.ROD_SECTION / 2.0)
-    assert y == 15.0
-    assert 0.0 < y < rod.SQUARE_LENGTH / 4.0
+    right, _up, toward = spec.EXPLODED_VIEW_AXES
+    # The square's sheet-right vertical corner, a silhouette: one of its two
+    # faces toward the reader.
+    half = rod.ROD_SECTION / 2.0
+    assert (x, z) == (math.copysign(half, right[0]), math.copysign(half, right[2]))
+    assert (x * toward[0] > 0.0) != (z * toward[2] > 0.0)
+    assert y == drawing.ROD_ANCHOR_Y == 63.0
+    assert 0.0 < y < rod.SQUARE_LENGTH
+
+
+def test_thumb_screw_shows_clear_below_the_stirrup_rail_on_the_sheet() -> None:
+    """Machinist review, farm run 20261023T222629630Z: 10 mm below the rail,
+    the tip hid behind the rail's near half on the sheet, so the screw read as
+    still threaded in."""
+    up = spec.EXPLODED_VIEW_AXES[1]
+    rail = [
+        notes.exploded_point(
+            spec.FRAME,
+            carriage.block_to_machine((bx, carriage.FRAME_ORIGIN_LOCAL[1], bz)),
+        )
+        for bx in (carriage.FRAME_X0_LOCAL, carriage.FRAME_X0_LOCAL + frame.FRAME_DEPTH)
+        for bz in (
+            carriage.FRAME_ORIGIN_LOCAL[2],
+            carriage.FRAME_ORIGIN_LOCAL[2] + frame.OUTER_WIDTH,
+        )
+    ]
+    tip, _mouth = notes.THUMB_SCREW_TRAIL
+    # Model mm; 4 mm on the sheet at 1:2.
+    assert min(_dot(corner, up) for corner in rail) - _dot(tip, up) > 8.0
+
+
+def test_stirrup_and_thumb_screw_balloons_land_on_their_own_parts() -> None:
+    """Machinist review, farm run 20261023T222629630Z: walked, balloons 5 and
+    6 landed side by side on the stirrup's bottom rail."""
+    right, _up, toward = spec.EXPLODED_VIEW_AXES
+    # The stirrup's: an outer vertical edge, the sheet-rightmost of the four,
+    # three quarters up.
+    x, y, z = drawing.BALLOON_ANCHORS[spec.FRAME].point_mm
+    edges = [
+        (ex, ez) for ex in (0.0, frame.OUTER_WIDTH) for ez in (0.0, frame.FRAME_DEPTH)
+    ]
+    assert (x, z) in edges and y == 0.75 * frame.OUTER_HEIGHT
+    rows = carriage.FRAME_ROWS
+    assert (x, z) == max(
+        edges, key=lambda e: _dot(_placed(rows, (e[0], 0.0, e[1])), right)
+    )
+    # The thumb screw's: the knob's top rim, the head chamfer's inner edge on
+    # the face the collar rises from, on the side toward the reader's lower right.
+    x, y, z = drawing.BALLOON_ANCHORS[spec.THUMB_SCREW].point_mm
+    assert x == thumb_screw.TS_HEAD_H
+    assert math.hypot(y, z) == pytest.approx(
+        thumb_screw.TS_HEAD_R - thumb_screw.HEAD_DIA / 16.0
+    )
+    side = _placed(carriage.THUMB_SCREW_ROWS, (0.0, y, z))
+    assert _dot(side, right) > 0.0 and _dot(side, toward) > 0.0
+
+
+def test_block_and_marker_balloons_land_off_the_rod_set_screw() -> None:
+    """Walked in the turned view, the block's far-end corner and the marker's
+    nib stand straight above the rod set screw, so their leaders ran past it."""
+    x, y, z = drawing.BALLOON_ANCHORS[spec.V_BLOCK].point_mm
+    # The front face's bottom edge, under the tap.
+    assert (x, y, z) == (v_block.PIVOT_BORE_X, 0.0, v_block.BODY_Z0)
+    x, y, z = drawing.BALLOON_ANCHORS[spec.MARKER].point_mm
+    station, radius = marker.PROFILE[-4]
+    # The edge round the back end, nearest the reader.
+    assert y == station and math.hypot(x, z) == pytest.approx(radius)
+    assert station > marker.OVERALL_LENGTH * 0.9
+    # Its radial direction is the reader's, less the marker's axial part.
+    toward = spec.EXPLODED_VIEW_AXES[2]
+    axis = tuple(carriage.MARKER_ROWS[1])
+    radial = tuple(t - _dot(toward, axis) * a for t, a in zip(toward, axis))
+    facing = _placed(carriage.MARKER_ROWS, (x / radius, 0.0, z / radius))
+    assert facing == pytest.approx(tuple(r / math.hypot(*radial) for r in radial))
 
 
 def test_every_setting_is_printed_with_a_callout_beside_its_detail() -> None:
@@ -869,7 +990,7 @@ def test_each_detail_title_carries_its_letter_and_any_other_direction() -> None:
 def test_stirrup_detail_shows_the_window_and_the_thumb_screw_tap_off_the_title_block() -> None:
     """Machinist review 2026-10-17: the stirrup's window and the thumb screw's
     tap in its bottom rail showed nowhere the reader could read them; the
-    exploded view sees the stirrup edge-on."""
+    exploded view then saw the stirrup edge-on."""
     detail = drawing.STIRRUP_DETAIL
     assert detail in drawing.DETAILS and detail.feature is None
     assert {spec.FRAME, spec.THUMB_SCREW, spec.V_BLOCK} <= detail.stems
