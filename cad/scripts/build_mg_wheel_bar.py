@@ -7,15 +7,17 @@ shows it clamped at ONE column (the machine +x / west one) with a
 free end just past the pen hanger; there is no second clamp on the far
 column at this height.
 
-Section 10 tall x 9.5 deep -- the support-bar stock (the front faces of
-both bars share the machine z -138.9 plane; the 9.5 depth puts the back
-face on the front clamp arc's face at -129.4, the same two-piece clamp
-seat as build_pd_support_bar.py). 234 long: the clamped end runs 29 past
-the west column line (the support-bar idiom -- the clamp-screw stack
-bar -> front arc -> back arc needs bar over BOTH ear holes), the free
-end just past the hanger. Placed IDENTITY in build_mg_magnifier_assembly at
-centre x +109 (machine = local + 109): span -8..+226, covering the wheel
-axle (+53) and the pen-hanger strap top with margin.
+Section 11 tall x 9.5 deep: the top face 5.0 over the bore row (the
+pen-hanger strap's top is flush with it), the rest below; the depth is the
+support-bar stock's (the front faces of both bars share the machine z -138.9
+plane; the 9.5 depth puts the back face on the front clamp arc's face at
+-129.4, the same two-piece clamp seat as build_pd_support_bar.py). 234 long:
+the clamped end runs 29 past the west column line (the support-bar idiom --
+the clamp-screw stack bar -> front arc -> back arc needs bar over BOTH ear
+holes), the free end just past the hanger. Placed IDENTITY in
+build_mg_magnifier_assembly at centre x +109 (machine = local + 109): span
+-8..+226, covering the wheel axle (+53) and the pen-hanger strap top with
+margin.
 
 Holes (all along local Z, the machine front-back axis):
 * 1x reamed axle bore at local (AXLE_BORE_X, 0) = machine x WHEEL_X, the
@@ -52,13 +54,13 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import (
     SketchDims,
+    add_line_chain,
     anchor_point_to_origin,
     blank_sketch,
     dimension_between,
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _sketch_rectangle import define_centered_rectangle
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from pn_vn_hanger_screw_spec import SHANK_DIA as HANGER_SCREW_DIA
@@ -67,7 +69,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_tolerances import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
@@ -81,9 +83,7 @@ from mg_wheel_bar_geom import (
     BAR_DEPTH_BAND,
     BAR_LENGTH,
     BAR_SIDE,
-    BAR_SIDE_BAND,
-    BORE_ROW_HEIGHT,
-    BORE_ROW_HEIGHT_TOL,
+    BAR_TOP_ABOVE_ROW,
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_SPEC,
     CLAMP_HOLE_X,
@@ -96,10 +96,12 @@ from mg_wheel_bar_geom import (
     SCREW_HOLE_X,
     require_hanger_end_wall,
 )
+import mg_wheel_bar_callouts as callouts
 from mg_wheel_bar_spec import (
     AXLE_BORE_STATION,
+    BORE_ROW_FROM_TOP,
+    CLAMP_POSITION_BAND,
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
 )
@@ -124,29 +126,51 @@ def _as_construction(adapter, entity_id: str, label: str) -> None:
         raise RuntimeError(f"{label} did not take the construction flag")
 
 
+def author_dimension_callouts(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back.
+
+    The drawing only reads these lanes: set from the sheet they would write
+    through to this part outside its recipe (#1942).
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: "
+                        f"{printed!r}"
+                    )
+
+
 async def _author_bore_row(adapter) -> list[tuple[str, str]]:
     """The bore row as model dimensions (the dt_cone_tip_block reference-sketch
     pattern): a Hole Wizard placement sketch cannot dimension from the bar's end
-    or bottom face, so one construction chain on the row carries the printed
-    stations from the left end and a rise at the right end carries the row's
-    height from the bottom face. The stations drive from the same globals as
+    or top face, so one construction chain on the row carries the printed
+    stations from the left end and a drop at the right end carries the row's
+    distance from the top face. The stations drive from the same globals as
     the Hole Wizard placement points, so each print dimension moves with its
     hole."""
     right_end_x = BAR_LENGTH / 2.0
-    bottom_y = -BAR_SIDE / 2.0
+    top_y = BAR_TOP_ABOVE_ROW
     row_xs = (LEFT_END_X, SCREW_HOLE_X, *CLAMP_HOLE_X, right_end_x)
     row = SketchDims()
     check("create_sketch bore row", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    rise = check(
-        "bore row rise",
-        await adapter.add_line(right_end_x, bottom_y, right_end_x, 0.0),
-    )
-    legs = [
-        check(f"bore row leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0))
-        for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
-    ]
-    set_sketch_direct_db(adapter, False)
+    try:
+        rise = check(
+            "bore row rise",
+            await adapter.add_line(right_end_x, top_y, right_end_x, 0.0),
+        )
+        legs = [
+            check(f"bore row leg {index}", await adapter.add_line(x0, 0.0, x1, 0.0))
+            for index, (x0, x1) in enumerate(zip(row_xs, row_xs[1:]))
+        ]
+    finally:
+        set_sketch_direct_db(adapter, False)
     _as_construction(adapter, rise, "bore row rise")
     check(
         "bore row rise vertical",
@@ -165,19 +189,19 @@ async def _author_bore_row(adapter) -> list[tuple[str, str]]:
             await adapter.add_sketch_constraint(f"{leg}.end", end, "coincident"),
         )
     await anchor_point_to_origin(
-        adapter, f"{rise}.start", right_end_x, bottom_y, "bar bottom right corner"
+        adapter, f"{rise}.start", right_end_x, top_y, "bar top right corner"
     )
     row.record("RowEndX", '"BarLength" / 2')
-    row.record("RowBottomY", '"BarSide" / 2')
+    row.record("RowTopY", '"BarTop"')
     await dimension_between(
         adapter,
         f"{rise}.start",
         f"{rise}.end",
         "vertical_distance",
-        BORE_ROW_HEIGHT,
-        "bore row height",
+        BORE_ROW_FROM_TOP,
+        "bore row from top",
     )
-    row.record("BoreRowHeight", '"BarSide" / 2')
+    row.record("BoreRowFromTop", '"BarTop"')
     start = f"{legs[0]}.start"
     await dimension_between(
         adapter, start, "origin", "horizontal_distance", -LEFT_END_X, "bar left end"
@@ -214,6 +238,7 @@ async def build(adapter) -> dict[str, str]:
     # now native Hole Wizard features whose diameters come from the clearance
     # tables and whose points are driven from the stations below.)
     await set_global(adapter, "BarSide", f"{BAR_SIDE}mm")
+    await set_global(adapter, "BarTop", f"{BAR_TOP_ABOVE_ROW}mm")
     await set_global(adapter, "BarDepth", f"{BAR_DEPTH}mm")
     await set_global(adapter, "BarLength", f"{BAR_LENGTH}mm")
     await set_global(adapter, "HangerStation", f"{HANGER_STATION}mm")
@@ -224,23 +249,51 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Square bar profile: width along X = length, depth along Z = section,
-    # origin-centred. The old add_line_chain + define_rectilinear_chain pair is
-    # an origin-centred rectangle, so switch it to define_centered_rectangle
-    # (cleaner; emits exactly width, depth, cornerX, cornerZ).
+    # Bar profile: width along X = length, centred on the origin; height along
+    # Y with the top face BarTop over the bore row (y = 0, where every bore
+    # sits) and the rest of the section below it.
     bar = SketchDims()
     check("create_sketch bar", await adapter.create_sketch("Front"))
-    await define_centered_rectangle(
+    bottom_y = BAR_TOP_ABOVE_ROW - BAR_SIDE
+    edges = await add_line_chain(
         adapter,
-        BAR_LENGTH / 2.0,
-        BAR_SIDE / 2.0,
-        "bar",
-        dims=bar,
-        name_width="Length",
-        drive_width='"BarLength"',
-        name_depth="Side",
-        drive_depth='"BarSide"',
+        [
+            (LEFT_END_X, bottom_y),
+            (-LEFT_END_X, bottom_y),
+            (-LEFT_END_X, BAR_TOP_ABOVE_ROW),
+            (LEFT_END_X, BAR_TOP_ABOVE_ROW),
+        ],
     )
+    for edge, direction in zip(
+        edges, ("horizontal", "vertical", "horizontal", "vertical"), strict=True
+    ):
+        check(
+            f"bar {direction} {edge}",
+            await adapter.add_sketch_constraint(edge, None, direction),
+        )
+    await dimension_between(
+        adapter,
+        f"{edges[0]}.start",
+        f"{edges[0]}.end",
+        "horizontal_distance",
+        BAR_LENGTH,
+        "bar length",
+    )
+    bar.record("Length", '"BarLength"')
+    await dimension_between(
+        adapter,
+        f"{edges[1]}.start",
+        f"{edges[1]}.end",
+        "vertical_distance",
+        BAR_SIDE,
+        "bar height",
+    )
+    bar.record("Side", '"BarSide"')
+    await anchor_point_to_origin(
+        adapter, f"{edges[1]}.end", -LEFT_END_X, BAR_TOP_ABOVE_ROW, "bar top right"
+    )
+    bar.record("BarEndX", '"BarLength" / 2')
+    bar.record("BarTopY", '"BarTop"')
     await ensure_fully_defined(adapter, "bar sketch")
     check("exit_sketch bar", await adapter.exit_sketch())
     name_last_feature(adapter, "BarProfile")
@@ -302,20 +355,22 @@ async def build(adapter) -> dict[str, str]:
 
     # Reamed axle bore, through along Z. Its centre is located from the bar's
     # LEFT END (where every hole station reads from) by one construction line
-    # on the mid-height axis, whose length is the printed station; the line's
+    # on the bore row, whose length is the printed station; the line's
     # left end is anchored at the end face (x = -BarLength/2).
     bore = SketchDims()
     check("create_sketch axle bore", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    bore_circle = check(
-        "axle bore circle",
-        await adapter.add_circle(AXLE_BORE_X, 0.0, AXLE_BORE_DIA / 2.0),
-    )
-    station_line = check(
-        "axle bore station line",
-        await adapter.add_line(-BAR_LENGTH / 2.0, 0.0, AXLE_BORE_X, 0.0),
-    )
-    set_sketch_direct_db(adapter, False)
+    try:
+        bore_circle = check(
+            "axle bore circle",
+            await adapter.add_circle(AXLE_BORE_X, 0.0, AXLE_BORE_DIA / 2.0),
+        )
+        station_line = check(
+            "axle bore station line",
+            await adapter.add_line(-BAR_LENGTH / 2.0, 0.0, AXLE_BORE_X, 0.0),
+        )
+    finally:
+        set_sketch_direct_db(adapter, False)
     segment = _early_bound(adapter._sketch_entities[station_line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
@@ -379,22 +434,28 @@ async def build(adapter) -> dict[str, str]:
 
     # Manufacturing drawing support: the native bands, then mark exactly the
     # print's dimensions and stamp the make-critical title-block properties.
-    set_dimension_bilateral_tolerance(
-        adapter, "BarProfile", "Side", *deviations(BAR_SIDE_BAND)
-    )
+    # The height has no band: the title block's .X governs it.
     set_dimension_bilateral_tolerance(
         adapter, "Bar", "BarDepth", *deviations(BAR_DEPTH_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "AxleBoreProfile", "AxleBoreDia", *deviations(AXLE_BORE_BAND)
     )
+    # The row and the clamp stations carry the MHA-SH-02 taps' band.
     set_dimension_symmetric_tolerance(
-        adapter, "BoreRowReference", "BoreRowHeight", BORE_ROW_HEIGHT_TOL
+        adapter, "BoreRowReference", "BoreRowFromTop", CLAMP_POSITION_BAND
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BoreRowReference", "ClampStation1", CLAMP_POSITION_BAND
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BoreRowReference", "ClampStation2", CLAMP_POSITION_BAND
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_dimension_callouts(adapter)
     # Hidden in the part so no assembly instance renders the row; the drawing
     # shows it in the front view (_drawing_hidden_sketches).
     blank_sketch(adapter, "BoreRowReference")
@@ -407,12 +468,7 @@ async def build(adapter) -> dict[str, str]:
     if int(row_feature.Visible) != 1:  # swVisibilityStateHide
         raise RuntimeError("BoreRowReference still visible after BlankSketch")
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

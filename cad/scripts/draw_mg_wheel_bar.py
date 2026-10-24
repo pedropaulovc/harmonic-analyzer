@@ -5,8 +5,8 @@ Four bores run along the depth (front-back), so the FRONT view (looking down the
 bore axis) shows them as circles: the reamed axle bore, 2x #8 clamp-screw
 clearance holes flanking the column and 1x #8 pen-hanger hole at the free end.
 The bar length + section, the axle bore's Ø + station from the left end, the
-screw holes' stations from the left end and the bore row's height from the
-bottom face ride the imported model marks (the row and its stations on the
+screw holes' stations from the left end and the bore row's distance from the
+top face ride the imported model marks (the row and its stations on the
 part-hidden BoreRowReference sketch, shown in the front view); the depth is
 added across the right-view section; the screw holes' sizes ride native
 Hole Wizard callouts.
@@ -24,10 +24,12 @@ from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -36,32 +38,34 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_edges import scan_view_edges
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from _column_clamp_interface import BAR_DEPTH
+import mg_wheel_bar_callouts as callouts
 from mg_wheel_bar_spec import (
     AXLE_BORE_X,
     BAR_LENGTH,
     BAR_SIDE,
-    BORE_MIN_WALL,
     CLAMP_HOLE_DIA,
     CLAMP_HOLE_X,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     PEN_HANGER_HOLE_DIA,
-    PEN_HANGER_MIN_END_WALL,
     SCREW_HOLE_X,
 )
-from mg_wheel_axle_spec import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX
-from mg_wheel_group import BAR_PRESS
+
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["mg_wheel_bar"]
@@ -87,7 +91,9 @@ _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
 RIGHT_END = FRONT_CENTER[0] + _HALF_LEN
 AXLE_BORE_SHEET_X = FRONT_CENTER[0] + AXLE_BORE_X * SHEET_SCALE[0] / 1000.0
+# The view centres the bar's outline.
 _BAR_BOTTOM = FRONT_CENTER[1] - BAR_SIDE * SHEET_SCALE[1] / 2000.0
+_BAR_TOP = FRONT_CENTER[1] + BAR_SIDE * SHEET_SCALE[1] / 2000.0
 
 
 def _sheet_x(model_x: float) -> float:
@@ -97,35 +103,30 @@ def _sheet_x(model_x: float) -> float:
 # Every station is a baseline dimension from the left end, stacked under the
 # bar shortest first (8 mm rows, text y), the overall length outermost, so no
 # dimension line crosses another's extension line. The rows stay below the bar
-# because the hole callouts' leaders come down from above. The hanger's wall
-# line prints under its value, so the next row stands 20 mm below it.
+# because the hole callouts' leaders come down from above.
 FRONT_KEEP = {
-    # The hanger's 5 mm span is too short for its text: the value and its
-    # wall need sit right of the hole's extension line, ending short of the
-    # axle bore's extension line.
+    # The hanger's 5 mm span is too short for its text: the value sits right
+    # of the hole's extension line, ending short of the axle bore's extension
+    # line.
     "HangerStation": (LEFT_END + 0.030, _BAR_BOTTOM - 0.010),
     "AxleBoreStation": ((LEFT_END + AXLE_BORE_SHEET_X) / 2.0, _BAR_BOTTOM - 0.030),
     "ClampStation1": (LEFT_END + 0.082, _BAR_BOTTOM - 0.038),
     "ClampStation2": (LEFT_END + 0.152, _BAR_BOTTOM - 0.046),
     "Length": (FRONT_CENTER[0], _BAR_BOTTOM - 0.054),
-    # The bar height off the right end, in the open sheet between the bar and
-    # the end view: off the left end its text sat on the border's zone
-    # letter and frame line. The model dimension sits on the left end, so its
-    # extension lines run the bar's whole length; the text stands above the
-    # top one rather than between them.
-    # The row's height from the bottom face (its rise is on the right end)
-    # pairs with it as a baseline: the shorter one nearer the bar, its text
-    # dropped under the shared bottom line and 21 mm off the bar end, so its
-    # block stays off the length's extension line; the height's line stands
-    # outside the row's extension line.
-    "Side": (RIGHT_END + 0.040, FRONT_CENTER[1] + 0.020),
-    "BoreRowHeight": (RIGHT_END + 0.021, FRONT_CENTER[1] - 0.019),
+    # The bar height and the row's drop from the top face off the right end,
+    # in the open sheet between the bar and the end view: off the left end
+    # their text sat on the border's zone letter and frame line. Both share
+    # the top face's extension line: the shorter row nearer the bar, its text
+    # (the band and its mate) above the top face; the height's line outside
+    # it, its text under the bottom face.
+    "Side": (RIGHT_END + 0.040, _BAR_BOTTOM - 0.014),
+    "BoreRowFromTop": (RIGHT_END + 0.021, _BAR_TOP + 0.015),
     # The reamed Ø up and right of the bore, the press lines standing clear
     # of the bar.
     "AxleBoreDia": (AXLE_BORE_SHEET_X + 0.035, FRONT_CENTER[1] + 0.042),
 }
 # The bar depth (the extrude's banded model dimension) under the end view,
-# its text right of the extension lines: the callout is wider than the 9.
+# its text right of the extension lines: the callout is wider than the 9.5.
 RIGHT_KEEP = {
     "BarDepth": (
         RIGHT_CENTER[0] + BAR_DEPTH / 2000.0 + 0.034,
@@ -133,31 +134,66 @@ RIGHT_KEEP = {
     ),
 }
 # The native Hole Wizard callouts stand above the bar, the hanger's left of
-# the reamed bore's Ø, the clamps' between that and the height's text.
+# the reamed bore's Ø, the clamps' between that and the row's text.
 HANGER_CALLOUT_XY = (_sheet_x(SCREW_HOLE_X) + 0.025, FRONT_CENTER[1] + 0.035)
 CLAMP_CALLOUT_XY = (_sheet_x(CLAMP_HOLE_X[0]) + 0.010, FRONT_CENTER[1] + 0.035)
-# Each band states its need: the bore holds the pressed axle, the depth sets
-# where the axle's back end lands, the height's top limit clears the tie wire
-# and its bottom limit, with the row's band, holds the bore walls; the hanger
-# station's .XX holds its end wall.
-DIMENSION_CALLOUTS = {
-    "AxleBoreDia": (
-        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n"
-        f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} INTERFERENCE"
-    ),
-    "BarDepth": (
-        "MG-WHEEL-AXLE BACK END\n"
-        f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK"
-    ),
-    "Side": f"CLEARS WHEEL TIE\nFOR {BORE_MIN_WALL:.1f} BORE WALLS",
-    "BoreRowHeight": f"ALL BORES\nFOR {BORE_MIN_WALL:.1f} WALLS",
-    "HangerStation": f"FOR {PEN_HANGER_MIN_END_WALL:.1f} END WALL",
-}
+# Each band's mate prints under its value, authored on the part's dimension
+# (mg_wheel_bar_callouts): the bore's press fit on the axle, the depth's
+# axle back end, the row's MHA-SH-02 taps.
 DRAWING_PRECISION_BY_NAME = {
     name: places
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
+
+
+def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
+    """Every imported dimension prints the text lanes its part authored.
+
+    The mates print nowhere else on the sheet, so a lost lane must fail the
+    drawing.  Read-only: text set from the sheet would write through to the
+    source part (#1942).
+    """
+    wanted = callouts.authored_by_name()
+    displays: dict[str, list[Any]] = {name: [] for name in wanted}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            displays[name].append(
+                _early_bound(
+                    _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+                    "IDisplayDimension",
+                )
+            )
+    counts = {name: len(found) for name, found in displays.items() if len(found) != 1}
+    if counts:
+        raise RuntimeError(f"authored dimensions not printed exactly once: {counts!r}")
+    printed = {
+        (name, lane): str(displays[name][0].GetText(lane) or "")
+        for name, lanes in wanted.items()
+        for lane in lanes
+    }
+    wrong = {
+        key: text
+        for key, text in printed.items()
+        if callouts.callout_rows(text) != callouts.callout_rows(wanted[key[0]][key[1]])
+    }
+    if wrong:
+        raise RuntimeError(
+            f"imported dimension text differs from the part's: {wrong!r}"
+        )
+
+
+def _name_clamp_taps(display: Any) -> None:
+    """Hang the back-arc taps the clamp holes locate to under their native
+    callout (a drawing annotation, not an imported model dimension)."""
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(callouts.CALLOUT_BELOW, callouts.CLAMP_HOLE_CALLOUT)
+    applied = str(display.GetText(callouts.CALLOUT_BELOW) or "")
+    if callouts.callout_rows(applied) != callouts.callout_rows(
+        callouts.CLAMP_HOLE_CALLOUT
+    ):
+        raise RuntimeError(f"clamp-hole callout's taps did not persist: {applied!r}")
 
 
 def _hole_rims(front: Any) -> list[Any]:
@@ -193,7 +229,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -201,7 +236,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -230,7 +264,8 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, right)
 
     # The front view shows the part-hidden BoreRowReference sketch that owns
-    # the row height and the screw-hole stations (_drawing_hidden_sketches).
+    # the row's drop from the top face and the screw-hole stations
+    # (_drawing_hidden_sketches).
     annotations = [
         *hidden_sketches.curate_view_dimensions(
             adapter,
@@ -247,27 +282,31 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _assert_part_authored_text(adapter, annotations)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to wheel-bar bores")
 
     hanger_rim, clamp_rim = _hole_rims(front)
-    for edge, callout_xy, label in (
-        (hanger_rim, HANGER_CALLOUT_XY, "pen-hanger clearance hole"),
-        (clamp_rim, CLAMP_CALLOUT_XY, "column-clamp clearance holes"),
-    ):
+    add_native_hole_callout(
+        adapter,
+        front,
+        edge=hanger_rim,
+        callout_xy=HANGER_CALLOUT_XY,
+        label="pen-hanger clearance hole",
+        process="DRILL",
+    )
+    _name_clamp_taps(
         add_native_hole_callout(
             adapter,
             front,
-            edge=edge,
-            callout_xy=callout_xy,
-            label=label,
+            edge=clamp_rim,
+            callout_xy=CLAMP_CALLOUT_XY,
+            label="column-clamp clearance holes",
             process="DRILL",
         )
+    )
 
-    # Under the length row, which sits 54 mm below the bar.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.105)
     # x <= 0.235 keeps the ~55 mm label fully left of the title-block keep-out
     # (x >= 0.264) -- the first run landed it 25.6 x 4.5 mm into the block.
     add_property_linked_note(adapter, "Isometric View Note", 0.180, 0.070)
