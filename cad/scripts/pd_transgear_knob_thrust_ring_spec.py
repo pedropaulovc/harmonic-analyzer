@@ -19,7 +19,7 @@ face) is y = LENGTH.
 from __future__ import annotations
 
 from _gtol_planar import PlanarFace
-from _printed_tolerance import printed_deviations
+from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OD = 13.6
@@ -27,15 +27,22 @@ OD = 13.6
 # TIR moves the ring off the tooth ends, and the smaller bore keeps the
 # charged rear tooth-end bearing above 1.0 mm^2 (1.36 at the 6.15 maximum).
 ID = 6.05
-# Clears the journal; drilled, never under size (drilled-hole class).
-ID_BAND = (0.10, 0.0)  # (upper, lower) deviations
+# Clears the journal; drilled, never under size.  The DRILL THRU callout
+# inherits this band from the title block's DRILLED HOLES row, so the model
+# dimension carries no band of its own (machinist review: a restated row is
+# over-specification).
+ID_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower) deviations
 LENGTH = 5.2
 # The forward stop of the knob's end float (contract §12): explicit ± band.
+# It spaces the knob shaft's 12T (MHA-PD-08) from the arm plate's front hub
+# (MHA-PD-19), so the knob's F datum, chain plane and disc/platen gap stacks
+# (paper_drive_arm_registration, the paper-drive assembly) consume it; the
+# sheet names that stack at the callout (drawing-guidelines rule 4).
 LENGTH_TOL = 0.05
 
 # Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the O.D. is routine
 # at .X (the wall below holds at that row, and nothing fits on the O.D.); the
-# bore prints at .XX under its own band; the length at .XXX under its
+# bore prints at .XX under the DRILLED HOLES row; the length at .XXX under its
 # explicit band.
 OD_PLACES = 1
 ID_PLACES = 2

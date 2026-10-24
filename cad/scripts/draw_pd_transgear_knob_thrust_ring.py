@@ -4,9 +4,10 @@ The edge view is the ``*Right`` orientation rotated a quarter turn in the
 sheet so the ring's axis lies horizontal, as it sits in the lathe: the front
 face (on the 12T) on the left, the rear face (on the plate hub) on the
 right, each with its running finish, the length between them under its
-explicit band and the O.D. beside it.  The face view is the ``*Bottom``
-orientation -- exactly the third-angle LEFT view of that rotated profile --
-so it sits on the profile's axis to its left and carries the source drill band.
+explicit band and the O.D. beside it; the length's callout names the stack
+its band serves.  The face view is the ``*Bottom`` orientation -- exactly the
+third-angle LEFT view of that rotated profile -- so it sits on the profile's
+axis to its left and carries the drilled bore under the DRILLED HOLES row.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -39,6 +41,7 @@ from _drawing_dimensions import assert_imported_precision, set_dimension_callout
 from _drawing_finish import add_surface_finish
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -53,6 +56,8 @@ from pd_transgear_knob_thrust_ring_spec import (
     SURFACE_FINISHES,
 )
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_knob_thrust_ring"]
 PART_STEM = SPEC.artifact_stem
@@ -79,6 +84,13 @@ END_CENTER = (0.090, SIDE_CENTER[1])
 ISO_CENTER = (0.300, SIDE_CENTER[1])
 
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# drawing-guidelines.md rule 4: the length's ± band names the stack it
+# serves -- the ring spaces the knob shaft's 12T from the arm plate's hub.
+LENGTH_CALLOUT = (
+    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} 12T\n"
+    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB"
+)
+SIDE_CALLOUTS = {"RingLength": LENGTH_CALLOUT}
 
 # The bore's callout stays on the end view (a drilled hole is defined by its
 # callout, and the side view is hidden-lines-removed); the O.D. arrives there
@@ -89,8 +101,13 @@ END_KEEP = {
     "BoreDia": (0.130, 0.225),
 }
 MOVED_TO_SIDE = frozenset({"RingOd"})
+# The length's text and its callout stand outside the right extension line:
+# the 20.8 mm span between the faces is narrower than "5.200 ±0.05", so text
+# centred between them is struck by both extension lines.  Far enough right
+# that the callout's left edge clears the right extension line, and high
+# enough that its second line clears the O.D.'s upper extension line.
 SIDE_KEEP = {
-    "RingLength": (0.180, 0.215),
+    "RingLength": (SIDE_CENTER[0] + LENGTH / 2.0 * _S / 1000.0 + 0.032, 0.224),
 }
 
 
@@ -247,10 +264,11 @@ async def build(adapter: Any) -> dict[str, str]:
     ]
     annotations = [*end_annotations, *side_annotations, *moved]
     # Decimal places (and so the general-tolerance row each dimension claims)
-    # and the bore's and length's bands are authored on the part; the sheet
-    # only proves the import kept them.
+    # and the length's band are authored on the part; the sheet only proves
+    # the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, side_annotations, SIDE_CALLOUTS)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the ring face view")
     # The turning axis, picked on the O.D. face above it.

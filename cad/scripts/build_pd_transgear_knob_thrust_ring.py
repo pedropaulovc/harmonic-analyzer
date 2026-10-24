@@ -37,17 +37,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from pd_transgear_knob_thrust_ring_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ID,
-    ID_BAND,
     LENGTH,
     LENGTH_TOL,
     OD,
@@ -131,9 +126,8 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(ID_BAND)
-    )
+    # The bore carries no band of its own: its DRILL THRU callout takes the
+    # title block's DRILLED HOLES row (spec ID_BAND).
     # The forward stop of the knob's end float: its explicit band.
     set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_TOL)
     apply_drawing_precision(adapter, DRAWING_PRECISION)

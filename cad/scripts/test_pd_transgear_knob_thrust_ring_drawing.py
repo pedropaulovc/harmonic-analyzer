@@ -45,20 +45,39 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for name in names
     }
     # The bore's process rides on the bore's own dimension, in the view that
-    # carries it.
+    # carries it; the length's stack callout on the length, in the side view.
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.END_KEEP)
+    assert set(drawing.SIDE_CALLOUTS) <= set(drawing.SIDE_KEEP)
 
 
-def test_the_bore_and_the_float_stop_carry_their_bands_on_the_model() -> None:
-    """The bore clears the journal (drilled, never under size) and the length
-    is the forward stop of the knob's end float (contract §12): both bands
-    live on the model dimension, from named constants.  The O.D. is governed
-    by its places alone."""
+def test_the_float_stop_carries_its_band_and_the_bore_takes_the_drilled_row() -> None:
+    """The length is the forward stop of the knob's end float (contract §12):
+    its band lives on the model dimension, from a named constant.  The bore
+    (drilled, never under size) and the O.D. carry no band of their own: the
+    DRILL THRU callout takes the title block's DRILLED HOLES row and the O.D.
+    is governed by its places alone."""
     assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(ID_BAND)",
         ("Ring", "RingLength"): "LENGTH_TOL",
     }
-    assert min(spec.ID_BAND) == 0.0 < max(spec.ID_BAND)
+    assert spec.ID_BAND == (_printed_tolerance.drilled_oversize_mm(), 0.0)
+
+
+def test_the_banded_length_names_the_stack_it_serves() -> None:
+    """drawing-guidelines.md rule 4: a band tighter than the title block names
+    the mating parts it serves, by drawing number."""
+    shaft = _config.parts("pd-transgear-knob-shaft")["number"]
+    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(spec.LENGTH_PLACES)
+    assert drawing.SIDE_CALLOUTS == {"RingLength": drawing.LENGTH_CALLOUT}
+    assert shaft in drawing.LENGTH_CALLOUT and plate in drawing.LENGTH_CALLOUT
+
+
+def test_the_length_text_stands_clear_of_its_extension_lines() -> None:
+    """The span between the faces is too short for the banded text; it stands
+    right of the rear face's extension line, above the O.D.'s."""
+    x, y = drawing.SIDE_KEEP["RingLength"]
+    assert x > drawing._sheet_x(spec.LENGTH) + 0.025
+    assert y > drawing.SIDE_CENTER[1] + spec.OD * drawing._S / 2000.0 + 0.020
 
 
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
