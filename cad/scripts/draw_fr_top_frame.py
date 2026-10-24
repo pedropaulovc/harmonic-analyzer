@@ -248,30 +248,30 @@ DETAIL_PLAN_HALF_D = PLAN_HALF_Z * DETAIL_VIEW_SCALE / 1000.0
 # Sheet 1: two octant pictorials, opposite corners, so every face is seen
 # once and named once.  Drawn at 1:4 -- two 1:3 isometrics of a 428 x 262
 # plan would not fit side by side inside the B-sheet border.
+#
+# The face names are the MACHINE's, the one convention the whole package
+# uses: FRONT is the operator side, model -Z, the rail at the top of the
+# plan; REAR is +Z, the face the standard front elevation shows; RIGHT is
+# +X (dimensions.yaml's assembly frame).  Sheet 3's FRONT/REAR hanger and
+# keeper Z read the same way, so no key note translates between two
+# meanings of FRONT (machinist review of 2056e3344).
 PICTORIAL_SCALE = SHEET_SCALES["PICTORIAL"]
-ORIENTATION_KEY_XY = (0.030, 0.052)
-ORIENTATION_KEY_TEXT = (
-    "FACE NAMES ABOVE ARE THE PRINT'S: FRONT IS THE FACE THE FRONT VIEW SHOWS.\n"
-    "MACHINE FRONT (OPERATOR SIDE) IS THE OPPOSITE RAIL, AT THE TOP OF THE PLAN;\n"
-    "SHEETS 3 AND 6 'FRONT' / 'REAR' NAMES ARE THE MACHINE'S. SHEET 6 IS THE\n"
-    "BOTTOM VIEW: MACHINE FRONT (B) AT ITS BOTTOM."
-)
 _LABEL_X = (BAR_X1 + INNER_X) / 2.0  # over the right window, clear of the web
 PICTORIAL_VIEWS = (
     PictorialView(
-        octant=(-1, 1, 1),  # FRONT-TOP-LEFT
+        octant=(-1, 1, 1),  # REAR-TOP-LEFT
         center_xy=(0.115, 0.165),
         labels=(
             FaceLabel("TOP", (_LABEL_X, HALF_H, (INNER_Z + OUTER_Z) / 2.0), (0.028, 0.232)),
-            FaceLabel("FRONT", (_LABEL_X, 0.0, OUTER_Z), (0.170, 0.088)),
+            FaceLabel("REAR", (_LABEL_X, 0.0, OUTER_Z), (0.170, 0.088)),
             FaceLabel("LEFT", (-OUTER_X, 0.0, 40.0), (0.024, 0.092)),
         ),
     ),
     PictorialView(
-        octant=(1, -1, 1),  # FRONT-BOTTOM-RIGHT
+        octant=(1, -1, 1),  # REAR-BOTTOM-RIGHT
         center_xy=(0.305, 0.165),
         labels=(
-            FaceLabel("FRONT", (_LABEL_X, 0.0, OUTER_Z), (0.222, 0.228)),
+            FaceLabel("REAR", (_LABEL_X, 0.0, OUTER_Z), (0.222, 0.228)),
             FaceLabel("RIGHT", (OUTER_X, 0.0, 40.0), (0.392, 0.226)),
             FaceLabel("BOTTOM", (_LABEL_X, -HALF_H, (WEB_IN_Z + WEB_OUT_Z) / 2.0), (0.352, 0.096)),
         ),
@@ -566,9 +566,7 @@ HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
 # The bottom view's label, then its edge note, at the band's left edge: the
 # 07527cf4 codex review read the one 85.7 mm row, wedged between the slot
-# width's block and F-F's 15.264, as crowding the section dimensions.  The
-# sheet-1 orientation key says the view is from below, front (B) at the
-# bottom (machinist review r1).
+# width's block and F-F's 15.264, as crowding the section dimensions.
 HUB_BOTTOM_NOTE_XY = (0.020, 0.122)
 HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
@@ -598,8 +596,9 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # establish the renamed caption's clearance.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # The slots' stations along the slot are F-F's plain .XXX 15.264 from the
-# round hole ("2X"), and the frames' implied basic zero and 90 deg need no
-# words (machinist review r1: no basic or tolerance in note text).
+# round hole ("2X"); each frame's name states its true position, the slot's
+# width centred on its own station's round hole (machinist review r1: no
+# basic or tolerance in note text).
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #10 plain clearance hole, with the native finished top-to-underside grip,
 # the round
@@ -739,13 +738,15 @@ HANGER_SLOT_FRAME_SHOULDER = 0.00635
 # clear of that line, at a height where the leader passes 2.4 mm from both the
 # rear-right boss and the front round hole.  Above the plan, it would have
 # fenced the rear round hole's size off from every band wide enough for it.
-# The name says the frame holds the slot's width (its median plane) and
-# nothing else: the station along the slot is F-F's 15.264 ±0.13 (codex
-# review of 06d0bbc59; machinist review r7); 15 glyphs, 39.0 mm, inside the
-# 39.1 mm outline's reach.
-HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH ONLY"
+# The name says what the frame holds and where: the slot's width (its median
+# plane), centred on its own station's round-hole datum -- the implied basic
+# zero, stated like sheet 3's HANGER AXES ON D (machinist review of 2056e3344
+# read the bare frame as having no basic).  The station along the slot is
+# F-F's 15.264 ±0.13 (codex review of 06d0bbc59; machinist review r7).  15
+# glyphs each, 39.0 mm, inside the 39.1 mm outline's reach.
+HANGER_SLOT_FRAME_QUANTITY = {"front": "SLOT WIDTH ON B", "rear": "SLOT WIDTH ON C"}
 HANGER_SLOT_FRAME_QUANTITY_BOX = (
-    0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
+    0.0, -0.0116, 0.0026 * max(map(len, HANGER_SLOT_FRAME_QUANTITY.values())), -0.0080
 )
 HANGER_SLOT_FRAME_XY = {"front": (0.1919, 0.2358), "rear": (0.052, 0.261)}
 
@@ -1065,9 +1066,12 @@ HOLE_STATION_NOTE = (
 # circle dimension, and the 27.0 rail pad is RibProfile's -- a Top-plane
 # sketch, so it imports into a plan view and not into the 1:2 side view
 # that used to derive the same width from the pad's own two edges.
+# The Ø17.00 callout stands under the 28.0 pad width, so its leader climbs to
+# the bore right of the 28.0's dimension line instead of crossing it
+# (machinist review of 2056e3344).
 HUB_TOP_KEEP = {
-    "GnDia": (0.040, 0.185),
-    "RibWidth": (0.060, 0.1465),
+    "GnDia": (0.040, 0.154),
+    "RibWidth": (0.060, 0.1828),
 }
 HUB_LEFT_KEEP = {
     "SetBossWidth": SET_BOSS_WIDTH_LINE_XY,
@@ -2177,8 +2181,8 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     # hole beside it, so the title block's +/-0.13 is the station band the
     # spec's wall and travel stacks charge (HANGER_SLOT_ALONG_TOL).  The
     # slot's position frame on the plan holds its width's median plane only,
-    # on an implied basic zero, and its name says so ("SLOT WIDTH ONLY":
-    # machinist review r7 read the frames as locating the 15.264); boxed
+    # centred on its round-hole datum, and its name says so ("SLOT WIDTH ON
+    # B": machinist review r7 read the frames as locating the 15.264); boxed
     # BASIC (machinist review r2) the station had no limit along the slot
     # (codex review of 06d0bbc59).  The drawing contract forbids a band
     # authored on the sheet, and the 15.264 has no model dimension to carry
@@ -2922,26 +2926,16 @@ async def build(adapter: Any) -> dict[str, str]:
     if extension.GetUserPreferenceInteger(542, 0) != 0:
         raise RuntimeError("section cutting-line style did not persist")
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
-    # Sheet 1 primes the reader: two octant pictorials with the six faces
-    # named where they are seen, so FRONT/TOP/LEFT on the orthographic
-    # sheets that follow need no orientation key.  The old 1:5 isometric
-    # tucked under the geometry sheet's front view is gone with it.
+    # Sheet 1 primes the reader: two octant pictorials with the faces named
+    # where they are seen, in the machine's names that sheet 3's FRONT/REAR
+    # hanger and keeper Z use, so no orientation key is needed.  The old 1:5
+    # isometric tucked under the geometry sheet's front view is gone with it.
     if not ddoc.ActivateSheet("PICTORIAL"):
         raise RuntimeError("failed to activate top-frame pictorial sheet")
     place_pictorial_sheet(
         adapter, str(SOURCE), PICTORIAL_VIEWS, scale=PICTORIAL_SCALE,
         label="top-frame pictorials",
     )
-    # The face names are the PRINT's (FRONT is the face the front view
-    # shows, +Z; RIGHT is +X), the ASME orientation-key reading and the one
-    # every *Front/*Right projection in the fleet follows.  The MACHINE's
-    # front is the operator side, model -Z -- the opposite rail, at the top
-    # of the plan -- and the model-owned hanger/keeper dimension names on
-    # sheet 3 (StudFrontZ -> "FRONT HANGER Z") keep that word.  A blind
-    # review read the two as conflicting hole locations (codex round 3), so
-    # the key says which is which once, here, where the reader starts.
-    if add_note(adapter, ORIENTATION_KEY_TEXT, *ORIENTATION_KEY_XY) is None:
-        raise RuntimeError("failed to add the pictorial sheet orientation key")
 
     if not ddoc.ActivateSheet("GEOMETRY"):
         raise RuntimeError("failed to activate top-frame geometry sheet")
@@ -4091,7 +4085,7 @@ async def build(adapter: Any) -> dict[str, str]:
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],
-            quantity=HANGER_SLOT_FRAME_QUANTITY,
+            quantity=HANGER_SLOT_FRAME_QUANTITY[station],
             label=f"knife-hanger {station} dowel slot position",
         )
     locator_dimensions = curate_view_dimensions(
