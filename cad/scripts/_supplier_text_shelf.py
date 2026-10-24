@@ -20,7 +20,7 @@ from typing import Any, Literal
 from _com import _early_bound
 from _drawing_annotation_extent import CLEAR_GAP_M, PLACE_SETTLE_M
 from _drawing_common import rebuild_drawing
-from _supplier_screw_dimensions import _assert_supplier_top_stations, _supplier_top_record
+from _supplier_screw_dimensions import _supplier_top_record
 from _supplier_screw_layout import supplier_top_text_geometry
 
 # name -> (dimension line is horizontal, shelf side past the outer witness)
@@ -36,6 +36,30 @@ def _measure(adapter: Any, display: Any, horizontal: bool) -> dict[str, Any]:
 def _gap(actual: Mapping[str, Any], side: str) -> float:
     text = actual["text"]
     return actual["left"] - text.xmax if side == "left" else text.xmin - actual["right"]
+
+
+def _line_stations(actual: Mapping[str, Any], horizontal: bool) -> set[float]:
+    normal = 1 if horizontal else 0
+    return {round(run[normal], 5) for run in actual["physical_lines"]}
+
+
+def _assert_stations(
+    name: str, horizontal: bool, before: Mapping[str, Any], after: Mapping[str, Any]
+) -> None:
+    """Arrow tips and witnesses exact; the dimension line on its same station.
+
+    Text centred on a long line breaks it in two around the text; the shelved
+    text leaves one unbroken run. The run count may change, its station never.
+    """
+    for field in ("tips", "witnesses"):
+        if len(before[field]) != len(after[field]) or any(
+            len(prior) != len(current)
+            or any(abs(a - b) > 1e-5 for a, b in zip(prior, current, strict=True))
+            for prior, current in zip(before[field], after[field], strict=True)
+        ):
+            raise RuntimeError(f"{name}: supplier text shelf moved native {field}")
+    if _line_stations(before, horizontal) != _line_stations(after, horizontal):
+        raise RuntimeError(f"{name}: supplier text shelf moved the native dimension line")
 
 
 def shelve_supplier_text(
@@ -81,7 +105,7 @@ def shelve_supplier_text(
         display = _early_bound(displays[name], "IDisplayDimension")
         annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
         actual = _measure(adapter, display, horizontal)
-        _assert_supplier_top_stations(name, before[name], actual)
+        _assert_stations(name, horizontal, before[name], actual)
         text = actual["text"]
         gap = CLEAR_GAP_M + PLACE_SETTLE_M
         current = tuple(float(value) for value in annotation.GetPosition())
@@ -111,4 +135,4 @@ def assert_supplier_shelves(
         actual = _measure(adapter, display, horizontal)
         if display.OffsetText is not True or _gap(actual, side) < CLEAR_GAP_M:
             raise RuntimeError(f"{name}: supplier text shelf is not clear")
-        _assert_supplier_top_stations(name, stations[name], actual)
+        _assert_stations(name, horizontal, stations[name], actual)
