@@ -809,6 +809,33 @@ def test_the_north_keeper_balloons_on_detail_c_right_of_its_lifted_screws() -> N
     assert ring_top + 0.004 < bracket_label_bottom
 
 
+def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
+    """#1895 machinist review (r2, r3): leader 1 climbed through the black
+    rocker-arm fan to a landing it hid. It lands on the south flat's
+    eye-side edge, on the stub between hub 0 and the exploded south ear,
+    whose line of sight (eye on +x +y +z) clears hub 0 and arm 0's top edge,
+    and its balloon stands off the ring, above and east of that landing."""
+    import ch_pivot_shaft_spec as shaft
+    import ch_rocker_arm_spec as arm
+
+    x, y, z = drawing.BALLOON_POINTS_MM[drawing.PIVOT_SHAFT_STEM]
+    radius = shaft.SHAFT_DIA / 2.0
+    assert y == pytest.approx(radius - shaft.FLAT_DEPTH)
+    assert x > 0.0 and math.hypot(x, y) == pytest.approx(radius)
+    point_z = bank.PIVOT_SHAFT_NORTH_Z + z
+    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0])
+    assert bank.SOUTH_EAR_OUTER_Z < point_z < bank.HUB0_SOUTH_FACE_Z
+    assert drawing.exploded_offset(drawing.explode.BRACKET, "south")[2] < 0.0
+    hub_t = bank.HUB0_SOUTH_FACE_Z - point_z
+    assert math.hypot(x + hub_t, y + hub_t) > arm.HUB_DIA / 2.0 + 5.0
+    arm_t = bank.hub_mid_z(0) - arm.ARM_THICKNESS / 2.0 - point_z
+    reach = x + arm_t
+    top_edge = arm.TOP_EDGE_ABOVE_PIVOT + arm.R_TOP - math.sqrt(arm.R_TOP**2 - reach**2)
+    assert y + arm_t - top_edge > 1.5
+    dx, dy = drawing.PIVOT_SHAFT_BALLOON_OFFSET
+    assert dy > 0.04 and 0.0 < dx < dy / 3.0
+
+
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 19
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)

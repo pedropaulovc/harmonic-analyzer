@@ -46,8 +46,10 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 import _config
+from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
+    BalloonLanding,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -109,13 +111,18 @@ from ch_pivot_bracket_spec import (
     FOOT_W as BRACKET_FOOT_W,
     SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
 )
-from ch_pivot_shaft_spec import DOME_HEIGHT
+from ch_pivot_shaft_spec import (
+    DOME_HEIGHT,
+    FLAT_DEPTH as PIVOT_FLAT_DEPTH,
+    SHAFT_DIA as PIVOT_SHAFT_DIA,
+)
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
     PIVOT_BRACKET_Z,
+    PIVOT_SHAFT_FLAT_STATIONS,
     SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
     STACK_MID_Z,
@@ -216,6 +223,33 @@ BRACKET_BALLOON_POINT_MM = (
     BRACKET_FOOT_H / 2.0,
     BRACKET_FOOT_Z1,
 )
+# Balloon 1 (the rocker pivot shaft) walked to the stub of shaft south of hub
+# 0, the only part of it the 1:7 view shows, but its ring slot is below the
+# view, so its leader climbed through the black rocker-arm fan and read as
+# naming the arms (#1895 machinist review, r2 and r3). Its landing is now the
+# south flat's edge on the eye's side, at the flat's middle (the south ear's
+# mid-plane): the flat faces +y, so both faces at that edge face the eye, and
+# in the isometric the edge clears arm 0's top edge (8 over the pivot) by
+# about 1.8. Part frame (ch_pivot_shaft_spec): axis along z from the north
+# cylinder end, unturned in the assembly.
+PIVOT_SHAFT_STEM = "ch-pivot-shaft"
+_PIVOT_FLAT_Y = PIVOT_SHAFT_DIA / 2.0 - PIVOT_FLAT_DEPTH
+PIVOT_SHAFT_BALLOON_POINT_MM = (
+    math.sqrt((PIVOT_SHAFT_DIA / 2.0) ** 2 - _PIVOT_FLAT_Y**2),
+    _PIVOT_FLAT_Y,
+    -PIVOT_SHAFT_FLAT_STATIONS[0],
+)
+# Off the ring, its circle stands this far (sheet m) from that landing: up
+# the open strip between the east edge of the bank's vertical column and the
+# exploded south washer, spring and bracket, which the stub points at. The
+# leader then reaches the stub over paper, about 1.3 mm east of the column's
+# corner and clear of the washer ring beside the stub's tip (measured on the
+# sheet of run 20261023T234951749Z).
+PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
+# The rendered circle's read-back may sit a viewport pixel off the request
+# at fit zoom (position_bom_balloon's pixel bound); a millimetre still proves
+# the circle left its ring slot for the strip.
+BALLOON_PLACEMENT_TOL_M = 0.001
 BOM_ANCHOR = (0.205, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
@@ -692,6 +726,7 @@ KEEPER_DETAIL_BALLOON_MARGIN = 0.010
 # the keeper's ring slot is the right-most and its leader crosses neither.
 KEEPER_BALLOON_POINT_MM = (-KEEPER_LUG_HALF_T, KEEPER_CROWN_TOP_Y, 0.0)
 BALLOON_POINTS_MM = {
+    PIVOT_SHAFT_STEM: PIVOT_SHAFT_BALLOON_POINT_MM,
     explode.BRACKET: BRACKET_BALLOON_POINT_MM,
     explode.KEEPER: KEEPER_BALLOON_POINT_MM,
 }
@@ -1436,6 +1471,15 @@ def _place_exploded_sheet(
         label="channel exploded-view BOM coverage",
         margin=BALLOON_MARGIN,
     )
+    shaft_landing = next(
+        landing for landing in landings if landing.stem == PIVOT_SHAFT_STEM
+    )
+    _offset_balloon_from_landing(
+        adapter,
+        shaft_landing,
+        PIVOT_SHAFT_BALLOON_OFFSET,
+        label="channel pivot-shaft balloon",
+    )
     bom_bottom, _ = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -1677,6 +1721,37 @@ def _exploded_detail(adapter: Any, detail: BankView) -> Any:
     if add_note(adapter, detail.label_text, *detail.crop_label_xy) is None:
         raise RuntimeError(f"failed to label {detail.title}")
     return view
+
+
+def _offset_balloon_from_landing(
+    adapter: Any,
+    landing: BalloonLanding,
+    offset: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Move ``landing``'s balloon off its ring so its circle centre stands
+    ``offset`` (sheet m) from its proven landing; the leader stays attached
+    (``_spread_balloons``' anchor-to-circle carry) and the circle is read
+    back."""
+    if landing.sheet_xy is None:
+        raise RuntimeError(f"{label}: the balloon's landing was not proven")
+    target = (landing.sheet_xy[0] + offset[0], landing.sheet_xy[1] + offset[1])
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
+    anchor = tuple(float(value) for value in annotation.GetPosition())
+    moved = (anchor[0] + target[0] - circle_x, anchor[1] + target[1] - circle_y)
+    if not annotation.SetPosition(moved[0], moved[1], 0.0):
+        raise RuntimeError(f"{label}: SetPosition{moved!r} returned false")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: rebuild failed")
+    adapter.currentModel.GraphicsRedraw2()
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    circle = rendered_balloon_circle(note, label=label)[:2]
+    _telemetry.info(f"{label}: circle at {circle!r}, target {target!r}")
+    if max(abs(a - b) for a, b in zip(circle, target)) > BALLOON_PLACEMENT_TOL_M:
+        raise RuntimeError(f"{label}: circle sits at {circle!r}, not {target!r}")
 
 
 def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
