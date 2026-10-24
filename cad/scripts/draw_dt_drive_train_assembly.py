@@ -111,6 +111,7 @@ from dt_crankshaft_spec import SHAFT_END_PROUD_RANGE as CRANK_END_PROUD_RANGE
 from dt_cylinder_end_disc_spec import WASHER_THICK as BANK_WASHER_THICK
 import dt_cylinder_gear_spec as drum
 from dt_drive_train_assembly_sheet import (
+    HANDLE_FERRULE_CURE,
     LEVER_PIN_HOLE_FIT,
     T120_FITUP_ASSEMBLY_CHECK,
 )
@@ -890,13 +891,16 @@ CONE_CRANK_STEPS = _note_text(
         f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-28 LOOP AND MHA-DT-27; SNAP",
         "   ONE END BEAD INTO EACH DOME OF MHA-DT-VN-66.",
         # Local review of 747487c71: the cup cures centred on the screw, or
-        # its offset can bind the head and shoulder.  Rule 23: the handle
-        # spins on the MHA-DT-32 shoulder, so the screw is staked in the
-        # arm's through tap (the MHA-PD-VN-57 pivot's staked-mouth lock, user
-        # ruling 2026-10-15); no threadlocker.
+        # its offset can bind the head and shoulder.  Owner ruling 2026-10-24
+        # (#1900): the ferrule cures centred on the pivot bore, the offset
+        # its skimmed wall is budgeted on.  Rule 23: the handle spins on the
+        # MHA-DT-32 shoulder, so the screw is staked in the arm's through tap
+        # (the MHA-PD-VN-57 pivot's staked-mouth lock, user ruling
+        # 2026-10-15); no threadlocker.
         "7. EPOXY MHA-DT-34 ON THE MHA-DT-08 TENON AND MHA-DT-35 IN ITS BUTT",
         f"   WITH {HANDLE_EPOXY}; CURE THEM ON MHA-DT-32, WAXED WITH {HANDLE_RELEASE},",
-        "   THROUGH BOTH. WIPE THE WAX OFF MHA-DT-32; SLIDE MHA-DT-08 ON",
+        f"   THROUGH BOTH, {HANDLE_FERRULE_CURE}.",
+        "   WIPE THE WAX OFF MHA-DT-32; SLIDE MHA-DT-08 ON",
         "   MHA-DT-32 AND THREAD MHA-DT-32 INTO MHA-DT-06, NO THREADLOCKER,",
         "   SHOULDER TIGHT; END PLAY",
         "   0.25-1.0. FILE THE TIP FLUSH TO THE ARM INBOARD FACE, THEN STAKE THE",
