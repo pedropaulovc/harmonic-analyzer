@@ -201,7 +201,7 @@ def test_stop_mark_division_sits_on_the_thumbscrew_axis() -> None:
     assert spec.STICK_ORIGIN[0] == pytest.approx(-74.4)
     assert spec.STICK_X_MIN == pytest.approx(-74.4)
     assert spec.SETTING_NEAR_FACE_MM == pytest.approx(74.4)
-    assert spec.STICK_X_MAX == pytest.approx(125.6)
+    assert spec.STICK_X_MAX == pytest.approx(127.6)  # 202 bar, stations fixed
     assert spec.STICK_X_MIN < 0.0 and spec.STICK_X_MAX > stop.BLOCK_LENGTH
 
 
@@ -313,10 +313,10 @@ def test_park_pose_sits_on_the_land_inside_the_corridor() -> None:
         top.PARK_WEST_LIMIT_X + top.PARK_EAST_LIMIT_X
     )
     assert min(p[2] for p in corners) + max(p[2] for p in corners) == pytest.approx(0.0)
-    # The unchanged longitudinal axis centres the 200 mm bar on machine Z.
-    assert top.MS_POS[2] == pytest.approx(-25.6)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-100)
-    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(100)
+    # The unchanged longitudinal axis centres the 202 mm bar on machine Z.
+    assert top.MS_POS[2] == pytest.approx(-26.6)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MIN, 0, 0))[2] == pytest.approx(-101)
+    assert _image(top.MS_ROWS, top.MS_POS, (spec.STICK_X_MAX, 0, 0))[2] == pytest.approx(101)
     assert _flat(rows_from_euler(top.MS_EULER)) == pytest.approx(_flat(top.MS_ROWS))
 
 
@@ -1089,7 +1089,7 @@ def test_plain_native_value_rests_on_dimension_line(monkeypatch, text_drop) -> N
         (0.235, 0.2342219, -0.0039495, -1, 0, 0, 0.003556, 0.000762, 0, 0, 0, 1),
     ]
     data = display.GetDisplayData()
-    data.GetTextAtIndex = lambda index: " (200.0) "
+    data.GetTextAtIndex = lambda index: " (202.0) "
     data.GetTextPositionAtIndex = lambda index: (
         0.1261674, 0.2342219 - text_drop, -0.0039495
     )
@@ -1375,7 +1375,7 @@ def test_reference_dimensions_select_owned_visible_end_edges(
         (start, False), (end, True)
     ]
     assert [display.value * 1000.0 for display in displays] == pytest.approx(
-        [200.0, spec.SETTING_NEAR_FACE_MM]
+        [202.0, spec.SETTING_NEAR_FACE_MM]
     )
     for index, display in enumerate(displays):
         assert display.value_reads == 1

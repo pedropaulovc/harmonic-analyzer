@@ -5,10 +5,11 @@ the full/minor pitch; TICK LENGTHS gives groove width and each length a local
 detail without cross-strip extension lines. ENGRAVING separates numeral
 dimensions from the open-edge Top detail for the square-bottom groove depth.
 The numeral detail and its dimensions leave air at the left border, with its
-placement note below the detail title and scale. The independently dimensioned
-shallow numeral cut has its actual removed G-G stroke profile on ENGRAVING;
-the Top parent imports its own NumeralDepth.
-Native probes import TickDepth in Top but not in a removed cut-only section.
+placement note below the detail title and scale. Section G-G cuts the whole
+8 x 3 bar across both strokes of the zero numeral, so the true V grooves read
+in profile, and imports NumeralDepth there; its callout names the V angle.
+Native probes import TickDepth in Top but not in a removed cut-only section,
+so G-G is a full section (with hidden lines removed only the cut face shows).
 All sizes, bands and places come from the part; scale is never shrunk to fit.
 Part-spec coordinates are millimetres; model-point projection takes metres.
 Drawing-sheet positions and projected fence coordinates are also metres.
@@ -27,6 +28,7 @@ import sys
 from typing import Any
 
 import _telemetry
+import ms_stick_callouts as callouts
 import ms_stick_spec as part
 from _check import check
 from _com import _early_bound
@@ -41,18 +43,21 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
-from _drawing_dimensions import set_dimension_callouts
-from _drawing_notes import add_property_linked_note, property_link
+from _drawing_detail_crop import native_circle_geometry
+from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
-from solidworks_mcp.adapters.solidworks.drawing import add_note
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_stick"]
 PART_STEM = SPEC.artifact_stem
@@ -63,14 +68,17 @@ SHEET_NAMES = ("BAR", "GRADUATIONS", "TICK LENGTHS", "ENGRAVING")
 SHEET_SCALE = (1.0, 1.0)
 FRONT_CENTER = (0.155, 0.175)
 TOP_CENTER = (FRONT_CENTER[0], 0.110)
-ISO_CENTER = (0.335, 0.145)
+# r2-r3 sheet 1: the 8.00 dimension line's tail touched the isometric at x 0.335.
+ISO_CENTER = (0.355, 0.145)
 DETAIL_PARENT_CENTER = (0.230, 0.245)
 DETAIL_CENTER = (0.180, 0.140)
 DETAIL_SCALE = (6.0, 1.0)
 DETAIL_RADIUS_MM = 9.0
 DEPTH_PARENT_CENTER = (0.330, 0.210)
-DEPTH_CENTER = (0.330, 0.125)
-DEPTH_RADIUS_MM = 2.0
+# r1-r3 sheet 4: at 6:1 the 0.40 x 0.50 groove could not be read; 15:1 can.
+DEPTH_CENTER = (0.375, 0.120)
+DEPTH_SCALE = (15.0, 1.0)
+DEPTH_RADIUS_MM = 1.6
 NUMERAL_PARENT_CENTER = (0.130, 0.210)
 # r4 sheet 4: full-tick-end callout starts 62 mm left of its placement.
 # Shift the entire detail/dimension group right without changing its scale.
@@ -78,13 +86,20 @@ NUMERAL_CENTER = (0.165, 0.135)
 # The fence includes the real full-tick endpoint and both numeral gap anchors.
 NUMERAL_RADIUS_MM = 7.0
 NUMERAL_NOTE_XY = (0.045, 0.068)
-NUMERAL_PROFILE_PARENT_CENTER = (0.230, 0.245)
-NUMERAL_PROFILE_CENTER = (0.270, 0.125)
-# The 0.10 mm cut must read as a profile, not a sub-millimetre printed nick.
-NUMERAL_PROFILE_SCALE = (20.0, 1.0)
-NUMERAL_TOOL_NOTE_XY = (0.225, 0.195)
+# A 1:1 parent spreads the across-the-bar cutting line (and its two arrows)
+# over a readable 11 mm instead of a 1:2 nick.
+NUMERAL_PROFILE_PARENT_CENTER = (0.200, 0.250)
+NUMERAL_PROFILE_CENTER = (0.280, 0.125)
+# The 0.40 mm V must read as a profile; 10:1 keeps the full 8 x 3 bar on sheet.
+NUMERAL_PROFILE_SCALE = (10.0, 1.0)
+# Mid-height of the zero numeral: the cut crosses both of its straight side
+# strokes square, and no graduation (the nearest minor tick ends 0.18 short).
+NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
+                     + part.NUMERAL_HEIGHT_MM / 2.0)
+# r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
+NUMERAL_SECTION_OVERSHOOT_MM = 4.0
 FRONT_KEEP = {
-    "BodyLength": (0.155, 0.205), "BodyWidth": (0.275, 0.175),
+    "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
 }
 TOP_KEEP = {"BodyThickness": (0.275, 0.130)}
@@ -92,39 +107,35 @@ DETAIL_KEEP = {
     "FullTickPitch": (0.180, 0.218),
     "MinorTickPitch": (0.075, 0.085),
 }
-# Local fences keep extension lines beside their tick; D excludes tick zero.
+# Local fences keep extension lines beside their tick. D sits between the
+# first two minor ticks, 0.7 inside the ruled edge, model radius 1.8: both
+# minor ticks and a plain stretch of edge show, and tick zero and the next
+# tick stay outside. It is authored exactly (EXACT_FENCES): with sketch
+# inference its fence snapped to the tick profile corner and shrank,
+# clipping tick zero and leaving the edge a stub (machinist review run
+# 20261024T101144897Z-358edb75; measured from that run's PDF vectors).
 LENGTH_DETAILS = (
     ("C", (0.100, 0.245), (0.105, 0.155),
      (part.SCALE_START_X, part.BODY_WIDTH - part.TICK_LENGTH / 2.0),
      {"FullTickLength": (0.075, 0.180), "Tick0Width": (0.075, 0.215)}, 4.0),
     ("D", (0.215, 0.245), (0.220, 0.155),
-     (part.SCALE_START_X + part.MINOR_SPACING, part.BODY_WIDTH - part.MINOR_TICK_LENGTH / 2.0),
-     {"MinorTickLength": (0.190, 0.180)}, 2.2),
+     (part.SCALE_START_X + 1.5 * part.MINOR_SPACING, part.BODY_WIDTH - 0.7),
+     {"MinorTickLength": (0.190, 0.180)}, 1.8),
     ("E", (0.330, 0.245), (0.335, 0.155),
      (part.SCALE_START_X + part.DIVISION_SPACING / 2.0, part.BODY_WIDTH - part.HALF_TICK_LENGTH / 2.0),
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
 )
+EXACT_FENCES = frozenset({"D"})
 NUMERAL_KEEP = {
-    "NumeralHeight": (0.170, 0.183),
+    "NumeralHeight": (0.215, 0.183),
     "NumeralXGap": (0.100, 0.170),
     "NumeralYGap": (0.100, 0.155),
 }
-DEPTH_KEEP = {"TickDepth": (0.330, 0.180)}
-NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.350, 0.245)}
-DIMENSION_CALLOUTS = {
-    "ScaleStartX": "SCALE ZERO CENTRELINE",
-    "Tick0Width": "ALL GRADUATIONS",
-    "TickDepth": "GRADUATIONS ONLY\nSQUARE-BOTTOM GROOVES",
-    "FullTickLength": "FULL TICKS",
-    "MinorTickLength": "MINOR TICKS",
-    "HalfTickLength": "HALF-DIVISION TICK",
-    "FullTickPitch": "FULL TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO",
-    "MinorTickPitch": "MINOR TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO",
-    "NumeralHeight": "NUMERAL HEIGHT",
-    "NumeralXGap": "NUMERAL TO TICK EDGE",
-    "NumeralYGap": "NUMERAL TO FULL-TICK END",
-    "NumeralDepth": "NUMERAL DEPTH",
-}
+# Text centre high enough that the shoulder under its last line clears the
+# top of SECTION G-G (machinist review, run 20261023T231808846Z-1d2625e9).
+DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
+# Text centre: the block ends left of G-G, its underside dimension line at the V.
+NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
 
 
 @_telemetry.traced("drawing.ms_ruled_face")
@@ -142,8 +153,17 @@ def _rotate_ruled_face(adapter: Any, view: Any) -> None:
 def _engraving_detail(
     adapter: Any, parent: Any, *, model_center: tuple[float, float, float],
     view_xy: tuple[float, float], radius_mm: float, detail_label: str,
+    scale: tuple[float, float] = DETAIL_SCALE, exact: bool = False,
 ) -> Any:
-    """Fence a useful-scale detail and move its parent letter off the strip."""
+    """Fence a useful-scale detail and move its parent letter off the strip.
+
+    The fence's sheet radius is ``radius_mm / 2`` mm. With ``exact`` the
+    circle is authored straight to the sketch database (no sketch inference,
+    which otherwise snaps the centre and rim to nearby view-sketch points at a
+    screen-pixel tolerance), read back, and selected for the detail, as in
+    draw_ch_rocker_arm._create_detail; the fence then sits exactly on
+    ``model_center`` with model radius ``radius_mm`` at the 1:2 parents.
+    """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(parent, "IView")
@@ -162,14 +182,35 @@ def _engraving_detail(
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    if exact:
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = manager.CreateCircle(*points[0], *points[1])
+        finally:
+            manager.AddToDB = previous
+        if circle is None:
+            raise RuntimeError(f"failed to draw engraving detail {detail_label} fence")
+        actual_centre, actual_radius = native_circle_geometry(
+            circle, label=f"engraving detail {detail_label} fence")
+        asked_radius = math.dist(points[0], points[1])
+        _telemetry.info(f"engraving detail {detail_label} fence: centre {actual_centre} (asked {points[0]}), "
+                        f"radius {actual_radius} (asked {asked_radius})")
+        if math.dist(actual_centre, points[0]) > 1e-7 or abs(actual_radius - asked_radius) > 1e-7:
+            raise RuntimeError(f"engraving detail {detail_label}: the authored fence moved or changed radius")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+        data.View = parent
+        if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
+            raise RuntimeError(f"engraving detail {detail_label}: cannot select its fence")
+    elif manager.CreateCircle(*points[0], *points[1]) is None:
         raise RuntimeError(f"failed to draw engraving detail {detail_label} fence")
-    detail = ddoc.CreateDetailViewAt4(*view_xy, 0.0, 0, *DETAIL_SCALE,
+    detail = ddoc.CreateDetailViewAt4(*view_xy, 0.0, 0, *scale,
                                     detail_label, 1, True, False, False, 5)
     if detail is None:
         raise RuntimeError(f"failed to create engraving detail {detail_label}")
     detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array(list(DETAIL_SCALE))
+    detail.ScaleRatio = double_array(list(scale))
     draw.ClearSelection2(True)
     draw.EditRebuild3()
     circles = tuple(parent.GetDetailCircles() or ())
@@ -189,37 +230,32 @@ def _engraving_detail(
 
 
 def _numeral_profile(adapter: Any, parent: Any) -> Any:
-    """Actual removed section across both strokes of the zero's closed outline."""
-    left = part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_GAP_MM
-    # At mid-height of the zero's advance, this cuts both stroke walls and floor.
-    # The span stays within the numeral band, excluding every graduation.
-    y = part.BODY_WIDTH - part.TICK_LENGTH - part.NUMERAL_GAP_MM - 0.8
+    """Whole-bar full section across both straight side strokes of the zero numeral."""
     endpoints = tuple(
         model_point_in_view(
-            adapter, parent, (x / 1000.0, y / 1000.0, 0.0),
+            adapter, parent, (NUMERAL_SECTION_X / 1000.0, y / 1000.0, 0.0),
             label="numeral stroke section endpoint",
         )
-        for x in (left - 0.2, left + part.NUMERAL_HEIGHT_MM + 0.3)
+        for y in (-NUMERAL_SECTION_OVERSHOOT_MM, part.BODY_WIDTH + NUMERAL_SECTION_OVERSHOOT_MM)
     )
     section = create_section_view(
         adapter, parent, line_start=endpoints[0], line_end=endpoints[1],
         view_xy=NUMERAL_PROFILE_CENTER, section_label="G", scale=NUMERAL_PROFILE_SCALE,
-        partial=True, label="numeral depth G-G",
+        label="numeral V G-G",
     )
     section = _early_bound(section, "IView")
     section.UseParentScale = False
     section.ScaleRatio = double_array(list(NUMERAL_PROFILE_SCALE))
     definition = _early_bound(section.GetSection(), "IDrSection")
-    definition.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="numeral G-G cut surface")
-    if not bool(definition.GetDisplayOnlySurfaceCut()) or not bool(definition.GetPartialSection()):
-        raise RuntimeError("numeral G-G must be a removed, cut-surface-only section")
+    definition.SetDisplayOnlySurfaceCut(False)
+    rebuild_drawing(adapter, label="numeral G-G full section")
+    if bool(definition.GetDisplayOnlySurfaceCut()) or bool(definition.GetPartialSection()):
+        raise RuntimeError("numeral G-G must be a full section of the whole bar")
     set_hidden_lines_removed(adapter, section)
     if bool(section.UseParentScale) or tuple(float(value) for value in section.ScaleRatio) != NUMERAL_PROFILE_SCALE:
-        raise RuntimeError("numeral G-G must retain its independent 20:1 scale")
+        raise RuntimeError("numeral G-G must retain its independent 10:1 scale")
     model_center = (
-        (left + part.NUMERAL_HEIGHT_MM / 2.0 + 0.05) / 1000.0,
-        y / 1000.0, part.BODY_THICKNESS / 2000.0,
+        NUMERAL_SECTION_X / 1000.0, part.BODY_WIDTH / 2000.0, part.BODY_THICKNESS / 2000.0,
     )
     actual = model_point_in_view(adapter, section, model_center, label="numeral G-G profile centre")
     if math.dist(actual, NUMERAL_PROFILE_CENTER) > 1e-8:
@@ -242,7 +278,61 @@ def _assert_numeral_depth_owner(annotation: Any) -> None:
     if str(dimension.FullName).split("@")[:2] != ["NumeralDepth", "Numerals"]:
         raise RuntimeError(f"numeral depth imported from wrong feature: {dimension.FullName}")
     if abs(float(dimension.SystemValue) * 1000.0 - part.NUMERAL_DEPTH) > 1e-6:
-        raise RuntimeError("numeral depth import does not read its independent shallow cut")
+        raise RuntimeError("numeral depth import does not read its V-engraved cut")
+
+
+@_telemetry.traced("drawing.ms_stick.imported_text_and_limits")
+def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> None:
+    """Every imported dimension prints the callout its part authored, and each
+    MIN-limit size still prints as a single MIN limit. The width ceiling and
+    the stock under the grooves print nowhere else, so a lost row or a changed
+    tolerance type must fail the drawing; the part, not the drawing, writes
+    the text (#1942)."""
+    names = {*callouts.CALLOUTS, *part.MIN_LIMIT_DEVIATIONS_MM}
+    displays: dict[str, list[Any]] = {name: [] for name in names}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            annotation = _early_bound(annotation, "IAnnotation")
+            displays[name].append(_early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension"))
+    missing = sorted(name for name, found in displays.items() if not found)
+    if missing:
+        raise RuntimeError(f"imported dimensions missing from the sheet: {missing}")
+    wrong = {
+        name: printed
+        for name, text in callouts.CALLOUTS.items()
+        for display in displays[name]
+        if callouts.callout_rows(printed := str(display.GetText(callouts.CALLOUT_BELOW) or ""))
+        != callouts.callout_rows(text)
+    }
+    if wrong:
+        raise RuntimeError(f"imported callouts differ from the part's: {wrong!r}")
+    types = {
+        name: int(_early_bound(_early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+                               "IDimensionTolerance").Type)
+        for name in part.MIN_LIMIT_DEVIATIONS_MM
+        for display in displays[name]
+    }
+    if any(kind != part.MIN_LIMIT_TOL_TYPE for kind in types.values()):
+        raise RuntimeError(
+            f"MIN-limit dimensions must print tolerance type {part.MIN_LIMIT_TOL_TYPE}: {types}"
+        )
+
+
+def _assert_dimension_contract(adapter: Any, annotations: list[Any]) -> None:
+    """Text, limits, values, bands, precision, attachment and visibility of
+    every imported dimension: run after import and again once the drawing has
+    settled, so a later rebuild cannot hide, detach or rewrite one unseen."""
+    hidden = [dimension_name(adapter, annotation) for annotation in annotations
+              if int(_early_bound(annotation, "IAnnotation").Visible) != 1]
+    if hidden:
+        raise RuntimeError(f"imported manufacturing dimensions are hidden: {hidden}")
+    _assert_imported_text_and_limits(adapter, annotations)
+    assert_manufacturing_dimensions(
+        adapter, annotations, part.DRAWING_VALUES_BY_NAME, part.DRAWING_PRECISION_BY_NAME,
+        bands={**{name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
+               **part.MIN_LIMIT_DEVIATIONS_MM},
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -252,7 +342,7 @@ async def build(adapter: Any) -> dict[str, str]:
     source_model = adapter.currentModel
     properties = ("Number", "Revision", "Title", "Material Specification", "Finish",
                   "Quantity", "Manufacturing Notes", "Front View Note", "Isometric View Note",
-                  "Numeral Placement Note", "Numeral Tool Note")
+                  "Numeral Placement Note")
     read_required_properties(source_model, properties, required=properties)
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
@@ -276,8 +366,7 @@ async def build(adapter: Any) -> dict[str, str]:
     for view, keep, label in ((front, FRONT_KEEP, "ruled bar"), (top, TOP_KEEP, "bar edge")):
         annotations += curate_view_dimensions(adapter, view, keep=keep, view_label=label,
                                                dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    add_note(adapter, property_link("Manufacturing Notes") + " REV " + property_link("Revision"),
-             0.045, 0.075)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.045, 0.075)
     add_property_linked_note(adapter, "Front View Note", 0.055, 0.135)
     add_property_linked_note(adapter, "Isometric View Note", 0.285, 0.095)
 
@@ -313,7 +402,7 @@ async def build(adapter: Any) -> dict[str, str]:
             length_detail = _engraving_detail(
                 adapter, length_parent,
                 model_center=(model_xy[0] / 1000.0, model_xy[1] / 1000.0, 0.0),
-                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label)
+                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label, exact=label in EXACT_FENCES)
             set_hidden_lines_removed(adapter, length_detail)
             annotations += curate_view_dimensions(
                 adapter, length_detail, keep=keep, view_label=f"tick length {label}",
@@ -341,42 +430,38 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=part.DRAWING_DIMENSIONS)
     add_property_linked_note(adapter, "Numeral Placement Note", *NUMERAL_NOTE_XY)
     profile_parent = place_view(
-        adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=(1.0, 2.0))
+        adapter, str(SOURCE), "*Back", *NUMERAL_PROFILE_PARENT_CENTER, scale=SHEET_SCALE)
     _rotate_ruled_face(adapter, profile_parent)
     set_hidden_lines_removed(adapter, profile_parent)
-    _numeral_profile(adapter, profile_parent)
-    add_property_linked_note(adapter, "Numeral Tool Note", *NUMERAL_TOOL_NOTE_XY)
-    depth_parent = place_view(
-        adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
-    set_hidden_lines_removed(adapter, depth_parent)
+    profile = _numeral_profile(adapter, profile_parent)
     numeral_depth_annotations = curate_view_dimensions(
-        adapter, depth_parent, keep=NUMERAL_DEPTH_KEEP, view_label="native numeral depth",
+        adapter, profile, keep=NUMERAL_DEPTH_KEEP, view_label="numeral V section",
         dimensions_by_feature=part.DRAWING_DIMENSIONS,
     )
     if len(numeral_depth_annotations) != 1:
         raise RuntimeError("expected one own model-linked numeral depth")
     _assert_numeral_depth_owner(numeral_depth_annotations[0])
     annotations += numeral_depth_annotations
+    depth_parent = place_view(
+        adapter, str(SOURCE), "*Top", *DEPTH_PARENT_CENTER, scale=(1.0, 2.0))
+    set_hidden_lines_removed(adapter, depth_parent)
     depth = _engraving_detail(
         adapter, depth_parent,
         model_center=(part.SCALE_START_X / 1000.0, part.BODY_WIDTH / 1000.0,
                       part.BODY_THICKNESS / 2000.0),
-        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B")
+        view_xy=DEPTH_CENTER, radius_mm=DEPTH_RADIUS_MM, detail_label="B", scale=DEPTH_SCALE)
     set_hidden_lines_removed(adapter, depth)
     annotations += curate_view_dimensions(adapter, depth, keep=DEPTH_KEEP,
                                            view_label="engraving depth detail",
                                            dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    assert_manufacturing_dimensions(
-        adapter, annotations, part.DRAWING_VALUES_BY_NAME, part.DRAWING_PRECISION_BY_NAME,
-        bands={name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
-    )
+    _assert_dimension_contract(adapter, annotations)
     for view in (parent, detail, depth_parent, depth):
         set_hidden_lines_removed(adapter, view)
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
                                   expected_sheet_names=SHEET_NAMES,
-                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES})
+                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+                                  settled_checks=(lambda: _assert_dimension_contract(adapter, annotations),))
 
 
 if __name__ == "__main__":

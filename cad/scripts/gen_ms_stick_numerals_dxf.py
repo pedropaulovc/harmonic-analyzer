@@ -1,18 +1,31 @@
-r"""Generate the measuring stick's engraved numerals DXF (tracked asset).
+r"""Generate the measuring stick's V-engraved numeral stroke DXFs (tracked assets).
 
-Writes ``cad/references/ms-stick-numerals.dxf``: the 0..10 scale
-numerals of the ruled measuring stick as closed loops at their FINAL model
-millimetre coordinates, ready for ``build_ms_stick`` to import onto the
-Front plane for the separate shallow numeral engraving. Depth and V-bit
-requirements belong to ``ms_stick_spec``, not to these unchanged surface
-outlines. Placement is baked into the file because the Makers seat ignores
-the importer's scale/position; the build imports at scale 1, position (0, 0).
+The 2026-10-23 owner ruling ("whatever is easiest to machine") engraves the
+0..10 scale numerals with a 30-degree included V bit. A V cut cannot follow
+filled font outlines at one depth, so the numerals are a SINGLE-STROKE sans
+design: each stroke is a straight centreline, and the groove is that
+centreline's V. The drawing accepts any single-stroke sans font; these strokes
+are the model's representative shapes.
 
-Deterministic: same constants -> same bytes (no timestamps; fixed-precision
-coordinates; matplotlib's bundled DejaVu Sans pinned by file). Re-run after
-changing any layout constant in ``ms_stick_spec`` and commit
-the DXF; ``test_dxf_text`` fails if the tracked file drifts from this script
-or its pinned area/bbox in ``ms_stick_spec`` go stale.
+Each straight stroke becomes the closed outline a V bit cuts along it at the
+ruled face: the stroke width at the surface (``NUMERAL_STROKE_WIDTH_MM``)
+wide, closed at each end by a faceted half-round of half that width around the
+end point (the cutter's footprint). ``build_ms_stick`` imports each layer
+onto the Front plane and cuts it ``NUMERAL_DEPTH`` deep with a 15-degree
+inward draft on every side, so each outline becomes a true 30-degree V whose
+walls nearly meet (``NUMERAL_TIP_FLAT_MM`` remains, which keeps the native
+faces valid). Consecutive strokes overlap in those round ends, so every joint
+reaches the full depth, as one continuous tool path does (square or mitred
+ends would be drafted too and leave a shallow saddle there). A drafted cut
+needs disjoint profiles, so overlapping strokes of one numeral go to
+different LAYERS (one DXF and one cut each), coloured here with a fixed
+greedy order.
+
+Placement is baked into the files because the Makers seat ignores the
+importer's scale/position; the build imports at scale 1, position (0, 0).
+Deterministic: same constants -> same bytes. Re-run after changing any layout
+constant in ``ms_stick_spec`` and commit the DXFs; ``test_dxf_text`` fails if
+a tracked file drifts or the pinned bbox/volumes in ``ms_stick_spec`` go stale.
 
 Photo derivation (2026-09-02, ch16 page001_img01 at 6x): each full tick carries
 a numeral just past the tick ends, on the +X side of its tick (toward 10), about
@@ -30,7 +43,7 @@ Frames and signs -- the one place they are worked out:
   screen-up = -Y, so a glyph frame (u along the baseline, v up the glyph) that
   reads correctly on the real face maps to model (x, y) with a y inversion. An
   un-inverted (as-drawn-from-+Z) import would read mirrored on the face -- the
-  inversion is applied HERE, in the file, never at import.
+  inversion is applied HERE, in the files, never at import.
 * Rotation 90 (default): glyph up (v) -> +X (toward 10), baseline (u) -> +Y,
   i.e. ``x = x0 + v, y = y0 + u`` -- the digit's foot faces the tick it labels
   (numerals 0..9 sit +X of their tick, the 10 numeral sits -X of its tick
@@ -48,35 +61,123 @@ Run::
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import numpy as np  # noqa: E402
 
 import _dxf_text as dxf  # noqa: E402
 from ms_stick_spec import (  # noqa: E402
     BODY_WIDTH,
-    NUMERALS_DXF,
     DIVISION_COUNT,
     DIVISION_SPACING,
+    NUMERAL_DEPTH,
+    NUMERAL_END_FACETS,
     NUMERAL_GAP_MM,
     NUMERAL_HEIGHT_MM,
+    NUMERAL_LAYER_DXFS,
     NUMERAL_ROTATION_DEG,
+    NUMERAL_STROKE_WIDTH_MM,
+    NUMERAL_V_INCLUDED_ANGLE_DEG,
     SCALE_START_X,
     TICK_LENGTH,
     TICK_WIDTH,
 )
 
+Point = tuple[float, float]
+Ring = list[Point]
+
 # The y at which the full ticks END (they hang from y = BODY_WIDTH); the numeral
 # band lies between here and the far edge y = 0.
 TICK_END_Y = BODY_WIDTH - TICK_LENGTH
+
+# Unit-cell centrelines: x across the digit (0..1), y up it (0..1). C is the
+# corner chamfer of the "round" digits; every stroke is straight, so each one
+# is a single V groove.
+_C = 0.3
+_CY = 0.16
+_ZERO = [(_C, 0), (1 - _C, 0), (1, _CY), (1, 1 - _CY), (1 - _C, 1), (_C, 1), (0, 1 - _CY), (0, _CY), (_C, 0)]
+_SIX = [
+    (1, 1 - _CY), (1 - _C, 1), (_C, 1), (0, 1 - _CY), (0, _CY), (_C, 0), (1 - _C, 0), (1, _CY),
+    (1, 0.55 - _CY), (1 - _C, 0.55), (_C, 0.55), (0, 0.55 - _CY),
+]
+DIGIT_STROKES: dict[str, list[list[Point]]] = {
+    "0": [_ZERO],
+    "1": [[(0.55, 0), (0.55, 1)], [(0.55, 1), (0.2, 0.78)]],
+    "2": [[(0, 1 - _CY), (_C, 1), (1 - _C, 1), (1, 1 - _CY), (1, 0.62), (0, 0), (1, 0)]],
+    "3": [[(0, 1), (1, 1), (0.4, 0.58), (1 - _C, 0.58), (1, 0.58 - _CY), (1, _CY), (1 - _C, 0), (_C, 0), (0, _CY)]],
+    "4": [[(0.75, 0), (0.75, 1), (0, 0.3), (1, 0.3)]],
+    "5": [[(1, 1), (0, 1), (0, 0.58), (1 - _C, 0.58), (1, 0.58 - _CY), (1, _CY), (1 - _C, 0), (_C, 0), (0, _CY)]],
+    "6": [_SIX],
+    "7": [[(0, 1), (1, 1), (0.35, 0)]],
+    "8": [
+        [(_C, 0.55), (1 - _C, 0.55), (0.95, 0.55 + _CY), (0.95, 1 - _CY), (1 - _C, 1), (_C, 1),
+         (0.05, 1 - _CY), (0.05, 0.55 + _CY), (_C, 0.55)],
+        [(_C, 0.55), (0, 0.55 - _CY), (0, _CY), (_C, 0), (1 - _C, 0), (1, _CY), (1, 0.55 - _CY), (1 - _C, 0.55)],
+    ],
+    "9": [[(1 - x, 1 - y) for x, y in _SIX]],
+}
+# Centreline cell in mm: the ink is the cell grown by half a stroke all round,
+# so a flat-ended digit is exactly NUMERAL_HEIGHT_MM tall.
+CELL_HEIGHT = NUMERAL_HEIGHT_MM - NUMERAL_STROKE_WIDTH_MM
+CELL_WIDTH = 0.5 * NUMERAL_HEIGHT_MM
+DIGIT_SPACING = 0.35  # ink gap between the "1" and "0" of 10
+# Facets per half-round stroke end (inscribed: every vertex on the cutter's
+# face circle, so the outline never leaves the true V-bit path).
+END_FACETS = NUMERAL_END_FACETS
+CAPSULE_VERTICES = 2 * (END_FACETS + 1)
+# Strokes of one layer stay this far apart at the face (the importer merges
+# endpoints within 0.002 mm).
+LAYER_GAP_MM = 0.02
+# Removed-volume integration grid (mm).
+_GRID_MM = 0.004
 
 
 def tick_x(k: int) -> float:
     return SCALE_START_X + k * DIVISION_SPACING
 
 
-def _place(rings: list[dxf.Ring], k: int) -> list[dxf.Ring]:
+def _unit(p: Point, q: Point) -> Point:
+    length = math.dist(p, q)
+    return ((q[0] - p[0]) / length, (q[1] - p[1]) / length)
+
+
+def _stroke_ring(p: Point, q: Point) -> Ring:
+    """The V-bit outline of the straight stroke p -> q at the face (mm)."""
+    d = _unit(p, q)
+    n = (-d[1], d[0])
+    half = NUMERAL_STROKE_WIDTH_MM / 2.0
+    ring = []
+    for centre, start_deg in ((q, 90.0), (p, -90.0)):
+        for k in range(END_FACETS + 1):
+            angle = math.radians(start_deg - 180.0 * k / END_FACETS)
+            ring.append((centre[0] + half * (math.cos(angle) * d[0] + math.sin(angle) * n[0]),
+                         centre[1] + half * (math.cos(angle) * d[1] + math.sin(angle) * n[1])))
+    return ring
+
+
+def _stroke_rects(polyline: list[Point]) -> list[Ring]:
+    """One V-bit outline per straight segment of a centreline polyline (mm)."""
+    return [_stroke_ring(p, q) for p, q in zip(polyline, polyline[1:])]
+
+
+def _glyph_rects(text: str) -> list[Ring]:
+    """Stroke outlines of ``text`` in the glyph frame (u along the baseline, v up)."""
+    rects: list[Ring] = []
+    advance = 0.0
+    for char in text:
+        for stroke in DIGIT_STROKES[char]:
+            mm = [(advance + x * CELL_WIDTH, y * CELL_HEIGHT) for x, y in stroke]
+            rects += _stroke_rects(mm)
+        advance += CELL_WIDTH + NUMERAL_STROKE_WIDTH_MM + DIGIT_SPACING
+    return rects
+
+
+def _place(rings: list[Ring], k: int) -> list[Ring]:
     """Map one numeral's glyph-frame rings (u, v) onto model (x, y) mm."""
     u0, v0, u1, v1 = dxf.bbox(rings)
     past_tick = k < DIVISION_COUNT - 1  # 0..9 on the +X side; 10 on the -X side
@@ -99,34 +200,151 @@ def _place(rings: list[dxf.Ring], k: int) -> list[dxf.Ring]:
     raise ValueError(f"NUMERAL_ROTATION_DEG must be 0 or 90, got {NUMERAL_ROTATION_DEG}")
 
 
-def numeral_rings() -> list[list[dxf.Ring]]:
-    """Per numeral 0..10, its placed rings (model mm)."""
-    return [
-        _place(dxf.glyph_polylines(str(k), NUMERAL_HEIGHT_MM), k)
-        for k in range(DIVISION_COUNT)
-    ]
+def numeral_rects() -> list[list[Ring]]:
+    """Per numeral 0..10, its placed stroke rectangles (model mm)."""
+    return [_place(_glyph_rects(str(k)), k) for k in range(DIVISION_COUNT)]
 
 
-def all_rings() -> list[dxf.Ring]:
-    return [ring for numeral in numeral_rings() for ring in numeral]
+def _gap(a: Ring, b: Ring) -> float:
+    """Separating-axis gap between two convex rings (<= 0 when they touch)."""
+    gap = -math.inf
+    for ring in (a, b):
+        for i in range(len(ring)):
+            p, q = ring[i], ring[(i + 1) % len(ring)]
+            axis = (q[1] - p[1], p[0] - q[0])
+            norm = math.hypot(*axis)
+            axis = (axis[0] / norm, axis[1] / norm)
+            pa = [x * axis[0] + y * axis[1] for x, y in a]
+            pb = [x * axis[0] + y * axis[1] for x, y in b]
+            gap = max(gap, min(pb) - max(pa), min(pa) - max(pb))
+    return gap
 
 
-def render() -> bytes:
-    return dxf.render_dxf(all_rings()).encode("ascii")
+def layers() -> list[list[Ring]]:
+    """Greedy colouring: no two rectangles of one layer come within LAYER_GAP_MM."""
+    out: list[list[Ring]] = []
+    for numeral in numeral_rects():
+        for rect in numeral:
+            for layer in out:
+                if all(_gap(rect, other) >= LAYER_GAP_MM for other in layer):
+                    layer.append(rect)
+                    break
+            else:
+                out.append([rect])
+    return out
 
 
-def summary() -> dict[str, float | int]:
-    numerals = numeral_rings()
-    rings = [ring for numeral in numerals for ring in numeral]
-    x0, y0, x1, y1 = dxf.bbox(rings)
-    outer = sum(
-        1 for numeral in numerals for i in range(len(numeral)) if dxf.nesting_depth(numeral, i) == 0
+def _depth_field(rects: list[Ring], xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+    """Removed depth of the drafted cuts of ``rects`` over the grid."""
+    slope = math.tan(math.radians(NUMERAL_V_INCLUDED_ANGLE_DEG / 2.0))
+    depth = np.zeros_like(xs)
+    for rect in rects:
+        # Inside distance is positive whichever way the placement wound it.
+        sign = -1.0 if dxf.signed_area(rect) > 0.0 else 1.0
+        inside = np.full_like(xs, np.inf)
+        for i in range(len(rect)):
+            p, q = rect[i], rect[(i + 1) % len(rect)]
+            ex, ey = q[0] - p[0], q[1] - p[1]
+            signed = ((xs - p[0]) * ey - (ys - p[1]) * ex) / math.hypot(ex, ey)
+            inside = np.minimum(inside, sign * signed)
+        depth = np.maximum(depth, np.clip(inside / slope, 0.0, NUMERAL_DEPTH))
+    return depth
+
+
+def removed_volume(rects: list[Ring]) -> float:
+    """Volume (mm^3) the drafted cuts of ``rects`` remove together."""
+    total = 0.0
+    for numeral in _clusters(rects):
+        x0, y0, x1, y1 = dxf.bbox(numeral)
+        xs, ys = np.meshgrid(np.arange(x0, x1, _GRID_MM) + _GRID_MM / 2.0,
+                             np.arange(y0, y1, _GRID_MM) + _GRID_MM / 2.0)
+        total += float(_depth_field(numeral, xs, ys).sum()) * _GRID_MM**2
+    return total
+
+
+def layer_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
+    """Each layer's removal over the layers cut before it (they overlap)."""
+    cumulative = [removed_volume([rect for layer in split[:i + 1] for rect in layer])
+                  for i in range(len(split))]
+    return tuple(after - before for before, after in zip([0.0, *cumulative], cumulative, strict=False))
+
+
+def _overlaps(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _added_by(stroke: Ring, others: list[Ring]) -> float:
+    """The removal ``stroke`` adds to the cuts of ``others``. Its cut is zero
+    outside its own bbox, so only that bbox is integrated, with the strokes
+    that reach into it."""
+    box = dxf.bbox([stroke])
+    near = [rect for rect in others if rect is not stroke and _overlaps(box, dxf.bbox([rect]))]
+    xs, ys = np.meshgrid(np.arange(box[0], box[2], _GRID_MM) + _GRID_MM / 2.0,
+                         np.arange(box[1], box[3], _GRID_MM) + _GRID_MM / 2.0)
+    added = _depth_field([*near, stroke], xs, ys) - _depth_field(near, xs, ys)
+    return float(added.sum()) * _GRID_MM**2
+
+
+def min_stroke_volumes(split: list[list[Ring]]) -> tuple[float, ...]:
+    """Per layer, the least removal any one stroke adds over the layers cut
+    before it and the rest of its own layer: dropping a stroke as its layer
+    is cut removes at least that much less."""
+    return tuple(
+        min(_added_by(stroke, [rect for earlier in split[:i + 1] for rect in earlier]) for stroke in layer)
+        for i, layer in enumerate(split)
     )
+
+
+def final_min_stroke_volume(split: list[list[Ring]]) -> float:
+    """The least removal any one stroke adds to all the others, every layer
+    cut: losing a stroke from the finished part removes at least that much."""
+    rings = [rect for layer in split for rect in layer]
+    return min(_added_by(stroke, rings) for stroke in rings)
+
+
+def _clusters(rects: list[Ring]) -> list[list[Ring]]:
+    """Rectangles grouped by numeral (numerals are far apart along X)."""
+    groups: list[list[Ring]] = []
+    for rect in sorted(rects, key=lambda ring: min(x for x, _ in ring)):
+        x_min = min(x for x, _ in rect)
+        if groups and x_min < max(x for ring in groups[-1] for x, _ in ring) + 1.0:
+            groups[-1].append(rect)
+        else:
+            groups.append([rect])
+    return groups
+
+
+def render_layers() -> list[bytes]:
+    return [dxf.render_dxf(layer).encode("ascii") for layer in layers()]
+
+
+class Summary(TypedDict):
+    strokes: int
+    layers: int
+    layer_volumes_mm3: tuple[float, ...]
+    min_stroke_volumes_mm3: tuple[float, ...]
+    final_min_stroke_mm3: float
+    volume_mm3: float
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+def summary() -> Summary:
+    numerals = numeral_rects()
+    rects = [rect for numeral in numerals for rect in numeral]
+    x0, y0, x1, y1 = dxf.bbox(rects)
+    split = layers()
+    by_layer = layer_volumes(split)
     return {
-        "loops": len(rings),
-        "outer": outer,
-        "inner": len(rings) - outer,
-        "area_mm2": sum(dxf.net_area(numeral) for numeral in numerals),
+        "strokes": len(rects),
+        "layers": len(split),
+        "layer_volumes_mm3": by_layer,
+        "min_stroke_volumes_mm3": min_stroke_volumes(split),
+        "final_min_stroke_mm3": final_min_stroke_volume(split),
+        # The increments telescope to the union of every stroke.
+        "volume_mm3": sum(by_layer),
         "x0": x0,
         "y0": y0,
         "x1": x1,
@@ -135,12 +353,20 @@ def summary() -> dict[str, float | int]:
 
 
 def main() -> int:
-    data = render()
-    NUMERALS_DXF.write_bytes(data)
+    rendered = render_layers()
+    if len(rendered) != len(NUMERAL_LAYER_DXFS):
+        raise SystemExit(
+            f"{len(rendered)} stroke layers, but ms_stick_spec names "
+            f"{len(NUMERAL_LAYER_DXFS)} NUMERAL_LAYER_DXFS"
+        )
+    for path, data in zip(NUMERAL_LAYER_DXFS, rendered, strict=True):
+        path.write_bytes(data)
+        print(f"wrote {path} ({len(data)} bytes)")
     s = summary()
-    print(f"wrote {NUMERALS_DXF} ({len(data)} bytes)")
-    print(f"loops {s['loops']} (outer {s['outer']}, inner {s['inner']})")
-    print(f"net area {s['area_mm2']:.4f} mm^2")
+    print(f"strokes {s['strokes']} in {s['layers']} layers")
+    print(f"removed volume {s['volume_mm3']:.4f} mm^3 (by layer {', '.join(f'{v:.4f}' for v in s['layer_volumes_mm3'])})")
+    print(f"least one-stroke removal by layer {', '.join(f'{v:.4f}' for v in s['min_stroke_volumes_mm3'])} mm^3"
+          f"; in the finished part {s['final_min_stroke_mm3']:.4f} mm^3")
     print(f"bbox x {s['x0']:.4f}..{s['x1']:.4f}  y {s['y0']:.4f}..{s['y1']:.4f}")
     return 0
 
