@@ -11,7 +11,6 @@ from types import SimpleNamespace
 import pytest
 
 import _drawing_projection as drawing_projection
-import _drawing_marks as drawing_marks
 import _dimensions as dimensions
 import _sketch as sketch
 import ms_stop_geom as stop_geom
@@ -984,9 +983,10 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
 
         async def add_line(self, x1, y1, x2, y2):
             assert self.currentSketchManager.AddToDB
-            self.lines["line"] = ((x1, y1), (x2, y2))
-            self._sketch_entities["line"] = Segment()
-            return result("line")
+            name = "line" if not self.lines else f"line{len(self.lines) + 1}"
+            self.lines[name] = ((x1, y1), (x2, y2))
+            self._sketch_entities[name] = Segment()
+            return result(name)
 
         async def add_sketch_constraint(self, *args):
             self.constraints.append(args)
@@ -1001,7 +1001,7 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
             return result()
 
     async def fully_defined(adapter, feature):
-        assert feature == "ReferenceWindowWidth"
+        adapter.defined = feature
 
     def name_feature(adapter, feature):
         features[feature] = adapter.dimensions
@@ -1021,117 +1021,52 @@ def _window_reference_seat(monkeypatch, *, reject_construction=False):
     return Adapter()
 
 
-@pytest.mark.parametrize("width,height,roof", [(8.4, 14.1, 2.1), (8.7, 15.0, 2.4)])
-def test_window_width_reference_owns_real_roof_endpoints_and_shared_global_equations(
-    monkeypatch, width, height, roof
-) -> None:
-    monkeypatch.setattr(spec, "WINDOW_WIDTH", width)
-    monkeypatch.setattr(spec, "BLOCK_HEIGHT", height)
-    monkeypatch.setattr(spec, "ROOF_THICKNESS", roof)
-    monkeypatch.setattr(spec, "WINDOW_Y_MAX", height - roof)
+def test_rebate_profile_owns_width_height_and_back_wall_on_its_consumed_sketch(monkeypatch) -> None:
+    # Run 20261024T043544205Z-432c211c gated shown reference chords ghosting
+    # over the rebate ceiling and the back wall. The consumed cut profile now
+    # owns all three, so its dimensions import without any drawn sketch line.
     adapter = _window_reference_seat(monkeypatch)
-    equations = dict(asyncio.run(stop_geom.window_width_reference(adapter)))
+    dims = sketch.SketchDims()
+    asyncio.run(stop_geom.rebate_profile(adapter, dims))
     assert adapter.planes == ["Right"]
-    assert adapter.lines == {"line": ((0.0, height - roof), (-width, height - roof))}
-    assert adapter._sketch_entities["line"].ConstructionGeometry
-    assert not adapter.currentSketchManager.AddToDB
-    width_dimension, station = adapter.dimensions
-    assert (width_dimension.first, width_dimension.second, width_dimension.kind) == (
-        "line.start", "line.end", "horizontal_distance",
-    )
-    assert width_dimension.value_mm == width
-    assert width_dimension.Name == "WindowWidth"
-    assert (station.first, station.second, station.kind, station.value_mm) == (
-        "line.start", "origin", "vertical_distance", height - roof,
-    )
-    assert station.Name == "WindowRoofStation"
-    assert ("line", None, "horizontal") in adapter.constraints
-    assert ("line.start", "origin", "vertical_points") in adapter.constraints
-    assert equations == {
-        "WindowWidth@ReferenceWindowWidth": '"WindowWidth"',
-        "WindowRoofStation@ReferenceWindowWidth": '"BlockHeight" - "RoofThickness"',
-    }
-    model_center = (spec.BLOCK_LENGTH / 2000.0, height / 2000.0, spec.BLOCK_DEPTH / 2000.0)
-    side = _StopView("*Left", block_drawing.RIGHT_CENTER, (4.0, 1.0), model_center)
-    model_points = [(0.0, y / 1000.0, -x / 1000.0) for x, y in adapter.lines["line"]]
-    projected = [side.ModelToViewTransform.apply(point) for point in model_points]
-    assert projected[0][0] == pytest.approx(0.293)
-    assert projected[1][0] == pytest.approx(0.293 + width * 0.004)
-    assert projected[0][1] == projected[1][1]
-    assert 0.293 <= projected[0][0] < projected[1][0] <= 0.337
+    assert adapter.defined == "rebate profile"
+    ceiling, back, floor, cover, wall = (adapter.lines[name] for name in (
+        "line", "line2", "line3", "line4", "line5"))
+    assert ceiling == ((0.0, spec.WINDOW_Y_MAX), (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX))
+    assert back == ((-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MIN))
+    assert floor[1] == cover[0] == (0.0, spec.WINDOW_Y_MIN)
+    assert wall == ((-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX))
+    assert adapter._sketch_entities["line5"].ConstructionGeometry
+    assert not any(adapter._sketch_entities[name].ConstructionGeometry
+                   for name in ("line", "line2", "line3", "line4"))
+    assert ("line5", None, "horizontal") in adapter.constraints
+    assert ("line5.start", "line.end", "coincident") in adapter.constraints
+    assert [(d.first, d.second, d.kind) for d in adapter.dimensions] == [
+        ("line.start", "line.end", "horizontal_distance"),
+        ("line2.start", "line2.end", "vertical_distance"),
+        ("line.start", "origin", "vertical_distance"),
+        ("line5.start", "line5.end", "horizontal_distance"),
+    ]
+    assert [d.value_mm for d in adapter.dimensions] == pytest.approx([
+        spec.WINDOW_WIDTH, spec.WINDOW_HEIGHT, spec.WINDOW_Y_MAX, spec.BACK_WALL_THICKNESS,
+    ])
+    assert dims._rows == [
+        ("WindowWidth", '"WindowWidth"'), ("WindowHeight", '"WindowHeight"'),
+        ("WindowRoofStation", '"BlockHeight" - "RoofThickness"'),
+        ("BackWall", '"BlockDepth" - "WindowWidth"'),
+    ]
+    assert spec.BLOCK_DRAWING_DIMENSIONS["WindowProfile"] == {"WindowWidth", "WindowHeight", "BackWall"}
+    assert not {"ReferenceWindowWidth", "BackWallReference", "Window"} & set(spec.BLOCK_DRAWING_DIMENSIONS)
 
 
-def test_window_width_reference_refuses_unapplied_construction_flag(monkeypatch) -> None:
+def test_rebate_profile_refuses_unapplied_back_wall_construction_flag(monkeypatch) -> None:
     adapter = _window_reference_seat(monkeypatch, reject_construction=True)
-    with pytest.raises(RuntimeError, match="construction flag rejected"):
-        asyncio.run(stop_geom.window_width_reference(adapter))
-    assert adapter.dimensions == []
+    with pytest.raises(RuntimeError, match="back wall construction flag rejected"):
+        asyncio.run(stop_geom.rebate_profile(adapter, sketch.SketchDims()))
+    assert all(d.kind != "horizontal_distance" or d.first != "line5.start" for d in adapter.dimensions)
 
 
-@pytest.mark.parametrize("reject_mark", [False, True])
-def test_native_window_marks_replace_cut_vector_without_marking_roof_station(
-    monkeypatch, reject_mark
-) -> None:
-    class Display:
-        def __init__(self, name, owner):
-            self.dimension = SimpleNamespace(Name=name, FullName=f"{name}@{owner}")
-            self.marked = True
-            self.puts = []
-
-        def GetDimension2(self, index):  # noqa: N802 - COM method name
-            assert index == 0
-            return self.dimension
-
-        @property
-        def MarkedForDrawing(self):  # noqa: N802 - COM property name
-            return self.marked
-
-        @MarkedForDrawing.setter
-        def MarkedForDrawing(self, value):  # noqa: N802 - COM property name
-            self.puts.append(value)
-            if not (value and reject_mark):
-                self.marked = value
-
-    cut = Display("WindowWidth", "Window")
-    width = Display("WindowWidth", "ReferenceWindowWidth")
-    station = Display("WindowRoofStation", "ReferenceWindowWidth")
-    features = {
-        "Window": SimpleNamespace(Name="Window", displays=[cut]),
-        "ReferenceWindowWidth": SimpleNamespace(Name="ReferenceWindowWidth", displays=[width, station]),
-    }
-
-    def invoke(obj, _interface, member, *args):
-        value = getattr(obj, member)
-        return value(*args) if callable(value) else value
-
-    adapter = SimpleNamespace(currentModel=SimpleNamespace(FeatureManager=SimpleNamespace(
-        GetFeatures=lambda top_level_only: list(features.values()),
-    )))
-    monkeypatch.setattr(drawing_marks, "_early_bound", lambda obj, _interface: obj)
-    monkeypatch.setattr(drawing_marks, "_com_invoke", invoke)
-    monkeypatch.setattr(drawing_marks, "_com_put", lambda obj, interface, member, value: setattr(obj, member, value))
-    monkeypatch.setattr(drawing_marks, "_feature_by_name", lambda adapter, name: features[name])
-    monkeypatch.setattr(drawing_marks, "_feature_tree", lambda feature: [feature])
-    monkeypatch.setattr(drawing_marks, "_feature_display_dimensions", lambda feature: feature.displays)
-    assert "Window" not in spec.BLOCK_DRAWING_DIMENSIONS
-    assert spec.BLOCK_DRAWING_DIMENSIONS["ReferenceWindowWidth"] == {"WindowWidth"}
-    drawing_marks.clear_dimensions_for_drawing(adapter)
-    if reject_mark:
-        with pytest.raises(RuntimeError, match="mark-for-drawing failed"):
-            drawing_marks.mark_dimensions_for_drawing(
-                adapter, "ReferenceWindowWidth", spec.BLOCK_DRAWING_DIMENSIONS["ReferenceWindowWidth"],
-            )
-    else:
-        drawing_marks.mark_dimensions_for_drawing(
-            adapter, "ReferenceWindowWidth", spec.BLOCK_DRAWING_DIMENSIONS["ReferenceWindowWidth"],
-        )
-        assert width.MarkedForDrawing
-    assert cut.puts == [False] and not cut.MarkedForDrawing
-    assert station.puts == [False] and not station.MarkedForDrawing
-    assert width.puts == [False, True]
-
-
-def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_toleranced(monkeypatch) -> None:
+def test_block_build_cuts_rebate_from_its_profile_driven_marked_and_toleranced(monkeypatch) -> None:
     equations, globals_authored, bands, marks, hidden = {}, {}, [], [], []
     cuts, precisions, properties = [], [], []
 
@@ -1155,7 +1090,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
             return result()
 
         async def create_cut_extrude(self, params):
-            cuts.append(params.depth)
+            cuts.append((params.depth, params.both_directions))
             return result()
 
         async def add_chamfer(self, *args, **kwargs):
@@ -1167,26 +1102,22 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     async def drive(adapter, name, expression):
         equations[name] = expression
 
-    async def reference(adapter):
+    async def rebate(adapter, dims):
         assert "WindowWidth" in globals_authored
-        assert cuts == [spec.WINDOW_WIDTH]
-        return await stop_geom.window_width_reference(reference_adapter)
+        assert cuts == []
+        profiles.append(dims)
 
     async def roof_reference(adapter):
         return []
 
-    async def back_wall_reference(adapter):
-        return [("BackWall@BackWallReference", '"BlockDepth" - "WindowWidth"')]
-
     async def save(adapter, part_name):
         return {"part": part_name}
 
-    reference_adapter = _window_reference_seat(monkeypatch)
+    profiles = []
     monkeypatch.setattr(block, "set_global", set_global)
     monkeypatch.setattr(block, "drive_dimension", drive)
-    monkeypatch.setattr(block, "window_width_reference", reference)
+    monkeypatch.setattr(block, "rebate_profile", rebate)
     monkeypatch.setattr(block, "roof_reference", roof_reference)
-    monkeypatch.setattr(block, "back_wall_reference", back_wall_reference)
     monkeypatch.setattr(block, "save_part_and_images", save)
     monkeypatch.setattr(block, "SketchDims", lambda: SimpleNamespace(apply=lambda *a: []))
     for name in (
@@ -1212,39 +1143,18 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
                         lambda adapter, part_name, values: properties.append(values))
     assert asyncio.run(block.build(Adapter())) == {"part": "ms-stop-block"}
     assert globals_authored["WindowWidth"] == f"{spec.WINDOW_WIDTH}mm"
-    assert cuts == [8.4]
-    assert equations["WindowWidth@Window"] == equations["WindowWidth@ReferenceWindowWidth"] == '"WindowWidth"'
-    assert equations["WindowRoofStation@ReferenceWindowWidth"] == '"BlockHeight" - "RoofThickness"'
-    assert ("ReferenceWindowWidth", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
-    assert ("Window", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
-    assert ("ReferenceWindowWidth", {"WindowWidth"}) in marks
+    assert len(profiles) == 1
+    assert cuts == [(2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), True)]
+    assert equations["WindowCutDepth@Window"] == f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'
+    assert ("WindowProfile", "WindowWidth", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
+    assert ("WindowProfile", "WindowHeight", *spec.WINDOW_SIZE_TOLERANCE_MM) in bands
+    assert ("WindowProfile", {"WindowHeight", "WindowWidth", "BackWall"}) in marks
     assert all(feature != "Window" for feature, names in marks)
-    assert "ReferenceWindowWidth" in hidden and "BackWallReference" in hidden
-    assert equations["BackWall@BackWallReference"] == '"BlockDepth" - "WindowWidth"'
-    assert ("BackWallReference", {"BackWall"}) in marks
+    assert hidden == ["ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference"]
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
     assert "Manufacturing Notes" not in properties[0]
     assert pmi == [{"surface_finishes": spec.BLOCK_SURFACE_FINISHES}]
-
-
-def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatch) -> None:
-    adapter = _window_reference_seat(monkeypatch)
-    monkeypatch.setattr(stop_geom, "ensure_fully_defined", lambda *a: asyncio.sleep(0))
-    equations = dict(asyncio.run(stop_geom.back_wall_reference(adapter)))
-    assert adapter.planes == ["Right"]
-    assert adapter.lines == {"line": (
-        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX))}
-    assert adapter._sketch_entities["line"].ConstructionGeometry
-    wall = adapter.dimensions[0]
-    assert (wall.Name, wall.kind, wall.value_mm) == (
-        "BackWall", "horizontal_distance", spec.BACK_WALL_THICKNESS)
-    assert spec.BACK_WALL_THICKNESS == pytest.approx(2.6)
-    assert equations == {
-        "BackWall@BackWallReference": '"BlockDepth" - "WindowWidth"',
-        "BackWallStationZ@BackWallReference": '"WindowWidth"',
-        "BackWallStationY@BackWallReference": '"BlockHeight" - "RoofThickness"',
-    }
 
 
 def test_roof_reference_lies_on_the_lip_face_not_through_the_lip(monkeypatch) -> None:

@@ -37,7 +37,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _holes import wizard_holes
 from ms_stop_geom import (
     author_hole_precision, hide_location_references, location_reference,
-    back_wall_reference, roof_reference, window_width_reference,
+    rebate_profile, roof_reference,
 )
 
 PART_NAME = "ms-stop-block"
@@ -78,7 +78,6 @@ async def build(adapter) -> dict[str, str]:
         ("RoofChamferSize", spec.ROOF_END_CHAMFER),
     ):
         await set_global(adapter, name, f"{value}mm")
-    await set_global(adapter, "WindowFloor", '"BlockHeight" - "RoofThickness" - "WindowHeight"')
     jobs: list[tuple[str, str]] = []
     dims = SketchDims()
     check("block profile", await adapter.create_sketch("Front"))
@@ -101,26 +100,17 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "block stock", spec.BLOCK_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
     dims = SketchDims()
-    check("open rebate profile", await adapter.create_sketch("Front"))
-    points = [(-spec.CUT_OVERHANG, spec.WINDOW_Y_MIN),
-              (spec.BLOCK_LENGTH + spec.CUT_OVERHANG, spec.WINDOW_Y_MIN),
-              (spec.BLOCK_LENGTH + spec.CUT_OVERHANG, spec.WINDOW_Y_MAX),
-              (-spec.CUT_OVERHANG, spec.WINDOW_Y_MAX)]
-    lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(
-        adapter, lines, points, label="open rebate", dims=dims,
-        names=["WindowCutLength", "WindowHeight", "WindowOverhang", "WindowFloor"],
-        drives=[f'"BlockLength" + {2.0 * spec.CUT_OVERHANG}', '"WindowHeight"',
-                None, '"WindowFloor"'],
-    )
-    await ensure_fully_defined(adapter, "rebate profile")
-    check("exit rebate profile", await adapter.exit_sketch())
+    await rebate_profile(adapter, dims)
     name_last_feature(adapter, "WindowProfile")
     jobs += dims.apply(adapter, "WindowProfile")
-    check("open rebate", await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.WINDOW_WIDTH)))
+    # Mid-plane from the X=0 end plane: total depth twice the block plus
+    # overhang, so the rebate runs out through both ends.
+    check("open rebate", await adapter.create_cut_extrude(ExtrusionParameters(
+        depth=2.0 * (spec.BLOCK_LENGTH + spec.CUT_OVERHANG), both_directions=True,
+    )))
     name_last_feature(adapter, "Window")
-    name_dimensions(adapter, "Window", ["WindowWidth"])
-    jobs.append(("WindowWidth@Window", '"WindowWidth"'))
+    name_dimensions(adapter, "Window", ["WindowCutDepth"])
+    jobs.append(("WindowCutDepth@Window", f'2 * ("BlockLength" + {spec.CUT_OVERHANG})'))
     await volume_check(adapter, "open rebate", spec.BLOCK_VOLUME - spec.WINDOW_VOLUME, 0.005 * spec.BLOCK_VOLUME)
 
     check("roof end chamfers", await adapter.add_chamfer(
@@ -151,8 +141,6 @@ async def build(adapter) -> dict[str, str]:
         names=("PlateLeftFromEnd", "PlateFromHeadFace", "PlateRightFromEnd"),
     )
     jobs += await roof_reference(adapter)
-    jobs += await window_width_reference(adapter)
-    jobs += await back_wall_reference(adapter)
     await force_rebuild(adapter)
     for name, expression in jobs:
         await drive_dimension(adapter, name, expression)
@@ -161,8 +149,7 @@ async def build(adapter) -> dict[str, str]:
                        0.005 * spec.BLOCK_FINISHED_VOLUME)
     lower, upper = spec.WINDOW_SIZE_TOLERANCE_MM
     set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowHeight", lower, upper)
-    set_dimension_bilateral_tolerance(adapter, "Window", "WindowWidth", lower, upper)
-    set_dimension_bilateral_tolerance(adapter, "ReferenceWindowWidth", "WindowWidth", lower, upper)
+    set_dimension_bilateral_tolerance(adapter, "WindowProfile", "WindowWidth", lower, upper)
     _author_reference_dimensions(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature, names in DRAWING_DIMENSIONS.items():
@@ -174,7 +161,6 @@ async def build(adapter) -> dict[str, str]:
     })
     hide_location_references(adapter, (
         "ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference",
-        "ReferenceWindowWidth", "BackWallReference",
     ))
     author_part_pmi(adapter, surface_finishes=spec.BLOCK_SURFACE_FINISHES)
     await apply_material(adapter, MATERIAL)

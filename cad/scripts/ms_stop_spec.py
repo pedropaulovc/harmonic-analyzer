@@ -103,10 +103,9 @@ PLATE_FINISHED_VOLUME = PLATE_VOLUME - PLATE_CHAMFER_VOLUME - PLATE_HOLE_VOLUME
 BLOCK_DRAWING_DIMENSIONS = {
     "BlockProfile": {"BlockLength", "BlockHeight"},
     "Block": {"BlockDepth"},
-    "WindowProfile": {"WindowHeight"},
-    "ReferenceWindowWidth": {"WindowWidth"},
+    # The consumed rebate profile owns all three: its lines never draw.
+    "WindowProfile": {"WindowHeight", "WindowWidth", "BackWall"},
     "RoofThicknessReference": {"RoofThickness"},
-    "BackWallReference": {"BackWall"},
     "RoofChamfers": {"RoofChamferSize", "RoofChamferAngle"},
     "ThumbLocationReference": {"ThumbFromEnd", "ThumbFromPlate"},
     "PlateLocationReference": {"PlateLeftFromEnd", "PlateRightFromEnd", "PlateFromHeadFace"},
