@@ -21,8 +21,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _paths import CAD_ROOT
 from _session import run_build
-import _telemetry
-from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
 
 SPEC = DRAWINGS_BY_NAME['ch_rocker_arm_tl_oblique_pivot_block']
@@ -116,15 +115,6 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y+contract.NUT_TAP_DRILL/2,z),'nut tap mouth')
         add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=(.310,.255),
                                 label='four nut flange taps',process='4X DRILL TO PRINT\n')
-        # SolidWorks pins its own "#4-40 Tapped Hole" note beside the nut taps;
-        # its leader crossed section line C and the Hole Wizard callout above
-        # already states the thread. How many it adds varies by run (1-3 seen),
-        # some appearing after the views, so the sweep runs after the last
-        # annotation, needs at least one, and finalize proves none survives.
-        removed_tap_notes = remove_notes_matching(adapter,'#4-40 Tapped Hole')
-        if removed_tap_notes < 1:
-            raise RuntimeError('nut interface: no automatic #4-40 tapped-hole note to remove')
-        _telemetry.info(f'removed {removed_tap_notes} automatic #4-40 tapped-hole note(s)')
         annotations += nut_annotations
     precision = {name:places for dims in contract.DRAWING_PRECISION.values() for name,places in dims.items()}
     assert_imported_precision(adapter,annotations,precision)
@@ -132,8 +122,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
                                   scale=SHEET_SCALE,layout=spec.layout,
+                                  # SolidWorks pins its own "#4-40 Tapped Hole" notes by the nut
+                                  # taps, whose Hole Wizard callout already states the thread; one
+                                  # crossed section line C. Finalize's all-sheet sweep: farm runs
+                                  # 20261024T074822931Z, T082734591Z and T084702861Z each found 3.
                                   redundant_note_substrings=('#4-40 Tapped Hole',) if is_feed else (),
-                                  expected_redundant_notes=0)
+                                  expected_redundant_notes=3 if is_feed else 0)
 
 
 async def build(adapter):
