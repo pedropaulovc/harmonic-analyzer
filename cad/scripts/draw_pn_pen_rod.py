@@ -73,6 +73,7 @@ from pn_pen_rod_spec import (
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    STUD_TAP_WALL_CALLOUT,
     TOTAL_LENGTH,
 )
 
@@ -455,6 +456,38 @@ def _overall_reference(adapter: Any, side: Any) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
+@_telemetry.traced("drawing.pen_rod.stud_tap_wall_row")
+def _set_stud_tap_wall_row(display: Any) -> None:
+    """Rule 20: write the tap's wall shortfall as the callout's last row
+    (named exception RV-01, pn-pen-rod.yaml) and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_pd_guide_lock._set_hole_callout_below)."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
+    if STUD_TAP_WALL_CALLOUT in below:
+        raise RuntimeError(f"stud tap callout already states its wall: {below!r}")
+    updated = f"{below}\n{STUD_TAP_WALL_CALLOUT}" if below else STUD_TAP_WALL_CALLOUT
+    native.SetText(4, updated)  # swDimensionTextCalloutBelow; void return
+    resolved = str(native.GetText(4) or "").replace("\r", "")
+    if (
+        str(native.GetText(8) or "").replace("\r", "") != updated
+        or STUD_TAP_WALL_CALLOUT not in resolved
+        or any(
+            str(native.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+        )
+    ):
+        raise RuntimeError(
+            "stud tap callout wall row or native definitions did not persist: "
+            f"{[str(native.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+    _telemetry.info(f"stud tap callout below: {resolved!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -560,6 +593,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")
+    _set_stud_tap_wall_row(stud_callout)
 
     _overall_reference(adapter, side)
 

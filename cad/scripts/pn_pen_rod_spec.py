@@ -19,6 +19,8 @@ Plane ∩ Right Plane), the part's only reference axis.
 
 from __future__ import annotations
 
+import math
+
 import _config
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
 
@@ -41,9 +43,11 @@ PIVOT_DIA = 4.0
 PIVOT_BAND = (-0.010, -0.025)  # g6-like running clearance on the 4.000/4.012 bore
 PIVOT_LENGTH = 10.5  # shoulder to end: stops 1.0 above the v-block relief roof
 
-# Adjuster stud tap in the top face. #0-80 is the largest thread whose tap
-# drill leaves the drawing-guidelines.md rule 17 (walls and webs) 1.5 mm floor
-# in the 5 mm square: (5 - 1.524 major) / 2 = 1.74 mm (#2-56 leaves 1.38).
+# Adjuster stud tap in the top face, centred in the square. #0-80 is the
+# largest thread whose major leaves the drawing-guidelines.md rule 17 (walls
+# and webs) 1.5 mm floor in the smallest printed square: (4.95 - 1.524
+# major) / 2 = 1.71 mm (#2-56 leaves 1.38). That is under rule 17's 2.0
+# target, a shortfall the owner accepted (STUD_TAP_WALL_MIN below).
 STUD_THREAD = "#0-80"
 STUD_TAP_SPEC = HoleSpec(
     "tapped", STUD_THREAD, end="blind", depth_mm=6.0, overrides_mm={"ThreadDepth": 4.5}
@@ -57,9 +61,23 @@ STUD_ENGAGEMENT = 3.2
 
 TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 
-_WALL = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
-if _WALL < 1.5:  # drawing-guidelines.md rule 17 (walls and webs) floor
-    raise AssertionError(f"rod stud tap leaves a {_WALL:.2f} mm wall")
+# Worst-case wall from the tap's thread major to each flat of the smallest
+# printed square (the tap on the rod axis).
+STUD_TAP_WALL_MIN = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
+if STUD_TAP_WALL_MIN < 1.5:  # drawing-guidelines.md rule 17 (walls and webs) floor
+    raise AssertionError(f"rod stud tap leaves a {STUD_TAP_WALL_MIN:.2f} mm wall")
+# Named exception RV-01 (pn-pen-rod.yaml, owner ruling 2026-10-24 on #1903)
+# accepts exactly this 1.71 shortfall under the 2.0 target; a different wall
+# is outside the declaration and needs a new ruling.
+STUD_TAP_WALL_ACCEPTED = 1.71
+if round(STUD_TAP_WALL_MIN, 2) != STUD_TAP_WALL_ACCEPTED:
+    raise AssertionError(
+        f"rod stud tap wall {STUD_TAP_WALL_MIN:.3f} is not the owner-accepted "
+        f"{STUD_TAP_WALL_ACCEPTED}"
+    )
+# Rule 20: the tap callout's last row states the shortfall, floored at one
+# place so the sheet never overstates the minimum (named exception RV-01).
+STUD_TAP_WALL_CALLOUT = f"WALL {math.floor(STUD_TAP_WALL_MIN * 10 + 1e-9) / 10:.1f} MIN"
 if STUD_ENGAGEMENT < 1.5 * THREAD_MAJOR_MM[STUD_THREAD]:  # rule 18
     raise AssertionError("adjuster stud engagement is under 1.5 D")
 if STUD_ENGAGEMENT >= STUD_TAP_SPEC.overrides_mm["ThreadDepth"]:

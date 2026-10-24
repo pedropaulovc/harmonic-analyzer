@@ -6,3 +6,9 @@ pn-pen-rod:
   quantity: 1
   tolerance_class: machined_block
   process: "machined (brass)"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "end view, under the #0-80 adjuster stud tap callout: WALL 1.7 MIN"
+      finding: "wall from the #0-80 tap's thread major to each flat of the 5.00 0/-0.05 square below the 2.0 mm target (rule 17)"
+      reason: "owner ruling 2026-10-24 (#1903): keep the #0-80 adjuster tap centred in the 5.00 0/-0.05 square; 1.71 at the smallest printed square holds the rule 17 floor, printed floored as 1.7 MIN. A smaller stud (M1 or #00-90) still misses 2.0, and a 6 mm square resizes the MHA-PN-02 hanger guides, the MHA-PN-05 v-block and the carriage (owner-ruled shortfall)"
