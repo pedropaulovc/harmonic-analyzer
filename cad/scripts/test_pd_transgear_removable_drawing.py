@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import ast
+import enum
+import inspect
 import math
 import re
+import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +17,7 @@ import pytest
 import _config
 import build_pd_transgear_removable as part
 import draw_pd_transgear_removable as drawing
+import pd_transgear_removable_callouts as callouts
 import pd_transgear_removable_notes as notes
 import pd_transgear_removable_spec as spec
 import _sprocket_seat_geometry as seat_geometry
@@ -56,8 +60,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The part marks exactly what the sheet imports.
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    # Every callout lands on a dimension the sheet keeps.
-    assert set(drawing.CALLOUTS_ABOVE) | set(drawing.CALLOUTS_BELOW) <= marked
+    # Every callout row lands on a dimension its feature marks and the sheet
+    # keeps.
+    for rows in callouts.CALLOUTS.values():
+        for feature, name in rows:
+            assert name in spec.DRAWING_DIMENSIONS[feature], (feature, name)
 
 
 def test_pin_locations_hold_the_shared_band_at_three_places() -> None:
@@ -307,7 +314,7 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
         assert f"{sku} ({configuration})" in notes.DRAWING_NOTES
     assert "1 EACH" in notes.DRAWING_NOTES
     assert "TEETH, O.D. AND PLATE FACES AS SUPPLIED" in notes.DRAWING_NOTES
-    assert "TURN HUB OFF FLUSH" in notes.DRAWING_NOTES
+    assert "HUB REMOVED FLUSH" in notes.DRAWING_NOTES
 
 
 def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
@@ -318,10 +325,11 @@ def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> Non
     assert "DEBUR" not in str(_config.parts("pd-transgear-removable")["finish"]).upper()
 
 
-def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
-    """The holes slip over pins pressed into a host part; the sheet names
-    each host by number.  Hosts are the assemblies' press-fit pairs: MHA-DT-VN-67
-    in the crankshaft, MHA-PD-VN-54 in the knob's drive collar (not the shaft)."""
+def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() -> None:
+    """The holes slip over pins pressed into a host part; each banded pin
+    location names each host by number.  Hosts are the assemblies' press-fit
+    pairs: MHA-DT-VN-67 in the crankshaft, MHA-PD-VN-54 in the knob's drive
+    collar (not the shaft)."""
     from _interference_contracts import allowed_interference_pairs
 
     pins = {"dt-vn-crank-seat-drive-pin", "pd-vn-transgear-knob-drive-pin"}
@@ -333,7 +341,210 @@ def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
                 hosts |= stems - pins
     assert hosts == {"dt-crankshaft", "pd-transgear-drive-collar"}
     numbers = {_config.parts(host)["number"] for host in hosts}
-    assert set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", notes.DRAWING_NOTES)) == numbers
+    number = re.compile(
+        r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?"
+        r"|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])"
+    )
+    below = callouts.callouts_by_name(callouts.CALLOUT_BELOW)
+    for name in ("PinPosY", "PinNegY"):
+        assert set(number.findall(below[name])) == numbers, name
+    # The mates print at the band they explain, not in the general notes.
+    assert not number.findall(notes.DRAWING_NOTES)
+
+
+def test_the_plate_band_names_the_chain_it_serves() -> None:
+    callout = callouts.callouts_by_name(callouts.CALLOUT_BELOW)["BlankWidth"]
+    assert "ANSI #25 CHAIN" in callout and "SUPPLIED" in callout
+
+
+def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> None:
+    """The dimensioned views are T24's; one note line covers every
+    configuration, and only the supplied OD differs between them (each other
+    configuration's view prints nothing else)."""
+    assert drawing.MAIN_VIEW_LABEL == spec.DEFAULT_CONFIG
+    names = [name for name, _teeth in spec.CONFIGS]
+    shared = [
+        line
+        for line in notes.DRAWING_NOTES.splitlines()
+        if all(name in line for name in names) and "BLANK" not in line
+    ]
+    assert len(shared) == 1
+    for configuration in drawing.CONFIGURATION_VIEW_CENTERS:
+        assert set(drawing.configuration_keep(configuration)) == {"BlankDia"}
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
+
+
+class _Write(enum.Enum):
+    """How a test display dimension answers ``SetText``."""
+
+    STORE = "store"
+    DROP = "drop"
+
+
+class _CalloutDisplay:
+    """A display dimension whose ``SetText`` stores or silently drops."""
+
+    def __init__(self, texts: dict[int, str], write: _Write = _Write.STORE) -> None:
+        self._texts = dict(texts)
+        self._write = write
+
+    def SetText(self, part: int, text: str) -> None:
+        if self._write is _Write.STORE:
+            self._texts[part] = text
+
+    def GetText(self, part: int) -> str:
+        return self._texts.get(part, "")
+
+
+def _imported(monkeypatch, printed: dict[tuple[int, str], str]) -> list[_Annotation]:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
+    names = {name for _lane, name in printed}
+    return [
+        _Annotation(
+            name,
+            _CalloutDisplay(
+                {lane: text for (lane, owner), text in printed.items() if owner == name}
+            ),
+        )
+        for name in sorted(names)
+    ]
+
+
+def _part_rows() -> dict[tuple[int, str], str]:
+    return {
+        (lane, name): text
+        for lane in callouts.CALLOUTS
+        for name, text in callouts.callouts_by_name(lane).items()
+    }
+
+
+def test_imported_callouts_read_back_through_crlf_and_trimmed_standoff(
+    monkeypatch,
+) -> None:
+    printed = {
+        key: text.replace("\n", "\r\n").strip() for key, text in _part_rows().items()
+    }
+    drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
+
+
+@pytest.mark.parametrize("lost", ["PinPosY", "PinNegY", "BlankWidth"])
+def test_an_imported_dimension_missing_its_mate_row_is_refused(
+    monkeypatch, lost: str
+) -> None:
+    printed = _part_rows() | {(callouts.CALLOUT_BELOW, lost): ""}
+    with pytest.raises(RuntimeError, match=lost):
+        drawing._assert_dimension_callouts(None, _imported(monkeypatch, printed))
+
+
+def test_a_callout_dimension_printed_twice_is_refused(monkeypatch) -> None:
+    annotations = _imported(monkeypatch, _part_rows())
+    with pytest.raises(RuntimeError, match="exactly once"):
+        drawing._assert_dimension_callouts(None, [*annotations, annotations[0]])
+
+
+def _author(monkeypatch, write: _Write) -> dict[tuple[str, str], _CalloutDisplay]:
+    displays: dict[tuple[str, str], _CalloutDisplay] = {}
+    walks: list[str] = []
+
+    def named(_adapter, feature: str, names: set[str]):
+        walks.append(feature)
+        return {
+            name: (
+                displays.setdefault((feature, name), _CalloutDisplay({}, write)),
+                None,
+            )
+            for name in names
+        }
+
+    monkeypatch.setattr(part, "_named_dimensions", named)
+    part.author_dimension_callouts(None)
+    # One tree walk per feature, however many lanes its dimensions carry.
+    assert sorted(walks) == sorted(set(walks))
+    return displays
+
+
+def test_the_part_authors_every_text_lane_on_its_source_dimension(
+    monkeypatch,
+) -> None:
+    displays = _author(monkeypatch, _Write.STORE)
+    for lane, rows in callouts.CALLOUTS.items():
+        for key, text in rows.items():
+            assert displays[key].GetText(lane) == text, (lane, key)
+    for key, lanes in callouts.REFERENCE_TEXT.items():
+        for lane, text in lanes.items():
+            assert displays[key].GetText(lane) == text, (lane, key)
+
+
+def test_the_part_authors_the_reference_mark_of_every_reference_dimension() -> None:
+    assert {name for _feature, name in callouts.REFERENCE_TEXT} == set(
+        spec.DRAWING_REFERENCE_DIMENSIONS
+    )
+
+
+def test_a_text_lane_the_part_failed_to_store_is_refused(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="did not persist"):
+        _author(monkeypatch, _Write.DROP)
+
+
+_SCRIPTS = Path(drawing.__file__).resolve().parent
+
+
+def _reaches_set_text(function, seen: set) -> bool:
+    """Whether ``function``, or a repository function it calls by name
+    (followed transitively through ``cad/scripts`` modules), calls ``SetText``."""
+    module = inspect.getmodule(function)
+    source_file = getattr(module, "__file__", None)
+    if function in seen or source_file is None:
+        return False
+    if Path(source_file).resolve().parent != _SCRIPTS:
+        return False
+    seen.add(function)
+    source = inspect.getsource(function)
+    if "SetText(" in source:
+        return True
+    for node in ast.walk(ast.parse(textwrap.dedent(source))):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            target = getattr(module, node.func.id, None)
+            if inspect.isfunction(target) and _reaches_set_text(target, seen):
+                return True
+    return False
+
+
+def test_the_drawing_never_writes_dimension_text() -> None:
+    """Text set from the drawing writes through to the built part, so no
+    function the draw script defines or imports reaches ``SetText``."""
+    seen: set = set()
+    writers = sorted(
+        name
+        for name, value in vars(drawing).items()
+        if inspect.isfunction(value) and _reaches_set_text(value, seen)
+    )
+    assert writers == []
+
+
+def test_the_write_scan_finds_the_shared_dimension_text_writers() -> None:
+    import _drawing_dimensions
+
+    for writer in (
+        _drawing_dimensions.set_dimension_callouts,
+        _drawing_dimensions.set_reference_dimensions,
+    ):
+        assert _reaches_set_text(writer, set()), writer.__name__
+
+
+def _settled_labels(landed: tuple[float, float, float]) -> None:
+    annotation = SimpleNamespace(GetPosition=lambda: landed)
+    drawing._assert_labels_in_place([(annotation, drawing.FRONT_LABEL_XY, "face")])
+
+
+def test_a_view_label_at_its_place_is_accepted() -> None:
+    _settled_labels((*drawing.FRONT_LABEL_XY, 0.0))
+
+
+def test_a_view_label_left_at_the_insertion_default_is_refused() -> None:
+    with pytest.raises(RuntimeError, match="sits at"):
+        _settled_labels((0.0, 0.0, 0.0))
 
 
 def test_gears_carry_no_frames_or_datums() -> None:

@@ -38,7 +38,10 @@ Drawing marks (``draw_pd_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
 ``spec.DRAWING_PRECISION``, the plate thickness banded ``seat_geometry.PLATE_BAND``
 and each pin centre +/-``seat_geometry.DRIVE_PIN_OFFSET_TOL``; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints
-its own.  The sheet's SPROCKET DATA and notes are file properties.
+its own.  The sheet's SPROCKET DATA and notes are file properties.  The
+dimensions' callout rows (``pd_transgear_removable_callouts``) are authored
+here, on the source dimensions: the drawing only reads them back, because
+text set from the drawing writes through to the built part.
 
 Part frame: axis Z through the origin, plate z = 0..PLATE (the Front Plane is
 the wheel's FRONT face; ``RearFace`` at z = PLATE seats on the shaft's seat
@@ -62,6 +65,7 @@ import sys
 
 import _config
 import _telemetry
+import pd_transgear_removable_callouts as callouts
 import pd_transgear_removable_spec as spec
 import _sprocket_seat_geometry as seat_geometry
 from _appearance import apply_material
@@ -81,7 +85,11 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import (
+    _named_dimension,
+    _named_dimensions,
+    apply_drawing_precision,
+)
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
@@ -123,6 +131,25 @@ if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
 
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+
+
+@_telemetry.traced("dim.pd_transgear_removable_text")
+def author_dimension_callouts(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back.
+
+    One tree walk per feature resolves all of its dimensions.
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: {printed!r}"
+                    )
 
 
 def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
@@ -1108,6 +1135,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_dimension_callouts(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,

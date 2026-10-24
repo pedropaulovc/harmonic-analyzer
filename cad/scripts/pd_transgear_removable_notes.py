@@ -38,9 +38,6 @@ if abs(BORE_PIN_WEB_WORST - 0.47) > 1e-9:
 # Pending exception ruling: MHA-PD-09 web (#1377).
 BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_WORST:.2f} MIN."
 
-CRANKSHAFT_NUMBER = "MHA-DT-11"
-KNOB_COLLAR_NUMBER = "MHA-PD-22"
-
 
 def _per_configuration(render: Callable[[int], str]) -> str:
     """One value per configuration, in ``spec.CONFIGS`` order."""
@@ -80,6 +77,8 @@ GEAR_DATA = "\n".join(
     ]
 )
 
+# The drive-pin holes' mates print at their location callouts (the drawing's
+# CALLOUTS); the sheet draws T24 only, so it says what the other two share.
 DRAWING_NOTES = "\n".join(
     (
         "BLANK, 1 EACH: McMASTER "
@@ -87,8 +86,10 @@ DRAWING_NOTES = "\n".join(
             f"{spec.BLANK_SKUS[name]} ({name})" for name, _teeth in spec.CONFIGS
         )
         + ".",
-        "TEETH, O.D. AND PLATE FACES AS SUPPLIED; TURN HUB OFF FLUSH.",
-        f"DRIVE-PIN HOLES SLIP OVER PINS IN {CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}.",
+        "TEETH, O.D. AND PLATE FACES AS SUPPLIED; HUB REMOVED FLUSH.",
+        "BORE, DRIVE-PIN HOLES AND PLATE SAME ON "
+        + " / ".join(name for name, _teeth in spec.CONFIGS)
+        + ".",
         BORE_PIN_WEB_NOTE,
     )
 )
