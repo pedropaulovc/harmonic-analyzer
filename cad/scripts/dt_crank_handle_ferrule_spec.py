@@ -9,10 +9,11 @@ the crank arm MHA-DT-06.
 The oak tenon is turned to suit this bore, and the handle's end play is set by
 facing the MHA-DT-32 shoulder at assembly (user ruling 2026-09-29, after the
 MHA-DT-34 machinist review), so no length here is a stack term and every size
-but the bore and the seat mouth's chamfer is routine (.X).  The bore keeps a
-+/-0.10 band (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X a large
-bore let the fitted tenon outgrow the MHA-DT-08 shoulder it seats on, and a
-small one thinned the oak round the pivot bore under 1.5.
+but the bore is routine (.X).  The bore keeps a +/-0.10 band (Codex P1/P2 on
+#1139, user ruling 2026-09-30): at .X a large bore let the fitted tenon outgrow
+the MHA-DT-08 shoulder it seats on, and a small one thinned the oak round the
+pivot bore under 1.5.  Both bore mouths take only the title block's edge break
+(owner ruling 2026-10-24, #1900).
 
 Local frame: the axis is local +X, the part's origin plane is the arm-bearing
 end face (x=0), and the seat face against the oak shoulder is at x=LENGTH --
@@ -23,9 +24,7 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-import math
-
-from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
+from dt_crank_hub_geometry import EDGE_BREAK_MAX_MM
 
 # The ring leaves the bench at the 9/16-in rod's own OD and is skimmed to the
 # Ø12.5 grip contour with the MHA-DT-08 shoulder after the epoxy cures (user
@@ -51,33 +50,14 @@ LENGTH = 7.0
 # The shortest tenon must retain this much uninterrupted bonded length.
 TENON_LENGTH = 5.0
 TENON_GLUE_LENGTH_FLOOR = 3.5
-# Owner ruling A on #1661: the seat-mouth chamfer clears the R0.3 tenon root.
-# Its maximum is the glue-length budget rounded DOWN to a one-place limit:
-# 5.0 - 0.8 - 0.25 - 3.5 = 0.45, hence 0.4.  Derive it here rather than
-# tightening it independently of the handle's joint-length requirement.
-SEAT_MOUTH_CHAMFER_MIN = 0.3
-SEAT_MOUTH_CHAMFER_MAX = (
-    math.floor(
-        round(
-            (
-                TENON_LENGTH
-                - GENERAL_1PL_TOL_MM
-                - EDGE_BREAK_MAX_MM
-                - TENON_GLUE_LENGTH_FLOOR
-            )
-            * 10.0,
-            6,
-        )
-    )
-    / 10.0
-)
-if SEAT_MOUTH_CHAMFER_MAX < SEAT_MOUTH_CHAMFER_MIN:
-    raise AssertionError("MHA-DT-34 glue-length budget cannot clear the tenon root")
-# Modelled at the midpoint; the native band prints both functional limits.
-SEAT_MOUTH_CHAMFER = round((SEAT_MOUTH_CHAMFER_MIN + SEAT_MOUTH_CHAMFER_MAX) / 2.0, 6)
-SEAT_MOUTH_CHAMFER_TOL = round(
-    (SEAT_MOUTH_CHAMFER_MAX - SEAT_MOUTH_CHAMFER_MIN) / 2.0, 6
-)
+# Owner ruling 2026-10-24 (#1900, option 4) supersedes owner ruling A on #1661
+# (a 0.35 +/-0.05 x 45-degree chamfer) for the seat mouth: MHA-DT-08's tenon
+# root is relieved into its shoulder, clear of the seat face, so this mouth
+# takes only the title block's edge break, and the brass the chamfer took stays
+# in the skimmed wall (dt_crank_handle_spec.FERRULE_MOUTH_WALL_MIN).  It is not
+# modelled, as no other edge break is; the walls and the glue length budget it
+# at its largest.
+SEAT_MOUTH_BREAK_MAX = EDGE_BREAK_MAX_MM
 
 # Brass wall, on radius, as made: the smallest stock over the largest bore.
 # The skimmed wall, with the ring off-centre, is MHA-DT-08's check.
@@ -86,10 +66,10 @@ if WALL_WORST < 1.5:
     raise AssertionError("MHA-DT-34 ferrule wall is under 1.5 at the worst case")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "FerruleProfile": {"OuterDia", "BoreDia", "Length", "SeatMouthChamfer"},
+    "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1, "SeatMouthChamfer": 2},
+    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

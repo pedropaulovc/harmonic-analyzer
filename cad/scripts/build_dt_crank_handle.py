@@ -15,7 +15,8 @@ cup.  Circumferentially smooth after the revolve.
 
 Layout: handle axis along +X; x=0 is the ferrule's arm face (the handle's
 seat on the arm), so the oak starts at the tenon end, short of it.  One
-revolve carries the tenon, the reamed bore, the grip and the counterbore, the
+revolve carries the tenon, its 45-degree root relief into the shoulder (owner
+ruling 2026-10-24, #1900), the reamed bore, the grip and the counterbore, the
 tenon root and the counterbore's floor corner rounded in the profile to their
 single-limit R0.3 MAX (owner ruling A on #1661).  The profile is defined by
 what the sheet prints -- stations from the tenon end face, the shoulder,
@@ -54,7 +55,10 @@ from _sketch import (
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
-from _drawing_tolerances import set_dimension_bilateral_tolerance
+from _drawing_tolerances import (
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 
@@ -98,12 +102,66 @@ from dt_crank_handle_spec import (  # noqa: E402
     TENON_DIA,
     TENON_LENGTH,
     TENON_R,
+    TENON_ROOT_RELIEF,
+    TENON_ROOT_RELIEF_TOL,
+    TENON_ROOT_ROUND_REACH,
     TENON_X0,
     WAIST_R,
     WAIST_X,
     WOOD_LENGTH,
     profile_radius,
 )
+
+# The tenon root (owner ruling 2026-10-24, #1900): a 45-degree relief cone
+# cut into the shoulder, from the shoulder face TENON_ROOT_RELIEF out from the
+# tenon OD down to the tenon TENON_ROOT_RELIEF behind the face, its corner
+# with the tenon rounded at INSIDE_CORNER_R_MAX.  That round meets the tenon
+# TENON_ROOT_ROUND_REACH (R (1 + sqrt 2)) back from the corner and the cone
+# R (1 + sqrt 2) along it, R / sqrt 2 off the corner's centre each way.
+RELIEF_TOP = (SHOULDER_X, TENON_R + TENON_ROOT_RELIEF)
+_ROOT_CORNER = (SHOULDER_X + TENON_ROOT_RELIEF, TENON_R)
+ROOT_ON_TENON = (_ROOT_CORNER[0] - TENON_ROOT_ROUND_REACH, TENON_R)
+ROOT_CENTER = (ROOT_ON_TENON[0], TENON_R + INSIDE_CORNER_R_MAX)
+ROOT_ON_RELIEF = (
+    ROOT_CENTER[0] + INSIDE_CORNER_R_MAX / math.sqrt(2.0),
+    ROOT_CENTER[1] + INSIDE_CORNER_R_MAX / math.sqrt(2.0),
+)
+# The relief line's run from the root round to the shoulder face, by equation
+# from the leg and the round so the cone stays at 45 degrees.
+RELIEF_RUN = ROOT_ON_RELIEF[0] - SHOULDER_X
+_RELIEF_RUN_EXPR = '"TenonRootRelief" - "InsideCornerR" * 1.7071067812'
+
+
+def _spandrel(
+    corner: tuple[float, float],
+    along: tuple[tuple[float, float], tuple[float, float]],
+    radius: float,
+) -> tuple[float, float]:
+    """Area and centroid height of the material a fillet of ``radius`` adds
+    in the corner at ``corner`` between the faces running off it along the
+    unit vectors ``along``: the kite between the corner, the two tangent
+    points and the centre, less the arc's sector."""
+    (ax, ay), (bx, by) = along
+    half = math.acos(ax * bx + ay * by) / 2.0
+    reach = radius / math.tan(half)
+    bisector = math.hypot(ax + bx, ay + by)
+    centre_y = corner[1] + radius / math.sin(half) * (ay + by) / bisector
+    kite = reach * radius
+    kite_y = (
+        2.0 * corner[1]
+        + (corner[1] + reach * ay)
+        + (corner[1] + reach * by)
+        + 2.0 * centre_y
+    ) / 6.0
+    sweep = math.pi - 2.0 * half
+    sector = radius**2 * sweep / 2.0
+    sector_y = (
+        centre_y
+        - (4.0 * radius * math.sin(sweep / 2.0) / (3.0 * sweep)) * (ay + by) / bisector
+    )
+    area = kite - sector
+    return area, (kite * kite_y - sector * sector_y) / area
+
 
 def _nominal_volume() -> float:
     """Revolved volume of the nominal profile, less the bore: the check that
@@ -121,13 +179,20 @@ def _nominal_volume() -> float:
     tenon = math.pi * TENON_R**2 * TENON_LENGTH
     counterbore = math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
     bore = math.pi * (PIVOT_BORE_DIA / 2.0) ** 2 * (COUNTERBORE_FLOOR_X - TENON_X0)
-    # Pappus (build_pn_pen_rod's shoulder root): each inside corner's fillet
-    # adds the spandrel R^2 (1 - pi/4), its centroid R (10 - 3 pi) / (3 (4 -
-    # pi)) off each face -- outside the tenon OD, inside the counterbore wall.
-    spandrel = INSIDE_CORNER_R_MAX**2 * (1.0 - math.pi / 4.0)
-    offset = INSIDE_CORNER_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
-    corners = 2.0 * math.pi * spandrel * ((TENON_R + offset) + (COUNTERBORE_R - offset))
-    return grip + tenon - counterbore - bore + corners
+    # The relief turns a right triangle of legs c out of the shoulder at the
+    # tenon OD, its centroid c/3 above it: pi c^2 (r + c/3).
+    relief = math.pi * TENON_ROOT_RELIEF**2 * (TENON_R + TENON_ROOT_RELIEF / 3.0)
+    # Pappus: each inside corner's fillet adds its spandrel -- the tenon root
+    # in the relief's 45-degree corner, the counterbore's floor corner square.
+    diagonal = 1.0 / math.sqrt(2.0)
+    corners = 0.0
+    for corner, along in (
+        (_ROOT_CORNER, ((-1.0, 0.0), (-diagonal, diagonal))),
+        ((COUNTERBORE_FLOOR_X, COUNTERBORE_R), ((1.0, 0.0), (0.0, -1.0))),
+    ):
+        area, centroid_y = _spandrel(corner, along, INSIDE_CORNER_R_MAX)
+        corners += 2.0 * math.pi * area * centroid_y
+    return grip + tenon - relief - counterbore - bore + corners
 
 
 V_HANDLE = _nominal_volume()
@@ -205,6 +270,7 @@ async def build(adapter) -> dict[str, str]:
         ("CounterboreDepth", COUNTERBORE_DEPTH),
         ("PivotBoreDia", PIVOT_BORE_DIA),
         ("InsideCornerR", INSIDE_CORNER_R_MAX),
+        ("TenonRootRelief", TENON_ROOT_RELIEF),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -217,14 +283,11 @@ async def build(adapter) -> dict[str, str]:
     peak_pt = (PEAK_X, PEAK_R)
     oak_end_pt = (OAK_END_X, COUNTERBORE_R)
     crest_pt = (OAK_END_X, END_ROUND_CENTER[1])
-    # The two inside corners, each a quarter arc of INSIDE_CORNER_R_MAX
-    # tangent to its faces: the tenon root rises from the tenon OD into the
-    # shoulder, the counterbore's floor corner turns from its wall into its
-    # floor.
+    # The two inside corners, each an arc of INSIDE_CORNER_R_MAX tangent to its
+    # faces: the tenon root turns from the tenon OD into the shoulder relief
+    # (owner ruling 2026-10-24, #1900), the counterbore's floor corner from its
+    # wall into its floor.
     corner_r = INSIDE_CORNER_R_MAX
-    tenon_root_start = (SHOULDER_X - corner_r, TENON_R)
-    tenon_root_end = (SHOULDER_X, TENON_R + corner_r)
-    tenon_root_center = (SHOULDER_X - corner_r, TENON_R + corner_r)
     floor_round_start = (COUNTERBORE_FLOOR_X + corner_r, COUNTERBORE_R)
     floor_round_end = (COUNTERBORE_FLOOR_X, COUNTERBORE_R - corner_r)
     floor_round_center = (COUNTERBORE_FLOOR_X + corner_r, COUNTERBORE_R - corner_r)
@@ -237,20 +300,21 @@ async def build(adapter) -> dict[str, str]:
         "add_centerline axis",
         await adapter.add_centerline(0.0, 0.0, COUNTERBORE_FLOOR_X, 0.0),
     )
-    # Tenon: end face (from the reamed bore) -> OD -> the root round -> the
-    # shoulder step up to the ferrule's OD.
+    # Tenon: end face (from the reamed bore) -> OD, running on behind the
+    # shoulder face -> the root round -> the 45-degree relief back out to the
+    # shoulder face -> the shoulder up to the ferrule's OD.
     tenon_end, tenon_top = await add_line_chain(
-        adapter, [(TENON_X0, bore_r), tenon_corner, tenon_root_start], close=False
+        adapter, [(TENON_X0, bore_r), tenon_corner, ROOT_ON_TENON], close=False
     )
     # add_arc sweeps CCW from start to end; each is ordered so the sweep is the
     # minor arc on the silhouette side.  Concave arcs (centre above) run left
     # to right under their centre; convex ones (centre below) right to left.
     tenon_root = check(
         "tenon root arc",
-        await adapter.add_arc(*tenon_root_center, *tenon_root_start, *tenon_root_end),
+        await adapter.add_arc(*ROOT_CENTER, *ROOT_ON_TENON, *ROOT_ON_RELIEF),
     )
-    (shoulder,) = await add_line_chain(
-        adapter, [tenon_root_end, shoulder_pt], close=False
+    relief, shoulder = await add_line_chain(
+        adapter, [ROOT_ON_RELIEF, RELIEF_TOP, shoulder_pt], close=False
     )
     flare = check(
         "flare arc", await adapter.add_arc(*FLARE_CENTER, *shoulder_pt, *waist_pt)
@@ -357,8 +421,8 @@ async def build(adapter) -> dict[str, str]:
         "PivotBoreDia",
     )
     profile.record("PivotBoreDia", '"PivotBoreDia"')
-    # To the shoulder's foot at the root round's end: the tenon OD line stops
-    # short of the shoulder by the round.
+    # To the shoulder face, where the relief leaves it: the tenon OD runs on
+    # behind the face to the root round in the relief.
     await dimension_between(
         adapter,
         f"{tenon_end}.end",
@@ -368,6 +432,27 @@ async def build(adapter) -> dict[str, str]:
         "tenon length",
     )
     profile.record("TenonLength", '"TenonLength"')
+    # The root relief's leg on the shoulder face, up from the tenon OD at the
+    # tenon end's corner, so the dimension stands off the part's left end; the
+    # relief line's run to the root round holds it at 45 degrees.
+    await dimension_between(
+        adapter,
+        f"{tenon_end}.end",
+        f"{relief}.end",
+        "vertical_distance",
+        TENON_ROOT_RELIEF,
+        "tenon root relief leg",
+    )
+    profile.record("TenonRootRelief", '"TenonRootRelief"')
+    await dimension_between(
+        adapter,
+        f"{relief}.start",
+        f"{relief}.end",
+        "horizontal_distance",
+        RELIEF_RUN,
+        "tenon root relief run",
+    )
+    profile.record("TenonRootReliefRun", _RELIEF_RUN_EXPR)
     # To the tenon end face's corner, not the OD line: the drawing hangs the
     # diameter's shelf on the side its text stands from the measured point, so
     # the fitted tenon's long callout can run right, into the sheet.
@@ -492,7 +577,7 @@ async def build(adapter) -> dict[str, str]:
         (dome, end_round, "end round"),
         (end_round, oak_end_face, "end round crest"),
         (tenon_top, tenon_root, "tenon root on the tenon OD"),
-        (tenon_root, shoulder, "tenon root on the shoulder"),
+        (tenon_root, relief, "tenon root on the relief"),
         (counterbore_wall, floor_round, "floor round on the counterbore wall"),
         (floor_round, counterbore_floor, "floor round on the counterbore floor"),
     ):
@@ -528,15 +613,21 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
-    # Manufacturing drawing support: the model owns the one printed band
-    # (drawing-simplicity-policy.md `How the repository implements the guidelines`), the reamed bore, and the places every mark prints with.
-    # The tenon and the counterbore are fitted to the parts they take; the two
-    # inside corners carry their single MAX limit.
+    # Manufacturing drawing support: the model owns every printed band
+    # (drawing-simplicity-policy.md `How the repository implements the guidelines`):
+    # the reamed bore's, and the root relief's, which keeps the root round
+    # behind the ferrule's seat face and the ferrule its shoulder; and the
+    # places every mark prints with.  The tenon and the counterbore are fitted
+    # to the parts they take; the two inside corners carry their single MAX
+    # limit.
     set_dimension_bilateral_tolerance(
         adapter,
         "HandleProfile",
         "PivotBoreDia",
         *deviations(PIVOT_BORE_BAND),
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "HandleProfile", "TenonRootRelief", TENON_ROOT_RELIEF_TOL
     )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

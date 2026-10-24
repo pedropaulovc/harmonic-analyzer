@@ -17,9 +17,11 @@ prints there.  The stations stack above it in a baseline from the tenon end
 face, with the tangency-fixed radii as references beneath them; the diameters
 are dimensioned across their own cut, their text on shelves clear of the
 section; the fitted tenon and counterbore carry their mates and clearances as
-callouts, and the tenon root and the counterbore's floor corner their R0.3 MAX
-single limits with the part that seats on each.  The end
-view stands on the section's axis and carries the cutting plane.
+callouts, the tenon root's 45-degree relief its band with the ferrule it
+serves (owner ruling 2026-10-24, #1900), and the tenon root and the
+counterbore's floor corner their R0.3 MAX single limits with the part that
+seats on each.  The end view stands on the section's axis and carries the
+cutting plane.
 
 Run with SolidWorks open::
 
@@ -90,6 +92,7 @@ from dt_crank_handle_spec import (
     TENON_FIT_NOTE,
     TENON_R,
     TENON_ROOT_CALLOUT,
+    TENON_ROOT_RELIEF_CALLOUT,
     TENON_X0,
     WAIST_X,
 )
@@ -215,13 +218,20 @@ FRONT_KEEP = {
     # 22.0 mm wide and 2 x 5.55 + 3.5 = 14.6 mm tall, centred on the keep (were
     # the rows to hang from the keep instead, each box drops ~7 mm and stays
     # clear):
-    #   Tenon root, left of the tenon end: box x 0.024..0.046, y 0.1607..
-    #   0.1753 -- 4.0 mm clear of the tenon end's extension line (x 0.050),
-    #   11.3 inside the border, 16.9 under the 5.0's outside tail (y 0.1922).
-    #   Its leader runs down-right through the air over the tenon to the
-    #   corner, crossing that extension line at y ~0.158 (4 mm from the text)
-    #   and passing ~9 mm over the tenon diameter's extension line (y 0.1452).
-    "TenonRootRadius": (_front_x(TENON_X0) - 0.015, _front_y(TENON_R) + 0.0228),
+    #   Tenon root, left of the tenon end above the root relief's block: box x
+    #   0.024..0.046, y 0.1689..0.1835 -- 4.0 mm clear of the tenon end's
+    #   extension line (x 0.050), 11.3 inside the border, 8.7 under the 5.0's
+    #   outside tail (y 0.1922) and 10.6 over the relief's block.  Its leader
+    #   runs down-right through the air over the tenon into the relief's mouth
+    #   to the root round.
+    "TenonRootRadius": (_front_x(TENON_X0) - 0.015, _front_y(TENON_R) + 0.031),
+    # The root relief's leg (owner ruling 2026-10-24, #1900): "1.1 ±0.3" over
+    # three callout rows of 11 characters at most, 30.3 x 22.2 mm centred on
+    # the keep, so x 0.0177..0.0480 and y 0.1361..0.1583 -- 2.0 clear of the
+    # tenon end (x 0.050), 5.3 inside the border.  The vertical dimension line
+    # stands there, its extension lines running right over the air above the
+    # tenon to the relief's edge and the tenon OD.
+    "TenonRootRelief": (_front_x(TENON_X0) - 0.0172, _front_y(TENON_R) + 0.0020),
     #   Counterbore floor, above the section between the swell diameter's
     #   dimension line (x 0.213) and the 8.1's floor extension line (x
     #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023
@@ -240,6 +250,7 @@ DIMENSION_CALLOUTS = {
     "TenonDia": TENON_FIT_NOTE,
     "CounterboreDia": COUNTERBORE_FIT_NOTE,
     "TenonRootRadius": TENON_ROOT_CALLOUT,
+    "TenonRootRelief": TENON_ROOT_RELIEF_CALLOUT,
     "CounterboreFloorRadius": COUNTERBORE_FLOOR_CALLOUT,
 }
 # Each inside corner's text stands up-left of its arc's centre: the tenon
