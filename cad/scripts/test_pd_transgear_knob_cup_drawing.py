@@ -66,8 +66,9 @@ def test_bore_callout_names_its_journal_and_clears_the_border_and_centreline() -
     shaft = _config.parts("pd-transgear-knob-shaft")["number"]
     callout = " ".join(drawing.BORE_CALLOUT.split())
     low, high = spec.BORE_JOURNAL_CLEARANCE
-    assert "REAM" in callout
-    assert shaft in callout
+    assert "REAM THRU" in callout
+    assert "SLIDES ON" in callout
+    assert f"{shaft} JOURNAL" in callout
     assert f"{low:.3f}-{high:.3f}" in callout
     assert "DIAMETRAL CLEARANCE" in callout
     assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
@@ -102,7 +103,7 @@ def test_front_finish_caption_names_the_plate_boss() -> None:
     plate = _config.parts("pd-transgear-arm-plate")["number"]
     caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
     assert "THRUST FACE" in caption
-    assert plate in caption
+    assert f"{plate} REAR BOSS" in caption
     assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
 
 
