@@ -428,7 +428,9 @@ def test_the_channel_apex_set_screws_are_staked_like_the_keeper_screws() -> None
         j for j in jr.JOINTS if j.id == "ch-channel/fulcrum-shaft-set-screw-in-keeper"
     ]
     assert keeper.lock is Lock.STAKED
-    rocker_fitup, fulcrum_fitup = (" ".join(n.split()) for n in channel.FITUP_NOTES)
+    rocker_fitup, fulcrum_fitup, _hookup = (
+        " ".join(n.split()) for n in channel.FITUP_NOTES
+    )
     assert "SNUG, AND STAKE EACH TAP MOUTH AT 2 POINTS." in rocker_fitup
     assert "STAKE EACH TAP MOUTH AT 2 POINTS." in fulcrum_fitup
     for banned in ("LOCTITE", "THREADLOCK"):

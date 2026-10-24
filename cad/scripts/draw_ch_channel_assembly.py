@@ -94,6 +94,7 @@ import ch_channel_assembly_steps as steps
 from ch_channel_lever_spec import (
     HUB_LENGTH as LEVER_HUB_LENGTH,
     HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
+    LEVER_SPRING_X,
 )
 from ch_fulcrum_keeper_spec import (
     CROWN_TOP_Y as KEEPER_CROWN_TOP_Y,
@@ -148,6 +149,7 @@ SHEET_NAMES = (
     "EXPLODED VIEW + BOM",
     "ROCKER BANK FIT-UP",
     "LEVER BANK FIT-UP",
+    "LEVER BANK FIT-UP (CONT.)",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the channel package is landscape throughout")
@@ -158,11 +160,13 @@ SHEET_SCALE = (1.0, 7.0)
 ASSEMBLED_SCALE = (1.0, 5.0)
 ASSEMBLED_ISO_SCALE = SHEET_SCALE
 FITUP_SCALE = (1.0, 1.0)
+HOOKUP_SCALE = (1.0, 2.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: SHEET_SCALE,
     SHEET_NAMES[2]: FITUP_SCALE,
     SHEET_NAMES[3]: FITUP_SCALE,
+    SHEET_NAMES[4]: HOOKUP_SCALE,
 }
 _TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 BORDER = 0.0127
@@ -185,7 +189,7 @@ ASSEMBLED_CAPTION = "\n".join(
     (
         "RIGHT VIEW: NORTH (HUB 19) LEFT, SOUTH (HUB 0) RIGHT.",
         "SHEET 2: EXPLODED VIEW AND BILL OF MATERIALS.",
-        f"SHEETS 3 AND 4: FIT-UP, STEPS 1 TO {len(steps.SEQUENCE)}.",
+        f"SHEETS 3 TO {len(SHEET_NAMES)}: FIT-UP, STEPS 1 TO {len(steps.SEQUENCE)}.",
     )
 )
 
@@ -585,6 +589,38 @@ KEEPER_PLAN = BankView(
     orientation="*Top",
     label_xy=(0.020, 0.090),
 )
+
+# --- sheet 5: the lever-bank step that overflows sheet 4 ---------------------
+# A blank line between steps (user request, asm-steps spacing) ran sheet 4's
+# block two lines into the title block, so its last step prints whole here,
+# with the front view it describes: the fulcrum shaft, a lever, its spring,
+# anchor and jam nut, the 20 channels in line behind the nearest. The summing
+# plate the anchor threads into belongs to MHA-HA-00, not this assembly. The
+# view runs from the hub top (~6 above the fulcrum) to the nut (~89 below),
+# and from the fulcrum to the spring hole LEVER_SPRING_X along the lever.
+HOOKUP_DROP_MM = 42.0
+HOOKUP = BankView(
+    "SPRING HOOK-UP, FRONT",
+    (int(HOOKUP_SCALE[0]), int(HOOKUP_SCALE[1])),
+    (
+        _FULCRUM_X - LEVER_SPRING_X / 2.0,
+        _FULCRUM_Y - HOOKUP_DROP_MM,
+        FULCRUM_KEEPER_CENTRE_Z,
+    ),
+    (0.105, 0.180),
+    frozenset(
+        {
+            "ch-fulcrum-shaft",
+            "ch-channel-lever",
+            SPRING_STEM,
+            explode.HOOK,
+            explode.ANCHOR_NUT,
+        }
+    ),
+    parts="SUMMING PLATE NOT SHOWN",
+    orientation="*Front",
+)
+
 _PLAN_LUG = KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, asm.KEEPER_SOCKET_XZ[1])
 _PLAN_FACES = tuple(
     KEEPER_PLAN.plan_xy(asm.KEEPER_LUG_X, z) for z in asm.LUG_INNER_FACE_Z
@@ -851,9 +887,12 @@ if not asm.KEEPER_SOCKET_XZ[1] < asm.LUG_INNER_FACE_Z[0] < asm.LUG_INNER_FACE_Z[
 ROCKER_KEYS = tuple(
     steps.SEQUENCE[: steps.SEQUENCE.index(steps.KEEPERS_PAIR_REAMED_KEY)]
 )
-LEVER_KEYS = tuple(steps.SEQUENCE[len(ROCKER_KEYS) :])
-if LEVER_KEYS[0] != steps.KEEPERS_PAIR_REAMED_KEY or LEVER_KEYS[-1] != (
-    steps.SPRINGS_HOOKED_KEY
+# The last lever-bank step prints whole on sheet 5 (HOOKUP).
+LEVER_CONTINUED_KEYS = (steps.SPRINGS_HOOKED_KEY,)
+LEVER_KEYS = tuple(steps.SEQUENCE[len(ROCKER_KEYS) : -len(LEVER_CONTINUED_KEYS)])
+if (
+    LEVER_KEYS[0] != steps.KEEPERS_PAIR_REAMED_KEY
+    or steps.SEQUENCE[-len(LEVER_CONTINUED_KEYS) :] != LEVER_CONTINUED_KEYS
 ):
     raise AssertionError("the lever-bank steps close the sequence")
 
@@ -862,7 +901,9 @@ def _block(
     heading: str, keys: tuple[str, ...], text: dict[str, str], width: int
 ) -> str:
     lines = [heading]
-    for key in keys:
+    for index, key in enumerate(keys):
+        if index:
+            lines.append("")  # one blank line between consecutive steps
         lines += textwrap.wrap(
             text[key],
             width=width,
@@ -874,7 +915,7 @@ def _block(
     return "\n".join(lines)
 
 
-def _fitup_notes() -> tuple[str, str]:
+def _fitup_notes() -> tuple[str, str, str]:
     # Literal stems, so the config-dependency analysis reads exactly these rows.
     arm = _config.parts("ch-rocker-arm")["number"]
     rod = _config.parts("ch-connecting-rod")["number"]
@@ -1059,6 +1100,9 @@ def _fitup_notes() -> tuple[str, str]:
     return (
         _block("ROCKER BANK FIT-UP", ROCKER_KEYS, text, STEPS_LINE_WIDTH),
         _block("LEVER BANK FIT-UP", LEVER_KEYS, text, STEPS_LINE_WIDTH),
+        _block(
+            "LEVER BANK FIT-UP (CONT.)", LEVER_CONTINUED_KEYS, text, STEPS_LINE_WIDTH
+        ),
     )
 
 
@@ -1946,6 +1990,22 @@ def _place_fitup_sheets(adapter: Any) -> Callable[[], None]:
     return lambda: _assert_settings(displays)
 
 
+def _place_hookup_sheet(adapter: Any) -> None:
+    """Sheet 5: the lever-bank step sheet 4 has no room for, by the front
+    view of the spring it hooks up."""
+    _activate_sheet(adapter, SHEET_NAMES[4])
+    view = _placed_bank_view(adapter, HOOKUP)
+    _assert_view_on_sheet(view, label=HOOKUP.title)
+    _activate_view(adapter, view, label=HOOKUP.title)
+    bottom = _view_outline(view, label=HOOKUP.title)[1]
+    label_xy = (HOOKUP.centre[0] - 0.016, bottom - 0.004)
+    if add_note(adapter, HOOKUP.label_text, *label_xy) is None:
+        raise RuntimeError(f"failed to label {HOOKUP.title}")
+    _place_steps(
+        adapter, SHEET_NAMES[4], FITUP_NOTES[2], label="lever-bank steps, continued"
+    )
+
+
 def _break_line_at_text(display: Any, *, label: str) -> None:
     """Put the value in a break of its dimension line (#1660 r8): on the
     unbroken line the reference parentheses' tails touched the line."""
@@ -2002,6 +2062,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _place_assembled_sheet(adapter)
     balloons_settled = _place_exploded_sheet(adapter, north_instances)
     settings_settled = _place_fitup_sheets(adapter)
+    _place_hookup_sheet(adapter)
 
     def settled() -> None:
         balloons_settled()

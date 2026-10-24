@@ -259,11 +259,11 @@ def test_the_stack_step_says_which_way_and_where_to_re_face() -> None:
 
 
 def test_each_step_block_fits_the_field_right_of_its_bank_view() -> None:
-    rocker, lever = drawing.FITUP_NOTES
-    assert drawing.FITUP_STEPS == f"{rocker}\n{lever}"
+    rocker, lever, lever_continued = drawing.FITUP_NOTES
+    assert drawing.FITUP_STEPS == f"{rocker}\n{lever}\n{lever_continued}"
     template = drawing._TEMPLATE
     left, top = drawing.STEPS_XY
-    for note in (rocker, lever):
+    for note in (rocker, lever, lever_continued):
         lines = note.splitlines()
         assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < (
             template.width_m - drawing.BORDER
@@ -280,9 +280,30 @@ def test_each_step_block_fits_the_field_right_of_its_bank_view() -> None:
     assert lever.startswith(
         f"LEVER BANK FIT-UP\n{steps.step_number(steps.KEEPERS_PAIR_REAMED_KEY)}. "
     )
+    assert lever_continued.startswith(
+        f"LEVER BANK FIT-UP (CONT.)\n{steps.step_number(steps.SPRINGS_HOOKED_KEY)}. "
+    )
     assert "TIGHTEN" not in rocker
     assert "TIGHTEN" in lever and "STAKE" in lever
     assert _config.parts("sh-vn-arbor-set-screw")["number"] not in lever
+    # The sheet-5 view sits left of the steps, wholly inside the border.
+    hookup = drawing.HOOKUP
+    half_width = (drawing.LEVER_SPRING_X / 2.0 + 15.0) * hookup.mm
+    assert drawing.BORDER < hookup.centre[0] - half_width
+    assert hookup.centre[0] + half_width < left - 0.010
+
+
+def test_steps_are_one_blank_line_apart_and_never_split() -> None:
+    """User request: a blank line between consecutive steps; none before
+    step 1 of a block, none inside a step."""
+    for block in drawing.FITUP_NOTES:
+        lines = block.splitlines()
+        heads = [i for i, line in enumerate(lines) if STEP_HEAD.match(line)]
+        assert heads[0] == 1
+        for previous, head in zip(heads, heads[1:]):
+            assert lines[head - 1] == ""
+            assert "" not in lines[previous : head - 1]
+        assert "" not in lines[heads[-1] :]
 
 
 def test_the_package_sheets_and_settings_contract() -> None:
@@ -291,6 +312,7 @@ def test_the_package_sheets_and_settings_contract() -> None:
         "EXPLODED VIEW + BOM",
         "ROCKER BANK FIT-UP",
         "LEVER BANK FIT-UP",
+        "LEVER BANK FIT-UP (CONT.)",
     )
     assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
     asm = drawing.asm
@@ -985,7 +1007,7 @@ def test_the_fulcrum_keepers_are_pair_reamed_set_by_dro_and_staked() -> None:
     fulcrum_shaft = _config.parts("ch-fulcrum-shaft")["number"]
     top_frame = _config.parts("fr-top-frame")["number"]
     assert steps.SEQUENCE[-6:-4] == drawing.LEVER_KEYS[:2]
-    assert drawing.LEVER_KEYS == (
+    assert drawing.LEVER_KEYS + drawing.LEVER_CONTINUED_KEYS == (
         steps.KEEPERS_PAIR_REAMED_KEY,
         steps.KEEPERS_SET_KEY,
         steps.BARS_PINNED_KEY,
