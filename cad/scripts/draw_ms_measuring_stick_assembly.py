@@ -31,6 +31,7 @@ import ms_measuring_stick_assembly_sheet as sheet
 import ms_measuring_stick_assembly_spec as spec
 import ms_measuring_stick_explode_spec as explode
 import ms_stick_spec as stick
+import ms_stop_spec as stop
 from _check import check
 from _com import _early_bound
 from _session import run_build
@@ -216,9 +217,16 @@ PLATE_SCREW_INSTANCES = tuple(
 )
 if len(PLATE_SCREW_INSTANCES) != 2:
     raise AssertionError("the cover plate takes exactly two screws")
+# The plate's body walk landed balloon 2 on its corner at the stick's edge,
+# where it read as pointing at the stick (machinist review, run
+# 20261024T043544205Z-432c211c). Pin it to the middle of the screw-side
+# face's bottom edge, the plate edge farthest from the stick.
+PLATE_BALLOON_POINT_MM = (stop.BLOCK_LENGTH / 2.0, 0.0, stop.PLATE_Z_MIN)
 BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance=PLATE_SCREW_INSTANCES[0])
     if stem == spec.PLATE_SCREW
+    else BalloonAnchor(point_mm=PLATE_BALLOON_POINT_MM)
+    if stem == spec.PLATE
     else BalloonAnchor()
     for stem in BOM_COMPONENTS
 }

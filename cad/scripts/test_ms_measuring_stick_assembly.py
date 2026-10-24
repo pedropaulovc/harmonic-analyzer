@@ -528,6 +528,15 @@ def test_every_component_instance_carries_a_balloon() -> None:
     assert len(singles) + len(pinned) == sum(spec.QUANTITIES.values()) == 6
     # The second pass rings outside the first, at least a balloon apart.
     assert drawing.SECOND_SCREW_BALLOON_MARGIN - drawing.BALLOON_MARGIN >= 0.010
+    # Balloon 2 lands mid-way along the plate's screw-side bottom edge, the
+    # edge farthest from the stick, not on the corner at the stick's edge.
+    import ms_stop_spec as stop
+
+    assert drawing.BALLOON_ANCHORS[spec.PLATE].point_mm == (
+        stop.BLOCK_LENGTH / 2.0, 0.0, stop.PLATE_Z_MIN,
+    )
+    assert all(drawing.BALLOON_ANCHORS[stem].point_mm is None
+               for stem in spec.QUANTITIES if stem != spec.PLATE)
 
 
 @pytest.mark.parametrize("layout", tuple(drawing.DrawingLayout))

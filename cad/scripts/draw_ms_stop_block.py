@@ -37,16 +37,22 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
-from _drawing_leader_notes import add_property_linked_callout
+from _surface_finish import surface_finish_by_key
+from _drawing_leader_notes import add_attached_note, add_property_linked_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_view_display import set_hidden_lines_removed
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ms_stop_block"]
 PART_STEM = SPEC.artifact_stem
@@ -56,40 +62,89 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 FRONT_CENTER = (0.155, 0.185)
 RIGHT_CENTER = (0.315, FRONT_CENTER[1])
-BOTTOM_CENTER = (FRONT_CENTER[0], 0.080)
-# Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end view.
-ISO_CENTER = (0.360, 0.119)
+# 7 mm lower than the original 0.080 so the cover-tap callout's three web
+# rows (#1937) clear the underside view's top edge and 4.20 extension line.
+BOTTOM_CENTER = (FRONT_CENTER[0], 0.073)
+# Native 2:1 outline is 56.4 x 60.3 mm; fit above the title and below the end
+# view, right of the four-line rebate callout.
+ISO_CENTER = (0.372, 0.119)
 FRONT_KEEP = {
     "BlockLength": (0.155, 0.235), "BlockHeight": (0.085, 0.185),
     "RoofChamferSize": (0.227, 0.240), "RoofChamferAngle": (0.207, 0.220),
-    "PlateLeftFromEnd": (0.155, 0.140),
-    "PlateRightFromEnd": (0.155, 0.122),
+    # Below the LOCATING EDGE label, between the hole-location witnesses.
+    "PlateLeftFromEnd": (0.155, 0.132),
+    "PlateRightFromEnd": (0.155, 0.116),
     "PlateFromHeadFace": (0.100, 0.163),
 }
 RIGHT_KEEP = {
-    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.315, 0.130),
-    "WindowHeight": (0.365, 0.198), "RoofThickness": (0.350, 0.215),
+    "BlockDepth": (0.315, 0.235), "WindowWidth": (0.262, 0.130),
+    "WindowHeight": (0.370, 0.180), "RoofThickness": (0.355, 0.220),
+    # Above the roof, left of the roof-thickness text, under the (11.0).
+    "BackWall": (0.345, 0.224),
 }
 BOTTOM_KEEP = {
-    "ThumbFromEnd": (0.175, 0.038), "ThumbFromPlate": (0.090, 0.080),
+    "ThumbFromEnd": (0.175, 0.031), "ThumbFromPlate": (0.090, 0.073),
 }
+STICK_FIT = f"SLIDING FIT ON\nMS-STICK {_config.parts('ms-stick')['number']}"
 # Native horizontal size witnesses end at this corner rather than spanning
 # the view; the shorter angle arc stays below the overall length dimension.
-DIMENSION_CALLOUTS = {"RoofChamferSize": "2 CORNERS", "WindowWidth": "OPEN REBATE"}
+# The rebate bands exist only for the stick that slides in it; the roof's
+# worst case between the 1.5 floor and 2.0 target is stated as a fact.
+DIMENSION_CALLOUTS = {
+    "RoofChamferSize": "2 CORNERS",
+    "WindowWidth": f"OPEN REBATE\n{STICK_FIT}",
+    "WindowHeight": STICK_FIT,
+    "RoofThickness": part.ROOF_WALL_CALLOUT,
+}
+# Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
+LOCATING_END_XY = (0.232, 0.160)
+# The edge label sits wholly left of its leader's landing point, so the
+# leader leaves the text's end, between the two hole witness lines.
+LOCATING_EDGE_XY = (0.137, 0.150)
+LOCATING_EDGE_X_MM = 5.0
 # The title block owns the general internal thread class. Keep Hole Wizard's
 # variable definitions, not the resolved text that would freeze drill/depths.
 FINAL_SHEET_REMOVED_NOTES = ("Tapped Hole",)
 COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
     f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
-    # Two short lines: one 55-character line ran through the left border.
-    + part.MATCH_DRILL_DATUM_ALIGNMENT.replace(" AND ", " AND\n")
-    + "\n"
+    f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
+    f"DEPTHS FROM {part.BLOCK_MATING_FACE_NOTE}\n"
+    f"{part.MATCHED_PAIR_NOTE}\n"
 )
+# The 4-40 runs from the underside through the floor and opens into the
+# rebate; THRU alone does not say which wall it stops at (rules 1, 12).
+THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
+# Ra 1.6 symbol left of the right view's open rebate mouth, below the mating
+# face label; its leader enters the mouth to the ceiling's mouth-side quarter.
+SLIDE_FINISH_OFFSET = (-0.030, -0.012)
 
 
-def _remove_general_thread_class(display: Any) -> None:
-    """Suppress only the native class token; leave thread/drill variables live."""
+def _add_rebate_slide_finish(adapter: Any, right: Any) -> None:
+    """Rule 6: grade the rebate ceiling the stick's graduated face slides on."""
+    window_depth = part.WINDOW_Z_MAX - part.WINDOW_Z_MIN
+    ceiling_xy = model_point_in_view(
+        adapter, right, (
+            part.BLOCK_LENGTH / 2000.0,
+            part.WINDOW_Y_MAX / 1000.0,
+            (part.WINDOW_Z_MIN + window_depth / 4.0) / 1000.0,
+        ), label="rebate ceiling",
+    )
+    add_surface_finish(
+        adapter, right,
+        edge_xy=ceiling_xy,
+        leader_attach_xy=ceiling_xy,
+        symbol_xy=(ceiling_xy[0] + SLIDE_FINISH_OFFSET[0], ceiling_xy[1] + SLIDE_FINISH_OFFSET[1]),
+        control=surface_finish_by_key(part.BLOCK_SURFACE_FINISHES, "rebate_slide"),
+        label="rebate slide finish",
+        char_height=0.0025,
+    )
+
+
+def _remove_general_thread_class(display: Any, *, last_line: str | None = None) -> None:
+    """Suppress only the native class token; leave thread/drill variables live.
+
+    ``last_line`` is appended below the native rows, e.g. where a THRU ends."""
     native = _early_bound(display, "IDisplayDimension")
     if not native.IsHoleCallout():
         raise RuntimeError("general thread class removal requires a native hole callout")
@@ -102,6 +157,8 @@ def _remove_general_thread_class(display: Any) -> None:
     if before.endswith("-"):
         before = before[:-1].rstrip(" \t")
     revised = before + after
+    if last_line:
+        revised = revised.rstrip("\r\n") + "\n" + last_line
     native.SetText(1, revised)  # swDimensionTextPrefix; void return
     if str(native.GetText(5) or "") != revised:
         raise RuntimeError("native tap class-token removal did not persist")
@@ -119,9 +176,10 @@ def _orient_bottom_view(adapter: Any, view: Any) -> None:
         )
 
 
-def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> None:
-    """Read back the source-owned parentheses and absence of receiver bands."""
-    remaining = set(part.PLATE_LOCATION_DIMENSIONS)
+def _assert_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Read back the source-owned parentheses and absence of bands on the
+    receiver's plate locations and the reference envelope depth."""
+    remaining = set(part.PLATE_LOCATION_DIMENSIONS | part.BLOCK_REFERENCE_DIMENSIONS)
     for annotation in annotations:
         name = dimension_name(adapter, annotation)
         if name not in remaining:
@@ -138,9 +196,21 @@ def _assert_plate_location_references(adapter: Any, annotations: list[Any]) -> N
             or (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != ("(", ")")
             or not bool(display.ShowDimensionValue)
         ):
-            raise RuntimeError(f"{name}: imported plate-master reference lost its source display")
+            raise RuntimeError(f"{name}: imported reference lost its source display")
     if remaining:
-        raise RuntimeError(f"missing plate-master reference dimensions: {sorted(remaining)}")
+        raise RuntimeError(f"missing reference dimensions: {sorted(remaining)}")
+
+
+def _label_locating_edges(adapter: Any, front: Any) -> None:
+    """Leader the match-drill X=0 end and Y=0 edge on the cover-face view."""
+    face_z = part.PLATE_Z_MAX / 1000.0
+    for text, model_xyz, note_xy in (
+        (part.LOCATING_END_NOTE, (0.0, 2.0 / 1000.0, face_z), LOCATING_END_XY),
+        (part.LOCATING_EDGE_NOTE, (LOCATING_EDGE_X_MM / 1000.0, 0.0, face_z), LOCATING_EDGE_XY),
+    ):
+        edge_xy = model_point_in_view(adapter, front, model_xyz, label=text.lower())
+        add_attached_note(adapter, front, text=text, entity_xy=edge_xy,
+                          note_xy=note_xy, label=text.lower())
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -178,21 +248,24 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.138),
+        # Vertically centred: 11 mm below the original 0.138 keeps the web
+        # rows' growth off the 14.1 / (4.00) extension line above it.
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.127),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
-    _remove_general_thread_class(plate_callout)
+    # Rule 20: the taps' three worst-case webs below the 2.0 target (#1937).
+    _remove_general_thread_class(plate_callout, last_line="\n".join(part.PLATE_TAP_WEB_LINES))
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,
             0.0, part.THUMB_AXIS_Z / 1000.0,
         ), label="thumb tap mouth")
     thumb_callout = add_native_hole_callout(
-        adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.060, 0.063),
+        adapter, bottom, edge_xy=thumb_edge, callout_xy=(0.060, 0.056),
         label="thumbscrew tap through floor",
     )
-    _remove_general_thread_class(thumb_callout)
+    _remove_general_thread_class(thumb_callout, last_line=THUMB_HOLE_END)
     mating_edge = model_point_in_view(
         adapter, right, (
             part.BLOCK_LENGTH / 2000.0,
@@ -204,22 +277,21 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, property_name="Mating Face Note",
         edge_xy=mating_edge, note_xy=(0.220, 0.210),
     )
+    _add_rebate_slide_finish(adapter, right)
+    _label_locating_edges(adapter, front)
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError("stop tap centre marks failed")
     assert_manufacturing_dimensions(
         adapter, annotations, part.BLOCK_DRAWING_VALUES_BY_NAME,
         part.BLOCK_DRAWING_PRECISION_BY_NAME,
-        bands={
-            **{name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
-        },
+        bands={name: part.WINDOW_SIZE_TOLERANCE_MM for name in ("WindowWidth", "WindowHeight")},
         angular=frozenset({"RoofChamferAngle"}),
     )
-    _assert_plate_location_references(adapter, annotations)
+    _assert_reference_dimensions(adapter, annotations)
     for view in (front, right, bottom):
         set_hidden_lines_removed(adapter, view)
     add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0] - 0.030, 0.085)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.024, 0.036)
     return await finalize_drawing(adapter, OUTPUTS,
                                   pdf_title="Measuring Stick Stop Block Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
