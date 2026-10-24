@@ -90,18 +90,25 @@ def _negated(direction: tuple[float, ...]) -> tuple[float, ...]:
 
 
 _CARRIAGE = (V_BLOCK, ROD_SET_SCREW, FRAME, THUMB_SCREW, MARKER)
-# The wire's sideways explode, each of X and -Z: 35 mm on the sheet at 1:2.
+# The wire's sideways explode, each of X and -Z: ~33 mm left (and ~7 mm up)
+# on the sheet at 1:2 in the exploded view (pn_pen_assembly_spec.EXPLODED_VIEW).
 WIRE_ASIDE = 50.0
 # Out of the front-face tap along its axis (block -Z): far enough that the
-# screw stands clear below the block's front face in the octant view, with a
-# trail from its cup back to the tap's mouth the reader can follow.
+# screw stands clear down-left of the block's front face in the exploded
+# view, with a trail from its cup back to the tap's mouth the reader can
+# follow.
 ROD_SET_SCREW_OUT = 55.0
 # Back along the marker's own axis (block +X), 36 on each of X and -Z.
 MARKER_BACK = 36.0 * math.sqrt(2.0)
 # The thumb screw's tip rests on the marker grip's underside, inside the
 # stirrup window; down its tap axis (block -Y) it clears the bottom rail's
 # underside by THUMB_SCREW_TRAIL_GAP, the length of its trail to the tap.
-THUMB_SCREW_TRAIL_GAP = 10.0
+# At 10 the pictorial's look down onto the rail hid that gap behind the
+# rail's near half (14 mm of rail toward the reader drops ~8 mm on the
+# sheet), so the screw read as still threaded in and balloons 5 and 6 landed
+# side by side on the rail's bottom edge (machinist review, farm run
+# 20261023T222629630Z). At 25 the knob and shank stand clear below it.
+THUMB_SCREW_TRAIL_GAP = 25.0
 THUMB_SCREW_DOWN = (
     carriage.MARKER_BOTTOM_LOCAL_Y - carriage.FRAME_ORIGIN_LOCAL[1]
 ) + THUMB_SCREW_TRAIL_GAP
@@ -114,8 +121,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ("hanger jam nut off", (HANGER_JAM_NUT,), "z", -26.0),
     ("hanger nut off", (HANGER_NUT,), "z", -14.0),
     ("hanger screw out behind", (HANGER_SCREW,), "z", 22.0),
-    # Up off the eye, then an equal +X/-Z pair: straight to the reader's left
-    # in the REAR-TOP-LEFT view, clear of the rod and stud. Left in place, its
+    # Up off the eye, then an equal +X/-Z pair: to the reader's left in the
+    # exploded view, clear of the rod and stud. Left in place, its
     # run read through hanger nut 13 (machinist review r3); lifted 60 instead,
     # its balloons crossed the sheet's top border and its leader lay on the
     # stud's ray and crossed balloon 8's.

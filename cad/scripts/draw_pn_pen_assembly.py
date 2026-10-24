@@ -26,13 +26,18 @@ from pathlib import Path
 from typing import Any, Callable
 
 import _config
+import _mcmaster_99607a213 as thumb_screw
 import _telemetry
 import pn_pen_adjust_screw_spec as stud
 import pn_pen_assembly_sheet as notes
 import pn_pen_assembly_spec as spec
+import pn_pen_carriage_geom as carriage
 import pn_pen_explode_spec as explode
+import pn_pen_frame_spec as frame
 import pn_pen_hanger_spec as hanger
 import pn_pen_rod_spec as rod
+import pn_pen_v_block_spec as v_block
+import pn_vn_pen_marker_spec as marker
 import sh_vn_music_wire_pen_geom as wire
 from _check import check
 from _com import _early_bound
@@ -76,7 +81,6 @@ from _drawing_view_configuration import (
 )
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
-from _named_views import octant_view_name
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -345,68 +349,146 @@ BOM_SKUS = {
 BOM_DESCRIPTIONS = {BOM_ROW_KEYS[stem]: text for stem, text in notes.BOM_DESCRIPTIONS.items()}
 BOM_IDENTITY_ALIASES = {number: stem for stem, number in BOM_PART_NUMBERS.items()}
 # Every family is one separated body on the exploded view: each balloon walks
-# its own part for a visible edge, except two pinned off the stack the stud,
-# its jam nut and the rod's top make in the pictorial. There the three walked
-# attachments sat within 2 mm of one sheet bearing at different radii, so
-# leaders 2/9 and 8/9 crossed (farm run 20261016T061511876Z). The rod's
-# balloon takes the vertical corner of its square nearest the viewer, low down
-# (part mm: square x, z +-S/2, y up from the shoulder; the rod is placed
-# unrotated), 15 mm above the shoulder: at 40 its bearing from the view centre
-# (-55.7 deg) sat 3 deg anticlockwise of thumb screw 6's tip (-58.9 deg), out
-# where the stirrup's explode carries it, so ring slot 2 came first and the
-# near-centre rod leader ran down-right across leader 6 (final build b9ae,
-# 20261018T015314587Z). At 15 the bearing is ~-67 deg, past the thumb screw's,
-# so balloon 2 rings below and left of 6 and its leader passes left of the
-# thumb screw and the rod set screw. The stud's takes the sheet-rightmost
-# point of its head's top edge (revolved about +Y; the octant's sheet-right is
-# (sz, 0, -sx)). The wire's
-# takes the sheet-leftmost point of its top end (extruded up +Y from the
-# origin, unrotated): walked, it took the end by the strap's corner and its
-# leader crossed the strap and the hanger screw (machinist review r3). The
-# hanger's takes the strap's sheet-rightmost long edge at mid-length (part mm:
-# Front-plane outline, top edge y 0, extruded from the bar seat z 0 to -T;
-# placed unrotated): walked, it took the strap's top corner, its leader ran
-# along screw 11's shank and landed beside balloon 11's arrow (machinist gate
-# 2026-10-17). Sheet-right (-1, 0, 1) makes that edge the strap's -x side on
-# its bar-seat face: a silhouette, clear of the screw, nuts and U guides.
-_OCTANT_X, _, _OCTANT_Z = spec.EXPLODED_OCTANT
-_ROD_ANCHOR_Y = 15.0
+# its own part for a visible edge, except the families pinned below. Each pin
+# is a point on a drawn edge in part millimetres, derived from the view's own
+# axes (spec.EXPLODED_VIEW_AXES), so the side it takes follows the camera.
+#
+# * The stud's and the rod's, off the stack the stud, its jam nut and the
+#   rod's top make: there three walked attachments sat within 2 mm of one sheet
+#   bearing at different radii, so leaders 2/9 and 8/9 crossed (farm run
+#   20261016T061511876Z). The stud's takes the sheet-rightmost point of its
+#   head's top edge (revolved about +Y, placed unrotated).
+# * The rod's takes the sheet-right vertical corner of its square (part mm:
+#   square x, z +-S/2, y up from the shoulder; placed unrotated), a
+#   silhouette, ROD_ANCHOR_Y up. The rod stands just right of the view centre
+#   with the v-block under it, the stirrup down-right and the hanger right, so
+#   its radial leader clears all three only in a band of the square: low, it
+#   ran down across the v-block (machinist review, farm run
+#   20261023T222629630Z); at 55 it crosses the stirrup, at 70 the hanger's
+#   lower U guide. At 63 it runs down-right between them, ~6 mm off each.
+# * The wire's takes the sheet-leftmost point of its top end (extruded up +Y
+#   from the origin, unrotated): walked, it took the end by the strap's corner
+#   and its leader crossed the strap and the hanger screw (machinist review
+#   r3).
+# * The hanger's takes the strap's sheet-rightmost long edge at mid-length
+#   (part mm: Front-plane outline, top edge y 0, extruded from the bar seat z 0
+#   to -T; placed unrotated): walked, it took the strap's top corner, its
+#   leader ran along screw 11's shank and landed beside balloon 11's arrow
+#   (machinist gate 2026-10-17). With sheet-right running -x and +z, that edge
+#   is the strap's -x side on its bar-seat face: a silhouette, clear of the
+#   screw, nuts and U guides.
+# * The stirrup's and the thumb screw's: walked, both landed side by side on
+#   the stirrup's bottom rail, balloon 5's leader through the thumb screw's
+#   knob (machinist review, farm run 20261023T222629630Z). The stirrup's takes
+#   its sheet-right outer vertical edge, a silhouette, three quarters up; the
+#   thumb screw's the knob's top rim (the inner edge of the vendor model's
+#   HeadDia/16 head chamfer on the face the collar rises from,
+#   diagnostics/diag_build_99607A213), on the side facing the reader's lower
+#   right.
+# * The v-block's and the marker's: walked, the block took its far-end bottom
+#   corner and the marker its nib, both straight above the rod set screw in
+#   this view, so their leaders ran down past it. The block's takes its front
+#   face's bottom edge under the tap; the marker's the edge round its back end
+#   (its last taper station before the dome), nearest the reader.
+_RIGHT, _UP, _TOWARD = spec.EXPLODED_VIEW_AXES
+if abs(_RIGHT[1]) > 1e-12:
+    raise AssertionError("the exploded view keeps model +Y up the sheet")
+if not _RIGHT[0] < 0.0 < _RIGHT[2]:
+    raise AssertionError("the hanger anchor assumes sheet-right runs -x and +z")
+
+
+def _dot(a: tuple[float, ...], b: tuple[float, ...]) -> float:
+    return sum(x * y for x, y in zip(a, b))
+
+
+def _unit(vector: tuple[float, ...]) -> tuple[float, ...]:
+    length = math.sqrt(_dot(vector, vector))
+    return tuple(value / length for value in vector)
+
+
+def _in_part(rows: Any, direction: tuple[float, ...]) -> tuple[float, ...]:
+    """``direction`` (model) in the frame of a part placed with ``rows``, the
+    images of its local axes."""
+    return tuple(_dot(tuple(row), direction) for row in rows)
+
+
+def _silhouette_corner(
+    rows: Any, size: tuple[float, float], *, label: str
+) -> tuple[float, float]:
+    """The (local x, local z) of a box part's sheet-right vertical edge, its
+    faces at x 0..size[0] and z 0..size[1]; proved a silhouette (one of its
+    two faces toward the reader)."""
+    right, toward = _in_part(rows, _RIGHT), _in_part(rows, _TOWARD)
+    x = size[0] if right[0] > 0.0 else 0.0
+    z = size[1] if right[2] > 0.0 else 0.0
+    x_face_seen = math.copysign(1.0, right[0]) * toward[0] > 0.0
+    z_face_seen = math.copysign(1.0, right[2]) * toward[2] > 0.0
+    if x_face_seen == z_face_seen:
+        raise AssertionError(
+            f"{label}: the sheet-right vertical edge is not a silhouette"
+        )
+    return x, z
+
+
+ROD_ANCHOR_Y = 63.0
 _HEAD_R = stud.HEAD_DIA / 2.0
 _WIRE_R = wire.WIRE_DIA / 2.0
-if (_OCTANT_Z, -_OCTANT_X) != (-1, 1):
-    raise AssertionError("the hanger anchor assumes sheet-right is (-x, +z)")
+_ROD_CORNER = (
+    math.copysign(rod.ROD_SECTION / 2.0, _RIGHT[0]),
+    math.copysign(rod.ROD_SECTION / 2.0, _RIGHT[2]),
+)
+if (_ROD_CORNER[0] * _TOWARD[0] > 0.0) == (_ROD_CORNER[1] * _TOWARD[2] > 0.0):
+    raise AssertionError("the rod anchor's corner is not a silhouette")
 HANGER_ANCHOR_MM = (
     (hanger.STRAP_TOP_X[0] + hanger.STRAP_BOT_X[0]) / 2.0,
     hanger.STRAP_BOT_Y / 2.0,
     hanger.STRAP_Z[1],
 )
+_STIRRUP_X, _STIRRUP_Z = _silhouette_corner(
+    carriage.FRAME_ROWS, (frame.OUTER_WIDTH, frame.FRAME_DEPTH), label="stirrup anchor"
+)
+STIRRUP_ANCHOR_MM = (_STIRRUP_X, 0.75 * frame.OUTER_HEIGHT, _STIRRUP_Z)
+# The thumb screw's frame: the axis along local +X from the head top (x 0) to
+# the tip; the head's base face, the collar's side, at x = TS_HEAD_H.
+KNOB_RIM_R = thumb_screw.TS_HEAD_R - thumb_screw.HEAD_DIA / 16.0
+_KNOB_SIDE = _in_part(
+    carriage.THUMB_SCREW_ROWS,
+    _unit(tuple(a + b for a, b in zip(_unit((_TOWARD[0], 0.0, _TOWARD[2])), _RIGHT))),
+)
+if abs(_KNOB_SIDE[0]) > 1e-12:
+    raise AssertionError("the thumb screw stands on a vertical axis")
+THUMB_SCREW_ANCHOR_MM = (
+    thumb_screw.TS_HEAD_H,
+    KNOB_RIM_R * _KNOB_SIDE[1],
+    KNOB_RIM_R * _KNOB_SIDE[2],
+)
+V_BLOCK_ANCHOR_MM = (v_block.PIVOT_BORE_X, 0.0, v_block.BODY_Z0)
+# The marker's frame: the axis along local +Y from the nib (y 0).
+MARKER_BACK_STATION = marker.PROFILE[-4]
+_MARKER_FACING = _in_part(carriage.MARKER_ROWS, _TOWARD)
+_MARKER_RADIAL = _unit((_MARKER_FACING[0], _MARKER_FACING[2]))
+MARKER_ANCHOR_MM = (
+    MARKER_BACK_STATION[1] * _MARKER_RADIAL[0],
+    MARKER_BACK_STATION[0],
+    MARKER_BACK_STATION[1] * _MARKER_RADIAL[1],
+)
 BALLOON_ANCHORS = {
     **{stem: BalloonAnchor() for stem in BOM_COMPONENTS},
-    spec.ROD: BalloonAnchor(
-        point_mm=(
-            _OCTANT_X * rod.ROD_SECTION / 2.0,
-            _ROD_ANCHOR_Y,
-            _OCTANT_Z * rod.ROD_SECTION / 2.0,
-        )
-    ),
+    spec.ROD: BalloonAnchor(point_mm=(_ROD_CORNER[0], ROD_ANCHOR_Y, _ROD_CORNER[1])),
     spec.STUD: BalloonAnchor(
-        point_mm=(
-            _OCTANT_Z * _HEAD_R * math.sqrt(0.5),
-            stud.OVERALL_LENGTH,
-            -_OCTANT_X * _HEAD_R * math.sqrt(0.5),
-        )
+        point_mm=(_HEAD_R * _RIGHT[0], stud.OVERALL_LENGTH, _HEAD_R * _RIGHT[2])
     ),
     WIRE_ROW: BalloonAnchor(
         instance="@PenWire:1",
-        point_mm=(
-            -_OCTANT_Z * _WIRE_R * math.sqrt(0.5),
-            wire.WIRE_LEN,
-            _OCTANT_X * _WIRE_R * math.sqrt(0.5),
-        )
+        point_mm=(-_WIRE_R * _RIGHT[0], wire.WIRE_LEN, -_WIRE_R * _RIGHT[2]),
     ),
     spec.HANGER: BalloonAnchor(point_mm=HANGER_ANCHOR_MM),
+    spec.FRAME: BalloonAnchor(point_mm=STIRRUP_ANCHOR_MM),
+    spec.THUMB_SCREW: BalloonAnchor(point_mm=THUMB_SCREW_ANCHOR_MM),
+    spec.V_BLOCK: BalloonAnchor(point_mm=V_BLOCK_ANCHOR_MM),
+    spec.MARKER: BalloonAnchor(point_mm=MARKER_ANCHOR_MM),
 }
-EXPLODED_ORIENTATION = octant_view_name(*spec.EXPLODED_OCTANT)
+EXPLODED_ORIENTATION = spec.EXPLODED_VIEW
 
 EXPLODED_VIEW_NAMES = {
     ASSEMBLY_VIEW_CONFIGURATION: explode.exploded_view_name(ASSEMBLY_VIEW_CONFIGURATION),
@@ -1243,7 +1325,7 @@ def _make_explode_readable(
 
     ``_drawing_balloons._view_explode_offsets`` reads a NON-active
     configuration's steps directly, and makes an ACTIVE one readable by showing
-    its explode on the model. Placed from the octant named view, the source's
+    its explode on the model. Placed from a builder-named view, the source's
     non-active Default Simplified read zero steps (farm run
     20261016T075516581Z), so when it does, Default Simplified is made the
     source's active configuration for the walk and Default shown again after.

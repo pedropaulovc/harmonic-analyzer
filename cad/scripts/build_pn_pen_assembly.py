@@ -93,7 +93,7 @@ from _sketch import (
     ensure_fully_defined,
     set_sketch_direct_db,
 )
-from _named_views import name_octant_views, octant_key
+from _assembly_named_views import name_standard_views
 from _pn_pen_explode import create_pn_explode
 from _assembly import (
     activate_assembly_contract,
@@ -576,12 +576,14 @@ async def build(adapter) -> dict[str, str]:
     author_in_drawing_configurations(
         adapter, ASM_NAME, lambda configuration: create_pn_explode(adapter, configuration)
     )
-    # The exploded view looks from the octant that sees the v-block's front
-    # face and the set screw's tap in it (spec.EXPLODED_OCTANT).
-    name_octant_views(
+    # The exploded view's camera: *Isometric turned about +Y so the v-block's
+    # front face, the set screw's tap in it and the screw's explode read
+    # obliquely (spec.EXPLODED_VIEW).
+    name_standard_views(
         adapter,
-        octants={octant_key(*spec.EXPLODED_OCTANT): spec.EXPLODED_OCTANT},
+        views={spec.EXPLODED_VIEW: spec.EXPLODED_VIEW_STANDARD},
         label=ASM_NAME,
+        model_rotation=spec.EXPLODED_VIEW_TURN,
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 
