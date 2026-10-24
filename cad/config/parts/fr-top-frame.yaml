@@ -6,11 +6,12 @@ fr-top-frame:
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
   machinist_exceptions:
+    # Owner coordinate ruling 2026-10-21; provenance: cad/docs/machining-dfm.md.
     - id: "RV-01"
       kind: "accept"
       where: "the knife-hanger slot position frames and the knife-hanger crossbar centring frame"
-      finding: "position frames over-specified (rule 5)"
-      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds the hanger axes' shift off the crossbar median while retaining the screw/slot and side webs (owner-accepted knife-edge-system control)"
+      finding: "position frames over-specified (rule 5); sheet 6 claim that longitudinal 15.264 or 7.632 must be BASIC for the SLOT WIDTH ONLY frames"
+      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds the hanger axes' shift off the crossbar median while retaining the screw/slot and side webs (owner-accepted knife-edge-system control); owner coordinate ruling 2026-10-21: the slot frames control each slot's transverse model-Z median plane at implied BASIC zero to its own round-hole datum (B front, C rear), with implied BASIC 90 deg to the B-C line. The 15.264 slot-to-hole and 7.632 hole-to-screw dimensions are longitudinal model-X locations, ordinary .XXX (+/-0.13), not basics feeding these frames. Only the claim that those longitudinal dimensions must be BASIC, or that their +/-0.13 bands conflict with the transverse 0.05 zone, is rejected as a coordinate misread. Missing transverse basics or datums remain defects; geometry, longitudinal bands and control semantics are unchanged."
     - id: "RV-02"
       kind: "accept"
       where: "sheet 3 general note 'INSIDE CORNERS R3.0 MAX UNLESS NOTED'"

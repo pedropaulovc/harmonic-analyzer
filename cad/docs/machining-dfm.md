@@ -638,6 +638,36 @@ In F-F, the ordinary **2X 15.264 ±0.13 mm** slot station names its actual
 mate, the **MHA-SM-02 knife-mount dowel pattern**. It is neither BASIC nor
 REF. The controlling **3.950 ±0.13 mm overall slot length** retains its
 MHA-SM-VN-53 dowel-travel purpose, and **3.240 ±0.030 mm width** is unchanged.
+
+The **2026-10-21 owner coordinate ruling**, recorded in `fr-top-frame.yaml`
+**RV-01**, rejects only the claim that the longitudinal **15.264** or
+**7.632** must be BASIC for the sheet 6 **SLOT WIDTH ONLY** frames.
+The slots run along model X; their width is measured along model Z.
+Datum B is the front round hole, C the rear; both hole axes run along model Y.
+Each slot's width-median plane has implied BASIC zero transverse offset from
+its own round-hole datum and implied BASIC 90° to the B-C line. Its
+**0.05 mm** width-only position zone does not control the longitudinal
+**15.264 ±0.13 mm** station. The **7.632 ±0.13 mm** hole-to-screw station
+also remains ordinary `.XXX`. RV-01 retains the existing acceptance of the
+knife-edge-system frames, but does **not** accept genuinely missing transverse
+basics or datums, alter geometry, loosen a band or change control semantics.
+
+This preserves the correction in
+[PR1640's primary P1 finding](https://github.com/pedropaulovc/harmonic-analyzer/pull/1640#discussion_r4306606726)
+and its [recorded disposition](https://github.com/pedropaulovc/harmonic-analyzer/pull/1640#discussion_r4307595371):
+boxing 15.264 removed its only longitudinal tolerance and invalidated the
+wall/travel proofs. [PR1737](https://github.com/pedropaulovc/harmonic-analyzer/pull/1737)
+preserved the ordinary station and width-only frames. The ruling was grounded
+in source `519bd318fae9863e221add738142b84dff461572` and the actual sheet 6
+PDF/native audit from run
+`20261021T142158291Z-d1c59497c205470093cfe22900145a83`
+(PDF SHA256
+`247a946a47cf5492267ccad93e9d7867d9419958d6f9678b7eae3737e0526e78`).
+The native width arrows measure along sheet vertical/model Z; F-F's 15.264
+and 7.632 arrows measure horizontally/model X. The original **FIX, 2/3**
+basics finding remains retained evidence: this exception clarification neither
+rewrites that verdict nor claims a new native drawing or clean review.
+
 The native **(0.710) radius-centre spacing** is a noncontrolling reference
 in **DETAIL L, 4:1**, cropped at model R3.0 from the Bottom locator's front
 slot. Its two short model-Z axes pass through the source-derived stadium
