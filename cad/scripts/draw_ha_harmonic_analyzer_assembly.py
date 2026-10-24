@@ -1,11 +1,11 @@
-r"""Create the four-sheet complete-machine fitter package (MHA-HA-00).
+r"""Create the five-sheet complete-machine fitter package (MHA-HA-00).
 
 Sheet 1 shows the assembled machine (front and crank-side views at 1:5) with
 the two settings only the complete machine makes, imported as the builder's
 driving dimensions; sheet 2 the finished machine in full detail; sheet 3 the
 builder-owned ``HA_EXPLODED`` presentation with the top-level BOM (one row per
-subassembly) and a balloon on every row; sheet 4 the integration sequence and
-checks. Every pose and setting comes from
+subassembly) and a balloon on every row; sheet 4 the integration sequence;
+sheet 5 the checks before running. Every pose and setting comes from
 ``ha_harmonic_analyzer_assembly_spec``, every printed text from
 ``ha_harmonic_analyzer_assembly_sheet``; this recipe only lays the sheets out.
 It never edits the source assembly or its explodes.
@@ -80,6 +80,7 @@ SHEET_NAMES = (
     "FINISHED MACHINE",
     "EXPLODED VIEW + BOM",
     "INTEGRATION STEPS",
+    "CHECKS BEFORE RUNNING",
 )
 if SPEC.layout is not DrawingLayout.PORTRAIT:
     raise AssertionError("the complete-machine primary sheet must stay portrait")
@@ -91,6 +92,7 @@ SHEET_LAYOUTS = dict(
             DrawingLayout.PORTRAIT,
             DrawingLayout.PORTRAIT,
             DrawingLayout.LANDSCAPE,
+            DrawingLayout.LANDSCAPE,
         ),
     )
 )
@@ -99,15 +101,21 @@ SHEET_LAYOUTS = dict(
 # model box, about twice the ink) is 2.41 x 2.94 m (r5 audit: 161 x 196 mm at
 # 1:15, the ink only ~82 x 125 mm, leaving most of the sheet empty). 1:12
 # keeps that outline (201 x 245 mm) inside the border and between the BOM and
-# the title block, the ink ~1.25x larger. The steps sheet's orientation view is
-# a thumbnail beside the text.
+# the title block, the ink ~1.25x larger. The steps and checks sheets'
+# orientation view is a thumbnail beside the text.
 ASSEMBLED_SCALE = (1.0, 5.0)
 EXPLODED_SCALE = (1.0, 12.0)
 STEPS_VIEW_SCALE = (1.0, 20.0)
 SHEET_SCALES = dict(
     zip(
         SHEET_NAMES,
-        (ASSEMBLED_SCALE, ASSEMBLED_SCALE, EXPLODED_SCALE, STEPS_VIEW_SCALE),
+        (
+            ASSEMBLED_SCALE,
+            ASSEMBLED_SCALE,
+            EXPLODED_SCALE,
+            STEPS_VIEW_SCALE,
+            STEPS_VIEW_SCALE,
+        ),
     )
 )
 
@@ -181,14 +189,17 @@ EXPLODED_CENTER = (
     (_PORTRAIT.title_block_top_m + _BOM_BOTTOM_Y) / 2.0,
 )
 
-# Sheet 4 (landscape): two text columns over the title block's height, the
-# finished-machine thumbnail at the right.
+# Sheets 4 and 5 (landscape): text columns over the title block's height,
+# the finished-machine thumbnail at the right. A blank line separates the
+# numbered steps, so the sequence fills both sheet-4 columns and the checks
+# move to sheet 5, level with its thumbnail rather than bunched in the top
+# corner (machinist review rule 15 on 29a080cd4).
 NOTE_LINE_PITCH = 0.00455  # measured default-format note line pitch
 STEPS_LINE_WIDTH = 60  # characters; ~2.7 mm each
 STEPS_TOP_Y = 0.262
 STEPS_LEFT_X = 0.018
 STEPS_RIGHT_X = 0.195
-STEPS_SPLIT = 8  # steps 1..8 in the left column
+STEPS_SPLIT = 7  # steps 1..7 in the left column
 STEPS_VIEW_CENTER = (0.390, 0.170)
 
 BOM_COMPONENTS = spec.BOM_ORDER
@@ -211,11 +222,16 @@ if spec.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block."""
+    """Wrap each numbered line under its own number, a blank line between
+    numbered lines; one note per block."""
     out = [heading] if heading else []
+    numbered = False
     for line in lines:
         number, sep, rest = line.partition(". ")
         if sep and number.isdigit():
+            if numbered:
+                out.append("")
+            numbered = True
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -244,16 +260,16 @@ STEPS_RIGHT = _wrapped(notes.ASSEMBLY_STEPS[STEPS_SPLIT:], width=STEPS_LINE_WIDT
 ASSEMBLY_CHECKS = _wrapped(
     notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, heading="CHECKS BEFORE RUNNING"
 )
-CHECKS_XY = (
-    STEPS_RIGHT_X,
-    STEPS_TOP_Y - (STEPS_RIGHT.count("\n") + 2) * NOTE_LINE_PITCH,
-)
+_CHECKS_HEIGHT = (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH
+CHECKS_XY = (STEPS_LEFT_X, STEPS_VIEW_CENTER[1] + _CHECKS_HEIGHT / 2.0)
 STEPS_COLUMN_BOTTOM_Y = min(
-    STEPS_TOP_Y - (STEPS_LEFT.count("\n") + 1) * NOTE_LINE_PITCH,
-    CHECKS_XY[1] - (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH,
+    STEPS_TOP_Y
+    - NOTE_LINE_PITCH
+    * max(block.count("\n") + 1 for block in (STEPS_LEFT, STEPS_RIGHT)),
+    CHECKS_XY[1] - _CHECKS_HEIGHT,
 )
-if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m:
-    raise AssertionError("the integration steps run into the title block")
+if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m or CHECKS_XY[1] > STEPS_TOP_Y:
+    raise AssertionError("the steps sheets' text leaves its field")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -726,30 +742,41 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     return lambda: assert_balloon_landings(adapter, landings)
 
 
-def _place_steps_sheet(adapter: Any) -> None:
-    """The integration sequence in two columns, the checks under the second,
-    and a finished-machine thumbnail for orientation."""
-    name = SHEET_NAMES[3]
+def _place_thumbnail(adapter: Any, name: str) -> None:
+    """A finished-machine thumbnail for orientation beside a text sheet."""
+    label = f"{name.lower()} thumbnail"
     _activate_sheet(adapter, name)
     thumbnail = place_view(
         adapter, str(SOURCE), "*Isometric", *STEPS_VIEW_CENTER, scale=STEPS_VIEW_SCALE
     )
-    set_high_quality_shaded_with_edges(adapter, thumbnail, label="steps thumbnail")
-    configuration = apply_view_configuration(
-        adapter, thumbnail, label="steps thumbnail"
-    )
+    set_high_quality_shaded_with_edges(adapter, thumbnail, label=label)
+    configuration = apply_view_configuration(adapter, thumbnail, label=label)
     set_view_exploded_state(
-        adapter, thumbnail, False, configuration=configuration, label="steps thumbnail"
+        adapter, thumbnail, False, configuration=configuration, label=label
     )
-    _assert_view_on_sheet(
-        thumbnail, layout=SHEET_LAYOUTS[name], label="steps thumbnail"
-    )
+    _assert_view_on_sheet(thumbnail, layout=SHEET_LAYOUTS[name], label=label)
+
+
+def _place_steps_sheet(adapter: Any) -> None:
+    """The integration sequence in two columns and a thumbnail."""
+    name = SHEET_NAMES[3]
+    _place_thumbnail(adapter, name)
     _add_note_block(
-        adapter, name, STEPS_LEFT, (STEPS_LEFT_X, STEPS_TOP_Y), label="steps 1-8"
+        adapter,
+        name,
+        STEPS_LEFT,
+        (STEPS_LEFT_X, STEPS_TOP_Y),
+        label=f"steps 1-{STEPS_SPLIT}",
     )
     _add_note_block(
         adapter, name, STEPS_RIGHT, (STEPS_RIGHT_X, STEPS_TOP_Y), label="later steps"
     )
+
+
+def _place_checks_sheet(adapter: Any) -> None:
+    """The checks before running and a thumbnail."""
+    name = SHEET_NAMES[4]
+    _place_thumbnail(adapter, name)
     _add_note_block(adapter, name, ASSEMBLY_CHECKS, CHECKS_XY, label="checks")
 
 
@@ -853,6 +880,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     _place_finished_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_steps_sheet(adapter)
+    _place_checks_sheet(adapter)
 
     def settled() -> None:
         assembled_settled()

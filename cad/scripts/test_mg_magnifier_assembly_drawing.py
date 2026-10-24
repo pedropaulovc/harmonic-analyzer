@@ -3,6 +3,7 @@
 import asyncio
 import json
 import math
+import re
 from dataclasses import replace
 from fractions import Fraction
 from types import SimpleNamespace
@@ -437,11 +438,23 @@ def test_the_stack_chain_is_authored_on_the_axle_and_driven_from_globals(
     assert stack.REFERENCE_DIMENSIONS <= {name for _f, name in references}
 
 
-def test_the_package_has_four_landscape_sheets_with_the_wire_steps_on_the_last() -> None:
-    assert drawing.SHEET_NAMES[-1] == "ASSEMBLY STEPS"
-    assert len(drawing.SHEET_NAMES) == 4
+def test_the_package_has_five_landscape_sheets_with_the_wire_steps_on_sheet_5() -> None:
+    assert drawing.SHEET_NAMES[3] == "ASSEMBLY STEPS"
+    assert drawing.SHEET_NAMES[-1] == "WIRE STEPS + CHECKS"
+    assert len(drawing.SHEET_NAMES) == 5
     assert set(drawing.SHEET_LAYOUTS.values()) == {DrawingLayout.LANDSCAPE}
-    # MHA-HA-00 prints "LEVER WIRE PER MHA-MG-00 (SHEET 4)" and names these keys.
+    assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
+    # MHA-HA-00 prints "LEVER WIRE: PER MHA-MG-00 SHEET 5." and names these keys;
+    # both wire steps, and only they, continue on sheet 5.
+    wire = notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT:]
+    assert [step.split(". ", 1)[0] for step in wire] == [
+        str(steps.step_number(steps.WIRE_HOOKED_KEY)),
+        str(steps.step_number(steps.WIRE_TIED_KEY)),
+    ]
+    assert all(
+        step.split(". ", 1)[1] in " ".join(drawing.ASSEMBLY_STEPS_CONTINUED.split())
+        for step in wire
+    )
     assert steps.WIRE_HOOKED_KEY == "lever-wire-hooked"
     assert steps.WIRE_TIED_KEY == "lever-wire-tied"
     assert steps.SEQUENCE[-2:] == (steps.WIRE_HOOKED_KEY, steps.WIRE_TIED_KEY)
@@ -1831,19 +1844,25 @@ def test_the_wire_balloon_stands_right_of_the_view_on_its_rising_leader() -> Non
 
 @pytest.fixture
 def instruction_note_bounds(monkeypatch):
-    # Sequence: actual b3 native GetExtent. The narrower checks box is only
-    # an accepted-predicate control, not evidence of a native after-fix sheet.
+    # Sequence: actual b3 native GetExtent (sheet 4). The continued sequence
+    # and checks boxes (sheet 5) are accepted-predicate controls only, not
+    # evidence of a native after-fix sheet.
     sequence_extent = [0.0176475, 0.0863243, 0.0, 0.2278142, 0.2583656, 0.0]
+    continued_extent = [0.0176475, 0.2019, 0.0, 0.2278142, 0.2607484, 0.0]
     checks_extent = [0.0176475, 0.0529645, 0.0, 0.201, 0.0753632, 0.0]
     adapter = SimpleNamespace(currentModel=SimpleNamespace(GraphicsRedraw2=lambda: None))
     sequence = SimpleNamespace(GetExtent=lambda: sequence_extent)
+    continued = SimpleNamespace(GetExtent=lambda: continued_extent)
     checks = SimpleNamespace(GetExtent=lambda: checks_extent)
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
     return SimpleNamespace(
         sequence_extent=sequence_extent,
+        continued_extent=continued_extent,
         checks_extent=checks_extent,
-        readback=lambda: drawing._assert_instruction_clearance(adapter, sequence, checks),
+        readback=lambda: drawing._assert_instruction_clearance(
+            adapter, sequence, continued, checks
+        ),
     )
 
 
@@ -1863,15 +1882,31 @@ def test_instruction_native_bounds_refuse_the_b3_title_block_overprint(
         instruction_note_bounds.readback()
 
 
+def test_instruction_native_bounds_refuse_the_all_steps_sheet_4_overprint(
+    instruction_note_bounds,
+) -> None:
+    # Run 20261024T041027643Z: all eleven spaced steps on sheet 4 ran down
+    # beside the title block.
+    instruction_note_bounds.sequence_extent[:] = [
+        0.01764747826086957, 0.025323545150501725, 0.0,
+        0.2278142140468227, 0.2607484147157191, 0.0,
+    ]
+    with pytest.raises(RuntimeError, match="assembly sequence.*title-block clearance"):
+        instruction_note_bounds.readback()
+
+
 @pytest.mark.parametrize("gap_m", (0.0039, 0.0041))
 def test_instruction_native_bounds_require_air_below_step_eleven(
     instruction_note_bounds, gap_m: float,
 ) -> None:
     instruction_note_bounds.checks_extent[4] = (
-        instruction_note_bounds.sequence_extent[1] - gap_m
+        instruction_note_bounds.continued_extent[1] - gap_m
+    )
+    instruction_note_bounds.checks_extent[1] = (
+        instruction_note_bounds.checks_extent[4] - 0.0229
     )
     if gap_m < drawing._PAD:
-        with pytest.raises(RuntimeError, match="native gap below the sequence"):
+        with pytest.raises(RuntimeError, match="native gap below the continued sequence"):
             instruction_note_bounds.readback()
     else:
         instruction_note_bounds.readback()
@@ -1916,31 +1951,60 @@ def test_instruction_native_bounds_refuse_unreadable_or_degenerate_boxes(
 def test_the_steps_and_checks_fit_their_column() -> None:
     for block, width in (
         (drawing.ASSEMBLY_STEPS, drawing.STEPS_LINE_WIDTH),
+        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_LINE_WIDTH),
         (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_LINE_WIDTH),
     ):
         assert max(len(line) for line in block.splitlines()) <= width
-    steps_bottom = drawing.STEPS_XY[1] - len(
-        drawing.ASSEMBLY_STEPS.splitlines()
+    # Each block's native box runs right of the title block's left edge, so
+    # each must end above the title block. Final native whole-note/layout
+    # checks establish clearance for this exact text.
+    continued_bottom = drawing.STEPS_XY[1] - len(
+        drawing.ASSEMBLY_STEPS_CONTINUED.splitlines()
     ) * drawing.NOTE_LINE_PITCH
-    checks_bottom = drawing.CHECKS_XY[1] - len(
-        drawing.ASSEMBLY_CHECKS.splitlines()
-    ) * drawing.NOTE_LINE_PITCH
+    assert continued_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
+    for block, top in (
+        (drawing.ASSEMBLY_STEPS, drawing.STEPS_XY[1]),
+        (drawing.ASSEMBLY_STEPS_CONTINUED, drawing.STEPS_XY[1]),
+        (drawing.ASSEMBLY_CHECKS, drawing.CHECKS_XY[1]),
+    ):
+        bottom = top - len(block.splitlines()) * drawing.NOTE_LINE_PITCH
+        assert bottom > drawing.TITLE_BLOCK[3] + drawing._PAD
     assert drawing.STEPS_XY[0] > drawing.INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.INNER_BORDER[3]
-    assert checks_bottom > drawing.INNER_BORDER[1] + drawing._PAD
-    # Upstream native envelopes used shorter, non-threaded text. They cannot
-    # certify these combined blocks. Check derived spacing here; final native
-    # whole-note/layout checks must establish clearance for this exact text.
-    assert steps_bottom - drawing.CHECKS_XY[1] == pytest.approx(2 * drawing._PAD)
     assert drawing.STEPS_RIGHT + drawing._PAD <= drawing.FINISHED_FIELD[0]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    assert drawing.ASSEMBLY_STEPS.split() == " ".join(
-        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)
+    assert (
+        drawing.ASSEMBLY_STEPS + " " + drawing.ASSEMBLY_STEPS_CONTINUED
+    ).split() == " ".join(
+        (
+            "ASSEMBLY SEQUENCE",
+            *notes.ASSEMBLY_STEPS[: drawing.STEPS_SPLIT],
+            drawing.CONTINUED_HEADING,
+            *notes.ASSEMBLY_STEPS[drawing.STEPS_SPLIT :],
+        )
     ).split()
     assert drawing.ASSEMBLY_CHECKS.split() == " ".join(notes.ASSEMBLY_CHECKS).split()
+    printed = drawing.ASSEMBLY_STEPS + drawing.ASSEMBLY_STEPS_CONTINUED
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.ASSEMBLY_STEPS
+            assert number in printed
+
+
+def test_one_blank_line_separates_consecutive_steps_only() -> None:
+    numbered = 0
+    for block in (drawing.ASSEMBLY_STEPS, drawing.ASSEMBLY_STEPS_CONTINUED):
+        rows = block.splitlines()
+        starts = [i for i, row in enumerate(rows) if re.match(r"\d+\. ", row)]
+        numbered += len(starts)
+        # The heading sits directly over the block's first step.
+        assert starts[0] == 1
+        blanks = [i for i, row in enumerate(rows) if not row.strip()]
+        # Exactly one blank row before every later step; continuation rows
+        # stay tight under their step.
+        assert blanks == [start - 1 for start in starts[1:]]
+    assert numbered == len(notes.ASSEMBLY_STEPS)
+    # The unnumbered checks stay tight.
+    assert "" not in drawing.ASSEMBLY_CHECKS.splitlines()
 
 
 def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
@@ -1989,27 +2053,24 @@ def test_whole_check_note_rewrap_clears_r22_aggregate_keepout(
 
     monkeypatch.setattr(drawing, "add_note", add_note)
     note = drawing._add_note_block(
-        adapter, drawing.SHEET_NAMES[3], drawing.ASSEMBLY_CHECKS,
+        adapter, drawing.SHEET_NAMES[4], drawing.ASSEMBLY_CHECKS,
         drawing.CHECKS_XY, label="assembly checks",
     )
     assert calls == [
-        ("sheet", adapter, drawing.SHEET_NAMES[3]),
+        ("sheet", adapter, drawing.SHEET_NAMES[4]),
         ("note", adapter, *drawing.CHECKS_XY),
     ]
     printed_rows = note.GetText().splitlines()
     assert " ".join(printed_rows).split() == " ".join(notes.ASSEMBLY_CHECKS).split()
     assert printed_rows[0] == notes.ASSEMBLY_CHECKS[0]
-    # Keep all five CHECK rows and the original steps column. A changed step
-    # may move the check block only through the existing line-count formula.
+    # Keep all five CHECK rows. A changed wire step may move the check block
+    # only through the existing line-count formula.
     assert len(printed_rows) == len(old_rows) == 5
     assert [i for i, row in enumerate(printed_rows) if row.startswith("CHECK:")] == [0, 1, 3]
-    assert drawing.ASSEMBLY_STEPS == drawing._wrapped(
-        notes.ASSEMBLY_STEPS, width=80, heading="ASSEMBLY SEQUENCE"
-    )
     assert drawing.CHECKS_XY == (
         drawing.STEPS_XY[0],
         drawing.STEPS_XY[1]
-        - len(drawing.ASSEMBLY_STEPS.splitlines()) * drawing.NOTE_LINE_PITCH
+        - len(drawing.ASSEMBLY_STEPS_CONTINUED.splitlines()) * drawing.NOTE_LINE_PITCH
         - 2 * drawing._PAD,
     )
     points_per_m = 72 / 0.0254
@@ -3553,10 +3614,10 @@ def immutable_tip_build(
     monkeypatch.setattr(
         drawing, "_add_note_block",
         lambda *_a, label, **_k: SimpleNamespace(
-            GetExtent=lambda: (
-                instruction_note_bounds.sequence_extent if label == "assembly sequence"
-                else instruction_note_bounds.checks_extent
-            ),
+            GetExtent=lambda: {
+                "assembly sequence": instruction_note_bounds.sequence_extent,
+                "assembly sequence, continued": instruction_note_bounds.continued_extent,
+            }.get(label, instruction_note_bounds.checks_extent),
         ),
     )
     monkeypatch.setattr(

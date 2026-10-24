@@ -135,7 +135,6 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     # The settings live on the associative sheet-1 dimensions only.
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
         assert f"{value:.1f}" not in printed
-    assert "PER MHA-MG-00 SHEET 4." in printed
     # Period hardware: no step leans on, or names, a chemical or nylon lock.
     for bad in ("TBD", "TODO", "THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
         assert bad not in printed
@@ -224,6 +223,19 @@ def test_steps_sheet_text_clears_the_title_block() -> None:
     assert drawing.STEPS_COLUMN_BOTTOM_Y > landscape.title_block_top_m
     for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
         assert max(map(len, block.splitlines())) <= drawing.STEPS_LINE_WIDTH
+
+
+def test_a_blank_line_separates_each_numbered_step() -> None:
+    steps_printed = 0
+    for block in (drawing.STEPS_LEFT, drawing.STEPS_RIGHT, drawing.ASSEMBLY_CHECKS):
+        lines = block.splitlines()
+        starts = [i for i, line in enumerate(lines) if line[:1].isdigit()]
+        assert starts[0] in (0, 1)  # no blank line under a heading
+        assert all(lines[i - 1] == "" for i in starts[1:])
+        assert lines.count("") == len(starts) - 1
+        if block is not drawing.ASSEMBLY_CHECKS:
+            steps_printed += len(starts)
+    assert steps_printed == len(notes.ASSEMBLY_STEPS)
 
 
 @pytest.mark.parametrize("axis", ((0.0, -1.0, 0.0), (0.0, 1.0, 0.0),

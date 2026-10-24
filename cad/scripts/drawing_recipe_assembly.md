@@ -85,7 +85,9 @@ Inspect every page and complete the blind machinist review before release.
 
 ## Magnifier package
 
-`draw_mg_magnifier_assembly.py` keeps its four sheets and all 19 BOM families.
+`draw_mg_magnifier_assembly.py` keeps its five sheets and all 19 BOM families.
+The assembly sequence prints one blank line between steps: steps 1-9 on
+sheet 4, the two lever-wire steps and the checks on sheet 5.
 The BOM's final five columns are item, full canonical Number, description,
 vendor SKU and quantity. Their widths are 12/48/82/32/12 mm respectively;
 the Number column has its own room for `MHA-MG-VN-50` through `MHA-MG-VN-56`.

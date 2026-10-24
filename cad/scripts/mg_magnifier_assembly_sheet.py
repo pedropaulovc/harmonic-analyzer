@@ -117,19 +117,24 @@ BOM_DESCRIPTIONS = {
 if set(BOM_DESCRIPTIONS) != set(BOM_ORDER) or len(set(BOM_ORDER)) != len(BOM_ORDER):
     raise AssertionError("every BOM family needs exactly one description")
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 4"
+EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 4-5"
 
 # One line per step key (mg_magnifier_assembly_steps.SEQUENCE). Settings are
 # named, never valued: their values print as the model dimensions on sheet 1.
 # Ends and sides name physical features rather than ambiguous compass words.
 STEP_TEXT = {
+    # Machinist review (run 20261024T053015093Z, 2 of 3 runs): "NOT PAST IT"
+    # read as forbidding the further press the same step then calls for. The
+    # REF depth is the first stop; the ACCEPT limit governs any further press.
+    # Same five printed rows as before (sheet 4's column has no row to spare).
     _steps.AXLE_PRESSED_KEY: (
         "PRESS THE MHA-MG-07 WHEEL AXLE INTO THE MHA-MG-08 WHEEL BAR FROM ITS "
-        "FRONT FACE UNTIL THE AXLE'S STEP REACHES THE REF DEPTH (SHEET 1, AXLE AS "
-        "PRESSED), NOT PAST IT. TRIAL-FIT THE STEP "
+        "FRONT FACE, FIRST UNTIL ITS STEP REACHES THE REF DEPTH (SHEET 1, AXLE "
+        "AS PRESSED). TRIAL-FIT THE STEP "
         f"{_steps.step_number('wheel-stacked')} STACK AND BOTH NUTS AT THE "
-        "ENDSHAKE; PRESS FURTHER ONLY WHILE THE THREAD END STANDS MORE THAN THE "
-        "ACCEPT LIMIT PAST THE LOCKNUT. TAKE THE TRIAL PARTS OFF."
+        "ENDSHAKE; WHILE THE THREAD END STANDS MORE THAN THE ACCEPT LIMIT PAST "
+        "THE LOCKNUT, TAKE THEM OFF, PRESS A LITTLE FURTHER AND TRIAL-FIT AGAIN. "
+        "TAKE THE TRIAL PARTS OFF."
     ),
     _steps.COLUMN_CLAMP_STARTED_KEY: (
         "FIT THE MHA-SH-01 FRONT AND MHA-SH-02 BACK COLUMN CLAMPS BEHIND THE "
