@@ -207,10 +207,12 @@ def test_end_view_layout_stays_clear() -> None:
     assert block[1] > cy - half + air
     assert block[3] < cy + half - air
     assert block[0] > cx + half + 0.005  # past the centre mark's arm
-    # Tap callout (centred on keep x, 45.6 mm wide, shoulder 5.6 mm under
-    # keep y) over the square and the block, left of the SQ line's arrow.
+    # Tap callout (three rows, the last WALL 1.7 MIN: farm run
+    # 20261024T123921226Z baselines keep y +2.8/-2.8/-8.4 mm at 3.5 mm text,
+    # shoulder under the last row) over the square and the block, left of the
+    # SQ line's arrow.
     tap_x, tap_y = drawing.TAP_CALLOUT_XY
-    tap = (tap_x - 0.0228, tap_y - 0.0056, tap_x + 0.0228, tap_y + 0.0035)
+    tap = (tap_x - 0.0228, tap_y - 0.0100, tap_x + 0.0228, tap_y + 0.0065)
     assert tap[1] > cy + half + 0.010
     assert tap[1] > block[3] + 0.010
     assert tap[2] < line_x - 0.005
@@ -360,6 +362,50 @@ def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
         'omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")'
         in _DRAWING_SOURCE
     )
+
+
+def test_stud_tap_wall_is_the_owner_accepted_shortfall_and_printed_floored() -> None:
+    import _config
+    from _hole_spec import THREAD_MAJOR_MM
+    from machinist_exceptions import load_exceptions
+
+    smallest_square = spec.ROD_SECTION + spec.SECTION_BAND[1]
+    wall = (smallest_square - THREAD_MAJOR_MM[spec.STUD_THREAD]) / 2.0
+    assert spec.STUD_TAP_WALL_MIN == pytest.approx(wall)
+    assert 1.5 <= spec.STUD_TAP_WALL_MIN < 2.0  # over the floor, under the target
+    assert round(spec.STUD_TAP_WALL_MIN, 2) == spec.STUD_TAP_WALL_ACCEPTED == 1.71
+    assert spec.STUD_TAP_WALL_CALLOUT == "WALL 1.7 MIN"
+    (declared,) = load_exceptions(_config.CONFIG_DIR, "pn_pen_rod", "part")
+    assert (declared.id, declared.kind) == ("RV-01", "minor")
+    assert spec.STUD_TAP_WALL_CALLOUT in declared.where
+    assert "owner ruling 2026-10-24 (#1903)" in declared.reason
+
+
+class _FakeCallout:
+    def __init__(self, below: str) -> None:
+        self.text = {5: "#0-80 UNF", 6: "", 7: "", 8: below}
+
+    def GetText(self, part: int) -> str:  # noqa: N802 - COM name
+        return self.text[{1: 5, 2: 6, 3: 7, 4: 8}.get(part, part)]
+
+    def SetText(self, part: int, text: str) -> None:  # noqa: N802 - COM name
+        self.text[{1: 5, 2: 6, 3: 7, 4: 8}[part]] = text
+
+
+@pytest.mark.parametrize(
+    ("below", "expected"),
+    [("", "WALL 1.7 MIN"), ("<HOLE-DEPTH>4.50\r\n", "<HOLE-DEPTH>4.50\nWALL 1.7 MIN")],
+)
+def test_stud_tap_wall_row_goes_last_under_the_native_rows(
+    monkeypatch: pytest.MonkeyPatch, below: str, expected: str
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    callout = _FakeCallout(below)
+    drawing._set_stud_tap_wall_row(callout)
+    assert callout.text == {5: "#0-80 UNF", 6: "", 7: "", 8: expected}
+    with pytest.raises(RuntimeError, match="already states its wall"):
+        drawing._set_stud_tap_wall_row(callout)
+    assert "_set_stud_tap_wall_row(stud_callout)" in _DRAWING_SOURCE
 
 
 def test_overall_length_is_one_parenthesised_reference() -> None:

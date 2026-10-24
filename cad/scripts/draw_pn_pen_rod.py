@@ -218,11 +218,13 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # each extension line (0.0625/0.0875).  Its line 52 mm right of the
 # centre puts the block at x 0.0987..0.1653, 6.2 mm right of the square
 # and ~3 mm past the centre mark's extended arm.  The tap callout keeps the
-# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide,
-# shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
-# over the square, 18 mm over the block, 7 mm left of the SQ line's upper
-# arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
-# the drill rim.  The view label (anchored top-left, text 4.5 mm under its
+# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide);
+# its third row, WALL 1.7 MIN, hangs under the two native rows (farm run
+# 20261024T123921226Z: baselines keep y +2.8/-2.8/-8.4 mm), so it spans
+# x 0.0792..0.1248, y ~0.100..0.1165, 12 mm over the square, 14 mm over the
+# block, 7 mm left of the SQ line's upper arrow piece (x 0.132, to y
+# ~0.0939); its leader drops almost straight to the drill rim.  The view
+# label (anchored top-left, text 4.5 mm under its
 # anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred 7 mm
 # under the square: x 0.0425..0.1175, y 0.051..0.0545, left of the SQ
 # line's lower arrow piece (x 0.132, to y ~0.0561).
