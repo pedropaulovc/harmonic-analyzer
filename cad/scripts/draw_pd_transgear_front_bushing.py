@@ -116,9 +116,10 @@ FIT_STEP_KEY = "front-bushing-faced-to-fit"
 # The bore stays on the end view, where it is a circle: a reamed through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
-# The O.D. arrives there too and is moved onto the profile below.
+# The O.D. arrives there too and is moved onto the profile below.  The bore
+# callout's block stands clear above the centre mark's vertical arm.
 END_KEEP = {
-    "BoreDia": (0.060, 0.225),
+    "BoreDia": (0.060, 0.228),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
 DIMENSION_CALLOUTS = {
@@ -144,16 +145,17 @@ PROFILE_KEEP = {
 OD_ON_PROFILE = (_PROFILE_NOSE_X + 0.083, PROFILE_CENTER[1])
 
 # Each face's pick lies on its edge line between the bore and the chamfer's
-# inner edge.  Each symbol's labelled bar grows about 5 mm plus 1.8 mm a
-# character right of its point.  The front (ring) face's symbol stands left
-# of the part above the axis, between the end view's O.D. and the profile;
-# the rear (nose) face's stands right of the part inside the O.D.'s
-# extension-line band, below the axis, short of the O.D. dimension line.
-_FACE_PICK_UP = PROFILE_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S
+# inner edge, below the axis, where SolidWorks lands the leader at that
+# segment's middle.  Each symbol's labelled bar grows about 5 mm plus 1.8 mm a
+# character right of its point, the leader leaving from that point.  The
+# front (ring) face's symbol stands left of the part above the axis, between
+# the end view's O.D. and the profile, so its leader falls away from its own
+# label to the face; the rear (nose) face's stands right of the part inside
+# the O.D.'s extension-line band, short of the O.D. dimension line.
 _FACE_PICK_DOWN = PROFILE_CENTER[1] - (BORE_DIA + OD) / 4.0 * _S
 FACE_FINISHES = {
     "ring_face": (
-        (_PROFILE_RING_X, _FACE_PICK_UP),
+        (_PROFILE_RING_X, _FACE_PICK_DOWN),
         (END_CENTER[0] + OD * _S / 2.0 + 0.007, PROFILE_CENTER[1] + 0.009),
     ),
     "nose_face": (
