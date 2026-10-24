@@ -25,7 +25,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
-import _config
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -37,7 +36,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_finish import add_surface_finish
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -47,7 +46,7 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_transgear_knob_thrust_ring_spec import (
-    BORE_CALLOUT,
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ID,
@@ -82,15 +81,6 @@ SIDE_CENTER = (0.180, 0.170)
 # Third-angle left view of the front face, on the profile's axis.
 END_CENTER = (0.090, SIDE_CENTER[1])
 ISO_CENTER = (0.300, SIDE_CENTER[1])
-
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
-# drawing-guidelines.md rule 4: the length's ± band names the stack it
-# serves -- the ring spaces the knob shaft's 12T from the arm plate's hub.
-LENGTH_CALLOUT = (
-    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} 12T\n"
-    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB"
-)
-SIDE_CALLOUTS = {"RingLength": LENGTH_CALLOUT}
 
 # The bore's callout stays on the end view (a drilled hole is defined by its
 # callout, and the side view is hidden-lines-removed); the O.D. arrives there
@@ -148,6 +138,28 @@ def _center_mark_count(view: Any) -> int:
     return len(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
+
+
+def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Import the part-authored callout rows verbatim; never write them here.
+
+    Text set from the drawing writes through to the built part (fleet issue
+    #1942), so the sheet only proves each callout dimension printed once with
+    the rows its part authored.
+    """
+    for callouts in DIMENSION_CALLOUTS.values():
+        for name, text in callouts.items():
+            matches = [
+                item for item in annotations if dimension_name(adapter, item) == name
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{name}: expected one imported callout dimension")
+            display = _early_bound(
+                _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+                "IDisplayDimension",
+            )
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}: imported callout differs from the part's")
 
 
 def _move_dimension(
@@ -278,12 +290,11 @@ async def build(adapter: Any) -> dict[str, str]:
         if dimension_name(adapter, annotation) not in MOVED_TO_SIDE
     ]
     annotations = [*end_annotations, *side_annotations, *moved]
-    # Decimal places (and so the general-tolerance row each dimension claims)
-    # and the length's band are authored on the part; the sheet only proves
-    # the import kept them.
+    # Decimal places (and so the general-tolerance row each dimension claims),
+    # the length's band and both callout rows are authored on the part; the
+    # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
-    set_dimension_callouts(adapter, side_annotations, SIDE_CALLOUTS)
+    _assert_dimension_callouts(adapter, annotations)
     if _center_mark_count(end) == 0 and not auto_center_marks(
         adapter, end, holes=True, size=0.0025
     ):

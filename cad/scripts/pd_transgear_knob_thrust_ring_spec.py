@@ -18,6 +18,7 @@ face) is y = LENGTH.
 
 from __future__ import annotations
 
+import _config
 from _gtol_planar import PlanarFace
 from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -67,6 +68,19 @@ if WALL_WORST < WALL_FLOOR - 1e-9:
 
 # The sheet: the bore's process under its size.
 BORE_CALLOUT = "DRILL THRU"
+# drawing-guidelines.md rule 4: the length's ± band names the stack it
+# serves -- the ring spaces the knob shaft's 12T from the arm plate's hub.
+LENGTH_CALLOUT = (
+    f"SPACES {_config.parts('pd-transgear-knob-shaft')['number']} 12T\n"
+    f"FROM {_config.parts('pd-transgear-arm-plate')['number']} HUB"
+)
+# Below-text the part build authors on its source dimensions; the drawing
+# imports and reads it back (text set from the drawing writes through to the
+# built part, fleet issue #1942).
+DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "RingProfile": {"BoreDia": BORE_CALLOUT},
+    "Ring": {"RingLength": LENGTH_CALLOUT},
+}
 
 # Both faces are thrust faces (12T in front, plate hub behind): MACHINED, on
 # the exact native faces the part build resolves.
