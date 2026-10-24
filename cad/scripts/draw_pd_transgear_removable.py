@@ -50,7 +50,6 @@ from _drawing_dimensions import (
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -63,9 +62,6 @@ from pd_transgear_removable_spec import (
     TEETH,
     outside_dia,
 )
-
-# TEMPORARY evidence leaf only; removed before merge (PD-09 held for #1679).
-MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_removable"]
 PART_STEM = SPEC.artifact_stem
