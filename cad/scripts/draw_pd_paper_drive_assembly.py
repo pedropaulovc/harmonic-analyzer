@@ -2923,6 +2923,11 @@ def _place_transgear_exploded_sheet(
         _link_view_to_bom(view, table, label=label)
         views.append((group, view))
     _iso_items, exploded_items = transgear_balloon_items(items)
+    # Both views reference the same configuration's explode, whose offsets
+    # cover every moved instance: read them once.
+    offsets = _view_explode_offsets(
+        adapter, views[0][1], label="paper-drive transgear exploded offsets"
+    )
     landings: list[Any] = []
     for group, view in views:
         balloons_label = f"paper-drive transgear {group.label} BOM coverage"
@@ -2934,6 +2939,7 @@ def _place_transgear_exploded_sheet(
             anchors=TRANSGEAR_BALLOON_ANCHORS,
             label=balloons_label,
             margin=BALLOON_MARGIN,
+            explode_offsets=offsets,
         )
         _uncross_ring(adapter, group_landings, label=balloons_label)
         landings += group_landings

@@ -10,13 +10,14 @@ steps that open it. Positions come from the opened model; distances are
 presentation offsets, not dimensions. The chain, the hanger pivot stack, the
 latch hook and the crank and spare wheels never move.
 
-Machine frame: +Y up, -Z front (the paper side). The platen sheet's isometric
-looks from the front-left-top, so a part raised in +Y or pushed rearward in
-+Z draws above the parts in front of it, and a screw drawn forward in -Z
-stands clear in front of its hole. The transgear sheet looks down -Y, so its
-parts spread along their axes in the order they go on: the cup, plate
-screws, plate and dowels rearward of the arm, the cluster and the knob stack
-forward of it.
+Machine frame: +Y up, -Z front (the paper side). Both sheets look from the
+front-left-top isometric, so a part raised in +Y or pushed rearward in +Z
+draws above the parts in front of it, and a screw drawn forward in -Z stands
+clear in front of its hole. The transgear sheet draws two views of the same
+presentation, the hanger and knob stack in one and the disc cluster in the
+other, so each axis's parts spread along it in the order they go on: the
+cup, plate screws, plate and dowels rearward of the arm, the cluster and the
+knob stack forward of it.
 """
 
 from __future__ import annotations
@@ -90,10 +91,9 @@ SHOWN_STEMS = STATIONARY_STEMS | frozenset(
 
 # The mounted knob wheel; the crank wheel and the spare share its family.
 KNOB_WHEEL_INSTANCE = "pd-transgear-removable-1"
-# Gaps along each axis are a few millimetres between neighbours, so the
-# whole spread fits the sheet at 1:1. The cluster and knob stack share no
-# span where a wide part (the 120T disc, the hub flange, the T24) would sit
-# over the other axis's parts in the top view.
+# Gaps along each axis are a few millimetres between neighbours. The cluster
+# and the knob stack are drawn in separate views, so a wide part (the 120T
+# disc, the hub flange, the T24) never sits over the other axis's parts.
 TRANSGEAR_STEPS: tuple[ExplodeStep, ...] = (
     # Knob shaft's rear: the cup off the journal, its cross pin out along
     # its own (machine X) axis.
