@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -31,23 +32,19 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimension, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
+from _drawing_tolerances import set_dimension_symmetric_tolerance
 from _part_pmi import author_part_pmi
 from pd_transgear_knob_thrust_ring_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ID,
-    ID_BAND,
     LENGTH,
     LENGTH_TOL,
     OD,
@@ -58,6 +55,22 @@ PART_NAME = "pd-transgear-knob-thrust-ring"
 MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 
 V_RING = math.pi * ((OD / 2.0) ** 2 - (ID / 2.0) ** 2) * LENGTH
+
+
+@_telemetry.traced("dim.pd_transgear_knob_thrust_ring_callouts")
+def _author_dimension_callouts(adapter) -> None:
+    """Persist the sheet's callout rows on the source dimensions.
+
+    The drawing imports them and only reads them back: text set from the
+    drawing writes through to the built part (fleet issue #1942).
+    """
+    for feature, callouts in DIMENSION_CALLOUTS.items():
+        for name, text in callouts.items():
+            display, _dimension = _named_dimension(adapter, feature, name)
+            # swDimensionTextCalloutBelow; the native value stays visible.
+            display.SetText(4, text)
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -131,11 +144,11 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "RingProfile", "BoreDia", *deviations(ID_BAND)
-    )
+    # The bore carries no band of its own: its DRILL THRU callout takes the
+    # title block's DRILLED HOLES row (spec ID_BAND).
     # The forward stop of the knob's end float: its explicit band.
     set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_TOL)
+    _author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

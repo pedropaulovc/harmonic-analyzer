@@ -45,20 +45,54 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for name in names
     }
     # The bore's process rides on the bore's own dimension, in the view that
-    # carries it.
-    assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.END_KEEP)
+    # carries it; the length's stack callout on the length, in the side view.
+    # Each rides a dimension its feature marks.
+    for feature, callouts in spec.DIMENSION_CALLOUTS.items():
+        assert set(callouts) <= spec.DRAWING_DIMENSIONS[feature], feature
+    assert set(spec.DIMENSION_CALLOUTS["RingProfile"]) <= set(drawing.END_KEEP)
+    assert set(spec.DIMENSION_CALLOUTS["Ring"]) <= set(drawing.SIDE_KEEP)
 
 
-def test_the_bore_and_the_float_stop_carry_their_bands_on_the_model() -> None:
-    """The bore clears the journal (drilled, never under size) and the length
-    is the forward stop of the knob's end float (contract §12): both bands
-    live on the model dimension, from named constants.  The O.D. is governed
-    by its places alone."""
+def test_the_float_stop_carries_its_band_and_the_bore_takes_the_drilled_row() -> None:
+    """The length is the forward stop of the knob's end float (contract §12):
+    its band lives on the model dimension, from a named constant.  The bore
+    (drilled, never under size) and the O.D. carry no band of their own: the
+    DRILL THRU callout takes the title block's DRILLED HOLES row and the O.D.
+    is governed by its places alone."""
     assert model_toleranced_dimensions(part) == {
-        ("RingProfile", "BoreDia"): "*deviations(ID_BAND)",
         ("Ring", "RingLength"): "LENGTH_TOL",
     }
-    assert min(spec.ID_BAND) == 0.0 < max(spec.ID_BAND)
+    assert spec.ID_BAND == (_printed_tolerance.drilled_oversize_mm(), 0.0)
+
+
+def test_the_banded_length_names_the_stack_it_serves() -> None:
+    """drawing-guidelines.md rule 4: a band tighter than the title block names
+    the mating parts it serves, by drawing number."""
+    shaft = _config.parts("pd-transgear-knob-shaft")["number"]
+    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    assert spec.LENGTH_TOL < _printed_tolerance.printed_band_mm(spec.LENGTH_PLACES)
+    assert spec.DIMENSION_CALLOUTS["Ring"] == {"RingLength": spec.LENGTH_CALLOUT}
+    assert shaft in spec.LENGTH_CALLOUT and plate in spec.LENGTH_CALLOUT
+
+
+def test_the_drawing_reads_the_callouts_back_and_never_writes_them() -> None:
+    """Text set from the drawing writes through to the built part (#1942): the
+    part build authors every callout and the sheet only reads it back."""
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "SetText(" not in source
+    assert "set_dimension_callouts" not in source
+    assert "set_reference_dimensions" not in source
+    assert "_author_dimension_callouts(adapter)" in Path(part.__file__).read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_length_text_stands_clear_of_its_extension_lines() -> None:
+    """The span between the faces is too short for the banded text; it stands
+    right of the rear face's extension line, above the O.D.'s."""
+    x, y = drawing.SIDE_KEEP["RingLength"]
+    assert x > drawing._sheet_x(spec.LENGTH) + 0.025
+    assert y > drawing.SIDE_CENTER[1] + spec.OD * drawing._S / 2000.0 + 0.020
 
 
 def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
@@ -69,7 +103,7 @@ def test_ring_bore_and_opposed_axial_faces_consume_the_new_interface() -> None:
     assert part.V_RING == pytest.approx(
         math.pi * ((spec.OD / 2.0) ** 2 - (spec.ID / 2.0) ** 2) * spec.LENGTH
     )
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_CALLOUT}
+    assert spec.DIMENSION_CALLOUTS["RingProfile"] == {"BoreDia": spec.BORE_CALLOUT}
     assert "DRILL" in spec.BORE_CALLOUT and "REAM" not in spec.BORE_CALLOUT
     assert drawing._sheet_x(spec.LENGTH) - drawing._sheet_x(0.0) == pytest.approx(
         spec.LENGTH * drawing._S / 1000.0
@@ -117,7 +151,7 @@ def test_the_od_is_dimensioned_on_the_side_view_beside_the_rear_face() -> None:
     end view carries one diameter (the bore's callout) and no two diameter
     lines cross its centre."""
     assert set(drawing.END_KEEP) - drawing.MOVED_TO_SIDE == set(
-        drawing.DIMENSION_CALLOUTS
+        spec.DIMENSION_CALLOUTS["RingProfile"]
     )
     assert drawing.MOVED_TO_SIDE == {"RingOd"}
     assert not drawing.MOVED_TO_SIDE & set(drawing.SIDE_KEEP)

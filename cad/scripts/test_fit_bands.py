@@ -295,6 +295,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the retained cup pin's hole match-drilled through cup and journal: "
         "indexed for HOLE_MAX against the B18.8.2 catalogue window"
     ),
+    ("pd_transgear_knob_thrust_ring_spec", "ID_BAND"): (
+        "title-block drilled-hole deviations (the DRILL THRU callout's row, no "
+        "native band); upper limit indexed for the ring's worst wall and the "
+        "knob shaft's rear tooth-end bearing (RING_TRANSVERSE_FLOAT_MAX)"
+    ),
     ("pd_vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"

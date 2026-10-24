@@ -4,9 +4,10 @@ The edge view is the ``*Right`` orientation rotated a quarter turn in the
 sheet so the ring's axis lies horizontal, as it sits in the lathe: the front
 face (on the 12T) on the left, the rear face (on the plate hub) on the
 right, each with its running finish, the length between them under its
-explicit band and the O.D. beside it.  The face view is the ``*Bottom``
-orientation -- exactly the third-angle LEFT view of that rotated profile --
-so it sits on the profile's axis to its left and carries the source drill band.
+explicit band and the O.D. beside it; the length's callout names the stack
+its band serves.  The face view is the ``*Bottom`` orientation -- exactly the
+third-angle LEFT view of that rotated profile -- so it sits on the profile's
+axis to its left and carries the drilled bore under the DRILLED HOLES row.
 """
 
 from __future__ import annotations
@@ -35,16 +36,17 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import assert_imported_precision
 from _drawing_finish import add_surface_finish
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from pd_transgear_knob_thrust_ring_spec import (
-    BORE_CALLOUT,
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     ID,
@@ -53,6 +55,8 @@ from pd_transgear_knob_thrust_ring_spec import (
     SURFACE_FINISHES,
 )
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_knob_thrust_ring"]
 PART_STEM = SPEC.artifact_stem
@@ -78,8 +82,6 @@ SIDE_CENTER = (0.180, 0.170)
 END_CENTER = (0.090, SIDE_CENTER[1])
 ISO_CENTER = (0.300, SIDE_CENTER[1])
 
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
-
 # The bore's callout stays on the end view (a drilled hole is defined by its
 # callout, and the side view is hidden-lines-removed); the O.D. arrives there
 # too and is moved onto the side view, so no two diameter lines cross the
@@ -89,8 +91,13 @@ END_KEEP = {
     "BoreDia": (0.130, 0.225),
 }
 MOVED_TO_SIDE = frozenset({"RingOd"})
+# The length's text and its callout stand outside the right extension line:
+# the 20.8 mm span between the faces is narrower than "5.200 ±0.05", so text
+# centred between them is struck by both extension lines.  Far enough right
+# that the callout's left edge clears the right extension line, and high
+# enough that its second line clears the O.D.'s upper extension line.
 SIDE_KEEP = {
-    "RingLength": (0.180, 0.215),
+    "RingLength": (SIDE_CENTER[0] + LENGTH / 2.0 * _S / 1000.0 + 0.032, 0.224),
 }
 
 
@@ -116,6 +123,44 @@ FACE_FINISHES = {
         (_sheet_x(LENGTH) + 0.014, SIDE_CENTER[1] - 0.008),
     ),
 }
+
+# swAnnotationType_e.swCenterMarkSym.  The template centre-marks the face
+# view's bore as it is placed; an unconditional auto_center_marks printed a
+# second identical mark over it (layout audit duplicate-annotation,
+# DetailItem347/348, ENFORCE fix run 1; the draw_dt_pinion_cam_pin
+# precedent), so the sheet adds one only if the template did not, and proves
+# exactly one.
+_CENTER_MARK_ANNOTATION = 13
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+
+
+@_telemetry.traced("drawing.pd_transgear_knob_thrust_ring.callouts")
+def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """Import the part-authored callout rows verbatim; never write them here.
+
+    Text set from the drawing writes through to the built part (fleet issue
+    #1942), so the sheet only proves each callout dimension printed once with
+    the rows its part authored.
+    """
+    for callouts in DIMENSION_CALLOUTS.values():
+        for name, text in callouts.items():
+            matches = [
+                item for item in annotations if dimension_name(adapter, item) == name
+            ]
+            if len(matches) != 1:
+                raise RuntimeError(f"{name}: expected one imported callout dimension")
+            display = _early_bound(
+                _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+                "IDisplayDimension",
+            )
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}: imported callout differs from the part's")
 
 
 def _move_dimension(
@@ -246,13 +291,20 @@ async def build(adapter: Any) -> dict[str, str]:
         if dimension_name(adapter, annotation) not in MOVED_TO_SIDE
     ]
     annotations = [*end_annotations, *side_annotations, *moved]
-    # Decimal places (and so the general-tolerance row each dimension claims)
-    # and the bore's and length's bands are authored on the part; the sheet
-    # only proves the import kept them.
+    # Decimal places (and so the general-tolerance row each dimension claims),
+    # the length's band and both callout rows are authored on the part; the
+    # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    _assert_dimension_callouts(adapter, annotations)
+    if _center_mark_count(end) == 0 and not auto_center_marks(
+        adapter, end, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to the ring face view")
+    found = _center_mark_count(end)
+    if found != 1:
+        raise RuntimeError(
+            f"expected 1 centre mark in the ring face view, found {found}"
+        )
     # The turning axis, picked on the O.D. face above it.
     add_view_centerline(
         adapter,
