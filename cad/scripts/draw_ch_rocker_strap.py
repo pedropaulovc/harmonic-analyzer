@@ -182,6 +182,7 @@ def _exterior_radius_leaders(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"strap radius dimensions missing: {sorted(remaining)}")
 
 
+@_telemetry.traced("drawing.strap_overall_length")
 def _add_overall_length(adapter: Any, front: Any) -> None:
     """Parenthesised overall length across both tip corners (rule 10), a
     native vertex-to-vertex sheet dimension (draw_ch_rocker_arm's overall
