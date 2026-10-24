@@ -43,6 +43,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -73,6 +76,7 @@ from pn_pen_rod_spec import (
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    STUD_TAP_WALL_CALLOUT,
     TOTAL_LENGTH,
 )
 
@@ -217,22 +221,37 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # each extension line (0.0625/0.0875).  Its line 52 mm right of the
 # centre puts the block at x 0.0987..0.1653, 6.2 mm right of the square
 # and ~3 mm past the centre mark's extended arm.  The tap callout keeps the
-# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide,
-# shoulder 5.6 mm under keep y): x 0.0792..0.1248, y 0.1044..0.1135, 17 mm
-# over the square, 18 mm over the block, 7 mm left of the SQ line's upper
-# arrow piece (x 0.132, to y ~0.0939); its leader drops almost straight to
-# the drill rim.  The view label (anchored top-left, text 4.5 mm under its
-# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred 7 mm
-# under the square: x 0.0425..0.1175, y 0.051..0.0545, left of the SQ
-# line's lower arrow piece (x 0.132, to y ~0.0561).
+# green sheet's offsets from the hole (text centred on keep x, 45.6 mm wide);
+# its third row, WALL 1.7 MIN, hangs under the two native rows (farm run
+# 20261024T123921226Z: baselines keep y +2.8/-2.8/-8.4 mm), so it spans
+# x 0.0792..0.1248, y ~0.100..0.1165, 12 mm over the square, 14 mm over the
+# block, 7 mm left of the SQ line's upper arrow piece (x 0.132, to y
+# ~0.0939); its leader drops almost straight to the drill rim.  The tap's
+# stations from the -X flat (sheet left) and the +Z flat (sheet bottom; *Top
+# looks down -Y, model +Z to sheet -y) dimension it from the square's corner:
+# the horizontal 2.500 on a line 7.5 mm under the square, its ~10.5 mm text
+# centred in the 12.5 mm span; the vertical 2.500 on a line 11.5 mm left of
+# the square.  The view label (anchored top-left, text 4.5 mm under its
+# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred
+# 20 mm under the square, under the horizontal station: x 0.0425..0.1175,
+# y 0.038..0.0425, left of the SQ line's lower arrow piece (x 0.132, to
+# y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
+    "TapStationX": (
+        END_CENTER[0] - _END_HALF_M / 2.0,
+        END_CENTER[1] - _END_HALF_M - 0.0075,
+    ),
+    "TapStationZ": (
+        END_CENTER[0] - _END_HALF_M - 0.0115,
+        END_CENTER[1] - _END_HALF_M / 2.0,
+    ),
 }
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
 END_NOTE_WIDTH = 0.075
 END_NOTE_XY = (
     END_CENTER[0] - END_NOTE_WIDTH / 2.0,
-    END_CENTER[1] - _END_HALF_M - 0.007,
+    END_CENTER[1] - _END_HALF_M - 0.020,
 )
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
@@ -455,6 +474,38 @@ def _overall_reference(adapter: Any, side: Any) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
+@_telemetry.traced("drawing.pen_rod.stud_tap_wall_row")
+def _set_stud_tap_wall_row(display: Any) -> None:
+    """Rule 20: write the tap's wall shortfall as the callout's last row
+    (named exception RV-01, pn-pen-rod.yaml) and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_pd_guide_lock._set_hole_callout_below)."""
+    native = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(native.GetText(part) or "") for part in (5, 6, 7, 8)}
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
+    if STUD_TAP_WALL_CALLOUT in below:
+        raise RuntimeError(f"stud tap callout already states its wall: {below!r}")
+    updated = f"{below}\n{STUD_TAP_WALL_CALLOUT}" if below else STUD_TAP_WALL_CALLOUT
+    native.SetText(4, updated)  # swDimensionTextCalloutBelow; void return
+    resolved = str(native.GetText(4) or "").replace("\r", "")
+    if (
+        str(native.GetText(8) or "").replace("\r", "") != updated
+        or STUD_TAP_WALL_CALLOUT not in resolved
+        or any(
+            str(native.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+        )
+    ):
+        raise RuntimeError(
+            "stud tap callout wall row or native definitions did not persist: "
+            f"{[str(native.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+    _telemetry.info(f"stud tap callout below: {resolved!r}")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -522,7 +573,9 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="side",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
-        *curate_view_dimensions(
+        # The tap stations' sketch is saved hidden (#880): this view shows
+        # it per view and imports its two stations (_drawing_hidden_sketches).
+        *curate_hidden_owner_dimensions(
             adapter,
             end,
             keep=END_KEEP,
@@ -560,6 +613,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The title block's THREADS row owns the general thread class (rule 2).
     omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")
+    _set_stud_tap_wall_row(stud_callout)
 
     _overall_reference(adapter, side)
 

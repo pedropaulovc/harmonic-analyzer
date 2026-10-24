@@ -61,7 +61,7 @@ def test_drawing_keeps_exactly_the_marked_dimensions() -> None:
         "PivotDia",
         "ShoulderRadius",
     }
-    assert set(drawing.END_KEEP) == {"Depth"}
+    assert set(drawing.END_KEEP) == {"Depth", "TapStationX", "TapStationZ"}
     assert "Section" not in marked
 
 
@@ -72,7 +72,9 @@ def test_side_view_is_turned_and_proved_before_any_import() -> None:
     assert drawing.SIDE_ROTATION == -math.pi / 2.0
     tree = ast.parse(_DRAWING_SOURCE)
     curated = [
-        ast.unparse(call.args[1]) for call in _calls(tree, "curate_view_dimensions")
+        ast.unparse(call.args[1])
+        for name in ("curate_view_dimensions", "curate_hidden_owner_dimensions")
+        for call in _calls(tree, name)
     ]
     assert curated == ["side", "end"]
     order = [
@@ -207,10 +209,12 @@ def test_end_view_layout_stays_clear() -> None:
     assert block[1] > cy - half + air
     assert block[3] < cy + half - air
     assert block[0] > cx + half + 0.005  # past the centre mark's arm
-    # Tap callout (centred on keep x, 45.6 mm wide, shoulder 5.6 mm under
-    # keep y) over the square and the block, left of the SQ line's arrow.
+    # Tap callout (three rows, the last the wall row: farm run
+    # 20261024T123921226Z baselines keep y +2.8/-2.8/-8.4 mm at 3.5 mm text,
+    # shoulder under the last row) over the square and the block, left of the
+    # SQ line's arrow.
     tap_x, tap_y = drawing.TAP_CALLOUT_XY
-    tap = (tap_x - 0.0228, tap_y - 0.0056, tap_x + 0.0228, tap_y + 0.0035)
+    tap = (tap_x - 0.0228, tap_y - 0.0100, tap_x + 0.0228, tap_y + 0.0065)
     assert tap[1] > cy + half + 0.010
     assert tap[1] > block[3] + 0.010
     assert tap[2] < line_x - 0.005
@@ -299,12 +303,19 @@ def test_part_frame_square_is_mid_plane_and_pivot_runs_down() -> None:
     planes = [
         ast.literal_eval(call.args[0]) for call in _calls(_PART_TREE, "create_sketch")
     ]
-    assert planes == ["Front", "Top"]
+    assert planes == ["Front", "Top", "Top"]
     names = [
         ast.literal_eval(call.args[1])
         for call in _calls(_PART_TREE, "name_last_feature")
     ]
-    assert names == ["RodProfile", "Rod", "PivotProfile", "Pivot", "ShoulderFillet"]
+    assert names == [
+        "RodProfile",
+        "Rod",
+        "PivotProfile",
+        "Pivot",
+        "ShoulderFillet",
+        "StudTapReference",
+    ]
     extrusions = [
         _keywords(call.args[0]) for call in _calls(_PART_TREE, "create_extrusion")
     ]
@@ -360,6 +371,112 @@ def test_stud_tap_is_one_blind_wizard_hole_on_the_top_face_axis() -> None:
         'omit_title_block_thread_class(stud_callout, label="adjuster stud blind tap")'
         in _DRAWING_SOURCE
     )
+
+
+def test_stud_tap_wall_budgets_its_location_and_is_the_declared_shortfall() -> None:
+    import _config
+    from _hole_spec import THREAD_MAJOR_MM
+    from _printed_tolerance import printed_band_mm
+    from machinist_exceptions import load_exceptions
+
+    # Located 2.500 from two adjacent flats at .XXX: the worst wall is to the
+    # far flat of the smallest square with the station at its longest.
+    assert spec.STUD_TAP_STATION == spec.ROD_SECTION / 2.0
+    assert spec.STUD_TAP_STATION_PLACES == 3
+    band = printed_band_mm(3)
+    smallest_square = spec.ROD_SECTION + spec.SECTION_BAND[1]
+    major_r = THREAD_MAJOR_MM[spec.STUD_THREAD] / 2.0
+    far = smallest_square - (spec.STUD_TAP_STATION + band) - major_r
+    near = spec.STUD_TAP_STATION - band - major_r
+    assert far < near
+    assert spec.STUD_TAP_WALL_MIN == pytest.approx(far)
+    # Centred, the wall would read 1.71; the location band is what costs it.
+    assert spec.STUD_TAP_WALL_MIN < (smallest_square / 2.0 - major_r)
+    assert 1.5 <= spec.STUD_TAP_WALL_MIN < 2.0  # over the floor, under the target
+    assert (
+        math.floor(spec.STUD_TAP_WALL_MIN * 100) / 100
+        == spec.STUD_TAP_WALL_ACCEPTED
+        == 1.55
+    )
+    assert spec.STUD_TAP_WALL_CALLOUT == "WALL 1.5 MIN"
+    (declared,) = load_exceptions(_config.CONFIG_DIR, "pn_pen_rod", "part")
+    assert (declared.id, declared.kind) == ("RV-01", "minor")
+    assert spec.STUD_TAP_WALL_CALLOUT in declared.where
+    assert "owner ruling 2026-10-24 (#1903)" in declared.reason
+    assert "1.55" in declared.reason
+
+
+def test_stud_tap_stations_are_hidden_construction_dimensions_from_two_flats() -> None:
+    assert spec.DRAWING_DIMENSIONS["StudTapReference"] == {"TapStationX", "TapStationZ"}
+    assert spec.DRAWING_PRECISION["StudTapReference"] == {
+        "TapStationX": 3,
+        "TapStationZ": 3,
+    }
+    assert spec.REFERENCE_SKETCHES == ("StudTapReference",)
+    assert "blank_reference_sketches(adapter, REFERENCE_SKETCHES)" in _PART_SOURCE
+    assert "drive_jobs += await _add_stud_tap_reference(adapter)" in _PART_SOURCE
+    centrelines = [
+        [ast.unparse(arg) for arg in call.args[0:]]
+        for call in _calls(_PART_TREE, "add_centerline")
+    ]
+    assert centrelines == [
+        ["-STUD_TAP_STATION", "0.0", "0.0", "0.0"],
+        ["0.0", "-STUD_TAP_STATION", "0.0", "0.0"],
+    ]
+    assert "dims.record(dim_name, '\"RodSection\" / 2')" in _PART_SOURCE
+    # The end view shows the part-hidden sketch per view to import them.
+    (hidden,) = _calls(ast.parse(_DRAWING_SOURCE), "curate_hidden_owner_dimensions")
+    assert ast.unparse(hidden.args[1]) == "end"
+
+
+# Hole Wizard variable tokens and the values SolidWorks resolves them to.
+_RESOLVED = {"<HOLE-SIZE>": "1.19", "<THREAD-DEPTH>": "4.50"}
+
+
+class _FakeCallout:
+    """Definitions (5-8) keep the Hole Wizard tokens; the writable parts
+    (1-4) set a definition and read back its resolved text."""
+
+    def __init__(self, below: str) -> None:
+        self.definitions = {5: "<MOD-DIAM><HOLE-SIZE>", 6: "", 7: "", 8: below}
+
+    def GetText(self, part: int) -> str:  # noqa: N802 - COM name
+        if part in self.definitions:
+            return self.definitions[part]
+        text = self.definitions[part + 4]
+        for token, value in _RESOLVED.items():
+            text = text.replace(token, value)
+        return text
+
+    def SetText(self, part: int, text: str) -> None:  # noqa: N802 - COM name
+        self.definitions[part + 4] = text
+
+
+@pytest.mark.parametrize(
+    ("below", "expected"),
+    [
+        ("", "WALL 1.5 MIN"),
+        ("TAP <THREAD-DEPTH>\r\n", "TAP <THREAD-DEPTH>\nWALL 1.5 MIN"),
+    ],
+)
+def test_stud_tap_wall_row_goes_last_under_the_native_rows(
+    monkeypatch: pytest.MonkeyPatch, below: str, expected: str
+) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    callout = _FakeCallout(below)
+    drawing._set_stud_tap_wall_row(callout)
+    # The row is appended to the token-bearing definition, never to resolved
+    # text, so the native depth stays a live Hole Wizard variable.
+    assert callout.definitions == {
+        5: "<MOD-DIAM><HOLE-SIZE>",
+        6: "",
+        7: "",
+        8: expected,
+    }
+    assert callout.GetText(4).endswith("WALL 1.5 MIN")
+    with pytest.raises(RuntimeError, match="already states its wall"):
+        drawing._set_stud_tap_wall_row(callout)
+    assert "_set_stud_tap_wall_row(stud_callout)" in _DRAWING_SOURCE
 
 
 def test_overall_length_is_one_parenthesised_reference() -> None:
