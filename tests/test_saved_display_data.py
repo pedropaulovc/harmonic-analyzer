@@ -41,8 +41,16 @@ def _stream(data: bytes, name: str = DISPLAY_LISTS) -> bytes:
 
 
 def _string(text: str) -> bytes:
+    """An MFC CArchive Unicode CString: marker, then AfxWriteStringLength."""
     encoded = text.encode("utf-16le")
-    return b"\xff\xfe\xff" + bytes([len(encoded) // 2]) + encoded
+    units = len(encoded) // 2
+    if units < 0xFF:
+        length = bytes([units])
+    elif units < 0xFFFE:
+        length = b"\xff" + struct.pack("<H", units)
+    else:
+        length = b"\xff\xff\xff" + struct.pack("<I", units)
+    return b"\xff\xfe\xff" + length + encoded
 
 
 def _record(path: str = r"C:\parts\pin.SLDPRT", flag: int = 1) -> bytes:
@@ -167,7 +175,15 @@ def test_damaged_secondary_stream_is_not_ignored(tmp_path):
     ("data", "message"),
     [
         (b"\xff\xfe\xff", "truncated string length"),
-        (b"\xff\xfe\xff\xff", "unsupported extended string length"),
+        (b"\xff\xfe\xff\xff", "truncated string length"),
+        (b"\xff\xfe\xff\xff\x01", "truncated string length"),
+        (b"\xff\xfe\xff\xff\xff\xff\x01\x00", "truncated string length"),
+        (b"\xff\xfe\xff\xff\xff\xff" + b"\xff" * 4, "unsupported 64-bit string length"),
+        (b"\xff\xfe\xff\xff\xfe\xff\x01x\x00", "repeated Unicode string tag"),
+        (
+            b"\xff\xfe\xff\xff" + struct.pack("<H", 300) + b"x\x00" * 299,
+            "truncated UTF-16 string",
+        ),
         (b"\xff\xfe\xff\x05x\x00", "truncated UTF-16 string"),
         (b"\xff\xfe\xff\x01\x00\xd8", "invalid UTF-16 string"),
         (_string("pin.SLDPRT") + b"\x00" * 23, "truncated display flag"),
@@ -186,6 +202,27 @@ def test_truncated_trailing_string_is_not_ignored_after_good_record(tmp_path):
     _reject(tmp_path, _stream(_record() + b"\xff\xfe\xff"), "truncated string length")
 
 
+@pytest.mark.parametrize("units", [0xFF, 300, 0xFFFD, 0xFFFF, 70000])
+def test_long_part_paths_use_the_mfc_word_or_dword_length(tmp_path, units):
+    path = "C:\\" + "p" * (units - len("C:\\.SLDPRT")) + ".SLDPRT"
+    assert len(path) == units
+    gate.assert_saved_display_data(_save(tmp_path, _stream(_record(path))))
+    _reject(
+        tmp_path, _stream(_record(path, 0)), r"flag=0.*pppp\.SLDPRT", incomplete=True
+    )
+
+
+def test_long_face_identity_record_is_skipped_whole(tmp_path):
+    # Run 23 (#1905): round-ended V strokes give an edge many faces, so its
+    # identity record outgrows the BYTE length form.
+    ids = "".join(f"moEndFace3IntSurfIdRep_c,176,1,{k},0, \n" for k in range(12))
+    assert len(ids) > 0xFF
+    gate.assert_saved_display_data(_save(tmp_path, _stream(_string(ids) + _record())))
+    _reject(
+        tmp_path, _stream(_string(ids) + _record(flag=0)), "flag=0", incomplete=True
+    )
+
+
 def test_untagged_utf16_part_path_is_not_a_component_record(tmp_path):
     _reject(
         tmp_path,
@@ -198,6 +235,40 @@ def test_nested_hidden_record_fails_closed(tmp_path):
     inner = _record("hidden.SLDPRT", 0)
     outer = b"\xff\xfe\xff" + bytes([len(inner) // 2]) + inner
     _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
+
+
+def test_marker_crossing_from_header_into_text_fails_closed(tmp_path):
+    # codjiflo #1964: a record starting inside a BYTE-length header must not be
+    # skipped as the outer string's text.
+    outer = (b"\xff\xfe" + _record("hidden000.SLDPRT", 0)).ljust(512, b"\x00")
+    _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
+
+
+def test_record_hidden_in_a_dword_length_header_fails_closed(tmp_path):
+    # codjiflo #1964 round 2: the outer DWORD length is read through a part
+    # record that starts inside the header.
+    outer = (b"\xff\xfe\xff\xff\xff" + _record("一.SLDPRT", 0)).ljust(
+        10 + 2 * 0x8FFFE, b"\x00"
+    )
+    _reject(tmp_path, _stream(outer + _record()), "nested or overlapping")
+
+
+def test_tag_straddling_the_string_end_fails_closed(tmp_path):
+    # codjiflo #1964 round 2: the hidden record's tag starts one byte before
+    # the outer string ends.
+    data = b"\xff\xfe\xff\x01\x00" + _record("hidden.SLDPRT", 0) + _record()
+    _reject(tmp_path, _stream(data), "nested or overlapping")
+
+
+def test_dword_length_header_spelling_the_tag_fails_closed(tmp_path):
+    # 0xFFFE units: the header's WORD 0xFFFF + DWORD FE FF 00 00 spells the
+    # tag at +5. Refused rather than guessing which tag is real.
+    assert _string("p" * 0xFFFE)[:10].find(b"\xff\xfe\xff", 1) == 5
+    _reject(
+        tmp_path,
+        _stream(_string("p" * 0xFFFE) + _record()),
+        "nested or overlapping",
+    )
 
 
 def test_container_markers_inside_stored_payload_are_not_entries(tmp_path):

@@ -90,6 +90,29 @@ def _display_streams(data: mmap.mmap):
                 raise ValueError(f"{name} at file offset {offset}: {exc}") from exc
 
 
+def _string_span(data: bytes, offset: int, context: str) -> tuple[int, int]:
+    """Text start and UTF-16 unit count of the CString whose marker is at offset.
+
+    The marker is MFC's BYTE 0xFF + WORD 0xFFFE Unicode tag; the length then
+    follows ``AfxWriteStringLength``: a BYTE below 0xFF; else 0xFF and a WORD
+    below 0xFFFE; else 0xFF, WORD 0xFFFF and a DWORD. Face-identity records
+    longer than 254 units use the WORD form. A second Unicode tag (WORD
+    0xFFFE) and the 64-bit escape are not written after a tag, so both are
+    refused. A DWORD length whose own bytes spell the tag is refused by the
+    caller's overlap check: fail closed rather than guess which tag is real.
+    """
+    lengths = ((offset + 3, "<B"), (offset + 4, "<H"), (offset + 6, "<I"))
+    for (at, layout), escape in zip(lengths, (0xFF, 0xFFFF, 0xFFFFFFFF), strict=True):
+        if at + struct.calcsize(layout) > len(data):
+            raise ValueError(f"{context}: truncated string length")
+        units = struct.unpack_from(layout, data, at)[0]
+        if layout == "<H" and units == 0xFFFE:
+            raise ValueError(f"{context}: repeated Unicode string tag")
+        if units != escape:
+            return at + struct.calcsize(layout), units
+    raise ValueError(f"{context}: unsupported 64-bit string length")
+
+
 def _assert_flags(data: bytes, stream_offset: int) -> str | None:
     """Validate every observed record, returning the first supported zero flag.
 
@@ -103,18 +126,16 @@ def _assert_flags(data: bytes, stream_offset: int) -> str | None:
     incomplete = None
     while (offset := data.find(_STRING_MARKER, cursor)) != -1:
         context = f"DisplayLists at file offset {stream_offset}, string offset {offset}"
-        if offset + 4 > len(data):
-            raise ValueError(f"{context}: truncated string length")
-        units = data[offset + 3]
-        if units == 0xFF:
-            raise ValueError(f"{context}: unsupported extended string length")
-        end = offset + 4 + 2 * units
+        start, units = _string_span(data, offset, context)
+        end = start + 2 * units
         if end > len(data):
             raise ValueError(f"{context}: truncated UTF-16 string")
-        if data.find(_STRING_MARKER, offset + 1, end) != -1:
+        # Any tag starting after this one and before its end overlaps it,
+        # including one that crosses the end or lies in a long-form header.
+        if data.find(_STRING_MARKER, offset + 1, end + len(_STRING_MARKER) - 1) != -1:
             raise ValueError(f"{context}: nested or overlapping serialized string")
         try:
-            text = data[offset + 4 : end].decode("utf-16le")
+            text = data[start:end].decode("utf-16le")
         except UnicodeDecodeError as exc:
             raise ValueError(f"{context}: invalid UTF-16 string") from exc
         cursor = end
