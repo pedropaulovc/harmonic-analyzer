@@ -331,6 +331,7 @@ def _assert_native_thread(display: Any) -> None:
         raise RuntimeError(f"thumbnut native thread callout does not carry the source thread: {texts!r}")
 
 
+@_telemetry.traced("drawing.thumbnut.tap_callout_thread_class")
 def _omit_thread_class(display: Any) -> None:
     """Rule 2: the title block's THREADS row owns class 2B; the native tap
     variables stay live (draw_dt_cone_swing_platform's pattern).  Run
@@ -376,6 +377,7 @@ def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"thumbnut countersink angle text did not persist: {position!r}")
 
 
+@_telemetry.traced("drawing.thumbnut.arrows_inside")
 def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
     """Stand each ARROWS_INSIDE dimension's arrows inside its extension lines,
     read back (draw_mg_magnifying_wheel's _set_arrows_inside)."""
