@@ -1031,9 +1031,22 @@ def test_text_air_refuses_the_line_hung_text_and_passes_the_shelf() -> None:
     )
     air, _nearest = drawing.tooth_thickness_text_air(shelved, 12)
     assert air >= drawing.TOOTH_THICKNESS_TEXT_AIR
+    # 746809f62 farm print: the bottom row no longer printed as one run. Its
+    # Ø as its own run or a path still counts it printed; dropped, it fails.
+    bottom = shelved.spans[-1]
+    cut = bottom.xmin + 0.04
+    split = (
+        Span("ONPITCHCIRCLE", bottom.xmin, bottom.ymin, cut, bottom.ymax, ()),
+        Span("6.350", cut + 0.002, bottom.ymin, bottom.xmax, bottom.ymax, ()),
+    )
+    assert drawing.tooth_thickness_text_air(
+        replace(shelved, spans=(*shelved.spans[:-1], *split)), 12
+    )[0] == pytest.approx(air)
+    with pytest.raises(ValueError, match=r"misses '[^']*NOP[^']*'"):
+        drawing.tooth_thickness_text_air(replace(shelved, spans=shelved.spans[:-1]), 12)
     with pytest.raises(ValueError, match="printed 0 times"):
         drawing.tooth_thickness_text_air(replace(shelved, spans=shelved.spans[1:]), 12)
-    with pytest.raises(ValueError, match="no shelf"):
+    with pytest.raises(ValueError, match="0 shelves"):
         drawing.tooth_thickness_text_air(
             replace(shelved, strokes=shelved.strokes[1:]), 12
         )

@@ -910,7 +910,10 @@ exported PDF. Every line except the callout's own shelf must keep 2 mm of
 printed air from its glyphs (`assert_tooth_thickness_text_air`, at
 `after_pdf_save`). The offset leader starts at the line's midpoint and ends at
 the shelf's near end, so it closes on the block's lower-left corner; budget
-the first glyph of the widest row against it.
+the first glyph of the widest row against it. Find such a callout in the PDF
+by its shelf, not by one text run per row: offset, the bottom row
+`ON PITCH CIRCLE Ø…` stopped printing as one run (farm run of 746809f62), so
+require its characters among the runs over the shelf instead.
 
 Full parent-scoped Numbers can also grow a BOM without changing its column
 widths or font. On MHA-SM-00 sheet 2, the native table bottom moved from

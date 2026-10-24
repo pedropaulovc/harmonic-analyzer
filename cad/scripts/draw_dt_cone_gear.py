@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +80,7 @@ from _layout_audit import arc_segments
 from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
-from _pdf_ink import PageInk, read_pdf_ink
+from _pdf_ink import PageInk, Span, read_pdf_ink
 from _session import run_build
 import _telemetry
 from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
@@ -1257,6 +1258,9 @@ def tooth_thickness_rows(teeth: int) -> tuple[str, ...]:
 # How far round the callout's text block a line is still measured; anything
 # farther is reported at this distance.
 _TEXT_AIR_WINDOW = 0.010
+# Where the shelf runs under CIRCULAR TOOTH THICKNESS: the bottom row stands
+# between them (6.5 mm on the 2056e3344 print).
+_SHELF_UNDER_ROW = (0.004, 0.009)
 
 
 def tooth_thickness_text_air(page: PageInk, teeth: int) -> tuple[float, str]:
@@ -1264,34 +1268,53 @@ def tooth_thickness_text_air(page: PageInk, teeth: int) -> tuple[float, str]:
     any line on ``page`` other than the shelf the text stands on, with the
     nearest line.
 
-    The callout is its printed rows (one PDF text run each) and every run
-    inside their joint box (the value and its tolerance). Its shelf is the
-    horizontal line under that box spanning it. Air is the glyph-box to
-    line distance less half the stroke width.
+    The top row and CIRCULAR TOOTH THICKNESS each print as one PDF text run;
+    the shelf is the one horizontal line spanning that row just under it.
+    The callout is every run over the shelf up to the top row's ink, and it
+    must print every character of its rows (the bottom row's Ø may print as
+    its own run or a path). Air is the glyph-box to line distance less half
+    the stroke width.
     """
-    runs = []
-    for row in tooth_thickness_rows(teeth):
-        key = "".join(row.split())
-        found = [span for span in page.spans if "".join(span.text.split()) == key]
-        if len(found) != 1:
-            raise ValueError(
-                f"T{teeth:03d}: thickness row {row!r} printed {len(found)} times"
-            )
-        runs.append(found[0])
-    block = Box(
-        min(span.xmin for span in runs),
-        min(span.ymin for span in runs),
-        max(span.xmax for span in runs),
-        max(span.ymax for span in runs),
-    )
+    rows = tooth_thickness_rows(teeth)
+    top, anchor = (_single_run(page, teeth, row) for row in rows[:2])
+    shelves = [
+        stroke
+        for stroke in page.strokes
+        if (stroke.stroked or stroke.filled)
+        and abs(stroke.y0 - stroke.y1) < 1e-7
+        and anchor.ymin - _SHELF_UNDER_ROW[1]
+        <= stroke.y0
+        <= anchor.ymin - _SHELF_UNDER_ROW[0]
+        and min(stroke.x0, stroke.x1) <= anchor.xmin + 0.0005
+        and max(stroke.x0, stroke.x1) >= anchor.xmax - 0.0005
+    ]
+    if len(shelves) != 1:
+        raise ValueError(
+            f"T{teeth:03d}: {len(shelves)} shelves under the thickness text "
+            f"{Box(anchor.xmin, anchor.ymin, anchor.xmax, anchor.ymax).format_mm()}"
+        )
+    (shelf,) = shelves
+    block = Box(min(shelf.x0, shelf.x1), shelf.y0, max(shelf.x0, shelf.x1), top.ymax)
     hair = 0.0001
-    glyphs = [
-        Box(glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax)
+    runs = [
+        span
         for span in page.spans
         if block.xmin - hair <= span.xmin
         and span.xmax <= block.xmax + hair
         and block.ymin - hair <= span.ymin
         and span.ymax <= block.ymax + hair
+    ]
+    wanted = Counter("".join("".join(rows).split()).replace("\u00d8", ""))
+    missing = wanted - Counter("".join("".join(span.text for span in runs).split()))
+    if missing:
+        raise ValueError(
+            f"T{teeth:03d}: the thickness text over its shelf {block.format_mm()} "
+            f"misses {''.join(sorted(missing.elements()))!r}; it prints "
+            f"{[span.text for span in runs]}"
+        )
+    glyphs = [
+        Box(glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax)
+        for span in runs
         for glyph in span.glyphs
     ]
     near = Box(
@@ -1300,21 +1323,12 @@ def tooth_thickness_text_air(page: PageInk, teeth: int) -> tuple[float, str]:
         block.xmax + _TEXT_AIR_WINDOW,
         block.ymax + _TEXT_AIR_WINDOW,
     )
-    shelves = 0
     air, nearest = _TEXT_AIR_WINDOW, "no line within reach"
     for stroke in page.strokes:
-        if not (stroke.stroked or stroke.filled):
+        if stroke is shelf or not (stroke.stroked or stroke.filled):
             continue
         segment = Segment(stroke.x0, stroke.y0, stroke.x1, stroke.y1)
         if segment.length == 0.0 or segment_box_distance(segment, near) > 0.0:
-            continue
-        if (
-            abs(stroke.y0 - stroke.y1) < 1e-7
-            and block.ymin - 0.0025 <= stroke.y0 <= block.ymin
-            and min(stroke.x0, stroke.x1) <= block.xmin + 0.0005
-            and max(stroke.x0, stroke.x1) >= block.xmax - 0.0005
-        ):
-            shelves += 1
             continue
         pen = stroke.width / 2.0 if stroke.stroked else 0.0
         for glyph in glyphs:
@@ -1325,11 +1339,18 @@ def tooth_thickness_text_air(page: PageInk, teeth: int) -> tuple[float, str]:
                     f"{gap * 1000:.2f} mm from line {segment.format_mm()} to glyph "
                     f"{glyph.format_mm()}"
                 )
-    if not shelves:
-        raise ValueError(
-            f"T{teeth:03d}: no shelf under the thickness text {block.format_mm()}"
-        )
     return air, nearest
+
+
+def _single_run(page: PageInk, teeth: int, row: str) -> Span:
+    """The one PDF text run printing ``row`` (whitespace aside)."""
+    key = "".join(row.split())
+    found = [span for span in page.spans if "".join(span.text.split()) == key]
+    if len(found) != 1:
+        raise ValueError(
+            f"T{teeth:03d}: thickness row {row!r} printed {len(found)} times"
+        )
+    return found[0]
 
 
 def assert_tooth_thickness_text_air(pdf: Path) -> None:
