@@ -22,6 +22,8 @@ import draw_dt_cone_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 import _drawing_annotation_extent
+from _layout_geometry import Box, Segment, segment_box_distance
+from _pdf_ink import Glyph, PageInk, Span, Stroke
 
 
 def test_required_drawing_paths_and_registry_entry() -> None:
@@ -734,13 +736,10 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         else:
             assert text_x - text_half >= drawing.RIGHT_CENTER[0] + half_face + clearance
             assert text_x + text_half < drawing.ISO_CENTER[0] - half_od - 0.005
-        # Thickness text (~65 mm callout centred on its x) sits below the gear,
-        # left of the side view and its face-width dimension.
-        ctt_x, ctt_y = front["ToothThickness"]
-        assert ctt_y < drawing.FRONT_CENTER[1] - half_od - 0.015
-        assert ctt_x + 0.0325 < drawing.RIGHT_CENTER[0] - half_face - 0.020
-        assert ctt_x - 0.0325 > bore["BoreCutDia"][0] + _BORE_DIA_TEXT_HALF_WIDTH + 0.010
-        assert front["ToothThickness"][0] > drawing.FRONT_CENTER[0] + half_od
+        # The thickness line stands right of the tip circle; its text stands
+        # on its own shelf further right (budgeted below).
+        line_x = front["ToothThickness"][0]
+        assert line_x > drawing.FRONT_CENTER[0] + half_od
         # The gap-floor limit stack (two 3-place values plus "GAP FLOOR",
         # ~17 x 11 mm) stands right of the tip circle, above the thickness
         # witness, left of the side view and below the Gear Data block.
@@ -772,6 +771,41 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert floor_y >= usual - 1e-12
         if floor_y > usual:
             assert shelf_y - tail_y == pytest.approx(_drawing_leaders.ARROW_TEXT_CLEARANCE)
+        # The thickness text's shelf, budgeted with the block the last print
+        # measured: its leader (from the line's midpoint on the bore axis to
+        # the shelf's start) keeps the fleet's text air off the C of CIRCULAR
+        # and the bottom row, the block tops out under the root-envelope
+        # stack's shelf and ends left of the side view.
+        thickness_x, thickness_y = drawing.tooth_thickness_shelf(teeth)
+        assert thickness_x - line_x == pytest.approx(drawing.TOOTH_THICKNESS_TEXT_GAP)
+        leader = Segment(line_x, drawing.FRONT_CENTER[1], thickness_x, thickness_y)
+        for x0, y0, x1, y1 in (_THICKNESS_C_GLYPH, _THICKNESS_BOTTOM_GLYPH):
+            glyph = Box(
+                thickness_x + x0, thickness_y + y0, thickness_x + x1, thickness_y + y1
+            )
+            assert segment_box_distance(leader, glyph) >= (
+                drawing.TOOTH_THICKNESS_TEXT_AIR + _THICKNESS_AIR_MARGIN
+            ), teeth
+        top = thickness_y + _THICKNESS_INK_HEIGHT
+        assert top + 0.002 <= floor_y - _FLOOR_SHELF_DROP, teeth
+        assert thickness_x + _THICKNESS_SHELF_LENGTH + 0.003 < (
+            drawing.RIGHT_CENTER[0] - half_face
+        ), teeth
+
+
+# The thickness block as run 20261024T091056564Z printed it on every sheet,
+# relative to its shelf's start (sheet metres): the shelf 64.21 mm long, the
+# ink 24.66 mm tall, the C of CIRCULAR 0.25 mm in and 6.49 mm up, the bottom
+# row's first glyph at least 3.0 mm in (T084's longer pitch diameter) and
+# 0.9 mm up; and the root-envelope stack's shelf 10.08 mm under its anchor.
+_THICKNESS_SHELF_LENGTH = 0.06421
+_THICKNESS_INK_HEIGHT = 0.02466
+_THICKNESS_C_GLYPH = (0.00025, 0.00649, 0.00353, 0.01006)
+_THICKNESS_BOTTOM_GLYPH = (0.0030, 0.0009, 0.0065, 0.0045)
+_FLOOR_SHELF_DROP = 0.01008
+# The budget keeps half a millimetre beyond the printed-air check, for the
+# leader's half stroke and the native shelf's placement tolerance.
+_THICKNESS_AIR_MARGIN = 0.0005
 
 
 # Text half-widths in the bore view, sheet metres: the stacked diameter
@@ -843,7 +877,7 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         assert title_top - _BORE_TITLE_HEIGHT > _ZONE_MARGIN + 0.001
         assert af_y + 2.0 * _BORE_TEXT_HALF_HEIGHT < keep["BoreFlatClock"][1] - 0.010
         # The clock text stands wholly right of the circle and clear of the
-        # thickness callout under the front view.
+        # thickness callout's shelved block.
         clock_x, clock_y = keep["BoreFlatClock"]
         # Its two-line block (measured half-extents) stands an arrow length
         # plus clearance above the axis line, where the arc's arrowhead ends
@@ -852,20 +886,19 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
             cy + drawing.BORE_CLOCK_ARROW_LENGTH + _drawing_leaders.ARROW_TEXT_CLEARANCE - 1e-12
         ), teeth
         assert clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH >= cx + crop + 0.002 - 1e-12, teeth
-        # The thickness callout, measured on the T006 PDF of run
-        # 20261010T051729717Z: its text spans x 136.2-200.4, y 100.0-116.5 mm
-        # round its keep (136.24, 107.76) mm, starting at its dimension line
-        # (the keep x) and running right, with its leader above. The pitch
-        # circle line over the value adds one 4.9 mm row (run
-        # 20261011T155111413Z).
-        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
+        ctt_x, ctt_y = drawing.tooth_thickness_shelf(teeth)
         clock_box = (
             clock_x - drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
             clock_y - drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
             clock_x + drawing.BORE_CLOCK_TEXT_HALF_WIDTH,
             clock_y + drawing.BORE_CLOCK_TEXT_HALF_HEIGHT,
         )
-        ctt_box = (ctt_x - 0.001, ctt_y - 0.0078, ctt_x + 0.0642, ctt_y + 0.0137)
+        ctt_box = (
+            ctt_x,
+            ctt_y,
+            ctt_x + _THICKNESS_SHELF_LENGTH,
+            ctt_y + _THICKNESS_INK_HEIGHT,
+        )
         assert _drawing_annotation_extent.boxes_clear(clock_box, ctt_box), teeth
         # The clock's arc centres where the flat crosses the axis and swings
         # through its text, in the quadrant right of the flat and above the
@@ -926,6 +959,168 @@ def test_settled_clocks_refuse_stub_arcs_on_any_sheet(monkeypatch: pytest.Monkey
     with pytest.raises(RuntimeError, match=r"settling rebuild:\nT012: no arc\nT018: no arc"):
         drawing._assert_settled_clocks(SimpleNamespace(currentModel=ddoc), clocks)
     assert sheets == ["T012", "T018"]
+
+
+# The T012 thickness callout as run 20261024T091056564Z printed it, each PDF
+# text run's ink relative to its shelf's start (sheet metres).
+_T012_THICKNESS_RUNS = (
+    ("BACKLASHWITHMHA-DT-12", (0.00164, 0.02110, 0.06282, 0.02466)),
+    ("0.831", (0.01856, 0.01210, 0.02898, 0.01567)),
+    ("+", (0.03160, 0.01718, 0.03390, 0.01951)),
+    ("-", (0.03213, 0.01325, 0.03338, 0.01354)),
+    ("0.075", (0.03432, 0.01657, 0.04560, 0.02014)),
+    ("0.075", (0.03432, 0.01205, 0.04560, 0.01561)),
+    ("CIRCULARTOOTHTHICKNESS", (0.00025, 0.00649, 0.06391, 0.01006)),
+    ("ONPITCHCIRCLE\u00d86.350", (0.00437, 0.00078, 0.05995, 0.00456)),
+)
+# Its dimension's pen and the witnesses' half spacing at 6:1, as printed.
+_PEN = 0.00013
+_T012_HALF_WITNESS = 0.00249
+
+
+def _line(x0: float, y0: float, x1: float, y1: float) -> Stroke:
+    return Stroke(x0, y0, x1, y1, _PEN, (0, 0, 0), False, False, True)
+
+
+def _t012_thickness_page(
+    shelf: tuple[float, float], lines: list[tuple[float, float, float, float]]
+) -> PageInk:
+    x, y = shelf
+    spans = []
+    for text, (x0, y0, x1, y1) in _T012_THICKNESS_RUNS:
+        glyph = Glyph(text[0], x + x0, y + y0, x + x1, y + y1)
+        spans.append(
+            Span(text, glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax, (glyph,))
+        )
+    strokes = (
+        _line(x, y, x + _THICKNESS_SHELF_LENGTH, y),
+        *(_line(*line) for line in lines),
+    )
+    glyphs = tuple(glyph for span in spans for glyph in span.glyphs)
+    return PageInk(0.4318, 0.2794, glyphs, tuple(spans), strokes)
+
+
+def test_text_air_refuses_the_line_hung_text_and_passes_the_shelf() -> None:
+    """Machinist review of 2056e3344: the line dropping from the 3 o'clock
+    tooth to the text it hung ran 0.19 mm off the C of CIRCULAR on every
+    sheet. On its own shelf the offset leader leaves the line's midpoint."""
+    from dataclasses import replace
+
+    line_x = drawing.front_keep(12)["ToothThickness"][0]
+    axis_y = drawing.FRONT_CENTER[1]
+    lower = axis_y - _T012_HALF_WITNESS
+    hung = _t012_thickness_page((line_x, 0.09286), [(line_x, 0.09286, line_x, lower)])
+    air, nearest = drawing.tooth_thickness_text_air(hung, 12)
+    assert air == pytest.approx(0.00025 - _PEN / 2.0, abs=1e-7)
+    assert air < drawing.TOOTH_THICKNESS_TEXT_AIR
+    assert "glyph" in nearest
+    shelf = drawing.tooth_thickness_shelf(12)
+    tail = drawing.DIMENSION_ARROW_LENGTH
+    shelved = _t012_thickness_page(
+        shelf,
+        [
+            (line_x, axis_y, *shelf),
+            (line_x, lower, line_x, lower - tail),
+            (
+                line_x,
+                axis_y + _T012_HALF_WITNESS,
+                line_x,
+                axis_y + _T012_HALF_WITNESS + tail,
+            ),
+        ],
+    )
+    air, _nearest = drawing.tooth_thickness_text_air(shelved, 12)
+    assert air >= drawing.TOOTH_THICKNESS_TEXT_AIR
+    with pytest.raises(ValueError, match="printed 0 times"):
+        drawing.tooth_thickness_text_air(replace(shelved, spans=shelved.spans[1:]), 12)
+    with pytest.raises(ValueError, match="no shelf"):
+        drawing.tooth_thickness_text_air(
+            replace(shelved, strokes=shelved.strokes[1:]), 12
+        )
+
+
+def test_export_is_refused_on_the_sheet_whose_thickness_text_a_line_strikes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = [object()] * len(drawing.SHEET_NAMES)
+    monkeypatch.setattr(drawing, "read_pdf_ink", lambda _path: pages)
+    struck = {18: 0.0015}
+    monkeypatch.setattr(
+        drawing,
+        "tooth_thickness_text_air",
+        lambda _page, teeth: (struck.get(teeth, 0.003), f"T{teeth:03d} nearest"),
+    )
+    with pytest.raises(
+        RuntimeError, match=r"strikes the thickness text.*\nT018: T018 nearest$"
+    ):
+        drawing.assert_tooth_thickness_text_air(drawing.PDF)
+    struck.clear()
+    drawing.assert_tooth_thickness_text_air(drawing.PDF)
+    checked: list[object] = []
+    monkeypatch.setattr(drawing, "assert_tooth_thickness_text_air", checked.append)
+    for phase in ("before_pdf_save", "after_drawing_save", "after_png_save"):
+        drawing._check_exported_pdf(phase)
+    assert checked == []
+    drawing._check_exported_pdf("after_pdf_save")
+    assert checked == [drawing.PDF]
+    build = inspect.getsource(drawing.build)
+    assert "checkpoint=_check_exported_pdf" in build
+    assert build.index("_shelve_tooth_thickness(") > build.index("CALLOUTS_ABOVE")
+
+
+def test_shelving_moves_the_text_by_its_measured_shelf_and_keeps_the_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    teeth = 12
+    line_x = drawing.front_keep(teeth)["ToothThickness"][0]
+    target = drawing.tooth_thickness_shelf(teeth)
+    display = SimpleNamespace(OffsetText=False)
+    annotation = SimpleNamespace(GetSpecificAnnotation=lambda: display)
+    state = {
+        "shelf": (target[0] + 0.003, target[1] - 0.002),
+        "lines": [((line_x, 0.1525), (line_x, 0.1588)), ((line_x, 0.150), target)],
+    }
+    calls: list[tuple[object, ...]] = []
+
+    def offset(_adapter: object, _annotations: object, positions: dict) -> None:
+        display.OffsetText = True
+        calls.append(("offset", positions["ToothThickness"]))
+
+    def ink(_adapter: object, _annotation: object, *, label: str) -> SimpleNamespace:
+        x, y = state["shelf"]
+        return SimpleNamespace(text=(x, y, x + 0.064, y + 0.025))
+
+    def move(
+        _adapter: object, _annotation: object, dx: float, dy: float, *, label: str
+    ) -> None:
+        calls.append(("move", dx, dy))
+        state["shelf"] = (state["shelf"][0] + dx, state["shelf"][1] + dy)
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        drawing, "dimension_name", lambda _adapter, _a: "ToothThickness"
+    )
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    monkeypatch.setattr(drawing, "callout_ink", ink)
+    monkeypatch.setattr(drawing, "move_annotation", move)
+    monkeypatch.setattr(drawing, "dimension_segments", lambda _a: state["lines"])
+    drawing._shelve_tooth_thickness(None, [annotation], teeth, label="T012")
+    assert calls == [
+        (
+            "offset",
+            (
+                target[0] + drawing.TOOTH_THICKNESS_SEED[0],
+                target[1] + drawing.TOOTH_THICKNESS_SEED[1],
+            ),
+        ),
+        ("move", pytest.approx(-0.003), pytest.approx(0.002)),
+    ]
+    # A line that followed its text off the tooth is refused.
+    state["lines"] = [((line_x + 0.03, 0.1), (line_x + 0.03, 0.12))]
+    with pytest.raises(RuntimeError, match="left the tooth"):
+        drawing._shelve_tooth_thickness(None, [annotation], teeth, label="T012")
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
