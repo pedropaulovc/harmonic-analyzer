@@ -121,12 +121,22 @@ HOLE_2_X_SHEET = _sheet_x(HOLE_XY[1][0])
 # right of the view's extension lines (centred between them, the lines struck
 # its digits, machinist review ENFORCE r1-r3) and its one-line as-supplied
 # stock callout in the clear field above the value.
+# The two edge hole coordinates carry three-row blocks (value plus the mate
+# callout below it). SolidWorks centres a block on its text position and
+# hangs the dimension's shelf from its last row, about 8.3 mm below that
+# position, its first row's top about 7.3 mm above (layout audit of farm run
+# 20261024T123122680Z). Kept at the one-row positions, the hole Y's line ran
+# down through the 4.000 and the 4.000's line fell onto the 18.000's
+# (machinist review r1-r3 of bef0d46b6). So the hole Y's line stands at
+# 68 mm, its block left of it and below the Height's bottom arrow; the 4.000's
+# block stands right of that line, its shelf (the 4.000's dimension line)
+# 6 mm above the 18.000's and its top clear of the Height's extension line.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.125),
     "Height": (0.057, FRONT_CENTER[1]),
-    "Hole1X": (0.085, 0.138),
+    "Hole1X": (0.086, 0.1448),
     "Hole2X": (0.142, 0.133),
-    "Hole1Y": (0.076, 0.147),
+    "Hole1Y": (0.068, 0.141),
     "CornerR": (0.215, 0.211),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0] + 0.023, 0.209)}
