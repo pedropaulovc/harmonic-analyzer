@@ -286,11 +286,16 @@ def test_each_step_block_fits_the_field_right_of_its_bank_view() -> None:
     assert "TIGHTEN" not in rocker
     assert "TIGHTEN" in lever and "STAKE" in lever
     assert _config.parts("sh-vn-arbor-set-screw")["number"] not in lever
-    # The sheet-5 view sits left of the steps, wholly inside the border.
+    # The sheet-5 view's outline (model x 7.4-217.1, y 955.6-1078.6 on the
+    # 06616793e farm leaf) sits under its step block, above the title block
+    # and inside the border.
     hookup = drawing.HOOKUP
-    half_width = (drawing.LEVER_SPRING_X / 2.0 + 15.0) * hookup.mm
-    assert drawing.BORDER < hookup.centre[0] - half_width
-    assert hookup.centre[0] + half_width < left - 0.010
+    cx, cy, _ = hookup.centre_xyz
+    x0, x1 = (hookup.centre[0] + (x - cx) * hookup.mm for x in (7.4, 217.1))
+    y0, y1 = (hookup.centre[1] + (y - cy) * hookup.mm for y in (955.6, 1078.6))
+    steps_bottom = top - len(lever_continued.splitlines()) * NOTE_LINE_PITCH
+    assert drawing.BORDER < x0 and x1 < template.width_m - drawing.BORDER
+    assert template.title_block_top_m + 0.010 < y0 and y1 < steps_bottom - 0.010
 
 
 def test_steps_are_one_blank_line_apart_and_never_split() -> None:

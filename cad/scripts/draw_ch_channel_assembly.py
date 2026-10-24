@@ -160,13 +160,12 @@ SHEET_SCALE = (1.0, 7.0)
 ASSEMBLED_SCALE = (1.0, 5.0)
 ASSEMBLED_ISO_SCALE = SHEET_SCALE
 FITUP_SCALE = (1.0, 1.0)
-HOOKUP_SCALE = (1.0, 2.0)
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: SHEET_SCALE,
     SHEET_NAMES[2]: FITUP_SCALE,
     SHEET_NAMES[3]: FITUP_SCALE,
-    SHEET_NAMES[4]: HOOKUP_SCALE,
+    SHEET_NAMES[4]: FITUP_SCALE,
 }
 _TEMPLATE = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
 BORDER = 0.0127
@@ -595,19 +594,21 @@ KEEPER_PLAN = BankView(
 # block two lines into the title block, so its last step prints whole here,
 # with the front view it describes: the fulcrum shaft, a lever, its spring,
 # anchor and jam nut, the 20 channels in line behind the nearest. The summing
-# plate the anchor threads into belongs to MHA-HA-00, not this assembly. The
-# view runs from the hub top (~6 above the fulcrum) to the nut (~89 below),
-# and from the fulcrum to the spring hole LEVER_SPRING_X along the lever.
-HOOKUP_DROP_MM = 42.0
+# plate the anchor threads into belongs to MHA-HA-00, not this assembly. At
+# 1:2 (farm leaf on 06616793e) the view outline ran from model x 7.4 to 217.1
+# and y 955.6 to 1078.6: 210 x 123 mm, so at 1:1 it spans sheet x 0.035-0.245
+# and y 0.089-0.212 about (0.140, 0.150), under the step block (bottom
+# 0.2355) and above the title block (top 0.066).
+HOOKUP_DROP_MM = 44.0
 HOOKUP = BankView(
     "SPRING HOOK-UP, FRONT",
-    (int(HOOKUP_SCALE[0]), int(HOOKUP_SCALE[1])),
+    (int(FITUP_SCALE[0]), int(FITUP_SCALE[1])),
     (
         _FULCRUM_X - LEVER_SPRING_X / 2.0,
         _FULCRUM_Y - HOOKUP_DROP_MM,
         FULCRUM_KEEPER_CENTRE_Z,
     ),
-    (0.105, 0.180),
+    (0.140, 0.150),
     frozenset(
         {
             "ch-fulcrum-shaft",
