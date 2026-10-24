@@ -1,27 +1,32 @@
 """Manufacturing sheets for the plain shoulder-screw pivot blocks.
 
 All sizes import native model dimensions; no bearing/cartridge sheets survive.
-The plan origin is the carriage-pattern centre; section B-B shows the floor
-from the carriage seat, not a competing counterbore-depth tolerance chain.
+Plan X locations run from the -X (left) edge through the hidden
+``PlanDatumReference`` sketch; Y from the Ø10 seat axis. Section B-B shows
+the floor from the carriage seat, not a competing counterbore-depth tolerance
+chain. TL-32's nut face is VIEW D on its own 2:1 sheet, its arrow on the plan.
 """
 from __future__ import annotations
 import argparse
 import sys
+from typing import Any
 from _check import check
 from _com import _early_bound
-from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties
-from _drawing_dimensions import assert_imported_precision
+from _drawing_common import DrawingOutputs, finalize_drawing, new_project_drawing, read_required_properties, rebuild_drawing
+from _drawing_dimensions import assert_imported_precision, dimension_name, offset_dimension_text
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_hole_callout import add_native_hole_callout
+from _drawing_leader_notes import add_leader_note
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
 from _session import run_build
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
 
 SPEC = DRAWINGS_BY_NAME['ch_rocker_arm_tl_oblique_pivot_block']
@@ -29,67 +34,151 @@ PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / 'out' / 'sldprt' / f'{PART_STEM}.SLDPRT'
 OUTPUTS = DrawingOutputs(slddrw=SPEC.outputs['slddrw'],pdf=SPEC.outputs['pdf'],png=SPEC.outputs['png'])
 SHEET_SCALE = (1.0,1.0)
-# Sheet metres. The plan sits at x .170 so the 104 mm REAM text, the tap
+# Sheet metres. The plan sits at x .170 so the 112 mm REAM text, the tap
 # callout and the 4X callouts fit left of it inside the border, with short
-# leaders. Plan geometry on the sheet: block x 139..201, y 185..225; origin
-# (carriage-pattern centre) 181,205; bore 149,205; holes x 168/194, y 192/218.
+# leaders. Plan geometry on the sheet: block x 139..201, y 185..225; frame
+# centre 181,205; bore 149,205; holes x 168/194, y 192/218.
 # Section A runs along y 205 (x 135..205); B along x 168 (y 181..229).
-# Hole columns and rows are dimensioned once each: CarriageDrills1X/3X chain
-# below, 3Y/4Y chain on the +X side (1Y/2X/2Y/4X repeat the same 13.000),
-# its 14 mm texts between the A arrow (x 206) and BlockSideY's line (x 224);
-# BlockWidth stands past BlockSideY's shouldered text (x 225..237).
+# X ordinates stand above the plan in 9 mm lanes from the -X edge (x 139):
+# the 10.00 to the seat, its text right of its 10 mm span (left of it is the
+# REAM text), then the two hole columns and the 62.00 overall, 8 mm under the
+# border. Rows are dimensioned once each from the seat axis: 3Y/4Y on the +X
+# side between the A arrow (x 206) and BlockSideY's line (x 224), arrows
+# inside so neither's outside tail strikes the other's text (review r1-r3);
+# BlockWidth stands past BlockSideY's shouldered text (x 225..237). The 4X
+# callouts' texts end left of x 139, so the -X edge's extension lines on TL-32
+# clear them.
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
-    'BlockLength':(.170,.265),'BlockEndX':(.150,.252),'BoreX':(.165,.240),
+    'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
+    'PlanBoreX':(.157,.232),
     'BlockWidth':(.242,.195),'BlockSideY':(.224,.220),
     'CarriageDrills3Y':(.215,.1985),'CarriageDrills4Y':(.215,.2115),
-    'CarriageDrills1X':(.158,.170),'CarriageDrills3X':(.204,.170),
-    'BoreDia':(.078,.226),'CarriageDrills1Dia':(.110,.168),'CarriageCounterbores1Dia':(.095,.150),
+    'BoreDia':(.078,.226),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores1Dia':(.095,.150),
 }
+ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # Section A-A: Z 0..24.3 prints at y 92.2..67.9 (top face down). The tap's
-# dimension line rides the tap-only band (y 75.5..92.2), clear of the 7.65
-# seat depth on its left.
+# dimension line rides the tap-only band (y 75.5..92.2); its extension lines
+# rise from the top-face sketch circle through the Ø10 seat, so they are
+# hidden and its arrows land on the bore walls (review r2/r3). The 7.650
+# seat depth keeps its line at x .120 and stands its text, with the stack it
+# sets, off to the lower left on a leader, clear of the section.
 SIDE_XY = (.170,.080)
 SIDE_KEEP = {'BlockHeight':(.212,.080),'TopBoreDepth':(.120,.072),'TapDrillDia':(.084,.091)}
+SEAT_DEPTH_TEXT_XY = (.098,.058)
 FLOOR_KEEP = {'CboreFloor':(.360,.155)}
 ISO_XY, ISO_SCALE = (.355,.235), SHEET_SCALE
 # TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
-# (x 171.75..190.25, y 137..185) takes the space below, so the hole-column
-# chain and the lug's own sizes stand under the lug and A-A moves down 20 mm.
-# Its taller pictorial prints at 1:2 to stay under the border. LugWidth's text
-# stands right of the hole-column extension line (x 194), off the origin line
-# (x 181) that runs down the lug.
+# (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
+# its text right of the hole-column line (x 194), then the lug face from the
+# -X edge. The 88.00 overall stands outermost on the +X side. A-A moves down
+# 20 mm. Its taller pictorial prints at 1:2 to stay under the border.
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
-    'CarriageDrills1X':(.158,.1145),'CarriageDrills3X':(.204,.1145),
-    'LugWidth':(.2045,.1305),'LugEndX':(.1635,.1225),
-    'LugLength':(.248,.161),'LugEndY':(.260,.171),
+    'LugWidth':(.2045,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.256,.181),
 }
 FEED_SIDE_XY = (.170,.060)
 FEED_SIDE_KEEP = {'BlockHeight':(.209,.060),'TopBoreDepth':(.120,.052),'TapDrillDia':(.084,.071)}
+FEED_SEAT_DEPTH_TEXT_XY = (.098,.038)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
-# Nut interface, 2:1 *Left at .190,.175: Z runs right from the -Z face at
-# x 165.7, Y=0 prints at y 223; holes at x 179.2/201.8, y 101.7/124.3; nut axis
-# 190.5,113; section line C along x 190.5 (y 83..143). Rows and columns are
-# dimensioned once: Y on the -Z column (Tap1Y/3Y) in lanes left of the view,
-# Z on the upper row (Tap3Z/4Z) over the lug face; both clearance callouts sit
-# under or beside the seat with short leaders.
+# VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
+# arrow, level with the lug's mid-length, 15 mm left of that face.
+VIEW_LETTER = 'D'
+VIEW_LETTER_HEIGHT = .005
+VIEW_ARROW_RUN = .015
+# Nut interface, VIEW D, *Left at 2:1 on a 2:1 sheet, at .190,.175: Z runs
+# right from the bottom face at x 165.7, Y=0 prints at y 223, the lug end
+# (Y -68) at y 87; taps at x 179.2/201.8, y 101.7/124.3; nut axis 190.5,113;
+# section line C along x 190.5 (y 83..143), its upper arrow and letter near
+# y 143..148, x 190..211. The axis stands from the lug end / bottom-face
+# corner, the taps from the axis. Y lanes left of the view, 12 mm apart so
+# the short spans' outside arrow tails miss the neighbouring texts; Z lanes
+# above the taps, under the step (y 183), the two 5.657 texts outside their
+# 11.3 mm spans. The clearance callouts and the tap callout leave the axis to
+# the right, between the taps (45 deg pattern) and off the C line.
+NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
-    'NutTap1Y':(.134,.160),'NutAxisY':(.144,.168),'NutTap3Y':(.154,.176),
-    'NutTap3Z':(.1724,.150),'NutAxisZ':(.178,.157),'NutTap4Z':(.1837,.164),
-    'NutSeatDia':(.140,.075),'NutClearanceDia':(.245,.110),
+    'NutCentreY':(.133,.100),'NutTap1Y':(.157,.1073),'NutTap3Y':(.145,.1187),
+    'NutCentreZ':(.178,.175),'NutTap3Z':(.1725,.160),'NutTap4Z':(.2225,.160),
+    'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.128),
 }
-# C-C at 1:1 (x 284..346, y 106..194; X mirrors, so the lug's -X face with
-# the 1.5 seat step prints at x 313.25, the seat at y 119): the depth text
-# stands right of that face.
-NUT_SECTION_XY = (.315,.150)
-NUT_SECTION_KEEP = {'NutSeatDepth':(.326,.120)}
-NUT_CALLOUT_XY = (.245,.088)
+NUT_CAPTION = 'VIEW D'
+NUT_CAPTION_XY = (.166,.078)
+# C-C: the removed (partial) section of the lug alone at the sheet's 2:1, cut
+# through the nut axis, hatched, showing the Ø8.50 across the lug and the
+# Ø10.50 recess floor that its callout gives the depth of.
+NUT_SECTION_XY = (.335,.160)
+NUT_CALLOUT_XY = (.245,.084)
 NUT_ISO_XY = (.380,.215)
+_ARROWS_INSIDE = 0  # swDimArrowsInside
+_WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
 
 
 def _project(adapter,view,point,label):
     return model_point_in_view(adapter,view,tuple(v/1000 for v in point),label=label)
+
+
+def _displays(adapter, annotations, names) -> dict[str, Any]:
+    """The named imported dimensions' ``IDisplayDimension``s, every name found."""
+    found = {}
+    for annotation in annotations:
+        annotation = _early_bound(annotation, 'IAnnotation')
+        name = dimension_name(adapter, annotation)
+        if name in names:
+            found[name] = _early_bound(annotation.GetSpecificAnnotation(), 'IDisplayDimension')
+    missing = sorted(set(names) - set(found))
+    if missing:
+        raise RuntimeError(f'block dimensions not imported: {missing}')
+    return found
+
+
+def _arrows_inside(adapter, annotations, names) -> None:
+    for name, display in _displays(adapter, annotations, names).items():
+        display.ArrowSide = _ARROWS_INSIDE
+        if int(display.ArrowSide) != _ARROWS_INSIDE:
+            raise RuntimeError(f'{name}: arrows did not move inside')
+    rebuild_drawing(adapter, label='block row arrows inside')
+
+
+def _hide_witness_lines(adapter, annotations, name) -> None:
+    display = _displays(adapter, annotations, (name,))[name]
+    display.WitnessVisibility = _WITNESS_NONE
+    if int(display.WitnessVisibility) != _WITNESS_NONE:
+        raise RuntimeError(f'{name}: extension lines still shown')
+    rebuild_drawing(adapter, label='tap drill extension lines hidden')
+
+
+def _append_callout_row(display, row: str, *, label: str) -> None:
+    """Add ``row`` under a native hole callout's thread row (draw_dt_crank_arm)."""
+    native = _early_bound(display, 'IDisplayDimension')
+    definition = str(native.GetText(5) or '')  # swDimensionTextPrefixDefinition
+    if not definition.strip():
+        raise RuntimeError(f'{label}: hole callout has no definition to extend')
+    extended = definition.rstrip() + '\n' + row
+    native.SetText(1, extended)
+    if str(native.GetText(5) or '') != extended:
+        raise RuntimeError(f'{label}: hole callout row did not persist: {native.GetText(5)!r}')
+
+
+def _size_note(adapter, note, height: float, *, label: str) -> None:
+    annotation = _early_bound(note.GetAnnotation(), 'IAnnotation')
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f'{label} has no text format')
+    text_format.CharHeight = height
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f'failed to size {label}')
+    rebuild_drawing(adapter, label=label)
+
+
+def _view_arrow(adapter, plan, contract) -> None:
+    """The lettered viewing arrow onto the lug's -X face (draw_dt_cone_tip_block)."""
+    tip = _project(adapter, plan, (contract.LUG_X0, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
+                                   contract.BLOCK_HEIGHT), 'view D arrow tip')
+    text_xy = (tip[0] - VIEW_ARROW_RUN, tip[1] + VIEW_LETTER_HEIGHT / 2)
+    note = add_leader_note(adapter, VIEW_LETTER, text_xy=text_xy, attach_xy=tip, view=plan,
+                           label=f'view {VIEW_LETTER} viewing arrow')
+    _size_note(adapter, note, VIEW_LETTER_HEIGHT, label=f'view {VIEW_LETTER} arrow letter')
 
 
 async def draw_block(adapter, spec, contract, *, read_source_properties=None):
@@ -106,20 +195,25 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     create_blank_drawing_sheets(adapter,sheets,label='block sheets')
     drawing = _early_bound(drawing,'IDrawingDoc')
     drawing.ActivateSheet(sheets[0])
-    plan_xy, plan_keep, side_xy, side_keep, iso_xy, iso_scale = (
-        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_ISO_XY, FEED_ISO_SCALE)
-        if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, ISO_XY, ISO_SCALE))
+    plan_xy, plan_keep, side_xy, side_keep, seat_text_xy, iso_xy, iso_scale = (
+        (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY, FEED_ISO_XY, FEED_ISO_SCALE)
+        if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY, ISO_SCALE))
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
     side = create_section_view(adapter,plan,
         line_start=_project(adapter,plan,(-46,0,contract.BLOCK_HEIGHT),'pivot cut start'),
         line_end=_project(adapter,plan,(24,0,contract.BLOCK_HEIGHT),'pivot cut end'),
         view_xy=side_xy,section_label='A',scale=(1,1),label='pivot shoulder seat')
     iso = place_view(adapter,str(source),'*Isometric',*iso_xy,scale=iso_scale)
-    annotations = []
-    for view,positions,label in ((plan,plan_keep,'plan'),(side,side_keep,'pivot section direction')):
-        set_hidden_lines_removed(adapter,view)
-        annotations += curate_view_dimensions(adapter,view,keep=positions,view_label=label,
+    set_hidden_lines_removed(adapter,plan)
+    plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    _arrows_inside(adapter, plan_annotations, ROW_DIMENSIONS)
+    set_hidden_lines_removed(adapter,side)
+    side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
+                     dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+    _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
+    offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
+    annotations = plan_annotations + side_annotations
     start = _project(adapter,plan,(-13,-24,contract.BLOCK_HEIGHT),'floor cut start')
     end = _project(adapter,plan,(-13,24,contract.BLOCK_HEIGHT),'floor cut end')
     # TL-32's full cut would carry the whole lug beyond the plane; the removed
@@ -131,41 +225,50 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter,iso)
     add_property_linked_note(adapter,'Isometric View Note',.305,.185)
+    sheet_scales = None
     if is_feed:
+        _view_arrow(adapter, plan, contract)
         drawing.ActivateSheet(sheets[1])
-        nut = place_view(adapter,str(source),'*Left',.190,.175,scale=(2,1))
+        nut = place_view(adapter,str(source),'*Left',*NUT_XY,scale=NUT_SCALE)
         nut_iso = place_view(adapter,str(source),'*Isometric',*NUT_ISO_XY,scale=FEED_ISO_SCALE)
         set_hidden_lines_removed(adapter,nut)
         set_hidden_lines_removed(adapter,nut_iso)
         nut_annotations = curate_view_dimensions(adapter,nut,keep=NUT_KEEP,view_label='nut face',
                       dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        # 1:1 keeps the full Z=12.4 slice (the removed, partial form imports no
-        # NutSeat depth) right of the callouts and clear of the title block.
-        nut_section = create_section_view(adapter,nut,
+        caption = add_note(adapter, NUT_CAPTION, *NUT_CAPTION_XY)
+        if caption is None:
+            raise RuntimeError('failed to insert the VIEW D caption')
+        _size_note(adapter, caption, VIEW_LETTER_HEIGHT, label='VIEW D caption')
+        # The removed section cuts the lug alone, from past its end into its
+        # length; the recess depth prints on the Ø10.50 callout.
+        create_section_view(adapter,nut,
             line_start=_project(adapter,nut,(contract.NUT_FACE_X,-70,contract.NUT_AXIS_Z),'nut cut start'),
             line_end=_project(adapter,nut,(contract.NUT_FACE_X,-40,contract.NUT_AXIS_Z),'nut cut end'),
-            view_xy=NUT_SECTION_XY,section_label='C',scale=(1,1),label='nut spigot seat depth')
-        nut_annotations += curate_view_dimensions(adapter,nut_section,
-            keep=NUT_SECTION_KEEP,view_label='C-C nut seat',
-            dimensions_by_feature=contract.DRAWING_DIMENSIONS)
+            view_xy=NUT_SECTION_XY,section_label='C',scale=NUT_SCALE,partial=True,
+            label='nut spigot recess')
         # The callout picks the +Z column's lower tap, right of section line C
         # at the nut axis, so its short leader from the right crosses neither
-        # the line nor its label.
+        # the line nor its label. The title block's THREADS row owns the class;
+        # the mate row names the bought nut the pattern serves.
         y,z = contract.NUT_HOLES_YZ[1]
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y+contract.NUT_TAP_DRILL/2,z),'nut tap mouth')
-        add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
-                                label='four nut flange taps',process='4X DRILL TO PRINT\n')
+        taps = add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=NUT_CALLOUT_XY,
+                                       label='four nut flange taps')
+        omit_title_block_thread_class(taps, label='four nut flange taps')
+        _append_callout_row(taps, contract.NUT_FLANGE_MATE_TEXT, label='four nut flange taps')
+        rebuild_drawing(adapter, label='nut flange tap callout rows')
         annotations += nut_annotations
+        sheet_scales = {sheets[0]: SHEET_SCALE, sheets[1]: NUT_SCALE}
     # Every printed dimension keeps its part-authored places; the repeated
     # row/column locations left off the sheet print nothing to check.
-    kept = {*plan_keep, *side_keep, *FLOOR_KEEP, *((*NUT_KEEP, *NUT_SECTION_KEEP) if is_feed else ())}
+    kept = {*plan_keep, *side_keep, *FLOOR_KEEP, *(NUT_KEEP if is_feed else ())}
     precision = {name:places for dims in contract.DRAWING_PRECISION.values()
                  for name,places in dims.items() if name in kept}
     assert_imported_precision(adapter,annotations,precision)
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
-                                  scale=SHEET_SCALE,layout=spec.layout,
+                                  scale=SHEET_SCALE,layout=spec.layout,sheet_scales=sheet_scales,
                                   # SolidWorks pins its own "#4-40 Tapped Hole" notes by the nut
                                   # taps, whose Hole Wizard callout already states the thread.
                                   # Finalize's all-sheet sweep: farm run 20261024T115707908Z (1:1

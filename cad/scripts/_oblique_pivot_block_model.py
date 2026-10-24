@@ -19,7 +19,7 @@ from _fit_deviations import deviations
 from _holes import wizard_holes
 from _part_checks import volume_check, report_mass_properties
 from _rebuild import force_rebuild
-from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
+from _sketch import SketchDims, add_line_chain, anchor_point_to_origin, anchor_point_to_point, blank_reference_sketches, dimension_between, ensure_fully_defined, set_sketch_direct_db
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
@@ -198,13 +198,117 @@ async def _circles(adapter, plane, z, profile, circles, *, side=False):
     dims = SketchDims()
     for x,y,dia,names in circles:
         uv = at((z,y,x)) if side else at(x,y)
-        circle = await define_circle(adapter,*uv,dia/2,profile,dims=dims,names=names)
-        if profile.endswith("Reference"):
-            _as_construction(adapter,circle)
+        await define_circle(adapter,*uv,dia/2,profile,dims=dims,names=names)
     await ensure_fully_defined(adapter, profile)
     check(profile, await adapter.exit_sketch())
     name_last_feature(adapter, profile)
     dims.apply(adapter, profile)
+
+
+async def _construction(adapter, create, label: str) -> str:
+    """One construction entity, drawn without inference (no snap to the
+    model edges it lies on), so only the dimensions below define it."""
+    set_sketch_direct_db(adapter, True)
+    try:
+        entity = check(label, await create())
+    finally:
+        set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, entity)
+    return entity
+
+
+async def _offset_point(adapter, dims, base, point, du, dv, names, label) -> None:
+    """Pin sketch ``point`` at offset (du, dv) from ``base`` and record the
+    dims ``anchor_point_to_point`` emits: none for a zero component."""
+    await anchor_point_to_point(adapter, base, point, du, dv, label)
+    for offset, name in zip((du, dv), names, strict=True):
+        if abs(offset) >= 1e-9:
+            dims.record(name)
+
+
+async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, label) -> str:
+    """A construction circle on a real hole, centred by offsets from
+    ``base`` (a sketch point at ``base_uv``), then sized."""
+    circle = await _construction(adapter, lambda: adapter.add_circle(*uv, dia / 2), label)
+    await _offset_point(adapter, dims, base, f"{circle}.center",
+                        abs(uv[0] - base_uv[0]), abs(uv[1] - base_uv[1]), names[:2], label)
+    check(f"{label} diameter", await adapter.add_sketch_dimension(circle, None, "diameter", dia))
+    dims.record(names[2])
+    return circle
+
+
+async def _plan_datum_reference(adapter, part) -> None:
+    """The hidden top-face sketch that carries the plan's X ordinates from
+    the -X edge (rule 10): a construction line ON that edge, construction
+    circles ON the Ø10 seat and one carriage hole per column, and on TL-32 a
+    line ON the lug's -X face, which also carries the 88 overall from the
+    top (+Y) edge. Shown in the plan view, every entity overlies a real edge."""
+    feature = spec.PLAN_DATUM_REFERENCE
+    z = part.BLOCK_HEIGHT
+    check(f"create_sketch {feature}", await adapter.create_sketch("TopFace"))
+    at = _xy_mapper(adapter, z, feature)
+    dims = SketchDims()
+    edge_start, edge_end = at(part.BLOCK_X0, -part.BLOCK_WIDTH / 2), at(part.BLOCK_X0, part.BLOCK_WIDTH / 2)
+    edge = await _construction(adapter, lambda: adapter.add_line(*edge_start, *edge_end), f"{feature} -X edge")
+    check(f"{feature} -X edge vertical", await adapter.add_sketch_constraint(edge, None, "vertical"))
+    await anchor_point_to_origin(adapter, f"{edge}.start", *edge_start, f"{feature} -X edge foot")
+    dims.record("PlanEdgeX")
+    dims.record("PlanEdgeY")
+    await dimension_between(adapter, f"{edge}.start", f"{edge}.end", "vertical_distance",
+                            part.BLOCK_WIDTH, f"{feature} -X edge length")
+    dims.record("PlanEdgeLength")
+    corner = f"{edge}.end"
+    await _construction_circle(adapter, dims, corner, edge_end, at(spec.BORE_X, spec.BORE_Y), spec.BORE_DIA,
+                               ("PlanBoreX", "PlanBoreY", "PlanBoreDia"), f"{feature} seat")
+    for i, (x, y) in enumerate(spec.PLAN_DATUM_HOLES, 1):
+        await _construction_circle(adapter, dims, corner, edge_end, at(x, y), spec.HOLE_DIA,
+                                   (f"PlanHole{i}X", f"PlanHole{i}Y", f"PlanHole{i}Dia"),
+                                   f"{feature} carriage hole column {i}")
+    if hasattr(part, "LUG_WIDTH"):
+        lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
+        lug = await _construction(adapter, lambda: adapter.add_line(*lug_top, *lug_end), f"{feature} lug -X face")
+        check(f"{feature} lug face vertical", await adapter.add_sketch_constraint(lug, None, "vertical"))
+        await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
+                            abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
+                            ("PlanLugX", "PlanLugY"), f"{feature} lug face from -X edge")
+        await dimension_between(adapter, corner, f"{lug}.end", "vertical_distance",
+                                part.BLOCK_WIDTH / 2 - part.LUG_Y0, f"{feature} overall from +Y edge")
+        dims.record("PlanOverallY")
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    dims.apply(adapter, feature)
+
+
+async def _nut_pattern_reference(adapter, part) -> None:
+    """The hidden nut-face sketch that carries VIEW D's locations: a
+    construction line ON the lug end, the nut axis (a circle ON the spigot
+    recess) from that end and the bottom face, and the four taps (circles ON
+    their drills) from the nut axis, so the pattern prints against the recess
+    it surrounds."""
+    feature = "NutPatternReference"
+    check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
+    to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
+    at = lambda y, z: to_sketch((part.NUT_FACE_X, y, z))  # noqa: E731
+    dims = SketchDims()
+    end_start, end_end = at(part.LUG_Y0, 0.0), at(part.LUG_Y0, part.BLOCK_HEIGHT)
+    end = await _construction(adapter, lambda: adapter.add_line(*end_start, *end_end), f"{feature} lug end")
+    check(f"{feature} lug end horizontal", await adapter.add_sketch_constraint(end, None, "horizontal"))
+    await anchor_point_to_origin(adapter, f"{end}.start", *end_start, f"{feature} lug end corner")
+    dims.record("NutEndY")
+    await dimension_between(adapter, f"{end}.start", f"{end}.end", "horizontal_distance",
+                            part.BLOCK_HEIGHT, f"{feature} lug end length")
+    dims.record("NutEndLength")
+    axis_uv = at(part.NUT_AXIS_Y, part.NUT_AXIS_Z)
+    axis = await _construction_circle(adapter, dims, f"{end}.start", end_start, axis_uv, part.NUT_SEAT_DIA,
+                                      ("NutCentreZ", "NutCentreY", "NutCentreDia"), f"{feature} nut axis")
+    for i, (y, z) in enumerate(part.NUT_HOLES_YZ, 1):
+        await _construction_circle(adapter, dims, f"{axis}.center", axis_uv, at(y, z), part.NUT_TAP_DRILL,
+                                   (f"NutTap{i}Z", f"NutTap{i}Y", f"NutTap{i}Dia"), f"{feature} tap {i}")
+    await ensure_fully_defined(adapter, feature)
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    dims.apply(adapter, feature)
 
 
 async def build_block_model(adapter, part) -> None:
@@ -250,6 +354,7 @@ async def build_block_model(adapter, part) -> None:
     expected -= 4*math.pi*((spec.HOLE_DIA/2)**2*spec.CBORE_FLOOR+(spec.CBORE_DIA/2)**2*spec.CBORE_DEPTH)
     # Preserve the native carriage-floor reference on the actual section plane.
     await _cbore_floor_reference(adapter)
+    await _plan_datum_reference(adapter, part)
     if hasattr(part,"NUT_FACE_X"):
         check("nut face plane",await adapter.create_plane(CreatePlaneParameters(mode="offset",base_plane="Right Plane",offset=part.NUT_FACE_X)))
         name_last_feature(adapter,"NutFace")
@@ -273,9 +378,7 @@ async def build_block_model(adapter, part) -> None:
         expected -= math.pi*((part.NUT_SEAT_DIA/2)**2-(part.SCREW_CLEARANCE_DIA/2)**2)*part.NUT_SPIGOT_DEPTH
         from _holes import blind_hole_volume_mm3
         expected -= 4*blind_hole_volume_mm3(part.NUT_TAP_DRILL,part.NUT_TAP_DRILL_DEPTH)
-        await _circles(adapter,"NutFace",part.NUT_FACE_X,"NutPatternReference",
-            [(z,y,part.NUT_TAP_DRILL,(f"NutTap{i}Z",f"NutTap{i}Y",f"NutTap{i}Dia"))
-             for i,(y,z) in enumerate(part.NUT_HOLES_YZ,1)],side=True)
+        await _nut_pattern_reference(adapter, part)
     await name_bore_axis(adapter,"Right Plane",spec.BORE_X,"Top Plane",0.0,"pivot axis")
     name_last_feature(adapter,spec.PIVOT_AXIS_NAME)
     await force_rebuild(adapter)
@@ -285,7 +388,7 @@ async def build_block_model(adapter, part) -> None:
     apply_drawing_precision(adapter,part.DRAWING_PRECISION)
     # Thread identity and fit/process qualifiers belong to the saved model.
     from _drawing_precision import _named_dimension
-    for channel,callouts in ((3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):
+    for channel,callouts in ((2,part.CALLOUTS_SUFFIX),(3,part.CALLOUTS_ABOVE),(4,part.CALLOUTS_BELOW)):
         for name,text in callouts.items():
             owners = [feature for feature,names in part.DRAWING_DIMENSIONS.items() if name in names]
             if len(owners) != 1:
