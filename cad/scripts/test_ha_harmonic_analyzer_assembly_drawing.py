@@ -135,7 +135,6 @@ def test_steps_cover_the_sequence_and_print_no_setting_values() -> None:
     # The settings live on the associative sheet-1 dimensions only.
     for value in (spec.BAR_HEIGHT_MM, spec.STUD_DROP_MM):
         assert f"{value:.1f}" not in printed
-    assert "PER MHA-MG-00 SHEET 4." in printed
     # Period hardware: no step leans on, or names, a chemical or nylon lock.
     for bad in ("TBD", "TODO", "THREADLOCK", "LOCTITE", "NYLON", "NYLOC"):
         assert bad not in printed

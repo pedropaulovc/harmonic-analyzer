@@ -131,7 +131,7 @@ _STEP_TEXT: dict[str, str] = {
         "MHA-SM-03 AND DRIVE BOTH MHA-MG-VN-53 #2-56 SCREWS UNTIL THE HEADS SEAT "
         "ON THE FLANGE."
     ),
-    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-00 SHEET 4.",
+    "lever-wire-fitted": "LEVER WIRE: PER MHA-MG-00 SHEET 5.",
     "pen-hung": (
         "PEN: HANG MHA-PN-00 FROM THE MHA-MG-08 BAR AND LOCK THE HANGER SCREW "
         "PER ITS HANGER SCREW LOCK STEP (MHA-PN-VN-50, MHA-PN-VN-54 NUT, "
