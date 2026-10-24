@@ -157,6 +157,11 @@ HOLE_R = SCREW_HOLE_DIA / 2.0
 # station's); FaceReference carries the outline's width and height and the
 # right column's and the top row's stations from the right and top edges,
 # each "2X".  The edge view carries the thickness with its reason over it.
+# The 1.5 plate prints 3 mm wide, narrower than its value: centred, both
+# extension lines ran up into the 1.500 digits (ENFORCE review r1/r3, rule
+# 14). The text stands left of the left arrow's tail, on the dimension line
+# carried out (draw_ch_rocker_strap's thickness), its reason above it still
+# clear of the face view's top-right corner.
 FRONT_KEEP = {
     "S0X": (_LEFT + 0.025, _BOTTOM - 0.012),
     "S0Z": (_LEFT - 0.010, _BOTTOM + 0.018),
@@ -167,7 +172,7 @@ FRONT_KEEP = {
     "RightHoleStation": (_RIGHT - 0.022, _BOTTOM - 0.012),
     "TopHoleStation": (_LEFT - 0.010, _TOP - 0.024),
 }
-RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0], _TOP + 0.012)}
+RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0] - 0.016, _TOP + 0.012)}
 HOLE_CALLOUT_XY = (_LEFT + 0.045, _TOP + 0.021)
 
 
