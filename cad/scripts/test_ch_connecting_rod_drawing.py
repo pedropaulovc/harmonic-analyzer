@@ -634,6 +634,13 @@ def test_fork_detail_takes_in_the_crown_and_the_ring_faces() -> None:
     source = Path(d.__file__).read_text(encoding="utf-8")
     assert "detail = _fork_detail(adapter, left)" in source
     assert "set_hidden_lines_visible" not in source
+    # ENFORCE farm runs: the inferred fence snapped in screen space (12.4,
+    # then 9.7 mm, off the rod axis); it is authored direct-to-DB and read
+    # back, with AddToDB restored in a finally block.
+    detail_source = source[source.index("def _fork_detail") : source.index("async def build")]
+    assert "manager.AddToDB = True" in detail_source
+    assert "finally:\n        manager.AddToDB = previous_add_to_db" in detail_source
+    assert "the fork detail fence moved from where it was placed" in detail_source
 
 
 def test_detail_texts_stand_outside_their_witness_lines() -> None:

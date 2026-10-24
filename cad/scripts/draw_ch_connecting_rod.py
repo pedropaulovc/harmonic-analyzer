@@ -206,7 +206,9 @@ OVERALL_TEXT_XY = (0.100, 0.175)
 # (baseline review). The fence centres on the rod axis midway between the
 # crown top and the ring-face references' lower ends and takes in both.
 DETAIL_SCALE = (3, 1)
-DETAIL_RADIUS_MM = 11.0
+# 12.5: the fence the passing layouts printed (an inferred draw had snapped
+# the authored 11.0 out to ~12.4), clear of the slot depth's text inside it.
+DETAIL_RADIUS_MM = 12.5
 DETAIL_FENCE_Y_MM = (FORK_TOP_Y + FORK_BASE_Y - 2.0) / 2.0
 # Right of the front view's pin-hole callout and FCF, below the isometric,
 # above the title block.
@@ -252,8 +254,9 @@ DETAIL_KEEP = {
     "SlotDepth": (_FAR_X + 0.016, (_TINE_TOP_Y + _ROOT_Y) / 2.0 + 0.004),
     "ForkBossLength": (_FAR_X + 0.034, (_TINE_TOP_Y + _ROOT_Y) / 2.0),
     # Under the fork, from the datum face: the plate's near face (text left
-    # of the datum face).
-    "RingFaceNear": (_FACE_X - 0.030, _REF_END_Y - 0.010),
+    # of the datum face, its longest line 5 mm clear of the face's witness;
+    # at 30 mm the witness ran through MHA-DT-12, ENFORCE review).
+    "RingFaceNear": (_FACE_X - 0.036, _REF_END_Y - 0.010),
 }
 # The near tine's band locates the slot from the datum face (the channel's
 # axial budget) and, with the far tine's, holds the gap to the next channel's
@@ -329,9 +332,30 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
         point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
+    # ENFORCE farm runs: an inferred circle snapped in screen space (a 12.4
+    # and then a 9.7 mm fence, each off the rod axis), so the detail's fork
+    # wandered under its fixed texts and their lines struck them. The fence
+    # goes straight to the database and is read back before the detail
+    # selects it (draw_dt_pinion_lever._hub_detail's recipe).
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        fence = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if fence is None:
         raise RuntimeError("failed to create the fork detail fence")
+    arc = _early_bound(fence, "ISketchArc")
+    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
+    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
+    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
+        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    ):
+        raise RuntimeError("the fork detail fence moved from where it was placed")
+    draw.ClearSelection2(True)
+    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
+        raise RuntimeError("failed to select the fork detail fence")
     detail = drawing.CreateDetailViewAt4(
         *DETAIL_CENTER,
         0.0,
