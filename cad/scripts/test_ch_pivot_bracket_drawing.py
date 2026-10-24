@@ -207,7 +207,7 @@ def test_bore_callout_names_the_mating_pivot_shaft() -> None:
     assert drawing.DIMENSION_CALLOUTS["HoleDia"] == "DRILL THRU"
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FRONT_KEEP) | set(
         drawing.TOP_KEEP
-    )
+    ) | set(drawing.RIGHT_KEEP_NAMES)
 
 
 def test_every_banded_length_says_what_its_band_holds() -> None:
@@ -416,6 +416,33 @@ def test_corner_radius_is_the_largest_the_screw_head_clears() -> None:
         - part.V_HOLE
         + part.V_CORNER
     )
+
+
+def test_corner_radius_names_the_screw_head_it_clears() -> None:
+    """Rule 4: the R MAX, tighter than the title block's inside corners,
+    names the mate it serves (machinist review FIX: a bare "R0.3 max." with no
+    reason), and its callout block stands in the corner's open air: above the
+    foot top, left of the ear, right of the bore callout."""
+    from _drawing_annotation_extent import CLEAR_GAP_M
+    from _layout_geometry import estimate_text_box
+
+    screw = _config.parts("ch-vn-bracket-hold-down-screw")["number"]
+    assert screw == "MHA-CH-VN-57"
+    callout = drawing.DIMENSION_CALLOUTS["CornerRadius"]
+    assert callout == f"CLEARS HEAD OF\nHOLD-DOWN SCREW\n{screw}"
+    # The native dimension font as the bore callout prints (cap 3.5 mm).
+    box = estimate_text_box(
+        f"R{drawing_spec.CORNER_R_MAX:.1f} MAX\n{callout}",
+        anchor=_planned_corner_text(),
+        height=0.0035,
+        reference=5,  # swUPPER_CENTER: the value line on the anchor
+        advance_ratio=109.7 / (42 * 3.5),
+        line_spacing=16.8 * 25.4 / 72.0 / 3.5,
+    )
+    assert box.ymin > drawing._right_y(spec.FOOT_H) + CLEAR_GAP_M
+    assert box.xmax < drawing._right_x(spec.EAR_T / 2.0) - CLEAR_GAP_M
+    bore_text_right = drawing.FRONT_KEEP["ShaftBoreDia"][0] + 0.029
+    assert box.xmin > bore_text_right + CLEAR_GAP_M
 
 
 def test_right_view_shows_the_corner_radius_clear_of_its_neighbours() -> None:
