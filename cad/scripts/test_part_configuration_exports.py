@@ -172,6 +172,8 @@ def native_export(tmp_path, monkeypatch):
         native.parent.mkdir(exist_ok=True)
         native.write_bytes(b"freshly saved and reopened native part")
         doc = _NativePart(native, members)
+        neutral = real_paths(stem, tmp_path)
+        producer = exports.configuration_producer_paths(stem, tmp_path)
         return SimpleNamespace(
             stem=stem,
             members=members,
@@ -179,7 +181,8 @@ def native_export(tmp_path, monkeypatch):
             doc=doc,
             adapter=_Adapter(doc),
             root=tmp_path,
-            paths=real_paths(stem, tmp_path),
+            # Part-owned STEP/PNG plus the scene-owned neutral STL.
+            paths={name: {**neutral[name], **producer[name]} for name in members},
             certificate=exports.configuration_manifest_path(stem, tmp_path),
             execution=native.with_name(f".{stem}.execution"),
         )
@@ -222,6 +225,22 @@ def test_real_registry_members_have_exact_physical_paths(tmp_path, stem, member,
         ]
         == expected
     )
+
+
+@pytest.mark.parametrize("stem,member", _MEMBER_CASES)
+def test_part_owned_member_step_is_outside_the_export_owned_neutral_tree(
+    tmp_path, stem, member
+):
+    neutral = exports.configuration_export_paths(stem, tmp_path)[member]
+    producer = exports.configuration_producer_paths(stem, tmp_path)[member]
+    assert producer == {
+        "step": tmp_path / "part-neutral" / stem / neutral["step"].name,
+        "png": neutral["png"],
+    }
+    assert set(exports.part_configuration_outputs(stem, tmp_path)) >= {
+        producer["step"], producer["png"],
+    }
+    assert neutral["step"] not in exports.part_configuration_outputs(stem, tmp_path)
 
 
 @pytest.mark.parametrize("stem", _MEMBERS)
@@ -297,7 +316,9 @@ def test_producer_exports_rebuilt_members_and_restores_saved_default(
         case.certificate
     }
     _stamp_execution(case)
-    assert exports.validate_member_exports(stem, case.root) == owned
+    assert exports.validate_member_exports(stem, case.root) == {
+        path: _digest(path) for path in owned
+    }
 
 
 def test_certificate_tracks_execution_not_later_parent_save_bytes(native_export):
@@ -525,7 +546,7 @@ def test_restored_payload_requires_matching_adopted_execution_and_certificate(
     restore(loser, restored_root)
     restored_outputs = {restored_root / path.relative_to(case.root) for path in owned}
     # Validation has only restored files: no adapter, document or native seat.
-    assert exports.validate_member_exports(stem, restored_root) == restored_outputs
+    assert set(exports.validate_member_exports(stem, restored_root)) == restored_outputs
 
     # Adopting the winning native identity is not permission to retain the
     # losing task's certificate/neutral payload, even for the same members.
@@ -540,4 +561,4 @@ def test_restored_payload_requires_matching_adopted_execution_and_certificate(
         exports.validate_member_exports(stem, restored_root)
 
     restore(winner, restored_root)
-    assert exports.validate_member_exports(stem, restored_root) == restored_outputs
+    assert set(exports.validate_member_exports(stem, restored_root)) == restored_outputs

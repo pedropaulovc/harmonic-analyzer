@@ -164,16 +164,21 @@ sheets without direct configuration reads. The simplified part wrapper must
 forward its caller's part name unchanged. These caller checks do not cover the
 purchased-variant or purchased-fastener drawing builders.
 
-Each part task declares and caches all member STEP/PNG files together with its
-`reports/part-neutral/<stem>.json` certificate. The certificate records the
+Each part task declares and caches its member PNG files, its member STEP files
+under `part-neutral/<stem>/`, and its `reports/part-neutral/<stem>.json`
+certificate. The certificate records the
 configuration for each file, its exact bytes, and the native `.execution`
 identity. Subsequent parent-assembly saves may change raw native bytes without
 changing that execution identity. The part action validates the complete member
 set after execution stamping on every cache/worker return and before publishing.
 An invalid restored set fails closed with its part name, cache key, and explicit
 refresh recovery instruction; it never silently rebuilds or retries for success.
-Full neutral export validates and consumes the part-owned files unchanged, even
-with `--force`; missing or stale member outputs fail closed and require an
+Full neutral export validates these part-owned files as immutable inputs, even
+with `--force`, and stages the certified STEP bytes into the export-owned `step/`
+tree. A feature-enrolled member's neutral STEP is instead its feature bundle's
+labelled STEP (`check:features_bound` requires that exact copy), so export never
+rewrites a part output or its own cache-key inputs. Missing or stale member
+outputs fail closed and require an
 explicit refresh of their owning part task. The release manifest records the
 explicit member-to-format mapping and requires all seven configured scene STLs
 rather than silently dropping a member.

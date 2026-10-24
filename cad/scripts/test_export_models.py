@@ -165,7 +165,7 @@ def _shared_release_fixture(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(export_models, "part_stems", lambda: list(_SHARED_MEMBERS))
     monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
     monkeypatch.setattr(export_features, "SUPPORTED_PARTS", ())
-    monkeypatch.setattr(features_bound, "stage_feature_steps", lambda *_args: [])
+    monkeypatch.setattr(features_bound, "stage_feature_steps", lambda *_args: {})
     monkeypatch.setattr(export_models, "_exporter_digest", lambda: "fixture-exporter")
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "src_digest", lambda _path: "fixture-recipe")
@@ -190,20 +190,22 @@ def _shared_release_fixture(tmp_path: Path, monkeypatch):
         records = {}
         for configuration, neutral, mesh in configurations:
             records[configuration] = {}
-            for kind, relative in (
-                ("step", f"step/{neutral}.STEP"),
-                ("png", f"png/{neutral}/{neutral}_isometric.png"),
-                ("stl", f"stl/{mesh}.STL"),
+            for kind, relative, produced in (
+                # Part-owned STEPs live outside step/; export stages the neutral copy.
+                ("step", f"step/{neutral}.STEP", f"part-neutral/{dashed}/{neutral}.STEP"),
+                ("png", f"png/{neutral}/{neutral}_isometric.png",
+                 f"png/{neutral}/{neutral}_isometric.png"),
+                ("stl", f"stl/{mesh}.STL", f"stl/{mesh}.STL"),
             ):
-                path = root / relative
+                path = root / produced
                 path.parent.mkdir(parents=True, exist_ok=True)
                 payload = f"{stem}:{configuration}:{kind}".encode()
                 path.write_bytes(payload)
-                expected[relative] = path
+                expected[relative] = root / relative
                 if kind != "stl":
                     owned[path] = payload
                     records[configuration][kind] = {
-                        "path": relative, "bytes": len(payload),
+                        "path": produced, "bytes": len(payload),
                         "sha256": hashlib.sha256(payload).hexdigest(),
                     }
         certificate = members.configuration_manifest_path(stem, root)
@@ -216,6 +218,10 @@ def _shared_release_fixture(tmp_path: Path, monkeypatch):
             "configurations": records,
         }), encoding="utf-8")
     return root, expected, owned
+
+
+def _staged_shared_members() -> dict[Path, str]:
+    return export_models.stage_neutral_producers(list(_SHARED_MEMBERS))
 
 
 def test_shared_release_inventory_requires_all_seven_members_without_scenes(
@@ -256,6 +262,7 @@ def test_shared_neutral_certificate_and_stage_include_unseen_members(
                     for _configuration, mesh in entries})
     export_models.write_release_neutral_manifest(
         list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+        _staged_shared_members(),
     )
     manifest = json.loads(export_models.NEUTRAL_MANIFEST.read_text(encoding="utf-8"))
     assert set(manifest["files"]) == set(expected)
@@ -297,13 +304,14 @@ def test_shared_neutral_certification_refuses_unseen_missing_member(
     digests = export_models.load_src_digests()
     digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
                     for _configuration, mesh in entries})
+    producers = _staged_shared_members()
     missing = next(path for relative, path in expected.items()
                    if relative.startswith(f"{kind}/") and "--penwire" in relative)
     missing.unlink()
 
     with pytest.raises(RuntimeError):
         export_models.write_release_neutral_manifest(
-            list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+            list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests, producers,
         )
     assert not export_models.NEUTRAL_MANIFEST.exists()
 
@@ -312,9 +320,11 @@ def test_shared_neutral_certification_refuses_missing_scene_member_coverage(
     tmp_path: Path, monkeypatch,
 ) -> None:
     _shared_release_fixture(tmp_path, monkeypatch)
+    producers = _staged_shared_members()
     with pytest.raises(RuntimeError):
         export_models.write_release_neutral_manifest(
             list(_SHARED_MEMBERS), [], {}, set(), {}, export_models.load_src_digests(),
+            producers,
         )
     assert not export_models.NEUTRAL_MANIFEST.exists()
 
@@ -332,6 +342,7 @@ def test_release_stage_refuses_changed_nondefault_shared_member(
                     for _configuration, mesh in entries})
     export_models.write_release_neutral_manifest(
         list(_SHARED_MEMBERS), [], scene_meshes, set(), {}, digests,
+        _staged_shared_members(),
     )
     path = next(path for relative, path in expected.items()
                 if relative.startswith(f"{kind}/") and "--penwire" in relative)
@@ -344,6 +355,44 @@ def test_release_stage_refuses_changed_nondefault_shared_member(
         export_models.stage_release_neutral(tmp_path / "stage")
 
 
+class _MemberDoc:
+    def __init__(self, native):
+        configurations = _SHARED_MEMBERS[native.stem.replace("-", "_")]
+        self.names = [entry[0] for entry in configurations]
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=self.names[0]),
+        )
+
+    def ShowConfiguration2(self, configuration):
+        assert configuration in self.names
+        self.ConfigurationManager.ActiveConfiguration.Name = configuration
+        return True
+
+    def ForceRebuild3(self, _top_only):
+        return True
+
+    def EditRebuild3(self):
+        return True
+
+    def SaveAs3(self, filename, _version, _options):
+        path = Path(filename)
+        assert path.suffix == ".STL", "full exporter must not regenerate member STEP"
+        path.write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+        return 1
+
+
+class _MemberAdapter:
+    swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
+    currentModel = None
+
+    async def open_model(self, filename):
+        self.currentModel = _MemberDoc(Path(filename))
+        return SimpleNamespace(is_success=True, data=None)
+
+    def _attempt(self, call, default=None):
+        return call()
+
+
 def test_forced_full_export_preserves_part_owned_member_bytes(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -352,48 +401,12 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
         path: path.read_bytes() for path in (root / "reports/part-neutral").glob("*.json")
     }
 
-    class Doc:
-        def __init__(self, native):
-            configurations = _SHARED_MEMBERS[native.stem.replace("-", "_")]
-            self.names = [entry[0] for entry in configurations]
-            self.ConfigurationManager = SimpleNamespace(
-                ActiveConfiguration=SimpleNamespace(Name=self.names[0]),
-            )
-
-        def ShowConfiguration2(self, configuration):
-            assert configuration in self.names
-            self.ConfigurationManager.ActiveConfiguration.Name = configuration
-            return True
-
-        def ForceRebuild3(self, _top_only):
-            return True
-
-        def EditRebuild3(self):
-            return True
-
-        def SaveAs3(self, filename, _version, _options):
-            path = Path(filename)
-            assert path.suffix == ".STL", "full exporter must not regenerate member STEP"
-            path.write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
-            return 1
-
-    class Adapter:
-        swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
-        currentModel = None
-
-        async def open_model(self, filename):
-            self.currentModel = Doc(Path(filename))
-            return SimpleNamespace(is_success=True, data=None)
-
-        def _attempt(self, call, default=None):
-            return call()
-
     async def forbid_render(*_args):
         raise AssertionError("full exporter must not regenerate part-owned member PNG")
 
     monkeypatch.setattr(export_models, "export_build_png", forbid_render)
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+        export_models, "run_build", lambda build: (asyncio.run(build(_MemberAdapter())), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
 
@@ -402,6 +415,112 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
     for path, payload in {**owned, **certificates}.items():
         assert path.read_bytes() == payload
     assert all(path.is_file() for path in expected.values())
+
+
+def _feature_member_export(tmp_path: Path, monkeypatch, before_build=None):
+    """Shared fixture where the clamping kit's bare STEP is feature-owned.
+
+    sh_vn_clamping_kit_hardware is both a member part and a feature part: its
+    labelled feature STEP, not the part-certified HoldDownStud STEP, is the
+    neutral ``step/sh-vn-clamping-kit-hardware.STEP`` (check:features_bound).
+    """
+    import _part_configuration_exports as members
+    import features_bound
+
+    root, expected, owned = _shared_release_fixture(tmp_path, monkeypatch)
+    feature_step = root / "step" / "sh-vn-clamping-kit-hardware.STEP"
+    labelled = b"labelled feature STEP"
+
+    def stage(_out, _step_directory):
+        feature_step.parent.mkdir(parents=True, exist_ok=True)
+        feature_step.write_bytes(labelled)
+        return {feature_step: hashlib.sha256(labelled).hexdigest()}
+
+    def run_build(build):
+        if before_build is not None:
+            before_build(root)
+        asyncio.run(build(_MemberAdapter()))
+        return 0
+
+    scene_meshes = _shared_scene_meshes()
+    digests = {stem.replace("_", "-"): "fixture-recipe" for stem in _SHARED_MEMBERS}
+    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
+                    for _configuration, mesh in entries})
+    monkeypatch.setattr(features_bound, "stage_feature_steps", stage)
+    monkeypatch.setattr(export_models, "load_src_digests", lambda: dict(digests))
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: scene_meshes)
+    monkeypatch.setattr(export_models, "export_build_png", None)
+    monkeypatch.setattr(export_models, "run_build", run_build)
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force", "--record-digests"])
+    part_inputs = [
+        path for stem in _SHARED_MEMBERS
+        for path in members.part_configuration_outputs(stem, root)
+    ]
+    return root, expected, owned, labelled, part_inputs
+
+
+def test_feature_owned_member_step_exports_repeatably_without_touching_part_inputs(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    root, expected, owned, labelled, part_inputs = _feature_member_export(
+        tmp_path, monkeypatch,
+    )
+    before = {path: path.read_bytes() for path in part_inputs}
+
+    # The second run is the regression: the first run's staged neutral STEP must
+    # neither invalidate the part certificate nor change export's own key inputs.
+    for _run in range(2):
+        assert export_models.main() == 0
+        assert {path: path.read_bytes() for path in part_inputs} == before
+
+    files = json.loads(export_models.NEUTRAL_MANIFEST.read_text(encoding="utf-8"))["files"]
+    assert set(files) == set(expected)
+    assert files["step/sh-vn-clamping-kit-hardware.STEP"]["sha256"] == (
+        hashlib.sha256(labelled).hexdigest()
+    )
+    produced = {
+        path.relative_to(root).as_posix().replace(
+            f"part-neutral/{path.parent.name}/", "step/",
+        ): payload
+        for path, payload in owned.items()
+    }
+    assert produced.pop("step/sh-vn-clamping-kit-hardware.STEP") != labelled
+    for relative, payload in produced.items():
+        assert files[relative]["sha256"] == hashlib.sha256(payload).hexdigest()
+        assert (root / relative).read_bytes() == payload
+
+
+def _mutate_staged_member(root: Path) -> None:
+    path = root / "step" / "sh-vn-clamping-kit-hardware--tnut.STEP"
+    path.write_bytes(b"x" * path.stat().st_size)
+
+
+def _mutate_staged_feature(root: Path) -> None:
+    path = root / "step" / "sh-vn-clamping-kit-hardware.STEP"
+    path.write_bytes(b"x" * path.stat().st_size)
+
+
+def _replace_native_execution(root: Path) -> None:
+    (root / "sldprt" / ".sh-vn-music-wire.execution").write_text("e" * 64, encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "fault,message",
+    [
+        (_mutate_staged_member, "changed after staging"),
+        (_mutate_staged_feature, "changed after staging"),
+        (_replace_native_execution, "identity"),
+    ],
+    ids=["staged-member", "staged-feature", "execution-identity"],
+)
+def test_release_certificate_refuses_changes_after_producer_staging(
+    tmp_path: Path, monkeypatch, fault, message: str,
+) -> None:
+    _feature_member_export(tmp_path, monkeypatch, before_build=fault)
+
+    with pytest.raises(RuntimeError, match=message):
+        export_models.main()
+    assert not export_models.NEUTRAL_MANIFEST.exists()
 
 
 @pytest.mark.parametrize("stem", list(_SHARED_MEMBERS))
@@ -429,7 +548,7 @@ def test_forced_export_refuses_invalid_member_before_any_export_work(
     else:
         kind = fault.split("-")[1]
         # Non-default member catches implementations validating only bare files.
-        path = members.configuration_export_paths(stem, root)[_SHARED_MEMBERS[stem][-1][0]][kind]
+        path = members.configuration_producer_paths(stem, root)[_SHARED_MEMBERS[stem][-1][0]][kind]
         if fault.startswith("missing"):
             path.unlink()
         else:
@@ -1519,6 +1638,8 @@ def test_features_cli_exports_and_stages_one_step_per_declared_configuration(
     assert {path.name for path in staged} == {
         f"{dashed}.STEP", f"{dashed}-Default.STEP", f"{dashed}-{INSTALLED_CONFIG}.STEP",
     }
+    for path, digest in staged.items():
+        assert digest == hashlib.sha256(path.read_bytes()).hexdigest()
     for cfg, path in configured.items():
         assert (tmp_path / "step" / path.name).read_bytes() == path.read_bytes()
         assert f"/* {cfg} */" in path.read_text(encoding="ascii")
