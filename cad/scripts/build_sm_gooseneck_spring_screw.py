@@ -1,6 +1,6 @@
 r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
-A made slotted fillister screw turned from 1/2-in 12L14 round.  Its #6-32
+A made slotted fillister screw turned from 1/2-in 12L14 or 1018 round.  Its #6-32
 shank threads into the gooseneck MHA-SM-01's tapped end plug and the
 under-head face clamps the counter spring's upper eye against the plug face.
 Sizes and bands live in ``sm_gooseneck_spring_screw_geom``; the print's
@@ -12,7 +12,9 @@ crown in +Z (apex at HEAD_H); ``ShankProfile`` revolves the shank in -Z,
 opening with the die relief (a 45-degree lead from its floor into the
 under-head face) and closing with a 45-degree tip chamfer.  The thread is
 modelled as its basic major cylinder.  The driver slot is sketched on a plane
-at the apex and cut SLOT_DEPTH down into the head along local X.
+at the apex and cut SLOT_DEPTH down into the head along local X.  Two hidden
+reference sketches carry printed dimensions only: ``StationReference`` the
+overall length, ``LeadReference`` the lead on the profile's lower silhouette.
 
 Run (SolidWorks already open)::
 
@@ -24,6 +26,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _check import check
 from _com import _early_bound
@@ -44,17 +47,17 @@ from _sketch import (
 )
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import (
+    _named_dimension,
+    _named_dimensions,
+    apply_drawing_precision,
+)
+from _drawing_tolerances import _set_tolerance_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
-from _fit_deviations import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spring_screw_geom import (
@@ -68,20 +71,23 @@ from sm_gooseneck_spring_screw_geom import (
     MAJOR_DIA,
     OVERALL_LENGTH,
     RELIEF_DIA,
-    RELIEF_DIA_TOL,
+    RELIEF_DIA_LOWER,
+    RELIEF_DIA_TOL_TYPE,
+    RELIEF_DIA_UPPER,
     RELIEF_LEAD,
-    RELIEF_LEAD_TOL,
+    RELIEF_LEAD_TOL_TYPE,
     RELIEF_WIDTH,
     SLOT_DEPTH,
     SLOT_FLOOR_Z,
     SLOT_WIDTH,
     TIP_CHAMFER,
-    TIP_CHAMFER_BAND,
 )
 from sm_gooseneck_spring_screw_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
 )
 
@@ -101,6 +107,12 @@ THREAD_R = MAJOR_DIA / 2.0
 RELIEF_R = RELIEF_DIA / 2.0
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
+# LeadReference's construction line (Right-plane sketch u, v in mm): the lead
+# as it shows on the profile's LOWER silhouette, from the under-head face down
+# to the relief floor.  The profile's own lead points sit on the upper
+# silhouette, where the relief width's extension lines leave no room for a
+# second baseline dimension's text.
+LEAD_REFERENCE_LINE = ((0.0, -(RELIEF_R + RELIEF_LEAD)), (RELIEF_LEAD, -RELIEF_R))
 
 # Head: the cylinder plus the spherical cap of sagitta CROWN_RISE.
 V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
@@ -151,6 +163,76 @@ def slot_volume(steps: int = 4000) -> float:
 
 V_SLOT = slot_volume()
 V_FINAL = V_BODY - V_SLOT
+
+
+@_telemetry.traced("part.single_limit", label_param="name")
+def _single_limit(
+    adapter, feature: str, name: str, nominal: float, tol_type: int
+) -> None:
+    """A dimension printed as a single MIN or MAX limit: SOLIDWORKS prints the
+    nominal then the limit word, so the model value is the limit itself
+    (build_pd_support_bar._single_limit)."""
+    label = f"{name}@{feature}"
+    _, dimension = _named_dimension(adapter, feature, name)
+    if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
+            f"the limit {nominal:.7f}"
+        )
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
+        raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
+    _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+
+
+@_telemetry.traced("part.limit_band", label_param="name")
+def _limit_band(
+    adapter, feature: str, name: str, deviations: tuple[float, float], tol_type: int
+) -> None:
+    """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
+    lower limits, the model value plus each deviation, at the dimension's own
+    places (build_mg_output_fixture._limit_band), never fewer than the
+    deviations need (_drawing_tolerances._set_tolerance_precision)."""
+    label = f"{name}@{feature}"
+    display, dimension = _named_dimension(adapter, feature, name)
+    lower, upper = deviations  # native API order, mm
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != tol_type
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = _set_tolerance_precision(
+        display, deviations, label=label, places=DRAWING_PRECISION_BY_NAME[name]
+    )
+    value = float(dimension.SystemValue) * 1000.0
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
+
+
+@_telemetry.traced("part.dimension_callouts")
+def _author_dimension_callouts(adapter) -> None:
+    """Persist each printed callout on its source dimension, below the value
+    (build_mg_magnifying_bracket._author_dimension_callouts): the drawing
+    imports and reads them back, never writing them itself."""
+    for feature, callouts in DIMENSION_CALLOUTS.items():
+        # One walk of the feature's dimension tree for all its callouts.
+        resolved = _named_dimensions(adapter, feature, set(callouts))
+        for name, text in callouts.items():
+            display, _dimension = resolved[name]
+            display.SetText(4, text)  # swDimensionTextCalloutBelow
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -414,6 +496,45 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "StationReference")
     drive_jobs += stations.apply(adapter, "StationReference")
 
+    # Drawing-only lead reference: one construction line over the lead's
+    # lower silhouette, so the printed lead's extension lines drop into the
+    # open air under the relief, beside the relief diameter, instead of
+    # crowding the relief width above it.  Its length IS the printed
+    # "0.30 MAX", driven by the profile's lead global so no geometry moves.
+    lead_dims = SketchDims()
+    (lead_u0, lead_v0), (lead_u1, lead_v1) = LEAD_REFERENCE_LINE
+    check("create_sketch lead reference", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    try:
+        lead_line = check(
+            "lead reference line",
+            await adapter.add_line(lead_u0, lead_v0, lead_u1, lead_v1),
+        )
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
+    lead_segment = _early_bound(adapter._sketch_entities[lead_line], "ISketchSegment")
+    lead_segment.ConstructionGeometry = True
+    if not bool(lead_segment.ConstructionGeometry):
+        raise RuntimeError("lead reference line did not take construction flag")
+    await anchor_point_to_origin(
+        adapter, f"{lead_line}.start", lead_u0, lead_v0, "lead reference seat edge"
+    )
+    lead_dims.record("LeadStation", '"ReliefDia" / 2 + "ReliefLead"')
+    for name, kind, label in (
+        ("HeadLead", "horizontal_distance", "lead reference axial leg"),
+        ("HeadLeadRise", "vertical_distance", "lead reference radial leg"),
+    ):
+        await dimension_between(
+            adapter, f"{lead_line}.start", f"{lead_line}.end", kind, RELIEF_LEAD, label
+        )
+        lead_dims.record(name, '"ReliefLead"')
+    await ensure_fully_defined(adapter, "lead reference sketch")
+    check("exit_sketch lead reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "LeadReference")
+    drive_jobs += lead_dims.apply(adapter, "LeadReference")
+
     # Apply the deferred drive equations once the whole model exists, then
     # re-check neutrality: every equation evaluates to its as-built value.
     await force_rebuild(adapter)
@@ -431,18 +552,21 @@ async def build(adapter) -> dict[str, str]:
             f"spring screw: expected one solid body, found {len(bodies)}"
         )
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the relief diameter keeps the die's
-    # run-out under the thread root, the relief lead prints as limits on the
-    # relief callout, and the tip chamfer is too small to ride the .XX band.
-    # Every other mark takes the title block's two-place band.
-    set_dimension_symmetric_tolerance(
-        adapter, "ShankProfile", "ReliefDia", RELIEF_DIA_TOL
+    # Model-owned limits (drawing-simplicity-policy.md `How the repository
+    # implements the guidelines`): the relief diameter prints as the LIMIT
+    # band 2.35/2.15, capped under the die root and floored at the neck's
+    # pre-existing minimum; its lead as a single MAX limit, short enough to
+    # keep the clamp seat flat inside the thread major.  Every other mark
+    # takes the title block's two-place band.
+    _limit_band(
+        adapter,
+        "ShankProfile",
+        "ReliefDia",
+        (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
+        RELIEF_DIA_TOL_TYPE,
     )
-    set_dimension_symmetric_tolerance(
-        adapter, "ShankProfile", "ReliefLead", RELIEF_LEAD_TOL
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "ShankProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
+    _single_limit(
+        adapter, "LeadReference", "HeadLead", RELIEF_LEAD, RELIEF_LEAD_TOL_TYPE
     )
 
     await apply_material(adapter, MATERIAL)
@@ -452,10 +576,12 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    # The reference sketch owns printed dimensions but no geometry: hide it so
-    # no assembly instance renders it (#880).  The drawing shows it per view
-    # through _drawing_hidden_sketches to import those dimensions.
+    _author_dimension_callouts(adapter)
+    # The reference sketches own printed dimensions but no geometry: hide them
+    # so no assembly instance renders them (#880).  The drawing shows them per
+    # view through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "StationReference")
+    blank_sketch(adapter, "LeadReference")
     apply_drawing_properties(
         adapter,
         PART_NAME,

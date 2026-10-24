@@ -4,10 +4,15 @@ PURE DATA -- no SolidWorks/COM imports.  ``sm_gooseneck_spring_screw_geom``
 owns every size and band; this module adds only what the print states: the
 marked dimensions, their authored places, the callouts and the notes.
 
-Every marked size prints at two places, so the title block's .XX band
-(+/-0.51) governs all but the three small turned features whose model
-bands the builder authors: the relief diameter (die root), the relief lead
-(printed as limits on the relief callout) and the tip chamfer.
+The title block's band for each mark's places governs every size but the
+relief diameter and its 45-degree lead.  The relief Ø prints as the native
+LIMIT band 2.35/2.15 about the model's 2.20.  The upper limit is derived from
+the estimated deepest #6-32 die root (geom's THREAD_MINOR_2A_MIN_EST, 2.38).
+The floor is the design's pre-existing 2.15, unchanged here, which keeps the
+neck's clamp-torque strength (its adequacy is tracked in #1951).  The lead
+prints as a single MAX limit (the model value is the limit) from the hidden
+``LeadReference`` sketch on the profile's lower silhouette, driven by the
+profile's ``ReliefLead``.
 """
 
 from __future__ import annotations
@@ -19,8 +24,6 @@ from sm_gooseneck_spring_screw_geom import (
     CROWN_RISE_UPPER,
     HEAD_H,
     HEAD_H_LOWER,
-    RELIEF_LEAD_MAX,
-    RELIEF_LEAD_MIN,
     SLOT_DEPTH,
     SLOT_DEPTH_LOWER,
     SLOT_DEPTH_UPPER,
@@ -29,9 +32,27 @@ from sm_gooseneck_spring_screw_geom import (
 
 THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
-# The lead prints as limits beside the relief diameter, its model band
-# (RELIEF_LEAD_TOL) all the same.
-RELIEF_CALLOUT = f"{RELIEF_LEAD_MIN:.2f}-{RELIEF_LEAD_MAX:.2f} {CHAMFER_CALLOUT} LEAD"
+# Below-value callouts the PART authors on its dimensions (the drawing only
+# reads them back; a drawing-side SetText can write through to the part,
+# #1942).  The lead's MAX and the relief's LIMIT band are tighter than the
+# title block, so each names what it serves (drawing-guidelines.md rule 4):
+# the flat under-head seat that clamps the counter spring's upper loop; the
+# die root that caps the relief and the clamp torque that floors it.
+COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
+DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "LeadReference": {
+        "HeadLead": f"{CHAMFER_CALLOUT}\nFLAT SEAT FOR\n{COUNTER_SPRING_NUMBER} LOOP"
+    },
+    "ShankProfile": {
+        "ReliefDia": "UNDER DIE ROOT,\nMIN FOR\nCLAMP TORQUE",
+        "TipChamfer": CHAMFER_CALLOUT,
+    },
+}
+DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
+    name: text
+    for callouts in DIMENSION_CALLOUTS.values()
+    for name, text in callouts.items()
+}
 
 # drawing-guidelines.md rule 17 (walls and webs): the head left under the slot floor, at the shortest head,
 # the deepest slot and a full under-head edge break, stays above the 2.0
@@ -63,9 +84,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
     "StationReference": {"OverallLength"},
+    "LeadReference": {"HeadLead"},
 }
+# Chamfers never need extra places (drawing-guidelines.md rule 3): the tip
+# chamfer rides the title block's .X band and the lead's single MAX limit
+# prints at one place too.  Every other mark prints at two.
+ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer", "HeadLead"})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    feature: {name: 2 for name in sorted(names)}
+    feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -77,19 +103,14 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 # and under-head length; the crown rise is NOT a reference (see above).
 REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 
-# Line 3 is the installation step the static-clamp retention relies on
-# (user ruling 2026-09-21: no torque value, no threadlocker). The three-view
-# summing sheet prints no notes until it is built out (drawing-guidelines.md rule 22 (an assembly package is complete)), so the
-# fitter reads it here, on the screw's own sheet.
-CLAMP_INSTRUCTION = (
-    "3. AT ASSEMBLY TIGHTEN UNTIL THE MHA-SM-VN-51 UPPER EYE IS CLAMPED\n"
-    "   AND CANNOT SWIVEL; NO THREADLOCKER."
-)
+# The fitter's clamp step (user ruling 2026-09-21: no torque value, no
+# threadlocker) prints on the summing assembly sheet as MHA-SM-00 step 8,
+# not here: a part sheet carries no assembly instruction (machinist review
+# 2026-10-23).
 DRAWING_NOTES = "\n".join(
     (
         "1. CROWN SPHERICAL THROUGH RIM AND APEX.",
         "2. THREAD MATES THE TAPPED END PLUG OF MHA-SM-01.",
-        CLAMP_INSTRUCTION,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import math
 from pathlib import Path
 
@@ -36,7 +37,8 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert row["number"] == "MHA-SM-04"
     assert row["title"] == "Gooseneck Spring Screw"
     assert row["description"] == "GOOSENECK SPRING SCREW"
-    for grade in ("12L14", "1/2 in"):
+    # Not a critical grade (rule 2): the field names the acceptable steels.
+    for grade in ("12L14", "1018", "1/2 in"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
     assert int(row["quantity"]) == 1
@@ -70,23 +72,50 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     assert "CrownRadius" not in marked
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
-    # The lead prints as limits on the relief callout.
+    # The profile's lead stays unprinted; the lead prints from the lower
+    # silhouette's reference line.
     assert "ReliefLead" not in marked
+    assert spec.DRAWING_DIMENSIONS["LeadReference"] == {"HeadLead"}
 
 
 def test_model_owns_places_and_bands() -> None:
     assert "draw_sm_gooseneck_spring_screw.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {2}
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
-    # Every band comes from a named geometry constant, never a typed number;
-    # every other mark takes the title block's .XX band.
-    assert model_toleranced_dimensions(part) == {
-        ("ShankProfile", "ReliefDia"): "RELIEF_DIA_TOL",
-        ("ShankProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
-        ("ShankProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
+    one_place = {
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     }
+    # Chamfers never need extra places (rule 3); every other mark is .XX.
+    assert one_place == {"TipChamfer", "HeadLead"}
+    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
+    # No mark carries a shared-helper band: the relief Ø is a native LIMIT
+    # band and the lead a single MAX, both set by the part with the model
+    # value as the upper limit; every other mark takes the title block's
+    # .XX band.
+    assert model_toleranced_dimensions(part) == {}
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+
+    def calls(helper: str) -> set[tuple[str, ...]]:
+        return {
+            tuple(ast.unparse(arg) for arg in node.args[1:])
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") == helper
+        }
+
+    assert calls("_single_limit") == {
+        ("'LeadReference'", "'HeadLead'", "RELIEF_LEAD", "RELIEF_LEAD_TOL_TYPE"),
+    }
+    assert calls("_limit_band") == {
+        (
+            "'ShankProfile'",
+            "'ReliefDia'",
+            "(RELIEF_DIA_LOWER, RELIEF_DIA_UPPER)",
+            "RELIEF_DIA_TOL_TYPE",
+        ),
+    }
+    assert geom.RELIEF_DIA_TOL_TYPE == 3  # swTolLIMIT
+    assert geom.RELIEF_LEAD_TOL_TYPE == 6  # swTolMAX
 
 
 def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
@@ -143,12 +172,44 @@ def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None
 
 
 def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
-    assert geom.RELIEF_DIA_MAX == pytest.approx(2.25)
-    assert geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST
+    # The relief's LIMIT band: its upper limit is the largest 0.05 step under
+    # the estimated deepest die root, about the unchanged model value 2.20;
+    # the lead's single MAX is the model value.
+    assert geom.RELIEF_DIA == pytest.approx(2.20)
+    assert geom.THREAD_MINOR_2A_MIN_EST == pytest.approx(2.3826, abs=1e-4)
+    assert geom.RELIEF_DIA_MAX == pytest.approx(2.35)
+    assert (
+        geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST < geom.RELIEF_DIA_MAX + 0.05
+    )
+    # The design's pre-existing floor (the former 2.20 +/-0.05), #1951.
+    assert geom.RELIEF_DIA_MIN == pytest.approx(2.15)
+    assert (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER) == pytest.approx(
+        (-0.05, 0.15)
+    )
+    assert geom.RELIEF_LEAD_MAX == geom.RELIEF_LEAD == pytest.approx(0.30)
     assert geom.RELIEF_FLOOR_MIN >= 1.5 * geom.PITCH
+    # The largest relief under the longest lead still leaves a flat seat.
+    assert geom.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.95)
     assert geom.SEAT_FLAT_INNER_DIA_MAX < geom.MAJOR_DIA
-    assert spec.RELIEF_CALLOUT == "0.20-0.40 X 45 DEG LEAD"
+    assert spec.DIMENSION_CALLOUTS_BY_NAME["ReliefDia"].splitlines() == [
+        "UNDER DIE ROOT,",
+        "MIN FOR",
+        "CLAMP TORQUE",
+    ]
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
+
+
+def test_lead_reference_line_is_the_lead_on_the_lower_silhouette() -> None:
+    (u0, v0), (u1, v1) = part.LEAD_REFERENCE_LINE
+    r = geom.RELIEF_DIA / 2.0
+    assert (u0, v0) == pytest.approx((0.0, -(r + geom.RELIEF_LEAD)))
+    assert (u1, v1) == pytest.approx((geom.RELIEF_LEAD, -r))
+    # 45 degrees: equal legs, both the profile's lead.
+    assert u1 - u0 == pytest.approx(v1 - v0) == pytest.approx(geom.RELIEF_LEAD)
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    blank = 'blank_sketch(adapter, "LeadReference")'
+    assert blank in build
+    assert build.index(blank) < build.rindex("save_part_and_images(adapter, PART_NAME)")
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
@@ -171,15 +232,20 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 2:1"
 
 
-def test_sheet_prints_the_ruled_clamp_instruction() -> None:
-    # The static-clamp retention depends on this step and the three-view
-    # summing sheet prints no notes (drawing-guidelines.md rule 22 (an assembly package is complete)), so the screw sheet carries it.
+def test_part_sheet_carries_no_assembly_instruction() -> None:
+    # The clamp step (user ruling 2026-09-21: no torque value, no
+    # threadlocker) prints in full as MHA-SM-00 step 8.
     notes = " ".join(spec.DRAWING_NOTES.split())
-    assert spec.CLAMP_INSTRUCTION in spec.DRAWING_NOTES
-    assert (
-        "TIGHTEN UNTIL THE MHA-SM-VN-51 UPPER EYE IS CLAMPED AND CANNOT SWIVEL" in notes
-    )
-    assert notes.endswith("NO THREADLOCKER.")
+    assert "ASSEMBLY" not in notes
+    assert "TIGHTEN" not in notes
+    import sm_summing_assembly_sheet as summing
+
+    step = next(s for s in summing.ASSEMBLY_STEPS if s.startswith("8. "))
+    assert "MHA-SM-04" in step
+    assert "CANNOT SWIVEL" in step
+    assert step.endswith("NO THREADLOCKER.")
+    for word in ("TORQUE", "N-M", "IN-LB"):
+        assert word not in step
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes": DRAWING_NOTES' in build
 
@@ -268,24 +334,38 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     thread_half = geom.MAJOR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert abs(drawing.THREAD_PICK[1] - drawing.SIDE_CENTER[1]) < thread_half
     assert drawing.THREAD_NOTE_XY[0] - drawing.THREAD_PICK[0] > 0.010
-    # The relief marks sit on the groove.  The Ø text hangs right of its own
-    # dimension line (its leader meets the text's left end, so the leader
-    # runs beside the text, not through it), clear of the under-head and the
-    # tip-chamfer extension lines, below the thread silhouette and above
-    # row 0 (layout audit, farm run 20261010T190631112Z).
+    # The relief marks sit on the groove.  The Ø stands on the floor beside
+    # the flank and its text hangs right of its own dimension line (its
+    # leader meets the text's left end, so the leader runs beside the text,
+    # not through it), below the thread silhouette and clear of the
+    # tip-chamfer extension lines (layout audit, farm run 20261010T190631112Z).
     for name in ("ReliefDia", "ReliefWidth"):
         assert drawing.UNDERHEAD_X < drawing.SIDE_KEEP[name][0] < drawing.RELIEF_END_X
-    assert drawing.SIDE_KEEP["ReliefDia"][0] == drawing.RELIEF_FLOOR_MID_X
+    assert drawing.SIDE_KEEP["ReliefDia"][0] == drawing.RELIEF_DIA_X
+    assert drawing.LEAD_FOOT_X + 0.003 < drawing.RELIEF_DIA_X < drawing.RELIEF_END_X
     text_x, text_y = drawing.RELIEF_DIA_TEXT_XY
     left = text_x - drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
     right = text_x + drawing.RELIEF_DIA_TEXT_WIDTH / 2.0
-    assert left > drawing.RELIEF_FLOOR_MID_X > drawing.UNDERHEAD_X + 0.002
+    assert left > drawing.RELIEF_DIA_X
     assert right <= drawing.THREAD_START_X - 0.002
-    text_height = 0.0035
+    # The stacked upper limit's top stays clear of the shank's lower outline
+    # (farm run 20261024T052013556Z struck it at 9.8 mm above the anchor).
     thread_bottom = drawing.SIDE_CENTER[1] - thread_half
-    assert text_y + 0.001 + text_height <= thread_bottom - 0.002
-    underline = text_y - drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
-    assert underline - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.010
+    assert text_y + drawing.RELIEF_DIA_TEXT_TOP_ABOVE_ANCHOR <= thread_bottom - 0.002
+    block_bottom = text_y - drawing.RELIEF_DIA_TEXT_BOTTOM_DROP
+    # The lead's extension line drops from the lead's foot on the lower
+    # silhouette, left of the Ø's leader; its text block stands right of
+    # that line with room to spare (the layout audit of farm run
+    # 20261024T031009457Z found the line through the block's left edge),
+    # under the Ø's LIMIT block and above row 0.
+    lead_x, lead_y = drawing.SIDE_KEEP["HeadLead"]
+    lead_left = lead_x - drawing.LEAD_TEXT_WIDTH / 2.0
+    assert drawing.UNDERHEAD_X < drawing.LEAD_FOOT_X <= lead_left - 0.003
+    assert drawing.LEAD_FOOT_X < drawing.RELIEF_DIA_X - 0.003
+    assert lead_y + drawing.LEAD_TEXT_TOP_ABOVE_ANCHOR <= block_bottom - 0.002
+    assert lead_y - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.015
+    assert lead_x + drawing.LEAD_TEXT_WIDTH / 2.0 < drawing.THREAD_START_X - 0.005
+    assert drawing.NECK_BOTTOM_Y > text_y
     # The crown rise's text stands outside, left of the apex extension line
     # it shares with the slot depth.
     crown_x = drawing.SIDE_KEEP["CrownRise"][0]
@@ -317,33 +397,36 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
 
 
 def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
-    from _fit_deviations import deviations
-
     printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.PRINTED_DIMENSIONS) == printed
-    bands = {
-        name: row[1:] for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]
+    limits = {name: row for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]}
+    # The builder's limits: the relief's LIMIT band and the lead's single
+    # MAX, the model value being the upper limit of each.
+    assert limits == {
+        "ReliefDia": (geom.RELIEF_DIA, 3),
+        "HeadLead": (geom.RELIEF_LEAD, 6),
     }
-    # The builder's exact setter arguments; the drawing reads the geom's
-    # printed-band deviations, equal to well inside the 1e-6 mm readback.
-    assert set(bands) == {"ReliefDia", "TipChamfer"}
-    assert bands["ReliefDia"] == pytest.approx(
-        (4, -geom.RELIEF_DIA_TOL, geom.RELIEF_DIA_TOL), abs=1e-9
-    )
-    assert bands["TipChamfer"] == pytest.approx(
-        (2, *deviations(geom.TIP_CHAMFER_BAND)), abs=1e-9
-    )
+    assert drawing.LIMIT_DEVIATIONS == {
+        "ReliefDia": (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER)
+    }
+    assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
     assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(23.0)
-    lead = drawing.SOURCE_ONLY_DIMENSIONS["ReliefLead@ShankProfile"]
-    assert lead == pytest.approx(
-        (geom.RELIEF_LEAD, 4, -geom.RELIEF_LEAD_TOL, geom.RELIEF_LEAD_TOL), abs=1e-9
-    )
-    # The unprinted lead band is exactly what the relief callout states.
-    assert spec.RELIEF_CALLOUT.startswith(
-        f"{lead[0] + lead[2]:.2f}-{lead[0] + lead[3]:.2f} X 45"
-    )
-    thread = drawing.SOURCE_ONLY_DIMENSIONS["ThreadDia@ShankProfile"]
-    assert thread == (geom.MAJOR_DIA, 0, 0.0, 0.0)
+    # The profile's own lead stays unbanded; the printed one follows it.
+    assert drawing.SOURCE_ONLY_DIMENSIONS == {
+        "ReliefLead@ShankProfile": (geom.RELIEF_LEAD, 0),
+        "ThreadDia@ShankProfile": (geom.MAJOR_DIA, 0),
+    }
+    # The lead's MAX names the part whose loop the flat seat clamps.  The part
+    # authors every callout on the dimension it marks; the drawing writes none.
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    lead_callout = callouts["HeadLead"].splitlines()
+    assert lead_callout == ["X 45 DEG", "FLAT SEAT FOR", "MHA-SM-VN-51 LOOP"]
+    assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
+    for feature, names in spec.DIMENSION_CALLOUTS.items():
+        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    assert part.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts" not in source
 
 
 def test_drawing_runs_the_readbacks_after_the_last_rebuild() -> None:
