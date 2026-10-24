@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import importlib.util
+from enum import Enum
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,7 +21,7 @@ import pd_transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from _test_stubbed_build import offline_adapter, stub_seat
 
 # The B landscape template's inner border, left edge (sheet metres).
@@ -56,16 +57,21 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_actual_entry_cones_carry_model_owned_controls() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("CountersinkProfile", "CountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
-        ("CountersinkProfile", "FrontCountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
-    }
+    # Machinist review: the 45° ±0.5° half-angle named no mate, so the title
+    # block's angular row governs it; only the MAX diameter is model-owned.
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.CSK_HALF_ANGLE_MIN == pytest.approx(
+        spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
+    )
     assert spec.CSK_DIA_TOL_TYPE == 6
-    assert spec.CSK_DIA_PLACES == 3
+    # Machinist review: a thread-entry chamfer's MAX prints at one place.
+    assert spec.CSK_DIA_PLACES == 1
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
         "CountersinkDia", "CountersinkHalfAngle",
     }
-    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER[3:])
+    # One way of saying "both cones", and no number in the qualifier.
+    assert spec.CSK_QUALIFIER == "CSK, BOTH ENDS"
+    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER)
 
 
 def _thumbnut_spec_with(monkeypatch, module, name: str, value):
@@ -117,7 +123,7 @@ def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
     """Actual MAX cone and the smallest printed half-angle charge both ends."""
-    assert spec.CSK_DIA == pytest.approx(4.566)
+    assert spec.CSK_DIA == pytest.approx(4.6)
     rear = (spec.CSK_DIA - spec.TAP_DRILL_DIA) / (
         2.0 * math.tan(math.radians(spec.CSK_HALF_ANGLE_MIN))
     )
@@ -153,7 +159,7 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
         spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
     ) == pytest.approx(
         {
-            "floor land outside the countersink": (9.0 - 0.8 - 4.566) / 2.0,
+            "floor land outside the countersink": (9.0 - 0.8 - 4.6) / 2.0,
             "cone from the rim to the floor": 2.2,
             "floor below the rim": 0.2,
         }
@@ -211,6 +217,64 @@ def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypa
             drawing._assert_native_thread(Callout(wrong))
     with pytest.raises(RuntimeError, match="invalid readback"):
         drawing._assert_native_thread(Callout(None))
+
+
+class _Readback(Enum):
+    """How the fake callout's resolved rows read back after the edit."""
+
+    FOLLOWS_DEFINITION = "follows"
+    KEEPS_CLASS = "keeps"
+
+
+class _NativeTapCallout:
+    """A native hole callout whose resolved rows follow its prefix definition."""
+
+    def __init__(self, readback: _Readback = _Readback.FOLLOWS_DEFINITION) -> None:
+        self.definition = "<hw-threaddesc> - <hw-threadclass> THRU ALL"
+        self.readback = readback
+
+    def IsHoleCallout(self) -> bool:
+        return True
+
+    def SetText(self, part: int, text: str) -> None:
+        assert part == 1
+        self.definition = text
+
+    def GetText(self, part: int) -> str:
+        if part == 5:
+            return self.definition
+        if part == 1:
+            resolved = self.definition.replace("<hw-threaddesc>", "#8-32 UNC")
+            resolved = resolved.replace("<hw-threadclass>", "2B")
+            if self.readback is _Readback.KEEPS_CLASS:
+                resolved += " - 2B"
+            return resolved
+        return ""
+
+
+def test_tap_callout_leaves_the_class_to_the_title_block(monkeypatch) -> None:
+    import _hole_callout_thread_class as thread_class
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(thread_class, "_early_bound", lambda value, _kind: value)
+    native = _NativeTapCallout()
+    drawing._omit_thread_class(native)
+    assert native.definition == "<hw-threaddesc> THRU ALL"
+    assert native.GetText(1) == "#8-32 UNC THRU ALL"
+    # Negative control: a callout whose rows still resolve the class refuses.
+    with pytest.raises(RuntimeError, match="still prints its class"):
+        drawing._omit_thread_class(_NativeTapCallout(_Readback.KEEPS_CLASS))
+
+
+def test_tap_callout_refuses_to_omit_a_nondefault_class(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "TAP_SPEC", SimpleNamespace(thread_class="3B"))
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a nondefault class must not reach the native edit")
+
+    monkeypatch.setattr(drawing, "omit_title_block_thread_class", forbidden)
+    with pytest.raises(RuntimeError, match="only the title block's default class 2B"):
+        drawing._omit_thread_class(object())
 
 
 def test_the_knurl_puts_crests_on_the_section_plane() -> None:
@@ -452,6 +516,67 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     assert drawing.SECTION_KEEP["DishDia"][1] > rim_y
     # Negative control: the 19e33c6c2 stack sat under the seat face.
     assert _section_station(seat_y - 0.014) < 0.0
+
+
+def test_lengths_read_from_the_seat_face() -> None:
+    """Machinist review: the 2.4 waist chained off the head's 8.7 shoulder.
+    The flange length and the head's rear face read from the faced seat face,
+    baseline with the overall length; the waist is their remainder and does
+    not print."""
+    assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {"HeadDia", "HeadRearY", "OverallLength"}
+    stem = spec.DRAWING_DIMENSIONS["StemProfile"]
+    assert "FlangeLength" in stem and "WaistLength" not in stem
+    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.0, 7.4))
+    assert spec.HEAD_REAR_Y - spec.FLANGE_LENGTH == pytest.approx(spec.WAIST_LENGTH)
+    # Two left lanes, the flange inner and the head's rear face outer, each
+    # text inside its own span from the seat.
+    for name, top, lane in (
+        ("FlangeLength", spec.FLANGE_LENGTH, 0.016),
+        ("HeadRearY", spec.HEAD_REAR_Y, 0.026),
+    ):
+        x, y = drawing.SECTION_KEEP[name]
+        assert x == pytest.approx(drawing._section_x(-spec.HEAD_DIA / 2.0) - lane)
+        assert 0.0 < _section_station(y) < top
+    # Run 20261024T025840809Z: an outside arrow hung below the seat into
+    # the cone diameter's "max."; both spans hold their arrows inside.
+    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY")
+
+
+def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
+    """codjiflo on 11fe6c440: 16.1, 8.7 from the rim and 5.0 from the seat,
+    each ±0.8, let the waist close to 0. From the seat, the head's rear face
+    at its lowest stands 0.8 above the flange's shoulder at its highest."""
+    band = printed_band_mm(1)
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(
+        (spec.HEAD_REAR_Y - band) - (spec.FLANGE_LENGTH + band)
+    )
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(0.8)
+    # Negative control: the 11fe6c440 scheme's corner.
+    assert (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band) - (
+        spec.FLANGE_LENGTH + band
+    ) == pytest.approx(0.0, abs=1e-9)
+    # The spec's own gate refuses a printed row wide enough to close the
+    # waist (one-place bands 1.7x wider; the walls still hold first).
+    import _printed_tolerance
+
+    real = _printed_tolerance.printed_deviations
+
+    def wider(nominal: float, places: int) -> tuple[float, float]:
+        lo, hi = real(nominal, places)
+        return (lo * 1.7, hi * 1.7) if places == 1 else (lo, hi)
+
+    with pytest.raises(AssertionError, match="waist closes"):
+        _thumbnut_spec_with(monkeypatch, _printed_tolerance, "printed_deviations", wider)
+
+
+def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
+    """Machinist review: the cone diameter's line and extension lines struck the
+    default caption's letters.  Run 20261024T025840809Z measured that line
+    13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
+    seat_y = drawing._section_y(0.0)
+    caption = drawing.SECTION_CAPTION_XY
+    assert caption[0] == drawing.SECTION_CENTER[0]
+    assert seat_y - caption[1] - 0.0135 >= 0.005
 
 
 @pytest.mark.parametrize(

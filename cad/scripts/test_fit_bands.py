@@ -188,10 +188,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the D-flat's FLAT_LIMITS as deviations for the flat-to-core clearance "
         "corners; the sheet prints the native LIMIT"
     ),
-    ("pd_transgear_thumbnut_spec", "CSK_HALF_ANGLE_BAND"): (
-        "half the title block's angular band on the 90 deg countersink, for the "
-        "seat-cone corners; not a size fit"
-    ),
     ("pd_vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the pan-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"

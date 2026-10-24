@@ -2,10 +2,11 @@ r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 
 The face view is the ``*Top`` orientation, looking at the dished front face:
 it carries the native #8-32 UNC-2B through-thread callout. Both actual entry
-cones have model-owned MAX diameter and half-angle controls in section.
+cones print a model-owned MAX diameter and their half-angle in section.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
-knurl diameter, the head, waist and flange, the overall length from the seat
-face and the dish's rim and floor diameters and its depth to the floor print
+knurl diameter, the head, waist and flange, the overall length and the
+flange length from the seat face (the waist is their remainder) and the
+dish's rim and floor diameters and its depth to the floor print
 on solid cut edges.  No roughness symbol: the seat face clamps the wheel
 (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
@@ -46,7 +47,10 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_transgear_thumbnut_spec import (
@@ -56,13 +60,17 @@ from pd_transgear_thumbnut_spec import (
     DRAWING_PRECISION_BY_NAME,
     FLANGE_LENGTH,
     HEAD_DIA,
-    HEAD_LENGTH,
+    HEAD_REAR_Y,
     KNURL_CALLOUT,
     OVERALL_LENGTH,
     TAP_DRILL_DIA,
+    TAP_SPEC,
     WAIST_LENGTH,
     THREAD,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_thumbnut"]
@@ -108,8 +116,11 @@ def _section_y(model_y_mm: float) -> float:
 
 # The rim's diameters stack above it (knurl outermost, the dish floor
 # innermost, so each one's extension lines stay inside the next one's) with
-# only air below their extension lines; the lengths stand off the right
-# (head, overall) and the left (waist, dish depth) of the silhouette.  The
+# only air below their extension lines; the overall length stands off the
+# right of the silhouette and the dish depth off the left.  The flange
+# length (inner lane) and the head's rear face (outer lane) read from the
+# seat face on the left, baseline with the overall length, arrows inside;
+# the waist length is the remainder and does not print.  The
 # dish depth's text stands above its rim extension line: at 3:1 the depth is
 # shorter than the text is tall.  The waist and the flange are dimensioned
 # across their own cut, each dimension line at its feature's height and its
@@ -125,14 +136,14 @@ SECTION_KEEP = {
         _section_x(-HEAD_DIA / 2.0) - 0.016,
         _section_y(OVERALL_LENGTH) + 0.004,
     ),
-    "HeadLength": (
-        _section_x(HEAD_DIA / 2.0) + 0.014,
-        _section_y(OVERALL_LENGTH - HEAD_LENGTH / 2.0),
+    "HeadRearY": (
+        _section_x(-HEAD_DIA / 2.0) - 0.026,
+        _section_y(HEAD_REAR_Y / 2.0),
     ),
     "OverallLength": (_section_x(HEAD_DIA / 2.0) + 0.032, SECTION_CENTER[1]),
-    "WaistLength": (
+    "FlangeLength": (
         _section_x(-HEAD_DIA / 2.0) - 0.016,
-        _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0),
+        _section_y(FLANGE_LENGTH / 2.0),
     ),
     "FlangeDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH / 2.0)),
     "WaistDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0)),
@@ -143,6 +154,16 @@ SECTION_KEEP = {
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
 COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
+# The baseline lengths' spans hold their text and arrows: inside, so no arrow
+# hangs below the seat face into the cone diameter's "max." (run
+# 20261024T025840809Z).
+ARROWS_INSIDE = ("FlangeLength", "HeadRearY")
+_DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
+# The native caption's top centre.  The cone diameter's dimension line runs
+# under its below-callout, 13.5 mm under the seat face (run
+# 20261024T025840809Z): the caption hangs 6.5 mm under that line, clear of
+# its extension lines.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - 0.020)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
@@ -310,6 +331,23 @@ def _assert_native_thread(display: Any) -> None:
         raise RuntimeError(f"thumbnut native thread callout does not carry the source thread: {texts!r}")
 
 
+@_telemetry.traced("drawing.thumbnut.tap_callout_thread_class")
+def _omit_thread_class(display: Any) -> None:
+    """Rule 2: the title block's THREADS row owns class 2B; the native tap
+    variables stay live (draw_dt_cone_swing_platform's pattern).  Run
+    20261024T041438788Z's review gated on the callout restating it."""
+    if TAP_SPEC.thread_class != "2B":
+        raise RuntimeError(
+            "thumbnut tap: only the title block's default class 2B may be "
+            f"omitted, got {TAP_SPEC.thread_class!r}"
+        )
+    omit_title_block_thread_class(display, label="thumbnut #8-32 tap")
+    native = _early_bound(display, "IDisplayDimension")
+    resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
+    if any(TAP_SPEC.thread_class in text for text in resolved):
+        raise RuntimeError(f"thumbnut tap callout still prints its class: {resolved!r}")
+
+
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
     """Keep the native rear cone/axis arc local and move only its text outboard."""
     name = "CountersinkHalfAngle"
@@ -337,6 +375,25 @@ def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
         (float(position[0]), float(position[1])), COUNTERSINK_ANGLE_TEXT_XY
     ) > 1e-5:
         raise RuntimeError(f"thumbnut countersink angle text did not persist: {position!r}")
+
+
+@_telemetry.traced("drawing.thumbnut.arrows_inside")
+def _set_arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Stand each ARROWS_INSIDE dimension's arrows inside its extension lines,
+    read back (draw_mg_magnifying_wheel's _set_arrows_inside)."""
+    remaining = set(ARROWS_INSIDE)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in remaining:
+            continue
+        remaining.discard(name)
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"thumbnut {name} did not keep its arrows inside")
+    if remaining:
+        raise RuntimeError(f"no thumbnut dimension to set arrows inside: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -421,6 +478,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
     _place_countersink_angle(adapter, section_annotations)
+    _set_arrows_inside(adapter, section_annotations)
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="thumbnut section A-A"
+    )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")
     # The tap-drill edge under the front countersink: the one visible circle
@@ -433,6 +494,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"{THREAD} UNC-2B through thread",
     )
     _assert_native_thread(thread_callout)
+    _omit_thread_class(thread_callout)
 
     return await finalize_drawing(
         adapter,
