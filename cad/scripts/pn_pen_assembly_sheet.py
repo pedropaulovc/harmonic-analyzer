@@ -178,7 +178,7 @@ EXPLODE_TRAILS = {
     "stirrup": STIRRUP_TRAIL,
 }
 
-EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEET 3"
+EXPLODED_CAPTION = "EXPLODED VIEW - ASSEMBLY SEQUENCE ON SHEETS 3-4"
 
 # The nib preset's text point, sketch mm: on the side of the marker-axis arm
 # away from the yaw wedge, and beyond the nib tip along the axis, so the
