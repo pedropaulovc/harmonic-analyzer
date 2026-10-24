@@ -132,6 +132,7 @@ def test_the_sheet_carries_no_general_notes() -> None:
 
 
 def test_part_authored_callouts_name_each_band_s_mate() -> None:
+    import _config
     from mg_wheel_axle_spec import BACK_END_PROUD_MAX, BACK_END_SUNK_MAX
     from mg_wheel_group import BAR_PRESS
 
@@ -140,13 +141,15 @@ def test_part_authored_callouts_name_each_band_s_mate() -> None:
         "BarDepth": {callouts.CALLOUT_BELOW: callouts.BAR_DEPTH_CALLOUT},
         "BoreRowFromTop": {callouts.CALLOUT_BELOW: callouts.BORE_ROW_CALLOUT},
     }
-    # The literals keep the wheel group and the axle out of the part recipe.
+    # The literals keep the wheel group and the axle out of the part recipe;
+    # the mate is named by its number (rule 4).
+    axle = _config.parts("mg-wheel-axle")["number"]
     assert callouts.AXLE_BORE_CALLOUT == (
-        "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n"
+        f"REAM THRU\nPRESS FIT {axle} AXLE\n"
         f"{BAR_PRESS[0]:.3f}-{BAR_PRESS[1]:.3f} INTERFERENCE"
     )
     assert callouts.BAR_DEPTH_CALLOUT == (
-        "MG-WHEEL-AXLE BACK END\n"
+        f"{axle} AXLE BACK END\n"
         f"{BACK_END_PROUD_MAX:.2f} PROUD TO {BACK_END_SUNK_MAX:.2f} SUNK"
     )
     assert "MHA-SH-02" in callouts.BORE_ROW_CALLOUT

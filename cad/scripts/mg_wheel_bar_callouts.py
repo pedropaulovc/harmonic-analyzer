@@ -7,20 +7,19 @@ the drawing's native save then saves the dirtied part outside its own recipe
 (``cad/docs/pipeline/evidence/vm2-datum-placement/source-hash-cause.md``,
 fleet issue #1942).
 
-The press interference and the axle back end's range are literals so the
-wheel group and the axle stay out of this part's recipe;
-``test_mg_wheel_bar_drawing`` pins them to ``mg_wheel_group.BAR_PRESS`` and
-``mg_wheel_axle_spec``.
+The axle's number, the press interference and the axle back end's range are
+literals so the wheel group and the axle stay out of this part's recipe;
+``test_mg_wheel_bar_drawing`` pins them to the axle's config row,
+``mg_wheel_group.BAR_PRESS`` and ``mg_wheel_axle_spec``.
 """
 
 from __future__ import annotations
 
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
-
-# The reamed bore names its press fit on the axle (rule 4).
-AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT MG-WHEEL-AXLE\n0.010-0.030 INTERFERENCE"
+# The reamed bore names its press fit on the axle by number (rule 4).
+AXLE_BORE_CALLOUT = "REAM THRU\nPRESS FIT MHA-MG-07 AXLE\n0.010-0.030 INTERFERENCE"
 # The depth's band places the pressed axle's back end on the back face.
-BAR_DEPTH_CALLOUT = "MG-WHEEL-AXLE BACK END\n0.35 PROUD TO 1.55 SUNK"
+BAR_DEPTH_CALLOUT = "MHA-MG-07 AXLE BACK END\n0.35 PROUD TO 1.55 SUNK"
 # One row for every bore; its band is the clamp holes' on the MHA-SH-02 taps
 # (mg_wheel_bar_spec.CLAMP_POSITION_BAND).
 BORE_ROW_CALLOUT = "ALL BORES;\nCLAMP HOLES TO\nMHA-SH-02 TAPS"
