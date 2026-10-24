@@ -442,7 +442,9 @@ if (
     view_configuration(TRANSGEAR_EXPLODED_SCALE, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
     != BOM_CONFIGURATION
 ):
-    raise AssertionError("the transgear explode's scale would leave the BOM configuration")
+    raise AssertionError(
+        "the transgear explode's scale would leave the BOM configuration"
+    )
 CLUSTER_STEMS = frozenset(
     {
         "pd-transgear-pin",
