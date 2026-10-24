@@ -242,11 +242,16 @@ if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block."""
+    """Wrap each numbered line under its own number; one note per block. One
+    blank line separates consecutive numbered steps."""
     out = [heading] if heading else []
+    numbered = False
     for line in lines:
         number, sep, rest = line.partition(". ")
         if sep and number.isdigit():
+            if numbered:
+                out.append("")
+            numbered = True
             out += textwrap.wrap(
                 rest,
                 width=width,
