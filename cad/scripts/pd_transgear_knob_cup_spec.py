@@ -129,9 +129,6 @@ if JOURNAL_END_INSET_WORST <= 0.0:
 if not math.isclose(JOURNAL_END_INSET, 1.5, abs_tol=1e-9):
     raise AssertionError("MHA-PD-16 no longer covers the journal's end by 1.5")
 
-# The sheet: the bore's process, and the hole the assembly drills.
-BORE_CALLOUT = "REAM THRU\nPIN HOLE DRILLED AT ASSEMBLY"
-
 # The front face is the running face on the plate's rear boss: MACHINED, on
 # the exact native face the part build resolves.
 SURFACE_FINISHES = (

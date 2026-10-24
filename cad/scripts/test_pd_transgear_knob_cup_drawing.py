@@ -58,22 +58,53 @@ def test_the_section_cuts_the_cup_axis_across_the_face_view() -> None:
     assert x1 > drawing.FACE_CENTER[0] + drawing.HALF_OD
 
 
-def test_bore_assembly_pin_callout_stays_inside_the_left_border() -> None:
-    """4e9a4df PNG: the intact 70 mm pin line started at sheet x 5 mm."""
+def test_bore_callout_names_its_journal_and_clears_the_border_and_centreline() -> None:
+    """Machinist review: the 0.012 band named no mate, and the old block's
+    last line, centred at x 60 mm, was struck by the bore's centreline."""
     from _layout_geometry import estimate_text_box
 
-    def left_edge(anchor):
-        box = estimate_text_box(
-            spec.BORE_CALLOUT.splitlines()[-1], anchor=anchor,
-            height=0.0035, reference=5,
-        )
-        assert box is not None
-        # Use the larger of the calibrated source ink and the generic estimate.
-        return min(box.xmin, anchor[0] - 0.070 / 2.0)
+    shaft = _config.parts("pd-transgear-knob-shaft")["number"]
+    callout = " ".join(drawing.BORE_CALLOUT.split())
+    low, high = spec.BORE_JOURNAL_CLEARANCE
+    assert "REAM THRU" in callout
+    assert "SLIDES ON" in callout
+    assert f"{shaft} JOURNAL" in callout
+    assert f"{low:.3f}-{high:.3f}" in callout
+    assert "DIAMETRAL CLEARANCE" in callout
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == drawing.BORE_CALLOUT
+    assert "PIN HOLE" not in callout
 
-    assert left_edge(drawing.FACE_KEEP["BoreDia"]) > 0.0127 + 0.003
-    assert left_edge((0.040, drawing.FACE_KEEP["BoreDia"][1])) < 0.0127
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == spec.BORE_CALLOUT
+    anchor = drawing.FACE_KEEP["BoreDia"]
+    for line in drawing.BORE_CALLOUT.splitlines():
+        box = estimate_text_box(line, anchor=anchor, height=0.0035, reference=5)
+        assert box is not None
+        # The larger of the generic estimate and the 2.45 mm a character
+        # draw_mg_magnifying_wheel measured on a farm render.
+        half = max(box.xmax - anchor[0], len(line) * 0.00245 / 2.0)
+        assert anchor[0] - half > 0.0127 + 0.003
+        assert anchor[0] + half < drawing.FACE_CENTER[0] - 0.005
+
+
+def test_pin_hole_note_stands_apart_and_cites_the_assembly_step() -> None:
+    import pd_paper_drive_assembly_steps as steps
+
+    note = " ".join(drawing.PIN_HOLE_NOTE.split())
+    assert "NO CROSS HOLE ON THIS PART" in note
+    assert _config.parts("pd-vn-transgear-knob-cup-pin")["number"] in note
+    assert steps.step_ref("knob-stack-fitted") in note
+    # Below the face view (and its section labels), inside the left border.
+    assert (
+        drawing.PIN_HOLE_NOTE_XY[1] < drawing.FACE_CENTER[1] - drawing.HALF_OD - 0.010
+    )
+    assert drawing.PIN_HOLE_NOTE_XY[0] > 0.0127 + 0.003
+
+
+def test_front_finish_caption_names_the_plate_boss() -> None:
+    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    caption = " ".join(drawing.FRONT_FINISH_CAPTION.split())
+    assert "THRUST FACE" in caption
+    assert f"{plate} REAR BOSS" in caption
+    assert drawing.FRONT_FINISH_CAPTION_XY[1] > drawing.FRONT_FINISH[1][1]
 
 
 def test_cup_od_text_and_line_clear_the_native_section_scale_caption() -> None:
