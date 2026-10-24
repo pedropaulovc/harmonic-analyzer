@@ -9,7 +9,10 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 * FRONT (``*Right``, looking along the lever bore at a corner): the block
   height, the bore's height from the bottom seat and its Ø callout. One grouped
   common-flat location applies to the bore and both tap entry axes; all three
-  native source measurements remain independently checked.
+  native source measurements remain independently checked. The shown
+  location sketch's construction lines (the converted flat on the outline,
+  the converted bore circle, the tap witnesses) sit on a hidden layer, so
+  only their dimensions print.
 * TOP and BOTTOM, turned and pinned into third-angle projection above and
   below the front (corners up and down, the flats square to the sheet): the
   controlled stock flats above and to the right of the top view, and each tap's
@@ -212,6 +215,12 @@ PROJECTION_SLOP_M = 1e-5
 _COSMETIC_THREAD_ANNOTATION = 1
 _CENTER_MARK_ANNOTATION = 13
 _SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
+# The front view must show LeverBoreLocationProfile for its dimensions to
+# import and stay visible (_drawing_hidden_sketches r21), but its construction
+# segments only duplicate the outline and bore circle (machinist review of
+# 2056e3344 read them as hidden lines).  Their view instances go on this layer.
+_FRONT_REFERENCE_SKETCH = "LeverBoreLocationProfile"
+_FRONT_REFERENCE_LAYER = "MG-CLAMP-FRONT-REFERENCE-HIDDEN"
 
 # swDimensionTextParts_e definitions (5-8) and the writable part each is set
 # through (1-4) -- the draw_mg_output_fixture convention.
@@ -372,27 +381,25 @@ def _assert_material_hatch(section: Any) -> None:
     )
 
 
+def _hidden_layer(adapter: Any, name: str, description: str) -> None:
+    """Add (once) a drawing layer that neither shows nor prints, read back."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(name)
+    if layer is None:
+        if int(manager.AddLayer(name, description, 0, 0, 0)) != 1:
+            raise RuntimeError(f"failed to add the {name} layer")
+        layer = manager.GetLayer(name)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError(f"the {name} layer is not hidden")
+
+
 def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
     """Keep the taps' cosmetic-thread ink out of a section (rule 9: a section
     never carries hidden lines); the callouts state both threads.  The
     draw_dt_cone_tip_block hidden-layer recipe."""
-    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
-    layer = manager.GetLayer(_SECTION_THREAD_LAYER)
-    if layer is None:
-        if (
-            int(
-                manager.AddLayer(
-                    _SECTION_THREAD_LAYER, "clamp section thread ink hidden", 0, 0, 0
-                )
-            )
-            != 1
-        ):
-            raise RuntimeError("failed to add the clamp section thread layer")
-        layer = manager.GetLayer(_SECTION_THREAD_LAYER)
-    layer = _early_bound(layer, "ILayer")
-    layer.Visible = False
-    if bool(layer.Visible) or bool(layer.Printable):
-        raise RuntimeError("the clamp section thread layer is not hidden")
+    _hidden_layer(adapter, _SECTION_THREAD_LAYER, "clamp section thread ink hidden")
     hidden = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
@@ -408,6 +415,78 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
         raise RuntimeError(f"clamp {label} has no cosmetic thread to hide")
     rebuild_drawing(adapter, label=f"hide clamp {label} cosmetic threads")
     return hidden
+
+
+def _front_reference_segments(view: Any) -> list[Any]:
+    """The front view's instances of every LeverBoreLocationProfile segment,
+    chosen on the model sketch and mapped into the view (the
+    draw_ch_fulcrum_keeper route); each must be construction geometry."""
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError("clamp front view references no model")
+    feature = _early_bound(model, "IPartDoc").FeatureByName(_FRONT_REFERENCE_SKETCH)
+    if feature is None:
+        raise RuntimeError(f"clamp part has no {_FRONT_REFERENCE_SKETCH}")
+    sketch = _early_bound(
+        _early_bound(feature, "IFeature").GetSpecificFeature2(), "ISketch"
+    )
+    in_view = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(
+                f"{_FRONT_REFERENCE_SKETCH}: {segment.GetName()} is not construction"
+            )
+        mapped = native.GetCorresponding(segment)
+        if mapped is None:
+            raise RuntimeError(
+                f"{_FRONT_REFERENCE_SKETCH}: {segment.GetName()} has no front-view instance"
+            )
+        in_view.append(_early_bound(mapped, "ISketchSegment"))
+    if not in_view:
+        raise RuntimeError(f"{_FRONT_REFERENCE_SKETCH} has no segments to hide")
+    return in_view
+
+
+def _assert_front_reference_hidden(view: Any) -> dict[str, str]:
+    layers = {
+        str(segment.GetName()): str(segment.Layer or "")
+        for segment in _front_reference_segments(view)
+    }
+    if any(layer != _FRONT_REFERENCE_LAYER for layer in layers.values()):
+        raise RuntimeError(f"clamp front reference segments left the hidden layer: {layers!r}")
+    return layers
+
+
+def _hide_front_reference_segments(adapter: Any, view: Any) -> None:
+    """Put the front view's location-sketch construction segments on a hidden
+    layer, reading each back.  The sketch itself stays shown, so the imported
+    dimensions keep their visibility and attachments (proved by the caller)."""
+    _hidden_layer(adapter, _FRONT_REFERENCE_LAYER, "clamp front reference sketch hidden")
+    for segment in _front_reference_segments(view):
+        segment.Layer = _FRONT_REFERENCE_LAYER
+        if str(segment.Layer or "") != _FRONT_REFERENCE_LAYER:
+            raise RuntimeError(
+                f"clamp front reference segment {segment.GetName()} refused the hidden layer"
+            )
+    rebuild_drawing(adapter, label="hide clamp front reference segments")
+    layers = _assert_front_reference_hidden(view)
+    _telemetry.info(
+        f"clamp front reference segments on {_FRONT_REFERENCE_LAYER}: {layers!r}",
+        segment_layers=repr(layers),
+    )
+
+
+def _assert_front_annotations_attached(adapter: Any, annotations: list[Any]) -> None:
+    dangling = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        state = annotation.IsDangling()
+        if state is not False:
+            dangling[dimension_name(adapter, annotation)] = state
+    if dangling:
+        raise RuntimeError(f"clamp front dimensions dangle: {dangling!r}")
 
 
 def _require_one_center_mark(view: Any, label: str) -> None:
@@ -834,6 +913,11 @@ async def build(adapter: Any) -> dict[str, str]:
         _assert_ordinary_location(display, dimension, name)
     set_dimension_callouts(adapter, [*right_annotations, *top_annotations], DIMENSION_CALLOUTS)
     _group_flat_locations(adapter, right, right_annotations)
+    # Hide the shown location sketch's construction ink; the sketch stays
+    # shown, and every front dimension must still be visible and attached.
+    _hide_front_reference_segments(adapter, right)
+    _assert_grouped_flat_locations(_flat_group_annotations(adapter, right, right_annotations))
+    _assert_front_annotations_attached(adapter, right_annotations)
     bore_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "LeverBoreDiaDim")
     bore_display = _early_bound(_early_bound(bore_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
     bore_dimension = _early_bound(bore_display.GetDimension2(0), "IDimension")
@@ -904,6 +988,8 @@ async def build(adapter: Any) -> dict[str, str]:
     def settled_dimensions() -> None:
         _assert_grouped_flat_locations(_flat_group_annotations(adapter, right, right_annotations))
         _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
+        _assert_front_reference_hidden(right)
+        _assert_front_annotations_attached(adapter, right_annotations)
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):
             annotation = _early_bound(raw, "IAnnotation")
