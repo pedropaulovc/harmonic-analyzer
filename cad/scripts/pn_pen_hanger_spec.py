@@ -96,17 +96,23 @@ SLOT_WIDTH = 5.05
 # slots allow (GUIDE_TILT_MAX).
 SLOT_WIDTH_BAND = (0.05, 0.0)
 # Nominal, largest rod's back face to slot bottom.  Open enough that the
-# title-block .X band on the slot bottom AND on the corner radius below still
-# keeps the rod's back corners off the slot-corner fillets (guarded below),
-# so the slot bottom needs no tight band.
+# plate's printed .X reach and slot depth, with the corner radius at its printed
+# MAX below, still keep the rod's back corners off the slot-corner fillets
+# (guarded below), so neither needs a tight band.
 SLOT_BOTTOM_GAP = 4.0
 SLOT_BOTTOM_Z = round(ROD_AXIS_Z + ROD_SECTION / 2.0 + SLOT_BOTTOM_GAP, 6)
-# Printed from the strap back face (the bar seat), the one face that fixes the
-# rod line relative to the slot.
+# The slot bottom from the strap back face (the bar seat): the sketch's anchor.
+# The sheet prints the slot depth from the plate's free end instead, the origin
+# of its reach too, so the plate is cut as its own blank before brazing.
 SLOT_BOTTOM = -SLOT_BOTTOM_Z
 # drawing-guidelines.md rule 16: the slot's two milled internal corners carry
-# the largest radius the rod's corner clearance allows.
+# a radius inside what the rod's corner clearance allows (guarded below),
+# printed as the single limit "R2.0 MAX" so the shop picks the cutter.
+# swTolMAX prints the nominal then MAX, so the modelled radius IS the limit;
+# the band runs from sharp up to it.
 SLOT_CORNER_R = 2.0
+SLOT_CORNER_R_BAND = (0.0, -SLOT_CORNER_R)  # (upper, lower)
+SLOT_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "2X R2.0 MAX"
 GUIDE_NOSE = 4.0  # plate front edge ahead of the rod axis
 PLATE_FRONT_Z = round(ROD_AXIS_Z - GUIDE_NOSE, 6)
 PLATE_REACH = round(STRAP_Z[0] - PLATE_FRONT_Z, 6)  # strap front to plate front
@@ -125,14 +131,19 @@ if SLOT_CLEARANCE[0] <= 0.0:
 GUIDE_TILT_MAX = math.atan(SLOT_CLEARANCE[1] / (GUIDE_PITCH + GUIDE_PLATE_T))
 if math.degrees(GUIDE_TILT_MAX) > 0.25:
     raise AssertionError("guide slots let the pen rod lean over 0.25 deg")
-# The slot bottom stays behind the rod's back face at its .X limit.
-SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP - printed_band_mm(1)
+# The slot bottom stays behind the rod's back face at the printed worst case.
+# The rod line is set from the strap back face (the bar seat); the plate's root
+# seats on the strap front face, the strap's sheet-stock thickness away (a
+# reference on the sheet, not a machined size), and the sheet prints the
+# plate's reach and its slot depth both .X from the plate's free end, so the
+# slot bottom carries both bands.
+SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP - 2.0 * printed_band_mm(1)
 if SLOT_BOTTOM_GAP_MIN <= 0.0:
     raise AssertionError("guide slot bottom can bear on the pen rod")
 # The corner fillets are tangent to the walls SLOT_CORNER_R ahead of the slot
-# bottom: with the slot bottom AND the radius both at their .X limits, the
-# rod's back corners still pass the fillets' wall tangency.
-SLOT_CORNER_R_MAX = SLOT_CORNER_R + printed_band_mm(1)
+# bottom: with the slot bottom at that worst case and the radius at its printed
+# MAX, the rod's back corners still pass the fillets' wall tangency.
+SLOT_CORNER_R_MAX = SLOT_CORNER_R
 if SLOT_BOTTOM_GAP_MIN < SLOT_CORNER_R_MAX:
     raise AssertionError(
         "guide slot corner fillets can bear on the pen rod's back corners"
@@ -140,7 +151,8 @@ if SLOT_BOTTOM_GAP_MIN < SLOT_CORNER_R_MAX:
 # The two fillets leave a flat slot bottom between them, inside the slot depth.
 if 2.0 * SLOT_CORNER_R >= SLOT_WIDTH or SLOT_CORNER_R >= SLOT_DEPTH:
     raise AssertionError("guide slot corner radius does not fit the slot")
-# The arms still cover the rod's front face with the reach at its .X limit.
+# The arms still cover the rod's front face with the reach at its .X limit (the
+# strap's sheet-stock thickness unbanded, as above).
 GUIDE_ARM_COVER_MIN = GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1)
 if GUIDE_ARM_COVER_MIN <= 0.0:
     raise AssertionError("guide plate arms can stop short of the rod's front face")
@@ -185,8 +197,9 @@ if NUT_ACROSS_FLATS / 2.0 >= SCREW_HOLE_EDGE_DISTANCE:
 # screw-hole station, the upper plate's drop and the (alike) lower plate's
 # thickness.
 # Section A-A just above the upper plate, looking down onto it: its U
-# outline, the slot-corner radius and the strap stock thickness (the lower
-# plate is identical and flush with the strap bottom end -- notes). ---
+# outline (the slot depth and the reach both from the plate's free end), the
+# slot-corner radius and the strap stock thickness (the lower plate is
+# identical and flush with the strap bottom end -- notes). ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"StrapTopRun", "StrapTaperDx", "StrapRise", "StrapBotWidth"},
     "Strap": {"StrapThick"},
@@ -195,7 +208,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LowerGuide": {"PlateThick"},
     "UpperGuideProfile": {
         "SlotWidth",
-        "SlotBottom",
+        "SlotDepth",
         "ArmWidth",
         "PlateReach",
         "PlateWidth",
@@ -215,7 +228,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LowerGuide": {"PlateThick": 1},
     "UpperGuideProfile": {
         "SlotWidth": 2,
-        "SlotBottom": 1,
+        "SlotDepth": 1,
         "ArmWidth": 1,
         "PlateReach": 1,
         "PlateWidth": 1,
@@ -273,12 +286,14 @@ DIMENSION_CALLOUTS: dict[str, str] = {
     "SlotWidth": f"2X SLIDING FIT ON\nPEN ROD {PEN_ROD_NUMBER}",
     # "2X" counts the two corners of one slot, not the two plates.
     "SlotCornerR": "EACH SLOT",
-    # The plates' thickness is the sheet's as supplied, not a machined size:
-    # printed as a reference (parenthesised) with the stock named under it.
+    # The strap's and the plates' thickness is the sheet's as supplied, not a
+    # machined size: printed as a reference (parenthesised) with the stock
+    # named under it.
+    "StrapThick": "SHEET STOCK",
     "PlateThick": "SHEET STOCK",
 }
 # Model dimensions the sheet parenthesises as reference (the stock governs).
-REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"PlateThick"})
+REFERENCE_DIMENSIONS: frozenset[str] = frozenset({"StrapThick", "PlateThick"})
 # (feature, dimension) -> native prefix.  A custom radius prefix replaces
 # SolidWorks' own "R", so it carries it: the section's two slot corners.
 DIMENSION_PREFIXES: dict[tuple[str, str], str] = {
