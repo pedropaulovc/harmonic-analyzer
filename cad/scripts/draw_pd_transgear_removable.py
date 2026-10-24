@@ -14,6 +14,7 @@ carrying the same model dimension, read back at that configuration's value.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -314,17 +315,66 @@ def _label_view(
 
     A model view has no native label the API can show, so the label is a note
     inserted while the view is ACTIVE: the view owns it and moves with it.
-    Read back: the view carries that label exactly once.
+    Read back: the view carries that label exactly once, at ``xy`` (the
+    note's upper-left corner on the sheet): ``add_note`` returns the note
+    even when its placement failed and it sat at the default insertion spot.
     """
     _activate_view(adapter, view, label=label)
-    if add_note(adapter, text, *xy) is None:
+    note = add_note(adapter, text, *xy)
+    if note is None:
         raise RuntimeError(f"failed to add the {label} view label")
+    annotation = _early_bound(
+        _early_bound(note, "INote").GetAnnotation(), "IAnnotation"
+    )
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) != 3 or math.dist(position[:2], xy) > 1e-6:
+        raise RuntimeError(f"{label} view label landed at {position!r}, not at {xy!r}")
     owned = [
-        str(_early_bound(note, "INote").GetText() or "")
-        for note in (_early_bound(view, "IView").GetNotes() or ())
+        str(_early_bound(owned_note, "INote").GetText() or "")
+        for owned_note in (_early_bound(view, "IView").GetNotes() or ())
     ]
     if owned.count(text) != 1:
         raise RuntimeError(f"{label} view label did not land in its view: {owned!r}")
+
+
+_CALLOUT_LANES = {"above": 3, "below": 4}  # swDimensionTextCallout{Above,Below}
+
+
+def _callout_rows(text: str) -> tuple[str, ...]:
+    """A callout's rows, independent of CRLF and of the standoff spaces."""
+    return tuple(row.strip() for row in text.replace("\r", "").split("\n"))
+
+
+def _assert_dimension_callouts(
+    adapter: Any,
+    annotations: list[Any],
+    callouts: dict[str, str],
+    *,
+    location: str,
+) -> None:
+    """Read back every callout row a dimension must print.
+
+    The shared writer swallows a failed ``SetText``, and the pin mates and
+    the plate's chain float print nowhere else on the sheet.
+    """
+    lane = _CALLOUT_LANES[location]
+    printed: dict[str, tuple[str, ...]] = {}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name not in callouts:
+            continue
+        display = _early_bound(
+            _early_bound(annotation, "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        printed[name] = _callout_rows(str(display.GetText(lane) or ""))
+    wrong = {
+        name: printed.get(name)
+        for name, text in callouts.items()
+        if printed.get(name) != _callout_rows(text)
+    }
+    if wrong:
+        raise RuntimeError(f"{location} dimension callouts did not persist: {wrong!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -423,6 +473,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _label_view(adapter, top, MAIN_VIEW_LABEL, TOP_LABEL_XY, label="edge")
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
+    _assert_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    _assert_dimension_callouts(adapter, annotations, CALLOUTS_BELOW, location="below")
     # Decimal places and bands are part-authored; the sheet proves they
     # survived import.  Parenthesized supplied ODs claim no general tolerance.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

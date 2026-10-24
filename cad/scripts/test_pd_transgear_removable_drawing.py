@@ -350,10 +350,87 @@ def test_the_plate_band_names_the_chain_it_serves() -> None:
     assert "ANSI #25 CHAIN" in callout and "SUPPLIED" in callout
 
 
-def test_the_sheet_says_t24_is_drawn_and_what_the_others_share() -> None:
+def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> None:
+    """The dimensioned views are T24's; one note line covers every
+    configuration, and only the supplied OD differs between them (each other
+    configuration's view prints nothing else)."""
     assert drawing.MAIN_VIEW_LABEL == spec.DEFAULT_CONFIG
-    shared = "BORE, DRIVE-PIN HOLES AND PLATE SAME ON T12 / T18 / T24."
-    assert shared in notes.DRAWING_NOTES.splitlines()
+    names = [name for name, _teeth in spec.CONFIGS]
+    shared = [
+        line
+        for line in notes.DRAWING_NOTES.splitlines()
+        if all(name in line for name in names) and "BLANK" not in line
+    ]
+    assert len(shared) == 1
+    for configuration in drawing.CONFIGURATION_VIEW_CENTERS:
+        assert set(drawing.configuration_keep(configuration)) == {"BlankDia"}
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
+
+
+class _CalloutDisplay:
+    def __init__(self, texts: dict[int, str]) -> None:
+        self._texts = texts
+
+    def GetText(self, part: int) -> str:
+        return self._texts.get(part, "")
+
+
+def _callouts_read_back(monkeypatch, printed: dict[str, str]) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
+    annotations = [
+        _Annotation(name, _CalloutDisplay({4: text})) for name, text in printed.items()
+    ]
+    drawing._assert_dimension_callouts(
+        None, annotations, drawing.CALLOUTS_BELOW, location="below"
+    )
+
+
+def test_callouts_read_back_through_crlf_and_trimmed_standoff(monkeypatch) -> None:
+    printed = {
+        name: text.replace("\n", "\r\n").strip()
+        for name, text in drawing.CALLOUTS_BELOW.items()
+    }
+    _callouts_read_back(monkeypatch, printed)
+
+
+@pytest.mark.parametrize("lost", ["PinPosY", "PinNegY", "BlankWidth"])
+def test_a_mate_callout_the_writer_dropped_is_refused(monkeypatch, lost: str) -> None:
+    printed = dict(drawing.CALLOUTS_BELOW) | {lost: ""}
+    with pytest.raises(RuntimeError, match=lost):
+        _callouts_read_back(monkeypatch, printed)
+
+
+class _Note:
+    def __init__(self, text: str, position: tuple[float, float, float]) -> None:
+        self._text = text
+        self._position = position
+
+    def GetAnnotation(self) -> SimpleNamespace:
+        return SimpleNamespace(GetPosition=lambda: self._position)
+
+    def GetText(self) -> str:
+        return self._text
+
+
+def _label_front(monkeypatch, landed: tuple[float, float, float]) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "_activate_view", lambda *_args, **_kwargs: None)
+    note = _Note(drawing.MAIN_VIEW_LABEL, landed)
+    monkeypatch.setattr(drawing, "add_note", lambda _adapter, _text, _x, _y: note)
+    view = SimpleNamespace(GetNotes=lambda: (note,))
+    drawing._label_view(
+        None, view, drawing.MAIN_VIEW_LABEL, drawing.FRONT_LABEL_XY, label="face"
+    )
+
+
+def test_a_view_label_at_its_place_is_accepted(monkeypatch) -> None:
+    _label_front(monkeypatch, (*drawing.FRONT_LABEL_XY, 0.0))
+
+
+def test_a_view_label_left_at_the_insertion_default_is_refused(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="landed at"):
+        _label_front(monkeypatch, (0.0, 0.0, 0.0))
 
 
 def test_gears_carry_no_frames_or_datums() -> None:
