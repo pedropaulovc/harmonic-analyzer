@@ -35,12 +35,14 @@ SHEET_SCALE = (1.0,1.0)
 # (carriage-pattern centre) 181,205; bore 149,205; holes x 168/194, y 192/218.
 # Section A runs along y 205 (x 135..205); B along x 168 (y 181..229).
 # Hole columns and rows are dimensioned once each: CarriageDrills1X/3X chain
-# below, 3Y/4Y chain on the +X side (1Y/2X/2Y/4X repeat the same 13.000).
+# below, 3Y/4Y chain on the +X side (1Y/2X/2Y/4X repeat the same 13.000),
+# its 14 mm texts between the A arrow (x 206) and BlockSideY's line (x 224);
+# BlockWidth stands past BlockSideY's shouldered text (x 225..237).
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.265),'BlockEndX':(.150,.252),'BoreX':(.165,.240),
-    'BlockWidth':(.236,.195),'BlockSideY':(.224,.220),
-    'CarriageDrills3Y':(.212,.1985),'CarriageDrills4Y':(.212,.2115),
+    'BlockWidth':(.242,.195),'BlockSideY':(.224,.220),
+    'CarriageDrills3Y':(.215,.1985),'CarriageDrills4Y':(.215,.2115),
     'CarriageDrills1X':(.158,.170),'CarriageDrills3X':(.204,.170),
     'BoreDia':(.078,.226),'CarriageDrills1Dia':(.110,.168),'CarriageCounterbores1Dia':(.095,.150),
 }
@@ -54,11 +56,13 @@ ISO_XY, ISO_SCALE = (.355,.235), SHEET_SCALE
 # TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
 # (x 171.75..190.25, y 137..185) takes the space below, so the hole-column
 # chain and the lug's own sizes stand under the lug and A-A moves down 20 mm.
-# Its taller pictorial prints at 1:2 to stay under the border.
+# Its taller pictorial prints at 1:2 to stay under the border. LugWidth's text
+# stands right of the hole-column extension line (x 194), off the origin line
+# (x 181) that runs down the lug.
 FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
     'CarriageDrills1X':(.158,.1145),'CarriageDrills3X':(.204,.1145),
-    'LugWidth':(.181,.1305),'LugEndX':(.1635,.1225),
+    'LugWidth':(.2045,.1305),'LugEndX':(.1635,.1225),
     'LugLength':(.248,.161),'LugEndY':(.260,.171),
 }
 FEED_SIDE_XY = (.170,.060)
