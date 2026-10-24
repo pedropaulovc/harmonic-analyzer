@@ -46,9 +46,9 @@ FLANGE_DIA = 12.4
 OVERALL_LENGTH = 16.1
 # The flange length prints from the faced seat face (drawing-guidelines.md
 # rules 10 and 11); the waist is the remainder between the flange and the
-# head, printed only as a reference.
+# head (the 8.7 from the rim), so it does not print.
 FLANGE_LENGTH = 5.0
-WAIST_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - FLANGE_LENGTH  # 2.4, reference
+WAIST_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - FLANGE_LENGTH  # 2.4, not printed
 # Dished front face: a conical recess from the rim's Ø down to a flat floor,
 # centred on the axis; the front countersink is cut in that floor.  The
 # machinist review of 6de7230aa found the earlier spherical cap (chord 15,
@@ -144,8 +144,7 @@ FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + TAP_DRILL_DIA / 2.0
 
 # --- Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance), contract §12) ----
 # The diameters over the thread at .XX (walls); the overall length, the
-# knurl, the head length, the flange length and the dish at .X; the waist
-# length is a .X reference.  The stud is
+# knurl, the head length, the flange length and the dish at .X.  The stud is
 # cut to fit the nut's rim at assembly, so the engagement stack takes the
 # shortest .X nut (pd_transgear_drive_collar_spec.thumbnut_engagement).
 HEAD_DIA_PLACES = 1
@@ -154,7 +153,6 @@ OVERALL_LENGTH_PLACES = 1
 FLANGE_DIA_PLACES = 2
 FLANGE_LENGTH_PLACES = 1
 WAIST_DIA_PLACES = 2
-WAIST_LENGTH_PLACES = 1
 DISH_DIA_PLACES = 1
 DISH_FLOOR_DIA_PLACES = 1
 DISH_DEPTH_PLACES = 1
@@ -261,12 +259,12 @@ KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The head profile carries the knurl
 # diameter, the head length and the overall length from the seat face; the
-# stem profile the flange and waist diameters, the flange length from the
-# seat face and the waist length (a reference: the remainder); the dish its
-# rim and floor diameters and its depth from the rim's edge to the floor's.
+# stem profile the flange and waist diameters and the flange length from the
+# seat face (the waist length is the remainder); the dish its rim and floor
+# diameters and its depth from the rim's edge to the floor's.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia", "HeadLength", "OverallLength"},
-    "StemProfile": {"FlangeDia", "WaistDia", "FlangeLength", "WaistLength"},
+    "StemProfile": {"FlangeDia", "WaistDia", "FlangeLength"},
     "DishProfile": {"DishDia", "DishFloorDia", "DishDepth"},
     "CountersinkProfile": {"CountersinkDia", "CountersinkHalfAngle"},
 }
@@ -280,7 +278,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FlangeDia": FLANGE_DIA_PLACES,
         "WaistDia": WAIST_DIA_PLACES,
         "FlangeLength": FLANGE_LENGTH_PLACES,
-        "WaistLength": WAIST_LENGTH_PLACES,
     },
     "DishProfile": {
         "DishDia": DISH_DIA_PLACES,

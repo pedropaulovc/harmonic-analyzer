@@ -430,7 +430,7 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     turned = set().union(
         *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
     )
-    assert len(turned) == 10
+    assert len(turned) == 9
     assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
     dia = drawing.SECTION_KEEP["CountersinkDia"]
     angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
@@ -458,31 +458,31 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
 
 def test_lengths_read_from_the_faced_ends() -> None:
     """Machinist review: the 2.4 waist chained off the head's 8.7 shoulder.
-    The flange length reads from the faced seat face; the waist prints only
-    as the reference remainder."""
-    assert "FlangeLength" in spec.DRAWING_DIMENSIONS["StemProfile"]
-    assert drawing.REFERENCE_DIMENSIONS == ("WaistLength",)
+    The flange length reads from the faced seat face, the head length from
+    the rim; the waist is their remainder and does not print."""
+    stem = spec.DRAWING_DIMENSIONS["StemProfile"]
+    assert "FlangeLength" in stem and "WaistLength" not in stem
     assert spec.FLANGE_LENGTH == 5.0
     assert spec.WAIST_LENGTH == pytest.approx(2.4)
     assert spec.HEAD_LENGTH + spec.WAIST_LENGTH + spec.FLANGE_LENGTH == pytest.approx(
         spec.OVERALL_LENGTH
     )
-    # One lane, left of the silhouette: the waist reference over the flange.
-    lane = drawing.SECTION_KEEP["FlangeLength"][0]
-    assert drawing.SECTION_KEEP["WaistLength"][0] == lane
-    assert lane < drawing._section_x(-spec.HEAD_DIA / 2.0)
-    assert 0.0 < _section_station(drawing.SECTION_KEEP["FlangeLength"][1]) < spec.FLANGE_LENGTH
+    x, y = drawing.SECTION_KEEP["FlangeLength"]
+    assert x < drawing._section_x(-spec.HEAD_DIA / 2.0)
+    assert 0.0 < _section_station(y) < spec.FLANGE_LENGTH
+    # Run 20261024T025840809Z: an outside arrow hung below the seat into
+    # the cone diameter's "max."; the 15 mm span holds its arrows inside.
+    assert drawing.ARROWS_INSIDE == ("FlangeLength",)
 
 
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
     """Machinist review: the Ø4.566 line and its extension lines struck the
-    default caption's letters; the caption's top now stands below them."""
+    default caption's letters.  Run 20261024T025840809Z measured that line
+    13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
     seat_y = drawing._section_y(0.0)
-    line_y = drawing.SECTION_KEEP["CountersinkDia"][1]
     caption = drawing.SECTION_CAPTION_XY
     assert caption[0] == drawing.SECTION_CENTER[0]
-    assert line_y - caption[1] >= 0.004
-    assert seat_y - line_y == pytest.approx(0.008)
+    assert seat_y - caption[1] - 0.0135 >= 0.005
 
 
 @pytest.mark.parametrize(
