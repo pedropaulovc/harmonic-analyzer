@@ -104,14 +104,17 @@ SECTION_Y = 14.85
 SECTION_FACE_X = 2.6
 SECTION_GROOVE_X = 3.38
 SECTION_FIELD_X = 5.5
-# SectionReference's construction chords (plate x0, x1, z), each lying on a
-# cut-face line the section shows: the decorated face ending at its station,
-# the groove floor and the field floor each starting at theirs. A depth's
-# dimension spans the face chord's end to its floor chord's start.
-SECTION_REFERENCE_CHORDS: dict[str, tuple[float, float, float]] = {
-    "face": (SECTION_FACE_X - 1.0, SECTION_FACE_X, 0.0),
-    "groove": (SECTION_GROOVE_X, SECTION_GROOVE_X + 0.1, -ENGRAVING_FLOOR_DEPTH),
-    "field": (SECTION_FIELD_X, SECTION_FIELD_X + 1.0, -FIELD_DEPTH),
+# SectionReference's points (plate x, z), each on a cut-face line the section
+# shows: the decorated face at its station, the groove floor and the field
+# floor at theirs. A depth's dimension spans the face point to its floor
+# point. Points, not construction chords: the section shows the sketch to
+# keep its dimensions, and a chord lying on a cut-face line printed grey
+# dashes over the outline, read as hidden lines in a section (ENFORCE
+# review, rule 9).
+SECTION_REFERENCE_POINTS: dict[str, tuple[float, float]] = {
+    "face": (SECTION_FACE_X, 0.0),
+    "groove": (SECTION_GROOVE_X, -ENGRAVING_FLOOR_DEPTH),
+    "field": (SECTION_FIELD_X, -FIELD_DEPTH),
 }
 ENGRAVING_FLOOR_MIN = (
     PLATE_THICKNESS

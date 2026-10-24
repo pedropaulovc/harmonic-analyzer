@@ -91,6 +91,7 @@ class _ReferenceSketchAdapter:
 
     def __init__(self) -> None:
         self.lines: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+        self.points: dict[str, tuple[float, float]] = {}
         self.relations: list[tuple[str, str | None, str]] = []
         self._sketch_entities: dict[str, _FakeSegment] = {}
         self.planes: list[Any] = []
@@ -124,6 +125,8 @@ class _ReferenceSketchAdapter:
         return self._ok()
 
     def point(self, ref: str) -> tuple[float, float]:
+        if ref in self.points:
+            return self.points[ref]
         line, end = ref.split(".")
         return self.lines[line][0 if end == "start" else 1]
 
@@ -169,6 +172,13 @@ def _run_reference_sketch(
     monkeypatch.setattr(part, "anchor_point_to_origin", anchor_point_to_origin)
     monkeypatch.setattr(part, "ensure_fully_defined", ensure_fully_defined)
     monkeypatch.setattr(part, "SketchDims", Dims)
+
+    def add_reference_point(_adapter: Any, uv: tuple[float, float], _label: str) -> str:
+        point = f"Point{len(adapter.points) + 1}"
+        adapter.points[point] = uv
+        return point
+
+    monkeypatch.setattr(part, "_add_reference_point", add_reference_point)
     monkeypatch.setattr(part, "set_sketch_direct_db", lambda _adapter, _on: None)
     monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
@@ -187,8 +197,11 @@ def _run_reference_sketch(
             (x0, y0), (x1, y1) = adapter.point(ref1), adapter.point(ref2)
             assert relation in {"horizontal_points", "vertical_points"}
             assert (y0 == y1) if relation == "horizontal_points" else (x0 == x1)
-    # Exactly defined: four DOF a line, one relation per anchor, every dim.
-    assert 4 * len(adapter.lines) == len(adapter.relations) + len(anchors) + len(values)
+    # Exactly defined: four DOF a line, two a point, one relation per anchor,
+    # every dim.
+    assert 4 * len(adapter.lines) + 2 * len(adapter.points) == len(
+        adapter.relations
+    ) + len(anchors) + len(values)
     return adapter, dict(zip(names, values, strict=True))
 
 
@@ -232,8 +245,12 @@ def test_section_reference_carries_both_depths_on_the_cut_plane(
     assert print_spec.DRAWING_DIMENSIONS[print_spec.SECTION_REFERENCE] <= set(dims)
     assert dims["FieldDepth"] == print_spec.FIELD_DEPTH == part.RECESS_DEPTH
     assert dims["EngravingDepth"] == print_spec.ENGRAVING_FLOOR_DEPTH
-    # Each chord lies on the cut-face line A-A draws at its height: the
-    # decorated face, the groove's floor, the field's floor (sketch v = -z).
+    # Points only: a construction chord on a cut-face line printed grey
+    # dashes over A-A's outline, read as hidden lines in a section (ENFORCE
+    # review). Each point lies on the cut-face line A-A draws at its height:
+    # the decorated face, the groove's floor, the field's floor (sketch v = -z).
+    assert not adapter.lines
+    assert len(adapter.points) == 3
     field = _rings(part.FIELD_DXF)[0]
     engraving = _rings(part.ENGRAVING_DXF)
     y = print_spec.SECTION_Y
@@ -246,18 +263,16 @@ def test_section_reference_carries_both_depths_on_the_cut_plane(
         print_spec.ENGRAVING_FLOOR_DEPTH: (False, True),
         print_spec.FIELD_DEPTH: (True, False),
     }
-    for (x0, v0), (x1, v1) in adapter.lines.values():
-        assert v0 == v1 and x0 < x1
-        for x in (x0, (x0 + x1) / 2.0, x1):
-            assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v0], x
-        assert drawing.SECTION_CROP[0][0] < x0 and x1 < drawing.SECTION_CROP[1][0]
+    for x, v in adapter.points.values():
+        assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v], x
+        assert drawing.SECTION_CROP[0][0] < x < drawing.SECTION_CROP[1][0]
 
 
 def test_section_plane_is_the_top_plane_carried_to_the_cut(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The +Y offset keeps the Top plane's (u, v) = model (X, -Z), the frame
-    # SectionReference's chords are drawn in.
+    # SectionReference's points are drawn in.
     adapter = _ReferenceSketchAdapter()
     monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
     asyncio.run(part._section_plane(adapter))
@@ -387,18 +402,18 @@ def test_section_a_break_line_closes_the_crops_open_end() -> None:
 
 def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     # r2 review C2: the two depths shared one face arrow; each now stands on
-    # its own station, both from the decorated face chord's end (z = 0).
-    chords = print_spec.SECTION_REFERENCE_CHORDS
-    face, field, groove = chords["face"], chords["field"], chords["groove"]
-    assert face[2] == 0.0 and field[0] != groove[0]
-    assert -field[2] == print_spec.FIELD_DEPTH
-    assert -groove[2] == print_spec.ENGRAVING_FLOOR_DEPTH
+    # its own station, both from the decorated face point (z = 0).
+    points = print_spec.SECTION_REFERENCE_POINTS
+    face, field, groove = points["face"], points["field"], points["groove"]
+    assert face[1] == 0.0 and field[0] != groove[0]
+    assert -field[1] == print_spec.FIELD_DEPTH
+    assert -groove[1] == print_spec.ENGRAVING_FLOOR_DEPTH
     keep = drawing.SECTION_KEEP
     assert keep["FieldDepth"][0] != keep["EngravingDepth"][0]
     # B3: the floor under the engraving chains below the engraving depth as
     # a reference, plate thickness less the engraving floor depth.
     floor = drawing.FLOOR_REFERENCE
-    assert floor["from"] == (groove[0], groove[2])
+    assert floor["from"] == groove
     (_, z0), (_, z1) = floor["from"], floor["to"]
     assert math.isclose(z0 - z1, floor["expected_mm"])
     assert math.isclose(

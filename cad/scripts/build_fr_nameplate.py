@@ -113,7 +113,7 @@ from fr_nameplate_drawing_spec import (
     REFERENCE_SKETCHES,
     SECTION_PLANE,
     SECTION_REFERENCE,
-    SECTION_REFERENCE_CHORDS,
+    SECTION_REFERENCE_POINTS,
     SECTION_Y,
 )
 from fr_nameplate_spec import (
@@ -377,52 +377,59 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
         raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
 
 
+def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
+    """One sketch point straight into the sketch DB (no inference snap),
+    registered for the adapter's dimension refs
+    (build_dt_cone_tip_block's idiom)."""
+    sketch_manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
+    previous = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        point = sketch_manager.CreatePoint(uv[0] / 1000.0, uv[1] / 1000.0, 0.0)
+    finally:
+        sketch_manager.AddToDB = previous
+    if point is None:
+        raise RuntimeError(f"cannot create the {label} reference point")
+    return adapter._register_sketch_entity("Point", point)
+
+
 async def _section_reference(adapter) -> None:
     """The sunk field's and the engraving floor's depths below the face.
 
-    On SECTION_PLANE, sketch (u, v) = model (X, -Z), construction only and
-    hidden. Each SECTION_REFERENCE_CHORDS chord lies on a cut-face line
-    section A-A draws: the decorated face, the groove's floor and the field's
-    floor. Each depth spans the face chord's end to its floor chord's start.
-    3 x 4 DOF less: the face chord's start on the origin's axis (1), three
-    horizontal relations and eight dims = 0.
+    On SECTION_PLANE, sketch (u, v) = model (X, -Z), points only and hidden.
+    Each SECTION_REFERENCE_POINTS point lies on a cut-face line section A-A
+    draws: the decorated face, the groove's floor and the field's floor.
+    Each depth spans the face point to its floor point. Points, not chords:
+    A-A shows this sketch to keep its dimensions, and a construction chord on
+    a cut-face line printed grey dashes over the outline (ENFORCE review).
+    3 x 2 DOF less: the face point on the origin's axis (1) at its station
+    (1), and each floor point's depth and station (4) = 0.
     """
     feature = SECTION_REFERENCE
     dims = SketchDims()
     check(f"create sketch {feature}", await adapter.create_sketch(SECTION_PLANE))
-    face_x0, face_x1, _ = SECTION_REFERENCE_CHORDS["face"]
-    face = await _construction_chord(adapter, feature, (face_x0, 0.0), (face_x1, 0.0))
+    face_x, face_z = SECTION_REFERENCE_POINTS["face"]
+    face = _add_reference_point(adapter, (face_x, -face_z), f"{feature} face")
     await anchor_point_to_origin(
-        adapter, f"{face}.start", face_x0, 0.0, f"{feature} face chord"
+        adapter, face, face_x, -face_z, f"{feature} face point"
     )
-    dims.record("FaceChordStation")
-    await _square_chord(
-        adapter, feature, face, "horizontal", face_x1 - face_x0, dims, "FaceChord"
-    )
-    for chord, depth in (("field", "FieldDepth"), ("groove", "EngravingDepth")):
-        x0, x1, z = SECTION_REFERENCE_CHORDS[chord]
-        line = await _construction_chord(adapter, feature, (x0, -z), (x1, -z))
+    dims.record("FacePointStation")
+    for name, depth in (("field", "FieldDepth"), ("groove", "EngravingDepth")):
+        x, z = SECTION_REFERENCE_POINTS[name]
+        point = _add_reference_point(adapter, (x, -z), f"{feature} {name}")
         await dimension_between(
-            adapter,
-            f"{face}.end",
-            f"{line}.start",
-            "vertical_distance",
-            -z,
-            f"{feature} {depth}",
+            adapter, face, point, "vertical_distance", -z, f"{feature} {depth}"
         )
         dims.record(depth)
         await dimension_between(
             adapter,
-            f"{face}.end",
-            f"{line}.start",
+            face,
+            point,
             "horizontal_distance",
-            x0 - face_x1,
-            f"{feature} {chord} chord station",
+            x - face_x,
+            f"{feature} {name} point station",
         )
-        dims.record(f"{chord.title()}ChordStation")
-        await _square_chord(
-            adapter, feature, line, "horizontal", x1 - x0, dims, f"{chord.title()}Chord"
-        )
+        dims.record(f"{name.title()}PointStation")
     await ensure_fully_defined(adapter, feature)
     check(f"exit sketch {feature}", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
