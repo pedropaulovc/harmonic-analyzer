@@ -150,15 +150,19 @@ TOP_AXIS_HEIGHT_SUFFIX = " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
 _DIMENSION_TEXT_SUFFIX = 2  # swDimensionTextParts_e.swDimensionTextSuffix
 
 
+# With a blank line between steps, the sequence fills sheet 3's note column,
+# so the assembly-only checks take their own sheet after it.
 SHEET_NAMES = (
     "ASSEMBLED + JOINT SECTIONS",
     "EXPLODED VIEW + BOM",
     "FITTING + ASSEMBLY",
+    "ASSEMBLY CHECKS",
 )
 SHEET_LAYOUTS = {
     SHEET_NAMES[0]: DrawingLayout.LANDSCAPE,
     SHEET_NAMES[1]: DrawingLayout.PORTRAIT,
     SHEET_NAMES[2]: DrawingLayout.LANDSCAPE,
+    SHEET_NAMES[3]: DrawingLayout.LANDSCAPE,
 }
 if SPEC.layout is not SHEET_LAYOUTS[SHEET_NAMES[0]]:
     raise AssertionError("the frame package primary sheet must remain landscape")
@@ -199,6 +203,7 @@ SHEET_SCALES = {
     SHEET_NAMES[0]: SHEET_SCALE,
     SHEET_NAMES[1]: EXPLODED_ISO_SCALE,
     SHEET_NAMES[2]: ASSEMBLY_ISO_SCALE,
+    SHEET_NAMES[3]: ASSEMBLY_ISO_SCALE,
 }
 BOM_ANCHOR = (0.018, 0.414)
 # Keep the complete set-screw balloon below the measured BOM, not its nominal
@@ -283,12 +288,14 @@ ASSEMBLY_STEPS = "\n".join(
         "   TO ITS ASSIGNED ACTUAL TUBE: CLOSE HAND-SLIP, NO PERCEPTIBLE ROCK,",
         "   FULL SHOULDER SEATING. RETAIN COLUMN/CORNER/ORIENTATION MATCH",
         "   MARKS.",
+        "",
         "2. RESEAT EACH MATCHED COLUMN. THROUGH THE EXISTING CASTING BORES,",
         "   PILOT-TRANSFER THE LOWER AXIS THROUGH BOTH TUBE WALLS WITH A DRILL",
         "   BELOW THE #10-32 THREAD MINOR; PROTECT BOTH THREAD SEGMENTS. REMOVE",
         f"   COLUMN; ENLARGE BOTH WALLS TO DIA {TUBE_CROSS_HOLE_DIAMETER:.2f} "
         "AND DEBURR. THE ACTUAL",
         "   MHA-FR-VN-53 SHANK MUST PASS FREELY WITHOUT THREAD CONTACT.",
+        "",
         "3. RESEAT EACH MATCHED COLUMN IN ITS BASE SOCKET. FIT MHA-FR-02 OVER",
         "   THE COLUMNS, HUB OPPOSITE THE MHA-FR-04 END. FIT EACH TOP SOCKET",
         "   TO ITS ASSIGNED ACTUAL MHA-FR-03 TUBE: CLOSE HAND-SLIP WITH NO",
@@ -296,29 +303,36 @@ ASSEMBLY_STEPS = "\n".join(
         "   CONTROLLING TOP-AXIS HEIGHT ON SHEET 1; COMPARE GAUGE-PIN CENTRES",
         "   FROM THE BASE UNDERSIDE. CLAMP; RETAIN EACH TOP CORNER/COLUMN",
         "   ORIENTATION MATCH MARK.",
+        "",
         "4. AT THAT HEIGHT, FINAL MATCH-CUT EACH IDENTIFIED COLUMN TO THE",
         "   ACTUAL BASE/TOP/CAP STACK: MHA-FR-VN-54 FULLY ON ITS INSIDE SEAT,",
         "   SKIRT CLEAR OF THE RECESS FLOOR. DO NOT TRIM THE STOCK CAPS. FINISH",
         "   THE TOP CHAMFER; RESEAT COLUMNS AND RESET THE TOP-AXIS HEIGHT.",
+        "",
         "5. THROUGH THE EXISTING MHA-FR-02 CASTING BORES, PILOT-TRANSFER EACH",
         "   TOP AXIS THROUGH BOTH TUBE WALLS AS STEP 2; PROTECT BOTH THREAD",
         "   SEGMENTS. REMOVE MHA-FR-02/COLUMNS; ENLARGE BOTH WALLS TO",
         f"   DIA {TUBE_CROSS_HOLE_DIAMETER:.2f}, DEBURR, AND VERIFY FREE PASSAGE "
         "OF THE ACTUAL MHA-FR-VN-53",
         "   SHANK.",
+        "",
         "6. REASSEMBLE MATCHED FRAME. INSTALL EIGHT MHA-FR-VN-53 FROM THE SIDES",
         "   USED FOR PILOT-DRILLING; TIGHTEN ONLY UNTIL EVERY HEAD SEATS.",
+        "",
         "7. VERIFY EACH MHA-FR-02 CAP RECESS CLEARS ITS ACTUAL MHA-FR-VN-54",
         "   SKIRT. AFTER MATCH MARKS ALIGN AND MHA-FR-VN-53 HEADS SEAT, PUSH EACH",
         "   CAP OVER THE CHAMFERED OPEN END UNTIL THE TUBE REACHES THE CAP'S",
         "   INSIDE SEAT.",
+        "",
         "8. SEAT MHA-FR-05 ON DECK, WINDOWS FACING THE SHORT ENDS; INSTALL FOUR",
         "   MHA-FR-VN-51 TOP-DOWN AND DRAW DOWN EVENLY UNTIL ALL HEADS SEAT.",
+        "",
         # Owner-accepted fit-up, declared as fr-frame RV-01 (#1468).
         "9. SET MHA-FR-04 DECORATED FACE UP, CENTRED FRONT TO REAR, PARALLEL TO",
         "   AND INSET FROM THE NEAR DECK END PER SECTION B-B, SHEET 1; CLAMP.",
         "   SPOT MHA-FR-01 THROUGH ITS FOUR HOLES; DRILL AND TAP EACH PER ITS",
         "   MHA-FR-01 TRANSFER CALLOUT. SEAT ALL FOUR MHA-SH-VN-51 HEADS.",
+        "",
         "10. START MHA-FR-VN-52 IN THE GOOSENECK HUB; LEAVE ITS CUP POINT CLEAR.",
     )
 )
@@ -327,13 +341,17 @@ ASSEMBLY_CHECKS = "\n".join(
         "ASSEMBLY-ONLY CHECKS",
         "1. ALL BASE/TOP MATCH MARKS ALIGN; COLUMNS ARE FULLY SEATED.",
         "   EACH FRONT/REAR TOP AXIS MEETS THE HEIGHT FROM THE BASE UNDERSIDE.",
+        "",
         "2. ALL EIGHT MHA-FR-VN-53 HEADS SEAT WITHOUT TIPS BOTTOMING. EACH SHANK",
         "   CLEARS BOTH TUBE WALLS AND HAS POSITIVE THREAD ENGAGEMENT IN BOTH",
         "   NEAR AND FAR CASTING THREAD SEGMENTS.",
+        "",
         "3. ALL FOUR MHA-FR-VN-54 CAPS REACH THEIR INSIDE SEATS; SKIRTS CLEAR THE",
         "   MHA-FR-02 RECESSES AND TUBE ENDS ARE NOT DISTORTED.",
+        "",
         "4. MHA-FR-05 AND MHA-FR-04 LIE FLAT; ALL EIGHT OF THEIR SCREW HEADS",
         "   BEAR.",
+        "",
         "5. GOOSENECK BORE IS UNOBSTRUCTED WITH MHA-FR-VN-52 BACKED CLEAR.",
     )
 )
@@ -1359,7 +1377,7 @@ def _append_template_sheet(
 
 
 def _create_mixed_package_sheets(adapter: Any) -> None:
-    """Create landscape/portrait/landscape sheets from the project templates."""
+    """Create landscape/portrait/landscape/landscape sheets from the project templates."""
     target, initial = new_project_drawing(
         adapter, layout=SHEET_LAYOUTS[SHEET_NAMES[0]], scale=SHEET_SCALES[SHEET_NAMES[0]]
     )
@@ -2135,17 +2153,34 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         label="assembly instruction isometric",
     )
     assert_full_detail_view(adapter, label="frame assembly")
+    # A blank line between steps gives the sequence 48 rows. At the ~4.5 mm
+    # pitch measured on the printed sheet they end near y=46 mm, clear of the
+    # bottom border and left of the title block; the checks cannot follow.
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
-    # Reflowed canonical references occupy 37 sequence rows. The existing
-    # ~4.7 mm pitch estimates the last sequence row's anchor near y=94 mm,
-    # overlapping checks at y=95. At y=80, the 11th checks row's anchor is
-    # near y=33 mm, not its full text bottom; native extents prove clearance.
-    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.080), label="assembly checks")
     _add_note_block(
         adapter,
         "FINISHED ASSEMBLY 1:7",
         (0.300, 0.074),
         label="assembly isometric caption",
+    )
+
+    _activate_sheet(adapter, SHEET_NAMES[3])
+    checks_iso = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ASSEMBLY_ISO_CENTER,
+        scale=ASSEMBLY_ISO_SCALE,
+    )
+    _configure_view(
+        adapter, checks_iso, exploded=False, label="assembly checks isometric"
+    )
+    _add_note_block(adapter, ASSEMBLY_CHECKS, (0.018, 0.263), label="assembly checks")
+    _add_note_block(
+        adapter,
+        "FINISHED ASSEMBLY 1:7",
+        (0.300, 0.074),
+        label="assembly checks isometric caption",
     )
 
     def settled() -> None:

@@ -557,17 +557,32 @@ def _step_lines(number: int) -> list[str]:
         (i for i in range(start + 1, len(steps)) if re.match(r"\d+\. ", steps[i])),
         len(steps),
     )
-    return steps[start:end]
+    return [line for line in steps[start:end] if line]
 
 
 def _step(number: int) -> str:
     return " ".join(line.strip() for line in _step_lines(number))
 
 
-def test_assembly_steps_keep_their_crowded_sheet_3_footprint() -> None:
+@pytest.mark.parametrize("block", ["ASSEMBLY_STEPS", "ASSEMBLY_CHECKS"])
+def test_one_blank_line_separates_consecutive_numbered_steps(block: str) -> None:
+    lines = getattr(drawing, block).splitlines()
+    numbered = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
+    assert numbered[0] == 1  # the heading sits directly on step 1
+    blanks = [i for i, line in enumerate(lines) if not line.strip()]
+    assert blanks == [i - 1 for i in numbered[1:]]
+    assert lines[-1].strip()
+
+
+def test_the_spaced_sequence_fills_sheet_3_and_the_checks_take_sheet_4() -> None:
+    # 48 rows at the printed ~4.5 mm pitch reach y=46 mm from the y=263 mm
+    # anchor; the checks no longer fit below them and print on the next sheet.
     steps = drawing.ASSEMBLY_STEPS.splitlines()
-    assert len(steps) <= 39
+    assert len(steps) <= 48
     assert max(map(len, steps)) <= 72
+    assert drawing.SHEET_NAMES[2:] == ("FITTING + ASSEMBLY", "ASSEMBLY CHECKS")
+    sheets = set(drawing.SHEET_NAMES)
+    assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_SCALES) == sheets
 
 
 def test_step_8_faces_the_support_windows_toward_the_short_ends() -> None:
