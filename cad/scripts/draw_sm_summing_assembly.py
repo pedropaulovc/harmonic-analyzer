@@ -1,12 +1,13 @@
-r"""Create the three-sheet summing-lever fitter package (MHA-SM-00).
+r"""Create the four-sheet summing-lever fitter package (MHA-SM-00).
 
 Sheet 1 shows the assembled lever on its knife mounts (front and right) with
 the counter-spring screw height the level setting finds, a 1:1 knife-edge
 detail carrying the free-rock acceptance, and the notes. Sheet 2 is the
 builder-owned SM_EXPLODED isometric with its BOM (vendor SKU added) and one
 balloon per BOM row. Sheet 3 is the finished isometric beside the numbered
-assembly steps and checks in a 190 mm left column, with the original text
-size and line pitch. Both settings are the assembly's own sketch dimensions
+assembly steps in a 190 mm left column, a blank line between steps, with the
+original text size and line pitch; sheet 4 repeats that layout for the
+checks. Both settings are the assembly's own sketch dimensions
 (``build_sm_summing_assembly._author_settings``), imported here; the explode
 comes from ``sm_summing_explode_spec`` and every printed text comes from
 ``sm_summing_assembly_sheet``.
@@ -96,6 +97,7 @@ SHEET_NAMES = (
     "ASSEMBLED + SETTINGS",
     "EXPLODED VIEW + BOM",
     "ASSEMBLY STEPS",
+    "ASSEMBLY CHECKS",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the summing package is landscape throughout")
@@ -103,7 +105,10 @@ SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 ASSEMBLED_SCALE = (1.0, 5.0)
 EXPLODED_SCALE = (1.0, 4.0)
 SHEET_SCALES = dict(
-    zip(SHEET_NAMES, (ASSEMBLED_SCALE, EXPLODED_SCALE, ASSEMBLED_SCALE))
+    zip(
+        SHEET_NAMES,
+        (ASSEMBLED_SCALE, EXPLODED_SCALE, ASSEMBLED_SCALE, ASSEMBLED_SCALE),
+    )
 )
 
 # Sheet geometry, metres: the template's inner border and the title block in
@@ -179,7 +184,7 @@ BOM_ANCHOR = (0.226, 0.258)
 EXPLODED_CAPTION_OFFSET = 0.006
 EXPLODED_CAPTION_MIN_GAP = 0.004
 
-# --- Sheet 3 ------------------------------------------------------------------
+# --- Sheets 3-4 ---------------------------------------------------------------
 # Reflow the full vendor Numbers into the unused space between the original
 # narrow instruction column and the finished view, without shrinking either.
 ASSEMBLY_ISO_CENTER = (0.322, 0.172)
@@ -252,12 +257,17 @@ PRECISION = {
 }
 
 
-def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
-    """Wrap each numbered line under its own number; one note per block."""
+def _wrapped(lines: tuple[str, ...], *, width: int, spaced: bool = False) -> str:
+    """Wrap each numbered line under its own number; one note per block.
+    ``spaced`` puts one blank line between consecutive numbered steps."""
     out: list[str] = []
+    numbered = False
     for line in lines:
         number, sep, rest = line.partition(". ")
         if sep and number.isdigit():
+            if spaced and numbered:
+                out.append("")
+            numbered = True
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -278,18 +288,28 @@ def _wrapped(lines: tuple[str, ...], *, width: int) -> str:
 
 
 ASSEMBLED_NOTES = _wrapped(notes.ASSEMBLED_NOTES, width=NOTES_WIDTH)
-# Steps and checks share one note so the checks can never overlap the steps.
-STEPS_AND_CHECKS = "\n".join(
+# A blank line separates consecutive steps (and checks). Spaced, steps and
+# checks together need 57 lines (262 mm) of a 249 mm field above the inner
+# border, so the whole checks list continues on sheet 4. The steps alone (41
+# lines) end 61 mm above the border; the checks (17 lines) 171 mm above it.
+STEPS_NOTE = "\n".join(
     (
         "ASSEMBLY SEQUENCE",
-        _wrapped(notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH),
-        "",
-        _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH),
+        _wrapped(notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, spaced=True),
     )
 )
-STEPS_BOTTOM = STEPS_XY[1] - len(STEPS_AND_CHECKS.splitlines()) * NOTE_LINE_PITCH
-if STEPS_BOTTOM < SHEET_INNER_BORDER[1]:
-    raise AssertionError("the summing assembly sequence and checks overrun the sheet")
+CHECKS_NOTE = "\n".join(
+    (
+        "ASSEMBLY SEQUENCE (CONT.)",
+        "",
+        _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, spaced=True),
+    )
+)
+for _note in (STEPS_NOTE, CHECKS_NOTE):
+    if STEPS_XY[1] - len(_note.splitlines()) * NOTE_LINE_PITCH < SHEET_INNER_BORDER[1]:
+        raise AssertionError(
+            "the summing assembly sequence or checks overrun the sheet"
+        )
 DETAIL_LABEL = f"{notes.DETAIL_TITLE}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 
 
@@ -905,10 +925,10 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     return settled
 
 
-def _place_steps_sheet(adapter: Any) -> None:
-    """The finished assembly in full detail beside the order and checks."""
-    label = "summing finished"
-    _activate_sheet(adapter, SHEET_NAMES[2])
+def _place_steps_sheet(adapter: Any, sheet_name: str, text: str) -> None:
+    """The finished assembly in full detail beside the order (or the checks)."""
+    label = f"summing finished ({sheet_name})"
+    _activate_sheet(adapter, sheet_name)
     finished = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=ASSEMBLED_SCALE
     )
@@ -922,11 +942,9 @@ def _place_steps_sheet(adapter: Any) -> None:
     _center_view_outline(adapter, finished, ASSEMBLY_ISO_CENTER, label=label)
     _assert_view_on_sheet(finished, label=label)
     if _view_outline(finished, label=label)[0] - STEPS_RIGHT < 0.004:
-        raise RuntimeError("summing finished view crowds the assembly sequence")
+        raise RuntimeError(f"{label} view crowds the assembly sequence")
     assert_full_detail_view(adapter, label="summing assembly")
-    _add_note_block(
-        adapter, SHEET_NAMES[2], STEPS_AND_CHECKS, STEPS_XY, label="assembly sequence"
-    )
+    _add_note_block(adapter, sheet_name, text, STEPS_XY, label=f"{sheet_name} note")
 
 
 def _create_sheets(adapter: Any) -> None:
@@ -959,7 +977,8 @@ async def build(adapter: Any) -> dict[str, str]:
     _create_sheets(adapter)
     assembled_settled = _place_assembled_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
-    _place_steps_sheet(adapter)
+    _place_steps_sheet(adapter, SHEET_NAMES[2], STEPS_NOTE)
+    _place_steps_sheet(adapter, SHEET_NAMES[3], CHECKS_NOTE)
 
     def settled() -> None:
         assembled_settled()

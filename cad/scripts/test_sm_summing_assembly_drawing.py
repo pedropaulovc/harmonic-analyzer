@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,7 @@ import sm_vn_boss_hook_jam_nut_spec as jam_nut
 from stock_anchor_geom import ANCHOR_9490T1
 
 
-def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
+def test_package_keeps_registry_outputs_and_four_landscape_sheets() -> None:
     row = DRAWINGS_BY_NAME["sm_summing_assembly"]
     assert row.source_kind == "assembly"
     assert row.part == "sm_summing"
@@ -32,7 +33,7 @@ def test_package_keeps_registry_outputs_and_three_landscape_sheets() -> None:
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         row.outputs["slddrw"], row.outputs["pdf"], row.outputs["png"]
     )
-    assert len(drawing.SHEET_NAMES) == 3
+    assert len(drawing.SHEET_NAMES) == 4
     assert (
         set(drawing.SHEET_LAYOUTS)
         == set(drawing.SHEET_SCALES)
@@ -257,16 +258,34 @@ def test_hanger_fit_up_reach_matches_the_builder_band() -> None:
 
 
 def test_steps_and_checks_stay_above_the_inner_border() -> None:
-    lines = drawing.STEPS_AND_CHECKS.splitlines()
-    assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
-    bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
-    assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
+    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
+        lines = text.splitlines()
+        assert max(map(len, lines)) <= drawing.STEPS_LINE_WIDTH
+        bottom = drawing.STEPS_XY[1] - len(lines) * drawing.NOTE_LINE_PITCH
+        assert bottom > drawing.SHEET_INNER_BORDER[1] + 0.004
     assert drawing.STEPS_XY[0] > drawing.SHEET_INNER_BORDER[0]
     assert drawing.STEPS_XY[1] < drawing.SHEET_INNER_BORDER[3]
     assert drawing.STEPS_RIGHT < drawing.TITLE_BLOCK[0]
-    assert drawing.STEPS_AND_CHECKS.split() == " ".join(
-        ("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS, *notes.ASSEMBLY_CHECKS)
-    ).split()
+    assert (
+        drawing.STEPS_NOTE.split()
+        == " ".join(("ASSEMBLY SEQUENCE", *notes.ASSEMBLY_STEPS)).split()
+    )
+    assert (
+        drawing.CHECKS_NOTE.split()
+        == " ".join(("ASSEMBLY SEQUENCE (CONT.)", *notes.ASSEMBLY_CHECKS)).split()
+    )
     for number in drawing.BOM_PART_NUMBERS.values():
         if any(number in step for step in notes.ASSEMBLY_STEPS):
-            assert number in drawing.STEPS_AND_CHECKS
+            assert number in drawing.STEPS_NOTE
+
+
+def test_one_blank_line_separates_consecutive_numbered_steps() -> None:
+    for text in (drawing.STEPS_NOTE, drawing.CHECKS_NOTE):
+        lines = text.splitlines()
+        starts = [i for i, line in enumerate(lines) if re.match(r"\d+\. ", line)]
+        assert len(starts) > 1
+        for previous, start in zip(starts, starts[1:]):
+            assert lines[start - 1] == ""
+            assert "" not in lines[previous : start - 1]
+        # The heading runs straight into step 1.
+        assert lines[starts[0] - 1].endswith(("SEQUENCE", "CHECKS:"))
