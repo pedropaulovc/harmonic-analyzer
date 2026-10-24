@@ -668,10 +668,6 @@ class _Rebuilds:
 
 
 def test_top_axis_height_names_itself_in_its_own_native_suffix() -> None:
-    # The tube-frame sheet sends the fitter to this height by name.
-    from fr_tube_frame_spec import DRAWING_NOTES
-
-    assert "TOP CROSS-BORE AXIS HEIGHT" in DRAWING_NOTES
     assert drawing.TOP_AXIS_HEIGHT_SUFFIX == (
         " TOP CROSS-BORE AXIS HEIGHT FROM BASE UNDERSIDE"
     )

@@ -1,8 +1,8 @@
 r"""Create the curated machinist drawing for the tube-frame column.
 
 The SLDPRT remains authoritative. This recipe supplies the regular open tube's
-orthographic views, diameter/cut-length/cross-hole dimensions, and manufacturing
-notes;
+orthographic views, diameter/cut-length/cross-hole dimensions, and their
+fit-up callouts;
 sheet/template and export behavior lives in ``_drawing_common``.
 Dimension import and curation live in ``_drawing_dimension_import``.
 
@@ -51,18 +51,27 @@ from _drawing_notes import add_property_linked_note, property_link
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed, set_hidden_lines_visible
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from fr_tube_frame_spec import (
     COLUMN_LENGTH,
+    CROSS_HOLE_CALLOUT as CROSS_HOLE_CALLOUT_TEXT,
     CROSS_HOLE_DIAMETER,
+    CROSS_HOLE_MATES_SUFFIX,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    LENGTH_FIT_CALLOUT,
+    LENGTH_SUPPLY_CALLOUT,
     LOWER_CROSS_HOLE_Y,
     OUTER_DIA,
     TOP_END_CHAMFER,
+    TOP_END_CHAMFER_SUFFIX,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_tube_frame"]
@@ -104,9 +113,16 @@ LENGTH_KEEP = {
     ),
     "TopChamfer": (LENGTH_CENTER[0] + 0.040, LENGTH_CENTER[1] + 0.120),
 }
-CROSS_HOLE_CALLOUT = {
-    "CrossHoleDia": "2 STA; MATCH-DRILL CLEARANCE THRU BOTH WALLS"
+# The cut length is set at assembly: the supply size rides above the (1018.8)
+# reference and the cut-to-fit stack below it (rule 19), so the requirement
+# is flagged on the length itself rather than in the note block.
+ABOVE_CALLOUTS = {
+    "CrossHoleDia": CROSS_HOLE_CALLOUT_TEXT,
+    "Length": LENGTH_SUPPLY_CALLOUT,
 }
+BELOW_CALLOUTS = {"Length": LENGTH_FIT_CALLOUT}
+_CALLOUT_ABOVE = 3  # swDimensionTextParts_e.swDimensionTextCalloutAbove
+_CALLOUT_BELOW = 4  # swDimensionTextParts_e.swDimensionTextCalloutBelow
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
 
 
@@ -222,7 +238,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
             "Length View Note",
@@ -233,7 +248,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "End View Note",
             "Isometric View Note",
             "Length View Note",
@@ -281,7 +295,8 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     dimensions = [outer_diameter, *length_annotations]
-    set_dimension_callouts(adapter, dimensions, CROSS_HOLE_CALLOUT, location="above")
+    set_dimension_callouts(adapter, dimensions, ABOVE_CALLOUTS, location="above")
+    set_dimension_callouts(adapter, dimensions, BELOW_CALLOUTS, location="below")
     hole_text = model_point_in_view(
         adapter,
         length,
@@ -300,6 +315,12 @@ async def build(adapter: Any) -> dict[str, str]:
         display.SetText(4, "")
         if str(display.GetText(4) or ""):
             raise RuntimeError("failed to clear underlined below-dimension callout")
+        # Each station's match-drill mate, on the value line (rule 7).
+        display.SetText(2, CROSS_HOLE_MATES_SUFFIX)
+        if str(display.GetText(2) or "") != CROSS_HOLE_MATES_SUFFIX:
+            raise RuntimeError("cross-hole mates suffix did not persist")
+        if str(display.GetText(_CALLOUT_ABOVE) or "") != CROSS_HOLE_CALLOUT_TEXT:
+            raise RuntimeError("cross-hole match-drill callout did not persist")
         display = _early_bound(display, "IDisplayDimension")
         hole_dimension = _early_bound(display.GetDimension2(0), "IDimension")
         if "CrossHoleProfile" not in str(hole_dimension.FullName):
@@ -371,6 +392,18 @@ async def build(adapter: Any) -> dict[str, str]:
             references[0],
             label=f"{name} reference",
         )
+        if name == "Length":
+            # The supply minimum and the cut-to-fit stack are the only place
+            # the sheet states them; a dropped SetText must fail the sheet.
+            lanes = {
+                part: str(display.GetText(part) or "").replace("\r\n", "\n")
+                for part in (_CALLOUT_ABOVE, _CALLOUT_BELOW)
+            }
+            if lanes != {
+                _CALLOUT_ABOVE: LENGTH_SUPPLY_CALLOUT,
+                _CALLOUT_BELOW: LENGTH_FIT_CALLOUT,
+            }:
+                raise RuntimeError(f"length supply/cut-to-fit callouts did not persist: {lanes!r}")
     chamfers = [
         annotation
         for annotation in dimensions
@@ -389,7 +422,7 @@ async def build(adapter: Any) -> dict[str, str]:
     cap_acceptance = " ".join(source_properties["Top End Callout"].splitlines())
     chamfer.SetText(3, cap_acceptance)
     chamfer.SetText(4, "")
-    chamfer_suffix = " X 45 DEG"
+    chamfer_suffix = TOP_END_CHAMFER_SUFFIX
     chamfer.SetText(2, chamfer_suffix)
     chamfer.ShowDimensionValue = True
     if (
@@ -404,17 +437,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the annulus end view")
 
-    # Both end rims receive native centre marks; the length view exposes both
-    # cross-drilled stations through visible hidden geometry.
-
-    add_property_linked_note(
-        adapter, "Manufacturing Notes", 0.135, 0.198
-    )
     add_note(adapter, f"TOP {property_link('End View Note')}", 0.060, 0.400)
     add_property_linked_note(adapter, "Isometric View Note", 0.175, 0.215)
     add_property_linked_note(adapter, "Length View Note", 0.075, 0.083)
-    for view in (length, end):
-        set_hidden_lines_visible(adapter, view)
+    # The end view's hidden lines carry the cross-hole through both walls
+    # (rule 9); the length view shows both stations as visible circles, so
+    # dashed bore lines there would say nothing (MR r2): hidden lines removed.
+    set_hidden_lines_removed(adapter, length)
+    set_hidden_lines_visible(adapter, end)
 
     return await finalize_drawing(
         adapter,
