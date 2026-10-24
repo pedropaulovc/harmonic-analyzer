@@ -1,7 +1,7 @@
 ms-stick:
   number: MHA-MS-01
-  material: C26000 brass, half-hard
-  material_specification: Brass flat bar (C26000 or C35300 engraving brass)
+  material: Brass
+  material_specification: Brass
   finish: "polished brass; black-fill all engraving with flat black enamel, wipe-filled and cured before final polish"
   quantity: 1
   tolerance_class: plate_profile
