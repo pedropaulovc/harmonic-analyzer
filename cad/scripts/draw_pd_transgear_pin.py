@@ -143,11 +143,14 @@ SIDE_KEEP = {
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
-    # Left of the shank's middle, so the callout under the value ends short
-    # of the head Ø, and high enough that it clears the Ra symbol below it.
-    "ShankDia": (SHANK_MID_X - 0.034, SHANK_TOP_Y + 0.046),
+    # At the shank's middle: its dimension line, and the arrow below the
+    # shank, stand clear right of the groove width's text and ring callout
+    # (34 mm left of here the lower arrow struck the +0.0762, run
+    # 20261024T030409384Z).  The callout under the value runs right from
+    # the line, high enough that it clears the Ra symbol and the head Ø.
+    "ShankDia": (SHANK_MID_X, SHANK_TOP_Y + 0.046),
     # Above the shank Ø's whole block: its shoulder, as wide as the ring
-    # callout, runs over the shank Ø's +0.000.
+    # callout, ends left of the shank Ø's +0.000.
     "GrooveDia": (GROOVE_MID_X, SHANK_TOP_Y + 0.068),
     "HeadDomeR": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] + 0.006),
     "HeadDomeSagDim": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] - 0.016),

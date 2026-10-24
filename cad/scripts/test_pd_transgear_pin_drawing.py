@@ -117,6 +117,10 @@ def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> 
     assert spec.RING_NUMBER in callout and "\n" not in callout
     x, _ = drawing.SIDE_KEEP["GrooveWidth"]
     assert x - 0.028 > drawing.GROOVE_REAR_X > drawing.LOAD_WALL_X
+    # The shank Ø's dimension line (and its arrow below the shank) passes
+    # right of the width's text and ring callout, not through its limits.
+    shank_x, _ = drawing.SIDE_KEEP["ShankDia"]
+    assert shank_x > x + 0.035
 
 
 def test_the_part_notes_carry_no_assembly_step() -> None:
