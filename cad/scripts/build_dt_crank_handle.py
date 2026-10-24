@@ -412,6 +412,32 @@ async def build(adapter) -> dict[str, str]:
             adapter, centerline, point, (x, radius + 4.0), name
         )
         profile.record(name, f'"{name}"')
+    # The S-curve's tangent point, where the inflection station ends: the
+    # tangencies fix its diameter, so like the four radii it is made while the
+    # sketch is still free and turned driven at once, a reference the drawing
+    # parenthesizes (MHA-DT-08 machinist review of 69eda6e4c: the turner reads
+    # the template point instead of working it out from tangency).
+    inflection_dia = await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        f"{s_concave}.end",
+        (INFLECTION[0], INFLECTION[1] + 4.0),
+        "InflectionDia",
+    )
+    inflection_dimension = _early_bound(inflection_dia.GetDimension2(0), "IDimension")
+    inflection_dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
+    if int(inflection_dimension.DrivenState) != 1:
+        raise RuntimeError("InflectionDia: dimension did not become driven")
+    if not math.isclose(
+        float(inflection_dimension.SystemValue) * 1000.0,
+        2.0 * INFLECTION[1],
+        abs_tol=1e-4,
+    ):
+        raise RuntimeError(
+            f"InflectionDia: measures {float(inflection_dimension.SystemValue) * 1000.0}"
+            f" mm, not the tangent point's Ø{2.0 * INFLECTION[1]}"
+        )
+    profile.record("InflectionDia")
     check(
         "end round radius",
         await adapter.add_sketch_dimension(end_round, None, "radial", END_ROUND_R),

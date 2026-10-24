@@ -86,6 +86,7 @@ from dt_crank_handle_spec import (
     S_CONVEX_CENTER,
     S_CONVEX_R,
     SHOULDER_X,
+    TANGENT_POINT_DIAMETERS,
     TENON_FIT_NOTE,
     TENON_R,
     TENON_ROOT_CALLOUT,
@@ -187,8 +188,17 @@ FRONT_KEEP = {
     # five-line block stands near its floor, clear of the end view.
     "ShoulderDia": (_front_x(SHOULDER_X) + _SHELF, _BELOW),
     "WaistDia": (_front_x(WAIST_X) + _SHELF, _BELOW),
+    # The S-curve's tangent point: its "( Ø12.6)" text (about 17 mm wide)
+    # runs right under the swell, where the outline drops to y ~0.0968 by
+    # its end (farm r1 of c1b463872 had the outline through the "6)" at the
+    # waist row), so its shelf hangs 7 mm lower, 8 mm right of the fitted
+    # tenon's block.
+    "InflectionDia": (_front_x(INFLECTION[0]) + _SHELF, _BELOW - 0.007),
     "TenonDia": (_front_x(TENON_X0) + 4.0 * _SHELF, _CALLOUT_ROW),
-    "PivotBoreDia": (0.140, 0.068),
+    # The reamed bore's dimension line stands 12 mm right of the tangent
+    # point's, clear of its text, and the block's right edge stays 12 mm left
+    # of the title block.
+    "PivotBoreDia": (0.152, 0.068),
     "CounterboreDia": (
         _front_x(OAK_END_X - COUNTERBORE_DEPTH) + 0.0055,
         _CALLOUT_ROW + 0.0015,
@@ -382,8 +392,9 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, front_annotations, DRAWING_PRECISION_BY_NAME)
     front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
     # The tenon and the counterbore are fitted to the ferrule and cup (their
-    # to-suit callouts), so their sizes print as references.
-    for name in sorted(REFERENCE_DIMENSIONS):
+    # to-suit callouts), and the S-curve's tangent point is fixed by its
+    # arcs, so their sizes print as references.
+    for name in sorted(REFERENCE_DIMENSIONS | TANGENT_POINT_DIAMETERS):
         set_reference_dimension(
             adapter,
             front_by_name[name],
