@@ -205,7 +205,8 @@ def test_notes_are_short_and_carry_no_dimension_or_method() -> None:
 
 
 def test_part_sheet_carries_no_assembly_instruction() -> None:
-    # The clamp step (user ruling 2026-09-21) prints as MHA-SM-00 step 8.
+    # The clamp step (user ruling 2026-09-21: no torque value, no
+    # threadlocker) prints in full as MHA-SM-00 step 8.
     notes = " ".join(spec.DRAWING_NOTES.split())
     assert "ASSEMBLY" not in notes
     assert "TIGHTEN" not in notes
@@ -214,6 +215,9 @@ def test_part_sheet_carries_no_assembly_instruction() -> None:
     step = next(s for s in summing.ASSEMBLY_STEPS if s.startswith("8. "))
     assert "MHA-SM-04" in step
     assert "CANNOT SWIVEL" in step
+    assert step.endswith("NO THREADLOCKER.")
+    for word in ("TORQUE", "N-M", "IN-LB"):
+        assert word not in step
     build = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes": DRAWING_NOTES' in build
 

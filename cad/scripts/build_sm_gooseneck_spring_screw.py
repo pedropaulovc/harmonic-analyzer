@@ -157,6 +157,7 @@ V_SLOT = slot_volume()
 V_FINAL = V_BODY - V_SLOT
 
 
+@_telemetry.traced("part.single_limit", label_param="name")
 def _single_limit(
     adapter, feature: str, name: str, nominal: float, tol_type: int
 ) -> None:
@@ -177,6 +178,7 @@ def _single_limit(
     _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
+@_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
     """Persist each printed callout on its source dimension, below the value
     (build_mg_magnifying_bracket._author_dimension_callouts): the drawing
