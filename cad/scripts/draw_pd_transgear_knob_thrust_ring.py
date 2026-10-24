@@ -140,6 +140,7 @@ def _center_mark_count(view: Any) -> int:
     )
 
 
+@_telemetry.traced("drawing.pd_transgear_knob_thrust_ring.callouts")
 def _assert_dimension_callouts(adapter: Any, annotations: list[Any]) -> None:
     """Import the part-authored callout rows verbatim; never write them here.
 

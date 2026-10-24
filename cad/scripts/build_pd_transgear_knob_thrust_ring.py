@@ -20,6 +20,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _appearance import apply_material
 from _bore_axis import name_bore_axis
 from _check import check
@@ -56,6 +57,7 @@ MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 V_RING = math.pi * ((OD / 2.0) ** 2 - (ID / 2.0) ** 2) * LENGTH
 
 
+@_telemetry.traced("dim.pd_transgear_knob_thrust_ring_callouts")
 def _author_dimension_callouts(adapter) -> None:
     """Persist the sheet's callout rows on the source dimensions.
 
