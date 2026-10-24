@@ -42,6 +42,8 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_detail_crop import native_circle_geometry
+from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -214,6 +216,9 @@ DETAIL_FENCE_Y_MM = (FORK_TOP_Y + FORK_BASE_Y - 2.0) / 2.0
 # Right of the front view's pin-hole callout and FCF, below the isometric,
 # above the title block.
 DETAIL_CENTER = (0.325, 0.135)
+# How far the fence centre may print from DETAIL_CENTER once placed (the
+# 0.5 mm the section and detail settle reads allow, draw_dt_cone_swing_platform).
+DETAIL_PLACEMENT_TOL_M = 0.0005
 _DETAIL_MM = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 _DETAIL_FENCE_R = DETAIL_RADIUS_MM * _DETAIL_MM
 if DETAIL_RADIUS_MM <= math.hypot(FORK_THICKNESS / 2.0, FORK_TOP_Y - DETAIL_FENCE_Y_MM):
@@ -347,11 +352,9 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
         manager.AddToDB = previous_add_to_db
     if fence is None:
         raise RuntimeError("failed to create the fork detail fence")
-    arc = _early_bound(fence, "ISketchArc")
-    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
-    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
-        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
+    placed_centre, placed_radius = native_circle_geometry(fence, label="fork detail fence")
+    if math.dist(placed_centre[:2], points[0][:2]) > 1e-9 or not math.isclose(
+        placed_radius, math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
     ):
         raise RuntimeError("the fork detail fence moved from where it was placed")
     draw.ClearSelection2(True)
@@ -375,6 +378,9 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     detail.ScaleRatio = double_array([float(value) for value in DETAIL_SCALE])
     draw.ClearSelection2(True)
     draw.EditRebuild3()
+    # A fresh detail's display geometry can lag its creation
+    # (_drawing_detail_projection): refresh it before its outline places it.
+    detail.UpdateViewDisplayGeometry()
     outline = tuple(float(value) for value in detail.GetOutline())
     position = tuple(float(value) for value in detail.Position)
     if len(outline) != 4 or len(position) != 2:
@@ -386,6 +392,16 @@ def _fork_detail(adapter: Any, left: Any) -> Any:
     if not detail.SetViewPosition(double_array(target), False):
         raise RuntimeError("failed to position the fork detail")
     draw.EditRebuild3()
+    # DETAIL_KEEP assumes the fence centre (on the rod axis) prints at
+    # DETAIL_CENTER: read it back through the settled detail.
+    settle_detail_projection(
+        adapter,
+        detail,
+        (0.0, DETAIL_FENCE_Y_MM / 1000.0, 0.0),
+        ink_xy=DETAIL_CENTER,
+        tolerance_xy=(DETAIL_PLACEMENT_TOL_M, DETAIL_PLACEMENT_TOL_M),
+        label="fork detail fence centre",
+    )
     notes = tuple(_read_member(detail, "GetNotes") or ())
     if len(notes) != 1:
         raise RuntimeError(f"expected one native detail label, found {len(notes)}")
