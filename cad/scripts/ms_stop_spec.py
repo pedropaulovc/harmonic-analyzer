@@ -272,14 +272,15 @@ def _floor_2(value_mm: float) -> float:
     return math.floor(value_mm * 100.0 + 1e-9) / 100.0
 
 
-# The other three worst-case webs between the 1.5 floor and the 2.0 target,
-# stated under the hole callouts they bound (rule 20); the owner accepted all
-# three on 2026-10-24 (#1937), recorded as ms-stop-block.yaml RV-03 and RV-04
-# and ms-stop-plate.yaml RV-01. Tap depths read from the mating face, so the
+# The other four worst-case webs below the 2.0 target, stated under the hole
+# callouts they bound (rule 20); the owner accepted all four on 2026-10-24
+# (#1937), recorded as ms-stop-block.yaml RV-03, RV-04 and RV-05 and
+# ms-stop-plate.yaml RV-01. Tap depths read from the mating face, so the
 # back wall is the drill point to the opposite face.
 PLATE_TAP_WEB_LINES = (
     f"DRILL POINT TO OPPOSITE FACE {_floor_2(PLATE_TAP_BACK_WALL_MIN):.2f} MIN",
     f"THREAD TO END FACE {_floor_2(PLATE_TAP_END_WEB_MIN):.2f} MIN",
+    f"THREAD TO REBATE FLOOR {_floor_2(PLATE_TAP_WINDOW_WEB_MIN):.2f} MIN",
 )
 PLATE_CLEARANCE_WEB_LINE = f"HOLE TO END FACE {_floor_2(PLATE_CLEARANCE_END_WEB_MIN):.2f} MIN"
 

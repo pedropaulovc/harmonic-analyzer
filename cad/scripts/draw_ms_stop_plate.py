@@ -87,7 +87,9 @@ DIMENSION_CALLOUTS = {
         f"{_config.parts('ms-stop-block')['number']} TAPS"
     ),
 }
-CLEARANCE_CALLOUT_XY = (0.285, 0.140)
+# Vertically centred and its leader leaves the last row: 6 mm above the
+# one-row 0.140 keeps that leader above LOCATING END's with the end-web row.
+CLEARANCE_CALLOUT_XY = (0.285, 0.146)
 # Leadered labels name the X=0 end and Y=0 edge the match-drill clamp aligns.
 # Note positions are the text's upper-left corner.
 LOCATING_END_XY = (0.228, 0.128)

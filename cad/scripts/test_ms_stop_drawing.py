@@ -300,7 +300,7 @@ class _StopMathUtility:
     (block_drawing, [
         ("two cover blind taps", "*Back", (0.018425, 0.004, 0.0), (0.1233, 0.1728)),
         ("thumbscrew tap through floor", "*Bottom",
-         (0.0116305, 0.0, 0.0042), (0.150478, 0.0852)),
+         (0.0116305, 0.0, 0.0042), (0.150478, 0.0782)),
         ("cover mating face", "*Left", (0.0105, 0.01255, 0.0), (0.293, 0.207)),
     ]),
     (plate_drawing, [
@@ -436,8 +436,8 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         )) == pytest.approx(0.197)
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] == 0.175
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
-        assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.063)
-        assert callout_positions["two cover blind taps"] == (0.065, 0.130)
+        assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.056)
+        assert callout_positions["two cover blind taps"] == (0.065, 0.127)
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
@@ -706,18 +706,19 @@ def test_thumb_tap_callout_states_where_its_thru_ends() -> None:
 
 
 def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
-    # Owner ruling 2026-10-24 (#1937): three webs between the 1.5 floor and
-    # the 2.0 target, each stated on its sheet and declared minor.
+    # Owner ruling 2026-10-24 (#1937): four webs below the 2.0 target, each
+    # stated on its sheet and declared minor.
     import _config
     from machinist_exceptions import load_exceptions
 
     assert spec.PLATE_TAP_WEB_LINES == (
         "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.50 MIN",
+        "THREAD TO REBATE FLOOR 1.99 MIN",
     )
     assert spec.PLATE_CLEARANCE_WEB_LINE == "HOLE TO END FACE 1.64 MIN"
     native = _StopDisplay("<hw-threaddesc>-<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>")
     block_drawing._remove_general_thread_class(native, last_line="\n".join(spec.PLATE_TAP_WEB_LINES))
-    assert native.prefix.splitlines()[-2:] == list(spec.PLATE_TAP_WEB_LINES)
+    assert native.prefix.splitlines()[-3:] == list(spec.PLATE_TAP_WEB_LINES)
     native = _StopDisplay("REMOVE PLATE; THEN OPEN 2X <MOD-DIAM><hw-diam> THRU ALL\n")
     plate_drawing._append_callout_line(native, spec.PLATE_CLEARANCE_WEB_LINE)
     assert native.prefix.splitlines() == [
@@ -732,6 +733,7 @@ def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
     for stem, entry_id, line in (
         ("ms_stop_block", "RV-03", spec.PLATE_TAP_WEB_LINES[0]),
         ("ms_stop_block", "RV-04", spec.PLATE_TAP_WEB_LINES[1]),
+        ("ms_stop_block", "RV-05", spec.PLATE_TAP_WEB_LINES[2]),
         ("ms_stop_plate", "RV-01", spec.PLATE_CLEARANCE_WEB_LINE),
     ):
         entry = declared[stem][entry_id]
