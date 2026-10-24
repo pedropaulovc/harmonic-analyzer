@@ -9,7 +9,8 @@ screw (MHA-CH-VN-55) in the crown tap bears on the shaft's flat and fixes it.
 The short straight foot points OUTBOARD and is screwed down into the
 top-frame rail top face by one slotted #2-56 fillister frame-side
 screw (MHA-CH-VN-52) seated flush in a counterbore; the foot-to-lug inside
-corner is filleted at its MAX radius (``CornerFillet``).
+corner is filleted at the title block's INSIDE CORNERS ceiling
+(``CornerFillet``).
 
 Layout (part frame): +X along the shaft, OUTBOARD (away from the lever
 bank; the lug mid-plane / set-screw axis is x = 0); +Y up from the seat
@@ -72,9 +73,7 @@ from ch_fulcrum_keeper_spec import (
     BORE_FROM_SIDE,
     CBORE_DEPTH_MM,
     CBORE_DIA_MM,
-    CORNER_R_BAND,
-    CORNER_R_MAX,
-    CORNER_R_TOL_TYPE,
+    CORNER_R,
     CROWN_R,
     CROWN_TOP_Y,
     DRAWING_DIMENSIONS,
@@ -126,7 +125,7 @@ if blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) >= LUG_T:
     raise AssertionError("crown tap drill breaks out of the lug faces")
 # The foot-to-lug inside corner's fillet adds its spandrel, (1 - pi/4) R^2,
 # along the keeper's width.
-V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R_MAX**2 * KEEPER_WIDTH
+V_CORNER = (1.0 - math.pi / 4.0) * CORNER_R**2 * KEEPER_WIDTH
 
 # The drawing-reference lines (ch_fulcrum_keeper_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives), the
@@ -377,7 +376,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "ShaftAxisH", f"{SHAFT_AXIS_H}mm")
     await set_global(adapter, "CrownR", f"{CROWN_R}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
-    await set_global(adapter, "CornerR", f"{CORNER_R_MAX}mm")
+    await set_global(adapter, "CornerR", f"{CORNER_R}mm")
     await set_global(adapter, "SupplyH", f"{SUPPLY_HEIGHT_MIN}mm")
     await set_global(adapter, "FootScrewFromTip", f"{SCREW_FROM_TIP}mm")
 
@@ -458,13 +457,13 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(adapter, "foot", volume + v_foot, 0.005 * v_foot)
 
     # Foot-to-lug inside corner (drawing-guidelines.md rule 16): the edge where
-    # the foot top meets the lug's outer face, filleted AT the largest radius
-    # whose tangent line stays off the counterbore (CORNER_R_MAX), the radius
-    # the print gives as a single MAX limit.
+    # the foot top meets the lug's outer face, filleted at the title block's
+    # INSIDE CORNERS R1.0 MAX (CORNER_R), whose tangent line stays off the
+    # counterbore; the sheet prints no local limit.
     check(
         "fillet foot-to-lug corner",
         await adapter.add_fillet(
-            CORNER_R_MAX, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
+            CORNER_R, [[LUG_HALF_T, FOOT_H, 0.0]], propagate=False
         ),
     )
     name_last_feature(adapter, "CornerFillet")
@@ -601,14 +600,6 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places are the tolerance statement, so the PART carries them;
     # the reamed bore's running band (BORE_DIA_BAND) is a native model tolerance.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _single_limit(
-        adapter,
-        "CornerFillet",
-        "CornerRadius",
-        CORNER_R_MAX,
-        CORNER_R_TOL_TYPE,
-        *deviations(CORNER_R_BAND),
-    )
     # Any taller blank rounds down to the crown: no deviation either way.
     _single_limit(
         adapter,

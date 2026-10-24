@@ -138,47 +138,29 @@ def test_three_place_sizes_state_their_function() -> None:
     assert spec.SET_SCREW_WEB_MM + 2.0 * (bands[2] - bands[1]) < 1.5
 
 
-def test_corner_round_prints_its_max_limit_in_the_open_corner() -> None:
+def test_corner_round_sits_under_the_title_block_inside_corner_ceiling() -> None:
     # MR-fleet r1: the foot-to-lug inside corner was sharp and unstated. The
-    # part models it at its single limit, which keeps the round's tangent
-    # line off the counterbore, and the front view prints "R1.0 MAX" up in
-    # the open corner on the round's bisector, clear of the views.
-    from _layout_geometry import Box
-
+    # title block's INSIDE CORNERS R1.0 MAX states it, so the sheet prints no
+    # local radius (ENFORCE review 2026-10-24: a local "R1.0 max." restated
+    # that row, rule 2). The part models the round at that ceiling, which
+    # keeps the round's tangent line off the counterbore.
     spec = ch_fulcrum_keeper_spec
-    assert spec.DRAWING_DIMENSIONS["CornerFillet"] == {"CornerRadius"}
-    assert spec.DRAWING_PRECISION["CornerFillet"] == {"CornerRadius": 1}
-    assert spec.CORNER_R_BAND == (0.0, -spec.CORNER_R_MAX)
-    assert spec.CORNER_R_TOL_TYPE == 6  # swTolMAX
-    assert 0.0 < spec.CORNER_R_MAX < spec.FOOT_CBORE_LUG_CLEARANCE_MM
+    assert spec.CORNER_R == 1.0
+    assert spec.CORNER_R <= _config.title_block("inside_corner")["radius_mm"]
+    assert 0.0 < spec.CORNER_R < spec.FOOT_CBORE_LUG_CLEARANCE_MM
+    assert "CornerFillet" not in spec.DRAWING_DIMENSIONS
+    assert "CornerFillet" not in spec.DRAWING_PRECISION
+    assert "CornerRadius" not in drawing.FRONT_KEEP
     assert (
         part.V_CORNER
-        == (1.0 - math.pi / 4.0) * spec.CORNER_R_MAX**2 * spec.KEEPER_WIDTH
+        == (1.0 - math.pi / 4.0) * spec.CORNER_R**2 * spec.KEEPER_WIDTH
     )
-    scale = drawing.SHEET_SCALE[0] / 1000.0
-    seat = drawing.FRONT_CENTER[1] - spec.CROWN_TOP_Y * scale / 2.0
-    corner = (drawing._front_x(spec.LUG_HALF_T), seat + spec.FOOT_H * scale)
-    x, y = drawing.FRONT_KEEP["CornerRadius"]
-    assert math.isclose(x - corner[0], y - corner[1], abs_tol=0.001)
-    block = _text_block((x, y), ["R1.0 MAX"])
-    lug = Box(
-        drawing._front_x(-spec.LUG_HALF_T),
-        seat,
-        corner[0],
-        seat + spec.CROWN_TOP_Y * scale,
-    )
-    foot = Box(corner[0], seat, drawing._front_x(spec.FOOT_TIP_X), corner[1])
-    crown_block = _text_block(
-        drawing.RIGHT_KEEP["CrownRadius"],
-        ["(R7.0)", *drawing.DIMENSION_CALLOUTS["CrownRadius"].splitlines()],
-    )
-    for other in (
-        lug,
-        foot,
-        crown_block,
-        _text_block(drawing.FRONT_KEEP["FootRise"], ["8.0"]),
-    ):
-        assert _box_gap(block, other) >= _AIR, other
+
+
+def test_drawing_enforces_machinist_review() -> None:
+    from _machinist_review_mode import MachinistReviewMode
+
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE
 
 
 def test_overall_sizes_print_as_references_and_the_bore_centred_on_the_width() -> None:
@@ -724,7 +706,6 @@ def test_function_callouts_stand_clear_of_the_views_and_each_other() -> None:
         "overall height": _text_block(drawing.FRONT_KEEP["OverallHeight"], ["(32.2)"]),
         "foot length": _text_block(drawing.FRONT_KEEP["FootLength"], ["8.50"]),
         "screw from tip": _text_block(drawing.TOP_KEEP["ScrewFromTip"], ["4.50"]),
-        "corner radius": _text_block(drawing.FRONT_KEEP["CornerRadius"], ["R1.0 MAX"]),
     }
     for name, block in blocks.items():
         assert 0.0127 + _AIR <= block.xmin, name
