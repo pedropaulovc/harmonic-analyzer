@@ -81,6 +81,10 @@ def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
     assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
     assert "CHAMFER END IN THE SEAT" in flat
     assert "DIAMETRAL CLEARANCE" in flat
+    # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
+    # mount the slip.
+    assert "PRESS FIT IN THE MHA-FR-02 CROSSBAR" in flat
+    assert "INTO THE MHA-SM-02 KNIFE MOUNT" in flat
 
 
 def test_purchased_sheet_documents_the_built_part() -> None:

@@ -8,8 +8,8 @@ GEOMETRY defines the frame windows and T-rail section;
 HOLES-SOCKETS carries the hole/station plan; CROSS-TAPS carries the front
 cross-tap elevation with section A-A through a corner boss; HUB-SET-SCREW
 holds the hub location, true-axis side view and the removed set-screw boss
-section; UNDERSIDE holds the underside locator, native enlarged hub detail J,
-slot-radius detail L and the removed knife-hanger section F-F. The faced keeper-rail top
+section; UNDERSIDE holds the underside locator, native enlarged hub detail J
+and the removed knife-hanger section F-F. The faced keeper-rail top
 is one linked note under the keeper callout on HOLES-SOCKETS, the faced
 underside plane one beside the UNDERSIDE detail.  A group gets
 its own sheet rather than a crowded corner of one:
@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from typing import Any
 
@@ -51,7 +52,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_detail_projection import settle_detail_projection
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
@@ -132,6 +132,7 @@ from build_fr_top_frame import (
     LAND_X1,
     OUTER_X,
     OUTER_Z,
+    PIN_HOLE_NEG_X,
     PIN_HOLE_X,
     RAIL_W_FR,
     RAIL_W_SIDE,
@@ -142,8 +143,6 @@ from build_fr_top_frame import (
     SET_SPOT_FACE_X,
     SET_TAP_SPEC,
     SIDE_TAP_DRILL_DIA,
-    SLOT_FLAT,
-    SLOT_X,
     STUD_Z_FRONT,
     STUD_Z_REAR,
     TAP_DRILL_MM,
@@ -165,16 +164,14 @@ from fr_top_frame_spec import (
     HANGER_CLEARANCE_DIA_BAND,
     HANGER_CLEARANCE_DIA_PLACES,
     HANGER_GRIP,
+    HANGER_KNOCKOUT_CALLOUT_ABOVE,
+    HANGER_KNOCKOUT_CALLOUT_BELOW,
+    HANGER_KNOCKOUT_DIA,
     HANGER_PIN_DEPTH_CALLOUT,
     HANGER_PIN_HOLE_CALLOUT,
     HANGER_PIN_HOLE_DEPTH,
     HANGER_PIN_HOLE_DIA,
     HANGER_PIN_X,
-    HANGER_SLOT_FROM_ROUND,
-    HANGER_SLOT_LENGTH,
-    HANGER_SLOT_LENGTH_CALLOUT,
-    HANGER_SLOT_WIDTH,
-    HANGER_SLOT_WIDTH_CALLOUT,
     HUB_SET_BOSS_FROM_AXIS,
     HUB_SET_SPOT_FROM_AXIS,
     KEEPER_TAP_CALLOUT_PRECISION,
@@ -559,29 +556,20 @@ HUB_LEFT_TITLE_XY = (0.128, 0.0455)
 HUB_LEFT_NOTE = "INNER RIB BOTTOM, GUSSETS SHARP\nOUTER RIB BOTTOM BESIDE BOSS SHARP"
 HUB_LEFT_NOTE_XY = (0.093, 0.030)
 
-# Sheet 6: the underside locator at the title block's own scale, hub/gusset
-# detail J at 2:1 and slot-radius detail L at 4:1. The local enlargement
-# separates the reference radius axes without crowding F-F's controls.
+# Sheet 6: the underside locator at the title block's own scale and the
+# hub/gusset detail J at 2:1.
 HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
 # The bottom view's label, then its edge note, at the band's left edge: the
-# 07527cf4 codex review read the one 85.7 mm row, wedged between the slot
-# width's block and F-F's 15.264, as crowding the section dimensions.  The
-# sheet-1 orientation key says the view is from below, front (B) at the
-# bottom (machinist review r1).
+# 07527cf4 codex review read the one 85.7 mm row, wedged between the
+# callout block over it and F-F's station rows, as crowding the section
+# dimensions.  The sheet-1 orientation key says the view is from below,
+# front (B) at the bottom (machinist review r1).
 HUB_BOTTOM_NOTE_XY = (0.020, 0.122)
 HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
 HUB_DETAIL_SCALE = (2, 1)
 HUB_DETAIL_CAPTION_XY = (0.300, 0.090)
-# Presentation-only crop of the front slot; no model dimensions import into L.
-SLOT_DETAIL_RADIUS_MM = 3.0
-SLOT_DETAIL_CENTER = (0.033, 0.064)
-SLOT_DETAIL_SCALE = (4, 1)
-SLOT_DETAIL_LETTER_XY = (0.094, 0.184)
-SLOT_DETAIL_CAPTION_XY = (0.033, 0.100)
-SLOT_DETAIL_RADIUS_CENTRES_LINE_Y = 0.048
-SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY = (0.065, 0.058)
 HUB_BOSS_DIA_TEXT_XY = (0.210, 0.100)
 HUB_GUSSET_T_TEXT_XY = (0.300, 0.212)
 HUB_GUSSET_T_OFFSET_XY = (0.390, 0.243)
@@ -597,14 +585,13 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # beside the hub boss and gussets it excludes.  Native inspection must
 # establish the renamed caption's clearance.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
-# The slots' stations along the slot are F-F's plain .XXX 15.264 from the
-# round hole ("2X"), and the frames' implied basic zero and 90 deg need no
-# words (machinist review r1: no basic or tolerance in note text).
+# The -X reams' stations along the dowel line are F-F's plain .XXX 7.632
+# from the screw axis ("2X"), and the frames' implied basic zero and 90 deg
+# need no words (machinist review r1: no basic or tolerance in note text).
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #10 plain clearance hole, with the native finished top-to-underside grip,
-# the round
-# dowel slip hole +X of it and the dowel slot -X of it, cut along its
-# length.  The cut crosses only the crossbar and its
+# and both dowel reams, each with its knockout up to the faced top, cut along
+# the dowel line.  The cut crosses only the crossbar and its
 # junction gussets, its ends in the window past the gussets' rail-face reach.
 # _orient_cut_section looks along -Z (model X right, Y up), which is sheet-down
 # on the locator, so both letters drop into the open window below the cut
@@ -628,47 +615,47 @@ def _hanger_section_xy(x: float, y: float) -> tuple[float, float]:
 
 
 # Left of the profile: the 36.50 grip, its text parked further left on a
-# jog.  Right: the depth the hole and slot share.  Above, between the owned
-# axes: the hole's station from the screw axis, its text on a jog to the
-# right; its rows state the hole stands at the screw's own Z.  The slot's
-# ordinary .XXX station from the round hole has a higher dimension line and
-# its own mate qualifier, on a jog above-left of the round-hole block.
-# The radius-centre reference belongs to the separate enlarged detail L.
-# Under the slot: its controlling overall length. The linked caption sits
-# directly below the section; the length text's separate jog frees that band.
-# Native inspection establishes the new text/arrow/leader clearances.
+# jog.  Right: the depth all four reams share, its text clear of the
+# profile's right end.  Above, between the owned axes: each ream's station
+# from the screw axis (the mount fits either way round, so neither ream
+# chains from the other), the +X one's text on a jog to the right, the -X
+# one's above-left; their rows state the ream stands at the screw's own Z.
+# The linked caption sits directly below the section.  Native inspection
+# establishes the text/arrow/leader clearances.
 HANGER_GRIP_TEXT_XY = _hanger_section_xy(
     BAR_X0 - HANGER_SECTION_GUSSET_REACH - 8.0, -HALF_H + HANGER_GRIP / 2.0
 )
 HANGER_GRIP_OFFSET_XY = (0.072, 0.076)
 PIN_STATION_TEXT_XY = _hanger_section_xy((HANGER_X + PIN_HOLE_X) / 2.0, HALF_H + 8.0)
 # Its third row names the mate the three-place station matches, the
-# MHA-SM-02 knife mount's own dowel hole (both read
+# MHA-SM-02 knife mount's own round dowel hole (both read
 # sm_vn_knife_mount_dowel_spec.HANGER_OFFSET; machinist review r4), so the
 # block, centred on its point, stands 5.5 mm (one row) higher than r4's.
 PIN_STATION_OFFSET_XY = (0.157, 0.1115)
-PIN_STATION_CALLOUT = "2X ROUND HOLE FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-02"
-SLOT_STATION_TEXT_XY = _hanger_section_xy((SLOT_X + PIN_HOLE_X) / 2.0, HALF_H + 14.0)
-# The added mate row needs its own band above the round-hole block, not the
-# old one-row station's point beside it.
-SLOT_STATION_OFFSET_XY = (0.112, 0.1295)
-SLOT_STATION_CALLOUT = "MATCHES MHA-SM-02"
-SLOT_LENGTH_TEXT_XY = _hanger_section_xy(SLOT_X, -HALF_H - 12.0)
-# The full native dowel-travel block is 69.55 mm wide on 4ef's PDF. Move
-# only its text into the band left of the title block, freeing the space
-# below the profile for its own caption. The selected ends, dimension line
-# and witnesses stay put; the new jog's own-arrow clearance needs native proof.
-SLOT_LENGTH_OFFSET_XY = (0.177, 0.045)
+PIN_STATION_CALLOUT = "2X REAM FROM\nSCREW AXIS, SAME Z;\nMATCHES MHA-SM-02"
+NEG_STATION_TEXT_XY = _hanger_section_xy(
+    (HANGER_X + PIN_HOLE_NEG_X) / 2.0, HALF_H + 8.0
+)
+# The -X block takes the band the old 15.264's two rows held, nudged 7 mm
+# left: its 51 mm widest row then ends 2.5 mm short of the +X block's left
+# edge, 1.9 mm above it; it stands 6.5 mm under the land's dimension line,
+# right of the bottom view's note and the knockouts' callout and its leader.
+NEG_STATION_OFFSET_XY = (0.105, 0.1295)
+# The depth's "4X FLAT BOTTOM" row runs about 37 mm, centred on its
+# dimension line: 24 mm right of the gusset's cut end (16 further out than
+# the old two-glyph "4X") it clears the profile, and still ends well left
+# of the title block.
 HANGER_SECTION_KEEP = {
     "HangerPinHoleDepth": _hanger_section_xy(
-        BAR_X1 + HANGER_SECTION_GUSSET_REACH + 8.0, -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0
+        BAR_X1 + HANGER_SECTION_GUSSET_REACH + 24.0,
+        -HALF_H + HANGER_PIN_HOLE_DEPTH / 2.0,
     ),
     "HangerGrip": HANGER_GRIP_TEXT_XY,
 }
-# One targeted import: the Crossbar extrude owns the grip and the pin holes'
+# One targeted import: the Crossbar extrude owns the grip and the reams'
 # cut the depth (fd0350a85746, leaf 20261014T203505Z-1-494a6e80, delivered
-# both from one selection).  Since the faced top, the slip hole's sketch
-# diameter has not reached F-F, which sees the hole edge-on, even imported
+# both from one selection).  Since the faced top, the ream sketch's
+# diameter has not reached F-F, which sees the reams edge-on, even imported
 # apart from the grip (d8fac576, leaf 20261014T212023Z-1-90af84a0).
 # The grip prints bare under the title block's .XX band (owner ruling
 # 2026-10-18: MHA-SM-VN-52 is cut to the measured grip at SM-00).
@@ -678,141 +665,138 @@ HANGER_SECTION_CALLOUTS = {
 }
 HANGER_SECTION_CAPTION_XY = (0.120, 0.031)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
-# centre): datum B is the front round dowel hole, its tag low in the window
+# centre): datum B is the front +X dowel ream, its tag low in the window
 # right of the crossbar; datum C the rear one, its tag above the rear rail so
-# its leader climbs away from F-F's right arrow.  Each slot's position
+# its leader climbs away from F-F's right arrow.  Each -X ream's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
-# the slot along the line to the other station's round hole), stands outside
+# the ream along the line to the other station's +X ream), stands outside
 # the plan silhouette, as the machinist review asked: the rear one above the
 # plan left of datum C's tag, its leader dropping from its right end to the
-# rear slot's outer end arc, above F-F's cutting line and left of datum C's
-# rim pick; the front one right of the plan under the rear-right boss, its
-# leader dropping from its left end, below the rear round hole and right of
-# datum B's tag, to the front slot's inner end arc, left of datum B's rim
-# pick and right of the pocket length's extension lines.  The FRONT slot's
-# width (the rear slot lies on F-F's cutting line) runs left of the front
-# gusset, its text on a leader into the band under the front rail that
-# passes left of the land's dimension line.  The REAR round hole's size,
+# rear -X ream's rim, above F-F's cutting line and left of datum C's rim
+# pick; the front one right of the plan under the rear-right boss, its
+# leader dropping from its left end, below the rear +X ream and right of
+# datum B's tag, to the front -X ream's rim, left of datum B's rim pick and
+# right of the pocket length's extension lines.  The REAR +X ream's size,
 # face-on here, climbs between the rear frame's leader and datum C's to its
-# block over the plan, right of datum C's tag.
+# block over the plan, right of datum C's tag.  The FRONT -X ream's
+# knockout callout parks in the band under the front rail, its leader
+# passing left of the land's dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
 HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
-# Each round hole is 1.08 mm across at 1:3, its rim 1.1 mm (sheet) inside
+# Each +X ream is 1.06 mm across at 1:3, its rim 1.1 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
 # is hundredths of a millimetre.
 HANGER_DATUM_PICK_ZOOM_HALF = 0.0025
 
 
-def hanger_datum_pick(
-    centre: tuple[float, float], symbol_xy: tuple[float, float]
+def hanger_ream_rim(
+    centre: tuple[float, float], toward: tuple[float, float]
 ) -> tuple[float, float]:
-    """The sheet point on a round dowel hole's rim facing its datum tag.
+    """The sheet point on a dowel ream's rim facing ``toward``.
 
-    The view looks along the hole's axis, so the rim prints as a circle of
-    the hole's radius at the view's scale about the projected centre.
+    The view looks along the ream's axis, so the rim prints as a circle of
+    the ream's radius at the view's scale about the projected centre: the
+    datum tags' rim picks and the frames' leader landings.
     """
-    dx, dy = symbol_xy[0] - centre[0], symbol_xy[1] - centre[1]
+    dx, dy = toward[0] - centre[0], toward[1] - centre[1]
     reach = math.hypot(dx, dy)
     radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
-# Each slot frame's printed text box and outline from its frame_xy (sheet m),
+# Each frame's printed text box and outline from its frame_xy (sheet m),
 # as farm run 20261009T204136744Z measured them with the translation modifier
 # inline (no vector): rear DetailItem507 at (116, 207.5) mm printed its text
 # [116.9, 202.2]..[148.5, 206.7] mm and a 39.1 x 7.0 mm outline.  The front
 # DetailItem506 prints the same outline and the same first and last text
 # items (only its middle divider sits 1.1 mm left, B being narrower than C),
-# so the same boxes.  Its leader leaves the outline's end facing its slot at
+# so the same boxes.  Its leader leaves the outline's end facing its ream at
 # mid height on a 6.35 mm shoulder.
-HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
-HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
-HANGER_SLOT_FRAME_SHOULDER = 0.00635
-# Each frame names its feature below it: at 1:3 the slot and the round hole
-# (datum B or C) beside it stand 4.7 mm apart, and a reader took the frames
-# for the round holes' own (codex review of 0d75ada1, sheet 6).  The
-# below-frame text prints left-aligned 1.1 mm under the outline, 3.4 tall,
-# 2.6 mm a glyph ("2X" under pn-pen-v-block's frame at (198, 196) mm printed
-# [198.1, 184.5]..[203.3, 187.9]).  The rear frame's top stands 5.7 mm under
-# the sheet frame, its name 4.6 over the plan's top (y 244.8 mm) and 3.3
-# right of the pocket length's block.  The front frame stands right of the
-# plan (x 183.2 at the corner bosses): its outline 8.7 clear and its knee 2.4
-# clear of that line, at a height where the leader passes 2.4 mm from both the
-# rear-right boss and the front round hole.  Above the plan, it would have
-# fenced the rear round hole's size off from every band wide enough for it.
-# The name says the frame holds the slot's width (its median plane) and
-# nothing else: the station along the slot is F-F's 15.264 ±0.13 (codex
-# review of 06d0bbc59; machinist review r7); 15 glyphs, 39.0 mm, inside the
-# 39.1 mm outline's reach.
-HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH ONLY"
-HANGER_SLOT_FRAME_QUANTITY_BOX = (
-    0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
+HANGER_REAM_FRAME_TEXT_BOX = (0.0009, -0.0053, 0.0325, -0.0008)
+HANGER_REAM_FRAME_OUTLINE = (0.0, -0.0070, 0.0391, 0.0)
+HANGER_REAM_FRAME_SHOULDER = 0.00635
+# Each frame names its zone's direction below it: at 1:3 the -X ream and
+# the +X ream (datum B or C) 15.264 from it stand 5.1 mm apart, and a reader
+# took the frames for the datum holes' own (codex review of 0d75ada1, sheet
+# 6).  The below-frame text prints left-aligned 1.1 mm under the outline,
+# 3.4 tall, 2.6 mm a glyph ("2X" under pn-pen-v-block's frame at (198, 196)
+# mm printed [198.1, 184.5]..[203.3, 187.9]).  The rear frame's top stands
+# 5.7 mm under the sheet frame, its name 4.6 over the plan's top (y 244.8 mm)
+# and 3.3 right of the pocket length's block.  The front frame stands right
+# of the plan (x 183.2 at the corner bosses): its outline 8.7 clear and its
+# knee 2.4 clear of that line, at a height where the leader passes 2.4 mm
+# from both the rear-right boss and the front +X ream.  Above the plan, it
+# would have fenced the rear ream's size off from every band wide enough
+# for it.  The name says the zone holds the -X ream only along the B-C
+# direction, across its dowel line: along the line its station is F-F's
+# 7.632 ±0.13 from the screw axis (codex review of 06d0bbc59; machinist
+# review r7); 14 glyphs,
+# 36.4 mm, inside the 39.1 mm outline's reach.
+HANGER_REAM_FRAME_QUANTITY = "ALONG B-C ONLY"
+HANGER_REAM_FRAME_QUANTITY_BOX = (
+    0.0, -0.0116, 0.0026 * len(HANGER_REAM_FRAME_QUANTITY), -0.0080
 )
-HANGER_SLOT_FRAME_XY = {"front": (0.1919, 0.2358), "rear": (0.052, 0.261)}
+HANGER_REAM_FRAME_XY = {"front": (0.1919, 0.2358), "rear": (0.052, 0.261)}
 
 
-def hanger_slot_frame_knee(
+def hanger_ream_frame_knee(
     frame_xy: tuple[float, float], target: tuple[float, float]
 ) -> tuple[float, float]:
-    """Where a slot frame's leader leaves its shoulder, toward ``target``.
+    """Where a ream frame's leader leaves its shoulder, toward ``target``.
 
     The leader runs from the outline's end facing the target, at mid height.
     """
-    left, bottom, right, top = HANGER_SLOT_FRAME_OUTLINE
+    left, bottom, right, top = HANGER_REAM_FRAME_OUTLINE
     y = frame_xy[1] + (bottom + top) / 2.0
     if frame_xy[0] + left > target[0]:
-        return (frame_xy[0] + left - HANGER_SLOT_FRAME_SHOULDER, y)
-    return (frame_xy[0] + right + HANGER_SLOT_FRAME_SHOULDER, y)
+        return (frame_xy[0] + left - HANGER_REAM_FRAME_SHOULDER, y)
+    return (frame_xy[0] + right + HANGER_REAM_FRAME_SHOULDER, y)
 
 
-def hanger_slot_landing(
-    end_centre: tuple[float, float], knee: tuple[float, float]
-) -> tuple[float, float]:
-    """The sheet point on a dowel slot's end arc facing its frame's knee.
-
-    The view looks along the slot's depth, so each end prints as a half
-    circle of the slot's half width at the view's scale about its centre.
-    """
-    dx, dy = knee[0] - end_centre[0], knee[1] - end_centre[1]
-    reach = math.hypot(dx, dy)
-    radius = HANGER_SLOT_WIDTH / 2.0 * _HUB_BOTTOM_M_PER_MM
-    return (end_centre[0] + radius * dx / reach, end_centre[1] + radius * dy / reach)
-
-
-HANGER_SLOT_WIDTH_TEXT_XY = (
-    HUB_BOTTOM_CENTER[0] + (BAR_X0 - 40.0) * _HUB_BOTTOM_M_PER_MM,
-    HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
-)
-# The block left of the land's dimension line.  On the fe1a7611 render the
-# leader ran from the width's lower arrow tail (x 87.67, y 165.10 mm) to the
-# underline's right end (offset x + 26.0, y 124.11) and passed 0.8 mm from
-# the land line's left arrow tail (x 86.64, y 144.99) at its height (codex
-# review of fe1a7611): 8 mm further left it passes 4.7 mm clear.  That block
-# stacked its band; the one-row +/- band (build) takes the 4.15 mm stacked
-# row off a block centred on its offset point, so the underline's end rises
-# about 2.1 mm (y 126.2), which only takes the leader further from the land
-# line (4.7 mm clear, 5.0 if the block hangs from its top).
-HANGER_SLOT_WIDTH_OFFSET_XY = (0.050, 0.137)
-# The rear round hole's size (the hole F-F cuts and the circle that owns
-# HangerPinHoleDia), with its band and slip-fit rows.  The historical v43
-# crop printed 66.4 x 20.3 mm with the band stacked; taking off its 4.15 mm
-# stacked row gave the former 67 x 17 mm estimate.  That width predates the
-# full parent-scoped vendor number.  Scale it conservatively from the old
-# 25-character process row to the current widest row, at the same font.
-# Keep the block's lower-left corner fixed: the native leader leaves that
-# underline end toward the hole.  Extra width grows into the empty band to
-# the right, not toward datum C's tag or its leader.
-# Right of the hole, the cutting line, F-F's right arrow and the rear-right
-# boss leave no leader route to a block beside the plan.  Left of it, the
-# rear frame's leader, F-F's left arrow and detail J's label leave a window
-# too narrow for the block.  The leader climbs instead to the band over the
-# plan; its old foot at (145.9, 247.2) mm and the 17 mm height stay put.
-# These are estimates from the historical crop, not measured new-ID ink;
-# the native layout audit must still read the regenerated text and leader.
+# The rear +X ream's size (the circle that owns HangerPinHoleDia), with its
+# stacked +0.000/-0.010 band and its one callout row: count, process, mate,
+# press, to the floor.  The historical v43 crop printed 66.4 x 20.3 mm for a
+# stacked band and two callout rows, 5.2 mm a row (the r7 sheet's pitch), so
+# the stacked band and one row stand 15.1 mm, inside the 17.9 mm between the
+# plan's top and the sheet frame less ink each side; a second row would not
+# fit, so the press reads on one row.  The width scales from the old
+# 25-character process row to this row, at the same font.  Keep the block's
+# lower-left corner fixed: the native leader leaves that underline end
+# toward the ream.  The width grows into the empty band to the right, short
+# of detail J's fence.  Right of the ream, the cutting line, F-F's right
+# arrow and the rear-right boss leave no leader route to a block beside the
+# plan.  Left of it, the rear frame's leader, F-F's left arrow and detail J's
+# label leave a window too narrow for the block.  The leader climbs instead
+# to the band over the plan; its old foot at (145.9, 247.2) mm stays put.
+# These are estimates from the historical crop, not measured new ink; the
+# native layout audit must still read the regenerated text and leader.
 HANGER_PIN_DIA_TEXT_WIDTH = 0.067 * max(
     25, max(map(len, HANGER_PIN_HOLE_CALLOUT.splitlines()))
 ) / 25
-HANGER_PIN_DIA_TEXT_HALF_HEIGHT = 0.0085
-HANGER_PIN_DIA_TEXT_XY = (0.1459 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0, 0.2557)
+HANGER_PIN_DIA_TEXT_HALF_HEIGHT = 0.0076
+HANGER_PIN_DIA_TEXT_XY = (
+    0.1459 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0,
+    0.2472 + HANGER_PIN_DIA_TEXT_HALF_HEIGHT,
+)
+# The knockouts' native callout (dt_crankshaft's form: the drill above the
+# native "4X" size and extent, the purpose below; the widest row's 21 glyphs
+# about 56 x 16 mm at the ream block's 2.68 mm a glyph and 5.2 mm a row) on
+# the FRONT -X ream's knockout circle, seen on its floor through the ream.
+# It parks in the band under the front rail where the old slot width's
+# block stood, centred 2.8 mm inside the sheet frame's left edge, 4.3 mm
+# under the front-left boss and 12.7 over the bottom view's note.  Its
+# leader leaves the block's right end up-right to the floor circle, 6 mm
+# left of the land's dimension line where it crosses that height, and
+# crosses only the land's extension line and the part's own outline.
+HANGER_KNOCKOUT_CALLOUT_WIDTH = 0.067 * max(
+    len(HANGER_KNOCKOUT_CALLOUT_ABOVE),
+    len("4X Ø2.26 THRU ALL"),
+    len(HANGER_KNOCKOUT_CALLOUT_BELOW),
+) / 25
+HANGER_KNOCKOUT_CALLOUT_HALF_HEIGHT = 0.0081
+HANGER_KNOCKOUT_CALLOUT_XY = (
+    0.01555 + HANGER_KNOCKOUT_CALLOUT_WIDTH / 2.0,
+    0.1428,
+)
 # The crossbar pockets' length stands outside the plan, so nothing inside
 # the frame reads as part of it: its dimension line at model x -256, 12.2
 # left of the Ø45 barrels, 7.0 left of detail J's fence (r 38 about the
@@ -823,7 +807,7 @@ HANGER_PIN_DIA_TEXT_XY = (0.1459 + HANGER_PIN_DIA_TEXT_WIDTH / 2.0, 0.2557)
 # widest row 33.9 mm by the 40d9d030e render's glyphs) parks on an offset
 # leader above the plan's top-left corner: 2.4 inside the sheet frame's left
 # edge, 2.45 under its top, 1.9 over the plan's top and its top-left boss,
-# and 3.0 left of the rear slot frame.
+# and 3.0 left of the rear -X ream frame.
 POCKET_LENGTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] - 256.0 * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1],
@@ -908,7 +892,6 @@ CROSSBAR_POCKET_DEPTH_LINE_XY = _side_section_xy(BAR_X0 - 8.0, (FLANGE_BOT_Y - H
 CROSSBAR_POCKET_DEPTH_TEXT_XY = (0.3155, 0.1068)
 # swDimensionArrowsSide_e (draw_dt_cone_tip_block's native-arrow precedent).
 _DIM_ARROWS_INSIDE = 0
-_DIM_ARROWS_OUTSIDE = 1
 
 # #955 (layoutcheck on b49e1): three cutting-plane letters printed on ink.
 # B's outer letter sat on the +Z rail's outer edge and the 183.9, E's outer
@@ -2107,15 +2090,15 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     """A removed section F-F through the rear knife-hanger station.
 
     drawing-guidelines.md rule 9 (show internal shape in solid lines): the
-    plain clearance hole and blind slip hole are exposed as solid cut lines.
+    plain clearance hole and both blind dowel reams, each with its knockout
+    up to the faced top, are exposed as solid cut lines.
     F-F imports the model's driving HangerGrip (finished top to finished
     underside, the crossbar's own extrude depth with the band authored on
-    it) and the depth the slip hole and slot share, in one targeted import,
-    and only reads the grip back; no sheet-side grip exists.  This section
-    also adds the slip hole's station from the screw axis, the slot's ordinary
-    station from the slip hole and its controlling overall length. The slip
-    hole's size and the slot's width are across this cut; the underside
-    locator carries them. Detail L carries the reference radius-centre span.
+    it) and the depth all four reams share, in one targeted import, and
+    only reads the grip back; no sheet-side grip exists.  This section also
+    adds the +X ream's station from the screw axis and the -X ream's
+    ordinary station from the +X ream.  The reams' size is across this cut;
+    the underside locator carries it and the knockouts' callout.
     Returns the view and its imported dimensions.
     """
     z = HANGER_SECTION_Z
@@ -2152,17 +2135,14 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     _pin_section_profile(
         adapter, view, (HANGER_X, 0.0, z), HANGER_SECTION_PROFILE_X, label="F-F",
     )
+    # Each ream and its coaxial knockout share one axis, underside to top.
     axes = _add_view_centerlines(
         adapter, view,
-        (
-            ((HANGER_X, -HALF_H-2.0, z), (HANGER_X, HALF_H+2.0, z)),
-            ((PIN_HOLE_X, -HALF_H-2.0, z),
-             (PIN_HOLE_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
-            ((SLOT_X, -HALF_H-2.0, z),
-             (SLOT_X, -HALF_H+HANGER_PIN_HOLE_DEPTH+2.0, z)),
+        tuple(
+            ((x, -HALF_H-2.0, z), (x, HALF_H+2.0, z))
+            for x in (HANGER_X, PIN_HOLE_X, PIN_HOLE_NEG_X)
         ),
     )
-    edges = scan_view_edges(view, label="F-F knife-hanger section")
     _checked_dimension(
         adapter, view,
         p0=(HANGER_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
@@ -2173,52 +2153,19 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
         suffix=PIN_STATION_CALLOUT,
         offset_text=PIN_STATION_OFFSET_XY,
     )
-    # The slot's location along the slot: a plain .XXX 15.264 from the round
-    # hole beside it, so the title block's +/-0.13 is the station band the
-    # spec's wall and travel stacks charge (HANGER_SLOT_ALONG_TOL).  The
-    # slot's position frame on the plan holds its width's median plane only,
-    # on an implied basic zero, and its name says so ("SLOT WIDTH ONLY":
-    # machinist review r7 read the frames as locating the 15.264); boxed
-    # BASIC (machinist review r2) the station had no limit along the slot
-    # (codex review of 06d0bbc59).  The drawing contract forbids a band
-    # authored on the sheet, and the 15.264 has no model dimension to carry
-    # one.  F-F cuts the rear station alone, so the native prefix counts both.
-    slot_station = _checked_dimension(
-        adapter, view,
-        p0=(SLOT_X, -HALF_H-2.0, z), p1=(PIN_HOLE_X, -HALF_H-2.0, z),
-        text_xy=SLOT_STATION_TEXT_XY, label="dowel slot from dowel hole",
-        expected_mm=HANGER_SLOT_FROM_ROUND, orientation="horizontal",
-        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
-        entities=(axes[2], axes[1]),
-        suffix=SLOT_STATION_CALLOUT,
-    )
-    slot_station.SetText(1, "2X ")  # swDimensionTextPrefix
-    if str(slot_station.GetText(1) or "") != "2X ":
-        raise RuntimeError("dowel slot from dowel hole: 2X prefix did not persist")
-    slot_station_annotation = _early_bound(slot_station.GetAnnotation(), "IAnnotation")
-    offset_dimension_text(
-        adapter, [slot_station_annotation],
-        {dimension_name(adapter, slot_station_annotation): SLOT_STATION_OFFSET_XY},
-    )
-    # The slot's end walls, where the cut runs through both end radii: the
-    # straight run plus one width.
-    slot_ends = [
-        _cut_face_edge(
-            edges, fixed={0: SLOT_X + side * HANGER_SLOT_LENGTH / 2.0, 2: z},
-            label=f"dowel slot {name} end wall",
-        )
-        for side, name in ((-1.0, "outer"), (1.0, "inner"))
-    ]
-    if abs(SLOT_FLAT + HANGER_SLOT_WIDTH - HANGER_SLOT_LENGTH) > 1e-9:
-        raise RuntimeError("dowel slot length is not its run plus one width")
+    # The -X ream's station along the dowel line: the same plain .XXX from
+    # the screw axis, not chained from the +X ream, since the knife mount
+    # fits turned 180 deg (its round hole on the -X ream).  Its position
+    # frame on the plan holds it across the line only ("ALONG B-C ONLY").
     _checked_dimension(
         adapter, view,
-        p0=slot_ends[0][1], p1=slot_ends[1][1],
-        text_xy=SLOT_LENGTH_TEXT_XY, label="dowel slot length",
-        expected_mm=HANGER_SLOT_LENGTH, orientation="horizontal",
-        entities=(slot_ends[0][0], slot_ends[1][0]),
-        suffix=HANGER_SLOT_LENGTH_CALLOUT,
-        offset_text=SLOT_LENGTH_OFFSET_XY,
+        p0=(HANGER_X, -HALF_H-2.0, z), p1=(PIN_HOLE_NEG_X, -HALF_H-2.0, z),
+        text_xy=NEG_STATION_TEXT_XY, label="-X dowel ream from hanger axis",
+        expected_mm=HANGER_PIN_X, orientation="horizontal",
+        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
+        entities=(axes[0], axes[2]),
+        suffix=PIN_STATION_CALLOUT,
+        offset_text=NEG_STATION_OFFSET_XY,
     )
     dimensions = curate_view_dimensions(
         adapter, view,
@@ -2292,138 +2239,61 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
     return detail
 
 
-def _hanger_slot_detail(adapter: Any, parent_view: Any) -> Any:
-    """Enlarge the front slot in Bottom for its sole radius-centre reference."""
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    parent = _early_bound(parent_view, "IView")
-    if not drawing.ActivateView(view_name(adapter, parent_view)):
-        raise RuntimeError("failed to activate slot-detail parent")
-    draw.ClearSelection2(True)
-    model_centre = (SLOT_X, -HALF_H, STUD_Z_FRONT)
-    parent.UpdateViewDisplayGeometry()
-    centre, rim = [
-        model_point_in_view(
-            adapter, parent_view, tuple(value / 1000.0 for value in xyz),
-            label="slot-detail fence",
-        )
-        for xyz in (
-            model_centre,
-            (SLOT_X + SLOT_DETAIL_RADIUS_MM, -HALF_H, STUD_Z_FRONT),
-        )
-    ]
-    sketch = _early_bound(parent.GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    points = []
-    for x, y in (centre, rim):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        points.append(tuple(_early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData))
-    manager = _early_bound(draw.SketchManager, "ISketchManager")
-    previous_add_to_db = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        fence = manager.CreateCircle(*points[0], *points[1])
-    finally:
-        manager.AddToDB = previous_add_to_db
-    if fence is None:
-        raise RuntimeError("failed to create slot-detail fence")
-    arc = _early_bound(fence, "ISketchArc")
-    placed = _early_bound(arc.GetCenterPoint2(), "ISketchPoint")
-    placed_centre = [float(adapter._get_attr_or_call(placed, axis)) for axis in "XY"]
-    if math.dist(placed_centre, points[0][:2]) > 1e-9 or not math.isclose(
-        float(arc.GetRadius()), math.dist(points[0][:2], points[1][:2]), abs_tol=1e-9
-    ):
-        raise RuntimeError("slot-detail fence moved from where it was placed")
-    draw.ClearSelection2(True)
-    if not _early_bound(fence, "ISketchSegment").Select4(False, None):
-        raise RuntimeError("failed to select slot-detail fence")
-    detail = drawing.CreateDetailViewAt4(
-        *SLOT_DETAIL_CENTER, 0.0, 0, *SLOT_DETAIL_SCALE, "L", 1, True, False, False, 5,
-    )
-    if detail is None:
-        raise RuntimeError("failed to create native slot detail L")
-    detail = _early_bound(detail, "IView")
-    detail.ScaleRatio = double_array([float(value) for value in SLOT_DETAIL_SCALE])
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="_hanger_slot_detail")
-    set_hidden_lines_removed(adapter, detail)
-    outline = tuple(float(value) for value in detail.GetOutline())
-    position = tuple(float(value) for value in detail.Position)
-    if len(outline) != 4 or len(position) != 2:
-        raise RuntimeError("slot detail L has invalid initial bounds")
-    span = 2.0 * SLOT_DETAIL_RADIUS_MM * SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1] / 1000.0
-    if min(outline[2] - outline[0], outline[3] - outline[1]) < 0.95 * span:
-        raise RuntimeError(f"slot detail L is smaller than its fence: {outline}")
-    target = [
-        position[axis] + SLOT_DETAIL_CENTER[axis] - (outline[axis] + outline[axis + 2]) / 2.0
-        for axis in range(2)
-    ]
-    if not detail.SetViewPosition(double_array(target), False):
-        raise RuntimeError("failed to position slot detail L")
-    rebuild_drawing(adapter, label="_hanger_slot_detail")
-    outline = tuple(float(value) for value in detail.GetOutline())
-    ratio = tuple(float(value) for value in detail.ScaleRatio)
-    if len(outline) != 4 or len(ratio) != 2:
-        raise RuntimeError("slot detail L has invalid final bounds")
-    if not math.isclose(ratio[0] / ratio[1], SLOT_DETAIL_SCALE[0] / SLOT_DETAIL_SCALE[1]):
-        raise RuntimeError("slot detail L scale did not persist")
-    if math.dist(
-        tuple((outline[axis] + outline[axis + 2]) / 2.0 for axis in range(2)),
-        SLOT_DETAIL_CENTER,
-    ) > 0.0001:
-        raise RuntimeError(f"slot detail L centre did not persist: {outline}")
-    raw_circle = detail.GetDetail()
-    if raw_circle is None:
-        raise RuntimeError("slot detail L has no native parent circle")
-    circle = _early_bound(raw_circle, "IDetailCircle")
-    if str(circle.GetLabel()) != "L":
-        raise RuntimeError("slot detail L has the wrong native parent label")
-    # This detail owns its circle; J is another circle on the same parent.
-    circle.SetLabelPosition(*SLOT_DETAIL_LETTER_XY)
-    rebuild_drawing(adapter, label="_hanger_slot_detail")
-    letter = tuple(float(value) for value in circle.GetLabelPosition())
-    if len(letter) != 2 or math.dist(letter, SLOT_DETAIL_LETTER_XY) > 1e-8:
-        raise RuntimeError(f"slot detail L's letter did not persist: {letter}")
-    _position_view_caption(adapter, detail, SLOT_DETAIL_CAPTION_XY)
-    centre_m = tuple(value / 1000.0 for value in model_centre)
-    settle_detail_projection(
-        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
-        tolerance_xy=(0.0001, 0.0001), label="slot detail L",
-    )
-    radius_centres = tuple(
-        (SLOT_X + side * SLOT_FLAT / 2.0, -HALF_H, STUD_Z_FRONT)
-        for side in (-1.0, 1.0)
-    )
-    # Bottom projects model Y end-on: the short local axes run along Z.
-    axis_half_length = HANGER_SLOT_WIDTH / 2.0 + 0.4
-    axes = _add_view_centerlines(
-        adapter, detail,
-        tuple(
-            ((x, y, z - axis_half_length), (x, y, z + axis_half_length))
-            for x, y, z in radius_centres
-        ),
-    )
-    centre = settle_detail_projection(
-        adapter, detail, centre_m, ink_xy=SLOT_DETAIL_CENTER,
-        tolerance_xy=(0.0001, 0.0001), label="slot detail L radius centres",
-    )
-    # Source-derived REF only: F-F's overall and the locator's width control.
-    slot_centres = _checked_dimension(
-        adapter, detail, p0=radius_centres[0], p1=radius_centres[1],
-        text_xy=(centre[0], SLOT_DETAIL_RADIUS_CENTRES_LINE_Y),
-        label="dowel slot radius centres", expected_mm=SLOT_FLAT,
-        orientation="horizontal", reference=True,
-        entity_types=("SKETCHSEGMENT", "SKETCHSEGMENT"),
-        entities=(axes[0], axes[1]), suffix="SLOT RADIUS\nCENTRES",
-        offset_text=SLOT_DETAIL_RADIUS_CENTRES_OFFSET_XY,
-    )
-    slot_centres.ArrowSide = _DIM_ARROWS_OUTSIDE
-    if int(slot_centres.ArrowSide) != _DIM_ARROWS_OUTSIDE:
-        raise RuntimeError("dowel slot radius centres did not keep their arrows outside")
-    return detail
+def _set_callout_text(display: Any, which: int, text: str, label: str) -> None:
+    """Put prose ABOVE (``which`` 3) or UNDER (4) a native hole callout.
+
+    The draw_dt_crankshaft knockout form: the drill reads first, the purpose
+    under it.  ``SetText`` reports nothing, so it is read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(which, text)  # swDimensionTextCalloutAbove/Below
+    applied = str(display.GetText(which) or "")
+    if applied.replace("\r", "") != text:
+        raise RuntimeError(f"{label}: callout text {which} did not persist: {applied!r}")
 
 
+_MOD_DIAM_VALUE = re.compile(r"<MOD-DIAM>(\d+(?:\.\d+)?)")
+
+
+def _drop_coaxial_step(display: Any, step_dia: float, label: str) -> None:
+    """Clear the coaxial ream's step SolidWorks folds into a native callout.
+
+    Each knockout and its ream meet end to end, so the knockout's callout
+    may read the pair as one stepped hole (draw_dt_crankshaft's farm
+    evidence: ``<MOD-DIAM>1.40<HOLE-DEPTH>12.63`` in the callout-above part,
+    run 20261018T110810560Z-720787ec).  The ream has its own dimension and
+    callout, so its step is cleared.  Only a definition part STARTING with
+    that step's diameter (at whatever places it prints) is cleared; the step
+    anywhere else fails loud.  A bare counterbore symbol before the size
+    goes with the step (machinist review of b5c02e5d6).  Read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+
+    def _is_step(match: re.Match[str]) -> bool:
+        return math.isclose(float(match.group(1)), step_dia, abs_tol=0.006)
+
+    holders = [
+        part for part, text in definitions.items()
+        if any(_is_step(match) for match in _MOD_DIAM_VALUE.finditer(text))
+    ]
+    for part in holders:
+        steps = [m for m in _MOD_DIAM_VALUE.finditer(definitions[part]) if _is_step(m)]
+        if len(steps) != 1 or steps[0].start() != 0:
+            raise RuntimeError(f"{label}: coaxial step mixed into part {part}: {definitions!r}")
+        display.SetText(part - 4, "")  # definition part 5..8 -> writable 1..4
+        if str(display.GetText(part) or ""):
+            raise RuntimeError(f"{label}: coaxial step in part {part} did not clear")
+    if not holders:
+        return
+    prefix = definitions[5]
+    if "<HOLE-SPOT>" in prefix and 5 not in holders:
+        bare = prefix.replace("<HOLE-SPOT>", "")
+        display.SetText(1, bare)
+        applied = str(display.GetText(5) or "")
+        if applied.replace("\r", "") != bare:
+            raise RuntimeError(f"{label}: counterbore symbol did not clear: {applied!r}")
+    _telemetry.info(f"{label}: cleared coaxial step from parts {holders}: {definitions!r}")
 
 
 def _finish_leader_tail(symbol: Any, *, label: str, length: float = FINISH_LEADER_TAIL) -> None:
@@ -3950,9 +3820,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # precision (machinist review r1: its dashed cross-tap and pad edges
     # communicated nothing, its circles printed faceted).
     set_hidden_lines_removed(adapter, geometry_bottom)
-    # Create L before the locator's authored annotations; import no dimensions
-    # into it. Native inspection still must rule out inherited annotations.
-    _hanger_slot_detail(adapter, hub_bottom_parent)
     hub_bottom_edges = scan_view_edges(hub_bottom_parent, label="underside locator")
     geometry_bottom_edges = scan_view_edges(geometry_bottom, label="enlarged underside")
     bottom_dimensions = curate_view_dimensions(
@@ -4033,88 +3900,93 @@ async def build(adapter: Any) -> dict[str, str]:
         exact_linear=True, edges=hub_bottom_edges,
         suffix="2X POCKET, E-E", offset_text=POCKET_LENGTH_OFFSET_XY,
     )
-    # The knife-hanger dowel pattern: datum B the front round hole, datum C
-    # the rear one; each slot located to the near round hole, free along the
+    # The knife-hanger dowel pattern: datum B the front +X ream, datum C the
+    # rear one; each -X ream located to the near +X ream, free along the
     # line to the far one (tolerance-gdt-assessment / drawing-guidelines.md rule 5 (avoid excessive GD&T)).  Each
-    # tag is attached by a sheet-point pick on its hole's rim, toward the tag,
+    # tag is attached by a sheet-point pick on its ream's rim, toward the tag,
     # proved to be the scanned circle: selected as an edge object, the tag
     # ignored SetPosition2 and stayed at its default drop, 37.6 mm from its
     # request (farm run 20261009T164113078Z; layout-tuning lesson h).
     for datum, station_z in (("B", STUD_Z_FRONT), ("C", STUD_Z_REAR)):
-        round_hole = hub_bottom_edges.circle_at(
+        datum_ream = hub_bottom_edges.circle_at(
             (PIN_HOLE_X, -HALF_H, station_z), HANGER_PIN_HOLE_DIA/2,
             axis=(0.0, 1.0, 0.0),
-            label=f"underside locator datum {datum} round dowel hole",
+            label=f"underside locator datum {datum} +X dowel ream",
         ).edge
-        hole_centre = model_point_in_view(
+        ream_centre = model_point_in_view(
             adapter, hub_bottom_parent,
             (PIN_HOLE_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
-            label=f"underside locator datum {datum} round dowel hole centre",
+            label=f"underside locator datum {datum} +X dowel ream centre",
         )
-        datum_pick = hanger_datum_pick(hole_centre, HANGER_DATUM_SYMBOL_XY[datum])
+        datum_pick = hanger_ream_rim(ream_centre, HANGER_DATUM_SYMBOL_XY[datum])
         with _zoomed_on(adapter, datum_pick, HANGER_DATUM_PICK_ZOOM_HALF):
             add_datum_feature(
                 adapter, hub_bottom_parent,
-                edge_xy=datum_pick, expected_entity=round_hole,
+                edge_xy=datum_pick, expected_entity=datum_ream,
                 symbol_xy=HANGER_DATUM_SYMBOL_XY[datum], datum=datum,
-                label=f"knife-hanger round dowel hole datum {datum}",
+                label=f"knife-hanger +X dowel ream datum {datum}",
             )
-    # Each frame's leader lands on the slot's end arc facing the frame's
-    # knee, so it runs straight down from above the plan.
+    # Each frame's leader lands on its -X ream's rim facing the frame's
+    # knee, so it runs straight down from beside the plan.
     for station, station_z, datums in (
         ("front", STUD_Z_FRONT, ("B", "C")),
         ("rear", STUD_Z_REAR, ("C", "B")),
     ):
-        slot_centre = model_point_in_view(
+        ream_centre = model_point_in_view(
             adapter, hub_bottom_parent,
-            (SLOT_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
-            label=f"underside locator {station} dowel slot centre",
+            (PIN_HOLE_NEG_X/1000.0, -HALF_H/1000.0, station_z/1000.0),
+            label=f"underside locator {station} -X dowel ream centre",
         )
-        knee = hanger_slot_frame_knee(HANGER_SLOT_FRAME_XY[station], slot_centre)
-        end, end_name = (1.0, "inner") if knee[0] > slot_centre[0] else (-1.0, "outer")
-        end_x = SLOT_X + end * SLOT_FLAT / 2.0
-        end_centre = model_point_in_view(
-            adapter, hub_bottom_parent,
-            (end_x/1000.0, -HALF_H/1000.0, station_z/1000.0),
-            label=f"underside locator {station} dowel slot {end_name} end centre",
-        )
+        knee = hanger_ream_frame_knee(HANGER_REAM_FRAME_XY[station], ream_centre)
         add_feature_control_frame(
             adapter, hub_bottom_parent,
             edge_entity=hub_bottom_edges.circle_at(
-                (end_x, -HALF_H, station_z), HANGER_SLOT_WIDTH/2,
+                (PIN_HOLE_NEG_X, -HALF_H, station_z), HANGER_PIN_HOLE_DIA/2,
                 axis=(0.0, 1.0, 0.0),
-                label=f"underside locator {station} dowel slot {end_name} end",
+                label=f"underside locator {station} -X dowel ream",
             ).edge,
-            leader_attach_xy=hanger_slot_landing(end_centre, knee),
-            frame_xy=HANGER_SLOT_FRAME_XY[station],
+            leader_attach_xy=hanger_ream_rim(ream_centre, knee),
+            frame_xy=HANGER_REAM_FRAME_XY[station],
             characteristic="position",
-            tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
+            tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger press ream position"],
             datums=datums,
             translated=datums[1:],
-            quantity=HANGER_SLOT_FRAME_QUANTITY,
-            label=f"knife-hanger {station} dowel slot position",
+            quantity=HANGER_REAM_FRAME_QUANTITY,
+            label=f"knife-hanger {station} -X dowel ream position",
         )
     locator_dimensions = curate_view_dimensions(
         adapter, hub_bottom_parent,
-        keep={
-            "HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY,
-            "HangerPinHoleDia": HANGER_PIN_DIA_TEXT_XY,
-        },
-        view_label="underside locator dowel slot and round hole",
+        keep={"HangerPinHoleDia": HANGER_PIN_DIA_TEXT_XY},
+        view_label="underside locator dowel ream",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     set_dimension_callouts(
         adapter,
         locator_dimensions,
-        {
-            "HangerSlotWidth": HANGER_SLOT_WIDTH_CALLOUT,
-            "HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT,
-        },
-    )
-    offset_dimension_text(
-        adapter, locator_dimensions, {"HangerSlotWidth": HANGER_SLOT_WIDTH_OFFSET_XY}
+        {"HangerPinHoleDia": HANGER_PIN_HOLE_CALLOUT},
     )
     imported_annotations += locator_dimensions
+    # The knockouts' native Hole Wizard callout, on the front -X ream's
+    # knockout circle where it breaks into the ream's floor.
+    knockouts = add_native_hole_callout(
+        adapter,
+        hub_bottom_parent,
+        callout_xy=HANGER_KNOCKOUT_CALLOUT_XY,
+        label="4X dowel ream knockouts",
+        edge=hub_bottom_edges.circle_at(
+            (PIN_HOLE_NEG_X, -HALF_H + HANGER_PIN_HOLE_DEPTH, STUD_Z_FRONT),
+            HANGER_KNOCKOUT_DIA/2,
+            axis=(0.0, 1.0, 0.0),
+            label="underside locator front -X ream knockout floor",
+        ).edge,
+    )
+    _drop_coaxial_step(knockouts, HANGER_PIN_HOLE_DIA, "4X dowel ream knockouts")
+    _set_callout_text(
+        knockouts, 3, HANGER_KNOCKOUT_CALLOUT_ABOVE, "4X dowel ream knockouts"
+    )
+    _set_callout_text(
+        knockouts, 4, HANGER_KNOCKOUT_CALLOUT_BELOW, "4X dowel ream knockouts"
+    )
     gusset_z = GOOSENECK_Z + (HUB_GUSSET_HALF_IN+HUB_GUSSET_HALF_OUT)/2
     gusset_y = -HALF_H-HUB_BOSS_DROP/2
     _checked_dimension(

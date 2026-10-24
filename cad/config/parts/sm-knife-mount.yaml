@@ -2,13 +2,13 @@ sm-knife-mount:
   number: MHA-SM-02
   material: AISI O1 tool steel
   material_specification: AISI O1 tool steel
-  finish: hardened and tempered 58-60 HRC, unpainted
+  finish: 58-60 HRC, unpainted; sizes apply after hardening
   quantity: 2
   tolerance_class: machined_block
   process: "machined (steel)"
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the 2X dowel-hole position frame, the bore squareness controls and the #10-24 hanger-tap position frame"
-      finding: "position and perpendicularity frames over-specified (rule 5)"
-      reason: "keeps the knife-edge dowel pattern and bore square consistent, and lets the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control)"
+      where: "the datum-C dowel slot's position frame and the #10-24 hanger-tap and knife-bore position frames to A|B|C"
+      finding: "position frames over-specified (rule 5)"
+      reason: "keep the knife bore square to the dowel line and let the crossbar clearance hole float round the bolt (owner-accepted knife-edge-system control; the slot frame moved here from MHA-FR-02 with the slot, owner ruling 2026-10-24 T+H3)"

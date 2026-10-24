@@ -23,7 +23,13 @@ import sm_vn_knife_hanger_washer_spec as HANGER_WASHER
 import sm_vn_knife_mount_dowel_spec as KNIFE_DOWEL
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _gtol_cylinder import CylinderFace
-from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import (
+    CLEARANCE_MM,
+    THREAD_MAJOR_MM,
+    HoleSpec,
+    blind_cut_dia_mm,
+    drill_process,
+)
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 from _cone_axis_constants import (
     FRAME_FRONT_COLUMN_Z,
@@ -84,15 +90,18 @@ def _sag(radius: float) -> float:
     return radius - sqrt(radius**2 - (SET_SCREW_MAJOR_DIA / 2.0) ** 2)
 
 
-# --- Knife-hanger hex-bolt clearance holes and dowel slip holes (crossbar) ----
+# --- Knife-hanger hex-bolt clearance holes and dowel press reams (crossbar) ---
 #
 # Each MHA-SM-02 knife mount hangs under the integral crossbar on one
 # cut-to-length #10-24 plain hex bolt (MHA-SM-VN-52). Its SAE washer bears on
 # the FACED top plane; the block's top seat bears on the FINISHED
-# underside. The two MHA-SM-VN-53 dowels retain their round-hole/slot scheme:
-# +X locates in a round blind slip hole, -X in a blind slip-width slot.
-# Slot travel absorbs the pair's spacing mismatch (drawing-guidelines.md
-# rule 19 (absorb stacks at fit-up, not with tighter bands)).
+# underside. Owner ruling 2026-10-24 (T+H3): the two MHA-SM-VN-53 dowels
+# PRESS into this soft casting, each to the flat floor of a blind ream cut
+# from the faced underside, with a knockout drilled through from the faced
+# top on the ream's axis to that floor (drawing-guidelines.md rule 16, a
+# pressed dowel needs a way out; the dt_crankshaft K0 precedent).  The
+# round slip hole and the slot that absorbs the pair's spacing mismatch
+# (rule 19) moved to the hardened MHA-SM-02 block (``sm_knife_mount_spec``).
 _X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("\u00b1"))
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
@@ -131,100 +140,85 @@ HANGER_WASHER_CONCENTRIC_ANNULUS_MIN = (
 ) / 2.0
 if HANGER_WASHER_CONCENTRIC_ANNULUS_MIN <= 0.0:
     raise AssertionError("knife-hanger washer lacks a bearing annulus round its hole")
-# The dowel slip hole: a slip on the pin's catalogue diameter at 0.02..0.10
-# diametral clearance (the dt_pinion_cam_spec slip band), reamed to an
-# explicit +/-0.03 band and printed .XXX: 0.0274..0.0925.
+# The dowel press reams: at each hanger station both dowel holes are blind
+# flat-floor reams cut KNIFE_DOWEL.PRESS_DEPTH up from the faced underside
+# to the dowel spec's press band, Ø3.175 +0.000/-0.010 printed .XXX (press
+# 0.0025..0.0177 on the catalogue pin), four in all.
 HANGER_PIN_X = KNIFE_DOWEL.HANGER_OFFSET  # 7.632 either side of the bolt axis
 # The pair's stations from the screw axis in the dowel spec's order: the -X
-# slot, then the +X round hole.
+# ream, then the +X ream (datum B front, C rear).
 HANGER_PIN_XS = (-HANGER_PIN_X, HANGER_PIN_X)
-HANGER_SLOT_X, HANGER_ROUND_X = HANGER_PIN_XS
 HANGER_PIN_X_PLACES = KNIFE_DOWEL.HANGER_OFFSET_PLACES
 HANGER_PIN_X_TOL = KNIFE_DOWEL.HANGER_OFFSET_TOL  # 0.13
-HANGER_PIN_HOLE_DIA = 3.24
-HANGER_PIN_HOLE_DIA_BAND = (0.03, -0.03)
-HANGER_PIN_HOLE_DIA_PLACES = 3
-HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.SLIP_DEPTH  # 12.0, from the underside
-HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.SLIP_DEPTH_PLACES
-HANGER_PIN_SLIP_CLEARANCE_MIN = round(
-    HANGER_PIN_HOLE_DIA + HANGER_PIN_HOLE_DIA_BAND[1] - KNIFE_DOWEL.DIA_MAX, 6
-)
-HANGER_PIN_SLIP_CLEARANCE_MAX = round(
-    HANGER_PIN_HOLE_DIA + HANGER_PIN_HOLE_DIA_BAND[0] - KNIFE_DOWEL.DIA_MIN, 6
-)
-if HANGER_PIN_SLIP_CLEARANCE_MIN < 0.02 or HANGER_PIN_SLIP_CLEARANCE_MAX > 0.10:
-    raise AssertionError(
-        f"knife-mount dowel slip clearance {HANGER_PIN_SLIP_CLEARANCE_MIN}-"
-        f"{HANGER_PIN_SLIP_CLEARANCE_MAX} is outside 0.02-0.10"
-    )
+HANGER_PIN_HOLE_DIA = KNIFE_DOWEL.PRESS_HOLE_DIA  # 3.175
+HANGER_PIN_HOLE_DIA_BAND = KNIFE_DOWEL.PRESS_HOLE_DIA_BAND  # (0.0, -0.010)
+HANGER_PIN_HOLE_DIA_PLACES = KNIFE_DOWEL.PRESS_HOLE_DIA_PLACES
+HANGER_PIN_HOLE_DIA_MIN = HANGER_PIN_HOLE_DIA + min(HANGER_PIN_HOLE_DIA_BAND)
+HANGER_PIN_HOLE_DIA_MAX = HANGER_PIN_HOLE_DIA + max(HANGER_PIN_HOLE_DIA_BAND)
+HANGER_PIN_HOLE_DEPTH = KNIFE_DOWEL.PRESS_DEPTH  # 12.0, from the underside
+HANGER_PIN_HOLE_DEPTH_PLACES = KNIFE_DOWEL.PRESS_DEPTH_PLACES
+HANGER_PIN_HOLE_DEPTH_TOL = KNIFE_DOWEL.PRESS_DEPTH_TOL  # 0.8
+# Each ream stands .XXX HANGER_PIN_X from its own screw axis along the
+# dowel line, the -X one as well as the +X one: the knife mount fits turned
+# 180 deg too (its round hole on the -X ream), so neither ream may chain
+# from the other.  The span between them is derived, two .XXX bands, and the
+# knife mount's slot takes it as travel.
 # Manufacturing GD&T limits consumed by the part's drawing projection: each
-# slot's width to its round hole (datum B front, C rear), oriented by the
-# other round hole with its location released (translation modifier), so the
-# two mounts' dowel lines stay square to the B-C line.  The values stay
-# literals (the FCF provenance scan reads them).  The keeper seats carry no
-# frame: rule 5 names flatness on a clamp face over-specification and no
-# user ruling accepts one (codex review of 06d0bbc59); the faced top (RV-03)
-# carries them.
+# -X ream's position ACROSS its dowel line to the +X ream beside it (datum B
+# front, C rear), oriented by the other station's +X ream with its location
+# released (translation modifier), so the two mounts' dowel lines stay square
+# to the B-C line (the old slot-width frame's semantics, moved to the ream).
+# Along the line each ream stays .XXX from its screw axis (HANGER_PIN_X_TOL).
+# The values stay literals (the FCF provenance scan reads them).  The keeper
+# seats carry no frame: rule 5 names flatness on a clamp face
+# over-specification and no user ruling accepts one (codex review of
+# 06d0bbc59); the faced top (RV-03) carries them.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "knife-hanger slot position": "0.05",
+    "knife-hanger press ream position": "0.05",
     "knife-hanger crossbar centring": "0.10",
 }
 HANGER_CROSSBAR_CENTER_ZONE = float(
     GEOMETRIC_TOLERANCES_MM["knife-hanger crossbar centring"]
 )
 HANGER_CROSSBAR_CENTER_TOL = HANGER_CROSSBAR_CENTER_ZONE / 2.0
-HANGER_SLOT_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"])
-# The slot's station from its round hole along the slot.  The frame's zone
-# holds the slot's width (across the dowel line), at an implied basic zero
-# from its round hole and an implied basic 90 deg to the B-C line; it does
-# not reach along the slot, so the 15.264 there is an ordinary .XXX
-# dimension, not a basic (codex review of 06d0bbc59: boxed, it left that
-# direction with no limit).  The wall and travel stacks charge that band:
-# from the screw axis the round hole's .XXX band plus its own, 0.26.
-HANGER_SLOT_FROM_ROUND = HANGER_ROUND_X - HANGER_SLOT_X  # 15.264
-HANGER_SLOT_FROM_ROUND_PLACES = 3
-HANGER_SLOT_ALONG_TOL = _XXX  # 0.13, the .XXX band charged along the slot
-HANGER_SLOT_STATION_TOL = HANGER_PIN_X_TOL + HANGER_SLOT_ALONG_TOL
-# The -X dowel's blind slot retains the round hole's slip width and depth.
-# Its shortest 3.820 takes the required 3.79508 travel. The functional .XXX
-# length limits the longest slot to 4.080; together with the spread dowels
-# and 25.0 crossbar, this retains the 2.0 wall guards at the printed bands
-# (drawing-guidelines.md rule 17 (walls and webs)).
-HANGER_SLOT_WIDTH = HANGER_PIN_HOLE_DIA
-HANGER_SLOT_WIDTH_BAND = HANGER_PIN_HOLE_DIA_BAND
-HANGER_SLOT_WIDTH_PLACES = HANGER_PIN_HOLE_DIA_PLACES
-HANGER_SLOT_LENGTH = 3.95
-HANGER_SLOT_LENGTH_PLACES = 3
-HANGER_SLOT_LENGTH_TOL = _XXX  # 0.13, functional (above)
-HANGER_SLOT_DEPTH = HANGER_PIN_HOLE_DEPTH
-HANGER_SLOT_TRAVEL = (
-    HANGER_SLOT_ALONG_TOL + KNIFE_DOWEL.SPAN_TOL + HANGER_PIN_SLIP_CLEARANCE_MAX / 2.0
-)  # 0.306
-HANGER_SLOT_LENGTH_REQUIRED = KNIFE_DOWEL.DIA_MAX + 2.0 * HANGER_SLOT_TRAVEL  # 3.795
-if HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL < HANGER_SLOT_LENGTH_REQUIRED:
-    raise AssertionError(
-        f"knife-hanger slot {HANGER_SLOT_LENGTH - HANGER_SLOT_LENGTH_TOL:.3f} long"
-        f" at its shortest does not take the dowel's"
-        f" {HANGER_SLOT_LENGTH_REQUIRED:.3f} travel"
-    )
+HANGER_PRESS_HOLE_POSITION_TOL = float(
+    GEOMETRIC_TOLERANCES_MM["knife-hanger press ream position"]
+)
 # The drilled #10 hole's float about the bolt shank is 0.6095 radial.
 # The assembly proves the tap/dowel mismatch plus underside-entry drill
 # drift stays inside that float.
 HANGER_SCREW_FLOAT = (HANGER_CLEARANCE_DIA - HANGER_SCREW.SHANK_DIA) / 2.0
-# Suffixes on the model's own slip-hole and slot sizes and the depth they
-# share (drawing-guidelines.md rule 7 (notes: few, flagged, never a method) and drawing-guidelines.md rule 12 (hole and slot callouts say what to do): count, process and purpose; the size and its band
-# print natively): section F-F carries the round holes' size, the depth of
-# all four (both holes and both slots floor at one height) and the slots'
-# length; the underside locator the slots' width.  Each names its mate by
-# number and name (codex review of 59f405ab).
-HANGER_PIN_HOLE_CALLOUT = "2X BLIND FLAT-BOTTOM REAM\nSLIP FIT MHA-SM-VN-53 DOWEL"
-HANGER_PIN_DEPTH_CALLOUT = "4X"
-# Milled to width: a reamer cannot make a slot 0.71 longer than it is wide
-# (machinist review r1, 2026-10-18).
-HANGER_SLOT_WIDTH_CALLOUT = "2X BLIND SLOT WIDTH\nSLIP FIT MHA-SM-VN-53 DOWEL"
-# The overall length's three places are functional (above); the reference
-# radius-centre span adds no tolerance or independent acceptance criterion.
-HANGER_SLOT_LENGTH_CALLOUT = "2X OVERALL SLOT LENGTH,\nMHA-SM-VN-53 DOWEL TRAVEL"
+# Each ream's knockout (rule 16): a #43 drill through from the faced top on
+# the ream's axis, breaking into its floor, so a pin punch drives the dowel
+# back out of the underside.  The ream keeps its depth, so the dowel still
+# bottoms on the annular floor the knockout leaves: the smallest ream less
+# the largest knockout (DRILLED HOLES row) keeps a 0.4 land (dt_crankshaft
+# DRIVE_PIN_FLOOR_LAND_WORST).  It runs from the top at the grip's far limit
+# to the floor at its shallowest printed depth.
+HANGER_KNOCKOUT_SPEC = HoleSpec("drilled_number", "#43")
+HANGER_KNOCKOUT_DIA = blind_cut_dia_mm(HANGER_KNOCKOUT_SPEC)  # 2.261
+HANGER_KNOCKOUT_DIA_MAX = HANGER_KNOCKOUT_DIA + DRILL_OVERSIZE  # 2.361
+HANGER_KNOCKOUT_LENGTH = RING_HEIGHT - HANGER_PIN_HOLE_DEPTH  # 24.5
+HANGER_KNOCKOUT_LENGTH_MAX = (
+    HANGER_GRIP + HANGER_GRIP_TOL - (HANGER_PIN_HOLE_DEPTH - HANGER_PIN_HOLE_DEPTH_TOL)
+)  # 25.81
+HANGER_PIN_FLOOR_LAND_MIN = (HANGER_PIN_HOLE_DIA_MIN - HANGER_KNOCKOUT_DIA_MAX) / 2.0
+if HANGER_PIN_FLOOR_LAND_MIN < 0.4:
+    raise AssertionError(
+        f"the knockout leaves the pressed MHA-SM-VN-53 a {HANGER_PIN_FLOOR_LAND_MIN:.3f}"
+        " floor land, under 0.4"
+    )
+# Callouts on the model's own ream size and depth (drawing-guidelines.md
+# rule 4: a REAM names its mate and fit; rule 12: count, process and
+# purpose; the size and its band print natively).  The underside locator
+# carries the ream size, its count, mate and press on one row under it; F-F
+# the depth all four share, to a flat floor.  The knockouts' native callout
+# reads its drill above the native size and its purpose below
+# (dt_crankshaft_notes.KNOCKOUT_CALLOUT_*).
+HANGER_PIN_HOLE_CALLOUT = "4X REAM, PRESS MHA-SM-VN-53 DOWEL TO FLOOR"
+HANGER_PIN_DEPTH_CALLOUT = "4X FLAT BOTTOM"
+HANGER_KNOCKOUT_CALLOUT_ABOVE = drill_process(HANGER_KNOCKOUT_SPEC)  # "#43 DRILL"
+HANGER_KNOCKOUT_CALLOUT_BELOW = "MHA-SM-VN-53 KNOCKOUT"
 
 # Full thread in the hub at the printed worst case (dt_arbor_pedestal_spec's
 # terms): the thread is full only where its major circle lies wholly in metal,
@@ -330,15 +324,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     # measures from the origin -- mid-air on the print -- so sheet 3
     # dimensions those stations from the socket bore axes with sheet-derived
     # dimensions (DRAWING_REFERENCE_PRECISION below, drawing-guidelines.md rule 10 (dimension from a real feature)).  The
-    # dowel slip holes' and slots' stations from the screw axis and the slot
-    # length are sheet-derived the same way; the round hole's size and depth
-    # are the model's, printed on section F-F, and the slot's width the
-    # model's, printed on the underside locator.
+    # dowel reams' stations (the +X ream from the screw axis, the -X ream
+    # from the +X ream) are sheet-derived the same way, on section F-F; the
+    # ream size is the model's, printed on the underside locator, and the
+    # depth the model's, printed on F-F.  The knockouts print their native
+    # Hole Wizard callout.
     "CapRecessProfile": {"CapRecessDia"},
     "CapRecesses": {"CapRecessDepth"},
     "HangerPinProfile": {"HangerPinHoleDia"},
     "HangerPinHoles": {"HangerPinHoleDepth"},
-    "HangerSlotProfile": {"HangerSlotWidth"},
 }
 
 
@@ -358,8 +352,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # and depth carry the bilateral bands above, the gooseneck bore prints the
 # clearance a purchased post is set into, the finished grip prints at the
 # owner's .XX (ruling 2026-10-18; the rail height, that same thickness,
-# prints its reference at the grip's places), and the dowel slip hole and
-# slot width hold their own +/-0.03 band at three places.
+# prints its reference at the grip's places), and the dowel press ream holds
+# its own +0.000/-0.010 band at three places.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OuterProfile": {"Width": 1, "Depth": 1, "WinWidth": 1, "WinDepth": 1},
     "WebRing": {"RingHeight": HANGER_GRIP_PLACES},
@@ -377,7 +371,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CapRecesses": {"CapRecessDepth": 2},
     "HangerPinProfile": {"HangerPinHoleDia": HANGER_PIN_HOLE_DIA_PLACES},
     "HangerPinHoles": {"HangerPinHoleDepth": HANGER_PIN_HOLE_DEPTH_PLACES},
-    "HangerSlotProfile": {"HangerSlotWidth": HANGER_SLOT_WIDTH_PLACES},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -467,17 +460,15 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "set-screw spot face from bore axis": HUB_SET_SPOT_PLACES,
     "set-screw thread length": 1,
     "set-screw boss face from bore axis": 1,
-    # Sheet 6, UNDERSIDE: junction lands, knife-hanger section F-F and detail L.
-    # The native finished-top grip is imported; stations and overall slot length
-    # are measured. L's source-derived radius-centre spacing is REF only.
+    # Sheet 6, UNDERSIDE: junction lands and knife-hanger section F-F.  The
+    # native finished-top grip and ream depth are imported; the ream
+    # stations are measured.
     "crossbar junction land": 1,
     "crossbar pocket length": 1,
     "crossbar pocket from front socket": 1,
     "underside gusset thickness": 1,
     "dowel hole from hanger axis": HANGER_PIN_X_PLACES,
-    "dowel slot from dowel hole": HANGER_SLOT_FROM_ROUND_PLACES,
-    "dowel slot length": HANGER_SLOT_LENGTH_PLACES,
-    "dowel slot radius centres": HANGER_SLOT_LENGTH_PLACES,
+    "-X dowel ream from hanger axis": HANGER_PIN_X_PLACES,
 }
 
 # Use the canonical printed-band reader, not the unrounded inch grades.
@@ -493,8 +484,9 @@ KEEPER_TAP_CALLOUT_PRECISION = {
 # printed cylindrical pilot depth, without relying on a precision drill jig.
 KEEPER_TAP_DRILL_WANDER_DEG = 0.3
 # The same allowance as a lateral drift per mm from a hole's entry face: the
-# knife-hanger holes, drilled from the faced underside, charge it
-# at the depth each wall is judged (``build_fr_top_frame``).
+# knife-hanger holes and reams, cut from the faced underside, and the
+# knockouts, drilled from the faced top, charge it at the depth each wall is
+# judged (``build_fr_top_frame``).
 DRILL_DRIFT_PER_MM = tan(radians(KEEPER_TAP_DRILL_WANDER_DEG))  # 0.00524
 
 # The nominal socket geometry stays fixed; the assigned actual tube governs fit
