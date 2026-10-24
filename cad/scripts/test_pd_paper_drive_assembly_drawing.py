@@ -596,6 +596,8 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "pd-vn-transgear-latch-pin",
     "pd-transgear-rear-bushing",
 }
+# Hidden in the arm's counterbore from the isometric; Section A-A balloons them.
+BALLOONED_BY_SECTION_A_A = {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
 
 
 def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None:
@@ -608,11 +610,19 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
     iso_stems = {stem for stem, _item in iso}
     exploded_stems = {stem for stem, _item in exploded}
     assert drawing.ISO_HIDDEN_STEMS == HIDDEN_BY_THE_ISOMETRIC
-    assert iso_stems == set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC
+    assert drawing.ISO_SECTION_ONLY_STEMS == BALLOONED_BY_SECTION_A_A
+    assert iso_stems == (
+        set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC - BALLOONED_BY_SECTION_A_A
+    )
     assert exploded_stems == explode.TRANSGEAR_SHOWN_STEMS
     assert HIDDEN_BY_THE_ISOMETRIC < exploded_stems
-    # Every transgear family is ballooned on sheet 2 or sheet 3.
-    assert iso_stems | exploded_stems == set(CONTRACT_TRANSGEAR_QUANTITIES)
+    # Every transgear family is ballooned on sheet 2 (isometric or Section
+    # A-A) or sheet 3.
+    section = {stem for stem, *_ in drawing.PIVOT_BALLOON_TIPS}
+    assert BALLOONED_BY_SECTION_A_A <= section
+    assert iso_stems | exploded_stems | BALLOONED_BY_SECTION_A_A == set(
+        CONTRACT_TRANSGEAR_QUANTITIES
+    )
     for balloons in (iso, exploded):
         assert all(items[stem] == item for stem, item in balloons)
         numbers = [int(item) for _stem, item in balloons]
@@ -1388,7 +1398,7 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
         exploded,
     )
     ballooned = [stem for plan in plans for stem, _item in plan]
-    assert set(ballooned) == set(drawing.BOM_PART_NUMBERS)
+    assert set(ballooned) | BALLOONED_BY_SECTION_A_A == set(drawing.BOM_PART_NUMBERS)
     for plan in plans:
         assert [int(item) for _stem, item in plan] == sorted(
             int(item) for _stem, item in plan

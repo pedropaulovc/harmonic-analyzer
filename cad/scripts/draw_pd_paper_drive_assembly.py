@@ -813,6 +813,18 @@ if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
     raise AssertionError("the transgear explode shows transgear families only")
 if not ISO_HIDDEN_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
     raise AssertionError("the explode shows every family the isometric cannot")
+# The pivot's spring and shim sit in the arm's counterbore under the shoulder
+# screw's head, hidden from the isometric: the ENFORCE review of farm run
+# 20261024T090600202Z-8e9ffbb4 found their leaders on the spacer's edge and
+# the arm's face. Section A-A on the same sheet cuts through them and
+# balloons both (PIVOT_BALLOON_TIPS), so the isometric leaves them out.
+ISO_SECTION_ONLY_STEMS = frozenset(
+    {"pd-vn-transgear-pivot-spring", "pd-vn-transgear-pivot-shim"}
+)
+if not ISO_SECTION_ONLY_STEMS <= {stem for stem, *_ in PIVOT_BALLOON_TIPS}:
+    raise AssertionError("Section A-A balloons every family the isometric leaves to it")
+if ISO_SECTION_ONLY_STEMS & explode.TRANSGEAR_SHOWN_STEMS:
+    raise AssertionError("a family the explode shows is ballooned there, not by the section")
 TRANSGEAR_EXPLODED_INSTANCES = frozenset(
     name
     for name in TRANSGEAR_INSTANCES
@@ -844,11 +856,14 @@ def transgear_balloon_items(
 ) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]:
     """(sheet 2 isometric, sheet 3 explode) balloon items, each in item order.
 
-    The isometric balloons every transgear family it can reach; the explode
-    balloons every family it shows, the ones the isometric cannot included.
+    The isometric balloons every transgear family it can reach, less the
+    pivot parts Section A-A balloons; the explode balloons every family it
+    shows, the ones the isometric cannot included.
     """
     return (
-        _in_item_order(items, set(TRANSGEAR_QUANTITIES) - ISO_HIDDEN_STEMS),
+        _in_item_order(
+            items, set(TRANSGEAR_QUANTITIES) - ISO_HIDDEN_STEMS - ISO_SECTION_ONLY_STEMS
+        ),
         _in_item_order(items, explode.TRANSGEAR_SHOWN_STEMS),
     )
 
