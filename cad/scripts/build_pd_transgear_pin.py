@@ -39,7 +39,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -49,6 +49,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
+import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
     DIA,
     DIA_BAND,
@@ -98,6 +99,26 @@ V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
 V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME
 
 
+def author_dimension_callouts(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back.
+
+    The drawing only reads these lanes: set from the sheet they would write
+    through to this part outside its recipe (#1942).
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: "
+                        f"{printed!r}"
+                    )
+
+
 async def _dome(
     adapter,
     *,
@@ -109,12 +130,15 @@ async def _dome(
     rim_r: float,
     rim_drive: str,
     station_drive: str,
+    station_at_apex: bool,
 ) -> SketchDims:
     """A spherical end on the Right plane (the MHA-DT-17 cap idiom): base on
     the end face at ``u_base``, apex on the axis at ``u_apex``, closed down
     the axis.  The arc runs CCW over its minor lobe, so it starts at the rim
     for a +Z end (apex at smaller u) and at the apex for a -Z end.  Its
-    radius prints as ``<prefix>DomeR``."""
+    radius prints as ``<prefix>DomeR``.  ``<prefix>DomeZ`` stations the base
+    from the head seat, or the apex when ``station_at_apex`` (the tip: the
+    one point at that end the shop can pick up)."""
     toward_minus_z = u_apex > u_base
     u_centre = u_apex - sphere_r if toward_minus_z else u_apex + sphere_r
     dims = SketchDims()
@@ -164,10 +188,13 @@ async def _dome(
             f"{base}.start", "origin", "horizontal_points"
         ),
     )
+    station_point, station_u = (
+        (f"{close}.start", u_apex) if station_at_apex else (f"{base}.start", u_base)
+    )
     check(
         f"{prefix} dome station",
         await adapter.add_sketch_dimension(
-            f"{base}.start", "origin", "horizontal_distance", abs(u_base)
+            station_point, "origin", "horizontal_distance", abs(station_u)
         ),
     )
     dims.record(f"{prefix}DomeZ", station_drive)
@@ -316,6 +343,7 @@ async def build(adapter) -> dict[str, str]:
         rim_r,
         rim_drive,
         station_drive,
+        station_at_apex,
         v_dome,
     ) in (
         (
@@ -327,6 +355,7 @@ async def build(adapter) -> dict[str, str]:
             R_HEAD,
             '"HeadDia" / 2',
             '"HeadLand"',
+            False,
             V_HEAD_DOME,
         ),
         (
@@ -337,7 +366,8 @@ async def build(adapter) -> dict[str, str]:
             TIP_DOME_SAG,
             R_SHANK,
             '"ShankDia" / 2',
-            '"GrooveStation" + "FrontLand"',
+            '"GrooveStation" + "FrontLand" + "TipDomeSag"',
+            True,
             V_TIP_DOME,
         ),
     ):
@@ -351,6 +381,7 @@ async def build(adapter) -> dict[str, str]:
             rim_r=rim_r,
             rim_drive=rim_drive,
             station_drive=station_drive,
+            station_at_apex=station_at_apex,
         )
         feature = f"{prefix}DomeProfile"
         await ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")
@@ -415,6 +446,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_dimension_callouts(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

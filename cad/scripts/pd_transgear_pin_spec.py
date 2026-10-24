@@ -82,22 +82,35 @@ GROOVE_WIDTH = RING.GROOVE_WIDTH
 GROOVE_WIDTH_BAND = RING.GROOVE_WIDTH_BAND
 GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 
-# --- Front end: a plain length in front of the groove, then a dome -----------
-# The land in front of the groove carries the ring's thrust, so it is a wall
-# held at its PRINTED lower limit to the larger of the policy's 1.5 hard
-# floor and three groove depths (ASSUMPTION from the ring maker's edge-margin
-# guidance: 0.4768 x 3 = 1.4304).  Nothing mates on it, so it prints .XX:
-# 2.10 leaves 1.59 (1.600 at .XXX left 1.470, review of e0ac6477e; at .X the
-# title block's +/-0.8 left 0.7, Codex P2).
-FRONT_LAND = 2.10  # groove load wall to the dome's base
-FRONT_LAND_PLACES = 2
-FRONT_LAND_BAND = printed_band_mm(FRONT_LAND_PLACES)
-FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)  # 1.59
+# --- Front end: the tip apex from the head seat, the land and the dome -------
+# The tip apex prints .XX from the head seat, the pin's one faced origin
+# (rule 11): the dome's near-tangent junction with the shank cannot be picked
+# up, so the land from the load wall to that junction prints only as a
+# reference (ENFORCE run 20261024T034648173Z).  The land carries the ring's
+# thrust, so it is a wall held to the larger of the policy's 1.5 hard floor
+# and three groove depths (ASSUMPTION from the ring maker's edge-margin
+# guidance: 0.4768 x 3 = 1.4304) at the worst case: the tip at its printed
+# lower limit, the load wall at its upper, and the deepest dome the R2.0's
+# .X band allows on the shank, a hemisphere.  51.35 leaves 1.51 (the 50.85
+# of the 2.10 land left 1.01).
+TIP_STATION = 51.35  # head seat to the tip's apex
+TIP_STATION_PLACES = 2
+TIP_STATION_BAND = printed_band_mm(TIP_STATION_PLACES)
 TIP_DOME_SAG = 1.5
 TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
-LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.85
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 53.75, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.3125
+TIP_DOME_SAG_MAX = DIA_MAX / 2.0  # a hemisphere on the largest shank
+FRONT_LAND = round(TIP_STATION - GROOVE_STATION - TIP_DOME_SAG, 6)  # 2.60
+FRONT_LAND_PLACES = 2
+FRONT_LAND_MIN = round(
+    TIP_STATION
+    - TIP_STATION_BAND
+    - (GROOVE_STATION + GROOVE_STATION_BAND)
+    - TIP_DOME_SAG_MAX,
+    6,
+)  # 1.51
+LENGTH = TIP_STATION
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 54.25, apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.8125
 HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.5625
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
@@ -115,7 +128,9 @@ SURFACE_FINISHES = (
 
 # --- Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
 # Each dome prints its radius and, as a reference, its height off the land's
-# end face, so the blank and the dome read without deriving the cap.
+# end face, so the blank and the dome read without deriving the cap.  The tip
+# apex prints from the head seat; the land ahead of the groove, ending at the
+# tip dome's junction, prints as a reference.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",
@@ -127,7 +142,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FrontLand",
     },
     "HeadDomeProfile": {"HeadDomeR", "HeadDomeSagDim"},
-    "TipDomeProfile": {"TipDomeR", "TipDomeSagDim"},
+    "TipDomeProfile": {"TipDomeR", "TipDomeSagDim", "TipDomeZ"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -140,12 +155,15 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FrontLand": FRONT_LAND_PLACES,
     },
     "HeadDomeProfile": {"HeadDomeR": 1, "HeadDomeSagDim": 1},
-    "TipDomeProfile": {"TipDomeR": 1, "TipDomeSagDim": 1},
+    "TipDomeProfile": {
+        "TipDomeR": 1,
+        "TipDomeSagDim": 1,
+        "TipDomeZ": TIP_STATION_PLACES,
+    },
 }
-# The dome heights follow from each radius on its land's Ø: reference only.
-REFERENCE_DIMENSIONS = frozenset({"HeadDomeSagDim", "TipDomeSagDim"})
-# The overall, apex to tip, a drawing reference for the bar cut (rule 10).
-OVERALL_LENGTH_PLACES = 2
+# The overall, apex to tip, a drawing reference for the bar cut (rule 10);
+# the dome heights print as references through ``pd_transgear_pin_callouts``.
+DRAWING_REFERENCE_PRECISION = 2
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -159,8 +177,9 @@ for _ok, _what in (
     (TIP_DOME_SAG < TIP_DOME_R, "the tip is not a spherical cap"),
     (
         FRONT_LAND_MIN >= FRONT_LAND_FLOOR,
-        f"the land in front of the groove {FRONT_LAND} at {FRONT_LAND_PLACES} "
-        f"places has a printed lower limit {FRONT_LAND_MIN:.3f}, under "
+        f"the land in front of the groove leaves {FRONT_LAND_MIN:.3f} with the "
+        f"tip apex {TIP_STATION} at {TIP_STATION_PLACES} places at its lower "
+        "limit, the load wall at its upper and a hemispherical dome, under "
         f"{FRONT_LAND_FLOOR:.4f}, the wall floor or three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
@@ -182,26 +201,6 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-23: {_what}")
 
-# The ring the groove takes, named once above the groove Ø (one line: an
-# above-callout holding a line break never prints).
-GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
-# The groove width's catalogue band names the same ring at its own callout
-# (rule 4: every tight band names its mate).
-GROOVE_WIDTH_CALLOUT = f"FOR {RING_NUMBER} RING"
-# The shank's band names its two fits at the Ø (rule 4, review of
-# 6de7230aa and the 2026-10-23 ENFORCE review): the press in the arm's ream
-# and the running bores whose bearing surface the Ra 1.6 marks.
-SHANK_CALLOUT = "\n".join(
-    (
-        f"PRESS FIT IN {ARM_NUMBER} REAM,",
-        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} "
-        "DIAMETRAL INTERFERENCE;",
-        f"RUNS IN {', '.join(RUNNING_MATES)}",
-    )
-)
-# The .XXX station names the stack it sets: the front bushing is faced to
-# fit over its band (``transgear_cluster_fit``).
-GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\nSETS {FRONT_BUSHING_NUMBER} FACED LENGTH"
 # The press into the arm is the MHA-PD-00 assembly's pin-pressed step, not a
 # part-sheet note (rule 24).
 DRAWING_NOTES = "1/4 IN BAR STOCK OK."

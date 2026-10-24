@@ -11,6 +11,7 @@ import _config
 import build_pd_transgear_pin as part
 import draw_pd_transgear_pin as drawing
 import pd_transgear_arm_geometry as arm
+import pd_transgear_pin_callouts as callouts
 import pd_transgear_pin_spec as spec
 import pd_vn_transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -46,8 +47,8 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
 def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     """The turned shank (running fit and arm press) and the groove's
     catalogue Ø and width carry native bands; the groove station prints .XXX,
-    the two lands .XX, and every other size its places under the title
-    block."""
+    the head land and the tip apex's station .XX, and every other size its
+    places under the title block."""
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "ShankDia"): "*deviations(DIA_BAND)",
         ("PinProfile", "GrooveDia"): "*deviations(GROOVE_DIA_BAND)",
@@ -55,20 +56,39 @@ def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     }
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["FrontLand"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["HeadLand"] == 2
 
 
-def test_the_front_land_holds_the_wall_floor_at_its_printed_lower_limit() -> None:
-    """Review of e0ac6477e (blocker): 1.600 at .XXX left 1.470 of land in
-    front of the groove, under the 1.5 wall floor (three groove depths,
-    1.4304, is the weaker bound).  The check reads the places the land
-    actually prints at."""
-    places = spec.DRAWING_PRECISION_BY_NAME["FrontLand"]
-    lower = round(spec.FRONT_LAND, places) - printed_band_mm(places)
+def test_the_front_land_holds_the_wall_floor_at_the_worst_case() -> None:
+    """Review of e0ac6477e (blocker): the land in front of the groove is a
+    wall under the 1.5 floor (three groove depths, 1.4304, is the weaker
+    bound).  ENFORCE run 20261024T034648173Z: the land's end at the tip
+    dome's junction cannot be picked up, so the tip apex prints from the
+    head seat and the land is a reference.  Its worst case is then the apex
+    at its printed lower limit, the load wall at its upper, and the deepest
+    dome the R2.0's .X band allows on the shank: a hemisphere."""
+    tip_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeZ"]
+    wall_places = spec.DRAWING_PRECISION_BY_NAME["GrooveStation"]
+    dome_r_places = spec.DRAWING_PRECISION_BY_NAME["TipDomeR"]
+    # At R2.0 -0.8 the sphere is smaller than the rim: the deepest real dome
+    # on the largest shank is the hemisphere.
+    assert round(spec.TIP_DOME_R, dome_r_places) - printed_band_mm(dome_r_places) < (
+        spec.DIA_MAX / 2.0
+    )
+    lower = (
+        round(spec.TIP_STATION, tip_places)
+        - printed_band_mm(tip_places)
+        - (spec.GROOVE_STATION + printed_band_mm(wall_places))
+        - spec.DIA_MAX / 2.0
+    )
     assert spec.FRONT_LAND_MIN == pytest.approx(lower)
     assert lower >= spec.WALL_FLOOR == 1.5
     assert lower >= spec.EDGE_MARGIN_MIN
+    assert spec.LENGTH == spec.TIP_STATION
+    assert spec.FRONT_LAND == pytest.approx(
+        spec.TIP_STATION - spec.GROOVE_STATION - spec.TIP_DOME_SAG
+    )
 
 
 def test_the_head_land_holds_the_wall_floor_at_its_printed_lower_limit() -> None:
@@ -99,21 +119,46 @@ def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
     )
 
 
+def _below(name: str) -> str:
+    return callouts.callouts_by_lane(callouts.CALLOUT_BELOW)[name]
+
+
 def test_the_groove_callout_names_the_ring_on_one_line() -> None:
     """An above-callout with a line break is stored but never printed."""
-    (text,) = drawing.DIMENSION_CALLOUTS_ABOVE.values()
+    (text,) = callouts.CALLOUTS[callouts.CALLOUT_ABOVE].values()
+    assert text == callouts.GROOVE_CALLOUT
     assert "\n" not in text
     assert spec.RING_NUMBER in text and ring.SKU in text
-    with pytest.raises(RuntimeError):
-        drawing._printable_above_callouts({"GrooveDia": "A\nB"})
+
+
+def test_the_part_authors_every_callout_on_a_marked_dimension() -> None:
+    """The builder writes each lane on its source dimension and the drawing
+    only reads it back (#1942): every authored dimension is one the part
+    marks for the drawing and the sheet places."""
+    marked = {
+        (feature, name)
+        for feature, names in spec.DRAWING_DIMENSIONS.items()
+        for name in names
+    }
+    authored = {
+        (feature, name)
+        for feature, by_name in callouts.authored_text().items()
+        for name in by_name
+    }
+    assert authored <= marked
+    assert set(callouts.authored_by_name()) <= set(drawing.SIDE_KEEP)
+    calls = _calls(drawing.__file__)
+    assert "set_dimension_callouts" not in calls
+    assert "set_dimension_text" not in calls
+    assert "author_dimension_callouts" in _calls(part.__file__)
 
 
 def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> None:
     """Rule 4: the catalogue width band names its ring at its own callout;
     rule 14: the text centre stands far enough toward the head that the
     rear wall's and the load wall's extension lines miss the text block."""
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["GrooveWidth"]
-    assert callout == spec.GROOVE_WIDTH_CALLOUT
+    callout = _below("GrooveWidth")
+    assert callout == callouts.GROOVE_WIDTH_CALLOUT
     assert spec.RING_NUMBER in callout and "\n" not in callout
     x, _ = drawing.SIDE_KEEP["GrooveWidth"]
     assert x - 0.028 > drawing.GROOVE_REAR_X > drawing.LOAD_WALL_X
@@ -135,7 +180,7 @@ def test_the_part_notes_carry_no_assembly_step() -> None:
         (-spec.HEAD_HEIGHT, -113.5625),
         (0.0, -116.4625),
         (spec.GROOVE_STATION, -163.7125),
-        (spec.LENGTH, -167.3125),
+        (spec.LENGTH, -167.8125),
     ],
 )
 def test_the_pin_sits_at_its_machine_stations(station: float, machine_z: float) -> None:
@@ -155,8 +200,8 @@ def test_the_three_place_station_names_the_stack_it_sets() -> None:
     faced to fit over the station's band."""
     import transgear_cluster_fit as fit
 
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["GrooveStation"]
-    assert callout == spec.GROOVE_STATION_CALLOUT
+    callout = _below("GrooveStation")
+    assert callout == callouts.GROOVE_STATION_CALLOUT
     assert "LOAD WALL" in callout and spec.FRONT_BUSHING_NUMBER in callout
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
     assert (
@@ -170,12 +215,18 @@ def test_the_three_place_station_names_the_stack_it_sets() -> None:
 def test_the_dome_heights_and_the_overall_print_as_references() -> None:
     """Rule 10: the overall and both dome heights read off the sheet, as
     references the radii and lands already set."""
-    assert spec.REFERENCE_DIMENSIONS == {"HeadDomeSagDim", "TipDomeSagDim"}
-    assert spec.REFERENCE_DIMENSIONS <= set(drawing.SIDE_KEEP)
+    assert callouts.REFERENCE_TEXT == {
+        (feature, name): {callouts.TEXT_PREFIX: "(", callouts.TEXT_SUFFIX: ")"}
+        for feature, name in (
+            ("HeadDomeProfile", "HeadDomeSagDim"),
+            ("TipDomeProfile", "TipDomeSagDim"),
+            ("PinProfile", "FrontLand"),
+        )
+    }
     assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 1
     assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 1
-    assert spec.OVERALL_LENGTH == pytest.approx(53.75)
-    assert spec.OVERALL_LENGTH_PLACES == 2
+    assert spec.OVERALL_LENGTH == pytest.approx(54.25)
+    assert spec.DRAWING_REFERENCE_PRECISION == 2
     # The overall's row stands under the station's callout.
     assert drawing.OVERALL_TEXT_XY[1] < drawing.SIDE_KEEP["GrooveStation"][1] - 0.020
 
@@ -203,8 +254,8 @@ def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
     tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert (loosest, tightest) == pytest.approx((0.010, 0.026))
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["ShankDia"]
-    assert callout == spec.SHANK_CALLOUT
+    callout = _below("ShankDia")
+    assert callout == callouts.SHANK_CALLOUT
     assert f"PRESS FIT IN {spec.ARM_NUMBER} REAM" in callout
     assert f"{loosest:.3f}-{tightest:.3f} DIAMETRAL INTERFERENCE" in callout
     assert all(number in callout for number in spec.RUNNING_MATES)
