@@ -54,6 +54,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import audit_sheet, format_findings
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -74,6 +75,9 @@ from pd_transgear_front_bushing_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_front_bushing"]
 PART_STEM = SPEC.artifact_stem
@@ -125,33 +129,36 @@ DIMENSION_CALLOUTS = {
 # The length under the profile.  Its four-line reference block is wider
 # than the 5.0 between its extension lines, so it stands off to the right,
 # under the O.D. dimension, where no extension line runs through it.  The
-# chamfer's leg sits above the chamfered (left) corner; the O.D. right of the
-# part, its dimension line far enough out that the nose face's finish symbol
-# sits between them.
+# chamfer's leg sits above the chamfered (left) corner, its text right of
+# both extension lines so neither runs into it (machinist review: the lines
+# struck "X 45 DEG" when the text sat between them).  The O.D. stands right
+# of the part, its dimension line far enough out that the rear face's
+# labelled finish symbol sits between them.
 PROFILE_KEEP = {
     "RingLength": (_PROFILE_NOSE_X + 0.045, _PROFILE_BOTTOM - 0.022),
     "FrontChamferSize": (
-        _PROFILE_RING_X + FRONT_CHAMFER * _S / 2.0,
-        _PROFILE_TOP + 0.018,
+        _PROFILE_RING_X + FRONT_CHAMFER * _S + 0.015,
+        _PROFILE_TOP + 0.016,
     ),
 }
-OD_ON_PROFILE = (_PROFILE_NOSE_X + 0.040, PROFILE_CENTER[1])
+OD_ON_PROFILE = (_PROFILE_NOSE_X + 0.083, PROFILE_CENTER[1])
 
 # Each face's pick lies on its edge line between the bore and the chamfer's
-# inner edge.  The ring face's symbol stands left of the part, clear of the
-# chamfer dimension above; the nose face's stands right of the part inside
-# the O.D.'s extension-line band, below the axis, short of the O.D.
-# dimension line.
+# inner edge.  Each symbol's labelled bar grows about 5 mm plus 1.8 mm a
+# character right of its point.  The front (ring) face's symbol stands left
+# of the part above the axis, between the end view's O.D. and the profile;
+# the rear (nose) face's stands right of the part inside the O.D.'s
+# extension-line band, below the axis, short of the O.D. dimension line.
 _FACE_PICK_UP = PROFILE_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S
 _FACE_PICK_DOWN = PROFILE_CENTER[1] - (BORE_DIA + OD) / 4.0 * _S
 FACE_FINISHES = {
     "ring_face": (
         (_PROFILE_RING_X, _FACE_PICK_UP),
-        (_PROFILE_RING_X - 0.030, PROFILE_CENTER[1] + 0.012),
+        (END_CENTER[0] + OD * _S / 2.0 + 0.007, PROFILE_CENTER[1] + 0.009),
     ),
     "nose_face": (
         (_PROFILE_NOSE_X, _FACE_PICK_DOWN),
-        (_PROFILE_NOSE_X + 0.014, PROFILE_CENTER[1] - 0.008),
+        (_PROFILE_NOSE_X + 0.006, _PROFILE_BOTTOM + 0.007),
     ),
 }
 # The bore runs on the pin (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): its finish sits on the end view, where

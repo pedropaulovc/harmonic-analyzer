@@ -178,6 +178,20 @@ def test_the_bore_and_both_end_faces_run_machined() -> None:
     ) == ((0.0, 0.0, 1.0), spec.LENGTH)
 
 
+def test_each_face_symbol_names_its_thrust_mate_and_the_faced_end() -> None:
+    """Machinist review: an end-face Ra 1.6 with no stated function reads as
+    over-specification, and FACED TO FIT must say which end.  The rear (nose)
+    face is the faced one; the length callout and its symbol both say so."""
+    targets = {
+        control.key: control.production_method for control in spec.SURFACE_FINISHES
+    }
+    assert targets["nose_face"] == f"REAR FACE, THRUST ON {hub.SLEEVE_NUMBER}"
+    assert targets["ring_face"] == f"THRUST ON {pin.RING_NUMBER}"
+    assert pin.RING_NUMBER == _config.parts("pd-vn-transgear-retaining-ring")["number"]
+    assert "REAR FACE FACED TO FIT" in drawing.DIMENSION_CALLOUTS["RingLength"]
+    assert "FACED TO FIT" not in spec.DRAWING_NOTES
+
+
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
     """The profile turns *Top a quarter turn, so model +Z runs LEFT: the nose
     face (z 0) is the right end, the ring face the left end.  Each pick lies
