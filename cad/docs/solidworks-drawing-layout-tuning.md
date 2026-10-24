@@ -2431,6 +2431,20 @@ orthographic view is hidden-lines-removed so dimensions sit on clean geometry.
 Assembly views are HLR. Never dimension to a hidden line — cut a section.
 Re-assert the mode after annotating (see refusal **e**).
 
+Dashes in an HLR view are not always hidden lines. A part-hidden reference
+sketch that `_drawing_hidden_sketches.curate_view_dimensions` shows in a view
+prints its construction segments as dashes; a converted edge then reads as a
+dashed hidden line on the outline (mg_magnifying_clamp, machinist review of
+2056e3344). Changing the display mode does nothing. Measured on that drawing:
+setting `ISketchSegment.Layer` on a segment's view instance
+(`IView.GetCorresponding`) to a hidden layer does not read back (farm run
+20261024T122828167Z, Arc2). A per-view `BlankSketch` after the import and
+grouping, followed by setting each imported dimension's `IAnnotation.Visible`
+back (the blank alone reads them 3, r21), hides the ink and keeps the
+dimensions. Their attachments re-prove (forward identity, `IsDangling` False)
+after the blank and after the final rebuild (run 20261024T124533556Z). See
+`draw_mg_magnifying_clamp._blank_front_reference_sketch`.
+
 ## Format-on-write trap
 
 Do NOT use an editor's patch/format-on-write path on an existing

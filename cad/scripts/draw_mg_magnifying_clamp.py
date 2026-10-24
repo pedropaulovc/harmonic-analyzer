@@ -9,7 +9,10 @@ Views (3:1, hidden lines removed throughout, drawing-guidelines.md rule 9):
 * FRONT (``*Right``, looking along the lever bore at a corner): the block
   height, the bore's height from the bottom seat and its Ø callout. One grouped
   common-flat location applies to the bore and both tap entry axes; all three
-  native source measurements remain independently checked.
+  native source measurements remain independently checked. The location
+  sketch the view shows to import them is blanked again afterwards, so its
+  construction lines (the converted flat on the outline, the converted bore
+  circle, the tap witnesses) do not print; only their dimensions do.
 * TOP and BOTTOM, turned and pinned into third-angle projection above and
   below the front (corners up and down, the flats square to the sheet): the
   controlled stock flats above and to the right of the top view, and each tap's
@@ -35,14 +38,16 @@ from typing import Any
 from types import SimpleNamespace
 
 from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
     remove_notes_matching,
+    view_name,
 )
 
 from _check import check
-from _com import _early_bound
+from _com import _early_bound, _read_member
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -51,7 +56,7 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimension_import import _model_item_paths, curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -212,6 +217,14 @@ PROJECTION_SLOP_M = 1e-5
 _COSMETIC_THREAD_ANNOTATION = 1
 _CENTER_MARK_ANNOTATION = 13
 _SECTION_THREAD_LAYER = "MG-CLAMP-SECTION-THREADS-HIDDEN"
+# The front view shows LeverBoreLocationProfile only to import its common-flat
+# dimensions (_drawing_hidden_sketches); its construction segments duplicate
+# the outline and bore circle (machinist review of 2056e3344 read them as
+# hidden lines).  After the import the view blanks it again and restores the
+# dimensions' visibility, which the re-blank alone hides (r21).  Putting the
+# segments' view instances on a hidden layer was refused (Arc2, farm run
+# 20261024T122828167Z).
+_FRONT_REFERENCE_SKETCH = "LeverBoreLocationProfile"
 
 # swDimensionTextParts_e definitions (5-8) and the writable part each is set
 # through (1-4) -- the draw_mg_output_fixture convention.
@@ -408,6 +421,78 @@ def _hide_cosmetic_threads(adapter: Any, view: Any, *, label: str) -> int:
         raise RuntimeError(f"clamp {label} has no cosmetic thread to hide")
     rebuild_drawing(adapter, label=f"hide clamp {label} cosmetic threads")
     return hidden
+
+
+def _front_reference_visibility(view: Any) -> Any:
+    """LeverBoreLocationProfile's Visible state as the front view maps it
+    (swVisibilityState_e; logged next to the dimension proofs)."""
+    native = _early_bound(view, "IView")
+    model = native.ReferencedDocument
+    if model is None:
+        raise RuntimeError("clamp front view references no model")
+    feature = _early_bound(model, "IPartDoc").FeatureByName(_FRONT_REFERENCE_SKETCH)
+    if feature is None:
+        raise RuntimeError(f"clamp part has no {_FRONT_REFERENCE_SKETCH}")
+    mapped = native.GetCorresponding(feature)
+    if mapped is None:
+        return None
+    return _read_member(_early_bound(mapped, "IFeature"), "Visible")
+
+
+def _blank_front_reference_sketch(adapter: Any, view: Any, annotations: list[Any]) -> None:
+    """Blank the front view's location sketch once its dimensions are imported
+    and grouped, then put each grouped dimension back to its group visibility.
+
+    The re-blank alone hides the imported dimensions (r21); the caller then
+    proves every front dimension visible as wanted and attached (forward
+    attachment identity, not dangling) before and after the final rebuild."""
+    draw = adapter.currentModel
+    name = view_name(adapter, view)
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate clamp front view {name!r}")
+    before = _front_reference_visibility(view)
+    for component, in_view in _model_item_paths(adapter, view):
+        draw.ClearSelection2(True)
+        if draw.Extension.SelectByID2(
+            f"{_FRONT_REFERENCE_SKETCH}@{component}@{in_view}",
+            "SKETCH",
+            0.0,
+            0.0,
+            0.0,
+            False,
+            0,
+            null_callout(),
+            0,
+        ):
+            break
+    else:
+        raise RuntimeError(f"cannot select {_FRONT_REFERENCE_SKETCH} in the front view")
+    draw.BlankSketch()
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"blank {_FRONT_REFERENCE_SKETCH} in the clamp front view")
+    group = _flat_group_annotations(adapter, view, annotations)
+    blanked = {item: annotation.Visible for item, annotation in group.items()}
+    for item, annotation in group.items():
+        annotation.Visible = 3 if item in GROUPED_HIDDEN_DIMENSIONS else 1
+    _early_bound(draw, "IModelDoc2").GraphicsRedraw2()
+    _assert_grouped_flat_locations(group)
+    _telemetry.info(
+        f"clamp front {_FRONT_REFERENCE_SKETCH} blanked: sketch Visible "
+        f"{before!r} -> {_front_reference_visibility(view)!r}; dimension Visible "
+        f"after blank {blanked!r}, restored to the group states",
+        dimension_visibility_after_blank=repr(blanked),
+    )
+
+
+def _assert_front_annotations_attached(adapter: Any, annotations: list[Any]) -> None:
+    dangling = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        state = annotation.IsDangling()
+        if state is not False:
+            dangling[dimension_name(adapter, annotation)] = state
+    if dangling:
+        raise RuntimeError(f"clamp front dimensions dangle: {dangling!r}")
 
 
 def _require_one_center_mark(view: Any, label: str) -> None:
@@ -834,6 +919,10 @@ async def build(adapter: Any) -> dict[str, str]:
         _assert_ordinary_location(display, dimension, name)
     set_dimension_callouts(adapter, [*right_annotations, *top_annotations], DIMENSION_CALLOUTS)
     _group_flat_locations(adapter, right, right_annotations)
+    # Blank the location sketch again now its dimensions are in; every front
+    # dimension must stay visible as grouped and attached.
+    _blank_front_reference_sketch(adapter, right, right_annotations)
+    _assert_front_annotations_attached(adapter, right_annotations)
     bore_annotation = next(a for a in right_annotations if dimension_name(adapter, a) == "LeverBoreDiaDim")
     bore_display = _early_bound(_early_bound(bore_annotation, "IAnnotation").GetSpecificAnnotation(), "IDisplayDimension")
     bore_dimension = _early_bound(bore_display.GetDimension2(0), "IDimension")
@@ -904,6 +993,8 @@ async def build(adapter: Any) -> dict[str, str]:
     def settled_dimensions() -> None:
         _assert_grouped_flat_locations(_flat_group_annotations(adapter, right, right_annotations))
         _assert_stock_af_import(adapter, top, top_by_name["HexAf"], stage="HexAf.after-final-rebuild")
+        _telemetry.info(f"clamp front {_FRONT_REFERENCE_SKETCH} Visible after final rebuild: {_front_reference_visibility(right)!r}")
+        _assert_front_annotations_attached(adapter, right_annotations)
         visibility = {}
         for raw in (*right_annotations, *top_annotations, *bottom_annotations):
             annotation = _early_bound(raw, "IAnnotation")
