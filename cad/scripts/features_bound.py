@@ -102,15 +102,16 @@ def _validated_bundles(out: Path) -> tuple[tuple[Path, bytes], ...]:
     return tuple(pending)
 
 
-def stage_feature_steps(out: Path, step_directory: Path) -> tuple[Path, ...]:
+def stage_feature_steps(out: Path, step_directory: Path) -> dict[Path, str]:
     """Copy every validated producer STEP to the neutral cache, byte-for-byte.
 
     All bundles must be complete and valid before the first destination is
-    created. Copy the snapshots just validated, not a later read of the cache.
+    created. Copy the snapshots just validated, not a later read of the cache,
+    and return each destination with its validated snapshot's SHA-256.
     """
     with _telemetry.span("export.feature_steps", parts=len(export_features.SUPPORTED_PARTS)):
         pending = _validated_bundles(Path(out))
-        staged = []
+        staged: dict[Path, str] = {}
         for source, content in pending:
             if source.suffix != ".STEP":
                 continue
@@ -118,8 +119,8 @@ def stage_feature_steps(out: Path, step_directory: Path) -> tuple[Path, ...]:
             if not target.is_file() or target.read_bytes() != content:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
-            staged.append(target)
-        return tuple(staged)
+            staged[target] = hashlib.sha256(content).hexdigest()
+        return staged
 
 
 def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:

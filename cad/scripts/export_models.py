@@ -61,12 +61,15 @@ any STEP. Missing or unbound bundles fail loudly; run the corresponding
 
 Heterogeneous purchased parts declare ``configuration_quantities`` and
 ``default_configuration`` in their registry row. Their changed ``part:<stem>``
-task owns all member STEP/PNG files and an execution-bound ``reports/part-neutral``
-certificate. First members InnerLink, LeverWire and HoldDownStud use bare physical
-STEP/PNG names; remaining members use the same lowercase ``--configuration`` suffix
-as scene STL keys. Bare files never represent the whole SKU. Full export consumes
-these exact bytes even under ``--force``; missing/stale bytes require rebuilding
-their part task, not another export producer. All seven member STLs remain
+task owns all member PNG files, member STEPs under ``part-neutral/<stem>/`` and an
+execution-bound ``reports/part-neutral`` certificate. First members InnerLink,
+LeverWire and HoldDownStud use bare physical STEP/PNG names; remaining members use
+the same lowercase ``--configuration`` suffix as scene STL keys. Bare files never
+represent the whole SKU. Full export validates these immutable inputs and stages
+the exact certified STEP bytes into ``step/`` even under ``--force``, except where
+a feature bundle owns that neutral STEP (HoldDownStud: the labelled bundle STEP).
+Missing/stale bytes require rebuilding their part task, not another export
+producer. All seven member STLs remain
 scene-driven and are mandatory release inventory. No aggregate export is needed
 to qualify the changed parts' STEP/PNG outputs.
 """
@@ -99,6 +102,7 @@ from _preferences import (
 )  # noqa: E402
 from _part_configuration_exports import (  # noqa: E402
     configuration_export_paths,
+    configuration_producer_paths,
     member_configurations,
     mesh_key,
     step_export_preferences,
@@ -683,28 +687,48 @@ def _source_fingerprint(source: Path) -> str | None:
     return _file_sha256(source)
 
 
-def certified_member_digests(parts: list[str]) -> dict[Path, str]:
-    """Validate every part member certificate; map each certified output to its digest."""
-    return {
-        path.resolve(): _file_sha256(path)
-        for stem in parts
-        for path in validate_member_exports(stem, OUT_STEP.parent)
-    }
+def stage_neutral_producers(parts: list[str]) -> dict[Path, str]:
+    """Validate every producer-owned neutral input, then stage its exact bytes.
 
+    Part tasks certify member STEP/PNG bytes (STEPs under ``part-neutral/``) and
+    feature leaves own labelled STEPs; both are immutable export inputs. Every
+    certificate and bundle is validated before the first neutral write, and the
+    validated snapshots, never a later read, are copied into the export-owned
+    ``step/`` tree. A feature-enrolled member's neutral STEP is its bundle's
+    labelled STEP (``check:features_bound`` requires the exact scoped copy); every
+    other member STEP is the part's certified STEP. Returns each producer input and
+    staged neutral output with the SHA-256 its validation established, for
+    :func:`write_release_neutral_manifest` to certify.
+    """
+    from features_bound import stage_feature_steps  # noqa: PLC0415
 
-def _require_certified_members(parts: list[str], member_digests: dict[Path, str]) -> None:
-    """Every member STEP/PNG still holds the exact bytes certified for it."""
-    expected = {
-        path.resolve()
-        for stem in parts
-        for paths in configuration_export_paths(stem, OUT_STEP.parent).values()
-        for path in (paths["step"], paths["png"])
+    root = OUT_STEP.parent
+    certified: dict[Path, str] = {}
+    member_steps: dict[Path, bytes] = {}
+    for stem in parts:
+        producers = validate_member_exports(stem, root)
+        certified.update({path.resolve(): digest for path, digest in producers.items()})
+        neutral = configuration_export_paths(stem, root)
+        for configuration, paths in configuration_producer_paths(stem, root).items():
+            content = paths["step"].read_bytes()
+            if hashlib.sha256(content).hexdigest() != producers[paths["step"]]:
+                raise RuntimeError(
+                    f"{stem}/{configuration}: member STEP changed after validation"
+                )
+            member_steps[neutral[configuration]["step"].resolve()] = content
+    features = {
+        path.resolve(): digest
+        for path, digest in stage_feature_steps(OUT_FEATURES.parent, OUT_STEP).items()
     }
-    if set(member_digests) != expected:
-        raise RuntimeError("release member certification inventory drifted")
-    for path, digest in member_digests.items():
-        if not _nonempty(path) or _file_sha256(path) != digest:
-            raise RuntimeError(f"release member output changed after certification: {path}")
+    certified.update(features)
+    for target, content in member_steps.items():
+        if target in features:
+            continue
+        if not target.is_file() or target.read_bytes() != content:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
+        certified[target] = hashlib.sha256(content).hexdigest()
+    return certified
 
 
 def write_release_neutral_manifest(
@@ -712,7 +736,7 @@ def write_release_neutral_manifest(
     scene_meshes: dict[str, list[tuple[str, str]]],
     scene_assemblies: set[str],
     colors: dict[str, Any], digests: dict[str, str],
-    member_digests: dict[Path, str] | None = None,
+    producers: dict[Path, str],
 ) -> None:
     """Atomically certify a complete, current neutral set for ``cut_release``.
 
@@ -720,14 +744,19 @@ def write_release_neutral_manifest(
     distinctness guard succeeds.  Source recipe digests prove freshness without
     trusting volatile SolidWorks mtimes; exact file names, sizes, and hashes prove the
     set is complete and unchanged.  PNGs are the render outputs owned by the
-    corresponding build tasks.  ``member_digests`` are the member bytes ``main``
-    certified before staging feature STEPs (see there); without them the part
-    certificates are validated now.
+    corresponding build tasks.  ``producers`` is :func:`stage_neutral_producers`'
+    result: part certificates (and execution identities) must still validate to
+    those digests, and every staged output is recorded only with its staged digest.
     """
     _require_member_scene_coverage(parts, scene_meshes)
-    _require_certified_members(
-        parts, certified_member_digests(parts) if member_digests is None else member_digests,
-    )
+    for stem in parts:
+        for path, digest in validate_member_exports(stem, OUT_STEP.parent).items():
+            if producers.get(path.resolve()) != digest:
+                raise RuntimeError(f"release member producer changed after staging: {path}")
+        for paths in configuration_export_paths(stem, OUT_STEP.parent).values():
+            for kind in ("step", "png"):
+                if paths[kind].resolve() not in producers:
+                    raise RuntimeError(f"release member output was not staged: {paths[kind]}")
     sources = _release_sources(parts, assemblies, scene_meshes)
     source_records: dict[str, str] = {}
     for dashed, source in sources.items():
@@ -756,10 +785,13 @@ def write_release_neutral_manifest(
     for destination, source in inventory.items():
         if not source.is_file() or source.stat().st_size == 0:
             raise RuntimeError(f"release neutral output missing/empty: {source}")
+        digest = _file_sha256(source)
+        if producers.get(source.resolve(), digest) != digest:
+            raise RuntimeError(f"release neutral output changed after staging: {source}")
         file_records[destination] = {
             "source": source.resolve().relative_to(REPO.resolve()).as_posix(),
             "bytes": source.stat().st_size,
-            "sha256": _file_sha256(source),
+            "sha256": digest,
         }
 
     manifest = {
@@ -1224,16 +1256,16 @@ def part_stl_stale(stem: str, mesh: str, colors: dict, digests: dict[str, str]) 
 def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> bool:
     """Manifest-part freshness also requires the archival ``<stem>.STEP``.
 
-    Enrolled STEP bytes have already been validated/copied from feature bundles;
-    other STEPs are regenerated alongside STL and colour when the recipe changes.
+    Enrolled and member STEP bytes have already been validated/copied from their
+    feature/part producers; other STEPs are regenerated alongside STL and colour
+    when the recipe changes.
     The old STL-vs-STEP mtime race needs no mtime clause for recipe-keyed models,
     except on the digest-unavailable fallback (``src_digest`` is None, e.g. a standalone
     run that cannot import dodo), where ``_source_changed`` compares only the STL mtime;
     there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
     but a stale STEP is not treated as fresh (codex review)."""
     if member_configurations(stem):
-        # main() validated the part certificates before staging feature STEPs; the
-        # release certificate re-checks those exact (or feature-owned) bytes.
+        # main() staged the certified member STEP/PNG bytes; only STL/colour remain.
         return part_stl_stale(stem, stem, colors, digests)
     step = OUT_STEP / f"{stem}.STEP"
     if not _nonempty(step) or part_stl_stale(stem, stem, colors, digests):
@@ -1681,31 +1713,16 @@ def main() -> int:
     if args.features:
         return export_feature_bundles(args.features)
 
-    from features_bound import stage_feature_steps  # noqa: PLC0415
-
     parts = part_stems()
     member_parts = {
         stem.replace("_", "-"): names
         for stem in parts if (names := member_configurations(stem))
     }
-    # Part tasks are the only producers of these STEP/PNG bytes. Validate their
-    # execution-bound certificates before even staging feature-bundle outputs.
-    member_digests = certified_member_digests(parts)
-    member_outputs = set(member_digests)
-
-    # Read and validate all producer bundles before writing any neutral output.
-    # These exact snapshots own the enrolled STEP bytes, even under --force.
-    feature_steps = {
-        path.resolve() for path in stage_feature_steps(OUT_FEATURES.parent, OUT_STEP)
-    }
-    # An enrolled member part's default STEP is also its feature bundle's neutral
-    # copy, which check:features_bound requires to equal the labelled scoped STEP.
-    # The feature producer owns those bytes; every other member output keeps the
-    # part-certified bytes validated above.
-    member_digests.update(
-        {path: _file_sha256(path) for path in member_outputs & feature_steps}
-    )
-    producer_outputs = feature_steps | member_outputs
+    # Part and feature leaves are the only producers of member and enrolled STEP
+    # (and member PNG) bytes. Validate them all, then stage those exact snapshots,
+    # before any other export work, even under --force.
+    producers = stage_neutral_producers(parts)
+    producer_outputs = set(producers)
 
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
     # mtime-gated undeclared targets regenerate through the current logic, not just the
@@ -1793,7 +1810,7 @@ def main() -> int:
         if record:
             write_release_neutral_manifest(
                 parts, assemblies, scene_meshes, scene_assemblies, colors, digests,
-                member_digests,
+                producers,
             )
         return 0
     _telemetry.info(
@@ -1952,7 +1969,7 @@ def main() -> int:
         if record:
             write_release_neutral_manifest(
                 parts, assemblies, all_scene_part_meshes(scene_assemblies),
-                scene_assemblies, colors, digests, member_digests,
+                scene_assemblies, colors, digests, producers,
             )
     return rc
 

@@ -270,6 +270,7 @@ _OWN_ROW_HELPERS = {
     "save_member_part": (1, "part_name"),
     "export_member_configurations": (1, "part_name"),
     "configuration_export_paths": (0, "stem"),
+    "configuration_producer_paths": (0, "stem"),
     "part_configuration_outputs": (0, "stem"),
     "validate_member_exports": (0, "stem"),
     "build_supplier_spring_drawing": (1, "spec"),
@@ -398,6 +399,7 @@ def _registered_source_row(tree: ast.Module) -> str | None:
         ("member_configurations", 0),
         ("export_member_configurations", 1),
         ("configuration_export_paths", 0),
+        ("configuration_producer_paths", 0),
         ("part_configuration_outputs", 0),
         ("validate_member_exports", 0),
     ),
@@ -5687,7 +5689,7 @@ def part_member_cache_action(tmp_path, monkeypatch):
         root = dodo.CAD_OUT
         native = Path(dodo._sldprt(stem))
         write(native, f"saved native for {stem}".encode())
-        members = exports.configuration_export_paths(stem, root)
+        members = exports.configuration_producer_paths(stem, root)
         records = {}
         for configuration, paths in members.items():
             records[configuration] = {}
@@ -5756,7 +5758,7 @@ def part_member_cache_action(tmp_path, monkeypatch):
     )
 
     def corrupt(stem, defect):
-        members = exports.configuration_export_paths(stem, dodo.CAD_OUT)
+        members = exports.configuration_producer_paths(stem, dodo.CAD_OUT)
         # Non-default members are not inside the default render directory: losing
         # their inventory entries must actually lose their bytes from the archive.
         paths = list(members.values())[-1]
@@ -5937,7 +5939,7 @@ def test_part_member_publication_loser_adopts_and_validates_winner_whole_set(
         root = dodo.CAD_OUT
         native = Path(dodo._sldprt(stem))
         write(native, producer.encode() + b"-native")
-        members = exports.configuration_export_paths(stem, root)
+        members = exports.configuration_producer_paths(stem, root)
         records = {}
         for configuration, paths in members.items():
             records[configuration] = {}
@@ -5988,7 +5990,7 @@ def test_part_member_publication_loser_adopts_and_validates_winner_whole_set(
                 certificate["execution_identity"] = loser_identity
                 manifest.write_text(json.dumps(certificate), encoding="utf-8")
             elif defect is not None:
-                members = exports.configuration_export_paths(stem, dodo.CAD_OUT)
+                members = exports.configuration_producer_paths(stem, dodo.CAD_OUT)
                 paths = list(members.values())[-1]
                 operation, kind = defect.split("-")
                 if operation == "missing":

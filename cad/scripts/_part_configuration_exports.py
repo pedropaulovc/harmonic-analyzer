@@ -3,6 +3,11 @@
 The parts registry owns the member inventory. Bare STEP/PNG files represent only
 ``default_configuration``; the other members use the existing mesh-key suffix.
 Scene STL files remain scene-export owned and are qualified for every named member.
+
+The part task certifies its member STEPs under ``part-neutral/<dashed>/``, never
+in the export-owned neutral ``step/`` directory: full export stages them there
+(or a feature bundle's labelled STEP for the same member), so a part output is
+never an export output and stays an immutable export input.
 """
 
 from __future__ import annotations
@@ -104,9 +109,25 @@ def configuration_export_paths(
     stem: str,
     out: Path | None = None,
 ) -> dict[str, dict[str, Path]]:
-    """Every declared member's paths, derived only from the parts registry."""
+    """Every declared member's neutral paths, derived only from the parts registry."""
     names = member_configurations(stem)
     return {name: member_export_paths(stem, name, names[0], out) for name in names}
+
+
+def configuration_producer_paths(
+    stem: str,
+    out: Path | None = None,
+) -> dict[str, dict[str, Path]]:
+    """Every member's part-owned STEP/PNG; only the STEP leaves the neutral tree."""
+    members = configuration_export_paths(stem, out)
+    if not members:
+        return {}
+    root = next(iter(members.values()))["step"].parent.parent
+    directory = root / "part-neutral" / stem.replace("_", "-")
+    return {
+        name: {"step": directory / paths["step"].name, "png": paths["png"]}
+        for name, paths in members.items()
+    }
 
 
 def configuration_manifest_path(stem: str, out: Path | None = None) -> Path:
@@ -116,7 +137,7 @@ def configuration_manifest_path(stem: str, out: Path | None = None) -> Path:
 
 def part_configuration_outputs(stem: str, out: Path | None = None) -> list[Path]:
     """Part-owned targets/cache payload; scene-owned configured STLs are excluded."""
-    members = configuration_export_paths(stem, out)
+    members = configuration_producer_paths(stem, out)
     if not members:
         return []
     return [
@@ -143,18 +164,19 @@ def _file_record(path: Path, root: Path) -> dict[str, Any]:
     }
 
 
-def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
+def validate_member_exports(stem: str, out: Path | None = None) -> dict[Path, str]:
     """Validate exact producer bytes against the existing native execution identity.
 
     Parent assembly saves can legitimately churn child-native bytes without
     changing ``.<stem>.execution``. The producer hashes the unchanged fresh native
     before dodo stamps that identity; consumers compare the certificate to that
-    token, never to the subsequently saved native's raw bytes.
+    token, never to the subsequently saved native's raw bytes. Returns each
+    part-owned output with the SHA-256 this validation established.
     """
-    members = configuration_export_paths(stem, out)
+    members = configuration_producer_paths(stem, out)
     if not members:
-        return set()
-    root = next(iter(members.values()))["step"].parent.parent
+        return {}
+    root = next(iter(members.values()))["step"].parents[2]
     manifest = configuration_manifest_path(stem, root)
     dashed = stem.replace("_", "-")
     try:
@@ -187,7 +209,7 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
             f"{dashed}: stale member export identity/inventory; "
             f"request an explicit reasoned cache refresh of part:{stem}"
         )
-    outputs: set[Path] = set()
+    outputs: dict[Path, str] = {}
     for configuration, paths in members.items():
         records = certificate["configurations"][configuration]
         if not isinstance(records, dict) or set(records) != {"step", "png"}:
@@ -196,12 +218,13 @@ def validate_member_exports(stem: str, out: Path | None = None) -> set[Path]:
             )
         for kind in ("step", "png"):
             path = paths[kind]
-            if records[kind] != _file_record(path, root):
+            record = _file_record(path, root)
+            if records[kind] != record:
                 raise RuntimeError(
                     f"{dashed}/{configuration}: stale member {kind} bytes; "
                     f"request an explicit reasoned cache refresh of part:{stem}"
                 )
-            outputs.add(path)
+            outputs[path] = record["sha256"]
     return outputs
 
 
@@ -251,9 +274,9 @@ async def export_member_configurations(
     from _preferences import enforce_preferences
 
     part_name = part_name.replace("_", "-")
-    members = configuration_export_paths(part_name)
+    members = configuration_producer_paths(part_name)
     root = (
-        next(iter(members.values()))["step"].parent.parent
+        next(iter(members.values()))["step"].parents[2]
         if members
         else Path(__file__).resolve().parents[1] / "out"
     )
