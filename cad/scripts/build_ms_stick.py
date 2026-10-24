@@ -211,8 +211,13 @@ def _v_cut_args(ddir1: bool, *, reverse: bool = True, drafted: bool = True,
     )
 
 
+class FeatureCutRefused(RuntimeError):
+    """FeatureCut3 returned no feature for this form (a probe may try another)."""
+
+
 def _feature_cut3(adapter, sketch_name: str, args: tuple) -> object:
-    """FeatureCut3 on the named sketch; the feature, or the refusal as an exception."""
+    """FeatureCut3 on the named sketch; the feature. Raises RuntimeError if the
+    sketch cannot be selected and FeatureCutRefused if the cut is refused."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     model = adapter.currentModel
@@ -221,18 +226,18 @@ def _feature_cut3(adapter, sketch_name: str, args: tuple) -> object:
         raise RuntimeError(f"select sketch {sketch_name!r} failed")
     feature, error = adapter._attempt_with_error(lambda: model.FeatureManager.FeatureCut3(*args))
     model.ClearSelection2(True)
-    return feature or RuntimeError(f"FeatureCut3 returned None ({error})")
+    if not feature:
+        raise FeatureCutRefused(f"FeatureCut3 returned None ({error})")
+    return feature
 
 
 async def _try_cut(adapter, sketch_name: str, args: tuple) -> str:
     """Diagnostic: make one cut, report what it removed, and undo it."""
     pre = await _volume_mm3(adapter)
     try:
-        feature = _feature_cut3(adapter, sketch_name, args)
+        _feature_cut3(adapter, sketch_name, args)
     except Exception as exc:  # noqa: BLE001 - a diagnostic reports, never raises
-        feature = exc
-    if isinstance(feature, Exception):
-        result = str(feature)
+        result = str(exc)
     else:
         try:
             removed = pre - await _volume_mm3(adapter)
@@ -249,9 +254,10 @@ async def _first_v_cut(adapter, sketch_name: str, pre: float) -> tuple:
     tried = []
     for label, ddir1 in V_CUT_VARIANTS:
         args = _v_cut_args(ddir1)
-        feature = _feature_cut3(adapter, sketch_name, args)
-        if isinstance(feature, Exception):
-            tried.append(f"{label}: {feature}")
+        try:
+            _feature_cut3(adapter, sketch_name, args)
+        except FeatureCutRefused as exc:
+            tried.append(f"{label}: {exc}")
             continue
         removed = pre - await _volume_mm3(adapter)
         expected = NUMERAL_LAYER_VOLUMES_MM3[0]
@@ -287,9 +293,10 @@ async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, a
     if args is None:
         args = await _first_v_cut(adapter, sketch, pre)
     else:
-        feature = _feature_cut3(adapter, sketch, args)
-        if isinstance(feature, Exception):
-            raise RuntimeError(f"{name}: {feature}")
+        try:
+            _feature_cut3(adapter, sketch, args)
+        except FeatureCutRefused as exc:
+            raise RuntimeError(f"{name}: {exc}") from exc
     name_last_feature(adapter, name)
     # D1 is the direction-1 blind depth (D2 repeats it for the unused second
     # direction, as on the adapter's cut); the draft adds an angle dimension.
@@ -362,27 +369,46 @@ def _dxf_bbox(path) -> tuple[float, float, float, float]:
     return dxf.bbox([ring for ring, _closed in dxf.read_lwpolylines(path.read_text(encoding="ascii"))])
 
 
+def _sketch_to_model(values: tuple[float, ...], xyz: tuple[float, float, float]) -> tuple[float, float, float]:
+    """Apply IMathTransform ArrayData (row-vector rotation, translation, scale;
+    the draw_fr_frame_assembly convention) to one point, in metres."""
+    x, y, z = xyz
+    scale = values[12]
+    return (
+        scale * (x * values[0] + y * values[3] + z * values[6]) + values[9],
+        scale * (x * values[1] + y * values[4] + z * values[7]) + values[10],
+        scale * (x * values[2] + y * values[5] + z * values[8]) + values[11],
+    )
+
+
+@_telemetry.traced("check.ms_stick_layer_placement", label_param="sketch_name")
 def _assert_layer_placement(adapter, sketch_name: str, path) -> None:
     """The imported layer sits where its DXF puts it. Removed volume cannot
     see a common shift of every layer, which would move the numerals off the
-    gaps the drawing dimensions, so the sketch's own vertices are read back."""
+    gaps the drawing dimensions, so the sketch's own vertices are read back.
+    The sketch-to-model transform is read once and applied locally; one native
+    MultiplyTransform cross-checks it on the first vertex."""
     feature = _early_bound(_feature_by_name(adapter, sketch_name), "IFeature")
     sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
-    inverse = _early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse()
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    model = []
+    inverse = _early_bound(_early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse(), "IMathTransform")
+    values = tuple(float(value) for value in inverse.ArrayData)
+    if len(values) != 16 or not all(map(math.isfinite, values)):
+        raise RuntimeError(f"{sketch_name}: sketch-to-model transform is incomplete: {values}")
+    local = []
     for raw in sketch.GetSketchPoints2() or ():
         point = _early_bound(raw, "ISketchPoint")
-        native = _early_bound(utility.CreatePoint(double_array([float(point.X), float(point.Y), float(point.Z)])),
-                              "IMathPoint")
-        x, y, _z = (float(value) * 1000.0 for value in
-                    _early_bound(native.MultiplyTransform(inverse), "IMathPoint").ArrayData)
-        model.append((x, y))
-    if not model:
+        local.append((float(point.X), float(point.Y), float(point.Z)))
+    if not local:
         raise RuntimeError(f"{sketch_name}: the imported sketch has no points")
-    got = dxf.bbox([model])
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    native = _early_bound(utility.CreatePoint(double_array(list(local[0]))), "IMathPoint")
+    checked = tuple(float(value) for value in _early_bound(native.MultiplyTransform(inverse), "IMathPoint").ArrayData)
+    if any(abs(a - b) > 1e-9 for a, b in zip(checked[:3], _sketch_to_model(values, local[0]), strict=True)):
+        raise RuntimeError(f"{sketch_name}: local transform {_sketch_to_model(values, local[0])} != native {checked[:3]}")
+    got = dxf.bbox([[(x * 1000.0, y * 1000.0) for x, y, _z in (_sketch_to_model(values, p) for p in local)]])
     want = _dxf_bbox(path)
-    _telemetry.info(f"{sketch_name}: imported bbox {tuple(round(v, 4) for v in got)} (DXF {tuple(round(v, 4) for v in want)})")
+    _telemetry.info(f"{sketch_name}: {len(local)} points, imported bbox {tuple(round(v, 4) for v in got)} "
+                    f"(DXF {tuple(round(v, 4) for v in want)})")
     if any(abs(a - b) > NUMERAL_PLACEMENT_TOL_MM for a, b in zip(got, want, strict=True)):
         raise RuntimeError(f"{sketch_name}: imported at {got}, but {path.name} places it at {want}")
 

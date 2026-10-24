@@ -1044,12 +1044,17 @@ def test_dimension_contract_refuses_a_hidden_dimension_and_reruns_the_audit(monk
 
 
 class _Placed:
-    """Sketch, math point and transform fakes: model = sketch + offset (m)."""
+    """Sketch, math point and transform fakes: model = sketch + offset (m).
+    ``native_skew`` makes the native MultiplyTransform disagree."""
 
-    def __init__(self, points_mm, offset_m=(0.0, 0.0)):
+    def __init__(self, points_mm, offset_m=(0.0, 0.0), native_skew=0.0):
         self.points = [SimpleNamespace(X=x / 1000.0, Y=y / 1000.0, Z=0.0) for x, y in points_mm]
         self.offset = offset_m
-        self.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: "inverse")
+        self.native_skew = native_skew
+        self.native_calls = 0
+        inverse = SimpleNamespace(ArrayData=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+                                             offset_m[0], offset_m[1], 0.0, 1.0, 0.0, 0.0, 0.0))
+        self.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: inverse)
 
     def GetSpecificFeature2(self):
         return self
@@ -1058,9 +1063,16 @@ class _Placed:
         return self.points
 
     def CreatePoint(self, xyz):
+        self.native_calls += 1
         x, y, z = xyz
         return SimpleNamespace(MultiplyTransform=lambda inverse: SimpleNamespace(
-            ArrayData=(x + self.offset[0], y + self.offset[1], z)))
+            ArrayData=(x + self.offset[0] + self.native_skew, y + self.offset[1], z)))
+
+
+def _place(monkeypatch, placed, path):
+    monkeypatch.setattr(builder, "_feature_by_name", lambda adapter, name: placed)
+    adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda: placed))
+    builder._assert_layer_placement(adapter, "NumeralsSketch", path)
 
 
 def test_layer_placement_reads_back_the_imported_sketch(monkeypatch) -> None:
@@ -1069,15 +1081,30 @@ def test_layer_placement_reads_back_the_imported_sketch(monkeypatch) -> None:
     vertices = [vertex for ring in rings for vertex in ring]
     monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
     monkeypatch.setattr(builder, "double_array", tuple)
-    for offset, ok in (((0.0, 0.0), True), ((0.0, 0.01e-3), False), ((0.5e-3, 0.0), False)):
-        placed = _Placed(vertices, offset)
-        monkeypatch.setattr(builder, "_feature_by_name", lambda adapter, name, p=placed: p)
-        adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda p=placed: p))
-        if ok:
-            builder._assert_layer_placement(adapter, "NumeralsSketch", path)
-        else:
-            with pytest.raises(RuntimeError, match="places it at"):
-                builder._assert_layer_placement(adapter, "NumeralsSketch", path)
+    placed = _Placed(vertices)
+    _place(monkeypatch, placed, path)
+    assert placed.native_calls == 1  # the transform is applied locally, not per vertex
+    for offset in ((0.0, 0.01e-3), (0.5e-3, 0.0)):
+        with pytest.raises(RuntimeError, match="places it at"):
+            _place(monkeypatch, _Placed(vertices, offset), path)
+    with pytest.raises(RuntimeError, match="!= native"):
+        _place(monkeypatch, _Placed(vertices, native_skew=1e-6), path)
+
+
+def test_feature_cut3_raises_for_both_failures(monkeypatch) -> None:
+    def adapter(selected):
+        model = SimpleNamespace(
+            ClearSelection2=lambda flag: None,
+            Extension=SimpleNamespace(SelectByID2=lambda *args: selected),
+            FeatureManager=SimpleNamespace(FeatureCut3=lambda *args: None),
+        )
+        return SimpleNamespace(currentModel=model, _attempt_with_error=lambda fn: (fn(), "refused"))
+
+    with pytest.raises(builder.FeatureCutRefused, match="returned None"):
+        builder._feature_cut3(adapter(True), "NumeralsSketch", ())
+    with pytest.raises(RuntimeError, match="select sketch") as failure:
+        builder._feature_cut3(adapter(False), "NumeralsSketch", ())
+    assert not isinstance(failure.value, builder.FeatureCutRefused)
 
 
 def _mass_seat(volume):
