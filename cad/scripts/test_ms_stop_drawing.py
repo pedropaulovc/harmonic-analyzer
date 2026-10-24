@@ -370,6 +370,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     else:
         monkeypatch.setattr(drawing, "_style_pilot_diameter", lambda *a: None)
         monkeypatch.setattr(drawing, "_style_plate_chamfer", lambda *a: None)
+        monkeypatch.setattr(drawing, "_append_callout_line", lambda *a: None)
     labelled = []
     monkeypatch.setattr(drawing, "_label_locating_edges", lambda adapter, view: labelled.append(view))
     monkeypatch.setattr(drawing, "auto_center_marks", lambda *a, **kw: True)
@@ -436,7 +437,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] == 0.175
         assert block_drawing.BOTTOM_KEEP["ThumbFromEnd"][0] - bottom.Position[0] > 0.010
         assert callout_positions["thumbscrew tap through floor"] == (0.060, 0.063)
-        assert callout_positions["two cover blind taps"] == (0.065, 0.138)
+        assert callout_positions["two cover blind taps"] == (0.065, 0.130)
     else:
         # The native pilot's construction circle is at X=3.5, the same
         # right-sheet hole selected for the opened clearance callout.
@@ -702,6 +703,41 @@ def test_thumb_tap_callout_states_where_its_thru_ends() -> None:
     rows = native.prefix.splitlines()
     assert rows[:2] == ["<MOD-DIAM><hw-tapdrldia> THRU", "<hw-threaddesc> THRU"]
     assert "REBATE" in rows[-1] and "ROOF" in rows[-1]
+
+
+def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
+    # Owner ruling 2026-10-24 (#1937): three webs between the 1.5 floor and
+    # the 2.0 target, each stated on its sheet and declared minor.
+    import _config
+    from machinist_exceptions import load_exceptions
+
+    assert spec.PLATE_TAP_WEB_LINES == (
+        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.50 MIN",
+    )
+    assert spec.PLATE_CLEARANCE_WEB_LINE == "HOLE TO END FACE 1.64 MIN"
+    native = _StopDisplay("<hw-threaddesc>-<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>")
+    block_drawing._remove_general_thread_class(native, last_line="\n".join(spec.PLATE_TAP_WEB_LINES))
+    assert native.prefix.splitlines()[-2:] == list(spec.PLATE_TAP_WEB_LINES)
+    native = _StopDisplay("REMOVE PLATE; THEN OPEN 2X <MOD-DIAM><hw-diam> THRU ALL\n")
+    plate_drawing._append_callout_line(native, spec.PLATE_CLEARANCE_WEB_LINE)
+    assert native.prefix.splitlines() == [
+        "REMOVE PLATE; THEN OPEN 2X <MOD-DIAM><hw-diam> THRU ALL", spec.PLATE_CLEARANCE_WEB_LINE,
+    ]
+    with pytest.raises(RuntimeError, match="did not persist"):
+        plate_drawing._append_callout_line(_StopDisplay("x", refusal="prefix"), "y")
+    declared = {
+        stem: {entry.id: entry for entry in load_exceptions(_config.CONFIG_DIR, stem, "part")}
+        for stem in ("ms_stop_block", "ms_stop_plate")
+    }
+    for stem, entry_id, line in (
+        ("ms_stop_block", "RV-03", spec.PLATE_TAP_WEB_LINES[0]),
+        ("ms_stop_block", "RV-04", spec.PLATE_TAP_WEB_LINES[1]),
+        ("ms_stop_plate", "RV-01", spec.PLATE_CLEARANCE_WEB_LINE),
+    ):
+        entry = declared[stem][entry_id]
+        assert entry.kind == "minor"
+        assert entry.where.endswith(line)
+        assert "owner ruling 2026-10-24 (#1937)" in entry.reason
 
 
 @pytest.mark.parametrize("native", [

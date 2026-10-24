@@ -173,6 +173,15 @@ def _label_locating_edges(adapter: Any, front: Any) -> None:
                           note_xy=note_xy, label=text.lower())
 
 
+def _append_callout_line(display: Any, line: str) -> None:
+    """Rule 20: state the holes' worst-case end web below the native row (#1937)."""
+    native = _early_bound(display, "IDisplayDimension")
+    revised = str(native.GetText(5) or "").rstrip("\r\n") + "\n" + line  # swDimensionTextPrefixDefinition
+    native.SetText(1, revised)  # swDimensionTextPrefix; void return
+    if str(native.GetText(5) or "") != revised:
+        raise RuntimeError("clearance-hole end-web line did not persist")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source stop cover missing: {SOURCE}")
@@ -211,8 +220,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # dimension-link format while keeping both 2X quantities and sizes live.
     # Both leaders stay right of the overall-height and hole-location lanes.
     # Unclamping first makes the opening this plate's alone, not the block's.
-    add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
-                           label="two cover clearance holes", process="REMOVE PLATE; THEN OPEN")
+    clearance = add_native_hole_callout(adapter, front, edge_xy=edge, callout_xy=CLEARANCE_CALLOUT_XY,
+                                        label="two cover clearance holes",
+                                        process="REMOVE PLATE; THEN OPEN")
+    _append_callout_line(clearance, part.PLATE_CLEARANCE_WEB_LINE)
     _label_locating_edges(adapter, front)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("stop clearance centre marks failed")

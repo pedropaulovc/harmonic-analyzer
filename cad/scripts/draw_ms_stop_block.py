@@ -246,11 +246,14 @@ async def build(adapter: Any) -> dict[str, str]:
             part.PLATE_HOLE_Y / 1000.0, part.PLATE_Z_MAX / 1000.0,
         ), label="plate tap mouth")
     plate_callout = add_native_hole_callout(
-        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.138),
+        # Vertically centred: 8 mm lower keeps the two web rows' growth off
+        # the 14.1 / (4.00) extension line above and the underside view below.
+        adapter, front, edge_xy=plate_edge, callout_xy=(0.065, 0.130),
         label="two cover blind taps",
         process=COVER_HOLE_PROCESS,
     )
-    _remove_general_thread_class(plate_callout)
+    # Rule 20: the taps' two worst-case webs below the 2.0 target (#1937).
+    _remove_general_thread_class(plate_callout, last_line="\n".join(part.PLATE_TAP_WEB_LINES))
     thumb_edge = model_point_in_view(
         adapter, bottom, (
             (part.THUMB_AXIS_X + part.THUMB_TAP_DRILL / 2.0) / 1000.0,

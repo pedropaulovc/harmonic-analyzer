@@ -6,3 +6,9 @@ ms-stop-plate:
   quantity: 1
   tolerance_class: machined_block
   process: "sawn and milled 21 x 14.1 x 1.00 brass plate closing the stop-block window; two plate-screw holes match-drilled with its ms-stop-block in one pilot pass, then opened to the 2.4 clearance (parts paired, not interchangeable)"
+  machinist_exceptions:
+    - id: "RV-01"
+      kind: "minor"
+      where: "front view, last row of the REMOVE PLATE; THEN OPEN 2X Ø2.40 THRU ALL callout: HOLE TO END FACE 1.64 MIN"
+      finding: "web from the far Ø2.40 clearance hole to the plate end face below the 2.0 mm target (rule 17)"
+      reason: "owner ruling 2026-10-24 (#1937): accepted as stated, no geometry change; 1.64 at the printed worst case (21.00 -0.51 plate length, 17.50 +0.10 station, Ø2.40 plus the drilled-hole oversize), above the 1.5 floor (owner-ruled shortfall)"
