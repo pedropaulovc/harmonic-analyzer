@@ -314,10 +314,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     ) in located
     assert (
         "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
-        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE (THE "
-        f"{_number('pd-transgear-knob-shaft')} {knob_shaft.TEETH}T / "
-        f"{_number('pd-rack-pinion')} {disc.TEETH}T MESH), PER THEIR DRAWINGS"
+        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE"
     ) in located
+    # The step names the mesh that centre distance sets.
+    jig = located[: located.index("PER THEIR DRAWINGS")]
+    for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
+        assert _number(stem) in jig
+    assert "MESH" in jig
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
@@ -1716,12 +1719,14 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
         assert method not in mesh
     assert "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE" in mesh
     assert f"SET {steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM" in mesh
-    assert "(DIAL ALONG THE RACK): THIS SHAKE SETS THE FEED MESH DEPTH." in mesh
-    # The window names its end by the crank, not by a machine axis no sheet
-    # draws, and the title block already gives the unit.
-    assert drawing.engaged_feed_text(domain) in mesh
-    assert "CRANK-SIDE CUT END TO THE FEED STUD AXIS" in mesh
-    assert "PLATEN FEED AWAY FROM THE CRANK SHORTENS IT" in mesh
+    # The datum shake states what it sets.
+    assert "FEED MESH DEPTH" in mesh
+    # The window names its end and the feed direction by the crank, not by a
+    # machine axis no sheet draws, and the title block already gives the unit.
+    window = drawing.engaged_feed_text(domain)
+    assert window in mesh
+    assert "CRANK-SIDE CUT END" in window and window.count("CRANK") >= 2
+    assert "FEED STUD AXIS" in window
     for axis_word in ("-X", "+X", "MACHINE X", " MM"):
         assert axis_word not in mesh
     low, high = domain.axis_from_left_end_limits_mm

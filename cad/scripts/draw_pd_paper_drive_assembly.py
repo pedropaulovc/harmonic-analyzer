@@ -428,8 +428,11 @@ CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # with no wide part over another axis's parts. Only those transgear instances
 # show: the pivot stack is SECTION A-A's and the latch hook stays on the bar.
 # The view is full-detail for the same reason as sheet 4's (the Default BOM).
+# It is drawn 1:1 only (drawing guidelines rule 15: never scale a view down
+# to fit a sheet); an outline past its field is refused, not shrunk. Farm
+# run 20261024T014330502Z placed it at 1:1 inside the field.
 TRANSGEAR_EXPLODED_ORIENTATION = "*Top"
-TRANSGEAR_EXPLODED_SCALE_LADDER = ((1.0, 1.0), (2.0, 3.0), (1.0, 2.0))
+TRANSGEAR_EXPLODED_SCALE_LADDER = ((1.0, 1.0),)
 if any(
     view_configuration(scale, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
     != BOM_CONFIGURATION
