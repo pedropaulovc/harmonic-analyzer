@@ -185,6 +185,9 @@ for _ok, _what in (
 # The ring the groove takes, named once above the groove Ø (one line: an
 # above-callout holding a line break never prints).
 GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
+# The groove width's catalogue band names the same ring at its own callout
+# (rule 4: every tight band names its mate).
+GROOVE_WIDTH_CALLOUT = f"FOR {RING_NUMBER} RING"
 # The shank's band names its two fits at the Ø (rule 4, review of
 # 6de7230aa and the 2026-10-23 ENFORCE review): the press in the arm's ream
 # and the running bores whose bearing surface the Ra 1.6 marks.
@@ -199,10 +202,7 @@ SHANK_CALLOUT = "\n".join(
 # The .XXX station names the stack it sets: the front bushing is faced to
 # fit over its band (``transgear_cluster_fit``).
 GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\nSETS {FRONT_BUSHING_NUMBER} FACED LENGTH"
-DRAWING_NOTES = "\n".join(
-    (
-        "1/4 IN BAR STOCK OK.",
-        f"PRESSED INTO {ARM_NUMBER} FROM THE REAR UNTIL THE HEAD SEATS.",
-    )
-)
+# The press into the arm is the MHA-PD-00 assembly's pin-pressed step, not a
+# part-sheet note (rule 24).
+DRAWING_NOTES = "1/4 IN BAR STOCK OK."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

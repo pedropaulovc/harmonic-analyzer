@@ -108,6 +108,23 @@ def test_the_groove_callout_names_the_ring_on_one_line() -> None:
         drawing._printable_above_callouts({"GrooveDia": "A\nB"})
 
 
+def test_the_groove_width_band_names_the_ring_clear_of_its_extension_lines() -> None:
+    """Rule 4: the catalogue width band names its ring at its own callout;
+    rule 14: the text centre stands far enough toward the head that the
+    rear wall's and the load wall's extension lines miss the text block."""
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["GrooveWidth"]
+    assert callout == spec.GROOVE_WIDTH_CALLOUT
+    assert spec.RING_NUMBER in callout and "\n" not in callout
+    x, _ = drawing.SIDE_KEEP["GrooveWidth"]
+    assert x - 0.028 > drawing.GROOVE_REAR_X > drawing.LOAD_WALL_X
+
+
+def test_the_part_notes_carry_no_assembly_step() -> None:
+    """The press into the arm is the assembly's pin-pressed step (rule 24)."""
+    assert spec.DRAWING_NOTES == "1/4 IN BAR STOCK OK."
+    assert "PRESSED" not in spec.DRAWING_NOTES
+
+
 @pytest.mark.parametrize(
     ("station", "machine_z"),
     [

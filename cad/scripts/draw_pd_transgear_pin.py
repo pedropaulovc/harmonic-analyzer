@@ -64,6 +64,7 @@ from pd_transgear_pin_spec import (
     GROOVE_REAR_STATION,
     GROOVE_STATION,
     GROOVE_STATION_CALLOUT,
+    GROOVE_WIDTH_CALLOUT,
     HEAD_DIA,
     HEAD_HEIGHT,
     HEAD_LAND,
@@ -128,17 +129,19 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 # wall, and the head land off the seat with its text right of the head.  The
 # reference overall runs apex to tip in a second row below the station's
 # callout.  The groove width hangs between the row and the profile, its text
-# toward the head, clear of the station's extension lines; the head dome's
-# reference height sits at the same height right of the head.  The diameters
+# and ring callout toward the head, clear of the groove's rear-wall extension
+# line (at +0.016 that line struck the 0.737, run 20261024T022718524Z) and of
+# the station's load-wall extension line; the head dome's reference height
+# sits at the same height right of the head.  The diameters
 # stand above the profile, each on its own section: the shank Ø's three-line
 # fit callout under its value, the groove Ø above it with the ring's name
 # above its value.  The tip dome's reference height stands above the tip.
-_ROW_Y = SIDE_CENTER[1] - 0.030
+_ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
     "FrontLand": (FRONT_END_X - 0.010, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
-    "GrooveWidth": (GROOVE_MID_X + 0.016, SIDE_CENTER[1] - 0.016),
+    "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
     # Left of the shank's middle, so the callout under the value ends short
     # of the head Ø, and high enough that it clears the Ra symbol below it.
@@ -157,6 +160,7 @@ DIMENSION_CALLOUTS_ABOVE = {"GrooveDia": GROOVE_CALLOUT}
 DIMENSION_CALLOUTS_BELOW = {
     "ShankDia": SHANK_CALLOUT,
     "GrooveStation": GROOVE_STATION_CALLOUT,
+    "GrooveWidth": GROOVE_WIDTH_CALLOUT,
 }
 OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.024)
 # The shank's upper silhouette, between the shank Ø's tolerance stack and the
