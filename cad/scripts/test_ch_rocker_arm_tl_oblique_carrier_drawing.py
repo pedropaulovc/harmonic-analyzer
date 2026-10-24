@@ -620,3 +620,55 @@ def test_relocated_b2dx_clears_outline_border_and_isometric() -> None:
     assert b2y - 8.0 - 3.0 > iso_top
 
 
+def test_5691ca3_native_capture_reproduces_its_farm_audit() -> None:
+    """The REAM block on the actual native sheet, not a replay.
+
+    The fixture is the native sheet dump that the layout audit of farm run
+    20261024T085427509Z-4794faa8f93e478a83904ec8bfc3c857 (5691ca380) read,
+    with that run's complete PDF ink (text spans and all 1340 strokes,
+    re-extracted from its PDF). Its REAM rows must still be the spec's, so a
+    wording change must be captured again from a fresh run.
+    """
+    import json
+    from collections import Counter
+    from _layout_audit import audit_dump
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures" / "ch_rocker_arm_tl_oblique_carrier_5691ca3.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert fixture["commit"].startswith("5691ca380")
+    assert fixture["pdf_sha256"] == (
+        "184568951ef159474a6ccbd5b4aa331f0ff70a07ab2929489fc4dbe07d99dc23"
+    )
+    sheet = fixture["sheet"]
+    assert len(sheet["ink"]["strokes"]) == 1340
+    (raw,) = [
+        annotation for annotation in sheet["views"][0]["annotations"]
+        if annotation["name"] == "PinHoleDia"
+    ]
+    assert [run["t"] for run in raw["display"]["texts"][6:]] == (
+        spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()
+    )
+    findings = audit_dump(sheet)
+    # Coverage: offline, the audit reproduces the farm run's own report
+    # exactly, so every view has its printed edges and all text its ink (no
+    # view-edges-missing, text-unmatched or pdf-text-unclaimed finding).
+    assert Counter(finding.kind for finding in findings) == {
+        "dim-line-crosses-extension": 23,
+        "text-on-line": 2,
+        "leader-crosses-line": 2,
+        "leader-over-part": 1,
+        "outside-border": 1,
+        "text-separation": 1,
+    }
+    ream = Counter(
+        finding.kind for finding in findings
+        if " PinHoleDia " in f" {finding.a} " or " PinHoleDia " in f" {finding.b} "
+    )
+    # Its diameter approach crosses witness extensions (rule 14); its "+0.015"
+    # row also reads on the 520.0/260.0 lines and past the left border, both
+    # report-only kinds on this capture.
+    assert ream == {"dim-line-crosses-extension": 5, "text-on-line": 2, "outside-border": 1}
+
