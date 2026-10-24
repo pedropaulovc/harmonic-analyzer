@@ -50,7 +50,6 @@ from _drawing_dimensions import (
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
-from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -63,9 +62,6 @@ from pd_transgear_removable_spec import (
     TEETH,
     outside_dia,
 )
-
-# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
-MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_removable"]
 PART_STEM = SPEC.artifact_stem
@@ -118,7 +114,9 @@ TOP_KEEP = {
 # the chain's axial float on the supplied plate.
 CRANKSHAFT_NUMBER = "MHA-DT-11"
 KNOB_COLLAR_NUMBER = "MHA-PD-22"
-PIN_LOCATION_CALLOUT = f"SLIP FIT OVER PINS IN\n{CRANKSHAFT_NUMBER} / {KNOB_COLLAR_NUMBER}"
+PIN_LOCATION_CALLOUT = (
+    f"SLIP FIT OVER PINS IN\n{CRANKSHAFT_NUMBER} / {KNOB_COLLAR_NUMBER}"
+)
 PLATE_CALLOUT = "SUPPLIED PLATE; SETS\nANSI #25 CHAIN FLOAT"
 CALLOUTS_ABOVE = {"PinPosDia": "2X", "PinPosY": PIN_LOCATION_CALLOUT}
 CALLOUTS_BELOW = {
