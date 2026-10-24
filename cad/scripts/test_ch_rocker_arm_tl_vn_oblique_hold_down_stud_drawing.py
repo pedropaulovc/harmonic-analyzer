@@ -1028,6 +1028,9 @@ def test_native_recipe_uses_one_true_length_driver_and_independent_end_features(
 def test_rework_sheet_does_not_duplicate_fixture_qualification() -> None:
     assert draw.SHEET_NAMES == ("REWORK",)
     assert draw.HOLD_DOWN_REFERENCE == jig.HOLD_DOWN_REFERENCE
+    # The jig's HD2-HD3 cut to this kit drawing's REWORK sheet, its second.
+    assert jig.STUD_REWORK_SHEET == f"{ROW['number']} SHEET 2"
+    assert "REWORK PER SHEET 2" in draw.GENERAL_TEXT
     assert not hasattr(draw, "INSTRUCTION_PLACEMENTS")
     assert set(draw.STUD_REWORK_PROPERTIES) == {"Stock Length", "Stock Note", "Lower End Note"}
     for name in part.SAVED_DRAWING_PROPERTIES:

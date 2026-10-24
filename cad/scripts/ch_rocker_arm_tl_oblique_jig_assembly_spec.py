@@ -81,6 +81,7 @@ import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import _config
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_vn_oblique_bearing_spec as bearing
@@ -1672,6 +1673,10 @@ _CL_HOLE = (
 # acceptance pointer.
 OPERATION_SHEET_NUMBER = 10
 HOLD_DOWN_REFERENCE = f"{DRAWING_NUMBER}, STEPS HD1-HD3 (SHEET {OPERATION_SHEET_NUMBER})"
+# HD2-HD3 cut the studs to the kit drawing's REWORK sheet, its second.
+STUD_REWORK_SHEET = (
+    f"{_config.parts('sh-vn-clamping-kit-hardware')['number']} SHEET 2"
+)
 # Initial A1/B1, first A2/B2, A2/B2 after the carrier-off realignment, then
 # final A1/B1: each fitting consumes one fresh cotter at each support.
 INITIAL_FIT_UP_COTTER_QUANTITY = 4 * pivot_cotter.QUANTITY
@@ -1749,7 +1754,12 @@ ASSEMBLY_STEPS = (
     "9. LOWER THE CARRIER A1/B1 (INNER PASS) ONTO BOTH PIN SEATS. FIT AND "
     "LOCK BOTH TOP RETAINERS PER C4-C5D (SHEET 9). RECORD HD1 H THROUGH "
     "THE COMPLETE INNER-PASS HAND SWEEP.",
-    "10. DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS (LOCATED ON "
+    # The carrier stays on its A1/B1 seats from step 9 to 13A: HUB and CL are
+    # finished in place on the running jig (carrier spec), the cotter count
+    # above has no removal before 13A, and seated, every hole it spots or
+    # presses through has 67 mm or more of open room below.
+    f"10. WITH THE CARRIER {_item(CARRIER)} STILL LOCKED ON A1/B1 THROUGH "
+    "STEP 11, DRILL AND REAM ITS HUB AND CL HOLES OFF THEIR SPOTS (LOCATED ON "
     "MHA-CH-06-TL-21 FROM THE A1-B1 PIN AXES), EACH IN ONE SETUP SQUARE TO THE "
     "CARRIER TOP: "
     f"{_HUB_HOLE}; {_CL_HOLE}; BREAK THE HUB HOLE BELOW "
@@ -2011,7 +2021,8 @@ HOLD_DOWN_STEPS = (
     "STACK (NONE IS ADDED); U, PROPOSED CUT END TO THE FIRST COMPLETE "
     "THREAD, NOT THE CHAMFER. MARK THE LOWER FACTORY END, THE ORIGINAL "
     "INSERTION AND THE ORIGINAL LOWER LOADED COMPLETE-THREAD INTERVAL.",
-    "HD2. WITH LMIN/LMAX THE STUD'S PRINTED FINISHED-LENGTH LIMITS, NOT STOCK "
+    "HD2. WITH LMIN/LMAX THE STUD'S FINISHED-LENGTH LIMITS PRINTED ON "
+    f"{STUD_REWORK_SHEET}, NOT STOCK "
     "LENGTH, REQUIRE GMIN = BMIN + HMIN + DMIN - LMAX >= "
     f"{_STUD_CLEARANCE} AND QMIN = LMIN - DMAX - BMAX - WMAX - NMAX - UMAX "
     f">= {_STUD_PITCH}. THE NUT'S WHOLE COMPLETE-THREAD SPAN MUST STAY ON "
@@ -2020,7 +2031,7 @@ HOLD_DOWN_STEPS = (
     "THE SETUP: NO DEEPER INSERTION, NO CUT THROUGH ENGAGED THREADS.",
     "HD3. AT STEP 13B, KEEP THE CARRIER OFF AND THE OTHER HOLD-DOWNS SECURE. "
     "REMOVE, SHORTEN AND REFIT ONE STUD AT A TIME. SHORTEN ONLY THE UNUSED "
-    "UPPER END TO THE STUD DRAWING; DEBURR, GAUGE THE COMPLETE THREADS AND "
+    f"UPPER END TO {STUD_REWORK_SHEET}; DEBURR, GAUGE THE COMPLETE THREADS AND "
     "REMEASURE U. RESTORE THE ORIGINAL INSERTION AND SEAT ITS NUT FULLY "
     "WITH NO WASHER BEFORE REMOVING ANOTHER STUD; DO NOT FORCE OR BOTTOM "
     "DEEPER. AFTER THE LAST STUD REFIT, WITH THE CARRIER STILL OFF, REPEAT "
