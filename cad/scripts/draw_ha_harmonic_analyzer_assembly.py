@@ -192,7 +192,8 @@ EXPLODED_CENTER = (
 # Sheets 4 and 5 (landscape): text columns over the title block's height,
 # the finished-machine thumbnail at the right. A blank line separates the
 # numbered steps, so the sequence fills both sheet-4 columns and the checks
-# take sheet 5's left column.
+# move to sheet 5, level with its thumbnail rather than bunched in the top
+# corner (machinist review rule 15 on 29a080cd4).
 NOTE_LINE_PITCH = 0.00455  # measured default-format note line pitch
 STEPS_LINE_WIDTH = 60  # characters; ~2.7 mm each
 STEPS_TOP_Y = 0.262
@@ -259,11 +260,16 @@ STEPS_RIGHT = _wrapped(notes.ASSEMBLY_STEPS[STEPS_SPLIT:], width=STEPS_LINE_WIDT
 ASSEMBLY_CHECKS = _wrapped(
     notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH, heading="CHECKS BEFORE RUNNING"
 )
-STEPS_COLUMN_BOTTOM_Y = STEPS_TOP_Y - NOTE_LINE_PITCH * max(
-    block.count("\n") + 1 for block in (STEPS_LEFT, STEPS_RIGHT, ASSEMBLY_CHECKS)
+_CHECKS_HEIGHT = (ASSEMBLY_CHECKS.count("\n") + 1) * NOTE_LINE_PITCH
+CHECKS_XY = (STEPS_LEFT_X, STEPS_VIEW_CENTER[1] + _CHECKS_HEIGHT / 2.0)
+STEPS_COLUMN_BOTTOM_Y = min(
+    STEPS_TOP_Y
+    - NOTE_LINE_PITCH
+    * max(block.count("\n") + 1 for block in (STEPS_LEFT, STEPS_RIGHT)),
+    CHECKS_XY[1] - _CHECKS_HEIGHT,
 )
-if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m:
-    raise AssertionError("the integration steps run into the title block")
+if STEPS_COLUMN_BOTTOM_Y <= _LANDSCAPE.title_block_top_m or CHECKS_XY[1] > STEPS_TOP_Y:
+    raise AssertionError("the steps sheets' text leaves its field")
 
 
 def _activate_sheet(adapter: Any, name: str) -> Any:
@@ -771,9 +777,7 @@ def _place_checks_sheet(adapter: Any) -> None:
     """The checks before running and a thumbnail."""
     name = SHEET_NAMES[4]
     _place_thumbnail(adapter, name)
-    _add_note_block(
-        adapter, name, ASSEMBLY_CHECKS, (STEPS_LEFT_X, STEPS_TOP_Y), label="checks"
-    )
+    _add_note_block(adapter, name, ASSEMBLY_CHECKS, CHECKS_XY, label="checks")
 
 
 def _activate_package(adapter: Any, target: Any) -> None:
