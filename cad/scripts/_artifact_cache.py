@@ -1265,23 +1265,81 @@ def _phase(name: str, **attributes):
         yield sp
 
 
-class _TimedCredential:
-    """Delegating token credential that spans each token fetch (``cache.credential``).
+def _token_request_identity(value):
+    """Freeze request options without logging their potentially secret contents."""
+    if isinstance(value, dict):
+        return (dict, frozenset(
+            (_token_request_identity(key), _token_request_identity(item))
+            for key, item in value.items()
+        ))
+    if isinstance(value, (list, tuple)):
+        return (type(value), tuple(_token_request_identity(item) for item in value))
+    if isinstance(value, (set, frozenset)):
+        return (type(value), frozenset(_token_request_identity(item) for item in value))
+    return (type(value), value)
 
-    The storage pipeline fetches a token lazily INSIDE the first request, so without
-    this a managed-identity or CLI round trip is indistinguishable from the download
-    it precedes. The SDK caches the token afterwards, so this fires about once per
-    process; everything else is delegated untouched."""
+
+class _TimedCredential:
+    """Share expiring tokens across the process's memoized blob client's pipelines.
+
+    Azure's individual bearer policies cache tokens, but separate blob pipelines
+    can still fetch independently, and AzureCliCredential does not cache at all.
+    Serialize refreshes here and span the actual acquisition (``cache.credential``),
+    reusing only the same interface, scopes and complete request options. Refresh
+    five minutes before expiry, or at ``refresh_on`` if earlier. Only credential
+    unavailability is retried, at most three attempts with 1 s / 2 s backoff;
+    authentication failures and exhausted unavailability retain their exceptions.
+    """
 
     def __init__(self, inner):
         self._inner = inner
+        self._tokens = {}
+        self._token_lock = threading.Lock()
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
 
+    def _get_token(self, method, scopes, kwargs):
+        from azure.identity import CredentialUnavailableError
+
+        identity = (method, scopes, _token_request_identity(kwargs))
+        # The backend owns one proxy per process. Hold the lock through acquisition
+        # and backoff so concurrent pipelines cannot launch competing CLI refreshes.
+        with self._token_lock:
+            saved = self._tokens.get(identity)
+            if saved is not None:
+                refresh_at = saved.expires_on - 300
+                refresh_on = getattr(saved, "refresh_on", None)
+                if refresh_on is not None:
+                    refresh_at = min(refresh_at, refresh_on)
+                if time.time() < refresh_at:
+                    return saved
+            with _phase("cache.credential", credential=type(self._inner).__name__):
+                for attempt in range(1, 4):
+                    try:
+                        token = getattr(self._inner, method)(*scopes, **kwargs)
+                    except CredentialUnavailableError as exc:
+                        if attempt == 3:
+                            raise
+                        cause = exc.__cause__ or exc.__context__
+                        cause_type = type(cause).__name__ if cause is not None else ""
+                        _warn(
+                            f"credential unavailable; retry {attempt}/2 in {attempt}s "
+                            f"(cause={cause_type or 'none'})"
+                        )
+                        _event(
+                            "cache.credential.retry", "", "",
+                            credential=type(self._inner).__name__,
+                            attempt=attempt, delay_s=attempt,
+                            error_type=type(exc).__name__, cause_type=cause_type,
+                        )
+                        time.sleep(attempt)
+                    else:
+                        self._tokens[identity] = token
+                        return token
+
     def get_token(self, *scopes, **kwargs):
-        with _phase("cache.credential", credential=type(self._inner).__name__):
-            return self._inner.get_token(*scopes, **kwargs)
+        return self._get_token("get_token", scopes, kwargs)
 
 
 class _TimedTokenInfoCredential(_TimedCredential):
@@ -1289,8 +1347,7 @@ class _TimedTokenInfoCredential(_TimedCredential):
     (azure-core prefers it when present, so the proxy must expose it only then)."""
 
     def get_token_info(self, *scopes, **kwargs):
-        with _phase("cache.credential", credential=type(self._inner).__name__):
-            return self._inner.get_token_info(*scopes, **kwargs)
+        return self._get_token("get_token_info", scopes, kwargs)
 
 
 def _make_backend() -> _BlobBackend | None:
@@ -1332,7 +1389,7 @@ _PREWARM_JOIN_S = 2.0
 
 
 def _backend() -> _BlobBackend | None:
-    """Memoized ContainerClient (one credential handshake per process). Returns
+    """Memoized ContainerClient with a shared expiry-aware token credential. Returns
     None when unconfigured / SDK absent, so the caller treats it as a miss. The
     first call's SDK import and client construction are ``cache.connect``.
 

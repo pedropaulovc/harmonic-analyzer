@@ -812,10 +812,11 @@ for line in sys.stdin:
 ''',
         encoding="utf-8",
     )
-    state = SimpleNamespace(processes=[], commands=[])
+    state = SimpleNamespace(processes=[], commands=[], environments=[])
     real_spawn = mr.asyncio.create_subprocess_exec
 
     async def spawn(*args: Any, **kwargs: Any):
+        state.environments.append(kwargs["env"])
         process = await real_spawn(*args, **kwargs)
         state.processes.append(process)
         return process
@@ -836,6 +837,43 @@ for line in sys.stdin:
     monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
     monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
     return state
+
+
+@pytest.mark.parametrize("timeout,expected_ms", [(300, "120000"), (17.25, "17250")])
+@pytest.mark.parametrize("inherited_timeout", [None, "1", "999999"])
+@pytest.mark.parametrize("caller_env", [False, True])
+def test_claude_spawn_sets_independent_mcp_timeout_without_mutating_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    claude_transport: SimpleNamespace, timeout: float, expected_ms: str,
+    inherited_timeout: str | None, caller_env: bool,
+) -> None:
+    if inherited_timeout is None:
+        monkeypatch.delenv("MCP_TIMEOUT", raising=False)
+    else:
+        monkeypatch.setenv("MCP_TIMEOUT", inherited_timeout)
+    monkeypatch.setenv("CLAUDE_TEST_INHERITED_ONLY", "not a caller setting")
+    source_env = dict(os.environ) if caller_env else None
+    if source_env is not None:
+        source_env.pop("CLAUDE_TEST_INHERITED_ONLY")
+        source_env["CLAUDE_TEST_CALLER_SETTING"] = "preserved"
+    inherited_before = dict(os.environ)
+    source_before = dict(source_env) if source_env is not None else inherited_before
+    command = claude_transport.command("stream", json.dumps({
+        "response": _claude_stdout(1, _clean_verdict()),
+    }))
+
+    completed = mr._run_reviewer(
+        command, reviewer="claude", input="synthetic prompt", timeout=timeout,
+        cwd=str(tmp_path), env=source_env,
+    )
+
+    assert completed.returncode == 0
+    (spawn_env,) = claude_transport.environments
+    assert spawn_env == {**source_before, "MCP_TIMEOUT": expected_ms}
+    assert spawn_env is not source_env and spawn_env is not os.environ
+    assert dict(os.environ) == inherited_before
+    if source_env is not None:
+        assert source_env == source_before
 
 
 def _wait_for_file(path: Path) -> None:
