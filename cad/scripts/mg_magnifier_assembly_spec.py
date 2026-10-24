@@ -62,12 +62,12 @@ PRESS_GAUGE_TOL = _pin.PRESS_GAUGE_TOL
 # locknut's outer face at the thick-stack corner (LOCKNUT_THREAD_MARGIN) --
 # 38.048. High: the tightest of three upper limits, at the thin-stack corner:
 # at most THREAD_PAST_LOCKNUT_LIMIT of thread past the locknut (38.183), the
-# first nut clear of the die run-out (38.361) and the step inside the hub
+# first nut clear of the axle's thread relief (38.214) and the step inside the hub
 # (38.807). The callout names the thread-past-locknut limit as the high
 # side's acceptance, so it must govern.
 PRESS_GAUGE_LOW_LIMIT = PRESS_GAUGE - PRESS_GAUGE_TOL - _group.LOCKNUT_THREAD_MARGIN
 _PRESS_GAUGE_HIGH_LIMITS = {
-    "thread past locknut": _group.THREAD_PAST_LOCKNUT_LIMIT
+    "thread past locknut": _pin.THREAD_PAST_LOCKNUT_LIMIT
     - _group.THREAD_PAST_LOCKNUT_MAX,
     "nut run-out": _group.NUT_RUNOUT_MARGIN,
     "step inside hub": _group.STEP_INSIDE_HUB,
@@ -165,7 +165,7 @@ SETTING_CALLOUTS = {
         PRESS_GAUGE_DIMENSION: (
             3,
             "ACCEPT: LOCKNUT ON FULL THREAD, THREAD END "
-            f"{_group.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST IT",
+            f"{_pin.THREAD_PAST_LOCKNUT_LIMIT:.1f} MAX PAST IT",
         ),
         ENDSHAKE_DIMENSION: (
             4,
