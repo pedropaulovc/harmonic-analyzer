@@ -1391,7 +1391,7 @@ def test_hanger_direct_adapter_calls_bind_to_the_vendored_sdk(recipe: str) -> No
     if any(
         isinstance(argument, ast.Starred) for call in calls for argument in call.args
     ):
-        from build_fr_top_frame import slot_stadium_points
+        from build_sm_knife_mount import slot_stadium_points
 
         producers = [
             node

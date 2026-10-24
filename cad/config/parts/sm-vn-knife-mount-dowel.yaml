@@ -8,9 +8,9 @@ sm-vn-knife-mount-dowel:
   material_specification: "Alloy steel dowel pin, 1/8 x 3/4, Round x Chamfer ends; McMaster-Carr 98381A473"
   finish: plain; no coating
   installation_notes: |-
-    INSTALLATION - PRESS FIT IN THE MHA-SM-02 KNIFE MOUNT TOP SEAT,
-    CHAMFER END IN THE SEAT. ONE PIN SLIPS INTO THE MHA-FR-02 CROSSBAR
-    HOLE, ONE INTO ITS SLOT: 0.027-0.093 DIAMETRAL CLEARANCE IN EACH.
+    INSTALLATION - PRESS FIT IN THE MHA-FR-02 CROSSBAR UNDERSIDE REAM,
+    CHAMFER END IN THE SEAT. ONE PIN SLIPS INTO THE MHA-SM-02 KNIFE MOUNT
+    ROUND HOLE, ONE INTO ITS SLOT: 0.027-0.093 DIAMETRAL CLEARANCE.
   quantity: 4
   tolerance_class: machined_block
   process: purchased

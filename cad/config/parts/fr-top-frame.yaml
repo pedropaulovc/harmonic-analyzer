@@ -8,9 +8,9 @@ fr-top-frame:
   machinist_exceptions:
     - id: "RV-01"
       kind: "accept"
-      where: "the knife-hanger slot position frames and the knife-hanger crossbar centring frame"
+      where: "the knife-hanger press ream position frames and the knife-hanger crossbar centring frame"
       finding: "position frames over-specified (rule 5)"
-      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds the hanger axes' shift off the crossbar median while retaining the screw/slot and side webs (owner-accepted knife-edge-system control)"
+      reason: "keeps both knife mounts dowel lines square to the knife-edge line and bounds the hanger axes' shift off the crossbar median while retaining the screw/ream and side webs (owner-accepted knife-edge-system control)"
     - id: "RV-02"
       kind: "accept"
       where: "sheet 3 general note 'INSIDE CORNERS R3.0 MAX UNLESS NOTED'"

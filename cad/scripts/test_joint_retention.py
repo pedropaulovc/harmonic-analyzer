@@ -379,7 +379,7 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     assert "THREADLOCK" not in notes.upper()
     assert "sm_vn_knife_mount_dowel" in jr.UNTHREADED_PARTS
     assert jr.UNTHREADED_STOCK["sm_vn_knife_mount_dowel"] == (
-        "dowel pin pressed into a reamed hole"
+        "dowel pin pressed into a blind reamed hole"
     )
     washer = "sm_vn_knife_hanger_washer"
     assert washer in jr.UNTHREADED_PARTS
@@ -390,6 +390,10 @@ def test_the_knife_hanger_is_a_plain_clamp_keyed_by_its_two_dowels() -> None:
     assert row.quantity == 2
     assert not row.lock_part and not row.lock_binds
     assert "two pressed MHA-SM-VN-53 dowels" in row.exposure_reason
+    # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press and the
+    # block takes the slip.
+    assert "held in the crossbar's underside reams" in row.exposure_reason
+    assert "the block's round hole and slot" in row.exposure_reason
     assert "92314A253" in row.axial_capture
     assert "96659A104" in row.axial_capture
     assert "crossbar's faced top" in row.axial_capture

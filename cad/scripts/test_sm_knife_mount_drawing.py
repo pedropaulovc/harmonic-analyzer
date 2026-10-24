@@ -87,18 +87,39 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     # Every marked dimension carries part-authored places (the block's .X
-    # overall size, the reamed bore's .XX band, the dowel hole's); the
-    # pair's span, the block depth and the pattern's face locations are
-    # sheet-added, their places the spec's.
-    assert set(sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME) == {
+    # overall size, the reamed bore's .XX band, datum B's slip Ø and datum
+    # C's slot width at their band's three, the slot end's .XX station from
+    # B and the shared floor depth's .X); the block depth, the tap axis's
+    # BASIC station from B, the bore's BASIC height and B's face locations
+    # are sheet-added, their places the spec's.
+    assert set(sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME) == marked == {
         "BlockWidth",
         "BlockHeight",
         "BoreDia",
         "PinHoleDia",
+        "SlotWidth",
+        "SlotEndFromB",
         "PinHoleDepth",
     }
+    assert sm_knife_mount_spec.DRAWING_DIMENSIONS["PinHoleProfile"] == {
+        "PinHoleDia",
+        "SlotWidth",
+        "SlotEndFromB",
+    }
+    assert sm_knife_mount_spec.DRAWING_DIMENSIONS["PinHole"] == {"PinHoleDepth"}
+    assert sm_knife_mount_spec.DRAWING_PRECISION["PinHoleProfile"] == {
+        "PinHoleDia": sm_knife_mount_spec.PIN_HOLE_DIA_PLACES,
+        "SlotWidth": sm_knife_mount_spec.SLOT_WIDTH_PLACES,
+        "SlotEndFromB": sm_knife_mount_spec.SLOT_END_PLACES,
+    }
+    assert sm_knife_mount_spec.PIN_HOLE_DIA_PLACES == 3
+    assert sm_knife_mount_spec.SLOT_WIDTH_PLACES == 3
+    assert sm_knife_mount_spec.SLOT_END_PLACES == 2
+    # The slot end's .XX claims the title block's 2-place band, the one its
+    # margins charge.
+    assert sm_knife_mount_spec.SLOT_END_TOL == sm_knife_mount_spec._XX
+    # The dowel pair's BASIC span is gone with the pressed pattern.
     assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
-        "dowel hole span": 3,
         "dowel hole from tap axis": 3,
         "knife-bore centre from top seat": 3,
         "block-depth overall": 1,
@@ -110,9 +131,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
 
 
 def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> None:
-    # drawing-guidelines.md rule 9 (show internal shape in solid lines): the blind dowel hole's floor is a hidden edge in the
-    # front view, so its depth rides section A-A, cut on z = 0 through the
-    # tap axis (the origin) and both dowel axes, and only there.
+    # drawing-guidelines.md rule 9 (show internal shape in solid lines): the
+    # blind slip hole's and slot's shared floor is a hidden edge in the front
+    # view, so its depth rides section A-A, cut on z = 0 through the tap axis
+    # (the origin), datum B's axis and the slot's centre plane, and only there.
     assert set(drawing.SECTION_KEEP) == {"PinHoleDepth"}
     assert "PinHoleDepth" not in drawing.FRONT_KEEP
     assert "PinHoleDepth" not in drawing.TOP_KEEP
@@ -120,7 +142,14 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
     assert start[2] == end[2] == 0.0
     assert start[0] < -sm_knife_mount_spec.BLK_HALF_X
     assert end[0] > sm_knife_mount_spec.BLK_HALF_X
-    assert start[0] < -sm_knife_mount_spec.PIN_HOLE_X < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
+    assert sm_knife_mount_spec.SLOT_X == -sm_knife_mount_spec.PIN_HOLE_X
+    assert start[0] < sm_knife_mount_spec.SLOT_X < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
+    # One cut, one floor: the depth states its 2X under the value, for the
+    # hole and the slot.
+    assert sm_knife_mount_spec.PIN_DEPTH_CALLOUT == "2X FLAT BOTTOM"
+    assert drawing.DIMENSION_CALLOUTS["PinHoleDepth"] is sm_knife_mount_spec.PIN_DEPTH_CALLOUT
+    assert sm_knife_mount_spec.PIN_HOLE_DEPTH == 9.5
+    assert sm_knife_mount_spec.DRAWING_PRECISION["PinHole"] == {"PinHoleDepth": 1}
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("create_section_view(") == 1
     assert "_look_section_along_minus_z(adapter, section)" in source
@@ -140,9 +169,12 @@ def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> N
 
 def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
     # drawing-guidelines.md rule 14 (keep text off the part) (dda9a33a8 render): the three callout lines ran through both
-    # holes and the leader shoulder crossed the view.  The block now hangs
-    # wholly right of the block's +X face, and the shoulder's near end stands
-    # below the hole centre so the leader climbs to the hole rim.
+    # holes and the leader shoulder crossed the view.  Datum B's Ø and its
+    # three rows now hang wholly right of the block's +X face and under the
+    # top view, and the shoulder's near end stands below the hole centre so
+    # the leader climbs to the hole rim.
+    from _layout_geometry import ARROW_TEXT_CLEARANCE_M
+
     x, y = drawing.TOP_KEEP["PinHoleDia"]
     face_x = drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
     shoulder_x, shoulder_y = drawing.PIN_CALLOUT_SHOULDER_START
@@ -152,12 +184,23 @@ def test_dowel_callout_is_parked_clear_of_the_top_view() -> None:
     )
     assert shoulder_start_x == pytest.approx(shoulder_x)
     assert y - drawing.PIN_CALLOUT_SHOULDER_DROP == pytest.approx(shoulder_y)
-    assert shoulder_y < drawing.TOP_CENTER[1]
+    assert shoulder_y < drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
     # Right edge clear of the right view's column and on the sheet.
     right_edge = x + drawing.PIN_CALLOUT_HALF_WIDTH
     assert right_edge < drawing.ISO_CENTER[0] - 0.050
     # Above the right view's box (front row, 2:1 block height).
     assert shoulder_y > drawing.RIGHT_CENTER[1] + drawing.RIGHT_HALF_Y + 0.040
+    # The block's left end stands right of B's 7.0 row dimension line, which
+    # runs down the top view's +X side.
+    assert shoulder_x - drawing.ROW_FACE_TEXT_XY[0] >= ARROW_TEXT_CLEARANCE_M
+    # The half width tracks the widest row, "0.027-0.093 DIAMETRAL
+    # CLEARANCE", at the ~2.52 mm a capital the sheet prints.
+    rows = drawing.DIMENSION_CALLOUTS["PinHoleDia"].splitlines()
+    widest = max(len(row) for row in rows)
+    assert widest == len("0.027-0.093 DIAMETRAL CLEARANCE")
+    assert 2.0 * drawing.PIN_CALLOUT_HALF_WIDTH == pytest.approx(
+        widest * 0.00252, abs=0.0005
+    )
 
 
 def test_the_tap_is_stated_once_on_its_hole_callout() -> None:
@@ -194,44 +237,48 @@ SHEET_INNER_BORDER_LEFT = 0.0127
 
 # Farm build 20261013T225639.450330Z (c673e62ee, re-run at e5ad7dcdd): the
 # five-row block at anchor (58.6, 209.0) mm printed x 20.0..97.1 with its top
-# ('+0.10') row 213.8..217.4, and the 7.0's (RD4's) outside tail ran
-# (77.6, 221.0)->(77.6, 214.7) through that row.
+# ('+0.10') row 213.8..217.4, and the 7.0's (RD4's) outside tail, then left of
+# the top view at x 77.6, ran (77.6, 221.0)->(77.6, 214.7) through that row.
 RUN_CALLOUT_XY = (0.0586, 0.2090)
 RUN_CALLOUT_SPAN_X = (0.0200, 0.0971)
 RUN_CALLOUT_TOP = 0.2174
-RUN_RD4_TAIL = ((0.0776, 0.2210), (0.0776, 0.2147))
+# The three-row block moved 6.0 mm down from the run's anchor; T+H3
+# (2026-10-24) took it 20 mm lower again, under datum C's tag.
+TAP_CALLOUT_RUN_DROP = 0.006 + 0.020
 
 
 def test_tap_callout_moves_clear_of_the_row_dimension_tail() -> None:
     # drawing-guidelines.md rule 14 (keep text off the part): the three rows
     # stand inside the five-row run's envelope, moved down with the anchor,
-    # whichever way SolidWorks restacks them, so their top clears RD4's tail by
-    # more than the gating arrow-to-text clearance.
+    # whichever way SolidWorks restacks them.  The 7.0 (B's row from the
+    # front face) now runs down the top view's +X side, so its outside tail
+    # stands right of the block's whole span, and the block's top stays
+    # under that tail's end by more than the gating arrow-to-text clearance.
     from _layout_audit import ARROW_TAIL_M
     from _layout_geometry import ARROW_TEXT_CLEARANCE_M
 
     x, y = drawing.TAP_CALLOUT_XY
     assert x == pytest.approx(RUN_CALLOUT_XY[0])
+    assert y == pytest.approx(RUN_CALLOUT_XY[1] - TAP_CALLOUT_RUN_DROP)
     assert RUN_CALLOUT_XY[1] + drawing.TAP_CALLOUT_TOP_REACH == pytest.approx(
         RUN_CALLOUT_TOP
     )
-    # The run's tail, from the drawing's own placement: the 7.0's line at its
+    # The 7.0's tail, from the drawing's own placement: its line at its
     # text's x, its outside tail one ARROW_TAIL_M under the view's lower edge.
     top_view_bottom = drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
     tail_x = drawing.ROW_FACE_TEXT_XY[0]
     tail_end = top_view_bottom - ARROW_TAIL_M
-    assert (tail_x, top_view_bottom) == pytest.approx(RUN_RD4_TAIL[0], abs=1e-4)
-    assert (tail_x, tail_end) == pytest.approx(RUN_RD4_TAIL[1], abs=1e-4)
-    # The run's top row ran across the tail; the three rows' top stays 1 mm
-    # more than the gating clearance under its end, the block spanning it.
-    assert RUN_CALLOUT_SPAN_X[0] < tail_x < RUN_CALLOUT_SPAN_X[1]
-    assert RUN_CALLOUT_TOP > tail_end
+    assert tail_x > drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
+    # Wherever SolidWorks restacks the rows, they stay inside the run's
+    # span, which ends well left of the tail.
+    assert tail_x > RUN_CALLOUT_SPAN_X[1] + ARROW_TEXT_CLEARANCE_M
+    assert tail_x > x + drawing.TAP_CALLOUT_HALF_WIDTH + ARROW_TEXT_CLEARANCE_M
     top = y + drawing.TAP_CALLOUT_TOP_REACH
-    assert top == pytest.approx(0.2114)
+    assert top == pytest.approx(RUN_CALLOUT_TOP - TAP_CALLOUT_RUN_DROP)
     assert top <= tail_end - ARROW_TEXT_CLEARANCE_M - 0.001
-    # The frame moves with the anchor, so it stands where the run printed it
-    # under the block (no finding between them; its top at 209.0 - 8.6 - 7.0
-    # = 193.4 mm), the block a row shorter.
+    # The frame moves with the anchor, so it keeps the drop under the block
+    # it printed at in the run with no finding between them (its top then at
+    # 209.0 - 8.6 - 7.0 = 193.4 mm), the block a row shorter.
     assert RUN_CALLOUT_XY[1] - drawing.TAP_FRAME_DROP == pytest.approx(0.1934)
     assert drawing.TAP_FRAME_XY[1] == pytest.approx(y - drawing.TAP_FRAME_DROP)
 
@@ -298,16 +345,25 @@ def test_tap_callout_prints_three_rows_with_its_bands_and_drill_point() -> None:
 
 def test_tap_callout_parks_between_the_top_view_and_the_front_view() -> None:
     # drawing-guidelines.md rule 14 (keep text off the part): the three rows
-    # stand in the band under the top view, left of the front view's datum-A
-    # tag, their frame under them and over the front view.
+    # stand in the band under the top view, under datum C's tag and left of
+    # the front view's datum-A tag, their frame under them and over the
+    # lowered front view.
+    from _layout_audit import TEXT_SEPARATION_HEIGHTS
+
     x, y = drawing.TAP_CALLOUT_XY
     top_view_bottom = drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
-    assert y + drawing.TAP_CALLOUT_TOP_REACH < top_view_bottom
+    top = y + drawing.TAP_CALLOUT_TOP_REACH
+    assert top < top_view_bottom
+    assert drawing.SLOT_DATUM_C_XY[1] - top >= TEXT_SEPARATION_HEIGHTS * 0.0035
     assert x + drawing.TAP_CALLOUT_HALF_WIDTH < drawing.FRONT_CENTER[0] - 0.0035 - 0.005
     # The frame (7 mm tall) stays over the 29.6 height line's upper witness
-    # line (y at the block top), not beside it.
+    # line (y at the block top), not beside it, a text height and more clear.
     frame_bottom = drawing.TAP_FRAME_XY[1] - 0.007
-    assert frame_bottom > drawing._front_y(sm_knife_mount_spec.BLK_TOP) + 0.010
+    front_top = drawing._front_y(sm_knife_mount_spec.BLK_TOP)
+    assert frame_bottom - front_top >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    # T+H3 lowered the front and right views 15 mm, the band they open
+    # taking the callout's 20 mm drop.
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1] == 0.125
     # Rule 13: the block stays inside the inner border.
     assert x - drawing.TAP_CALLOUT_HALF_WIDTH > SHEET_INNER_BORDER_LEFT + 0.001
     # The widest row is now the reason, "SETS MHA-SM-VN-52 TIP CLEARANCE":
@@ -380,45 +436,56 @@ def test_tap_frame_leader_lands_clear_of_the_tap_callout_leader() -> None:
     assert "edge_xy=_tap_lower_rim(adapter, top, TAP_FRAME_RIM_SIDE)" in source
 
 
-def test_dowel_frame_leader_lands_apart_from_the_dowel_diameter_leader() -> None:
-    # Blind machinist review R3 (farm run 20261014T010316127Z): the 2X Ø's
+def test_datum_b_tag_lands_apart_from_the_slip_hole_diameter_leader() -> None:
+    # Blind machinist review R3 (farm run 20261014T010316127Z): the Ø's
     # arrowhead and datum B's frame's landed on the +X hole's lower-right rim
-    # 0.10 mm apart, so the two leaders read as one.  The points below are
-    # that run's printed ones (sheet metres); the frame's elbow stood 6.35 mm
-    # left of its left end, at its middle height, its top then 6 mm under the
-    # Ø's shoulder start.  The frame has since dropped to PIN_FRAME_DROP under
-    # it (room for its above-frame 2X), its elbow with it.
+    # 0.10 mm apart, so the two leaders read as one.  T+H3 (2026-10-24):
+    # datum B is the one round slip hole and carries no frame; its tag rides
+    # its own leader to the rim at PIN_DATUM_B_RIM_DEG, left of the centre
+    # mark's vertical arm, while the Ø's leader leaves its shoulder's near end
+    # radially for the hole's centre and lands right of that arm.
     from _layout_audit import _segment_crossing
     from _layout_geometry import Segment
 
-    run_dia_tip, run_dia_shoulder = (0.13275, 0.23301), (0.14640, 0.22221)
-    run_frame_tip, run_frame_elbow = (0.13268, 0.23294), (0.14164, 0.21548)
-    assert math.dist(run_dia_tip, run_frame_tip) < 0.0002
-    frame_left, frame_top = drawing.PIN_FRAME_XY
-    run_frame_top = drawing.PIN_CALLOUT_SHOULDER_START[1] - 0.006
-    run_elbow = (frame_left - 0.00635, run_frame_top - drawing.PIN_FRAME_SIZE[1] / 2.0)
-    assert math.dist(run_elbow, run_frame_elbow) < 0.0003
-    assert run_frame_top - frame_top == pytest.approx(0.005)
-    elbow = (frame_left - 0.00635, frame_top - drawing.PIN_FRAME_SIZE[1] / 2.0)
     centre = (drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X), drawing.TOP_CENTER[1])
     rim = sm_knife_mount_spec.PIN_HOLE_DIA / 2.0 * drawing.SHEET_SCALE[0] / 1000.0
-    assert math.dist(centre, run_dia_tip) == pytest.approx(rim, abs=0.0002)
-    angle = math.radians(drawing.PIN_FRAME_RIM_DEG)
-    tip = (centre[0] + rim * math.cos(angle), centre[1] + rim * math.sin(angle))
+    shoulder = drawing.PIN_CALLOUT_SHOULDER_START
+    dia_angle = math.atan2(shoulder[1] - centre[1], shoulder[0] - centre[0])
+    assert -90.0 < math.degrees(dia_angle) < -45.0
+    dia_tip = (centre[0] + rim * math.cos(dia_angle), centre[1] + rim * math.sin(dia_angle))
+    assert drawing.PIN_DATUM_B_RIM_DEG == -110.0
+    tag_angle = math.radians(drawing.PIN_DATUM_B_RIM_DEG)
+    tag_tip = (centre[0] + rim * math.cos(tag_angle), centre[1] + rim * math.sin(tag_angle))
     # Its own point: an arrowhead's width and more round the rim from the
-    # Ø's, below the cutting line, right of the centre mark's vertical arm.
-    assert math.dist(tip, run_dia_tip) >= 0.0015
-    assert tip[1] < centre[1]
-    assert tip[0] - centre[0] >= 0.0006
-    # The frame's leader stays under the Ø's, crossing neither it nor the
-    # centre mark's vertical arm (x = centre, down to 226.83 mm).
-    frame = Segment(*elbow, *tip)
-    assert _segment_crossing(Segment(*run_dia_tip, *run_dia_shoulder), frame) is None
-    assert min(frame.x0, frame.x1) > centre[0]
+    # Ø's, below the cutting line, left of the centre mark's vertical arm.
+    assert math.dist(tag_tip, dia_tip) >= 0.0015
+    assert tag_tip[1] < centre[1]
+    assert centre[0] - tag_tip[0] >= 0.0006
+    # The tag's leader crosses neither the Ø's leader nor the centre mark's
+    # vertical arm (x = centre).
+    tag_leader = Segment(*drawing.PIN_DATUM_B_XY, *tag_tip)
+    assert _segment_crossing(Segment(*dia_tip, *shoulder), tag_leader) is None
+    assert max(tag_leader.x0, tag_leader.x1) < centre[0]
+    # Its box hangs under the top view (rule 14), whichever way it stands
+    # off the leader's end, and over the bore's frame, the tap callout's
+    # right end and the Ø's shoulder clear either side of it.
+    box = drawing.DATUM_TAG_BOX
+    x, y = drawing.PIN_DATUM_B_XY
+    assert y + box < drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z
+    assert (y - box) - drawing.BORE_FRAME_XY[1] >= 0.004
+    assert x - box / 2.0 > drawing.TAP_CALLOUT_XY[0] + drawing.TAP_CALLOUT_HALF_WIDTH
+    assert x + box / 2.0 < shoulder[0]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("    pin_frame_angle = math.radians(PIN_FRAME_RIM_DEG)") :]
-    body = body[: body.index("    add_frame_datum_feature(")]
-    assert "        edge_xy=pin_frame_rim,\n        leader_attach_xy=pin_frame_rim,\n" in body
+    assert "    b_tag_angle = math.radians(PIN_DATUM_B_RIM_DEG)\n" in source
+    tag = source[source.index("    b_tag_angle = math.radians(PIN_DATUM_B_RIM_DEG)") :]
+    tag = tag[tag.index("    add_datum_feature(") :]
+    tag = tag[: tag.index("    )\n")]
+    assert (
+        "        top,\n"
+        "        edge_xy=b_tag_rim,\n"
+        "        symbol_xy=PIN_DATUM_B_XY,\n"
+        '        datum="B",\n'
+    ) in tag
 
 
 def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
@@ -434,6 +501,10 @@ def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
     assert x + drawing.BORE_DIA_TEXT_HALF_WIDTH < face_x - 0.005
     # Above the bore centre, so the leader descends to the upper-left rim.
     assert y > drawing._front_y(sm_knife_mount_spec.BORE_CY)
+    # Its top row stays under the block top's 29.6 extension line (farm run
+    # 20261024T114146582Z: the +0.03 rode it, text-on-line).
+    top_line = drawing._front_y(sm_knife_mount_spec.BLK_TOP)
+    assert y + drawing.BORE_DIA_TEXT_TOP_REACH < top_line - 0.0035
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_near_side_diameter(bore_dia[0], "knife-bore diameter")' in source
 
@@ -466,41 +537,67 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     assert not hasattr(part, "STUD_TAP_DEPTH")
     assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
     assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
-    # Dowel holes: one each side of the tap at +/-7.632 (the printed BASIC
-    # span 15.264), printed places and the volume the build's gate expects.
+    # The slip seats (T+H3): datum B's round hole +X of the tap at 7.632,
+    # datum C's slot along the line -X of it, its half-round inner end's
+    # centre SlotEndFromB from B, running out through the -X face; their
+    # printed places and the volume the build's gate expects.
     assert sm_knife_mount_spec.PIN_HOLE_X == 7.632
-    assert sm_knife_mount_spec.PIN_HOLE_XS == (-7.632, 7.632)
-    assert sm_knife_mount_spec.PIN_HOLE_SPAN == 15.264
+    assert sm_knife_mount_spec.SLOT_END_FROM_B == 14.40
+    for gone in ("PIN_HOLE_XS", "PIN_HOLE_SPAN", "PIN_HOLE_PAIR_CALLOUT", "PIN_HOLE_COUNT"):
+        assert not hasattr(sm_knife_mount_spec, gone)
     assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
         "BlockWidth": 1,
         "BlockHeight": 1,
         "BoreDia": 2,
         "PinHoleDia": 3,
+        "SlotWidth": 3,
+        "SlotEndFromB": 2,
         "PinHoleDepth": 1,
     }
-    import math
-
-    assert abs(part.V_PIN - math.pi * (3.175 / 2.0) ** 2 * 9.5) < 1e-9
-    assert part.V_PINS == 2 * part.V_PIN
+    dia, width = sm_knife_mount_spec.PIN_HOLE_DIA, sm_knife_mount_spec.SLOT_WIDTH
+    depth = sm_knife_mount_spec.PIN_HOLE_DEPTH
+    assert dia == width == 3.24
+    assert part.V_PIN == pytest.approx(math.pi * (dia / 2.0) ** 2 * depth, abs=1e-9)
+    inner_x = sm_knife_mount_spec.PIN_HOLE_X - sm_knife_mount_spec.SLOT_END_FROM_B
+    assert part.SLOT_INNER_X == pytest.approx(inner_x)
+    # The stadium's outer end is modelled wholly past the -X face, in air.
+    assert part.SLOT_OUTER_X + width / 2.0 < -sm_knife_mount_spec.BLK_HALF_X
+    slot_area = (inner_x + sm_knife_mount_spec.BLK_HALF_X) * width + math.pi * width**2 / 8.0
+    assert part.V_SLOT == pytest.approx(slot_area * depth, abs=1e-9)
+    assert part.V_PINS == part.V_PIN + part.V_SLOT
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
     assert "\nBLK_HALF_X = " not in source
     assert "    BLK_HALF_X,\n" in source
-    assert 'for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):' in source
-    # The band prints at the nominal's places, +0.000/-0.010 under Ø3.175,
-    # not "0.00 / -0.01" (farm run 20261009T171439353Z).
+    assert "PinHole2Dia" not in source
+    assert 'await set_global(adapter, "SlotWidth", f"{SLOT_WIDTH}mm")' in source
+    assert 'await set_global(adapter, "SlotEndFromB", f"{SLOT_END_FROM_B}mm")' in source
+    assert 'pin.record("SlotWidth", \'"SlotWidth"\')' in source
+    assert 'pin.record("SlotEndFromB", \'"SlotEndFromB"\')' in source
+    # B's Ø and C's width each carry the symmetric slip band, one row
+    # (3.240 +/-0.030), at their three places.
+    assert sm_knife_mount_spec.PIN_HOLE_DIA_BAND == (0.03, -0.03)
+    assert sm_knife_mount_spec.SLOT_WIDTH_BAND == (0.03, -0.03)
     assert (
-        '            "PinHoleProfile",\n'
-        "            pin_dia_name,\n"
-        "            *deviations(PIN_HOLE_DIA_BAND),\n"
-        "            places=PIN_HOLE_DIA_PLACES,\n"
+        "    for dim_name, band in (\n"
+        '        ("PinHoleDia", PIN_HOLE_DIA_BAND),\n'
+        '        ("SlotWidth", SLOT_WIDTH_BAND),\n'
+        "    ):\n"
+        "        lower, upper = deviations(band)\n"
+    ) in source
+    assert (
+        '        set_dimension_symmetric_tolerance(adapter, "PinHoleProfile", dim_name, upper)\n'
     ) in source
     assert (
         sm_knife_mount_spec.PIN_HOLE_DIA_PLACES
+        == sm_knife_mount_spec.SLOT_WIDTH_PLACES
         == sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"]
+        == sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME["SlotWidth"]
         == 3
     )
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
+    assert source.index("set_dimension_symmetric_tolerance(adapter") < source.index(
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)"
+    )
 
 
 def test_the_sheet_carries_no_notes_block() -> None:
@@ -516,43 +613,112 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert "Manufacturing Notes" not in drawing_source
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
-    # The dowel holes' count rides above their Ø and the press below it
-    # (MHA-PD-18 precedent); their position frame hangs under the callout.
-    assert drawing.CALLOUTS_ABOVE == {"PinHoleDia": "2X"}
+    # No quantity rides above B's Ø (the 2X pattern is gone); the slip hole's
+    # and the slot's callouts name their mate and the clearance it sets
+    # (rule 4), and the depth states one floor for both.
+    assert not hasattr(drawing, "CALLOUTS_ABOVE")
+    assert drawing.DIMENSION_CALLOUTS == {
+        "BoreDia": sm_knife_mount_spec.BORE_CALLOUT,
+        "PinHoleDia": sm_knife_mount_spec.PIN_HOLE_CALLOUT,
+        "SlotWidth": sm_knife_mount_spec.SLOT_WIDTH_CALLOUT,
+        "PinHoleDepth": sm_knife_mount_spec.PIN_DEPTH_CALLOUT,
+    }
+    assert sm_knife_mount_spec.DOWEL_NUMBER == _config.parts("sm-vn-knife-mount-dowel")[
+        "number"
+    ]
     assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
         "BLIND FLAT-BOTTOM REAM",
-        "PRESS MHA-SM-VN-53 DOWEL TO FLOOR",
-        "0.0025/0.0177 INTERFERENCE",
+        "0.027-0.093 DIAMETRAL CLEARANCE",
+        "ON MHA-SM-VN-53 DOWEL",
     ]
+    assert sm_knife_mount_spec.SLOT_WIDTH_CALLOUT.splitlines() == [
+        "OPEN-END SLOT",
+        "SLIP FIT ON MHA-SM-VN-53",
+    ]
+    # The printed clearance band rounds the dowel's slip band outward.
+    import sm_vn_knife_mount_dowel_spec as dowel
+
+    low, high = sm_knife_mount_spec.PIN_SLIP_PRINTED
+    assert (low, high) == (0.027, 0.093)
+    assert low <= dowel.SLIP_CLEARANCE_MIN < low + 0.001
+    assert high - 0.001 < dowel.SLIP_CLEARANCE_MAX <= high
+    assert not any(
+        "PRESS" in text or "INTERFERENCE" in text
+        for text in drawing.DIMENSION_CALLOUTS.values()
+    )
 
 
-def test_datum_b_hangs_under_its_frame_clear_of_the_bore_frame() -> None:
-    # The B symbol's box (its bottom middle at PIN_DATUM_B_XY) sits under the
-    # dowel-pattern frame's printed box, within its width, with stem room to
-    # it and clear of the bore frame's top (DetailItem355, 188.62 mm) below.
-    frame_left, frame_top = drawing.PIN_FRAME_XY
-    frame_w, frame_h = drawing.PIN_FRAME_SIZE
+def test_datum_c_hangs_under_the_slot_frame_clear_of_the_tap_callout() -> None:
+    # Datum C, the slot, is its width's ⌖0.05 to A|B (the crossbar's former
+    # slot frame, moved with the slot): the C symbol's box (its bottom middle
+    # at SLOT_DATUM_C_XY) hangs under that frame's printed box, within its
+    # width, a stem under it, and over the tap's callout block below.
+    from _layout_audit import TEXT_SEPARATION_HEIGHTS
+
+    frame_left, frame_top = drawing.SLOT_FRAME_XY
+    frame_w, frame_h = drawing.SLOT_FRAME_SIZE
     box = drawing.DATUM_TAG_BOX
-    x, y = drawing.PIN_DATUM_B_XY
+    x, y = drawing.SLOT_DATUM_C_XY
     assert frame_left + box / 2 <= x <= frame_left + frame_w - box / 2
-    assert (frame_top - frame_h) - (y + box) >= 0.004
-    assert y - drawing.BORE_FRAME_XY[1] >= 0.004
+    assert (frame_top - frame_h) - (y + box) == pytest.approx(drawing.DATUM_TAG_STEM)
+    assert drawing.DATUM_TAG_STEM >= 0.004
+    tap_top = drawing.TAP_CALLOUT_XY[1] + drawing.TAP_CALLOUT_TOP_REACH
+    assert y - tap_top >= TEXT_SEPARATION_HEIGHTS * 0.0035
+    # The frame stands left of the block inside the inner border (rule 13),
+    # under the top view's centre line, its leader landing on the slot's
+    # front wall between the slot's inner end and the -X face.
+    assert frame_left > SHEET_INNER_BORDER_LEFT + 0.001
+    assert frame_left + frame_w < drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    assert frame_top < drawing.TOP_CENTER[1]
+    inner_end_x = sm_knife_mount_spec.PIN_HOLE_X - sm_knife_mount_spec.SLOT_END_FROM_B
+    assert -sm_knife_mount_spec.BLK_HALF_X < drawing.SLOT_FRAME_WALL_X < inner_end_x
+    # The width's three rows (~24 capitals at ~2.52 mm, the mate row) stand
+    # left of the A-A cutting line's -X end and inside the border.
+    rows = drawing.DIMENSION_CALLOUTS["SlotWidth"].splitlines()
+    half_width = max(len(row) for row in rows) * 0.00252 / 2.0
+    text_x, text_y = drawing.TOP_KEEP["SlotWidth"]
+    assert (text_x, text_y) == drawing.SLOT_WIDTH_TEXT_XY
+    assert text_x - half_width > SHEET_INNER_BORDER_LEFT + 0.001
+    section_start_x = drawing._sheet_x(
+        -(sm_knife_mount_spec.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM)
+    )
+    assert text_x + half_width < section_start_x
+    assert text_y > drawing.TOP_CENTER[1]
 
 
 def test_native_gdt_and_bore_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Datum A the top seat (a tag on its edge); datum B the dowel pair, its
-    # symbol on the pair's position frame: a tag on the 2X Ø attaches to
-    # nothing (farm run 20261009T155421516Z, count=0), and the frame's datum
-    # identifier read "B" back but printed nothing (20261009T171439353Z).
-    assert source.count("add_datum_feature(") == 1
+    # Datum A the top seat and datum B the round slip hole, each a tag on
+    # its own edge (owner ruling 2026-10-24, T+H3: B is one hole, no 2X
+    # pattern and no frame of its own); datum C the slot, its symbol on the
+    # slot's position frame (a frame's datum identifier read "B" back but
+    # printed nothing, 20261009T171439353Z).
+    assert source.count("add_datum_feature(") == 2
     assert "add_dimension_datum_feature" not in source
     assert "datum_identifier" not in source
     assert source.count("add_frame_datum_feature(") == 1
-    frame_datum = source[source.index("pin_frame = add_feature_control_frame(") :]
-    frame_datum = frame_datum[: frame_datum.index("# The bore:")]
-    assert "        pin_frame,\n        datum=\"B\",\n" in frame_datum
     assert 'datum="A"' in source
+    assert source.count('datum="B"') == 1
+    assert source.index('datum="A"') < source.index('datum="B"')
+    slot = source[source.index("    slot_frame = add_feature_control_frame(") :]
+    slot = slot[: slot.index("    # The bore:")]
+    assert (
+        "        edge_xy=slot_wall,\n"
+        "        leader_attach_xy=slot_wall,\n"
+        "        frame_xy=SLOT_FRAME_XY,\n"
+        '        characteristic="position",\n'
+        '        tolerance=GEOMETRIC_TOLERANCES_MM["dowel slot position"],\n'
+        '        datums=("A", "B"),\n'
+    ) in slot
+    assert (
+        "    add_frame_datum_feature(\n"
+        "        adapter,\n"
+        "        top,\n"
+        "        slot_frame,\n"
+        '        datum="C",\n'
+        "        symbol_xy=SLOT_DATUM_C_XY,\n"
+    ) in slot
+    assert "position_tolerance_m" not in slot
     # The sheet fails unless every frame's datum is printed, over every view
     # a frame or tag stands in.
     assert (
@@ -561,9 +727,10 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert source.index("assert_frame_datums_defined(") > source.index(
         "add_frame_datum_feature("
     )
-    # The pair's frame to A, the bore's and the tap's frames to A|B; under
-    # the bore's position, a stacked (not composite) ⊥Ø0.05 to B
-    # (2026-10-10 ruling: one Ø zone bounds the yaw the rock budget takes).
+    # The slot's width to A|B (a width: no Ø zone); the bore's and the tap's
+    # Ø zones to A|B|C.  The bore carries no stacked ⊥ lower frame: its
+    # Ø0.20 zone over the 14 deep bore bounds the yaw and the tilt, the rock
+    # budget charging the whole zone.
     import ast
 
     frames = [
@@ -573,95 +740,87 @@ def test_native_gdt_and_bore_geometry() -> None:
         and isinstance(node.func, ast.Name)
         and node.func.id == "add_feature_control_frame"
     ]
-    assert len(frames) == 3
-    assert source.count('characteristic="position"') == 3
-    assert source.count('datums=("A",)') == 1
-    assert source.count('datums=("A", "B")') == 2
+
+    def frame_keywords(frame: ast.Call) -> dict[str, object]:
+        found: dict[str, object] = {}
+        for keyword in frame.keywords:
+            value = keyword.value
+            if isinstance(value, ast.Subscript):
+                found[keyword.arg] = ast.literal_eval(value.slice)
+            elif keyword.arg in {"label", "characteristic", "datums", "diameter"}:
+                found[keyword.arg] = ast.literal_eval(value)
+            else:
+                found[keyword.arg] = None
+        return found
+
+    by_label = {}
+    for frame in frames:
+        keywords = frame_keywords(frame)
+        by_label[keywords["label"]] = (
+            keywords["characteristic"],
+            keywords["tolerance"],
+            keywords["datums"],
+            keywords.get("diameter", False),
+        )
+        assert set(keywords) <= {
+            "edge_xy",
+            "leader_attach_xy",
+            "frame_xy",
+            "characteristic",
+            "tolerance",
+            "datums",
+            "diameter",
+            "label",
+        }
+    assert by_label == {
+        "dowel slot position": ("position", "dowel slot position", ("A", "B"), False),
+        "knife-bore position": (
+            "position",
+            "knife-bore position",
+            ("A", "B", "C"),
+            True,
+        ),
+        "knife-hanger tap position": (
+            "position",
+            "knife-hanger tap position",
+            ("A", "B", "C"),
+            True,
+        ),
+    }
+    assert source.count('datums=("A", "B", "C")') == 2
+    assert source.count('datums=("A", "B")') == 1
+    assert 'datums=("A",)' not in source
+    assert "lower_frame" not in source
     assert "composite_lower" not in source
-    bore_frame = source[source.index("# The bore: Ø0.20 located to A|B") :]
-    bore_frame = bore_frame[: bore_frame.index("bore_basic = ")]
-    assert (
-        "        lower_frame=(\n"
-        '            "perpendicularity",\n'
-        '            GEOMETRIC_TOLERANCES_MM["knife-bore perpendicularity"],\n'
-        '            ("B",),\n'
-        "        ),\n"
-    ) in bore_frame
-    assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in source
+    assert "quantity=" not in source
+    assert "_GTOL_TEXT_CALLOUT_ABOVE" not in source
+    for gone in ("PIN_FRAME_XY", "PIN_FRAME_QUANTITY", "PIN_SPAN_TEXT_XY"):
+        assert not hasattr(drawing, gone)
+    bore_frame = source[source.index("    # The bore: Ø0.20 located to A|B|C") :]
+    bore_frame = bore_frame[: bore_frame.index("    bore_basic = ")]
+    assert 'tolerance=GEOMETRIC_TOLERANCES_MM["knife-bore position"],' in bore_frame
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
         "knife-bore position": "0.20",
-        "knife-bore perpendicularity": "0.05",
         "knife-hanger tap position": "0.15",
-        "dowel hole pattern position": "0.13",
+        "dowel slot position": "0.05",
     }
-    assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
-    # R4 blocker: datum B is the 2X pattern.  The pattern's frame -- the one
-    # datum B's symbol is attached to -- prints its own native 2X above-frame
-    # text (IGtol.SetText(swGTolTextCalloutAbove), read back after a rebuild
-    # before B attaches).  R5: the below-frame quantity moved B's tag 5.6 mm
-    # off its place, so no frame takes ``quantity=`` any more.
-    assert drawing.PIN_FRAME_QUANTITY == sm_knife_mount_spec.PIN_HOLE_PAIR_CALLOUT
-    assert drawing.PIN_FRAME_QUANTITY == f"{sm_knife_mount_spec.PIN_HOLE_COUNT}X"
-    assert sm_knife_mount_spec.PIN_HOLE_COUNT == 2
-    assert drawing._GTOL_TEXT_CALLOUT_ABOVE == 3  # swGTolTextCalloutAbove
-    assert "quantity=PIN_FRAME_QUANTITY" not in source
-    assert not any(
-        keyword.arg == "quantity" for frame in frames for keyword in frame.keywords
-    )
-    pin_frame = source[source.index("    pin_frame = add_feature_control_frame(") :]
-    pin_frame = pin_frame[: pin_frame.index("    )\n")]
-    assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in pin_frame
-    count = source[source.index("    pin_gtol = _early_bound(pin_frame, \"IGtol\")") :]
-    count = count[: count.index("    add_frame_datum_feature(")]
-    assert source.count("_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY") == 1
-    assert "if not pin_gtol.SetText(_GTOL_TEXT_CALLOUT_ABOVE, PIN_FRAME_QUANTITY):" in count
-    assert count.index("SetText(") < count.index("rebuild_drawing(") < count.index(
-        "GetText(_GTOL_TEXT_CALLOUT_ABOVE)"
-    )
-    assert "if pin_frame_count != PIN_FRAME_QUANTITY:\n        raise RuntimeError(" in count
-    assert source.index("    pin_gtol = _early_bound(") < source.index(
-        "    add_frame_datum_feature("
-    )
-    datum_b = source[source.index("    add_frame_datum_feature(") :]
-    datum_b = datum_b[: datum_b.index("    )\n")]
-    assert "pin_frame," in datum_b and 'datum="B"' in datum_b
-    assert "symbol_xy=PIN_DATUM_B_XY," in datum_b
-    assert "position_tolerance_m" not in datum_b
-    # The 2X (left-aligned 1.1 mm over the frame, 3.4 mm tall, as the
-    # measured below-frame line) tops out a text height and more under the
-    # 2X Ø callout's shoulder, printed at y 222.21 mm (farm run
-    # 20261014T010316127Z), and well under the A-A cutting line.
-    from _layout_audit import TEXT_SEPARATION_HEIGHTS
-
-    assert drawing.PIN_CALLOUT_SHOULDER_PRINTED_Y == pytest.approx(0.22221)
-    assert drawing.PIN_FRAME_QUANTITY_TOP == pytest.approx(
-        drawing.PIN_FRAME_XY[1] + 0.0011 + 0.0034
-    )
-    assert drawing.PIN_FRAME_QUANTITY_TOP_CLEARANCE == pytest.approx(0.00371)
-    assert drawing.PIN_FRAME_QUANTITY_TOP_CLEARANCE >= TEXT_SEPARATION_HEIGHTS * 0.0035
-    assert drawing.PIN_FRAME_QUANTITY_SECTION_CLEARANCE == pytest.approx(0.0165)
-    section_end_x = drawing._sheet_x(
-        sm_knife_mount_spec.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
-    )
-    assert drawing.PIN_FRAME_XY[0] - section_end_x == pytest.approx(0.0026)
-    # B keeps its proven tag placement: 5 mm of stem under the frame's
-    # bottom, at its mid-width, through the shared helper's default gate.
-    assert drawing.PIN_DATUM_B_XY[0] - drawing.DATUM_TAG_BOX / 2.0 == pytest.approx(
-        drawing.PIN_FRAME_XY[0] + 0.0112
-    )
-    assert drawing.PIN_DATUM_B_XY[1] == pytest.approx(
-        drawing.PIN_FRAME_XY[1] - drawing.PIN_FRAME_SIZE[1] - 0.005 - 0.007
-    )
-    # Sheet-added: the block depth, the dowel span, the tap axis's station
-    # from a dowel axis and the bore centre's height under A (all BASIC), and
-    # the pattern's two face locations; the
-    # dowel holes' Ø and depth are marked model dimensions
-    # (DRAWING_DIMENSIONS).
-    assert source.count("add_edge_dimension(") == 6
-    assert source.count("set_basic_dimension(") == 3
-    assert 'set_basic_dimension(adapter, span, label="dowel hole span")' in source
+    assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == 0.20
+    assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.20
+    assert sm_knife_mount_spec.STUD_TAP_POSITION_TOL == 0.15
+    assert sm_knife_mount_spec.SLOT_POSITION_TOL == 0.05
+    # Sheet-added: the block depth, the tap axis's station from B's axis and
+    # the bore centre's height under A (both BASIC), and B's two face
+    # locations; B's Ø, the slot's width and end station and the shared
+    # depth are marked model dimensions (DRAWING_DIMENSIONS).
+    assert source.count("add_edge_dimension(") == 5
+    assert source.count("set_basic_dimension(") == 2
+    assert "dowel hole span" not in source
     assert (
         'set_basic_dimension(adapter, station, label="dowel hole from tap axis")'
+        in source
+    )
+    assert (
+        'set_basic_dimension(adapter, bore_basic, label="knife-bore centre from top seat")'
         in source
     )
 
@@ -670,7 +829,6 @@ def test_native_gdt_and_bore_geometry() -> None:
     ("label", "basic"),
     (
         ("knife-bore centre from top seat", part.BORE_CENTRE_DEPTH),
-        ("dowel hole span", sm_knife_mount_spec.PIN_HOLE_SPAN),
         ("dowel hole from tap axis", sm_knife_mount_spec.PIN_HOLE_X),
     ),
 )
@@ -702,13 +860,18 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("sm-knife-mount")
-    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
+    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.  The
+    # SolidWorks library material stays the generic steel (density); the
+    # title block's MATERIAL cell names the hardenable grade the finish
+    # needs (ENFORCE review, 2026-10-24, rule 2).
     assert part.MATERIAL == "Plain Carbon Steel"
-    assert config["material"] == "Plain Carbon Steel"
+    assert config["material"] == "AISI O1 tool steel"
     assert config["material_specification"] == "AISI O1 tool steel"
     # drawing-guidelines.md rule 2 (the title block is the general specification): the heat treatment and the bare surface are the Finish field's,
-    # stated once there (the sheet has no notes block).
-    assert config["finish"] == "hardened and tempered 58-60 HRC, unpainted"
+    # stated once there (the sheet has no notes block), with the state the
+    # slip bands are inspected in (T+H3: cut soft, hardening's growth inside
+    # the band).
+    assert config["finish"] == "58-60 HRC, unpainted; sizes apply after hardening"
     assert "Brass" not in config["material_specification"]
     assert int(config["quantity"]) == 2
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -966,12 +1129,12 @@ def test_hidden_threads_and_restated_hidden_lines_are_gone() -> None:
     assert "visible=False" in hidden_call
 
 
-def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
+def test_datum_b_is_located_from_the_side_and_front_faces() -> None:
     # Machinist review B1: the span located the dowels only to each other.
-    # The +X hole's axis stands 5.07 .XX from the +X face, a row above the
-    # BASIC span over the top view (clear of the dowel frame's leader under
-    # it, and of the span's arrows); the row 7.0 .X from the front face, left
-    # of the view.
+    # Datum B's axis stands 5.07 .XX from the +X face, a row above the slot
+    # end's station over the top view; the row 7.0 .X from the front face,
+    # right of the view, past the A-A cutting line's +X end.  Both measure
+    # B's hole.
     assert sm_knife_mount_spec.PIN_HOLE_SIDE_DISTANCE == pytest.approx(
         sm_knife_mount_spec.BLK_HALF_X - sm_knife_mount_spec.PIN_HOLE_X
     )
@@ -980,42 +1143,60 @@ def test_the_pattern_is_located_from_the_side_and_front_faces() -> None:
     )
     top_view_top = drawing.TOP_CENTER[1] + drawing.TOP_HALF_Z
     side_x, side_y = drawing.PIN_SIDE_TEXT_XY
-    assert side_y > top_view_top
-    assert side_y >= drawing.PIN_SPAN_TEXT_XY[1] + 0.006
+    end_x, end_y = drawing.SLOT_END_TEXT_XY
+    assert drawing.TOP_KEEP["SlotEndFromB"] == drawing.SLOT_END_TEXT_XY
+    assert end_y > top_view_top
+    assert side_y - end_y == pytest.approx(0.006)
     assert drawing._sheet_x(sm_knife_mount_spec.PIN_HOLE_X) < side_x
     assert side_x < drawing._sheet_x(sm_knife_mount_spec.BLK_HALF_X)
-    row_x, _ = drawing.ROW_FACE_TEXT_XY
-    assert row_x < drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    # The slot end's value stands between its two centres, B's and the
+    # slot's inner end's.
+    inner_end_x = sm_knife_mount_spec.PIN_HOLE_X - sm_knife_mount_spec.SLOT_END_FROM_B
+    assert drawing._sheet_x(inner_end_x) < end_x < drawing._sheet_x(
+        sm_knife_mount_spec.PIN_HOLE_X
+    )
+    row_x, row_y = drawing.ROW_FACE_TEXT_XY
+    section_end_x = drawing._sheet_x(
+        sm_knife_mount_spec.BLK_HALF_X + drawing.SECTION_LINE_OVERRUN_MM
+    )
+    assert row_x > section_end_x
+    assert drawing.TOP_CENTER[1] - drawing.TOP_HALF_Z < row_y < drawing.TOP_CENTER[1]
     source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '_set_sheet_precision(side, label="dowel hole from side face")' in source
+    assert '_set_sheet_precision(row, label="hole row from front face")' in source
     for label in ("dowel hole from side face", "hole row from front face"):
-        assert f'_set_sheet_precision(side, label="{label}")' in source or (
-            f'_set_sheet_precision(row, label="{label}")' in source
-        )
         assert source.count(f'label="{label}"') == 3
+    # Both pick B's rim, on the +X side of its axis.
+    assert "(PIN_HOLE_X + pin_rim_mm) / 1000.0," in source
+    assert source.count("        p1=b_pick,\n") == 2
 
 
-def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
+def test_the_tap_and_bore_axis_is_basic_from_datum_b() -> None:
     # Machinist review (2026-10-10): the tap frame and the bore's frames
     # reference B, but their offset from B was only the implied centre.  The
     # tap axis, run on through the bore's centre in section A-A, stands BASIC
-    # 7.632 from the -X dowel axis; its boxed value parks left of that axis,
-    # over the section's top seat.
-    assert sm_knife_mount_spec.PIN_HOLE_X == pytest.approx(
-        sm_knife_mount_spec.PIN_HOLE_SPAN / 2.0
-    )
+    # 7.632 from datum B's axis (+X); its boxed value parks right of that
+    # axis, over the section's top seat.
+    import sm_vn_knife_mount_dowel_spec as dowel
+
+    assert sm_knife_mount_spec.PIN_HOLE_X == dowel.HANGER_OFFSET
+    assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION[
+        "dowel hole from tap axis"
+    ] == dowel.HANGER_OFFSET_PLACES
     section_top = drawing._section_y(sm_knife_mount_spec.BLK_TOP)
-    pin_x = drawing._section_x(-sm_knife_mount_spec.PIN_HOLE_X)
+    pin_x = drawing._section_x(sm_knife_mount_spec.PIN_HOLE_X)
     text_x, text_y = drawing.TAP_STATION_TEXT_XY
-    assert pin_x < text_x < drawing._section_x(0.0)
+    assert drawing._section_x(0.0) < text_x < pin_x
     assert text_y > section_top
     offset_x, offset_y = drawing.TAP_STATION_OFFSET_XY
     assert offset_y == text_y
-    assert offset_x < pin_x
+    assert offset_x > pin_x
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # The tap's axis reaches past the bore's bottom, the dowel's past its
-    # floor, both inside the block.
+    assert "    if not pin_axis_x > tap_axis_x:\n" in source
+    # The tap's axis reaches past the bore's bottom, B's past its floor,
+    # both inside the block.
     assert "(0.0, BORE_CY - R_BORE - SECTION_AXIS_TAIL_MM, 0.0)" in source
-    assert "BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM" in source
+    assert "(PIN_HOLE_X, BLK_TOP - PIN_HOLE_DEPTH - SECTION_AXIS_TAIL_MM, 0.0)" in source
     assert (
         sm_knife_mount_spec.BORE_CY
         - sm_knife_mount_spec.R_BORE
@@ -1026,10 +1207,78 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     assert source.count('label="dowel hole from tap axis"') == 3
 
 
-def test_the_bore_states_its_ream_and_band() -> None:
+def test_the_slip_seats_hold_their_margins_and_webs() -> None:
+    # T+H3: the -X pin, at the crossbar's span limits plus B's slip, bears
+    # wholly on the slot's straight walls (clocking) and wholly inside the
+    # block short of the open mouth; the half-round end stands a web inboard
+    # of the mouth; and every web the hole, the slot, the tap and the bore
+    # leave holds the 2.0 floor (drawing-guidelines.md rule 17).  Each is
+    # recomputed here from the dowel's and the title block's terms.
+    import sm_vn_knife_mount_dowel_spec as dowel
+
+    spec = sm_knife_mount_spec
+    slip_half = dowel.SLIP_CLEARANCE_MAX / 2.0
+    pin_from_b = (
+        dowel.SPAN - dowel.SPAN_TOL - slip_half,
+        dowel.SPAN + dowel.SPAN_TOL + slip_half,
+    )
+    assert spec.SLOT_PIN_FROM_B == pytest.approx(pin_from_b, abs=1e-9)
+    end_longest = spec.SLOT_END_FROM_B + spec.SLOT_END_TOL
+    assert spec.SLOT_PIN_LOCATION_MARGIN == pytest.approx(
+        pin_from_b[0] - end_longest, abs=1e-9
+    )
+    assert spec.SLOT_PIN_LOCATION_MARGIN > 0.0
+    face_from_b_min = (2.0 * spec.BLK_HALF_X - spec.BLOCK_SIZE_TOL) - (
+        spec.PIN_HOLE_SIDE_DISTANCE + spec.PIN_HOLE_SIDE_TOL
+    )
+    assert spec.SLOT_MOUTH_PIN_MARGIN == pytest.approx(
+        face_from_b_min - pin_from_b[1] - dowel.DIA_MAX / 2.0, abs=1e-9
+    )
+    assert spec.SLOT_MOUTH_PIN_MARGIN > 0.0
+    slot_half_w_max = (spec.SLOT_WIDTH + max(spec.SLOT_WIDTH_BAND)) / 2.0
+    assert spec.SLOT_END_TO_MOUTH == pytest.approx(
+        face_from_b_min - end_longest - slot_half_w_max, abs=1e-9
+    )
+    assert spec.SLOT_END_TO_MOUTH >= spec.STUD_TAP_WEB_MIN == 2.0
+    for web in (
+        spec.PIN_HOLE_SIDE_WEB,
+        spec.PIN_HOLE_Z_WEB,
+        spec.SLOT_CHEEK_WEB,
+        spec.PIN_HOLE_TAP_WEB,
+        spec.SLOT_TAP_WEB,
+        spec.PIN_HOLE_BORE_WEB,
+        spec.SLOT_BORE_WEB,
+        spec.STUD_TAP_Z_WALL,
+        spec.BORE_SIDE_WEB,
+        spec.BORE_BOTTOM_WALL,
+        spec.STUD_TAP_WEB_WORST,
+        part._TAP_WEB_WORST,
+    ):
+        assert web >= 2.0
+    # The slot end's shortest limit keeps its half-round end clear of the
+    # tap's thread by that web, recomputed.
+    tip_from_b_min = spec.SLOT_END_FROM_B - spec.SLOT_END_TOL - slot_half_w_max
+    assert spec.SLOT_TAP_WEB == pytest.approx(
+        tip_from_b_min
+        - (spec.PIN_HOLE_X + spec.STUD_TAP_POSITION_TOL / 2.0)
+        - spec.STUD_THREAD_MAJOR / 2.0,
+        abs=1e-9,
+    )
+    # The slip band holds the dowel at 0.02..0.10 diametral clearance.
+    assert 0.02 <= dowel.SLIP_CLEARANCE_MIN < dowel.SLIP_CLEARANCE_MAX <= 0.10
+    assert spec.PIN_HOLE_DIA == spec.SLOT_WIDTH == dowel.SLIP_HOLE_DIA
+    assert spec.PIN_HOLE_DIA_BAND == spec.SLOT_WIDTH_BAND == dowel.SLIP_HOLE_DIA_BAND
+
+
+def test_the_bore_states_its_ream_band_and_mate() -> None:
     # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # reamed to +0.03/0 at two places (Ra 1.6 stays).
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "REAM THRU"
+    # reamed to +0.03/0 at two places (Ra 1.6 stays).  ENFORCE review
+    # (2026-10-24, rule 4): the band names its mate, the lever's trunnion.
+    rows = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
+    assert rows[0] == "REAM THRU"
+    assert rows[1:] == ["KNIFE SEAT FOR", "MHA-SM-03 TRUNNION"]
+    widest = max(len(row) for row in rows)
+    assert drawing.BORE_DIA_TEXT_HALF_WIDTH >= widest * 0.00252 / 2.0
     assert sm_knife_mount_spec.BORE_DIA_BAND == (0.03, 0.0)
     assert sm_knife_mount_spec.BORE_DIA_PLACES == 2
     assert sm_knife_mount_spec.DRAWING_PRECISION["BoreProfile"] == {"BoreDia": 2}
