@@ -155,6 +155,7 @@ DRAWING_PRECISION_BY_NAME = {
 }
 
 
+@_telemetry.traced("drawing.mg_wheel_bar.part_authored_text")
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every imported dimension prints the text lanes its part authored.
 
@@ -192,16 +193,30 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
+@_telemetry.traced("drawing.mg_wheel_bar.clamp_tap_callout")
 def _name_clamp_taps(display: Any) -> None:
     """Hang the back-arc taps the clamp holes locate to under their native
-    callout (a drawing annotation, not an imported model dimension)."""
+    callout (a drawing annotation, not an imported model dimension).
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_ch_channel_lever._name_hole_mate)."""
     display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7)}
     display.SetText(callouts.CALLOUT_BELOW, callouts.CLAMP_HOLE_CALLOUT)
-    applied = str(display.GetText(callouts.CALLOUT_BELOW) or "")
-    if callouts.callout_rows(applied) != callouts.callout_rows(
-        callouts.CLAMP_HOLE_CALLOUT
+    wanted = callouts.callout_rows(callouts.CLAMP_HOLE_CALLOUT)
+    applied = {
+        part: callouts.callout_rows(str(display.GetText(part) or ""))
+        for part in (callouts.CALLOUT_BELOW, 8)
+    }
+    if any(rows != wanted for rows in applied.values()) or any(
+        str(display.GetText(part) or "") != text for part, text in definitions.items()
     ):
-        raise RuntimeError(f"clamp-hole callout's taps did not persist: {applied!r}")
+        raise RuntimeError(
+            "clamp-hole callout's taps or native definitions did not persist: "
+            f"{applied!r}"
+        )
 
 
 def _hole_rims(front: Any) -> list[Any]:

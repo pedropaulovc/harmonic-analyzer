@@ -43,6 +43,8 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
+
 from _appearance import apply_material
 from _check import check
 from _com import _early_bound
@@ -126,6 +128,7 @@ def _as_construction(adapter, entity_id: str, label: str) -> None:
         raise RuntimeError(f"{label} did not take the construction flag")
 
 
+@_telemetry.traced("dim.mg_wheel_bar.authored_callouts")
 def author_dimension_callouts(adapter) -> None:
     """Write every authored text lane on its source dimension, read it back.
 

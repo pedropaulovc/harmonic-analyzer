@@ -58,7 +58,7 @@ BORE_ROW_PLACES = 2
 # +/-0.18 at .XX (0.509 + 0.283 = 0.792). The clamp row and both clamp
 # stations carry it. A literal, so the clamp's geometry stays out of this
 # part's recipe (test_mg_wheel_bar_drawing derives it from the clamp's own
-# modules).
+# modules). Drill wander is not charged, as on the support bar (#1988).
 CLAMP_POSITION_BAND = 0.18
 CLAMP_POSITION_PLACES = 2
 
