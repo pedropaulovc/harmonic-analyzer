@@ -46,8 +46,10 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 from _check import check
 from _com import _early_bound
 import _config
+from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
     BalloonAnchor,
+    BalloonLanding,
     add_component_bom_balloons,
     assert_balloon_landings,
     isolate_drawing_view_components,
@@ -94,12 +96,14 @@ from ch_channel_lever_spec import (
     HUB_LENGTH_BAND as LEVER_HUB_LENGTH_BAND,
 )
 from ch_fulcrum_keeper_spec import (
+    CROWN_TOP_Y as KEEPER_CROWN_TOP_Y,
     FULCRUM_KEEPER_CENTRE_Z,
     KEEPER_FITUP_LOCATION_BAND_MM,
     KEEPER_FITUP_X_FROM_WEB_MM,
     KEEPER_INNER_FACE_FROM_FRONT_SOCKET_MM,
     KEEPER_INNER_FACE_SPAN_MM,
     KEEPER_Z_OFF,
+    LUG_HALF_T as KEEPER_LUG_HALF_T,
 )
 from ch_pivot_bracket_sides import FOOT_Z1 as BRACKET_FOOT_Z1
 from ch_pivot_bracket_spec import (
@@ -107,13 +111,18 @@ from ch_pivot_bracket_spec import (
     FOOT_W as BRACKET_FOOT_W,
     SET_SCREW_ENGAGEMENT_ASSEMBLY_FACT,
 )
-from ch_pivot_shaft_spec import DOME_HEIGHT
+from ch_pivot_shaft_spec import (
+    DOME_HEIGHT,
+    FLAT_DEPTH as PIVOT_FLAT_DEPTH,
+    SHAFT_DIA as PIVOT_SHAFT_DIA,
+)
 from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 from channel_frame_geom import LEVER_FULCRUM_XY, ROCKER_PIVOT_XY
 from frame_column_stations import COLUMN_X
 from rocker_bank_layout import (
     COUNT,
     PIVOT_BRACKET_Z,
+    PIVOT_SHAFT_FLAT_STATIONS,
     SHAFT_TIP_SET_BAND,
     STACK_L20_ACCEPT,
     STACK_MID_Z,
@@ -214,6 +223,33 @@ BRACKET_BALLOON_POINT_MM = (
     BRACKET_FOOT_H / 2.0,
     BRACKET_FOOT_Z1,
 )
+# Balloon 1 (the rocker pivot shaft) walked to the stub of shaft south of hub
+# 0, the only part of it the 1:7 view shows, but its ring slot is below the
+# view, so its leader climbed through the black rocker-arm fan and read as
+# naming the arms (#1895 machinist review, r2 and r3). Its landing is now the
+# south flat's edge on the eye's side, at the flat's middle (the south ear's
+# mid-plane): the flat faces +y, so both faces at that edge face the eye, and
+# in the isometric the edge clears arm 0's top edge (8 over the pivot) by
+# about 1.8. Part frame (ch_pivot_shaft_spec): axis along z from the north
+# cylinder end, unturned in the assembly.
+PIVOT_SHAFT_STEM = "ch-pivot-shaft"
+_PIVOT_FLAT_Y = PIVOT_SHAFT_DIA / 2.0 - PIVOT_FLAT_DEPTH
+PIVOT_SHAFT_BALLOON_POINT_MM = (
+    math.sqrt((PIVOT_SHAFT_DIA / 2.0) ** 2 - _PIVOT_FLAT_Y**2),
+    _PIVOT_FLAT_Y,
+    -PIVOT_SHAFT_FLAT_STATIONS[0],
+)
+# Off the ring, its circle stands this far (sheet m) from that landing: up
+# the open strip between the east edge of the bank's vertical column and the
+# exploded south washer, spring and bracket, which the stub points at. The
+# leader then reaches the stub over paper, about 1.3 mm east of the column's
+# corner and clear of the washer ring beside the stub's tip (measured on the
+# sheet of run 20261023T234951749Z).
+PIVOT_SHAFT_BALLOON_OFFSET = (0.012, 0.045)
+# The rendered circle's read-back may sit a viewport pixel off the request
+# at fit zoom (position_bom_balloon's pixel bound); a millimetre still proves
+# the circle left its ring slot for the strip.
+BALLOON_PLACEMENT_TOL_M = 0.001
 BOM_ANCHOR = (0.205, 0.262)
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
@@ -233,6 +269,7 @@ EXPLODED_CAPTION = "\n".join(
     (
         f"EXPLODED: ALL {COUNT} CHANNELS ALIKE, THE NORTH-MOST PULLED OUT",
         "NORTH; ONE BALLOON PER BOM ROW, ON THE NORTH-MOST INSTANCE.",
+        "THE NORTH KEEPER AND ITS SCREWS ARE BALLOONED IN DETAIL C.",
         f"QTY IS PER {steps.DRAWING_NUMBER} (ALL {COUNT} CHANNELS).",
     )
 )
@@ -646,6 +683,16 @@ NORTH_BRACKET_DETAIL = BankView(
     # tell which boundary it named; the lower left of the circle is clear.
     letter_corner=(-1, -1),
 )
+# The north keeper's balloons (items for MHA-CH-07 and its VN-52/VN-55 screws)
+# sit on this enlargement, not on the 1:7 view: there the north keeper stands
+# in front of the near-black rocker bank, so their leaders ran across the
+# shaded stack and their arrowheads were lost in it (#1895 machinist review,
+# DETAIL C). Here every leader runs over open paper to a part drawn at 1:2.
+# The column is 56 mm wide, so the ring stays above the keeper: the farm read
+# this view's outline 24.1 x 44.1 mm about the crop centre, and the three
+# attachments (the crown apex and the two lifted screws) lie above it. 20 mm
+# lower than the r7 spot, the ring's top balloon (about 37 mm over the centre)
+# clears DETAIL B's label, and its label stays above the title block.
 NORTH_KEEPER_DETAIL = BankView(
     "DETAIL C",
     EXPLODED_DETAIL_SCALE,
@@ -654,7 +701,7 @@ NORTH_KEEPER_DETAIL = BankView(
         explode.KEEPER,
         "north",
     ),
-    (EXPLODED_DETAIL_X, 0.170),
+    (EXPLODED_DETAIL_X, 0.150),
     frozenset({explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}),
     crop_radius_mm=36.0,
     parts="NORTH KEEPER",
@@ -667,6 +714,22 @@ NORTH_KEEPER_DETAIL = BankView(
     letter_corner=(1, -1),
 )
 EXPLODED_DETAILS = (NORTH_BRACKET_DETAIL, NORTH_KEEPER_DETAIL)
+KEEPER_DETAIL_BALLOON_STEMS = NORTH_KEEPER_DETAIL.stems
+# Inside the 56 mm column: a 10 mm ring margin keeps a right-hand balloon
+# inside the border and the upper-left one 10 mm clear of the BOM.
+KEEPER_DETAIL_BALLOON_MARGIN = 0.010
+# The keeper's leader lands on the crown apex of its INNER lug face (part
+# frame, build_ch_fulcrum_keeper: +x outboard, so the north keeper's x runs
+# with machine +z). In the isometric that apex is the crown's back
+# silhouette, drawn against open paper, and it projects right of both lifted
+# screws (the set screw on the lug mid-plane, the foot screw 8 outboard), so
+# the keeper's ring slot is the right-most and its leader crosses neither.
+KEEPER_BALLOON_POINT_MM = (-KEEPER_LUG_HALF_T, KEEPER_CROWN_TOP_Y, 0.0)
+BALLOON_POINTS_MM = {
+    PIVOT_SHAFT_STEM: PIVOT_SHAFT_BALLOON_POINT_MM,
+    explode.BRACKET: BRACKET_BALLOON_POINT_MM,
+    explode.KEEPER: KEEPER_BALLOON_POINT_MM,
+}
 # The north bracket cluster (DETAIL B) is lifted 570 up out of the hanging
 # rocker arms (ch_channel_explode_spec), so off its shaft it read as part of
 # the lever bank (#1660 r3, rule 22: show which face mates to which). Its
@@ -1357,8 +1420,9 @@ def _place_exploded_sheet(
     adapter: Any, north_instances: dict[str, str]
 ) -> Callable[[], None]:
     """The exploded isometric, its BOM (with vendor SKU) and one balloon per
-    BOM row on the family's north-most instance; returns the check that proves
-    every balloon again after the last rebuild."""
+    BOM row on the family's north-most instance (the north keeper's on DETAIL
+    C); returns the check that proves every balloon again after the last
+    rebuild."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     exploded = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_ISO_CENTER, scale=SHEET_SCALE
@@ -1388,25 +1452,34 @@ def _place_exploded_sheet(
         label="channel",
     )
     items = _validate_bom(adapter, table)
+    anchors = {
+        stem: BalloonAnchor(
+            point_mm=BALLOON_POINTS_MM.get(stem), instance=north_instances[stem]
+        )
+        for stem in BOM_COMPONENTS
+    }
+    keeper_items = tuple(
+        (stem, item) for stem, item in items if stem in KEEPER_DETAIL_BALLOON_STEMS
+    )
+    if {stem for stem, _item in keeper_items} != KEEPER_DETAIL_BALLOON_STEMS:
+        raise RuntimeError("channel BOM does not list every DETAIL C family")
     landings = add_component_bom_balloons(
         adapter,
         exploded,
-        items=items,
-        anchors={
-            stem: BalloonAnchor(
-                point_mm=BRACKET_BALLOON_POINT_MM if stem == explode.BRACKET else None,
-                instance=north_instances[stem],
-            )
-            for stem in BOM_COMPONENTS
-        },
+        items=tuple(pair for pair in items if pair not in keeper_items),
+        anchors=anchors,
         label="channel exploded-view BOM coverage",
         margin=BALLOON_MARGIN,
     )
-    if len(landings) != len(BOM_COMPONENTS):
-        raise RuntimeError(
-            f"channel exploded view carries {len(landings)} balloons, "
-            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
-        )
+    shaft_landing = next(
+        landing for landing in landings if landing.stem == PIVOT_SHAFT_STEM
+    )
+    _offset_balloon_from_landing(
+        adapter,
+        shaft_landing,
+        PIVOT_SHAFT_BALLOON_OFFSET,
+        label="channel pivot-shaft balloon",
+    )
     bom_bottom, _ = _bom_vertical_limits(table)
     caption = _add_note_block(
         adapter,
@@ -1420,8 +1493,23 @@ def _place_exploded_sheet(
     _mark_exploded_details(adapter, exploded)
     _add_north_end_trail(adapter, exploded)
     _activate_sheet(adapter, SHEET_NAMES[1])
-    for detail in EXPLODED_DETAILS:
-        _exploded_detail(adapter, detail)
+    details = {detail: _exploded_detail(adapter, detail) for detail in EXPLODED_DETAILS}
+    keeper_view = details[NORTH_KEEPER_DETAIL]
+    keeper_label = f"channel {NORTH_KEEPER_DETAIL.title} BOM coverage"
+    _link_view_to_bom(keeper_view, table, label=keeper_label)
+    landings += add_component_bom_balloons(
+        adapter,
+        keeper_view,
+        items=keeper_items,
+        anchors=anchors,
+        label=keeper_label,
+        margin=KEEPER_DETAIL_BALLOON_MARGIN,
+    )
+    if len(landings) != len(BOM_COMPONENTS):
+        raise RuntimeError(
+            f"channel exploded sheet carries {len(landings)} balloons, "
+            f"expected one per BOM row ({len(BOM_COMPONENTS)})"
+        )
     _activate_sheet(adapter, SHEET_NAMES[1])
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("channel exploded caption rebuild failed")
@@ -1624,14 +1712,65 @@ def _mark_detail(
         raise RuntimeError(f"failed to letter the {label}")
 
 
-def _exploded_detail(adapter: Any, detail: BankView) -> None:
+def _exploded_detail(adapter: Any, detail: BankView) -> Any:
     """One enlarged, exploded hardware cluster: placed, isolated, cropped to
-    its circle and labelled under it."""
+    its circle and labelled under it; returns its view."""
     view = _placed_bank_view(adapter, detail)
     _crop(adapter, view, detail)
     _activate_view(adapter, view, label=detail.title)
     if add_note(adapter, detail.label_text, *detail.crop_label_xy) is None:
         raise RuntimeError(f"failed to label {detail.title}")
+    return view
+
+
+def _offset_balloon_from_landing(
+    adapter: Any,
+    landing: BalloonLanding,
+    offset: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Move ``landing``'s balloon off its ring so its circle centre stands
+    ``offset`` (sheet m) from its proven landing; the leader stays attached
+    (``_spread_balloons``' anchor-to-circle carry) and the circle is read
+    back."""
+    if landing.sheet_xy is None:
+        raise RuntimeError(f"{label}: the balloon's landing was not proven")
+    target = (landing.sheet_xy[0] + offset[0], landing.sheet_xy[1] + offset[1])
+    note = _early_bound(landing.note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    circle_x, circle_y, _radius = rendered_balloon_circle(note, label=label)
+    anchor = tuple(float(value) for value in annotation.GetPosition())
+    moved = (anchor[0] + target[0] - circle_x, anchor[1] + target[1] - circle_y)
+    if not annotation.SetPosition(moved[0], moved[1], 0.0):
+        raise RuntimeError(f"{label}: SetPosition{moved!r} returned false")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: rebuild failed")
+    adapter.currentModel.GraphicsRedraw2()
+    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+    circle = rendered_balloon_circle(note, label=label)[:2]
+    _telemetry.info(f"{label}: circle at {circle!r}, target {target!r}")
+    if max(abs(a - b) for a, b in zip(circle, target)) > BALLOON_PLACEMENT_TOL_M:
+        raise RuntimeError(f"{label}: circle sits at {circle!r}, not {target!r}")
+
+
+def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
+    """Number ``view``'s balloons from the BOM table inserted on the exploded
+    view (draw_pd_paper_drive_assembly's link)."""
+    feature = _early_bound(
+        _early_bound(table, "IBomTableAnnotation").BomFeature, "IBomFeature"
+    )
+    name = str(feature.Name or "")
+    if not name:
+        raise RuntimeError(f"{label}: the channel BOM feature has no name")
+    view = _early_bound(view, "IView")
+    if not view.SetKeepLinkedToBOM(True, name):
+        raise RuntimeError(f"{label}: SetKeepLinkedToBOM({name!r}) returned false")
+    if (
+        not bool(view.GetKeepLinkedToBOM())
+        or str(view.GetKeepLinkedToBOMName() or "") != name
+    ):
+        raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
 
 
 def _mark_exploded_details(adapter: Any, exploded: Any) -> None:

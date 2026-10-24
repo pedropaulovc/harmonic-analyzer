@@ -759,6 +759,83 @@ def test_the_bracket_balloon_lands_left_of_its_lifted_hold_down() -> None:
     assert head_left - _iso((x, y, z))[0] > 5.0
 
 
+def test_the_north_keeper_balloons_on_detail_c_right_of_its_lifted_screws() -> None:
+    """#1895 machinist review: on the 1:7 view the north keeper stands in
+    front of the near-black rocker bank, and leaders 8-10 crossing it were
+    lost. Its family balloons on DETAIL C, the caption says so, and the
+    keeper's leader lands on its inner crown apex, which projects right of
+    both lifted screws (eye on +x +y +z), so its ring slot is the right-most
+    and its leader crosses neither screw."""
+    from _hole_spec import THREAD_MAJOR_MM
+    import ch_fulcrum_keeper_spec as keeper
+    import ch_vn_frame_side_screw_spec as foot_screw
+
+    explode = drawing.explode
+    detail = drawing.NORTH_KEEPER_DETAIL
+    family = {explode.KEEPER, explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW}
+    assert drawing.KEEPER_DETAIL_BALLOON_STEMS == detail.stems == family
+    assert detail.title in drawing.EXPLODED_CAPTION
+    assert drawing.BALLOON_POINTS_MM[explode.KEEPER] == (
+        -keeper.LUG_HALF_T,
+        keeper.CROWN_TOP_Y,
+        0.0,
+    )
+    # North keeper: part +x is outboard, machine +z. Relative to the lug
+    # mid-plane, the apex sits 4 inboard, the set screw on the mid-plane and
+    # the foot screw SCREW_X outboard; both screws move straight up.
+    for stem in (explode.KEEPER_SET_SCREW, explode.KEEPER_FOOT_SCREW):
+        moved = drawing.exploded_offset(stem, "north")
+        carried = drawing.exploded_offset(explode.KEEPER, "north")
+        assert (moved[0], moved[2]) == (carried[0], carried[2])
+    apex_u = _iso((0.0, 0.0, -keeper.LUG_HALF_T))[0]
+    set_screw_right = THREAD_MAJOR_MM[keeper.SET_SCREW_THREAD] / 2.0
+    foot_screw_right = _iso((0.0, 0.0, keeper.SCREW_X))[0] + foot_screw.HEAD_DIA / 2.0
+    assert apex_u - set_screw_right > 1.5
+    assert apex_u - foot_screw_right > 5.0
+    # The ring stays in the column above DETAIL C: the farm read its outline
+    # 44.1 mm tall about the crop centre (run 20261023T222629630Z), so the
+    # top balloon reaches 22.05 + margin + a balloon radius over it, under
+    # DETAIL B's three-line label.
+    bracket_label_bottom = (
+        drawing.NORTH_BRACKET_DETAIL.crop_label_xy[1]
+        - len(drawing.NORTH_BRACKET_DETAIL.label_text.splitlines()) * NOTE_LINE_PITCH
+    )
+    ring_top = (
+        detail.centre[1]
+        + 0.02205
+        + drawing.KEEPER_DETAIL_BALLOON_MARGIN
+        + drawing.BALLOON_MAX_RADIUS
+    )
+    assert ring_top + 0.004 < bracket_label_bottom
+
+
+def test_the_pivot_shaft_balloon_lands_on_its_bare_south_stub() -> None:
+    """#1895 machinist review (r2, r3): leader 1 climbed through the black
+    rocker-arm fan to a landing it hid. It lands on the south flat's
+    eye-side edge, on the stub between hub 0 and the exploded south ear,
+    whose line of sight (eye on +x +y +z) clears hub 0 and arm 0's top edge,
+    and its balloon stands off the ring, above and east of that landing."""
+    import ch_pivot_shaft_spec as shaft
+    import ch_rocker_arm_spec as arm
+
+    x, y, z = drawing.BALLOON_POINTS_MM[drawing.PIVOT_SHAFT_STEM]
+    radius = shaft.SHAFT_DIA / 2.0
+    assert y == pytest.approx(radius - shaft.FLAT_DEPTH)
+    assert x > 0.0 and math.hypot(x, y) == pytest.approx(radius)
+    point_z = bank.PIVOT_SHAFT_NORTH_Z + z
+    assert point_z == pytest.approx(bank.PIVOT_BRACKET_Z[0])
+    assert bank.SOUTH_EAR_OUTER_Z < point_z < bank.HUB0_SOUTH_FACE_Z
+    assert drawing.exploded_offset(drawing.explode.BRACKET, "south")[2] < 0.0
+    hub_t = bank.HUB0_SOUTH_FACE_Z - point_z
+    assert math.hypot(x + hub_t, y + hub_t) > arm.HUB_DIA / 2.0 + 5.0
+    arm_t = bank.hub_mid_z(0) - arm.ARM_THICKNESS / 2.0 - point_z
+    reach = x + arm_t
+    top_edge = arm.TOP_EDGE_ABOVE_PIVOT + arm.R_TOP - math.sqrt(arm.R_TOP**2 - reach**2)
+    assert y + arm_t - top_edge > 1.5
+    dx, dy = drawing.PIVOT_SHAFT_BALLOON_OFFSET
+    assert dy > 0.04 and 0.0 < dx < dy / 3.0
+
+
 def test_the_bom_covers_every_family_once_with_its_sku() -> None:
     assert len(drawing.BOM_COMPONENTS) == 19
     assert set(drawing.BOM_PART_NUMBERS) == set(drawing.BOM_COMPONENTS)
