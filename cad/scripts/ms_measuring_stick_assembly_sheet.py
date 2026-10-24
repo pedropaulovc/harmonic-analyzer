@@ -78,8 +78,7 @@ ASSEMBLY_STEPS = (
     "3. LAY THE STICK IN THE OPEN WINDOW, GRADUATED FACE OPPOSITE THE THUMBSCREW.",
     "4. FIT ITS OWN STOP COVER PLATE OVER THE WINDOW, PAIR MARKS TOGETHER; DRIVE "
     f"BOTH {plate_screw.THREAD} BRASS FILLISTER SCREWS UNTIL THE HEADS SEAT.",
-    f"5. SET {SETTING_CRITERION} TO INDEX THE {spec.STICK.upper()} SETUP MARK "
-    "ON THE THUMBSCREW AXIS; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
+    f"5. SET {SETTING_CRITERION}; THEN TURN THE THUMBSCREW IN BY HAND UNTIL "
     "ITS TIP CLAMPS THE PLAIN FACE; THUMBSCREW ABOVE THE STICK.",
 )
 ASSEMBLY_CHECKS = (
@@ -94,8 +93,8 @@ CLAMPED_SETUP_NOTE = (
 
 # Overall is pure reference; the near-face value is assembly acceptance only.
 REFERENCE_OVERALL_LENGTH = spec.STICK_X_MAX - spec.STICK_X_MIN
-# Name the measured face here; step 5 explains the source-owned index purpose
-# without implying that the dimension's witness lands on the thumbscrew axis.
+# Name the measured face here; the setting from the left stick end is the
+# whole acceptance (no view shows the division it puts on the thumbscrew axis).
 STOP_POSITION_CALLOUT = "NEAR BLOCK FACE"
 DRAWING_REFERENCE_PRECISION = 1
 
