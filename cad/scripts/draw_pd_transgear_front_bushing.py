@@ -54,6 +54,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import audit_sheet, format_findings
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -74,6 +75,9 @@ from pd_transgear_front_bushing_spec import (
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_front_bushing"]
 PART_STEM = SPEC.artifact_stem
@@ -112,9 +116,10 @@ FIT_STEP_KEY = "front-bushing-faced-to-fit"
 # The bore stays on the end view, where it is a circle: a reamed through
 # hole, fully defined by its callout (drawing-guidelines.md rule 12 (hole and slot callouts say what to do)), it needs no section, and the
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
-# The O.D. arrives there too and is moved onto the profile below.
+# The O.D. arrives there too and is moved onto the profile below.  The bore
+# callout's block stands clear above the centre mark's vertical arm.
 END_KEEP = {
-    "BoreDia": (0.060, 0.225),
+    "BoreDia": (0.060, 0.228),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
 DIMENSION_CALLOUTS = {
@@ -125,33 +130,37 @@ DIMENSION_CALLOUTS = {
 # The length under the profile.  Its four-line reference block is wider
 # than the 5.0 between its extension lines, so it stands off to the right,
 # under the O.D. dimension, where no extension line runs through it.  The
-# chamfer's leg sits above the chamfered (left) corner; the O.D. right of the
-# part, its dimension line far enough out that the nose face's finish symbol
-# sits between them.
+# chamfer's leg sits above the chamfered (left) corner, its text right of
+# both extension lines so neither runs into it (machinist review: the lines
+# struck "X 45 DEG" when the text sat between them).  The O.D. stands right
+# of the part, its dimension line far enough out that the rear face's
+# labelled finish symbol sits between them.
 PROFILE_KEEP = {
     "RingLength": (_PROFILE_NOSE_X + 0.045, _PROFILE_BOTTOM - 0.022),
     "FrontChamferSize": (
-        _PROFILE_RING_X + FRONT_CHAMFER * _S / 2.0,
-        _PROFILE_TOP + 0.018,
+        _PROFILE_RING_X + FRONT_CHAMFER * _S + 0.015,
+        _PROFILE_TOP + 0.016,
     ),
 }
-OD_ON_PROFILE = (_PROFILE_NOSE_X + 0.040, PROFILE_CENTER[1])
+OD_ON_PROFILE = (_PROFILE_NOSE_X + 0.083, PROFILE_CENTER[1])
 
 # Each face's pick lies on its edge line between the bore and the chamfer's
-# inner edge.  The ring face's symbol stands left of the part, clear of the
-# chamfer dimension above; the nose face's stands right of the part inside
-# the O.D.'s extension-line band, below the axis, short of the O.D.
-# dimension line.
-_FACE_PICK_UP = PROFILE_CENTER[1] + (BORE_DIA + OD) / 4.0 * _S
+# inner edge, below the axis, where SolidWorks lands the leader at that
+# segment's middle.  Each symbol's labelled bar grows about 5 mm plus 1.8 mm a
+# character right of its point, the leader leaving from that point.  The
+# front (ring) face's symbol stands left of the part above the axis, between
+# the end view's O.D. and the profile, so its leader falls away from its own
+# label to the face; the rear (nose) face's stands right of the part inside
+# the O.D.'s extension-line band, short of the O.D. dimension line.
 _FACE_PICK_DOWN = PROFILE_CENTER[1] - (BORE_DIA + OD) / 4.0 * _S
 FACE_FINISHES = {
     "ring_face": (
-        (_PROFILE_RING_X, _FACE_PICK_UP),
-        (_PROFILE_RING_X - 0.030, PROFILE_CENTER[1] + 0.012),
+        (_PROFILE_RING_X, _FACE_PICK_DOWN),
+        (END_CENTER[0] + OD * _S / 2.0 + 0.007, PROFILE_CENTER[1] + 0.009),
     ),
     "nose_face": (
         (_PROFILE_NOSE_X, _FACE_PICK_DOWN),
-        (_PROFILE_NOSE_X + 0.014, PROFILE_CENTER[1] - 0.008),
+        (_PROFILE_NOSE_X + 0.006, _PROFILE_BOTTOM + 0.007),
     ),
 }
 # The bore runs on the pin (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): its finish sits on the end view, where

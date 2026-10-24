@@ -83,20 +83,32 @@ if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
         f"facing allowance over the {GAP_MAX:.3f} longest fit"
     )
 
-LENGTH_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nFACED TO FIT"
-DRAWING_NOTES = "\n".join(
-    (
-        f"SUPPLY {BLANK_LENGTH_MIN:.2f} MIN LONG.",
-        "THE REAR FACE IS FACED TO FIT AT ASSEMBLY.",
-    )
-)
+# The rear face (z 0, the unchamfered end) is the one faced, so the chamfer
+# survives the fit; the callout and the rear face's finish symbol both name it.
+LENGTH_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nREAR FACE FACED TO FIT"
+DRAWING_NOTES = f"SUPPLY {BLANK_LENGTH_MIN:.2f} MIN LONG."
 
 # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore runs on the pin and both faces bear, so all three carry
 # the machined grade, the bore as the sleeve's bore on the same pin does.
+# The bushing runs free between the turning MHA-PD-10 sleeve's nose and the
+# MHA-PD-VN-61 ring on the pin, so either face may slip under the cluster's
+# thrust: each face's symbol names its mate (rule 7, say why).
+REAR_FACE_TARGET = f"REAR FACE, THRUST ON {HUB.SLEEVE_NUMBER}"
+FRONT_FACE_TARGET = f"THRUST ON {PIN.RING_NUMBER}"
 SURFACE_FINISHES = (
     SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
-    SurfaceFinishControl("nose_face", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
-    SurfaceFinishControl("ring_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), LENGTH)),
+    SurfaceFinishControl(
+        "nose_face",
+        MACHINED_UM,
+        PlanarFace((0.0, 0.0, -1.0), 0.0),
+        production_method=REAR_FACE_TARGET,
+    ),
+    SurfaceFinishControl(
+        "ring_face",
+        MACHINED_UM,
+        PlanarFace((0.0, 0.0, 1.0), LENGTH),
+        production_method=FRONT_FACE_TARGET,
+    ),
 )
 
 # The chamfer is a native chamfer feature on the O.D. edge; its one leg

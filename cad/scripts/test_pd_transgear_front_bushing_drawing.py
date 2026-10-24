@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -176,6 +177,33 @@ def test_the_bore_and_both_end_faces_run_machined() -> None:
         tuple(faces["ring_face"][1].normal),
         faces["ring_face"][1].offset_mm,
     ) == ((0.0, 0.0, 1.0), spec.LENGTH)
+
+
+def test_each_face_symbol_names_its_thrust_mate_and_the_faced_end() -> None:
+    """Machinist review: an end-face Ra 1.6 with no stated function reads as
+    over-specification, and FACED TO FIT must say which end.  Each face's
+    symbol names the part it thrusts on; the faced end is named both at its
+    symbol and on the fitted-length callout."""
+    targets = {
+        control.key: control.production_method for control in spec.SURFACE_FINISHES
+    }
+
+    def names(text: str, number: str) -> bool:
+        return re.search(rf"(?<![\w-]){re.escape(number)}(?![\w-])", text) is not None
+
+    assert names(targets["nose_face"], hub.SLEEVE_NUMBER)
+    assert names(targets["ring_face"], pin.RING_NUMBER)
+    assert pin.RING_NUMBER == _config.parts("pd-vn-transgear-retaining-ring")["number"]
+    assert "REAR" in targets["nose_face"]
+    assert "REAR" not in targets["ring_face"]
+    # The facing instruction itself names the rear end, never the front.
+    facing = [
+        line
+        for line in drawing.DIMENSION_CALLOUTS["RingLength"].splitlines()
+        if "FACED TO FIT" in line
+    ]
+    assert len(facing) == 1
+    assert "REAR" in facing[0] and "FRONT" not in facing[0]
 
 
 def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
