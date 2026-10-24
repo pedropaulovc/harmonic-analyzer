@@ -153,7 +153,7 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
     from types import SimpleNamespace
 
     text = drawing._step_text(
-        operating_domain=SimpleNamespace(operating_window_text="UNIT NOTE WINDOW ONLY")
+        operating_domain=SimpleNamespace(axis_from_left_end_limits_mm=(0.0, 1.0))
     )
     printed = drawing._step_column("", steps.SEQUENCE, text)
 

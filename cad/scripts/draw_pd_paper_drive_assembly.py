@@ -1,14 +1,17 @@
-r"""Create the six-sheet paper-drive assembly drawing (MHA-PD-00).
+r"""Create the seven-sheet paper-drive assembly drawing (MHA-PD-00).
 
 Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
 balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
 a ballooned isometric of the transgear (the hanger, the latch, the disc cluster
-and the knob stack) and a ballooned right view of its hidden parts. Sheet 3
-balloons the bar, its clamps and the platen group on PAPER_DRIVE_EXPLODED and
-prints their steps. Sheet 4 prints the transgear's assembly steps; sheet 5
-prints the chain fit-up (CONTRACT-paper-drive.md §13.2). Sheet 6 carries the
-complete native BOM, split horizontally into two pieces at measured row
-heights, and an assembly reference. The BOM identifies the current inch
+and the knob stack) and the hanger pivot's section. Sheet 3 draws the hanger,
+the disc cluster and the knob stack apart along their axes on
+PAPER_DRIVE_EXPLODED, seen from above, and balloons every part it shows.
+Sheet 4 balloons the bar, its clamps and the platen group on
+PAPER_DRIVE_EXPLODED and prints their steps. Sheet 5 prints the transgear's
+assembly steps; sheet 6 prints the chain fit-up (CONTRACT-paper-drive.md
+§13.2). Sheet 7 carries the complete native BOM, split horizontally into two
+pieces at measured row heights, and an assembly reference. The BOM identifies
+the current inch
 reducer, finite stock-form integral pinions and rack/backer; sheet 1 gives the
 selected chain ratio's reference paper travel. Gear cutting data stays on the
 gear sheets. The chain fit-up includes the actual loaded collar/disc overlap
@@ -38,13 +41,12 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     place_view,
-    raw_visible_entities,
     view_name,
 )
 
 import _chain as chain
 from _check import check
-from _com import _com_invoke, _early_bound
+from _com import _early_bound
 from _component_references import component_identity
 from sh_vn_chain_link_spec import (
     INNER_LINK_BOM_DESCRIPTION,
@@ -55,14 +57,10 @@ from sh_vn_chain_link_spec import (
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
-    _VIEW_ENTITY_EDGE,
     BalloonAnchor,
     BalloonLanding,
     _anchor_model_points,
-    _AnchorChoice,
-    _create_component_bom_balloon,
     _shown_instances,
-    _spread_balloons,
     _view_component_leaves,
     _view_explode_offsets,
     add_component_bom_balloons,
@@ -102,6 +100,7 @@ from _drawing_view_configuration import (
     view_configuration,
 )
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _pd_paper_drive_explode import exploded_view_name
 from _section_axis import position_section_caption
 from _session import run_build
@@ -135,8 +134,11 @@ import pd_rack_pinion_spec as disc
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
-from paper_drive_rack_travel import OPERATING_DIRECTION_TEXT, RackOperatingDomain
+from paper_drive_rack_travel import OPERATING_LIMIT_PLACES, RackOperatingDomain
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_paper_drive_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -156,6 +158,7 @@ BOM_CONFIGURATION = "Default"
 SHEET_NAMES = (
     "ASSEMBLED VIEWS",
     "TRANSGEAR VIEWS",
+    "TRANSGEAR EXPLODED",
     "PLATEN AND SUPPORT",
     "ASSEMBLY AND FIT-UP",
     "CHAIN FIT-UP",
@@ -186,7 +189,7 @@ ISO_SCALE_LADDER = (ASSEMBLED_SCALE, (1.0, 5.0))
 ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
-# --- sheet 6: full qualified Numbers and two native BOM pieces ---------------
+# --- sheet 7: full qualified Numbers and two native BOM pieces ---------------
 # f353's 22 mm Number column wrapped the identities: the native audit measured
 # the unsplit table 437.2384 mm high, not the requested rows' nominal height.
 # Use the drive-train's proven column widths without changing table text size;
@@ -209,54 +212,34 @@ BOM_REFERENCE_CENTER = (0.060, 0.065)
 BOM_REFERENCE_LIMITS = (0.018, 0.028, 0.095, 0.104)
 BOM_REFERENCE_CAPTION_XY = (0.100, 0.088)
 BOM_REFERENCE_CAPTION = (
-    "REFERENCE 1:10\nBALLOONS: SHEETS 1-3\nASSEMBLY: SHEETS 3-5"
+    "REFERENCE 1:10\n"
+    f"BALLOONS: SHEETS 1-{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}\n"
+    f"ASSEMBLY: SHEETS {SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}-"
+    f"{SHEET_NAMES.index('CHAIN FIT-UP') + 1}"
 )
 # The ASME B landscape sheet's inner border, bottom edge, and the clearance
 # the BOM keeps above it.
 SHEET_INNER_BORDER_BOTTOM = 0.0127
 BOM_BORDER_CLEARANCE = 0.003
-# The transgear alone at 2:3, right of the inner view's ring and above the
-# title block. The v40 sheet 2 (594749aec's layout) printed its outline at
-# x 285.3 to 396.6, y 111.2 to 244.8 mm: a ring top of 261.8 in the 262.0
-# limit. The one-piece MHA-PD-14 hook's ear stands at machine x 77.6, 17.6
-# further +X than the bracket's flap. The isometric looks along (-1, +1, -1),
-# so sheet up is 0.408 x and sheet right -0.707 x, and the outline grew to
-# x 278.5 and y 248.8 (farm run of 9055bc155: ring top 265.8). The view is
-# 137.6 mm tall, so its ring of 171.6 fits the field's 172.0 only when it is
-# centred: transgear_view_shift moves it down before the inner view is
-# fitted beside it.
+# The transgear alone at 2:3, above the title block. The v40 sheet 2
+# (594749aec's layout) printed its outline at x 285.3 to 396.6, y 111.2 to
+# 244.8 mm: a ring top of 261.8 in the 262.0 limit. The one-piece MHA-PD-14
+# hook's ear stands at machine x 77.6, 17.6 further +X than the bracket's
+# flap. The isometric looks along (-1, +1, -1), so sheet up is 0.408 x and
+# sheet right -0.707 x, and the outline grew to x 278.5 and y 248.8 (farm run
+# of 9055bc155: ring top 265.8). The view is 137.6 mm tall, so its ring of
+# 171.6 fits the field's 172.0 only when it is centred: transgear_view_shift
+# moves it down.
 TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
 TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
 TRANSGEAR_CAPTION_XY = (0.222, 0.082)
-# The parts the isometric hides, seen from the machine's right (camera at -X:
-# sheet x is machine +Z, sheet y is +Y) with every other part hidden in that
-# view only. The largest ladder scale whose ring fits beside the isometric's
-# (inner_view_scale): the same run read the view 57.3 mm wide at 2:3, a 91.3
-# mm ring in the 76.3 mm left of the isometric's ring at x 355; the v40 sheet
-# 2 printed it at 1:3, 34.5 mm wide. Every ladder scale requests the simplified
-# configuration at creation. Native2537 read Default after the later view
-# operations; their individual effects are unmeasured. Check the actual view
-# against the BOM immediately before ballooning rather than infer it from scale.
-INNER_VIEW_ORIENTATION = "*Right"
-INNER_SCALE_LADDER = ((1.0, 2.0), (1.0, 3.0))
-if any(
-    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
-    for scale in INNER_SCALE_LADDER
-):
-    raise AssertionError(
-        "a rescale on the inner-view ladder would switch configuration"
-    )
-# Where the inner view lands before inner_view_shift centres it.
-INNER_VIEW_START = (0.230, 0.190)
-# Sheet 2 retains the established model fields when the BOM moves to sheet 6.
+# Sheet 2 retains the established model fields when the BOM moves to sheet 7.
 # Its balloon circles still clear the drawing border and caption fields.
 SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
-SHEET_TWO_RING_GAP = 0.004
-INNER_CAPTION_GAP = 0.002
 # The hanger pivot (step 13, rules 9 and 22) in sheet 2's empty left field,
-# clear of the inner view's ring (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
+# clear of the isometric's field (SHEET_TWO_RING_LIMITS[0]). A 1:1 *Top
 # locator, cropped to a circle on the MHA-PD-VN-57 axis and showing only the
 # pivot stack, carries cutting line A-A along that axis. SECTION A-A at 2:1
 # shows every part of the stack cut (the shim and spring under the head and
@@ -438,7 +421,80 @@ def pivot_stake_note_xy(tip_x: float, front_side: float) -> tuple[float, float]:
 
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 
-# --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
+# --- sheet 3: the transgear drawn apart, two isometric views ------------------
+# PAPER_DRIVE_EXPLODED moves the hanger's plate, the disc cluster and the knob
+# stack along their own axes (machine Z, and the cup's cross pin along X).
+# Farm runs 20261024T014330502Z and 20261024T021816733Z drew them from above:
+# every Z-axis circle and every round of the turned arm lay edge-on, and the
+# balloon leaders on them re-solved along the line (0.85 and 0.26 mm). The
+# isometric draws those circles as ellipses, as on sheet 2, but there the disc
+# would cover the knob stack (the two axes stand 29.5 mm apart on the sheet).
+# So each axis is its own view: the hanger and the knob stack on its shaft
+# left of the title block, the disc cluster on its pin above the caption.
+# Only those transgear instances show: the pivot stack is SECTION A-A's and
+# the latch hook stays on the bar. The views are full-detail for the same
+# reason as sheet 4's (the Default BOM). Both are drawn at 2:3, sheet 2's
+# transgear scale, and never rescaled (drawing guidelines rule 15); an outline
+# past its field is refused, not shrunk. An isometric's native outline is its
+# projected box, not its ink: farm run 20261024T025815061Z read the knob
+# stack and hanger's at 1:1 as 247.3 x 226.8 mm, past any 1:1 field here.
+TRANSGEAR_EXPLODED_ORIENTATION = "*Isometric"
+TRANSGEAR_EXPLODED_SCALE = (2.0, 3.0)
+if (
+    view_configuration(TRANSGEAR_EXPLODED_SCALE, _SW_SHADED_EDGES, ViewRole.FULL_DETAIL)
+    != BOM_CONFIGURATION
+):
+    raise AssertionError(
+        "the transgear explode's scale would leave the BOM configuration"
+    )
+CLUSTER_STEMS = frozenset(
+    {
+        "pd-transgear-pin",
+        "pd-transgear-rear-bushing",
+        "pd-transgear-feed-pinion",
+        "pd-rack-pinion",
+        "pd-transgear-disc-hub",
+        "pd-vn-transgear-disc-screw",
+        "pd-transgear-front-bushing",
+        "pd-vn-transgear-retaining-ring",
+    }
+)
+if not CLUSTER_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
+    raise AssertionError("the disc cluster's view shows exploded transgear families")
+
+
+@dataclass(frozen=True)
+class ExplodedGroup:
+    """One sheet-3 view: its families, where it is placed and its ring field."""
+
+    label: str
+    stems: frozenset[str]
+    center: tuple[float, float]
+    ring_limits: Box
+
+
+# The knob stack and hanger's ring at 2:3 is about 199 x 185 mm (run
+# 20261024T025815061Z's outline scaled), the cluster's about 135 x 130 mm
+# (its projected box from the builder's stations). The title block spans x
+# 218 to 420, y 13 to 66 mm, so the left field stops above it.
+TRANSGEAR_EXPLODED_GROUPS = (
+    ExplodedGroup(
+        "knob stack and hanger exploded",
+        explode.TRANSGEAR_SHOWN_STEMS - CLUSTER_STEMS,
+        (0.140, 0.168),
+        (0.018, 0.070, 0.262, 0.267),
+    ),
+    ExplodedGroup(
+        "disc cluster exploded",
+        CLUSTER_STEMS,
+        (0.341, 0.193),
+        (0.268, 0.120, 0.415, 0.267),
+    ),
+)
+TRANSGEAR_EXPLODED_CAPTION_XY = (0.270, 0.112)
+TRANSGEAR_EXPLODED_CAPTION_WIDTH = 52  # characters, above the title block
+
+# --- sheet 4: the platen-and-support steps, the ballooned exploded view -----
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
 # has read its outline yet, and sheet 1's showed the outline (the projected
 # box) well past the ink, so the view takes the largest ladder scale whose
@@ -463,17 +519,17 @@ PLATEN_NOTE_XY = (0.018, 0.262)
 PLATEN_NOTE_RIGHT = 0.222
 EXPLODED_RING_LIMITS = (PLATEN_NOTE_RIGHT + 0.003, 0.069, 0.418, 0.267)
 
-# --- sheets 4 and 5: ordered steps in two columns, same note-field budgets ----
+# --- sheets 5 and 6: ordered steps in two columns, same note-field budgets ----
 FITUP_SCALE = (1.0, 10.0)
 FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # Each column's top-left corner, then its right limit and lowest y: the left
-# column stops above sheet 4's reference view; the right column stops above
-# the title block (top 0.066). Sheet 5 retains the same field clearances.
+# column stops above sheet 5's reference view; the right column stops above
+# the title block (top 0.066). Sheet 6 retains the same field clearances.
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# Sheet 4 splits after the disc's match-centre/transfer inspection so the
-# knob, mesh and hook operations stay together. Sheet 5 begins with the
+# Sheet 5 splits after the disc's match-centre/transfer inspection so the
+# knob, mesh and hook operations stay together. Sheet 6 begins with the
 # loaded full-stroke inspection and splits after the fitted collar rear face.
 FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
 FITUP_SECOND_COLUMN_KEY = "disc-screws-cut"
@@ -481,13 +537,16 @@ FITUP_CHAIN_KEY = "loaded-rack-geometry-checked"
 CHAIN_SECOND_COLUMN_KEY = "collar-shoulder-seated"
 
 SHEET_SCALES = {
-    SHEET_NAMES[0]: ASSEMBLED_SCALE,
-    SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
-    SHEET_NAMES[2]: EXPLODED_SCALE,
-    SHEET_NAMES[3]: FITUP_SCALE,
-    SHEET_NAMES[4]: FITUP_SCALE,
-    SHEET_NAMES[5]: BOM_REFERENCE_SCALE,
+    "ASSEMBLED VIEWS": ASSEMBLED_SCALE,
+    "TRANSGEAR VIEWS": TRANSGEAR_VIEW_SCALE,
+    "TRANSGEAR EXPLODED": TRANSGEAR_EXPLODED_SCALE,
+    "PLATEN AND SUPPORT": EXPLODED_SCALE,
+    "ASSEMBLY AND FIT-UP": FITUP_SCALE,
+    "CHAIN FIT-UP": FITUP_SCALE,
+    "BILL OF MATERIALS": BOM_REFERENCE_SCALE,
 }
+if tuple(SHEET_SCALES) != SHEET_NAMES:
+    raise AssertionError("every paper-drive sheet takes a scale, in sheet order")
 
 # --- BOM identities ------------------------------------------------------------
 # Literal stems, so the config-dependency analysis reads exactly these rows.
@@ -731,89 +790,13 @@ TRANSGEAR_INSTANCES = frozenset(
     for stem, count in TRANSGEAR_QUANTITIES.items()
     for index in range(1, (1 if stem == "pd-transgear-removable" else count) + 1)
 )
-# The drive collar's balloon (on the inner view, INNER_STEMS) attaches by
-# entity to its rear-face rim, never by a sheet hit test. From the right
-# (camera at -X, sheet x along +Z) the collar's rims are circles seen
-# edge-on: lines at sheet x 216.52 (front) and 218.52 (rear), 1:2, y 171.82
-# to 180.57. Hit tests on those lines are unreliable. On farm run
-# 20261002T160324403Z (swmaker000005) walk tries 1 to 7 at y +/-4.601 and
-# +/-8.174 missed both rims; try 8 hit (3.122, 8.174, 0), which try 3 had
-# missed, and its leader landed at the rim's top end, 0.288 mm up. A frozen
-# point then selected no edge on the rear rim's middle (7.443, -4.601, 4.0),
-# run 20261002T164049933Z (swmaker000005), nor 0.05 mm from its bottom end
-# (-1.319, -8.65, 4.0), run 20261002T171234232Z (swmaker00000a). So the rim
-# is named by its model geometry, as the disc hub's perpendicularity frames
-# name theirs: the circle on the collar's axis at z LENGTH, r OD/2, from the
-# edges the view lists for the collar. The rear slot (along local X) splits
-# it into a +Y and a -Y arc; the -Y arc holds the landing. That arc's
-# assembly-aligned bottom point projects onto the line's bottom end, and the leader lands
-# COLLAR_RIM_END_INSET up from it: a leader re-solved to the line's nearer
-# end, as run 20261002T160324403Z's was, stays 0.05 mm away at 1:2. The
-# landing is 0.23 mm below the drive-pin hole's edge on the same line and
-# 2.0 mm from the lower drive pin, which stands proud of the front face only.
-# The knob shaft's 12T is 2.2 mm away. The feed sleeve is all above the axis.
-COLLAR_STEM = "pd-transgear-drive-collar"
-COLLAR_INSTANCE = f"{COLLAR_STEM}-1"
-COLLAR_RIM_RADIUS = collar.OD / 2.0
-COLLAR_RIM_Z = collar.LENGTH
-COLLAR_RIM_END_INSET = 0.1
-COLLAR_LANDING_Y = COLLAR_RIM_END_INSET - COLLAR_RIM_RADIUS
-# The assembly spins the collar with the knob front stack by
-# FRONT_STACK_PHASE_DEG (-3) about its axis. The inner view looks along the
-# assembly's X, so the rim's line ends and its edge-on witnesses are the
-# assembly-aligned +/-Y and +/-X points, and the landing is placed in that
-# frame. Run 10 projected the collar-LOCAL +X point instead: r sin 3 deg =
-# 0.458 mm off the line's midpoint, 0.153 mm on the 1:3 sheet.
-COLLAR_SPIN_RAD = math.radians(knob_shaft.FRONT_STACK_PHASE_DEG)
-
-
-def _collar_local(x_mm: float, y_mm: float) -> tuple[float, float, float]:
-    """An assembly-aligned point on the rear-rim plane, in collar-local mm."""
-    c, s = math.cos(COLLAR_SPIN_RAD), math.sin(COLLAR_SPIN_RAD)
-    return (x_mm * c + y_mm * s, -x_mm * s + y_mm * c, COLLAR_RIM_Z)
-
-
-# Collar-local mm, in order: the -Y end, the +Y end, the +X point, the -X point.
-COLLAR_RIM_VIEW_POINTS_MM = tuple(
-    _collar_local(x, y)
-    for x, y in (
-        (0.0, -COLLAR_RIM_RADIUS),
-        (0.0, COLLAR_RIM_RADIUS),
-        (COLLAR_RIM_RADIUS, 0.0),
-        (-COLLAR_RIM_RADIUS, 0.0),
-    )
-)
-# View frame (-1.319, -8.650) -> collar-local mm (-0.865, -8.707, 6.200),
-# 0.72 mm outside the lower drive-pin hole.
-COLLAR_LANDING_MM = _collar_local(
-    -math.sqrt(COLLAR_RIM_RADIUS**2 - COLLAR_LANDING_Y**2), COLLAR_LANDING_Y
-)
-# A listed circle is the rim within these of its modelled centre and radius,
-# its axis along the collar's (both senses), and the arc holding the landing
-# when its closest point to it is within 1e-6 m (draw_transgear_disc_hub's).
-_RIM_CENTER_TOL_MM = 1e-4
-_RIM_RADIUS_TOL_MM = 1e-4
-_RIM_AXIS_TOL = 1e-6
-_RIM_LANDING_TOL_MM = 1e-3
-# Seen edge-on, a rim's +/-X points project onto its line's midpoint; the
-# projection is exact to ~1e-9 m.
-_EDGE_ON_TOL_M = 1e-6
-# The collar has no anchor here: _balloon_collar_on_its_rear_rim places it.
-TRANSGEAR_BALLOON_ANCHORS = {
-    stem: BalloonAnchor(instance="pd-transgear-removable-1")
-    if stem == "pd-transgear-removable"
-    else BalloonAnchor()
-    for stem in TRANSGEAR_QUANTITIES
-    if stem != COLLAR_STEM
-}
-# Farm run 20261001T051043622Z found no reachable isometric ink for the feed
-# sleeve: its extreme-point picks missed, and its gear edges exceeded the
-# fallback's edge budget. The inner right view shows that sleeve, the rear
-# bushing behind the reducer disc, and the knob drive and hanger hardware
-# obscured by their neighbours. The current reducer and feed geometry is
-# spec-driven; do not preserve old disc diameters or knob centres here as
-# visibility assumptions. Native balloon landings still prove each attachment.
-INNER_STEMS = frozenset(
+# Sheet 2's isometric cannot reach these families' ink. Farm run
+# 20261001T051043622Z found none for the feed sleeve: its extreme-point picks
+# missed, and its gear edges exceeded the fallback's edge budget. The rear
+# bushing behind the reducer disc and the knob drive and hanger hardware are
+# obscured by their neighbours. Sheet 3's explode shows and balloons them,
+# with every other family it draws apart.
+ISO_HIDDEN_STEMS = frozenset(
     {
         "pd-transgear-feed-pinion",
         "pd-transgear-knob-shaft",
@@ -826,85 +809,47 @@ INNER_STEMS = frozenset(
         "pd-transgear-rear-bushing",
     }
 )
-if not INNER_STEMS < set(TRANSGEAR_QUANTITIES):
-    raise AssertionError("the inner view balloons transgear families only")
-INNER_INSTANCES = frozenset(
-    name for name in TRANSGEAR_INSTANCES if name.rsplit("-", 1)[0] in INNER_STEMS
+if not explode.TRANSGEAR_SHOWN_STEMS <= set(TRANSGEAR_QUANTITIES):
+    raise AssertionError("the transgear explode shows transgear families only")
+if not ISO_HIDDEN_STEMS < explode.TRANSGEAR_SHOWN_STEMS:
+    raise AssertionError("the explode shows every family the isometric cannot")
+TRANSGEAR_EXPLODED_INSTANCES = frozenset(
+    name
+    for name in TRANSGEAR_INSTANCES
+    if name.rsplit("-", 1)[0] in explode.TRANSGEAR_SHOWN_STEMS
 )
+if explode.KNOB_WHEEL_INSTANCE not in TRANSGEAR_EXPLODED_INSTANCES:
+    raise AssertionError("the explode moves the mounted knob wheel it shows")
+# The knob wheel is the mounted removable; the crank wheel and spare T18 are
+# sheet 1's.
+TRANSGEAR_BALLOON_ANCHORS = {
+    stem: BalloonAnchor(instance=explode.KNOB_WHEEL_INSTANCE)
+    if stem == "pd-transgear-removable"
+    else BalloonAnchor()
+    for stem in TRANSGEAR_QUANTITIES
+}
+
+
+def exploded_group_instances(group: ExplodedGroup) -> frozenset[str]:
+    """The sheet-3 instances one view shows: its families' exploded instances."""
+    return frozenset(
+        name
+        for name in TRANSGEAR_EXPLODED_INSTANCES
+        if name.rsplit("-", 1)[0] in group.stems
+    )
 
 
 def transgear_balloon_items(
     items: dict[str, str],
 ) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]:
-    """(isometric, inner view) balloon items, each in item order.
+    """(sheet 2 isometric, sheet 3 explode) balloon items, each in item order.
 
-    Every transgear family lands on exactly one of the two views; the inner
-    view balloons only the families it shows.
+    The isometric balloons every transgear family it can reach; the explode
+    balloons every family it shows, the ones the isometric cannot included.
     """
-    ordered = sorted(
-        ((stem, items[stem]) for stem in TRANSGEAR_QUANTITIES),
-        key=lambda pair: int(pair[1]),
-    )
     return (
-        tuple(pair for pair in ordered if pair[0] not in INNER_STEMS),
-        tuple(pair for pair in ordered if pair[0] in INNER_STEMS),
-    )
-
-
-@dataclass(frozen=True)
-class RimCandidate:
-    """One circular edge the inner view lists for the collar: its
-    ``ICurve.CircleParams`` (centre and radius in collar-local mm, the axis a
-    unit vector) and its ``IEdge.GetClosestPointOn`` the landing (mm)."""
-
-    edge: Any
-    circle: tuple[float, float, float, float, float, float, float]
-    closest_mm: tuple[float, float, float]
-
-
-def collar_rear_rim(candidates: Sequence[RimCandidate]) -> RimCandidate:
-    """The one listed arc of the collar's rear-face rim that holds the
-    landing; none or several raise, listing every circle the view lists."""
-    centre = (0.0, 0.0, COLLAR_RIM_Z)
-
-    def is_rim(candidate: RimCandidate) -> bool:
-        circle = candidate.circle
-        offset = sum(abs(a - b) for a, b in zip(circle[:3], centre))
-        return (
-            offset <= _RIM_CENTER_TOL_MM
-            and abs(circle[6] - COLLAR_RIM_RADIUS) <= _RIM_RADIUS_TOL_MM
-            and 1.0 - abs(circle[5]) <= _RIM_AXIS_TOL
-            and math.dist(candidate.closest_mm, COLLAR_LANDING_MM)
-            <= _RIM_LANDING_TOL_MM
-        )
-
-    matches = [candidate for candidate in candidates if is_rim(candidate)]
-    if len(matches) != 1:
-        listed = "; ".join(
-            "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f}) axis ({3:.3f}, {4:.3f}, {5:.3f})".format(
-                *candidate.circle
-            )
-            + f", {math.dist(candidate.closest_mm, COLLAR_LANDING_MM):.4f} from the landing"
-            for candidate in candidates
-        )
-        landing = ", ".join(f"{value:.3f}" for value in COLLAR_LANDING_MM)
-        raise RuntimeError(
-            f"{COLLAR_INSTANCE}: expected one listed rear-rim arc r "
-            f"{COLLAR_RIM_RADIUS:g} mm at z {COLLAR_RIM_Z:g} mm through ({landing}), "
-            f"matched {len(matches)} of {len(candidates)} circles: {listed or 'none'}"
-        )
-    return matches[0]
-
-
-def collar_rim_landing(
-    minus_end: tuple[float, float], plus_end: tuple[float, float]
-) -> tuple[float, float]:
-    """Where the collar's leader lands: the landing's y along the rear rim's
-    projected line, from its -Y end to its +Y end (sheet metres)."""
-    t = (COLLAR_LANDING_Y + COLLAR_RIM_RADIUS) / (2.0 * COLLAR_RIM_RADIUS)
-    return (
-        minus_end[0] + t * (plus_end[0] - minus_end[0]),
-        minus_end[1] + t * (plus_end[1] - minus_end[1]),
+        _in_item_order(items, set(TRANSGEAR_QUANTITIES) - ISO_HIDDEN_STEMS),
+        _in_item_order(items, explode.TRANSGEAR_SHOWN_STEMS),
     )
 
 
@@ -1050,17 +995,32 @@ def _uncross_ring(
         rebuild_drawing(adapter, label=f"{label} uncrossed")
 
 
-# Sheet 1's isometric balloons what sheets 2 and 3 do not show: the chain,
+# Sheet 1's isometric balloons what sheets 2 to 4 do not show: the chain,
 # and the spare T18 on the base deck (the third removable inserted), whose
 # item sheet 2 balloons on the mounted knob wheel.
 SPARE_INSTANCE = "pd-transgear-removable-3"
+# The chain's loop stations count from the knob wheel (the builder's
+# _chain_station_point); station s is the link @<role>:s // 2 + 1, inner links
+# on even stations, and the connecting link closes the loop at the last. The
+# first inner and outer links sat in the knob wheel's wrap beside the
+# connecting link, under the bar's and wheel's edges, and their three leaders
+# met there (machinist review, #1531). One inner link midway along one run
+# between the wheels and one outer link midway along the other stand clear.
+CHAIN_INNER_BALLOON_STATION = 24
+CHAIN_OUTER_BALLOON_STATION = 51
+if CHAIN_INNER_BALLOON_STATION % 2 or not CHAIN_OUTER_BALLOON_STATION % 2:
+    raise AssertionError("inner links take even loop stations, outer links odd")
 ASSEMBLED_BALLOON_ANCHORS = {
-    "sh-vn-chain-link--InnerLink": BalloonAnchor(instance="@InnerLink:1"),
-    "sh-vn-chain-link--OuterLink": BalloonAnchor(instance="@OuterLink:1"),
+    "sh-vn-chain-link--InnerLink": BalloonAnchor(
+        instance=f"@InnerLink:{CHAIN_INNER_BALLOON_STATION // 2 + 1}"
+    ),
+    "sh-vn-chain-link--OuterLink": BalloonAnchor(
+        instance=f"@OuterLink:{CHAIN_OUTER_BALLOON_STATION // 2 + 1}"
+    ),
     "pd-vn-chain-connecting-link": BalloonAnchor(),
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
-# Sheet 3's exploded view balloons every family it shows.
+# Sheet 4's exploded view balloons every family it shows.
 PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS}
 
 
@@ -1078,7 +1038,7 @@ def assembled_balloon_items(items: dict[str, str]) -> tuple[tuple[str, str], ...
 
 
 def platen_balloon_items(items: dict[str, str]) -> tuple[tuple[str, str], ...]:
-    """Sheet 3's exploded-view balloons, in item order."""
+    """Sheet 4's exploded-view balloons, in item order."""
     return _in_item_order(items, PLATEN_BALLOON_ANCHORS)
 
 
@@ -1155,96 +1115,32 @@ def _native_outline_at(
 
 def transgear_view_shift(iso_outline: Box) -> tuple[float, float]:
     """Shift that centres the transgear isometric's balloon ring in sheet 2's
-    field vertically. It does not move along x, so the room left of it for the
-    inner view stays the same.
+    field vertically. It does not move along x, so the pivot section's field
+    left of it stays the same.
 
     The outline is in sheet metres (left, bottom, right, top). Raises if the
-    ring is taller than the field.
-    """
-    _left, bottom, _right, top = SHEET_TWO_RING_LIMITS
-    ring = _grown(iso_outline, BALLOON_RING_REACH)
-    if ring[3] - ring[1] > top - bottom:
-        raise ValueError(
-            f"sheet 2 isometric ring height {(ring[3] - ring[1]) * 1000:.1f} mm > "
-            f"room {(top - bottom) * 1000:.1f} mm"
-        )
-    return (0.0, (bottom + top - ring[1] - ring[3]) / 2.0)
-
-
-def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
-    """Shift that centres the inner view's balloon ring between the BOM and
-    the isometric's ring, level with the isometric.
-
-    Outlines are sheet metres (left, bottom, right, top). Raises naming every
-    side of either ring that leaves SHEET_TWO_RING_LIMITS, or an inner ring
-    reaching within SHEET_TWO_RING_GAP of the isometric's.
+    ring is taller than the field or leaves it at either side.
     """
     left, bottom, right, top = SHEET_TWO_RING_LIMITS
-    iso_ring = _grown(iso_outline, BALLOON_RING_REACH)
-    room_right = iso_ring[0] - SHEET_TWO_RING_GAP
-    shift = (
-        (left + room_right) / 2.0 - (inner_outline[0] + inner_outline[2]) / 2.0,
-        (iso_outline[1] + iso_outline[3]) / 2.0
-        - (inner_outline[1] + inner_outline[3]) / 2.0,
-    )
-    inner_ring = _grown(
-        (
-            inner_outline[0] + shift[0],
-            inner_outline[1] + shift[1],
-            inner_outline[2] + shift[0],
-            inner_outline[3] + shift[1],
-        ),
-        BALLOON_RING_REACH,
-    )
+    ring = _grown(iso_outline, BALLOON_RING_REACH)
     findings = []
-    for name, ring in (("isometric", iso_ring), ("inner view", inner_ring)):
-        for side, value, limit, outside in (
-            ("left", ring[0], left, ring[0] < left),
-            ("bottom", ring[1], bottom, ring[1] < bottom),
-            ("right", ring[2], right, ring[2] > right),
-            ("top", ring[3], top, ring[3] > top),
-        ):
-            if outside:
-                findings.append(
-                    f"{name} ring {side} {value * 1000:.1f} mm past {limit * 1000:.1f} mm"
-                )
-    if inner_ring[2] > room_right:
+    if ring[3] - ring[1] > top - bottom:
         findings.append(
-            f"inner view ring right {inner_ring[2] * 1000:.1f} mm within "
-            f"{SHEET_TWO_RING_GAP * 1000:g} mm of the isometric ring "
-            f"({iso_ring[0] * 1000:.1f} mm)"
+            f"height {(ring[3] - ring[1]) * 1000:.1f} mm > "
+            f"room {(top - bottom) * 1000:.1f} mm"
+        )
+    if ring[0] < left or ring[2] > right:
+        findings.append(
+            f"x {ring[0] * 1000:.1f} to {ring[2] * 1000:.1f} mm leaves "
+            f"{left * 1000:.1f} to {right * 1000:.1f} mm"
         )
     if findings:
-        raise ValueError(f"sheet 2 balloon rings do not fit: {'; '.join(findings)}")
-    return shift
+        raise ValueError(f"sheet 2 isometric ring {'; '.join(findings)}")
+    return (0.0, (bottom + top - ring[1] - ring[3]) / 2.0)
 
 
 def _scale_text(scale: tuple[float, float]) -> str:
     return f"{scale[0]:g}:{scale[1]:g}"
-
-
-def inner_view_scale(
-    iso_outline: Box, inner_outline: Box, placed: tuple[float, float]
-) -> tuple[float, float]:
-    """The largest INNER_SCALE_LADDER scale whose ring inner_view_shift fits.
-
-    ``inner_outline`` is the inner view's outline at ``placed``; a view's
-    outline scales with its scale about its centre, and the fit reads only
-    its size. Raises naming every scale's finding when none fits.
-    """
-    x0, y0, x1, y1 = inner_outline
-    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
-    findings = []
-    for scale in INNER_SCALE_LADDER:
-        k = (scale[0] / scale[1]) / (placed[0] / placed[1])
-        hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
-        try:
-            inner_view_shift(iso_outline, (cx - hw, cy - hh, cx + hw, cy + hh))
-        except ValueError as error:
-            findings.append(f"{_scale_text(scale)}: {error}")
-            continue
-        return scale
-    raise ValueError(f"no inner-view scale fits sheet 2 ({' | '.join(findings)})")
 
 
 # --- sheet wording ---------------------------------------------------------------
@@ -1273,6 +1169,25 @@ KNOB_END_FLOAT_RANGE = (
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
 CLIP_SCREWS = len(platen.SOCKET_XY)
+
+
+# The engaged-feed window, measured from the rack's -X cut end. Machine X is
+# drawn on no sheet, so the end and the feed direction are named by the
+# crank, which stands on the drive's -X side (machinist review: "-X CUT END"
+# could not be found on the part).
+ENGAGED_FEED_DATUM_TEXT = (
+    "FROM THE RACK'S CRANK-SIDE CUT END TO THE FEED STUD AXIS; PLATEN FEED "
+    "AWAY FROM THE CRANK SHORTENS IT"
+)
+
+
+def engaged_feed_text(domain: RackOperatingDomain) -> str:
+    """The window the hanger step prints, in the title block's millimetres."""
+    low, high = domain.axis_from_left_end_limits_mm
+    return (
+        f"ENGAGED FEED: {low:.{OPERATING_LIMIT_PLACES}f} TO "
+        f"{high:.{OPERATING_LIMIT_PLACES}f} {ENGAGED_FEED_DATUM_TEXT}."
+    )
 
 
 def _stack_text() -> str:
@@ -1343,7 +1258,9 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
         "arm-plate-located": (
             f"CLAMP {_N['pd-transgear-arm']} AND {_N['pd-transgear-arm-plate']} "
             "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
-            f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE, PER THEIR DRAWINGS; "
+            f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE (THE "
+            f"{_N['pd-transgear-knob-shaft']} {KNOB_TEETH}T / {_N['pd-rack-pinion']} "
+            f"{disc.TEETH}T MESH), PER THEIR DRAWINGS; "
             "MATCH-DRILL AND REAM THE LOCATING HOLES. "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
@@ -1455,8 +1372,8 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"ENTER THE {_N['pd-platen-rack']} RACK. ALIGN A FEED TOOTH CENTRE "
             "DIRECTLY BELOW A RACK SPACE CENTRE. KNOB HELD, SET "
             f"{steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM "
-            "(DIAL ALONG THE RACK); CLAMP THE ARM TO THE BAR. "
-            f"{operating_domain.operating_window_text} {OPERATING_DIRECTION_TEXT}; "
+            "(DIAL ALONG THE RACK): THIS SHAKE SETS THE FEED MESH DEPTH. CLAMP "
+            f"THE ARM TO THE BAR. {engaged_feed_text(operating_domain)} "
             f"THE FEED STUD IS THE {_N['pd-transgear-pin']} PIN. "
             "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH. "
             "STOP BEFORE EITHER END LIMIT; RESET ONLY WITH FEED DISENGAGED."
@@ -1593,7 +1510,7 @@ def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> s
 def _step_columns(
     *, operating_domain: RackOperatingDomain,
 ) -> tuple[str, tuple[str, str], tuple[str, str]]:
-    """Sheet 3's platen steps, then the two columns on sheets 4 and 5."""
+    """Sheet 4's platen steps, then the two columns on sheets 5 and 6."""
     text = _step_text(operating_domain=operating_domain)
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
@@ -1648,7 +1565,7 @@ class StepNotes:
 
     @property
     def fitup_steps(self) -> str:
-        """Each sheet's columns read left to right; sheet 5 continues sheet 4."""
+        """Each sheet's columns read left to right; sheet 6 continues sheet 5."""
         return "\n".join((self.platen_steps, *self.fitup_notes, *self.chain_notes))
 
     @property
@@ -1689,7 +1606,8 @@ ASSEMBLED_CAPTIONS = {
                     f"THE {sprocket.CRANK_CONFIG} ON THE "
                     "CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
                     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR "
-                    f"ITEMS: SHEET {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}.",
+                    f"ITEMS: SHEETS {SHEET_NAMES.index('TRANSGEAR VIEWS') + 1} AND "
+                    f"{SHEET_NAMES.index('TRANSGEAR EXPLODED') + 1}.",
                     width=FITUP_LINE_WIDTH,
                 )
             ),
@@ -1700,15 +1618,27 @@ ASSEMBLED_CAPTIONS = {
 }
 TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
+    f"EXPLODED: SHEET {SHEET_NAMES.index('TRANSGEAR EXPLODED') + 1};\n"
     f"ASSEMBLY AND FIT-UP: SHEETS {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} "
     f"AND {SHEET_NAMES.index('CHAIN FIT-UP') + 1}; "
     f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
 )
-# The inner view's caption at each scale it may take.
-INNER_CAPTIONS = {
-    scale: f"INNER PARTS, RIGHT SIDE {_scale_text(scale)}"
-    for scale in INNER_SCALE_LADDER
-}
+# Sheet 3's caption, right of the knob-stack view and under the cluster's.
+TRANSGEAR_EXPLODED_CAPTION = "\n".join(
+    textwrap.wrap(
+        f"TRANSGEAR EXPLODED, ISOMETRIC, {_scale_text(TRANSGEAR_EXPLODED_SCALE)}. "
+        "LEFT: THE HANGER ARM AND ITS PLATE, AND THE KNOB STACK ON ITS SHAFT. "
+        "ABOVE: THE DISC CLUSTER ON ITS PIN. EACH PART IS DRAWN APART ALONG ITS "
+        "AXIS IN THE ORDER IT GOES ON. HANGER PIVOT: SECTION A-A, SHEET "
+        f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}; LATCH HOOK: SHEET "
+        f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}. ASSEMBLY: SHEETS "
+        f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} AND "
+        f"{SHEET_NAMES.index('CHAIN FIT-UP') + 1}; BOM: SHEET "
+        f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
+        width=TRANSGEAR_EXPLODED_CAPTION_WIDTH,
+        break_on_hyphens=False,
+    )
+)
 FITUP_REFERENCE_CAPTION = (
     f"REFERENCE {FITUP_SCALE[0]:g}:{FITUP_SCALE[1]:g}; ITEMS: SHEETS 1 TO "
     f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}"
@@ -1724,7 +1654,7 @@ def sheet_texts(notes: StepNotes) -> tuple[str, ...]:
         *EXPLODED_CAPTIONS.values(),
         *ASSEMBLED_CAPTIONS.values(),
         TRANSGEAR_CAPTION,
-        *INNER_CAPTIONS.values(),
+        TRANSGEAR_EXPLODED_CAPTION,
         FITUP_REFERENCE_CAPTION,
         BOM_REFERENCE_CAPTION,
         PIVOT_CAPTION,
@@ -2489,105 +2419,6 @@ def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
 
 
-def _collar_rim_candidates(view: Any, leaf: Any) -> list[RimCandidate]:
-    """Every circular edge the view lists as drawn for the collar ``leaf``,
-    read in collar-local mm (the listed-edge fallback's part space)."""
-    landing_m = tuple(value / 1000.0 for value in COLLAR_LANDING_MM)
-    candidates = []
-    for edge in raw_visible_entities(view, leaf.component, _VIEW_ENTITY_EDGE):
-        curve = _com_invoke(edge, "IEdge", "GetCurve")
-        if curve is None or not _com_invoke(curve, "ICurve", "IsCircle"):
-            continue
-        params = tuple(
-            float(v) for v in (_com_invoke(curve, "ICurve", "CircleParams") or ())
-        )
-        closest = tuple(
-            float(v)
-            for v in (_com_invoke(edge, "IEdge", "GetClosestPointOn", *landing_m) or ())
-        )
-        if len(params) < 7 or len(closest) < 3:
-            raise RuntimeError(
-                f"{leaf.path}: a listed circle read params {params}, closest point {closest}"
-            )
-        cx, cy, cz, nx, ny, nz, radius = params[:7]
-        candidates.append(
-            RimCandidate(
-                edge=edge,
-                circle=(cx * 1e3, cy * 1e3, cz * 1e3, nx, ny, nz, radius * 1e3),
-                closest_mm=(closest[0] * 1e3, closest[1] * 1e3, closest[2] * 1e3),
-            )
-        )
-    return candidates
-
-
-@_telemetry.traced("drawing.collar_rim_balloon", label_param="label")
-def _balloon_collar_on_its_rear_rim(
-    adapter: Any, view: Any, *, item: str, label: str
-) -> BalloonLanding:
-    """The drive collar's balloon on its rear-face rim, selected by entity.
-
-    The rim is checked edge-on, then its leader lands at the landing's y
-    along the rim's projected line, and is proven there. The rim is a listed
-    edge selected through the view with its landing set: the
-    ``landed-listed-edge`` path of :func:`_create_component_bom_balloon`.
-    """
-    leaves = _view_component_leaves(adapter, view, label=label)
-    leaf = _shown_instances(
-        leaves, COLLAR_STEM, BalloonAnchor(instance=COLLAR_INSTANCE), label=label
-    )[0]
-    offsets = _view_explode_offsets(adapter, view, label=label)
-    minus_end, plus_end, plus_x, minus_x = model_points_in_view(
-        adapter,
-        view,
-        _anchor_model_points(
-            adapter,
-            leaf,
-            tuple(
-                tuple(value / 1000.0 for value in point)
-                for point in COLLAR_RIM_VIEW_POINTS_MM
-            ),
-            offsets,
-            stem=COLLAR_STEM,
-            label=label,
-        ),
-        label=f"{label} {COLLAR_STEM} rear rim",
-        names=("-Y end", "+Y end", "+X point", "-X point"),
-    )
-    middle = ((minus_end[0] + plus_end[0]) / 2.0, (minus_end[1] + plus_end[1]) / 2.0)
-    for side, point in (("+X", plus_x), ("-X", minus_x)):
-        if math.dist(point, middle) > _EDGE_ON_TOL_M:
-            raise RuntimeError(
-                f"{label}: {leaf.path}'s rear rim is not edge-on in the inner view: "
-                f"its {side} point projects to {point}, its line's midpoint is {middle}"
-            )
-    rim = collar_rear_rim(_collar_rim_candidates(view, leaf))
-    landing = collar_rim_landing(minus_end, plus_end)
-    _telemetry.info(
-        f"{label}: {leaf.path} rear rim projects from ({minus_end[0]:.5f}, "
-        f"{minus_end[1]:.5f}) at -Y to ({plus_end[0]:.5f}, {plus_end[1]:.5f}) at +Y; "
-        f"leader lands at ({landing[0]:.5f}, {landing[1]:.5f}); matched arc "
-        "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f}) axis ({3:.3f}, {4:.3f}, {5:.3f})".format(
-            *rim.circle
-        )
-        + ", closest point ({:.4f}, {:.4f}, {:.4f}) mm".format(*rim.closest_mm)
-    )
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
-        view_name(adapter, view)
-    ):
-        raise RuntimeError(f"{label}: failed to activate the collar's balloon view")
-    _assert_bom_balloon_configuration(view, label=label)
-    return _create_component_bom_balloon(
-        adapter,
-        view,
-        stem=COLLAR_STEM,
-        choice=_AnchorChoice(
-            instance=leaf.path, edge=rim.edge, method="landed-listed-edge", sheet_xy=landing
-        ),
-        expected_item=item,
-        label=label,
-    )
-
-
 def _assert_bom_balloon_configuration(view: Any, *, label: str) -> None:
     """Read actual post-operation membership; never coerce a view to fit the BOM."""
     actual = _early_bound(view, "IView").ReferencedConfiguration
@@ -2614,10 +2445,10 @@ def _assert_bom_balloon_items(
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
 ) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any], BomSnapshot]:
-    """BOM of the whole drive; the transgear isometric and the inner view
-    between them balloon every transgear family once. Returns landings,
-    the logical table, its (stem: item) numbers, pieces and validated snapshot."""
-    _activate_sheet(adapter, SHEET_NAMES[5])
+    """BOM of the whole drive; the transgear isometric balloons every
+    transgear family it can reach. Returns landings, the logical table, its
+    (stem: item) numbers, pieces and validated snapshot."""
+    _activate_sheet(adapter, SHEET_NAMES[6])
     reference = place_view(
         adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_CENTER,
         scale=BOM_REFERENCE_SCALE,
@@ -2631,7 +2462,7 @@ def _place_bom_sheet(
     ):
         raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
     _place_sheet_note(
-        adapter, SHEET_NAMES[5], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        adapter, SHEET_NAMES[6], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation
@@ -2664,24 +2495,11 @@ def _place_bom_sheet(
     apply_view_configuration(adapter, view, label=label)
     _link_view_to_bom(view, table, label=label)
     _isolate_instances(adapter, view, TRANSGEAR_INSTANCES, label=label)
-    inner_label = "transgear inner view"
-    placed = INNER_SCALE_LADDER[0]
-    inner = place_view(
-        adapter,
-        str(SOURCE),
-        INNER_VIEW_ORIENTATION,
-        *INNER_VIEW_START,
-        scale=placed,
-    )
-    set_high_quality_shaded_with_edges(adapter, inner, label=inner_label)
-    apply_view_configuration(adapter, inner, label=inner_label)
-    _isolate_instances(adapter, inner, INNER_INSTANCES, label=inner_label)
-    _link_view_to_bom(inner, table, label=inner_label)
     if dict(
         _validate_bom(adapter, table, counts, configuration=bom_configuration)
     ) != items:
         raise RuntimeError(
-            "paper-drive BOM items moved when the transgear views were isolated"
+            "paper-drive BOM items moved when the transgear view was isolated"
         )
     bom_snapshot = validate_bom_number_property(
         table,
@@ -2690,26 +2508,19 @@ def _place_bom_sheet(
         expected_rows=len(BOM_PART_NUMBERS) + 1,
         occurrence_quantities=True,
     )
-    _activate_sheet(adapter, SHEET_NAMES[5])
+    _activate_sheet(adapter, SHEET_NAMES[6])
     pieces = _split_bom(
         adapter, table, configuration=bom_configuration,
         expected_snapshot=bom_snapshot,
     )
     _activate_sheet(adapter, SHEET_NAMES[1])
-    # Both rings fit before any balloon exists. The isometric is centred in
-    # the field's height, then the inner view is fitted beside it. Requested
-    # creation policy is not proof of the actual post-operation configuration.
+    # The ring fits before any balloon exists: the isometric is centred in
+    # the field's height. Requested creation policy is not proof of the
+    # actual post-operation configuration.
     _shift_view(
         adapter, view, transgear_view_shift(_view_outline(view)), label=f"{label} ring fit"
     )
-    iso_outline = _view_outline(view)
-    scale = inner_view_scale(iso_outline, _view_outline(inner), placed)
-    if scale != placed:
-        _set_view_scale(adapter, inner, scale, label=inner_label)
-    # The ladder predicted the fit; the re-read outline is the proof.
-    shift = inner_view_shift(iso_outline, _view_outline(inner))
-    _shift_view(adapter, inner, shift, label=f"{inner_label} ring fit")
-    iso_items, inner_items = transgear_balloon_items(items)
+    iso_items, _exploded_items = transgear_balloon_items(items)
     iso_label = "paper-drive transgear BOM coverage"
     _assert_bom_balloon_configuration(view, label=iso_label)
     landings = add_component_bom_balloons(
@@ -2722,52 +2533,14 @@ def _place_bom_sheet(
     )
     # Farm run 20261015T082822796Z: the isometric's angular ring order still
     # crossed items 14 and 16, whose attachments sit at different depths
-    # inside the ring; the inner ring's slot swap uncrosses
-    # it the same way.
+    # inside the ring; swapping their ring slots uncrosses them.
     _uncross_ring(adapter, landings, label=iso_label)
-    # The collar balloons after the batch, so its balloon cannot cover a
-    # point the batch hit-tests; then all of the view's balloons re-ring.
-    balloons_label = "paper-drive transgear inner BOM coverage"
-    _assert_bom_balloon_configuration(inner, label=balloons_label)
-    inner_landings = add_component_bom_balloons(
-        adapter,
-        inner,
-        items=tuple(pair for pair in inner_items if pair[0] != COLLAR_STEM),
-        anchors=TRANSGEAR_BALLOON_ANCHORS,
-        label=balloons_label,
-        margin=BALLOON_MARGIN,
-    )
-    inner_landings.append(
-        _balloon_collar_on_its_rear_rim(
-            adapter, inner, item=dict(inner_items)[COLLAR_STEM], label=balloons_label
-        )
-    )
-    _spread_balloons(
-        adapter,
-        inner,
-        [landing.note for landing in inner_landings],
-        margin=BALLOON_MARGIN,
-    )
-    rebuild_drawing(adapter, label=f"{balloons_label} ring")
-    _uncross_ring(adapter, inner_landings, label=balloons_label)
-    landings += inner_landings
     _place_sheet_note(
         adapter,
         SHEET_NAMES[1],
         TRANSGEAR_CAPTION,
         TRANSGEAR_CAPTION_XY,
         label="transgear caption",
-    )
-    inner_outline = _view_outline(inner)
-    _place_sheet_note(
-        adapter,
-        SHEET_NAMES[1],
-        INNER_CAPTIONS[scale],
-        (
-            inner_outline[0] - BALLOON_RING_REACH,
-            inner_outline[1] - BALLOON_RING_REACH - INNER_CAPTION_GAP,
-        ),
-        label="inner-parts caption",
     )
     return landings, table, items, pieces, bom_snapshot
 
@@ -3113,12 +2886,79 @@ def _balloon_assembled_sheet(
     )
 
 
+def _place_transgear_exploded_sheet(
+    adapter: Any, table: Any, items: dict[str, str]
+) -> list[Any]:
+    """The builder's PAPER_DRIVE_EXPLODED in two isometric views, the hanger
+    and knob stack in one and the disc cluster in the other, each family
+    ballooned once. Both views fit their fields before any balloon exists."""
+    sheet = SHEET_NAMES[2]
+    _activate_sheet(adapter, sheet)
+    views = []
+    for group in TRANSGEAR_EXPLODED_GROUPS:
+        label = group.label
+        view = place_view(
+            adapter,
+            str(SOURCE),
+            TRANSGEAR_EXPLODED_ORIENTATION,
+            *group.center,
+            scale=TRANSGEAR_EXPLODED_SCALE,
+        )
+        set_high_quality_shaded_with_edges(adapter, view, label=label)
+        configuration = apply_view_configuration(
+            adapter, view, role=ViewRole.FULL_DETAIL, label=label
+        )
+        set_view_exploded_state(
+            adapter, view, True, configuration=configuration, label=label
+        )
+        _isolate_instances(adapter, view, exploded_group_instances(group), label=label)
+        _scale, outline = step_down_to_fit(
+            _native_outline_at(adapter, view, TRANSGEAR_EXPLODED_SCALE, label=label),
+            (TRANSGEAR_EXPLODED_SCALE,),
+            group.ring_limits,
+            name=label,
+        )
+        shift = ring_fit_shift(outline, group.ring_limits, name=label)
+        _shift_view(adapter, view, shift, label=f"{label} ring fit")
+        _link_view_to_bom(view, table, label=label)
+        views.append((group, view))
+    _iso_items, exploded_items = transgear_balloon_items(items)
+    # Both views reference the same configuration's explode, whose offsets
+    # cover every moved instance: read them once.
+    offsets = _view_explode_offsets(
+        adapter, views[0][1], label="paper-drive transgear exploded offsets"
+    )
+    landings: list[Any] = []
+    for group, view in views:
+        balloons_label = f"paper-drive transgear {group.label} BOM coverage"
+        _assert_bom_balloon_configuration(view, label=balloons_label)
+        group_landings = add_component_bom_balloons(
+            adapter,
+            view,
+            items=tuple(pair for pair in exploded_items if pair[0] in group.stems),
+            anchors=TRANSGEAR_BALLOON_ANCHORS,
+            label=balloons_label,
+            margin=BALLOON_MARGIN,
+            explode_offsets=offsets,
+        )
+        _uncross_ring(adapter, group_landings, label=balloons_label)
+        landings += group_landings
+    _place_sheet_note(
+        adapter,
+        sheet,
+        TRANSGEAR_EXPLODED_CAPTION,
+        TRANSGEAR_EXPLODED_CAPTION_XY,
+        label="transgear exploded caption",
+    )
+    return landings
+
+
 def _place_exploded_sheet(
     adapter: Any, table: Any, items: dict[str, str], notes: StepNotes,
 ) -> list[Any]:
     """The builder's PAPER_DRIVE_EXPLODED, only the platen-and-support
     families shown, each ballooned once; their steps left of it."""
-    _activate_sheet(adapter, SHEET_NAMES[2])
+    _activate_sheet(adapter, SHEET_NAMES[3])
     label = "platen and support exploded"
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *EXPLODED_CENTER, scale=EXPLODED_SCALE
@@ -3152,11 +2992,11 @@ def _place_exploded_sheet(
         margin=BALLOON_MARGIN,
     )
     _place_sheet_note(
-        adapter, SHEET_NAMES[2], notes.platen_steps, PLATEN_NOTE_XY, label="platen steps"
+        adapter, SHEET_NAMES[3], notes.platen_steps, PLATEN_NOTE_XY, label="platen steps"
     )
     _place_sheet_note(
         adapter,
-        SHEET_NAMES[2],
+        SHEET_NAMES[3],
         EXPLODED_CAPTIONS[scale],
         notes.exploded_caption_xy,
         label="exploded-view caption",
@@ -3166,8 +3006,8 @@ def _place_exploded_sheet(
 
 def _place_fitup_sheets(adapter: Any, step_notes: StepNotes) -> None:
     for sheet_name, notes in (
-        (SHEET_NAMES[3], step_notes.fitup_notes),
-        (SHEET_NAMES[4], step_notes.chain_notes),
+        (SHEET_NAMES[4], step_notes.fitup_notes),
+        (SHEET_NAMES[5], step_notes.chain_notes),
     ):
         _activate_sheet(adapter, sheet_name)
         view = place_view(
@@ -3226,6 +3066,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings, table, items, pieces, bom_snapshot = _place_bom_sheet(adapter, counts)
     _place_pivot_view(adapter, items)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
+    landings += _place_transgear_exploded_sheet(adapter, table, items)
     landings += _place_exploded_sheet(adapter, table, items, notes)
     _place_fitup_sheets(adapter, notes)
     assert_full_detail_view(adapter, label="paper-drive assembly")
