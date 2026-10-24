@@ -300,7 +300,8 @@ def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> No
     assert _number(locating) != _number(driving)
     assert "PLATE LOCATING DOWEL" in drawing.BOM_DESCRIPTIONS[locating]
     assert "WHEEL DRIVE DOWEL" in drawing.BOM_DESCRIPTIONS[driving]
-    assert locating in drawing.INNER_STEMS
+    assert locating in drawing.ISO_HIDDEN_STEMS
+    assert {locating, driving} <= explode.TRANSGEAR_SHOWN_STEMS
     for stem in (locating, driving):
         assert len(drawing.BOM_DESCRIPTIONS[stem]) <= drawing.BOM_DESCRIPTION_MAX_CHARS
 
@@ -313,7 +314,9 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     ) in located
     assert (
         "TOGETHER IN A JIG HOLDING THE PLATE'S KNOB BORE "
-        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE, PER THEIR DRAWINGS"
+        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE (THE "
+        f"{_number('pd-transgear-knob-shaft')} {knob_shaft.TEETH}T / "
+        f"{_number('pd-rack-pinion')} {disc.TEETH}T MESH), PER THEIR DRAWINGS"
     ) in located
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
@@ -393,90 +396,17 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
         if stem != "pd-transgear-removable"
     } | {"pd-transgear-removable-1"}
     assert drawing.TRANSGEAR_INSTANCES == expected
-    # The collar alone has no batch anchor: it balloons on its rear rim.
-    anchored = set(CONTRACT_TRANSGEAR_QUANTITIES) - {drawing.COLLAR_STEM}
-    assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == anchored
+    # Every transgear family has a batch anchor, on either sheet's view.
+    assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == set(CONTRACT_TRANSGEAR_QUANTITIES)
     # The knob wheel is instance 1; crank wheel and spare T18 stay off.
     assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-transgear-removable"].instance == (
         "pd-transgear-removable-1"
     )
-
-
-def test_the_collar_leader_lands_on_its_rear_rim_beside_the_lower_end() -> None:
-    # The inner view sees the collar's rims edge-on from the right; hit tests
-    # missed them on farm runs 20261002T160324403Z, 20261002T164049933Z and
-    # 20261002T171234232Z. The leader lands past the drive-pin hole, so one
-    # re-solved to the rim line's nearer end stays in limit.
-    x, y, z = drawing.COLLAR_LANDING_MM
-    radius = collar.OD / 2.0
-    assert math.hypot(x, y) == pytest.approx(radius, abs=1e-9)
-    assert z == pytest.approx(collar.LENGTH)
-    pin_gap = math.dist((x, y), (0.0, -collar.PIN_CIRCLE_RADIUS)) - collar.PIN_HOLE_DIA / 2.0
-    assert pin_gap > 0.5
-    # The rear slot along local X splits the rim: the landing stays on the -Y arc.
-    assert abs(math.degrees(math.atan2(x, -y))) < 30.0
-    # Green run 20261001T172013211Z's 1:2 rear-rim line, -Y end to +Y end.
-    minus_end, plus_end = (0.21852, 0.171822), (0.21852, 0.180572)
-    landing = drawing.collar_rim_landing(minus_end, plus_end)
-    assert landing[0] == pytest.approx(0.21852)
-    view_y = drawing.COLLAR_LANDING_Y
-    assert landing[1] - minus_end[1] == pytest.approx((radius + view_y) / 2.0 / 1000.0)
-    largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
-    end_gap_m = (radius + view_y) * largest_scale / 1000.0
-    assert end_gap_m < _drawing_balloons._BALLOON_LANDING_TOLERANCE_M / 2.0
-    # Below the axis is away from the feed sleeve: its stud stands above the knob.
-    assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
-
-
-def test_the_collar_rim_points_follow_the_front_stack_spin() -> None:
-    # Run 10: the collar is spun -3 deg with the knob front stack, so its
-    # LOCAL +X point sat r sin 3 deg off the edge-on line's midpoint.
-    assert assembly.THIRD_PHASE_DEG == knob_shaft.FRONT_STACK_PHASE_DEG
-    spin = math.radians(assembly.THIRD_PHASE_DEG)
-    rows = ((math.cos(spin), -math.sin(spin)), (math.sin(spin), math.cos(spin)))
-    radius = collar.OD / 2.0
-    view_frame = [
-        (rows[0][0] * x + rows[0][1] * y, rows[1][0] * x + rows[1][1] * y)
-        for x, y, _z in drawing.COLLAR_RIM_VIEW_POINTS_MM
-    ]
-    expected = [(0.0, -radius), (0.0, radius), (radius, 0.0), (-radius, 0.0)]
-    for got, want in zip(view_frame, expected, strict=True):
-        assert got == pytest.approx(want, abs=1e-12)
-    x, y, _z = drawing.COLLAR_LANDING_MM
-    assert rows[1][0] * x + rows[1][1] * y == pytest.approx(drawing.COLLAR_LANDING_Y)
-
-
-def _circle(
-    z: float, radius: float, closest: tuple[float, float, float], axis_z: float = 1.0
-) -> drawing.RimCandidate:
-    return drawing.RimCandidate(
-        edge=object(),
-        circle=(0.0, 0.0, z, 0.0, 0.0, axis_z, radius),
-        closest_mm=closest,
+    # Seen from above, the +Y drive dowel (the builder's first) covers the -Y.
+    assert drawing.TRANSGEAR_BALLOON_ANCHORS["pd-vn-transgear-knob-drive-pin"].instance == (
+        "pd-vn-transgear-knob-drive-pin-1"
     )
-
-
-def test_the_collar_rim_matcher_takes_the_one_arc_holding_the_landing() -> None:
-    radius, z = collar.OD / 2.0, collar.LENGTH
-    landing = drawing.COLLAR_LANDING_MM
-    # The nearest-point matcher must reject a different circular carrier,
-    # whether a model seam splits a rim or the source has one complete circle.
-    lower = _circle(z, radius, landing)
-    upper = _circle(z, radius, (-radius, 0.0, z))
-    front = _circle(0.0, radius, (landing[0], landing[1], 0.0))
-    bore = _circle(z, collar.BORE_DIA / 2.0, (landing[0] / 2, landing[1] / 2, z))
-    assert drawing.collar_rear_rim([front, upper, lower, bore]) is lower
-    # Either axis sense is the collar's.
-    flipped = _circle(z, radius, landing, axis_z=-1.0)
-    assert drawing.collar_rear_rim([front, flipped, upper]) is flipped
-    # 2 micrometres off the landing is another arc.
-    near = _circle(z, radius, (landing[0], landing[1] - 0.002, z))
-    with pytest.raises(RuntimeError, match=r"matched 0 of 4 circles: r 8\.7500"):
-        drawing.collar_rear_rim([front, upper, bore, near])
-    with pytest.raises(RuntimeError, match="matched 0 of 0 circles: none"):
-        drawing.collar_rear_rim([])
-    with pytest.raises(RuntimeError, match="matched 2 of 3 circles"):
-        drawing.collar_rear_rim([lower, flipped, upper])
+    assert assembly.KNOB_DRIVE_PIN_XY[0][1] > assembly.KNOB_DRIVE_PIN_XY[1][1]
 
 
 # Farm run 20261002T180658288Z's inner-view ring (its drawing.balloon_ring
@@ -649,9 +579,8 @@ def test_the_isometric_ring_pair_from_run_082822_swaps() -> None:
     assert not crossings(slots)
 
 
-# These families were assigned to the inner view after farm run
-# 20261001T051043622Z found no reachable isometric ink for the sleeve.
-# Native balloon landings, not old diameters or centres, defend the selection.
+# The isometric never balloons these: farm run 20261001T051043622Z found no
+# reachable isometric ink for the sleeve. Sheet 3's explode balloons them.
 HIDDEN_BY_THE_ISOMETRIC = {
     "pd-transgear-feed-pinion",
     "pd-transgear-knob-shaft",
@@ -671,115 +600,65 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
         stem: str(len(drawing.BOM_PART_NUMBERS) - index)
         for index, stem in enumerate(drawing.BOM_PART_NUMBERS)
     }
-    iso, inner = drawing.transgear_balloon_items(items)
+    iso, exploded = drawing.transgear_balloon_items(items)
     iso_stems = {stem for stem, _item in iso}
-    inner_stems = {stem for stem, _item in inner}
-    assert inner_stems == HIDDEN_BY_THE_ISOMETRIC
+    exploded_stems = {stem for stem, _item in exploded}
+    assert drawing.ISO_HIDDEN_STEMS == HIDDEN_BY_THE_ISOMETRIC
     assert iso_stems == set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC
-    for balloons in (iso, inner):
+    assert exploded_stems == explode.TRANSGEAR_SHOWN_STEMS
+    assert HIDDEN_BY_THE_ISOMETRIC < exploded_stems
+    # Every transgear family is ballooned on sheet 2 or sheet 3.
+    assert iso_stems | exploded_stems == set(CONTRACT_TRANSGEAR_QUANTITIES)
+    for balloons in (iso, exploded):
         assert all(items[stem] == item for stem, item in balloons)
         numbers = [int(item) for _stem, item in balloons]
         assert numbers == sorted(numbers)
-    # The inner view shows every instance of its families and nothing else,
-    # so no outer part covers them there.
-    assert drawing.INNER_INSTANCES == {
+    # The explode shows every instance of its families, the mounted knob
+    # wheel only of the removables, and nothing else.
+    assert drawing.TRANSGEAR_EXPLODED_INSTANCES == {
         f"{stem}-{index}"
-        for stem in inner_stems
+        for stem in exploded_stems - {"pd-transgear-removable"}
         for index in range(1, CONTRACT_TRANSGEAR_QUANTITIES[stem] + 1)
-    }
-    assert drawing.INNER_INSTANCES <= drawing.TRANSGEAR_INSTANCES
+    } | {explode.KNOB_WHEEL_INSTANCE}
+    assert drawing.TRANSGEAR_EXPLODED_INSTANCES <= drawing.TRANSGEAR_INSTANCES
+    # The pivot stack is SECTION A-A's; the latch hook stays on the bar.
+    for stem in (
+        "pd-transgear-pivot-spacer",
+        "pd-vn-transgear-pivot-screw",
+        "pd-latch-hook",
+    ):
+        assert stem not in exploded_stems
 
 
-# Native run 20261001T062924323Z (024e240b3) read sheet 2's outlines in x: the
-# isolated transgear at 2:3 centred at x 355 mm spans 295.3 to 404.8, the
-# inner *Right view at 2:3 placed at x 240 spans 201.0 to 258.3. Their y
-# extents are estimates from the builder's stations (the run reported no y).
-ISO_OUTLINE_AT_355 = (0.2953, 0.1438, 0.4048, 0.2319)
-INNER_OUTLINE_AT_2_3 = (0.2010, 0.1622, 0.2583, 0.2179)
-
-
-def _iso_outline(center_x: float) -> tuple[float, float, float, float]:
-    dx = center_x - 0.355
-    x0, y0, x1, y1 = ISO_OUTLINE_AT_355
-    return (x0 + dx, y0, x1 + dx, y1)
-
-
-def _scaled(
-    outline: tuple[float, float, float, float], scale: tuple[float, float]
-) -> tuple[float, float, float, float]:
-    """``outline`` (read at 2:3) at ``scale``, about its centre."""
-    k = (scale[0] / scale[1]) / (2.0 / 3.0)
-    x0, y0, x1, y1 = outline
-    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
-    return (cx - hw, cy - hh, cx + hw, cy + hh)
-
-
-def test_the_024e240b3_layout_is_refused_naming_each_overflow() -> None:
-    """The native failure: both views at 2:3, the isometric centred at 355."""
-    with pytest.raises(ValueError) as refused:
-        drawing.inner_view_shift(_iso_outline(0.355), INNER_OUTLINE_AT_2_3)
-    message = str(refused.value)
-    assert "isometric ring right 421.8 mm past 415.0 mm" in message
-    assert "inner view ring left 184.0 mm past 185.0 mm" in message
-    assert (
-        "inner view ring right 275.3 mm within 4 mm of the isometric ring (278.3 mm)"
-        in message
-    )
-    with pytest.raises(ValueError, match="no inner-view scale fits.*1:2.*1:3"):
-        drawing.inner_view_scale(_iso_outline(0.355), INNER_OUTLINE_AT_2_3, (2.0, 3.0))
-
-
-def test_both_model_rings_fit_inside_their_reserved_sheet_two_fields() -> None:
-    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
-    scale = drawing.inner_view_scale(iso, INNER_OUTLINE_AT_2_3, (2.0, 3.0))
-    assert scale == (1.0, 2.0)
-    inner = _scaled(INNER_OUTLINE_AT_2_3, scale)
-    dx, dy = drawing.inner_view_shift(iso, inner)
-    reach = drawing.BALLOON_RING_REACH
-    iso_left, iso_right = iso[0] - reach, iso[2] + reach
-    left, right = inner[0] + dx - reach, inner[2] + dx + reach
-    assert iso_right <= 0.415 - 0.002
-    assert left >= drawing.SHEET_TWO_RING_LIMITS[0] + 0.0015
-    assert right <= iso_left - drawing.SHEET_TWO_RING_GAP - 0.0015
-    # Level with the isometric.
-    assert (inner[1] + inner[3]) / 2.0 + dy == pytest.approx((iso[1] + iso[3]) / 2.0)
-    # Its caption stands under the ring, over the title block, left of the
-    # isometric's ring.
+def test_the_transgear_explode_fits_its_sheet_at_the_bom_configuration() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    caption_top = inner[1] + dy - reach - drawing.INNER_CAPTION_GAP
-    assert caption_top - NOTE_LINE_PITCH > template.title_block_top_m
-    assert left + len(drawing.INNER_CAPTIONS[scale]) * NOTE_CHAR_WIDTH < iso_left
+    left, bottom, right, top = drawing.TRANSGEAR_EXPLODED_RING_LIMITS
+    # Left of the title block, inside the border.
+    assert left > 0.0127 and bottom > drawing.SHEET_INNER_BORDER_BOTTOM
+    assert right < 0.218 and top < 0.270
+    ladder = drawing.TRANSGEAR_EXPLODED_SCALE_LADDER
+    assert [n / d for n, d in ladder] == sorted((n / d for n, d in ladder), reverse=True)
+    assert set(drawing.TRANSGEAR_EXPLODED_CAPTIONS) == set(ladder)
+    # The caption takes the field right of the ring, above the title block.
+    x, y = drawing.TRANSGEAR_EXPLODED_CAPTION_XY
+    assert x > right
+    for scale, caption in drawing.TRANSGEAR_EXPLODED_CAPTIONS.items():
+        lines = caption.splitlines()
+        assert lines[0].startswith(
+            f"TRANSGEAR EXPLODED, SEEN FROM ABOVE, {scale[0]:g}:{scale[1]:g}"
+        )
+        assert x + max(map(len, lines)) * NOTE_CHAR_WIDTH < 0.420
+        assert y - len(lines) * NOTE_LINE_PITCH > template.title_block_top_m
+    assert drawing.TRANSGEAR_EXPLODED_ORIENTATION == "*Top"
 
 
-def test_an_inner_view_wider_than_measured_steps_down_to_1_3() -> None:
-    """Ten per cent wider at 2:3 overflows at 1:2; 1:3 then fits."""
-    x0, y0, x1, y1 = INNER_OUTLINE_AT_2_3
-    wider = (x0 - (x1 - x0) * 0.05, y0, x1 + (x1 - x0) * 0.05, y1)
-    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
-    with pytest.raises(ValueError, match="inner view ring"):
-        drawing.inner_view_shift(iso, _scaled(wider, (1.0, 2.0)))
-    assert drawing.inner_view_scale(iso, wider, (2.0, 3.0)) == (1.0, 3.0)
-
-
-# The v40 sheet 2 (the same layout code as 594749aec) printed the views'
-# outlines, read from the PDF's view images: the transgear isometric at 2:3
-# and the inner view at 1:3. The farm run of 9055bc155 refused the one-piece
-# hook's isometric. That isometric's left edge and top come from its message
-# (rings at 261.5 and 265.8). Its right edge and bottom are v40's, because
-# the hook only grows the view up and left. The run's inner view at 1:2 was
-# 46.5 mm wide (ring 181.0 to 261.5). Its height is v40's 1:3 height
-# scaled, since the run reported no y.
+# The v40 sheet 2 (the same layout code as 594749aec) printed the transgear
+# isometric's outline at 2:3, read from the PDF's view image. The farm run of
+# 9055bc155 refused the one-piece hook's isometric. That isometric's left
+# edge and top come from its message (rings at 261.5 and 265.8). Its right
+# edge and bottom are v40's, because the hook only grows the view up and left.
 ISO_OUTLINE_V40 = (0.2853, 0.1112, 0.3966, 0.2448)
-INNER_OUTLINE_V40_AT_1_3 = (0.2073, 0.1612, 0.2418, 0.1948)
 ISO_OUTLINE_ONE_PIECE_HOOK = (0.2785, 0.1112, 0.3966, 0.2488)
-INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2 = (0.2000, 0.1528, 0.2465, 0.2032)
-# v40's printed 1:3 inner view, as placed at 1:2 (1.5 times about its centre).
-INNER_OUTLINE_V40_AT_1_2 = (
-    0.224550 - 0.0258750,
-    0.178000 - 0.0252000,
-    0.224550 + 0.0258750,
-    0.178000 + 0.0252000,
-)
 
 
 def _moved(
@@ -789,38 +668,14 @@ def _moved(
     return (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy)
 
 
-def test_the_one_piece_hook_isometric_as_placed_is_refused_as_on_the_farm() -> None:
-    """The farm refusal of 9055bc155, word for word: placed at
-    TRANSGEAR_VIEW_CENTER, the grown isometric's ring tops the field at
-    every inner-view scale."""
-    with pytest.raises(ValueError) as refused:
-        drawing.inner_view_scale(
-            ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2, (1.0, 2.0)
-        )
-    assert str(refused.value) == (
-        "no inner-view scale fits sheet 2 (1:2: sheet 2 balloon rings do not fit: "
-        "isometric ring top 265.8 mm past 262.0 mm; inner view ring left 181.0 mm "
-        "past 185.0 mm; inner view ring right 261.5 mm within 4 mm of the "
-        "isometric ring (261.5 mm) | 1:3: sheet 2 balloon rings do not fit: "
-        "isometric ring top 265.8 mm past 262.0 mm)"
-    )
-
-
 @pytest.mark.parametrize(
-    ("iso_outline", "inner_at_placed"),
-    [
-        (ISO_OUTLINE_ONE_PIECE_HOOK, INNER_OUTLINE_ONE_PIECE_HOOK_AT_1_2),
-        (ISO_OUTLINE_V40, INNER_OUTLINE_V40_AT_1_2),
-    ],
-    ids=["one-piece-hook", "v40"],
+    "iso_outline", [ISO_OUTLINE_ONE_PIECE_HOOK, ISO_OUTLINE_V40], ids=["one-piece-hook", "v40"]
 )
-def test_the_centred_isometric_leaves_the_inner_view_room_at_1_3(
+def test_the_centred_isometric_ring_fits_sheet_two_field(
     iso_outline: tuple[float, float, float, float],
-    inner_at_placed: tuple[float, float, float, float],
 ) -> None:
     """Centred vertically and unmoved along x, the isometric's ring fits the
-    field. The inner view then steps down to 1:3, and the outline of 1:3 as
-    printed (with its padding) fits beside it."""
+    field, right of the pivot section's."""
     shift = drawing.transgear_view_shift(iso_outline)
     assert shift[0] == 0.0
     iso = _moved(iso_outline, shift)
@@ -828,11 +683,13 @@ def test_the_centred_isometric_leaves_the_inner_view_room_at_1_3(
     left, bottom, right, top = drawing.SHEET_TWO_RING_LIMITS
     assert (iso[1] - reach - bottom) == pytest.approx(top - (iso[3] + reach))
     assert iso[1] - reach >= bottom and iso[3] + reach <= top
-    assert drawing.inner_view_scale(iso, inner_at_placed, (1.0, 2.0)) == (1.0, 3.0)
-    dx, dy = drawing.inner_view_shift(iso, INNER_OUTLINE_V40_AT_1_3)
-    inner = _moved(INNER_OUTLINE_V40_AT_1_3, (dx, dy))
-    assert inner[0] - reach >= left
-    assert inner[2] + reach <= iso[0] - reach - drawing.SHEET_TWO_RING_GAP
+    assert left <= iso[0] - reach and iso[2] + reach <= right
+
+
+def test_an_isometric_ring_leaving_the_field_sideways_is_refused() -> None:
+    x0, y0, x1, y1 = ISO_OUTLINE_V40
+    with pytest.raises(ValueError, match=r"sheet 2 isometric ring x .* leaves 185\.0 to 415\.0 mm"):
+        drawing.transgear_view_shift((x0 + 0.020, y0, x1 + 0.020, y1))
 
 
 def test_the_one_piece_hook_isometric_moves_down_4_0_mm() -> None:
@@ -942,7 +799,7 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
 
 def test_the_pivot_section_and_its_locator_keep_to_sheet_two_left_field() -> None:
     ring_left, _bottom, _right, ring_top = drawing.SHEET_TWO_RING_LIMITS
-    field_right = ring_left - drawing.SHEET_TWO_RING_GAP
+    field_right = ring_left
     # The section's balloon ring stays in the field.
     sx, sy = drawing.PIVOT_SECTION_CENTER
     reach = drawing.PIVOT_SECTION_RADIUS + drawing.BALLOON_RING_REACH
@@ -1064,7 +921,7 @@ def test_the_pivot_stake_note_points_at_the_front_mouth_clear_of_the_balloons() 
     # stands r right of the circle's centre.
     tip_x = sx + r * scale
     column_x = sx + radius + drawing.PIVOT_BALLOON_GAP
-    field_right = drawing.SHEET_TWO_RING_LIMITS[0] - drawing.SHEET_TWO_RING_GAP
+    field_right = drawing.SHEET_TWO_RING_LIMITS[0]
     caption_y = drawing.PIVOT_SECTION_CAPTION_XY[1]
     right_tips = [
         tip_y
@@ -1466,15 +1323,38 @@ def _numbered_items() -> dict[str, str]:
     }
 
 
+@pytest.mark.parametrize(
+    ("stem", "station", "role"),
+    (
+        ("sh-vn-chain-link--InnerLink", drawing.CHAIN_INNER_BALLOON_STATION, "InnerLink"),
+        ("sh-vn-chain-link--OuterLink", drawing.CHAIN_OUTER_BALLOON_STATION, "OuterLink"),
+    ),
+)
+def test_each_chain_link_balloon_lands_on_a_free_run_clear_of_both_wheels(
+    stem, station, role
+) -> None:
+    """#1531: links in the knob wheel's wrap sat under the bar's and wheel's
+    edges; the ballooned links stand on the runs between the wheels."""
+    anchor = drawing.ASSEMBLED_BALLOON_ANCHORS[stem].instance
+    assert anchor == f"@{role}:{station // 2 + 1}"
+    assert station % 2 == (0 if role == "InnerLink" else 1)
+    assert 0 < station < chain.LINK_COUNT - 1  # Not the connecting link.
+    crank = (-chain.CRANK_CENTRE[0], chain.CRANK_CENTRE[1])
+    for pin in (station, station + 1):
+        x, y, _z = assembly._chain_station_point(pin)
+        assert math.dist((x, y), assembly.KNOB_SHAFT_XY) - chain.KNOB_TIP_R > 20.0
+        assert math.dist((x, y), crank) - chain.CRANK_TIP_R > 20.0
+
+
 def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     """Codex B1 (19e33c6c2): items 1-12 and the chain had no balloon."""
     items = _numbered_items()
-    iso, inner = drawing.transgear_balloon_items(items)
+    iso, exploded = drawing.transgear_balloon_items(items)
     plans = (
         drawing.assembled_balloon_items(items),
         drawing.platen_balloon_items(items),
         iso,
-        inner,
+        exploded,
     )
     ballooned = [stem for plan in plans for stem, _item in plan]
     assert set(ballooned) == set(drawing.BOM_PART_NUMBERS)
@@ -1482,10 +1362,18 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
         assert [int(item) for _stem, item in plan] == sorted(
             int(item) for _stem, item in plan
         )
-    # Only the removable is ballooned twice: on the mounted knob wheel (sheet 2) and
-    # on the spare T18 on the deck (sheet 1), which the caption names.
+    # The removable is ballooned on the mounted knob wheel (sheets 2 and 3)
+    # and on the spare T18 on the deck (sheet 1), which the caption names.
+    # The transgear families the isometric reaches are ballooned again on
+    # sheet 3's explode, which shows them drawn apart.
     repeated = {stem for stem in ballooned if ballooned.count(stem) > 1}
-    assert repeated == {"pd-transgear-removable"}
+    assert repeated == (
+        set(CONTRACT_TRANSGEAR_QUANTITIES) - drawing.ISO_HIDDEN_STEMS
+    ) & explode.TRANSGEAR_SHOWN_STEMS
+    assert ballooned.count("pd-transgear-removable") == 3
+    assert all(
+        ballooned.count(stem) <= 2 for stem in ballooned if stem != "pd-transgear-removable"
+    )
     spare = drawing.ASSEMBLED_BALLOON_ANCHORS["pd-transgear-removable"].instance
     assert spare == drawing.SPARE_INSTANCE == "pd-transgear-removable-3"
     # Edge-on in the front and right views the spare is a bare bar: hidden
@@ -1512,17 +1400,24 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     }
     assert set(drawing.PLATEN_BALLOON_ANCHORS) == platen_group
     assert explode.SHOWN_STEMS == platen_group
-    assert drawing.SHEET_NAMES[2] == "PLATEN AND SUPPORT"
+    assert drawing.SHEET_NAMES[3] == "PLATEN AND SUPPORT"
+    assert drawing.SHEET_NAMES[2] == "TRANSGEAR EXPLODED"
+    assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
 
 
-def _platen_instances() -> list[explode.Instance]:
+def _explode_instances() -> list[explode.Instance]:
     instances = [explode.Instance(f"{stem}-1", stem) for stem in explode.SHOWN_STEMS]
     instances.append(explode.Instance("pd-rack-pinion-1", "pd-rack-pinion"))
+    for stem, count in CONTRACT_TRANSGEAR_QUANTITIES.items():
+        if stem != "pd-rack-pinion":
+            instances += [
+                explode.Instance(f"{stem}-{index}", stem) for index in range(1, count + 1)
+            ]
     return instances
 
 
 def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
-    plan = explode.plan_explode(_platen_instances())
+    plan = explode.plan_explode(_explode_instances())[: len(explode.PLATEN_STEPS)]
     moved = {name for _step, names in plan for name in names}
     assert "pd-rack-pinion-1" not in moved
     assert "pd-platen-1" not in moved
@@ -1535,9 +1430,39 @@ def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
         assert not {"sh-vn-brass-fillister-screw-1", "pd-vn-platen-clip-screw-1"} <= set(names)
 
 
+def test_the_transgear_explode_moves_the_knob_wheel_but_not_the_crank_wheel() -> None:
+    plan = explode.plan_explode(_explode_instances())
+    assert [step for step, _names in plan] == list(explode.EXPLODE_STEPS)
+    transgear = plan[len(explode.PLATEN_STEPS) :]
+    moved = {name for _step, names in transgear for name in names}
+    removables = {name for name in moved if name.startswith("pd-transgear-removable-")}
+    assert removables == {explode.KNOB_WHEEL_INSTANCE}
+    stems = {name.rsplit("-", 1)[0] for name in moved}
+    assert stems == explode.TRANSGEAR_SHOWN_STEMS - explode.TRANSGEAR_STATIONARY_STEMS
+    # Nothing outside the transgear moves on these steps; the arm stays put.
+    assert stems <= set(CONTRACT_TRANSGEAR_QUANTITIES)
+    assert "pd-transgear-arm-1" not in moved
+    # Every part moves along one machine axis, so it stays on its own axis
+    # seen from above; the cup pin alone leaves along X, out of its cross hole.
+    for step, _names in transgear:
+        assert step.axis == ("x" if step.stems == ("pd-vn-transgear-knob-cup-pin",) else "z")
+
+
 def test_the_explode_refuses_a_model_missing_a_shown_family() -> None:
-    instances = [i for i in _platen_instances() if i.stem != "pd-vn-platen-clip-screw"]
+    instances = [i for i in _explode_instances() if i.stem != "pd-vn-platen-clip-screw"]
     with pytest.raises(ValueError, match="pd-vn-platen-clip-screw"):
+        explode.plan_explode(instances)
+    instances = [i for i in _explode_instances() if i.stem != "pd-transgear-thumbnut"]
+    with pytest.raises(ValueError, match="pd-transgear-thumbnut"):
+        explode.plan_explode(instances)
+
+
+def test_the_explode_refuses_a_model_missing_the_knob_wheel() -> None:
+    instances = [
+        i for i in _explode_instances() if i.name != explode.KNOB_WHEEL_INSTANCE
+    ]
+    instances.append(explode.Instance("pd-transgear-removable-9", "pd-transgear-removable"))
+    with pytest.raises(ValueError, match="explode instances absent.*removable-1"):
         explode.plan_explode(instances)
 
 
@@ -1762,9 +1687,16 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
         assert method not in mesh
     assert "ALIGN A FEED TOOTH CENTRE DIRECTLY BELOW A RACK SPACE CENTRE" in mesh
     assert f"SET {steps.RACK_DATUM_BACKLASH_TEXT} PLATEN SHAKE AT THAT DATUM" in mesh
-    assert "(DIAL ALONG THE RACK)" in mesh
-    assert domain.operating_window_text in mesh
-    assert drawing.OPERATING_DIRECTION_TEXT in mesh
+    assert "(DIAL ALONG THE RACK): THIS SHAKE SETS THE FEED MESH DEPTH." in mesh
+    # The window names its end by the crank, not by a machine axis no sheet
+    # draws, and the title block already gives the unit.
+    assert drawing.engaged_feed_text(domain) in mesh
+    assert "CRANK-SIDE CUT END TO THE FEED STUD AXIS" in mesh
+    assert "PLATEN FEED AWAY FROM THE CRANK SHORTENS IT" in mesh
+    for axis_word in ("-X", "+X", "MACHINE X", " MM"):
+        assert axis_word not in mesh
+    low, high = domain.axis_from_left_end_limits_mm
+    assert f"ENGAGED FEED: {low:.2f} TO {high:.2f} FROM" in mesh
     assert "RUN THAT WINDOW: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
     assert "STOP BEFORE EITHER END LIMIT" in mesh
     assert "RESET ONLY WITH FEED DISENGAGED" in mesh
@@ -1966,7 +1898,7 @@ def test_a_direct_datum_reader_cannot_widen_the_printed_setup_band() -> None:
 def test_note_formatting_is_explicit_about_its_supplied_window() -> None:
     domain = _unit_operating_domain()
     notes = drawing.format_step_notes(operating_domain=domain)
-    assert domain.operating_window_text in notes.fitup_steps.replace("\n   ", " ")
+    assert drawing.engaged_feed_text(domain) in notes.fitup_steps.replace("\n   ", " ")
     assert (notes.platen_steps, notes.fitup_notes, notes.chain_notes) == drawing._step_columns(
         operating_domain=domain
     )
@@ -3888,20 +3820,17 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
     for name in (
         "_activate_sheet", "set_high_quality_shaded_with_edges",
         "apply_view_configuration", "_place_sheet_note", "_link_view_to_bom",
-        "_isolate_instances", "_shift_view", "_uncross_ring", "_spread_balloons",
+        "_isolate_instances", "_shift_view", "_uncross_ring",
     ):
         monkeypatch.setattr(drawing, name, lambda *_, **__: None)
     # Model the observed post-operation views, without attributing the native
     # configuration change to any particular link/isolation/scale operation.
     native_views = iter((
         scene.view, SimpleNamespace(ReferencedConfiguration="Default"),
-        SimpleNamespace(ReferencedConfiguration="Default"),
     ))
     monkeypatch.setattr(drawing, "place_view", lambda *_, **__: next(native_views))
     monkeypatch.setattr(drawing, "_view_outline", lambda _: drawing.BOM_REFERENCE_LIMITS)
     monkeypatch.setattr(drawing, "transgear_view_shift", lambda _: (0.0, 0.0))
-    monkeypatch.setattr(drawing, "inner_view_shift", lambda *_: (0.0, 0.0))
-    monkeypatch.setattr(drawing, "inner_view_scale", lambda *_: drawing.INNER_SCALE_LADDER[0])
     monkeypatch.setattr(drawing, "_split_bom", lambda *_, **__: ())
     def balloons(_adapter, view, *, items, **_options):
         landings = []
@@ -3914,9 +3843,6 @@ def test_place_bom_sheet_preserves_native_grouped_quantities_with_visible_number
         return landings
 
     monkeypatch.setattr(drawing, "add_component_bom_balloons", balloons)
-    monkeypatch.setattr(drawing, "_balloon_collar_on_its_rear_rim", lambda adapter, view, *, item, label: (
-        balloons(adapter, view, items=((drawing.COLLAR_STEM, item),))[0]
-    ))
 
     _landings, table, items, _pieces, snapshot = drawing._place_bom_sheet(
         scene.adapter, drawing._source_family_counts(scene.model)
@@ -4725,6 +4651,7 @@ def test_pd_build_settled_checks_reject_native_item_drift_with_good_attachments(
         landings, pieces[0], items, pieces, snapshot,
     ))
     monkeypatch.setattr(drawing, "_balloon_assembled_sheet", lambda *_: [])
+    monkeypatch.setattr(drawing, "_place_transgear_exploded_sheet", lambda *_: [])
     monkeypatch.setattr(drawing, "_place_exploded_sheet", lambda *_: [])
 
     async def finalize(actual_adapter, _outputs, *, settled_checks, **_options):
