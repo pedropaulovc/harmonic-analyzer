@@ -146,11 +146,12 @@ TOP_KEEP: dict[str, tuple[float, float, float]] = {
     # B9e4's complete native/PDF glyph block reaches y 164.57, not merely
     # the shoulder at 111.10: the 45.00 text/arrow and its y 152.5 witness
     # strike the size/limits and first REAM row. Lower the WHOLE block 16
-    # sheet mm, retaining the previous 3.5 mm left move. Its conditional
-    # upper ink is now y 148.57 and its shoulder x 17.13..89.46, y 95.10.
+    # sheet mm, retaining the previous 3.5 mm left move. The block centres
+    # on x 52.5: run 20261024T085427509Z printed its single 91 mm mate row
+    # x 7..98, past the border (12.7) and across the plate end's extension
+    # line (x 92); the mate now wraps to two rows, 63 mm wide (x ~21..84).
     # The diameter approach may cross genuine witness extensions (rule 14),
     # but never a dimension line, another text row or the shoulder's text.
-    # The next native export must confirm the regenerated route and glyphs.
     "PinHoleDia": _xy(-339.0, -106.3),
     # The spots: each its own diameter callout; HUB by Y right, CL by X
     # below and Y left.
@@ -218,19 +219,20 @@ _SECTION_ANCHOR_MM = (_A1[0], -part_spec.THICKNESS / 2.0, 0.0)
 # Carrier r13 (4:1) squeezed the slab between the 260.0/520.0 lanes and the
 # border, its caption cut off from it by the 520.0's extension line and the
 # chamfer text against the border. At 3:1 the band under the bottom lanes
-# (75) holds, left to right on one row: the caption (x ~20..66), the
-# thickness text (lane x 79), the slab (91..145 x 27..63) and the chamfer
-# text (~150..209, left of the title block at x 216).
-SECTION_CENTER = (0.118, 0.045)
+# (75) holds, left to right: the caption (x ~20..66), the thickness text
+# (lane x 79) and the slab (91..145 x 34..70), the chamfer text under it.
+SECTION_CENTER = (0.118, 0.052)
 _STOCK_TEXT_DX = 13.0  # A1's axis to the thickness lane, model mm (-X side)
 SECTION_KEEP_MODEL_MM: dict[str, tuple[float, float, float]] = {
     "StockThick": (_A1[0] - _STOCK_TEXT_DX, -part_spec.THICKNESS / 2.0, 0.0),
-    # 20.5 mm beside A1's axis on the +X side (61.5 on the sheet), clear of
-    # the slab: the text block ~150..209 x 24..46, its dimension line (the
-    # last row's lane) 3 mm under the underside, running back under the slab
-    # to the -X chamfer.
-    "PinChamferSize": (_A1[0] + 20.5, -part_spec.THICKNESS + 2.7, 0.0),
+    # The chamfer leg's dimension line: 1 mm under the -X chamfer.
+    "PinChamferSize": (_A1[0] - part_spec.PIN_HOLE_DIA / 2.0, -part_spec.THICKNESS - 1.0, 0.0),
 }
+# Machinist review (3 runs FIX): with its text beside the slab, the chamfer's
+# dimension line ran back along the underside as the text's shelf. The text
+# now hangs under the slab, A1's +X side (sheet ~121..178 x 15..29), on a
+# short angled OffsetText leader from that line (the text centres on it).
+SECTION_CHAMFER_TEXT_MODEL_MM = (_A1[0] + 10.5, -part_spec.THICKNESS - 4.0, 0.0)
 # The thickness's extension lines from its lane (4 model mm, 12 sheet mm,
 # outside the slab's -X end) stop 1.5 sheet mm short of the slab: sheet m.
 STOCK_WITNESS_MAX_M = (
@@ -346,7 +348,7 @@ for _key, (_x, _y) in part_spec.PIN_HOLES.items():
             "thru": (True, ("PIN_HOLE_CALLOUT",)),
             "note": (
                 " ".join(part_spec.CALLOUTS_BELOW["PinHoleDia"].splitlines()),
-                ("CALLOUTS_BELOW", "PIN_HOLE_CALLOUT", "PIN_MATE"),
+                ("CALLOUTS_BELOW", "PIN_HOLE_CALLOUT", "PIN_NUMBER"),
             ),
             **_chain,
         },
@@ -904,6 +906,11 @@ def _pin_section(adapter: Any, source_model: Any, top: Any) -> tuple[list[Any], 
         _crop_section(adapter, section)
         _centre_section(adapter, section)
         annotations = _reposition_section_dimensions(adapter, section, annotations)
+        chamfer_text = model_point_in_view(
+            adapter, section, _metres(SECTION_CHAMFER_TEXT_MODEL_MM),
+            label="section A-A chamfer text",
+        )
+        offset_dimension_text(adapter, annotations, {"PinChamferSize": chamfer_text})
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="carrier section A-A"
     )

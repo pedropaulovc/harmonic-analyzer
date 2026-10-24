@@ -145,10 +145,12 @@ HUB_BOND_CLEARANCE_MIN = HUB_HOLE_LIMITS[0] - HUB_PIN_LIMITS[1]
 HUB_BOND_CLEARANCE_MAX = HUB_HOLE_LIMITS[1] - HUB_PIN_LIMITS[0]
 if HUB_BOND_CLEARANCE_MIN < 0.0:
     raise AssertionError("bonded gauge pin interferes with the unchanged carrier H7 bore")
-PIN_MATE = f"{PIN_NUMBER} SHOULDER SCREW"
+# The mate's number and name print on rows of their own: on one row they
+# made the block 91 mm wide, past the inner border and across the plate
+# end's extension line.
 PIN_HOLE_CALLOUT = (
     f"4X REAM THRU ({PIN_CLEARANCE_MIN:.3f}-{PIN_CLEARANCE_MAX:.3f}\n"
-    f"DIAMETRAL CLEARANCE ON\n{PIN_MATE})"
+    f"DIAMETRAL CLEARANCE ON\n{PIN_NUMBER}\nSHOULDER SCREW)"
 )
 # Rule 4: each pin band names what it sets and on which part (jig-r3 review);
 # the error sensitivities stay in the docstring.

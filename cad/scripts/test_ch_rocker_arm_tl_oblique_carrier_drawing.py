@@ -533,17 +533,18 @@ def test_section_is_never_reversed_and_fits_either_way() -> None:
         tx, ty = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["StockThick"], sign)
         assert not (slab[0] - 6.0 < tx < slab[2] + 6.0), sign
         assert _BORDER[0] + 10.0 < tx < _TITLE_BLOCK[0] - 10.0, sign
-        # Carrier r11: the chamfer text under the slab was struck by its own
-        # extension lines. It stands beside the slab, opposite the stock
-        # text, its dimension line (its last row, 2.78 mm per row under the
-        # anchor) below the underside.
-        cx, cy = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["PinChamferSize"], sign)
+        # Machinist review (3 runs FIX): beside the slab, the chamfer text's
+        # dimension line ran back along the underside as its shelf. The line
+        # stands under the -X chamfer; the text hangs under the slab, above
+        # the border, on a short OffsetText leader from it.
+        lx, ly = _section_sheet(drawing.SECTION_KEEP_MODEL_MM["PinChamferSize"], sign)
+        assert slab[0] < lx < slab[2] and slab[1] - 4.0 < ly < slab[1] - 2.0, sign
+        cx, cy = _section_sheet(drawing.SECTION_CHAMFER_TEXT_MODEL_MM, sign)
         rows = spec.CALLOUTS_BELOW["PinChamferSize"].splitlines()
         half = 2.36 * max(len(row) for row in rows) / 2.0
-        assert cx + half + 2.0 < slab[0] or cx - half - 2.0 > slab[2], sign
-        assert (cx < slab[0]) != (tx < slab[0]), sign
-        lane = cy - (1 + len(rows)) * 2.778
-        assert lane < slab[1] and lane - 2.5 > _BORDER[1], sign
+        half_height = 5.0 * (1 + len(rows)) / 2.0  # value row + callout rows
+        assert cy + half_height < ly and cy - half_height > _BORDER[1], sign
+        assert 0.0 < (cx - lx) * sign - half < 25.0, sign
         assert _BORDER[0] < cx - half and cx + half < _TITLE_BLOCK[0]
     # Carrier r13: the caption printed above the 520.0's lane, cut off from
     # the slab by its extension line. It (top-centre anchor, ~46 x 15 mm)
