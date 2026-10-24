@@ -483,19 +483,21 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "92871A359",
         material="AISI 304",
     ),
+    # DIN 988 spring-steel shims: the library's plain carbon steel (default),
+    # as pd-vn-transgear-pivot-shim.
     "ch-rocker-arm-tl-vn-oblique-pivot-shim": _stock(
         "ch-rocker-arm-tl-vn-oblique-pivot-shim",
         "DIN 988 Spring Steel Shim, 10 mm ID x 16 mm OD x 0.2 mm",
         "98055A118",
         "98055A117",
         "98055A121",
-        material="Spring Steel",
     ),
+    # Hardened tool-steel gauge pin: the library's Alloy Steel stand-in.
     "ch-rocker-arm-tl-vn-oblique-hub-pin": _stock(
         "ch-rocker-arm-tl-vn-oblique-hub-pin",
         "Class Z Minus Gauge Pin, size 10.2000 mm, 2 in supply, cut to 20.0 mm",
         "2281A11-6410N695",
-        material="Tool Steel",
+        material="Alloy Steel",
     ),
 }
 

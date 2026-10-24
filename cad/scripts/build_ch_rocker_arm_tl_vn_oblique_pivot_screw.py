@@ -42,10 +42,12 @@ async def _ring(adapter, name, od, bore, length, *, offset=0.0, reverse=False):
 
     plane = "Front"
     if offset:
-        plane = check(name + " plane", await adapter.create_plane(
+        check(name + " plane", await adapter.create_plane(
             CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=offset)
         ))
-        plane = getattr(plane, "name", plane)
+        plane = "HeadPlane"
+        name_last_feature(adapter, "HeadPlane")
+        blank_reference_geometry(adapter, (("HeadPlane", "PLANE"),))
     check(name + " sketch", await adapter.create_sketch(plane))
     await define_circle(adapter, 0.0, 0.0, od / 2.0, name + " OD")
     if bore:

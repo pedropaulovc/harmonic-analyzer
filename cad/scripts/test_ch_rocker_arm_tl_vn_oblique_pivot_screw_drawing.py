@@ -30,6 +30,8 @@ def test_native_section_frame_and_direction(monkeypatch, offset, reverse):
     monkeypatch.setattr(part, "ensure_fully_defined", AsyncMock())
     monkeypatch.setattr(part, "check", lambda label, value: value)
     monkeypatch.setattr(part, "name_last_feature", lambda *args: None)
+    blanked = []
+    monkeypatch.setattr(part, "blank_reference_geometry", lambda _adapter, refs: blanked.extend(refs))
     adapter = SimpleNamespace(
         create_plane=AsyncMock(return_value=SimpleNamespace(name="HeadPlane")),
         create_sketch=AsyncMock(), exit_sketch=AsyncMock(), create_extrusion=AsyncMock(),
@@ -44,6 +46,7 @@ def test_native_section_frame_and_direction(monkeypatch, offset, reverse):
         plane = adapter.create_plane.call_args.args[0]
         assert plane.base_plane == "Front Plane"
         assert plane.offset == offset
+        assert blanked == [("HeadPlane", "PLANE")]
     else:
         adapter.create_plane.assert_not_awaited()
 
