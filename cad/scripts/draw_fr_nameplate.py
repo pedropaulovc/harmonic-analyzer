@@ -78,6 +78,7 @@ from fr_nameplate_drawing_spec import (
     FLOOR_UNDER_ENGRAVING,
     FLOOR_UNDER_ENGRAVING_CALLOUT,
     HOLE_CALLOUT_PROCESS,
+    HOLE_LIGAMENT_NOTE,
     MINIMUM_NOTES,
     SCREW_HOLE_DIA,
     SECTION_CALLOUTS,
@@ -201,6 +202,21 @@ def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
             )
         )
     return max(rims, key=lambda item: item.circle[2]).edge
+
+
+@_telemetry.traced("drawing.nameplate.hole_ligament_statement")
+def _state_hole_ligament(display: Any) -> None:
+    """State the holes' wall to the corner radius UNDER their native callout.
+
+    Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
+    #1971): a rule-20 fact under the callout it qualifies, the dt-crankshaft
+    rim's pattern. ``SetText`` reports nothing, so it is read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetText(4, HOLE_LIGAMENT_NOTE)  # swDimensionTextCalloutBelow
+    applied = str(display.GetText(4) or "").replace("\r", "")
+    if applied != HOLE_LIGAMENT_NOTE:
+        raise RuntimeError(f"hole ligament statement did not persist: {applied!r}")
 
 
 # Section A-A: a cut across the whole plate at SECTION_Y (plate-local, the
@@ -678,7 +694,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    add_native_hole_callout(
+    holes = add_native_hole_callout(
         adapter,
         front,
         edge=_hole_rim_edge(scan_view_edges(front, label="front"), TOP_LEFT),
@@ -686,6 +702,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="nameplate screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
+    _state_hole_ligament(holes)
 
     # SectionReference lies in A-A's cutting plane, saved hidden: a derived
     # view takes it from the part as it stands when it is cut and selects it

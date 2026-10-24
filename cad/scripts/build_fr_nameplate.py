@@ -377,6 +377,7 @@ def _require_on_section_plane(adapter, sketch: str) -> None:
         raise RuntimeError(f"{sketch} is not on {SECTION_PLANE}: parents {parents}")
 
 
+@_telemetry.traced("part.nameplate.reference_point", label_param="label")
 def _add_reference_point(adapter, uv: tuple[float, float], label: str) -> str:
     """One sketch point straight into the sketch DB (no inference snap),
     registered for the adapter's dimension refs

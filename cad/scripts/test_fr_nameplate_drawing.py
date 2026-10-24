@@ -284,6 +284,49 @@ def test_section_plane_is_the_top_plane_carried_to_the_cut(
     )
 
 
+class _PointSketchManager:
+    def __init__(self, result: Any) -> None:
+        self.AddToDB = False
+        self.result = result
+        self.calls: list[tuple[tuple[float, float, float], bool]] = []
+
+    def CreatePoint(self, x: float, y: float, z: float) -> Any:  # noqa: N802
+        self.calls.append(((x, y, z), self.AddToDB))
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+@pytest.mark.parametrize("result", [object(), None, RuntimeError("COM")])
+def test_reference_point_goes_straight_to_the_db_and_restores_it(
+    monkeypatch: pytest.MonkeyPatch, result: Any
+) -> None:
+    # The real helper: CreatePoint with AddToDB on (no inference snap), in
+    # metres, registered for dimension refs, and AddToDB restored on every
+    # path, a failed or raising CreatePoint included.
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    manager = _PointSketchManager(result)
+    registered: list[tuple[str, Any]] = []
+
+    def register(kind: str, entity: Any) -> str:
+        registered.append((kind, entity))
+        return f"{kind}1"
+
+    adapter = SimpleNamespace(
+        currentSketchManager=manager, _register_sketch_entity=register
+    )
+    if result is None or isinstance(result, Exception):
+        with pytest.raises(RuntimeError):
+            part._add_reference_point(adapter, (2.6, 0.7), "face")
+        assert registered == []
+    else:
+        assert part._add_reference_point(adapter, (2.6, 0.7), "face") == "Point1"
+        assert registered == [("Point", result)]
+    ((point, add_to_db),) = manager.calls
+    assert point == pytest.approx((0.0026, 0.0007, 0.0)) and add_to_db
+    assert manager.AddToDB is False
+
+
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
     assert model_toleranced_dimensions(part) == {}
 
@@ -685,6 +728,7 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
+        "RV-04": "minor",
     }
     for entry in declared.values():
         assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
@@ -701,6 +745,17 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
     )
     for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
         assert note in declared["RV-01"].where
+    # Owner ruling 2026-10-24 (#1971): the holes' wall to the corner radius,
+    # 1.555 at the printed worst case, rounds down to 1.55 under the callout.
+    ligament = print_spec.HOLE_LIGAMENT_NOTE
+    assert ligament == "WALL TO CORNER RADIUS 1.55 MIN"
+    assert ligament in declared["RV-04"].where
+    assert float(ligament.split()[-2]) == pytest.approx(
+        math.floor(print_spec.HOLE_LIGAMENT_WORST * 100.0) / 100.0
+    )
+    assert print_spec.HOLE_LIGAMENT_WORST < 2.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "    _state_hole_ligament(holes)\n" in source
 
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:

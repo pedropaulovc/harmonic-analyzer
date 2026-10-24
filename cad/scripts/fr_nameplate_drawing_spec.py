@@ -297,6 +297,13 @@ SCREW_ENGAGEMENT_NOTE = (
 )
 MINIMUM_NOTES = "\n".join((FLOOR_MINIMUM_NOTE, SCREW_ENGAGEMENT_NOTE))
 
+# The screw holes' wall to the outline's corner radius at the printed worst
+# case (HOLE_LIGAMENT_WORST, 1.555), under rule 17's 2.0 target: stated under
+# the holes' own callout, the dt-crankshaft rim's pattern.
+# Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
+# #1971).
+HOLE_LIGAMENT_NOTE = f"WALL TO CORNER RADIUS {_stated_minimum(HOLE_LIGAMENT_WORST)} MIN"
+
 # The DXF rows: fr-nameplate machinist exception RV-01 (the outline, the sunk
 # field and the engraving are the release bundle's DXF artwork, not
 # dimensioned on the sheet).
