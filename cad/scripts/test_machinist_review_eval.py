@@ -702,6 +702,24 @@ def test_matching_fix_evidence_resumes_without_model_execution(
     assert summary["counts"]["baseline"] == {"pass": 0, "fail": 0, "unassessed": 1, "invalid": 0}
 
 
+def test_codex_short_attempt_startup_budget_survives_evidence_reconstruction(
+    tmp_path: Path, case, provider,
+) -> None:
+    identity = _identity(case)
+    identity["timeout_s"] = 12.5
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    (attempt,) = review.extra["evidence"]["attempts"]
+    setting = "mcp_servers.sheets.startup_timeout_sec=12.5"
+    assert setting in attempt["command"]
+    assert setting in attempt["retained_argv"]
+    assert review.blind and review.extra["inspection_proven"] is True
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert len(provider["calls"]) == 1
+
+
 @pytest.mark.parametrize("change", ["prompt", "image", "model", "sheets_server", "runtime"])
 def test_changed_identity_executes_fresh_model_without_overwriting_old_evidence(
     tmp_path: Path, case, provider, change: str, monkeypatch: pytest.MonkeyPatch,

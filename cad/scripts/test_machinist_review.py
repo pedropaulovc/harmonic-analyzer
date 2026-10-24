@@ -1113,7 +1113,7 @@ def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
 ) -> None:
     command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
-    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
@@ -1148,7 +1148,7 @@ def test_claude_startup_infrastructure_failure_retries_without_reviewing(
         claude_transport.command("slow", reply, pending_polls=2),
     ]
     monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
-    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 0.75)
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
     review = mr._review_session(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
         reviewer="claude", claude="fake", report_dir=tmp_path / "reports", retries=1,
@@ -1201,7 +1201,7 @@ def test_claude_startup_and_review_share_one_overall_timeout(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
 ) -> None:
     command = claude_transport.command("review_timeout", "", delay_s=1.0)
-    monkeypatch.setattr(mr, "CLAUDE_MCP_STARTUP_TIMEOUT_S", 10.0)
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 10.0)
     started = mr.time.monotonic()
     with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
         mr._run_reviewer(
@@ -1286,6 +1286,20 @@ def test_codex_command_keeps_cwd_and_attempt_files_independent(
     ):
         with pytest.raises(ValueError):
             build(**misplaced)
+
+
+@pytest.mark.parametrize(("timeout_s", "startup_s"), [(None, 90.0), (300.0, 90.0), (12.5, 12.5)])
+def test_codex_command_caps_mcp_startup_by_shared_and_attempt_budgets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    timeout_s: float | None, startup_s: float,
+) -> None:
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 90.0)
+    command = mr.build_codex_command(
+        workdir=tmp_path, sources=[tmp_path / "sheet.png"],
+        schema=tmp_path / "schema.json", output=tmp_path / "verdict.json",
+        model="gpt-6-astra", effort="low", timeout_s=timeout_s,
+    )
+    assert _codex_overrides(command)["mcp_servers.sheets.startup_timeout_sec"] == startup_s
 
 
 def test_codex_home_is_isolated_outside_repository_and_reports() -> None:
@@ -4196,6 +4210,36 @@ def _session_reply(
     return mr.subprocess.CompletedProcess(
         command, 0, stdout=_claude_stdout(sheets, value), stderr=""
     )
+
+
+@pytest.mark.parametrize(("timeout_s", "startup_s"), [(300.0, 90.0), (12.5, 12.5)])
+def test_codex_review_and_judge_propagate_attempt_startup_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    timeout_s: float, startup_s: float,
+) -> None:
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 90.0)
+    invocations: list[bool] = []
+
+    def reply(command: list[str], **kwargs: Any):
+        assert kwargs["timeout"] == timeout_s
+        assert _codex_overrides(command)["mcp_servers.sheets.startup_timeout_sec"] == startup_s
+        findings = _judge_inputs(kwargs["input"])
+        invocations.append(findings is not None)
+        value = (
+            {"clusters": [_judge_cluster([item["id"] for item in findings])]}
+            if findings is not None else _finding_verdict()
+        )
+        return _session_reply(command, kwargs, value)
+
+    monkeypatch.setattr(mr, "_run_reviewer", reply)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="codex", judge_reviewer="codex", runs=1, retries=0,
+        timeout_s=timeout_s, report_dir=tmp_path / "reports", force=True,
+        codex="codex-test",
+    )
+    assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
+    assert invocations == [False, True]
 
 
 @pytest.mark.parametrize("reviewer", mr.REVIEWERS)
