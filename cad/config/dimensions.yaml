@@ -549,7 +549,7 @@ sections:
       cylinder_bank_layout calls the pure owning-spec guard with its actual
       datum budget. Native assembly checks remain required, including an
       engaged-pinion sweep; a parked-pose interference result alone cannot
-      certify that sweep. MHA-DT-00 sheet 13 carries native associative closed
+      certify that sweep. MHA-DT-00 sheet 15 carries native associative closed
       stack and north spring-gap settings; assembly steps 8 and 9C use them.
 
       Current build (`build_dt_cylinder_gear.py`): single non-configured custom
