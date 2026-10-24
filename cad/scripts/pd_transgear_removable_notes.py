@@ -86,7 +86,7 @@ DRAWING_NOTES = "\n".join(
             f"{spec.BLANK_SKUS[name]} ({name})" for name, _teeth in spec.CONFIGS
         )
         + ".",
-        "TEETH, O.D. AND PLATE FACES AS SUPPLIED; TURN HUB OFF FLUSH.",
+        "TEETH, O.D. AND PLATE FACES AS SUPPLIED; HUB REMOVED FLUSH.",
         "BORE, DRIVE-PIN HOLES AND PLATE SAME ON "
         + " / ".join(name for name, _teeth in spec.CONFIGS)
         + ".",

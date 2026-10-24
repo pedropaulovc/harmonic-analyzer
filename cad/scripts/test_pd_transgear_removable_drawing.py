@@ -307,7 +307,7 @@ def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None
         assert f"{sku} ({configuration})" in notes.DRAWING_NOTES
     assert "1 EACH" in notes.DRAWING_NOTES
     assert "TEETH, O.D. AND PLATE FACES AS SUPPLIED" in notes.DRAWING_NOTES
-    assert "TURN HUB OFF FLUSH" in notes.DRAWING_NOTES
+    assert "HUB REMOVED FLUSH" in notes.DRAWING_NOTES
 
 
 def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:

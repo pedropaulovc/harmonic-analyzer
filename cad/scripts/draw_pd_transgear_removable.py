@@ -50,6 +50,7 @@ from _drawing_dimensions import (
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -62,6 +63,9 @@ from pd_transgear_removable_spec import (
     TEETH,
     outside_dia,
 )
+
+# TEMPORARY evidence leaf only; removed before merge (PD-09 held for #1679).
+MACHINIST_REVIEW = MachinistReviewMode.LEARN
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_removable"]
 PART_STEM = SPEC.artifact_stem
@@ -91,11 +95,15 @@ MANUFACTURING_NOTES_XY = (0.018, 0.060)
 # stack into one vertical chain right of the teeth.  Each one's text sits
 # beyond its own hole, above the chain for +Y and below it for -Y: printed
 # inside the chain, each text was struck by the other's outside arrow tail.
+# Each carries its mate callout in the below lane (a linear dimension's above
+# lane does not print), so the +Y text stands high enough for its callout
+# rows to clear its hole's extension line; the bore callout drops below the
+# -Y rows.
 _PIN_CHAIN_X = FRONT_CENTER[0] + 0.070
 FRONT_KEEP = {
-    "BoreDiaDim": (FRONT_CENTER[0] + 0.070, FRONT_CENTER[1] - 0.052),
+    "BoreDiaDim": (FRONT_CENTER[0] + 0.070, FRONT_CENTER[1] - 0.060),
     "PinPosDia": (FRONT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.060),
-    "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.021),
+    "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.040),
     "PinNegY": (_PIN_CHAIN_X, FRONT_CENTER[1] - 0.021),
 }
 # The outside diameter stands above the edge view, between the tips'
@@ -109,19 +117,21 @@ TOP_KEEP = {
 # Both holes and the bore are drilled through: the title block's DRILLED
 # HOLES row governs their sizes.
 # Each pin centre's band serves the drive pins pressed into the crankshaft
-# and the knob's drive collar, so each location names them: above the +Y
-# text and below the -Y text, each outside the chain.  The plate band serves
-# the chain's axial float on the supplied plate.
+# and the knob's drive collar, so each location names them in rows narrow
+# enough to stop short of the T12 / T18 labels.  The plate band serves the
+# chain's axial float on the supplied plate; its rows stand off the
+# thickness dimension's lower arrow by leading spaces.
 CRANKSHAFT_NUMBER = "MHA-DT-11"
 KNOB_COLLAR_NUMBER = "MHA-PD-22"
 PIN_LOCATION_CALLOUT = (
-    f"SLIP FIT OVER PINS IN\n{CRANKSHAFT_NUMBER} / {KNOB_COLLAR_NUMBER}"
+    f"SLIP FIT OVER\nPINS IN\n{CRANKSHAFT_NUMBER} AND\n{KNOB_COLLAR_NUMBER}"
 )
-PLATE_CALLOUT = "SUPPLIED PLATE; SETS\nANSI #25 CHAIN FLOAT"
-CALLOUTS_ABOVE = {"PinPosDia": "2X", "PinPosY": PIN_LOCATION_CALLOUT}
+PLATE_CALLOUT = "   SUPPLIED PLATE; SETS\n   ANSI #25 CHAIN FLOAT"
+CALLOUTS_ABOVE = {"PinPosDia": "2X"}
 CALLOUTS_BELOW = {
     "BoreDiaDim": "DRILL THRU",
     "PinPosDia": "DRILL THRU",
+    "PinPosY": PIN_LOCATION_CALLOUT,
     "PinNegY": PIN_LOCATION_CALLOUT,
     "BlankWidth": PLATE_CALLOUT,
 }
