@@ -1,4 +1,4 @@
-r"""Create the three-sheet pen fitter package (MHA-PN-00).
+r"""Create the four-sheet pen fitter package (MHA-PN-00).
 
 Sheet 1 shows the pen assembled (front and right) beside four details, three
 of which carry its settings as the builder's driving, toleranced model
@@ -8,9 +8,9 @@ preset (``CarriageSetting``), DETAIL D the stirrup and its thumb screw on the
 block, with the as-shipped note; sheet 2 the builder-owned ``PN_EXPLODED``
 presentation (``pn_pen_explode_spec``) with its explode trails, the BOM
 (numbers, descriptions, vendor SKU, quantity) and a balloon on every row;
-sheet 3 the finished isometric beside the numbered assembly sequence and
-checks. Every setting and pose comes from ``pn_pen_assembly_spec``, every
-printed text and detail region from
+sheet 3 the finished isometric beside the numbered bench steps; sheet 4 the
+at-machine steps and the checks. Every setting and pose comes from
+``pn_pen_assembly_spec``, every printed text and detail region from
 ``pn_pen_assembly_sheet``, the rest from the part registry; this recipe only
 lays the sheets out. It never edits the source assembly or its explodes.
 """
@@ -109,6 +109,7 @@ SHEET_NAMES = (
     "ASSEMBLED VIEWS + SETTINGS",
     "EXPLODED VIEW + BOM",
     "ASSEMBLY STEPS",
+    "ASSEMBLY STEPS CONTINUED",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the pen package sheets are landscape")
@@ -499,18 +500,24 @@ EXPLODED_VIEW_NAMES = {
 if explode.SOURCE_CONFIGURATION != ASSEMBLY_VIEW_CONFIGURATION:
     raise AssertionError("the pen explode is authored in Default")
 
-# --- sheet 3: the finished isometric beside the sequence and checks --------------
+# --- sheets 3 and 4: the finished isometric beside the bench steps (sheet 3),
+# then beside the at-machine steps and the checks (sheet 4) -------------------------
 ASSEMBLY_ISO_CENTER = (0.062, 0.145)
 STEPS_TOP = SHEET_INNER_BORDER[3] - 0.005
 STEPS_LINE_WIDTH = 108  # characters
 
 
 def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) -> str:
-    """Wrap each numbered line under its own number; one note per block."""
+    """Wrap each numbered line under its own number, one blank line between a
+    step and whatever follows it; one note per block."""
     out = [heading] if heading else []
+    after_step = False
     for line in lines:
+        if after_step:
+            out.append("")
         number, sep, rest = line.partition(". ")
-        if sep and number.isdigit():
+        after_step = bool(sep and number.isdigit())
+        if after_step:
             out += textwrap.wrap(
                 rest,
                 width=width,
@@ -522,9 +529,27 @@ def _wrapped(lines: tuple[str, ...], *, width: int, heading: str | None = None) 
     return "\n".join(out)
 
 
+# The spaced sequence and checks overran sheet 3 into the title block (main
+# farm run 20261023T233427412Z: the checks' last line stood 31.5 mm above it,
+# the 7 blank lines take 31.7 mm), so the second group heading's steps -- the
+# ones done at MHA-HA-00 -- and the checks after them continue on sheet 4.
+_GROUP_HEADINGS = tuple(
+    index
+    for index, line in enumerate(notes.ASSEMBLY_STEPS)
+    if not line.partition(". ")[0].isdigit()
+)
+if len(_GROUP_HEADINGS) != 2 or _GROUP_HEADINGS[0] != 0:
+    raise AssertionError("the pen sequence is a bench group then an at-machine group")
 SETTINGS_NOTE = _wrapped((notes.SETTINGS_NOTE,), width=SETTINGS_NOTE_WIDTH)
 ASSEMBLY_STEPS = _wrapped(
-    notes.ASSEMBLY_STEPS, width=STEPS_LINE_WIDTH, heading="ASSEMBLY SEQUENCE"
+    notes.ASSEMBLY_STEPS[: _GROUP_HEADINGS[1]],
+    width=STEPS_LINE_WIDTH,
+    heading="ASSEMBLY SEQUENCE",
+)
+ASSEMBLY_STEPS_CONTINUED = _wrapped(
+    notes.ASSEMBLY_STEPS[_GROUP_HEADINGS[1] :],
+    width=STEPS_LINE_WIDTH,
+    heading="ASSEMBLY SEQUENCE (CONT.)",
 )
 ASSEMBLY_CHECKS = _wrapped(notes.ASSEMBLY_CHECKS, width=STEPS_LINE_WIDTH)
 
@@ -1454,13 +1479,15 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
     return settled
 
 
-# --- sheet 3 ----------------------------------------------------------------------
+# --- sheets 3 and 4 ---------------------------------------------------------------
 
 
-def _place_steps_sheet(adapter: Any) -> None:
-    """The finished assembly in full detail beside the sequence and checks."""
-    label = "pen finished"
-    _activate_sheet(adapter, SHEET_NAMES[2])
+def _place_finished_view(adapter: Any, sheet_name: str) -> float:
+    """The finished assembly in full detail down the sheet's left, labelled;
+    returns the x the steps beside it start at. Every sheet needs a view for
+    its title-block property links, so the continuation sheet repeats it."""
+    label = f"pen finished ({sheet_name})"
+    _activate_sheet(adapter, sheet_name)
     finished = place_view(
         adapter, str(SOURCE), "*Isometric", *ASSEMBLY_ISO_CENTER, scale=SHEET_SCALE
     )
@@ -1482,17 +1509,34 @@ def _place_steps_sheet(adapter: Any) -> None:
         (x0, y0 - VIEW_LABEL_GAP),
         label=label,
     )
-    steps_x = x1 + NOTE_GAP
-    steps = _add_note_block(
+    return x1 + NOTE_GAP
+
+
+def _place_steps_sheet(adapter: Any) -> None:
+    """The finished assembly beside the bench steps."""
+    steps_x = _place_finished_view(adapter, SHEET_NAMES[2])
+    _add_note_block(
         adapter,
         SHEET_NAMES[2],
         ASSEMBLY_STEPS,
         (steps_x, STEPS_TOP),
         label="assembly sequence",
     )
+
+
+def _place_steps_continued_sheet(adapter: Any) -> None:
+    """The finished assembly beside the at-machine steps and the checks."""
+    steps_x = _place_finished_view(adapter, SHEET_NAMES[3])
+    steps = _add_note_block(
+        adapter,
+        SHEET_NAMES[3],
+        ASSEMBLY_STEPS_CONTINUED,
+        (steps_x, STEPS_TOP),
+        label="assembly sequence continued",
+    )
     _add_note_block(
         adapter,
-        SHEET_NAMES[2],
+        SHEET_NAMES[3],
         ASSEMBLY_CHECKS,
         (steps_x, steps[1] - NOTE_GAP),
         label="assembly checks",
@@ -1513,6 +1557,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     settings_settled = _place_settings_sheet(adapter)
     exploded_settled = _place_exploded_sheet(adapter)
     _place_steps_sheet(adapter)
+    _place_steps_continued_sheet(adapter)
 
     def settled() -> None:
         settings_settled()
