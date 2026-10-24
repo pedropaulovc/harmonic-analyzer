@@ -11,23 +11,26 @@ from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
+from _supplier_limits import LIMIT
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
-from _supplier_lane import move_supplier_lane
-from _supplier_screw_layout import supplier_screw_margins
+from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
 ITEM = '18-8 STAINLESS STEEL ROUND SPACER, 10 MM ID X 16 MM OD X 15 MM'
-# The two Front diameters' stacked texts overprinted on one bottom lane;
-# the bore takes the top lane.
-SIDES = part.SUPPLIER_REFERENCE_SIDES | {'SupplierBoreDiameter': 'top'}
-# The Top view's length text, centred on its 6 mm lane, printed across the
-# part; its line moves 10 mm further out, reserved before the scale fit.
-LANE_SHIFT = 0.010
-SUPPLIER_MARGINS = supplier_screw_margins(
-    part.SUPPLIER_REFERENCE_DIMENSIONS,
-    planes=part.SUPPLIER_REFERENCE_PLANES,
-    sides=SIDES,
-) | {"*Top": (0.006 + LANE_SHIFT + 0.021, 0.020, 0.020, 0.020)}
+# Every text shelves right of its own witnesses, clear of the lines: the bore
+# on the Front's top lane, the OD on its bottom lane, the length beside
+# the Top view. Front and Top reserve the same left/right space so the fit
+# centres them on one projection line; the Front's equal top/bottom keeps it
+# level with the unannotated Right. The 16 x 15 mm part fits at 2:1.
+SHELVES = {
+    "SupplierBoreDiameter": (True, "right"),
+    "SupplierOuterDiameter": (True, "right"),
+    "SupplierLength": (False, "right"),
+}
+SUPPLIER_MARGINS = {
+    "*Front": (0.010, 0.018, 0.060, 0.018),
+    "*Top": (0.010, 0.010, 0.060, 0.010),
+}
 
 
 def _assert_supplier_bands(displays):
@@ -35,18 +38,13 @@ def _assert_supplier_bands(displays):
         display = _early_bound(display, "IDisplayDimension")
         native = _early_bound(display.GetDimension2(0), "IDimension")
         tolerance = _early_bound(native.Tolerance, "IDimensionTolerance")
-        band = part.SUPPLIER_REFERENCE_TOLERANCES_MM.get(name)
-        if band is None:
-            if int(tolerance.Type) != 0:
-                raise RuntimeError(name + ": unsourced tolerance")
-            continue
-        lower, upper = band
-        if int(tolerance.Type) != 2 or not all(
+        lower, upper = part.SUPPLIER_REFERENCE_TOLERANCES_MM[name]
+        if int(tolerance.Type) != LIMIT or not all(
             math.isclose(actual, expected / 1000.0, rel_tol=0.0, abs_tol=1e-12)
             for actual, expected in ((float(tolerance.GetMinValue()), lower),
                                      (float(tolerance.GetMaxValue()), upper))
         ):
-            raise RuntimeError(name + ": supplier band changed")
+            raise RuntimeError(name + ": supplier limits changed")
         if int(display.GetPrimaryTolPrecision2()) != part.SUPPLIER_REFERENCE_FORMATS[name][0]:
             raise RuntimeError(name + ": supplier tolerance precision changed")
 
@@ -62,12 +60,11 @@ async def build(adapter) -> dict[str, str]:
             formats=part.SUPPLIER_REFERENCE_FORMATS,
             starts=part.SUPPLIER_REFERENCE_STARTS,
             planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=SIDES,
+            sides=part.SUPPLIER_REFERENCE_SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
-        move_supplier_lane(adapter, displays["SupplierLength"], views["*Top"],
-                           lane_shift=LANE_SHIFT, label="SupplierLength")
         _assert_supplier_bands(displays)
+        stations = shelve_supplier_text(adapter, displays, SHELVES)
 
         def assert_references():
             fresh = assert_supplier_screw(
@@ -77,6 +74,7 @@ async def build(adapter) -> dict[str, str]:
                 units=part.SUPPLIER_REFERENCE_UNITS,
             )
             _assert_supplier_bands(fresh)
+            assert_supplier_shelves(adapter, fresh, SHELVES, stations)
 
         proofs.append(assert_references)
 

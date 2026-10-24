@@ -10,7 +10,9 @@ ch-rocker-arm-tl-vn-oblique-hub-pin:
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
-  manufacturing_notes: "Abrasive cut-off to 20.0 mm; deburr cut end. No other modification."
+  manufacturing_notes: "Cut to 20.0 mm. No other modification."
+  # The sheet's one shop size is the dimensioned 20.0 cut length; these two
+  # lines except it from the footer's "VIEWS ARE REFERENCE ONLY".
   installation_notes: |
-    Cut end down; factory end up. Bond with Loctite 638.
-    Set height per jig assembly.
+    CUT TO 20.0; THE 20.0 CUT LENGTH IS A REQUIREMENT, NOT REFERENCE.
+    CUT END DOWN, FACTORY END UP; LOCTITE 638; HEIGHT PER JIG ASSEMBLY.

@@ -27,8 +27,11 @@ LENGTH = THICKNESS
 SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', 10.0, 'horizontal'), ('SupplierOuterDiameter', 16.0, 'horizontal'), ('SupplierThickness', 0.2, 'vertical'))
 SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-5.0, 0.0), 'SupplierOuterDiameter': (-8.0, 0.0), 'SupplierThickness': (0.0, -0.2)}
 SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Front', 'SupplierOuterDiameter': 'Front', 'SupplierThickness': 'Top'}
-SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'NOMINAL BORE DIAMETER'), 'SupplierOuterDiameter': (2, 'diameter', None, 'NOMINAL OUTER DIAMETER'), 'SupplierThickness': (2, 'length', None, 'NOMINAL THICKNESS')}
-SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'bottom', 'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'left'}
+# Bands print as stacked limits (max over min) inside one parenthesis.
+SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (2, 'diameter', None, 'OUTSIDE'), 'SupplierThickness': (2, 'length', None, 'THICKNESS')}
+# The bore takes the top lane, the OD the bottom: each shelved text stays clear
+# of the other's witnesses. The thickness sits right of the Top view.
+SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierThickness': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'mm', 'SupplierOuterDiameter': 'mm', 'SupplierThickness': 'mm'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierBoreDiameter': deviations(ID_BAND),
