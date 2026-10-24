@@ -33,7 +33,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
-import _config
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -47,7 +46,6 @@ from _drawing_common import (
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
-    set_dimension_callouts,
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -78,7 +76,7 @@ from sm_gooseneck_spring_screw_geom import (
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
-    CHAMFER_CALLOUT,
+    DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
@@ -151,10 +149,12 @@ RELIEF_DIA_X = RELIEF_END_X - 0.0015
 _ROW_Y = (HEAD_TOP_Y - 0.085, HEAD_TOP_Y - 0.100)
 # ' 1.00 ' as rendered (farm run 20261010T190631112Z).
 CROWN_RISE_TEXT_WIDTH = 0.0116
-# The lead's text block: '0.30 MAX' over its three-line callout, the widest
-# line (the spring's number) ~2.4 mm a character.
-LEAD_TEXT_WIDTH = 0.041
-LEAD_TEXT_HEIGHT = 0.018
+# The lead's text block: '0.3 max.' over its three-line callout, the widest
+# line (the spring's number) 48.2 mm as rendered (farm run
+# 20261024T031009457Z, 9d8923584).
+LEAD_TEXT_WIDTH = 0.049
+# Its top line stood 10.7 mm above the anchor in that run.
+LEAD_TEXT_TOP_ABOVE_ANCHOR = 0.011
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -180,7 +180,7 @@ SIDE_KEEP = {
     # The lead reads under the relief from the lower silhouette's reference
     # line: its text stands right of its 1.2 mm span, under the relief Ø's
     # text and above row 0, its left end clear of the lead's extension line.
-    "HeadLead": (LEAD_FOOT_X + 0.003 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.068),
+    "HeadLead": (LEAD_FOOT_X + 0.0035 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.068),
     # The tip chamfer's axial leg reads below-right of the tip.
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - 0.016),
 }
@@ -198,14 +198,6 @@ RELIEF_DIA_TEXT_XY = (
     RELIEF_DIA_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
     SIDE_CENTER[1] - 0.0155,
 )
-# The lead's MAX is tighter than the title block, so it names what it serves
-# (drawing-guidelines.md rule 4): the flat under-head seat that clamps the
-# counter spring's upper loop.  The chamfer form rides both chamfers.
-COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
-DIMENSION_CALLOUTS = {
-    "HeadLead": f"{CHAMFER_CALLOUT}\nFLAT SEAT FOR\n{COUNTER_SPRING_NUMBER} LOOP",
-    "TipChamfer": CHAMFER_CALLOUT,
-}
 # The slot width reads right of the head-end view, left of the head Ø.
 END_KEEP = {
     "SlotWidth": (
@@ -306,10 +298,13 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
-        # swDimensionTextCalloutBelow; SOLIDWORKS may hand lines back as CRLF.
+        # The part authors every callout (swDimensionTextCalloutBelow); the
+        # drawing only reads it back.  SOLIDWORKS may hand lines back as CRLF.
         callout = str(display.GetText(4) or "").replace("\r\n", "\n")
-        if callout != DIMENSION_CALLOUTS.get(name, ""):
-            raise RuntimeError(f"MHA-SM-04 {name}: callout {callout!r} did not persist")
+        if callout != DIMENSION_CALLOUTS_BY_NAME.get(name, ""):
+            raise RuntimeError(
+                f"MHA-SM-04 {name}: callout {callout!r} is not the part's"
+            )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -375,7 +370,6 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*side_annotations, *end_annotations]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):

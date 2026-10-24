@@ -28,6 +28,21 @@ from sm_gooseneck_spring_screw_geom import (
 
 THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
+# Below-value callouts the PART authors on its dimensions (the drawing only
+# reads them back; a drawing-side SetText can write through to the part,
+# #1942).  The lead's MAX is tighter than the title block, so it names what
+# it serves (drawing-guidelines.md rule 4): the flat under-head seat that
+# clamps the counter spring's upper loop.
+COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
+DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
+    "LeadReference": {
+        "HeadLead": f"{CHAMFER_CALLOUT}\nFLAT SEAT FOR\n{COUNTER_SPRING_NUMBER} LOOP"
+    },
+    "ShankProfile": {"TipChamfer": CHAMFER_CALLOUT},
+}
+DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
+    name: text for callouts in DIMENSION_CALLOUTS.values() for name, text in callouts.items()
+}
 
 # drawing-guidelines.md rule 17 (walls and webs): the head left under the slot floor, at the shortest head,
 # the deepest slot and a full under-head edge break, stays above the 2.0

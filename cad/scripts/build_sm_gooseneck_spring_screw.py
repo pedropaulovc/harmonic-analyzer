@@ -1,6 +1,6 @@
 r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
-A made slotted fillister screw turned from 1/2-in 12L14 round.  Its #6-32
+A made slotted fillister screw turned from 1/2-in 12L14 or 1018 round.  Its #6-32
 shank threads into the gooseneck MHA-SM-01's tapped end plug and the
 under-head face clamps the counter spring's upper eye against the plug face.
 Sizes and bands live in ``sm_gooseneck_spring_screw_geom``; the print's
@@ -76,6 +76,7 @@ from sm_gooseneck_spring_screw_geom import (
     TIP_CHAMFER,
 )
 from sm_gooseneck_spring_screw_spec import (
+    DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -174,6 +175,18 @@ def _single_limit(
     if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
         raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
     _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+
+
+def _author_dimension_callouts(adapter) -> None:
+    """Persist each printed callout on its source dimension, below the value
+    (build_mg_magnifying_bracket._author_dimension_callouts): the drawing
+    imports and reads them back, never writing them itself."""
+    for feature, callouts in DIMENSION_CALLOUTS.items():
+        for name, text in callouts.items():
+            display, _dimension = _named_dimension(adapter, feature, name)
+            display.SetText(4, text)  # swDimensionTextCalloutBelow
+            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
+                raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -510,6 +523,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    _author_dimension_callouts(adapter)
     # The reference sketches own printed dimensions but no geometry: hide them
     # so no assembly instance renders them (#880).  The drawing shows them per
     # view through _drawing_hidden_sketches to import those dimensions.

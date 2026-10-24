@@ -37,7 +37,8 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert row["number"] == "MHA-SM-04"
     assert row["title"] == "Gooseneck Spring Screw"
     assert row["description"] == "GOOSENECK SPRING SCREW"
-    for grade in ("12L14", "1/2 in"):
+    # Not a critical grade (rule 2): the field names the acceptable steels.
+    for grade in ("12L14", "1018", "1/2 in"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
     assert int(row["quantity"]) == 1
@@ -321,14 +322,16 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     underline = text_y - drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
     # The lead's extension line drops from the lead's foot on the lower
     # silhouette, left of the Ø's leader; its text block stands right of
-    # that line, under the Ø's text and above row 0.
+    # that line with room to spare (the layout audit of farm run
+    # 20261024T031009457Z found the line through the block's left edge),
+    # under the Ø's text and above row 0.
     lead_x, lead_y = drawing.SIDE_KEEP["HeadLead"]
     lead_left = lead_x - drawing.LEAD_TEXT_WIDTH / 2.0
-    assert drawing.UNDERHEAD_X < drawing.LEAD_FOOT_X < lead_left - 0.002
+    assert drawing.UNDERHEAD_X < drawing.LEAD_FOOT_X <= lead_left - 0.003
     assert drawing.LEAD_FOOT_X < drawing.RELIEF_DIA_X - 0.003
-    assert lead_y + drawing.LEAD_TEXT_HEIGHT <= underline - 0.002
+    assert lead_y + drawing.LEAD_TEXT_TOP_ABOVE_ANCHOR <= underline - 0.002
     assert lead_y - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.015
-    assert lead_x + drawing.LEAD_TEXT_WIDTH / 2.0 < drawing.TIP_X
+    assert lead_x + drawing.LEAD_TEXT_WIDTH / 2.0 < drawing.THREAD_START_X - 0.005
     assert drawing.NECK_BOTTOM_Y > text_y
     # The crown rise's text stands outside, left of the apex extension line
     # it shares with the slot depth.
@@ -376,11 +379,17 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "ReliefLead@ShankProfile": (geom.RELIEF_LEAD, 0),
         "ThreadDia@ShankProfile": (geom.MAJOR_DIA, 0),
     }
-    # The lead's MAX names the part whose loop the flat seat clamps.
-    lead_callout = drawing.DIMENSION_CALLOUTS["HeadLead"].splitlines()
+    # The lead's MAX names the part whose loop the flat seat clamps.  The part
+    # authors every callout on the dimension it marks; the drawing writes none.
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    lead_callout = callouts["HeadLead"].splitlines()
     assert lead_callout == ["X 45 DEG", "FLAT SEAT FOR", "MHA-SM-VN-51 LOOP"]
-    assert drawing.DIMENSION_CALLOUTS["TipChamfer"] == spec.CHAMFER_CALLOUT
-    assert set(drawing.DIMENSION_CALLOUTS) <= printed
+    assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
+    for feature, names in spec.DIMENSION_CALLOUTS.items():
+        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    assert part.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "set_dimension_callouts" not in source
 
 
 def test_drawing_runs_the_readbacks_after_the_last_rebuild() -> None:
