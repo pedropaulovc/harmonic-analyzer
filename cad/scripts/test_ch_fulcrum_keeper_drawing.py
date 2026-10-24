@@ -145,9 +145,13 @@ def test_corner_round_sits_under_the_title_block_inside_corner_ceiling() -> None
     # that row, rule 2). The part models the round at that ceiling, which
     # keeps the round's tangent line off the counterbore.
     spec = ch_fulcrum_keeper_spec
+    ceiling = _config.title_block("inside_corner")["radius_mm"]
     assert spec.CORNER_R == 1.0
-    assert spec.CORNER_R <= _config.title_block("inside_corner")["radius_mm"]
-    assert 0.0 < spec.CORNER_R < spec.FOOT_CBORE_LUG_CLEARANCE_MM
+    assert spec.CORNER_R <= ceiling
+    # The title block now permits the corner up to its ceiling, so the
+    # ceiling itself must keep the round's tangent line off the counterbore.
+    assert 0.0 < spec.CORNER_R
+    assert ceiling < spec.FOOT_CBORE_LUG_CLEARANCE_MM
     assert "CornerFillet" not in spec.DRAWING_DIMENSIONS
     assert "CornerFillet" not in spec.DRAWING_PRECISION
     assert "CornerRadius" not in drawing.FRONT_KEEP
