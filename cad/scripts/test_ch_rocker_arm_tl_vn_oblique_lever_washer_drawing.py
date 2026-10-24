@@ -64,7 +64,7 @@ def test_catalogue_dimensions_and_pair_stack() -> None:
 def test_one_pair_under_each_lever_screw_head() -> None:
     washer = fasteners.LEVER_LOCK_WASHER
     screw = fasteners.LEVER_TO_CARRIER
-    assert fasteners.WASHERS == (fasteners.BLOCK_LOCK_WASHER, washer)
+    assert fasteners.WASHERS == (washer,)
     assert spec.ROW is washer
     assert washer.joint == screw.joint
     assert int(_config.parts(STEM)["quantity"]) == spec.QUANTITY == screw.count == 2
@@ -94,7 +94,7 @@ def test_lever_screw_engagement_and_stand_out_at_the_worst_case() -> None:
     assert spec.STAND_OUT_MAX == pytest.approx(
         1.0 * IN - (12.7 - 0.51 + 0.070 * IN) - (12.0 - 0.8)
     )  # 0.23
-    assert 0.0 < spec.STAND_OUT_MAX < trammel.PIN_COLLAR_PROUD
+    assert 0.0 < spec.STAND_OUT_MAX < trammel.PIVOT_SUPPORT_HEIGHT
 
 
 def test_pairs_fit_on_the_feed_lever() -> None:

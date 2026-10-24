@@ -8,8 +8,8 @@ The item is the shop-inventory ``fixtures.trammel-tr8-flange-nut``: the
 regular brass T8x2 flange nut that ships with the ZYLtech HW-SC-T8x2-600
 screw (standalone replacement SKU HW-SC-T8x2-NUT). It has a round flange with
 four plain holes and a body that runs through it: a short spigot on one side,
-the long body on the other. Four #4-40 screws fix it to the nut bracket TL-29,
-with the spigot in TL-29's counterbore.
+the long body on the other. Four #4-40 screws fix it to the integral lug
+of feed block TL-32, with the spigot in TL-32's counterbore.
 
 Datasheet-built: no vendor CAD obtained (ZYLtech publishes no STEP, IGES, STL
 or drawing download, checked 2026-10-17 UTC; see
@@ -64,7 +64,7 @@ HOLE_PCD = feed.NUT_HOLE_PCD  # 16
 HOLE_ANGLES_DEG = feed.NUT_HOLE_ANGLES_DEG  # 45, 135, 225, 315
 BODY_DIA = feed.NUT_BODY_DIA  # 10.2
 LENGTH = feed.NUT_LENGTH  # 15
-SPIGOT_LENGTH = feed.NUT_BODY_SHORT  # 1.5, into TL-29's counterbore
+SPIGOT_LENGTH = feed.NUT_BODY_SHORT  # 1.5, into TL-32's counterbore
 BODY_LONG = feed.NUT_BODY_LONG  # 10
 LEAD = feed.SCREW_LEAD  # 2, single start
 
@@ -121,7 +121,7 @@ SUPPLIER_DRAWING_URLS = (
 # Construction-only source chords are nominal size references, not measurements
 # of the omitted internal thread. No source bore diameter or tolerance is given.
 # Only what a drop-in substitute must match: the flange OD, the pilot (spigot)
-# diameter TL-29's counterbore takes, the overall length (C4's 1.5 + 3.5 + 10),
+# diameter TL-32's counterbore takes, the overall length (1.5 + 3.5 + 10),
 # the flange thickness (the #4-40 screws' grip) and the bolt pattern.
 # Any Top-plane reference reserves at least 20 mm on every side of the 64 mm
 # Top cell, and a top/bottom lane 26 mm: horizontal end-view chords left a

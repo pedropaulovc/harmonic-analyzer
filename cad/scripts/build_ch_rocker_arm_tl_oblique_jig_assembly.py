@@ -4,13 +4,12 @@ The rocker arm's oblique-trammel mill jig, a shop fixture (never in the
 machine tree, ``_buildgraph.is_shop_fixture``): two of the one base bar (as
 saved under rail 1 on -X, turned over under rail 2 on +X) held to the table
 by hold-down studs in T-nuts under flange nuts, an HGR15 rail screwed on each
-bar with an HGH15 carriage on it, a pivot block screwed on each carriage with
-its two bearings and its pressed pivot pin, the carrier riding the two pins
-with its riser, its pressed HUB locator pin, its CL dowel, its CR clamp screw
-and its feed lever, and the leadscrew feed: two end brackets on bar 1
-carrying the KP08 blocks, the leadscrew with its handwheel, and the nut
-bracket on pivot block 1 carrying the flanged nut. Every bought item and
-every screw is inserted (``spec.BOM_ORDER``, the BOM's item order).
+bar with an HGH15 carriage on it, a plain pivot block on rail 2 and an
+integral nut-lug feed block on rail 1. Purchased shoulder screws, selected
+shims and loose spacers support and capture the carrier. Its gauge-pin HUB
+locator is bonded; the CL dowel, riser, clamp and lever retain their roles.
+The raised leadscrew runs in two KP08 blocks on on-edge end brackets and
+through the feed block's nut. Every bought item and screw is inserted.
 
 Authored in the MACHINE frame of ``ch_rocker_arm_tl_oblique_jig_assembly_spec``
 (origin on the spindle at the table top, +X along the table, +Y toward the
@@ -105,91 +104,33 @@ _PARTS = (
     ("ch-rocker-arm-tl-oblique-base-bar", "ch-rocker-arm-tl-oblique-base-bar"),
     ("ch-rocker-arm-tl-oblique-carrier", "ch-rocker-arm-tl-oblique-carrier"),
     ("ch-rocker-arm-tl-oblique-pivot-block", "ch-rocker-arm-tl-oblique-pivot-block"),
-    ("ch-rocker-arm-tl-oblique-pivot-pin", "ch-rocker-arm-tl-oblique-pivot-pin"),
+    ("ch-rocker-arm-tl-oblique-feed-block", "ch-rocker-arm-tl-oblique-feed-block"),
+    ("ch-rocker-arm-tl-vn-oblique-pivot-screw", "ch-rocker-arm-tl-vn-oblique-pivot-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-pivot-spacer", "ch-rocker-arm-tl-vn-oblique-pivot-spacer"),
+    ("ch-rocker-arm-tl-vn-oblique-pivot-shim", "ch-rocker-arm-tl-vn-oblique-pivot-shim"),
     ("ch-rocker-arm-tl-oblique-riser", "ch-rocker-arm-tl-oblique-riser"),
-    ("ch-rocker-arm-tl-oblique-hub-pin", "ch-rocker-arm-tl-oblique-hub-pin"),
+    ("ch-rocker-arm-tl-vn-oblique-hub-pin", "ch-rocker-arm-tl-vn-oblique-hub-pin"),
     ("ch-rocker-arm-tl-oblique-feed-lever", "ch-rocker-arm-tl-oblique-feed-lever"),
     ("ch-rocker-arm-tl-oblique-end-bracket", "ch-rocker-arm-tl-oblique-end-bracket"),
-    ("ch-rocker-arm-tl-oblique-nut-bracket", "ch-rocker-arm-tl-oblique-nut-bracket"),
-    ("ch-rocker-arm-tl-oblique-pivot-cap", "ch-rocker-arm-tl-oblique-pivot-cap"),
-    (
-        "ch-rocker-arm-tl-oblique-pivot-retainer",
-        "ch-rocker-arm-tl-oblique-pivot-retainer",
-    ),
     ("ch-rocker-arm-tl-vn-oblique-rail", "ch-rocker-arm-tl-vn-oblique-rail"),
     ("ch-rocker-arm-tl-vn-oblique-carriage", "ch-rocker-arm-tl-vn-oblique-carriage"),
-    ("ch-rocker-arm-tl-vn-oblique-bearing", "ch-rocker-arm-tl-vn-oblique-bearing"),
     ("ch-rocker-arm-tl-vn-oblique-cl-dowel", "ch-rocker-arm-tl-vn-oblique-cl-dowel"),
     ("ch-rocker-arm-tl-vn-oblique-leadscrew", "ch-rocker-arm-tl-vn-oblique-leadscrew"),
-    (
-        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-        "ch-rocker-arm-tl-vn-oblique-leadscrew-nut",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-pillow-block",
-        "ch-rocker-arm-tl-vn-oblique-pillow-block",
-    ),
+    ("ch-rocker-arm-tl-vn-oblique-leadscrew-nut", "ch-rocker-arm-tl-vn-oblique-leadscrew-nut"),
+    ("ch-rocker-arm-tl-vn-oblique-pillow-block", "ch-rocker-arm-tl-vn-oblique-pillow-block"),
     ("ch-rocker-arm-tl-vn-oblique-handwheel", "ch-rocker-arm-tl-vn-oblique-handwheel"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--HoldDownStud"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--TNut"),
     ("sh-vn-clamping-kit-hardware", "sh-vn-clamping-kit-hardware--FlangeNut"),
-    (
-        "ch-rocker-arm-tl-vn-oblique-rail-screw",
-        "ch-rocker-arm-tl-vn-oblique-rail-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-bracket-screw",
-        "ch-rocker-arm-tl-vn-oblique-bracket-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-block-screw",
-        "ch-rocker-arm-tl-vn-oblique-block-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-carriage-screw",
-        "ch-rocker-arm-tl-vn-oblique-carriage-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-        "ch-rocker-arm-tl-vn-oblique-kp08-screw",
-    ),
+    ("ch-rocker-arm-tl-vn-oblique-rail-screw", "ch-rocker-arm-tl-vn-oblique-rail-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-bracket-screw", "ch-rocker-arm-tl-vn-oblique-bracket-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-carriage-screw", "ch-rocker-arm-tl-vn-oblique-carriage-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-kp08-screw", "ch-rocker-arm-tl-vn-oblique-kp08-screw"),
     ("ch-rocker-arm-tl-vn-oblique-nut-screw", "ch-rocker-arm-tl-vn-oblique-nut-screw"),
-    (
-        "ch-rocker-arm-tl-vn-oblique-riser-screw",
-        "ch-rocker-arm-tl-vn-oblique-riser-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-        "ch-rocker-arm-tl-vn-oblique-clamp-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-lever-screw",
-        "ch-rocker-arm-tl-vn-oblique-lever-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-block-washer",
-        "ch-rocker-arm-tl-vn-oblique-block-washer",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-lever-washer",
-        "ch-rocker-arm-tl-vn-oblique-lever-washer",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
-        "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
-        "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
-    ),
-    (
-        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
-        "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
-    ),
+    ("ch-rocker-arm-tl-vn-oblique-riser-screw", "ch-rocker-arm-tl-vn-oblique-riser-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-clamp-screw", "ch-rocker-arm-tl-vn-oblique-clamp-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-lever-screw", "ch-rocker-arm-tl-vn-oblique-lever-screw"),
+    ("ch-rocker-arm-tl-vn-oblique-lever-washer", "ch-rocker-arm-tl-vn-oblique-lever-washer"),
 )
 assert tuple(family for _physical, family in _PARTS) == spec.BOM_ORDER
 assert all(
@@ -540,22 +481,6 @@ def _create_jig_explode(adapter: Any, configuration_name: str) -> None:
             for selector in selectors:
                 if selector in groups:
                     moved.extend(groups[selector])
-                elif selector in (
-                    spec.instance_name(spec.BEARING, index)
-                    for index in range(spec.QUANTITIES[spec.BEARING])
-                ):
-                    # Only upper/lower bearing steps split a family. Resolve
-                    # its full native name, never GetComponents enumeration order.
-                    occurrences = [
-                        component for component in groups[spec.BEARING]
-                        if str(component.Name2) == selector
-                    ]
-                    if len(occurrences) != 1:
-                        raise RuntimeError(
-                            f"{label}: expected one bearing occurrence {selector!r}, "
-                            f"got {len(occurrences)}"
-                        )
-                    moved.extend(occurrences)
                 else:
                     raise RuntimeError(f"{label}: unknown explode selector {selector!r}")
             distance = distance_mm / 1000.0

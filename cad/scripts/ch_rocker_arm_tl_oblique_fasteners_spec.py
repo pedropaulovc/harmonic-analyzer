@@ -24,26 +24,14 @@ Nominal engagement is at least 1.5 diameters except on two joints:
   The lever-washer spec records the worst-case engagement and possible
   stand-out; the nominal table alone does not bound either.
 
-Threads are US-customary UNC except the bought HGH15CA carriage's vendor-cut
-M4 holes, which fix the carriage screw's thread (the fastener policy's
-exception: a bought part's own threads; a bought part's plain holes take a UNC
-screw sized to float).
+Threads are US-customary UNC except the bought carriage's M4 holes and the
+supplier-defined M8 shoulder screw.
+The shoulder screw has its own datum-based row: treating its 35 mm shoulder
+as a conventional screw grip would report a false engagement.
 
-Washers (``WASHERS``): a wedge-lock pair under each head of two joints whose
-screws carry a reversing load, so rule 23 wants a mechanical lock: the two
-TL-29 block screws (the leadscrew's reversing thrust, TL-VN-70) and the two
-feed lever screws (the operator's push and pull on the lever, TL-VN-71).
-Each pair's stack adds to its row's grip. The four nut screws are button
-heads (BHCS) bearing directly on the Tr8 nut's brass flange, no washer (owner
-ruling 2026-10-20). Every other head seats in a counterbore or countersink,
-or on a flat face. Hold-down studs start as the kit's 1/2-13 x 3 in stock,
-then only their unused upper ends are cut to the finished length below.
-The actual installed stack must retain the full nut thread and clear the
-moving wing; the former carrier-only length limit is not sufficient.
-
-Each joint's screw is its own bought part and BOM row (TL-VN-61 to TL-VN-69, the
-wedge-lock pairs TL-VN-70 and TL-VN-71); the assembly steps name each by its
-callout (``callout``) and its item number.
+Only the feed lever screws use wedge-lock pairs. The four nut screws are
+button heads directly on the brass flange. Hold-down studs retain their loaded
+lower ends when shortened. These nominal fit contracts do not certify the jig.
 """
 
 from __future__ import annotations
@@ -58,8 +46,7 @@ import ch_rocker_arm_tl_vn_oblique_leadscrew_spec as leadscrew
 import ch_rocker_arm_tl_oblique_pivot_block_spec as pivot_block
 import ch_rocker_arm_tl_oblique_riser_spec as riser
 import ch_rocker_arm_tl_oblique_trammel_spec as trammel
-import ch_rocker_arm_tl_oblique_retention_spec as retention
-import ch_rocker_arm_tl_oblique_retention_hardware_spec as retention_hardware
+import ch_rocker_arm_tl_vn_oblique_pivot_screw_spec as pivot_screw
 from _hole_spec import THREAD_MAJOR_MM
 from _mcmaster_91771a112 import DIMS as _RISER_SCREW
 from _printed_tolerance import printed_band_mm
@@ -162,23 +149,13 @@ BRACKET_TO_BAR = Fastener(
     leadscrew.BAR_SCREW_GRIP,  # head recessed in TL-20's 4.80 counterbore
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
-NUT_BRACKET_TO_BLOCK = Fastener(
-    "TL-29 nut bracket to TL-22 pivot block 1",
-    leadscrew.BLOCK_SCREW,
-    SHCS,
-    leadscrew.BLOCK_SCREW_LENGTH,
-    len(leadscrew.PIVOT_BLOCK_HOLES),
-    # head on the TL-VN-70 pair, on TL-22's 4.40 counterbore floor
-    leadscrew.BLOCK_SCREW_GRIP + leadscrew.BLOCK_SCREW_LOCK_STACK,
-    leadscrew.NUT_BRACKET_TAP_DEPTH,  # blind
-)
 BLOCK_TO_CARRIAGE = Fastener(
-    "TL-22 pivot block to HGH15CA carriage",
+    "TL-32 feed block / TL-22 pivot block to HGH15CA carriage",
     trammel.CARRIAGE_BOLT,
     SHCS,
     f"{pivot_block.SCREW_LENGTH:.0f}",
     4 * RAILS,  # the 26 x 26 pattern on each carriage
-    pivot_block.UNDER_HEAD,  # head on TL-22's c'bore floor, from the carriage face
+    pivot_block.CBORE_FLOOR,
     pivot_block.CARRIAGE_THREAD_DEPTH,  # the carriage's M4 x 5
     min_engagement_d=1.1,
     note="the carriage maker's M4 x 5 holes limit the engagement",
@@ -192,8 +169,8 @@ KP08_TO_BRACKET = Fastener(
     leadscrew.KP08_FOOT_THICK,  # UNVERIFIED foot thickness
     leadscrew.BRACKET_THICK,  # tapped THRU
 )
-NUT_TO_NUT_BRACKET = Fastener(
-    "Tr8 flanged nut to TL-29 nut bracket",
+NUT_TO_FEED_BLOCK = Fastener(
+    "Tr8 flanged nut to TL-32 feed block",
     leadscrew.NUT_SCREW,
     BHCS,
     leadscrew.NUT_SCREW_LENGTH,
@@ -234,45 +211,15 @@ LEVER_TO_CARRIER = Fastener(
     min_engagement_d=1.3,
     note="the 12 carrier limits engagement; see the lever washer's worst-case stack",
 )
-CAP_TO_BLOCK = Fastener(
-    "TL-30 capture cap to TL-22 pivot block",
-    retention_hardware.SCREW_THREAD,
-    SHCS,
-    "3/4",
-    len(retention.CAP_BOLT_CENTERS) * RAILS,
-    retention.CAP_HEIGHT - retention.CAP_COUNTERBORE_DEPTH,
-    pivot_block.BLOCK_HEIGHT,
-    note=(
-        f"{retention_hardware.SCREW_SUPPLIER} {retention_hardware.SCREW_SKU}; "
-        "inspect actual complete full-form overlap >=1.5D (11.90625 mm) in THRU "
-        "block threads; overall length and nominal overlap alone are not proof. "
-        "Seat clean, dry, free-running actual screws cross-pattern at "
-        "0.50 +/-0.05 Nm; cap must seat on all faces with cap/block base gap "
-        "<=0.05 mm over the whole mounting footprint; independently, underhead "
-        "gap must be <=0.05 mm over the whole accessible head bearing footprint. "
-        "Spend these two independent gap allowances separately, then "
-        "safety-wire heads in pairs in the tightening direction. Engineering "
-        "seating torque is not a minimum-preload or force certification"
-    ),
-)
 FASTENERS: tuple[Fastener, ...] = (
     RAIL_TO_BAR,
     BRACKET_TO_BAR,
-    NUT_BRACKET_TO_BLOCK,
     BLOCK_TO_CARRIAGE,
     KP08_TO_BRACKET,
-    NUT_TO_NUT_BRACKET,
+    NUT_TO_FEED_BLOCK,
     RISER_TO_CARRIER,
     CR_CLAMP,
     LEVER_TO_CARRIER,
-    CAP_TO_BLOCK,
-)
-BLOCK_LOCK_WASHER = Washer(
-    NUT_BRACKET_TO_BLOCK.joint,
-    "#8",
-    "WEDGE-LOCK WASHER PAIR",
-    NUT_BRACKET_TO_BLOCK.count,
-    leadscrew.BLOCK_SCREW_LOCK_STACK,
 )
 LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.joint,
@@ -281,7 +228,31 @@ LEVER_LOCK_WASHER = Washer(
     LEVER_TO_CARRIER.count,
     LEVER_LOCK_STACK,
 )
-WASHERS: tuple[Washer, ...] = (BLOCK_LOCK_WASHER, LEVER_LOCK_WASHER)
+WASHERS: tuple[Washer, ...] = (LEVER_LOCK_WASHER,)
+
+
+@dataclass(frozen=True)
+class ShoulderScrew:
+    """Shoulder-end datum and threaded tail, not an under-head grip screw."""
+
+    joint: str = "TL-VN-77 shoulder screw to TL-32 / TL-22 pivot receiver"
+    sku: str = pivot_screw.SKU
+
+    thread: str = pivot_screw.THREAD
+    count: int = pivot_screw.QUANTITY
+    shoulder_diameter_mm: float = pivot_screw.SHOULDER_DIA
+    shoulder_length_mm: float = pivot_screw.SHOULDER_LENGTH
+    thread_length_mm: float = pivot_screw.THREAD_LENGTH
+    counterbore_depth_mm: float = pivot_block.BORE_DEPTH
+    torque_nm: float = 4.0
+    threadlocker: str = "Loctite 222"
+
+    @property
+    def engagement_mm(self) -> float:
+        return min(self.thread_length_mm, pivot_block.BLOCK_HEIGHT - self.counterbore_depth_mm)
+
+
+PIVOT_SCREW_TO_BLOCK = ShoulderScrew()
 
 # Hold-down studs, reworked from the clamping-kit stock
 # (fixtures.clamping-kit-pm-52pcck-14mm). Keep the loaded lower ends unchanged.
@@ -309,11 +280,9 @@ if abs(RAIL_TO_BAR.engagement_mm - base_bar.RAIL_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("rail screw engagement disagrees with the base bar spec")
 if abs(BRACKET_TO_BAR.engagement_mm - leadscrew.BAR_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("bar screw engagement disagrees with the leadscrew spec")
-if abs(NUT_BRACKET_TO_BLOCK.engagement_mm - leadscrew.BLOCK_SCREW_ENGAGEMENT) > 1e-9:
-    raise AssertionError("block screw engagement disagrees with the leadscrew spec")
-if abs(NUT_TO_NUT_BRACKET.engagement_mm - leadscrew.NUT_SCREW_ENGAGEMENT) > 1e-9:
+if abs(NUT_TO_FEED_BLOCK.engagement_mm - leadscrew.NUT_SCREW_ENGAGEMENT) > 1e-9:
     raise AssertionError("nut screw engagement disagrees with the leadscrew spec")
-if abs(BLOCK_TO_CARRIAGE.engagement_mm - pivot_block.THREAD_IN_CARRIAGE) > 1e-9:
+if abs(BLOCK_TO_CARRIAGE.engagement_mm - (pivot_block.SCREW_LENGTH - pivot_block.CBORE_FLOOR)) > 1e-9:
     raise AssertionError("carriage screw engagement disagrees with the block spec")
 if abs(RAIL_TO_BAR.length_mm - trammel.RAIL_SCREW_LENGTH) > 1e-9:
     raise AssertionError("the rail screw's printed length is not the calculator's")

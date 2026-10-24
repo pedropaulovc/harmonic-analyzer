@@ -1,0 +1,16 @@
+ch-rocker-arm-tl-vn-oblique-hub-pin:
+  title: Rocker Oblique Trammel Hub Pin
+  number: MHA-CH-06-TL-VN-80
+  stock_name: Class Z Minus Gauge Pin, size 10.2000 mm, 2 in supply, cut to 20.0 mm
+  supplier: McMaster-Carr
+  supplier_skus: ['2281A11-6410N695']
+  material: Tool Steel
+  material_specification: "Tool steel, HRC60, ASME B89.1.5 Class Z minus"
+  finish: as supplied
+  quantity: 1
+  tolerance_class: visual_noncritical
+  process: purchased
+  manufacturing_notes: "Abrasive cut-off to 20.0 mm; deburr cut end. No other modification."
+  installation_notes: |
+    Cut end down; factory end up. Bond with Loctite 638.
+    Set height per jig assembly.

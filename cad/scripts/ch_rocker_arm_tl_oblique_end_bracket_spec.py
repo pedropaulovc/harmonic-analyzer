@@ -11,15 +11,18 @@ and every bought dimension) belongs to
 ``ch_rocker_arm_tl_vn_oblique_leadscrew_spec``, imported as ``leadscrew``; this
 module never retypes one of its numbers.
 
-Material and stock: aluminium flat bar 1/2 x 3/4 in (12.70 x 19.05), e.g.
-6061-T6, sawn and faced to ``leadscrew.BRACKET_LENGTH`` 68.9. Width and
-thickness stay as bought and print "STOCK". Only the taps need the metal, so
-the title block names the flat-bar family, not a grade (rule 2).
+Material and stock: aluminium flat bar 1/2 x 1 in standing on edge, e.g.
+6061-T6 (the owned OnlineMetals 1165 6061-T6511 bar): 12.70 along the screw,
+25.40 high, sawn and faced to ``leadscrew.BRACKET_LENGTH`` 68.9. Width and
+height stay as bought and print "STOCK". Only the taps need the metal, so
+the title block names the flat-bar family, not a grade (rule 2). The KP08
+foot (13 wide, UNVERIFIED) overhangs the 12.70 top by 0.15 a side
+(``KP08_FOOT_OVERHANG``).
 
 Frame (SolidWorks model, and the ``PRECHIPS_SOLIDS`` frame; the leadscrew
 spec's): origin on the bottom face at the inner end (toward the rail),
 mid-width; +X outward (machine +lateral), +Y along the screw, +Z up. Envelope
-X 0 .. 68.9, Y -9.525 .. 9.525, Z 0 .. 12.7.
+X 0 .. 68.9, Y -6.35 .. 6.35, Z 0 .. 25.4.
 
 Holes, all six on the mid-width row (Y 0), tapped THRU from the top face:
 
@@ -43,7 +46,7 @@ positions. A #8 (major Ø4.166) floats 0.406 in the bar's Ø4.978 normal-fit
 clearance, leaving ``BAR_PATTERN_ALLOWANCE`` 0.222 for the bar's pattern. At
 two places (±0.51) the corner would be 0.72 out and neither pattern would fit.
 Each station is a DRO absolute from the faced inner end (rule 10) and names
-its own mate (rule 4); the row is 9.525 from the -Y side face, a hidden
+its own mate (rule 4); the row is 6.35 from the -Y side face, a hidden
 reference-sketch dimension (base bar ``RailRowReference``), and names both.
 Pair spacings (18, 42) with the edge locations at two places would loosen the
 8 between the patterns to ±1.02; that offset sets the screw line over the
@@ -56,7 +59,7 @@ two-place ±0.51, each thread at its major diameter: #8 at 7.5 to the inner
 end 5.29; #8 at 7.5 to #6 at 14 2.40; #6 at 14 to #8 at 24 5.90; #8 at 24 to
 #8 at 46 17.57; #8 at 46 to #6 at 56 5.90; #6 at 56 to #8 at 62.5 2.40; #8 at
 62.5 to the outer end 3.39 (the length's one place suffices); the row to the
--Y side 7.31, to the +Y side 6.80. No rule-20 shortfall.
+-Y side 4.14, to the +Y side 3.63. No rule-20 shortfall.
 
 Rule 18 belongs to the screws' lengths (leadscrew spec): the #8 engagement is
 ``leadscrew.BAR_SCREW_ENGAGEMENT``; this part only proves its through thread
@@ -80,18 +83,18 @@ NUMBER = leadscrew.END_BRACKET_NUMBER
 QUANTITY = leadscrew.END_BRACKET_QUANTITY
 KP08_ID = leadscrew.KP08_ID
 
-# --- Bracket: 6061-T6 1/2 x 3/4 in flat, sawn and faced to length ------------
+# --- Bracket: 6061-T6511 1/2 x 1 in flat on edge, sawn and faced to length ---
 BRACKET_LENGTH = round(leadscrew.BRACKET_LENGTH, 9)  # 68.9
-BRACKET_WIDTH = round(leadscrew.BRACKET_WIDTH, 9)  # 19.05 stock
-BRACKET_THICK = round(leadscrew.BRACKET_THICK, 9)  # 12.7 stock
+BRACKET_WIDTH = round(leadscrew.BRACKET_WIDTH, 9)  # 12.7 stock
+BRACKET_THICK = round(leadscrew.BRACKET_THICK, 9)  # 25.4 stock
 HALF_WIDTH = round(BRACKET_WIDTH / 2.0, 9)
 LENGTH_PLACES = 1
-STOCK_PLACES = 2  # 19.05 and 12.70 print exactly at two places
+STOCK_PLACES = 2  # 12.70 and 25.40 print exactly at two places
 STOCK_DIMENSIONS = {"BracketWidth", "BracketThick"}
 
 # --- Holes: six taps THRU on the mid-width row ---------------------------------
 HOLE_PLACES = 3  # fixed-fastener patterns (module docstring)
-HOLE_ROW_Y = HALF_WIDTH  # 9.525 from the -Y side face to the row
+HOLE_ROW_Y = HALF_WIDTH  # 6.35 from the -Y side face to the row
 BAR_SCREW = leadscrew.BAR_SCREW  # "#8-32"
 BAR_TAP_X: tuple[float, ...] = tuple(round(x, 9) for x in leadscrew.BRACKET_BAR_HOLES_X)
 BAR_TAP_SPEC = HoleSpec("tapped", BAR_SCREW, end="through_all")
@@ -129,14 +132,18 @@ if not _TWO_PLACE_RADIUS > max(KP08_SCREW_FLOAT, BAR_SCREW_FLOAT):
 # and the row, which serves both patterns.
 KP08_MATE_CALLOUT = "MATCHES KP08 BLOCK HOLES"
 BAR_MATE_CALLOUT = "MATCHES MHA-CH-06-TL-20"
-ROW_CALLOUT = "\n".join(("HOLES IN LINE FOR KP08", "AND MHA-CH-06-TL-20"))
+# One line naming both mates: the 6.35 row's witnesses leave room for two
+# text rows only (the value and this).
+ROW_CALLOUT = "KP08 + MHA-CH-06-TL-20"
 
 # --- The KP08 base lands on the bracket ------------------------------------------
+# Its 13 foot (UNVERIFIED) overhangs the 12.7 stock 0.15 a side (contract).
+KP08_FOOT_OVERHANG = max(0.0, (leadscrew.KP08_WIDTH - BRACKET_WIDTH) / 2.0)
 _KP08_CENTRE_X = (KP08_TAP_X[0] + KP08_TAP_X[1]) / 2.0
 if not (
     0.0 < _KP08_CENTRE_X - leadscrew.KP08_LENGTH / 2.0
     and _KP08_CENTRE_X + leadscrew.KP08_LENGTH / 2.0 < BRACKET_LENGTH
-    and leadscrew.KP08_WIDTH < BRACKET_WIDTH
+    and KP08_FOOT_OVERHANG <= 0.15 + 1e-9
 ):
     raise AssertionError("the KP08 base overhangs its end bracket")
 if abs(KP08_TAP_X[1] - KP08_TAP_X[0] - leadscrew.KP08_BOLT_SPACING) > 1e-9:
@@ -257,7 +264,7 @@ PRECHIPS_SOLIDS: list[dict[str, Any]] = [
         "at_mm": [0.0, -HALF_WIDTH, 0.0],
         "size_mm": [BRACKET_LENGTH, BRACKET_WIDTH, BRACKET_THICK],
         "note": (
-            f"{NUMBER}, 6061-T6 1/2 x 3/4 flat; carries a {KP08_ID} block on "
+            f"{NUMBER}, 6061-T6511 1/2 x 1 flat on edge; carries a {KP08_ID} block on "
             "base bar MHA-CH-06-TL-20 by 4 x #8-32 SHCS"
         ),
         "measured": dict(_MEASURED),

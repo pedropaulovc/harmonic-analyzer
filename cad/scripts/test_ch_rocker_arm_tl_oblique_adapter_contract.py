@@ -1,10 +1,8 @@
-"""Source-only census of the complete positive-capture native recipe boundary.
+"""Source-only census of the plain-pivot native recipe boundary.
 
-Reuse the transgear test's AST-only SDK/MRO/signature machinery, NOT its two-item
-recipe inventory or its extrusion allowlist. No native recipe, SDK, COM or stock
-recipe discovery module is imported. Wrapper authors are followed from their
-actual StockComponent imports. Fixed tuple expansion is resolved from source,
-so legitimate projected-coordinate calls are bound rather than skipped.
+Reuse the transgear test's AST-only SDK/MRO/signature machinery. No native
+recipe, SDK, COM or stock discovery module is imported. Fixed tuple expansion
+is resolved from source, so projected-coordinate calls bind rather than skip.
 """
 
 from __future__ import annotations
@@ -21,22 +19,16 @@ import test_pd_transgear_adapter_contract as sdk
 SCRIPTS = Path(__file__).resolve().parent
 RECIPES = (
     "build_ch_rocker_arm_tl_oblique_carrier.py",
-    "build_ch_rocker_arm_tl_oblique_pivot_pin.py",
     "build_ch_rocker_arm_tl_oblique_pivot_block.py",
-    "build_ch_rocker_arm_tl_oblique_pivot_cap.py",
-    "build_ch_rocker_arm_tl_oblique_pivot_retainer.py",
-    "build_ch_rocker_arm_tl_vn_oblique_pivot_cap_screw.py",
-    "build_ch_rocker_arm_tl_vn_oblique_pivot_clevis_pin.py",
-    "build_ch_rocker_arm_tl_vn_oblique_pivot_cotter.py",
-    "build_ch_rocker_arm_tl_vn_oblique_pivot_lock_wire.py",
-    "build_ch_rocker_arm_tl_oblique_nut_bracket.py",
+    "build_ch_rocker_arm_tl_oblique_feed_block.py",
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_screw.py",
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_spacer.py",
+    "build_ch_rocker_arm_tl_vn_oblique_pivot_shim.py",
+    "build_ch_rocker_arm_tl_vn_oblique_hub_pin.py",
     "build_ch_rocker_arm_tl_oblique_jig_assembly.py",
     "build_sh_vn_clamping_kit_hardware.py",
 )
-HARDWARE_RECIPES = RECIPES[5:9]
-STOCK_GEOMETRY = SCRIPTS / "_pivot_retention_stock_geometry.py"
-STOCK_WRAPPER = SCRIPTS / "_stock_fastener.py"
-Function = ast.FunctionDef | ast.AsyncFunctionDef
+HARDWARE_RECIPES = RECIPES[3:7]
 
 
 def _local_nodes(scope: ast.AST):
@@ -213,63 +205,42 @@ def _bind_calls(path: Path, tree: ast.Module) -> list[ast.Call]:
     return calls
 
 
-def _stock_authors(path: Path, tree: ast.Module) -> list[tuple[Path, Function]]:
-    sources = _Sources(path, tree)
-    authors = []
-    for call in ast.walk(tree):
-        if not isinstance(call, ast.Call) or not isinstance(call.func, ast.Name) or call.func.id != "StockComponent":
-            continue
-        author = next((keyword.value for keyword in call.keywords if keyword.arg == "author"), None)
-        assert isinstance(author, ast.Name), f"{path.name}: stock author is not a static import"
-        resolved = sources.callable(path, author)
-        assert len(resolved) == 1 and isinstance(resolved[0][1], (ast.FunctionDef, ast.AsyncFunctionDef))
-        authors.append(resolved[0])
-    return authors
-
-
 def _census_units(recipe: str) -> tuple[Path, ...]:
-    path = SCRIPTS / recipe
-    tree = sdk._tree(path)
-    units = [path]
-    authors = _stock_authors(path, tree)
-    if recipe in HARDWARE_RECIPES:
-        assert len(authors) == 1, f"{recipe}: missing unique stock author"
-    if not sdk._adapter_calls(tree):
-        assert authors, f"{recipe}: empty root census without a resolved stock wrapper"
-    for source, author in authors:
-        assert source.parent.name == "diagnostics"
-        assert any(isinstance(item, ast.Call) and isinstance(item.func, ast.Name) and item.func.id == "stock_recipe" for item in author.decorator_list), f"{source.name}: author lost its recipe-local declaration"
-        units.extend((source, STOCK_WRAPPER))
-        # Follow the existing async stock-family delegation (e.g. socket head),
-        # not every sketch utility or a guessed extrusion requirement.
-        pending = [source]
-        while pending:
-            current = pending.pop()
-            current_tree = sdk._tree(current)
-            imports = {
-                alias.asname or alias.name: (item.module, alias.name)
-                for item in current_tree.body
-                if isinstance(item, ast.ImportFrom) and item.module
-                for alias in item.names
-            }
-            for node in ast.walk(current_tree):
-                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
-                    continue
-                if not node.args or not isinstance(node.args[0], ast.Name) or node.args[0].id != "adapter":
-                    continue
-                imported = imports.get(node.func.id)
-                if imported is None:
-                    continue
-                module, name = imported
-                if module != STOCK_GEOMETRY.stem and not (module.startswith("diagnostics.") and name.startswith("build_")):
-                    continue
-                target = _Sources(current, current_tree).module(current, module)
-                resolved = _Sources(current, current_tree).callable(current, node.func)
-                assert len(resolved) == 1, f"{current.name}: ambiguous stock delegate {name}"
-                if target not in units:
-                    units.append(target)
-                    pending.append(target)
-    return tuple(dict.fromkeys(units))
+    """Follow actual adapter-forwarding imports through thin entrypoints."""
+    units = []
+    pending = [SCRIPTS / recipe]
+    while pending:
+        path = pending.pop()
+        if path in units:
+            continue
+        units.append(path)
+        tree = sdk._tree(path)
+        native_calls = sdk._adapter_calls(tree)
+        imported = {
+            alias.asname or alias.name: alias.name
+            for node in tree.body if isinstance(node, ast.ImportFrom)
+            for alias in node.names
+        }
+        delegates = []
+        sources = _Sources(path, tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                continue
+            if node.func.id not in imported or not node.args:
+                continue
+            if not isinstance(node.args[0], ast.Name) or node.args[0].id != "adapter":
+                continue
+            # Follow substantive build authors, not save/property guards:
+            # those utilities can touch COM without authoring any geometry.
+            if not imported[node.func.id].startswith("build_"):
+                continue
+            resolved = sources.callable(path, node.func)
+            assert resolved, f"{path.name}: unresolved native delegate"
+            delegates.extend(source for source, _function in resolved)
+        assert native_calls or delegates, f"{path.name}: empty native boundary without a source delegate"
+        pending.extend(delegates)
+    assert any(sdk._adapter_calls(sdk._tree(path)) for path in units), f"{recipe}: no native calls reached"
+    return tuple(units)
 
 
 @pytest.mark.parametrize("recipe", RECIPES)
@@ -281,44 +252,34 @@ def test_all_affected_native_recipe_calls_exist_and_bind_to_initialized_sdk(reci
     assert total, f"{recipe}: no adapter methods reached in its source census"
 
 
-def test_census_includes_real_new_methods_without_demanding_extrusion_in_wrappers() -> None:
-    assert len(RECIPES) == len(set(RECIPES))
-    assert len(RECIPES) == 12
-    for recipe in RECIPES[2:4]:
-        calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
+def test_census_covers_every_new_physical_interface() -> None:
+    assert len(RECIPES) == len(set(RECIPES)) == 9
+    for recipe in RECIPES[1:3]:
+        calls = {call.func.attr for path in _census_units(recipe) for call in sdk._adapter_calls(sdk._tree(path))}
         assert {"create_sketch", "create_cut_extrude"} <= calls
-    cap_calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / RECIPES[3]))}
-    assert {"create_part", "create_extrusion", "create_cut_extrude", "add_chamfer"} <= cap_calls
-    hardware_units = {path for recipe in HARDWARE_RECIPES for path in _census_units(recipe)}
-    calls = {call.func.attr for path in hardware_units for call in sdk._adapter_calls(sdk._tree(path))}
-    assert {"create_part", "create_revolve", "create_cut_extrude", "create_axis"} <= calls
-    assert STOCK_GEOMETRY in hardware_units
-    screw_units = _census_units(HARDWARE_RECIPES[0])
-    assert SCRIPTS / "diagnostics" / "diag_build_NAS1352N5H12.py" in screw_units
     for recipe in HARDWARE_RECIPES:
-        units = _census_units(recipe)
-        assert STOCK_WRAPPER in units
-        assert len(units) >= 3  # actual root, imported diagnostic author, stock wrapper
+        calls = {call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / recipe))}
+        assert {"create_part", "create_sketch", "create_extrusion"} <= calls
     stud = "build_sh_vn_clamping_kit_hardware.py"
-    assert stud in RECIPES
     assert _census_units(stud) == (SCRIPTS / stud,)
-    stud_calls = {
-        call.func.attr for call in sdk._adapter_calls(sdk._tree(SCRIPTS / stud))
-    }
-    assert {"create_part", "create_sketch", "create_revolve", "add_chamfer"} <= stud_calls
+    helper = SCRIPTS / "_oblique_pivot_block_model.py"
+    for recipe in RECIPES[1:3]:
+        assert helper in _census_units(recipe)
 
 
 @pytest.mark.parametrize(
     "recipe, method",
     (
-        ("build_ch_rocker_arm_tl_oblique_pivot_cap.py", "create_extrusion"),
+        ("build_ch_rocker_arm_tl_oblique_pivot_block.py", "create_cut_extrude"),
         ("build_sh_vn_clamping_kit_hardware.py", "create_revolve"),
     ),
 )
 def test_real_direct_method_rename_is_rejected_without_importing_recipe(
     recipe: str, method: str,
 ) -> None:
-    path = SCRIPTS / recipe
+    path = next(path for path in _census_units(recipe) if any(
+        call.func.attr == method for call in sdk._adapter_calls(sdk._tree(path))
+    ))
     tree = copy.deepcopy(sdk._tree(path))
     actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == method)
     actual.func.attr = "retention_undeclared_method"
@@ -329,12 +290,14 @@ def test_real_direct_method_rename_is_rejected_without_importing_recipe(
 @pytest.mark.parametrize(
     "recipe",
     (
-        "build_ch_rocker_arm_tl_oblique_pivot_cap.py",
+        "build_ch_rocker_arm_tl_oblique_pivot_block.py",
         "build_sh_vn_clamping_kit_hardware.py",
     ),
 )
 def test_actual_call_with_wrong_keyword_is_rejected_by_sdk_signature(recipe: str) -> None:
-    path = SCRIPTS / recipe
+    path = next(path for path in _census_units(recipe) if any(
+        call.func.attr == "create_sketch" for call in sdk._adapter_calls(sdk._tree(path))
+    ))
     tree = copy.deepcopy(sdk._tree(path))
     actual = next(call for call in sdk._adapter_calls(tree) if call.func.attr == "create_sketch")
     method = sdk._adapter_methods()[actual.func.attr][1]

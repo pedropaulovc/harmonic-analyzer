@@ -3783,10 +3783,6 @@ def _check_recipe_spec(pytest_cmd: list[str]) -> dict[str, Any]:
         # tree): poses closing on the calculator, the shop-fixture rule, and
         # the pinned sweep clearances of both passes.
         SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_jig_assembly.py",
-        # Positive capture bounds and finite tooling envelopes are pure data,
-        # not a certificate of installed spindle/toolholder clearance.
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_retention.py",
-        SCRIPTS_DIR / "test_ch_rocker_arm_tl_oblique_retention_hardware.py",
         # The pen carriage's CG-on-rod-axis balance, paper stand-off and rider
         # layout (pn_pen_carriage_geom) that build_pn_pen_assembly places from.
         SCRIPTS_DIR / "test_pn_pen_carriage_geom.py",
