@@ -92,8 +92,10 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
     assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(1.59416, abs=1e-5)
     assert spec.PLATE_TAP_BACK_WALL_MIN >= 1.5
     assert spec.ROOF_THICKNESS_MIN == pytest.approx(1.59)
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(1.9728)
-    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(1.7728)
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(1.96351)
+    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(1.76351)
+    assert spec.PLATE_TAP_MAJOR_DIA_MAX == pytest.approx(0.0887 * 25.4)
+    assert spec.PLATE_TAP_MAJOR_DIA_MAX > screw.MAJOR_DIA
     assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(2.09)
     assert spec.BLOCK_DEPTH_MIN == pytest.approx(10.49)
     assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(1.64)
@@ -713,8 +715,8 @@ def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
     from machinist_exceptions import load_exceptions
 
     assert spec.PLATE_TAP_WEB_LINES == (
-        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.77 MIN",
-        "THREAD TO REBATE FLOOR 1.97 MIN",
+        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.76 MIN",
+        "THREAD TO REBATE FLOOR 1.96 MIN",
     )
     assert spec.PLATE_CLEARANCE_WEB_LINE == "HOLE TO END FACE 1.64 MIN"
     native = _StopDisplay("<hw-threaddesc>-<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>")

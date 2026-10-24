@@ -223,11 +223,12 @@ WINDOW_FLOOR_MIN = BLOCK_HEIGHT - BLOCK_PRINTED_BANDS_MM["BlockHeight"] - (
 )
 # Reference labels do not make the transferred axes float: retain the plate
 # master's absolute +/-0.10 in both the receiver and cover worst-case proofs.
-# A 2B tap's major runs over basic: the fleet's 0.05 diametral allowance
-# (pd_rack_pinion_spec TAP_MAJOR_ALLOWANCE, mg_magnifying_vertical_rod_geom)
-# bounds the cut thread, which has no specified maximum major of its own.
-PLATE_TAP_MAJOR_ALLOWANCE_MM = 0.05
-PLATE_TAP_MAJOR_RADIUS_MAX = (PLATE_SCREW_MAJOR_DIA + PLATE_TAP_MAJOR_ALLOWANCE_MM) / 2.0
+# A 2B internal thread has no specified maximum major; the tap that cuts it
+# does. ASME/ANSI B94.9-1987 machine screw taps, #2-56: cut-thread major max
+# 0.0887 in (Table 7), ground-thread 0.0883 in (Table 6). The larger bounds
+# the tapped major whichever tap the shop uses.
+PLATE_TAP_MAJOR_DIA_MAX = 0.0887 * 25.4
+PLATE_TAP_MAJOR_RADIUS_MAX = PLATE_TAP_MAJOR_DIA_MAX / 2.0
 PLATE_TAP_WINDOW_WEB_MIN = WINDOW_FLOOR_MIN - (
     PLATE_HOLE_Y + PLATE_HOLE_POSITION_TOLERANCE_MM + PLATE_TAP_MAJOR_RADIUS_MAX
 )
