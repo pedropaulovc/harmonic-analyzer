@@ -56,12 +56,12 @@ def _reloaded_collar(monkeypatch, module, name: str, value):
     return fresh
 
 
-def _reloaded_nut(monkeypatch, included_angle_band: float):
+def _reloaded_nut(monkeypatch, angular_row: float):
     # Perturb the nut's angular row only; the collar's own break angle reads
     # the same title-block helper and must keep the real row when reloaded.
     with pytest.MonkeyPatch.context() as local:
         local.setattr(
-            "_printed_tolerance.angular_band_deg", lambda: included_angle_band
+            "_printed_tolerance.angular_band_deg", lambda: angular_row
         )
         fresh_spec = importlib.util.spec_from_file_location(
             "_thumbnut_perturbed", nut.__file__
@@ -203,7 +203,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     nut's seat countersink on the longest fitted pilot (R9-70: the nut seats
     on the collar's pilot, not the T24), or the shortest stud's full-thread
     end; each countersink's loss counted from the tap drill at its smallest
-    printed angle (R9-63). Least 11.92421 at the shortest fitted body."""
+    printed angle (R9-63). Least 11.91425 at the shortest fitted body."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
@@ -214,11 +214,10 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     cut_deepest = collar.STUD_CUT_BELOW_RIM[1]
     # Recompute each countersink's thread loss from its actual printed form,
     # including dish depth and the angular row, rather than trusting losses.
-    included_band = angular_band_deg()
-    half_min = (90.0 - included_band) / 2.0
-    assert included_band == 1.0
-    assert nut.CSK_INCLUDED_ANGLE_TOL == included_band
-    assert nut.CSK_HALF_ANGLE_BAND == pytest.approx((0.5, -0.5))
+    # The sheet prints the 45 deg half-angle under the title block's row.
+    angular_row = angular_band_deg()
+    half_min = 45.0 - angular_row
+    assert angular_row == 1.0
     assert nut.CSK_HALF_ANGLE_MIN == pytest.approx(half_min)
     rear_loss = (
         (BASIC_MAJOR + 0.4 - nut.TAP_DRILL_DIA) / 2.0
@@ -241,7 +240,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
         for i in range(101)
     ]
     worst = min(engagement(seat) for seat in settings)
-    assert worst == pytest.approx(11.92421, abs=1e-5)
+    assert worst == pytest.approx(11.91425, abs=1e-5)
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 8 shorter leaves less than 1.5 D.
@@ -255,9 +254,9 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
         wider = _reloaded_nut(patch, 2.0)
         loss = (
             (BASIC_MAJOR + 0.4 - wider.TAP_DRILL_DIA) / 2.0
-            / math.tan(math.radians(44.0))
+            / math.tan(math.radians(43.0))
         )
-        assert wider.CSK_HALF_ANGLE_MIN == 44.0
+        assert wider.CSK_HALF_ANGLE_MIN == 43.0
         assert wider.REAR_THREAD_LOSS == pytest.approx(loss)
         assert wider.REAR_THREAD_LOSS > nut.REAR_THREAD_LOSS
         patch.setattr(nut, "FRONT_THREAD_LOSS", wider.FRONT_THREAD_LOSS)
@@ -265,7 +264,7 @@ def test_printed_countersink_angle_reaches_the_engagement_refusal(monkeypatch) -
         assert ENGAGEMENT_FLOOR < perturbed.THUMBNUT_ENGAGEMENT_WORST
         assert perturbed.THUMBNUT_ENGAGEMENT_WORST < collar.THUMBNUT_ENGAGEMENT_WORST
     with monkeypatch.context() as patch:
-        shallow = _reloaded_nut(patch, 80.0)
+        shallow = _reloaded_nut(patch, 40.0)
         assert shallow.CSK_HALF_ANGLE_MIN == 5.0
         patch.setattr(nut, "FRONT_THREAD_LOSS", shallow.FRONT_THREAD_LOSS)
         with pytest.raises(AssertionError, match="MHA-PD-13 thumbnut / MHA-PD-08 stud"):

@@ -20,7 +20,7 @@ import pd_transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from _test_stubbed_build import offline_adapter, stub_seat
 
 # The B landscape template's inner border, left edge (sheet metres).
@@ -56,10 +56,12 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 
 
 def test_actual_entry_cones_carry_model_owned_controls() -> None:
-    assert model_toleranced_dimensions(part) == {
-        ("CountersinkProfile", "CountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
-        ("CountersinkProfile", "FrontCountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
-    }
+    # Machinist review: the 45° ±0.5° half-angle named no mate, so the title
+    # block's angular row governs it; only the MAX diameter is model-owned.
+    assert model_toleranced_dimensions(part) == {}
+    assert spec.CSK_HALF_ANGLE_MIN == pytest.approx(
+        spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
+    )
     assert spec.CSK_DIA_TOL_TYPE == 6
     assert spec.CSK_DIA_PLACES == 3
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
@@ -428,7 +430,7 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     turned = set().union(
         *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
     )
-    assert len(turned) == 9
+    assert len(turned) == 10
     assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
     dia = drawing.SECTION_KEEP["CountersinkDia"]
     angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
@@ -452,6 +454,35 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     assert drawing.SECTION_KEEP["DishDia"][1] > rim_y
     # Negative control: the 19e33c6c2 stack sat under the seat face.
     assert _section_station(seat_y - 0.014) < 0.0
+
+
+def test_lengths_read_from_the_faced_ends() -> None:
+    """Machinist review: the 2.4 waist chained off the head's 8.7 shoulder.
+    The flange length reads from the faced seat face; the waist prints only
+    as the reference remainder."""
+    assert "FlangeLength" in spec.DRAWING_DIMENSIONS["StemProfile"]
+    assert drawing.REFERENCE_DIMENSIONS == ("WaistLength",)
+    assert spec.FLANGE_LENGTH == 5.0
+    assert spec.WAIST_LENGTH == pytest.approx(2.4)
+    assert spec.HEAD_LENGTH + spec.WAIST_LENGTH + spec.FLANGE_LENGTH == pytest.approx(
+        spec.OVERALL_LENGTH
+    )
+    # One lane, left of the silhouette: the waist reference over the flange.
+    lane = drawing.SECTION_KEEP["FlangeLength"][0]
+    assert drawing.SECTION_KEEP["WaistLength"][0] == lane
+    assert lane < drawing._section_x(-spec.HEAD_DIA / 2.0)
+    assert 0.0 < _section_station(drawing.SECTION_KEEP["FlangeLength"][1]) < spec.FLANGE_LENGTH
+
+
+def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
+    """Machinist review: the Ø4.566 line and its extension lines struck the
+    default caption's letters; the caption's top now stands below them."""
+    seat_y = drawing._section_y(0.0)
+    line_y = drawing.SECTION_KEEP["CountersinkDia"][1]
+    caption = drawing.SECTION_CAPTION_XY
+    assert caption[0] == drawing.SECTION_CENTER[0]
+    assert line_y - caption[1] >= 0.004
+    assert seat_y - line_y == pytest.approx(0.008)
 
 
 @pytest.mark.parametrize(

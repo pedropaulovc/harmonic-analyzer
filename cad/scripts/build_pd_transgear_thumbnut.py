@@ -17,8 +17,8 @@ seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
   seed puts two crests on the Front Plane, so the axial section shows the
   knurl diameter.
 * ``StemProfile``: the waist and flange as a stepped profile revolved onto
-  the head's rear face.  Its dimensions are both diameters and the waist
-  length; the flange length is the remainder of the overall length.
+  the head's rear face.  Its dimensions are both diameters and the flange
+  length from the seat face; the waist length is the remainder.
 * ``ThreadBore``: one Hole Wizard #8-32 UNC-2B tapped hole, through all
   from the seat face.
 * ``DishProfile``: the dished front face, a cone cut from the rim's Ø down
@@ -67,14 +67,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_tolerances import set_dimension_symmetric_angular_tolerance
 from _holes import wizard_holes
 from _visibility import blank_reference_geometry
 from pd_transgear_thumbnut_spec import (
     CSK_DIA,
     CSK_DIA_DEVIATIONS,
     CSK_DIA_TOL_TYPE,
-    CSK_HALF_ANGLE_BAND,
     CSK_HALF_ANGLE_DEG,
     DISH_DEPTH,
     DISH_DIA,
@@ -208,7 +206,7 @@ async def build(adapter) -> dict[str, str]:
         ("HeadLength", HEAD_LENGTH),
         ("FlangeDia", FLANGE_DIA),
         ("WaistDia", WAIST_DIA),
-        ("WaistLength", WAIST_LENGTH),
+        ("FlangeLength", FLANGE_LENGTH),
         ("DishDia", DISH_DIA),
         ("DishFloorDia", DISH_FLOOR_DIA),
         ("DishDepth", DISH_DEPTH),
@@ -360,14 +358,14 @@ async def build(adapter) -> dict[str, str]:
         "waist length",
         await adapter.add_sketch_dimension(stem_lines[3], None, "linear", WAIST_LENGTH),
     )
-    stem.record("WaistLength", '"WaistLength"')
+    stem.record("WaistLength", '"OverallLength" - "HeadLength" - "FlangeLength"')
     check(
         "flange length",
         await adapter.add_sketch_dimension(
             stem_lines[1], None, "linear", FLANGE_LENGTH
         ),
     )
-    stem.record("FlangeLength", '"OverallLength" - "HeadLength" - "WaistLength"')
+    stem.record("FlangeLength", '"FlangeLength"')
     await ensure_fully_defined(adapter, "stem profile")
     check("exit_sketch stem profile", await adapter.exit_sketch())
     name_last_feature(adapter, "StemProfile")
@@ -562,16 +560,11 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # Model-owned controls on both actual cones; general printed bands govern
-    # the remaining turned sizes. The seat is a clamp, not a running face.
+    # Model-owned MAX on both actual cone diameters; the title block governs
+    # their half-angle and the remaining turned sizes. The seat is a clamp,
+    # not a running face.
     for name in ("CountersinkDia", "FrontCountersinkDia"):
         _countersink_max_limit(adapter, name)
-    set_dimension_symmetric_angular_tolerance(
-        adapter, "CountersinkProfile", "CountersinkHalfAngle", max(CSK_HALF_ANGLE_BAND)
-    )
-    set_dimension_symmetric_angular_tolerance(
-        adapter, "CountersinkProfile", "FrontCountersinkHalfAngle", max(CSK_HALF_ANGLE_BAND)
-    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

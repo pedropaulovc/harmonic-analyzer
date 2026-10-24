@@ -2,10 +2,11 @@ r"""Create the manufacturing drawing for the transgear thumbnut (MHA-PD-13).
 
 The face view is the ``*Top`` orientation, looking at the dished front face:
 it carries the native #8-32 UNC-2B through-thread callout. Both actual entry
-cones have model-owned MAX diameter and half-angle controls in section.
+cones print a model-owned MAX diameter and their half-angle in section.
 Section A-A uses the Front plane through the axis and two knurl crests, so the
-knurl diameter, the head, waist and flange, the overall length from the seat
-face and the dish's rim and floor diameters and its depth to the floor print
+knurl diameter, the head, waist and flange, the overall length and the
+flange length from the seat face (the waist length a reference between
+them) and the dish's rim and floor diameters and its depth to the floor print
 on solid cut edges.  No roughness symbol: the seat face clamps the wheel
 (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 """
@@ -39,6 +40,7 @@ from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
     set_dimension_callouts,
+    set_reference_dimension,
 )
 from _drawing_hole_callout import add_native_hole_callout
 from _drawing_projection import model_point_in_view
@@ -46,7 +48,9 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
 from pd_transgear_thumbnut_spec import (
@@ -64,6 +68,9 @@ from pd_transgear_thumbnut_spec import (
     THREAD,
 )
 
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
+
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_thumbnut"]
 PART_STEM = SPEC.artifact_stem
@@ -77,7 +84,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its nine
+# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its ten
 # dimensions and the knurl callout on the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -109,7 +116,8 @@ def _section_y(model_y_mm: float) -> float:
 # The rim's diameters stack above it (knurl outermost, the dish floor
 # innermost, so each one's extension lines stay inside the next one's) with
 # only air below their extension lines; the lengths stand off the right
-# (head, overall) and the left (waist, dish depth) of the silhouette.  The
+# (head, overall) and the left (dish depth, the waist reference and the
+# flange from the seat face, one lane) of the silhouette.  The
 # dish depth's text stands above its rim extension line: at 3:1 the depth is
 # shorter than the text is tall.  The waist and the flange are dimensioned
 # across their own cut, each dimension line at its feature's height and its
@@ -134,6 +142,10 @@ SECTION_KEEP = {
         _section_x(-HEAD_DIA / 2.0) - 0.016,
         _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0),
     ),
+    "FlangeLength": (
+        _section_x(-HEAD_DIA / 2.0) - 0.016,
+        _section_y(FLANGE_LENGTH / 2.0),
+    ),
     "FlangeDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH / 2.0)),
     "WaistDia": (_STEM_TEXT_X, _section_y(FLANGE_LENGTH + WAIST_LENGTH / 2.0)),
     # A sheet-outboard angular anchor makes the native cone/axis arc huge
@@ -143,6 +155,12 @@ SECTION_KEEP = {
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
 COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
+# The waist is the remainder between the head and the flange: a reference.
+REFERENCE_DIMENSIONS = ("WaistLength",)
+# The native caption's top centre, hung below the cone diameter's dimension
+# line (seat - 8 mm): the default caption stood on it, its extension lines
+# striking SECTION's letters.
+SECTION_CAPTION_XY = (SECTION_CENTER[0], _section_y(0.0) - 0.013)
 # The face view prints only the native thread callout.
 FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
@@ -339,6 +357,15 @@ def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
         raise RuntimeError(f"thumbnut countersink angle text did not persist: {position!r}")
 
 
+def _mark_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Parenthesize each REFERENCE_DIMENSIONS length; refuse a missing one."""
+    for name in REFERENCE_DIMENSIONS:
+        matches = [item for item in annotations if dimension_name(adapter, item) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"thumbnut needs one native {name}, got {len(matches)}")
+        set_reference_dimension(adapter, matches[0], label=f"thumbnut {name} reference")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -421,6 +448,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, section_annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
     _place_countersink_angle(adapter, section_annotations)
+    _mark_reference_dimensions(adapter, section_annotations)
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="thumbnut section A-A"
+    )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")
     # The tap-drill edge under the front countersink: the one visible circle
