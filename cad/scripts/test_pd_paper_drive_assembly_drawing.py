@@ -1436,6 +1436,107 @@ def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
     assert not explode.SHOWN_STEMS & explode.TRANSGEAR_SHOWN_STEMS
 
 
+def test_the_guide_lock_balloon_is_pinned_on_a_free_bottom_plate() -> None:
+    anchor = drawing.PLATEN_BALLOON_ANCHORS["pd-guide-lock"]
+    # Each station inserts its top plate, then its bottom one.
+    assert anchor.instance == "pd-guide-lock-2"
+    x, y, z = anchor.point_mm
+    # The plate's front face (z 0), on its +X end's straight run.
+    assert (x, z) == (drawing.guide_lock.LOCK_WIDTH, 0.0)
+    straight = drawing.guide_lock.LOCK_HEIGHT - drawing.guide_lock.CORNER_R
+    assert drawing.guide_lock.CORNER_R < y < straight
+    others = set(drawing.PLATEN_BALLOON_ANCHORS) - {"pd-guide-lock"}
+    assert all(
+        drawing.PLATEN_BALLOON_ANCHORS[stem] == _drawing_balloons.BalloonAnchor()
+        for stem in others
+    )
+
+
+# Run 20261024T091056564Z's platen ring (drawing.balloon_ring), item: sheet
+# attachment, with item 8 (pd-guide-lock) moved to the pinned point: its
+# walked point on -1 read (292.538, 204.798) mm, and the pinned one on -2
+# projects through the view's isometric at 1:4 to (292.402, 198.029) mm.
+PLATEN_RING_241024 = (
+    ("12", (0.274470, 0.163753)),
+    ("10", (0.315578, 0.149024)),
+    ("5", (0.325318, 0.141191)),
+    ("6", (0.327059, 0.136983)),
+    ("7", (0.325999, 0.167202)),
+    ("4", (0.350806, 0.165084)),
+    ("1", (0.359999, 0.166151)),
+    ("3", (0.307567, 0.218544)),
+    ("2", (0.299524, 0.213901)),
+    ("13", (0.300604, 0.198248)),
+    ("8", (0.292402, 0.198029)),
+    ("9", (0.272527, 0.173868)),
+    ("11", (0.266059, 0.172444)),
+)
+# Its outline, reconstructed from the printed circles (radius 4.78 mm) on the
+# ring they were spread on, centred in EXPLODED_RING_LIMITS by ring_fit_shift.
+PLATEN_OUTLINE_241024 = (0.2593, 0.1008, 0.3837, 0.2352)
+PLATEN_BALLOON_RADIUS = 0.00478
+
+
+def test_the_aimed_guide_lock_balloon_keeps_the_platen_ring_clear() -> None:
+    attachments = dict(PLATEN_RING_241024)
+    for dx, dy in product((-0.002, 0.0, 0.002), repeat=2):
+        x0, y0, x1, y1 = PLATEN_OUTLINE_241024
+        outline = (x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+        cx, cy = (outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0
+        rx = (outline[2] - outline[0]) / 2.0 + drawing.BALLOON_MARGIN
+        ry = (outline[3] - outline[1]) / 2.0 + drawing.BALLOON_MARGIN
+        items = list(attachments)
+        thetas = [
+            math.atan2(attachments[i][1] - cy, attachments[i][0] - cx) for i in items
+        ]
+        order = sorted(range(len(items)), key=thetas.__getitem__)
+        gap = _drawing_balloons._min_angular_gap(
+            min(rx, ry),
+            PLATEN_BALLOON_RADIUS,
+            clearance=_drawing_balloons._BALLOON_CLEARANCE_M,
+        )
+        angles = _drawing_balloons._push_apart_on_ring(
+            [thetas[index] for index in order], min_gap=gap
+        )
+        centres = {
+            items[index]: (cx + rx * math.cos(angle), cy + ry * math.sin(angle))
+            for index, angle in zip(order, angles)
+        }
+        attach = attachments["8"]
+        aimed = drawing.ring_point_along(
+            outline, drawing.BALLOON_MARGIN, attach, drawing.GUIDE_LOCK_LEADER_DEG
+        )
+        # On the ring, along the aimed direction from the attachment.
+        on_ring = ((aimed[0] - cx) / rx) ** 2 + ((aimed[1] - cy) / ry) ** 2
+        assert on_ring == pytest.approx(1.0)
+        leader = math.atan2(aimed[1] - attach[1], aimed[0] - attach[0])
+        assert math.degrees(leader) == pytest.approx(drawing.GUIDE_LOCK_LEADER_DEG)
+        centres["8"] = aimed
+        segments = [
+            LeaderSegment(item, "balloon", *centres[item], *attachments[item])
+            for item in items
+        ]
+        assert not find_leader_leader_crossings(segments), (dx, dy)
+        assert all(
+            math.hypot(x - aimed[0], y - aimed[1])
+            > 2 * PLATEN_BALLOON_RADIUS + _drawing_balloons._BALLOON_CLEARANCE_M
+            for item, (x, y) in centres.items()
+            if item != "8"
+        ), (dx, dy)
+
+
+def test_a_ring_point_needs_a_start_inside_the_ring() -> None:
+    outline = (0.0, 0.0, 0.2, 0.1)
+    assert drawing.ring_point_along(outline, 0.01, (0.1, 0.05), 0.0) == pytest.approx(
+        (0.21, 0.05)
+    )
+    assert drawing.ring_point_along(outline, 0.01, (0.1, 0.05), 90.0) == pytest.approx(
+        (0.1, 0.11)
+    )
+    with pytest.raises(ValueError):
+        drawing.ring_point_along(outline, 0.01, (0.3, 0.05), 180.0)
+
+
 def _explode_instances() -> list[explode.Instance]:
     instances = [explode.Instance(f"{stem}-1", stem) for stem in explode.SHOWN_STEMS]
     instances.append(explode.Instance("pd-rack-pinion-1", "pd-rack-pinion"))

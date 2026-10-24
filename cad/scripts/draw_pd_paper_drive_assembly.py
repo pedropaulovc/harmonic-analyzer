@@ -57,6 +57,7 @@ from sh_vn_chain_link_spec import (
 import _config
 from _drawing_balloon_display import rendered_balloon_circle
 from _drawing_balloons import (
+    _BALLOON_CLEARANCE_M,
     BalloonAnchor,
     BalloonLanding,
     _anchor_model_points,
@@ -110,6 +111,7 @@ import pd_latch_hook_geometry as hook_geometry
 import paper_drive_rack_setup as rack_setup
 import pd_paper_drive_assembly_steps as steps
 import pd_paper_drive_explode_spec as explode
+import pd_guide_lock_spec as guide_lock
 import pd_platen_guide_spec as platen_guide
 import pd_platen_spec as platen
 import pd_support_bar_spec as support_bar
@@ -1021,7 +1023,40 @@ ASSEMBLED_BALLOON_ANCHORS = {
     "pd-transgear-removable": BalloonAnchor(instance=SPARE_INSTANCE),
 }
 # Sheet 4's exploded view balloons every family it shows.
-PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS}
+# Each lock station inserts its top plate, then its bottom one
+# (build_pd_paper_drive_assembly), so the first bottom plate is -2; the
+# first station is the platen's +X end, the view's left. The walk put the
+# guide lock's balloon (MHA-PD-12) on -1, a top plate, whose corner the
+# explode leaves just under the bar's lower edge: its arrowhead read as
+# landing on the bar (machinist review, rolling main 2056e3344, run
+# 20261024T091056564Z). The bottom plate stands clear between the bar and the
+# top guide, so the balloon lands on it, on its front face's +X end edge (the
+# view's left edge of the plate): up from its guide-side edge on the straight
+# run below the corner round, where the leader's corridor is widest
+# (GUIDE_LOCK_LEADER_DEG).
+GUIDE_LOCK_BALLOON_INSTANCE = "pd-guide-lock-2"
+GUIDE_LOCK_BALLOON_POINT_MM = (guide_lock.LOCK_WIDTH, 7.0, 0.0)
+if not (
+    guide_lock.CORNER_R
+    < GUIDE_LOCK_BALLOON_POINT_MM[1]
+    < guide_lock.LOCK_HEIGHT - guide_lock.CORNER_R
+):
+    raise AssertionError(
+        "the guide-lock balloon point must be on the end's straight run"
+    )
+PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS} | {
+    "pd-guide-lock": BalloonAnchor(
+        point_mm=GUIDE_LOCK_BALLOON_POINT_MM, instance=GUIDE_LOCK_BALLOON_INSTANCE
+    )
+}
+# A ringed balloon sits on the ray from the view's centre through its
+# attachment. Past the bottom plate that ray crosses both left item 4 clamp
+# screws, drawn forward of the bar's end. The guide-lock balloon is aimed
+# up-left from its attachment at this sheet angle instead (degrees
+# counterclockwise from +x), between those screws' heads and the top guide's
+# left end: on the v46 sheet (run 20261024T091056564Z) all other ink stood
+# at least 1.0 mm off that line at 1:4.
+GUIDE_LOCK_LEADER_DEG = 153.5
 
 
 def _in_item_order(
@@ -1069,6 +1104,27 @@ def ring_fit_shift(outline: Box, limits: Box, *, name: str) -> tuple[float, floa
         (limits[0] + limits[2] - ring[0] - ring[2]) / 2.0,
         (limits[1] + limits[3] - ring[1] - ring[3]) / 2.0,
     )
+
+
+def ring_point_along(
+    outline: Box, margin: float, start: tuple[float, float], direction_deg: float
+) -> tuple[float, float]:
+    """Where the ray from ``start`` at ``direction_deg`` (counterclockwise
+    from +x) leaves the balloon ring: the ellipse ``margin`` outside
+    ``outline`` that _spread_balloons rings a view's balloon circles on."""
+    cx, cy = (outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0
+    rx = (outline[2] - outline[0]) / 2.0 + margin
+    ry = (outline[3] - outline[1]) / 2.0 + margin
+    ux, uy = (start[0] - cx) / rx, (start[1] - cy) / ry
+    if ux * ux + uy * uy >= 1.0:
+        raise ValueError(f"ray start {start!r} is not inside the balloon ring")
+    angle = math.radians(direction_deg)
+    vx, vy = math.cos(angle) / rx, math.sin(angle) / ry
+    a = vx * vx + vy * vy
+    b = 2.0 * (ux * vx + uy * vy)
+    c = ux * ux + uy * uy - 1.0
+    t = (-b + math.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)
+    return (start[0] + t * math.cos(angle), start[1] + t * math.sin(angle))
 
 
 def step_down_to_fit(
@@ -2953,6 +3009,90 @@ def _place_transgear_exploded_sheet(
     return landings
 
 
+# A moved balloon circle must read back on its aimed ring point within this.
+_AIMED_BALLOON_TOLERANCE_M = 5e-4
+
+
+def _aim_ringed_balloon(
+    adapter: Any,
+    view: Any,
+    landings: Sequence[BalloonLanding],
+    *,
+    stem: str,
+    direction_deg: float,
+    label: str,
+) -> None:
+    """Move ``stem``'s ringed balloon to where the ray from its attachment
+    at ``direction_deg`` meets the view's balloon ring (ring_point_along);
+    the attachment and every other balloon stay. Fails when the moved circle
+    does not read back there, touches another circle, or any two of the
+    view's leaders cross."""
+    circles, attachments = [], []
+    for landing in landings:
+        circles.append(rendered_balloon_circle(landing.note, label=label))
+        annotation = _early_bound(
+            _early_bound(landing.note, "INote").GetAnnotation(), "IAnnotation"
+        )
+        points = tuple(
+            float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ())
+        )
+        if len(points) < 6:
+            raise RuntimeError(f"{label}: {landing.stem} balloon leader is unreadable")
+        attachments.append((points[-3], points[-2]))
+    stems = [landing.stem for landing in landings]
+    if stems.count(stem) != 1:
+        raise RuntimeError(f"{label}: {stems.count(stem)} {stem} balloons, expected 1")
+    index = stems.index(stem)
+    target = ring_point_along(
+        _view_outline(view), BALLOON_MARGIN, attachments[index], direction_deg
+    )
+    annotation = _early_bound(
+        _early_bound(landings[index].note, "INote").GetAnnotation(), "IAnnotation"
+    )
+    anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(anchor) < 2:
+        raise RuntimeError(f"{label}: {stem} balloon has no position")
+    x, y, _radius = circles[index]
+    if not annotation.SetPosition(
+        target[0] + anchor[0] - x, target[1] + anchor[1] - y, 0.0
+    ):
+        raise RuntimeError(f"{label}: failed to move the {stem} balloon")
+    rebuild_drawing(adapter, label=f"{label} {stem} aimed")
+    circles[index] = rendered_balloon_circle(landings[index].note, label=label)
+    x, y, radius = circles[index]
+    if math.hypot(x - target[0], y - target[1]) > _AIMED_BALLOON_TOLERANCE_M:
+        raise RuntimeError(
+            f"{label}: {stem} balloon reads at ({x:.4f}, {y:.4f}), aimed at "
+            f"({target[0]:.4f}, {target[1]:.4f})"
+        )
+    touching = [
+        stems[other]
+        for other, (ox, oy, oradius) in enumerate(circles)
+        if other != index
+        and math.hypot(ox - x, oy - y) < radius + oradius + _BALLOON_CLEARANCE_M
+    ]
+    if touching:
+        raise RuntimeError(f"{label}: aimed {stem} balloon touches {touching}")
+    crossings = find_leader_leader_crossings(
+        [
+            LeaderSegment(stems[i], "balloon", cx, cy, *attachments[i])
+            for i, (cx, cy, _r) in enumerate(circles)
+        ]
+    )
+    if crossings:
+        raise RuntimeError(
+            f"{label}: aimed {stem} leader crossings "
+            f"{[(c.a.label, c.b.label) for c in crossings]}"
+        )
+    _telemetry.event(
+        "drawing.balloon_aimed",
+        stem=stem,
+        direction_deg=direction_deg,
+        attachment_mm=f"{attachments[index][0] * 1000:.3f},{attachments[index][1] * 1000:.3f}",
+        centre_mm=f"{x * 1000:.3f},{y * 1000:.3f}",
+    )
+
+
 def _place_exploded_sheet(
     adapter: Any, table: Any, items: dict[str, str], notes: StepNotes,
 ) -> list[Any]:
@@ -2990,6 +3130,14 @@ def _place_exploded_sheet(
         anchors=PLATEN_BALLOON_ANCHORS,
         label="paper-drive platen BOM coverage",
         margin=BALLOON_MARGIN,
+    )
+    _aim_ringed_balloon(
+        adapter,
+        view,
+        landings,
+        stem="pd-guide-lock",
+        direction_deg=GUIDE_LOCK_LEADER_DEG,
+        label="paper-drive platen BOM coverage",
     )
     _place_sheet_note(
         adapter, SHEET_NAMES[3], notes.platen_steps, PLATEN_NOTE_XY, label="platen steps"
