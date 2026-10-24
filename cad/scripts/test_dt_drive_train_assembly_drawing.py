@@ -40,7 +40,7 @@ EXTERNAL_NUMBERS = frozenset(
         "MHA-CH-08",
         "MHA-CH-VN-56",
         drawing.NORTH_BRACKET_SCREW,
-        # Step 5's paper-drive T12, named on sheet 12's interface line.
+        # Step 5's paper-drive T12, named on sheet 13's interface line.
         drawing.CRANK_CHAIN_WHEEL,
     }
 )
@@ -234,6 +234,7 @@ def test_the_package_prints_each_numbered_assembly_step_once() -> None:
         for field in drawing.package_note_fields(_drawing_facts())
         if field.sheet in (
             drawing.SEQUENCE_SHEET,
+            drawing.CRANK_SHEET,
             drawing.BANK_SHEET,
             drawing.FIT_SHEET,
             drawing.CONTINUATION_SHEET,
@@ -248,17 +249,23 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
     assert (
         drawing.SEQUENCE_SHEET,
+        drawing.CRANK_SHEET,
         drawing.BANK_SHEET,
         drawing.FIT_SHEET,
         drawing.CONTINUATION_SHEET,
         drawing.FULL_DETAIL_SHEET,
         drawing.CHECKS_SHEET,
-    ) == (7, 8, 9, 10, 11, 12), "the numbered steps read in sheet order"
+        drawing.CHECKS_CONTINUATION_SHEET,
+        drawing.BANK_SETTINGS_SHEET,
+    ) == (7, 8, 9, 10, 11, 12, 13, 14, 15), "the numbered steps read in sheet order"
+    assert len(names) == drawing.BANK_SETTINGS_SHEET
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
+    assert names[drawing.CRANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CRANK"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
+    assert names[drawing.CHECKS_CONTINUATION_SHEET - 1] == "CHECKS (CONT.)"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5, 6]
     assert set(drawing.SHEET_SCALES) == set(names)
