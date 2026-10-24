@@ -504,6 +504,15 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     assert part.PART_NAME == ARTIFACT == leadscrew.END_BRACKET
 
 
+def test_material_names_the_aluminium_flat_bar_family() -> None:
+    # Machinist review ENFORCE (rule 2): only the taps need the metal, so the
+    # title block names the family; the spec row keeps 6061-T6 as an example.
+    row = _config.parts(ARTIFACT)
+    assert row["material"].startswith("ALUMINUM FLAT BAR")
+    assert "6061" not in row["material"]
+    assert "6061-T6" in row["material_specification"]
+
+
 def test_places_are_model_authored_and_the_sheet_is_pure() -> None:
     script = Path(drawing.__file__)
     assert script.name in _drawing_contract.PRECISION_MIGRATED_DRAWINGS

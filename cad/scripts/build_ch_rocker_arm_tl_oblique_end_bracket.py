@@ -66,7 +66,7 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-oblique-end-bracket"
-MATERIAL = "6061 Alloy"  # the registry row names the 6061-T6 flat bar
+MATERIAL = "6061 Alloy"  # the registry row's example aluminium flat bar
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",

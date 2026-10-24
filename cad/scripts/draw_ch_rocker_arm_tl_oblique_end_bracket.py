@@ -44,6 +44,7 @@ from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -70,6 +71,9 @@ from ch_rocker_arm_tl_oblique_end_bracket_spec import (
     KP08_TAP_X,
     ROW_CALLOUT,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_end_bracket"]
 PART_STEM = SPEC.artifact_stem
@@ -507,7 +511,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Oblique Trammel End Bracket Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker oblique trammel end bracket; 6061-T6 flat; MHA-CH-06-TL-28",
+            3: "rocker oblique trammel end bracket; aluminum flat bar; MHA-CH-06-TL-28",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
