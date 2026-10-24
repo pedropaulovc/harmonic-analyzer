@@ -87,7 +87,10 @@ FRONT_CENTER = (0.161, 0.175)
 # The end view stands far enough right that the height's callout runs
 # between it and the bar end.
 RIGHT_CENTER = (0.340, 0.175)
-ISO_CENTER = (0.320, 0.095)
+# The isometric falls from its upper-left end toward the title block; that
+# end stands about 15 mm right of the front view's right-end extension line,
+# the lower-right end about 5 mm over the title block.
+ISO_CENTER = (0.336, 0.098)
 
 _HALF_LEN = BAR_LENGTH * SHEET_SCALE[0] / 2000.0
 LEFT_END = FRONT_CENTER[0] - _HALF_LEN
@@ -315,7 +318,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Beside the isometric, over its lower-right run (the view falls from
     # its upper-left end): clear of the title block below and of the depth's
     # callout above.
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.118)
+    add_property_linked_note(adapter, "Isometric View Note", 0.335, 0.125)
 
     return await finalize_drawing(
         adapter,
