@@ -229,6 +229,10 @@ def test_the_dome_heights_and_the_overall_print_as_references() -> None:
     assert spec.DRAWING_REFERENCE_PRECISION == 2
     # The overall's row stands under the station's callout.
     assert drawing.OVERALL_TEXT_XY[1] < drawing.SIDE_KEEP["GrooveStation"][1] - 0.020
+    # The land's (2.60), about 11.3 mm wide, ends left of the tip apex's
+    # extension line that the 51.35 and the overall share.
+    land_x, _ = drawing.SIDE_KEEP["FrontLand"]
+    assert land_x + 0.0057 < drawing.TIP_X - 0.001
 
 
 def test_the_shank_carries_the_one_machined_finish() -> None:

@@ -137,7 +137,10 @@ HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 _ROW_Y = SIDE_CENTER[1] - 0.036
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
-    "FrontLand": (FRONT_END_X - 0.010, _ROW_Y),
+    # Left of the tip apex's extension line (shared by the 51.35 and the
+    # overall), which ran through the ')' at FRONT_END_X - 0.010 (layout
+    # audit text-on-line, run 20261024T060429646Z).
+    "FrontLand": (TIP_X - 0.008, _ROW_Y),
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
     "GrooveWidth": (GROOVE_MID_X + 0.032, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
@@ -147,9 +150,10 @@ SIDE_KEEP = {
     # 20261024T030409384Z).  The callout under the value runs right from
     # the line, high enough that it clears the Ra symbol and the head Ø.
     "ShankDia": (SHANK_MID_X, SHANK_TOP_Y + 0.046),
-    # Above the shank Ø's whole block: its shoulder, as wide as the ring
-    # callout, ends left of the shank Ø's +0.000.
-    "GrooveDia": (GROOVE_MID_X, SHANK_TOP_Y + 0.068),
+    # Above the shank Ø's whole block, with a text gap past the audit's
+    # 3.57 mm (+0.068 left 2.80 to the shank Ø's 0.000): its shoulder, as
+    # wide as the ring callout, ends left of the shank Ø's +0.000.
+    "GrooveDia": (GROOVE_MID_X, SHANK_TOP_Y + 0.072),
     "HeadDomeR": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] + 0.006),
     "HeadDomeSagDim": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] - 0.016),
     "TipDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
