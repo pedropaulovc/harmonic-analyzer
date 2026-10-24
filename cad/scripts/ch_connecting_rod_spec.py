@@ -115,15 +115,13 @@ FORK_BASE_BELOW_PIN = 13.0
 PIN_HOLE_DIA = 1.968
 PIN_HOLE_BAND = (0.010, 0.0)  # (upper, lower) deviations, reamed; native
 # Every inside corner -- the slot floor's two, the fork's root step onto the
-# shank (four) and the shank onto the ring (two) -- is one modelled fillet
-# printed as a single-limit R MAX (drawing-guidelines.md rule 16): the model
-# value IS the printed maximum (swTolMAX prints nominal + MAX). The slot
-# floor's caps the size: under the arm's least clearance over the floor
-# (ch_rod_pivot_pin_spec checks it), and well inside half the slot.
+# shank (four) and the shank onto the ring (two) -- is one modelled fillet,
+# inside the title block's INSIDE CORNERS R1.0 MAX, which governs them on the
+# print (machinist review: a tighter all-corners R0.5 MAX named no function).
+# That ceiling still clears the arm over the slot floor (the offline drawing
+# test checks it against ch_rod_pivot_pin_spec), and stays well inside half
+# the slot.
 INSIDE_CORNER_R = 0.5
-INSIDE_CORNER_BAND = (0.0, -INSIDE_CORNER_R)  # (upper, lower): sharp to MAX
-INSIDE_CORNER_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
-INSIDE_CORNER_PLACES = 1
 if 2.0 * INSIDE_CORNER_R >= FORK_SLOT_WIDTH + FORK_SLOT_BAND[1]:
     raise AssertionError("the slot floor's corner radii meet across the slot")
 
