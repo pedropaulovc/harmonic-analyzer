@@ -1,9 +1,10 @@
 r"""Create the MHA-SM-04 gooseneck spring screw manufacturing drawing.
 
 The SLDPRT remains authoritative.  A screw carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter, relief lead and
-tip chamfer keep their native bands, and every other size is an ordinary
-model dimension at its part-authored places under the title block's .XX band.
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the relief diameter and its
+45-degree lead print as the part's single MAX limits, and every other size is
+an ordinary model dimension at its part-authored places under the title
+block's .XX band.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the crowned head
@@ -32,6 +33,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_centerline import add_view_centerline
@@ -53,6 +55,7 @@ from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -65,28 +68,25 @@ from sm_gooseneck_spring_screw_geom import (
     MAJOR_DIA,
     OVERALL_LENGTH,
     RELIEF_DIA,
-    RELIEF_DIA_LOWER,
-    RELIEF_DIA_UPPER,
+    RELIEF_DIA_TOL_TYPE,
     RELIEF_LEAD,
-    RELIEF_LEAD_LOWER,
-    RELIEF_LEAD_UPPER,
+    RELIEF_LEAD_TOL_TYPE,
     RELIEF_WIDTH,
     SLOT_DEPTH,
     SLOT_FLOOR_Z,
     SLOT_WIDTH,
     TIP_CHAMFER,
-    TIP_CHAMFER_LOWER,
-    TIP_CHAMFER_UPPER,
 )
 from sm_gooseneck_spring_screw_spec import (
     CHAMFER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
-    RELIEF_CALLOUT,
     THREAD_CALLOUT,
 )
 
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_gooseneck_spring_screw"]
 PART_STEM = SPEC.artifact_stem
@@ -136,16 +136,25 @@ HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(MAJOR_DIA / 2.0)
 RELIEF_TOP_Y = _sheet_y(RELIEF_DIA / 2.0)
 RELIEF_MID_X = (UNDERHEAD_X + RELIEF_END_X) / 2.0
-# The relief floor runs from the foot of the 45-degree lead to the flank.
-RELIEF_FLOOR_MID_X = (_sheet_x(-RELIEF_LEAD) + RELIEF_END_X) / 2.0
+# The 45-degree lead's foot on the relief floor.
+LEAD_FOOT_X = _sheet_x(-RELIEF_LEAD)
+NECK_BOTTOM_Y = _sheet_y(-RELIEF_DIA / 2.0)
+# The relief Ø's dimension line stands on the floor next to the flank,
+# leaving the air under the floor's head end to the lead's extension line.
+RELIEF_DIA_X = RELIEF_END_X - 0.0015
 
-# Rows below the profile, 15 mm apart, the first 15 mm under the head
+# Rows below the profile, 15 mm apart, the first 30 mm under the head
 # (text sits ~3 mm above its requested point, the dimension line ~5 mm
-# below it).  Row 0 chains the head height and the under-head length from
-# the under-head face; row 1 carries the reference overall.
-_ROW_Y = (HEAD_TOP_Y - 0.065, HEAD_TOP_Y - 0.080)
+# below it), clear of the lead's text block above them.  Row 0 chains the
+# head height and the under-head length from the under-head face; row 1
+# carries the reference overall.
+_ROW_Y = (HEAD_TOP_Y - 0.085, HEAD_TOP_Y - 0.100)
 # ' 1.00 ' as rendered (farm run 20261010T190631112Z).
 CROWN_RISE_TEXT_WIDTH = 0.0116
+# The lead's text block: '0.30 MAX' over its three-line callout, the widest
+# line (the spring's number) ~2.4 mm a character.
+LEAD_TEXT_WIDTH = 0.041
+LEAD_TEXT_HEIGHT = 0.018
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -164,27 +173,39 @@ SIDE_KEEP = {
     ),
     "SlotDepth": ((APEX_X + SLOT_FLOOR_X) / 2.0, HEAD_TOP_Y + 0.024),
     # The die relief against the under-head face.  Its width reads above it,
-    # clear of the head; its Ø below it with the 45-degree lead as its
-    # callout, the dimension line standing on the floor.
+    # clear of the head; its Ø below it, the dimension line standing on the
+    # floor.
     "ReliefWidth": (RELIEF_MID_X, HEAD_TOP_Y + 0.005),
-    "ReliefDia": (RELIEF_FLOOR_MID_X, SIDE_CENTER[1] - 0.012),
+    "ReliefDia": (RELIEF_DIA_X, SIDE_CENTER[1] - 0.012),
+    # The lead reads under the relief from the lower silhouette's reference
+    # line: its text stands right of its 1.2 mm span, under the relief Ø's
+    # text and above row 0, its left end clear of the lead's extension line.
+    "HeadLead": (LEAD_FOOT_X + 0.003 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.068),
     # The tip chamfer's axial leg reads below-right of the tip.
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - 0.016),
 }
 # The relief Ø's text goes on an OffsetText leader, hung right of its own
 # dimension line: the leader meets the text's LEFT end, so with that end
 # right of the line the leader descends beside the text, not through it, and
-# the text stays clear of the under-head extension lines (layout audit of farm
-# run 20261010T190631112Z, 6c56fd769: the 0.20-0.40 X 45 DEG LEAD line
-# measured 54.46 wide).  Its right end stops short of the tip chamfer's
-# extension lines and the Ø line stays below the thread silhouette.
-RELIEF_DIA_TEXT_WIDTH = 0.0545
+# the text stays clear of the under-head and lead extension lines (layout
+# audit of farm run 20261010T190631112Z, 6c56fd769).  Its right end stops
+# short of the tip chamfer's extension lines and the Ø line stays below the
+# thread silhouette.
+RELIEF_DIA_TEXT_WIDTH = 0.0215
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
 RELIEF_DIA_LEADER_GAP = 0.0008
 RELIEF_DIA_TEXT_XY = (
-    RELIEF_FLOOR_MID_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
+    RELIEF_DIA_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
     SIDE_CENTER[1] - 0.0155,
 )
+# The lead's MAX is tighter than the title block, so it names what it serves
+# (drawing-guidelines.md rule 4): the flat under-head seat that clamps the
+# counter spring's upper loop.  The chamfer form rides both chamfers.
+COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
+DIMENSION_CALLOUTS = {
+    "HeadLead": f"{CHAMFER_CALLOUT}\nFLAT SEAT FOR\n{COUNTER_SPRING_NUMBER} LOOP",
+    "TipChamfer": CHAMFER_CALLOUT,
+}
 # The slot width reads right of the head-end view, left of the head Ø.
 END_KEEP = {
     "SlotWidth": (
@@ -204,41 +225,38 @@ ISO_NOTE_XY = (0.340, 0.180)
 NOTES_XY = (0.016, 0.070)
 
 # Policy: native generation verifies persisted values, tolerances and
-# reference state.  swTolType_e: NONE leaves the title block's .XX band, the
-# lathe controls keep the part's own bands.  Each row is (nominal mm,
-# tolerance type, lower deviation mm, upper deviation mm); the deviations of
-# an untoleranced row are not read.
-_TOL_NONE, _TOL_BILATERAL, _TOL_SYMMETRIC = 0, 2, 4
-PRINTED_DIMENSIONS: dict[str, tuple[float, int, float, float]] = {
-    "HeadDia": (HEAD_DIA, _TOL_NONE, 0.0, 0.0),
-    "HeadHeight": (HEAD_H, _TOL_NONE, 0.0, 0.0),
-    "CrownRise": (CROWN_RISE, _TOL_NONE, 0.0, 0.0),
-    "UnderHeadLength": (LENGTH, _TOL_NONE, 0.0, 0.0),
-    "ReliefDia": (RELIEF_DIA, _TOL_SYMMETRIC, RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
-    "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE, 0.0, 0.0),
-    "TipChamfer": (TIP_CHAMFER, _TOL_BILATERAL, TIP_CHAMFER_LOWER, TIP_CHAMFER_UPPER),
-    "SlotWidth": (SLOT_WIDTH, _TOL_NONE, 0.0, 0.0),
-    "SlotDepth": (SLOT_DEPTH, _TOL_NONE, 0.0, 0.0),
-    "OverallLength": (OVERALL_LENGTH, _TOL_NONE, 0.0, 0.0),
+# reference state.  swTolType_e: NONE leaves the title block's .XX band, MAX
+# prints the model value as the part's single limit.  Each row is (nominal
+# mm, tolerance type).
+_TOL_NONE, _TOL_MAX = 0, 6
+if RELIEF_DIA_TOL_TYPE != _TOL_MAX or RELIEF_LEAD_TOL_TYPE != _TOL_MAX:
+    raise AssertionError("MHA-SM-04 relief limits are no longer single MAX limits")
+PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
+    "HeadDia": (HEAD_DIA, _TOL_NONE),
+    "HeadHeight": (HEAD_H, _TOL_NONE),
+    "CrownRise": (CROWN_RISE, _TOL_NONE),
+    "UnderHeadLength": (LENGTH, _TOL_NONE),
+    "ReliefDia": (RELIEF_DIA, _TOL_MAX),
+    "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE),
+    "HeadLead": (RELIEF_LEAD, _TOL_MAX),
+    "TipChamfer": (TIP_CHAMFER, _TOL_NONE),
+    "SlotWidth": (SLOT_WIDTH, _TOL_NONE),
+    "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
+    "OverallLength": (OVERALL_LENGTH, _TOL_NONE),
 }
-# Unprinted controls behind the relief-lead and thread callouts: the callout
-# text states their band, so the source part must still carry exactly it.
-SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int, float, float]] = {
-    "ReliefLead@ShankProfile": (
-        RELIEF_LEAD,
-        _TOL_SYMMETRIC,
-        RELIEF_LEAD_LOWER,
-        RELIEF_LEAD_UPPER,
-    ),
-    "ThreadDia@ShankProfile": (MAJOR_DIA, _TOL_NONE, 0.0, 0.0),
+# Unprinted controls: the profile's lead (the printed lead's reference line
+# follows it by equation) and the thread major the callout defines.
+SOURCE_ONLY_DIMENSIONS: dict[str, tuple[float, int]] = {
+    "ReliefLead@ShankProfile": (RELIEF_LEAD, _TOL_NONE),
+    "ThreadDia@ShankProfile": (MAJOR_DIA, _TOL_NONE),
 }
 
 
 def _check_dimension_state(
-    label: str, dimension: Any, expected: tuple[float, int, float, float]
+    label: str, dimension: Any, expected: tuple[float, int]
 ) -> None:
-    """Raise unless one native dimension holds its spec nominal and band."""
-    nominal, tolerance_type, lower, upper = expected
+    """Raise unless one native dimension holds its spec nominal and type."""
+    nominal, tolerance_type = expected
     dimension = _early_bound(dimension, "IDimension")
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     value_mm = float(dimension.SystemValue) * 1000.0
@@ -251,20 +269,6 @@ def _check_dimension_state(
         raise RuntimeError(
             f"MHA-SM-04 {label}: tolerance type {int(tolerance.Type)}, "
             f"spec {tolerance_type}; rebuild the source part"
-        )
-    if tolerance_type == _TOL_NONE:
-        return
-    band_mm = (
-        float(tolerance.GetMinValue()) * 1000.0,
-        float(tolerance.GetMaxValue()) * 1000.0,
-    )
-    if not all(
-        math.isclose(actual, wanted, abs_tol=1e-6)
-        for actual, wanted in zip(band_mm, (lower, upper), strict=True)
-    ):
-        raise RuntimeError(
-            f"MHA-SM-04 {label}: persisted deviations {band_mm!r} mm, spec "
-            f"{(lower, upper)!r} mm; rebuild the source part"
         )
 
 
@@ -302,6 +306,10 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
+        # swDimensionTextCalloutBelow; SOLIDWORKS may hand lines back as CRLF.
+        callout = str(display.GetText(4) or "").replace("\r\n", "\n")
+        if callout != DIMENSION_CALLOUTS.get(name, ""):
+            raise RuntimeError(f"MHA-SM-04 {name}: callout {callout!r} did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -367,12 +375,7 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*side_annotations, *end_annotations]
-    set_dimension_callouts(
-        adapter, annotations, {"ReliefDia": RELIEF_CALLOUT}, location="below"
-    )
-    set_dimension_callouts(
-        adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below"
-    )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
     offset_dimension_text(adapter, side_annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     for name in sorted(REFERENCE_DIMENSIONS):

@@ -30,23 +30,24 @@ SLOT_WIDTH = 1.60
 SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
 SLOT_DEPTH = 3.00  # From the uncut crown apex, not its cylindrical rim.
 SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
+# The die relief under the head mates with nothing (machinist review
+# 2026-10-23), so it carries no band: its diameter prints as the single limit
+# "Ø2.20 MAX" (swTolMAX prints the model value, so the model IS the limit),
+# under the die's root so the die cuts full thread up to the flank.
 RELIEF_DIA = 2.20
-RELIEF_DIA_TOL = 0.05
-RELIEF_DIA_LOWER, RELIEF_DIA_UPPER = printed_deviations(
-    RELIEF_DIA, 2, (-RELIEF_DIA_TOL, RELIEF_DIA_TOL)
-)
+RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
 RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.
 RELIEF_WIDTH_LOWER, RELIEF_WIDTH_UPPER = printed_deviations(RELIEF_WIDTH, 2)
-RELIEF_LEAD = 0.30  # Axial and radial legs of the ordinary 45-degree lead.
-RELIEF_LEAD_TOL = 0.10
-RELIEF_LEAD_LOWER, RELIEF_LEAD_UPPER = printed_deviations(
-    RELIEF_LEAD, 2, (-RELIEF_LEAD_TOL, RELIEF_LEAD_TOL)
-)
+# The 45-degree lead from the under-head face down onto the relief floor
+# prints as the single limit "0.30 MAX" (any shorter lead down to a sharp
+# corner is accepted).  It is tighter than the title block because the
+# under-head face is the clamp seat: at the largest relief and lead the flat
+# still reaches inside the thread major, where the inner edge of the spring's
+# clamped upper loop can bear when the loop is shoved against the thread.
+RELIEF_LEAD = 0.30  # Axial and radial legs of the 45-degree lead.
+RELIEF_LEAD_TOL_TYPE = 6  # swTolType_e.swTolMAX
+# The thread-start chamfer rides the title block's one-place band.
 TIP_CHAMFER = 0.30
-TIP_CHAMFER_BAND = (0.05, -0.10)  # (upper, lower), as on MHA-DT-32.
-TIP_CHAMFER_LOWER, TIP_CHAMFER_UPPER = printed_deviations(
-    TIP_CHAMFER, 2, (TIP_CHAMFER_BAND[1], TIP_CHAMFER_BAND[0])
-)
 
 # #6-32 UNC-2A pitch-diameter minimum, ASME B1.1 as tabled by Engineers Edge
 # (read 2026-10-10, https://www.engineersedge.com/screw_threads_chart.htm).
@@ -56,13 +57,10 @@ THREAD_PD_2A_MIN_IN = 0.1141
 # below the minimum 2A pitch diameter. The table publishes a minor MAXIMUM,
 # not this minimum. The largest relief must clear the estimated deeper root.
 THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * MM_PER_IN
-RELIEF_DIA_MAX = RELIEF_DIA + RELIEF_DIA_UPPER
-RELIEF_LEAD_MIN = RELIEF_LEAD + RELIEF_LEAD_LOWER
-RELIEF_LEAD_MAX = RELIEF_LEAD + RELIEF_LEAD_UPPER
+RELIEF_DIA_MAX = RELIEF_DIA
+RELIEF_LEAD_MAX = RELIEF_LEAD
 RELIEF_FLOOR_MIN = RELIEF_WIDTH + RELIEF_WIDTH_LOWER - RELIEF_LEAD_MAX
 SEAT_FLAT_INNER_DIA_MAX = RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_MAX
-TIP_CHAMFER_MIN = TIP_CHAMFER + TIP_CHAMFER_LOWER
-TIP_CHAMFER_MAX = TIP_CHAMFER + TIP_CHAMFER_UPPER
 OVERALL_LENGTH = LENGTH + HEAD_H
 SLOT_FLOOR_Z = HEAD_H - SLOT_DEPTH
 
