@@ -91,6 +91,7 @@ class _ReferenceSketchAdapter:
 
     def __init__(self) -> None:
         self.lines: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+        self.points: dict[str, tuple[float, float]] = {}
         self.relations: list[tuple[str, str | None, str]] = []
         self._sketch_entities: dict[str, _FakeSegment] = {}
         self.planes: list[Any] = []
@@ -124,6 +125,8 @@ class _ReferenceSketchAdapter:
         return self._ok()
 
     def point(self, ref: str) -> tuple[float, float]:
+        if ref in self.points:
+            return self.points[ref]
         line, end = ref.split(".")
         return self.lines[line][0 if end == "start" else 1]
 
@@ -169,6 +172,13 @@ def _run_reference_sketch(
     monkeypatch.setattr(part, "anchor_point_to_origin", anchor_point_to_origin)
     monkeypatch.setattr(part, "ensure_fully_defined", ensure_fully_defined)
     monkeypatch.setattr(part, "SketchDims", Dims)
+
+    def add_reference_point(_adapter: Any, uv: tuple[float, float], _label: str) -> str:
+        point = f"Point{len(adapter.points) + 1}"
+        adapter.points[point] = uv
+        return point
+
+    monkeypatch.setattr(part, "_add_reference_point", add_reference_point)
     monkeypatch.setattr(part, "set_sketch_direct_db", lambda _adapter, _on: None)
     monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
@@ -187,8 +197,11 @@ def _run_reference_sketch(
             (x0, y0), (x1, y1) = adapter.point(ref1), adapter.point(ref2)
             assert relation in {"horizontal_points", "vertical_points"}
             assert (y0 == y1) if relation == "horizontal_points" else (x0 == x1)
-    # Exactly defined: four DOF a line, one relation per anchor, every dim.
-    assert 4 * len(adapter.lines) == len(adapter.relations) + len(anchors) + len(values)
+    # Exactly defined: four DOF a line, two a point, one relation per anchor,
+    # every dim.
+    assert 4 * len(adapter.lines) + 2 * len(adapter.points) == len(
+        adapter.relations
+    ) + len(anchors) + len(values)
     return adapter, dict(zip(names, values, strict=True))
 
 
@@ -232,8 +245,12 @@ def test_section_reference_carries_both_depths_on_the_cut_plane(
     assert print_spec.DRAWING_DIMENSIONS[print_spec.SECTION_REFERENCE] <= set(dims)
     assert dims["FieldDepth"] == print_spec.FIELD_DEPTH == part.RECESS_DEPTH
     assert dims["EngravingDepth"] == print_spec.ENGRAVING_FLOOR_DEPTH
-    # Each chord lies on the cut-face line A-A draws at its height: the
-    # decorated face, the groove's floor, the field's floor (sketch v = -z).
+    # Points only: a construction chord on a cut-face line printed grey
+    # dashes over A-A's outline, read as hidden lines in a section (ENFORCE
+    # review). Each point lies on the cut-face line A-A draws at its height:
+    # the decorated face, the groove's floor, the field's floor (sketch v = -z).
+    assert not adapter.lines
+    assert len(adapter.points) == 3
     field = _rings(part.FIELD_DXF)[0]
     engraving = _rings(part.ENGRAVING_DXF)
     y = print_spec.SECTION_Y
@@ -246,18 +263,16 @@ def test_section_reference_carries_both_depths_on_the_cut_plane(
         print_spec.ENGRAVING_FLOOR_DEPTH: (False, True),
         print_spec.FIELD_DEPTH: (True, False),
     }
-    for (x0, v0), (x1, v1) in adapter.lines.values():
-        assert v0 == v1 and x0 < x1
-        for x in (x0, (x0 + x1) / 2.0, x1):
-            assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v0], x
-        assert drawing.SECTION_CROP[0][0] < x0 and x1 < drawing.SECTION_CROP[1][0]
+    for x, v in adapter.points.values():
+        assert (dxf.point_in_ring(field, (x, y)), engraved(x)) == expected[v], x
+        assert drawing.SECTION_CROP[0][0] < x < drawing.SECTION_CROP[1][0]
 
 
 def test_section_plane_is_the_top_plane_carried_to_the_cut(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The +Y offset keeps the Top plane's (u, v) = model (X, -Z), the frame
-    # SectionReference's chords are drawn in.
+    # SectionReference's points are drawn in.
     adapter = _ReferenceSketchAdapter()
     monkeypatch.setattr(part, "name_last_feature", lambda _adapter, _name: None)
     asyncio.run(part._section_plane(adapter))
@@ -267,6 +282,98 @@ def test_section_plane_is_the_top_plane_carried_to_the_cut(
         "Top Plane",
         print_spec.SECTION_Y,
     )
+
+
+class _PointSketchManager:
+    def __init__(self, result: Any) -> None:
+        self.AddToDB = False
+        self.result = result
+        self.calls: list[tuple[tuple[float, float, float], bool]] = []
+
+    def CreatePoint(self, x: float, y: float, z: float) -> Any:  # noqa: N802
+        self.calls.append(((x, y, z), self.AddToDB))
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+@pytest.mark.parametrize("result", [object(), None, RuntimeError("COM")])
+def test_reference_point_goes_straight_to_the_db_and_restores_it(
+    monkeypatch: pytest.MonkeyPatch, result: Any
+) -> None:
+    # The real helper: CreatePoint with AddToDB on (no inference snap), in
+    # metres, registered for dimension refs, and AddToDB restored on every
+    # path, a failed or raising CreatePoint included.
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _iface: obj)
+    manager = _PointSketchManager(result)
+    registered: list[tuple[str, Any]] = []
+
+    def register(kind: str, entity: Any) -> str:
+        registered.append((kind, entity))
+        return f"{kind}1"
+
+    adapter = SimpleNamespace(
+        currentSketchManager=manager, _register_sketch_entity=register
+    )
+    if result is None or isinstance(result, Exception):
+        with pytest.raises(RuntimeError):
+            part._add_reference_point(adapter, (2.6, 0.7), "face")
+        assert registered == []
+    else:
+        assert part._add_reference_point(adapter, (2.6, 0.7), "face") == "Point1"
+        assert registered == [("Point", result)]
+    ((point, add_to_db),) = manager.calls
+    assert point == pytest.approx((0.0026, 0.0007, 0.0)) and add_to_db
+    assert manager.AddToDB is False
+
+
+class _HoleCalloutDisplay:
+    """swDimensionTextCalloutBelow (4) writes CalloutBelowDefinition (8)."""
+
+    def __init__(self, below: str) -> None:
+        self.texts = {5: "DRILL ", 6: "<MOD-DIAM><hw-diam>", 7: "<hw-thru>", 8: below}
+
+    def GetText(self, part: int) -> str:  # noqa: N802
+        return self.texts[part]
+
+    def SetText(self, part: int, text: str) -> None:  # noqa: N802
+        assert part == 4
+        self.texts[8] = text.replace("\n", "\r\n")
+
+
+@pytest.mark.parametrize(
+    ("below", "expected"),
+    [
+        ("", print_spec.HOLE_LIGAMENT_NOTE),
+        ("NATIVE ROW\r\n", f"NATIVE ROW\n{print_spec.HOLE_LIGAMENT_NOTE}"),
+    ],
+)
+def test_hole_ligament_statement_keeps_the_native_callout(
+    monkeypatch: pytest.MonkeyPatch, below: str, expected: str
+) -> None:
+    # codjiflo P2 on 9171754: a native below-row must survive the statement.
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    display = _HoleCalloutDisplay(below)
+    drawing._state_hole_ligament(display)
+    assert display.texts[8].replace("\r", "") == expected
+    assert [display.texts[part] for part in (5, 6, 7)] == [
+        "DRILL ",
+        "<MOD-DIAM><hw-diam>",
+        "<hw-thru>",
+    ]
+
+
+def test_hole_ligament_statement_refuses_a_lost_native_definition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Clobbering(_HoleCalloutDisplay):
+        def SetText(self, part: int, text: str) -> None:  # noqa: N802
+            super().SetText(part, text)
+            self.texts[7] = ""
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    with pytest.raises(RuntimeError, match="did not persist"):
+        drawing._state_hole_ligament(Clobbering(""))
 
 
 def test_no_model_band_every_dimension_prints_the_title_block_grade() -> None:
@@ -387,18 +494,18 @@ def test_section_a_break_line_closes_the_crops_open_end() -> None:
 
 def test_section_a_dimensions_each_depth_on_its_own_line() -> None:
     # r2 review C2: the two depths shared one face arrow; each now stands on
-    # its own station, both from the decorated face chord's end (z = 0).
-    chords = print_spec.SECTION_REFERENCE_CHORDS
-    face, field, groove = chords["face"], chords["field"], chords["groove"]
-    assert face[2] == 0.0 and field[0] != groove[0]
-    assert -field[2] == print_spec.FIELD_DEPTH
-    assert -groove[2] == print_spec.ENGRAVING_FLOOR_DEPTH
+    # its own station, both from the decorated face point (z = 0).
+    points = print_spec.SECTION_REFERENCE_POINTS
+    face, field, groove = points["face"], points["field"], points["groove"]
+    assert face[1] == 0.0 and field[0] != groove[0]
+    assert -field[1] == print_spec.FIELD_DEPTH
+    assert -groove[1] == print_spec.ENGRAVING_FLOOR_DEPTH
     keep = drawing.SECTION_KEEP
     assert keep["FieldDepth"][0] != keep["EngravingDepth"][0]
     # B3: the floor under the engraving chains below the engraving depth as
     # a reference, plate thickness less the engraving floor depth.
     floor = drawing.FLOOR_REFERENCE
-    assert floor["from"] == (groove[0], groove[2])
+    assert floor["from"] == groove
     (_, z0), (_, z1) = floor["from"], floor["to"]
     assert math.isclose(z0 - z1, floor["expected_mm"])
     assert math.isclose(
@@ -670,6 +777,7 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
         "RV-01": "accept",
         "RV-02": "minor",
         "RV-03": "minor",
+        "RV-04": "minor",
     }
     for entry in declared.values():
         assert entry.reason.endswith(("(owner-accepted)", "(owner-ruled shortfall)"))
@@ -686,6 +794,17 @@ def test_declared_exceptions_name_the_printed_minimums() -> None:
     )
     for note in print_spec.MANUFACTURING_NOTES.splitlines()[:3]:
         assert note in declared["RV-01"].where
+    # Owner ruling 2026-10-24 (#1971): the holes' wall to the corner radius,
+    # 1.555 at the printed worst case, rounds down to 1.55 under the callout.
+    ligament = print_spec.HOLE_LIGAMENT_NOTE
+    assert ligament == "WALL TO CORNER RADIUS 1.55 MIN"
+    assert ligament in declared["RV-04"].where
+    assert float(ligament.split()[-2]) == pytest.approx(
+        math.floor(print_spec.HOLE_LIGAMENT_WORST * 100.0) / 100.0
+    )
+    assert print_spec.HOLE_LIGAMENT_WORST < 2.0
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "    _state_hole_ligament(holes)\n" in source
 
 
 def test_notes_and_callouts_carry_no_numbers_and_stay_short() -> None:

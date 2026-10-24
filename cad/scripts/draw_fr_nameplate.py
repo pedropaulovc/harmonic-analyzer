@@ -62,6 +62,7 @@ from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
 from _session import run_build
@@ -77,6 +78,7 @@ from fr_nameplate_drawing_spec import (
     FLOOR_UNDER_ENGRAVING,
     FLOOR_UNDER_ENGRAVING_CALLOUT,
     HOLE_CALLOUT_PROCESS,
+    HOLE_LIGAMENT_NOTE,
     MINIMUM_NOTES,
     SCREW_HOLE_DIA,
     SECTION_CALLOUTS,
@@ -86,6 +88,9 @@ from fr_nameplate_drawing_spec import (
     SECTION_Y,
 )
 from fr_nameplate_spec import PLATE_HEIGHT, PLATE_THICKNESS, PLATE_WIDTH, SCREW_XY
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["fr_nameplate"]
@@ -153,6 +158,11 @@ HOLE_R = SCREW_HOLE_DIA / 2.0
 # station's); FaceReference carries the outline's width and height and the
 # right column's and the top row's stations from the right and top edges,
 # each "2X".  The edge view carries the thickness with its reason over it.
+# The 1.5 plate prints 3 mm wide, narrower than its value: centred, both
+# extension lines ran up into the 1.500 digits (ENFORCE review r1/r3, rule
+# 14). The text stands left of the left arrow's tail, on the dimension line
+# carried out (draw_ch_rocker_strap's thickness), its reason above it still
+# clear of the face view's top-right corner.
 FRONT_KEEP = {
     "S0X": (_LEFT + 0.025, _BOTTOM - 0.012),
     "S0Z": (_LEFT - 0.010, _BOTTOM + 0.018),
@@ -163,7 +173,7 @@ FRONT_KEEP = {
     "RightHoleStation": (_RIGHT - 0.022, _BOTTOM - 0.012),
     "TopHoleStation": (_LEFT - 0.010, _TOP - 0.024),
 }
-RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0], _TOP + 0.012)}
+RIGHT_KEEP = {"PlateThick": (RIGHT_CENTER[0] - 0.016, _TOP + 0.012)}
 HOLE_CALLOUT_XY = (_LEFT + 0.045, _TOP + 0.021)
 
 
@@ -192,6 +202,35 @@ def _hole_rim_edge(edges: ViewEdges, hole: tuple[float, float]) -> Any:
             )
         )
     return max(rims, key=lambda item: item.circle[2]).edge
+
+
+@_telemetry.traced("drawing.nameplate.hole_ligament_statement")
+def _state_hole_ligament(display: Any) -> None:
+    """State the holes' wall to the corner radius UNDER their native callout.
+
+    Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
+    #1971): a rule-20 fact under the callout it qualifies, the dt-crankshaft
+    rim's pattern. swDimensionTextCalloutBelowDefinition (8) pairs with the
+    writable swDimensionTextCalloutBelow (4): any native below-row is kept and
+    the statement appended under it, and the prefix, size and depth
+    definitions (5, 6, 7) must read back unchanged, so the Hole Wizard
+    variables stay associative (draw_pd_guide_lock._set_hole_callout_below).
+    ``SetText`` reports nothing, so all four are read back.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{HOLE_LIGAMENT_NOTE}" if below else HOLE_LIGAMENT_NOTE
+    display.SetText(4, updated)  # swDimensionTextCalloutBelow
+    readback = [str(display.GetText(part) or "") for part in (5, 6, 7, 8)]
+    if readback[3].replace("\r", "") != updated or readback[:3] != [
+        definitions[part] for part in (5, 6, 7)
+    ]:
+        raise RuntimeError(
+            "hole ligament statement or native callout definitions did not "
+            f"persist: {readback!r}"
+        )
 
 
 # Section A-A: a cut across the whole plate at SECTION_Y (plate-local, the
@@ -669,7 +708,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
-    add_native_hole_callout(
+    holes = add_native_hole_callout(
         adapter,
         front,
         edge=_hole_rim_edge(scan_view_edges(front, label="front"), TOP_LEFT),
@@ -677,6 +716,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="nameplate screw holes",
         process=HOLE_CALLOUT_PROCESS,
     )
+    _state_hole_ligament(holes)
 
     # SectionReference lies in A-A's cutting plane, saved hidden: a derived
     # view takes it from the part as it stands when it is cut and selects it

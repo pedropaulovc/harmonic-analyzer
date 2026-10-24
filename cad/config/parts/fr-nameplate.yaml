@@ -22,3 +22,8 @@ fr-nameplate:
       where: "the sheet note SCREWS ENGAGE 3.73 MIN FULL THREAD"
       finding: "#4-40 screw full-thread engagement below 1.5D (rules 18, 20)"
       reason: "3.73 MIN (1.31D) for the 1/4 in 90114A511 fillister at its shortest stock length through the thickest printed plate, tip chamfer deducted; it only holds an unloaded cosmetic plate, so the screw stays (owner-ruled shortfall)"
+    - id: "RV-04"
+      kind: "minor"
+      where: "front view, under the DRILL 4X Ø3.05 THRU ALL callout: WALL TO CORNER RADIUS 1.55 MIN"
+      finding: "wall from each screw hole to the outline's corner radius below the 2.0 mm target (rules 17, 20)"
+      reason: "owner ruling 2026-10-24 (#1971): 1.555 at the printed worst case (2X 4.2 stations at .X, the Ø3.05 hole at its DRILLED HOLES maximum), measured to the outline DXF's corner arc, above the 1.5 floor; the holes stay concentric with the engraved screw heads and on the base's tap stations, no geometry change (owner-ruled shortfall)"

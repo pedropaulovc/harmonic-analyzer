@@ -104,14 +104,17 @@ SECTION_Y = 14.85
 SECTION_FACE_X = 2.6
 SECTION_GROOVE_X = 3.38
 SECTION_FIELD_X = 5.5
-# SectionReference's construction chords (plate x0, x1, z), each lying on a
-# cut-face line the section shows: the decorated face ending at its station,
-# the groove floor and the field floor each starting at theirs. A depth's
-# dimension spans the face chord's end to its floor chord's start.
-SECTION_REFERENCE_CHORDS: dict[str, tuple[float, float, float]] = {
-    "face": (SECTION_FACE_X - 1.0, SECTION_FACE_X, 0.0),
-    "groove": (SECTION_GROOVE_X, SECTION_GROOVE_X + 0.1, -ENGRAVING_FLOOR_DEPTH),
-    "field": (SECTION_FIELD_X, SECTION_FIELD_X + 1.0, -FIELD_DEPTH),
+# SectionReference's points (plate x, z), each on a cut-face line the section
+# shows: the decorated face at its station, the groove floor and the field
+# floor at theirs. A depth's dimension spans the face point to its floor
+# point. Points, not construction chords: the section shows the sketch to
+# keep its dimensions, and a chord lying on a cut-face line printed grey
+# dashes over the outline, read as hidden lines in a section (ENFORCE
+# review, rule 9).
+SECTION_REFERENCE_POINTS: dict[str, tuple[float, float]] = {
+    "face": (SECTION_FACE_X, 0.0),
+    "groove": (SECTION_GROOVE_X, -ENGRAVING_FLOOR_DEPTH),
+    "field": (SECTION_FIELD_X, -FIELD_DEPTH),
 }
 ENGRAVING_FLOOR_MIN = (
     PLATE_THICKNESS
@@ -293,6 +296,13 @@ SCREW_ENGAGEMENT_NOTE = (
     f"SCREWS ENGAGE {_stated_minimum(nameplate.SCREW_FULL_THREAD_MIN)} MIN FULL THREAD"
 )
 MINIMUM_NOTES = "\n".join((FLOOR_MINIMUM_NOTE, SCREW_ENGAGEMENT_NOTE))
+
+# The screw holes' wall to the outline's corner radius at the printed worst
+# case (HOLE_LIGAMENT_WORST, 1.555), under rule 17's 2.0 target: stated under
+# the holes' own callout, the dt-crankshaft rim's pattern.
+# Emits approved declaration fr-nameplate RV-04 (owner ruling 2026-10-24,
+# #1971).
+HOLE_LIGAMENT_NOTE = f"WALL TO CORNER RADIUS {_stated_minimum(HOLE_LIGAMENT_WORST)} MIN"
 
 # The DXF rows: fr-nameplate machinist exception RV-01 (the outline, the sunk
 # field and the engraving are the release bundle's DXF artwork, not
