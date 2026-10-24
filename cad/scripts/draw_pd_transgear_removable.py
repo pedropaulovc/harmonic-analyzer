@@ -43,10 +43,7 @@ from _drawing_dimension_import import (
     curate_view_dimensions,
     delete_unnamed_imports,
 )
-from _drawing_dimensions import (
-    assert_imported_precision,
-    set_reference_dimensions,
-)
+from _drawing_dimensions import assert_imported_precision
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
@@ -59,7 +56,6 @@ from pd_transgear_removable_spec import (
     DEFAULT_CONFIG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_DIMENSIONS,
     TEETH,
     outside_dia,
 )
@@ -437,7 +433,8 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="edge",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_reference_dimensions(adapter, edge, DRAWING_REFERENCE_DIMENSIONS)
+    # The part authors the supplied OD's reference parentheses; each view
+    # only proves it imported them.
     _assert_outside_diameter(adapter, edge, DEFAULT_CONFIG)
     annotations = [*face, *edge]
     # The T24 edge view imports first, so its import keeps eliminating
@@ -450,7 +447,6 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=configuration_keep(configuration),
             view_label=f"{configuration} edge",
         )
-        set_reference_dimensions(adapter, curated, DRAWING_REFERENCE_DIMENSIONS)
         _assert_outside_diameter(adapter, curated, configuration)
         annotations += curated
         xy = configuration_label_xy(configuration)

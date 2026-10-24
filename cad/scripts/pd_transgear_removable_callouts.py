@@ -1,9 +1,9 @@
-"""Native callout rows the MHA-PD-09 part authors on its marked dimensions.
+"""Dimension text the MHA-PD-09 part authors on its marked dimensions.
 
-The part builder writes each row on its source dimension; the drawing imports
-them verbatim and only reads them back.  Setting dimension text from the
-drawing writes through to the imported source dimension, and the drawing's
-native save then saves the dirtied part outside its own recipe
+The part builder writes every lane below on its source dimension; the
+drawing imports them verbatim and only reads them back.  Setting dimension
+text from the drawing writes through to the imported source dimension, and
+the drawing's native save then saves the dirtied part outside its own recipe
 (``cad/docs/pipeline/evidence/vm2-datum-placement/source-hash-cause.md``).
 Kept out of ``pd_transgear_removable_spec``, which the chain solver and the
 assemblies import.
@@ -11,6 +11,8 @@ assemblies import.
 
 from __future__ import annotations
 
+TEXT_PREFIX = 1  # swDimensionTextPrefix
+TEXT_SUFFIX = 2  # swDimensionTextSuffix
 CALLOUT_ABOVE = 3  # swDimensionTextCalloutAbove
 CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
@@ -42,6 +44,25 @@ CALLOUTS: dict[int, dict[tuple[str, str], str]] = {
         ("BlankProfile", "BlankWidth"): PLATE_CALLOUT,
     },
 }
+
+# The supplied outside diameter prints once per configuration's view as a
+# REFERENCE: "(Ø52.0)".  A custom prefix replaces the automatic diameter
+# glyph, so it carries SOLIDWORKS' own <MOD-DIAM> token.  Each view proves
+# it (the drawing's ``_assert_outside_diameter``).
+REFERENCE_TEXT: dict[tuple[str, str], dict[int, str]] = {
+    ("BlankProfile", "BlankDia"): {TEXT_PREFIX: "(<MOD-DIAM>", TEXT_SUFFIX: ")"},
+}
+
+
+def authored_text() -> dict[str, dict[str, dict[int, str]]]:
+    """feature -> dimension -> lane -> text: everything the part writes."""
+    authored: dict[str, dict[str, dict[int, str]]] = {}
+    for lane, rows in CALLOUTS.items():
+        for (feature, name), text in rows.items():
+            authored.setdefault(feature, {}).setdefault(name, {})[lane] = text
+    for (feature, name), lanes in REFERENCE_TEXT.items():
+        authored.setdefault(feature, {}).setdefault(name, {}).update(lanes)
+    return authored
 
 
 def callout_rows(text: str) -> tuple[str, ...]:

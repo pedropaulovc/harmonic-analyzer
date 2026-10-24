@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import ast
+import enum
+import inspect
 import math
 import re
+import textwrap
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -371,15 +374,22 @@ def test_the_sheet_names_t24_and_covers_what_every_configuration_shares() -> Non
     assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
 
 
-class _CalloutDisplay:
-    """A display dimension: ``SetText`` stores unless told the write fails."""
+class _Write(enum.Enum):
+    """How a test display dimension answers ``SetText``."""
 
-    def __init__(self, texts: dict[int, str], *, stores: bool = True) -> None:
+    STORE = "store"
+    DROP = "drop"
+
+
+class _CalloutDisplay:
+    """A display dimension whose ``SetText`` stores or silently drops."""
+
+    def __init__(self, texts: dict[int, str], write: _Write = _Write.STORE) -> None:
         self._texts = dict(texts)
-        self._stores = stores
+        self._write = write
 
     def SetText(self, part: int, text: str) -> None:
-        if self._stores:
+        if self._write is _Write.STORE:
             self._texts[part] = text
 
     def GetText(self, part: int) -> str:
@@ -433,43 +443,94 @@ def test_a_callout_dimension_printed_twice_is_refused(monkeypatch) -> None:
         drawing._assert_dimension_callouts(None, [*annotations, annotations[0]])
 
 
-def _author(monkeypatch, *, stores: bool) -> dict[tuple[str, str], _CalloutDisplay]:
+def _author(monkeypatch, write: _Write) -> dict[tuple[str, str], _CalloutDisplay]:
     displays: dict[tuple[str, str], _CalloutDisplay] = {}
+    walks: list[str] = []
 
-    def named(_adapter, feature: str, name: str):
-        display = displays.setdefault(
-            (feature, name), _CalloutDisplay({}, stores=stores)
-        )
-        return display, None
+    def named(_adapter, feature: str, names: set[str]):
+        walks.append(feature)
+        return {
+            name: (
+                displays.setdefault((feature, name), _CalloutDisplay({}, write)),
+                None,
+            )
+            for name in names
+        }
 
-    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(part, "_named_dimensions", named)
     part.author_dimension_callouts(None)
+    # One tree walk per feature, however many lanes its dimensions carry.
+    assert sorted(walks) == sorted(set(walks))
     return displays
 
 
-def test_the_part_authors_every_callout_row_on_its_source_dimension(
+def test_the_part_authors_every_text_lane_on_its_source_dimension(
     monkeypatch,
 ) -> None:
-    displays = _author(monkeypatch, stores=True)
+    displays = _author(monkeypatch, _Write.STORE)
     for lane, rows in callouts.CALLOUTS.items():
         for key, text in rows.items():
             assert displays[key].GetText(lane) == text, (lane, key)
+    for key, lanes in callouts.REFERENCE_TEXT.items():
+        for lane, text in lanes.items():
+            assert displays[key].GetText(lane) == text, (lane, key)
 
 
-def test_a_callout_the_part_failed_to_store_is_refused(monkeypatch) -> None:
+def test_the_part_authors_the_reference_mark_of_every_reference_dimension() -> None:
+    assert {name for _feature, name in callouts.REFERENCE_TEXT} == set(
+        spec.DRAWING_REFERENCE_DIMENSIONS
+    )
+
+
+def test_a_text_lane_the_part_failed_to_store_is_refused(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="did not persist"):
-        _author(monkeypatch, stores=False)
+        _author(monkeypatch, _Write.DROP)
+
+
+_SCRIPTS = Path(drawing.__file__).resolve().parent
+
+
+def _reaches_set_text(function, seen: set) -> bool:
+    """Whether ``function``, or a repository function it calls by name
+    (followed transitively through ``cad/scripts`` modules), calls ``SetText``."""
+    module = inspect.getmodule(function)
+    source_file = getattr(module, "__file__", None)
+    if function in seen or source_file is None:
+        return False
+    if Path(source_file).resolve().parent != _SCRIPTS:
+        return False
+    seen.add(function)
+    source = inspect.getsource(function)
+    if "SetText(" in source:
+        return True
+    for node in ast.walk(ast.parse(textwrap.dedent(source))):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            target = getattr(module, node.func.id, None)
+            if inspect.isfunction(target) and _reaches_set_text(target, seen):
+                return True
+    return False
 
 
 def test_the_drawing_never_writes_dimension_text() -> None:
-    """Text set from the drawing writes through to the built part."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    called = {
-        getattr(node.func, "id", getattr(node.func, "attr", ""))
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-    }
-    assert not called & {"SetText", "set_dimension_callouts", "set_dimension_text"}
+    """Text set from the drawing writes through to the built part, so no
+    function the draw script defines or imports reaches ``SetText``."""
+    seen: set = set()
+    writers = sorted(
+        name
+        for name, value in vars(drawing).items()
+        if inspect.isfunction(value) and _reaches_set_text(value, seen)
+    )
+    assert writers == []
+
+
+def test_the_write_scan_finds_the_shared_dimension_text_writers() -> None:
+    import _drawing_dimensions
+
+    for writer in (
+        _drawing_dimensions.set_dimension_callouts,
+        _drawing_dimensions.set_reference_dimensions,
+    ):
+        assert _reaches_set_text(writer, set()), writer.__name__
 
 
 def _settled_labels(landed: tuple[float, float, float]) -> None:

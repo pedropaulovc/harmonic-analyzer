@@ -85,7 +85,11 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _sketch_circle import define_circle
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import (
+    _named_dimension,
+    _named_dimensions,
+    apply_drawing_precision,
+)
 from _drawing_dimension_insert import add_diametric_linear_dimension
 from _drawing_marks import apply_drawing_properties, clear_dimensions_for_drawing, mark_dimensions_for_drawing
 from _drawing_tolerances import set_dimension_bilateral_tolerance, set_dimension_symmetric_tolerance
@@ -129,17 +133,23 @@ _TOL_BILAT = 2  # swTolType_e.swTolBILAT
 _TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
 
 
+@_telemetry.traced("dim.pd_transgear_removable_text")
 def author_dimension_callouts(adapter) -> None:
-    """Write every callout row on its source dimension and read it back."""
-    for lane, rows in callouts.CALLOUTS.items():
-        for (feature, name), text in rows.items():
-            display, _dimension = _named_dimension(adapter, feature, name)
-            display.SetText(lane, text)
-            printed = str(display.GetText(lane) or "")
-            if callouts.callout_rows(printed) != callouts.callout_rows(text):
-                raise RuntimeError(
-                    f"{name}@{feature}: callout lane {lane} did not persist: {printed!r}"
-                )
+    """Write every authored text lane on its source dimension, read it back.
+
+    One tree walk per feature resolves all of its dimensions.
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: {printed!r}"
+                    )
 
 
 def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
