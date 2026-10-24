@@ -75,6 +75,10 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         assert sorted(kept) == sorted(marked)
         # The whole D-bore prints in the bore view, and only there.
         assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS["BoreProfile"]
+        # The turned blank reads as an overall diameter on the side view,
+        # never as a circular/end-view leader; face width keeps that view too.
+        assert set(drawing.front_keep(teeth)) == {"FloorDia", "ToothThickness"}
+        assert set(drawing.right_keep(teeth)) == {"BlankDia", "FaceWidth"}
 
 
 def test_model_owns_precision_for_every_printed_dimension() -> None:
@@ -270,10 +274,11 @@ def test_tight_bands_name_their_mates_at_the_callout() -> None:
     assert "MHA-DT-04" in drawing.DIMENSION_CALLOUTS["FaceWidth"]
     assert notes.CYLINDER_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["FloorDia"]
     above = drawing.CALLOUTS_ABOVE
-    assert set(above) == {"ToothThickness", "BlankDia", "BoreFlatClock"}
+    assert set(above) == {"ToothThickness", "BoreFlatClock"}
     assert all("\n" not in text for text in above.values())
-    for key in ("ToothThickness", "BlankDia"):
-        assert notes.CYLINDER_MATE_NUMBER in above[key], key
+    assert notes.CYLINDER_MATE_NUMBER in above["ToothThickness"]
+    blank_reason = drawing.DIMENSION_CALLOUTS["BlankDia"]
+    assert " ".join(blank_reason.split()) == f"MESHES WITH {notes.CYLINDER_MATE_NUMBER}"
     assert "MHA-DT-04" in above["BoreFlatClock"]
     label = "CIRCULAR TOOTH THICKNESS"
     assert drawing.DIMENSION_CALLOUTS["ToothThickness"] == label
@@ -710,7 +715,7 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             assert not (x > 0.216 and y < 0.070)
         assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - half_face
         assert drawing.RIGHT_CENTER[0] + half_face < drawing.ISO_CENTER[0] - half_od
-        assert front["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
+        assert right["BlankDia"][1] < drawing.GEAR_DATA_POS[1] - 0.035
         # Third-angle projection: the side view shares the front bore axis.
         assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
         # The Gear Data block clears the largest side view, and the face-width
@@ -1152,8 +1157,8 @@ def test_the_reopened_audit_reads_each_band_with_its_own_configuration_active(
 
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:
-    """Both sketches' dimensions live on the front view, which takes the
-    opt-in import; the side, iso and bore views show the part as saved."""
+    """The two inspection references belong only to Front; other views keep
+    those hidden. The consumed BlankProfile is separately shown in Right."""
     for sketch in (spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH):
         owned = spec.DRAWING_DIMENSIONS[sketch]
         for teeth in spec.CONFIGURATION_TEETH:
@@ -1162,17 +1167,752 @@ def test_only_the_front_view_shows_the_authoring_sketches() -> None:
             assert not owned & set(drawing.bore_view_keep(teeth))
 
 
-# Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):
-# the vertical centre-mark line reaches y 0.1763, and the BlankDia value's text
-# box hangs 0.0036 below its anchor (anchor 0.1791, box bottom 0.1755).
-_T006_CENTRE_MARK_TOP = 0.1763
-_BLANK_DIA_TEXT_DESCENT = 0.0036
+@pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
+def test_side_blank_diameter_lane_clears_preserved_dimensions_and_iso(teeth: int) -> None:
+    """Projected diameter witnesses and text have their own side-view lane."""
+    half_face = drawing.rendered_half_face_width(teeth)
+    half_od = drawing.rendered_half_od(teeth)
+    cx, cy = drawing.RIGHT_CENTER
+    blank_x, blank_y = drawing.right_keep(teeth)["BlankDia"]
+    face_x, face_y = drawing.right_keep(teeth)["FaceWidth"]
+    # The 22 mm lane is measured from the physical side silhouette, not the
+    # end-view circle. At the bore axis a vertical linear diameter spans the
+    # whole OD; its text cannot be lifted back onto the end view.
+    assert blank_x == pytest.approx(cx + half_face + 0.022)
+    assert blank_y == pytest.approx(cy)
+    assert blank_x - (cx + half_face) >= 0.022 - 1e-12
+    # The same mesh reason is stacked below the value rather than shortened;
+    # bound its native multiline footprint independently of the model size.
+    blank_half_width = 0.032 / 2.0
+    blank_half_height = 0.020 / 2.0
+    assert blank_x - blank_half_width > cx + half_face + 0.005
+    # Standard isometric horizontal projection includes the axial face span,
+    # not just the end-view radius; reserve another 5 mm around that silhouette.
+    iso_half_span = (half_od + half_face) / math.sqrt(2.0)
+    assert blank_x + blank_half_width < drawing.ISO_CENTER[0] - iso_half_span - 0.005
+    # Keep the existing FaceWidth position independently of the new OD lane.
+    expected_face_x = cx if 2.0 * half_face >= 0.040 else cx + half_face + 0.020
+    assert (face_x, face_y) == pytest.approx((expected_face_x, cy - half_od - 0.017))
+    assert face_y + 0.012 < cy - half_od
+    assert face_y + 0.012 < blank_y - blank_half_height
+    floor_x, _floor_y = drawing.front_keep(teeth)["FloorDia"]
+    assert floor_x + _FLOOR_TEXT_HALF_WIDTH < cx - half_face - 0.020
+    assert floor_x + _FLOOR_TEXT_HALF_WIDTH < blank_x - blank_half_width
+    assert blank_y + blank_half_height < drawing.GEAR_DATA_POS[1] - drawing.GEAR_DATA_HEIGHT
 
 
-def test_t006_blank_dia_value_clears_the_centre_mark_line() -> None:
-    """layoutcheck T006: the value sat 0.82 mm down over the centre-mark line."""
-    text_bottom = drawing.front_keep(6)["BlankDia"][1] - _BLANK_DIA_TEXT_DESCENT
-    assert text_bottom >= _T006_CENTRE_MARK_TOP + 0.001
+# Captured from the copied native cylinder positive control, 64.44 mm at 3:2:
+# C:/farm-runs/fix-cone-gear-blank-od-20261020/positive-control-cylinder.
+# These four segments are observed native ink; source projection is a separate
+# input. The source_x below deliberately equals the observed witness start,
+# not the unverified inferred cylinder projection x=.210.
+_CYLINDER_NATIVE_BLANK_INK = [
+    ((0.2112439, 0.22167), (0.249, 0.22167)),
+    ((0.2112439, 0.31833), (0.249, 0.31833)),
+    ((0.248, 0.22167), (0.248, 0.2571399)),
+    ((0.248, 0.31833), (0.248, 0.2828601)),
+]
+_CYLINDER_TEST_PROJECTED_ENDS = [(0.2112439, 0.22167), (0.2112439, 0.31833)]
+
+
+def test_native_cylinder_capture_accepts_split_axis_and_witness_overrun() -> None:
+    assert drawing._blank_diameter_ink_problem(
+        _CYLINDER_NATIVE_BLANK_INK, _CYLINDER_TEST_PROJECTED_ENDS, 0.248,
+    ) is None
+
+
+@pytest.mark.parametrize("gap", (0.0, 0.001244, 0.003))
+def test_native_witness_start_allows_only_presentation_extension_gap(gap: float) -> None:
+    # Synthetic projection inputs, not a claim about the captured CAD origin.
+    ends = [(0.2112439 - gap, y) for _, y in _CYLINDER_TEST_PROJECTED_ENDS]
+    assert drawing._blank_diameter_ink_problem(
+        _CYLINDER_NATIVE_BLANK_INK, ends, 0.248,
+    ) is None
+
+
+@pytest.mark.parametrize("outside_arrows", (False, True))
+def test_native_blank_axis_can_continue_outside_both_arrows(outside_arrows: bool) -> None:
+    segments = list(_CYLINDER_NATIVE_BLANK_INK[:2])
+    low, high = 0.22167, 0.31833
+    extension = 0.006 if outside_arrows else 0.0
+    segments.append(((0.248, low - extension), (0.248, high + extension)))
+    assert drawing._blank_diameter_ink_problem(
+        segments, _CYLINDER_TEST_PROJECTED_ENDS, 0.248,
+    ) is None
+
+
+def _bad_blank_ink(problem: str):
+    segments = list(_CYLINDER_NATIVE_BLANK_INK)
+    if problem == "horizontal-axis":
+        segments[2:] = [((0.22167, 0.248), (0.31833, 0.248))]
+    elif problem == "diagonal-axis":
+        segments[2:] = [((0.247, 0.22167), (0.249, 0.31833))]
+    elif problem == "wrong-span":
+        segments[2:] = [((0.248, 0.224), (0.248, 0.316))]
+    elif problem == "wrong-axis":
+        segments[2:] = [((0.245, 0.22167), (0.245, 0.31833))]
+    elif problem == "missing-upper-witness":
+        del segments[1]
+    elif problem == "missing-lower-witness":
+        del segments[0]
+    elif problem == "wrong-upper-origin":
+        segments[1] = ((0.220, 0.31833), (0.249, 0.31833))
+    elif problem == "wrong-lower-origin":
+        segments[0] = ((0.220, 0.22167), (0.249, 0.22167))
+    elif problem == "upper-witness-short":
+        segments[1] = ((0.2112439, 0.31833), (0.247, 0.31833))
+    elif problem == "lower-witness-short":
+        segments[0] = ((0.2112439, 0.22167), (0.247, 0.22167))
+    elif problem == "diagonal-witness":
+        segments[1] = ((0.2112439, 0.317), (0.249, 0.31833))
+    elif problem == "wrong-witness-span":
+        segments[1] = ((0.2112439, 0.316), (0.249, 0.316))
+    elif problem == "disconnected-witness":
+        segments[1] = ((0.2112439, 0.31833), (0.215, 0.31833))
+        segments.append(((0.244, 0.31833), (0.249, 0.31833)))
+    elif problem == "extra-left-witness":
+        segments.append(((0.200, 0.31833), (0.205, 0.31833)))
+    elif problem == "extra-detached-witness":
+        segments.append(((0.230, 0.31833), (0.235, 0.31833)))
+    elif problem == "nan":
+        segments[2] = ((math.nan, 0.22167), (0.248, 0.2571399))
+    elif problem == "infinite":
+        segments[1] = ((0.2112439, 0.31833), (math.inf, 0.31833))
+    elif problem == "empty":
+        segments = []
+    else:
+        raise AssertionError(problem)
+    return segments
+
+
+_BAD_BLANK_INK_CASES = (
+    "horizontal-axis", "diagonal-axis", "wrong-span", "wrong-axis",
+    "missing-upper-witness", "missing-lower-witness",
+    "wrong-upper-origin", "wrong-lower-origin",
+    "upper-witness-short", "lower-witness-short", "diagonal-witness",
+    "wrong-witness-span", "disconnected-witness", "extra-left-witness",
+    "extra-detached-witness", "nan", "infinite", "empty",
+)
+
+
+@pytest.mark.parametrize("start_offset", (-0.000101, 0.003101))
+def test_native_witness_start_rejects_just_outside_gap_and_ink_slop(
+    start_offset: float,
+) -> None:
+    segments = list(_CYLINDER_NATIVE_BLANK_INK)
+    source_x = _CYLINDER_TEST_PROJECTED_ENDS[0][0]
+    segments[1] = ((source_x + start_offset, 0.31833), (0.249, 0.31833))
+    assert drawing._blank_diameter_ink_problem(
+        segments, _CYLINDER_TEST_PROJECTED_ENDS, 0.248,
+    )
+
+
+@pytest.mark.parametrize("problem", _BAD_BLANK_INK_CASES)
+def test_native_blank_ink_rejects_independent_geometry_failures(problem: str) -> None:
+    result = drawing._blank_diameter_ink_problem(
+        _bad_blank_ink(problem), _CYLINDER_TEST_PROJECTED_ENDS, 0.248,
+    )
+    assert isinstance(result, str) and result
+
+
+@pytest.mark.parametrize(
+    "ends",
+    (
+        [], [(0.2112439, 0.22167)],
+        [(0.2112439, 0.22167), (0.2112439, 0.31833), (0.2112439, 0.4)],
+        [(0.2112439, 0.22167), (0.215, 0.31833)],
+        [(0.2112439, 0.22167), (0.2112439, 0.22167)],
+        [(math.nan, 0.22167), (0.2112439, 0.31833)],
+        [(0.2112439, 0.22167), (0.2112439, math.inf)],
+    ),
+)
+def test_native_blank_ink_requires_two_finite_projected_diameter_limits(ends) -> None:
+    assert drawing._blank_diameter_ink_problem(
+        _CYLINDER_NATIVE_BLANK_INK, ends, 0.248,
+    )
+
+
+@pytest.mark.parametrize("line_x", (math.nan, math.inf, -math.inf))
+def test_native_blank_ink_rejects_nonfinite_axis(line_x: float) -> None:
+    assert drawing._blank_diameter_ink_problem(
+        _CYLINDER_NATIVE_BLANK_INK, _CYLINDER_TEST_PROJECTED_ENDS, line_x,
+    )
+
+
+class _ImportedBlankDimension:
+    """Read-only model data: presentation cannot rewrite size or bands."""
+
+    __slots__ = ("Name", "values", "queries")
+
+    def __init__(self, teeth: int, name: str = "BlankDia") -> None:
+        self.Name = name
+        self.values = {f"T{teeth:03d}": (spec.outside_dia_mm(teeth) / 1000.0,)}
+        self.queries: list[tuple[int, str]] = []
+
+    @property
+    def SystemValue(self) -> float:
+        raise AssertionError("Read the sheet configuration, not the active model")
+
+    def GetSystemValue3(self, which: int, configuration: str) -> tuple[float, ...]:
+        assert which == 3
+        self.queries.append((which, configuration))
+        return self.values[configuration]
+
+
+class _ImportedBlankDisplay:
+    def __init__(self, teeth: int, name: str = "BlankDia") -> None:
+        self.dimension = _ImportedBlankDimension(teeth, name)
+        self.kind = 6
+        self.linear = False
+        self.accept_linear = True
+        self.annotation = _ImportedBlankAnnotation(self)
+        self.segments = _blank_view_geometry(teeth)[1]
+
+    @property
+    def Type2(self) -> int:
+        return self.kind
+
+    @property
+    def DisplayAsLinear(self) -> bool:
+        return self.linear
+
+    @DisplayAsLinear.setter
+    def DisplayAsLinear(self, value: bool) -> None:
+        if self.accept_linear:
+            self.linear = value
+
+    def SetVertical(self) -> bool:
+        raise AssertionError("Native ink, not SetVertical's return, proves orientation")
+
+    def GetAnnotation(self):
+        return self.annotation
+
+    def GetDimension2(self, index: int) -> _ImportedBlankDimension:
+        assert index == 0
+        return self.dimension
+
+
+class _ImportedBlankAnnotation:
+    def __init__(self, display: _ImportedBlankDisplay) -> None:
+        self.display = display
+
+    def GetSpecificAnnotation(self) -> _ImportedBlankDisplay:
+        return self.display
+
+
+def _blank_view_geometry(teeth: int):
+    from types import SimpleNamespace
+
+    numerator, denominator = drawing.SHEET_SCALES[f"T{teeth:03d}"]
+    view = SimpleNamespace(
+        source_x=drawing.RIGHT_CENTER[0],
+        center_y=drawing.RIGHT_CENTER[1],
+        scale=numerator / denominator,
+    )
+    radius = spec.outside_dia_mm(teeth) / 2000.0
+    low, high = view.center_y - radius * view.scale, view.center_y + radius * view.scale
+    line_x = drawing.right_keep(teeth)["BlankDia"][0]
+    # A synthetic native-ink fixture, independent of the annotation's flag.
+    segments = [
+        ((view.source_x + 0.0012, low), (line_x + 0.001, low)),
+        ((view.source_x + 0.0012, high), (line_x + 0.001, high)),
+        ((line_x, low), (line_x, view.center_y - 0.004)),
+        ((line_x, high), (line_x, view.center_y + 0.004)),
+    ]
+    return view, segments
+
+
+@pytest.fixture
+def native_blank_adapter(monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace
+
+    events = []
+    active: list[str] = []
+    model = SimpleNamespace(
+        ActivateSheet=lambda name: active.append(name) or True,
+        GraphicsRedraw2=lambda: events.append("redraw"),
+    )
+    adapter = SimpleNamespace(
+        currentModel=model, active=active, curations=[],
+        projections=[], ink_reads=[], events=events,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(
+        drawing, "dimension_name",
+        lambda _adapter, annotation: annotation.GetSpecificAnnotation().dimension.Name,
+    )
+
+    def curate(_adapter, annotations, *, reposition):
+        assert events and events[-1] == "redraw"
+        events.append("curate")
+        adapter.curations.append((annotations, reposition))
+
+    def project(_adapter, view, points, *, label):
+        adapter.projections.append((view, points, label))
+        return [
+            (view.source_x + x * view.scale, view.center_y + y * view.scale)
+            for x, y, z in points
+        ]
+
+    def ink(annotation):
+        events.append("ink")
+        adapter.ink_reads.append(annotation)
+        return annotation.display.segments
+
+    monkeypatch.setattr(drawing, "curate_dimensions", curate)
+    monkeypatch.setattr(drawing, "model_points_in_view", project)
+    monkeypatch.setattr(drawing, "dimension_segments", ink)
+    return adapter
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_imported_blank_has_native_vertical_ink_without_changing_model_data(
+    native_blank_adapter, configuration: str, teeth: int,
+) -> None:
+    display = _ImportedBlankDisplay(teeth)
+    view, _segments = _blank_view_geometry(teeth)
+    original = dict(display.dimension.values)
+    result = drawing._set_linear_blank_diameter(
+        native_blank_adapter, [display.annotation], configuration, teeth, view,
+    )
+    assert result is display
+    assert display.DisplayAsLinear
+    assert display.Type2 == 6
+    assert display.dimension.values == original
+    assert display.dimension.queries
+    assert set(display.dimension.queries) == {(3, configuration)}
+    assert native_blank_adapter.curations == [
+        ([display.annotation], {"BlankDia": drawing.right_keep(teeth)["BlankDia"]})
+    ]
+    assert native_blank_adapter.ink_reads == [display.annotation]
+    projected_view, points, _label = native_blank_adapter.projections[-1]
+    assert projected_view is view
+    radius = original[configuration][0] / 2.0
+    assert points == [(0, -radius, 0), (0, radius, 0)]
+
+
+@pytest.mark.parametrize("problem", _BAD_BLANK_INK_CASES)
+def test_blank_flag_and_position_cannot_substitute_for_native_ink(
+    native_blank_adapter, problem: str,
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    view, _segments = _blank_view_geometry(6)
+    line_x = drawing.right_keep(6)["BlankDia"][0]
+    radius_on_sheet = spec.outside_dia_mm(6) / 2000.0 * view.scale
+
+    def map_point(point):
+        x, y = point
+        return (
+            view.source_x + (x - 0.2112439) * (line_x - view.source_x) / (0.248 - 0.2112439),
+            view.center_y + (y - 0.270) * radius_on_sheet / (0.31833 - 0.270),
+        )
+
+    display.segments = [
+        (map_point(start), map_point(end)) for start, end in _bad_blank_ink(problem)
+    ]
+    with pytest.raises(RuntimeError) as failure:
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [display.annotation], "T006", 6, view,
+        )
+    assert "T006" in str(failure.value)
+    assert "BlankDia" in str(failure.value)
+
+
+def test_blank_redraw_precedes_reposition_and_native_ink(native_blank_adapter) -> None:
+    display = _ImportedBlankDisplay(6)
+    view, _segments = _blank_view_geometry(6)
+
+    def redraw():
+        assert display.DisplayAsLinear
+        native_blank_adapter.events.append("redraw")
+
+    native_blank_adapter.currentModel.GraphicsRedraw2 = redraw
+    drawing._set_linear_blank_diameter(
+        native_blank_adapter, [display.annotation], "T006", 6, view,
+    )
+    events = native_blank_adapter.events
+    assert events.index("redraw") < events.index("curate")
+    assert events.index("curate") < events.index("ink")
+
+
+@pytest.mark.parametrize("kind", (0, 2, 3, 5, 12, 15))
+def test_blank_rejects_wrong_native_type_before_reading_a_length(
+    native_blank_adapter, kind: int,
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.kind = kind
+    with pytest.raises(RuntimeError, match="native diameter"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [display.annotation], "T006", 6, _blank_view_geometry(6)[0],
+        )
+    assert not display.dimension.queries
+    assert not display.DisplayAsLinear
+
+
+@pytest.mark.parametrize(
+    "values", ((), (0.001,), (0.001, 0.002), (math.nan,), (math.inf,)),
+)
+def test_blank_rejects_wrong_or_ambiguous_configuration_value(
+    native_blank_adapter, values: tuple[float, ...],
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.dimension.values["T006"] = values
+    with pytest.raises(RuntimeError, match="BlankDia"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [display.annotation], "T006", 6, _blank_view_geometry(6)[0],
+        )
+    assert not display.DisplayAsLinear
+
+
+@pytest.mark.parametrize("names", ((), ("FaceWidth",), ("BlankDia", "BlankDia")))
+def test_blank_requires_one_imported_model_dimension(
+    native_blank_adapter, names: tuple[str, ...],
+) -> None:
+    annotations = [_ImportedBlankDisplay(6, name).annotation for name in names]
+    with pytest.raises(RuntimeError, match="expected one BlankDia"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, annotations, "T006", 6, _blank_view_geometry(6)[0],
+        )
+
+
+@pytest.mark.parametrize("refusal", ("linear", "curation-revert", "value-drift", "type-drift"))
+def test_blank_refuses_failed_or_unsettled_native_presentation(
+    native_blank_adapter, monkeypatch: pytest.MonkeyPatch, refusal: str,
+) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.accept_linear = refusal != "linear"
+
+    original_curate = drawing.curate_dimensions
+
+    def curate(_adapter, annotations, *, reposition):
+        original_curate(_adapter, annotations, reposition=reposition)
+        if refusal == "curation-revert":
+            display.linear = False
+        if refusal == "value-drift":
+            display.dimension.values["T006"] = (0.001,)
+        if refusal == "type-drift":
+            display.kind = 5
+
+    monkeypatch.setattr(drawing, "curate_dimensions", curate)
+    with pytest.raises(RuntimeError, match="BlankDia"):
+        drawing._set_linear_blank_diameter(
+            native_blank_adapter, [display.annotation], "T006", 6, _blank_view_geometry(6)[0],
+        )
+
+
+def test_blank_native_value_readback_returns_actual_metres(native_blank_adapter) -> None:
+    display = _ImportedBlankDisplay(6)
+    display.linear = True
+    assert drawing._assert_blank_diameter_value(
+        display, "T006", 6,
+    ) == display.dimension.values["T006"][0]
+
+
+def test_settled_blank_readback_checks_every_sheet(native_blank_adapter) -> None:
+    blanks = []
+    for configuration, teeth in spec.CONFIGS:
+        display = _ImportedBlankDisplay(teeth)
+        display.linear = True
+        blanks.append((configuration, display, teeth, _blank_view_geometry(teeth)[0]))
+    drawing._assert_settled_blank_diameters(native_blank_adapter, blanks)
+    assert native_blank_adapter.active == list(drawing.GEAR_SHEET_NAMES)
+    assert native_blank_adapter.ink_reads == [display.annotation for _, display, _, _ in blanks]
+    for configuration, display, _teeth, _view in blanks:
+        assert display.dimension.queries
+        assert set(display.dimension.queries) == {(3, configuration)}
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+@pytest.mark.parametrize("drift", ("circular", "value", "type", "ink"))
+def test_settled_blank_refuses_native_regression_on_any_sheet(
+    native_blank_adapter, configuration: str, teeth: int, drift: str,
+) -> None:
+    blanks = []
+    for sheet, count in spec.CONFIGS:
+        display = _ImportedBlankDisplay(count)
+        display.linear = True
+        blanks.append((sheet, display, count, _blank_view_geometry(count)[0]))
+    original_activate = native_blank_adapter.currentModel.ActivateSheet
+
+    def activate(sheet):
+        if sheet == configuration:
+            display = next(display for name, display, _, _ in blanks if name == sheet)
+            if drift == "circular":
+                display.linear = False
+            elif drift == "value":
+                display.dimension.values[configuration] = (0.001,)
+            elif drift == "type":
+                display.kind = 5
+            else:
+                display.segments = display.segments[:2]
+        return original_activate(sheet)
+
+    native_blank_adapter.currentModel.ActivateSheet = activate
+    with pytest.raises(RuntimeError) as failure:
+        drawing._assert_settled_blank_diameters(native_blank_adapter, blanks)
+    assert configuration in str(failure.value)
+    assert "BlankDia" in str(failure.value)
+
+
+class _BlankReferencePart:
+    """Tripwire at the actual view-to-part boundary, not disconnected state."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"drawing-only blank reference accessed part member {name}")
+
+
+class _BlankReferenceView:
+    def __init__(self, configuration, role, instance):
+        self.name = f"Drawing View{instance}"
+        self.component = f"cone-instance-{instance}"
+        self.ReferencedConfiguration = configuration
+        self.orientation = {
+            "right": "*Right", "front": "*Front",
+            "iso": "*Isometric", "bore": "*Front",
+        }[role]
+        self.shown = {"GapFloorReference"} if role == "front" else set()
+        self.base = None
+
+    def GetName2(self):
+        return self.name
+
+    def GetOrientationName(self):
+        return self.orientation
+
+    def RootDrawingComponent2(self, in_child_context):
+        assert in_child_context is False
+        from types import SimpleNamespace
+        return SimpleNamespace(Name=self.component)
+
+    def GetBaseView(self):
+        return self.base
+
+
+class _BlankReferenceDrawing:
+    """Selection/ownership state only; not a simulator of native printed ink."""
+
+    def __init__(self):
+        self.views = {}
+        part_model = _BlankReferencePart()
+        for configuration, _teeth in spec.CONFIGS:
+            for role in ("front", "right", "iso", "bore"):
+                view = _BlankReferenceView(configuration, role, len(self.views) + 1)
+                view.ReferencedDocument = part_model
+                self.views[configuration, role] = view
+        self.Extension = self
+        self.active = None
+        self.selected = None
+        self.refused_activation = set()
+        self.refused_selection = set()
+        self.attempts = []
+        self.unblanked = []
+
+    def ActivateView(self, name):
+        if name in self.refused_activation:
+            return False
+        self.active = next(view for view in self.views.values() if view.name == name)
+        return True
+
+    def ClearSelection2(self, all_marks):
+        assert all_marks is True
+        self.selected = None
+
+    def SelectByID2(self, name, kind, x, y, z, append, mark, callout, option):
+        assert (kind, x, y, z, append, mark, option) == (
+            "SKETCH", 0.0, 0.0, 0.0, False, 0, 0,
+        )
+        self.attempts.append(name)
+        self.selected = None
+        if name in self.refused_selection:
+            return False
+        for view in self.views.values():
+            if name == f"BlankProfile@{view.component}@{view.name}":
+                if self.active is not view:
+                    return False
+                self.selected = (view, "BlankProfile")
+                return True
+        return False
+
+    def UnblankSketch(self):
+        assert self.selected is not None
+        view, sketch = self.selected
+        assert self.active is view
+        view.shown.add(sketch)
+        self.unblanked.append((view, sketch))
+        # SolidWorks returns void, not a success Boolean.
+        return None
+
+
+@pytest.fixture
+def blank_reference_adapter(monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace
+    import _drawing_dimension_import
+
+    # Keep the actual view-name/component qualifier and show primitive. Only
+    # COM binding/null marshalling is replaced at this offline boundary.
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(_drawing_dimension_import, "_early_bound", lambda obj, _interface: obj)
+    monkeypatch.setattr(drawing.hidden_sketches, "null_callout", lambda: None)
+
+    def member(obj, name):
+        value = getattr(obj, name)
+        return value() if callable(value) else value
+
+    return SimpleNamespace(
+        currentModel=_BlankReferenceDrawing(), _get_attr_or_call=member,
+    )
+
+
+def test_blank_reference_persists_only_in_each_exact_right_view(blank_reference_adapter):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    original = {key: set(view.shown) for key, view in draw.views.items()}
+    for index, (configuration, _teeth) in enumerate(spec.CONFIGS, start=1):
+        right = draw.views[configuration, "right"]
+        drawing._show_blank_profile(adapter, right)
+        assert draw.active is right
+        assert draw.selected is None
+        assert draw.attempts[-1] == f"BlankProfile@{right.component}@{right.name}"
+        assert len(draw.unblanked) == index
+        # Check all eighty persistent owners after EACH show, not just the
+        # last active view or twenty independent throwaway fake documents.
+        visited = set(drawing.GEAR_SHEET_NAMES[:index])
+        for (sheet, role), view in draw.views.items():
+            added = {"BlankProfile"} if role == "right" and sheet in visited else set()
+            assert view.shown == original[sheet, role] | added
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+@pytest.mark.parametrize("failure", ("activation", "exact-selection", "base-fallback"))
+def test_blank_reference_refuses_without_showing_another_owner(
+    blank_reference_adapter, configuration, teeth, failure,
+):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    right = draw.views[configuration, "right"]
+    front = draw.views[configuration, "front"]
+    # An available base qualifier is tempting but must NEVER be tried.
+    right.base = front
+    exact = f"BlankProfile@{right.component}@{right.name}"
+    if failure == "activation":
+        draw.refused_activation.add(right.name)
+    else:
+        draw.refused_selection.add(exact)
+        if failure == "exact-selection":
+            right.base = None
+    draw.ActivateView(front.name)
+    before = {key: set(view.shown) for key, view in draw.views.items()}
+    with pytest.raises(RuntimeError, match="activate|cannot select"):
+        drawing._show_blank_profile(adapter, right)
+    assert draw.attempts == ([] if failure == "activation" else [exact])
+    assert not draw.unblanked
+    assert draw.selected is None
+    assert {key: view.shown for key, view in draw.views.items()} == before
+
+
+@pytest.mark.parametrize("role", ("front", "iso", "bore"))
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_blank_reference_rejects_nonright_targets_before_activation(
+    blank_reference_adapter, configuration, teeth, role,
+):
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    right = draw.views[configuration, "right"]
+    draw.ActivateView(right.name)
+    before = {key: set(view.shown) for key, view in draw.views.items()}
+    with pytest.raises(RuntimeError, match=r"requires \*Right"):
+        drawing._show_blank_profile(adapter, draw.views[configuration, role])
+    assert draw.active is right
+    assert not draw.attempts
+    assert not draw.unblanked
+    assert {key: view.shown for key, view in draw.views.items()} == before
+
+
+@pytest.mark.parametrize("configuration,teeth", spec.CONFIGS)
+def test_build_shows_configured_blank_reference_before_right_import(
+    blank_reference_adapter, monkeypatch: pytest.MonkeyPatch, configuration, teeth,
+):
+    """Exercise build wiring; the fake selection state cannot prove printing."""
+    import asyncio
+    from types import SimpleNamespace
+
+    class RightImportReached(Exception):
+        pass
+
+    adapter = blank_reference_adapter
+    draw = adapter.currentModel
+    roles = ("front", "right", "iso", "bore")
+    views = tuple(draw.views[configuration, role] for role in roles)
+    for view in views:
+        view.ReferencedConfiguration = "not-yet-configured"
+    original = {key: set(view.shown) for key, view in draw.views.items()}
+    placement = iter(views)
+    configured = []
+
+    async def open_model(_source):
+        return True
+
+    async def topology(_adapter, *, phase):
+        pass
+
+    def no_op(*args, **kwargs):
+        pass
+
+    def activate_sheet(sheet):
+        assert sheet == configuration
+        return True
+
+    def place(_adapter, _source, orientation, x, y, *, scale):
+        view = next(placement)
+        assert orientation == view.orientation
+        return view
+
+    def rebuild(_adapter, *, label):
+        # Keep the real _configure_views assignment/readback. This checkpoint
+        # also rejects moving the show operation before configuration.
+        assert all(view.ReferencedConfiguration == configuration for view in views)
+        assert not draw.unblanked
+        configured.append(configuration)
+
+    def import_other_view(_adapter, view, **kwargs):
+        assert view in (views[0], views[3])
+        draw.ActivateView(view.name)
+        return []
+
+    def right_import(_adapter, view, *, keep, view_label):
+        right = views[1]
+        assert configured == [configuration]
+        assert view is right
+        assert right.ReferencedConfiguration == configuration
+        assert draw.active is right
+        assert draw.selected is None
+        assert draw.unblanked == [(right, "BlankProfile")]
+        assert draw.attempts == [f"BlankProfile@{right.component}@{right.name}"]
+        for key, owner in draw.views.items():
+            added = {"BlankProfile"} if owner is right else set()
+            assert owner.shown == original[key] | added
+        raise RightImportReached
+
+    monkeypatch.setattr(drawing, "SOURCE", SimpleNamespace(is_file=lambda: True))
+    monkeypatch.setattr(drawing, "CONFIGURATION_TEETH", (teeth,))
+    monkeypatch.setattr(adapter, "open_model", open_model, raising=False)
+    monkeypatch.setattr(draw, "ActivateSheet", activate_sheet, raising=False)
+    monkeypatch.setattr(drawing, "check", no_op)
+    monkeypatch.setattr(drawing, "assert_saved_configuration_topology", topology)
+    monkeypatch.setattr(drawing, "new_project_drawing", lambda *a, **k: (draw, None))
+    for name in (
+        "read_required_properties", "_assert_dimension_arrow_length",
+        "create_blank_drawing_sheets", "stamp_drawing_summary",
+        "set_hidden_lines_removed", "_hide_tangent_edges", "_assert_tooth_geometry",
+        "_center_bore_view", "_sweep_clock_right_of_flat", "_crop_bore_view",
+    ):
+        monkeypatch.setattr(drawing, name, no_op)
+    monkeypatch.setattr(drawing, "place_view", place)
+    monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", import_other_view)
+    monkeypatch.setattr(drawing, "_curate_repeated_dimensions", right_import)
+    with pytest.raises(RightImportReached):
+        asyncio.run(drawing.build(adapter))
 
 
 def test_invalid_family_member_is_rejected() -> None:

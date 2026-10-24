@@ -14,10 +14,13 @@ There are no datums, feature-control frames or finish symbols: the bore is a
 fixed D-fit that does not run (drawing-guidelines.md rule 6).  Hidden lines
 communicate no additional manufacturing fact on these through-bored spur
 gears, so every view remains hidden-lines-removed.  The side view stays in
-projection with the front view's bore axis; its
-face width hangs below it, clear of the Gear Data block. The circular pitch
-thickness uses a construction inspection witness of the actual arc size, not
-an ideal chord oracle; root MIN/MAX use the actual radial-envelope witness.
+projection with the front view's bore axis; its native blank diameter reads
+linearly across the profile. Only Right shows the existing consumed BlankProfile
+as a drawing-only cross-section, not a full blank envelope; its edge-on printed
+appearance and persistence still require native proof. Its face width hangs
+below it, clear of the Gear Data block. The circular pitch thickness uses a
+construction inspection witness of the actual arc size, not an ideal chord
+oracle; root MIN/MAX use the actual radial-envelope witness.
 The D-bore prints in an enlarged bore view, a cropped *Front model view at a
 scale that renders every bore at least ``BORE_VIEW_BORE_MIN`` across (its flat
 is 0.13 deep on T006 and T012); both views centre-mark the bore.  The part
@@ -53,14 +56,18 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
+from _drawing_dimension_import import (
+    _INSERT_DIMS_MARKED,
+    _drawing_component_name,
+    delete_unnamed_imports,
+)
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leaders import ARROW_TEXT_CLEARANCE, set_near_side_diameter
+from _drawing_leaders import ARROW_TEXT_CLEARANCE, dimension_segments
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
@@ -492,6 +499,9 @@ DIMENSION_CALLOUTS = {
     "ToothThickness": "CIRCULAR TOOTH THICKNESS",
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\nCLEARS {CYLINDER_MATE}",
+    # Two rows below the value retain the reason without widening the profile
+    # callout into the isometric lane. Multiline above-callouts do not print.
+    "BlankDia": f"MESHES WITH\n{CYLINDER_MATE}",
     # The cone set is a solid stack on the shaft; each gear's width sets the
     # stations (user ruling 2026-09-28, spec FACE_WIDTH).
     "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
@@ -521,7 +531,6 @@ def callouts_below(teeth: int) -> dict[str, str]:
 # every two-line one went unmatched in the PDF; draw_ch_amplitude_bar r1).
 CALLOUTS_ABOVE = {
     "ToothThickness": f"BACKLASH WITH {CYLINDER_MATE}",
-    "BlankDia": f"MESHES WITH {CYLINDER_MATE}",
     "BoreFlatClock": f"PHASED TO {SHAFT_MATE}",
 }
 if any("\n" in text for text in CALLOUTS_ABOVE.values()):
@@ -538,17 +547,10 @@ def rendered_half_face_width(teeth: int) -> float:
     return FACE_WIDTH * numerator / (denominator * 2000.0)
 
 
-# BlankDia's value stands this far above the tip circle.  At 0.012 the T006
-# value (8:1) sat on the vertical centre-mark line, which reaches 26.3 mm
-# above the bore axis on that sheet (layout audit, 0.82 mm overlap); 0.0145
-# cleared it with the value alone. The block is centred on its point, so the
-# mate's line over the value lowers the shoulder ~2.5 mm: 0.0175 restores it.
-BLANK_DIA_LIFT = 0.0175
-# ...and this far left of the bore axis, so its leader drops from the
-# block's right end nearly straight onto the tip circle. Centred over the
-# axis (ENFORCE round 3, T006) the leader ran diagonally from x 134 mm down
-# through the root envelope's block, whose left edge stands at 121 mm.
-BLANK_DIA_SHIFT_X = 0.020
+# The native blank diameter reads linearly in the side view (rule 11), in
+# the open lane before the isometric. Its mesh-mate reason wraps below the
+# value, following the existing bore/face-width callout pattern.
+BLANK_DIA_GAP_X = 0.022
 # The functional root-envelope stack stands right of the tip circle,
 # above the thickness witness: in the same lane as the thickness
 # dimension line, which runs DOWN from the +X tooth, and clear of the side
@@ -619,10 +621,6 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
     half_od = rendered_half_od(teeth)
     return {
         "FloorDia": (FRONT_CENTER[0] + half_od + FLOOR_DIA_GAP_X, floor_dia_y(teeth)),
-        "BlankDia": (
-            FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
-            FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT,
-        ),
         # Vertical dimension on the +X tooth: its line stands at the text x,
         # just right of the tip circle, and runs down to the text below the
         # gear's lowest point (the ~65 mm callout stays left of the side view).
@@ -732,15 +730,171 @@ FACE_WIDTH_DROP = 0.017
 
 def right_keep(teeth: int) -> dict[str, tuple[float, float]]:
     y = RIGHT_CENTER[1] - rendered_half_od(teeth) - FACE_WIDTH_DROP
-    if face_width_text_inside(teeth):
-        return {"FaceWidth": (RIGHT_CENTER[0], y)}
-    x = (
-        RIGHT_CENTER[0]
-        + rendered_half_face_width(teeth)
-        + FACE_WIDTH_TEXT_CLEARANCE
-        + FACE_WIDTH_TEXT_WIDTH / 2.0
+    x = RIGHT_CENTER[0]
+    if not face_width_text_inside(teeth):
+        x = (
+            RIGHT_CENTER[0]
+            + rendered_half_face_width(teeth)
+            + FACE_WIDTH_TEXT_CLEARANCE
+            + FACE_WIDTH_TEXT_WIDTH / 2.0
+        )
+    return {
+        "FaceWidth": (x, y),
+        "BlankDia": (
+            RIGHT_CENTER[0] + rendered_half_face_width(teeth) + BLANK_DIA_GAP_X,
+            RIGHT_CENTER[1],
+        ),
+    }
+
+
+def _blank_diameter_display(
+    adapter: Any, annotations: list[Any], configuration: str, teeth: int
+) -> Any:
+    """Read the imported driving diameter, qualified by its source configuration."""
+    matches = [
+        annotation for annotation in annotations
+        if dimension_name(adapter, annotation) == "BlankDia"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{configuration}: expected one BlankDia dimension, found {len(matches)}"
+        )
+    display = _early_bound(
+        _early_bound(matches[0], "IAnnotation").GetSpecificAnnotation(),
+        "IDisplayDimension",
     )
-    return {"FaceWidth": (x, y)}
+    _assert_blank_diameter_value(display, configuration, teeth)
+    return display
+
+
+def _assert_blank_diameter_value(display: Any, configuration: str, teeth: int) -> float:
+    """A display-style change must leave the source diameter untouched."""
+    # swDimensionType_e.swDiameterDimension: check before treating a native
+    # system value as a diameter, never reinterpret a radius or doubled span.
+    if int(display.Type2) != 6:
+        raise RuntimeError(f"{configuration}: BlankDia is not a native diameter")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    # swInConfigurationOpts_e.swSpecifyConfiguration; a BSTR is an accepted
+    # configuration selector. Do not read whichever model configuration is active.
+    values = tuple(float(value) for value in dimension.GetSystemValue3(3, configuration))
+    expected = outside_dia_mm(teeth) / 1000.0
+    if len(values) != 1 or not math.isclose(values[0], expected, abs_tol=1e-8):
+        raise RuntimeError(
+            f"{configuration}: native BlankDia reads {values!r} m, expected {expected} m"
+        )
+    return values[0]
+
+
+def _blank_diameter_ink_problem(
+    segments: list[tuple[tuple[float, float], tuple[float, float]]],
+    ends: list[tuple[float, float]],
+    line_x: float,
+) -> str | None:
+    """Require the native axis and witnesses at the projected blank limits."""
+    slop = 0.0001  # Sheet-ink comparison only, not a manufacturing tolerance.
+    if len(ends) != 2 or not all(
+        math.isfinite(value) for point in ends for value in point
+    ):
+        return "blank limits are not two finite projected points"
+    low, high = sorted(ends, key=lambda point: point[1])
+    if abs(low[0] - high[0]) > slop or high[1] - low[1] <= slop:
+        return "blank limits do not project to a vertical diameter"
+    if not math.isfinite(line_x) or line_x <= max(low[0], high[0]) + slop:
+        return "diameter lane is not right of the blank limits"
+    if not segments:
+        return "no native dimension strokes"
+    axis: list[tuple[float, float]] = []
+    witnesses: list[list[tuple[float, float]]] = [[], []]
+    for (x0, y0), (x1, y1) in segments:
+        if not all(math.isfinite(value) for value in (x0, y0, x1, y1)):
+            return "nonfinite native dimension stroke"
+        if abs(x0 - line_x) <= slop and abs(x1 - line_x) <= slop:
+            if abs(y1 - y0) > slop:
+                axis.append(tuple(sorted((y0, y1))))
+            continue
+        for index, (_, limit_y) in enumerate((low, high)):
+            if max(abs(y0 - limit_y), abs(y1 - limit_y)) <= slop:
+                witnesses[index].append(tuple(sorted((x0, x1))))
+                break
+        else:
+            return "stroke is neither the vertical diameter axis nor a blank witness"
+    for (source_x, limit_y), xs in zip((low, high), witnesses, strict=True):
+        if not any(start - slop <= limit_y <= end + slop for start, end in axis):
+            return f"no vertical dimension run reaches blank limit y={limit_y * 1000:.3f} mm"
+        # Allow a native extension-start gap, but every witness must run
+        # continuously from the projected source side through the axis.
+        if not xs or any(
+            start < source_x - slop
+            or start > source_x + 0.003 + slop
+            or end < line_x - slop
+            for start, end in xs
+        ):
+            return f"no native witness joins blank limit y={limit_y * 1000:.3f} mm to its axis"
+    return None
+
+
+def _assert_blank_diameter_ink(
+    adapter: Any, display: Any, configuration: str, teeth: int, view: Any
+) -> None:
+    """Read native ink against the original circle's actual view projection."""
+    diameter = _assert_blank_diameter_value(display, configuration, teeth)
+    # BlankProfile is the fully constrained origin circle on Front. These
+    # points validate its imported display; they never create a sheet dimension.
+    ends = model_points_in_view(
+        adapter,
+        view,
+        [(0.0, -diameter / 2.0, 0.0), (0.0, diameter / 2.0, 0.0)],
+        label=f"{configuration} native blank diameter limits",
+    )
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    segments = dimension_segments(annotation)
+    line_x = right_keep(teeth)["BlankDia"][0]
+    problem = _blank_diameter_ink_problem(segments, ends, line_x)
+    if problem is not None:
+        raise RuntimeError(f"{configuration}: BlankDia native ink: {problem}")
+    _telemetry.info(
+        f"{configuration}: BlankDia native ink: {len(segments)} strokes, "
+        f"projected limits {[(round(x * 1000, 3), round(y * 1000, 3)) for x, y in ends]} mm, "
+        f"vertical axis x={line_x * 1000:.3f} mm; "
+        f"native strokes {[[tuple(round(value * 1000, 3) for value in point) for point in segment] for segment in segments]} mm"
+    )
+
+
+def _set_linear_blank_diameter(
+    adapter: Any, annotations: list[Any], configuration: str, teeth: int, view: Any
+) -> Any:
+    """Set diameter-specific presentation, then prove its native result."""
+    display = _blank_diameter_display(adapter, annotations, configuration, teeth)
+    display.DisplayAsLinear = True
+    # DisplayAsLinear's SDK contract requires redraw. This native diameter
+    # rejected SetVertical; its actual ink, not a generic orientation setter's
+    # success flag or our requested position, is the acceptance boundary.
+    adapter.currentModel.GraphicsRedraw2()
+    annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+    curate_dimensions(
+        adapter, [annotation], reposition={"BlankDia": right_keep(teeth)["BlankDia"]}
+    )
+    _assert_blank_diameter_value(display, configuration, teeth)
+    if not bool(display.DisplayAsLinear):
+        raise RuntimeError(f"{configuration}: BlankDia did not retain linear presentation")
+    _assert_blank_diameter_ink(adapter, display, configuration, teeth, view)
+    return display
+
+
+def _assert_settled_blank_diameters(
+    adapter: Any, blanks: list[tuple[str, Any, int, Any]]
+) -> None:
+    """The final rebuild must retain the side view's native linear diameters."""
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    for configuration, display, teeth, view in blanks:
+        if not drawing.ActivateSheet(configuration):
+            raise RuntimeError(f"failed to activate {configuration} for its blank diameter")
+        _assert_blank_diameter_value(display, configuration, teeth)
+        if not bool(display.DisplayAsLinear):
+            raise RuntimeError(
+                f"{configuration}: settled BlankDia lost linear presentation"
+            )
+        _assert_blank_diameter_ink(adapter, display, configuration, teeth, view)
 
 
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
@@ -876,6 +1030,24 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
         raise RuntimeError(f"failed to activate the {label} {name!r}")
     adapter.currentModel.ClearSelection2(True)
     return name
+
+
+def _show_blank_profile(adapter: Any, view: Any) -> None:
+    """Show the existing blank cross-section in Right only, never on the part.
+
+    Qualified selection and the drawing's void UnblankSketch call do not prove
+    that this consumed, edge-on sketch prints or survives final export.
+    """
+    orientation = str(adapter._get_attr_or_call(view, "GetOrientationName") or "")
+    if orientation != "*Right":
+        raise RuntimeError(f"BlankProfile requires *Right, got {orientation!r}")
+    name = _activate_view(adapter, view, label="blank reference Right view")
+    hidden_sketches._show_view_sketches(
+        adapter.currentModel,
+        ("BlankProfile",),
+        paths=((_drawing_component_name(adapter, view), name),),
+        label=f"{name} blank reference",
+    )
 
 
 def _center_bore_view(adapter: Any, view: Any, configuration: str) -> None:
@@ -1327,6 +1499,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ddoc = _early_bound(drawing_model, "IDrawingDoc")
 
     clocks: list[tuple[str, Any, int]] = []
+    blanks: list[tuple[str, Any, int, Any]] = []
     for teeth in CONFIGURATION_TEETH:
         configuration = f"T{teeth:03d}"
         view_scale = SHEET_SCALES[configuration]
@@ -1374,10 +1547,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         clocks.append((configuration, clock, teeth))
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
-        # The part saves both authoring sketches hidden; the front view shows
-        # them again for their dimensions (the side and iso views show the
-        # part as saved).  The targeted import still delivers the dimensions
-        # on every sheet after the first (probe 834-gapfloor-c301).
+        # The part saves both authoring sketches hidden; Front shows them
+        # for their dimensions. Right separately shows the consumed blank
+        # cross-section below; iso keeps the part as saved. The targeted import
+        # still delivers dimensions on every sheet (probe 834-gapfloor-c301).
         front_annotations = hidden_sketches.curate_view_dimensions(
             adapter,
             front,
@@ -1385,27 +1558,19 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        _assert_sheet_bands(adapter, front_annotations, configuration, teeth)
-        # ENFORCE round 4 of #971: the OD's and the root envelope's
-        # dimension lines crossed at the centre and over the bore; the OD
-        # leader now stops on its near rim.
-        blank_dia = [
-            item for item in front_annotations
-            if dimension_name(adapter, item) == "BlankDia"
-        ]
-        if len(blank_dia) != 1:
-            raise RuntimeError(
-                f"{configuration}: expected one BlankDia dimension, found {len(blank_dia)}"
-            )
-        set_near_side_diameter(blank_dia[0], f"{configuration} blank diameter")
-        rebuild_drawing(adapter, label=f"{configuration} blank diameter near-side leader")
+        _show_blank_profile(adapter, right)
         right_annotations = _curate_repeated_dimensions(
             adapter,
             right,
             keep=right_keep(teeth),
             view_label=f"{configuration} right",
         )
+        blank = _set_linear_blank_diameter(
+            adapter, right_annotations, configuration, teeth, right
+        )
+        blanks.append((configuration, blank, teeth, right))
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
+        _assert_sheet_bands(adapter, annotations, configuration, teeth)
         set_dimension_callouts(adapter, annotations, callouts_below(teeth))
         set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -1458,7 +1623,10 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
-        settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
+        settled_checks=(
+            lambda: _assert_settled_clocks(adapter, clocks),
+            lambda: _assert_settled_blank_diameters(adapter, blanks),
+        ),
     )
 
 
