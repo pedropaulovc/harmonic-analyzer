@@ -456,8 +456,21 @@ def test_datum_b_is_basic_from_datum_a() -> None:
     assert text_y > drawing.FRONT_KEEP["RingOuterDia"][1] + 0.012
     assert text_x < drawing.DATUM_B_EDGE[0] - 0.015
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'set_basic_dimension(adapter, datum_b_offset, label="datum B from datum A")' in source
-    assert "expected_mm=SHANK_WIDTH / 2.0," in source
+    # The A-to-B locator's own block: centre-anchored, value-checked at half
+    # the shank width, then boxed (not satisfied by the B-to-pin check).
+    start = source.index("datum_b_offset = add_edge_dimension(")
+    end = source.index(
+        'set_basic_dimension(adapter, datum_b_offset, label="datum B from datum A")'
+    )
+    block = source[start:end]
+    assert "p1=ring_rim," in block
+    assert 'set_arc_endpoints_to_center(adapter, datum_b_offset, label="datum B from datum A")' in block
+    assert (
+        "assert_dimension_measures(\n"
+        "        adapter,\n"
+        "        datum_b_offset,\n"
+        "        expected_mm=SHANK_WIDTH / 2.0,\n"
+    ) in block
 
 
 def test_ring_diameters_keep_one_arrow_on_the_near_rim() -> None:
