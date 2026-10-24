@@ -21,6 +21,7 @@ from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _feature_tree import name_last_feature
 from _part_checks import report_mass_properties, volume_check
+from _part_pmi import author_part_pmi
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -175,6 +176,7 @@ async def build(adapter) -> dict[str, str]:
         "ThumbLocationReference", "PlateLocationReference", "RoofThicknessReference",
         "ReferenceWindowWidth", "BackWallReference",
     ))
+    author_part_pmi(adapter, surface_finishes=spec.BLOCK_SURFACE_FINISHES)
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)

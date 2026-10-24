@@ -37,7 +37,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimensions import set_dimension_callouts
+from _drawing_finish import add_surface_finish
 from _drawing_hole_callout import add_native_hole_callout
+from _surface_finish import surface_finish_by_key
 from _drawing_leader_notes import add_attached_note, add_property_linked_callout
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
@@ -111,6 +113,31 @@ COVER_HOLE_PROCESS = (
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
+# Ra 1.6 symbol left of the right view's open rebate mouth, below the mating
+# face label; its leader enters the mouth to the ceiling's mouth-side quarter.
+SLIDE_FINISH_OFFSET = (-0.030, -0.012)
+
+
+def _add_rebate_slide_finish(adapter: Any, right: Any) -> None:
+    """Rule 6: grade the rebate ceiling the stick's graduated face slides on."""
+    window_depth = part.WINDOW_Z_MAX - part.WINDOW_Z_MIN
+    ceiling_xy = model_point_in_view(
+        adapter, right, (
+            part.BLOCK_LENGTH / 2000.0,
+            part.WINDOW_Y_MAX / 1000.0,
+            (part.WINDOW_Z_MIN + window_depth / 4.0) / 1000.0,
+        ), label="rebate ceiling",
+    )
+    add_surface_finish(
+        adapter, right,
+        edge_xy=ceiling_xy,
+        leader_attach_xy=ceiling_xy,
+        symbol_xy=(ceiling_xy[0] + SLIDE_FINISH_OFFSET[0], ceiling_xy[1] + SLIDE_FINISH_OFFSET[1]),
+        control=surface_finish_by_key(part.BLOCK_SURFACE_FINISHES, "rebate_slide"),
+        label="rebate slide finish",
+        char_height=0.0025,
+    )
+
 
 def _remove_general_thread_class(display: Any, *, last_line: str | None = None) -> None:
     """Suppress only the native class token; leave thread/drill variables live.
@@ -245,6 +272,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, right, property_name="Mating Face Note",
         edge_xy=mating_edge, note_xy=(0.220, 0.210),
     )
+    _add_rebate_slide_finish(adapter, right)
     _label_locating_edges(adapter, front)
     for view in (front, bottom):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

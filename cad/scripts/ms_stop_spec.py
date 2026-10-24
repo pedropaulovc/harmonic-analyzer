@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import math
 
+from _gtol_planar import PlanarFace
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _mcmaster_90114a124 import (
     LENGTH as PLATE_SCREW_LENGTH,
@@ -263,3 +265,10 @@ assert PLATE_RADIAL_CLEARANCE_MIN > 0.0
 # the block print as a fact beside its dimension (rule 20); the owner's
 # 2026-10-09 ruling accepting it is recorded as ms-stop-block.yaml RV-01.
 ROOF_WALL_CALLOUT = f"WALL {ROOF_THICKNESS_MIN:.2f} MIN"
+
+# Rule 6: the stick's graduated face slides on the roof underside (the
+# rebate ceiling, outward normal -Y at the window top), so that face is the
+# one sliding surface the print grades: Ra 1.6.
+BLOCK_SURFACE_FINISHES = (
+    SurfaceFinishControl("rebate_slide", MACHINED_UM, PlanarFace((0, -1, 0), -WINDOW_Y_MAX)),
+)

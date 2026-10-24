@@ -318,6 +318,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     monkeypatch.setattr(drawing, "SOURCE", source)
     fonts = []
     monkeypatch.setattr(drawing, "_construction_curve_font", fonts.append, raising=False)
+    monkeypatch.setattr(drawing, "_add_rebate_slide_finish", lambda adapter, view: None, raising=False)
     utility = _StopMathUtility()
 
     async def open_model(path):
@@ -629,6 +630,22 @@ class _StopDisplay:
         assert which == 1
         if self.refusal != "prefix":
             self.prefix = text
+
+
+def test_rebate_ceiling_is_the_graded_sliding_face(monkeypatch) -> None:
+    # Rule 6: the stick's graduated face slides on the roof underside.
+    (control,) = spec.BLOCK_SURFACE_FINISHES
+    assert (control.key, control.roughness_um) == ("rebate_slide", 1.6)
+    assert control.face.normal == (0, -1, 0)
+    assert control.face.offset_mm == pytest.approx(-spec.WINDOW_Y_MAX)
+    calls = []
+    monkeypatch.setattr(block_drawing, "model_point_in_view", lambda adapter, view, xyz, label: (0.30, 0.19))
+    monkeypatch.setattr(block_drawing, "add_surface_finish", lambda adapter, view, **kw: calls.append(kw))
+    block_drawing._add_rebate_slide_finish(object(), object())
+    (call,) = calls
+    assert call["control"] is control
+    assert call["leader_attach_xy"] == call["edge_xy"] == (0.30, 0.19)
+    assert call["symbol_xy"] == pytest.approx((0.27, 0.178))
 
 
 @pytest.mark.parametrize("refusal", [None, "set", "readback"])
@@ -1147,6 +1164,8 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     monkeypatch.setattr(block, "mark_dimensions_for_drawing",
                         lambda adapter, feature, names: marks.append((feature, names)))
     monkeypatch.setattr(block, "hide_location_references", lambda adapter, names: hidden.extend(names))
+    pmi = []
+    monkeypatch.setattr(block, "author_part_pmi", lambda adapter, **kw: pmi.append(kw))
     monkeypatch.setattr(block, "apply_drawing_precision", lambda adapter, precision: precisions.append(precision))
     monkeypatch.setattr(block, "apply_drawing_properties",
                         lambda adapter, part_name, values: properties.append(values))
