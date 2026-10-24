@@ -946,15 +946,17 @@ def test_register_gap_checks_detect_lost_material(changes: dict, key: str) -> No
     assert spec.cap_register_margins(**changes)[key] < spec.WALL_TARGET
 
 
-def test_register_section_diametrically_cuts_only_the_first_flat_floor() -> None:
+def test_register_section_diametrically_cuts_only_the_dimensioned_flat_floor() -> None:
+    # ENFORCE review: the native depth's floor witness rises from register 2,
+    # so D-D cuts register 2; its witness then starts on the cut floor.
     start, end = drawing.REGISTER_CUT_START, drawing.REGISTER_CUT_END
-    first, second = spec.REGISTER_POINTS
-    assert start[0] == end[0] == first[0]
+    other, cut = spec.REGISTER_POINTS
+    assert start[0] == end[0] == cut[0]
     assert start[1] < -spec.WING_WIDTH / 2.0
     assert end[1] > spec.WING_WIDTH / 2.0
     radius = (spec.REGISTER_DIA + spec.REGISTER_DIA_BAND[0]) / 2.0
-    assert abs(second[0] - start[0]) > radius
-    assert start[1] < first[1] - radius < first[1] + radius < end[1]
+    assert abs(other[0] - start[0]) > radius
+    assert start[1] < cut[1] - radius < cut[1] + radius < end[1]
     # The shown profile remains the actual shared blind cut, not a second
     # handwritten depth or a diagonal cutting plane through both stations.
     assert spec.BLOCK_HEIGHT - spec.REGISTER_DEPTH > 0.0
@@ -963,11 +965,13 @@ def test_register_section_diametrically_cuts_only_the_first_flat_floor() -> None
     )
 
 
+@pytest.mark.parametrize("register", [(0.347, 0.117), (0.347, 0.213)])
 @pytest.mark.parametrize("translation", [(0.0, 0.0), (-0.011, 0.007)])
-def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(translation) -> None:
+def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(
+    translation, register
+) -> None:
     dx, dy = translation
     outline = (0.295, 0.087, 0.355, 0.243)
-    register = (0.347, 0.117)
     original = drawing._register_section_layout(outline, register)
     moved = drawing._register_section_layout(
         tuple(value + (dx if axis % 2 == 0 else dy) for axis, value in enumerate(outline)),
@@ -980,9 +984,23 @@ def test_register_paper_layout_follows_the_fitted_outline_and_cut_station(transl
     line = original[0]["CapRegisterDepth"]
     text = original[1]["CapRegisterDepth"]
     assert line[0] == register[0]
-    assert 0.0 < register[1] - line[1] < 0.015
+    # The line stands outboard of the register (toward the nearer outline
+    # end, away from the bore), so both witnesses stay short; the text shelf
+    # stands on the other side, right of the outline.
+    outboard = 1.0 if register[1] > (outline[1] + outline[3]) / 2.0 else -1.0
+    assert 0.0 < outboard * (line[1] - register[1]) < 0.015
+    assert outline[1] < line[1] < outline[3]
+    assert outboard * (text[1] - register[1]) < 0.0
     assert text[0] > outline[2]
     assert original[2] == pytest.approx(((outline[0] + outline[2]) / 2.0, outline[1]))
+
+
+def test_overall_height_reference_stands_clear_left_of_the_plan() -> None:
+    # ENFORCE review: the 72 overall printed nowhere. Sheet 4's plan carries
+    # it as a reference, picked on both wing faces, its line left of -X end.
+    assert spec.BLOCK_X0 < drawing.OVERALL_HEIGHT_PICK_X < spec.BLOCK_X0 + 10.0
+    assert drawing.OVERALL_HEIGHT_LINE_X <= spec.BLOCK_X0 - 7.0
+    assert spec.WING_HALF_WIDTH_PLACES == spec.DRAWING_PRECISION_BY_NAME["WingHalfWidth"]
 
 
 @pytest.mark.parametrize("qualifier_gap_m", [0.019446875900030136, 0.0075, 0.028])
