@@ -66,7 +66,9 @@ from sm_gooseneck_spring_screw_geom import (
     MAJOR_DIA,
     OVERALL_LENGTH,
     RELIEF_DIA,
+    RELIEF_DIA_LOWER,
     RELIEF_DIA_TOL_TYPE,
+    RELIEF_DIA_UPPER,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL_TYPE,
     RELIEF_WIDTH,
@@ -80,6 +82,7 @@ from sm_gooseneck_spring_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     ISOMETRIC_VIEW_NOTE,
 )
 
@@ -176,6 +179,41 @@ def _single_limit(
     if not tolerance.SetValues(0.0, 0.0) or int(tolerance.Type) != tol_type:
         raise RuntimeError(f"{label}: cannot retain the single limit {tol_type}")
     _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
+
+
+@_telemetry.traced("part.limit_band", label_param="name")
+def _limit_band(
+    adapter, feature: str, name: str, deviations: tuple[float, float], tol_type: int
+) -> None:
+    """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
+    lower limits, the model value plus each deviation, at the dimension's own
+    places (build_mg_output_fixture._limit_band)."""
+    label = f"{name}@{feature}"
+    display, dimension = _named_dimension(adapter, feature, name)
+    lower, upper = deviations  # native API order, mm
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = tol_type
+    if tolerance.SetValues(lower / 1000.0, upper / 1000.0) is not True:
+        raise RuntimeError(f"{label}: LIMIT deviations were rejected")
+    if (
+        int(tolerance.Type) != tol_type
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
+    places = DRAWING_PRECISION_BY_NAME[name]
+    display = _early_bound(display, "IDisplayDimension")
+    display.SetPrecision3(-1, -1, places, -1)
+    if int(display.GetPrimaryTolPrecision2()) != places:
+        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    value = float(dimension.SystemValue) * 1000.0
+    _telemetry.success(
+        f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
+    )
 
 
 @_telemetry.traced("part.dimension_callouts")
@@ -509,11 +547,18 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`): the relief diameter and its lead print as
-    # single MAX limits, the relief under the die root and the lead short
-    # enough to keep the clamp seat flat inside the thread major.  Every
-    # other mark takes the title block's two-place band.
-    _single_limit(adapter, "ShankProfile", "ReliefDia", RELIEF_DIA, RELIEF_DIA_TOL_TYPE)
+    # implements the guidelines`): the relief diameter prints as the LIMIT
+    # band 2.20/2.00, under the die root and above the neck's clamp-torque
+    # floor; its lead as a single MAX limit, short enough to keep the clamp
+    # seat flat inside the thread major.  Every other mark takes the title
+    # block's two-place band.
+    _limit_band(
+        adapter,
+        "ShankProfile",
+        "ReliefDia",
+        (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
+        RELIEF_DIA_TOL_TYPE,
+    )
     _single_limit(
         adapter, "LeadReference", "HeadLead", RELIEF_LEAD, RELIEF_LEAD_TOL_TYPE
     )

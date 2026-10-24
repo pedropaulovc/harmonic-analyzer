@@ -31,11 +31,15 @@ SLOT_WIDTH_LOWER, SLOT_WIDTH_UPPER = printed_deviations(SLOT_WIDTH, 2)
 SLOT_DEPTH = 3.00  # From the uncut crown apex, not its cylindrical rim.
 SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
 # The die relief under the head mates with nothing (machinist review
-# 2026-10-23), so it carries no band: its diameter prints as the single limit
-# "Ø2.20 MAX" (swTolMAX prints the model value, so the model IS the limit),
-# under the die's root so the die cuts full thread up to the flank.
+# 2026-10-23), so its largest size is the die root's: the model value 2.20 is
+# the upper limit, under the die's root so the die cuts full thread up to the
+# flank.  The neck carries the clamp torque and preload, so it also has a
+# lower limit (sm_gooseneck_spring_screw_spec derives its strength): it
+# prints as the native LIMIT band 2.20/2.00.
 RELIEF_DIA = 2.20
-RELIEF_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
+RELIEF_DIA_MIN = 2.00
+RELIEF_DIA_LOWER, RELIEF_DIA_UPPER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6), 0.0
+RELIEF_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.
 RELIEF_WIDTH_LOWER, RELIEF_WIDTH_UPPER = printed_deviations(RELIEF_WIDTH, 2)
 # The 45-degree lead from the under-head face down onto the relief floor
@@ -57,7 +61,7 @@ THREAD_PD_2A_MIN_IN = 0.1141
 # below the minimum 2A pitch diameter. The table publishes a minor MAXIMUM,
 # not this minimum. The largest relief must clear the estimated deeper root.
 THREAD_MINOR_2A_MIN_EST = (THREAD_PD_2A_MIN_IN - 0.649519 / 32.0) * MM_PER_IN
-RELIEF_DIA_MAX = RELIEF_DIA
+RELIEF_DIA_MAX = RELIEF_DIA + RELIEF_DIA_UPPER
 RELIEF_LEAD_MAX = RELIEF_LEAD
 RELIEF_FLOOR_MIN = RELIEF_WIDTH + RELIEF_WIDTH_LOWER - RELIEF_LEAD_MAX
 SEAT_FLAT_INNER_DIA_MAX = RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_MAX

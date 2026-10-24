@@ -66,7 +66,9 @@ from sm_gooseneck_spring_screw_geom import (
     MAJOR_DIA,
     OVERALL_LENGTH,
     RELIEF_DIA,
+    RELIEF_DIA_LOWER,
     RELIEF_DIA_TOL_TYPE,
+    RELIEF_DIA_UPPER,
     RELIEF_LEAD,
     RELIEF_LEAD_TOL_TYPE,
     RELIEF_WIDTH,
@@ -141,12 +143,12 @@ NECK_BOTTOM_Y = _sheet_y(-RELIEF_DIA / 2.0)
 # leaving the air under the floor's head end to the lead's extension line.
 RELIEF_DIA_X = RELIEF_END_X - 0.0015
 
-# Rows below the profile, 15 mm apart, the first 30 mm under the head
+# Rows below the profile, 15 mm apart, the first 38 mm under the head
 # (text sits ~3 mm above its requested point, the dimension line ~5 mm
 # below it), clear of the lead's text block above them.  Row 0 chains the
 # head height and the under-head length from the under-head face; row 1
 # carries the reference overall.
-_ROW_Y = (HEAD_TOP_Y - 0.085, HEAD_TOP_Y - 0.100)
+_ROW_Y = (HEAD_TOP_Y - 0.093, HEAD_TOP_Y - 0.108)
 # ' 1.00 ' as rendered (farm run 20261010T190631112Z).
 CROWN_RISE_TEXT_WIDTH = 0.0116
 # The lead's text block: '0.3 max.' over its three-line callout, the widest
@@ -179,8 +181,9 @@ SIDE_KEEP = {
     "ReliefDia": (RELIEF_DIA_X, SIDE_CENTER[1] - 0.012),
     # The lead reads under the relief from the lower silhouette's reference
     # line: its text stands right of its 1.2 mm span, under the relief Ø's
-    # text and above row 0, its left end clear of the lead's extension line.
-    "HeadLead": (LEAD_FOOT_X + 0.0035 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.068),
+    # LIMIT block and above row 0, its left end clear of the lead's extension
+    # line.
+    "HeadLead": (LEAD_FOOT_X + 0.0035 + LEAD_TEXT_WIDTH / 2.0, HEAD_TOP_Y - 0.076),
     # The tip chamfer's axial leg reads below-right of the tip.
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - 0.016),
 }
@@ -190,9 +193,13 @@ SIDE_KEEP = {
 # the text stays clear of the under-head and lead extension lines (layout
 # audit of farm run 20261010T190631112Z, 6c56fd769).  Its right end stops
 # short of the tip chamfer's extension lines and the Ø line stays below the
-# thread silhouette.
-RELIEF_DIA_TEXT_WIDTH = 0.0215
+# thread silhouette.  The block is the stacked 2.20/2.00 limits over the
+# two-line callout; its widest line, 'CLAMP TORQUE', is estimated from the
+# lead's rendered 2.84 mm per character (farm run 20261024T031009457Z), and
+# its last line ends about 16 mm below the anchor.
+RELIEF_DIA_TEXT_WIDTH = 0.035
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
+RELIEF_DIA_TEXT_BOTTOM_DROP = 0.016
 RELIEF_DIA_LEADER_GAP = 0.0008
 RELIEF_DIA_TEXT_XY = (
     RELIEF_DIA_X + RELIEF_DIA_LEADER_GAP + RELIEF_DIA_TEXT_WIDTH / 2.0,
@@ -218,23 +225,27 @@ NOTES_XY = (0.016, 0.070)
 
 # Policy: native generation verifies persisted values, tolerances and
 # reference state.  swTolType_e: NONE leaves the title block's .XX band, MAX
-# prints the model value as the part's single limit.  Each row is (nominal
-# mm, tolerance type).
-_TOL_NONE, _TOL_MAX = 0, 6
-if RELIEF_DIA_TOL_TYPE != _TOL_MAX or RELIEF_LEAD_TOL_TYPE != _TOL_MAX:
-    raise AssertionError("MHA-SM-04 relief limits are no longer single MAX limits")
+# prints the model value as the part's single limit, LIMIT prints the model
+# value plus each deviation.  Each row is (nominal mm, tolerance type).
+_TOL_NONE, _TOL_LIMIT, _TOL_MAX = 0, 3, 6
+if RELIEF_DIA_TOL_TYPE != _TOL_LIMIT or RELIEF_LEAD_TOL_TYPE != _TOL_MAX:
+    raise AssertionError("MHA-SM-04 relief limits are no longer LIMIT / MAX")
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "HeadDia": (HEAD_DIA, _TOL_NONE),
     "HeadHeight": (HEAD_H, _TOL_NONE),
     "CrownRise": (CROWN_RISE, _TOL_NONE),
     "UnderHeadLength": (LENGTH, _TOL_NONE),
-    "ReliefDia": (RELIEF_DIA, _TOL_MAX),
+    "ReliefDia": (RELIEF_DIA, _TOL_LIMIT),
     "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE),
     "HeadLead": (RELIEF_LEAD, _TOL_MAX),
     "TipChamfer": (TIP_CHAMFER, _TOL_NONE),
     "SlotWidth": (SLOT_WIDTH, _TOL_NONE),
     "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
     "OverallLength": (OVERALL_LENGTH, _TOL_NONE),
+}
+# The LIMIT band's (lower, upper) deviations, mm.
+LIMIT_DEVIATIONS: dict[str, tuple[float, float]] = {
+    "ReliefDia": (RELIEF_DIA_LOWER, RELIEF_DIA_UPPER),
 }
 # Unprinted controls: the profile's lead (the printed lead's reference line
 # follows it by equation) and the thread major the callout defines.
@@ -262,6 +273,19 @@ def _check_dimension_state(
             f"MHA-SM-04 {label}: tolerance type {int(tolerance.Type)}, "
             f"spec {tolerance_type}; rebuild the source part"
         )
+    if label in LIMIT_DEVIATIONS:
+        lower, upper = LIMIT_DEVIATIONS[label]
+        read = (
+            float(tolerance.GetMinValue()) * 1000.0,
+            float(tolerance.GetMaxValue()) * 1000.0,
+        )
+        if not all(
+            math.isclose(a, b, abs_tol=1e-6) for a, b in zip(read, (lower, upper))
+        ):
+            raise RuntimeError(
+                f"MHA-SM-04 {label}: LIMIT deviations {read!r} mm, spec "
+                f"{(lower, upper)!r} mm; rebuild the source part"
+            )
 
 
 def _verify_source_dimensions(model: Any) -> None:
@@ -298,6 +322,12 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
+        if (
+            name in LIMIT_DEVIATIONS
+            and int(display.GetPrimaryTolPrecision2())
+            != DRAWING_PRECISION_BY_NAME[name]
+        ):
+            raise RuntimeError(f"MHA-SM-04 {name}: limit places did not persist")
         # The part authors every callout (swDimensionTextCalloutBelow); the
         # drawing only reads it back.  SOLIDWORKS may hand lines back as CRLF.
         callout = str(display.GetText(4) or "").replace("\r\n", "\n")

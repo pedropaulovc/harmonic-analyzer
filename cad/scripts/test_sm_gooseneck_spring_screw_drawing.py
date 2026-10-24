@@ -89,22 +89,33 @@ def test_model_owns_places_and_bands() -> None:
     assert one_place == {"TipChamfer", "HeadLead"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
-    # No mark carries a band: every limit is a single MAX the part sets with
-    # the model value as the limit, and every other mark takes the title
-    # block's .XX band.
+    # No mark carries a shared-helper band: the relief Ø is a native LIMIT
+    # band and the lead a single MAX, both set by the part with the model
+    # value as the upper limit; every other mark takes the title block's
+    # .XX band.
     assert model_toleranced_dimensions(part) == {}
     tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    limits = {
-        tuple(ast.unparse(arg) for arg in node.args[1:])
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", "") == "_single_limit"
-    }
-    assert limits == {
-        ("'ShankProfile'", "'ReliefDia'", "RELIEF_DIA", "RELIEF_DIA_TOL_TYPE"),
+
+    def calls(helper: str) -> set[tuple[str, ...]]:
+        return {
+            tuple(ast.unparse(arg) for arg in node.args[1:])
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and getattr(node.func, "id", "") == helper
+        }
+
+    assert calls("_single_limit") == {
         ("'LeadReference'", "'HeadLead'", "RELIEF_LEAD", "RELIEF_LEAD_TOL_TYPE"),
     }
-    assert geom.RELIEF_DIA_TOL_TYPE == geom.RELIEF_LEAD_TOL_TYPE == 6  # swTolMAX
+    assert calls("_limit_band") == {
+        (
+            "'ShankProfile'",
+            "'ReliefDia'",
+            "(RELIEF_DIA_LOWER, RELIEF_DIA_UPPER)",
+            "RELIEF_DIA_TOL_TYPE",
+        ),
+    }
+    assert geom.RELIEF_DIA_TOL_TYPE == 3  # swTolLIMIT
+    assert geom.RELIEF_LEAD_TOL_TYPE == 6  # swTolMAX
 
 
 def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
@@ -161,13 +172,29 @@ def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None
 
 
 def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
-    # Single MAX limits: the model value is the largest part accepted.
+    # The relief's LIMIT band tops out at the model value; the lead's single
+    # MAX is the model value.
     assert geom.RELIEF_DIA_MAX == geom.RELIEF_DIA == pytest.approx(2.20)
+    assert geom.RELIEF_DIA_MIN == pytest.approx(2.00)
+    assert (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER) == pytest.approx((-0.20, 0.0))
     assert geom.RELIEF_LEAD_MAX == geom.RELIEF_LEAD == pytest.approx(0.30)
     assert geom.RELIEF_DIA_MAX < geom.THREAD_MINOR_2A_MIN_EST
     assert geom.RELIEF_FLOOR_MIN >= 1.5 * geom.PITCH
     assert geom.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.80)
     assert geom.SEAT_FLAT_INNER_DIA_MAX < geom.MAJOR_DIA
+
+
+def test_relief_floor_carries_the_clamp_torque() -> None:
+    # The clamp holds the spring's catalog maximum by face friction alone.
+    assert spec.COUNTER_SPRING["maximum_load_n"] == pytest.approx(69.303, abs=1e-3)
+    assert spec.CLAMP_PRELOAD_N == pytest.approx(69.303 / 0.30, abs=0.01)
+    assert spec.THREAD_PITCH_DIA == pytest.approx(2.9896, abs=1e-4)
+    assert spec.NECK_TORQUE_NM == pytest.approx(0.0903, abs=1e-4)
+    assert spec.NECK_TENSION_MPA == pytest.approx(73.5, abs=0.1)
+    assert spec.NECK_SHEAR_MPA == pytest.approx(57.5, abs=0.1)
+    assert spec.NECK_VON_MISES_MPA == pytest.approx(123.8, abs=0.1)
+    assert spec.NECK_SAFETY_FACTOR >= spec.NECK_SAFETY_FACTOR_MIN == 2.0
+    assert spec.DIMENSION_CALLOUTS_BY_NAME["ReliefDia"] == "MIN FOR\nCLAMP TORQUE"
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
 
 
@@ -323,17 +350,18 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     text_height = 0.0035
     thread_bottom = drawing.SIDE_CENTER[1] - thread_half
     assert text_y + 0.001 + text_height <= thread_bottom - 0.002
-    underline = text_y - drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
+    block_bottom = text_y - drawing.RELIEF_DIA_TEXT_BOTTOM_DROP
+    assert drawing.RELIEF_DIA_TEXT_BOTTOM_DROP > drawing.RELIEF_DIA_TEXT_UNDERLINE_DROP
     # The lead's extension line drops from the lead's foot on the lower
     # silhouette, left of the Ø's leader; its text block stands right of
     # that line with room to spare (the layout audit of farm run
     # 20261024T031009457Z found the line through the block's left edge),
-    # under the Ø's text and above row 0.
+    # under the Ø's LIMIT block and above row 0.
     lead_x, lead_y = drawing.SIDE_KEEP["HeadLead"]
     lead_left = lead_x - drawing.LEAD_TEXT_WIDTH / 2.0
     assert drawing.UNDERHEAD_X < drawing.LEAD_FOOT_X <= lead_left - 0.003
     assert drawing.LEAD_FOOT_X < drawing.RELIEF_DIA_X - 0.003
-    assert lead_y + drawing.LEAD_TEXT_TOP_ABOVE_ANCHOR <= underline - 0.002
+    assert lead_y + drawing.LEAD_TEXT_TOP_ABOVE_ANCHOR <= block_bottom - 0.002
     assert lead_y - drawing.SIDE_KEEP["UnderHeadLength"][1] >= 0.015
     assert lead_x + drawing.LEAD_TEXT_WIDTH / 2.0 < drawing.THREAD_START_X - 0.005
     assert drawing.NECK_BOTTOM_Y > text_y
@@ -371,10 +399,14 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     printed = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
     assert set(drawing.PRINTED_DIMENSIONS) == printed
     limits = {name: row for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]}
-    # The builder's single MAX limits, the model value being the limit.
+    # The builder's limits: the relief's LIMIT band and the lead's single
+    # MAX, the model value being the upper limit of each.
     assert limits == {
-        "ReliefDia": (geom.RELIEF_DIA, 6),
+        "ReliefDia": (geom.RELIEF_DIA, 3),
         "HeadLead": (geom.RELIEF_LEAD, 6),
+    }
+    assert drawing.LIMIT_DEVIATIONS == {
+        "ReliefDia": (geom.RELIEF_DIA_LOWER, geom.RELIEF_DIA_UPPER)
     }
     assert drawing.PRINTED_DIMENSIONS["TipChamfer"] == (geom.TIP_CHAMFER, 0)
     assert drawing.PRINTED_DIMENSIONS["OverallLength"][0] == pytest.approx(23.0)
@@ -389,6 +421,7 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     lead_callout = callouts["HeadLead"].splitlines()
     assert lead_callout == ["X 45 DEG", "FLAT SEAT FOR", "MHA-SM-VN-51 LOOP"]
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
+    assert callouts["ReliefDia"].splitlines() == ["MIN FOR", "CLAMP TORQUE"]
     for feature, names in spec.DIMENSION_CALLOUTS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
     assert part.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
