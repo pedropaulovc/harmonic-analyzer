@@ -89,7 +89,8 @@ def main() -> None:
     requested, worker_option = _worker_request(args, capacity)
     minimum = (min(requested, capacity) + 1) // 2
     started = time.monotonic()
-    next_log = started + 30
+    # Report the first refused pass at once, then every 30 seconds.
+    next_log = started
     service = _telemetry.BUILD_INFRA_SERVICE
     with ExitStack() as slots:
         granted = 0

@@ -16,6 +16,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _local_check
 
+# Hang guards only: no assertion measures elapsed time. Every ordering below is
+# proven by a pipe or file event, so a saturated host can only slow the test.
+HANG_GUARD_S = 300
+
 
 @pytest.fixture
 def check_env(tmp_path, monkeypatch):
@@ -36,6 +40,7 @@ def _start(cmd, cwd, env):
     )
     lines = queue.Queue()
     errors = queue.Queue()
+    proc.stderr_lines = queue.Queue()
 
     def drain():
         for line in proc.stdout:
@@ -45,7 +50,12 @@ def _start(cmd, cwd, env):
     def drain_errors():
         # wait() cannot complete if the child fills an unread stderr pipe.
         # Keep diagnostics separate from stdout's readiness protocol.
-        errors.put(proc.stderr.read())
+        chunks = []
+        for line in proc.stderr:
+            chunks.append(line)
+            proc.stderr_lines.put(line)
+        proc.stderr_lines.put(None)
+        errors.put("".join(chunks))
 
     proc._capture_readers = (
         threading.Thread(target=drain, name="local-check-stdout", daemon=True),
@@ -56,16 +66,31 @@ def _start(cmd, cwd, env):
     return proc, lines, errors
 
 
+def _await_refusal(proc, lines):
+    """Block until a contender reports a refused admission pass."""
+    # The runner logs its first refused pass at once. Unlike a sub-second
+    # silence window, this cannot pass before the contender has even started.
+    while True:
+        line = proc.stderr_lines.get(timeout=HANG_GUARD_S)
+        assert line is not None, "contender exited before reporting a refusal"
+        assert " admitted " not in line, f"contender admitted while slots were held: {line}"
+        if "waiting for CPU slots" in line:
+            break
+    # Readiness is printed only after admission, so it must still be absent.
+    with pytest.raises(queue.Empty):
+        lines.get_nowait()
+
+
 def _stop(proc):
     proc.stdin.close()
     try:
-        proc.wait(timeout=30)
+        proc.wait(timeout=HANG_GUARD_S)
     except subprocess.TimeoutExpired:
         proc.kill()
-        proc.wait(timeout=30)
+        proc.wait(timeout=HANG_GUARD_S)
     # A process exit does not mean its readers have consumed EOF yet.
     # Join before closing either stream, including when a reader started late.
-    deadline = time.monotonic() + 30
+    deadline = time.monotonic() + HANG_GUARD_S
     for reader in proc._capture_readers:
         reader.join(timeout=max(0, deadline - time.monotonic()))
     assert not any(reader.is_alive() for reader in proc._capture_readers), (
@@ -92,11 +117,11 @@ def test_released_check_completes_with_stderr_larger_than_pipe_capacity(tmp_path
         tmp_path, check_env,
     )
     try:
-        int(lines.get(timeout=30))
+        int(lines.get(timeout=HANG_GUARD_S))
         proc.stdin.write("x")
         proc.stdin.flush()
-        assert proc.wait(timeout=30) == 7, errors.get(timeout=30)
-        assert errors.get(timeout=30).endswith("teardown stderr\n" * 131072)
+        assert proc.wait(timeout=HANG_GUARD_S) == 7, errors.get(timeout=HANG_GUARD_S)
+        assert errors.get(timeout=HANG_GUARD_S).endswith("teardown stderr\n" * 131072)
     finally:
         _stop(proc)
 
@@ -115,6 +140,7 @@ def test_separate_checkouts_share_admission_until_running_check_exits(tmp_path, 
             "sys.stdin.read(1)\n", encoding="utf-8",
         )
         commands.append(([sys.executable, str(runner), "check:fixture", str(script)], checkout))
+    check_env["HARMONIC_VERBOSITY"] = "info"
     check_env["PYTHONPATH"] = os.pathsep.join(
         [str(Path(_local_check.__file__).parent), check_env.get("PYTHONPATH", "")]
     )
@@ -122,17 +148,16 @@ def test_separate_checkouts_share_admission_until_running_check_exits(tmp_path, 
     second = None
     try:
         # Windows venv executables may redirect to a different interpreter PID.
-        first_pid = int(first_lines.get(timeout=30))
+        first_pid = int(first_lines.get(timeout=HANG_GUARD_S))
         second, second_lines, second_errors = _start(*commands[1], check_env)
-        with pytest.raises(queue.Empty):
-            second_lines.get(timeout=0.5)
+        _await_refusal(second, second_lines)
         first.stdin.write("x")
         first.stdin.flush()
-        assert first.wait(timeout=30) == 0, first_errors.get(timeout=30)
-        assert int(second_lines.get(timeout=30)) != first_pid
+        assert first.wait(timeout=HANG_GUARD_S) == 0, first_errors.get(timeout=HANG_GUARD_S)
+        assert int(second_lines.get(timeout=HANG_GUARD_S)) != first_pid
         second.stdin.write("x")
         second.stdin.flush()
-        assert second.wait(timeout=30) == 0, second_errors.get(timeout=30)
+        assert second.wait(timeout=HANG_GUARD_S) == 0, second_errors.get(timeout=HANG_GUARD_S)
     finally:
         _stop(first)
         if second is not None:
@@ -145,10 +170,10 @@ def test_killed_check_releases_admission(tmp_path, check_env):
     cmd = _local_check.command([sys.executable, str(script)], "check:fixture")
     proc, lines, _ = _start(cmd, tmp_path, check_env)
     try:
-        owner_pid = int(lines.get(timeout=30))
+        owner_pid = int(lines.get(timeout=HANG_GUARD_S))
         os.kill(owner_pid, signal.SIGTERM)
-        proc.wait(timeout=30)
-        result = subprocess.run(cmd, cwd=tmp_path, env=check_env, input="x", capture_output=True, text=True, timeout=30)
+        proc.wait(timeout=HANG_GUARD_S)
+        result = subprocess.run(cmd, cwd=tmp_path, env=check_env, input="x", capture_output=True, text=True, timeout=HANG_GUARD_S)
         assert result.returncode == 0, result.stderr
         assert int(result.stdout.strip()) != owner_pid
     finally:
@@ -176,7 +201,7 @@ def test_failure_preserves_exit_status_and_does_not_stamp_success(tmp_path, chec
     assert json.loads((tmp_path / "received.json").read_text()) == ["two words"]
     result = subprocess.run(
         _local_check.command([sys.executable, *args], "check:fixture"),
-        cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=30,
+        cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=HANG_GUARD_S,
     )
     assert result.returncode == 7, result.stderr
 
@@ -235,7 +260,7 @@ def test_serial_pytest_cannot_inherit_unbudgeted_workers(tmp_path, check_env, op
              "--", str(worker_test)],
             "check:serial",
         ),
-        cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=30,
+        cwd=tmp_path, env=check_env, capture_output=True, text=True, timeout=HANG_GUARD_S,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -247,6 +272,7 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
     # Explicit host capacity also governs auto when interpreter CPU counts differ.
     check_env["PYTHON_CPU_COUNT"] = "2"
     check_env["PYTEST_ADDOPTS"] = "-n auto"
+    check_env["HARMONIC_VERBOSITY"] = "info"
     hold = tmp_path / "hold.py"
     hold.write_text(
         "import os, sys\nprint(os.getpid(), flush=True)\nsys.stdin.read(1)\n",
@@ -260,7 +286,7 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
         "    ready = pathlib.Path('.' + worker_id)\n"
         "    ready.write_text(os.environ['PYTEST_XDIST_WORKER_COUNT'])\n"
         "    ready.replace(worker_id)\n"
-        "    deadline = time.monotonic() + 60\n"
+        f"    deadline = time.monotonic() + {HANG_GUARD_S}\n"
         "    while not pathlib.Path('release').exists():\n"
         "        assert time.monotonic() < deadline, 'worker release timed out'\n"
         "        time.sleep(0.05)\n"
@@ -275,10 +301,10 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
     waiting = None
     blocker = None
     try:
-        int(small_lines.get(timeout=30))
+        int(small_lines.get(timeout=HANG_GUARD_S))
         blocker, blocker_lines, blocker_errors = _start(cmd, tmp_path, check_env)
-        int(blocker_lines.get(timeout=30))
-        parallel, _, parallel_errors = _start(
+        int(blocker_lines.get(timeout=HANG_GUARD_S))
+        parallel, parallel_lines, parallel_errors = _start(
             _local_check.command(
                 [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
                  *worker_args, str(worker_test)],
@@ -288,28 +314,27 @@ def test_parallel_pytest_shares_remaining_slots_with_small_checks(tmp_path, chec
         )
         # One free slot must not strand a long suite at one worker after
         # these short checks finish. Wait for a useful worker batch instead.
-        time.sleep(2)
+        _await_refusal(parallel, parallel_lines)
         assert not list(tmp_path.glob("gw*"))
         blocker.stdin.write("x")
         blocker.stdin.flush()
-        assert blocker.wait(timeout=30) == 0, blocker_errors.get(timeout=30)
-        deadline = time.monotonic() + 30
+        assert blocker.wait(timeout=HANG_GUARD_S) == 0, blocker_errors.get(timeout=HANG_GUARD_S)
+        deadline = time.monotonic() + HANG_GUARD_S
         while len(list(tmp_path.glob("gw*"))) < 2:
-            assert parallel.poll() is None, parallel_errors.get(timeout=30)
+            assert parallel.poll() is None, parallel_errors.get(timeout=HANG_GUARD_S)
             assert time.monotonic() < deadline, "two admitted workers did not start"
             time.sleep(0.05)
         assert {p.name: p.read_text() for p in tmp_path.glob("gw*")} == {"gw0": "2", "gw1": "2"}
         waiting, waiting_lines, _ = _start(cmd, tmp_path, check_env)
-        with pytest.raises(queue.Empty):
-            waiting_lines.get(timeout=0.5)
+        _await_refusal(waiting, waiting_lines)
         small.stdin.write("x")
         small.stdin.flush()
-        assert small.wait(timeout=30) == 0, small_errors.get(timeout=30)
-        int(waiting_lines.get(timeout=30))
+        assert small.wait(timeout=HANG_GUARD_S) == 0, small_errors.get(timeout=HANG_GUARD_S)
+        int(waiting_lines.get(timeout=HANG_GUARD_S))
         # The small successor starts while the two xdist workers remain alive.
         assert parallel.poll() is None
         (tmp_path / "release").touch()
-        assert parallel.wait(timeout=30) == 0, parallel_errors.get(timeout=30)
+        assert parallel.wait(timeout=HANG_GUARD_S) == 0, parallel_errors.get(timeout=HANG_GUARD_S)
     finally:
         (tmp_path / "release").touch()
         for proc in (small, parallel, waiting, blocker):
