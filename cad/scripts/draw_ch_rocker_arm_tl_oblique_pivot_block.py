@@ -42,7 +42,7 @@ PLAN_KEEP = {
     'BlockWidth':(.236,.195),'BlockSideY':(.224,.220),
     'CarriageDrills3Y':(.212,.1985),'CarriageDrills4Y':(.212,.2115),
     'CarriageDrills1X':(.158,.170),'CarriageDrills3X':(.204,.170),
-    'BoreDia':(.082,.226),'CarriageDrills1Dia':(.110,.168),'CarriageCounterbores1Dia':(.095,.150),
+    'BoreDia':(.078,.226),'CarriageDrills1Dia':(.110,.168),'CarriageCounterbores1Dia':(.095,.150),
 }
 # Section A-A: Z 0..24.3 prints at y 92.2..67.9 (top face down). The tap's
 # dimension line rides the tap-only band (y 75.5..92.2), clear of the 7.65
@@ -163,11 +163,11 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
                                   scale=SHEET_SCALE,layout=spec.layout,
                                   # SolidWorks pins its own "#4-40 Tapped Hole" notes by the nut
-                                  # taps, whose Hole Wizard callout already states the thread; one
-                                  # crossed section line C. Finalize's all-sheet sweep: farm runs
-                                  # 20261024T074822931Z, T082734591Z and T084702861Z each found 3.
+                                  # taps, whose Hole Wizard callout already states the thread.
+                                  # Finalize's all-sheet sweep: farm run 20261024T115707908Z (1:1
+                                  # C-C) found 1.
                                   redundant_note_substrings=('#4-40 Tapped Hole',) if is_feed else (),
-                                  expected_redundant_notes=3 if is_feed else 0)
+                                  expected_redundant_notes=1 if is_feed else 0)
 
 
 async def build(adapter):
