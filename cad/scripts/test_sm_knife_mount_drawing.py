@@ -434,6 +434,10 @@ def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
     assert x + drawing.BORE_DIA_TEXT_HALF_WIDTH < face_x - 0.005
     # Above the bore centre, so the leader descends to the upper-left rim.
     assert y > drawing._front_y(sm_knife_mount_spec.BORE_CY)
+    # Its top row stays under the block top's 29.6 extension line (farm run
+    # 20261024T114146582Z: the +0.03 rode it, text-on-line).
+    top_line = drawing._front_y(sm_knife_mount_spec.BLK_TOP)
+    assert y + drawing.BORE_DIA_TEXT_TOP_REACH < top_line - 0.0035
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'set_near_side_diameter(bore_dia[0], "knife-bore diameter")' in source
 

@@ -185,10 +185,18 @@ def _sheet_x(model_x_mm: float) -> float:
 # capitals at the ~2.52 mm a character the tap callout's 31-character reason
 # row printed (78 mm, run 20261024T081603839Z), 45.4 mm.
 BORE_DIA_TEXT_HALF_WIDTH = 0.0227
+# SolidWorks centres the five rows (+0.03 / Ø12.00 0.00 / three callout rows)
+# on the text position: farm run 20261024T114146582Z printed the top row
+# 12.8 mm over a position 30 mm above the bore centre, through the block
+# top's 29.6 extension line (sheet y 169.6, text-on-line).  At 23 mm the
+# top row stands ~164.2, 5.4 mm under that line, and the bottom row stays
+# above the bore centre so the leader descends to the upper-left rim.
+BORE_DIA_TEXT_RISE = 0.023
+BORE_DIA_TEXT_TOP_REACH = 0.0128
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.091, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + 0.030),
+    "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + BORE_DIA_TEXT_RISE),
 }
 # The dowel hole's floor depth stands right of the section, level with the
 # middle of the hole, its witness lines off the cut top seat and hole floor.
