@@ -43,6 +43,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_detail_crop import native_circle_geometry
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
@@ -106,18 +107,25 @@ DETAIL_KEEP = {
     "FullTickPitch": (0.180, 0.218),
     "MinorTickPitch": (0.075, 0.085),
 }
-# Local fences keep extension lines beside their tick; D excludes tick zero.
+# Local fences keep extension lines beside their tick. D sits between the
+# first two minor ticks, 0.7 inside the ruled edge, model radius 1.8: both
+# minor ticks and a plain stretch of edge show, and tick zero and the next
+# tick stay outside. It is authored exactly (EXACT_FENCES): with sketch
+# inference its fence snapped to the tick profile corner and shrank,
+# clipping tick zero and leaving the edge a stub (machinist review run
+# 20261024T101144897Z-358edb75; measured from that run's PDF vectors).
 LENGTH_DETAILS = (
     ("C", (0.100, 0.245), (0.105, 0.155),
      (part.SCALE_START_X, part.BODY_WIDTH - part.TICK_LENGTH / 2.0),
      {"FullTickLength": (0.075, 0.180), "Tick0Width": (0.075, 0.215)}, 4.0),
     ("D", (0.215, 0.245), (0.220, 0.155),
-     (part.SCALE_START_X + part.MINOR_SPACING, part.BODY_WIDTH - part.MINOR_TICK_LENGTH / 2.0),
-     {"MinorTickLength": (0.190, 0.180)}, 2.2),
+     (part.SCALE_START_X + 1.5 * part.MINOR_SPACING, part.BODY_WIDTH - 0.7),
+     {"MinorTickLength": (0.190, 0.180)}, 1.8),
     ("E", (0.330, 0.245), (0.335, 0.155),
      (part.SCALE_START_X + part.DIVISION_SPACING / 2.0, part.BODY_WIDTH - part.HALF_TICK_LENGTH / 2.0),
      {"HalfTickLength": (0.300, 0.185)}, 4.0),
 )
+EXACT_FENCES = frozenset({"D"})
 NUMERAL_KEEP = {
     "NumeralHeight": (0.215, 0.183),
     "NumeralXGap": (0.100, 0.170),
@@ -145,9 +153,17 @@ def _rotate_ruled_face(adapter: Any, view: Any) -> None:
 def _engraving_detail(
     adapter: Any, parent: Any, *, model_center: tuple[float, float, float],
     view_xy: tuple[float, float], radius_mm: float, detail_label: str,
-    scale: tuple[float, float] = DETAIL_SCALE,
+    scale: tuple[float, float] = DETAIL_SCALE, exact: bool = False,
 ) -> Any:
-    """Fence a useful-scale detail and move its parent letter off the strip."""
+    """Fence a useful-scale detail and move its parent letter off the strip.
+
+    The fence's sheet radius is ``radius_mm / 2`` mm. With ``exact`` the
+    circle is authored straight to the sketch database (no sketch inference,
+    which otherwise snaps the centre and rim to nearby view-sketch points at a
+    screen-pixel tolerance), read back, and selected for the detail, as in
+    draw_ch_rocker_arm._create_detail; the fence then sits exactly on
+    ``model_center`` with model radius ``radius_mm`` at the 1:2 parents.
+    """
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     parent = _early_bound(parent, "IView")
@@ -166,7 +182,28 @@ def _engraving_detail(
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(draw.SketchManager, "ISketchManager")
-    if manager.CreateCircle(*points[0], *points[1]) is None:
+    if exact:
+        previous = bool(manager.AddToDB)
+        manager.AddToDB = True
+        try:
+            circle = manager.CreateCircle(*points[0], *points[1])
+        finally:
+            manager.AddToDB = previous
+        if circle is None:
+            raise RuntimeError(f"failed to draw engraving detail {detail_label} fence")
+        actual_centre, actual_radius = native_circle_geometry(
+            circle, label=f"engraving detail {detail_label} fence")
+        asked_radius = math.dist(points[0], points[1])
+        _telemetry.info(f"engraving detail {detail_label} fence: centre {actual_centre} (asked {points[0]}), "
+                        f"radius {actual_radius} (asked {asked_radius})")
+        if math.dist(actual_centre, points[0]) > 1e-7 or abs(actual_radius - asked_radius) > 1e-7:
+            raise RuntimeError(f"engraving detail {detail_label}: the authored fence moved or changed radius")
+        selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        data = _early_bound(selection.CreateSelectData(), "ISelectData")
+        data.View = parent
+        if _early_bound(circle, "ISketchSegment").Select4(False, data) is not True:
+            raise RuntimeError(f"engraving detail {detail_label}: cannot select its fence")
+    elif manager.CreateCircle(*points[0], *points[1]) is None:
         raise RuntimeError(f"failed to draw engraving detail {detail_label} fence")
     detail = ddoc.CreateDetailViewAt4(*view_xy, 0.0, 0, *scale,
                                     detail_label, 1, True, False, False, 5)
@@ -365,7 +402,7 @@ async def build(adapter: Any) -> dict[str, str]:
             length_detail = _engraving_detail(
                 adapter, length_parent,
                 model_center=(model_xy[0] / 1000.0, model_xy[1] / 1000.0, 0.0),
-                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label)
+                view_xy=detail_xy, radius_mm=radius_mm, detail_label=label, exact=label in EXACT_FENCES)
             set_hidden_lines_removed(adapter, length_detail)
             annotations += curate_view_dimensions(
                 adapter, length_detail, keep=keep, view_label=f"tick length {label}",

@@ -462,7 +462,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
 
     def circle(*points):
         circles.append(points)
-        return object()
+        return SimpleNamespace(centre=points[:3], radius=math.dist(points[:3], points[3:]),
+                               Select4=lambda append, data: data.View is active["parent"])
 
     def create_detail(*args):
         label = args[6]
@@ -485,7 +486,8 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     document = SimpleNamespace(
         ActivateSheet=activate_sheet, ActivateView=activate_view,
         ClearSelection2=lambda clear: None, EditRebuild3=lambda: True,
-        SketchManager=SimpleNamespace(CreateCircle=circle),
+        SketchManager=SimpleNamespace(CreateCircle=circle, AddToDB=False),
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace(View=None)),
         CreateDetailViewAt4=create_detail,
     )
 
@@ -515,6 +517,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
 
     monkeypatch.setattr(drawing_projection, "_com_invoke", invoke)
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    monkeypatch.setattr(drawing, "native_circle_geometry", lambda circle, label: (circle.centre, circle.radius))
     # The fake has no COM property marshaller: store the SAFEARRAY payload.
     monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
     monkeypatch.setattr(drawing, "new_project_drawing", new_drawing)
@@ -705,15 +708,33 @@ def test_local_length_fences_include_owned_ticks_without_cross_strip_routing() -
         "MinorTickLength": spec.MINOR_TICK_LENGTH,
         "HalfTickLength": spec.HALF_TICK_LENGTH,
     }
-    for label, _parent, detail, model, keep, radius in drawing.LENGTH_DETAILS:
+    def outside(centre, radius, x0, x1, y0, y1):
+        nearest = (min(max(centre[0], x0), x1), min(max(centre[1], y0), y1))
+        return math.dist(centre, nearest) > radius
+
+    def inside(centre, radius, x0, x1, y0, y1):
+        return all(math.dist(centre, corner) < radius for corner in ((x0, y0), (x0, y1), (x1, y0), (x1, y1)))
+
+    half = spec.TICK_WIDTH / 2.0
+    for label, _parent, detail, model, keep, diameter in drawing.LENGTH_DETAILS:
         name = next(name for name in keep if name in lengths)
-        assert radius > math.hypot(spec.TICK_WIDTH / 2.0, lengths[name] / 2.0)
-        assert keep[name][0] < detail[0] - radius * drawing.DETAIL_SCALE[0] / 1000.0
-        assert model[1] == pytest.approx(spec.BODY_WIDTH - lengths[name] / 2.0)
-        if label == "D":
-            # _engraving_detail takes a fence diameter, not its circle radius.
-            assert radius / 2.0 > math.hypot(spec.TICK_WIDTH / 2.0, lengths[name] / 2.0)
-            assert radius / 2.0 < spec.MINOR_SPACING - spec.TICK_WIDTH / 2.0
+        assert keep[name][0] < detail[0] - diameter * drawing.DETAIL_SCALE[0] / 1000.0
+        if label != "D":
+            assert diameter > math.hypot(half, lengths[name] / 2.0)
+            assert model[1] == pytest.approx(spec.BODY_WIDTH - lengths[name] / 2.0)
+            continue
+        # Exact fence (EXACT_FENCES): sheet radius radius_mm / 2 at the 1:2
+        # parent, so the model radius is radius_mm.
+        assert label in drawing.EXACT_FENCES
+        radius = diameter
+        tick = spec.SCALE_START_X + spec.MINOR_SPACING
+        edge = spec.BODY_WIDTH
+        assert inside(model, radius, tick - half, tick + half, edge - spec.MINOR_TICK_LENGTH, edge)
+        assert outside(model, radius, spec.SCALE_START_X - half, spec.SCALE_START_X + half,
+                       edge - spec.TICK_LENGTH, edge)  # tick zero stays out
+        nxt = spec.SCALE_START_X + 3 * spec.MINOR_SPACING
+        assert outside(model, radius, nxt - half, nxt + half, edge - spec.MINOR_TICK_LENGTH, edge)
+        assert 2.0 * math.sqrt(radius**2 - (edge - model[1]) ** 2) >= 2.0  # the edge reads as an edge
 
 
 @pytest.mark.parametrize("labels,readback", [
@@ -757,6 +778,45 @@ def test_detail_letter_refuses_missing_ambiguous_or_ignored_native_placement(
             view_xy=drawing.DETAIL_CENTER, radius_mm=drawing.DETAIL_RADIUS_MM,
             detail_label="A",
         )
+
+
+@pytest.mark.parametrize("fault, match", [
+    ("snapped", "moved or changed radius"),
+    ("unselectable", "cannot select its fence"),
+])
+def test_exact_fence_refuses_a_snapped_or_unselected_circle(monkeypatch, fault, match) -> None:
+    db_writes = []
+    manager = SimpleNamespace(AddToDB=False)
+
+    def create(*points):
+        db_writes.append(manager.AddToDB)
+        shift = 0.0002 if fault == "snapped" else 0.0
+        return SimpleNamespace(centre=(points[0] + shift, points[1], points[2]),
+                               radius=math.dist(points[:3], points[3:]),
+                               Select4=lambda append, data: fault != "unselectable")
+
+    manager.CreateCircle = create
+    parent = SimpleNamespace(GetSketch=lambda: SimpleNamespace(
+        ModelToSketchTransform=_StickAffine((1.0, 1.0, 1.0), (0.0, 0.0, 0.0))))
+    document = SimpleNamespace(
+        ActivateView=lambda name: True, ClearSelection2=lambda clear: None,
+        SketchManager=manager,
+        SelectionManager=SimpleNamespace(CreateSelectData=lambda: SimpleNamespace(View=None)),
+        CreateDetailViewAt4=lambda *args: pytest.fail("detail created from a bad fence"),
+    )
+    adapter = SimpleNamespace(currentModel=document,
+                              swApp=SimpleNamespace(GetMathUtility=lambda: _StickMathUtility()))
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "double_array", lambda values: tuple(values))
+    monkeypatch.setattr(drawing, "native_circle_geometry", lambda circle, label: (circle.centre, circle.radius))
+    monkeypatch.setattr(drawing, "view_name", lambda *args: "offline-parent")
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda *args, **kwargs: (0.100, 0.200))
+    with pytest.raises(RuntimeError, match=match):
+        drawing._engraving_detail(
+            adapter, parent, model_center=(0.06, 0.007, 0.0), view_xy=(0.22, 0.155),
+            radius_mm=1.8, detail_label="D", exact=True)
+    assert db_writes == [True]  # authored without sketch inference
+    assert manager.AddToDB is False  # restored
 
 
 def test_numeral_v_contract_is_independent_of_graduations() -> None:
