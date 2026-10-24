@@ -59,3 +59,13 @@ free_dof: 1
 # carries_chain: wraps the roller chain, so verify:soundness's interference
 #   gate gets the authored wheel mounts, as the assembly build does (541011de0).
 carries_chain: true
+# machinist_exceptions: the fitter package's owner-declared machinist-review
+#   exceptions (drawing-simplicity-policy.md "Named exceptions"); read by
+#   machinist_exceptions.load_exceptions for pd_paper_drive_assembly,
+#   ignored by the build.
+machinist_exceptions:
+  - id: "U-MHA-PD-13-no-lock"
+    kind: "accept"
+    where: "sheets 5 and 6, knob stack and chain fit-up: MHA-PD-13 thumbnut tight on the MHA-PD-22 collar's pilot, MHA-PD-08 knob shaft stud; THUMBNUT IS A CLAMP ONLY; NEVER TURNED TO DRIVE"
+    finding: "MHA-PD-13 thumbnut on the reversing knob shaft carries no mechanical lock (rule 23, lock threaded joints exposed to operating loads)"
+    reason: "user ruling 2026-10-03 on the machinist review of 6c385465d, re-granted 2026-10-11 for #8-32 (joint_retention ruling U-MHA-PD-13-no-lock): the T24 floats under the flange and turns against it only by its drive-pin backlash, so the drag it passes is over 300x below the hand-tight nut's break-away torque; every positive lock tried broke a wall or the chain's envelope"
