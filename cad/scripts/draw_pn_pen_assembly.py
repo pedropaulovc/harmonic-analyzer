@@ -63,6 +63,7 @@ from _drawing_dimensions import (
     set_reference_dimension,
 )
 from _drawing_hidden_sketches import _show_base_view_sketches
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_sheets import create_blank_drawing_sheets
@@ -151,8 +152,24 @@ SETTINGS_NOTE_WIDTH = 70  # characters
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_LETTER_GAP = 0.001
+# One default-format glyph's width (the measured 2.55 mm per character above).
+DETAIL_LETTER_WIDTH = 0.00255
 BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
-BOUNDED_ON_RIGHT = frozenset(("stud", "hanger"))
+# Each circled detail's parent view, by the orientation the detail shares with
+# it. A and B are bounded on RIGHT, where the stud and the hanger screw both
+# show (on FRONT the strap hides the stud); D on FRONT, which it enlarges.
+# D's letter stands at its circle's upper left: the marker's grip block fills
+# the upper right on FRONT.
+BOUNDED_ON = {"stud": "*Right", "hanger": "*Right", "stirrup": "*Front"}
+LETTERED_LEFT = frozenset(("stirrup",))
+# C, the turned plan, is named by a viewing arrow on FRONT instead
+# (draw_sm_summing_lever's VIEW F arrow): the letter's top stands this far over
+# the tip, the leader leaving the letter's side squared over the tip.
+VIEW_ARROW_RISE = 0.010
+VIEW_ARROW_SQUARE_TOL = 0.0003
+# The arrow's tip stands at least this far off D's circle, so it reads as
+# pointing at the block, not at the circle.
+VIEW_ARROW_CIRCLE_CLEARANCE = 0.002
 TRAIL_LINE_STYLE = 2  # swLineStyles_e.swLinePHANTOM: the explode trail
 
 _CARRIAGE_STEMS = frozenset(
@@ -176,7 +193,7 @@ class Detail:
     builder's settings sketch whose marked dimensions the detail prints
     (``None``: a lock shown, nothing dimensioned). ``axis_points`` (machine mm,
     from, to), when given, is the direction the view is turned to lay along
-    sheet +X."""
+    sheet +X, clockwise by ``turn_cw_deg`` (the angle its title prints)."""
 
     key: str
     orientation: str
@@ -190,6 +207,7 @@ class Detail:
     axis_points: (
         tuple[tuple[float, float, float], tuple[float, float, float]] | None
     ) = None
+    turn_cw_deg: float | None = None
 
     @property
     def title(self) -> str:
@@ -248,6 +266,7 @@ CARRIAGE_DETAIL = Detail(
     feature=spec.CARRIAGE_FEATURE,
     label_xy=(0.156, 0.090),
     axis_points=notes.CARRIAGE_AXIS_POINTS,
+    turn_cw_deg=notes.CARRIAGE_TURN_CW_DEG,
 )
 # D sits in the free band right of C's title, between the as-shipped note
 # and the title block, its title to its right.
@@ -761,7 +780,8 @@ def _placed_base_view(
 def _turn_detail(adapter: Any, view: Any, detail: Detail) -> None:
     """Turn ``view`` so ``detail.axis_points`` read along sheet +X, and prove
     it (the dt_crank_drive_gear A-A turn: ``IView.Angle`` less the axis's
-    sheet angle)."""
+    sheet angle). The axis's untouched sheet angle is the clockwise turn the
+    title prints, so it must read ``detail.turn_cw_deg``."""
     native = _early_bound(view, "IView")
     label = f"{detail.label} axis"
 
@@ -778,6 +798,12 @@ def _turn_detail(adapter: Any, view: Any, detail: Detail) -> None:
         return end[0] - start[0], end[1] - start[1]
 
     dx, dy = axis()
+    untouched = math.degrees(math.atan2(dy, dx))
+    if detail.turn_cw_deg is None or abs(untouched - detail.turn_cw_deg) > 1e-3:
+        raise RuntimeError(
+            f"{label} reads {untouched!r} deg before the turn; its title prints "
+            f"ROTATED {detail.turn_cw_deg!r} DEG CW"
+        )
     native.Angle = float(native.Angle) - math.atan2(dy, dx)
     adapter.currentModel.EditRebuild3()
     dx, dy = axis()
@@ -898,10 +924,14 @@ def _add_explode_trail(
     _telemetry.info(f"{label}: {ends[0]!r} -> {ends[1]!r}")
 
 
-def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
+def _mark_detail_boundary(
+    adapter: Any, parent: Any, detail: Detail
+) -> tuple[tuple[float, float], float]:
     """The detail's boundary on its parent view: a black circle round what
-    the detail shows, lettered at its upper right (machinist review, farm run
-    20261016T082735510Z: the fitter could not tell where A and B come from)."""
+    the detail shows, lettered at its upper right, or its upper left for
+    ``LETTERED_LEFT`` (machinist review, farm run 20261016T082735510Z: the
+    fitter could not tell where A and B come from; run 20261024T091056564Z:
+    nor D). Returns the circle's sheet centre and radius."""
     label = f"{detail.label} boundary"
     centre = model_point_in_view(adapter, parent, detail.model_centre_m, label=label)
     radius = detail.radius_mm * SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0
@@ -915,12 +945,69 @@ def _mark_detail_boundary(adapter: Any, parent: Any, detail: Detail) -> None:
     adapter.currentModel.ClearSelection2(True)
     adapter.currentModel.EditRebuild3()
     reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
-    _label_view(
+    left = detail.key in LETTERED_LEFT
+    x = centre[0] - reach - DETAIL_LETTER_WIDTH if left else centre[0] + reach
+    box = _label_view(
         adapter,
         parent,
         notes.DETAIL_LETTERS[detail.key],
-        (centre[0] + reach, centre[1] + reach),
+        (x, centre[1] + reach),
         label=label,
+    )
+    # Mirrored, the letter's right edge must stay outside the circle's
+    # upper-left 45 degree point, as A's and B's left edges do on the right.
+    if left and box[2] > centre[0] - radius * math.sqrt(0.5):
+        raise RuntimeError(f"{label}: letter {box!r} runs into its circle")
+    return centre, radius
+
+
+def _add_carriage_arrow(
+    adapter: Any, front: Any, stirrup_circle: tuple[tuple[float, float], float]
+) -> None:
+    """DETAIL C's viewing arrow on FRONT: a letter note whose straight leader
+    points straight down onto the block top, clear above D's circle
+    (machinist review, farm run 20261024T091056564Z: C had no mark on any
+    parent view). The leader leaves the letter's nearer side, so the letter
+    slides by any miss until the arrow stands square
+    (draw_sm_summing_lever._add_view_arrow)."""
+    letter = notes.DETAIL_LETTERS[CARRIAGE_DETAIL.key]
+    label = f"view {letter} viewing arrow"
+    tip = model_point_in_view(
+        adapter,
+        front,
+        tuple(value / 1000.0 for value in notes.CARRIAGE_ARROW_TIP),
+        label=label,
+    )
+    centre, radius = stirrup_circle
+    if math.dist(tip, centre) - radius < VIEW_ARROW_CIRCLE_CLEARANCE:
+        raise RuntimeError(f"{label}: tip {tip!r} crowds D's circle at {centre!r}")
+    note = add_leader_note(
+        adapter,
+        letter,
+        text_xy=(tip[0] - DETAIL_LETTER_WIDTH, tip[1] + VIEW_ARROW_RISE),
+        attach_xy=tip,
+        view=front,
+        label=label,
+    )
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) >= 6 and abs(tip[0] - points[0]) > VIEW_ARROW_SQUARE_TOL:
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + tip[0] - points[0], y, z):
+            raise RuntimeError(f"failed to square the {label}")
+        adapter.currentModel.EditRebuild3()
+        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if (
+        len(points) < 6
+        or math.dist((points[-3], points[-2]), tip) > 0.001
+        or abs(tip[0] - points[0]) > VIEW_ARROW_SQUARE_TOL
+        or points[1] <= tip[1]
+    ):
+        raise RuntimeError(f"{label} does not stand square over its tip: {points!r}")
+    _assert_on_sheet(_note_box(_early_bound(note, "INote"), label=label), label=label)
+    _telemetry.info(
+        f"{label}: leader {points[0]:.5f},{points[1]:.5f} -> "
+        f"{points[-3]:.5f},{points[-2]:.5f}"
     )
 
 
@@ -1075,7 +1162,7 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     """Front and right at 1:2, the four details, the as-shipped note; returns
     the check that re-reads every setting once the drawing has settled."""
     _activate_sheet(adapter, SHEET_NAMES[0])
-    _placed_base_view(
+    front = _placed_base_view(
         adapter, "*Front", FRONT_CENTER, notes.VIEW_TITLES["front"], label="pen front"
     )
     right = _placed_base_view(
@@ -1114,12 +1201,17 @@ def _place_settings_sheet(adapter: Any) -> Callable[[], None]:
     for name, display in displays:
         _assert_dimension_ink_on_sheet(display, label=f"pen {name}")
     _assert_settings(displays, when="placed")
-    # A and B are bounded on RIGHT, where the stud and the hanger screw both
-    # show (on FRONT the strap hides the stud); A is drawn from the front and
-    # says so in its title, as the turned plan C does.
-    for detail in DETAILS:
-        if detail.key in BOUNDED_ON_RIGHT:
-            _mark_detail_boundary(adapter, right, detail)
+    # A, B and D are circled on the view they enlarge (BOUNDED_ON); C, the
+    # turned plan, is named by its viewing arrow on FRONT, clear of D's circle.
+    parents = {"*Front": front, "*Right": right}
+    circles = {
+        detail.key: _mark_detail_boundary(
+            adapter, parents[BOUNDED_ON[detail.key]], detail
+        )
+        for detail in DETAILS
+        if detail.key in BOUNDED_ON
+    }
+    _add_carriage_arrow(adapter, front, circles[STIRRUP_DETAIL.key])
     _add_note_block(
         adapter,
         SHEET_NAMES[0],

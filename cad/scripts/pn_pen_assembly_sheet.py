@@ -244,6 +244,18 @@ CARRIAGE_DETAIL_CENTRE = carriage.block_to_machine(
 CARRIAGE_DETAIL_RADIUS = 20.0
 # The two points whose sheet direction the turned detail lays along +X.
 CARRIAGE_AXIS_POINTS = (carriage.MARKER_POS, CARRIAGE_END_MACHINE)
+# In the plan as placed (sheet x = machine X, sheet y = machine -Z) that axis
+# runs up and right, so laying it along +X turns the view clockwise by its
+# angle; the title says by how much and the drawing proves it on the sheet.
+CARRIAGE_TURN_CW_DEG = round(
+    math.degrees(
+        math.atan2(
+            CARRIAGE_AXIS_POINTS[0][2] - CARRIAGE_AXIS_POINTS[1][2],
+            CARRIAGE_AXIS_POINTS[1][0] - CARRIAGE_AXIS_POINTS[0][0],
+        )
+    ),
+    6,
+)
 
 # DETAIL D, from the front at 1:1: the stirrup on the block's paper end, its
 # window round the marker grip, and the thumb screw up through the bottom
@@ -259,18 +271,26 @@ STIRRUP_DETAIL_CENTRE = carriage.block_to_machine(
     )
 )
 STIRRUP_DETAIL_RADIUS = (v_block.BLOCK_HEIGHT - _THUMB_SCREW_HEAD_LOCAL_Y) / 2.0 + 2.0
+# DETAIL C's viewing arrow on FRONT points straight down onto the block top,
+# nib-ward of the rod where FRONT has open paper (the strap stands over the
+# rod), its tip clear above D's circle, which crests just over the block top.
+CARRIAGE_ARROW_TIP = (
+    carriage.PEN_ROD_X - 13.0,
+    carriage.BLOCK_TOP_Y + 7.0,
+    carriage.PEN_Z_MID,
+)
 
-# A and B are bounded on RIGHT and drawn from the right; C is the turned
-# plan and D the front view's stirrup, so their titles name their viewing
-# directions.
+# A, B and D are circled on the view they enlarge (A and B on RIGHT, D on
+# FRONT) and drawn from its direction. C, the turned plan, is named by a
+# viewing arrow on FRONT; its title says which way it looks and how it is
+# turned.
 DETAIL_LETTERS = {"stud": "A", "hanger": "B", "carriage": "C", "stirrup": "D"}
 SHEET_TITLES = {
     "carriage": f"DETAIL {DETAIL_LETTERS['carriage']} - FROM ABOVE\n"
-    "PEN YAW + NIB PRESET\nSCALE 2 : 1",
+    f"ROTATED {CARRIAGE_TURN_CW_DEG:g} DEG CW\nPEN YAW + NIB PRESET\nSCALE 2 : 1",
     "stud": f"DETAIL {DETAIL_LETTERS['stud']}\nSTUD HEIGHT + LOCK\nSCALE 2 : 1",
     "hanger": f"DETAIL {DETAIL_LETTERS['hanger']}\nHANGER SCREW LOCK\nSCALE 2 : 1",
-    "stirrup": f"DETAIL {DETAIL_LETTERS['stirrup']} - FROM THE FRONT\n"
-    "STIRRUP + THUMB SCREW\nSCALE 1 : 1",
+    "stirrup": f"DETAIL {DETAIL_LETTERS['stirrup']}\nSTIRRUP + THUMB SCREW\nSCALE 1 : 1",
 }
 VIEW_TITLES = {
     "front": "FRONT\nSCALE 1 : 2",
