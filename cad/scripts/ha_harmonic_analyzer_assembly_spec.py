@@ -25,7 +25,7 @@ from typing import Literal, Sequence
 
 import fr_harmonic_base_spec as base
 from frame_column_stations import COLUMN_X
-from mg_wheel_bar_geom import BAR_LENGTH, BAR_SIDE, WHEEL_BAR_X0, WHEEL_BAR_Y
+from mg_wheel_bar_geom import BAR_LENGTH, BAR_TOP_ABOVE_ROW, WHEEL_BAR_X0, WHEEL_BAR_Y
 from pn_pen_carriage_geom import STUD_HEAD_TOP_REST_Y
 from sh_vn_music_wire_pen_geom import WIRE_X
 
@@ -144,7 +144,7 @@ DRAWING_PRECISION = {
 }
 
 DECK_TOP_Y = base.STACK_HEIGHT
-WHEEL_BAR_TOP_Y = WHEEL_BAR_Y + BAR_SIDE / 2.0
+WHEEL_BAR_TOP_Y = WHEEL_BAR_Y + BAR_TOP_ABOVE_ROW
 BAR_HEIGHT_X = COLUMN_X
 STUD_X = WIRE_X
 _BAR_X_SPAN = (WHEEL_BAR_X0 - BAR_LENGTH / 2.0, WHEEL_BAR_X0 + BAR_LENGTH / 2.0)

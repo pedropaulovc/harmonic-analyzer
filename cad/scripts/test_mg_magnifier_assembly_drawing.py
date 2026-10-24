@@ -164,10 +164,10 @@ def test_each_detail_s_lowest_ink_is_its_geometry() -> None:
     import mg_magnifying_wheel_spec as wheel
     import mg_vn_wheel_axle_front_washer_spec as washer
     import mg_vn_wheel_axle_nut_spec as nut
-    from mg_wheel_bar_geom import BAR_SIDE
+    from mg_wheel_bar_geom import BAR_SIDE, BAR_TOP_ABOVE_ROW
 
-    # The bar's underside: the axle runs mid-height through the bar.
-    assert drawing.PRESSED.ink_drop_mm == pytest.approx(BAR_SIDE / 2.0)
+    # The bar's underside: the row stands BAR_TOP_ABOVE_ROW under the top face.
+    assert drawing.PRESSED.ink_drop_mm == pytest.approx(BAR_SIDE - BAR_TOP_ABOVE_ROW)
     # The circle's chord at the spigot face: the spigot fills it there, and
     # the nuts and washer beside it stand higher.
     detail = drawing.ENDSHAKE
@@ -262,9 +262,9 @@ def test_each_detail_frames_both_ends_of_its_dimension() -> None:
 
 
 def test_the_gauge_line_clears_the_bar_inside_the_crop() -> None:
-    from mg_wheel_bar_geom import BAR_SIDE
+    from mg_wheel_bar_geom import BAR_TOP_ABOVE_ROW
 
-    assert BAR_SIDE / 2.0 + 5.0 <= drawing.GAUGE_RISE < drawing.PRESSED.radius_mm
+    assert BAR_TOP_ABOVE_ROW + 5.0 <= drawing.GAUGE_RISE < drawing.PRESSED.radius_mm
     x, y = drawing.PRESSED_KEEP[stack.PRESS_GAUGE_DIMENSION]
     assert math.dist((x, y), drawing.PRESSED.centre) < drawing.PRESSED.crop_radius
 
