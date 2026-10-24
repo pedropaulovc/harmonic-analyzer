@@ -18,6 +18,7 @@ import _sketch as sketch
 import _drawing_projection as drawing_projection
 import build_ms_stick as builder
 import draw_ms_stick as drawing
+import ms_stick_callouts as callouts
 import ms_stick_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import Box
@@ -210,7 +211,7 @@ def test_last_graduation_is_complete_at_printed_band_extremes() -> None:
     land_min = spec.MINOR_SPACING - 2.0 * spec.GRADUATION_POSITION_TOLERANCE_MM - spec.GRADUATION_WIDTH_MAX_MM
     assert land_min == pytest.approx(0.70)
     assert spec.GRADUATION_WIDTH_CALLOUT == "0.62 MAX ON 1.42 PITCH"
-    assert drawing.DIMENSION_CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
+    assert callouts.CALLOUTS["Tick0Width"].endswith(spec.GRADUATION_WIDTH_CALLOUT)
     last_edge_nominal = (
         values["ScaleStartX"] + (spec.DIVISION_COUNT - 1) * values["FullTickPitch"]
         + values["Tick0Width"] / 2.0
@@ -230,12 +231,12 @@ def test_engraving_sizes_are_min_limits_and_graduation_depth_keeps_its_stock() -
     }
     assert not set(spec.MIN_LIMIT_DEVIATIONS_MM) & set(spec.DRAWING_TOLERANCES)
     for name in spec.MIN_LIMIT_DEVIATIONS_MM:
-        assert drawing.DIMENSION_CALLOUTS[name].count("HOLDS ENAMEL FILL") == 1, name
+        assert callouts.CALLOUTS[name].count("HOLDS ENAMEL FILL") == 1, name
     values, bands = spec.DRAWING_VALUES_BY_NAME, spec.DRAWING_TOLERANCES
     assert spec.GRADUATION_FLOOR_CALLOUT == "STOCK UNDER GROOVE 2.0 MIN"
-    assert drawing.DIMENSION_CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
+    assert callouts.CALLOUTS["TickDepth"].endswith(spec.GRADUATION_FLOOR_CALLOUT)
     # The V depth states the same stock under it, so it is bounded too.
-    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"].endswith(spec.NUMERAL_FLOOR_CALLOUT)
+    assert callouts.CALLOUTS["NumeralDepth"].endswith(spec.NUMERAL_FLOOR_CALLOUT)
     assert spec.NUMERAL_FLOOR_CALLOUT == "STOCK UNDER 2.0 MIN"
     depth_max = values["BodyThickness"] - bands["BodyThickness"] - spec.GRADUATION_FLOOR_MIN_MM
     assert depth_max == pytest.approx(0.90)
@@ -520,7 +521,7 @@ def test_build_projects_metre_scale_local_details_and_open_edge_depth_fences(mon
     monkeypatch.setattr(drawing, "view_name", lambda adapter, view: view.GetName2())
     for name in (
         "read_required_properties", "create_blank_drawing_sheets", "stamp_drawing_summary",
-        "set_dimension_callouts", "assert_manufacturing_dimensions",
+        "_assert_imported_text_and_limits", "assert_manufacturing_dimensions",
         "rebuild_drawing",
     ):
         monkeypatch.setattr(drawing, name, lambda *args, **kwargs: None)
@@ -771,9 +772,9 @@ def test_numeral_v_contract_is_independent_of_graduations() -> None:
     assert spec.DRAWING_PRECISION["Numerals"] == {"NumeralDepth": 2}
     assert spec.DRAWING_VALUES_BY_NAME["NumeralDepth"] == spec.NUMERAL_DEPTH
     assert (spec.TICK_WIDTH, spec.TICK_DEPTH) == (0.4, 0.5)
-    assert "GRADUATIONS ONLY" in drawing.DIMENSION_CALLOUTS["TickDepth"]
-    assert "ALL ENGRAVING" not in drawing.DIMENSION_CALLOUTS["TickDepth"]
-    assert drawing.DIMENSION_CALLOUTS["NumeralDepth"].splitlines()[:3] == [
+    assert "GRADUATIONS ONLY" in callouts.CALLOUTS["TickDepth"]
+    assert "ALL ENGRAVING" not in callouts.CALLOUTS["TickDepth"]
+    assert callouts.CALLOUTS["NumeralDepth"].splitlines()[:3] == [
         "NUMERAL DEPTH", "30° INCLUDED V", "HOLDS ENAMEL FILL"]
     assert not hasattr(spec, "NUMERAL_TOOL_NOTE")
     assert not hasattr(drawing, "NUMERAL_TOOL_NOTE_XY")
@@ -790,7 +791,7 @@ def test_every_tight_band_states_its_function() -> None:
     }
     assert set(reasons) == set(spec.DRAWING_TOLERANCES)
     for name, reason in reasons.items():
-        assert drawing.DIMENSION_CALLOUTS[name].endswith(reason), name
+        assert callouts.CALLOUTS[name].endswith(reason), name
     for name in ("BodyLength", "FullTickLength", "MinorTickLength", "HalfTickLength",
                  "NumeralHeight", "NumeralXGap", "NumeralYGap", *spec.MIN_LIMIT_DEVIATIONS_MM):
         assert name not in spec.DRAWING_TOLERANCES, name
@@ -970,6 +971,85 @@ def test_min_limit_refuses_a_nominal_that_is_not_the_printed_limit(monkeypatch) 
         builder._min_limit(object(), "Tick0Cut", "TickDepth")
 
 
+class _TextDisplay:
+    """Display-dimension fake: one text lane per part, optionally dropping writes."""
+
+    def __init__(self, text: str = "", keeps: bool = True, tol_type: int = spec.MIN_LIMIT_TOL_TYPE):
+        self.lanes, self.keeps = {callouts.CALLOUT_BELOW: text}, keeps
+        self.dimension = SimpleNamespace(Tolerance=SimpleNamespace(Type=tol_type))
+
+    def SetText(self, lane, text):
+        if self.keeps:
+            self.lanes[lane] = text
+
+    def GetText(self, lane):
+        return self.lanes.get(lane, "")
+
+    def GetDimension2(self, config):
+        return self.dimension
+
+
+def test_part_authors_every_callout_on_its_own_feature(monkeypatch) -> None:
+    displays, asked = {}, []
+
+    def named(adapter, feature, names):
+        asked.append(feature)
+        return {name: (displays.setdefault(name, _TextDisplay()), None) for name in names}
+
+    monkeypatch.setattr(builder, "_named_dimensions", named)
+    builder.author_dimension_callouts(None)
+    assert {name: display.GetText(callouts.CALLOUT_BELOW) for name, display in displays.items()} == callouts.CALLOUTS
+    assert sorted(asked) == sorted(set(callouts.FEATURE_OF.values()))
+    monkeypatch.setattr(builder, "_named_dimensions",
+                        lambda adapter, feature, names: {name: (_TextDisplay(keeps=False), None) for name in names})
+    with pytest.raises(RuntimeError, match="callout did not persist"):
+        builder.author_dimension_callouts(None)
+
+
+def _imported(monkeypatch, displays):
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda adapter, annotation: annotation.name)
+    return [SimpleNamespace(name=name, GetSpecificAnnotation=lambda d=display: d)
+            for name, display in displays.items()]
+
+
+def test_drawing_reads_back_part_callouts_and_min_limit_types(monkeypatch) -> None:
+    good = {name: _TextDisplay(text.replace("\n", "\r\n")) for name, text in callouts.CALLOUTS.items()}
+    drawing._assert_imported_text_and_limits(None, _imported(monkeypatch, good))
+    lost = {**good, "TickDepth": _TextDisplay(callouts.CALLOUTS["TickDepth"].rsplit("\n", 1)[0])}
+    with pytest.raises(RuntimeError, match="differ from the part"):
+        drawing._assert_imported_text_and_limits(None, _imported(monkeypatch, lost))
+    retyped = {**good, "NumeralDepth": _TextDisplay(callouts.CALLOUTS["NumeralDepth"], tol_type=0)}
+    with pytest.raises(RuntimeError, match="tolerance type"):
+        drawing._assert_imported_text_and_limits(None, _imported(monkeypatch, retyped))
+    with pytest.raises(RuntimeError, match="missing from the sheet"):
+        drawing._assert_imported_text_and_limits(
+            None, _imported(monkeypatch, {k: v for k, v in good.items() if k != "BodyWidth"}))
+
+
+def _mass_seat(volume):
+    async def mass():
+        return SimpleNamespace(is_success=True, data=SimpleNamespace(volume=volume))
+
+    return SimpleNamespace(get_mass_properties=mass)
+
+
+def test_rebuild_and_save_hold_the_volume_to_one_stroke() -> None:
+    built = 4805.9
+    asyncio.run(builder._check_volume_unchanged(_mass_seat(built + 1e-4), "driven", built))
+    with pytest.raises(RuntimeError, match="moved from the as-built"):
+        asyncio.run(builder._check_volume_unchanged(
+            _mass_seat(built + min(spec.NUMERAL_LAYER_MIN_STROKE_MM3)), "saved", built))
+    with pytest.raises(RuntimeError, match="returned volume nan"):
+        asyncio.run(builder._check_volume_unchanged(_mass_seat(math.nan), "saved", built))
+
+
+def test_numeral_volume_gate_refuses_a_non_finite_reading() -> None:
+    with pytest.raises(RuntimeError, match="V cut removed"):
+        builder._check_numeral_volume("layer", math.nan, spec.NUMERAL_LAYER_VOLUMES_MM3[0],
+                                      builder.NUMERAL_LAYER_ALLOWANCES_MM3[0])
+
+
 @pytest.mark.parametrize("full_name,value", [
     ("NumeralDepth@Tick0Cut@ms-stick", 0.0001),
     ("TickDepth@Numerals@ms-stick", 0.0001),
@@ -1070,7 +1150,7 @@ def test_numeral_profile_scale_makes_the_v_readable_without_crowding() -> None:
     # The V depth callout (placed by its centre) sits between detail F's circle
     # and the section, its dimension line level with the V grooves.
     depth_x, depth_y = drawing.NUMERAL_DEPTH_KEEP["NumeralDepth"]
-    half_text = max(map(len, drawing.DIMENSION_CALLOUTS["NumeralDepth"].splitlines())) * 0.00275 / 2.0
+    half_text = max(map(len, callouts.CALLOUTS["NumeralDepth"].splitlines())) * 0.00275 / 2.0
     assert numeral_right < depth_x - half_text and depth_x + half_text < profile.xmin - 0.005
     assert profile.ymin < depth_y < profile.ymax
     assert depth_left - profile.xmax > 0.020

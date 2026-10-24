@@ -60,6 +60,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -318,7 +319,19 @@ def render_layers() -> list[bytes]:
     return [dxf.render_dxf(layer).encode("ascii") for layer in layers()]
 
 
-def summary() -> dict[str, float | int]:
+class Summary(TypedDict):
+    strokes: int
+    layers: int
+    layer_volumes_mm3: tuple[float, ...]
+    min_stroke_volumes_mm3: tuple[float, ...]
+    volume_mm3: float
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+def summary() -> Summary:
     numerals = numeral_rects()
     rects = [rect for numeral in numerals for rect in numeral]
     x0, y0, x1, y1 = dxf.bbox(rects)

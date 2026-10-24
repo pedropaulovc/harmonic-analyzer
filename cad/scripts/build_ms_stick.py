@@ -52,7 +52,7 @@ from _check import check
 from _com import _early_bound
 from _dimensions import drive_dimension, dump_dimensions, name_dimensions, set_global
 from _feature_tree import _feature_by_name, name_last_feature
-from _part_checks import measure_check, report_mass_properties, volume_check
+from _part_checks import measure_check, report_mass_properties
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
@@ -69,7 +69,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import _named_dimension, _named_dimensions, apply_drawing_precision
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from ms_stick_geom import (
     DIVISION_COUNT,
@@ -110,6 +110,7 @@ from ms_stick_spec import (
     TICK_OVERHANG,
 )
 from _visibility import blank_sketch_feature
+import ms_stick_callouts as callouts
 
 PART_NAME = "ms-stick"
 MATERIAL = "Brass"  # see _appearance.apply_material docstring
@@ -268,6 +269,7 @@ async def _first_v_cut(adapter, sketch_name: str, pre: float) -> tuple:
     )
 
 
+@_telemetry.traced("cut.ms_stick_numerals", label_param="name")
 async def _cut_numerals(adapter, drive_jobs: list[tuple[str, str]], name: str, args: tuple | None,
                         pre: float) -> tuple:
     """Blind V cut of one imported stroke layer, read back at once; returns
@@ -320,17 +322,49 @@ async def _volume_mm3(adapter) -> float:
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"measuring stick: get_mass_properties failed: {mass.error}")
-    return float(mass.data.volume)
+    volume = float(mass.data.volume)
+    if not math.isfinite(volume):
+        raise RuntimeError(f"measuring stick: get_mass_properties returned volume {volume!r}")
+    return volume
 
 
 def _check_numeral_volume(label: str, removed: float, expected: float, allowance: float) -> None:
     _telemetry.info(f"{label}: V cut removed {removed:.4f} mm^3 (pinned {expected:.4f})")
-    if abs(removed - expected) > allowance:
+    if not math.isfinite(removed) or abs(removed - expected) > allowance:
         raise RuntimeError(
             f"{label}: V cut removed {removed:.4f} mm^3, expected {expected:.4f} "
             f"+/-{allowance:.4f} -- check for a dropped stroke, the draft direction, "
             "the DXF import plane/placement, or re-pin the volumes from the generator"
         )
+
+
+async def _check_volume_unchanged(adapter, label: str, built: float) -> None:
+    """The volume still reads ``built`` to the tightest numeral allowance, so a
+    rebuild or save that loses one stroke fails here."""
+    volume = await _volume_mm3(adapter)
+    _telemetry.info(f"{label}: volume {volume:.4f} mm^3 (as built {built:.4f})")
+    if abs(volume - built) > NUMERAL_VOLUME_ALLOWANCE_MM3:
+        raise RuntimeError(
+            f"{label}: volume {volume:.4f} mm^3 moved from the as-built {built:.4f} by more "
+            f"than {NUMERAL_VOLUME_ALLOWANCE_MM3:.4f} -- a drive or the save changed the geometry"
+        )
+
+
+@_telemetry.traced("dim.ms_stick_text")
+def author_dimension_callouts(adapter) -> None:
+    """Write each callout below its source dimension and read it back: the
+    drawing imports this text and never sets it (#1942)."""
+    by_feature: dict[str, dict[str, str]] = {}
+    for name, text in callouts.CALLOUTS.items():
+        by_feature.setdefault(callouts.FEATURE_OF[name], {})[name] = text
+    for feature, texts in by_feature.items():
+        displays = _named_dimensions(adapter, feature, set(texts))
+        for name, text in texts.items():
+            display, _dimension = displays[name]
+            display.SetText(callouts.CALLOUT_BELOW, text)
+            printed = str(display.GetText(callouts.CALLOUT_BELOW) or "")
+            if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                raise RuntimeError(f"{name}@{feature}: callout did not persist: {printed!r}")
 
 
 async def _cut_tick(
@@ -727,20 +761,16 @@ async def build(adapter) -> dict[str, str]:
 
     # Capture the as-built volume, then apply the deferred drive equations and
     # re-check: every equation evaluates to the value just built, so the geometry
-    # must not move (the neutrality proof; this part's other checks are measures).
-    mass = await adapter.get_mass_properties()
-    if not mass.is_success:
-        raise RuntimeError(f"measuring stick: get_mass_properties failed: {mass.error}")
-    v_built = float(mass.data.volume)
+    # must not move (the neutrality proof). It holds to the tightest numeral
+    # allowance, so a stroke that a later rebuild or the save loses still fails.
+    v_built = await _volume_mm3(adapter)
     await _manufacturing_chords(adapter, drive_jobs)
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     _assert_numeral_cut(adapter, numeral_sense)
-    await volume_check(
-        adapter, "driven measuring-stick (equations neutral)", v_built, 0.005 * v_built
-    )
+    await _check_volume_unchanged(adapter, "driven measuring-stick (equations neutral)", v_built)
 
     # Verify the 202 mm length and the untouched front face
     # (the 14.2 mm tick spacing is driven by the linear pattern's spacing).
@@ -780,6 +810,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_dimension_callouts(adapter)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     apply_drawing_properties(
         adapter,
@@ -794,6 +825,7 @@ async def build(adapter) -> dict[str, str]:
     _hide_manufacturing_chords(adapter)
     outputs = await save_part_and_images(adapter, PART_NAME)
     _assert_numeral_cut(adapter, numeral_sense)
+    await _check_volume_unchanged(adapter, "saved measuring-stick", v_built)
     return outputs
 
 

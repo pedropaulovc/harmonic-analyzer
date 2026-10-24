@@ -28,6 +28,7 @@ import sys
 from typing import Any
 
 import _telemetry
+import ms_stick_callouts as callouts
 import ms_stick_spec as part
 from _check import check
 from _com import _early_bound
@@ -42,7 +43,6 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
-from _drawing_dimensions import set_dimension_callouts
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_sections import create_section_view
@@ -53,7 +53,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _machinist_review_mode import MachinistReviewMode
 from _ms_drawing_contract import assert_manufacturing_dimensions
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 # Cached machinist review leaf: a FIX or ERROR verdict fails the build.
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -97,9 +97,6 @@ NUMERAL_SECTION_X = (part.SCALE_START_X + part.TICK_WIDTH / 2.0 + part.NUMERAL_G
                      + part.NUMERAL_HEIGHT_MM / 2.0)
 # r1-r3 sheet 4: at 1.5 mm the G letters sat on their arrows and the outline.
 NUMERAL_SECTION_OVERSHOOT_MM = 4.0
-STOP_REBATE_FIT = "SLIDES IN MS-STOP-BLOCK\nMHA-MS-02 REBATE"
-AMPLITUDE_STATIONS = "SETS CH-AMPLITUDE-BAR\nMHA-CH-01 STATIONS"
-ENAMEL = "HOLDS ENAMEL FILL"
 FRONT_KEEP = {
     "BodyLength": (0.155, 0.205), "BodyWidth": (0.305, 0.215),
     "ScaleStartX": (0.180, 0.150),
@@ -131,25 +128,6 @@ NUMERAL_KEEP = {
 DEPTH_KEEP = {"TickDepth": (0.380, 0.188)}
 # Text centre: the block ends left of G-G, its underside dimension line at the V.
 NUMERAL_DEPTH_KEEP = {"NumeralDepth": (0.2333, 0.138)}
-DIMENSION_CALLOUTS = {
-    "BodyWidth": STOP_REBATE_FIT,
-    "BodyThickness": STOP_REBATE_FIT,
-    "ScaleStartX": f"SCALE ZERO CENTRELINE\n{AMPLITUDE_STATIONS}",
-    "Tick0Width": f"ALL GRADUATIONS\n{ENAMEL}\n{part.GRADUATION_WIDTH_CALLOUT}",
-    "TickDepth": f"GRADUATIONS ONLY, SQUARE-BOTTOM\n{ENAMEL}\n{part.GRADUATION_FLOOR_CALLOUT}",
-    "FullTickLength": "FULL TICKS",
-    "MinorTickLength": "MINOR TICKS",
-    "HalfTickLength": "HALF-DIVISION TICK",
-    "FullTickPitch": f"FULL TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO\n{AMPLITUDE_STATIONS}",
-    "MinorTickPitch": f"MINOR TICK CENTRELINES\nNONCUMULATIVE FROM SCALE ZERO\n{AMPLITUDE_STATIONS}",
-    "NumeralHeight": "NUMERAL HEIGHT",
-    "NumeralXGap": "NUMERAL TO TICK EDGE",
-    "NumeralYGap": "NUMERAL TO FULL-TICK END",
-    "NumeralDepth": (
-        f"NUMERAL DEPTH\n{part.NUMERAL_V_INCLUDED_ANGLE_DEG:g}° INCLUDED V\n{ENAMEL}\n"
-        f"{part.NUMERAL_FLOOR_CALLOUT}"
-    ),
-}
 
 
 @_telemetry.traced("drawing.ms_ruled_face")
@@ -264,6 +242,44 @@ def _assert_numeral_depth_owner(annotation: Any) -> None:
         raise RuntimeError(f"numeral depth imported from wrong feature: {dimension.FullName}")
     if abs(float(dimension.SystemValue) * 1000.0 - part.NUMERAL_DEPTH) > 1e-6:
         raise RuntimeError("numeral depth import does not read its V-engraved cut")
+
+
+@_telemetry.traced("drawing.ms_stick.imported_text_and_limits")
+def _assert_imported_text_and_limits(adapter: Any, annotations: list[Any]) -> None:
+    """Every imported dimension prints the callout its part authored, and each
+    MIN-limit size still prints as a single MIN limit. The width ceiling and
+    the stock under the grooves print nowhere else, so a lost row or a changed
+    tolerance type must fail the drawing; the part, not the drawing, writes
+    the text (#1942)."""
+    names = {*callouts.CALLOUTS, *part.MIN_LIMIT_DEVIATIONS_MM}
+    displays: dict[str, list[Any]] = {name: [] for name in names}
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in displays:
+            annotation = _early_bound(annotation, "IAnnotation")
+            displays[name].append(_early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension"))
+    missing = sorted(name for name, found in displays.items() if not found)
+    if missing:
+        raise RuntimeError(f"imported dimensions missing from the sheet: {missing}")
+    wrong = {
+        name: printed
+        for name, text in callouts.CALLOUTS.items()
+        for display in displays[name]
+        if callouts.callout_rows(printed := str(display.GetText(callouts.CALLOUT_BELOW) or ""))
+        != callouts.callout_rows(text)
+    }
+    if wrong:
+        raise RuntimeError(f"imported callouts differ from the part's: {wrong!r}")
+    types = {
+        name: int(_early_bound(_early_bound(display.GetDimension2(0), "IDimension").Tolerance,
+                               "IDimensionTolerance").Type)
+        for name in part.MIN_LIMIT_DEVIATIONS_MM
+        for display in displays[name]
+    }
+    if any(kind != part.MIN_LIMIT_TOL_TYPE for kind in types.values()):
+        raise RuntimeError(
+            f"MIN-limit dimensions must print tolerance type {part.MIN_LIMIT_TOL_TYPE}: {types}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -385,7 +401,7 @@ async def build(adapter: Any) -> dict[str, str]:
     annotations += curate_view_dimensions(adapter, depth, keep=DEPTH_KEEP,
                                            view_label="engraving depth detail",
                                            dimensions_by_feature=part.DRAWING_DIMENSIONS)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _assert_imported_text_and_limits(adapter, annotations)
     assert_manufacturing_dimensions(
         adapter, annotations, part.DRAWING_VALUES_BY_NAME, part.DRAWING_PRECISION_BY_NAME,
         bands={**{name: (-tolerance, tolerance) for name, tolerance in part.DRAWING_TOLERANCES.items()},
@@ -396,7 +412,8 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(adapter, OUTPUTS, pdf_title="Measuring Stick Manufacturing Drawing",
                                   scale=SHEET_SCALE, layout=SPEC.layout,
                                   expected_sheet_names=SHEET_NAMES,
-                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES})
+                                  sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+                                  settled_checks=(lambda: _assert_imported_text_and_limits(adapter, annotations),))
 
 
 if __name__ == "__main__":
