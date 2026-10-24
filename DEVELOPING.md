@@ -351,7 +351,8 @@ Remote farm leaves and cached machinist reviews use separate budgets. Doit
 still owns dependency checks and success stamps. The `local.check.wait` span
 measures admission latency; logs record requested/granted workers, host
 capacity, and execution `held_s`. Top-level telemetry context is unchanged.
-Waits log every 30 seconds, with no queue deadline or failed-check retry.
+A refused admission logs at once and then every 30 seconds, with no queue
+deadline or failed-check retry.
 
 `HARMONIC_LOCAL_CHECK_LOCK` selects the lock namespace and
 `HARMONIC_LOCAL_CHECK_CPU_SLOTS` overrides capacity (a positive integer).
