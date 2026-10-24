@@ -1047,13 +1047,14 @@ class _Placed:
     """Sketch, math point and transform fakes: model = sketch + offset (m).
     ``native_skew`` makes the native MultiplyTransform disagree."""
 
-    def __init__(self, points_mm, offset_m=(0.0, 0.0), native_skew=0.0):
+    def __init__(self, points_mm, offset_m=(0.0, 0.0), native_skew=0.0, offset_z_m=0.0):
         self.points = [SimpleNamespace(X=x / 1000.0, Y=y / 1000.0, Z=0.0) for x, y in points_mm]
         self.offset = offset_m
         self.native_skew = native_skew
         self.native_calls = 0
+        self.offset_z = offset_z_m
         inverse = SimpleNamespace(ArrayData=(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
-                                             offset_m[0], offset_m[1], 0.0, 1.0, 0.0, 0.0, 0.0))
+                                             offset_m[0], offset_m[1], offset_z_m, 1.0, 0.0, 0.0, 0.0))
         self.ModelToSketchTransform = SimpleNamespace(Inverse=lambda: inverse)
 
     def GetSpecificFeature2(self):
@@ -1066,7 +1067,7 @@ class _Placed:
         self.native_calls += 1
         x, y, z = xyz
         return SimpleNamespace(MultiplyTransform=lambda inverse: SimpleNamespace(
-            ArrayData=(x + self.offset[0] + self.native_skew, y + self.offset[1], z)))
+            ArrayData=(x + self.offset[0] + self.native_skew, y + self.offset[1], z + self.offset_z)))
 
 
 def _place(monkeypatch, placed, path):
@@ -1085,10 +1086,26 @@ def test_layer_placement_reads_back_the_imported_sketch(monkeypatch) -> None:
     _place(monkeypatch, placed, path)
     assert placed.native_calls == 1  # the transform is applied locally, not per vertex
     for offset in ((0.0, 0.01e-3), (0.5e-3, 0.0)):
-        with pytest.raises(RuntimeError, match="places it at"):
+        with pytest.raises(RuntimeError, match="not where"):
             _place(monkeypatch, _Placed(vertices, offset), path)
     with pytest.raises(RuntimeError, match="!= native"):
         _place(monkeypatch, _Placed(vertices, native_skew=1e-6), path)
+    # Buried 0.10 below the ruled face: XY and volume would still match.
+    with pytest.raises(RuntimeError, match="off the z=0 ruled face"):
+        _place(monkeypatch, _Placed(vertices, offset_z_m=0.1e-3), path)
+    # One interior numeral moved 0.05 along the bar: the layer bbox is unchanged.
+    x0, _y0, x1, _y1 = dxf_text.bbox(rings)
+    inner = [ring for ring in rings if x0 + 20 < min(x for x, _ in ring) and max(x for x, _ in ring) < x1 - 20]
+    assert inner
+    moved = [vertex for ring in rings if not any(ring is r for r in inner) for vertex in ring] + [
+        (x + 0.05, y) for ring in inner for x, y in ring]
+    assert dxf_text.bbox([moved]) == pytest.approx((x0, _y0, x1, _y1))
+    with pytest.raises(RuntimeError, match="not where"):
+        _place(monkeypatch, _Placed(moved), path)
+    # Shared endpoints read back twice are fine; a dropped vertex is not.
+    _place(monkeypatch, _Placed(vertices + vertices[:50]), path)
+    with pytest.raises(RuntimeError, match="1 DXF vertices were not imported"):
+        _place(monkeypatch, _Placed(vertices[1:]), path)
 
 
 def test_feature_cut3_raises_for_both_failures(monkeypatch) -> None:
@@ -1105,6 +1122,17 @@ def test_feature_cut3_raises_for_both_failures(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="select sketch") as failure:
         builder._feature_cut3(adapter(False), "NumeralsSketch", ())
     assert not isinstance(failure.value, builder.FeatureCutRefused)
+
+
+@pytest.mark.parametrize("depth_m, angle_rad", [(math.nan, math.radians(15.0)), (0.0004, math.nan)])
+def test_numeral_cut_readback_refuses_non_finite_readings(monkeypatch, depth_m, angle_rad) -> None:
+    definition = SimpleNamespace(GetDepth=lambda first: depth_m, GetDraftWhileExtruding=lambda first: True,
+                                 GetDraftAngle=lambda first: angle_rad, GetDraftOutward=lambda first: False)
+    monkeypatch.setattr(builder, "_early_bound", lambda value, interface: value)
+    monkeypatch.setattr(builder, "_feature_by_name",
+                        lambda adapter, name: SimpleNamespace(GetDefinition=lambda: definition))
+    with pytest.raises(RuntimeError, match="expected"):
+        builder._assert_one_numeral_cut(None, "Numerals")
 
 
 def _mass_seat(volume):

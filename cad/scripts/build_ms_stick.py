@@ -150,11 +150,11 @@ def _assert_one_numeral_cut(adapter, name: str) -> bool:
         raise RuntimeError(f"{name}: missing native extrusion definition")
     definition = _early_bound(definition, "IExtrudeFeatureData2")
     depth = float(definition.GetDepth(True)) * 1000.0
-    if abs(depth - NUMERAL_DEPTH) > 1e-6:
+    if not math.isfinite(depth) or abs(depth - NUMERAL_DEPTH) > 1e-6:
         raise RuntimeError(f"{name}: expected depth {NUMERAL_DEPTH}; got depth {depth}")
     drafted = bool(definition.GetDraftWhileExtruding(True))
     angle = math.degrees(float(definition.GetDraftAngle(True)))
-    if not drafted or abs(angle - half_angle) > 1e-6:
+    if not drafted or not math.isfinite(angle) or abs(angle - half_angle) > 1e-6:
         raise RuntimeError(
             f"{name}: expected a {half_angle:g} deg draft on every wall (a "
             f"{NUMERAL_V_INCLUDED_ANGLE_DEG:g} deg included V); got "
@@ -365,8 +365,24 @@ async def _check_volume_unchanged(adapter, label: str, built: float) -> None:
         )
 
 
-def _dxf_bbox(path) -> tuple[float, float, float, float]:
-    return dxf.bbox([ring for ring, _closed in dxf.read_lwpolylines(path.read_text(encoding="ascii"))])
+def _dxf_vertices(path) -> list[tuple[float, float]]:
+    return [vertex for ring, _closed in dxf.read_lwpolylines(path.read_text(encoding="ascii")) for vertex in ring]
+
+
+def _unmatched(points: list[tuple[float, float]], targets: list[tuple[float, float]],
+               tol: float) -> list[tuple[float, float]]:
+    """``points`` with no ``targets`` point within ``tol`` (mm), bucketed so a
+    layer's ~700 vertices compare in linear time."""
+    buckets: dict[tuple[int, int], list[tuple[float, float]]] = {}
+    for x, y in targets:
+        buckets.setdefault((math.floor(x / tol), math.floor(y / tol)), []).append((x, y))
+    missing = []
+    for x, y in points:
+        i, j = math.floor(x / tol), math.floor(y / tol)
+        near = (t for di in (-1, 0, 1) for dj in (-1, 0, 1) for t in buckets.get((i + di, j + dj), ()))
+        if not any(math.dist((x, y), t) <= tol for t in near):
+            missing.append((x, y))
+    return missing
 
 
 def _sketch_to_model(values: tuple[float, ...], xyz: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -383,11 +399,12 @@ def _sketch_to_model(values: tuple[float, ...], xyz: tuple[float, float, float])
 
 @_telemetry.traced("check.ms_stick_layer_placement", label_param="sketch_name")
 def _assert_layer_placement(adapter, sketch_name: str, path) -> None:
-    """The imported layer sits where its DXF puts it. Removed volume cannot
-    see a common shift of every layer, which would move the numerals off the
-    gaps the drawing dimensions, so the sketch's own vertices are read back.
-    The sketch-to-model transform is read once and applied locally; one native
-    MultiplyTransform cross-checks it on the first vertex."""
+    """The imported layer lies on the z=0 ruled face, vertex for vertex where
+    its DXF puts it. Removed volume cannot see a shifted layer or numeral
+    (the printed gaps would move) or a profile buried below the face, so
+    every sketch point is read back and matched both ways to the DXF's
+    vertices. The sketch-to-model transform is read once and applied locally;
+    one native MultiplyTransform cross-checks it on the first vertex."""
     feature = _early_bound(_feature_by_name(adapter, sketch_name), "IFeature")
     sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
     inverse = _early_bound(_early_bound(sketch.ModelToSketchTransform, "IMathTransform").Inverse(), "IMathTransform")
@@ -405,12 +422,21 @@ def _assert_layer_placement(adapter, sketch_name: str, path) -> None:
     checked = tuple(float(value) for value in _early_bound(native.MultiplyTransform(inverse), "IMathPoint").ArrayData)
     if any(abs(a - b) > 1e-9 for a, b in zip(checked[:3], _sketch_to_model(values, local[0]), strict=True)):
         raise RuntimeError(f"{sketch_name}: local transform {_sketch_to_model(values, local[0])} != native {checked[:3]}")
-    got = dxf.bbox([[(x * 1000.0, y * 1000.0) for x, y, _z in (_sketch_to_model(values, p) for p in local)]])
-    want = _dxf_bbox(path)
-    _telemetry.info(f"{sketch_name}: {len(local)} points, imported bbox {tuple(round(v, 4) for v in got)} "
-                    f"(DXF {tuple(round(v, 4) for v in want)})")
-    if any(abs(a - b) > NUMERAL_PLACEMENT_TOL_MM for a, b in zip(got, want, strict=True)):
-        raise RuntimeError(f"{sketch_name}: imported at {got}, but {path.name} places it at {want}")
+    model = [tuple(v * 1000.0 for v in _sketch_to_model(values, p)) for p in local]
+    off_face = [p for p in model if not math.isfinite(p[2]) or abs(p[2]) > NUMERAL_PLACEMENT_TOL_MM]
+    if off_face:
+        raise RuntimeError(f"{sketch_name}: {len(off_face)} points off the z=0 ruled face, e.g. {off_face[0]}")
+    got = [(x, y) for x, y, _z in model]
+    want = _dxf_vertices(path)
+    _telemetry.info(f"{sketch_name}: {len(got)} points for {len(want)} DXF vertices, bbox "
+                    f"{tuple(round(v, 4) for v in dxf.bbox([got]))} (DXF {tuple(round(v, 4) for v in dxf.bbox([want]))})")
+    stray = _unmatched(got, want, NUMERAL_PLACEMENT_TOL_MM)
+    lost = _unmatched(want, got, NUMERAL_PLACEMENT_TOL_MM)
+    if stray or lost:
+        raise RuntimeError(
+            f"{sketch_name}: {len(stray)} imported points are not where {path.name} places a vertex "
+            f"(e.g. {stray[:1]}) and {len(lost)} DXF vertices were not imported (e.g. {lost[:1]})"
+        )
 
 
 @_telemetry.traced("dim.ms_stick_text")
@@ -506,9 +532,10 @@ async def _cut_tick(
     # Single-ended into the bar, so the depth dimension spans face to floor;
     # the adapter's double-ended cut put D1 on the air side (detail B, run
     # 20261023T211330900Z-bfdf1b6e: the depth read from a stub above the face).
-    cut = _feature_cut3(adapter, f"{stem}Profile", _v_cut_args(False, drafted=False, depth_mm=TICK_DEPTH))
-    if isinstance(cut, Exception):
-        raise RuntimeError(f"cut {label}: {cut}")
+    try:
+        _feature_cut3(adapter, f"{stem}Profile", _v_cut_args(False, drafted=False, depth_mm=TICK_DEPTH))
+    except FeatureCutRefused as exc:
+        raise RuntimeError(f"cut {label}: {exc}") from exc
     return name_last_feature(adapter, f"{stem}Cut")
 
 
