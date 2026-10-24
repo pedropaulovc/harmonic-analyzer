@@ -818,7 +818,7 @@ async def build(adapter) -> dict[str, str]:
         f"jig at the {spec.PASS} pass, theta {spec.THETA:g}: pins at station "
         f"{spec.PIN_STATION:.3f}, carriages at {spec.CARRIAGE_STATION:.3f}; "
         f"carrier underside Z {spec.trammel.CARRIER_UNDERSIDE_Z:.1f}, "
-        f"HUB pin Z {spec.HUB_HEAD_BOTTOM_Z:.1f}..{spec.HUB_PIN_TOP_Z:.1f}"
+        f"HUB pin Z {spec.HUB_PIN_BOTTOM_Z:.1f}..{spec.HUB_PIN_TOP_Z:.1f}"
     )
 
     # One free DOF, the sweep: every moving family reads under-constrained
