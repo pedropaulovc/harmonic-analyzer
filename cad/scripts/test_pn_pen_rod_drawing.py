@@ -381,20 +381,35 @@ def test_stud_tap_wall_is_the_owner_accepted_shortfall_and_printed_floored() -> 
     assert "owner ruling 2026-10-24 (#1903)" in declared.reason
 
 
+# Hole Wizard variable tokens and the values SolidWorks resolves them to.
+_RESOLVED = {"<HOLE-SIZE>": "1.19", "<THREAD-DEPTH>": "4.50"}
+
+
 class _FakeCallout:
+    """Definitions (5-8) keep the Hole Wizard tokens; the writable parts
+    (1-4) set a definition and read back its resolved text."""
+
     def __init__(self, below: str) -> None:
-        self.text = {5: "#0-80 UNF", 6: "", 7: "", 8: below}
+        self.definitions = {5: "<MOD-DIAM><HOLE-SIZE>", 6: "", 7: "", 8: below}
 
     def GetText(self, part: int) -> str:  # noqa: N802 - COM name
-        return self.text[{1: 5, 2: 6, 3: 7, 4: 8}.get(part, part)]
+        if part in self.definitions:
+            return self.definitions[part]
+        text = self.definitions[part + 4]
+        for token, value in _RESOLVED.items():
+            text = text.replace(token, value)
+        return text
 
     def SetText(self, part: int, text: str) -> None:  # noqa: N802 - COM name
-        self.text[{1: 5, 2: 6, 3: 7, 4: 8}[part]] = text
+        self.definitions[part + 4] = text
 
 
 @pytest.mark.parametrize(
     ("below", "expected"),
-    [("", "WALL 1.7 MIN"), ("<HOLE-DEPTH>4.50\r\n", "<HOLE-DEPTH>4.50\nWALL 1.7 MIN")],
+    [
+        ("", "WALL 1.7 MIN"),
+        ("TAP <THREAD-DEPTH>\r\n", "TAP <THREAD-DEPTH>\nWALL 1.7 MIN"),
+    ],
 )
 def test_stud_tap_wall_row_goes_last_under_the_native_rows(
     monkeypatch: pytest.MonkeyPatch, below: str, expected: str
@@ -402,7 +417,15 @@ def test_stud_tap_wall_row_goes_last_under_the_native_rows(
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
     callout = _FakeCallout(below)
     drawing._set_stud_tap_wall_row(callout)
-    assert callout.text == {5: "#0-80 UNF", 6: "", 7: "", 8: expected}
+    # The row is appended to the token-bearing definition, never to resolved
+    # text, so the native depth stays a live Hole Wizard variable.
+    assert callout.definitions == {
+        5: "<MOD-DIAM><HOLE-SIZE>",
+        6: "",
+        7: "",
+        8: expected,
+    }
+    assert callout.GetText(4).endswith("WALL 1.7 MIN")
     with pytest.raises(RuntimeError, match="already states its wall"):
         drawing._set_stud_tap_wall_row(callout)
     assert "_set_stud_tap_wall_row(stud_callout)" in _DRAWING_SOURCE
