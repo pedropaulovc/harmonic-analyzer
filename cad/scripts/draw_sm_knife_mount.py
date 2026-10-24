@@ -79,6 +79,7 @@ from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -88,6 +89,7 @@ from sm_knife_mount_spec import (
     BLK_BOT,
     BLK_HALF_X,
     BLK_TOP,
+    BORE_CALLOUT,
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -117,6 +119,7 @@ from sm_knife_mount_spec import (
     TAP_DRILL_CALLOUT,
 )
 
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["sm_knife_mount"]
 PART_STEM = SPEC.artifact_stem
@@ -172,17 +175,20 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
 
 
-# The 29.6 height's dimension line stands at sheet x 0.050, 41 mm off the
-# block's -X face, and the bore's Ø, its ream band and REAM THRU sit in the
-# band between them: the 5ff8fba5d render ran the height line (then x 0.063)
-# 3.62 mm through the Ø (text 58.5..75.3 mm).  BORE_DIA_TEXT_HALF_WIDTH is
-# half the banded line: the 20261009T204136744Z render's Ø12.00 (16.2 mm)
-# plus a stacked +0.03/0.00 at the dowel band's 2.05 mm a character.
-BORE_DIA_TEXT_HALF_WIDTH = 0.0135
+# The 29.6 height's dimension line stands at sheet x 0.024, 65.6 mm off the
+# block's -X face (its text 6 mm inside the border), and the bore's Ø, its
+# ream band and its three callout
+# rows (REAM THRU, then the knife seat's mate, sm_knife_mount_spec.
+# BORE_CALLOUT) sit in the band between them: the 5ff8fba5d render ran the
+# height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3 mm).
+# BORE_DIA_TEXT_HALF_WIDTH is half the widest row, "MHA-SM-03 TRUNNION": 18
+# capitals at the ~2.52 mm a character the tap callout's 31-character reason
+# row printed (78 mm, run 20261024T081603839Z), 45.4 mm.
+BORE_DIA_TEXT_HALF_WIDTH = 0.0227
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.065, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.044, _front_y(BORE_CY) + 0.026),
+    "BlockHeight": (FRONT_CENTER[0] - 0.091, FRONT_CENTER[1]),
+    "BoreDia": (FRONT_CENTER[0] - 0.0565, _front_y(BORE_CY) + 0.030),
 }
 # The dowel hole's floor depth stands right of the section, level with the
 # middle of the hole, its witness lines off the cut top seat and hole floor.
@@ -257,9 +263,10 @@ TOP_KEEP = {
     ),
 }
 # The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
-# (blind machinist review, 2026-10-09: a bare THRU left drill or ream open).
+# (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
+# and the band's mate under it (ENFORCE review, 2026-10-24, rule 4).
 DIMENSION_CALLOUTS = {
-    "BoreDia": "REAM THRU",
+    "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 # The pair's count rides ABOVE its Ø (the pd-latch-hook-bracket PAIR_CALLOUT

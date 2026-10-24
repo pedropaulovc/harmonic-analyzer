@@ -702,9 +702,12 @@ def test_part_stamps_make_critical_properties() -> None:
     import _config
 
     config = _config.parts("sm-knife-mount")
-    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.
+    # ch18 p.42 (2026-09-02): unpainted heat-treated steel, not brass.  The
+    # SolidWorks library material stays the generic steel (density); the
+    # title block's MATERIAL cell names the hardenable grade the finish
+    # needs (ENFORCE review, 2026-10-24, rule 2).
     assert part.MATERIAL == "Plain Carbon Steel"
-    assert config["material"] == "Plain Carbon Steel"
+    assert config["material"] == "AISI O1 tool steel"
     assert config["material_specification"] == "AISI O1 tool steel"
     # drawing-guidelines.md rule 2 (the title block is the general specification): the heat treatment and the bare surface are the Finish field's,
     # stated once there (the sheet has no notes block).
@@ -1026,10 +1029,15 @@ def test_the_tap_and_bore_axis_is_basic_from_the_dowel_pattern() -> None:
     assert source.count('label="dowel hole from tap axis"') == 3
 
 
-def test_the_bore_states_its_ream_and_band() -> None:
+def test_the_bore_states_its_ream_band_and_mate() -> None:
     # Machinist review B3: a bare THRU left drill or ream open; the bore is
-    # reamed to +0.03/0 at two places (Ra 1.6 stays).
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "REAM THRU"
+    # reamed to +0.03/0 at two places (Ra 1.6 stays).  ENFORCE review
+    # (2026-10-24, rule 4): the band names its mate, the lever's trunnion.
+    rows = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
+    assert rows[0] == "REAM THRU"
+    assert rows[1:] == ["KNIFE SEAT FOR", "MHA-SM-03 TRUNNION"]
+    widest = max(len(row) for row in rows)
+    assert drawing.BORE_DIA_TEXT_HALF_WIDTH >= widest * 0.00252 / 2.0
     assert sm_knife_mount_spec.BORE_DIA_BAND == (0.03, 0.0)
     assert sm_knife_mount_spec.BORE_DIA_PLACES == 2
     assert sm_knife_mount_spec.DRAWING_PRECISION["BoreProfile"] == {"BoreDia": 2}

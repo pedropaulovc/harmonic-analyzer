@@ -65,6 +65,11 @@ BORE_DIA_BAND = (0.03, 0.0)
 BORE_DIA_PLACES = 2
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
 BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
+# The band's mate, named on the bore's callout (drawing-guidelines.md rule
+# 4): the summing lever's hex trunnion, whose top ridge rocks on the bore's
+# crown, the knife seat.
+LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
+BORE_CALLOUT = "\n".join(("REAM THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
 # The block's overall sizes print one place (.X, drawing-guidelines.md rule 17 (walls and webs): every web below
 # holds at that band); the stacks judge the block at those limits.
 BLOCK_SIZE_PLACES = 1
