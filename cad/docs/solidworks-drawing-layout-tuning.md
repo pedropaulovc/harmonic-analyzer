@@ -1107,14 +1107,16 @@ swAnnotationOwner_DrawingView` (0) — so the view owns it, lists it under
 `GetAnnotations`, and the audit exempts the one view a leader is allowed to land
 on. `place_pictorial_sheet` does this for every octant face label.
 
-**f3. Face names: the print's or the machine's?** Pictorial face labels are
-the PRINT's (FRONT = the face `*Front` shows, +Z; RIGHT = +X) — the ASME
-orientation-key reading every fleet caption follows. The MACHINE's front is
-model −Z (`dimensions.yaml` "Z = depth (− front)"), and model-owned dimension
-names carry that word (`StudFrontZ` → "FRONT HANGER Z"). A blind reviewer reads
-the two as conflicting locations; resolve it with one key note on the priming
-sheet saying which is which (top-frame `ORIENTATION_KEY_TEXT`), never by
-flipping the model names.
+**f3. Face names: the print's or the machine's?** The fleet's pictorial face
+labels default to the PRINT's (FRONT = the face `*Front` shows, +Z; RIGHT =
++X) — the ASME orientation-key reading. The MACHINE's front is model −Z
+(`dimensions.yaml` "Z = depth (− front)"), and model-owned dimension names
+carry that word (`StudFrontZ` → "FRONT HANGER Z"). When a package prints both,
+a blind reviewer reads them as conflicting locations, and a key note that
+translates between them is itself a clarity finding (top-frame machinist
+review at 2056e3344). Use one convention per package: where the dimension
+names are the machine's, name the pictorial faces the machine's way too
+(top-frame: the +Z face is REAR), never by flipping the model names.
 
 Assembly opening views and fitter projections have separate contracts. MG's
 standard Front faces machine −Z, matching HA; its named fitter views preserve
