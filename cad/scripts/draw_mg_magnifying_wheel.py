@@ -1,6 +1,6 @@
 r"""Create the curated machinist drawing for the magnifying wheel.
 
-A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø25 boss with
+A Ø100 cast-iron spider: six tapered spokes, a grooved rim, a Ø28.5 boss with
 the Ø14.0 drum spigot, a reamed axle bore and two wire-tie holes.  The wheel
 axis is local +Z, so the FRONT view is the face (rim, spokes, fillets, bore,
 ties) and SECTION A-A, cut on the axis through the model's Right plane, is
@@ -8,8 +8,8 @@ the hub profile, the groove and the axial widths in solid lines
 (drawing-guidelines.md rule 9 (show internal shape in solid lines)).  Every size rides the part's marked dimensions; only the rim's axial
 width and the rim-bore round's R (on its cut arc) are added on the sheet.
 The bore's and the spigot's mates print on
-their own diameter callouts (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and each carries the part-owned
-roughness its fit needs (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
+their own diameter callouts (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)), and the running bore carries the
+part-owned roughness its fit needs (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)).
 
 Run with SolidWorks open::
 
@@ -23,6 +23,7 @@ import math
 import sys
 from typing import Any
 
+import _config
 import _telemetry
 from _check import check
 from _com import _early_bound
@@ -60,6 +61,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import Box, estimate_text_box
 from _paths import CAD_ROOT
+from _machinist_review_mode import MachinistReviewMode
 from _section_axis import position_section_caption
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -68,7 +70,6 @@ from mg_magnifying_wheel_geom import (
     DRUM_PRESS,
     HUB_BACK_Z,
     HUB_FRONT_Z,
-    HUB_STEP_Z,
     SPOKE_X0,
 )
 from mg_magnifying_wheel_spec import (
@@ -94,6 +95,9 @@ from mg_magnifying_wheel_spec import (
 from mg_wheel_group import HUB_RUNNING
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["mg_magnifying_wheel"]
@@ -207,14 +211,23 @@ _HUB_FILLET_SHOULDER = _polar((0.0, 0.0), 30.0, RIM_OUTER_DIA / 2.0 + 10.0)
 # clears that arrow and its letter, so the Ø88 lands in the 0-60 window at
 # 19 deg, its near end 14 mm past the OD: the block stands between the R4's
 # (top 16.5 mm above the axis) and the R3's shoulder (30 mm), right of the
-# wheel and left of A-A's Ø25.
+# wheel and left of A-A's hub Ø.
 _DIA_SHOULDER_LEFT = 10.0
 _RIM_INNER_SHOULDER = _polar((0.0, 0.0), 19.0, RIM_OUTER_DIA / 2.0 + 14.0)
-# The bore's block: its "RUNS ON MG-WHEEL-AXLE" line is the face's widest
-# text (21 characters at run 7's 2.45 mm each); the block stands left of the
-# wheel on a shoulder 30 mm above the axis, its right end 7 mm off the OD.
+# The mates the matched fits and the tight bands name (drawing-guidelines.md
+# rule 4 (tighten only for function, and name the mate)), by drawing number.
+AXLE_NUMBER = str(_config.parts("mg-wheel-axle")["number"])
+DRUM_NUMBER = str(_config.parts("mg-wheel-drum")["number"])
+PEN_WIRE_NUMBER = str(_config.parts("sh-vn-music-wire")["number"])
+BORE_CALLOUT = (
+    f"REAM THRU\n{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f} DIAMETRAL\n"
+    f"CLEARANCE ON\nMG-WHEEL-AXLE {AXLE_NUMBER}"
+)
+# The bore's block: its widest line sets its width (run 7's 2.45 mm a
+# character); the block stands left of the wheel on a shoulder 30 mm above
+# the axis, its right end 7 mm off the OD.
 _BORE_SHOULDER_Y = 30.0
-_BORE_BLOCK_HALF = 21 * 2.45 / 2.0
+_BORE_BLOCK_HALF = max(len(line) for line in BORE_CALLOUT.splitlines()) * 2.45 / 2.0
 _BORE_BLOCK_X = (
     -math.sqrt((RIM_OUTER_DIA / 2.0) ** 2 - _BORE_SHOULDER_Y**2)
     - 7.0
@@ -245,7 +258,7 @@ FRONT_KEEP = {
     # neither's extension lines reach the other's line.
     "SpokeRootWidth": _face(SPOKE_X0 + 4.5, 0.0),
     "SpokeTipWidth": _over((RIM_OUTER_DIA / 2.0 + 3.0, -22.0), 2),
-    # TIE 1's 9.85 between its own extension lines, which run left from the
+    # TIE 1's radius between its own extension lines, which run left from the
     # bore's and the hole's centres past the OD: the text breaks its line
     # 16 mm outside the rim, a quarter line under mid-span, so the block
     # stays between the lines whether its point reads as the block's middle
@@ -355,7 +368,7 @@ def _beside(face_x: float, side: int, chars: int, y: float) -> tuple[float, floa
 # away from its text.
 _ONE_LINE_UP = 0.0028
 _STACK_UP = 0.0045
-# Run 8 printed "Ø25.00 +0.1/-0.1" 30.1 mm wide.
+# Run 8 printed "Ø25.00 +0.1/-0.1" 30.1 mm wide: the widest hub Ø text.
 _DIA_TEXT_HALF = 0.0151
 # Run 8 stacked all three diameters right of the view, where the Ø14.5 printed
 # over the isometric and the Ø97.6's line ran through it, and the axial sizes
@@ -402,7 +415,10 @@ _HUB_ROWS = tuple(
 )
 SPIGOT_LENGTH_CALLOUT = "DRUM NOT PROUD"
 WEB_CENTER_CALLOUT = "WEB & RIM CENTER"
-HUB_LENGTH_CALLOUT = "LOCKNUT ON FULL THREAD"
+HUB_LENGTH_CALLOUT = f"LOCKNUT ON FULL THREAD OF\nMG-WHEEL-AXLE {AXLE_NUMBER}"
+# The groove's two bands seat the pen wire (mg_magnifying_wheel_spec
+# GROOVE_WIDTH_MIN, GROOVE_DEPTH_MIN): each callout names it.
+GROOVE_CALLOUT = f"PEN-WIRE SEAT\n{PEN_WIRE_NUMBER}"
 # Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
 # 2.6 mm a character), so a callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
@@ -437,7 +453,8 @@ SECTION_KEEP = {
     "HubLength": _beside(
         _section_x(HUB_BACK_Z),
         -1,
-        len(HUB_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
+        max(len(line) for line in HUB_LENGTH_CALLOUT.splitlines())
+        + _CALLOUT_MARGIN_CHARS,
         _HUB_ROWS[2] + _STACK_UP + _ABOVE_UP,
     ),
     # The groove's R up right, its leader down-left onto the groove at run
@@ -457,7 +474,7 @@ SECTION_KEEP = {
 # the cut plane, so its axis is the cut's normal (model X); the round's
 # tangent circles beyond the cut keep the wheel's Z (run 13's scan read the
 # r = 44.8 one so), and the axis keeps the pick off them.
-# Its callout stands right, between the spigot's finish and the groove's R:
+# Its callout stands right, between the spigot's Ø block and the groove's R:
 # the value on its point and the two callout lines under it, the shoulder
 # under the last (run 13 readback: 5.6 mm a line, starting 23.8 mm left of
 # the point).  The shoulder runs 1.8 mm under the arc's centre, so the
@@ -484,14 +501,12 @@ ROUND_CALLOUT = "2X RIM BORE EDGES\nHOLDS TIE 2 WALL"
 # the bore is reamed to run on the finished axle, and the spigot turned to
 # press into the drum's finished H7 bore.
 DIMENSION_CALLOUTS = {
-    "BoreDiaDim": (
-        f"REAM THRU\n{HUB_RUNNING[0]:.3f}-{HUB_RUNNING[1]:.3f} DIAMETRAL\n"
-        "CLEARANCE ON\nMG-WHEEL-AXLE"
-    ),
+    "BoreDiaDim": BORE_CALLOUT,
     "SpigotDia": (
         f"{DRUM_PRESS[0]:.3f}-{DRUM_PRESS[1]:.3f}\nDIAMETRAL\n"
-        "INTERFERENCE IN\nMG-WHEEL-DRUM"
+        f"INTERFERENCE IN\nMG-WHEEL-DRUM\n{DRUM_NUMBER}"
     ),
+    "GrooveBottomDia": GROOVE_CALLOUT,
     # The OD's .XX floor keeps the groove deeper than the pen wire
     # (mg_magnifying_wheel_spec.GROOVE_DEPTH_MIN).
     "RimOuterDiaDim": "HOLDS PEN WIRE\nIN GROOVE",
@@ -503,14 +518,15 @@ DIMENSION_CALLOUTS = {
     "Tie2HoleDia": "TIE 2",
 }
 # The tie holes' operation stands over their Ø, keeping each block as narrow
-# as its stacked Ø; each axial band's need, and the plane the 12.5
-# locates, stands over its value.
+# as its stacked Ø; each axial band's need, the plane the 12.5 locates and
+# the groove R's seat stand over their values.
 CALLOUTS_ABOVE = {
     "Tie1HoleDia": "DRILL THRU",
     "Tie2HoleDia": "DRILL THRU",
     "SpigotLength": SPIGOT_LENGTH_CALLOUT,
     "HubFrontZ": WEB_CENTER_CALLOUT,
     "HubLength": HUB_LENGTH_CALLOUT,
+    "GrooveR": GROOVE_CALLOUT,
 }
 # Three note lines, top-left anchored, under the two tie blocks and left of
 # the title block.
@@ -538,12 +554,6 @@ BORE_FINISH_SYMBOL = _face(
     *_polar((0.0, 0.0), _BORE_FINISH_BEARING, RIM_OUTER_DIA / 2.0 + 16.0)
 )
 _BORE_FINISH_POINT = (*_polar((0.0, 0.0), _BORE_FINISH_BEARING, BORE_DIA / 2.0), 0.0)
-# The spigot's finish lands mid-length on the spigot's upper cut line (the
-# cylinder's edge where the A-A plane cuts it, model +Y), its symbol up and
-# right of the landing, above the Ø14.0's upper extension line and under the
-# rim-bore round's shoulder (sheet metres).
-_SPIGOT_FINISH_POINT = (0.0, SPIGOT_DIA / 2.0, (HUB_STEP_Z + HUB_FRONT_Z) / 2.0)
-_SPIGOT_FINISH_OFFSET = (0.012, 0.014)
 FINISH_CHAR_HEIGHT = 0.0025
 
 
@@ -980,9 +990,9 @@ async def build(adapter: Any) -> dict[str, str]:
     _trim_centre_marks(adapter, front, {"bore": axis, "tie 1": tie1})
 
     # drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates): the bore is a running fit (the general machined grade),
-    # the spigot a static locating press seat; both controls are authored on
-    # the part and read back here.  The boss step is the drum's register face
-    # and takes no symbol.
+    # authored on the part and read back here.  The spigot is pressed into
+    # the drum and the boss step is the drum's register face: neither takes
+    # a symbol.
     bore_finish = add_surface_finish(
         adapter,
         front,
@@ -999,21 +1009,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # lines (_RIM_SIDE_POINTS), its text left of the rim's back face on its
     # own row (above).  Each line is selected as a native entity: a
     # coordinate hit-test found no edge on farm run 4 (85a5d462d).  One sweep
-    # serves them, the spigot's cut line and the rim-bore round's arc.
+    # serves them and the rim-bore round's arc.
     section_edges = scan_view_edges(section, label="wheel section edges")
     rim_sides = tuple(
         _line_through(section_edges, point, label=f"rim side cut line z={point[2]:+g}")
         for point in _RIM_SIDE_POINTS
     )
-    rim_back, rim_front, spigot_landing = model_points_in_view(
+    rim_back, rim_front = model_points_in_view(
         adapter,
         section,
-        tuple(
-            tuple(value / 1000.0 for value in point)
-            for point in (*_RIM_SIDE_POINTS, _SPIGOT_FINISH_POINT)
-        ),
+        tuple(tuple(value / 1000.0 for value in point) for point in _RIM_SIDE_POINTS),
         label="wheel section picks",
-        names=("rim back side", "rim front side", "spigot finish landing"),
+        names=("rim back side", "rim front side"),
     )
     rim_width = add_edge_dimension(
         adapter,
@@ -1036,21 +1043,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _pass_through_places(
         _early_bound(rim_width, "IDisplayDimension"), "rim axial width"
-    )
-    add_surface_finish(
-        adapter,
-        section,
-        edge_entity=_line_through(
-            section_edges, _SPIGOT_FINISH_POINT, label="spigot upper cut line"
-        ),
-        symbol_xy=(
-            spigot_landing[0] + _SPIGOT_FINISH_OFFSET[0],
-            spigot_landing[1] + _SPIGOT_FINISH_OFFSET[1],
-        ),
-        control=surface_finish_by_key(SURFACE_FINISHES, "mg_wheel_spigot"),
-        label="wheel spigot finish",
-        leader_attach_xy=spigot_landing,
-        char_height=FINISH_CHAR_HEIGHT,
     )
     round_radius = _add_round_radius(adapter, section, section_edges)
     rebuild_drawing(adapter, label="wheel dimension layout")

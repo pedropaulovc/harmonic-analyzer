@@ -187,12 +187,13 @@ for _label, _left in (
 # and the spacer behind it (the bar is a spacer's length further back). The
 # hole circles the axle as the wheel turns, so the tail must clear the larger
 # of the two at every angle: radially. The tail envelope is the wire plus one
-# twisted turn beside it (1.5 wire dia from the hole centre).
-TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE_POSITION_TOL
+# twisted turn beside it (1.5 wire dia from the hole centre), about a hole at
+# its innermost printed station.
+TAIL_ENVELOPE_R = 1.5 * _lever.WIRE_DIA + _wheel.TIE1_POSITION_BAND
 _STACK_OD_MAX = max(
     _back.OD, _spacer.OD + printed_band_mm(_spacer.OD_PLACES)
 )  # 11.8, the spacer at its .X limit
-TAIL_STACK_CLEARANCE = _wheel.TIE1_R - TAIL_ENVELOPE_R - _STACK_OD_MAX / 2.0  # 2.7
+TAIL_STACK_CLEARANCE = _wheel.TIE1_R - TAIL_ENVELOPE_R - _STACK_OD_MAX / 2.0  # 3.1
 if TAIL_STACK_CLEARANCE <= 0.0:
     raise AssertionError(
         f"TIE 1 tail reaches the back washer or spacer: {TAIL_STACK_CLEARANCE:.3f}"

@@ -1,11 +1,11 @@
 r"""Reproduction script: magnifying wheel (book ch. 21, pp. 50-53).
 
 A gray cast-iron spider: a turned Ø100 rim on six tapered cast spokes and a
-turned Ø25 hub boss. The boss carries an integral Ø14.0 spigot on its front
+turned Ø28.5 hub boss. The boss carries an integral Ø14.0 spigot on its front
 (pen) side, on which the MHA-MG-10 brass drum is pressed. The lever wire wraps
 the drum, the pen wire runs in the rim's U-groove: the wire-centre radii
 49.2 / 9.85 give the wheel's 5x magnification. TIE 1 (lever wire) is an axial
-hole through the boss on the drum's wire-centre radius; TIE 2 (pen wire) is a
+hole through the boss just outboard of the drum's O.D.; TIE 2 (pen wire) is a
 radial hole from the groove bottom to the rim bore.
 
 Layout: wheel axis = local Z through the origin, the origin on the spokes' and
@@ -54,10 +54,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import apply_drawing_precision
-from _drawing_tolerances import (
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
-)
+from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -76,7 +73,6 @@ from mg_magnifying_wheel_geom import (
     CAST_ROUND_R,
     HUB_BACK_Z,
     HUB_DIA,
-    HUB_DIA_BAND,
     HUB_FILLET_R,
     HUB_FRONT_Z,
     HUB_LEN,
@@ -97,7 +93,6 @@ from mg_magnifying_wheel_geom import (
     TIE1_R,
     TIE2_CLOCK_DEG,
     TIE_HOLE_DIA,
-    TIE_POSITION_TOL,
     clock_to_local_deg,
     fillet_area,
     fillets_volume,
@@ -688,8 +683,8 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Groove")
     volume = await volume_check(adapter, "groove", volume - V_GROOVE, 0.02 * V_GROOVE)
 
-    # TIE 1: the lever-wire tie hole, axial through the boss on the drum's
-    # wire-centre radius at TIE1_CLOCK_DEG (on the Y axis: one centre dim).
+    # TIE 1: the lever-wire tie hole, axial through the boss just outboard of
+    # the drum's O.D. at TIE1_CLOCK_DEG (on the Y axis: one centre dim).
     tie1_local = math.radians(clock_to_local_deg(TIE1_CLOCK_DEG))
     tie1_x, tie1_y = TIE1_R * math.cos(tie1_local), TIE1_R * math.sin(tie1_local)
     tie1_sd = SketchDims()
@@ -801,7 +796,7 @@ async def build(adapter) -> dict[str, str]:
     # Black-painted casting (p.51 photo); the brass drum is its own part.
     await apply_color(adapter, PANEL_BLACK)
 
-    # The rim OD (book-annotated Ø100) and the boss Ø25 at its back face.
+    # The rim OD (book-annotated Ø100) and the boss Ø at its back face.
     await measure_check(
         adapter,
         "rim OD (annotated 100)",
@@ -852,10 +847,8 @@ async def build(adapter) -> dict[str, str]:
 
     # drawing-simplicity-policy.md `How the repository implements the guidelines`: the tight bands sit on the model dimensions,
     # the places on every marked one.  The spigot and the bore are matched
-    # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.
-    set_dimension_bilateral_tolerance(
-        adapter, "HubProfile", "HubDia", *deviations(HUB_DIA_BAND)
-    )
+    # fits (mg_magnifying_wheel_spec.REFERENCE_DIMENSIONS): no band.  The
+    # boss Ø rides the title block (mg_magnifying_wheel_geom.HUB_DIA).
     set_dimension_bilateral_tolerance(
         adapter, "HubProfile", "HubLength", *deviations(HUB_LEN_BAND)
     )
@@ -869,8 +862,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "GrooveProfile", "GrooveBottomDia", *deviations(GROOVE_BOTTOM_BAND)
     )
     # The tie holes are drilled: the title block's DRILLED HOLES row governs
-    # their size.  TIE 1's location keeps its band; its note says why.
-    set_dimension_symmetric_tolerance(adapter, "Tie1Profile", "Tie1Y", TIE_POSITION_TOL)
+    # their size, and TIE 1's radius rides the title block's .XX.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
