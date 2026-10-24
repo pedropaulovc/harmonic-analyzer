@@ -109,6 +109,9 @@ def test_matched_pair_uses_functional_positions_and_a_real_shop_sequence() -> No
     # Rule 7: the pair is flagged at both match-drill callouts, not in a loose note.
     assert not hasattr(spec, "BLOCK_DRAWING_NOTES") and not hasattr(spec, "PLATE_DRAWING_NOTES")
     # Both match-drill callouts (feature-local) flag the pair as matched.
+    # The block's blind depths are measured from its own mating face, not from
+    # the clamped plate's exposed face.
+    assert f"DEPTHS FROM {spec.BLOCK_MATING_FACE_NOTE}" in block_drawing.COVER_HOLE_PROCESS
     for callout in (block_drawing.COVER_HOLE_PROCESS,
                     plate_drawing.DIMENSION_CALLOUTS["PilotDrillDiameter"]):
         assert spec.MATCHED_PAIR_NOTE in callout
@@ -314,7 +317,7 @@ def test_build_projects_metre_hole_mouths_into_the_native_callout_view(
     source.write_bytes(b"offline source sentinel")
     monkeypatch.setattr(drawing, "SOURCE", source)
     fonts = []
-    monkeypatch.setattr(drawing, "_construction_curve_font", fonts.append)
+    monkeypatch.setattr(drawing, "_construction_curve_font", fonts.append, raising=False)
     utility = _StopMathUtility()
 
     async def open_model(path):
@@ -628,12 +631,14 @@ class _StopDisplay:
             self.prefix = text
 
 
-@pytest.mark.parametrize("drawing,style", [(block_drawing, 0), (plate_drawing, 2)])
 @pytest.mark.parametrize("refusal", [None, "set", "readback"])
-def test_construction_curve_font_is_set_and_read_back(monkeypatch, drawing, style, refusal) -> None:
-    # Block: solid thin chords hide in the outline; plate: phantom pilot.
+def test_construction_curve_font_is_set_and_read_back(monkeypatch, refusal) -> None:
+    # Only the plate restyles construction curves (a phantom pilot). The
+    # block keeps the default: its location chords cross the views' interiors.
+    drawing = plate_drawing
+    assert not hasattr(block_drawing, "CONSTRUCTION_CURVE_FONT")
     assert drawing.CONSTRUCTION_CURVE_FONT == {
-        "swLineFontConstructionCurvesStyle": style,
+        "swLineFontConstructionCurvesStyle": 2,
         "swLineFontConstructionCurvesThickness": 0,
     }
     stored = {}
@@ -1168,7 +1173,7 @@ def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatc
     equations = dict(asyncio.run(stop_geom.back_wall_reference(adapter)))
     assert adapter.planes == ["Right"]
     assert adapter.lines == {"line": (
-        (-spec.WINDOW_Z_MAX, spec.BLOCK_HEIGHT), (-spec.BLOCK_DEPTH, spec.BLOCK_HEIGHT))}
+        (-spec.WINDOW_Z_MAX, spec.WINDOW_Y_MAX), (-spec.BLOCK_DEPTH, spec.WINDOW_Y_MAX))}
     assert adapter._sketch_entities["line"].ConstructionGeometry
     wall = adapter.dimensions[0]
     assert (wall.Name, wall.kind, wall.value_mm) == (
@@ -1177,7 +1182,7 @@ def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatc
     assert equations == {
         "BackWall@BackWallReference": '"BlockDepth" - "WindowWidth"',
         "BackWallStationZ@BackWallReference": '"WindowWidth"',
-        "BackWallStationY@BackWallReference": '"BlockHeight"',
+        "BackWallStationY@BackWallReference": '"BlockHeight" - "RoofThickness"',
     }
 
 

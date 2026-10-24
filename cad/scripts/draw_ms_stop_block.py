@@ -25,7 +25,6 @@ import _config
 import _telemetry
 import ms_stop_spec as part
 from _check import check
-from solidworks_mcp.adapters.sw_type_info import constant
 from _com import _early_bound
 from _paths import CAD_ROOT
 from _session import run_build
@@ -106,36 +105,12 @@ COVER_HOLE_PROCESS = (
     f"2X MATCH-DRILL FROM {part.MATCH_DRILL_MASTER}\n"
     f"{_config.parts('ms-stop-plate')['number']}; CLAMP WITH\n"
     f"{part.MATCH_DRILL_DATUM_ALIGNMENT}\n"
+    f"DEPTHS FROM {part.BLOCK_MATING_FACE_NOTE}\n"
     f"{part.MATCHED_PAIR_NOTE}\n"
 )
 # The 4-40 runs from the underside through the floor and opens into the
 # rebate; THRU alone does not say which wall it stops at (rules 1, 12).
 THUMB_HOLE_END = "INTO REBATE; ROOF NOT DRILLED"
-
-
-# The reference chords shown for their dimensions lie on outline edges;
-# drawn dashed they broke those edges (machinist review, run
-# 20261023T231957372Z-0d874475). Solid thin construction curves sit inside
-# the thick outline instead. swLineStyles_e.swLineCONTINUOUS = 0,
-# swLineWeights_e.swLW_THIN = 0.
-CONSTRUCTION_CURVE_FONT = {
-    "swLineFontConstructionCurvesStyle": 0,
-    "swLineFontConstructionCurvesThickness": 0,
-}
-
-
-@_telemetry.traced("drawing.ms_stop_block_construction_font")
-def _construction_curve_font(drawing: Any) -> None:
-    """Construction curves solid and thin, so edge-lying chords hide in the outline."""
-    extension = _early_bound(drawing.Extension, "IModelDocExtension")
-    option = constant("swDetailingNoOptionSpecified")
-    for name, value in CONSTRUCTION_CURVE_FONT.items():
-        pref = constant(name)
-        if not extension.SetUserPreferenceInteger(pref, option, value):
-            raise RuntimeError(f"failed to set document line font {name}")
-        if int(extension.GetUserPreferenceInteger(pref, option)) != value:
-            raise RuntimeError(f"document line font {name} readback differs")
-
 
 def _remove_general_thread_class(display: Any, *, last_line: str | None = None) -> None:
     """Suppress only the native class token; leave thread/drill variables live.
@@ -218,7 +193,6 @@ async def build(adapter: Any) -> dict[str, str]:
                              required=("Number", "Material Specification", "Finish", "Quantity"))
     drawing, _sheet = new_project_drawing(adapter, property_view=PART_STEM,
                                         scale=SHEET_SCALE, layout=SPEC.layout)
-    _construction_curve_font(drawing)
     stamp_drawing_summary(adapter, drawing, {
         0: "Measuring Stick Stop Block Manufacturing Drawing",
         1: "Harmonic Analyzer hobby-machinist book drawing",
