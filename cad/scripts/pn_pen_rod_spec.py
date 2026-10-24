@@ -23,6 +23,7 @@ import math
 
 import _config
 from _hole_spec import DRILL_POINT_H, HoleSpec, TAP_DRILL_MM, THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 
 PEN_HANGER_NUMBER = _config.parts("pn-pen-hanger")["number"]
 PEN_V_BLOCK_NUMBER = _config.parts("pn-pen-v-block")["number"]
@@ -43,11 +44,12 @@ PIVOT_DIA = 4.0
 PIVOT_BAND = (-0.010, -0.025)  # g6-like running clearance on the 4.000/4.012 bore
 PIVOT_LENGTH = 10.5  # shoulder to end: stops 1.0 above the v-block relief roof
 
-# Adjuster stud tap in the top face, centred in the square. #0-80 is the
-# largest thread whose major leaves the drawing-guidelines.md rule 17 (walls
-# and webs) 1.5 mm floor in the smallest printed square: (4.95 - 1.524
-# major) / 2 = 1.71 mm (#2-56 leaves 1.38). That is under rule 17's 2.0
-# target, a shortfall the owner accepted (STUD_TAP_WALL_MIN below).
+# Adjuster stud tap in the top face, on the rod axis. #0-80 is the largest
+# thread whose major leaves the drawing-guidelines.md rule 17 (walls and webs)
+# 1.5 mm floor in the 5 mm square (#2-56 leaves 1.38 even centred). Located
+# from two adjacent flats at the .XXX band, it leaves 1.55 at the worst case
+# (STUD_TAP_WALL_MIN below): under rule 17's 2.0 target, a shortfall the
+# owner accepted.
 STUD_THREAD = "#0-80"
 STUD_TAP_SPEC = HoleSpec(
     "tapped", STUD_THREAD, end="blind", depth_mm=6.0, overrides_mm={"ThreadDepth": 4.5}
@@ -61,18 +63,31 @@ STUD_ENGAGEMENT = 3.2
 
 TOTAL_LENGTH = SQUARE_LENGTH + PIVOT_LENGTH
 
-# Worst-case wall from the tap's thread major to each flat of the smallest
-# printed square (the tap on the rod axis).
-STUD_TAP_WALL_MIN = (ROD_SECTION + SECTION_BAND[1] - THREAD_MAJOR_MM[STUD_THREAD]) / 2.0
+# Rule 10: the tap is located from two adjacent flats of the square (the -X
+# and +Z faces), each station half the square at the .XXX band (the .XX
+# band's +/-0.51 would leave 1.18, under the floor; any 4-jaw or collet
+# setup holds +/-0.13).  The stations
+# are construction dimensions in the hidden StudTapReference sketch; the Hole
+# Wizard point itself stays on the axis.
+STUD_TAP_STATION = ROD_SECTION / 2.0
+STUD_TAP_STATION_PLACES = 3
+_STATION_BAND = printed_band_mm(STUD_TAP_STATION_PLACES)
+# Worst-case wall from the tap's thread major to a flat: the nearer flat at
+# the shortest station, the far flat of the smallest square at the longest.
+_TAP_MAJOR_R = THREAD_MAJOR_MM[STUD_THREAD] / 2.0
+STUD_TAP_WALL_MIN = min(
+    STUD_TAP_STATION - _STATION_BAND - _TAP_MAJOR_R,
+    ROD_SECTION + SECTION_BAND[1] - (STUD_TAP_STATION + _STATION_BAND) - _TAP_MAJOR_R,
+)
 if STUD_TAP_WALL_MIN < 1.5:  # drawing-guidelines.md rule 17 (walls and webs) floor
     raise AssertionError(f"rod stud tap leaves a {STUD_TAP_WALL_MIN:.2f} mm wall")
 # Named exception RV-01 (pn-pen-rod.yaml, owner ruling 2026-10-24 on #1903)
-# accepts exactly this 1.71 shortfall under the 2.0 target; a different wall
-# is outside the declaration and needs a new ruling.
-STUD_TAP_WALL_ACCEPTED = 1.71
-if round(STUD_TAP_WALL_MIN, 2) != STUD_TAP_WALL_ACCEPTED:
+# declares this worst case, floored at two places (1.558 -> 1.55); a
+# different wall is outside the declaration.
+STUD_TAP_WALL_ACCEPTED = 1.55
+if math.floor(STUD_TAP_WALL_MIN * 100 + 1e-9) / 100 != STUD_TAP_WALL_ACCEPTED:
     raise AssertionError(
-        f"rod stud tap wall {STUD_TAP_WALL_MIN:.3f} is not the owner-accepted "
+        f"rod stud tap wall {STUD_TAP_WALL_MIN:.3f} is not RV-01's declared "
         f"{STUD_TAP_WALL_ACCEPTED}"
     )
 # Rule 20: the tap callout's last row states the shortfall, floored at one
@@ -116,15 +131,20 @@ if round(TOTAL_LENGTH, DRAWING_REFERENCE_PRECISION) != TOTAL_LENGTH:
 # End view (5:1) of the tapped top face: the square's banded depth, which the
 # SQ in its callout makes the size of both flats (Section and Depth are one
 # "RodSection" global, so the model holds the square), and the stud-tap
-# wizard callout.  Section keeps its model band but is not printed: one SQ
-# size defines a square (fr_rocker_arm_support's WinWidth "SQ POCKET").
+# wizard callout with the tap's two stations from adjacent flats (rule 10).
+# Section keeps its model band but is not printed: one SQ size defines a
+# square (fr_rocker_arm_support's WinWidth "SQ POCKET").
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RodProfile": {"Length"},
     "Rod": {"Depth"},
     "PivotProfile": {"PivotDia"},
     "Pivot": {"PivotLength"},
     "ShoulderFillet": {"ShoulderRadius"},
+    "StudTapReference": {"TapStationX", "TapStationZ"},
 }
+# The part saves its dimension-carrying construction sketch hidden (#880);
+# the end view shows it per view to import its stations.
+REFERENCE_SKETCHES = ("StudTapReference",)
 # Places (drawing-guidelines.md rule 3): the banded square and pivot print at
 # their bands' places; the overall length and the pivot length (1.0 clear of
 # the v-block relief roof) are near-enough sizes; the shoulder radius prints
@@ -135,6 +155,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PivotProfile": {"PivotDia": 3},
     "Pivot": {"PivotLength": 1},
     "ShoulderFillet": {"ShoulderRadius": SHOULDER_FILLET_PLACES},
+    "StudTapReference": {
+        "TapStationX": STUD_TAP_STATION_PLACES,
+        "TapStationZ": STUD_TAP_STATION_PLACES,
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

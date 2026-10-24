@@ -34,7 +34,14 @@ from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _sketch import SketchDims, add_line_chain, ensure_fully_defined
+from _sketch import (
+    SketchDims,
+    add_line_chain,
+    anchor_point_to_origin,
+    blank_reference_sketches,
+    ensure_fully_defined,
+    set_sketch_direct_db,
+)
 from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _drawing_marks import (
@@ -55,6 +62,7 @@ from pn_pen_rod_spec import (
     ISOMETRIC_VIEW_NOTE,
     PIVOT_DIA,
     PIVOT_LENGTH,
+    REFERENCE_SKETCHES,
     ROD_SECTION,
     SHOULDER_FILLET_BAND,
     SHOULDER_FILLET_R,
@@ -62,6 +70,7 @@ from pn_pen_rod_spec import (
     SQUARE_LENGTH,
     STUD_TAP_DRILL_DIA,
     STUD_TAP_SPEC,
+    STUD_TAP_STATION,
 )
 
 PART_NAME = "pn-pen-rod"
@@ -226,6 +235,7 @@ async def build(adapter) -> dict[str, str]:
         placement_dims=[((None, None), (None, None))],
     )
     drive_jobs += stud_tap.placement_drive_jobs
+    drive_jobs += await _add_stud_tap_reference(adapter)
     v_tap = blind_hole_volume_mm3(stud_tap.hole_dia_mm, STUD_TAP_SPEC.depth_mm)
     volume = await volume_check(
         adapter, "adjuster stud tap", volume - v_tap, 0.03 * v_tap
@@ -279,6 +289,9 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    # The stations' construction sketch would render in every assembly (#880);
+    # the drawing shows it in the end view alone.
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -292,6 +305,48 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     return artefacts
+
+
+async def _add_stud_tap_reference(adapter) -> list[tuple[str, str]]:
+    """The tap's two stations from adjacent flats (rule 10), as construction
+    dimensions without model geometry: on Top Plane (the shoulder face, so
+    each witness starts on the square's edge there), a centreline from the
+    -X flat and one from the +Z flat (sketch -Y) to the rod axis, where the
+    Hole Wizard point sits.  Both track half the square."""
+    dims = SketchDims()
+    check("create sketch StudTapReference", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    from_x = check(
+        "add tap station X witness",
+        await adapter.add_centerline(-STUD_TAP_STATION, 0.0, 0.0, 0.0),
+    )
+    from_z = check(
+        "add tap station Z witness",
+        await adapter.add_centerline(0.0, -STUD_TAP_STATION, 0.0, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line, relation, dim_name, kind in (
+        (from_x, "horizontal", "TapStationX", "horizontal_distance"),
+        (from_z, "vertical", "TapStationZ", "vertical_distance"),
+    ):
+        check(
+            f"{dim_name} witness {relation}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+        await anchor_point_to_origin(
+            adapter, f"{line}.end", 0.0, 0.0, f"{dim_name} axis end"
+        )
+        check(
+            f"dimension {dim_name}",
+            await adapter.add_sketch_dimension(
+                f"{line}.start", f"{line}.end", kind, STUD_TAP_STATION
+            ),
+        )
+        dims.record(dim_name, '"RodSection" / 2')
+    await ensure_fully_defined(adapter, "StudTapReference")
+    check("exit sketch StudTapReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "StudTapReference")
+    return dims.apply(adapter, "StudTapReference")
 
 
 def _blank_ref_axis(adapter, name: str) -> None:

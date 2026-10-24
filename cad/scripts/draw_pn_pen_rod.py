@@ -43,6 +43,9 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions, import_cosmetic_threads
+from _drawing_hidden_sketches import (
+    curate_view_dimensions as curate_hidden_owner_dimensions,
+)
 from _drawing_dimensions import (
     assert_imported_precision,
     set_dimension_callouts,
@@ -223,19 +226,32 @@ _CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 # 20261024T123921226Z: baselines keep y +2.8/-2.8/-8.4 mm), so it spans
 # x 0.0792..0.1248, y ~0.100..0.1165, 12 mm over the square, 14 mm over the
 # block, 7 mm left of the SQ line's upper arrow piece (x 0.132, to y
-# ~0.0939); its leader drops almost straight to the drill rim.  The view
-# label (anchored top-left, text 4.5 mm under its
-# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred 7 mm
-# under the square: x 0.0425..0.1175, y 0.051..0.0545, left of the SQ
-# line's lower arrow piece (x 0.132, to y ~0.0561).
+# ~0.0939); its leader drops almost straight to the drill rim.  The tap's
+# stations from the -X flat (sheet left) and the +Z flat (sheet bottom; *Top
+# looks down -Y, model +Z to sheet -y) dimension it from the square's corner:
+# the horizontal 2.500 on a line 7.5 mm under the square, its ~10.5 mm text
+# centred in the 12.5 mm span; the vertical 2.500 on a line 11.5 mm left of
+# the square.  The view label (anchored top-left, text 4.5 mm under its
+# anchor, ~75 mm long at the scale note's ~2.5 mm a character) centred
+# 20 mm under the square, under the horizontal station: x 0.0425..0.1175,
+# y 0.038..0.0425, left of the SQ line's lower arrow piece (x 0.132, to
+# y ~0.0561).
 END_KEEP = {
     "Depth": (END_CENTER[0] + 0.052, END_CENTER[1] + 0.00051),
+    "TapStationX": (
+        END_CENTER[0] - _END_HALF_M / 2.0,
+        END_CENTER[1] - _END_HALF_M - 0.0075,
+    ),
+    "TapStationZ": (
+        END_CENTER[0] - _END_HALF_M - 0.0115,
+        END_CENTER[1] - _END_HALF_M / 2.0,
+    ),
 }
 TAP_CALLOUT_XY = (END_CENTER[0] + 0.022, END_CENTER[1] + 0.035)
 END_NOTE_WIDTH = 0.075
 END_NOTE_XY = (
     END_CENTER[0] - END_NOTE_WIDTH / 2.0,
-    END_CENTER[1] - _END_HALF_M - 0.007,
+    END_CENTER[1] - _END_HALF_M - 0.020,
 )
 # The isometric (1:1 outline 18.2 x 115.3 mm: x 0.3709..0.3891, y
 # 0.1174..0.2327, 43 mm right of the top face's extension lines) takes its
@@ -557,7 +573,9 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label="side",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
-        *curate_view_dimensions(
+        # The tap stations' sketch is saved hidden (#880): this view shows
+        # it per view and imports its two stations (_drawing_hidden_sketches).
+        *curate_hidden_owner_dimensions(
             adapter,
             end,
             keep=END_KEEP,
