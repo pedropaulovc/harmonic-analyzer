@@ -12,10 +12,21 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+from _supplier_lane import move_supplier_lane
 from _supplier_screw_layout import supplier_screw_margins
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_screw"]
 ITEM = '18-8 SS PRECISION SHOULDER SCREW, 10 MM X 35 MM, M8 X 1.25'
+# The shoulder length's three-line text is ~62 mm wide, centred on its dimension
+# line; the helper's 6 mm lane would print it across the 4 mm wide 1:4 screw.
+# Its line moves 26 mm further out, and the Top cell reserves that lane plus
+# half the text before the scale fit.
+SHOULDER_LANE_SHIFT = 0.026
+SUPPLIER_MARGINS = supplier_screw_margins(
+    part.SUPPLIER_REFERENCE_DIMENSIONS,
+    planes=part.SUPPLIER_REFERENCE_PLANES,
+    sides=part.SUPPLIER_REFERENCE_SIDES,
+) | {"*Top": (0.006 + SHOULDER_LANE_SHIFT + 0.033, 0.020, 0.020, 0.020)}
 
 
 def _assert_supplier_bands(displays):
@@ -40,7 +51,10 @@ def _assert_supplier_bands(displays):
 
 
 async def build(adapter) -> dict[str, str]:
+    # supplier_top's 70 mm Top cell holds the 52.5 mm screw at 1:4 (standard: 1:8).
+    view_layout = "supplier_top"
     proofs = []
+    stations = {}
 
     def supplier_dimensions(adapter, views):
         if proofs:
@@ -52,7 +66,11 @@ async def build(adapter) -> dict[str, str]:
             planes=part.SUPPLIER_REFERENCE_PLANES,
             sides=part.SUPPLIER_REFERENCE_SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
+            layout=view_layout,
+            shelf_stations=stations,
         )
+        move_supplier_lane(adapter, displays["SupplierShoulderLength"], -SHOULDER_LANE_SHIFT,
+                           label="SupplierShoulderLength")
         _assert_supplier_bands(displays)
 
         def assert_references():
@@ -61,6 +79,8 @@ async def build(adapter) -> dict[str, str]:
                 formats=part.SUPPLIER_REFERENCE_FORMATS,
                 planes=part.SUPPLIER_REFERENCE_PLANES,
                 units=part.SUPPLIER_REFERENCE_UNITS,
+                layout=view_layout,
+                shelf_stations=stations,
             )
             _assert_supplier_bands(fresh)
 
@@ -72,13 +92,9 @@ async def build(adapter) -> dict[str, str]:
         proofs[0]()
 
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=False,
+        adapter, SPEC, item=ITEM, cut_to_suit=False, view_layout=view_layout,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            part.SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
     )
 

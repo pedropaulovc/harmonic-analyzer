@@ -31,14 +31,17 @@ HEAD_HEIGHT = 4.5
 HEX = 5.0
 LENGTH = SHOULDER_LENGTH + HEAD_HEIGHT
 
-SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierShoulderDiameter', 10.0, 'horizontal'), ('SupplierShoulderLength', 35.0, 'vertical'), ('SupplierThreadLength', 13.0, 'vertical'), ('SupplierHeadDiameter', 16.0, 'horizontal'), ('SupplierHeadHeight', 4.5, 'vertical'))
-SUPPLIER_REFERENCE_STARTS = {'SupplierShoulderDiameter': (-5.0, 0.0), 'SupplierShoulderLength': (0.0, -35.0), 'SupplierThreadLength': (0.0, 0.0), 'SupplierHeadDiameter': (-8.0, 0.0), 'SupplierHeadHeight': (0.0, -39.5)}
-SUPPLIER_REFERENCE_PLANES = {'SupplierShoulderDiameter': 'Front', 'SupplierShoulderLength': 'Top', 'SupplierThreadLength': 'Top', 'SupplierHeadDiameter': 'Front', 'SupplierHeadHeight': 'Top'}
-SUPPLIER_REFERENCE_FORMATS = {'SupplierShoulderDiameter': (3, 'diameter', None, 'NOMINAL SHOULDER DIAMETER'), 'SupplierShoulderLength': (2, 'length', None, 'NOMINAL SHOULDER LENGTH'), 'SupplierThreadLength': (0, 'length', None, 'NOMINAL THREAD LENGTH'), 'SupplierHeadDiameter': (0, 'diameter', None, 'NOMINAL HEAD DIAMETER'), 'SupplierHeadHeight': (1, 'length', None, 'NOMINAL HEAD HEIGHT')}
-SUPPLIER_REFERENCE_SIDES = {'SupplierShoulderDiameter': 'bottom', 'SupplierShoulderLength': 'left', 'SupplierThreadLength': 'left', 'SupplierHeadDiameter': 'bottom', 'SupplierHeadHeight': 'left'}
-SUPPLIER_REFERENCE_UNITS = {'SupplierShoulderDiameter': 'mm', 'SupplierShoulderLength': 'mm', 'SupplierThreadLength': 'mm', 'SupplierHeadDiameter': 'mm', 'SupplierHeadHeight': 'mm'}
+# At the sheet's 1:4 the head-height and thread-length chords stack their texts
+# on the shoulder length's; both sizes are stated in SUPPLIER_DATA instead.
+SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierShoulderDiameter', 10.0, 'horizontal'), ('SupplierShoulderLength', 35.0, 'vertical'), ('SupplierHeadDiameter', 16.0, 'horizontal'))
+SUPPLIER_REFERENCE_STARTS = {'SupplierShoulderDiameter': (-5.0, 0.0), 'SupplierShoulderLength': (0.0, -35.0), 'SupplierHeadDiameter': (-8.0, 0.0)}
+SUPPLIER_REFERENCE_PLANES = {'SupplierShoulderDiameter': 'Front', 'SupplierShoulderLength': 'Top', 'SupplierHeadDiameter': 'Front'}
+SUPPLIER_REFERENCE_FORMATS = {'SupplierShoulderDiameter': (3, 'diameter', None, 'NOMINAL SHOULDER DIAMETER'), 'SupplierShoulderLength': (2, 'length', None, 'NOMINAL SHOULDER LENGTH'), 'SupplierHeadDiameter': (0, 'diameter', None, 'NOMINAL HEAD DIAMETER')}
+# The two Front diameters take opposite lanes so their stacked texts never meet.
+SUPPLIER_REFERENCE_SIDES = {'SupplierShoulderDiameter': 'top', 'SupplierShoulderLength': 'left', 'SupplierHeadDiameter': 'bottom'}
+SUPPLIER_REFERENCE_UNITS = {'SupplierShoulderDiameter': 'mm', 'SupplierShoulderLength': 'mm', 'SupplierHeadDiameter': 'mm'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierShoulderDiameter': deviations(SHOULDER_DIA_BAND),
     'SupplierShoulderLength': deviations(SHOULDER_LENGTH_BAND),
 }
-SUPPLIER_DATA = ('THREAD M8 X 1.25; 5 mm HEX KEY.', 'NOMINAL MAJOR-DIAMETER THREAD ENVELOPE; HELIX NOT MODELLED.', 'SOCKET DEPTH AND EDGE FORMS NOT STATED; NOT MODELLED.')
+SUPPLIER_DATA = ('HEAD Ø16 X 4.5; THREAD M8 X 1.25 X 13 LONG; 5 mm HEX KEY.', 'NOMINAL MAJOR-DIAMETER THREAD ENVELOPE; HELIX NOT MODELLED.', 'SOCKET DEPTH AND EDGE FORMS NOT STATED; NOT MODELLED.')

@@ -12,10 +12,22 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+from _supplier_lane import move_supplier_lane
 from _supplier_screw_layout import supplier_screw_margins
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_shim"]
 ITEM = 'DIN 988 SPRING STEEL SHIM, 10 MM ID X 16 MM OD X 0.2 MM'
+# The two Front diameters' stacked texts overprinted on one bottom lane;
+# the bore takes the top lane.
+SIDES = part.SUPPLIER_REFERENCE_SIDES | {'SupplierBoreDiameter': 'top'}
+# The Top view's thickness text, centred on its 6 mm lane, printed across the
+# part; its line moves 14 mm further out, reserved before the scale fit.
+LANE_SHIFT = 0.014
+SUPPLIER_MARGINS = supplier_screw_margins(
+    part.SUPPLIER_REFERENCE_DIMENSIONS,
+    planes=part.SUPPLIER_REFERENCE_PLANES,
+    sides=SIDES,
+) | {"*Top": (0.006 + LANE_SHIFT + 0.025, 0.020, 0.020, 0.020)}
 
 
 def _assert_supplier_bands(displays):
@@ -50,9 +62,10 @@ async def build(adapter) -> dict[str, str]:
             formats=part.SUPPLIER_REFERENCE_FORMATS,
             starts=part.SUPPLIER_REFERENCE_STARTS,
             planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
+            sides=SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
+        move_supplier_lane(adapter, displays["SupplierThickness"], -LANE_SHIFT, label="SupplierThickness")
         _assert_supplier_bands(displays)
 
         def assert_references():
@@ -74,11 +87,7 @@ async def build(adapter) -> dict[str, str]:
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, cut_to_suit=False,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            part.SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
     )
 
