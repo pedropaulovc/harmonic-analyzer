@@ -566,9 +566,7 @@ HUB_BOTTOM_CENTER = (0.110, 0.200)
 HUB_BOTTOM_SCALE = (1, 3)
 # The bottom view's label, then its edge note, at the band's left edge: the
 # 07527cf4 codex review read the one 85.7 mm row, wedged between the slot
-# width's block and F-F's 15.264, as crowding the section dimensions.  The
-# sheet-1 orientation key says the view is from below, front (B) at the
-# bottom (machinist review r1).
+# width's block and F-F's 15.264, as crowding the section dimensions.
 HUB_BOTTOM_NOTE_XY = (0.020, 0.122)
 HUB_BOTTOM_NOTE = "BOTTOM VIEW\nBAR/GUSSET BOTTOMS AT\nSEATS SHARP"
 HUB_DETAIL_CENTER = (0.300, 0.174)
@@ -598,8 +596,9 @@ LAND_TEXT_OFFSET_XY = (0.155, 0.145)
 # establish the renamed caption's clearance.
 UNDERSIDE_FACING_NOTE_XY = (0.330, 0.098)
 # The slots' stations along the slot are F-F's plain .XXX 15.264 from the
-# round hole ("2X"), and the frames' implied basic zero and 90 deg need no
-# words (machinist review r1: no basic or tolerance in note text).
+# round hole ("2X"); each frame's name states its true position, the slot's
+# width centred on its own station's round hole (machinist review r1: no
+# basic or tolerance in note text).
 # Sheet 6, removed section F-F through the REAR knife-hanger station: the
 # #10 plain clearance hole, with the native finished top-to-underside grip,
 # the round
@@ -739,13 +738,15 @@ HANGER_SLOT_FRAME_SHOULDER = 0.00635
 # clear of that line, at a height where the leader passes 2.4 mm from both the
 # rear-right boss and the front round hole.  Above the plan, it would have
 # fenced the rear round hole's size off from every band wide enough for it.
-# The name says the frame holds the slot's width (its median plane) and
-# nothing else: the station along the slot is F-F's 15.264 ±0.13 (codex
-# review of 06d0bbc59; machinist review r7); 15 glyphs, 39.0 mm, inside the
-# 39.1 mm outline's reach.
-HANGER_SLOT_FRAME_QUANTITY = "SLOT WIDTH ONLY"
+# The name says what the frame holds and where: the slot's width (its median
+# plane), centred on its own station's round-hole datum -- the implied basic
+# zero, stated like sheet 3's HANGER AXES ON D (machinist review of 2056e3344
+# read the bare frame as having no basic).  The station along the slot is
+# F-F's 15.264 ±0.13 (codex review of 06d0bbc59; machinist review r7).  15
+# glyphs each, 39.0 mm, inside the 39.1 mm outline's reach.
+HANGER_SLOT_FRAME_QUANTITY = {"front": "SLOT WIDTH ON B", "rear": "SLOT WIDTH ON C"}
 HANGER_SLOT_FRAME_QUANTITY_BOX = (
-    0.0, -0.0116, 0.0026 * len(HANGER_SLOT_FRAME_QUANTITY), -0.0080
+    0.0, -0.0116, 0.0026 * max(map(len, HANGER_SLOT_FRAME_QUANTITY.values())), -0.0080
 )
 HANGER_SLOT_FRAME_XY = {"front": (0.1919, 0.2358), "rear": (0.052, 0.261)}
 
@@ -1065,9 +1066,12 @@ HOLE_STATION_NOTE = (
 # circle dimension, and the 27.0 rail pad is RibProfile's -- a Top-plane
 # sketch, so it imports into a plan view and not into the 1:2 side view
 # that used to derive the same width from the pad's own two edges.
+# The Ø17.00 callout stands under the 28.0 pad width, so its leader climbs to
+# the bore right of the 28.0's dimension line instead of crossing it
+# (machinist review of 2056e3344).
 HUB_TOP_KEEP = {
-    "GnDia": (0.040, 0.185),
-    "RibWidth": (0.060, 0.1465),
+    "GnDia": (0.040, 0.154),
+    "RibWidth": (0.060, 0.1828),
 }
 HUB_LEFT_KEEP = {
     "SetBossWidth": SET_BOSS_WIDTH_LINE_XY,
@@ -2177,8 +2181,8 @@ def _hanger_section(adapter: Any, parent_view: Any) -> tuple[Any, list[Any]]:
     # hole beside it, so the title block's +/-0.13 is the station band the
     # spec's wall and travel stacks charge (HANGER_SLOT_ALONG_TOL).  The
     # slot's position frame on the plan holds its width's median plane only,
-    # on an implied basic zero, and its name says so ("SLOT WIDTH ONLY":
-    # machinist review r7 read the frames as locating the 15.264); boxed
+    # centred on its round-hole datum, and its name says so ("SLOT WIDTH ON
+    # B": machinist review r7 read the frames as locating the 15.264); boxed
     # BASIC (machinist review r2) the station had no limit along the slot
     # (codex review of 06d0bbc59).  The drawing contract forbids a band
     # authored on the sheet, and the 15.264 has no model dimension to carry
@@ -4081,7 +4085,7 @@ async def build(adapter: Any) -> dict[str, str]:
             tolerance=GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"],
             datums=datums,
             translated=datums[1:],
-            quantity=HANGER_SLOT_FRAME_QUANTITY,
+            quantity=HANGER_SLOT_FRAME_QUANTITY[station],
             label=f"knife-hanger {station} dowel slot position",
         )
     locator_dimensions = curate_view_dimensions(

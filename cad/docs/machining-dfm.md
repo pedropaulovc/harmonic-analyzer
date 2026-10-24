@@ -665,7 +665,8 @@ This per-drawing tessellation control is independent of the views' precise
 HLR mode (`Faceted=False`); it does not change geometry, dimensions, tolerance
 exceptions, crops or scales. In particular, the longitudinal 15.264 and
 7.632 ±0.13 controls remain distinct from the transverse **0.05 SLOT WIDTH
-ONLY** requirement. Successful preference readback or offline tests do not
+ON B / ON C** requirement (each slot's width centred on its own station's
+round-hole datum). Successful preference readback or offline tests do not
 prove smooth exported ink: inspection of the resulting native drawing and
 actual exported vector PDF, including DETAIL L's curves, is required.
 

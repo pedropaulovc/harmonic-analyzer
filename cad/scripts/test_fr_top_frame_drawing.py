@@ -3582,8 +3582,13 @@ def test_slots_are_positioned_to_the_round_holes_with_translation() -> None:
     assert '("front", STUD_Z_FRONT, ("B", "C"))' in underside
     assert '("rear", STUD_Z_REAR, ("C", "B"))' in underside
     assert "translated=datums[1:]" in underside
-    assert "quantity=HANGER_SLOT_FRAME_QUANTITY," in underside
-    assert drawing.HANGER_SLOT_FRAME_QUANTITY == "SLOT WIDTH ONLY"
+    assert "quantity=HANGER_SLOT_FRAME_QUANTITY[station]," in underside
+    # Each name states the frame's true position: the slot's width centred
+    # on its own station's round hole, the frame's primary datum.
+    assert drawing.HANGER_SLOT_FRAME_QUANTITY == {
+        "front": "SLOT WIDTH ON B",
+        "rear": "SLOT WIDTH ON C",
+    }
     assert 'GEOMETRIC_TOLERANCES_MM["knife-hanger slot position"]' in underside
     assert '"HangerSlotWidth": HANGER_SLOT_WIDTH_TEXT_XY' in underside
     assert '"HangerPinHoleDia": HANGER_PIN_DIA_TEXT_XY' in underside
@@ -4070,7 +4075,7 @@ def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
 
 def test_slot_station_is_a_plain_xxx_from_its_round_hole() -> None:
     # The slot's position frame holds its width's median plane only (its name
-    # says SLOT WIDTH ONLY: machinist review r7), so along the slot the
+    # says SLOT WIDTH ON B/C: machinist review r7), so along the slot the
     # 15.264 is an ordinary .XXX band, the one the spec's wall and travel
     # stacks charge.  Boxed BASIC (machinist review r2) it left that
     # direction with no limit (codex review of 06d0bbc59); no note restates
