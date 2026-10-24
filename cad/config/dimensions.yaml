@@ -1862,7 +1862,7 @@ sections:
         - scaled
         - low
       - - Transgear thumbnut (MHA-PD-13, round 10)
-        - 'custom knurled brass #8-32 UNC-2B nut, outermost on the knob stud in front of the removable sprocket (nominal z −173.2..−157.1): Ø20.5 × 8.7 straight-knurled head with dished front face, Ø11 × 2.4 waist, Ø12.4 flange. The flange bears on the drive collar''s faced pilot, not on T24; pilot proudness leaves T24 free. Countersink both thread entries to the source Ø4.566 MAX. Outer head/waist/flange remain unchanged; this is MHA-PD-13 fabricated from brass, not a new purchased nut.'
+        - 'custom knurled brass #8-32 UNC-2B nut, outermost on the knob stud in front of the removable sprocket (nominal z −173.2..−157.1): Ø20.5 × 8.7 straight-knurled head with dished front face, Ø11 × 2.4 waist, Ø12.4 flange. The flange bears on the drive collar''s faced pilot, not on T24; pilot proudness leaves T24 free. Countersink both thread entries to the source Ø4.6 MAX. Outer head/waist/flange remain unchanged; this is MHA-PD-13 fabricated from brass, not a new purchased nut.'
         - —
         - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place"; current thread and seating authority: `pd_transgear_thumbnut_spec` and `pd_transgear_drive_collar_spec`'
         - scaled

@@ -63,11 +63,14 @@ def test_actual_entry_cones_carry_model_owned_controls() -> None:
         spec.CSK_HALF_ANGLE_DEG - angular_band_deg()
     )
     assert spec.CSK_DIA_TOL_TYPE == 6
-    assert spec.CSK_DIA_PLACES == 3
+    # Machinist review: a thread-entry chamfer's MAX prints at one place.
+    assert spec.CSK_DIA_PLACES == 1
     assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
         "CountersinkDia", "CountersinkHalfAngle",
     }
-    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER[3:])
+    # One way of saying "both cones", and no number in the qualifier.
+    assert spec.CSK_QUALIFIER == "CSK, BOTH ENDS"
+    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER)
 
 
 def _thumbnut_spec_with(monkeypatch, module, name: str, value):
@@ -119,7 +122,7 @@ def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
     """Actual MAX cone and the smallest printed half-angle charge both ends."""
-    assert spec.CSK_DIA == pytest.approx(4.566)
+    assert spec.CSK_DIA == pytest.approx(4.6)
     rear = (spec.CSK_DIA - spec.TAP_DRILL_DIA) / (
         2.0 * math.tan(math.radians(spec.CSK_HALF_ANGLE_MIN))
     )
@@ -155,7 +158,7 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
         spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
     ) == pytest.approx(
         {
-            "floor land outside the countersink": (9.0 - 0.8 - 4.566) / 2.0,
+            "floor land outside the countersink": (9.0 - 0.8 - 4.6) / 2.0,
             "cone from the rim to the floor": 2.2,
             "floor below the rim": 0.2,
         }
@@ -476,7 +479,7 @@ def test_lengths_read_from_the_faced_ends() -> None:
 
 
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:
-    """Machinist review: the Ø4.566 line and its extension lines struck the
+    """Machinist review: the cone diameter's line and extension lines struck the
     default caption's letters.  Run 20261024T025840809Z measured that line
     13.5 mm under the seat face; the caption's top stands 6.5 mm under it."""
     seat_y = drawing._section_y(0.0)

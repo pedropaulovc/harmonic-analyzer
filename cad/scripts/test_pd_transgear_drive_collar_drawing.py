@@ -412,7 +412,7 @@ def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
 
 def test_the_thumbnut_bears_on_the_pilot_and_the_knob_wheel_floats() -> None:
     # The nut's rear countersink leaves a real annulus on the pilot.
-    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((9.90 - 4.566) / 2.0)
+    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx((9.90 - 4.6) / 2.0)
     assert spec.NUT_PILOT_BEARING_WORST > 0.0
     assert min(spec.KNOB_FLOAT_RANGE) > 0.0
     # Negative control: a pilot faced flush with the wheel leaves no float.

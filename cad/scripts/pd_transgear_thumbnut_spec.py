@@ -115,12 +115,16 @@ THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 # https://itpbolt.com/wp-content/uploads/2015/08/Class-2B-Internal-Threads.pdf
 # Where the nut stands over the shaft's relief, its crests must clear it.
 TAP_MINOR_2B_MIN = 0.130 * 25.4
-# 90° entry countersink at each end, opened 0.2 past the thread major so the
-# first thread starts full rather than on a feather edge.  The sheet prints
-# it as a MAX, so the thread it removes never exceeds the losses below.
-CSK_DIA = THREAD_MAJOR + 2.0 * 0.2
-CSK_DIA_PLACES = 3
-CSK_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX, same physical envelope as before
+# 90° entry countersink at each end, opened at least 0.2 a side past the
+# thread major so the first thread starts full rather than on a feather
+# edge.  The sheet prints it as a one-place MAX (a thread-entry chamfer
+# needs no more places, drawing-guidelines.md rule 3): the size rounds UP
+# to that place (Ø4.6 on the #8-32), and the thread it removes never
+# exceeds the losses below.
+CSK_DIA_PLACES = 1
+_CSK_SCALE = 10**CSK_DIA_PLACES
+CSK_DIA = math.ceil((THREAD_MAJOR + 2.0 * 0.2) * _CSK_SCALE) / _CSK_SCALE
+CSK_DIA_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CSK_DIA_DEVIATIONS = (THREAD_MAJOR - CSK_DIA, 0.0)
 # The sheet prints the cone's 45° half-angle at the title block's angular
 # row: no mate seats in these thread-entry cones, so no tighter band.
@@ -130,7 +134,7 @@ CSK_HALF_ANGLE_PLACES = 1
 CSK_HALF_ANGLE_MIN = CSK_HALF_ANGLE_DEG - angular_band_deg()
 if CSK_DIA <= THREAD_MAJOR:
     raise AssertionError("MHA-PD-13 countersink ends inside the thread major")
-CSK_QUALIFIER = "2X CSK, BOTH ENDS"
+CSK_QUALIFIER = "CSK, BOTH ENDS"
 # Rear countersink: a 45° break on the tap-drill edge of the seat face, its
 # cone y = CSK_DIA / 2 - r.  Front: the same break on the dish floor, its
 # cone y = FRONT_CSK_APEX_Y + r.
