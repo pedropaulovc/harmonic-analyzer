@@ -52,7 +52,7 @@ Z = wall thickness):
 * **CornerFillet** -- R12.7 on the four cavity corner edges.
 * **PocketCornerFillet** -- R6.35 on the four corners of each opposed pocket.
 * **PocketFloorFillet** -- R0.8 around each pocket's floor-to-wall corner,
-  modelled AT the printed limit ``R0.8 MAX`` (a sharp corner is in band).
+  inside the title block's ``INSIDE CORNERS R1.0 MAX`` (no local callout).
 * **FootClearanceHoles** -- a single Hole Wizard (``HoleWzd``) feature, 4x
   5/16 in clearance drills through the 6.35 mm foot from its top seat
   (Y=-82.55) at ``(X ±60.32, Z ±17.46)``. One feature carries all four
@@ -124,9 +124,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension, apply_drawing_precision
-from _fit_deviations import deviations
-import _telemetry
+from _drawing_precision import apply_drawing_precision
 from _hole_spec import blind_cut_dia_mm
 from _part_pmi import author_part_pmi
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
@@ -241,23 +239,20 @@ POCKET_FILLET_VOLUME = (
 
 # PocketFloorFillet: each pocket's floor (the web face) meets its four walls
 # and four R6.35 corners in one tangent loop. The r7 machinist review asked
-# what that corner may be; Main ruled R0.8 MAX (r8), modelled AT the printed
-# limit as the V-block rule does (swTolMAX prints the nominal, so nominal =
-# limit and the band runs from sharp up to it). Its spandrel
+# what that corner may be; the title block's INSIDE CORNERS R1.0 MAX answers
+# it, so the sheet prints no local limit (ENFORCE review 2026-10-23: a bespoke
+# R0.8 MAX named no mate or function, drawing-guidelines rule 2). R0.8 is the
+# modelled corner within that band. Its spandrel
 # ((1 - pi/4) R^2) runs the four straight walls and, by Pappus, the four
 # corner quarter-turns at the R6.35 wall radius less the spandrel's centroid
 # offset R (10 - 3 pi) / (3 (4 - pi)). The fillet sits at |Z| >= WEB, clear
 # of the seats (thread inside the web) and of the clearance holes' heads.
-POCKET_FLOOR_R_MAX = 0.8
-POCKET_FLOOR_R_BAND = (0.0, -POCKET_FLOOR_R_MAX)  # (upper, lower)
-POCKET_FLOOR_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.8 MAX"
-POCKET_FLOOR_R_PLACES = 1
-# One point per pocket on its top-rail floor edge (Z = +WEB first: its size
-# lands on that corner, the section's upper-right, under the top flat's +Z
-# station's text); tangent propagation takes the rest of each loop.
+POCKET_FLOOR_R = 0.8
+# One point per pocket on its top-rail floor edge (Z = +WEB first);
+# tangent propagation takes the rest of each loop.
 POCKET_FLOOR_FILLET_EDGES = [[0.0, BIG, WEB], [0.0, BIG, -WEB]]
-_FLOOR_SPANDREL = (1.0 - math.pi / 4.0) * POCKET_FLOOR_R_MAX**2
-_FLOOR_CENTROID = POCKET_FLOOR_R_MAX * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
+_FLOOR_SPANDREL = (1.0 - math.pi / 4.0) * POCKET_FLOOR_R**2
+_FLOOR_CENTROID = POCKET_FLOOR_R * (10.0 - 3.0 * math.pi) / (3.0 * (4.0 - math.pi))
 POCKET_FLOOR_FILLET_GROWTH = (
     2.0
     * _FLOOR_SPANDREL
@@ -282,7 +277,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CavityProfile": {"CavWidth"},
     "CornerFillet": {"CavityRadius"},
     "PocketCornerFillet": {"PocketRadius"},
-    "PocketFloorFillet": {"PocketFloorRadius"},
     "RimChamfer": {"RimChamferSize"},
     "SeatStationReference": {"SeatEastStation", "SeatWestStation"},
     "CavityLocationReference": {
@@ -302,7 +296,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 
 # Decimal places the PART owns (drawing-simplicity-policy.md: the model owns
 # tolerance and precision; the drawing imports the dimension verbatim and only
-# reads its places back). The R0.8 MAX single limit prints at one place.
+# reads its places back).
 # A chamfer never needs extra places (drawing-guidelines.md rule 3): no stack
 # reads RimChamferSize, so 1.27 prints as 1.3 on the .X band.
 RIM_CHAMFER_PLACES = 1
@@ -320,7 +314,6 @@ CAVITY_LOCATION_PLACES = 1
 POCKET_END_PLACES = 2
 SECTION_LOCATION_PLACES = WEB_PLACES
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "PocketFloorFillet": {"PocketFloorRadius": POCKET_FLOOR_R_PLACES},
     "RimChamfer": {"RimChamferSize": RIM_CHAMFER_PLACES},
     "SeatStationReference": {
         "SeatEastStation": SEAT_STATION_PLACES,
@@ -521,35 +514,6 @@ CHAMFER_FACES = [  # whole faces whose every edge is chamfered (tangent-propagat
     [-BOSS_DEPTH / 2.0, 0.0, 0.0],  # back trapezoid (-X) face
     [59.78, -59.78, 0.0],  # one inner fillet face
 ]
-
-
-def _pocket_floor_radius_max_limit(adapter) -> None:
-    """PocketFloorRadius as the single limit "R0.8 MAX" carrying the band's
-    deviations (build_ch_pivot_bracket._corner_radius_max_limit's recipe)."""
-    lower, upper = deviations(POCKET_FLOOR_R_BAND)
-    _, dimension = _named_dimension(adapter, "PocketFloorFillet", "PocketFloorRadius")
-    label = "PocketFloorRadius@PocketFloorFillet"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, POCKET_FLOOR_R_MAX / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max "
-            f"{POCKET_FLOOR_R_MAX}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = POCKET_FLOOR_R_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != POCKET_FLOOR_R_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {POCKET_FLOOR_R_MAX:g} MAX")
 
 
 async def _seat_station_reference(adapter) -> list[tuple[str, str]]:
@@ -831,7 +795,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     )
     dims.record("BaseChordZ", '"FootHalf"')
     dims.record("BaseChordY", '"HalfHeight"')
-    web_y = -(BIG - POCKET_FLOOR_R_MAX - REFERENCE_CHORD)
+    web_y = -(BIG - POCKET_FLOOR_R - REFERENCE_CHORD)
     web = await _reference_chord(
         adapter, sketch, dims, "WebChord", (WEB, web_y), (WEB, web_y + REFERENCE_CHORD)
     )
@@ -859,7 +823,7 @@ async def _web_location_reference(adapter) -> list[tuple[str, str]]:
     # Each top-flat edge off the web face on its side (owner Q13d): the face
     # chord runs down from under the upper pocket floor's fillet, inside the
     # web's straight run above the cavity's rim chamfer.
-    face_y = BIG - POCKET_FLOOR_R_MAX - REFERENCE_CHORD
+    face_y = BIG - POCKET_FLOOR_R - REFERENCE_CHORD
     for name, row in TOP_FLAT_STATIONS.items():
         face = await _reference_chord(
             adapter,
@@ -1211,11 +1175,11 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "PocketCornerFillet", ["PocketRadius"])
     await volume_check(adapter, "PocketCornerFillet", POCKET_FILLET_VOLUME, 20)
 
-    # 6b. PocketFloorFillet: R0.8 (the printed MAX) around both pocket floors.
+    # 6b. PocketFloorFillet: R0.8 around both pocket floors.
     check(
         "fillet pocket floors",
         await adapter.add_fillet(
-            POCKET_FLOOR_R_MAX, POCKET_FLOOR_FILLET_EDGES, propagate=True
+            POCKET_FLOOR_R, POCKET_FLOOR_FILLET_EDGES, propagate=True
         ),
     )
     name_last_feature(adapter, "PocketFloorFillet")
@@ -1282,7 +1246,6 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven part (equations neutral)", BRACKET_SEATS_VOLUME, 200
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _pocket_floor_radius_max_limit(adapter)
 
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.

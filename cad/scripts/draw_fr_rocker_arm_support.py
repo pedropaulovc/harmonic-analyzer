@@ -27,7 +27,6 @@ from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
     auto_center_marks,
-    dimension_name,
     place_view,
     remove_notes_matching,
     view_name,
@@ -69,6 +68,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _hole_spec import blind_cut_dia_mm
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -84,14 +84,15 @@ from build_fr_rocker_arm_support import (
     HOLE_DIA,
     HOLES,
     NARROW,
-    POCKET_FLOOR_R_MAX,
-    POCKET_FLOOR_R_TOL_TYPE,
     WEB,
     WIDE,
 )
 from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
 from rocker_bracket_seat_layout import SEAT_LOCAL_X, SEAT_SPEC, WEB_PLACES
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["fr_rocker_arm_support"]
 PART_STEM = SPEC.artifact_stem
@@ -185,8 +186,6 @@ DIMENSION_CALLOUTS = {
     "WinWidth": "SQ POCKET BOTH SIDES",
     "CavWidth": "SQ CAVITY THRU",
     "RimChamferSize": " X 45 DEG\nALL OUTSIDE\nEDGES AND\nPOCKET AND\nCAVITY RIMS",
-    # One fillet loop per pocket floor (r7 review: the corner was unstated).
-    "PocketFloorRadius": "POCKET FLOOR\nCORNERS",
     # One location covers both opposed pockets, as the SQ size does.
     "PocketEndStation": "BOTH SIDES",
     "PocketBottomStation": "BOTH SIDES",
@@ -199,7 +198,7 @@ DIMENSION_CALLOUTS = {
         f"KEEPS {_config.parts('ch-pivot-bracket')['number']}\nSEAT TAPS IN WEB"
     ),
 }
-# The sheet's own places. RimChamferSize's, PocketFloorRadius's, the seat REF
+# The sheet's own places. RimChamferSize's, the seat REF
 # stations' and the locations' are the PART's
 # (build_fr_rocker_arm_support.DRAWING_PRECISION): read back
 # (PART_PRECISION), never set here.
@@ -317,16 +316,13 @@ WEB_TEXT_XY = (RIGHT_CENTER[0] + 0.026, RIGHT_CENTER[1] - 0.0122)
 # extension line instead, in the gap between the front view and the
 # section's slanted wall.
 FOOT_TEXT_XY = (RIGHT_CENTER[0] - 0.025, RIGHT_CENTER[1] - 0.0365)
-# PocketFloorFillet's R0.8 MAX lands on its first edge, the +Z pocket's
-# top-rail floor corner (build_fr_rocker_arm_support.POCKET_FLOOR_FILLET_EDGES),
-# which the section shows in profile at its upper right. The text stands
-# level with it right of the section, between the slanted wall and the
-# 177.8, which moves out to clear it. One top-flat edge prints off its
+# PocketFloorFillet prints no size: the title block's INSIDE CORNERS R1.0 MAX
+# governs the pocket floor corners (ENFORCE review 2026-10-23: a local R0.8
+# MAX named no mate or function). One top-flat edge prints off its
 # nearer web face (WebLocationReference, blanked in the part; owner Q13d),
 # its BOTH SIDES covering the other (r6 review), on the row above the
 # section: the span is only about 1 mm of sheet, so its text stands outboard
-# of the +Z edge, its reason rows hanging below the value, above the R0.8
-# MAX's block. The 63.5 prints
+# of the +Z edge, its reason rows hanging below the value. The 63.5 prints
 # right of the web face's extension line WebFaceStation runs down to just
 # above it, its row no lower than r8's (r10 review: 1 mm lower, its left
 # extension line's overshoot struck the SECTION A-A label's E).
@@ -337,7 +333,6 @@ RIGHT_KEEP = {
     "FootSpan": (0.2125, 0.133),
     "TopFlatPlusZStation": (0.2385, 0.2475),
     "WebFaceStation": (0.1958, 0.1375),
-    "PocketFloorRadius": (0.2335, 0.2195),
 }
 # The chamfer text on its OffsetText leader (the text centres on its point),
 # in the lane between the front view and the section, low enough that the
@@ -360,6 +355,33 @@ EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
     (150.57, 14.29),
     (29.93, 14.29),
 )
+# The SIZE cells are generated from FootClearanceHoles and are not
+# text-editable, so they print "Ø 7.94 THRU ALL" with no process; the
+# machinist could not tell whether the title block's DRILLED HOLES row or the
+# .XX band governs them (ENFORCE review, rule 12). The header names the
+# process, so each row reads DRILL Ø7.94 THRU ALL; size and depth stay native.
+HOLE_TABLE_SIZE_COLUMN = 3
+HOLE_TABLE_SIZE_HEADING = "DRILL"
+
+
+@_telemetry.traced("drawing.rocker_support.hole_table_process")
+def _name_hole_table_process(adapter: Any, table: Any) -> None:
+    """Retitle the native SIZE column with the foot holes' process."""
+    column = HOLE_TABLE_SIZE_COLUMN
+    if not table.IsCellTextEditable(0, column):
+        raise RuntimeError("native hole-table SIZE header is not editable")
+    table.SetText2(0, column, False, HOLE_TABLE_SIZE_HEADING)
+    rebuild_drawing(adapter, label="rocker-arm-support hole-table process")
+    heading = str(table.DisplayedText2(0, column, False) or "")
+    if heading.upper() != HOLE_TABLE_SIZE_HEADING:
+        raise RuntimeError(f"hole-table process header did not persist: {heading!r}")
+    sizes = {
+        str(table.DisplayedText2(row, column, False) or "")
+        for row in range(1, int(table.RowCount))
+    }
+    if len(sizes) != 1 or "THRU" not in next(iter(sizes)).upper():
+        raise RuntimeError(f"hole-table DRILL column holds unexpected sizes: {sizes!r}")
+    _telemetry.info(f"hole-table process header {heading!r} over sizes {sizes!r}")
 
 
 def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
@@ -400,39 +422,6 @@ def _seat_entry_edge(view: Any) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one east-seat entry rim, found {len(matches)}")
     return matches[0]
-
-
-@_telemetry.traced("drawing.rocker_support.pocket_floor_radius")
-def _dress_pocket_floor_radius(adapter: Any, annotations: list[Any]) -> None:
-    """Prove the section's PocketFloorRadius prints the part's R0.8 MAX and
-    stop its leader at the arc (draw_ch_pivot_bracket's corner radius)."""
-    found = [
-        annotation
-        for annotation in annotations
-        if dimension_name(adapter, annotation) == "PocketFloorRadius"
-    ]
-    if len(found) != 1:
-        raise RuntimeError(
-            f"expected one PocketFloorRadius on the section, found {len(found)}"
-        )
-    annotation = _early_bound(found[0], "IAnnotation")
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    if bool(display.Diametric):
-        raise RuntimeError("the imported pocket floor radius is not radial")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    if int(tolerance.Type) != POCKET_FLOOR_R_TOL_TYPE:
-        raise RuntimeError(
-            f"PocketFloorRadius lost its native MAX type: {int(tolerance.Type)}"
-        )
-    if not math.isclose(
-        float(dimension.SystemValue), POCKET_FLOOR_R_MAX / 1000.0, abs_tol=1e-9
-    ):
-        raise RuntimeError("PocketFloorRadius does not measure the floor fillet")
-    display.ArcExtensionLineOrOppositeSide = False
-    if bool(display.ArcExtensionLineOrOppositeSide):
-        raise RuntimeError("PocketFloorRadius leader still runs to the opposite side")
-    _telemetry.info(f"pocket floor radius: text {display.GetText(1)!r}, MAX type")
 
 
 def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
@@ -816,7 +805,6 @@ async def build(adapter: Any) -> dict[str, str]:
     offset_dimension_text(
         adapter, front_dimensions, {"RimChamferSize": RIM_CHAMFER_TEXT_XY}
     )
-    _dress_pocket_floor_radius(adapter, right_dimensions)
     _create_view_centerline(
         adapter,
         front,
@@ -923,7 +911,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # coordinates are ordinary two-place dimensions under the title block's
     # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
     # feeds, and without one it has no tolerance at all.
-    insert_hole_table(
+    hole_table = insert_hole_table(
         adapter,
         bottom,
         datum_xy=(
@@ -938,6 +926,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
+    _name_hole_table_process(adapter, hole_table)
     _mirror_right_end_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's edge set
     # stale, so regenerate it before export.
