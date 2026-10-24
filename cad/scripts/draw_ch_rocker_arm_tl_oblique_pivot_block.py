@@ -47,6 +47,7 @@ from _feature_requirements import part_metadata, requirement
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
 from _hole_callout_thread_class import omit_title_block_thread_class
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _printed_limits import limits
 from _section_axis import position_section_caption
@@ -76,6 +77,8 @@ from ch_rocker_arm_tl_oblique_pivot_block_spec import (
     SIDE_SCREW_HOLES,
     SIDE_SCREW_REFERENCE,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_oblique_pivot_block"]
 PART_STEM = SPEC.artifact_stem
@@ -147,7 +150,10 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # its own column, 12 mm apart on paper; retain every baseline attachment.
     "BoreStationY": (38.0, -10.0, _H),
     "HoleRow2Y": (46.0, -3.5, _H),
-    "BlockWidth": (52.0, 8.0, _H),
+    # ENFORCE review: at X52 the 33.000 line (X46) struck the centred
+    # "SETS C'BORE / WALL 2.10 MIN" rows (~27 mm wide on paper). X60 stands
+    # the whole block right of that line with ~7 mm of air.
+    "BlockWidth": (60.0, 8.0, _H),
     "BoreDia": (BLOCK_X0 - 15.5, 15.5, _H),
 }
 # The 9 mm witnesses stay with A-A; its complete bracket identity has an
@@ -228,7 +234,9 @@ SIDE_KEEP: dict[str, tuple[float, float, float]] = {
     "SideScrew1X": (-29.5, _HW, -4.0),
     "SideScrew2X": (-24.5, _HW, -8.0),
     # Height stays to the right; its carriage-seat datum is named in A-A.
-    "BlockHeight": (BLOCK_X1 + 4.0, _HW, _H / 2.0),
+    # ENFORCE review: 4 mm out, the centred "24.00" touched the +X outline;
+    # 12 mm (18 mm on paper) stands the text clear of the part.
+    "BlockHeight": (BLOCK_X1 + 12.0, _HW, _H / 2.0),
 }
 _OTHER_SHEET_DIMENSIONS = (
     set(CAPTURE_KEEP) | set(REGISTER_KEEP) | set(REGISTER_SECTION_KEEP)
@@ -1426,7 +1434,9 @@ def _register_section_sheet(adapter: Any) -> tuple[Any, Callable[[], None]]:
         ),
     )
     position_section_caption(adapter, section, caption_xy, label="pivot block D")
-    if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.260) is None:
+    # ENFORCE review: at the top-left (0.025, 0.260) the note's final "3"
+    # touched the D-D cutting line's upper end; the lower-left corner is clear.
+    if add_note(adapter, "REGISTER XY LOCATIONS ON SHEET 3", 0.025, 0.045) is None:
         raise RuntimeError("failed to identify the register-ordinate sheet")
     return plan, check_depth
 
