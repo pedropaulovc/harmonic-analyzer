@@ -45,6 +45,7 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import (
     assert_imported_precision,
+    set_arc_endpoints_to_center,
     set_basic_dimension,
     set_dimension_callouts,
     set_reference_dimension,
@@ -611,8 +612,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="shank left flank",
     )
-    # Value-only: both picks are coordinate hits (the flank, the bore rim);
-    # the bore's centre is datum A, so the measure is half the shank width.
+    # Both 4.00 BASICs run from the flank to a circle's CENTRE (datum A's bore,
+    # the pin's axis), set explicitly rather than left to the arc condition the
+    # pick resolves to. Value-only: both picks are coordinate hits.
     datum_b_offset = add_edge_dimension(
         adapter,
         front,
@@ -622,6 +624,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="datum B from datum A",
         orientation="horizontal",
     )
+    set_arc_endpoints_to_center(adapter, datum_b_offset, label="datum B from datum A")
     assert_dimension_measures(
         adapter,
         datum_b_offset,
@@ -637,6 +640,13 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=PIN_OFFSET_TEXT_XY,
         label="pin C/L from shank flank",
         orientation="horizontal",
+    )
+    set_arc_endpoints_to_center(adapter, pin_offset, label="pin C/L from shank flank")
+    assert_dimension_measures(
+        adapter,
+        pin_offset,
+        expected_mm=SHANK_WIDTH / 2.0,
+        label="pin C/L from shank flank",
     )
     set_basic_dimension(adapter, pin_offset, label="pin C/L from shank flank")
     add_surface_finish(
