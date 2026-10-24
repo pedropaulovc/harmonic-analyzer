@@ -271,12 +271,15 @@ STIRRUP_DETAIL_CENTRE = carriage.block_to_machine(
     )
 )
 STIRRUP_DETAIL_RADIUS = (v_block.BLOCK_HEIGHT - _THUMB_SCREW_HEAD_LOCAL_Y) / 2.0 + 2.0
-# DETAIL C's viewing arrow on FRONT points straight down onto the block top,
+# DETAIL C's viewing arrow on FRONT points straight down onto the carriage,
 # nib-ward of the rod where FRONT has open paper (the strap stands over the
-# rod), its tip clear above D's circle, which crests just over the block top.
+# rod): its tip just over the stirrup's top, which FRONT draws as the
+# carriage's top edge, and clear above D's circle, which crests inside the
+# stirrup just over the block top.
+_STIRRUP_TOP_Y = carriage.block_to_machine((0.0, carriage.FRAME_TOP_LOCAL_Y, 0.0))[1]
 CARRIAGE_ARROW_TIP = (
     carriage.PEN_ROD_X - 13.0,
-    carriage.BLOCK_TOP_Y + 7.0,
+    _STIRRUP_TOP_Y + 1.0,
     carriage.PEN_Z_MID,
 )
 

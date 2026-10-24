@@ -152,8 +152,10 @@ SETTINGS_NOTE_WIDTH = 70  # characters
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 DETAIL_LETTER_GAP = 0.001
-# One default-format glyph's width (the measured 2.55 mm per character above).
+# One default-format glyph's width and line height (the measured 2.55 mm per
+# character and 4.53 mm per line above).
 DETAIL_LETTER_WIDTH = 0.00255
+DETAIL_LETTER_HEIGHT = 0.00453
 BOUNDARY_COLOR = 0  # COLORREF black, the outline's colour.
 # Each circled detail's parent view, by the orientation the detail shares with
 # it. A and B are bounded on RIGHT, where the stud and the hanger screw both
@@ -946,17 +948,25 @@ def _mark_detail_boundary(
     adapter.currentModel.EditRebuild3()
     reach = radius * math.sqrt(0.5) + DETAIL_LETTER_GAP
     left = detail.key in LETTERED_LEFT
-    x = centre[0] - reach - DETAIL_LETTER_WIDTH if left else centre[0] + reach
-    box = _label_view(
-        adapter,
-        parent,
-        notes.DETAIL_LETTERS[detail.key],
-        (x, centre[1] + reach),
-        label=label,
+    # Upper left, the letter stands up and left of the circle's 45 degree
+    # point, its lower-right corner there, so the arc, which swings out left
+    # below that point, passes under it (farm run 20261024T122758180Z: a
+    # letter hung DOWN from that point straddled the arc).
+    xy = (
+        (
+            centre[0] - reach - DETAIL_LETTER_WIDTH,
+            centre[1] + reach + DETAIL_LETTER_HEIGHT,
+        )
+        if left
+        else (centre[0] + reach, centre[1] + reach)
     )
-    # Mirrored, the letter's right edge must stay outside the circle's
-    # upper-left 45 degree point, as A's and B's left edges do on the right.
-    if left and box[2] > centre[0] - radius * math.sqrt(0.5):
+    box = _label_view(
+        adapter, parent, notes.DETAIL_LETTERS[detail.key], xy, label=label
+    )
+    if left and (
+        box[2] > centre[0] - radius * math.sqrt(0.5)
+        or math.dist((box[2], box[1]), centre) < radius + DETAIL_LETTER_GAP
+    ):
         raise RuntimeError(f"{label}: letter {box!r} runs into its circle")
     return centre, radius
 
