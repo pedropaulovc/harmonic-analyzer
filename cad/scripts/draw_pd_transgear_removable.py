@@ -50,6 +50,7 @@ from _drawing_dimensions import (
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
@@ -62,6 +63,9 @@ from pd_transgear_removable_spec import (
     TEETH,
     outside_dia,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_removable"]
 PART_STEM = SPEC.artifact_stem
@@ -108,8 +112,31 @@ TOP_KEEP = {
 # The two pin holes share one size: the +Y hole's diameter prints for both.
 # Both holes and the bore are drilled through: the title block's DRILLED
 # HOLES row governs their sizes.
-CALLOUTS_ABOVE = {"PinPosDia": "2X"}
-CALLOUTS_BELOW = {"BoreDiaDim": "DRILL THRU", "PinPosDia": "DRILL THRU"}
+# Each pin centre's band serves the drive pins pressed into the crankshaft
+# and the knob's drive collar, so each location names them: above the +Y
+# text and below the -Y text, each outside the chain.  The plate band serves
+# the chain's axial float on the supplied plate.
+CRANKSHAFT_NUMBER = "MHA-DT-11"
+KNOB_COLLAR_NUMBER = "MHA-PD-22"
+PIN_LOCATION_CALLOUT = f"SLIP FIT OVER PINS IN\n{CRANKSHAFT_NUMBER} / {KNOB_COLLAR_NUMBER}"
+PLATE_CALLOUT = "SUPPLIED PLATE; SETS\nANSI #25 CHAIN FLOAT"
+CALLOUTS_ABOVE = {"PinPosDia": "2X", "PinPosY": PIN_LOCATION_CALLOUT}
+CALLOUTS_BELOW = {
+    "BoreDiaDim": "DRILL THRU",
+    "PinPosDia": "DRILL THRU",
+    "PinNegY": PIN_LOCATION_CALLOUT,
+    "BlankWidth": PLATE_CALLOUT,
+}
+
+# The face and edge views draw the saved T24; each is labelled with it,
+# under the view and flush with its left tip like the configuration views.
+MAIN_VIEW_LABEL = DEFAULT_CONFIG
+_T24_TIP_X = FRONT_CENTER[0] - outside_dia(TEETH[DEFAULT_CONFIG]) * _S / 2000.0
+FRONT_LABEL_XY = (
+    _T24_TIP_X,
+    FRONT_CENTER[1] - outside_dia(TEETH[DEFAULT_CONFIG]) * _S / 2000.0 - 0.010,
+)
+TOP_LABEL_XY = (_T24_TIP_X, TOP_CENTER[1] - PLATE * _S / 2000.0 - 0.008)
 
 # T12 and T18 differ from the T24 only in their teeth, so each is drawn once
 # more as a small edge view of its own configuration, carrying its outside
@@ -276,25 +303,24 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"failed to activate the {label} view {name!r}")
 
 
-def _label_configuration_view(adapter: Any, view: Any, configuration: str) -> None:
-    """Title a configuration view with its configuration and scale.
+def _label_view(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], *, label: str
+) -> None:
+    """Title a view with its configuration (and a configuration view's scale).
 
     A model view has no native label the API can show, so the label is a note
     inserted while the view is ACTIVE: the view owns it and moves with it.
     Read back: the view carries that label exactly once.
     """
-    _activate_view(adapter, view, label=configuration)
-    text = configuration_label(configuration)
-    if add_note(adapter, text, *configuration_label_xy(configuration)) is None:
-        raise RuntimeError(f"failed to add the {configuration} view label")
+    _activate_view(adapter, view, label=label)
+    if add_note(adapter, text, *xy) is None:
+        raise RuntimeError(f"failed to add the {label} view label")
     owned = [
         str(_early_bound(note, "INote").GetText() or "")
         for note in (_early_bound(view, "IView").GetNotes() or ())
     ]
     if owned.count(text) != 1:
-        raise RuntimeError(
-            f"{configuration} view label did not land in its view: {owned!r}"
-        )
+        raise RuntimeError(f"{label} view label did not land in its view: {owned!r}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -382,7 +408,15 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimensions(adapter, curated, DRAWING_REFERENCE_DIMENSIONS)
         _assert_outside_diameter(adapter, curated, configuration)
         annotations += curated
-        _label_configuration_view(adapter, view, configuration)
+        _label_view(
+            adapter,
+            view,
+            configuration_label(configuration),
+            configuration_label_xy(configuration),
+            label=configuration,
+        )
+    _label_view(adapter, front, MAIN_VIEW_LABEL, FRONT_LABEL_XY, label="face")
+    _label_view(adapter, top, MAIN_VIEW_LABEL, TOP_LABEL_XY, label="edge")
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     # Decimal places and bands are part-authored; the sheet proves they

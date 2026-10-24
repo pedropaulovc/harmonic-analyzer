@@ -318,10 +318,11 @@ def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> Non
     assert "DEBUR" not in str(_config.parts("pd-transgear-removable")["finish"]).upper()
 
 
-def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
-    """The holes slip over pins pressed into a host part; the sheet names
-    each host by number.  Hosts are the assemblies' press-fit pairs: MHA-DT-VN-67
-    in the crankshaft, MHA-PD-VN-54 in the knob's drive collar (not the shaft)."""
+def test_the_pin_locations_name_exactly_the_parts_the_drive_pins_press_into() -> None:
+    """The holes slip over pins pressed into a host part; each banded pin
+    location names each host by number.  Hosts are the assemblies' press-fit
+    pairs: MHA-DT-VN-67 in the crankshaft, MHA-PD-VN-54 in the knob's drive
+    collar (not the shaft)."""
     from _interference_contracts import allowed_interference_pairs
 
     pins = {"dt-vn-crank-seat-drive-pin", "pd-vn-transgear-knob-drive-pin"}
@@ -333,7 +334,26 @@ def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
                 hosts |= stems - pins
     assert hosts == {"dt-crankshaft", "pd-transgear-drive-collar"}
     numbers = {_config.parts(host)["number"] for host in hosts}
-    assert set(re.findall(r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])", notes.DRAWING_NOTES)) == numbers
+    number = re.compile(
+        r"MHA-(?!VN-)[A-Z]{2}-(?:[0-9]{2}(?:-TL-(?:[0-9]{2}|VN-[5-9][0-9]))?"
+        r"|VN-[5-9][0-9])(?:-T[0-9]{3})?(?![A-Z0-9-])"
+    )
+    callouts = drawing.CALLOUTS_ABOVE | drawing.CALLOUTS_BELOW
+    for name in ("PinPosY", "PinNegY"):
+        assert set(number.findall(callouts[name])) == numbers, name
+    # The mates print at the band they explain, not in the general notes.
+    assert not number.findall(notes.DRAWING_NOTES)
+
+
+def test_the_plate_band_names_the_chain_it_serves() -> None:
+    callout = (drawing.CALLOUTS_ABOVE | drawing.CALLOUTS_BELOW)["BlankWidth"]
+    assert "ANSI #25 CHAIN" in callout and "SUPPLIED" in callout
+
+
+def test_the_sheet_says_t24_is_drawn_and_what_the_others_share() -> None:
+    assert drawing.MAIN_VIEW_LABEL == spec.DEFAULT_CONFIG
+    shared = "BORE, DRIVE-PIN HOLES AND PLATE SAME ON T12 / T18 / T24."
+    assert shared in notes.DRAWING_NOTES.splitlines()
 
 
 def test_gears_carry_no_frames_or_datums() -> None:
