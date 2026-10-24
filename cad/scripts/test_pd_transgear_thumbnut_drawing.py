@@ -218,6 +218,55 @@ def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypa
         drawing._assert_native_thread(Callout(None))
 
 
+class _NativeTapCallout:
+    """A native hole callout whose resolved rows follow its prefix definition."""
+
+    def __init__(self, *, stale: bool = False) -> None:
+        self.definition = "<hw-threaddesc> - <hw-threadclass> THRU ALL"
+        self.stale = stale
+
+    def IsHoleCallout(self) -> bool:
+        return True
+
+    def SetText(self, part: int, text: str) -> None:
+        assert part == 1
+        self.definition = text
+
+    def GetText(self, part: int) -> str:
+        if part == 5:
+            return self.definition
+        if part == 1:
+            resolved = self.definition.replace("<hw-threaddesc>", "#8-32 UNC")
+            resolved = resolved.replace("<hw-threadclass>", "2B")
+            return resolved + (" - 2B" if self.stale else "")
+        return ""
+
+
+def test_tap_callout_leaves_the_class_to_the_title_block(monkeypatch) -> None:
+    import _hole_callout_thread_class as thread_class
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(thread_class, "_early_bound", lambda value, _kind: value)
+    native = _NativeTapCallout()
+    drawing._omit_thread_class(native)
+    assert native.definition == "<hw-threaddesc> THRU ALL"
+    assert native.GetText(1) == "#8-32 UNC THRU ALL"
+    # Negative control: a callout whose rows still resolve the class refuses.
+    with pytest.raises(RuntimeError, match="still prints its class"):
+        drawing._omit_thread_class(_NativeTapCallout(stale=True))
+
+
+def test_tap_callout_refuses_to_omit_a_nondefault_class(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "TAP_SPEC", SimpleNamespace(thread_class="3B"))
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("a nondefault class must not reach the native edit")
+
+    monkeypatch.setattr(drawing, "omit_title_block_thread_class", forbidden)
+    with pytest.raises(RuntimeError, match="only the title block's default class 2B"):
+        drawing._omit_thread_class(object())
+
+
 def test_the_knurl_puts_crests_on_the_section_plane() -> None:
     """Section A-A is the Front plane: both of its sides must cut a crest, or
     the knurl diameter has no edge to print on."""

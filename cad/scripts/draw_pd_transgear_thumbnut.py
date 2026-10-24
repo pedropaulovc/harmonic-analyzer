@@ -47,6 +47,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _section_axis import position_section_caption
@@ -63,6 +64,7 @@ from pd_transgear_thumbnut_spec import (
     KNURL_CALLOUT,
     OVERALL_LENGTH,
     TAP_DRILL_DIA,
+    TAP_SPEC,
     WAIST_LENGTH,
     THREAD,
 )
@@ -328,6 +330,22 @@ def _assert_native_thread(display: Any) -> None:
         raise RuntimeError(f"thumbnut native thread callout does not carry the source thread: {texts!r}")
 
 
+def _omit_thread_class(display: Any) -> None:
+    """Rule 2: the title block's THREADS row owns class 2B; the native tap
+    variables stay live (draw_dt_cone_swing_platform's pattern).  Run
+    20261024T041438788Z's review gated on the callout restating it."""
+    if TAP_SPEC.thread_class != "2B":
+        raise RuntimeError(
+            "thumbnut tap: only the title block's default class 2B may be "
+            f"omitted, got {TAP_SPEC.thread_class!r}"
+        )
+    omit_title_block_thread_class(display, label="thumbnut #8-32 tap")
+    native = _early_bound(display, "IDisplayDimension")
+    resolved = [str(native.GetText(part) or "") for part in (1, 2, 3, 4)]
+    if any(TAP_SPEC.thread_class in text for text in resolved):
+        raise RuntimeError(f"thumbnut tap callout still prints its class: {resolved!r}")
+
+
 def _place_countersink_angle(adapter: Any, annotations: list[Any]) -> None:
     """Keep the native rear cone/axis arc local and move only its text outboard."""
     name = "CountersinkHalfAngle"
@@ -473,6 +491,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label=f"{THREAD} UNC-2B through thread",
     )
     _assert_native_thread(thread_callout)
+    _omit_thread_class(thread_callout)
 
     return await finalize_drawing(
         adapter,
