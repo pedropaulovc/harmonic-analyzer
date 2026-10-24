@@ -12,10 +12,19 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
+from _supplier_lane import move_supplier_lane
 from _supplier_screw_layout import supplier_screw_margins
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_hub_pin"]
 ITEM = 'CLASS Z MINUS GAUGE PIN, 10.2000 MM, CUT TO 20.0 MM'
+# The Top view's cut-length text, centred on its 6 mm lane, printed across the
+# pin; its line moves 10 mm further out, reserved before the scale fit.
+LANE_SHIFT = 0.010
+SUPPLIER_MARGINS = supplier_screw_margins(
+    part.SUPPLIER_REFERENCE_DIMENSIONS,
+    planes=part.SUPPLIER_REFERENCE_PLANES,
+    sides=part.SUPPLIER_REFERENCE_SIDES,
+) | {"*Top": (0.006 + LANE_SHIFT + 0.021, 0.020, 0.020, 0.020)}
 
 
 def _assert_supplier_bands(displays):
@@ -53,6 +62,8 @@ async def build(adapter) -> dict[str, str]:
             sides=part.SUPPLIER_REFERENCE_SIDES,
             units=part.SUPPLIER_REFERENCE_UNITS,
         )
+        move_supplier_lane(adapter, displays["SupplierCutLength"], views["*Top"],
+                           lane_shift=LANE_SHIFT, label="SupplierCutLength")
         _assert_supplier_bands(displays)
 
         def assert_references():
@@ -74,11 +85,7 @@ async def build(adapter) -> dict[str, str]:
     return await build_purchased_fastener_drawing(
         adapter, SPEC, item=ITEM, cut_to_suit=True,
         supplier_dimensions=supplier_dimensions,
-        supplier_margins=supplier_screw_margins(
-            part.SUPPLIER_REFERENCE_DIMENSIONS,
-            planes=part.SUPPLIER_REFERENCE_PLANES,
-            sides=part.SUPPLIER_REFERENCE_SIDES,
-        ),
+        supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
     )
 
