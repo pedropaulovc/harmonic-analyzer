@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 import sys
+from enum import Enum
 
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
@@ -99,6 +100,13 @@ V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
 V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME
 
 
+class StationAnchor(Enum):
+    """Which dome point ``<prefix>DomeZ`` stations from the head seat."""
+
+    BASE = "base"  # the dome's base, on its land's end face
+    APEX = "apex"  # the dome's apex: the one point the shop can pick up
+
+
 def author_dimension_callouts(adapter) -> None:
     """Write every authored text lane on its source dimension, read it back.
 
@@ -130,15 +138,14 @@ async def _dome(
     rim_r: float,
     rim_drive: str,
     station_drive: str,
-    station_at_apex: bool,
+    station_anchor: StationAnchor,
 ) -> SketchDims:
     """A spherical end on the Right plane (the MHA-DT-17 cap idiom): base on
     the end face at ``u_base``, apex on the axis at ``u_apex``, closed down
     the axis.  The arc runs CCW over its minor lobe, so it starts at the rim
     for a +Z end (apex at smaller u) and at the apex for a -Z end.  Its
-    radius prints as ``<prefix>DomeR``.  ``<prefix>DomeZ`` stations the base
-    from the head seat, or the apex when ``station_at_apex`` (the tip: the
-    one point at that end the shop can pick up)."""
+    radius prints as ``<prefix>DomeR``.  ``<prefix>DomeZ`` stations the
+    ``station_anchor`` point from the head seat."""
     toward_minus_z = u_apex > u_base
     u_centre = u_apex - sphere_r if toward_minus_z else u_apex + sphere_r
     dims = SketchDims()
@@ -188,9 +195,10 @@ async def _dome(
             f"{base}.start", "origin", "horizontal_points"
         ),
     )
-    station_point, station_u = (
-        (f"{close}.start", u_apex) if station_at_apex else (f"{base}.start", u_base)
-    )
+    station_point, station_u = {
+        StationAnchor.BASE: (f"{base}.start", u_base),
+        StationAnchor.APEX: (f"{close}.start", u_apex),
+    }[station_anchor]
     check(
         f"{prefix} dome station",
         await adapter.add_sketch_dimension(
@@ -343,7 +351,7 @@ async def build(adapter) -> dict[str, str]:
         rim_r,
         rim_drive,
         station_drive,
-        station_at_apex,
+        station_anchor,
         v_dome,
     ) in (
         (
@@ -355,7 +363,7 @@ async def build(adapter) -> dict[str, str]:
             R_HEAD,
             '"HeadDia" / 2',
             '"HeadLand"',
-            False,
+            StationAnchor.BASE,
             V_HEAD_DOME,
         ),
         (
@@ -367,7 +375,7 @@ async def build(adapter) -> dict[str, str]:
             R_SHANK,
             '"ShankDia" / 2',
             '"GrooveStation" + "FrontLand" + "TipDomeSag"',
-            True,
+            StationAnchor.APEX,
             V_TIP_DOME,
         ),
     ):
@@ -381,7 +389,7 @@ async def build(adapter) -> dict[str, str]:
             rim_r=rim_r,
             rim_drive=rim_drive,
             station_drive=station_drive,
-            station_at_apex=station_at_apex,
+            station_anchor=station_anchor,
         )
         feature = f"{prefix}DomeProfile"
         await ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")

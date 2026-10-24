@@ -48,7 +48,7 @@ from _drawing_edge_dimensions import add_edge_dimension, assert_dimension_measur
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -216,9 +216,12 @@ def _overall_reference(adapter: Any, side: Any) -> None:
     own text, not an imported part dimension's.
     """
     label = "pin overall length reference"
-    head_apex, tip_apex = (
-        model_point_in_view(adapter, side, (0.0, 0.0, z_mm / 1000.0), label=name)
-        for z_mm, name in ((-HEAD_HEIGHT, "head apex"), (LENGTH, "tip apex"))
+    head_apex, tip_apex = model_points_in_view(
+        adapter,
+        side,
+        ((0.0, 0.0, -HEAD_HEIGHT / 1000.0), (0.0, 0.0, LENGTH / 1000.0)),
+        label=label,
+        names=("head apex", "tip apex"),
     )
     display = add_edge_dimension(
         adapter,
@@ -231,6 +234,13 @@ def _overall_reference(adapter: Any, side: Any) -> None:
         entity_type="SILHOUETTE",
     )
     display = _early_bound(display, "IDisplayDimension")
+    dimension_type = int(display.Type2)
+    # swLinearDimension, swHorLinearDimension: the curved silhouette picks
+    # must still give a length before SystemValue is read as metres.
+    if dimension_type not in (2, 11):
+        raise RuntimeError(
+            f"{label}: expected a linear dimension, got type {dimension_type}"
+        )
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
     measured_mm = abs(float(dimension.SystemValue) * 1000.0)
     if not math.isclose(measured_mm, OVERALL_LENGTH, abs_tol=1e-4):
