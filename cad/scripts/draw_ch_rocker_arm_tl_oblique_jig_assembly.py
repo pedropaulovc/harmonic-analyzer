@@ -2623,10 +2623,14 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                        callouts["upper_rim"], (0.224, 0.155)),
         CaptureReading(2, spec.PIVOT_CAP, roof,
                        callouts["chamber_excess"], (0.365, 0.128)),
+        # The left column stacks C4A (clear of the plan caption), C4 MOUTH,
+        # C5B HEAD and C4 COMMON at least one row pitch apart. Each leader
+        # leaves its bottom row's right end, so the mouth leader passes 2.7 mm
+        # above C5B's longer first row (struck by 0.78 mm at 2056e3344).
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
-                         callouts["mouth"], (x, 0.199),
+                         callouts["mouth"], xy,
                          pick_local_mm=(side * mouth, 0.0, top / 2.0))
-          for side, x in ((-1.0, 0.224), (1.0, 0.365))),
+          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.199)))),
         *(CaptureReading(2, spec.CARRIER, carrier_face(side),
                          callouts["carrier_backing_pin_end" if side > 0.0 else "carrier_backing"],
                          (x, 0.184))
@@ -2636,12 +2640,12 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
                        callouts["pin_end"], (0.305, 0.214)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
-                       callouts["cross_hole"], (0.224, 0.216),
+                       callouts["cross_hole"], (0.224, 0.2145),
                        pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),
         CaptureReading(2, spec.PIVOT_CLEVIS_PIN,
                        (-spec.clevis_pin.CLEVIS_HEAD_HEIGHT, 0.0,
                         -spec.clevis_pin.CLEVIS_HEAD_DIA / 2.0),
-                       callouts["clevis"], (0.224, 0.190)),
+                       callouts["clevis"], (0.224, 0.193)),
         CaptureReading(1, spec.PIVOT_COTTER,
                        (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
                        callouts["cotter"], (0.288, 0.205)),

@@ -700,6 +700,97 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     assert find_leader_leader_crossings(leaders) == []
 
 
+def _captured_left_capture_column(moved: bool, mouth_junction=None):
+    """Native b49db6fb (#1949 proof, source e926afd0c) left capture column:
+    measured PDF rows and COM leaders at the notes' then (0.224, y) points.
+    ``moved`` translates each note's rows and leader junction to its authored
+    point; the physical landing stays. A replay budget, not native proof."""
+    from _layout_geometry import AnnotationGeometry, Box, Segment
+
+    measured = {
+        "C4A UPPER CROSS-HOLE EDGE": (
+            0.216,
+            ((0.224144, 0.2135337, 0.263304, 0.215571),
+             (0.2242293, 0.2105337, 0.2544796, 0.212571)),
+            (0.2545473, 0.2122206, 0.3184239, 0.17925),
+        ),
+        "C4 MOUTH / FLAT LAND": (
+            0.199,
+            ((0.224144, 0.1963203, 0.2538891, 0.198571),
+             (0.2242319, 0.1935337, 0.2556403, 0.195571),
+             (0.22408, 0.1903577, 0.2489821, 0.192571)),
+            (0.2491779, 0.1920641, 0.3183739, 0.1769195),
+        ),
+        "C5B HEAD / SHANK REGIONS": (
+            0.190,
+            ((0.224144, 0.1873203, 0.2605988, 0.189571),
+             (0.2240853, 0.1845337, 0.2507479, 0.186571)),
+            (0.2509223, 0.1860093, 0.3136492, 0.1761163),
+        ),
+        "C4 COMMON SHANK / LAND": (
+            0.184,
+            ((0.224144, 0.1813203, 0.261128, 0.183571),
+             (0.2240347, 0.1785337, 0.2559832, 0.180571),
+             (0.22408, 0.1753577, 0.2489821, 0.177571)),
+            (0.2491779, 0.1768139, 0.3165864, 0.17475),
+        ),
+    }
+    authored = {
+        reading.text.splitlines()[0]: reading.text_xy
+        for reading in drawing.capture_readings()
+        if reading.text_xy[0] == 0.224
+    }
+    notes = [
+        AnnotationGeometry(
+            label="locator caption", kind="note", owner="captured TL-00",
+            text_boxes=(Box(0.224112, 0.2164082, 0.2704386, 0.2199736),),
+        )
+    ]
+    for label, (native_y, rows, leader) in measured.items():
+        dy = authored[label][1] - native_y if moved else 0.0
+        x0, y0 = (mouth_junction if label.startswith("C4 MOUTH") and mouth_junction
+                  else leader[:2])
+        notes.append(AnnotationGeometry(
+            label=label, kind="note", owner="captured TL-00",
+            text_boxes=tuple(Box(row[0], row[1] + dy, row[2], row[3] + dy) for row in rows),
+            segments=(Segment(x0, y0 + dy, leader[2], leader[3], "leader"),),
+        ))
+    return notes
+
+
+def test_capture_left_column_mouth_leader_clears_c5b_head_text():
+    from _layout_audit import (
+        find_leader_through_text, find_merged_blocks, find_text_clearance,
+        find_text_separation,
+    )
+    from _layout_geometry import segment_box_distance
+
+    # 2056e3344's native leaf: the mouth leader left (249.3,191.8) mm and ran
+    # 0.78 mm through C5B's first row; #1949's leaf missed it by 0.04 mm.
+    struck = _captured_capture_sheet(*_captured_left_capture_column(False, (0.2493, 0.1918)))
+    assert any(
+        (finding.kind, finding.a.startswith("C4 MOUTH"), finding.b) ==
+        ("leader-through-text", True, "C5B HEAD / SHANK REGIONS")
+        for finding in find_leader_through_text(struck)
+    )
+    assert find_text_clearance(struck)
+    for junction in (None, (0.2493, 0.1918)):
+        notes = _captured_left_capture_column(True, junction)
+        sheet = _captured_capture_sheet(*notes)
+        assert find_leader_through_text(sheet) == []
+        assert find_text_clearance(sheet) == []
+        assert find_merged_blocks(sheet) == []
+        assert find_text_separation(sheet) == []
+        by_label = {note.label: note for note in notes}
+        mouth = by_label["C4 MOUTH / FLAT LAND"].segments[0]
+        assert segment_box_distance(mouth, by_label["C5B HEAD / SHANK REGIONS"].text_boxes[0]) > 0.002
+        leaders = [
+            LeaderSegment(label=note.label, kind="note", x0=s.x0, y0=s.y0, x1=s.x1, y1=s.y1)
+            for note in notes for s in note.segments
+        ]
+        assert find_leader_leader_crossings(leaders) == []
+
+
 def test_plan_tags_stand_apart_inside_the_sheet() -> None:
     boxes = [_note_box(tag.text, _plan_xy(*tag.text_xy)) for tag in spec.PLAN_TAGS]
     others = (
