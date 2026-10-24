@@ -134,6 +134,21 @@ FACE_FINISHES = {
     ),
 }
 
+# swAnnotationType_e.swCenterMarkSym.  The template centre-marks the face
+# view's bore as it is placed; an unconditional auto_center_marks printed a
+# second identical mark over it (layout audit duplicate-annotation,
+# DetailItem347/348, ENFORCE fix run 1; the draw_dt_pinion_cam_pin
+# precedent), so the sheet adds one only if the template did not, and proves
+# exactly one.
+_CENTER_MARK_ANNOTATION = 13
+
+
+def _center_mark_count(view: Any) -> int:
+    """The view's centre-mark annotations (a bare view answers None)."""
+    return len(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+
 
 def _move_dimension(
     adapter: Any,
@@ -269,8 +284,15 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, side_annotations, SIDE_CALLOUTS)
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
+    if _center_mark_count(end) == 0 and not auto_center_marks(
+        adapter, end, holes=True, size=0.0025
+    ):
         raise RuntimeError("failed to add ASME center mark to the ring face view")
+    found = _center_mark_count(end)
+    if found != 1:
+        raise RuntimeError(
+            f"expected 1 centre mark in the ring face view, found {found}"
+        )
     # The turning axis, picked on the O.D. face above it.
     add_view_centerline(
         adapter,
