@@ -33,11 +33,12 @@ SLOT_DEPTH_LOWER, SLOT_DEPTH_UPPER = printed_deviations(SLOT_DEPTH, 2)
 # The die relief under the head mates with nothing (machinist review
 # 2026-10-23), so its largest size is the die root's: the model value 2.20 is
 # the upper limit, under the die's root so the die cuts full thread up to the
-# flank.  The neck carries the clamp torque and preload, so it also has a
-# lower limit (sm_gooseneck_spring_screw_spec derives its strength): it
-# prints as the native LIMIT band 2.20/2.00.
+# flank.  The neck carries the clamp torque and preload, so it keeps the
+# design's pre-existing floor, 2.15 (the former 2.20 +/-0.05), unchanged here;
+# its strength adequacy is tracked in #1951.  It prints as the native LIMIT
+# band 2.20/2.15.
 RELIEF_DIA = 2.20
-RELIEF_DIA_MIN = 2.00
+RELIEF_DIA_MIN = 2.15
 RELIEF_DIA_LOWER, RELIEF_DIA_UPPER = round(RELIEF_DIA_MIN - RELIEF_DIA, 6), 0.0
 RELIEF_DIA_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 RELIEF_WIDTH = 2.20  # Under-head face to the full-thread flank.

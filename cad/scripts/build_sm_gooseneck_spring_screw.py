@@ -47,7 +47,12 @@ from _sketch import (
 )
 from _sketch_rectangle import define_centered_rectangle
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import (
+    _named_dimension,
+    _named_dimensions,
+    apply_drawing_precision,
+)
+from _drawing_tolerances import _set_tolerance_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -187,7 +192,8 @@ def _limit_band(
 ) -> None:
     """A dimension as a native LIMIT band: SOLIDWORKS prints the upper and
     lower limits, the model value plus each deviation, at the dimension's own
-    places (build_mg_output_fixture._limit_band)."""
+    places (build_mg_output_fixture._limit_band), never fewer than the
+    deviations need (_drawing_tolerances._set_tolerance_precision)."""
     label = f"{name}@{feature}"
     display, dimension = _named_dimension(adapter, feature, name)
     lower, upper = deviations  # native API order, mm
@@ -205,11 +211,9 @@ def _limit_band(
         )
     ):
         raise RuntimeError(f"{label}: LIMIT tolerance readback changed")
-    places = DRAWING_PRECISION_BY_NAME[name]
-    display = _early_bound(display, "IDisplayDimension")
-    display.SetPrecision3(-1, -1, places, -1)
-    if int(display.GetPrimaryTolPrecision2()) != places:
-        raise RuntimeError(f"{label}: LIMIT precision did not persist")
+    places = _set_tolerance_precision(
+        display, deviations, label=label, places=DRAWING_PRECISION_BY_NAME[name]
+    )
     value = float(dimension.SystemValue) * 1000.0
     _telemetry.success(
         f"{label}: LIMIT {value + upper:.{places}f}/{value + lower:.{places}f}"
@@ -222,8 +226,10 @@ def _author_dimension_callouts(adapter) -> None:
     (build_mg_magnifying_bracket._author_dimension_callouts): the drawing
     imports and reads them back, never writing them itself."""
     for feature, callouts in DIMENSION_CALLOUTS.items():
+        # One walk of the feature's dimension tree for all its callouts.
+        resolved = _named_dimensions(adapter, feature, set(callouts))
         for name, text in callouts.items():
-            display, _dimension = _named_dimension(adapter, feature, name)
+            display, _dimension = resolved[name]
             display.SetText(4, text)  # swDimensionTextCalloutBelow
             if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
                 raise RuntimeError(f"{name}@{feature}: callout did not persist")
@@ -548,7 +554,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
     # implements the guidelines`): the relief diameter prints as the LIMIT
-    # band 2.20/2.00, under the die root and above the neck's clamp-torque
+    # band 2.20/2.15, under the die root and at the neck's pre-existing
     # floor; its lead as a single MAX limit, short enough to keep the clamp
     # seat flat inside the thread major.  Every other mark takes the title
     # block's two-place band.

@@ -193,7 +193,7 @@ SIDE_KEEP = {
 # the text stays clear of the under-head and lead extension lines (layout
 # audit of farm run 20261010T190631112Z, 6c56fd769).  Its right end stops
 # short of the tip chamfer's extension lines and the Ø line stays below the
-# thread silhouette.  The block is the stacked 2.20/2.00 limits over the
+# thread silhouette.  The block is the stacked 2.20/2.15 limits over the
 # two-line callout; its widest line, 'CLAMP TORQUE', is estimated from the
 # lead's rendered 2.84 mm per character (farm run 20261024T031009457Z), and
 # its last line ends about 16 mm below the anchor.
