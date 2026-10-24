@@ -1410,6 +1410,7 @@ def _position_register_depth(
     return check_layout
 
 
+@_telemetry.traced("drawing.pivot_block.overall_height_reference")
 def _overall_height_reference(adapter: Any, plan: Any, on_plan: Any) -> None:
     """The body's (72.00) overall, wing face to wing face (rule 10).
 
