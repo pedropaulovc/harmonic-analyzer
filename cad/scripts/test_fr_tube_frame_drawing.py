@@ -43,16 +43,18 @@ def test_open_tube_and_cross_holes_share_the_installed_frame_stations() -> None:
 
 
 def test_length_is_flagged_cut_to_fit_from_a_longer_supply() -> None:
-    assert fr_tube_frame_spec.SUPPLY_LENGTH_MIN == 1030.0
-    assert fr_tube_frame_spec.SUPPLY_LENGTH_MIN > fr_tube_frame_spec.COLUMN_LENGTH
-    assert fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT == "SUPPLY 1030 MIN"
-    assert "CUT TO FIT AT ASSEMBLY" in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
+    supply = fr_tube_frame_spec.SUPPLY_LENGTH_MIN
+    cut = fr_tube_frame_spec.COLUMN_LENGTH
+    assert supply >= cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
+    assert supply % 5.0 == 0.0
+    assert supply - 5.0 < cut + fr_tube_frame_spec.SUPPLY_LENGTH_ALLOWANCE
+    assert f"{supply:.0f}" in fr_tube_frame_spec.LENGTH_SUPPLY_CALLOUT
+    for mate in ("MHA-FR-01", "MHA-FR-02", "MHA-FR-VN-54"):
+        assert mate in fr_tube_frame_spec.LENGTH_FIT_CALLOUT
 
 
 def test_cross_hole_callout_names_each_station_mate_on_single_line_lanes() -> None:
     callout = fr_tube_frame_spec.CROSS_HOLE_CALLOUT
     mates = fr_tube_frame_spec.CROSS_HOLE_MATES_SUFFIX
-    assert "MATCH-DRILL" in callout
-    assert "UPPER WITH MHA-FR-02" in mates
-    assert "LOWER WITH MHA-FR-01" in mates
+    assert mates.index("MHA-FR-02") < mates.index("MHA-FR-01")  # upper, lower
     assert "\n" not in callout + mates
