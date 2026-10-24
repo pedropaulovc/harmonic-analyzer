@@ -44,9 +44,9 @@ KNURL_FLANK_ANGLE_DEG = 90.0
 WAIST_DIA = 11.0
 FLANGE_DIA = 12.4
 OVERALL_LENGTH = 16.1
-# The flange length prints from the faced seat face (drawing-guidelines.md
-# rules 10 and 11); the waist is the remainder between the flange and the
-# head (the 8.7 from the rim), so it does not print.
+# The flange length and the head's rear face print from the faced seat face
+# (drawing-guidelines.md rules 10 and 11), baseline with the overall length;
+# the waist is the remainder between them, so it does not print.
 FLANGE_LENGTH = 5.0
 WAIST_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - FLANGE_LENGTH  # 2.4, not printed
 # Dished front face: a conical recess from the rim's Ø down to a flat floor,
@@ -148,11 +148,12 @@ FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + TAP_DRILL_DIA / 2.0
 
 # --- Places each printed dimension carries (drawing-guidelines.md rule 3 (decimal places carry the tolerance), contract §12) ----
 # The diameters over the thread at .XX (walls); the overall length, the
-# knurl, the head length, the flange length and the dish at .X.  The stud is
+# knurl, the head's rear face and the flange length (both from the seat
+# face) and the dish at .X.  The stud is
 # cut to fit the nut's rim at assembly, so the engagement stack takes the
 # shortest .X nut (pd_transgear_drive_collar_spec.thumbnut_engagement).
 HEAD_DIA_PLACES = 1
-HEAD_LENGTH_PLACES = 1
+HEAD_REAR_Y_PLACES = 1
 OVERALL_LENGTH_PLACES = 1
 FLANGE_DIA_PLACES = 2
 FLANGE_LENGTH_PLACES = 1
@@ -166,7 +167,8 @@ WALL_FLOOR = 2.0
 _TAP_OVERSIZE_R = 0.025
 
 _HEAD_LO, _ = printed_deviations(HEAD_DIA, HEAD_DIA_PLACES)
-_HEAD_LEN_LO, _ = printed_deviations(HEAD_LENGTH, HEAD_LENGTH_PLACES)
+_HEAD_REAR_LO, _HEAD_REAR_HI = printed_deviations(HEAD_REAR_Y, HEAD_REAR_Y_PLACES)
+_FLANGE_LEN_LO, _FLANGE_LEN_HI = printed_deviations(FLANGE_LENGTH, FLANGE_LENGTH_PLACES)
 _WAIST_LO, _ = printed_deviations(WAIST_DIA, WAIST_DIA_PLACES)
 _FLANGE_LO, _ = printed_deviations(FLANGE_DIA, FLANGE_DIA_PLACES)
 _DISH_LO, _ = printed_deviations(DISH_DIA, DISH_DIA_PLACES)
@@ -197,7 +199,9 @@ WALLS: dict[str, tuple[float, float]] = {
     ),
     "dish floor to the head's rear face": (
         HEAD_LENGTH - DISH_DEPTH,
-        (HEAD_LENGTH + _HEAD_LEN_LO) - (DISH_DEPTH + _DISH_DEPTH_HI),
+        (OVERALL_LENGTH + OVERALL_LENGTH_LO)
+        - (HEAD_REAR_Y + _HEAD_REAR_HI)
+        - (DISH_DEPTH + _DISH_DEPTH_HI),
     ),
 }
 for _name, (_nominal, _worst) in WALLS.items():
@@ -206,6 +210,16 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"MHA-PD-13 {_name} wall {_worst:.3f} at the printed worst case is "
             f"under the {WALL_FLOOR} floor"
         )
+
+# The Ø11 waist keeps a real length at every printed corner: the head's rear
+# face at its lowest and the flange's shoulder at its highest, both read
+# from the seat face (codjiflo on 11fe6c440: chained from the rim's 8.7 and
+# the seat's 5.0, the waist could close to nothing).
+WAIST_LENGTH_WORST = (HEAD_REAR_Y + _HEAD_REAR_LO) - (FLANGE_LENGTH + _FLANGE_LEN_HI)
+if WAIST_LENGTH_WORST <= 0.0:
+    raise AssertionError(
+        f"MHA-PD-13 waist closes to {WAIST_LENGTH_WORST:.3f} at the printed worst case"
+    )
 
 
 def dish_floor_margins(
@@ -262,12 +276,12 @@ KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
 
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity-policy.md `How the repository implements the guidelines`).  The head profile carries the knurl
-# diameter, the head length and the overall length from the seat face; the
-# stem profile the flange and waist diameters and the flange length from the
-# seat face (the waist length is the remainder); the dish its rim and floor
-# diameters and its depth from the rim's edge to the floor's.
+# diameter and, from the seat face, the head's rear face and the overall
+# length; the stem profile the flange and waist diameters and the flange
+# length from the seat face (the waist length is the remainder); the dish its
+# rim and floor diameters and its depth from the rim's edge to the floor's.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDia", "HeadLength", "OverallLength"},
+    "HeadProfile": {"HeadDia", "HeadRearY", "OverallLength"},
     "StemProfile": {"FlangeDia", "WaistDia", "FlangeLength"},
     "DishProfile": {"DishDia", "DishFloorDia", "DishDepth"},
     "CountersinkProfile": {"CountersinkDia", "CountersinkHalfAngle"},
@@ -275,7 +289,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {
         "HeadDia": HEAD_DIA_PLACES,
-        "HeadLength": HEAD_LENGTH_PLACES,
+        "HeadRearY": HEAD_REAR_Y_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
     },
     "StemProfile": {

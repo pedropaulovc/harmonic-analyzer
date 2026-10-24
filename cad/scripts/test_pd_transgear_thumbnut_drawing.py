@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import importlib.util
+from enum import Enum
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -218,12 +219,19 @@ def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypa
         drawing._assert_native_thread(Callout(None))
 
 
+class _Readback(Enum):
+    """How the fake callout's resolved rows read back after the edit."""
+
+    FOLLOWS_DEFINITION = "follows"
+    KEEPS_CLASS = "keeps"
+
+
 class _NativeTapCallout:
     """A native hole callout whose resolved rows follow its prefix definition."""
 
-    def __init__(self, *, stale: bool = False) -> None:
+    def __init__(self, readback: _Readback = _Readback.FOLLOWS_DEFINITION) -> None:
         self.definition = "<hw-threaddesc> - <hw-threadclass> THRU ALL"
-        self.stale = stale
+        self.readback = readback
 
     def IsHoleCallout(self) -> bool:
         return True
@@ -238,7 +246,9 @@ class _NativeTapCallout:
         if part == 1:
             resolved = self.definition.replace("<hw-threaddesc>", "#8-32 UNC")
             resolved = resolved.replace("<hw-threadclass>", "2B")
-            return resolved + (" - 2B" if self.stale else "")
+            if self.readback is _Readback.KEEPS_CLASS:
+                resolved += " - 2B"
+            return resolved
         return ""
 
 
@@ -253,7 +263,7 @@ def test_tap_callout_leaves_the_class_to_the_title_block(monkeypatch) -> None:
     assert native.GetText(1) == "#8-32 UNC THRU ALL"
     # Negative control: a callout whose rows still resolve the class refuses.
     with pytest.raises(RuntimeError, match="still prints its class"):
-        drawing._omit_thread_class(_NativeTapCallout(stale=True))
+        drawing._omit_thread_class(_NativeTapCallout(_Readback.KEEPS_CLASS))
 
 
 def test_tap_callout_refuses_to_omit_a_nondefault_class(monkeypatch) -> None:
@@ -508,23 +518,55 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
     assert _section_station(seat_y - 0.014) < 0.0
 
 
-def test_lengths_read_from_the_faced_ends() -> None:
+def test_lengths_read_from_the_seat_face() -> None:
     """Machinist review: the 2.4 waist chained off the head's 8.7 shoulder.
-    The flange length reads from the faced seat face, the head length from
-    the rim; the waist is their remainder and does not print."""
+    The flange length and the head's rear face read from the faced seat face,
+    baseline with the overall length; the waist is their remainder and does
+    not print."""
+    assert spec.DRAWING_DIMENSIONS["HeadProfile"] == {"HeadDia", "HeadRearY", "OverallLength"}
     stem = spec.DRAWING_DIMENSIONS["StemProfile"]
     assert "FlangeLength" in stem and "WaistLength" not in stem
-    assert spec.FLANGE_LENGTH == 5.0
-    assert spec.WAIST_LENGTH == pytest.approx(2.4)
-    assert spec.HEAD_LENGTH + spec.WAIST_LENGTH + spec.FLANGE_LENGTH == pytest.approx(
-        spec.OVERALL_LENGTH
-    )
-    x, y = drawing.SECTION_KEEP["FlangeLength"]
-    assert x < drawing._section_x(-spec.HEAD_DIA / 2.0)
-    assert 0.0 < _section_station(y) < spec.FLANGE_LENGTH
+    assert (spec.FLANGE_LENGTH, spec.HEAD_REAR_Y) == pytest.approx((5.0, 7.4))
+    assert spec.HEAD_REAR_Y - spec.FLANGE_LENGTH == pytest.approx(spec.WAIST_LENGTH)
+    # Two left lanes, the flange inner and the head's rear face outer, each
+    # text inside its own span from the seat.
+    for name, top, lane in (
+        ("FlangeLength", spec.FLANGE_LENGTH, 0.016),
+        ("HeadRearY", spec.HEAD_REAR_Y, 0.026),
+    ):
+        x, y = drawing.SECTION_KEEP[name]
+        assert x == pytest.approx(drawing._section_x(-spec.HEAD_DIA / 2.0) - lane)
+        assert 0.0 < _section_station(y) < top
     # Run 20261024T025840809Z: an outside arrow hung below the seat into
-    # the cone diameter's "max."; the 15 mm span holds its arrows inside.
-    assert drawing.ARROWS_INSIDE == ("FlangeLength",)
+    # the cone diameter's "max."; both spans hold their arrows inside.
+    assert drawing.ARROWS_INSIDE == ("FlangeLength", "HeadRearY")
+
+
+def test_the_waist_keeps_a_length_at_every_printed_corner(monkeypatch) -> None:
+    """codjiflo on 11fe6c440: 16.1, 8.7 from the rim and 5.0 from the seat,
+    each ±0.8, let the waist close to 0. From the seat, the head's rear face
+    at its lowest stands 0.8 above the flange's shoulder at its highest."""
+    band = printed_band_mm(1)
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(
+        (spec.HEAD_REAR_Y - band) - (spec.FLANGE_LENGTH + band)
+    )
+    assert spec.WAIST_LENGTH_WORST == pytest.approx(0.8)
+    # Negative control: the 11fe6c440 scheme's corner.
+    assert (spec.OVERALL_LENGTH - band) - (spec.HEAD_LENGTH + band) - (
+        spec.FLANGE_LENGTH + band
+    ) == pytest.approx(0.0, abs=1e-9)
+    # The spec's own gate refuses a printed row wide enough to close the
+    # waist (one-place bands 1.7x wider; the walls still hold first).
+    import _printed_tolerance
+
+    real = _printed_tolerance.printed_deviations
+
+    def wider(nominal: float, places: int) -> tuple[float, float]:
+        lo, hi = real(nominal, places)
+        return (lo * 1.7, hi * 1.7) if places == 1 else (lo, hi)
+
+    with pytest.raises(AssertionError, match="waist closes"):
+        _thumbnut_spec_with(monkeypatch, _printed_tolerance, "printed_deviations", wider)
 
 
 def test_the_section_caption_hangs_below_the_cone_diameter() -> None:

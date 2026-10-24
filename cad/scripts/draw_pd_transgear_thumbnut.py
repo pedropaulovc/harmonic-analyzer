@@ -60,7 +60,7 @@ from pd_transgear_thumbnut_spec import (
     DRAWING_PRECISION_BY_NAME,
     FLANGE_LENGTH,
     HEAD_DIA,
-    HEAD_LENGTH,
+    HEAD_REAR_Y,
     KNURL_CALLOUT,
     OVERALL_LENGTH,
     TAP_DRILL_DIA,
@@ -116,10 +116,11 @@ def _section_y(model_y_mm: float) -> float:
 
 # The rim's diameters stack above it (knurl outermost, the dish floor
 # innermost, so each one's extension lines stay inside the next one's) with
-# only air below their extension lines; the lengths stand off the right
-# (head, overall) and the left (dish depth, and the flange from the seat
-# face, arrows inside) of the silhouette; the waist length is the
-# remainder and does not print.  The
+# only air below their extension lines; the overall length stands off the
+# right of the silhouette and the dish depth off the left.  The flange
+# length (inner lane) and the head's rear face (outer lane) read from the
+# seat face on the left, baseline with the overall length, arrows inside;
+# the waist length is the remainder and does not print.  The
 # dish depth's text stands above its rim extension line: at 3:1 the depth is
 # shorter than the text is tall.  The waist and the flange are dimensioned
 # across their own cut, each dimension line at its feature's height and its
@@ -135,9 +136,9 @@ SECTION_KEEP = {
         _section_x(-HEAD_DIA / 2.0) - 0.016,
         _section_y(OVERALL_LENGTH) + 0.004,
     ),
-    "HeadLength": (
-        _section_x(HEAD_DIA / 2.0) + 0.014,
-        _section_y(OVERALL_LENGTH - HEAD_LENGTH / 2.0),
+    "HeadRearY": (
+        _section_x(-HEAD_DIA / 2.0) - 0.026,
+        _section_y(HEAD_REAR_Y / 2.0),
     ),
     "OverallLength": (_section_x(HEAD_DIA / 2.0) + 0.032, SECTION_CENTER[1]),
     "FlangeLength": (
@@ -153,10 +154,10 @@ SECTION_KEEP = {
     "CountersinkHalfAngle": (_section_x(CSK_DIA / 2.0 + 0.6), _section_y(-0.6)),
 }
 COUNTERSINK_ANGLE_TEXT_XY = (0.264, _section_y(0.0) - 0.008)
-# The flange length's span holds its text and arrows: inside, so no arrow
+# The baseline lengths' spans hold their text and arrows: inside, so no arrow
 # hangs below the seat face into the cone diameter's "max." (run
 # 20261024T025840809Z).
-ARROWS_INSIDE = ("FlangeLength",)
+ARROWS_INSIDE = ("FlangeLength", "HeadRearY")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 # The native caption's top centre.  The cone diameter's dimension line runs
 # under its below-callout, 13.5 mm under the seat face (run

@@ -8,8 +8,8 @@ Layout (part frame, ``pd_transgear_thumbnut_spec``): axis local +Y (``Axis1``),
 seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
 
 * ``HeadProfile``: the knurled head as a plain Front-plane rectangle revolved
-  about +Y.  Its driving dimensions are the knurl diameter, the head length
-  and the overall length from the seat face.
+  about +Y.  Its driving dimensions are the knurl diameter and, from the
+  seat face, the head's rear face and the overall length.
 * ``Knurl``: one straight flute cut from a Top-plane seed, circular-patterned
   ``KNURL_TEETH`` times about ``Axis1``.  It comes BEFORE the stem: circular
   patterns of cuts fail on stepped revolved bodies but pattern fine on a
@@ -254,11 +254,18 @@ async def build(adapter) -> dict[str, str]:
         "HeadDia",
     )
     head.record("HeadDia", '"HeadDia"')
-    check(
-        "head length",
-        await adapter.add_sketch_dimension(head_lines[1], None, "linear", HEAD_LENGTH),
+    # The head's rear face from the seat face (the sketch origin), baseline
+    # with the overall length and the flange length: the waist between them
+    # keeps a real length at every printed corner.
+    await dimension_between(
+        adapter,
+        f"{head_lines[1]}.start",
+        "origin",
+        "vertical_distance",
+        HEAD_REAR_Y,
+        "head rear face from the seat face",
     )
-    head.record("HeadLength", '"HeadLength"')
+    head.record("HeadRearY", '"OverallLength" - "HeadLength"')
     # Overall length: the rim's outer corner from the seat face (the sketch
     # origin), the one axial dimension the stud's cut-to-fit rides on.
     await dimension_between(
