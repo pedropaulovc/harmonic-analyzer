@@ -701,7 +701,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
     assert spec["material"] == rod.MATERIAL == "Plain Carbon Steel"
     assert spec["material_specification"] == "AISI 1018 low-carbon steel plate"
     assert spec["finish"] == (
-        "BLACK ENAMEL; MASK STRAP BORE, RING AND SHANK FACES, PIN HOLE AND FORK SLOT; "
+        "BLACK ENAMEL; MASK BORE, PLATE FACES, PIN HOLE AND FORK SLOT; "
         "OIL BARE MACHINED SURFACES"
     )
     assert int(spec["quantity"]) == 20
