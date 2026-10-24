@@ -44,7 +44,7 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
 
 
 def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
-    """The ground shank (running fit and arm press) and the groove's
+    """The turned shank (running fit and arm press) and the groove's
     catalogue Ø and width carry native bands; the groove station prints .XXX,
     the two lands .XX, and every other size its places under the title
     block."""
@@ -129,6 +129,36 @@ def test_the_functional_station_runs_from_the_head_seat_to_the_load_wall() -> No
     assert drawing.LOAD_WALL_X < drawing.GROOVE_REAR_X < drawing.SEAT_X
 
 
+def test_the_three_place_station_names_the_stack_it_sets() -> None:
+    """Rule 4: a .XXX size with a function names it.  The front bushing is
+    faced to fit over the station's band."""
+    import transgear_cluster_fit as fit
+
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["GrooveStation"]
+    assert callout == spec.GROOVE_STATION_CALLOUT
+    assert "LOAD WALL" in callout and spec.FRONT_BUSHING_NUMBER in callout
+    assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
+    assert (
+        "MHA-PD-23 groove station",
+        spec.GROOVE_STATION,
+        spec.GROOVE_STATION_BAND,
+        1,
+    ) in fit.FRONT_CHAIN_TERMS
+
+
+def test_the_dome_heights_and_the_overall_print_as_references() -> None:
+    """Rule 10: the overall and both dome heights read off the sheet, as
+    references the radii and lands already set."""
+    assert spec.REFERENCE_DIMENSIONS == {"HeadDomeSagDim", "TipDomeSagDim"}
+    assert spec.REFERENCE_DIMENSIONS <= set(drawing.SIDE_KEEP)
+    assert spec.DRAWING_PRECISION["HeadDomeProfile"]["HeadDomeSagDim"] == 1
+    assert spec.DRAWING_PRECISION["TipDomeProfile"]["TipDomeSagDim"] == 1
+    assert spec.OVERALL_LENGTH == pytest.approx(53.75)
+    assert spec.OVERALL_LENGTH_PLACES == 2
+    # The overall's row stands under the station's callout.
+    assert drawing.OVERALL_TEXT_XY[1] < drawing.SIDE_KEEP["GrooveStation"][1] - 0.020
+
+
 def test_the_shank_carries_the_one_machined_finish() -> None:
     (shank,) = spec.SURFACE_FINISHES
     assert shank.key == "journal"
@@ -143,15 +173,21 @@ def test_notes_fit_the_sheet_limits() -> None:
     assert all(len(line) <= 70 for line in lines)
 
 
-def test_the_note_names_the_press_the_shank_band_sets() -> None:
+def test_the_shank_callout_names_both_fits_its_band_sets() -> None:
     """The 0/-0.008 shank against the arm's +0.008/0 ream: smallest pin in
-    the largest ream and the reverse.  The finish field says ground, so the
-    notes do not."""
+    the largest ream and the reverse, flagged at the Ø it serves (rule 4),
+    with the bores that run on it, so the Ra 1.6 reads as their bearing
+    surface (rule 6).  The general notes no longer carry the fit."""
     loosest = spec.DIA_MIN - arm.PIN_BORE_DIA_MAX
     tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
     assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
     assert (loosest, tightest) == pytest.approx((0.010, 0.026))
-    assert f"{loosest:.3f}-{tightest:.3f} DIAMETRAL INTERFERENCE" in spec.DRAWING_NOTES
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["ShankDia"]
+    assert callout == spec.SHANK_CALLOUT
+    assert f"PRESS FIT IN {spec.ARM_NUMBER} REAM" in callout
+    assert f"{loosest:.3f}-{tightest:.3f} DIAMETRAL INTERFERENCE" in callout
+    assert all(number in callout for number in spec.RUNNING_MATES)
+    assert "INTERFERENCE" not in spec.DRAWING_NOTES
     assert "GROUND" not in spec.DRAWING_NOTES
 
 
@@ -161,6 +197,9 @@ def test_registry_row_is_the_turned_steel_mha_179() -> None:
     assert int(row["quantity"]) == 1
     assert row["material"] == part.MATERIAL
     assert row["tolerance_class"] == "machined_block"
+    # No grinding is assumed (rule 4): the shank is turned to its band.
+    assert row["finish"] == "oiled"
+    assert "grind" not in row["process"]
 
 
 def _calls(path: str) -> dict[str, ast.Call]:

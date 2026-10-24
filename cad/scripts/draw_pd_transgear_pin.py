@@ -1,17 +1,18 @@
 r"""Create the MHA-PD-23 transgear pin manufacturing drawing.
 
 The SLDPRT remains authoritative.  A turned pin carries no datum and no
-geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the ground shank keeps its native
-fit band and one bearing-surface finish, the MHA-PD-VN-61 ring groove its
-catalogue Ø and width bands, and every other size is an ordinary model
-dimension at its part-authored places.
+geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): the turned shank keeps its native
+fit band, named at its Ø with both fits it serves, and one bearing-surface
+finish, the MHA-PD-VN-61 ring groove its catalogue Ø and width bands, and
+every other size is an ordinary model dimension at its part-authored places.
 
 The pin axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the domed tip on the
 left and the head on the right.  Every feature is visible, so the side view
 removes hidden lines.  The head's underside (its seat on the MHA-PD-18 arm) is
 the one origin: the groove's load wall, the pin's functional station, is
-dimensioned from it, and the head land runs back from it.
+dimensioned from it, and the head land runs back from it.  The dome heights
+and the apex-to-tip overall print as references.
 
 Run with SolidWorks open::
 
@@ -24,9 +25,10 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 from _check import check
+from _com import _early_bound
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -35,12 +37,20 @@ from _drawing_common import (
     read_required_properties,
     stamp_drawing_summary,
 )
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    set_arc_endpoints_to_max,
+    set_dimension_callouts,
+    set_reference_dimension,
+)
+from _drawing_edge_dimensions import add_edge_dimension
 from _drawing_finish import add_surface_finish
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -53,12 +63,19 @@ from pd_transgear_pin_spec import (
     GROOVE_CALLOUT,
     GROOVE_REAR_STATION,
     GROOVE_STATION,
+    GROOVE_STATION_CALLOUT,
     HEAD_DIA,
     HEAD_HEIGHT,
     HEAD_LAND,
     LENGTH,
+    OVERALL_LENGTH,
+    OVERALL_LENGTH_PLACES,
+    REFERENCE_DIMENSIONS,
+    SHANK_CALLOUT,
     SURFACE_FINISHES,
 )
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_pin"]
 PART_STEM = SPEC.artifact_stem
@@ -107,11 +124,15 @@ SHANK_MID_X = (SEAT_X + GROOVE_REAR_X) / 2.0
 HEAD_LAND_MID_X = (HEAD_BACK_X + SEAT_X) / 2.0
 
 # One axial row under the profile: the functional station (head seat to the
-# groove's load wall), the front land off that wall, and the head land off
-# the seat with its text right of the head.  The groove width hangs between
-# the row and the profile, its text toward the head, clear of the station's
-# extension lines.  The diameters stand above the profile, each on its own
-# section; the groove Ø carries the ring's name above its value.
+# groove's load wall, naming the stack it sets), the front land off that
+# wall, and the head land off the seat with its text right of the head.  The
+# reference overall runs apex to tip in a second row below the station's
+# callout.  The groove width hangs between the row and the profile, its text
+# toward the head, clear of the station's extension lines; the head dome's
+# reference height sits at the same height right of the head.  The diameters
+# stand above the profile, each on its own section: the shank Ø's three-line
+# fit callout under its value, the groove Ø above it with the ring's name
+# above its value.  The tip dome's reference height stands above the tip.
 _ROW_Y = SIDE_CENTER[1] - 0.030
 SIDE_KEEP = {
     "GrooveStation": ((SEAT_X + LOAD_WALL_X) / 2.0, _ROW_Y),
@@ -119,16 +140,25 @@ SIDE_KEEP = {
     "HeadLand": (HEAD_APEX_X + 0.010, _ROW_Y),
     "GrooveWidth": (GROOVE_MID_X + 0.016, SIDE_CENTER[1] - 0.016),
     "HeadDia": (HEAD_LAND_MID_X, HEAD_TOP_Y + 0.010),
-    "ShankDia": (SHANK_MID_X, SHANK_TOP_Y + 0.012),
-    # High enough that its shoulder, as wide as the ring callout, runs over
-    # the shank Ø's +0.000 (at +0.020 the shoulder ended under it).
-    "GrooveDia": (GROOVE_MID_X, SHANK_TOP_Y + 0.028),
+    # Left of the shank's middle, so the callout under the value ends short
+    # of the head Ø, and high enough that it clears the Ra symbol below it.
+    "ShankDia": (SHANK_MID_X - 0.034, SHANK_TOP_Y + 0.046),
+    # Above the shank Ø's whole block: its shoulder, as wide as the ring
+    # callout, runs over the shank Ø's +0.000.
+    "GrooveDia": (GROOVE_MID_X, SHANK_TOP_Y + 0.068),
     "HeadDomeR": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] + 0.006),
+    "HeadDomeSagDim": (HEAD_APEX_X + 0.012, SIDE_CENTER[1] - 0.016),
     "TipDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
+    "TipDomeSagDim": (TIP_X - 0.012, SIDE_CENTER[1] + 0.016),
 }
 # One line only: SolidWorks keeps an above-callout holding a line break but
 # never prints it (drive collar, farm run 20261001T151531763Z).
 DIMENSION_CALLOUTS_ABOVE = {"GrooveDia": GROOVE_CALLOUT}
+DIMENSION_CALLOUTS_BELOW = {
+    "ShankDia": SHANK_CALLOUT,
+    "GrooveStation": GROOVE_STATION_CALLOUT,
+}
+OVERALL_TEXT_XY = (SIDE_CENTER[0], _ROW_Y - 0.024)
 # The shank's upper silhouette, between the shank Ø's tolerance stack and the
 # head Ø (at 30 mm left of the seat its leader touched the -0.008).
 FINISH_PICK = (SEAT_X - 0.015, SHANK_TOP_Y)
@@ -145,6 +175,54 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
     if broken:
         raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
     return callouts
+
+
+def _mark_reference_dimensions(adapter: Any, annotations: list[Any]) -> None:
+    """Parenthesize the dome heights: each follows from its radius and rim."""
+    marked = set()
+    for annotation in annotations:
+        name = dimension_name(adapter, annotation)
+        if name in REFERENCE_DIMENSIONS:
+            set_reference_dimension(adapter, annotation, label=f"{name} reference")
+            marked.add(name)
+    if marked != REFERENCE_DIMENSIONS:
+        missing = sorted(REFERENCE_DIMENSIONS - marked)
+        raise RuntimeError(f"reference dimensions not on the side view: {missing}")
+
+
+def _overall_reference(adapter: Any, side: Any) -> None:
+    """The (53.75) overall, head apex to tip apex (rule 10), for the bar cut."""
+    label = "pin overall length reference"
+    head_apex, tip_apex = (
+        model_point_in_view(adapter, side, (0.0, 0.0, z_mm / 1000.0), label=name)
+        for z_mm, name in ((-HEAD_HEIGHT, "head apex"), (LENGTH, "tip apex"))
+    )
+    display = add_edge_dimension(
+        adapter,
+        side,
+        p0=tip_apex,
+        p1=head_apex,
+        text_xy=OVERALL_TEXT_XY,
+        label=label,
+        orientation="horizontal",
+        entity_type="SILHOUETTE",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_LENGTH) > 1e-4:
+        # A pick on a dome may resolve to its centre; the overall runs to
+        # each apex, the arcs' far extremes.
+        set_arc_endpoints_to_max(adapter, display, label=label)
+        measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_LENGTH) > 1e-4:
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {OVERALL_LENGTH:g}"
+        )
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(OVERALL_LENGTH_PLACES, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != OVERALL_LENGTH_PLACES:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -183,7 +261,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Pin Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear pin; turned and ground steel; ring groove",
+            3: "transgear pin; turned steel; ring groove",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -207,6 +285,9 @@ async def build(adapter: Any) -> dict[str, str]:
         _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
         location="above",
     )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_BELOW)
+    _mark_reference_dimensions(adapter, annotations)
+    _overall_reference(adapter, side)
 
     add_view_centerline(
         adapter,

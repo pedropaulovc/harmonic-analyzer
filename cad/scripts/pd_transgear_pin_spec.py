@@ -29,6 +29,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 PIN_NUMBER = "MHA-PD-23"
 ARM_NUMBER = "MHA-PD-18"
 RING_NUMBER = "MHA-PD-VN-61"
+FRONT_BUSHING_NUMBER = "MHA-PD-25"
+# The sleeve and the two bushings, rear to front order on the shank.
+RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 
 # The head seats on the arm's rear face.
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
@@ -36,9 +39,9 @@ HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116
 # --- Shank: the running journal and the press in the arm -----------------------
 # The sleeve and both bushings run on it (their bores Ø3.900 +0.030/+0.012,
 # 0.012..0.038 diametral); the arm's REAM Ø3.874 +0.008/0 holds it by a
-# 0.010..0.026 press (``pd_transgear_arm_geometry``), named on this sheet.
+# 0.010..0.026 press (``pd_transgear_arm_geometry``), named at the shank Ø.
 DIA = 3.900
-DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, ground
+DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, turned
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 3
@@ -111,6 +114,8 @@ SURFACE_FINISHES = (
 )
 
 # --- Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
+# Each dome prints its radius and, as a reference, its height off the land's
+# end face, so the blank and the dome read without deriving the cap.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",
@@ -121,8 +126,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "GrooveWidth",
         "FrontLand",
     },
-    "HeadDomeProfile": {"HeadDomeR"},
-    "TipDomeProfile": {"TipDomeR"},
+    "HeadDomeProfile": {"HeadDomeR", "HeadDomeSagDim"},
+    "TipDomeProfile": {"TipDomeR", "TipDomeSagDim"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -134,9 +139,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "GrooveWidth": 3,
         "FrontLand": FRONT_LAND_PLACES,
     },
-    "HeadDomeProfile": {"HeadDomeR": 1},
-    "TipDomeProfile": {"TipDomeR": 1},
+    "HeadDomeProfile": {"HeadDomeR": 1, "HeadDomeSagDim": 1},
+    "TipDomeProfile": {"TipDomeR": 1, "TipDomeSagDim": 1},
 }
+# The dome heights follow from each radius on its land's Ø: reference only.
+REFERENCE_DIMENSIONS = frozenset({"HeadDomeSagDim", "TipDomeSagDim"})
+# The overall, apex to tip, a drawing reference for the bar cut (rule 10).
+OVERALL_LENGTH_PLACES = 2
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -176,15 +185,24 @@ for _ok, _what in (
 # The ring the groove takes, named once above the groove Ø (one line: an
 # above-callout holding a line break never prints).
 GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
-# The shank's band sets the press in the arm's ream: the note names it, so
-# the 0.008 band reads as the fit it is (review of 6de7230aa).  The finish
-# field already says ground.
+# The shank's band names its two fits at the Ø (rule 4, review of
+# 6de7230aa and the 2026-10-23 ENFORCE review): the press in the arm's ream
+# and the running bores whose bearing surface the Ra 1.6 marks.
+SHANK_CALLOUT = "\n".join(
+    (
+        f"PRESS FIT IN {ARM_NUMBER} REAM,",
+        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} "
+        "DIAMETRAL INTERFERENCE;",
+        f"RUNS IN {', '.join(RUNNING_MATES)}",
+    )
+)
+# The .XXX station names the stack it sets: the front bushing is faced to
+# fit over its band (``transgear_cluster_fit``).
+GROOVE_STATION_CALLOUT = f"TO RING LOAD WALL;\nSETS {FRONT_BUSHING_NUMBER} FACED LENGTH"
 DRAWING_NOTES = "\n".join(
     (
         "1/4 IN BAR STOCK OK.",
         f"PRESSED INTO {ARM_NUMBER} FROM THE REAR UNTIL THE HEAD SEATS.",
-        f"SHANK TO {ARM_NUMBER} REAM: {PRESS_INTERFERENCE[0]:.3f}-"
-        f"{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL INTERFERENCE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

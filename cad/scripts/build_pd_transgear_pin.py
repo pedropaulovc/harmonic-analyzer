@@ -6,7 +6,7 @@ from the rear.  Dimensions and the derived fit facts live in
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø5.0 head land, the Ø3.900 ground shank, the MHA-PD-VN-61 ring
+the rear: the Ø5.0 head land, the Ø3.900 turned shank, the MHA-PD-VN-61 ring
 groove (its FRONT wall, the load wall, at ``GROOVE_STATION`` from the seat)
 and the plain land in front of it.  The two spherical ends are separate
 revolves on the same plane.  The named plane ``GrooveLoadWall`` and
@@ -232,7 +232,7 @@ async def build(adapter) -> dict[str, str]:
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     # The land in front of the groove is the same Ø3.900 cylinder as the
-    # shank: collinear with it (one ground diameter, one dimension), not a
+    # shank: collinear with it (one turned diameter, one dimension), not a
     # second horizontal with its own Ø.
     front_land_index = 7
     for index, line in enumerate(lines):
@@ -394,7 +394,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
     await bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the ground shank (the running fit and
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the turned shank (the running fit and
     # the press in the arm) and the ring groove's catalogue Ø and width.  The
     # groove station and the front land print .XXX and the title block governs
     # them.
