@@ -344,6 +344,44 @@ def test_release_stage_refuses_changed_nondefault_shared_member(
         export_models.stage_release_neutral(tmp_path / "stage")
 
 
+class _MemberDoc:
+    def __init__(self, native):
+        configurations = _SHARED_MEMBERS[native.stem.replace("-", "_")]
+        self.names = [entry[0] for entry in configurations]
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=self.names[0]),
+        )
+
+    def ShowConfiguration2(self, configuration):
+        assert configuration in self.names
+        self.ConfigurationManager.ActiveConfiguration.Name = configuration
+        return True
+
+    def ForceRebuild3(self, _top_only):
+        return True
+
+    def EditRebuild3(self):
+        return True
+
+    def SaveAs3(self, filename, _version, _options):
+        path = Path(filename)
+        assert path.suffix == ".STL", "full exporter must not regenerate member STEP"
+        path.write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+        return 1
+
+
+class _MemberAdapter:
+    swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
+    currentModel = None
+
+    async def open_model(self, filename):
+        self.currentModel = _MemberDoc(Path(filename))
+        return SimpleNamespace(is_success=True, data=None)
+
+    def _attempt(self, call, default=None):
+        return call()
+
+
 def test_forced_full_export_preserves_part_owned_member_bytes(
     tmp_path: Path, monkeypatch,
 ) -> None:
@@ -352,48 +390,12 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
         path: path.read_bytes() for path in (root / "reports/part-neutral").glob("*.json")
     }
 
-    class Doc:
-        def __init__(self, native):
-            configurations = _SHARED_MEMBERS[native.stem.replace("-", "_")]
-            self.names = [entry[0] for entry in configurations]
-            self.ConfigurationManager = SimpleNamespace(
-                ActiveConfiguration=SimpleNamespace(Name=self.names[0]),
-            )
-
-        def ShowConfiguration2(self, configuration):
-            assert configuration in self.names
-            self.ConfigurationManager.ActiveConfiguration.Name = configuration
-            return True
-
-        def ForceRebuild3(self, _top_only):
-            return True
-
-        def EditRebuild3(self):
-            return True
-
-        def SaveAs3(self, filename, _version, _options):
-            path = Path(filename)
-            assert path.suffix == ".STL", "full exporter must not regenerate member STEP"
-            path.write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
-            return 1
-
-    class Adapter:
-        swApp = SimpleNamespace(CloseAllDocuments=lambda _unsaved: None)
-        currentModel = None
-
-        async def open_model(self, filename):
-            self.currentModel = Doc(Path(filename))
-            return SimpleNamespace(is_success=True, data=None)
-
-        def _attempt(self, call, default=None):
-            return call()
-
     async def forbid_render(*_args):
         raise AssertionError("full exporter must not regenerate part-owned member PNG")
 
     monkeypatch.setattr(export_models, "export_build_png", forbid_render)
     monkeypatch.setattr(
-        export_models, "run_build", lambda build: (asyncio.run(build(Adapter())), 0)[1],
+        export_models, "run_build", lambda build: (asyncio.run(build(_MemberAdapter())), 0)[1],
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", "--force"])
 
@@ -402,6 +404,56 @@ def test_forced_full_export_preserves_part_owned_member_bytes(
     for path, payload in {**owned, **certificates}.items():
         assert path.read_bytes() == payload
     assert all(path.is_file() for path in expected.values())
+
+
+@pytest.mark.parametrize("fault", [None, "unstaged-member-change"])
+def test_feature_staged_default_member_step_is_certified_as_feature_bytes(
+    tmp_path: Path, monkeypatch, fault: str | None,
+) -> None:
+    # sh_vn_clamping_kit_hardware is both a member part and a feature part: its
+    # labelled feature STEP replaces the part-certified default (bare) STEP.
+    import features_bound
+
+    root, expected, owned = _shared_release_fixture(tmp_path, monkeypatch)
+    feature_step = root / "step" / "sh-vn-clamping-kit-hardware.STEP"
+    other_member = root / "step" / "sh-vn-clamping-kit-hardware--tnut.STEP"
+    labelled = b"labelled feature STEP"
+
+    def stage(_out, _step_directory):
+        feature_step.write_bytes(labelled)
+        if fault:
+            other_member.write_bytes(b"x" * other_member.stat().st_size)
+        return (feature_step,)
+
+    scene_meshes = _shared_scene_meshes()
+    digests = {stem.replace("_", "-"): "fixture-recipe" for stem in _SHARED_MEMBERS}
+    digests.update({mesh: "fixture-recipe" for entries in scene_meshes.values()
+                    for _configuration, mesh in entries})
+    monkeypatch.setattr(features_bound, "stage_feature_steps", stage)
+    monkeypatch.setattr(export_models, "load_src_digests", lambda: dict(digests))
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _scenes: scene_meshes)
+    monkeypatch.setattr(export_models, "export_build_png", None)
+    monkeypatch.setattr(
+        export_models, "run_build", lambda build: (asyncio.run(build(_MemberAdapter())), 0)[1],
+    )
+    monkeypatch.setattr(sys, "argv", ["export_models.py", "--force", "--record-digests"])
+
+    if fault:
+        with pytest.raises(RuntimeError, match="changed after certification"):
+            export_models.main()
+        assert not export_models.NEUTRAL_MANIFEST.exists()
+        return
+    assert export_models.main() == 0
+
+    files = json.loads(export_models.NEUTRAL_MANIFEST.read_text(encoding="utf-8"))["files"]
+    assert set(files) == set(expected)
+    assert files["step/sh-vn-clamping-kit-hardware.STEP"]["sha256"] == (
+        hashlib.sha256(labelled).hexdigest()
+    )
+    for path, payload in owned.items():
+        if path != feature_step:
+            relative = path.relative_to(root).as_posix()
+            assert files[relative]["sha256"] == hashlib.sha256(payload).hexdigest()
 
 
 @pytest.mark.parametrize("stem", list(_SHARED_MEMBERS))

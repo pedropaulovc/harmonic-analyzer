@@ -683,11 +683,36 @@ def _source_fingerprint(source: Path) -> str | None:
     return _file_sha256(source)
 
 
+def certified_member_digests(parts: list[str]) -> dict[Path, str]:
+    """Validate every part member certificate; map each certified output to its digest."""
+    return {
+        path.resolve(): _file_sha256(path)
+        for stem in parts
+        for path in validate_member_exports(stem, OUT_STEP.parent)
+    }
+
+
+def _require_certified_members(parts: list[str], member_digests: dict[Path, str]) -> None:
+    """Every member STEP/PNG still holds the exact bytes certified for it."""
+    expected = {
+        path.resolve()
+        for stem in parts
+        for paths in configuration_export_paths(stem, OUT_STEP.parent).values()
+        for path in (paths["step"], paths["png"])
+    }
+    if set(member_digests) != expected:
+        raise RuntimeError("release member certification inventory drifted")
+    for path, digest in member_digests.items():
+        if not _nonempty(path) or _file_sha256(path) != digest:
+            raise RuntimeError(f"release member output changed after certification: {path}")
+
+
 def write_release_neutral_manifest(
     parts: list[str], assemblies: list[str],
     scene_meshes: dict[str, list[tuple[str, str]]],
     scene_assemblies: set[str],
     colors: dict[str, Any], digests: dict[str, str],
+    member_digests: dict[Path, str] | None = None,
 ) -> None:
     """Atomically certify a complete, current neutral set for ``cut_release``.
 
@@ -695,11 +720,14 @@ def write_release_neutral_manifest(
     distinctness guard succeeds.  Source recipe digests prove freshness without
     trusting volatile SolidWorks mtimes; exact file names, sizes, and hashes prove the
     set is complete and unchanged.  PNGs are the render outputs owned by the
-    corresponding build tasks.
+    corresponding build tasks.  ``member_digests`` are the member bytes ``main``
+    certified before staging feature STEPs (see there); without them the part
+    certificates are validated now.
     """
     _require_member_scene_coverage(parts, scene_meshes)
-    for stem in parts:
-        validate_member_exports(stem, OUT_STEP.parent)
+    _require_certified_members(
+        parts, certified_member_digests(parts) if member_digests is None else member_digests,
+    )
     sources = _release_sources(parts, assemblies, scene_meshes)
     source_records: dict[str, str] = {}
     for dashed, source in sources.items():
@@ -1204,7 +1232,8 @@ def manifest_part_stale(stem: str, colors: dict, digests: dict[str, str]) -> boo
     there the STEP-vs-source mtime guard is re-added so a rebuilt part with a fresh STL
     but a stale STEP is not treated as fresh (codex review)."""
     if member_configurations(stem):
-        validate_member_exports(stem, OUT_STEP.parent)
+        # main() validated the part certificates before staging feature STEPs; the
+        # release certificate re-checks those exact (or feature-owned) bytes.
         return part_stl_stale(stem, stem, colors, digests)
     step = OUT_STEP / f"{stem}.STEP"
     if not _nonempty(step) or part_stl_stale(stem, stem, colors, digests):
@@ -1661,16 +1690,21 @@ def main() -> int:
     }
     # Part tasks are the only producers of these STEP/PNG bytes. Validate their
     # execution-bound certificates before even staging feature-bundle outputs.
-    member_outputs = {
-        path.resolve() for stem in member_parts
-        for path in validate_member_exports(stem, OUT_STEP.parent)
-    }
+    member_digests = certified_member_digests(parts)
+    member_outputs = set(member_digests)
 
     # Read and validate all producer bundles before writing any neutral output.
     # These exact snapshots own the enrolled STEP bytes, even under --force.
     feature_steps = {
         path.resolve() for path in stage_feature_steps(OUT_FEATURES.parent, OUT_STEP)
     }
+    # An enrolled member part's default STEP is also its feature bundle's neutral
+    # copy, which check:features_bound requires to equal the labelled scoped STEP.
+    # The feature producer owns those bytes; every other member output keeps the
+    # part-certified bytes validated above.
+    member_digests.update(
+        {path: _file_sha256(path) for path in member_outputs & feature_steps}
+    )
     producer_outputs = feature_steps | member_outputs
 
     # An untrusted cache (sentinel absent or mismatched) forces a FULL export so even
@@ -1759,6 +1793,7 @@ def main() -> int:
         if record:
             write_release_neutral_manifest(
                 parts, assemblies, scene_meshes, scene_assemblies, colors, digests,
+                member_digests,
             )
         return 0
     _telemetry.info(
@@ -1917,7 +1952,7 @@ def main() -> int:
         if record:
             write_release_neutral_manifest(
                 parts, assemblies, all_scene_part_meshes(scene_assemblies),
-                scene_assemblies, colors, digests,
+                scene_assemblies, colors, digests, member_digests,
             )
     return rc
 
