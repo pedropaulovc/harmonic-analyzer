@@ -143,8 +143,9 @@ PLATE_DRAWING_PRECISION = {
     for feature, names in PLATE_DRAWING_DIMENSIONS.items()
 }
 # The stock bands remain loose wherever the actual worst-case web permits it.
-# Cover length still needs .XX; its .X band would breach 1.5 mm.
-BLOCK_DRAWING_PRECISION["BlockProfile"].update(BlockLength=1, BlockHeight=1)
+# Both lengths need .XX: at .X the cover's clearance-hole end web and the
+# block's tap end web (with the tap-major allowance) would breach 1.5 mm.
+BLOCK_DRAWING_PRECISION["BlockProfile"]["BlockHeight"] = 1
 BLOCK_DRAWING_PRECISION["Block"]["BlockDepth"] = 1
 PLATE_DRAWING_PRECISION["PlateProfile"]["PlateHeight"] = 1
 # Only the cover's cosmetic corners use .X; the block chamfer retains .XX,
@@ -222,14 +223,19 @@ WINDOW_FLOOR_MIN = BLOCK_HEIGHT - BLOCK_PRINTED_BANDS_MM["BlockHeight"] - (
 )
 # Reference labels do not make the transferred axes float: retain the plate
 # master's absolute +/-0.10 in both the receiver and cover worst-case proofs.
+# A 2B tap's major runs over basic: the fleet's 0.05 diametral allowance
+# (pd_rack_pinion_spec TAP_MAJOR_ALLOWANCE, mg_magnifying_vertical_rod_geom)
+# bounds the cut thread, which has no specified maximum major of its own.
+PLATE_TAP_MAJOR_ALLOWANCE_MM = 0.05
+PLATE_TAP_MAJOR_RADIUS_MAX = (PLATE_SCREW_MAJOR_DIA + PLATE_TAP_MAJOR_ALLOWANCE_MM) / 2.0
 PLATE_TAP_WINDOW_WEB_MIN = WINDOW_FLOOR_MIN - (
-    PLATE_HOLE_Y + PLATE_HOLE_POSITION_TOLERANCE_MM + PLATE_SCREW_MAJOR_DIA / 2.0
+    PLATE_HOLE_Y + PLATE_HOLE_POSITION_TOLERANCE_MM + PLATE_TAP_MAJOR_RADIUS_MAX
 )
 
 
 def transferred_tap_end_web_min(master_position_band_mm: float) -> float:
     """Receiver end web after transfer from the edge-aligned plate master."""
-    radius = PLATE_SCREW_MAJOR_DIA / 2.0
+    radius = PLATE_TAP_MAJOR_RADIUS_MAX
     return min(
         PLATE_HOLE_XS[0] - master_position_band_mm - radius,
         BLOCK_LENGTH - BLOCK_PRINTED_BANDS_MM["BlockLength"] - (

@@ -92,8 +92,8 @@ def test_print_worst_joint_stack_preserves_bottoming_tap_and_ligaments() -> None
     assert spec.PLATE_TAP_BACK_WALL_MIN == pytest.approx(1.59416, abs=1e-5)
     assert spec.PLATE_TAP_BACK_WALL_MIN >= 1.5
     assert spec.ROOF_THICKNESS_MIN == pytest.approx(1.59)
-    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(1.9978)
-    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(1.5078)
+    assert spec.PLATE_TAP_WINDOW_WEB_MIN == pytest.approx(1.9728)
+    assert spec.PLATE_TAP_END_WEB_MIN == pytest.approx(1.7728)
     assert spec.WINDOW_BACK_WALL_MIN == pytest.approx(2.09)
     assert spec.BLOCK_DEPTH_MIN == pytest.approx(10.49)
     assert spec.PLATE_CLEARANCE_END_WEB_MIN == pytest.approx(1.64)
@@ -153,7 +153,7 @@ def test_each_sheet_imports_the_complete_model_contract(builder, drawing, dimens
     if hasattr(drawing, "BOTTOM_KEEP"):
         keeps |= set(drawing.BOTTOM_KEEP)
     assert marked == keeps == set(precision) == set(values)
-    loose = ({"BlockLength", "BlockHeight", "BlockDepth"} if builder is block
+    loose = ({"BlockHeight", "BlockDepth"} if builder is block
              else {"PlateHeight", "RoofChamferSize"})
     assert {name for name, places in precision.items() if places == 1} == loose
     assert all(places == (
@@ -530,14 +530,15 @@ def test_reference_receiver_end_web_tracks_perturbed_plate_master_band(master_ba
     # These are absolute plate-master errors transferred from the same X=0
     # edge, not independent or floating block reference-dimension bands.
     expected = spec.BLOCK_LENGTH - spec.BLOCK_PRINTED_BANDS_MM["BlockLength"] - (
-        spec.PLATE_HOLE_XS[1] + master_band + spec.PLATE_SCREW_MAJOR_DIA / 2.0
+        spec.PLATE_HOLE_XS[1] + master_band + spec.PLATE_TAP_MAJOR_RADIUS_MAX
     )
     actual = spec.transferred_tap_end_web_min(master_band)
     assert actual == pytest.approx(expected)
     assert actual == pytest.approx(
         spec.PLATE_TAP_END_WEB_MIN + spec.PLATE_HOLE_POSITION_TOLERANCE_MM - master_band
     )
-    assert (actual >= 1.5) is (master_band <= spec.PLATE_HOLE_POSITION_TOLERANCE_MM)
+    if master_band <= spec.PLATE_HOLE_POSITION_TOLERANCE_MM:
+        assert actual >= 1.5
 
 
 @pytest.mark.parametrize("refusal", [None, "prefix", "suffix", "tolerance", "value"])
@@ -712,8 +713,8 @@ def test_owner_ruled_webs_print_floored_under_their_callouts() -> None:
     from machinist_exceptions import load_exceptions
 
     assert spec.PLATE_TAP_WEB_LINES == (
-        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.50 MIN",
-        "THREAD TO REBATE FLOOR 1.99 MIN",
+        "DRILL POINT TO OPPOSITE FACE 1.59 MIN", "THREAD TO END FACE 1.77 MIN",
+        "THREAD TO REBATE FLOOR 1.97 MIN",
     )
     assert spec.PLATE_CLEARANCE_WEB_LINE == "HOLE TO END FACE 1.64 MIN"
     native = _StopDisplay("<hw-threaddesc>-<hw-threadclass> <HOLE-DEPTH><hw-threaddepth>")
@@ -928,7 +929,7 @@ def test_stock_precision_and_worst_case_walls_use_each_printed_band() -> None:
         for name in ("PlateLength", "PlateHeight")
     }
     assert spec.BLOCK_PRINTED_BANDS_MM == {
-        "BlockLength": 0.8, "BlockHeight": 0.8, "RoofThickness": 0.51, "BackWall": 0.51,
+        "BlockLength": 0.51, "BlockHeight": 0.8, "RoofThickness": 0.51, "BackWall": 0.51,
     }
     assert spec.PLATE_PRINTED_BANDS_MM == {"PlateLength": 0.51, "PlateHeight": 0.8}
     assert spec.WINDOW_FLOOR_MIN == pytest.approx(
@@ -1222,6 +1223,7 @@ def test_block_build_keeps_real_cut_and_reference_width_driven_marked_and_tolera
     assert precisions == [spec.BLOCK_DRAWING_PRECISION]
     assert properties[0]["Mating Face Note"] == "STOP-PLATE MATING FACE"
     assert "Manufacturing Notes" not in properties[0]
+    assert pmi == [{"surface_finishes": spec.BLOCK_SURFACE_FINISHES}]
 
 
 def test_back_wall_reference_chains_the_rebate_chord_to_the_back_face(monkeypatch) -> None:
