@@ -27,6 +27,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 
 import _config
 from _check import check
+from _com import _early_bound
 from _drawing_common import (
     DrawingOutputs,
     finalize_drawing,
@@ -150,10 +151,36 @@ PIN_HOLE_NOTE = (
 PIN_HOLE_NOTE_XY = (0.020, 0.112)
 # The front face's finish caption names the face's function and its mate
 # (rule 6: a finish only on a face that runs, slides or locates; machinist
-# review: the face's function was stated nowhere).  Above the symbol, left of
+# review: the face's function was stated nowhere).  Just above the symbol (a
+# run-1 reviewer read the 6 mm gap as a caption floating free of it), left of
 # the isometric.
 FRONT_FINISH_CAPTION = f"THRUST FACE ON\n{PLATE_NUMBER} REAR BOSS"
-FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.009, FRONT_FINISH[1][1] + 0.022)
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.009, FRONT_FINISH[1][1] + 0.0185)
+# A note's read-back position may differ from the one asked by this much.
+NOTE_POSITION_TOL_M = 5e-4
+
+
+def _add_placed_note(
+    adapter: Any, text: str, xy: tuple[float, float], label: str
+) -> None:
+    """Insert a free note and prove it landed at ``xy``.
+
+    ``add_note`` only logs a failed ``IAnnotation.SetPosition``, which would
+    leave the note at SolidWorks' default spot, so read the position back.
+    """
+    raw_note = add_note(adapter, text, *xy)
+    if raw_note is None:
+        raise RuntimeError(f"failed to add the {label}")
+    raw_annotation = _early_bound(raw_note, "INote").GetAnnotation()
+    if raw_annotation is None:
+        raise RuntimeError(f"the {label} has no annotation")
+    annotation = _early_bound(raw_annotation, "IAnnotation")
+    position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+    if len(position) < 2 or any(
+        abs(actual - wanted) > NOTE_POSITION_TOL_M
+        for actual, wanted in zip(position[:2], xy, strict=True)
+    ):
+        raise RuntimeError(f"the {label} sits at {position[:2]}, not {xy}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -241,10 +268,13 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cup front (running) face finish",
         char_height=0.0025,
     )
-    if add_note(adapter, FRONT_FINISH_CAPTION, *FRONT_FINISH_CAPTION_XY) is None:
-        raise RuntimeError("failed to add the cup front face's finish caption")
-    if add_note(adapter, PIN_HOLE_NOTE, *PIN_HOLE_NOTE_XY) is None:
-        raise RuntimeError("failed to add the cup's cross pin hole note")
+    _add_placed_note(
+        adapter,
+        FRONT_FINISH_CAPTION,
+        FRONT_FINISH_CAPTION_XY,
+        "front face finish caption",
+    )
+    _add_placed_note(adapter, PIN_HOLE_NOTE, PIN_HOLE_NOTE_XY, "cross pin hole note")
 
     return await finalize_drawing(
         adapter,
