@@ -1,12 +1,16 @@
 r"""Create the manufacturing drawing for the transgear knob cup (MHA-PD-16).
 
 The face view is the ``*Top`` orientation, looking into the ring from the
-rear: it carries the source six-millimetre H7 bore and the note that the
-MHA-PD-VN-62 pin hole is drilled at assembly (through cup and journal together,
-so it is not dimensioned here).  Section A-A cuts it on the cup axis through
-the Front plane, the plane of the turned profile, so the O.D. and the length
-print on solid cut edges.  The front face is the running face on the plate's
-rear boss and carries its finish.
+rear: it carries the source six-millimetre H7 bore, whose callout names the
+MHA-PD-08 journal it slides on and the diametral clearance it keeps there.
+A separate sheet note says the MHA-PD-VN-62 cross pin hole is not drilled
+on this part: it is made through cup and journal together at assembly, at
+the paper-drive step the note cites, so it is not dimensioned here.
+Section A-A cuts it on the cup axis through the Front plane, the plane of
+the turned profile, so the O.D. and the length print on solid cut edges.
+The front face is the thrust face on the arm plate's rear boss (the rear
+stop of the knob's end float) and carries its finish under a caption that
+names that boss.
 """
 
 from __future__ import annotations
@@ -16,10 +20,12 @@ import sys
 from typing import Any
 
 from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
     auto_center_marks,
     place_view,
 )
 
+import _config
 from _check import check
 from _drawing_common import (
     DrawingOutputs,
@@ -34,19 +40,24 @@ from _drawing_finish import add_surface_finish
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
+from pd_paper_drive_assembly_steps import step_ref
 from pd_transgear_knob_cup_spec import (
-    BORE_CALLOUT,
     BORE_DIA,
+    BORE_JOURNAL_CLEARANCE,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OD,
     SURFACE_FINISHES,
 )
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_knob_cup"]
@@ -79,12 +90,25 @@ SECTION_LINE = (
     (FACE_CENTER[0] + HALF_OD + SECTION_LINE_OVERRUN, FACE_CENTER[1]),
 )
 
+SHAFT_NUMBER = _config.parts("pd-transgear-knob-shaft")["number"]
+PLATE_NUMBER = _config.parts("pd-transgear-arm-plate")["number"]
+PIN_NUMBER = _config.parts("pd-vn-transgear-knob-cup-pin")["number"]
+# drawing-guidelines.md rule 4: the reamed bore's band names its mate and the
+# fit it keeps -- the cup slides on the knob shaft's journal to its feeler
+# setting before it is pinned (machinist review: the band named no mate).
+BORE_CALLOUT = (
+    f"REAM THRU; SLIDES ON\n{SHAFT_NUMBER} JOURNAL,\n"
+    f"{min(BORE_JOURNAL_CLEARANCE):.3f}-{max(BORE_JOURNAL_CLEARANCE):.3f}\n"
+    "DIAMETRAL CLEARANCE"
+)
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
-# 4e9a4df's assembly-pin line spanned x 5 .. 75 mm at the old x 40 mm
-# anchor, across the 12.7 mm border. Move the whole model-linked bore callout.
+# The bore block stands up and left of the face view, its right end clear of
+# the bore's vertical centreline (x = FACE_CENTER[0]): the earlier block,
+# centred at x 60 mm, ran its last line across that centreline (machinist
+# review: the line struck ASSEMBLY's B).
 FACE_KEEP = {
-    "BoreDia": (0.060, 0.225),
+    "BoreDia": (0.050, 0.238),
 }
 # The section spans y 154 .. 186 mm. Its native SECTION / SCALE caption
 # occupies the old OD lane at y 130 mm; put the OD below the intact caption.
@@ -112,6 +136,24 @@ _FRONT_PICK = (
     _section_y(0.0),
 )
 FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
+
+# The cross pin hole is no feature of the supplied cup: a sheet note, apart
+# from the bore's callout, says so and points at the assembly step that sizes
+# and locates it (machinist review: on the bore's leader the line read as the
+# bore, and it gave the hole no definition).  Below the face view, left of
+# the section's O.D. dimension.
+PIN_HOLE_NOTE = (
+    f"NO CROSS HOLE ON THIS PART: THE {PIN_NUMBER}\n"
+    f"PIN HOLE IS MADE THROUGH CUP AND {SHAFT_NUMBER}\n"
+    f"AT ASSEMBLY PER {step_ref('knob-stack-fitted')}."
+)
+PIN_HOLE_NOTE_XY = (0.020, 0.112)
+# The front face's finish caption names the face's function and its mate
+# (rule 6: a finish only on a face that runs, slides or locates; machinist
+# review: the face's function was stated nowhere).  Above the symbol, left of
+# the isometric.
+FRONT_FINISH_CAPTION = f"THRUST FACE ON\n{PLATE_NUMBER} REAR BOSS"
+FRONT_FINISH_CAPTION_XY = (FRONT_FINISH[1][0] - 0.009, FRONT_FINISH[1][1] + 0.022)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -199,6 +241,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cup front (running) face finish",
         char_height=0.0025,
     )
+    if add_note(adapter, FRONT_FINISH_CAPTION, *FRONT_FINISH_CAPTION_XY) is None:
+        raise RuntimeError("failed to add the cup front face's finish caption")
+    if add_note(adapter, PIN_HOLE_NOTE, *PIN_HOLE_NOTE_XY) is None:
+        raise RuntimeError("failed to add the cup's cross pin hole note")
 
     return await finalize_drawing(
         adapter,
