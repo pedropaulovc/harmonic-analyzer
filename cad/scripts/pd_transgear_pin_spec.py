@@ -29,6 +29,9 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 PIN_NUMBER = "MHA-PD-23"
 ARM_NUMBER = "MHA-PD-18"
 RING_NUMBER = "MHA-PD-VN-61"
+FRONT_BUSHING_NUMBER = "MHA-PD-25"
+# The sleeve and the two bushings, rear to front order on the shank.
+RUNNING_MATES = ("MHA-PD-10", "MHA-PD-24", FRONT_BUSHING_NUMBER)
 
 # The head seats on the arm's rear face.
 HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116.4625
@@ -36,9 +39,9 @@ HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116
 # --- Shank: the running journal and the press in the arm -----------------------
 # The sleeve and both bushings run on it (their bores Ø3.900 +0.030/+0.012,
 # 0.012..0.038 diametral); the arm's REAM Ø3.874 +0.008/0 holds it by a
-# 0.010..0.026 press (``pd_transgear_arm_geometry``), named on this sheet.
+# 0.010..0.026 press (``pd_transgear_arm_geometry``), named at the shank Ø.
 DIA = 3.900
-DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, ground
+DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, turned
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 3
@@ -79,22 +82,35 @@ GROOVE_WIDTH = RING.GROOVE_WIDTH
 GROOVE_WIDTH_BAND = RING.GROOVE_WIDTH_BAND
 GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 
-# --- Front end: a plain length in front of the groove, then a dome -----------
-# The land in front of the groove carries the ring's thrust, so it is a wall
-# held at its PRINTED lower limit to the larger of the policy's 1.5 hard
-# floor and three groove depths (ASSUMPTION from the ring maker's edge-margin
-# guidance: 0.4768 x 3 = 1.4304).  Nothing mates on it, so it prints .XX:
-# 2.10 leaves 1.59 (1.600 at .XXX left 1.470, review of e0ac6477e; at .X the
-# title block's +/-0.8 left 0.7, Codex P2).
-FRONT_LAND = 2.10  # groove load wall to the dome's base
-FRONT_LAND_PLACES = 2
-FRONT_LAND_BAND = printed_band_mm(FRONT_LAND_PLACES)
-FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)  # 1.59
+# --- Front end: the tip apex from the head seat, the land and the dome -------
+# The tip apex prints .XX from the head seat, the pin's one faced origin
+# (rule 11): the dome's near-tangent junction with the shank cannot be picked
+# up, so the land from the load wall to that junction prints only as a
+# reference (ENFORCE run 20261024T034648173Z).  The land carries the ring's
+# thrust, so it is a wall held to the larger of the policy's 1.5 hard floor
+# and three groove depths (ASSUMPTION from the ring maker's edge-margin
+# guidance: 0.4768 x 3 = 1.4304) at the worst case: the tip at its printed
+# lower limit, the load wall at its upper, and the deepest dome the R2.0's
+# .X band allows on the shank, a hemisphere.  51.35 leaves 1.51 (the 50.85
+# of the 2.10 land left 1.01).
+TIP_STATION = 51.35  # head seat to the tip's apex
+TIP_STATION_PLACES = 2
+TIP_STATION_BAND = printed_band_mm(TIP_STATION_PLACES)
 TIP_DOME_SAG = 1.5
 TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
-LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.85
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 53.75, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.3125
+TIP_DOME_SAG_MAX = DIA_MAX / 2.0  # a hemisphere on the largest shank
+FRONT_LAND = round(TIP_STATION - GROOVE_STATION - TIP_DOME_SAG, 6)  # 2.60
+FRONT_LAND_PLACES = 2
+FRONT_LAND_MIN = round(
+    TIP_STATION
+    - TIP_STATION_BAND
+    - (GROOVE_STATION + GROOVE_STATION_BAND)
+    - TIP_DOME_SAG_MAX,
+    6,
+)  # 1.51
+LENGTH = TIP_STATION
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 54.25, apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.8125
 HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.5625
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
@@ -111,6 +127,10 @@ SURFACE_FINISHES = (
 )
 
 # --- Decimal places ARE the tolerance (drawing-guidelines.md rule 3 (decimal places carry the tolerance)) --------------------------
+# Each dome prints its radius and, as a reference, its height off the land's
+# end face, so the blank and the dome read without deriving the cap.  The tip
+# apex prints from the head seat; the land ahead of the groove, ending at the
+# tip dome's junction, prints as a reference.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {
         "ShankDia",
@@ -121,8 +141,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "GrooveWidth",
         "FrontLand",
     },
-    "HeadDomeProfile": {"HeadDomeR"},
-    "TipDomeProfile": {"TipDomeR"},
+    "HeadDomeProfile": {"HeadDomeR", "HeadDomeSagDim"},
+    "TipDomeProfile": {"TipDomeR", "TipDomeSagDim", "TipDomeZ"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
@@ -134,9 +154,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "GrooveWidth": 3,
         "FrontLand": FRONT_LAND_PLACES,
     },
-    "HeadDomeProfile": {"HeadDomeR": 1},
-    "TipDomeProfile": {"TipDomeR": 1},
+    "HeadDomeProfile": {"HeadDomeR": 1, "HeadDomeSagDim": 1},
+    "TipDomeProfile": {
+        "TipDomeR": 1,
+        "TipDomeSagDim": 1,
+        "TipDomeZ": TIP_STATION_PLACES,
+    },
 }
+# The overall, apex to tip, a drawing reference for the bar cut (rule 10);
+# the dome heights print as references through ``pd_transgear_pin_callouts``.
+DRAWING_REFERENCE_PRECISION = 2
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -150,8 +177,9 @@ for _ok, _what in (
     (TIP_DOME_SAG < TIP_DOME_R, "the tip is not a spherical cap"),
     (
         FRONT_LAND_MIN >= FRONT_LAND_FLOOR,
-        f"the land in front of the groove {FRONT_LAND} at {FRONT_LAND_PLACES} "
-        f"places has a printed lower limit {FRONT_LAND_MIN:.3f}, under "
+        f"the land in front of the groove leaves {FRONT_LAND_MIN:.3f} with the "
+        f"tip apex {TIP_STATION} at {TIP_STATION_PLACES} places at its lower "
+        "limit, the load wall at its upper and a hemispherical dome, under "
         f"{FRONT_LAND_FLOOR:.4f}, the wall floor or three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
@@ -173,18 +201,7 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-PD-23: {_what}")
 
-# The ring the groove takes, named once above the groove Ø (one line: an
-# above-callout holding a line break never prints).
-GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
-# The shank's band sets the press in the arm's ream: the note names it, so
-# the 0.008 band reads as the fit it is (review of 6de7230aa).  The finish
-# field already says ground.
-DRAWING_NOTES = "\n".join(
-    (
-        "1/4 IN BAR STOCK OK.",
-        f"PRESSED INTO {ARM_NUMBER} FROM THE REAR UNTIL THE HEAD SEATS.",
-        f"SHANK TO {ARM_NUMBER} REAM: {PRESS_INTERFERENCE[0]:.3f}-"
-        f"{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL INTERFERENCE.",
-    )
-)
+# The press into the arm is the MHA-PD-00 assembly's pin-pressed step, not a
+# part-sheet note (rule 24).
+DRAWING_NOTES = "1/4 IN BAR STOCK OK."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

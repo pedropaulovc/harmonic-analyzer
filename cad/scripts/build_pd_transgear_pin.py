@@ -6,7 +6,7 @@ from the rear.  Dimensions and the derived fit facts live in
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From
-the rear: the Ø5.0 head land, the Ø3.900 ground shank, the MHA-PD-VN-61 ring
+the rear: the Ø5.0 head land, the Ø3.900 turned shank, the MHA-PD-VN-61 ring
 groove (its FRONT wall, the load wall, at ``GROOVE_STATION`` from the seat)
 and the plain land in front of it.  The two spherical ends are separate
 revolves on the same plane.  The named plane ``GrooveLoadWall`` and
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 import sys
+from enum import Enum
 
 from _appearance import POLISHED_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
@@ -39,7 +40,7 @@ from _sketch import (
     set_sketch_direct_db,
 )
 from _drawing_dimension_insert import add_diametric_linear_dimension
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -49,6 +50,7 @@ from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
+import pd_transgear_pin_callouts as callouts
 from pd_transgear_pin_spec import (
     DIA,
     DIA_BAND,
@@ -98,6 +100,33 @@ V_TIP_DOME = _cap_volume(TIP_DOME_SAG, TIP_DOME_R)
 V_TOTAL = V_PROFILE + V_HEAD_DOME + V_TIP_DOME
 
 
+class StationAnchor(Enum):
+    """Which dome point ``<prefix>DomeZ`` stations from the head seat."""
+
+    BASE = "base"  # the dome's base, on its land's end face
+    APEX = "apex"  # the dome's apex: the one point the shop can pick up
+
+
+def author_dimension_callouts(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back.
+
+    The drawing only reads these lanes: set from the sheet they would write
+    through to this part outside its recipe (#1942).
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: "
+                        f"{printed!r}"
+                    )
+
+
 async def _dome(
     adapter,
     *,
@@ -109,12 +138,14 @@ async def _dome(
     rim_r: float,
     rim_drive: str,
     station_drive: str,
+    station_anchor: StationAnchor,
 ) -> SketchDims:
     """A spherical end on the Right plane (the MHA-DT-17 cap idiom): base on
     the end face at ``u_base``, apex on the axis at ``u_apex``, closed down
     the axis.  The arc runs CCW over its minor lobe, so it starts at the rim
     for a +Z end (apex at smaller u) and at the apex for a -Z end.  Its
-    radius prints as ``<prefix>DomeR``."""
+    radius prints as ``<prefix>DomeR``.  ``<prefix>DomeZ`` stations the
+    ``station_anchor`` point from the head seat."""
     toward_minus_z = u_apex > u_base
     u_centre = u_apex - sphere_r if toward_minus_z else u_apex + sphere_r
     dims = SketchDims()
@@ -164,10 +195,14 @@ async def _dome(
             f"{base}.start", "origin", "horizontal_points"
         ),
     )
+    station_point, station_u = {
+        StationAnchor.BASE: (f"{base}.start", u_base),
+        StationAnchor.APEX: (f"{close}.start", u_apex),
+    }[station_anchor]
     check(
         f"{prefix} dome station",
         await adapter.add_sketch_dimension(
-            f"{base}.start", "origin", "horizontal_distance", abs(u_base)
+            station_point, "origin", "horizontal_distance", abs(station_u)
         ),
     )
     dims.record(f"{prefix}DomeZ", station_drive)
@@ -232,7 +267,7 @@ async def build(adapter) -> dict[str, str]:
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
     # The land in front of the groove is the same Ø3.900 cylinder as the
-    # shank: collinear with it (one ground diameter, one dimension), not a
+    # shank: collinear with it (one turned diameter, one dimension), not a
     # second horizontal with its own Ø.
     front_land_index = 7
     for index, line in enumerate(lines):
@@ -316,6 +351,7 @@ async def build(adapter) -> dict[str, str]:
         rim_r,
         rim_drive,
         station_drive,
+        station_anchor,
         v_dome,
     ) in (
         (
@@ -327,6 +363,7 @@ async def build(adapter) -> dict[str, str]:
             R_HEAD,
             '"HeadDia" / 2',
             '"HeadLand"',
+            StationAnchor.BASE,
             V_HEAD_DOME,
         ),
         (
@@ -337,7 +374,8 @@ async def build(adapter) -> dict[str, str]:
             TIP_DOME_SAG,
             R_SHANK,
             '"ShankDia" / 2',
-            '"GrooveStation" + "FrontLand"',
+            '"GrooveStation" + "FrontLand" + "TipDomeSag"',
+            StationAnchor.APEX,
             V_TIP_DOME,
         ),
     ):
@@ -351,6 +389,7 @@ async def build(adapter) -> dict[str, str]:
             rim_r=rim_r,
             rim_drive=rim_drive,
             station_drive=station_drive,
+            station_anchor=station_anchor,
         )
         feature = f"{prefix}DomeProfile"
         await ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")
@@ -394,7 +433,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "head Ø (x)", "x", HEAD_DIA, 0.01)
     await bbox_extent_check(adapter, "head Ø (y)", "y", HEAD_DIA, 0.01)
 
-    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the ground shank (the running fit and
+    # Model-owned bands (drawing-simplicity-policy.md `How the repository implements the guidelines`): the turned shank (the running fit and
     # the press in the arm) and the ring groove's catalogue Ø and width.  The
     # groove station and the front land print .XXX and the title block governs
     # them.
@@ -415,6 +454,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_dimension_callouts(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
