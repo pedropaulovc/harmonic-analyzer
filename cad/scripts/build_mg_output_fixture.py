@@ -22,7 +22,8 @@ spigot face (x = SPIGOT_FACE_X), flats facing +/-Z, corners on +/-Y.
   overall length as a DRIVEN dimension (``OverallLength``, REF on the sheet).
   The hex's depth is the equation ``RodStation + BoreStation - SpigotLength``.
 * ``ShoulderFillet``: the spigot's internal corner at the hex shoulder,
-  ``ShoulderRadius`` (a single MAX limit: the largest tool-nose radius).
+  ``ShoulderRadius``: one tool-nose radius inside the title block's INSIDE
+  CORNERS R1.0 MAX, which governs it on the sheet (no local callout).
 * ``GrooveProfile``: the full-radius groove, a Top-plane circle drawn as two
   semicircles meeting at the root, revolved as a cut.  Its centreline runs
   from the bore axis to the spigot face, so ``GrooveStation`` runs from the
@@ -105,7 +106,6 @@ from mg_output_fixture_spec import (
     DRAWING_PRECISION_BY_NAME,
     GROOVE_STATION,
     LIMIT_BANDS,
-    SINGLE_LIMITS,
 )
 
 PART_NAME = "mg-output-fixture"
@@ -240,9 +240,8 @@ async def build(adapter) -> dict[str, str]:
     )
     await bbox_extent_check(adapter, "overall length", "x", OVERALL_LENGTH)
 
-    # --- Shoulder corner: the tool-nose radius the print allows (R MAX) ---------
-    # Picked on the circular shoulder edge at model -Z (the side view's upper
-    # silhouette, where the sheet reads its radius): the only edge through
+    # --- Shoulder corner: a tool-nose radius inside the title block's R1.0 MAX --
+    # Picked on the circular shoulder edge at model -Z: the only edge through
     # that point.
     check(
         "fillet shoulder corner",
@@ -327,11 +326,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     # Places are the tolerance statement (drawing-guidelines.md rule 3 (decimal places carry the tolerance)): the part carries
-    # them, the shoulder corner's single MAX limit and the groove radius's
-    # LIMIT band; the drawing reads them back.
+    # them and the groove radius's LIMIT band; the drawing reads them back.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for dimension_name, (feature_name, tol_type) in SINGLE_LIMITS.items():
-        _single_limit(adapter, feature_name, dimension_name, tol_type)
     for dimension_name, (feature_name, limits) in LIMIT_BANDS.items():
         _limit_band(adapter, feature_name, dimension_name, limits)
     # The last dimension edit is behind us: the saved geometry must still be
@@ -574,16 +570,6 @@ def _make_driven(adapter: Any, dimension_id: str, label: str) -> None:
     dimension.DrivenState = 1  # swDimensionDrivenState_e.swDimensionDriven
     if int(dimension.DrivenState) != 1:
         raise RuntimeError(f"{label}: dimension did not become driven")
-
-
-def _single_limit(adapter: Any, feature: str, dimension_name: str, tol_type: int) -> None:
-    """A dimension as a single limit (swTolMAX prints the model value then
-    MAX, so the model IS the limit; build_ch_rocker_arm_tl_filing_stud)."""
-    _, dimension = _named_dimension(adapter, feature, dimension_name)
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if int(tolerance.Type) != tol_type:
-        raise RuntimeError(f"{dimension_name}@{feature}: single-limit type did not persist")
 
 
 def _limit_band(
