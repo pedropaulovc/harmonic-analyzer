@@ -69,8 +69,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     iso = place_view(adapter,str(source),'*Isometric',.355,.235,scale=SHEET_SCALE)
     keep = dict(PLAN_KEEP)
     if is_feed:
+        # LugLength's line stands at sheet x 50 over the lug (y 161..209), so
+        # the carriage callouts drop below it: the 4X DRILL shoulder at y .180
+        # crossed it (run 20261024T033637618Z).
         keep |= {'LugWidth':(.130,.025),'LugLength':(.050,.165),
-                 'LugEndX':(.080,.035),'LugEndY':(.265,.175)}
+                 'LugEndX':(.080,.035),'LugEndY':(.265,.175),
+                 'CarriageDrills1Dia':(.035,.150),'CarriageCounterbores1Dia':(.035,.120)}
     annotations = []
     for view,positions,label in ((plan,keep,'plan'),(side,SIDE_KEEP,'pivot section direction')):
         set_hidden_lines_removed(adapter,view)
@@ -104,7 +108,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         nut_annotations += curate_view_dimensions(adapter,nut_section,
             keep={'NutSeatDepth':(.330,.065)},view_label='C-C nut seat',
             dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-        y,z = contract.NUT_HOLES_YZ[0]
+        # The callout picks the +Z column's tap, right of section line C at the
+        # nut axis, so its leader up-right to the callout crosses neither the
+        # line nor its label.
+        y,z = contract.NUT_HOLES_YZ[1]
         edge = _project(adapter,nut,(contract.NUT_FACE_X,y+contract.NUT_TAP_DRILL/2,z),'nut tap mouth')
         add_native_hole_callout(adapter,nut,edge_xy=edge,callout_xy=(.310,.255),
                                 label='four nut flange taps',process='4X DRILL TO PRINT\n')
@@ -114,7 +121,12 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     drawing.ActivateSheet(sheets[0])
     outputs = DrawingOutputs(slddrw=spec.outputs['slddrw'],pdf=spec.outputs['pdf'],png=spec.outputs['png'])
     return await finalize_drawing(adapter,outputs,pdf_title='Rocker Oblique Trammel Block Manufacturing Drawing',
-                                  scale=SHEET_SCALE,layout=spec.layout)
+                                  scale=SHEET_SCALE,layout=spec.layout,
+                                  # SolidWorks pins its own "#4-40 Tapped Hole" note beside the
+                                  # nut taps' callout, which already states the thread; its
+                                  # leader crossed section line C.
+                                  redundant_note_substrings=('Tapped Hole',) if is_feed else (),
+                                  expected_redundant_notes=1 if is_feed else 0)
 
 
 async def build(adapter):
