@@ -202,7 +202,11 @@ def test_profile_and_wing_are_baselined_from_the_hole_axis() -> None:
     )
     free = dt_pinion_spring_spec.FORMED_DIMENSIONS[dt_pinion_spring_spec.FREE_FORM_SKETCH]
     assert free == {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
-    assert set(drawing.DETAIL_KEEP) == {"KinkR", "FlatLen"}
+    assert set(drawing.DETAIL_KEEP) == {
+        "KinkR",
+        "FlatLen",
+        dt_pinion_spring_spec.FREE_KINK_ANGLE,
+    }
     assert drawing.DETAIL_SCALE == (5, 1)
     # Both views print the datum as a centreline on the hole's axis.
     for ends in (drawing.FRONT_HOLE_AXIS_ENDS, drawing.TOP_HOLE_AXIS_ENDS):
@@ -329,17 +333,17 @@ def test_free_form_presets_the_crest_into_the_flank() -> None:
 
 
 def test_free_form_prints_from_the_hidden_reference_sketch() -> None:
-    # O2 (a): the installed solid plus the FreeForm phantom; the free crest and
-    # kink angle print from the hidden sketch, which the part blanks and the front
-    # view shows through the opt-in hidden-sketch curation.
+    # O2 (a): the installed solid plus the FreeForm phantom; the free crest
+    # prints from the hidden sketch in the front view and the kink angle in
+    # detail A, each through the opt-in hidden-sketch curation.
     assert dt_pinion_spring_spec.REFERENCE_SKETCHES == ("FreeForm",)
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "blank_sketch(adapter, FREE_FORM_SKETCH)" in build_source
     assert 'prefix="Free", construction=True' in build_source
     draw_source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "hidden_sketches.curate_view_dimensions(" in draw_source
-    free = {"FreeKinkH", "FreeKinkV", dt_pinion_spring_spec.FREE_KINK_ANGLE}
-    assert free <= set(drawing.FRONT_KEEP)
+    assert draw_source.count("hidden_sketches.curate_view_dimensions(") == 2
+    assert {"FreeKinkH", "FreeKinkV"} <= set(drawing.FRONT_KEEP)
+    assert dt_pinion_spring_spec.FREE_KINK_ANGLE in drawing.DETAIL_KEEP
     assert "FREE FORM" in dt_pinion_spring_spec.DRAWING_NOTES
 
 
@@ -372,7 +376,7 @@ def test_kink_angle_drives_the_flick_as_its_included_angle() -> None:
     # PR #1675 review r2: the tip's location from the free end less the kink
     # start's (two .X dimensions) let the flick read flat, reversed or sharply
     # kinked.  The kink's included angle, blade to flat, now drives both
-    # profiles and prints on the free one, on the crest's convex side.
+    # profiles and prints on the free one, between its drawn legs in detail A.
     build_source = Path(spring.__file__).read_text(encoding="utf-8")
     assert "TipH" not in build_source
     assert (
@@ -417,26 +421,33 @@ def test_kink_angle_drives_the_flick_as_its_included_angle() -> None:
         assert bisector == pytest.approx(
             _unit((blade_down[0] + flat_down[0], blade_down[1] + flat_down[1]))
         )
-        # The printed wedge: between the blade's line carried up and the
-        # flat's carried down, away from the crest.
+        # The convex-side included wedge: between the blade's line carried up
+        # and the flat's carried down, away from the crest.
         assert included == pytest.approx(
             _unit((flat_down[0] - blade_down[0], flat_down[1] - blade_down[1]))
         )
         towards_crest = (start[0] - vertex[0], start[1] - vertex[1])
         assert included[0] * towards_crest[0] + included[1] * towards_crest[1] < 0.0
-    # The keep sits on the free included wedge's bisector, west of the crest.
-    vertex = (
-        drawing._front_x(geometry.FREE_KINK_VERTEX[0]),
-        drawing._front_y(geometry.FREE_KINK_VERTEX[1]),
-    )
-    keep = drawing.FRONT_KEEP[dt_pinion_spring_spec.FREE_KINK_ANGLE]
+    # Detail A's keep sits on the bisector of the wedge between the free
+    # form's drawn legs (blade down, flat up), on the crest's concave side:
+    # machinist review 69eda6e4c could not tell which legs the convex-side
+    # arc on the 2:1 phantom measured.
+    vertex = drawing._detail_xy(geometry.FREE_KINK_VERTEX)
+    keep = drawing.DETAIL_KEEP[dt_pinion_spring_spec.FREE_KINK_ANGLE]
     assert math.dist(keep, vertex) == pytest.approx(drawing.KINK_ANGLE_TEXT_RADIUS)
-    assert keep[0] < vertex[0] - 0.010
+    assert drawing.KINK_ARC_BISECTOR == pytest.approx(
+        tuple(-v for v in geometry.FREE_KINK_INCLUDED_BISECTOR)
+    )
+    assert keep[0] > vertex[0] + 0.010
+    # Its arc ends on the drawn flat, so no extension line runs off a leg.
+    low, high = drawing.KINK_ARC_RADIUS_RANGE
+    assert low < drawing.KINK_ANGLE_TEXT_RADIUS < high
+    assert dt_pinion_spring_spec.FREE_KINK_ANGLE not in drawing.FRONT_KEEP
     assert dt_pinion_spring_spec.FREE_KINK_ANGLE not in drawing.DIMENSION_CALLOUTS
 
 
 def _arc(vertex, about_deg: float, half_deg: float, radius: float = 0.012):
-    bisector_x, bisector_y = geometry.FREE_KINK_INCLUDED_BISECTOR
+    bisector_x, bisector_y = drawing.KINK_ARC_BISECTOR
     bisector = math.degrees(math.atan2(bisector_y, bisector_x))
     points = []
     for step in range(11):
@@ -459,8 +470,14 @@ def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
     shifted = (vertex[0] + 0.002, vertex[1])
     assert drawing.kink_arc_faults(_arc(shifted, 0.0, half), vertex)
     assert drawing.kink_arc_faults([], vertex) == ["no arc"]
-    # The r10 leaf's arcs as imported: the segments' own wedge across the
-    # crest (blade down to flat up) plus an extension arc out to the text.
+    # An arc past the flat's tip (or short of its start) needs an extension
+    # line off the drawn leg.
+    high = drawing.KINK_ARC_RADIUS_RANGE[1]
+    assert drawing.kink_arc_faults(_arc(vertex, 0.0, half, radius=high + 0.001), vertex)
+    low = drawing.KINK_ARC_RADIUS_RANGE[0]
+    assert drawing.kink_arc_faults(_arc(vertex, 0.0, half, radius=low - 0.001), vertex)
+    # The r10 leaf's arcs as imported: the legs' own wedge plus an extension
+    # arc out to text on the convex side.
     centre = (0.08715684620887239, 0.15211975644463)
     blade_down = (0.0890486683798352, 0.14028129645639575)
     flat_up = (0.09044542242555458, 0.16364856351590332)
@@ -470,10 +487,12 @@ def test_kink_arc_faults_reads_the_wedge_the_arc_sweeps() -> None:
         (centre, drawing.minor_arc_points(centre, text_side, blade_down)),
     ]
     assert drawing.kink_arc_faults(r10, centre)
+    # Its legs' arc alone is the wedge this print asks for.
+    assert drawing.kink_arc_faults(r10[:1], centre) == []
 
 
 def test_minor_arc_points_sweep_the_short_way_either_sense() -> None:
-    # The convex wedge's 155 deg arc, given end-first or start-first, reads
+    # The legs' wedge's 155 deg arc, given end-first or start-first, reads
     # inside the wedge: the arc's sense flag is not consulted.
     vertex = (0.087, 0.152)
     half = geometry.KINK_INCLUDED_DEG / 2
@@ -626,7 +645,7 @@ def _order_seat(monkeypatch, view: _DimensionedView, *, crop_drops: tuple[str, .
         calls.append("read")
         return sorted(view.names)
 
-    monkeypatch.setattr(drawing, "curate_view_dimensions", curate)
+    monkeypatch.setattr(drawing.hidden_sketches, "curate_view_dimensions", curate)
     monkeypatch.setattr(drawing, "_crop_kink_view", crop)
     monkeypatch.setattr(drawing, "_view_dimension_names", names)
     monkeypatch.setattr(
@@ -648,8 +667,8 @@ def test_kink_detail_is_dimensioned_before_it_is_cropped(monkeypatch) -> None:
         (
             "kink_detail.crop",
             {
-                "dimensions_before": "FlatLen,KinkR",
-                "dimensions_after": "FlatLen,KinkR",
+                "dimensions_before": "FlatLen,FreeKinkAngle,KinkR",
+                "dimensions_after": "FlatLen,FreeKinkAngle,KinkR",
                 "lost": "",
             },
         )
@@ -686,22 +705,36 @@ def test_kink_detail_fails_loud_when_the_seat_does_not_obey(
 
 
 def test_kink_crop_holds_its_dimensions_and_labels_clear_of_them() -> None:
-    # The crop circle is where pc-r12 printed the native detail's circle, so
-    # the KinkR and FlatLen text positions tuned there still ride its edge.
+    # The fence takes both crests: the phantom free crest with its angle's
+    # arc ends on the drawn legs and the installed crest with its centre and
+    # its flat's tip.
     focus = drawing.DETAIL_FOCUS
     radius = drawing.DETAIL_RADIUS_MM
-    flat_tip = geometry.FLAT_TIP
-    kink_c = geometry.KINK_C
-    # The flat's tip and the kink centre both sit inside the fence.
-    assert ((flat_tip[0] - focus[0]) ** 2 + (flat_tip[1] - focus[1]) ** 2) ** 0.5 < radius
-    assert ((kink_c[0] - focus[0]) ** 2 + (kink_c[1] - focus[1]) ** 2) ** 0.5 < radius
+    vertex = geometry.FREE_KINK_VERTEX
+    arc_mm = drawing.KINK_ANGLE_TEXT_RADIUS * 1000.0 / drawing.DETAIL_RATIO
+    legs_down_up = [
+        math.atan2(point[1] - vertex[1], point[0] - vertex[0])
+        for point in (geometry.FREE_BEND_EXIT, geometry.FREE_FLAT_TIP)
+    ]
+    arc_ends = [
+        (vertex[0] + arc_mm * math.cos(a), vertex[1] + arc_mm * math.sin(a))
+        for a in legs_down_up
+    ]
+    for point in (
+        geometry.FLAT_TIP,
+        geometry.KINK_C,
+        vertex,
+        geometry.FREE_FLAT_TIP,
+        *arc_ends,
+    ):
+        assert math.dist(point, focus) < radius, point
     crop_bottom = drawing.DETAIL_CENTER[1] - drawing.DETAIL_CROP_RADIUS
     assert drawing.DETAIL_LABEL_XY[0] == drawing.DETAIL_CENTER[0]
     assert drawing.DETAIL_LABEL_XY[1] < crop_bottom
     assert drawing.DETAIL_LABEL_TEXT == "DETAIL A\nSCALE 5 : 1"
     # KinkR rides above-left of the circle, FlatLen right of it: neither
     # reaches down to the label.
-    for name in ("KinkR", "FlatLen"):
+    for name in ("KinkR", "FlatLen", dt_pinion_spring_spec.FREE_KINK_ANGLE):
         assert drawing.DETAIL_KEEP[name][1] > drawing.DETAIL_LABEL_XY[1]
     # The fence letter goes east of the front view's fence, off the phantom.
     assert drawing.PARENT_LETTER_OFFSET[0] > drawing.DETAIL_RADIUS_MM * drawing._S
