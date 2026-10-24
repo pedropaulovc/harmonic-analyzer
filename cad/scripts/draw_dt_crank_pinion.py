@@ -238,24 +238,31 @@ _FACE_WIDTH_TEXT_X = _side_x(OVERALL_LENGTH) + 0.030
 # the gear data's long rows.
 _TOP_ROW_Y = _SIDE_TOP + 0.065
 # The tooth-face shoulder's R0.4 MAX (machinist review of 88d48ad2a7b4, rules
-# 11 and 16), laid out like draw_mg_output_fixture's shoulder radius (same
-# template, same nine printed glyphs): the arc's centre is up-right of the
-# upper corner, the leader rises from the arc nearly plumb, 3 mm right of
-# that centre, to an elbow in the open air over the turned band, and the
-# text, 20.83 mm wide, centres SHOULDER_RADIUS_RUN_IN right of the elbow and
-# RADIUS_SHOULDER_DROP over it.  The leader crosses only the turned
-# diameter's upper extension line; the turned diameter's line stands 9 mm
-# left of the elbow and the pin hole's line leaves the boss right of the
-# text's shoulder.
+# 11 and 16), laid out like draw_mg_output_fixture's shoulder radius: the
+# arc's centre is up-right of the upper corner, the leader rises from the arc
+# nearly plumb, 3 mm right of that centre, to an elbow in the open air over
+# the turned band.  The limit is tighter than the title block's R1.0 inside
+# corners because the MHA-DT-07 64T's tooth tips run over the corner at the
+# drive train's worst axial pose (dt_crank_pinion_spec.SHOULDER_RADIUS), so
+# its callout names that mate (machinist review of 2056e3344, rule 4): a
+# three-row block, R0.4 MAX / MHA-DT-07 / TIP CLR, whose widest row (the part
+# number, 24.28 mm on that sheet) centres SHOULDER_RADIUS_RUN_IN right of the
+# elbow and whose middle stands RADIUS_SHOULDER_DROP, half the block's
+# 5.56 mm rows, over its shoulder.  The elbow stands 17 mm over the tooth
+# tips, so the wider block's shoulder still ends 3 mm left of the pin hole's
+# line.  The leader crosses only the turned diameter's upper extension line;
+# the turned diameter's line stands 9 mm left of the elbow.
 SHOULDER_ARC_CENTRE = (
     _side_x(FACE_WIDTH + SHOULDER_RADIUS),
     RIGHT_CENTER[1] + HALF_BOSS + SHOULDER_RADIUS * VIEW_SCALE[0] / 1000.0,
 )
-SHOULDER_RADIUS_ELBOW = (SHOULDER_ARC_CENTRE[0] + 0.003, _SIDE_TOP + 0.012)
-SHOULDER_RADIUS_TEXT_HALF_WIDTH = 0.02083 / 2.0
-SHOULDER_RADIUS_RUN_IN = 0.01391
+SHOULDER_RADIUS_ELBOW = (SHOULDER_ARC_CENTRE[0] + 0.003, _SIDE_TOP + 0.017)
+SHOULDER_RADIUS_CALLOUT = "\n".join((MESH_GEAR_NUMBER, "TIP CLR"))
+SHOULDER_RADIUS_ROWS = 3
+SHOULDER_RADIUS_TEXT_HALF_WIDTH = 0.02428 / 2.0
+SHOULDER_RADIUS_RUN_IN = SHOULDER_RADIUS_TEXT_HALF_WIDTH + 0.0035
 SHOULDER_RADIUS_OVERRUN = 0.00174
-RADIUS_SHOULDER_DROP = 0.0027781
+RADIUS_SHOULDER_DROP = SHOULDER_RADIUS_ROWS * 0.0027781
 # The pin hole's reference diameter runs from the hole's centre to the left
 # end of its callout's underline, 55.4 mm left of the keep (88d48ad2a7b4
 # audit: keep x 0.275, line to x 0.2196 at y 0.2322).
@@ -305,6 +312,9 @@ DIMENSION_CALLOUTS = {
     # Reamed to the pin, so the size is a reference; the words carry the
     # operation, the mate, the pin, the fit's acceptance and flush.
     "PinHoleDia": PIN_HOLE_PROCESS,
+    # The shoulder's R MAX is tighter than the title block's inside corners
+    # for the 64T's tip clearance over the corner.
+    "ShoulderRadius": SHOULDER_RADIUS_CALLOUT,
 }
 REFERENCE_DIMENSIONS = ("PinHoleDia",)
 
@@ -367,12 +377,12 @@ def _boss_dia_text_crossings(adapter: Any, annotations: Sequence[Any]) -> None:
 
 
 def _dress_shoulder_radius(adapter: Any, annotations: Sequence[Any]) -> None:
-    """Prove the section's imported ShoulderRadius prints the part's R MAX and
-    stop its leader at the corner arc.
+    """Prove the section's imported ShoulderRadius prints the part's R MAX
+    with its mate callout, and stop its leader at the corner arc.
 
     Read back: radial (not a diameter), measuring SHOULDER_RADIUS, the native
-    swTolMAX the part set. ``ArcExtensionLineOrOppositeSide`` False keeps the
-    leader from running on through the arc centre into the boss
+    swTolMAX the part set, the callout under it. ``ArcExtensionLineOrOppositeSide``
+    False keeps the leader from running on through the arc centre into the boss
     (draw_pn_pen_rod._dress_shoulder_radius, draw_mg_output_fixture).
     """
     found = [
@@ -398,10 +408,15 @@ def _dress_shoulder_radius(adapter: Any, annotations: Sequence[Any]) -> None:
         float(dimension.SystemValue), SHOULDER_RADIUS / 1000.0, abs_tol=1e-9
     ):
         raise RuntimeError("ShoulderRadius does not measure the shoulder radius")
+    callout = str(display.GetText(4) or "")  # swDimensionTextCalloutBelow
+    if callout != SHOULDER_RADIUS_CALLOUT:
+        raise RuntimeError(f"ShoulderRadius callout did not persist: {callout!r}")
     display.ArcExtensionLineOrOppositeSide = False
     if display.ArcExtensionLineOrOppositeSide is not False:
         raise RuntimeError("ShoulderRadius leader still runs to the opposite side")
-    _telemetry.info(f"shoulder radius: text {display.GetText(1)!r}, MAX type")
+    _telemetry.info(
+        f"shoulder radius: text {display.GetText(1)!r}, MAX type, callout {callout!r}"
+    )
 
 
 def _isometric_clears_boss_dia(iso: Any) -> None:

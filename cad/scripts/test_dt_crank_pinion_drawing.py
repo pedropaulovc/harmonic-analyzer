@@ -153,6 +153,12 @@ def test_tooth_face_shoulder_prints_a_native_single_limit_radius() -> None:
     assert "_shoulder_radius_max_limit(adapter)" in build
     assert "_dress_shoulder_radius(adapter, right_annotations)" in _source()
     assert drawing.SHOULDER_RADIUS_TOL_TYPE == spec.SHOULDER_RADIUS_TOL_TYPE
+    # Tighter than the title block's R1.0 inside corners, so it names the
+    # mate whose tips run over the corner (machinist review of 2056e3344).
+    assert drawing.DIMENSION_CALLOUTS["ShoulderRadius"] == "MHA-DT-07\nTIP CLR"
+    assert spec.MESH_GEAR_NUMBER == "MHA-DT-07"
+    assert drawing.SHOULDER_RADIUS_ROWS == 3  # R0.4 MAX over the two callout rows
+    assert "if callout != SHOULDER_RADIUS_CALLOUT:" in _source()
 
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
@@ -394,6 +400,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         "ShoulderLength",
         "FaceWidth",
         "PinHoleDia",
+        "ShoulderRadius",
     }
     assert callouts["BoreDia"] == spec.BORE_PROCESS_CALLOUT
     assert spec.MESH_GEAR_NUMBER in callouts["OutsideDia"]
@@ -402,6 +409,7 @@ def test_callouts_add_only_what_the_number_cannot_carry() -> None:
         assert spec.CONE_GEAR_NUMBER in callouts[name], name
     assert callouts["TurnedDia"] == spec.TURNED_DIA_FITUP_CALLOUT
     assert spec.CONE_GEAR_NUMBER in callouts["TurnedDia"]
+    assert spec.MESH_GEAR_NUMBER in callouts["ShoulderRadius"]
     assert spec.BORE_PROCESS_CALLOUT == "REAM THRU"
     assert spec.BORE_FIT_CALLOUT == "\n".join(
         (
@@ -602,8 +610,9 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     shoulder_right = text_right + drawing.SHOULDER_RADIUS_OVERRUN
     assert elbow_x < radius_x - drawing.SHOULDER_RADIUS_TEXT_HALF_WIDTH
     assert shoulder_right + 0.003 < pin_line_x(elbow_y)
-    assert text_right + 0.003 < pin_line_x(radius_y + 0.004)
-    assert radius_y + 0.004 < drawing._TOP_ROW_Y - 0.0111
+    block_top = radius_y + drawing.RADIUS_SHOULDER_DROP
+    assert text_right + 0.003 < pin_line_x(block_top)
+    assert block_top + 0.002 < drawing._TOP_ROW_Y - 0.0111
     # The bore-fit note stays left of the end view; its short pointer enters
     # radially through the upper-left tooth gap and lands on the bore circle.
     assert drawing.BORE_FIT_NOTE[0] < drawing.FRONT_CENTER[0] - half_od
