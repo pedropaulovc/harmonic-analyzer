@@ -16,7 +16,11 @@ peaks too. The decimal places are the PART's
 (``crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_drive_gear``); this script only reads them back off the sheet.
 
-Drawn 3:2 so the face view's 64 teeth read as teeth on the B sheet.
+Drawn 3:2 so the face view's 64 teeth read as teeth on the B sheet. Section
+A-A shows only the native cut faces: projected helical tooth edges beyond
+the plane must not masquerade as chamfers at the hatched OD corners. The
+full gear remains in the face/isometric views and the real bore chamfer
+remains in the cut.
 """
 
 from __future__ import annotations
@@ -229,6 +233,17 @@ def _hide_tangent_edges(view: Any, label: str) -> None:
     if int(view.GetDisplayTangentEdges2()) != 0:
         raise RuntimeError(f"failed to hide {label}-view tangent edges")
     view.UpdateViewDisplayGeometry()
+
+
+def _cut_faces_only(adapter: Any, view: Any) -> None:
+    """Use the drawing-section SDK option, not a simplified gear model."""
+    section = _early_bound(_early_bound(view, "IView").GetSection(), "IDrSection")
+    # IDrSection::SetDisplayOnlySurfaceCut is void; prove the state with its
+    # dedicated getter after rebuilding, as on the cone-gear-shaft sections.
+    section.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="64T section cut faces only")
+    if not bool(section.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError("64T section kept geometry beyond the cut")
 
 
 def _position_section_caption(adapter: Any, view: Any) -> None:
@@ -450,6 +465,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="64T longitudinal centre section",
     )
     _turn_section_axis_across(adapter, section)
+    _cut_faces_only(adapter, section)
     _position_section_caption(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     # The bore profile is a circular arc closed by a flat; the D-shape is
