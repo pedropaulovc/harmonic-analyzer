@@ -958,11 +958,21 @@ async def build_supplier_spring_drawing(
     installed_variants: Sequence[tuple[str, str]] = (),
     stock_caption: str = "SUPPLIER NOMINAL STOCK DIAGRAM — NOT PART SHAPE",
     installed_caption: str = "INSTALLED REPRESENTATION",
+    installed_caption_gap: float | None = None,
     right_caption: str = "SUPPLIER NOMINAL SECTIONS",
     cut_to_suit: bool = False,
     spring_metadata: bool = False,
     settled_checks: Sequence[Callable[[], None]] = (),
 ) -> dict[str, str]:
+    """Build separate supplier diagrams and an installed pictorial.
+
+    An opt-in installed caption targets its measured top below the native
+    pictorial outline. None preserves every existing cell-floor caption.
+    """
+    if installed_caption_gap is not None and (
+        not isfinite(installed_caption_gap) or installed_caption_gap <= 0.0
+    ):
+        raise ValueError("installed caption gap must be finite and positive")
     source = spec.source
     if spec.source_kind != "part" or not source.is_file():
         raise FileNotFoundError(f"source purchased part is missing: {source}")
@@ -1291,12 +1301,29 @@ async def build_supplier_spring_drawing(
         text = f"{captions[key]}  {ratio[0]}:{ratio[1]}"
         y = cell[1] - (0.016 if key == "free_right" else 0.012)
         note = _literal_note(adapter, text, center[0], y)
+        if key == "installed_iso" and installed_caption_gap is not None:
+            _rebuild(draw, phase="measure installed state caption")
         bounds = _box(note.GetExtent(), label=text, kind="note")
         annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
         if int(annotation.OwnerType) != 1:
             raise RuntimeError(f"{key}: state caption is not sheet-owned")
         x = center[0] - (bounds[2] - bounds[0]) / 2
-        if not annotation.SetPosition(x, y, 0.0):
+        if key == "installed_iso" and installed_caption_gap is not None:
+            outline = _box(views[key].GetOutline(), label=f"{key} caption anchor")
+            y = outline[1] - installed_caption_gap
+            position = tuple(float(value) for value in (annotation.GetPosition() or ()))
+            if len(position) != 3 or not all(map(isfinite, position)):
+                raise RuntimeError(f"{key}: state caption has invalid position {position!r}")
+            x = position[0] + center[0] - (bounds[0] + bounds[2]) / 2.0
+            if not annotation.SetPosition2(
+                x, position[1] + y - bounds[3], position[2]
+            ):
+                raise RuntimeError(
+                    f"{key}: cannot place measured caption below {outline!r}; "
+                    f"caption={bounds!r}, gap={installed_caption_gap!r}"
+                )
+            _rebuild(draw, phase="position installed state caption")
+        elif not annotation.SetPosition(x, y, 0.0):
             raise RuntimeError(f"{key}: cannot center state caption")
         placed.append((note, text, text, (0.015, y - 0.008, 0.416, y + 0.001)))
     placed.extend(

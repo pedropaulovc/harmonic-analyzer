@@ -1,4 +1,11 @@
-"""Native nominal supplier dimension diagrams, never physical spring replicas."""
+"""Native nominal supplier dimension diagrams, never physical spring replicas.
+
+Linear dimensions keep their native dimension lines outside the source planes
+and their complete source-formatted text on separate lower/upper offset shelves.
+Plan diameters use near-rim single-arrow leaders in distinct sectors, never
+OffsetText (which the API does not support for diameters). The shared whole-ink
+cell guard remains authoritative after the final rebuild.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +16,14 @@ from typing import Any
 from solidworks_mcp.adapters.solidworks.drawing import dimension_name
 
 from _com import _early_bound
+from _drawing_common import rebuild_drawing
+from _drawing_dimensions import offset_dimension_text
 from _drawing_hidden_sketches import _show_hidden_owners, curate_view_dimensions
+from _drawing_leaders import (
+    assert_leaders_clear,
+    dimension_segments,
+    set_near_side_diameter,
+)
 from _supplier_dimensions import (
     assert_supplier_reference_dimension,
     supplier_reference_dimension,
@@ -77,12 +91,57 @@ def prepare_supplier_disc_diagram(
     return (check_rebuilt_diagram_extents,)
 
 
+def _assert_nominal_diameter_routes(
+    displays: dict[str, Any],
+    *,
+    spec: Any,
+    bounds: tuple[float, float, float, float],
+) -> None:
+    """Read final native routes, not just successful presentation setters."""
+    x0, y0, x1, y1 = bounds
+    radii = {}
+    segments = {}
+    for semantic in ("ID", "OD", "SHAFT_DIA"):
+        name = SUPPLIER_DIMENSION_NAMES[semantic]
+        if name not in displays:
+            continue
+        display = displays[name]
+        if (
+            not bool(display.Diametric)
+            or int(display.ArrowSide) != 1  # swDimArrowsOutside
+            or bool(display.SolidLeader)
+            or bool(display.GetUseDocBrokenLeader())
+            or int(display.GetBrokenLeader2()) != 2  # swBrokenLeaderHorizontalText
+            or bool(display.GetUseDocSecondArrow())
+            or bool(display.GetSecondArrow())
+        ):
+            raise RuntimeError(f"{spec.SKU} {semantic}: near-side diameter style changed")
+        radii[name] = (x1 - x0) * float(getattr(spec, semantic)) / (2.0 * spec.OD)
+        segments[name] = dimension_segments(display.GetAnnotation())
+    # Native circle bounds use GetRadius plus analytic projected extrema
+    # (_supplier_reference_geometry), not a rounded/nominal box. The source
+    # extent's 1e-7 comparison is a refusal threshold, not projection rounding.
+    # dimension_segments reads unrounded doubles; only audit JSON rounds to
+    # 1e-7. Retain this fail-closed landing budget without adding that JSON
+    # quantization or widening the source/cell guards.
+    assert_leaders_clear(
+        segments,
+        centre=((x0 + x1) / 2.0, (y0 + y1) / 2.0),
+        keep_out={name: radius - 1e-7 for name, radius in radii.items()},
+        lands_within={
+            name: (radius - 1e-7, radius + 1e-7) for name, radius in radii.items()
+        },
+        label=f"{spec.SKU} nominal diameter leaders",
+    )
+
+
 def supplier_disc_spring_dimensions(
     adapter: Any,
     views: dict[str, Any],
     *,
     spec: Any,
     reference_bounds: Callable[[str], tuple[float, float, float, float]],
+    id_callout: str | None = None,
     settled_checks: list[Callable[[], None]] | None = None,
 ) -> None:
     """Import native nominal sizes from explicitly nonphysical diagrams.
@@ -91,45 +150,81 @@ def supplier_disc_spring_dimensions(
     dimensions, not a wave/bow reconstruction or the installed annulus/cone.
     Working-height/deflection planes and nominal mating-shaft circles are
     separate application gauges, not an invented loaded spring or bore.
+    The optional ID flag links an existing installation requirement, not a new size;
+    its taller native text lane sits 2 mm farther inward without moving the source.
     """
     references = []
     placements = {}
     source_bounds = {
         key: reference_bounds(key) for key in supplier_disc_reference_features(spec)
     }
-    for key, left_size, right_size in (
-        ("free_top", "ID", "OD"),
-        ("free_front", "THICKNESS", "FREE_HEIGHT"),
-    ):
-        x0, y0, x1, y1 = source_bounds[key]
-        placements[key] = {
-            left_size: (x0 - 0.018, (y0 + y1) / 2.0),
-            right_size: (x1 + 0.018, (y0 + y1) / 2.0),
-        }
+    x0, y0, x1, y1 = source_bounds["free_front"]
+    placements["free_front"] = {
+        "THICKNESS": (x0 - 0.018, (y0 + y1) / 2.0),
+        "FREE_HEIGHT": (x1 + 0.018, (y0 + y1) / 2.0),
+    }
+    nominal_text_positions = {
+        SUPPLIER_DIMENSION_NAMES["THICKNESS"]: ((x0 + x1) / 2.0, y0 - 0.014),
+        SUPPLIER_DIMENSION_NAMES["FREE_HEIGHT"]: ((x0 + x1) / 2.0, y1 + 0.014),
+    }
+    x0, y0, x1, y1 = source_bounds["free_top"]
+    # The widest source bands need their entire text outside the outer circle.
+    # Upper-left ID, lower-right OD and upper-right shaft avoid the old
+    # through-centre X; these are text origins, not replacement attachments.
+    # Both ID/OD origins sit 4 mm inside the source's vertical extrema to
+    # reserve headroom for the rocker's 4:1 asymmetric-band text. The final
+    # native whole-ink guard, not that reserve, decides containment.
+    placements["free_top"] = {
+        "ID": (x0 - 0.026, y1 - 0.004),
+        "OD": (x1 + 0.026, y0 + 0.004),
+    }
+    if id_callout is not None:
+        # f4's complete rocker ID ink exceeded the unchanged top cell by
+        # 0.9217 mm. Lower only this flagged lane another 2 mm; the settled
+        # native route/whole-ink guards still decide whether it really fits.
+        placements["free_top"]["ID"] = (x0 - 0.026, y1 - 0.006)
 
     application = set(spec.SUPPLIER_APPLICATION_DIMENSIONS)
     if "SHAFT_DIA" in application:
-        x0, _y0, x1, y1 = source_bounds["free_top"]
-        placements["free_top"]["SHAFT_DIA"] = ((x0 + x1) / 2.0, y1 + 0.010)
+        placements["free_top"]["SHAFT_DIA"] = (
+            (x0 + x1) / 2.0 + 0.020, y1 + 0.010
+        )
+    diameter_text_positions = {
+        SUPPLIER_DIMENSION_NAMES[semantic]: xy
+        for semantic, xy in placements["free_top"].items()
+    }
     height_sizes = [
         semantic
         for semantic in ("WORKING_HEIGHT", "WORKING_DEFLECTION")
         if semantic in application
     ]
+    application_text_positions = {}
     if height_sizes:
         x0, y0, x1, y1 = source_bounds["free_right"]
+        # Keep the dimension lines outside the application planes. Offset the
+        # complete native callouts next to their own gauge bands: compressed
+        # height below the baseline, deflection above the free-upper plane.
         placements["free_right"] = {
             semantic: (
-                x0 - 0.014 if index == 0 else x1 + 0.014,
+                x0 - 0.014 if semantic == "WORKING_HEIGHT" else x1 + 0.014,
                 (y0 + y1) / 2.0,
             )
-            for index, semantic in enumerate(height_sizes)
+            for semantic in height_sizes
         }
-    application_labels = {
+        application_text_positions = {
+            SUPPLIER_DIMENSION_NAMES[semantic]: (
+                (x0 + x1) / 2.0,
+                y0 - 0.014 if semantic == "WORKING_HEIGHT" else y1 + 0.014,
+            )
+            for semantic in height_sizes
+        }
+    reference_labels = {
         "WORKING_HEIGHT": "COMPRESSED HEIGHT",
         "WORKING_DEFLECTION": "DEFLECTION",
         "SHAFT_DIA": "FOR SHAFT",
     }
+    if id_callout is not None:
+        reference_labels["ID"] = id_callout
 
     for key, positions in placements.items():
         keep = {
@@ -160,12 +255,24 @@ def supplier_disc_spring_dimensions(
                     "diameter" if semantic in ("ID", "OD", "SHAFT_DIA") else "length"
                 ),
             }
-            if semantic in application_labels:
-                arguments["callout"] = application_labels[semantic]
+            if semantic in reference_labels:
+                arguments["callout"] = reference_labels[semantic]
             supplier_reference_dimension(adapter, display, **arguments)
+            if key == "free_top":
+                set_near_side_diameter(annotation, arguments["label"])
+                # Re-pin after source formatting and leader style have settled
+                # the text width; never offset a diametric dimension's text.
+                if not annotation.SetPosition2(*positions[semantic], 0.0):
+                    raise RuntimeError(f"{arguments['label']}: diameter placement failed")
             references.append(
                 (key, SUPPLIER_DIMENSION_NAMES[semantic], arguments, semantic)
             )
+        if key == "free_front":
+            offset_dimension_text(adapter, imported, nominal_text_positions)
+        elif key == "free_top":
+            rebuild_drawing(adapter, label=f"{spec.SKU} near-side nominal diameters")
+        elif key == "free_right":
+            offset_dimension_text(adapter, imported, application_text_positions)
 
     expected = {key: {} for key in views}
     configurations = {
@@ -191,8 +298,39 @@ def supplier_disc_spring_dimensions(
             expected=expected,
             configurations=configurations,
         )
+        _assert_nominal_diameter_routes(
+            displays, spec=spec, bounds=source_bounds["free_top"]
+        )
         for key, name, arguments, semantic in references:
             display = displays[name]
+            text_positions = (
+                nominal_text_positions
+                if key == "free_front"
+                else diameter_text_positions
+                if key == "free_top"
+                else application_text_positions
+            )
+            if name in text_positions:
+                kind = (
+                    "nominal" if key == "free_front"
+                    else "diameter" if key == "free_top"
+                    else "application"
+                )
+                if key != "free_top" and not bool(display.OffsetText):
+                    raise RuntimeError(
+                        f"{spec.SKU} {semantic}: {kind} text lost its offset shelf"
+                    )
+                annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
+                point = tuple(float(value) for value in (annotation.GetPosition() or ()))
+                if (
+                    len(point) != 3
+                    or not all(map(math.isfinite, point))
+                    or math.dist(point[:2], text_positions[name]) > 1e-6
+                ):
+                    raise RuntimeError(
+                        f"{spec.SKU} {semantic}: {kind} text moved from its target: "
+                        f"{point!r} != {text_positions[name]!r}"
+                    )
             assert_supplier_reference_dimension(adapter, display, **arguments)
             assert_supplier_configuration_value(
                 display,

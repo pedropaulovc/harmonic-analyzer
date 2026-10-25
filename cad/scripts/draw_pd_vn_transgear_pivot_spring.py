@@ -43,6 +43,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         right_caption="SUPPLIER APPLICATION GAUGES — NOT PART SHAPE",
         installed_caption="INSTALLED CONICAL REPRESENTATION",
+        installed_caption_gap=0.003,
         settled_checks=settled_checks,
     )
 

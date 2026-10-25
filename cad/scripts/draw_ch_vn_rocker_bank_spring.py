@@ -40,8 +40,10 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         supplier_dimensions=partial(
             supplier_disc_spring_dimensions, spec=supplier_spec, settled_checks=settled_checks,
+            id_callout="SEE NOTE 1",
         ),
         installed_caption="INSTALLED ENVELOPE",
+        installed_caption_gap=0.003,
         settled_checks=settled_checks,
     )
 
