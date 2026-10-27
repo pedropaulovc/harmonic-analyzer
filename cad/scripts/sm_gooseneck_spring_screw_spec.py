@@ -39,11 +39,11 @@ crown rise drive it (machinist FIX round 1: no note carries a feature's
 geometry).
 
 The counter seats in ``cad/config/machine/springs.yaml`` were re-measured
-natively on this 17.50 screw and the counterbored 9.90 plug by the one-off
-``verify:spring_seats`` leaf, farm run
-20261027T075336815Z-1baa0df23b41420a99b0a2ad630e377f; the committed file is
+natively on this 17.50 screw (R0.5 under-head corner) and the counterbored
+9.90 plug by the one-off ``verify:spring_seats`` leaf, farm run
+20261027T090037071Z-f6fae47f673d41ddadbaee1c5f04e77a; the committed file is
 that leaf's output byte for byte (sha256
-4e402ecb4406a2c27d5ff3cacc32557f2c8bc55bf8c57cf8b32827bb7c5b89c7).
+3a718b80bac4c449299042edbf7e254573fd5128e430102a6b39358f57922d14).
 """
 
 from __future__ import annotations

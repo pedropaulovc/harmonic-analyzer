@@ -285,15 +285,17 @@ springs:
           seat_dia_mm: 3.5
           shoulder_length_mm: 3.9
           tip_chamfer_mm: 0.3
+          underhead_corner_r_mm: 0.5
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           plug_length_mm: 9.9
           plug_counterbore_dia_mm: 4.7
           plug_counterbore_depth_mm: 2.57
+          plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864983418976494e-06
-          upper: 3.5083300210182834e-11
+          upper: 3.5083301858668596e-11
     square:
       amplitudes_mm:
       - 0
@@ -321,16 +323,16 @@ springs:
           length_mm: 350.26533131534217
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439944
+          - 1010.3428723439941
           upper_eye_xy:
           - -91.2
-          - 1351.1086036593365
+          - 1351.1086036593363
           axis_xy:
           - -4.068867282667633e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.7257380016654
+          - 1180.7257380016651
           clocking: half_turn
         gooseneck_origin_y_mm: 1190.8034229809937
         upper_support:
@@ -348,12 +350,14 @@ springs:
           seat_dia_mm: 3.5
           shoulder_length_mm: 3.9
           tip_chamfer_mm: 0.3
+          underhead_corner_r_mm: 0.5
           clamp_gap_mm: 4.88061
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           plug_length_mm: 9.9
           plug_counterbore_dia_mm: 4.7
           plug_counterbore_depth_mm: 2.57
+          plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864959429115734e-06
-          upper: 3.486125887335281e-11
+          upper: 3.5083301858668596e-11
