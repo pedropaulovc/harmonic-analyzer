@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -97,7 +98,9 @@ def test_punch_and_seam_operations_are_callouts_not_fake_dimensions() -> None:
     assert "AT ASSEMBLY" in seam
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert all("Fiducial" not in name for name in marked)
+    # The punch witness prints its location, never a size (machinist review
+    # 2026-10-27: "LOCATE BY EYE" gave none).
+    assert {name for name in marked if "Fiducial" in name} == {"FiducialX", "FiducialY"}
     assert all("AxialPin" not in name for name in marked)
 
 
@@ -109,7 +112,10 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     )
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    assert model_toleranced_dimensions(arm) == {}
+    # Only the punch witness's two ordinates carry their own band.
+    assert model_toleranced_dimensions(arm) == {
+        ("FiducialProfile", "name"): "FIDUCIAL_ORDINATE_TOL"
+    }
     assert spec.SURFACE_FINISHES == ()
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
@@ -339,6 +345,55 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     # The note stands above the arm's top edge, left of the hub-seat leader.
     assert drawing.FIDUCIAL_CALLOUT_XY[1] > drawing.ARM_SILHOUETTE[3]
     assert drawing.FIDUCIAL_CALLOUT_XY[0] < cx
+    # Its right end stays left of the mark (iter 1 of the 2026-10-27 fix: a
+    # wider block sent the leader down-left through the FiducialX 7.9).
+    char_w = 0.0027  # measured on the 5bca52e13 render
+    width = max(map(len, notes.FIDUCIAL_CALLOUT.splitlines())) * char_w
+    assert drawing.FIDUCIAL_CALLOUT_XY[0] + width + 0.005 < cx
+    # Both ordinates draw their arrows inside their witnesses, so neither 7.9
+    # line runs out under the punch-mark or hub-seat leader (farm iter 2).
+    assert drawing.ARROWS_INSIDE == ("FiducialX", "FiducialY")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.index("_arrows_inside(adapter, front_annotations)") < source.index(
+        "_hub_seat_leader_clear(adapter, front_annotations)"
+    )
+
+
+def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:
+    # Machinist review 2026-10-27: the callout said where only in words.  The
+    # mark now prints two toleranced ordinates from the hub-seat axis; the
+    # callout names its function and mate.
+    assert "BY EYE" not in notes.FIDUCIAL_CALLOUT
+    assert "MHA-DT-11" in notes.FIDUCIAL_CALLOUT
+    assert spec.DRAWING_PRECISION["FiducialProfile"] == {"FiducialX": 1, "FiducialY": 1}
+    # codjiflo P2 on #2005: the flat face is judged at the printed worst case,
+    # the seat bore at its .X upper limit and the boss end at its .X lower
+    # limit, each less its edge break.
+    general, break_ = geometry.GENERAL_1PL_TOL_MM, geometry.EDGE_BREAK_MAX_MM
+    face = ((spec.HUB_SEAT_DIA + general) / 2.0 + break_, spec.HALF_WIDTH - general - break_)
+    assert spec.FIDUCIAL_FACE_RADII == pytest.approx(face)
+    assert face == pytest.approx((10.35, 11.65))
+    # The model ordinates are the printed one-place values, at 135 degrees on
+    # that annulus's mid-radius.
+    assert spec.FIDUCIAL_Y == -spec.FIDUCIAL_X == pytest.approx(7.8)
+    assert round(spec.FIDUCIAL_Y, 1) == spec.FIDUCIAL_Y
+    # Anywhere in the ordinates' square band the centre stays on that face;
+    # the title block's .X band would not.
+    assert spec.FIDUCIAL_ORDINATE_TOL == 0.4
+    inner, outer = spec.FIDUCIAL_RADIAL_LIMITS
+    assert inner == pytest.approx(math.sqrt(2.0) * (7.8 - 0.4))
+    assert outer == pytest.approx(math.sqrt(2.0) * (7.8 + 0.4))
+    assert face[0] < inner < outer < face[1]
+    assert math.sqrt(2.0) * (7.8 - general) < face[0]
+    # Both ordinate texts stand off the part, the Y left of the boss end.
+    import _drawing_leaders as leaders
+
+    texts = [drawing.FRONT_KEEP["FiducialX"], drawing.FRONT_KEEP["FiducialY"]]
+    assert leaders.points_inside(texts, drawing.ARM_SILHOUETTE) == []
+    assert drawing.FRONT_KEEP["FiducialY"][0] < drawing.ARM_SILHOUETTE[0]
+    # R12.7 no longer reads along the axis, where its leader would lie on the
+    # witness Y's extension line from the bore centre.
+    assert drawing.FRONT_KEEP["BossRadius"][1] < drawing.ARM_SILHOUETTE[1]
 
 
 def test_stock_line_comes_from_the_one_stock_constant() -> None:

@@ -50,5 +50,9 @@ PIVOT_TAP_ROWS = (
 )
 # The punched fiducial is flagged at the mark, not in the general notes
 # (#984 machinist review r2/r3: an unlabelled crosshair could read as an
-# undimensioned hole).
-FIDUCIAL_CALLOUT = "PUNCH FIDUCIAL MARK;\nLOCATE BY EYE"
+# undimensioned hole).  Its location is the two imported ordinates from the
+# hub-seat axis; the callout states only what it is for (machinist review
+# 2026-10-27: "LOCATE BY EYE" placed it in words).  Short lines keep the
+# block's right end left of the mark, so its leader descends away from the
+# block and the FiducialX ordinate.
+FIDUCIAL_CALLOUT = "PUNCH MARK:\nALIGNS WITH\nMHA-DT-11\nDOME MARK"

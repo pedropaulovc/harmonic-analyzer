@@ -268,7 +268,7 @@ sections:
         - scaled
         - low
       - - Fiducial punch marks
-        - 'simple un-dimensioned punched witnesses on arm and shaft dome'
+        - 'simple punched witnesses on arm and shaft dome; neither prints a size, the arm''s prints .X ordinates from the hub-seat axis'
         - —
         - 'primary construction photo/annotation; these are alignment witnesses, not machined dimples. The CAD uses only a shallow visual representation and the drawings intentionally carry no diameter/depth callout.'
         - construction

@@ -228,7 +228,13 @@ FRONT_KEEP = {
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
     "Width": (0.279, FRONT_CENTER[1]),
-    "BossRadius": (0.030, FRONT_CENTER[1]),
+    # The punch witness's ordinates from the hub-seat axis: the X above the
+    # boss end, under the witness's callout; the Y left of the boss.
+    "FiducialX": (_sheet_x(FIDUCIAL_X / 2.0), 0.178),
+    "FiducialY": (0.034, FRONT_CENTER[1] + FIDUCIAL_Y / 2.0 * SHEET_SCALE[0] / 1000.0),
+    # Below the boss end, inboard of the overall's extension line: on the axis
+    # its leader would run along the witness Y's extension line from the centre.
+    "BossRadius": (0.057, 0.106),
     # Below and right of the handle end, clear of the Width row and the
     # 75.0 station row; its leader lands on the lower-right quarter of the arc.
     "EndRadius": (0.268, 0.100),
@@ -271,7 +277,10 @@ FIDUCIAL_EDGE_PICK = (
     * SHEET_SCALE[0]
     / 1000.0,
 )
-FIDUCIAL_CALLOUT_XY = (0.016, 0.196)
+# Under the hub-seat block, its right end left of the mark: the leader runs
+# down and right to the rim, outside the FiducialX ordinate's lines and text
+# (iter 1 of the 2026-10-27 fix: from right of the mark it ran through 7.9).
+FIDUCIAL_CALLOUT_XY = (0.016, 0.205)
 # The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
 _END_PICK_DY_SHEET = 0.004
 _END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
@@ -281,6 +290,13 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
+# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
+# document's smart arrows (draw_dt_pinion_arbor's form): left smart, the two
+# 7.9 ordinates drew their arrows outside, and the X's tails ran under the
+# punch-mark and hub-seat leaders (machinist review of the 2026-10-27 fix's
+# farm iter 2, rule 14).
+ARROWS_INSIDE = ("FiducialX", "FiducialY")
+_DIM_ARROWS_INSIDE = 0
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -288,6 +304,16 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
     return matches[0]
+
+
+def _arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Draw each ``ARROWS_INSIDE`` dimension's arrows inside its witnesses."""
+    for name in ARROWS_INSIDE:
+        annotation = _early_bound(_named(adapter, annotations, name), "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside its witnesses")
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -399,6 +425,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
         )
+    _arrows_inside(adapter, front_annotations)
     _hub_seat_leader_clear(adapter, front_annotations)
     _texts_off_the_part(adapter, front_annotations)
 
