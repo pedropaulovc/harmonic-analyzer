@@ -1925,7 +1925,7 @@ CAP_SEATING_STEPS = (
     "C3A.4 FLAT FACES MUST SEAT; REGISTERS MUST NOT BOTTOM. DO NOT PULL A GAP "
     "SHUT WITH THE SCREWS: RE-MACHINE OR REPLACE A FAILED PART.",
     "C3B. NO THREAD-ENGAGEMENT MEASUREMENT: ESTIMATED COMPLETE-THREAD "
-    f"ENGAGEMENT {retention.cap_screw_complete_engagement_estimate():.2f} (UNDER "
+    f"ENGAGEMENT {fasteners.cap_screw_complete_engagement_estimate():.2f} (UNDER "
     f"1.5D, {retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f}).",
     "C3C. LOCK EACH PAIR WITH NEW "
     f"{retention_hardware.WIRE_DIA / retention_hardware.INCH:.3f} STAINLESS WIRE "

@@ -48,8 +48,11 @@ callout (``callout``) and its item number.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from fractions import Fraction
+
+import _config
 
 import ch_rocker_arm_tl_oblique_base_bar_spec as base_bar
 import ch_rocker_arm_tl_oblique_carrier_spec as carrier
@@ -234,6 +237,48 @@ LEVER_TO_CARRIER = Fastener(
     min_engagement_d=1.3,
     note="the 12 carrier limits engagement; see the lever washer's worst-case stack",
 )
+# ESTIMATES, not procurement limits, for the TL-30 cap screws' complete-thread
+# runouts. A 3/4 NAS1352N5H12 is shorter than NAS1352's 1.125 minimum basic
+# thread length, so it is only "threaded as close to the head as practicable"
+# (NAS note c), and no supplier bound is published. These adopt ASME
+# B18.3-2012's conventions as the estimate: complete threads to within two
+# pitches of the head (Table 4 note (c), sizes through 5/8) and a ~90-degree
+# point chamfered just below the root (Table 1 note (8)), taken as two
+# incomplete pitches. They feed only the RV-04 estimate, never a guarantee.
+CAP_SCREW_COMPLETE_THREAD_FROM_HEAD_EST = 2.0 * retention.CAP_BOLT_PITCH
+CAP_SCREW_POINT_INCOMPLETE_EST = 2.0 * retention.CAP_BOLT_PITCH
+# The pivot block's THRU tap mouth carries only the title-block edge break MAX.
+BLOCK_TAP_MOUTH_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+
+
+def cap_screw_complete_engagement_estimate() -> float:
+    """Estimated worst-case complete-thread overlap of a cap screw in its tap, mm.
+
+    An ESTIMATE, conditional on the ASME B18.3-convention runouts above (no
+    NAS or supplier limit exists for a screw this short). Along the actual
+    tap axis from the block top: the screw's complete threads run from
+    CAP_SCREW_COMPLETE_THREAD_FROM_HEAD_EST under its head to
+    CAP_SCREW_POINT_INCOMPLETE_EST short of its point; the block's start
+    below the tap mouth's title-block break plus one partial thread. The
+    shortest screw pairs with the highest seated head for the deep end and
+    the lowest seat for the shallow end. Even this estimate falls short of
+    retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT: owner minor exception RV-04
+    (owner ruling 2026-10-27) accepts the shortfall with no assembly
+    measurement.
+    """
+    gamma = math.radians(retention.GENERAL_ANGULAR_BAND_DEGREES)
+    fitted = retention.fitted_counterbore_bounds()
+    deep = (
+        retention.CAP_BOLT_LENGTH_MIN - CAP_SCREW_POINT_INCOMPLETE_EST
+        - fitted.head_seat_max / math.cos(gamma)
+    )
+    shallow = max(
+        BLOCK_TAP_MOUTH_BREAK_MAX / math.cos(gamma) + retention.CAP_BOLT_PITCH,
+        CAP_SCREW_COMPLETE_THREAD_FROM_HEAD_EST - fitted.head_seat_min,
+    )
+    return deep - shallow
+
+
 CAP_TO_BLOCK = Fastener(
     "TL-30 capture cap to TL-22 pivot block",
     retention_hardware.SCREW_THREAD,
@@ -245,7 +290,7 @@ CAP_TO_BLOCK = Fastener(
     note=(
         f"{retention_hardware.SCREW_SUPPLIER} {retention_hardware.SCREW_SKU}; "
         "estimated worst-case complete full-form overlap in the THRU block "
-        f"threads is {retention.cap_screw_complete_engagement_estimate():.2f} mm, under 1.5D "
+        f"threads is {cap_screw_complete_engagement_estimate():.2f} mm, under 1.5D "
         f"({retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f} mm): owner minor "
         "exception RV-04 (owner ruling 2026-10-27), not measured at assembly. "
         "Seat clean, dry, free-running actual screws cross-pattern at "

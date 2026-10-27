@@ -2650,11 +2650,10 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     hole_top = pin.CROSS_HOLE_STATION + pin.CROSS_HOLE_DIA / 2.0
     bolt_y = r.CAP_BOLT_Y_OFFSETS[0]
     # B-B's two C3A labels sit left of it, so both land on the bolt's outer
-    # (-X) side and no leader crosses the section: the cap/block land midway
-    # between the cap's edge and the clearance hole, the underhead footprint
-    # on the head's -X bearing ring.
+    # (-X) side and no leader crosses the section: the cap/block land at the
+    # clearance hole's bottom corner, the underhead footprint on the head's
+    # -X bearing ring.
     clearance_edge = r.CAP_BOLT_X_OFFSETS[0] - (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
-    cap_land_x = (-r.CAP_WIDTH / 2.0 + clearance_edge) / 2.0
     cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
     roof = _capture_local_point(spec.PIVOT_CAP, (
         spec.PIVOT_PIN_ORIGINS[0][0] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][0],
@@ -2705,8 +2704,16 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         CaptureReading(1, spec.PIVOT_COTTER,
                        (spec.pivot_cotter.EYE_OUTER_RADIUS, -spec.pivot_cotter.COTTER_WIDTH / 2.0, spec.pivot_cotter.EYE_CENTER),
                        callouts["cotter"], (0.288, 0.205)),
-        CaptureReading(3, spec.PIVOT_CAP, (cap_land_x, bolt_y, 0.0),
-                       callouts["cap_land"], (0.279, 0.2235)),
+        # Along the land itself the cap's bottom edge and the block's top edge
+        # coincide, so a coordinate pick may return either (run 13 got the
+        # block). As with C4 MOUTH, the criterion is a corner, here the
+        # clearance hole's bottom corner on the land. The pick acquires the
+        # cap's own hole wall at mid-height below the counterbore, which no
+        # block edge shares and which ends at that corner.
+        CaptureReading(3, spec.PIVOT_CAP, (clearance_edge, bolt_y, 0.0),
+                       callouts["cap_land"], (0.279, 0.2235),
+                       pick_local_mm=(clearance_edge, bolt_y,
+                                      (r.CAP_HEIGHT - r.CAP_COUNTERBORE_DEPTH) / 2.0)),
         # C3A's underhead arrow lands mid-annulus on the head's bearing face:
         # outside the cap's largest clearance hole, inside the smallest head
         # bearing diameter, so cap material lies beneath it.

@@ -1622,7 +1622,7 @@ def test_cap_seating_steps_cite_the_sourced_cap_screw_sku() -> None:
 def test_c3b_states_the_owner_accepted_engagement_shortfall() -> None:
     # Owner ruling 2026-10-27: the 3/4 screw stays; its worst-case complete
     # thread engagement is a minor exception (RV-04), C3B a plain statement.
-    engagement = spec.retention.cap_screw_complete_engagement_estimate()
+    engagement = spec.fasteners.cap_screw_complete_engagement_estimate()
     minimum = spec.retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
     assert 0.0 < engagement < minimum
     c3b = next(step for step in spec.CAP_SEATING_STEPS if step.startswith("C3B."))
@@ -3160,6 +3160,14 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     # acquisition point but starts above the corner: the
                     # unchanged strict criterion must refuse it.
                     endpoints = ((x, y, hole_top + 0.25 * (chamfer - hole_top)), (x, y, chamfer))
+            elif reading.stem == spec.PIVOT_CAP and reading.text.startswith("C3A CAP / BLOCK LAND"):
+                # B-B cuts the cap's clearance hole as one vertical wall from
+                # the cap/block land up to the counterbore floor. Its bottom
+                # corner on the land is the C3A criterion; the mid-wall point
+                # is only where the coordinate pick acquires the cap's own edge.
+                x, y, land = reading.local_mm
+                floor = spec.retention.CAP_HEIGHT - spec.retention.CAP_COUNTERBORE_DEPTH
+                endpoints = ((x, y, land), (x, y, floor))
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -4171,11 +4179,22 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
     package.doc.raw_picks = raw_picks
     _scales, settled = drawing._place_package(package.adapter)
     readings = drawing.capture_readings()
-    # Only the two C4 MOUTH rows and the C4A UPPER CROSS-HOLE row separate
-    # acquisition from criterion.
+    # Only the two C4 MOUTH rows, the C4A UPPER CROSS-HOLE row and C3A's
+    # cap/block land (its arrow is on the coincident cap/block interface)
+    # separate acquisition from criterion.
     assert [reading.pick_local_mm is not None for reading in readings] == [
-        reading.text.startswith(("C4 MOUTH", "C4A UPPER CROSS-HOLE")) for reading in readings
+        reading.text.startswith(("C4 MOUTH", "C4A UPPER CROSS-HOLE", "C3A CAP / BLOCK LAND"))
+        for reading in readings
     ]
+    land = next(reading for reading in readings if reading.text.startswith("C3A CAP / BLOCK LAND"))
+    r = spec.retention
+    # Acquired on the cap's own clearance-hole wall, strictly between the
+    # cap/block interface and the counterbore floor: no block edge there.
+    assert land.pick_local_mm[0] == pytest.approx(
+        r.CAP_BOLT_X_OFFSETS[0] - (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
+    )
+    assert 0.0 < land.pick_local_mm[2] < r.CAP_HEIGHT - r.CAP_COUNTERBORE_DEPTH
+    assert land.local_mm[2] == 0.0
     mouth = [(index, reading) for index, reading in enumerate(readings)
              if reading.text.startswith("C4 MOUTH")]
     bore = spec.pivot_retainer.BORE_DIA / 2.0
