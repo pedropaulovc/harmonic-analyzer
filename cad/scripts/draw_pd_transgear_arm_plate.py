@@ -452,20 +452,52 @@ def _cut(
     )
 
 
-@_telemetry.traced("drawing.plate_note", label_param="label")
-def _add_note(adapter: Any, text: str, xy: tuple[float, float], label: str) -> None:
-    note = add_note(adapter, text, *xy)
+def _require_note_in_view(
+    note: Any, view: Any, xy: tuple[float, float], label: str
+) -> None:
+    """The note sits where it was placed and belongs to ``view``: a note
+    inserts into whichever view is active, and a label owned by another
+    view moves or disappears with it."""
     if note is None:
         raise RuntimeError(f"failed to add the plate's {label}")
-    # The wrapper only warns when it cannot place the note; read it back.
     annotation = _early_bound(note, "INote").GetAnnotation()
-    position = (
-        _early_bound(annotation, "IAnnotation").GetPosition() if annotation else None
-    )
+    if not annotation:
+        raise RuntimeError(f"the plate's {label} has no annotation")
+    annotation = _early_bound(annotation, "IAnnotation")
+    position = annotation.GetPosition()
     if not position or math.hypot(
         float(position[0]) - xy[0], float(position[1]) - xy[1]
     ) > NOTE_POSITION_TOL_M:
         raise RuntimeError(f"the plate's {label} is not at {xy}: reads {position}")
+    owner = annotation.Owner
+    wanted = str(_early_bound(view, "IView").GetName2())
+    actual = str(_early_bound(owner, "IView").GetName2()) if owner else None
+    if actual != wanted:
+        raise RuntimeError(f"the plate's {label} belongs to {actual!r}, not {wanted!r}")
+
+
+def _activate_view(adapter: Any, view: Any, label: str) -> None:
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the view for the plate's {label}")
+
+
+@_telemetry.traced("drawing.plate_note", label_param="label")
+def _add_note(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], label: str
+) -> None:
+    _activate_view(adapter, view, label)
+    _require_note_in_view(add_note(adapter, text, *xy), view, xy, label)
+
+
+@_telemetry.traced("drawing.plate_note", label_param="label")
+def _add_linked_note(
+    adapter: Any, view: Any, property_name: str, xy: tuple[float, float], label: str
+) -> None:
+    _activate_view(adapter, view, label)
+    _require_note_in_view(
+        add_property_linked_note(adapter, property_name, *xy), view, xy, label
+    )
 
 
 @_telemetry.traced("drawing.projected_zone_line", label_param="label")
@@ -697,8 +729,10 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         for index, zone in enumerate(SCREW_ZONES, 1)
     ]
-    _add_note(adapter, REAR_VIEW_LABEL, REAR_LABEL_XY, "rear view label")
-    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    _add_note(adapter, plan, REAR_VIEW_LABEL, REAR_LABEL_XY, "rear view label")
+    _add_linked_note(
+        adapter, iso, "Isometric View Note", ISO_NOTE_XY, "isometric view note"
+    )
 
     # --- Sheet 2: face A, its frames and datums, and the knob-bore section. --
     _activate_sheet(adapter, SHEET_NAMES[1])
@@ -793,7 +827,7 @@ async def build(adapter: Any) -> dict[str, str]:
             char_height=FINISH_CHAR_HEIGHT,
         )
         _add_note(
-            adapter, FINISH_CAPTIONS[key],
+            adapter, knob_section, FINISH_CAPTIONS[key],
             _sheet_xy(adapter, knob_section, caption, f"{label} caption"),
             f"{label} caption",
         )
@@ -801,7 +835,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, knob_section, KNOB_ZONE, height_mm=KNOB_ZONE_HEIGHT,
         precision_key="KnobZone", label="knob bore projected zone",
     ))
-    _add_note(adapter, FRONT_VIEW_LABEL, FRONT_LABEL_XY, "front view label")
+    _add_note(adapter, back, FRONT_VIEW_LABEL, FRONT_LABEL_XY, "front view label")
 
     artefacts = await finalize_drawing(
         adapter,
