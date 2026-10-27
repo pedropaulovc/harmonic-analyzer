@@ -9,9 +9,12 @@ rebuild the complete-machine assembly. No SolidWorks.
 
 from __future__ import annotations
 
+import _config
 import dt_drive_train_steps
 import ha_harmonic_analyzer_assembly_steps as steps
 import pd_paper_drive_assembly_steps as pd_steps
+import pd_transgear_removable_spec as removable
+import _sprocket_seat_geometry as seat_geometry
 import ch_vn_spring_hook_spec
 from ha_harmonic_analyzer_assembly_spec import (
     BAR_HEIGHT_DIMENSION,
@@ -58,6 +61,33 @@ if set(BALLOON_PARTS) != set(BOM_ORDER) or len(set(BALLOON_PARTS.values())) != l
     BALLOON_PARTS
 ):
     raise AssertionError("one distinct balloon part per BOM row")
+
+# MHA-PD-00 stores its spare chain wheel flat and loose on the base deck,
+# its own sheet 1 says so; at this level it lies beside item 7's group on
+# sheet 3 and on the deck on sheet 2. Machinist review of 5bca52e13 (r1, r2)
+# could not tell which row supplies it or where it stays: sheet 3 labels it
+# and the paper-drive step names its supplier and its place. The spare is the
+# one removable configuration neither wheel mounts, read the way the drawing
+# finds it in the source (never an allocator-numbered instance).
+PAPER_DRIVE = "pd-paper-drive"
+SPARE_SPROCKET_STEM = "pd-transgear-removable"
+(SPARE_SPROCKET_CONFIG,) = tuple(
+    name
+    for name, _teeth in removable.CONFIGS
+    if name not in {removable.CRANK_CONFIG, removable.KNOB_CONFIG}
+)
+SPARE_SPROCKET_NUMBER = str(_config.parts(SPARE_SPROCKET_STEM)["number"])
+PAPER_DRIVE_ITEM = str(BOM_ORDER.index(PAPER_DRIVE) + 1)
+# The label's leader tip: a point on the spare's upper plate face, part
+# millimetres (plate local z 0..PLATE), on the local x axis between the
+# drive-pin circle (pins on local y) and the tooth roots.
+SPARE_SPROCKET_TIP_MM = (12.0, 0.0, seat_geometry.PLATE)
+if not (
+    seat_geometry.PIN_CIRCLE_RADIUS + seat_geometry.PIN_HOLE_DIA
+    < SPARE_SPROCKET_TIP_MM[0]
+    < removable.bottom_dia(removable.TEETH[SPARE_SPROCKET_CONFIG]) / 2.0 - 1.0
+):
+    raise AssertionError("the spare label's tip must land on the solid plate face")
 
 NIB_CLEARANCE_TEXT = f"{PEN_PAPER_CLEARANCE_MM:.2f}"
 # Each setting's printed callout names what it sets and the step that sets
@@ -117,7 +147,9 @@ _STEP_TEXT: dict[str, str] = {
         f"PAPER DRIVE: BUILD MHA-PD-00 STEPS 1-{len(pd_steps.SEQUENCE)} IN "
         f"ORDER; ITS STEP {pd_steps.step_number('bar-clamped')} SETS THE "
         "SUPPORT BAR ON THE FRONT COLUMNS. ITS CHAIN STEPS NEED THE CRANK SIDE "
-        f"OF STEP {_n('drive-train-built')}."
+        f"OF STEP {_n('drive-train-built')}. MHA-PD-00 ALSO SUPPLIES ONE LOOSE "
+        f"{SPARE_SPROCKET_NUMBER} {SPARE_SPROCKET_CONFIG} SPARE SPROCKET (LABELLED "
+        "ON SHEET 3): LEAVE IT LYING FLAT ON THE BASE DECK WHERE SHEET 2 SHOWS IT."
     ),
     "magnifier-bar-clamped": (
         "MAGNIFIER BAR: MHA-MG-00 SUPPLIES THE MHA-SH-01/MHA-SH-02 CLAMP ARCS "
@@ -200,4 +232,13 @@ ORIENTATION_NOTE = (
 NIB_PARKED_NOTE = (
     f"VIEWS SHOW THE NIB PARKED {NIB_CLEARANCE_TEXT} OFF THE PAPER (STEP "
     f"{_n('nib-set')}); STEP {_n('nib-on-paper')} SETS IT ON."
+)
+# Sheet 3's label on the spare, beside item 7's group (its leader ends on the
+# spare's plate face).
+SPARE_SPROCKET_LABEL = "\n".join(
+    (
+        f"{SPARE_SPROCKET_NUMBER} {SPARE_SPROCKET_CONFIG}",
+        "SPARE SPROCKET",
+        f"(ITEM {PAPER_DRIVE_ITEM}, STEP {_n('paper-drive-built')})",
+    )
 )

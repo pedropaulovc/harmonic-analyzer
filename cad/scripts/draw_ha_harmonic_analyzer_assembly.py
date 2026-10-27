@@ -35,11 +35,14 @@ from _drawing_common import (
 )
 from _drawing_balloons import (
     BalloonAnchor,
+    _explode_offset,
+    _view_explode_offsets,
     add_component_bom_balloons,
     assert_balloon_landings,
 )
 from _drawing_centerline import add_view_centerline
 from _drawing_dimension_import import curate_view_dimensions
+from _drawing_leader_notes import add_leader_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_tables import insert_bom_table
 from _drawing_view_configuration import (
@@ -54,7 +57,7 @@ from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drawing_hidden_sketches import _show_base_view_sketches
-from _simplified_names import simplified_name
+from _simplified_names import SIMPLIFIED_SUFFIX, simplified_name
 from fr_frame_attachment_spec import TOP_SCREW_Y
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 from solidworks_mcp.adapters.com_variant import double_array
@@ -187,6 +190,22 @@ _BOM_BOTTOM_Y = BOM_ANCHOR[1] - (len(spec.BOM_ORDER) + 1) * BOM_ROW_HEIGHT
 EXPLODED_CENTER = (
     _PORTRAIT.width_m / 2.0,
     (_PORTRAIT.title_block_top_m + _BOM_BOTTOM_Y) / 2.0,
+)
+# The spare sprocket's label (notes.SPARE_SPROCKET_LABEL): its top-left
+# corner this far from the leader tip, sheet metres. The spare lies ~4 mm
+# west of item 7's leader (5bca52e13 sheet 3), so the three short lines stand
+# below-left of it, in the open sheet between the item 6 and item 7 balloons
+# and clear of that leader.
+SPARE_LABEL_OFFSET = (-0.058, -0.004)
+_AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
+# The paper drive's authored explode (model metres): the spare rides it.
+PAPER_DRIVE_EXPLODE_M = tuple(
+    sum(
+        step.distance_mm / 1000.0
+        for step in spec.EXPLODE_STEPS
+        if notes.PAPER_DRIVE in step.stems and _AXIS_INDEX[step.axis] == axis
+    )
+    for axis in range(3)
 )
 
 # Sheets 4 and 5 (landscape): text columns over the title block's height,
@@ -371,6 +390,80 @@ def _component_stem(component: Any) -> str:
     if not path:
         raise RuntimeError(f"component {component.Name2!r} has no referenced path")
     return Path(path).stem.casefold()
+
+
+def _spare_sprocket_tip(adapter: Any, view: Any) -> tuple[float, float]:
+    """The sheet point on the paper drive's spare sprocket, exploded, that its
+    label's leader ends on (notes.SPARE_SPROCKET_TIP_MM on its upper face).
+
+    The spare is found in the view's referenced configuration's own tree as
+    the one paper-drive removable in the spare configuration (its derived
+    ``Simplified`` one in ``Default Simplified``), never by an
+    allocator-numbered instance name; its collapsed pose comes from its
+    native transform and its explode from the view's explode steps, which
+    must equal the paper drive's authored one.
+    """
+    label = "spare sprocket label"
+    bound = _early_bound(view, "IView")
+    model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
+    configuration_name = str(bound.ReferencedConfiguration)
+    configuration = model.GetConfigurationByName(configuration_name)
+    if configuration is None:
+        raise RuntimeError(f"{label}: no configuration {configuration_name!r}")
+    root = _early_bound(configuration, "IConfiguration").GetRootComponent3(True)
+    spares = []
+    pending = list(root.GetChildren() or ()) if root is not None else []
+    while pending:
+        component = _early_bound(pending.pop(), "IComponent2")
+        pending.extend(component.GetChildren() or ())
+        # A pattern member or virtual part may carry no file path, so the
+        # stem is read without _component_stem's refusal.
+        if (
+            Path(str(component.GetPathName() or "")).stem.casefold()
+            == notes.SPARE_SPROCKET_STEM
+            and str(component.ReferencedConfiguration or "").removesuffix(
+                SIMPLIFIED_SUFFIX
+            )
+            == notes.SPARE_SPROCKET_CONFIG
+        ):
+            spares.append(component)
+    if len(spares) != 1:
+        raise RuntimeError(
+            f"{label}: {len(spares)} {notes.SPARE_SPROCKET_STEM} "
+            f"{notes.SPARE_SPROCKET_CONFIG} instances in {configuration_name!r}, "
+            "expected one"
+        )
+    spare = spares[0]
+    parent = spare.GetParent()
+    if parent is None or _component_stem(parent) != notes.PAPER_DRIVE:
+        raise RuntimeError(f"{label}: {spare.Name2!r} is not the paper drive's")
+    path = str(spare.Name2 or "").replace("\\", "/")
+    values = [
+        float(value)
+        for value in _early_bound(spare.Transform2, "IMathTransform").ArrayData
+    ]
+    rotation, origin = values[0:9], values[9:12]
+    local = [value / 1000.0 for value in notes.SPARE_SPROCKET_TIP_MM]
+    collapsed = [
+        sum(local[i] * rotation[i * 3 + k] for i in range(3)) + origin[k]
+        for k in range(3)
+    ]
+    shift = _explode_offset(_view_explode_offsets(adapter, view, label=label), path)
+    if any(
+        abs(actual - wanted) > 1e-9
+        for actual, wanted in zip(shift, PAPER_DRIVE_EXPLODE_M, strict=True)
+    ):
+        raise RuntimeError(
+            f"{label}: {path} explodes by {shift}, not the paper drive's "
+            f"{PAPER_DRIVE_EXPLODE_M}"
+        )
+    point = (
+        collapsed[0] + shift[0],
+        collapsed[1] + shift[1],
+        collapsed[2] + shift[2],
+    )
+    _telemetry.event("drawing.spare_sprocket_tip", instance=path, model_m=list(point))
+    return model_point_in_view(adapter, view, point, label=label)
 
 
 def _validate_source(source_model: Any) -> None:
@@ -671,9 +764,9 @@ def _place_finished_sheet(adapter: Any) -> None:
 
 
 def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
-    """The exploded isometric, the top-level BOM and one balloon per row;
-    returns the check that proves every balloon again after the last
-    rebuild."""
+    """The exploded isometric, the top-level BOM, one balloon per row and the
+    spare sprocket's label; returns the check that proves every balloon again
+    after the last rebuild."""
     name = SHEET_NAMES[2]
     _activate_sheet(adapter, name)
     exploded = place_view(
@@ -717,6 +810,16 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
         label="complete-machine",
     )
     rows = _validate_bom(adapter, table)
+    # The paper drive's loose spare sprocket, beside item 7's group: labelled
+    # with its number and its row, the step that places it (r1/r2 on 5bca52e13).
+    # Its tip is read before the balloons exist, so they bind after any
+    # explode read-back this does on the source.
+    if dict(rows)[notes.PAPER_DRIVE] != notes.PAPER_DRIVE_ITEM:
+        raise RuntimeError(
+            f"complete-machine paper drive is item {dict(rows)[notes.PAPER_DRIVE]}, "
+            f"the spare label says {notes.PAPER_DRIVE_ITEM}"
+        )
+    spare_tip = _spare_sprocket_tip(adapter, exploded)
     # A top-level BOM numbers a nested part's balloon with its subassembly's
     # row: each row's balloon lands on one part only that subassembly owns.
     landings = add_component_bom_balloons(
@@ -732,6 +835,17 @@ def _place_exploded_sheet(adapter: Any) -> Callable[[], None]:
             f"complete-machine exploded view carries {len(landings)} balloons, "
             f"expected one per BOM row ({len(BOM_COMPONENTS)})"
         )
+    add_leader_note(
+        adapter,
+        notes.SPARE_SPROCKET_LABEL,
+        text_xy=(
+            spare_tip[0] + SPARE_LABEL_OFFSET[0],
+            spare_tip[1] + SPARE_LABEL_OFFSET[1],
+        ),
+        attach_xy=spare_tip,
+        label="spare sprocket label",
+        view=exploded,
+    )
     _add_note_block(
         adapter,
         name,
