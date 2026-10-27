@@ -467,10 +467,11 @@ CAPTURE_VIEW_REGIONS = (
 CAPTURE_LOCATOR_SCALE = (1, 4)
 CAPTURE_SECTION_SCALES = {"A": (1, 2), "B": (1, 1)}
 CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.384, 0.2175))
-# Half-lengths of the cutting lines along their rows. B-B's is shorter, so its
-# arrows and letters stand 3.75 mm (at the plan's 1:4) inside A-A's instead of
-# on top of them; it still spans the whole 50 mm cap.
-CAPTURE_CUT_HALF_LENGTHS = {"A": 65.0, "B": 50.0}
+# Half-lengths of the cutting lines along their rows. B-B's is longer, so its
+# arrows and letters stand 3.75 mm (at the plan's 1:4) outside A-A's instead of
+# on top of them. Shorter, its right letter sat 0.48 mm in the C5B cotter
+# leader (00fa5c46c); longer, it moves away from that leader.
+CAPTURE_CUT_HALF_LENGTHS = {"A": 65.0, "B": 80.0}
 CAPTURE_NOTE_HEIGHT = 0.002
 
 
