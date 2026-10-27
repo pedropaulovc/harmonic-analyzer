@@ -1423,6 +1423,114 @@ def test_omp_stream_retains_deltas_and_terminal_inspection_without_partial_snaps
     assert transport.omp_native_event(terminal) is terminal
 
 
+@pytest.mark.parametrize("flag", ["--mcp-config", "--schema"])
+def test_transport_rejects_descriptor_paths_different_from_staged_inputs(tmp_path, sdk_transport, monkeypatch, flag):
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text('{"mcpServers": {}}')
+    (tmp_path / "schema.json").write_text("{}")
+    alternate = tmp_path / "alternate.json"
+    alternate.write_text("{}")
+    async def forbidden(**kwargs):
+        pytest.fail("mismatched descriptor must fail before provider submission")
+    monkeypatch.setattr(transport, "_sdk", forbidden)
+    with pytest.raises(ValueError, match="differs from staged input"):
+        transport.run(
+            command=["claude_agent_sdk", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001", flag, str(alternate)],
+            prompt="inspect", timeout=5, cwd=str(tmp_path), startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance={},
+        )
+
+
+@pytest.mark.parametrize("outcome", ["failure", "fallback"])
+def test_transport_records_original_error_category_and_routing_timeline(
+    tmp_path, sdk_transport, monkeypatch, outcome,
+):
+    transport = sdk_transport.transport
+    config = tmp_path / "mcp.json"
+    schema = tmp_path / "schema.json"
+    config.write_text(json.dumps({"mcpServers": {}, "recorded": True}))
+    schema.write_text(json.dumps({"type": "object", "title": "recorded"}))
+    timeline, logs = [], []
+    monkeypatch.setattr(transport._telemetry, "event", lambda name, **fields: timeline.append((name, fields)))
+    for level in ("info", "warn", "error"):
+        monkeypatch.setattr(transport._telemetry, level, lambda name, **fields: logs.append((name, fields)))
+    async def sdk(**kwargs):
+        assert kwargs["config"]["recorded"] and kwargs["schema"]["title"] == "recorded"
+        if outcome == "failure":
+            raise ValueError("provider secret-canary-0")
+        return {"status": "exhausted", "reason": "credit-balance", "retryAt": None}
+    async def omp(**kwargs):
+        assert kwargs["config"]["recorded"] and kwargs["schema"]["title"] == "recorded"
+    monkeypatch.setattr(transport, "_sdk", sdk)
+    monkeypatch.setattr(transport, "_omp", omp)
+    provenance = {}
+    def invoke():
+        return transport.run(
+            command=["claude_agent_sdk", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001",
+                     "--mcp-config", str(config), "--schema", str(schema)],
+            prompt="inspect", timeout=5, cwd=str(tmp_path), startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    if outcome == "failure":
+        with pytest.raises(transport.TransportError) as caught:
+            invoke()
+        assert "secret-canary" not in str(caught.value)
+        assert provenance["routes"][-1]["error_category"] == "ValueError"
+        failure, = [fields for name, fields in logs if name == "machinist_review.transport_failed"]
+        assert failure["error_category"] == "ValueError"
+        assert [name for name, _ in timeline] == ["machinist_review.credentials", "machinist_review.sdk_attempt"]
+    else:
+        assert invoke().returncode == 0
+        assert [name for name, _ in timeline] == (
+            ["machinist_review.credentials", "machinist_review.sdk_attempt", "machinist_review.credential_unavailable"] * 3
+            + ["machinist_review.credentials", "machinist_review.fallback"]
+        )
+        assert timeline[-1][1]["reason"] == "no_eligible_keys"
+        assert all(route["quota_state_write"] == "persisted" for route in provenance["routes"][:-1])
+    assert "secret-canary" not in json.dumps(timeline + logs)
+
+
+@pytest.mark.parametrize("primary", [False, True])
+def test_sdk_redaction_failure_is_fatal_without_masking_primary(
+    tmp_path, sdk_transport, monkeypatch, primary,
+):
+    from machinist_review_credentials import CredentialPool
+
+    transport = sdk_transport.transport
+    key = CredentialPool().credentials[0]
+    session_dir = tmp_path / "native" / "sdk"
+    session_dir.mkdir(parents=True)
+    transcript = session_dir / "session.jsonl"
+    transcript.write_text(key.api_key)
+    original = Path.write_text
+    def denied(path, *args, **kwargs):
+        if path == transcript:
+            raise PermissionError("redaction secret-canary-0")
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "write_text", denied)
+    sdk_transport.fail = primary
+    diagnostics, native = [], []
+    async def invoke():
+        await transport._sdk(
+            key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
+            model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
+            continuation="fresh", cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS,
+            emit=lambda event, raw: native.append(raw) if raw else None,
+            diagnostics=diagnostics, provenance={"private_home": str(session_dir.parent)},
+        )
+    with pytest.raises(RuntimeError) as caught:
+        asyncio.run(invoke())
+    assert str(caught.value) == ("failure secret-canary-0" if primary else "SDK transcript redaction failed (PermissionError)")
+    cleanup, = [row for row in native if row.get("type") == "cleanup_error"]
+    assert cleanup == {"type": "cleanup_error", "phase": "sdk_redaction", "error_category": "PermissionError"}
+    assert "sdk_redaction: PermissionError" in "".join(diagnostics)
+    assert "redaction secret-canary" not in json.dumps(native)
+    assert sdk_transport.clients[0].disconnected
+
+
 def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
     tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1520,7 +1628,7 @@ def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
         assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
 
 
-@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "slow_shutdown", "footer_context", "footer_instruction"])
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
 def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
 ) -> None:
@@ -1581,7 +1689,8 @@ for line in sys.stdin:
               "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
         emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
               "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
-        emit({"type": "prompt_result", "id": request["id"], "status": "failed" if mode == "turn_failure" else "completed", "sessionSettled": True})
+        result = {"type": "prompt_result", "id": request["id"], "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
+        print(json.dumps(result) + ("\nnot-json-drain-canary" if mode == "failure_then_malformed" else ""), flush=True)
         continue
     elif kind == "get_last_assistant_text":
         data = {"text": "{}"}
@@ -1589,6 +1698,17 @@ for line in sys.stdin:
     else:
         data = {}
     emit({"type": "response", "id": request["id"], "command": kind, "success": True, "data": data})
+    if kind == "get_last_assistant_text":
+        if mode == "trailing_malformed": print("not-json-drain-canary", flush=True)
+        if mode == "trailing_array": emit([])
+        if mode == "trailing_unknown": emit({"type": "unexpected_shutdown_event"})
+        if mode == "trailing_execution": emit({"type": "tool_execution_end", "toolName": "bash", "toolCallId": "late", "result": {}})
+        if mode == "trailing_failure": emit({"type": "message_end", "message": {"role": "assistant", "content": [], "stopReason": "error"}})
+        if mode == "trailing_valid": print("\n  ", flush=True)
+        if mode in {"trailing_tool", "trailing_valid"}:
+            emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+                  "content": [{"type": "toolCall", "id": "late", "name": "bash" if mode == "trailing_tool" else "mcp__sheets_crop", "arguments": {"sheet": 1}}]}})
+            emit({"type": "agent_end", "messages": []})
 if mode == "slow_shutdown": time.sleep(60)
 ''', encoding="utf-8")
     home = tmp_path / "private"
@@ -1627,11 +1747,19 @@ if mode == "slow_shutdown": time.sleep(60)
         assert provenance["shutdown"] == "forced_after_completion"
         assert provenance["image_blobs"]
         assert normalized[-1]["type"] == "result" and not normalized[-1]["is_error"]
-    elif catalog == "valid":
+    elif catalog in {"valid", "trailing_valid"}:
         asyncio.run(invoke())
         assert Path(environments[0]["PI_CODING_AGENT_DIR"]).is_dir()
         assert mr.evaluate_sheet_evidence(normalized, reviewer="claude", sheet_count=1)["inspection_proven"]
         assert provenance["image_blobs"]
+        if catalog == "trailing_valid":
+            assert normalized[-1]["type"] == "result"
+            assert any(block.get("id") == "late" and block["name"] == "mcp__sheets__crop"
+                       for event in normalized if event.get("type") == "assistant"
+                       for block in event["message"]["content"])
+            assert any(event.get("type") == "agent_end" for event in native)
+            assert all(process.returncode is not None for process in processes)
+            return
         import hashlib
         expected_prompt = "inspect\nReturn JSON matching this schema:\n{}"
         assert provenance["omp_prompt"] == expected_prompt
@@ -1665,11 +1793,16 @@ if mode == "slow_shutdown": time.sleep(60)
             asyncio.run(invoke("omp_resume"))
         assert len(processes) == started  # Missing images fail before launching a new turn.
     else:
-        with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError):
+        with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError) as caught:
             asyncio.run(invoke())
+        if catalog == "failure_then_malformed":
+            assert str(caught.value) == "OMP review did not complete"
+        if catalog.startswith("trailing_"):
+            assert not any(event.get("type") == "result" and not event.get("is_error") for event in normalized)
+            assert "image_blobs" not in provenance
     requests = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines()]
     assert requests[0]["type"] == "get_state"
-    assert any(row["type"] == "prompt" for row in requests) is (catalog in {"valid", "slow_shutdown"})
+    assert any(row["type"] == "prompt" for row in requests) is (catalog.startswith("trailing_") or catalog in {"valid", "slow_shutdown", "failure_then_malformed"})
     if catalog == "malformed":
         assert any(
             row.get("type") == "rpc_parse_error"
@@ -1677,6 +1810,10 @@ if mode == "slow_shutdown": time.sleep(60)
             for row in native
         )
         assert "shutdown" not in provenance and "image_blobs" not in provenance
+    if catalog in {"trailing_malformed", "trailing_array", "failure_then_malformed"}:
+        assert any(row.get("type") == "rpc_parse_error" for row in native)
+    if catalog == "failure_then_malformed":
+        assert any(row.get("type") == "cleanup_error" and row.get("phase") == "omp_shutdown" for row in native)
     assert all(process.returncode is not None for process in processes)
     assert environments and all(env["HOME"] == str(home) for env in environments)
     assert all("PI_CONFIG_FILES" not in env and "OMP_PROFILE" not in env for env in environments)

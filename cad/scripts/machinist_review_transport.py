@@ -17,6 +17,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import time
 import uuid
 
@@ -254,6 +255,24 @@ def quota_event(event):
     return None
 
 
+def _error_category(exc):
+    """Carry only a class identifier, never provider exception text, in telemetry."""
+    return exc.error_category if isinstance(exc, _SanitizedOperationError) else type(exc).__name__
+
+
+class _SanitizedOperationError(RuntimeError):
+    def __init__(self, message, error_category):
+        super().__init__(message)
+        self.error_category = error_category
+
+
+def _cleanup_error(phase, exc, emit, diagnostics):
+    category = _error_category(exc)
+    emit(None, {"type": "cleanup_error", "phase": phase, "error_category": category})
+    diagnostics.append(f"{phase}: {category}\n")
+    _telemetry.error("machinist_review.cleanup_failed", phase=phase, error_category=category)
+
+
 async def _sdk(*, key, config, schema, model, effort, session_id, continuation, cwd, remaining, startup, settings, emit, diagnostics, provenance):
     from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
     env = environment(key.api_key)
@@ -331,9 +350,14 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
                 raise RuntimeError("SDK review failed (non-quota terminal result)")
         raise RuntimeError("SDK ended without terminal result")
     finally:
+        primary = sys.exception()
+        disconnect_error = None
         try:
             await client.disconnect()
-        finally:
+        except BaseException as exc:
+            disconnect_error = exc
+            _cleanup_error("sdk_disconnect", exc, emit, diagnostics)
+        try:
             # SDK transcripts are resumable state, not an unredacted back door
             # around the retained-stream redactor.
             for path in session_dir.rglob("*"):
@@ -352,6 +376,12 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
                     previous_files[str(path)] = [stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
             provenance["sdk_redacted_files"] = previous_files
             provenance["sdk_redacted_fingerprint"] = key.fingerprint
+        except Exception as exc:
+            _cleanup_error("sdk_redaction", exc, emit, diagnostics)
+            if primary is None and disconnect_error is None:
+                raise RuntimeError(f"SDK transcript redaction failed ({_error_category(exc)})") from None
+        if primary is None and disconnect_error is not None:
+            raise disconnect_error
 
 
 def omp_event(event):
@@ -592,17 +622,43 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
     async def send(value):
         proc.stdin.write((json.dumps(value) + "\n").encode())
         await proc.stdin.drain()
-    async def receive():
-        line = await proc.stdout.readline()
-        if not line:
-            raise RuntimeError("OMP exited before terminal response")
+    def parse(line, *, postcompletion=False):
         try:
             event = json.loads(line)
+            if not isinstance(event, dict):
+                raise ValueError("not an object")
         except (ValueError, UnicodeDecodeError):
             emit(None, {"type": "rpc_parse_error", "text": line.decode("utf-8", errors="replace")})
-            raise RuntimeError("OMP RPC stdout is not valid JSON") from None
-        emit(omp_event(event), omp_native_event(event))
+            raise RuntimeError("OMP RPC stdout is not a valid JSON object") from None
+        emit(None, omp_native_event(event))
+        normalized = omp_event(event)
+        emit(normalized, None)
+        if postcompletion and normalized and normalized.get("is_error"):
+            raise RuntimeError("OMP emitted a failed postcompletion message")
+        # Check native names too: execution events and incremental/cumulative
+        # messages must not bypass the sheets-only boundary.
+        def validate_tools(node):
+            if isinstance(node, dict):
+                if node.get("type") == "toolCall" and node.get("name") not in OMP_TOOLS:
+                    raise RuntimeError("OMP emitted an unauthorized tool")
+                for child in node.values():
+                    validate_tools(child)
+            elif isinstance(node, list):
+                for child in node:
+                    validate_tools(child)
+        validate_tools(event)
+        if event.get("type") in {"tool_execution_start", "tool_execution_update", "tool_execution_end"} and event.get("toolName") not in OMP_TOOLS:
+            raise RuntimeError("OMP emitted an unauthorized tool")
+        if postcompletion and event.get("type") not in {"message_end", "tool_execution_end", "turn_end", "agent_end"}:
+            raise RuntimeError("OMP emitted an unexpected postcompletion event")
         return event
+    async def receive():
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                raise RuntimeError("OMP exited before terminal response")
+            if line.strip():
+                return parse(line)
     async def control(kind, **fields):
         identity = str(uuid.uuid4())
         await send({"id": identity, "type": kind, **fields})
@@ -651,13 +707,23 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                     raise RuntimeError("OMP review did not complete")
                 break
         text = await control("get_last_assistant_text")
-        emit({"type": "result", "subtype": "success", "is_error": False, "session_id": actual, "result": text.get("text", "")}, None)
+        # Publish success only after shutdown output and persisted blobs pass
+        # the same validation as the active receive loop.
         completed = True
     finally:
-        partial = []
+        primary = sys.exception()
         async def drain_stdout():
-            while chunk := await proc.stdout.read(65536):
-                partial.append(chunk)
+            failure = None
+            while line := await proc.stdout.readline():
+                if not line.strip():
+                    continue
+                try:
+                    parse(line, postcompletion=completed)
+                except Exception as exc:
+                    if failure is None:
+                        failure = exc
+            if failure is not None:
+                raise failure
         drain = asyncio.create_task(drain_stdout())
         try:
             if completed and proc.returncode is None:
@@ -676,17 +742,24 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                     provenance["shutdown"] = "forced_after_completion"
                     _telemetry.warn("machinist_review.omp_shutdown", outcome="forced_after_completion")
         finally:
+            cleanup_primary = sys.exception() or primary
             if proc.returncode is None:
                 try:
                     proc.kill()
                 except ProcessLookupError:
                     pass
-            await asyncio.gather(drain, task)
+            outcomes = await asyncio.gather(drain, task, return_exceptions=True)
             await proc.wait()
-            if partial:
-                emit(None, {"type": "unconsumed_stdout", "text": b"".join(partial).decode("utf-8", errors="replace")})
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException):
+                    _cleanup_error("omp_shutdown", outcome, emit, diagnostics)
+            if cleanup_primary is None:
+                for outcome in outcomes:
+                    if isinstance(outcome, BaseException):
+                        raise outcome
     if completed:
         provenance["image_blobs"] = _omp_blobs(provenance)
+        emit({"type": "result", "subtype": "success", "is_error": False, "session_id": actual, "result": text.get("text", "")}, None)
 
 
 def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_first_response=None, provider_response=None):
@@ -779,10 +852,18 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             except Exception as exc:
                 if isinstance(exc, TimeoutError):
                     raise
-                raise RuntimeError(pool.redact(f"{type(exc).__name__}: {exc}")) from None
-    config = json.loads((Path(cwd) / "mcp.json").read_text())
+                raise _SanitizedOperationError(pool.redact(f"{_error_category(exc)}: {exc}"), _error_category(exc)) from None
+    def input_path(flag, default):
+        expected = Path(cwd) / default
+        if flag in command:
+            recorded = Path(command[command.index(flag) + 1])
+            recorded = recorded if recorded.is_absolute() else Path(cwd) / recorded
+            if recorded.resolve() != expected.resolve():
+                raise ValueError(f"Transport descriptor {flag} differs from staged input")
+        return expected
+    config = json.loads(input_path("--mcp-config", "mcp.json").read_text())
     config["prompt"] = prompt
-    schema = json.loads((Path(cwd) / "schema.json").read_text())
+    schema = json.loads(input_path("--schema", "schema.json").read_text())
     model = command[command.index("--model") + 1]
     effort = command[command.index("--effort") + 1]
     prior_transport = provenance.get("transport") if resume else None
@@ -813,6 +894,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                 credential = await credential_operation(pool, pool.claim, remaining, attempted)
             remaining()
             _telemetry.info("machinist_review.credentials", configured_count=len(pool.credentials), selected_id=credential.id if credential else None, reason="selected" if credential else "no_eligible_keys", **common)
+            _telemetry.event("machinist_review.credentials", configured_count=len(pool.credentials), selected_id=credential.id if credential else None, reason="selected" if credential else "no_eligible_keys", **common)
             if credential is None:
                 break
             attempted.append(credential.id)
@@ -824,6 +906,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                      "session_id": session_id, "route_index": route_index, "event_start": len(events)}
             provenance.setdefault("routes", []).append(route)
             _telemetry.info("machinist_review.sdk_attempt", model=model, effort=effort, credential_id=credential.id, route_index=route_index, **common)
+            _telemetry.event("machinist_review.sdk_attempt", model=model, effort=effort, credential_id=credential.id, route_index=route_index, **common)
             async with operation("machinist_review.sdk", credential_id=credential.id, model=model, effort=effort):
                 quota = await _sdk(key=credential, config=config, schema=schema, model=model, effort=effort, session_id=session_id, continuation=continuation, cwd=cwd, remaining=remaining, startup=startup, settings=settings, emit=emit, diagnostics=diagnostics, provenance=provenance)
             finish_usage()
@@ -844,6 +927,8 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             route["quota_state_write"] = "persisted"
             _telemetry.warn("machinist_review.credential_unavailable", credential_id=credential.id,
                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
+            _telemetry.event("machinist_review.credential_unavailable", credential_id=credential.id,
+                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
             if resume:
                 raise RuntimeError("SDK continuation credential exhausted; refusing transport switch")
             # Session history may contain the API error: start a new session for
@@ -860,6 +945,9 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         _telemetry.info("machinist_review.omp_attempt" if pinned_omp else "machinist_review.fallback",
                         source_transport="omp" if pinned_omp else "claude_agent_sdk", destination_transport="omp",
                         reason="continuation" if pinned_omp else "no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
+        _telemetry.event("machinist_review.omp_attempt" if pinned_omp else "machinist_review.fallback",
+                         source_transport="omp" if pinned_omp else "claude_agent_sdk", destination_transport="omp",
+                         reason="continuation" if pinned_omp else "no_configured_keys" if not pool.credentials else "no_eligible_keys", **common)
         async with operation("machinist_review.omp", model=model, effort=effort):
             await _omp(config=config, schema=schema, model=model, effort=effort, cwd=cwd, remaining=remaining, startup=startup, emit=emit, diagnostics=diagnostics, provenance=provenance, continuation=continuation, register_secret=pool.secrets.add)
         finish_usage()
@@ -879,8 +967,8 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     except Exception as exc:
         finish_usage()
         if provenance["routes"] and provenance["routes"][-1]["outcome"] == "started":
-            provenance["routes"][-1].update(outcome="failed", event_end=len(events), error_category=type(exc).__name__)
-        category = type(exc).__name__
+            provenance["routes"][-1].update(outcome="failed", event_end=len(events), error_category=_error_category(exc))
+        category = _error_category(exc)
         _telemetry.error("machinist_review.transport_failed", transport=provenance.get("transport"), error_category=category, timed_out=isinstance(exc, TimeoutError), **common)
         output = "\n".join(json.dumps(event) for event in events)
         errors = pool.redact("".join(diagnostics))

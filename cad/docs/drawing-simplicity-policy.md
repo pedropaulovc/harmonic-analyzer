@@ -361,7 +361,8 @@ both verdicts and the finding diff.
   Failed or incomplete startup submits no review. Native redacted records and
   normalized image/tool evidence are retained separately.
   SDK dataclasses are converted once; native records are redacted before being
-  streamed to disk rather than accumulating image-bearing JSON lines in memory.
+  streamed to disk. Normalized image/tool events still accumulate in memory for
+  the existing stdout/evaluation interface; only native records are streamed.
   OMP streaming logs retain incremental deltas rather than repeated cumulative
   message snapshots. Terminal messages, including real tool images and usage,
   remain intact. Verdict extraction and successful inspection use only the final
@@ -384,6 +385,14 @@ both verdicts and the finding diff.
   RPC stdout is a strict machine channel: every nonempty line, including the
   shutdown drain, must be a JSON object. Malformed lines are retained as native
   `rpc_parse_error` evidence and fail closed, never discarded as diagnostic noise.
+  Legitimate trailing terminal events use the same native retention and
+  normalization as active RPC events; unexpected postcompletion events and
+  non-sheets tool calls fail closed. Success is emitted only after this drain
+  and persisted-image validation complete. Drain failures retain sanitized
+  `cleanup_error` evidence and logs without replacing an earlier primary
+  failure. SDK disconnect and transcript-redaction failures follow the same
+  primary-error rule; redaction failure alone is fatal, never permission to
+  return a successful verdict with unsanitized native state.
   Valid findings are never retried. A successful precheck pins its actual transport and session for
   judging. SDK continuation prefers the original credential, but may select
   another eligible key **before** submitting its single resumed turn: the local
@@ -406,11 +415,15 @@ both verdicts and the finding diff.
   redacted event/image evidence. The aggregate also cleans an unused precheck
   when judging is skipped or an error returns early. Native session IDs remain
   historical provenance, not standalone CLI resume recipes after cleanup.
-- Structured operation logs record credential decisions (safe IDs/counts),
-  SDK attempts, OMP fallback reasons, broker readiness and terminal outcome or
-  failure category. Keys/tokens, environment maps and unredacted exceptions are
-  never logged or retained. Eval identities record SDK/OMP runtime versions and
+- Structured operation logs and span events record credential decisions (safe
+  IDs/counts), SDK route starts, quota unavailability and OMP fallback reasons.
+  Logs also record broker readiness and terminal outcome or original failure
+  category; redacting a provider exception must not collapse its structured
+  category to `RuntimeError`. Keys/tokens, environment maps and unredacted
+  exceptions are never logged or retained. Eval identities record runtime versions and
   each attempt's actual transport provenance; SDK descriptors are not CLI argv.
+  Descriptor config/schema paths must match the staged cwd-local inputs; a
+  mismatched recorded path fails before submitting a provider request.
   SDK provenance records the effective isolation options in `sdk_isolation`
   (tools, permission mode, setting sources and strict MCP configuration).
   Both transports record `resolved_model` as a provider/id object; the SDK
