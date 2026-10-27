@@ -492,9 +492,13 @@ def test_the_bore_callout_names_ream_for_the_shoulder_press() -> None:
     # Process, fit and mate (rule 4), not their wording or wrapping.
     assert bore.startswith("REAM THRU")
     assert "DIAMETRAL INTERFERENCE" in bore
-    assert _config.parts("pd-vn-transgear-pivot-screw")["number"] in bore
-    # The printed window encloses the spec's press at both limits.
-    (window,) = re.findall(r"(\d+\.\d+)-(\d+\.\d+)", bore)
+    screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
+    # The mating feature is the screw's shoulder, not its thread.
+    assert re.search(rf"{re.escape(screw)}\s+SHOULDER\b", bore)
+    assert "THREAD" not in bore
+    # The printed window encloses the spec's press at both limits; a sign
+    # before either limit is never read as its magnitude.
+    (window,) = re.findall(r"(?<![-+\d.])(\d+\.\d+)-(\d+\.\d+)", bore)
     low, high = (float(v) for v in window)
     assert 0.0 < low <= spec.PRESS_INTERFERENCE[0] < spec.PRESS_INTERFERENCE[1] <= high
     assert high - spec.PRESS_INTERFERENCE[1] < 0.001
@@ -509,14 +513,29 @@ def test_the_length_band_names_the_spring_room_it_sets() -> None:
     assert "SPRING ROOM" in callout
 
 
-def test_callout_boxes_enclose_the_native_rows_the_farm_printed() -> None:
-    """The calibration behind _length_text_box and _bore_text_box: each
-    encloses the native rows' extents from run 20261027T121009040Z-eda67c82
-    (layout audit, lower-left anchored runs plus their width and 3.5 cap)."""
-    for box, (xmin, ymin, xmax, ymax) in (
-        (_length_text_box(), (0.2224, 0.1132, 0.2665, 0.1278)),
-        (_bore_text_box(), (0.0207, 0.2064, 0.0793, 0.2366)),
-    ):
+# The rows run 20261027T121009040Z-eda67c82 printed (layout audit: each
+# row's lower-left anchor, plus its width and the 3.5 cap), with the text
+# and SetPosition2 anchor that produced them.
+_PRINTED_BLOCKS = (
+    (
+        "5.000 ±0.05\nSETS MHA-PD-VN-63\nSPRING ROOM",
+        (0.2445, 0.1215),
+        (0.2224, 0.1132, 0.2665, 0.1278),
+    ),
+    (
+        "+0.008\nØ4.727 0.000\nREAM THRU\n0.002-0.036 DIAMETRAL\n"
+        "INTERFERENCE ON\nMHA-PD-VN-57 SHOULDER",
+        (0.050, 0.222),
+        (0.0207, 0.2064, 0.0793, 0.2366),
+    ),
+)
+
+
+def test_callout_block_model_encloses_the_rows_the_farm_printed() -> None:
+    """The calibration behind _callout_block, on the text and anchors the
+    farm printed, independent of where the sheet places them now."""
+    for text, anchor, (xmin, ymin, xmax, ymax) in _PRINTED_BLOCKS:
+        box = _callout_block(text, anchor)
         assert box.xmin <= xmin and xmax <= box.xmax
         assert box.ymin <= ymin and ymax <= box.ymax
 
