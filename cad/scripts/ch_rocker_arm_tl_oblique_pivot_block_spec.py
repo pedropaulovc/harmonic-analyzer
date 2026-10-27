@@ -2,6 +2,8 @@
 
 Frame: carriage-pattern centre, bottom Z0; +X away from spindle. New
 6061 1 x 3-1/2 inch stock is shared with TL-32. No cartridge hardware.
+The print locates every X from the -X (left) edge, never from the frame
+centre: ``PLAN_DATUM_REFERENCE`` carries those ordinates.
 """
 from __future__ import annotations
 
@@ -19,6 +21,9 @@ BLOCK_LENGTH = BLOCK_X1 - BLOCK_X0
 BLOCK_WIDTH, BLOCK_HEIGHT = 40.0, 24.3
 STOCK_THICKNESS, STOCK_WIDTH = 25.4, 88.9
 BORE_X, BORE_Y = -32.0, 0.0
+# The TL-VN-77 shoulder bottoms on the seat floor, so the 3-place depth sets
+# how high the screw stands, hence the head-to-carrier gap the assembly's
+# shim selection then trims (jig assembly ``PIVOT_RUNNING_GAP``).
 BORE_DIA, BORE_DEPTH = 10.0, 7.65
 BORE_BAND = (0.015, 0.0)  # H7; locating seat for TL-VN-77 shoulder
 _bore_lower, _bore_upper = deviations(BORE_BAND)
@@ -42,6 +47,12 @@ CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0
 UNDER_HEAD = CBORE_FLOOR
 CBORE_SECTION_PLANE = "CboreSectionPlane"
+CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
+# Hidden construction sketch on the top face: a line on the -X edge and
+# circles on the bore and one hole per column, so the plan's X ordinates start
+# on that edge (rule 10) while staying model dimensions.
+PLAN_DATUM_REFERENCE = "PlanDatumReference"
+PLAN_DATUM_HOLES = ((-BOLT_X, BOLT_Y), (BOLT_X, BOLT_Y))
 SCREW_LENGTH, SCREW_LENGTH_TOL = 20.0, 0.42
 ENGAGEMENT_MIN = SCREW_LENGTH - SCREW_LENGTH_TOL - CBORE_FLOOR - printed_band_mm(3)
 ENGAGEMENT_MAX = SCREW_LENGTH + SCREW_LENGTH_TOL - CBORE_FLOOR + printed_band_mm(3)
@@ -51,45 +62,54 @@ SCREW_HOLE_SPEC = HoleSpec("counterbore_socket", "#8", overrides_mm={
 })
 DRAWING_VALUES = {
     "BlockLength": BLOCK_LENGTH, "BlockWidth": BLOCK_WIDTH,
-    "BlockHeight": BLOCK_HEIGHT, "BlockEndX": -BLOCK_X0,
-    "BlockSideY": BLOCK_WIDTH / 2, "BoreX": -BORE_X,
+    "SectionBlockHeight": BLOCK_HEIGHT, "BlockSideY": BLOCK_WIDTH / 2,
     "BoreDia": BORE_DIA, "TopBoreDepth": BORE_DEPTH,
-    "TapDrillDia": PIVOT_TAP_DRILL, "TapX": -BORE_X,
+    "TapDrillDia": PIVOT_TAP_DRILL,
     "CboreFloor": CBORE_FLOOR,
     "CarriageDrills1Dia": HOLE_DIA,
-    "CarriageCounterbores1Dia": CBORE_DIA,
-    **{f"CarriageDrills{i}{axis}": abs(value)
-       for i, point in enumerate(BOLT_POINTS, 1)
-       for axis, value in zip(("X", "Y"), point)},
+    # The counterbore prints on hole 3, the drill on hole 1: one leader each.
+    "CarriageCounterbores3Dia": CBORE_DIA,
+    "CarriageDrills3Y": BOLT_Y, "CarriageDrills4Y": BOLT_Y,
+    "PlanBoreX": BORE_X - BLOCK_X0,
+    **{f"PlanHole{i}X": x - BLOCK_X0 for i, (x, _y) in enumerate(PLAN_DATUM_HOLES, 1)},
 }
 DRAWING_DIMENSIONS = {
-    "BlockProfile": ("BlockLength", "BlockWidth", "BlockEndX", "BlockSideY"),
-    "Block": ("BlockHeight",),
-    "TopBoreProfile": ("BoreX", "BoreDia"),
+    "BlockProfile": ("BlockLength", "BlockWidth", "BlockSideY"),
+    "TopBoreProfile": ("BoreDia",),
     "TopBore": ("TopBoreDepth",),
     "PivotTapProfile": ("TapDrillDia",),
-    CBORE_FLOOR_REFERENCE: ("CboreFloor",),
-    "CarriageDrillProfile": tuple(n for i in range(1, 5) for n in (f"CarriageDrills{i}X", f"CarriageDrills{i}Y")) + ("CarriageDrills1Dia",),
-    "CarriageCboreProfile": ("CarriageCounterbores1Dia",),
+    CBORE_FLOOR_REFERENCE: ("CboreFloor", "SectionBlockHeight"),
+    "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
+    "CarriageCboreProfile": ("CarriageCounterbores3Dia",),
+    PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
 }
+THREE_PLACE_DIMENSIONS = frozenset({
+    "CboreFloor", "TopBoreDepth", "CarriageDrills3Y", "CarriageDrills4Y",
+    "PlanHole1X", "PlanHole2X",
+})
 DRAWING_PRECISION = {
-    feature: {name: (3 if name in ("CboreFloor", "TopBoreDepth") or name.startswith("CarriageDrills") and not name.endswith("Dia") else 2)
-              for name in names}
+    feature: {name: (3 if name in THREE_PLACE_DIMENSIONS else 2) for name in names}
     for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME = {name: places for names in DRAWING_PRECISION.values() for name, places in names.items()}
+CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
     "BoreDia": "REAM H7", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
-    "CarriageCounterbores1Dia": "4X COUNTERBORE FROM TOP",
+    "CarriageCounterbores3Dia": "4X COUNTERBORE FROM TOP",
 }
 CALLOUTS_BELOW = {
     "BoreDia": "LOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER",
     "TapDrillDia": "M8x1.25 TAP THRU BELOW SHOULDER SEAT",
-    "CboreFloor": "M4x20 IN HGH15CA: 3.85 MIN ENGAGEMENT",
+    "TopBoreDepth": "SETS TL-VN-77 SHOULDER HEIGHT",
+    "CarriageDrills1Dia": "MATCHES HGH15CA CARRIAGE M4 PATTERN",
+    "CarriageCounterbores3Dia": "FLOOR: SECTION B-B",
+    # Under the value, two rows, right of B-B (an above-text newline dropped
+    # the note, farm run 20261027T175531766Z): the block height's extension
+    # lines pass left of it.
+    "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
 }
-REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE,)
-ISOMETRIC_VIEW_NOTE = "RAIL 2 / QTY 1"
+REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
 WALLS_MM = {
     "pivot seat to spindle end": BORE_X - BORE_DIA / 2 - BLOCK_X0,
     "carriage counterbore to side": BLOCK_WIDTH / 2 - BOLT_Y - CBORE_DIA / 2,
