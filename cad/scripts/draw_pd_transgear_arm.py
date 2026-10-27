@@ -1119,11 +1119,12 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales={name: SHEET_SCALE for name in SHEET_NAMES},
-        # SolidWorks pins its own "... Tapped Hole" note to the front view
-        # once a tap carries a hole callout; the plate-tap callout already
-        # states the thread and drill.
+        # SolidWorks pins its own "... Tapped Hole" note to each plan (sheet
+        # 1's and sheet 2's: run 20261027T210532641Z removed 2) once a tap
+        # carries a hole callout; the plate-tap callout already states the
+        # thread and drill.
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=len(TAP_CALLOUTS),
+        expected_redundant_notes=len(TAP_CALLOUTS) * len(SHEET_NAMES),
         settled_checks=(lambda: _pin_section_caption_settled(adapter, pin_section),),
     )
     require_saved_projected_gtols(
