@@ -62,6 +62,46 @@ def test_model_precision_and_functional_bands_have_one_authority() -> None:
     )
 
 
+def test_foot_grip_dimension_sits_on_the_free_end_not_the_upright_face(monkeypatch) -> None:
+    import asyncio
+
+    import _sketch
+    import _sketch_chains
+
+    spans, anchors = [], []
+
+    async def dimension_between(_adapter, ref1, ref2, kind, value, _label):
+        spans.append((ref1, ref2, kind, value))
+
+    async def anchor_point_to_origin(_adapter, ref, x, y, _label):
+        anchors.append((ref, x, y))
+
+    async def add_sketch_constraint(*_args):
+        return SimpleNamespace(is_success=True, data=None)
+
+    monkeypatch.setattr(_sketch_chains, "dimension_between", dimension_between)
+    monkeypatch.setattr(_sketch_chains, "anchor_point_to_origin", anchor_point_to_origin)
+    monkeypatch.setattr(_sketch_chains._telemetry, "success", lambda *_a, **_k: None)
+    points = list(part.FOOT_PROFILE)
+    lines = [f"L{index}" for index in range(len(points))]
+    dims = _sketch.SketchDims()
+    asyncio.run(_sketch_chains.define_rectilinear_chain(
+        SimpleNamespace(add_sketch_constraint=add_sketch_constraint), lines, points,
+        anchor=part.FOOT_PROFILE_ANCHOR, label="foot", dims=dims, names=list(part.FOOT_PROFILE_DIMENSIONS),
+    ))
+    names = [name for name, _drive in dims._rows]
+    vertex = {f"{line}.start": points[index] for index, line in enumerate(lines)}
+    vertex |= {f"{line}.end": points[(index + 1) % len(points)] for index, line in enumerate(lines)}
+    segments = {name: [vertex[ref1], vertex[ref2]] for name, (ref1, ref2, *_rest) in zip(names[:2], spans, strict=True)}
+    # Sketch y is -model Z. FlangeDepth spans the free -X end, top to seat,
+    # so its drawing witnesses leave real corners, not the shared +X face.
+    assert segments["FlangeDepth"] == [(part.FLANGE_X[0], -part.FLANGE_Z[0]), (part.FLANGE_X[0], -part.FLANGE_Z[1])]
+    assert spans[names.index("FlangeDepth")][2:] == ("vertical_distance", pytest.approx(mounting.SIDE_PLATE_THICKNESS))
+    assert segments["FlangeWidth"] == [(part.FLANGE_X[0], -part.FLANGE_Z[1]), (part.FLANGE_X[1], -part.FLANGE_Z[1])]
+    assert anchors == [("L1.start", part.FLANGE_X[0], -part.FLANGE_Z[1])]
+    assert names[2:] == ["FlangeCornerX", "FlangeCornerZ"]
+
+
 def test_overall_precision_bands_do_not_loosen_receiver_or_move_nominal_geometry() -> None:
     assert mounting.SIDE_PLATE_MACHINE_X == (-8.0, 46.25)
     assert mounting.SIDE_PLATE_HEIGHT == 11.0
@@ -672,7 +712,7 @@ def test_overall_reference_measures_real_seat_to_arc_extreme_without_a_new_size_
 
 
 @pytest.mark.parametrize("row_mm", (4.79, 5.64))
-@pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "overall_name"))
+@pytest.mark.parametrize("fault", (None, "unsettled_modes", "ignored_move", "own_crossing", "neighbour_crossing", "overall_name", "crowded_upright"))
 def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(monkeypatch, fault, row_mm):
     """Simulate current 4.79 and historical 5.64 foot rows with R7 head ink.
 
@@ -683,10 +723,11 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     """
     rows = {
         "NeckThickness": [("12.5", .1070212, .185, .012)],
+        # Imported at the free foot end, left of the L; text starts there.
         "FlangeDepth": [
-            ("3.175 ±0.13", .1667191, .123, .027),
-            ("MHA-MG-VN-53", .1667191, .118, .032),
-            ("SCREW GRIP", .1667191, .113, .025),
+            ("3.175 ±0.13", .0305, .123, .027),
+            ("MHA-MG-VN-53", .0305, .118, .042 if fault == "crowded_upright" else .032),
+            ("SCREW GRIP", .0305, .113, .025),
         ],
         "MountingX0": [("9.00 ±0.05", .0327281, .0532219, .0245438)],
         "MountingX1": [("22.70 ±0.05", .0464351, .0432219, .0271299)],
@@ -716,7 +757,10 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     }
     lines = {
         "NeckThickness": [(.091125, .2114488, .091125, .1784438), (.103625, .2114488, .103625, .1784438), (.091125, .1794438, .1633882, .1794438)],
-        "FlangeDepth": [(.104625, .1120512, .141, .1120512), (.104625, .1152262, .141, .1152262), (.2050757, .1174438, .140, .1174438), (.140, .1174438, .140, .1152262), (.140, .1120512, .140, .1057012)],
+        # Witnesses leave the foot's free-end corners (1 mm gap) for a
+        # dimension line 8 mm out; arrows outside. The offset leader is
+        # appended from the moved text in native_display below.
+        "FlangeDepth": [(.048375, .1120512, .043, .1120512), (.048375, .1152262, .043, .1152262), (.044, .1174438, .044, .1152262), (.044, .1120512, .044, .1057012)],
         "MountingX0": [(.054375, .07265, .054375, .0522219), (.058375, .07265, .058375, .0522219), (.0327281, .0532219, .064725, .0532219)],
         "MountingX1": [(.054375, .07265, .054375, .0422219), (.072075, .07265, .072075, .0422219), (.048025, .0432219, .078425, .0432219)],
         "MountingY0": [(.057375, .080 - row_mm / 1000.0, .029, .080 - row_mm / 1000.0), (.0535796, .080, .029, .080), (.030, .080 - row_mm / 1000.0, .030, .080 - 2.0 * row_mm / 1000.0), (.030, .080, .030, .080 + row_mm / 1000.0)],
@@ -784,7 +828,8 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         if item.name == "NeckThickness":
             native_lines = [(a, b, c, d + item.dy) if i < 2 else (a, b + item.dy, c, d + item.dy) for i, (a, b, c, d) in enumerate(native_lines)]
         elif item.name == "FlangeDepth":
-            native_lines = [(a if i < 2 else a + item.dx, b, c + item.dx, d) for i, (a, b, c, d) in enumerate(native_lines)]
+            x, y = rows[item.name][2][1] + item.dx, rows[item.name][2][2] + item.dy - .001
+            native_lines = [*native_lines, (.044, .1174438, x, y), (x, y, x + rows[item.name][1][3], y)]
         elif item.name == "NoseR":
             native_lines = [
                 (a, b, c + item.dx, d + item.dy) if i == 0 else
@@ -845,10 +890,14 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     monkeypatch.setattr(drawing, "dimension_name", lambda _a, item: "" if item.name in ("OverallHeight", "LeverTapCallout") else item.name)
     monkeypatch.setattr(drawing, "move_annotation", move)
     monkeypatch.setattr(drawing, "sheet_region", lambda _a: _R8_REGION)
-    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, _v, p, **_kw: (.097375 + p[0], .080 + p[1]))
+    front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
+    # Front (*Top) projection: X right about the upright centre, +Z down
+    # from the mounting seat line; the bottom view keeps its own row map.
+    monkeypatch.setattr(drawing, "model_point_in_view", lambda _a, view, p, **_kw: (
+        (.097375 + p[0], .1120512 + mounting.SIDE_PLATE_Z[1] / 1000.0 - p[2]) if view is front else (.097375 + p[0], .080 + p[1])
+    ))
     monkeypatch.setattr(drawing, "rebuild_drawing", rebuild)
     monkeypatch.setattr(drawing._telemetry, "info", lambda message, **fields: messages.append((message, fields)))
-    front = SimpleNamespace(GetOutline=lambda: (.048787, .1064632, .109213, .2235368))
     # Historical frozen witnesses cross both horizontal size text boxes and
     # the row text at Y80. Each simulated row changes the measured Y span.
     for name, line in (("MountingX0", lines["MountingX0"][0]), ("MountingX1", lines["MountingX1"][0]), ("MountingY0", lines["MountingY0"][1]), ("TapFromSide", lines["TapFromSide"][0])):
@@ -862,7 +911,11 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
     tip_reason = Box(.165366 + .00015, .2204437 + .00015, .206 - .00015, .2239437 - .00015)
     assert segment_box_overlap_length(Segment(*lines["TapFromTip"][5]), tip_reason) > .0009
     if fault:
-        message = "retained native dimension name" if fault == "overall_name" else ("did not settle" if fault == "ignored_move" else ("own native line" if fault in ("own_crossing", "unsettled_modes") else "neighbouring native line"))
+        message = {
+            "overall_name": "retained native dimension name", "ignored_move": "did not settle",
+            "own_crossing": "own native line", "unsettled_modes": "own native line",
+            "neighbour_crossing": "neighbouring native line", "crowded_upright": r"FlangeDepth .* crowds \['front upright'\]",
+        }[fault]
         with pytest.raises(RuntimeError, match=message):
             drawing._layout_linear_annotations(object(), front, object(), [item for name, item in items.items() if name not in ("OverallHeight", "LeverTapCallout")], overall_reference=items["OverallHeight"], tap_callout=items["LeverTapCallout"])
     else:
@@ -871,13 +924,12 @@ def test_reviewed_linear_ink_is_placed_from_geometry_and_guards_actual_segments(
         assert ink["NeckThickness"].text[0] == pytest.approx(.103625 + .004)
         assert items["NeckThickness"].OffsetText
         assert ink["NeckThickness"].text[1] > .2235368
-        assert ink["FlangeDepth"].text[2] < .196
-        # A real new overall line would cut the old 3.175 text station.
-        # Its measured witness now bounds that lane too, not a fixed nudge.
-        assert segment_box_overlap_length(Segment(.174, .1120512, .174, .181), Box(.1667191, .123, .1783566, .1265)) > 0.0
-        assert ink["FlangeDepth"].text[2] <= .174 - .004 + 1e-8
+        # Text starts above the foot's free end, in the open L: clear of the
+        # foot top, its own witnesses and dimension line, and the upright.
+        assert ink["FlangeDepth"].text[0] == pytest.approx(.097375 + mounting.SIDE_PLATE_X[0] / 1000.0)
+        assert ink["FlangeDepth"].text[1] == pytest.approx(.1174438 + .004)
+        assert ink["FlangeDepth"].text[2] + .002 <= .097375 - joint.NECK_HALF_X / 1000.0
         assert items["FlangeDepth"].OffsetText
-        assert ink["FlangeDepth"].text[1] > max(max(line[1], line[3]) for line in lines["FlangeDepth"])
         assert ink["MountingX0"].text[2] < .054375
         assert ink["MountingX1"].text[0] > .072075
         assert ink["MountingY0"].text[1] == pytest.approx(mode_shoulder_y + .0022)
