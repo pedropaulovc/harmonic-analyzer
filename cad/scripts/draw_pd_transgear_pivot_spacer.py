@@ -192,6 +192,8 @@ DATUM_A_AIR = 0.002
 DATUM_A_LEADER_TOL = 0.0005
 # The datum triangle (as lines or filled) lies within this of its tip.
 DATUM_A_TRIANGLE_SPAN = 0.005
+# Two leader primitives join where their ends meet within this.
+_JOIN_TOL_M = 1e-5
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -511,7 +513,7 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
 
 def _datum_a_ink(
     adapter: Any, tag: Any
-) -> tuple[list[Segment], list[tuple[float, float]], list[Box]]:
+) -> tuple[list[Segment], list[tuple[float, float]], Box]:
     """Datum A's rendered ink from its own GetDisplayData, decoded by the
     layout audit's own primitives (_layout_audit): its strokes (lines with
     zero-length records dropped, polylines, polygons), the vertices of a
@@ -540,23 +542,76 @@ def _datum_a_ink(
         for raw in display.get("arrows", ())
         if len(raw) >= 3
     ]
-    letter = display_box({"texts": display.get("texts", ())})
-    return strokes, vertices, [] if letter is None else [letter]
+    texts = display.get("texts", ())
+    if not any(str(text.get("t", "")).strip() == BORE_DATUM for text in texts):
+        raise RuntimeError(
+            f"datum A renders no {BORE_DATUM!r} letter: "
+            f"{[text.get('t') for text in texts]!r}"
+        )
+    letter = display_box({"texts": texts})
+    if letter is None:
+        raise RuntimeError("datum A's letter has no box")
+    return strokes, vertices, letter
+
+
+def _ends(segment: Segment) -> tuple[tuple[float, float], tuple[float, float]]:
+    return (segment.x0, segment.y0), (segment.x1, segment.y1)
+
+
+def _leader_path(near: list[Segment], tip: tuple[float, float]) -> list[Segment]:
+    """The strokes of datum A's triangle and leader among ``near``: those
+    touching the tip (the triangle drawn as lines, the leader's first piece),
+    then every stroke joined end to end with the path and lying on the
+    leader's line, however SolidWorks splits it into primitives."""
+    path = [
+        s
+        for s in near
+        if min(math.dist(end, tip) for end in _ends(s)) <= DATUM_A_TRIANGLE_SPAN
+    ]
+    if not path:
+        return []
+    far = max(
+        (end for s in path for end in _ends(s)), key=lambda end: math.dist(end, tip)
+    )
+    length = math.dist(far, tip)
+    ux, uy = (far[0] - tip[0]) / length, (far[1] - tip[1]) / length
+
+    def on_leader(point: tuple[float, float]) -> bool:
+        return (
+            abs((point[0] - tip[0]) * uy - (point[1] - tip[1]) * ux)
+            <= DATUM_A_LEADER_TOL
+        )
+
+    grown = True
+    while grown:
+        grown = False
+        joints = [end for s in path for end in _ends(s)]
+        for s in near:
+            if s in path or not all(on_leader(end) for end in _ends(s)):
+                continue
+            if any(
+                math.dist(end, joint) <= _JOIN_TOL_M
+                for end in _ends(s)
+                for joint in joints
+            ):
+                path.append(s)
+                grown = True
+    return path
 
 
 @_telemetry.traced("pivot_spacer.datum_a_clear")
 def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
     """Datum A's settled ink: its tip (the triangle's or leader's point
     nearest the axis, in whichever primitives SolidWorks draws it) lies on
-    the bore; every stroke within DATUM_A_AIR of the O.D. reaches that tip
-    (the leader, or the triangle drawn as lines), and one of them, the
-    leader, leaves the O.D.; the frame, its letter and the shoulder all
+    the bore; every stroke within DATUM_A_AIR of the O.D. belongs to the
+    triangle or the leader path from that tip (_leader_path), and the leader
+    leaves the O.D.; the frame, the shoulder and the rendered letter all
     stand DATUM_A_AIR outside the O.D. (the clearance
     test_datum_a_tag_stands_off_the_od_... sets on the requested point)."""
-    strokes, vertices, letters = _datum_a_ink(adapter, tag)
+    strokes, vertices, letter = _datum_a_ink(adapter, tag)
     od_r = OD / 2.0 * _S
     bore_r = BORE_DIA / 2.0 * _S
-    points = [p for s in strokes for p in ((s.x0, s.y0), (s.x1, s.y1))] + vertices
+    points = [end for s in strokes for end in _ends(s)] + vertices
     if not points:
         raise RuntimeError("datum A drew no ink")
     tip = min(points, key=lambda point: math.dist(point, END_CENTER))
@@ -565,29 +620,24 @@ def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
     near = [
         s for s in strokes if point_segment_distance(END_CENTER, s) < od_r + DATUM_A_AIR
     ]
-    stray = [
-        s
-        for s in near
-        if min(math.dist((s.x0, s.y0), tip), math.dist((s.x1, s.y1), tip))
-        > DATUM_A_TRIANGLE_SPAN
-    ]
+    path = _leader_path(near, tip)
+    stray = [s for s in near if s not in path]
     if stray:
         raise RuntimeError(
-            f"datum A's ink stands on the O.D. away from its tip: {stray!r}"
+            f"datum A's ink stands on the O.D. off its leader: {stray!r}"
         )
     if not any(
-        max(math.dist((s.x0, s.y0), END_CENTER), math.dist((s.x1, s.y1), END_CENTER))
-        >= od_r + DATUM_A_AIR
-        for s in near
+        math.dist(end, END_CENTER) >= od_r + DATUM_A_AIR
+        for s in path
+        for end in _ends(s)
     ):
         raise RuntimeError("datum A has no leader from outside the O.D. to the bore")
-    for box in letters:
-        nearest = (
-            min(max(END_CENTER[0], box.xmin), box.xmax),
-            min(max(END_CENTER[1], box.ymin), box.ymax),
-        )
-        if math.dist(nearest, END_CENTER) < od_r + DATUM_A_AIR:
-            raise RuntimeError(f"datum A's letter {box!r} stands on the O.D.")
+    nearest = (
+        min(max(END_CENTER[0], letter.xmin), letter.xmax),
+        min(max(END_CENTER[1], letter.ymin), letter.ymax),
+    )
+    if math.dist(nearest, END_CENTER) < od_r + DATUM_A_AIR:
+        raise RuntimeError(f"datum A's letter {letter!r} stands on the O.D.")
 
 
 def _datum_a_live(
