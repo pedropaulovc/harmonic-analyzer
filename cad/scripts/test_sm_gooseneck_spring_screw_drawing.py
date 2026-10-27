@@ -345,6 +345,63 @@ def _shank_profile_points() -> list[tuple[float, float]]:
     return eval(compile(ast.Expression(node.value), "<points>", "eval"), vars(part))
 
 
+def _shank_tangent_pairs() -> set[frozenset[str]]:
+    """Every tangent relation the builder authors in the shank profile.
+
+    Resolved from the AST, so a loop over pairs and separate calls both count
+    while a loop that authors nothing counts for nothing: each
+    ``add_sketch_constraint(a, b, "tangent")`` between the shank sketch's create
+    and exit, its names substituted through any enclosing ``for`` over a
+    literal tuple of pairs.
+    """
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    marks = {
+        node.value: node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and node.value in ("create_sketch shank profile", "exit_sketch shank profile")
+    }
+    first, last = (
+        marks["create_sketch shank profile"],
+        marks["exit_sketch shank profile"],
+    )
+    pairs: set[frozenset[str]] = set()
+
+    def visit(node: ast.AST, names: dict[str, str]) -> None:
+        if (
+            isinstance(node, ast.For)
+            and isinstance(node.target, ast.Tuple)
+            and isinstance(node.iter, ast.Tuple | ast.List)
+        ):
+            targets = [ast.unparse(target) for target in node.target.elts]
+            for item in node.iter.elts:
+                if isinstance(item, ast.Tuple) and len(item.elts) == len(targets):
+                    bound = names | {
+                        target: names.get(ast.unparse(value), ast.unparse(value))
+                        for target, value in zip(targets, item.elts)
+                    }
+                    for child in node.body:
+                        visit(child, bound)
+            return
+        if (
+            isinstance(node, ast.Call)
+            and getattr(node.func, "attr", "") == "add_sketch_constraint"
+            and first <= node.lineno <= last
+            and len(node.args) == 3
+            and isinstance(node.args[2], ast.Constant)
+            and node.args[2].value == "tangent"
+        ):
+            a, b = (
+                names.get(ast.unparse(arg), ast.unparse(arg)) for arg in node.args[:2]
+            )
+            pairs.add(frozenset((a, b)))
+        for child in ast.iter_child_nodes(node):
+            visit(child, names)
+
+    visit(tree, {})
+    return pairs
+
+
 def test_shank_profile_is_corner_seat_lead_thread_and_tip() -> None:
     seat_r, thread_r = geom.SEAT_DIA / 2.0, geom.MAJOR_DIA / 2.0
     corner_r = geom.UNDERHEAD_CORNER_R
@@ -385,8 +442,10 @@ def test_shank_profile_is_corner_seat_lead_thread_and_tip() -> None:
     assert shank.count('"vertical_distance"') == 1
     # The round is tangent to both legs and its radius, a sketch dimension,
     # runs from the global; the axial sizes read from the face, not the seat.
-    assert shank.count('"tangent"') == 1
-    assert "for first, second in ((face, corner), (corner, seat)):" in shank
+    assert _shank_tangent_pairs() == {
+        frozenset(("face", "corner")),
+        frozenset(("corner", "seat")),
+    }
     assert """shank.record("UnderHeadCornerR", '"UnderHeadCornerR"')""" in shank
     assert '("ShoulderLength", f"{face}.end", f"{seat}.end", SHOULDER_LENGTH)' in shank
     assert '("UnderHeadLength", f"{face}.end", f"{tip_chamfer}.end", LENGTH)' in shank
