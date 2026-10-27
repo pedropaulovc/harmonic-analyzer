@@ -158,6 +158,35 @@ def test_shared_vendor_instructions_print_current_numbers_and_roles() -> None:
     assert assembly_contract("pn-pen").number in pen_wire
 
 
+def test_the_loose_spare_sprocket_is_named_with_its_row_and_its_place() -> None:
+    """Machinist review r1/r2 on 5bca52e13: the paper drive's spare sprocket
+    lies loose on the deck (sheet 2) and beside item 7 (sheet 3) with no
+    balloon, row or step. Sheet 3 labels it with its number and row; the
+    paper-drive step names its supplier and where it stays."""
+    import _config
+    import pd_transgear_removable_spec as removable
+
+    number = _config.parts("pd-transgear-removable")["number"]
+    mounted = {removable.CRANK_CONFIG, removable.KNOB_CONFIG}
+    assert notes.SPARE_SPROCKET_CONFIG in removable.TEETH
+    assert notes.SPARE_SPROCKET_CONFIG not in mounted
+    item = str(spec.BOM_ORDER.index("pd-paper-drive") + 1)
+    assert drawing.BOM_PART_NUMBERS["pd-paper-drive"] == "MHA-PD-00"
+    step = steps.step_number("paper-drive-built")
+    label = notes.SPARE_SPROCKET_LABEL
+    assert f"{number} {notes.SPARE_SPROCKET_CONFIG}" in label
+    assert f"(ITEM {item}, STEP {step})" in label
+    assert max(map(len, label.splitlines())) <= 16
+    text = notes.ASSEMBLY_STEPS[step - 1]
+    assert (
+        f"MHA-PD-00 ALSO SUPPLIES ONE LOOSE {number} {notes.SPARE_SPROCKET_CONFIG} "
+        "SPARE SPROCKET"
+    ) in text
+    assert "SHEET 2" in text and "SHEET 3" in text
+    # The label's leader rides the paper drive's explode.
+    assert drawing.PAPER_DRIVE_EXPLODE_M == pytest.approx((0.0, 0.0, -0.450))
+
+
 def test_the_parked_nib_is_set_on_the_paper_before_the_line_check() -> None:
     """Code review C08: the model and the feeler step park the nib
     PEN_PAPER_CLEARANCE_MM off the paper, and nothing on the plumb, guided

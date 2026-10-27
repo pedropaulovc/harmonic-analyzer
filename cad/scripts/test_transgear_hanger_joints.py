@@ -328,8 +328,12 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
         assert worst >= module.WALL_TARGET, name
 
 
-def test_spacer_wall_is_the_one_printed_shortfall() -> None:
-    worst = (spacer.OD - spacer.OD_BAND - spacer.BORE_DIA_MAX) / 2.0
+def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:
+    worst = (
+        (spacer.OD - spacer.OD_BAND - spacer.BORE_DIA_MAX) / 2.0
+        - spacer.BORE_ECCENTRICITY
+        - 2.0 * spacer.EDGE_BREAK
+    )
     assert math.isclose(spacer.WALL_WORST, worst)
-    assert spacer.WALL_WORST_PRINTED <= worst + 1e-9 < 2.0
-    assert f"{spacer.WALL_WORST_PRINTED:.2f} MIN" in spacer.WALL_NOTE
+    assert worst >= spacer.WALL_TARGET
+    assert not hasattr(spacer, "WALL_NOTE")

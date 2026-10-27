@@ -2409,6 +2409,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "paper_drive_geom",
         "paper_drive_rack_travel",
         "pd_transgear_knob_shaft_spec",
+        # Edge-break row sizes the pivot spacer's wall and its seat flat.
+        "pd_transgear_pivot_spacer_spec",
     }
 )
 
