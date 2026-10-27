@@ -173,6 +173,7 @@ def _end_y(model_y_mm: float) -> float:
 # Across the front view on the centreline: the cut is the Top plane, the
 # plane of the spot-face profile, through every hole.
 SECTION_LINE_OVERRUN = 0.005
+_PIN_SECTION_LOWER_OVERRUN = 0.009
 SECTION_LINE = (
     (_front_x(-PIVOT_END_R) - SECTION_LINE_OVERRUN, FRONT_CENTER[1]),
     (_front_x(TIP_STATION) + SECTION_LINE_OVERRUN, FRONT_CENTER[1]),
@@ -314,10 +315,10 @@ PIN_SECTION_LABEL = "D"
 PIN_SECTION_SCALE = (1, 1)
 # The middle of section D-D's cut face and the pin bore's chain line
 # together, and the top centre of its caption, under them: the cut face's
-# top stands 2 mm under the floor depth's text, the caption's foot over the
-# lower border.
+# top stands 2 mm under the floor depth's text, the two-line caption (name,
+# scale: about 16 mm, as A-A's) between the cut face and the lower border.
 PIN_SECTION_ZONE_CENTER = (0.040, 0.042)
-PIN_SECTION_CAPTION_TOP = (0.040, 0.0298)
+PIN_SECTION_CAPTION_TOP = (0.040, 0.0302)
 _CAPTION_SETTLE_M = 2e-4
 
 
@@ -722,7 +723,10 @@ def _pin_zone_section(adapter: Any, front: Any) -> Any:
     section = create_section_view(
         adapter, front,
         line_start=(pin_x, _front_y(half) + SECTION_LINE_OVERRUN),
-        line_end=(pin_x, _front_y(-half) - SECTION_LINE_OVERRUN),
+        # Further out below: there the arm's lower edge falls toward the
+        # pivot, under the letter left of the arrow (run 20261027T201320296Z:
+        # it crossed the D at 5 mm); above, the locator callout sits close.
+        line_end=(pin_x, _front_y(-half) - _PIN_SECTION_LOWER_OVERRUN),
         view_xy=PIN_SECTION_ZONE_CENTER, section_label=PIN_SECTION_LABEL,
         scale=PIN_SECTION_SCALE, label="pin bore projected-zone section",
     )
@@ -766,20 +770,39 @@ def _pin_zone_section(adapter: Any, front: Any) -> Any:
     return section
 
 
-def _place_pin_section_caption(adapter: Any, section: Any) -> None:
-    """Hang section D-D's native caption, centred, under its cut face and
-    chain line (draw_pd_transgear_feed_pinion's measured placement), keeping
-    its linked view-label fields."""
-    view = _early_bound(section, "IView")
+def _section_caption(view: Any, label: str) -> tuple[Any, str]:
+    """A section's native caption note and its linked view-label fields."""
     captions = []
-    for raw_note in view.GetNotes() or ():
+    for raw_note in _early_bound(view, "IView").GetNotes() or ():
         note = _early_bound(raw_note, "INote")
         linked_text = str(note.PropertyLinkedText or "")
         if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
             captions.append((note, linked_text))
     if len(captions) != 1:
-        raise RuntimeError(f"expected one native section D-D caption, found {len(captions)}")
-    note, linked_text = captions[0]
+        raise RuntimeError(f"expected one native section {label} caption, found {len(captions)}")
+    return captions[0]
+
+
+def _place_pin_section_caption(adapter: Any, section: Any, section_a: Any) -> None:
+    """Hang section D-D's native caption, centred, under its cut face and
+    chain line (draw_pd_transgear_feed_pinion's measured placement), with
+    section A-A's linked view-label fields: D-D is drawn at 1:1 on the 2:1
+    sheet, so it must state its scale (Y14.3), and the native caption, laid
+    out before the sheet scale is set, carried none (run
+    20261027T201320296Z)."""
+    note, linked_text = _section_caption(section, "D-D")
+    _note_a, linked_a = _section_caption(section_a, "A-A")
+    if "<VLSCALEV>" not in linked_a:
+        raise RuntimeError(f"section A-A caption carries no scale field: {linked_a!r}")
+    if linked_text != linked_a:
+        note.PropertyLinkedText = linked_a
+        rebuild_drawing(adapter, label="section D-D caption scale field")
+        linked_text = str(note.PropertyLinkedText or "")
+        if linked_text != linked_a:
+            raise RuntimeError(f"section D-D caption fields did not persist: {linked_text!r}")
+    # GetText can read blank before the sheet's final rebuild (draw_fr_top_
+    # frame), so the printed scale is evidenced, not asserted, here.
+    _telemetry.info(f"section D-D caption {linked_text!r} prints {note.GetText()!r}")
     target = PIN_SECTION_CAPTION_TOP
     for _attempt in range(4):
         extent = tuple(float(value) for value in note.GetExtent())
@@ -987,7 +1010,7 @@ async def build(adapter: Any) -> dict[str, str]:
     chain_views = {"A-A": section, "D-D": pin_section}
     for key, chain in PROJECTED_ZONE_CHAINS.items():
         _add_projected_zone_chain(adapter, chain_views[chain.view], key=key, chain=chain)
-    _place_pin_section_caption(adapter, pin_section)
+    _place_pin_section_caption(adapter, pin_section, section)
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
