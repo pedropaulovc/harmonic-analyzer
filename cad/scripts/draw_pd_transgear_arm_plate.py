@@ -56,6 +56,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_attachment import _assert_attached_to
@@ -480,6 +481,20 @@ def _cut(
     )
 
 
+def _show_cut_faces_only(adapter: Any, view: Any, label: str) -> None:
+    """Only the cut face prints: past D-D's plane (looking down the plan)
+    the notch section and the hub stood in the view and under the zones'
+    chain lines, and pushed its caption onto the title block (run
+    20261027T175228772Z)."""
+    section = _early_bound(_early_bound(view, "IView").GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    section.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label=f"{label} cut faces only")
+    if section.GetDisplayOnlySurfaceCut() is not True:
+        raise RuntimeError(f"{label} retained geometry beyond the cutting plane")
+
+
 def _require_note_in_view(
     note: Any, view: Any, xy: tuple[float, float], label: str
 ) -> None:
@@ -783,6 +798,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, plan, SCREW_SECTION_LINE_MODEL, SCREW_SECTION_CENTER, "D",
         "plate section through the screw holes",
     )
+    _show_cut_faces_only(adapter, screw_section, "plate section D-D")
     iso = place_view(
         adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_VIEW_SCALE
     )
