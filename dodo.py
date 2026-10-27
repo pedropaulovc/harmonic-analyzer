@@ -3348,6 +3348,10 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         str(path.resolve())
         for path in (
             spec.outputs["pdf"],
+            # SDK/runtime dependency changes invalidate verdicts, not geometry.
+            # Hash both authorities whole rather than duplicating SDK versions.
+            REPO_ROOT / "pyproject.toml",
+            REPO_ROOT / "uv.lock",
             *(
                 SCRIPTS_DIR / name
                 for name in _MACHINIST_REVIEW_MODULES

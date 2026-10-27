@@ -236,6 +236,14 @@ def inputs(dodo, tmp_path, monkeypatch):
     scripts = root / "cad" / "scripts"
     prompts = scripts / "prompts"
     prompts.mkdir(parents=True)
+    (root / "pyproject.toml").write_text(
+        '[project]\ndependencies = ["claude-agent-sdk==0.1.0"]\n',
+        encoding="utf-8",
+    )
+    (root / "uv.lock").write_text(
+        '[[package]]\nname = "claude-agent-sdk"\nversion = "0.1.0"\n',
+        encoding="utf-8",
+    )
     for name in dodo._MACHINIST_REVIEW_MODULES:
         (scripts / name).write_text("# review code\n", encoding="utf-8")
     (scripts / "_drawing_diff.py").write_text("# unused PDF diff\n", encoding="utf-8")
@@ -323,6 +331,21 @@ def test_key_changes_only_with_review_inputs(inputs):
     assert key() != initial
     inputs.spec.source_kind = "assembly"
     assert key() != initial
+
+
+@pytest.mark.parametrize("manifest", ["pyproject.toml", "uv.lock"])
+def test_dependency_manifest_edits_rekey_review(inputs, manifest):
+    dodo = inputs.module
+    path = inputs.root / manifest
+    initial = _review_key(dodo)
+    original = path.read_text(encoding="utf-8")
+    path.write_text(original.replace("0.1.0", "0.2.0"), encoding="utf-8")
+    assert _review_key(dodo) != initial
+    # Whole-manifest hashing intentionally includes non-SDK dependency edits.
+    path.write_text(original + "\n# unrelated dependency edit\n", encoding="utf-8")
+    assert _review_key(dodo) != initial
+    path.write_text(original, encoding="utf-8")
+    assert _review_key(dodo) == initial
 
 
 @pytest.mark.parametrize(
@@ -515,6 +538,37 @@ def test_reviewer_selection_does_not_rekey_real_native_leaves(
         dodo, "_MACHINIST_REVIEW_PROFILE",
         registered_review_profile({})._replace(**{field: value}),
     )
+    assert [dodo._cache_key(deps, label) for label, deps in rows] == initial
+
+
+@pytest.mark.parametrize("manifest", ["pyproject.toml", "uv.lock"])
+def test_dependency_manifest_edits_rekey_review_not_native_geometry(
+    dodo, monkeypatch, manifest
+):
+    stem = "sm_summing_lever"
+    part = next(
+        path for path in dodo.part_scripts() if path.stem == f"build_{stem}"
+    )
+    rows = [
+        (f"part:{stem}", dodo._part_file_deps(part, stem)),
+        (f"drawing:{stem}", dodo._drawing_file_deps(stem)),
+    ]
+    initial = [dodo._cache_key(deps, label) for label, deps in rows]
+    review_key = _review_key(dodo, stem)
+    manifest_path = (dodo.REPO_ROOT / manifest).resolve()
+    original_digest = dodo.ContentChecker._digest
+
+    def changed_manifest_digest(path):
+        source = original_digest(path)
+        if Path(path).resolve() == manifest_path:
+            return source + "-changed-dependency-manifest"
+        return source
+
+    # Simulate a manifest-only content change without touching this checkout.
+    monkeypatch.setattr(
+        dodo.ContentChecker, "_digest", staticmethod(changed_manifest_digest)
+    )
+    assert _review_key(dodo, stem) != review_key
     assert [dodo._cache_key(deps, label) for label, deps in rows] == initial
 
 

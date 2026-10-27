@@ -1464,7 +1464,7 @@ def test_transport_records_original_error_category_and_routing_timeline(
         assert kwargs["config"]["recorded"] and kwargs["schema"]["title"] == "recorded"
     monkeypatch.setattr(transport, "_sdk", sdk)
     monkeypatch.setattr(transport, "_omp", omp)
-    provenance = {}
+    provenance = {"private_home": str(tmp_path)}
     def invoke():
         return transport.run(
             command=["claude_agent_sdk", "--model", "test", "--effort", "high",
@@ -1477,6 +1477,7 @@ def test_transport_records_original_error_category_and_routing_timeline(
         with pytest.raises(transport.TransportError) as caught:
             invoke()
         assert "secret-canary" not in str(caught.value)
+        assert caught.value.category == "ValueError"
         assert provenance["routes"][-1]["error_category"] == "ValueError"
         failure, = [fields for name, fields in logs if name == "machinist_review.transport_failed"]
         assert failure["error_category"] == "ValueError"
@@ -1628,7 +1629,7 @@ def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
         assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
 
 
-@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "prompt_rejected", "slow_shutdown", "footer_context", "footer_instruction", "trailing_malformed", "trailing_array", "trailing_tool", "trailing_execution", "trailing_unknown", "trailing_failure", "trailing_valid", "failure_then_malformed"])
 def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
 ) -> None:
@@ -1677,6 +1678,10 @@ for line in sys.stdin:
                 "model": {"provider": provider, "id": "test"}, "systemPrompt": parts,
                 "dumpTools": [{"name": name} for name in names]}
     elif kind == "prompt":
+        if mode == "prompt_rejected":
+            emit({"type": "response", "id": request["id"], "command": kind, "success": False, "error": "fixture rejection"})
+            time.sleep(20)  # No prompt_result follows a rejected request.
+            continue
         payload = os.urandom(1536)
         digest = hashlib.sha256(payload).hexdigest()
         blobs = Path(os.environ["PI_CODING_AGENT_DIR"]) / "blobs"
@@ -1689,7 +1694,7 @@ for line in sys.stdin:
               "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
         emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
               "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
-        result = {"type": "prompt_result", "id": request["id"], "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
+        result = {"type": "prompt_result", "id": request["id"], "agentInvoked": True, "status": "failed" if mode in {"turn_failure", "failure_then_malformed"} else "completed", "sessionSettled": True}
         print(json.dumps(result) + ("\nnot-json-drain-canary" if mode == "failure_then_malformed" else ""), flush=True)
         continue
     elif kind == "get_last_assistant_text":
@@ -1795,6 +1800,10 @@ if mode == "slow_shutdown": time.sleep(60)
     else:
         with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError) as caught:
             asyncio.run(invoke())
+        if catalog == "prompt_rejected":
+            assert isinstance(caught.value, transport.TransportError)
+            assert caught.value.category == "protocol_error"
+            assert str(caught.value) == "OMP prompt request failed"
         if catalog == "failure_then_malformed":
             assert str(caught.value) == "OMP review did not complete"
         if catalog.startswith("trailing_"):
@@ -1802,7 +1811,7 @@ if mode == "slow_shutdown": time.sleep(60)
             assert "image_blobs" not in provenance
     requests = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines()]
     assert requests[0]["type"] == "get_state"
-    assert any(row["type"] == "prompt" for row in requests) is (catalog.startswith("trailing_") or catalog in {"valid", "slow_shutdown", "failure_then_malformed"})
+    assert any(row["type"] == "prompt" for row in requests) is (catalog.startswith("trailing_") or catalog in {"valid", "prompt_rejected", "slow_shutdown", "failure_then_malformed"})
     if catalog == "malformed":
         assert any(
             row.get("type") == "rpc_parse_error"
@@ -1881,12 +1890,12 @@ def test_private_pool_rotation_groups_and_replaced_key_cannot_restore_old_block(
     first = pool.claim()
     assert first.id == "a"
     assert pool.claim().id == "b"
-    pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
+    assert pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}) == "persisted"
     assert pool.claim().id == "c"
     assert pool.claim(["c"]) is None
     value["keys"][0]["apiKey"] = "replacement-key-a"
     save()
-    pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
+    assert pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}) == "stale_credential"
     assert pool.claim(["c"]).id == "a"
     with pytest.raises(ValueError, match="rotated"):
         pool.claim(required_id=first.id, required_fingerprint=first.fingerprint)
@@ -5588,8 +5597,14 @@ def test_omp_broker_exhausted_startup_budget_is_typed_startup_timeout(monkeypatc
         clock[0] = 2
         yield {}
     monkeypatch.setattr(transport, "_broker", broker)
+    async def version(*args):
+        return None
+    monkeypatch.setattr(transport, "_omp_version", version)
     with pytest.raises(transport.StartupTimeout) as caught:
-        asyncio.run(transport._omp(register_secret=lambda value: None, remaining=lambda: 20, startup=1))
+        asyncio.run(transport._omp(
+            register_secret=lambda value: None, remaining=lambda: 20, startup=1,
+            emit=lambda event, raw: None, provenance={},
+        ))
     assert caught.value.phase == "OMP sheets MCP connection"
     assert caught.value.budget == 1
 
@@ -5644,6 +5659,8 @@ def test_failed_routed_successor_does_not_inherit_predecessor_execution_evidence
         "omp_effective_options": {"predecessor": True}, "omp_prompt": "predecessor",
         "omp_prompt_sha256": "a" * 64, "shutdown": "graceful",
         "image_blobs": ["b" * 64], "session_dir": "predecessor",
+        "unknown_future_completion": {"passed": True}, "schema_validated": True,
+        "sdk_redacted_files": {"predecessor": [1, 2, 3, 4]},
     }
     calls = []
     def assert_clean(provenance):
@@ -5679,3 +5696,124 @@ def test_failed_routed_successor_does_not_inherit_predecessor_execution_evidence
     )
     assert all(route["quota_state_write"] == "persisted"
                for route in provenance["routes"][:-1])
+
+
+@pytest.mark.parametrize("version", ["17.4.0", "18.6.99", "unknown", "failed", "silent"])
+def test_omp_unsupported_version_fails_before_broker_or_prompt(tmp_path, monkeypatch, version):
+    import machinist_review_transport as transport
+    script = tmp_path / "version_fixture.py"
+    script.write_text(
+        "import sys, time\n"
+        "assert sys.argv[1] == '--version'\n"
+        + ("time.sleep(20)\n" if version == "silent" else f"print({'omp/' + version!r}, flush=True)\n")
+        + ("sys.exit(1)\n" if version == "failed" else ""),
+        encoding="utf-8",
+    )
+    processes, native = [], []
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        assert arguments == ("--version",)
+        process = await original(sys.executable, str(script), *arguments, **kwargs)
+        processes.append(process)
+        return process
+    def forbidden_broker(*args, **kwargs):
+        pytest.fail("unsupported OMP must fail before opening credentials or submitting a prompt")
+    monkeypatch.setattr(transport.shutil, "which", lambda name: sys.executable)
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setattr(transport, "_broker", forbidden_broker)
+    async def invoke():
+        async with asyncio.timeout(5):
+            await transport._omp(
+                register_secret=lambda secret: None, remaining=lambda: 10, startup=1,
+                emit=lambda event, raw: native.append(raw), provenance={},
+            )
+    expected = transport.StartupTimeout if version == "silent" else transport.TransportError
+    with pytest.raises(expected) as caught:
+        asyncio.run(invoke())
+    if version == "silent":
+        assert caught.value.phase == "OMP version preflight"
+    else:
+        assert caught.value.category == "configuration_error"
+        assert ">=18.7.0" in str(caught.value)
+        assert native[-1]["outcome"] == "unsupported"
+    assert processes and all(process.returncode is not None for process in processes)
+
+
+@pytest.mark.parametrize("version", ["18.7.0", "18.11.0", "19.0.0"])
+def test_omp_supported_version_preflight_records_version(tmp_path, monkeypatch, version):
+    import machinist_review_transport as transport
+    script = tmp_path / "version_fixture.py"
+    script.write_text(f"print({'omp/' + version!r})\n", encoding="utf-8")
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        assert arguments == ("--version",)
+        return await original(sys.executable, str(script), *arguments, **kwargs)
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    provenance, native = {"routes": [{"transport": "omp", "outcome": "started"}]}, []
+    asyncio.run(transport._omp_version(
+        sys.executable, lambda: 5, 1, lambda event, raw: native.append(raw), provenance,
+    ))
+    assert provenance["omp_version"] == version
+    assert provenance["routes"][0]["omp_version"] == version
+    assert native == [{"type": "omp_version_preflight", "version": version, "outcome": "supported"}]
+
+
+@pytest.mark.parametrize("text", ["", "Localized billing diagnostic", "Billing system unavailable"])
+def test_sdk_billing_error_is_typed_quota_independent_of_prose(text):
+    import machinist_review_transport as transport
+    event = {"type": "assistant", "error": "billing_error",
+             "message": {"content": [{"type": "text", "text": text}]}}
+    assert transport.quota_event(event) == {
+        "status": "exhausted", "retryAt": None, "reason": "billing-error",
+    }
+    event["error"] = "authentication_failed"
+    assert transport.quota_event(event) is None
+
+
+def test_stale_quota_update_outcome_is_retained_in_route_and_logs(tmp_path, sdk_transport, monkeypatch):
+    from machinist_review_credentials import CredentialPool
+    sdk_transport.quota = True
+    logs = []
+    monkeypatch.setattr(CredentialPool, "unavailable", lambda self, key, quota: "stale_credential")
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "warn",
+                        lambda event, **fields: logs.append((event, fields)))
+    monkeypatch.setattr(sdk_transport.transport._telemetry, "event",
+                        lambda event, **fields: logs.append((event, fields)))
+    async def fallback(**kwargs):
+        raise RuntimeError("fixture stops after quota routes")
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    record, = review.extra["evidence"]["attempts"]
+    assert [route["quota_state_write"] for route in record["transport_provenance"]["routes"][:-1]] == [
+        "stale_credential",
+    ] * 3
+    updates = [fields for event, fields in logs if event == "machinist_review.credential_unavailable"]
+    assert len(updates) == 6
+    assert all(fields["quota_state_write"] == "stale_credential" for fields in updates)
+
+
+def test_sdk_authentication_failure_is_configuration_error_without_rotation(tmp_path, sdk_transport, monkeypatch):
+    import claude_agent_sdk as sdk
+    async def failed(self):
+        yield sdk.AssistantMessage(
+            content=[sdk.TextBlock(text="Insufficient credits (invalid API key)")],
+            model="test", error="authentication_failed",
+        )
+        yield sdk.ResultMessage(
+            subtype="error_during_execution", duration_ms=1, duration_api_ms=1,
+            is_error=True, num_turns=1, session_id=self.options.session_id,
+        )
+    monkeypatch.setattr(sdk.ClaudeSDKClient, "receive_response", failed)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 1
+    assert "configuration_error" in review.error
+    record, = review.extra["evidence"]["attempts"]
+    route, = record["transport_provenance"]["routes"]
+    assert route["outcome"] == "failed" and route["error_category"] == "configuration_error"
+    assert "quota_state_write" not in route

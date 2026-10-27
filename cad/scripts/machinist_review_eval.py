@@ -15,9 +15,10 @@ Only pass/fail are human outcomes. Invalid evidence is an infrastructure failure
 unassessed evidence and targeted failures remain usable experiment outcomes.
 
 Each invocation resumes matching valid results automatically. Inputs plus harness,
-evaluator, schema and sheet-server hashes, Pillow/pypdfium2/mcp and reviewer CLI
-versions (queried once per invocation), model, effort, timeout and retry settings
-define the run identity.
+evaluator, schema and sheet-server hashes, Pillow/pypdfium2/mcp and active reviewer
+runtime versions, model, effort, timeout and retry settings define the run identity.
+Optional OMP probes remain diagnostic for SDK-only runs; retained actual OMP
+executions require a matching successful current version probe before reuse.
 Use a separate report directory for an independent repeat of identical inputs.
 Concurrent invocations must not share a report directory. Each completed case is
 checkpointed atomically; interrupted/invalid cases rerun without overwriting old
@@ -48,6 +49,7 @@ import hashlib
 import importlib.metadata
 import json
 import math
+import os
 from pathlib import Path
 import re
 import shutil
@@ -58,7 +60,7 @@ from typing import Any, Sequence
 
 import _telemetry as telemetry
 import machinist_review as mr
-from machinist_review_credentials import _LABEL
+from machinist_review_credentials import CredentialPool, _LABEL
 
 DEFAULT_CASES = mr.CAD_ROOT / "comparisons" / "bench" / "machinist_review" / "manifest.json"
 VERSIONS = ("baseline", "candidate")
@@ -217,7 +219,13 @@ def make_identity(
         },
         "schema_sha256": mr._sha256(mr.SCHEMA_FILE),
         "reviewer": reviewer, "model": model, "effort": effort,
-        "retries": retries, "timeout_s": timeout_s, "runtime": dict(runtime),
+        "retries": retries, "timeout_s": timeout_s,
+        "runtime": {
+            key: value for key, value in runtime.items()
+            if reviewer != "claude" or (
+                key != "reviewer_cli" and not key.startswith("omp_version_probe")
+            )
+        },
         "prompts": {
             version: {"raw_sha256": hashlib.sha256(raw).hexdigest(),
                       "effective_sha256": {
@@ -327,6 +335,125 @@ def _check_retained_argv(
         )
     ):
         raise ValueError("retained argv must relocate exactly the attempt-dir file arguments")
+
+
+class _OMPProbeUnavailable(RuntimeError):
+    """A cached OMP execution cannot be checked without a current version."""
+
+
+def _check_native_events(
+    path: Path | None, provenance: dict[str, Any], events: list[dict[str, Any]],
+) -> None:
+    """Bind offline native bytes to the invocation and its started routes."""
+    if any(not isinstance(event, dict) for event in events):
+        raise ValueError("invalid normalized event object")
+    # Route offsets index the full transport stream, before _parse_events removes
+    # MCP control responses. Status alone is not proof of a provider response.
+    provider_events = [event for event in events if event.get("type") != "control_response"]
+    routes = provenance.get("routes", [])
+    if not isinstance(routes, list):
+        raise ValueError("invalid native event routes")
+    indexes: set[int] = set()
+    cursor = 0
+    for route in routes:
+        if (
+            not isinstance(route, dict)
+            or type(route.get("route_index")) is not int
+            or route["route_index"] != len(indexes) + 1
+            or route.get("transport") not in {"claude_agent_sdk", "omp"}
+            or route.get("outcome") not in {"succeeded", "failed", "quota"}
+            or type(route.get("event_start")) is not int or route["event_start"] != cursor
+            or type(route.get("event_end")) is not int
+            or not cursor <= route["event_end"] <= len(events)
+        ):
+            raise ValueError("invalid native event route boundaries")
+        index = route["route_index"]
+        indexes.add(index)
+        if any(type(event.get("route_index")) is not int or event["route_index"] != index
+               for event in events[cursor:route["event_end"]]):
+            raise ValueError("normalized events cross native routes")
+        cursor = route["event_end"]
+    if cursor != len(events):
+        raise ValueError("normalized events lack native routes")
+    if path is None:
+        if provider_events or provenance.get("native_events") is not None:
+            raise ValueError("missing retained native events")
+        return
+    content = path.read_bytes()
+    binding = provenance.get("native_events")
+    lines = content.splitlines()
+    if (
+        not isinstance(binding, dict) or set(binding) != {"sha256", "records"}
+        or binding["sha256"] != hashlib.sha256(content).hexdigest()
+        or type(binding["records"]) is not int or binding["records"] != len(lines)
+    ):
+        raise ValueError("retained native event digest/count mismatch")
+    # Offline validation cannot discover arbitrary credentials. Reuse the writer's
+    # literal/JSON-escaped redactor for known environment secrets; never open a vault.
+    redactor = CredentialPool(load_mode="skip")
+    redactor.secrets.update(
+        value for name, value in os.environ.items()
+        if value and name in {"ANTHROPIC_API_KEY", "ANTHROPIC_OAUTH_TOKEN", "CLAUDE_API_KEY"}
+    )
+    def contains_secret(value: Any) -> bool:
+        if isinstance(value, str):
+            return redactor.redact(value) != value
+        if isinstance(value, dict):
+            return any(contains_secret(key) or contains_secret(item) for key, item in value.items())
+        if isinstance(value, list):
+            return any(contains_secret(item) for item in value)
+        return False
+
+    seen: set[int] = set()
+    previous = 0
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("invalid retained native event JSON") from exc
+        if (
+            not isinstance(row, dict) or set(row) != {"route_index", "native_event"}
+            or type(row["route_index"]) is not int or row["route_index"] not in indexes
+            or row["route_index"] < previous or not isinstance(row["native_event"], dict)
+        ):
+            raise ValueError("invalid retained native event object/route")
+        if contains_secret(row):
+            raise ValueError("retained native events contain a known secret")
+        previous = row["route_index"]
+        seen.add(previous)
+    required = {event["route_index"] for event in provider_events}
+    required.update(route["route_index"] for route in routes if route["outcome"] == "succeeded")
+    if not required <= seen:
+        raise ValueError("retained native events lack provider route coverage")
+
+
+def _check_omp_version(provenance: dict[str, Any]) -> None:
+    if any(
+        route.get("transport") == "omp" and route.get("outcome") == "succeeded"
+        and not isinstance(route.get("omp_version"), str)
+        for route in provenance.get("routes", [])
+    ):
+        raise ValueError("retained OMP execution lacks version evidence")
+    versions = [
+        route.get("omp_version") for route in provenance.get("routes", [])
+        if route.get("transport") == "omp" and route.get("omp_version") is not None
+    ]
+    if provenance.get("transport") == "omp" and provenance.get("omp_version") is not None:
+        versions.append(provenance["omp_version"])
+    if not versions:
+        return
+    runtime = runtime_versions("claude")
+    if runtime.get("omp_version_probe") != "succeeded":
+        raise _OMPProbeUnavailable(
+            "cannot validate cached OMP execution: current OMP version probe unavailable; "
+            "retry when the probe succeeds (no provider request submitted)"
+        )
+    match = re.fullmatch(r"(?:omp(?:/|\s+))?v?(\d+\.\d+\.\d+)", runtime["reviewer_cli"])
+    if match is None:
+        raise _OMPProbeUnavailable("cannot validate cached OMP execution: unrecognized current OMP version")
+    current = match[1]
+    if any(value != current for value in versions):
+        raise ValueError("retained OMP execution version differs from current runtime")
 
 
 def _check_omp_provenance(
@@ -675,6 +802,15 @@ def validate_evidence(
             for path in artifact_paths
         ):
             raise ValueError("missing or misplaced retained artifact")
+        if review.reviewer == "claude":
+            native = retained / "native-events.jsonl"
+            raw_events = (
+                [json.loads(line) for line in Path(invocation["stdout_file"]).read_text(encoding="utf-8").splitlines()
+                 if line.strip()]
+                if invocation["stdout_file"] is not None else []
+            )
+            _check_native_events(native if native in artifact_paths else None, provenance, raw_events)
+            _check_omp_version(provenance)
         catalog = retained / "codex-models.json"
         if catalog in artifact_paths:
             _check_codex_model_catalog(catalog, review.model)
@@ -790,6 +926,8 @@ def run_case(
             validate_evidence(cached, identity, version, package, directory)
             telemetry.info("Resuming review evaluation", case=package.name, version=version)
             return cached
+        except _OMPProbeUnavailable:
+            raise
         except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError) as exc:
             telemetry.warn("Discarding unusable checkpoint", case=package.name, reason=str(exc))
     directory.mkdir(parents=True, exist_ok=True)
@@ -893,9 +1031,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         manifest, packages = load_cases(args.cases)
         prompts = {v: getattr(args, v).read_bytes() for v in VERSIONS}
+        runtime = runtime_versions(args.reviewer)
         identity = make_identity(manifest, packages, prompts, reviewer=args.reviewer,
                                  model=args.model, effort=args.effort, retries=args.retries,
-                                 timeout_s=args.timeout, runtime=runtime_versions(args.reviewer))
+                                 timeout_s=args.timeout, runtime=runtime)
         frozen_baseline = manifest.get("baseline_prompt")
         if (
             frozen_baseline is not None
@@ -923,6 +1062,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 results.append(future.result())
         results.sort(key=lambda r: (r["version"], r["case"]))
         summary = aggregate(identity, results, assessments)
+        summary["runtime_probes"] = runtime
         _atomic_json(run_dir / "results.json", summary)
         print(json.dumps(summary, indent=2))
         return int(any(r["outcome"] == "invalid" for r in summary["results"]))

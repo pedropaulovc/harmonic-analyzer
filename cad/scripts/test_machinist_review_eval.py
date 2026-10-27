@@ -26,7 +26,8 @@ def _runtime(reviewer: str) -> dict[str, str]:
         "Pillow": "11.0.0", "pypdfium2": "4.30.0", "mcp": "1.12.0",
         "reviewer_cli": f"codex-cli {CODEX_CLI_VERSION}" if reviewer == "codex"
         else "omp v18.7.0",
-        **({"claude-agent-sdk": "0.1.76", "routing": "sdk-api-pool-then-omp-v1"} if reviewer == "claude" else {}),
+        **({"claude-agent-sdk": "0.1.76", "routing": "sdk-api-pool-then-omp-v1",
+            "omp_version_probe": "succeeded"} if reviewer == "claude" else {}),
     }
 
 
@@ -464,6 +465,16 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             path.parent.mkdir(parents=True, exist_ok=True)
             _write_rows(path, rollout)
             state["rollouts"][session_id] = path
+        if reviewer == "claude":
+            for event in events:
+                event["route_index"] = 1
+            kwargs["transport_provenance"]["routes"] = [{
+                "route_index": 1, "transport": "claude_agent_sdk",
+                "outcome": "succeeded", "event_start": 0, "event_end": len(events),
+            }]
+            _write_rows(cwd / "native-events.jsonl", [
+                {"route_index": 1, "native_event": deepcopy(event)} for event in events
+            ])
         return mr.subprocess.CompletedProcess(
             command, 1 if state["mode"] == "provider_error" else 0,
             stdout="\n".join(json.dumps(event) for event in events),
@@ -500,6 +511,9 @@ def _preserve_report(result, directory: Path, report: dict[str, Any]) -> None:
 
 
 def _preserve_events(result, directory: Path, events: list[dict[str, Any]]) -> None:
+    if result["review"]["reviewer"] == "claude":
+        for row in events:
+            row["event"].setdefault("route_index", 1)
     events_path = directory / result["events"]
     events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
     result["events_sha256"] = mr._sha256(events_path)
@@ -509,6 +523,20 @@ def _preserve_events(result, directory: Path, events: list[dict[str, Any]]) -> N
                 json.dumps(row["event"]) for row in events
                 if row["attempt"] == invocation["attempt"]
             ), encoding="utf-8")
+        if invocation["reviewer"] == "claude":
+            native = Path(invocation["retained_dir"]) / "native-events.jsonl"
+            selected = [row["event"] for row in events if row["attempt"] == invocation["attempt"]]
+            routes = invocation["transport_provenance"].get("routes", [])
+            if len(routes) == 1:
+                routes[0]["event_end"] = len(selected)
+                _write_rows(native, [
+                    {"route_index": event["route_index"], "native_event": deepcopy(event)}
+                    for event in selected
+                ])
+                invocation["transport_provenance"]["native_events"] = {
+                    "sha256": mr._sha256(native), "records": len(selected),
+                }
+    _preserve_report(result, directory, result["review"])
     (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
 
@@ -1127,6 +1155,8 @@ def _omp_report(result: dict[str, Any]) -> dict[str, Any]:
             },
         },
     )
+    provenance["omp_version"] = "18.7.0"
+    provenance["routes"][0].update(transport="omp", omp_version="18.7.0")
     return report
 
 
@@ -1326,8 +1356,18 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
             if failure == "launch":
                 raise OSError("provider could not start")
             if failure == "timeout":
+                partial = {"type": "turn.started"}
+                if reviewer == "claude":
+                    partial["route_index"] = 1
+                    kwargs["transport_provenance"]["routes"] = [{
+                        "route_index": 1, "transport": "claude_agent_sdk",
+                        "outcome": "failed", "event_start": 0, "event_end": 1,
+                    }]
+                    _write_rows(Path(kwargs["cwd"]) / "native-events.jsonl", [
+                        {"route_index": 1, "native_event": deepcopy(partial)},
+                    ])
                 raise mr.subprocess.TimeoutExpired(
-                    command, kwargs["timeout"], output=b'{"type":"turn.started"}\n',
+                    command, kwargs["timeout"], output=(json.dumps(partial) + "\n").encode(),
                     stderr=b"partial diagnostics",
                 )
             if failure == "invalid_verdict":
@@ -1500,7 +1540,7 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
     )
     expected_files = {"schema.json", "stdout.txt", "stderr.txt"}
     if reviewer == "claude":
-        expected_files.add("mcp.json")
+        expected_files.update({"mcp.json", "native-events.jsonl"})
         assert cwd == attempt_dir
         assert invocation["codex_home"] is None
         assert invocation["rollout_file"] is None
@@ -1519,7 +1559,7 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
                 "args": [str(mr.SHEETS_SERVER), *(str(source.resolve()) for source in snapshot_sources)],
             }},
         }
-        assert invocation["artifacts"] == []
+        assert invocation["artifacts"] == [str(retained / "native-events.jsonl")]
         assert command[command.index("--mcp-config") + 1] == str(attempt_dir / "mcp.json")
     else:
         expected_files |= {"verdict.json", "codex-models.json", "rollout.jsonl"}
@@ -2559,3 +2599,182 @@ def test_codex_argv_mcp_servers_bind_the_catalog(tmp_path: Path) -> None:
     ) == {"sheets", "files"}
     # A whole-table override names no server and can never match the catalog.
     assert evaluation._codex_mcp_servers([*command, "-c", "mcp_servers={}"]) == {"sheets", ""}
+
+
+@pytest.mark.parametrize("probe", [
+    {"reviewer_cli": "omp-unavailable", "omp_version_probe": "timeout"},
+    {"reviewer_cli": "omp-unavailable", "omp_version_probe": "nonzero_exit",
+     "omp_version_probe_exit_code": "1"},
+    {"reviewer_cli": "omp v18.11.0", "omp_version_probe": "succeeded"},
+])
+def test_sdk_only_checkpoint_resumes_despite_optional_probe_changes(
+    tmp_path, case, provider, monkeypatch, probe,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    first = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert first["error"] is None
+    changed_runtime = {**_runtime("claude"), **probe}
+    changed_identity = _identity(case, reviewer="claude", runtime=changed_runtime)
+    assert changed_identity == identity
+    monkeypatch.setattr(evaluation, "runtime_versions", lambda reviewer: changed_runtime)
+    assert evaluation.run_case(changed_identity, "baseline", case[1], "Rubric A", directory) == first
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("probe,unavailable", [
+    ({"reviewer_cli": "omp v18.7.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp/18.7.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp v18.11.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp-unavailable", "omp_version_probe": "timeout"}, True),
+    ({"reviewer_cli": "omp-unavailable", "omp_version_probe": "unavailable"}, True),
+])
+def test_cached_actual_omp_version_is_checked_without_stale_identity(
+    tmp_path, case, provider, monkeypatch, probe, unavailable,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    _preserve_report(result, directory, _omp_report(result))
+    monkeypatch.setattr(evaluation, "runtime_versions", lambda reviewer: {**_runtime("claude"), **probe})
+    if unavailable:
+        with pytest.raises(evaluation._OMPProbeUnavailable, match="no provider request submitted"):
+            evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    elif probe["reviewer_cli"] in {"omp v18.7.0", "omp/18.7.0"}:
+        assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    else:
+        with pytest.raises(ValueError, match="version differs"):
+            evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("damage", [
+    "empty", "truncated_boundary", "swapped_same_route", "malformed_json",
+    "nonobject", "nonobject_native", "unknown_route", "bool_route", "missing_coverage",
+    "known_secret", "escaped_secret",
+])
+def test_retained_native_content_and_route_integrity(
+    tmp_path, case, provider, monkeypatch, damage,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    native = Path(invocation["retained_dir"]) / "native-events.jsonl"
+    rows = [json.loads(line) for line in native.read_text().splitlines()]
+    if damage == "empty":
+        native.write_text("")
+    elif damage == "truncated_boundary":
+        _write_rows(native, rows[:-1])
+    elif damage == "swapped_same_route":
+        rows[0]["native_event"] = {"type": "other-operation", "session_id": str(uuid.uuid4())}
+        _write_rows(native, rows)
+    else:
+        if damage == "malformed_json":
+            native.write_text("{broken\n")
+        elif damage == "nonobject":
+            _write_rows(native, [[]])
+        else:
+            if damage == "nonobject_native":
+                rows[0]["native_event"] = []
+            elif damage == "unknown_route":
+                rows[0]["route_index"] = 2
+            elif damage == "bool_route":
+                rows[0]["route_index"] = True
+            elif damage == "missing_coverage":
+                rows = []
+            else:
+                secret = 'secret-canary-"\u2603'
+                monkeypatch.setenv("ANTHROPIC_API_KEY", secret)
+                rows[0]["native_event"]["diagnostic"] = (
+                    secret if damage == "known_secret" else json.dumps(secret)[1:-1]
+                )
+            _write_rows(native, rows)
+        # Keep the outer digest valid to exercise semantic checks independently.
+        invocation["transport_provenance"]["native_events"] = {
+            "sha256": mr._sha256(native), "records": len(native.read_bytes().splitlines()),
+        }
+        _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="native"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+def test_native_routes_allow_preprovider_failure_but_reject_cross_route_records(tmp_path):
+    path = tmp_path / "native-events.jsonl"
+    events = [{"type": "system", "route_index": 2}]
+    provenance = {"routes": [
+        {"transport": "claude_agent_sdk", "route_index": 1, "outcome": "failed",
+         "event_start": 0, "event_end": 0},
+        {"transport": "omp", "route_index": 2, "outcome": "succeeded",
+         "event_start": 0, "event_end": 1},
+    ]}
+    rows = [{"route_index": 2, "native_event": {"type": "system"}}]
+    _write_rows(path, rows)
+    provenance["native_events"] = {"sha256": mr._sha256(path), "records": 1}
+    evaluation._check_native_events(path, provenance, events)
+    # A valid JSON object from the failed route cannot cover the successful route.
+    rows[0]["route_index"] = 1
+    _write_rows(path, rows)
+    provenance["native_events"]["sha256"] = mr._sha256(path)
+    with pytest.raises(ValueError, match="route coverage"):
+        evaluation._check_native_events(path, provenance, events)
+    rows[0]["route_index"] = 2
+    _write_rows(path, rows)
+    provenance["native_events"]["sha256"] = mr._sha256(path)
+    with pytest.raises(ValueError, match="cross native routes"):
+        evaluation._check_native_events(path, provenance, [{"type": "system", "route_index": 1}])
+    # No provider records at all is valid when every started route failed early.
+    provenance = {"routes": [provenance["routes"][0]]}
+    evaluation._check_native_events(None, provenance, [])
+
+
+@pytest.mark.parametrize("category", ["protocol_error", "configuration_error", "transport_error"])
+def test_attempt_failure_telemetry_preserves_transport_category(
+    tmp_path, case, provider, monkeypatch, category,
+):
+    logged = []
+    monkeypatch.setattr(mr._telemetry, "error", lambda name, **fields: logged.append((name, fields)))
+    def fail(command, **kwargs):
+        raise mr._ClaudeTransportError("safe error", category=category)
+    monkeypatch.setattr(mr, "_run_reviewer", fail)
+    result = evaluation.run_case(
+        _identity(case, reviewer="claude"), "baseline", case[1], "Rubric A", tmp_path / "run",
+    )
+    assert result["error"] is not None
+    attempt, = [fields for name, fields in logged if name == "machinist_review.attempt_failed"]
+    assert attempt["error_category"] == category
+
+
+def test_completed_attempt_telemetry_has_no_failure_category(tmp_path, case, provider, monkeypatch):
+    logged = []
+    monkeypatch.setattr(mr._telemetry, "success", lambda name, **fields: logged.append((name, fields)))
+    result = evaluation.run_case(
+        _identity(case, reviewer="claude"), "baseline", case[1], "Rubric A", tmp_path / "run",
+    )
+    assert result["error"] is None
+    attempt, = [fields for name, fields in logged if name == "machinist_review.attempt_completed"]
+    assert attempt["error_category"] is None
+
+
+def test_native_route_offsets_include_control_responses_without_provider_coverage(tmp_path):
+    status = {"type": "control_response", "route_index": 1, "response": {"subtype": "success"}}
+    response = {"type": "system", "route_index": 2}
+    provenance = {"routes": [
+        {"transport": "claude_agent_sdk", "route_index": 1, "outcome": "failed",
+         "event_start": 0, "event_end": 1},
+        {"transport": "omp", "route_index": 2, "outcome": "succeeded",
+         "event_start": 1, "event_end": 2},
+    ]}
+    native = tmp_path / "native-events.jsonl"
+    _write_rows(native, [{"route_index": 2, "native_event": {"type": "system"}}])
+    provenance["native_events"] = {"sha256": mr._sha256(native), "records": 1}
+    evaluation._check_native_events(native, provenance, [status, response])
+    # Passing the _parse_events projection loses the indexed control response.
+    with pytest.raises(ValueError):
+        evaluation._check_native_events(native, provenance, [response])
+    # A route that got only an MCP status before failing has no provider record.
+    early_failure = {"routes": [provenance["routes"][0]]}
+    evaluation._check_native_events(None, early_failure, [status])

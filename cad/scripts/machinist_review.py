@@ -1817,6 +1817,7 @@ def _review_session(
         attempt_context: list[str] = []
         stdout: str | bytes | None = None
         stderr: str | bytes | None = None
+        error_category: str | None = None
         attempt_record: dict[str, Any] = {
             "attempt": attempts,
             "reviewer": reviewer,
@@ -1983,6 +1984,7 @@ def _review_session(
             attempt_record["outcome"] = "succeeded"
             break
         except _ClaudeTransportError as exc:
+            error_category = exc.category
             stdout, stderr = exc.stdout, exc.stderr
             attempt_events = _parse_events(stdout)
             attempt_record["exit_code"] = exc.returncode
@@ -1990,6 +1992,7 @@ def _review_session(
             attempt_record["error"] = error
             verdict = None
         except subprocess.TimeoutExpired as exc:
+            error_category = "timeout"
             stdout, stderr = exc.stdout, exc.stderr
             partial_stdout = stdout or ""
             if isinstance(partial_stdout, bytes):
@@ -2000,6 +2003,7 @@ def _review_session(
             attempt_record["error"] = error
             verdict = None
         except Exception as exc:
+            error_category = type(exc).__name__
             error = f"{type(exc).__name__}: {exc}"
             attempt_record["error"] = error
             verdict = None
@@ -2023,7 +2027,7 @@ def _review_session(
                 transport=attempt_record["transport_provenance"].get("transport", reviewer),
                 session_id=session_id, outcome=attempt_record["outcome"],
                 duration_s=time.monotonic() - attempt_started,
-                error_category=error.split(":", 1)[0] if error else None,
+                error_category=error_category,
             )
             events.extend(_tag_events(attempts, attempt_events))
             calls = attempt_events if reviewer == "claude" else rollout_details["events"]
@@ -2051,13 +2055,21 @@ def _review_session(
                 if artifact.name not in inputs
             ]
             if reviewer == "claude":
+                native_path = retained_dir / "native-events.jsonl"
+                if native_path.is_file():
+                    with native_path.open("rb") as native:
+                        native_records = sum(1 for _ in native)
+                    attempt_record["transport_provenance"]["native_events"] = {
+                        "sha256": _sha256(native_path),
+                        "records": native_records,
+                    }
                 preserve = (
                     precheck_diff is not None and attempt_record["outcome"] == "succeeded"
                     and verdict is not None and verdict.get("decision") == "review"
                 )
                 if preserve:
                     attempt_record["transport_provenance"]["state_cleanup"] = "preserved_for_judge"
-                else:
+                if not preserve:
                     _claude_transport.cleanup_state(attempt_record["transport_provenance"])
 
     _write_events(events_path, events)

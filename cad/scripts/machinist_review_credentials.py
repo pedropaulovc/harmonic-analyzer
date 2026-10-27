@@ -290,7 +290,7 @@ class CredentialPool:
         }})
         with self._state() as state:
             if not any(current == key for current in self.credentials):
-                return
+                return "stale_credential"
             for current in self.credentials:
                 if current.quota_group != key.quota_group:
                     continue
@@ -299,3 +299,4 @@ class CredentialPool:
                 if entry["status"] != "ready" and (entry["retryAt"] is None or retry is not None and entry["retryAt"] > retry):
                     continue
                 entry.update(quota)
+        return "persisted"

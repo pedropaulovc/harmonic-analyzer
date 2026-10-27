@@ -304,11 +304,20 @@ both verdicts and the finding diff.
   insecure configuration fails closed. Invalid API keys are configuration errors,
   not quota exhaustion: they never authorize cooldown or transport switching.
   Only terminal typed API quota errors authorize rotation, not ordinary prose,
-  schema errors, startup failures or SDK exceptions. Transient SDK
+  schema errors, startup failures or SDK exceptions. The pinned SDK exposes
+  `billing_error` as an assistant-error discriminator: it authorizes indefinite
+  exhaustion independently of diagnostic wording (`reason=billing-error`).
+  Authentication errors remain configuration failures, even when their prose
+  mentions credits. Other typed rate-limit/invalid-request errors require the
+  corresponding quota signal; normal assistant text never authorizes rotation.
+  Transient SDK
   `system/api_retry` notices are retained as evidence while the in-flight turn
   continues, including a resumed judge; they do not trigger credential cooldown,
   rotation or transport switching. A terminal quota route records
-  `quota_state_write` as pending, then persisted or failed; failure also records
+  `quota_state_write` as pending, then persisted, stale_credential or failed.
+  A concurrent credential replacement returns `stale_credential`, does not block
+  the replacement key and is reported identically in route evidence and logs.
+  Failure also records
   the safe exception type in `quota_state_write_error` and emits
   `machinist_review.quota_state_write` with outcome `failed`. State-write lock
   waits remain inside the original attempt deadline. A failed write does not
@@ -333,6 +342,12 @@ both verdicts and the finding diff.
   built-in tools, extensions, rules, skills, LSP, memory and autolearn. Only the
   cwd-local sheets MCP server is discovered. The model is qualified as
   `anthropic/<model>` and its resolved provider must be Anthropic.
+  A bounded `omp --version` preflight requires a recognized stable version at
+  least **18.7.0**, before opening the broker or submitting any prompt. Unknown
+  or older versions fail clearly; there is no 17.x compatibility path. A newer
+  version does not bypass actual system-prompt, provider or sheets-only tool
+  isolation validation. Successful probes record canonical `omp_version` in
+  both current provenance and the route history.
   OMP's fixed workstation metadata and built-in critical directives remain;
   the startup guard accepts their rendered structure but rejects additional
   project instructions, rules, skills or appended context.
@@ -385,6 +400,8 @@ both verdicts and the finding diff.
   RPC stdout is a strict machine channel: every nonempty line, including the
   shutdown drain, must be a JSON object. Malformed lines are retained as native
   `rpc_parse_error` evidence and fail closed, never discarded as diagnostic noise.
+  A prompt-correlated RPC `response` with `success:false` fails immediately,
+  without waiting for a `prompt_result` that may never arrive.
   Legitimate trailing terminal events use the same native retention and
   normalization as active RPC events; unexpected postcompletion events and
   non-sheets tool calls fail closed. Success is emitted only after this drain
@@ -407,8 +424,11 @@ both verdicts and the finding diff.
   Judge provenance is a separate object; judging must not mutate the retained
   precheck report.
   The same boundary applies when quota rotation starts a new SDK route or
-  falls back to OMP: current-execution evidence is cleared at route entry,
-  while conversation inputs, redaction state and prior route outcomes remain.
+  falls back to OMP: route entry rebuilds provenance from explicitly owned run
+  metadata and conversation inputs, not a completion-field denylist. Unknown
+  completion fields cannot leak into a successor; prior route outcomes remain.
+  Resumed conversations retain their explicit session/redaction inputs, while
+  fresh routes retain only their lifecycle-owned private HOME and run metadata.
   Private SDK transcripts and OMP agent/blob state survive the precheck so
   persisted images hydrate correctly in the judge's history. Independent runs,
   failed attempts and completed judges delete native state after retaining
@@ -424,6 +444,14 @@ both verdicts and the finding diff.
   each attempt's actual transport provenance; SDK descriptors are not CLI argv.
   Descriptor config/schema paths must match the staged cwd-local inputs; a
   mismatched recorded path fails before submitting a provider request.
+  Each retained `native-events.jsonl` is SHA-256/count-bound to its invocation.
+  Eval parses every JSONL record as an object envelope with object `native_event`;
+  indexes must belong to started routes, agree with normalized-event route
+  boundaries and cover successful/provider-event routes. Failures before the
+  first provider event need no native records. Validation remains offline:
+  `CredentialPool.redact` checks explicitly known environment credential values
+  without opening credential stores; arbitrary unknown-secret detection is not
+  claimed. Digests catch later injection, truncation and substitution.
   SDK provenance records the effective isolation options in `sdk_isolation`
   (tools, permission mode, setting sources and strict MCP configuration).
   Both transports record `resolved_model` as a provider/id object; the SDK
@@ -448,6 +476,17 @@ both verdicts and the finding diff.
   quota-dependent route selected in advance. The canonical cached result records
   the route actually used and its per-attempt provenance, which adopters retain;
   it does not claim SDK and OMP are identical inference harnesses.
+  Review-verdict inputs include repository-root `pyproject.toml` and `uv.lock`,
+  so pinned SDK/runtime dependency changes invalidate cached verdicts.
+  Whole-manifest hashing conservatively invalidates reviews for unrelated
+  manifest edits too; dependency versions remain authoritative in manifests,
+  not duplicated in cache code. These review-only inputs do not change CAD
+  part/drawing geometry recipe keys.
+  SDK-only run identity excludes optional OMP version probes; diagnostics remain
+  in aggregate `runtime_probes`. An actual OMP route's recorded version must
+  match a successful current probe before reuse. An unavailable cached OMP probe
+  stops clearly without issuing paid reruns; a changed successful version
+  invalidates the evidence.
 - Claude multi-run reviews use **initial-request staggering, then concurrent
   continuation**: `r1` starts alone; the other isolated runs start after its
   first real positive-usage provider assistant response, while `r1` continues.

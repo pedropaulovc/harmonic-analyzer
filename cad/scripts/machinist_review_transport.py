@@ -110,8 +110,9 @@ def session_lifecycle():
 
 
 class TransportError(RuntimeError):
-    def __init__(self, message, *, stdout="", stderr="", returncode=None):
+    def __init__(self, message, *, category, stdout="", stderr="", returncode=None):
         super().__init__(message)
+        self.category = category
         self.stdout, self.stderr, self.returncode = stdout, stderr, returncode
 
 
@@ -233,9 +234,11 @@ def quota_event(event):
     if event.get("type") != "assistant" or not event.get("error"):
         return None
     error = event["error"]
+    if error == "billing_error":
+        return {"status": "exhausted", "retryAt": None, "reason": "billing-error"}
     text = "\n".join(block.get("text", "") for block in event.get("message", {}).get("content", []) if block.get("type") == "text")
-    if error in {"rate_limit", "invalid_request", "billing_error"}:
-        if (error == "billing_error" and text == "Credit balance is too low") or re.search(r"Your credit balance is too low to access the Anthropic API|Insufficient (?:API )?credits", text, re.I):
+    if error in {"rate_limit", "invalid_request"}:
+        if re.search(r"Your credit balance is too low to access the Anthropic API|Insufficient (?:API )?credits", text, re.I):
             return {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}
         if "enforced_spend_limit_reached" in text or re.search(r"You have reached your specified (?:workspace )?API usage limits", text):
             from datetime import datetime, timezone
@@ -257,6 +260,8 @@ def quota_event(event):
 
 def _error_category(exc):
     """Carry only a class identifier, never provider exception text, in telemetry."""
+    if isinstance(exc, TransportError):
+        return exc.category
     return exc.error_category if isinstance(exc, _SanitizedOperationError) else type(exc).__name__
 
 
@@ -326,6 +331,7 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
                 await asyncio.sleep(0.05)
         await client.query(config["prompt"])
         quota = None
+        last_error = None
         async for message in client.receive_response():
             value = asdict(message)
             event = sdk_event(message, value)
@@ -340,6 +346,7 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
             current = quota_event(event)
             if event.get("type") == "assistant":
                 quota = current
+                last_error = event.get("error")
             if event.get("type") == "result":
                 if not event.get("is_error") and event.get("subtype") == "success":
                     if not provenance.get("session_id"):
@@ -347,6 +354,8 @@ async def _sdk(*, key, config, schema, model, effort, session_id, continuation, 
                     return None
                 if quota and event.get("subtype") in {"success", "error_during_execution"}:
                     return quota
+                if last_error == "authentication_failed":
+                    raise TransportError("SDK API credential authentication failed", category="configuration_error")
                 raise RuntimeError("SDK review failed (non-quota terminal result)")
         raise RuntimeError("SDK ended without terminal result")
     finally:
@@ -507,12 +516,49 @@ async def _broker(executable, register_secret, remaining, startup):
             await broker.wait()
 
 
+async def _omp_version(executable, remaining, startup, emit, provenance):
+    """Reject unknown/old RPC contracts within the shared startup deadline."""
+    proc = None
+    try:
+        async with startup_timeout("OMP version preflight", min(startup, remaining())):
+            proc = await asyncio.create_subprocess_exec(
+                executable, "--version", stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            output, _ = await proc.communicate()
+            text = output.decode("utf-8", errors="replace").strip()
+            match = re.fullmatch(r"(?:omp(?:/|\s+))?v?(\d+)\.(\d+)\.(\d+)", text)
+            version = tuple(map(int, match.groups())) if match else None
+            supported = proc.returncode == 0 and version is not None and version >= (18, 7, 0)
+            emit(None, {"type": "omp_version_preflight", "version": ".".join(map(str, version)) if version else None,
+                        "outcome": "supported" if supported else "unsupported"})
+            if not supported:
+                raise TransportError(
+                    "OMP fallback requires a recognized stable version >=18.7.0; "
+                    + (f"found {'.'.join(map(str, version))}" if version else "version could not be determined"),
+                    category="configuration_error",
+                )
+            provenance["omp_version"] = ".".join(map(str, version))
+            if provenance.get("routes"):
+                provenance["routes"][-1]["omp_version"] = provenance["omp_version"]
+    finally:
+        if proc is not None and proc.returncode is None:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            await proc.communicate()
+
+
 async def _omp(*, register_secret, remaining, startup, **kwargs):
     executable = shutil.which("omp")
     if not executable:
         raise RuntimeError("OMP fallback executable not found")
     startup_deadline = time.monotonic() + min(startup, remaining())
-    async with _broker(executable, register_secret, remaining, startup) as broker_env:
+    await _omp_version(executable, remaining, startup, kwargs["emit"], kwargs["provenance"])
+    broker_budget = min(startup_deadline - time.monotonic(), remaining())
+    if broker_budget <= 0:
+        raise StartupTimeout("OMP credential broker", startup)
+    async with _broker(executable, register_secret, remaining, broker_budget) as broker_env:
         startup_remaining = min(startup_deadline - time.monotonic(), remaining())
         if startup_remaining <= 0:
             raise StartupTimeout("OMP sheets MCP connection", startup)
@@ -702,6 +748,8 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
         await send({"id": prompt_id, "type": "prompt", "message": omp_prompt})
         while True:
             event = await receive()
+            if event.get("type") == "response" and event.get("id") == prompt_id and event.get("success") is False:
+                raise TransportError("OMP prompt request failed", category="protocol_error")
             if event.get("type") == "prompt_result" and event.get("id") == prompt_id:
                 if event.get("status") != "completed":
                     raise RuntimeError("OMP review did not complete")
@@ -868,14 +916,16 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     effort = command[command.index("--effort") + 1]
     prior_transport = provenance.get("transport") if resume else None
     def clear_route_evidence():
-        # These describe the current execution, not resumable conversation
-        # inputs. A quota predecessor must not certify a failed next route.
-        for name in (
-            "resolved_model", "sdk_isolation", "omp_command",
-            "omp_effective_options", "omp_prompt", "omp_prompt_sha256",
-            "shutdown", "image_blobs", "session_dir",
-        ):
-            provenance.pop(name, None)
+        # Retain only owned run metadata and explicitly resumable inputs.
+        # Unknown completion fields must never certify a later route.
+        preserved = resume_inputs(provenance) if resume else {"private_home": provenance["private_home"]}
+        preserved.update({
+            name: provenance[name] for name in (
+                "operation_id", "package", "phase", "attempt", "requested_session_id", "routes",
+            ) if name in provenance
+        })
+        provenance.clear()
+        provenance.update(preserved)
 
     async def execute():
         nonlocal session_id, route_index
@@ -917,18 +967,20 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             route.update(outcome="quota", reason=quota["reason"])
             route["quota_state_write"] = "pending"
             try:
-                await credential_operation(pool, pool.unavailable, remaining, credential, quota)
+                write_outcome = await credential_operation(pool, pool.unavailable, remaining, credential, quota)
             except (Exception, asyncio.CancelledError) as exc:
                 route.update(quota_state_write="failed", quota_state_write_error=type(exc).__name__)
                 _telemetry.error("machinist_review.quota_state_write", outcome="failed",
                                  error_category=type(exc).__name__, credential_id=credential.id,
                                  reason=quota["reason"], **common)
                 raise
-            route["quota_state_write"] = "persisted"
+            route["quota_state_write"] = write_outcome
             _telemetry.warn("machinist_review.credential_unavailable", credential_id=credential.id,
-                            reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
+                            reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"],
+                            quota_state_write=write_outcome, **common)
             _telemetry.event("machinist_review.credential_unavailable", credential_id=credential.id,
-                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
+                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"],
+                             quota_state_write=write_outcome, **common)
             if resume:
                 raise RuntimeError("SDK continuation credential exhausted; refusing transport switch")
             # Session history may contain the API error: start a new session for
@@ -987,4 +1039,4 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         detail = pool.redact(f"{category}: {exc}")
         if errors.strip():
             detail += "\nSanitized transport stderr:\n" + errors.strip()[-1600:]
-        raise TransportError(detail, stdout=output, stderr=errors) from None
+        raise TransportError(detail, category=category, stdout=output, stderr=errors) from None
