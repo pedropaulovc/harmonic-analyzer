@@ -3,6 +3,9 @@
 > **Snapshot review, not current status.** This reviews the published v45 bundle as a shop
 > would receive it. Findings may already be fixed on `main`. Track the work on the
 > [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+>
+> **Revised 2026-10-27.** The cone-tip findings are corrected (VN-54, tip-gear material), and §7
+> adds cone-tip options with a to-scale sketch.
 
 ## Scope and method
 
@@ -16,7 +19,9 @@
 - **3D inspection.** meshprobe 1.4.0 on Blender 5.2.0 (software GL) against
   `dt-drive-train.glb`: component census and world bounds, top/side orthographic views,
   close-ups of the cone tip, the crank mesh and the alignment-pinion rig, and a side-by-side
-  with the book's top-down photo (p.18). See [Reproducing the renders](#reproducing-the-renders).
+  with the book's top-down photo (p.18). A surface-sampled trimesh pass measured where each
+  cylinder gear actually touches its cone gear (§7). See
+  [Reproducing the renders](#reproducing-the-renders).
 - **Drawings.** Three parallel sheet reviews (crank group, cone group, cylinder and pinion
   group) plus a direct read of the 13-sheet assembly `MHA-DT-00`. The headline claims in the
   summary were re-checked by hand against `pdftotext -layout` output. The per-drawing items
@@ -30,7 +35,9 @@
 1. **Fidelity: high at the level of layout and kinematics.** Tooth counts, the 4:1 crank
    reduction, the 13° oblique cone, the tip pivot and lock, the 120T cylinder gears with 3 mm
    notches, and the alignment-pinion rig all match the book. The departures are in small-part
-   detail. There is also one known accuracy defect: a 1.5° cam phase error that `READOUT.md`
+   detail, and the cone tip is the clearest one: `MHA-DT-VN-54`, a Ø17.48 steel set-screw
+   collar, has no counterpart on the original, which has a small brass collar against a split
+   tip block. There is also one known accuracy defect: a 1.5° cam phase error that `READOUT.md`
    documents itself.
 2. **Drawings: rich in shop knowledge, weak on drafting discipline.** The sheets have gear data
    blocks, vendor SKUs, a complete BOM and a feeler-gauge assembly procedure. But they cite
@@ -74,8 +81,30 @@
   "1.5° ±0.25° NOTCH CCW FROM CAM LOBE" **[V]**.
 - **Smallest cone gears.** T006 and T012 are separate brass gears with a "Ø0.794 +0.055/+0.025
   THRU" D-bore, riding on a Ø0.794 wire section of `dt-cone-gear-shaft` (133.167 → 166.78,
-  ≈33.6 mm long, L/D ≈ 42) **[V]**. On the original the tip gears look integral with the shaft
-  and of a different, harder metal (book, Cone Gear Set) **[I from photos]**.
+  ≈33.6 mm long, L/D ≈ 42) **[V]**.
+  - **Material.** The book says "the four smallest gears at the tip of the cone are slightly
+    more yellow in appearance and seem to be made of a different, perhaps harder metal"
+    (p.17). That covers T006–T024. The p.21 close-up shows verdigris on the 6-leaf pinion,
+    which points to a copper alloy, not steel **[I from photo]**.
+  - **Construction.** The photos don't show whether the tip gears are integral with the shaft
+    or separate gears.
+  - **v45.** All four are drawn in plain "Brass".
+- **No counterpart for `MHA-DT-VN-54`.**
+  - **Model:** a Ø17.48 × 11.5 steel collar from 3/4″ bar with a radial 2-56 set screw on
+    the wire flat, set "0.45 FEELER OFF T006 THRUST FACE" **[V]**.
+  - **Original:** the book's top-down photo (p.18; bundled overlay
+    `comparisons/*/harmonic_analyzer--ch12-p002-img09*`) and the p.21 close-up show only a
+    small brass collar. It sits directly against T006 and the black tip block, and is about
+    Ø5 × 4 mm (scaled from the gear pitch, ±25 %) **[I from photos]**.
+  - **Verdict:** VN-54 is roughly 3× too large in diameter and length, the wrong metal, and
+    has no set screw on the original.
+- **Tip block hardware.** On the original, a domed, slotted, blackened end screw sits on the
+  cone axis in the split black block, and a bright slotted pinch screw on the side locks the
+  slit (book pp.17–18) **[I from photos]**.
+  - v45 uses a headless #10-32 cup-point set screw (`VN-55`) for the end screw and a #4-40
+    fillister (`VN-56`) for the pinch **[V]**.
+  - In the aligned overlay, the model's pinch-screw head is on the side facing the cylinder
+    bank. On the original it is on the outboard side **[I]**.
 - **Helical crank drive gear.** `dt-crank-drive-gear` is "HELIX AT PITCH DIA: 13.0 ±1 DEG RIGHT
   HAND", meshing with a 16T spur pinion as a crossed-axis pair **[V]**. Nothing in the book
   suggests a helical gear, and every other skewed mesh on the machine is spur-on-spur oblique.
@@ -85,8 +114,8 @@
 - **Restored or invented parts.** The keeper chain is a bead chain (McMaster 3606T118). The book
   says the original chain is lost, so its form is a guess **[V]**.
 - **Appearance (GLB only).** The crank arm renders black, where the original is nickel-bright.
-  The post renders turquoise, where the original is dark green. The tip collar renders steel,
-  where the original is brass. These are cosmetic.
+  The post renders turquoise, where the original is dark green. These are cosmetic. The tip
+  collar is not cosmetic; see the VN-54 item above.
 
 ## 2. Drawing quality
 
@@ -229,14 +258,15 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 - `dt-cone-gear` (DT-03, 21 sheets)
   - **BLOCKER [V/I]** T006/T012 call "Ø0.794 +0.055 +0.025 THRU" with "0.420 +0.02 +0.01 BORE
     ACROSS FLAT", a ~0.8 mm near-half-round bore about 7 mm long. It needs wire EDM and can't
-    be gauged. Cut these gears integral with the shaft or on pinion wire.
+    be gauged. §7 gives three ways around it.
   - **BLOCKER (novice) [V]** T006: "CUTTER: NOT STOCK; FORM = TOOTH SPACE, SHEET 21". There is a
     16-point form table but no cutter drawing.
   - **MAJOR [V]** The T018–T120 D-bores are held to "+0.02 / +0.01" across the flat.
   - **MAJOR [V/I]** Edge contact from the 13° skew means one face edge of each gear does the
     work. The sheets never say which face is the contact face. "DO NOT BREAK OR CHAMFER EDGES ON
     TOOTH FLANKS" conflicts with the title block's "REMOVE BURRS AND BREAK SHARP EDGES".
-  - **MAJOR [V]** "MATERIAL Brass" names no alloy (the original's small gears look harder).
+  - **MAJOR [V]** "MATERIAL Brass" names no alloy. The book says T006–T024 look yellower and
+    harder than the rest.
   - **NICE [I]** On Brown & Sharpe-pattern plates (15–49 holes), 96T, 102T and 114T have no
     simple index (40/N = 5/12, 20/51, 20/57). Add an indexing table that flags them.
 - `dt-cone-gear-shaft` (DT-04)
@@ -263,6 +293,8 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
   - **MINOR [V]** "SWINGS FREE, NO AXIAL SHAKE" has no end-play number.
   - Good: a clear stock call.
 - `dt-vn-cone-tip-collar` (VN-54)
+  - **MAJOR [I from photos]** It has no counterpart on the original (§1 Departures). The real
+    tip has a small brass collar, about Ø5 × 4, against the tip block.
   - **MAJOR [V]** A made part ("REAM THRU", "3/4 STEEL BAR STOCK OK") carries a VN number.
   - **MAJOR [I]** A 2-56 set screw clamping a 0.8 mm half-round wire will bend or mark it.
 - Vendor sheets (VN-51, -52, -55, -56, -60, -61)
@@ -335,12 +367,19 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 
 ## 6. What would help a novice (prioritised)
 
-1. **Rework the cone tip.** Cut T006–T018 integral on a steel tip arbor or pinion wire, and drop
-   the Ø0.794 mm journal and D-bores.
+1. **Rework the cone tip (§7).**
+   - Drop the Ø0.794 mm journal, the T006/T012 D-bores and VN-54.
+   - Replace VN-54 with the original's small brass collar.
+   - Pick one of the three period-accurate options: an integral 6-leaf pinion on a tip arbor,
+     a one-piece planed arbor, or gears cut separately and sweated into a cluster.
+   - Make T006–T024 in a yellow, harder copper alloy (phosphor bronze C544).
+   - A one-piece T006–T018 can't be cut with a rotating cutter.
 2. **Offer an easier crank drive gear.** Allow a spur 64T that meshes obliquely like the cone
    gears, or a purchased gear, alongside the 13° helical.
-3. **Replace the 10 µm D-bores** with a cross pin or key, or a round bore with retaining compound
-   plus a phasing jig, and give a go/no-go gauge.
+3. **Replace the 10 µm D-bores** with a cross pin or key, or a round bore and a phasing jig, and
+   give a go/no-go gauge.
+   - Fix the gear with soft solder or a riveted collet (period), or retaining compound (modern,
+     1950s+).
 4. **Make one tabulated gear sheet** listing, per tooth count: cutter (48 DP, 20° PA, custom for
    6T), dividing-head turns and holes (flag 96/102/114T), blank stock and an operation sequence.
 5. **Write a per-part plan:** stock size, operation order, workholding, and critical vs cosmetic
@@ -356,6 +395,93 @@ Severity: **BLOCKER** (can't be made or will not work as drawn), **MAJOR**, **MI
 9. **Fix the drafting basis.** Use a metric general-tolerance block (ISO 2768-m or an explicit
    mm table), add a datum scheme with real FCFs, add QTY and descriptive part names, and use a
    revision letter distinct from the build number.
+
+## 7. Cone-tip options (period-accurate)
+
+![Cone tip: v45 vs three period-accurate options, why a one-piece tip can't be milled, and
+c.1898 fixing methods](drive-train-v45-review/cone-tip-options.png)
+
+The sketch is drawn to scale from MHA-DT-03/-04/VN-54 and the GLB. It is a proposal only; none
+of it is in CAD.
+
+### What the original tip looks like
+
+- **Brass collar.** A small brass collar, about Ø5 × 4 mm, sits against the T006 face and the
+  tip block (book p.18 top-down, p.21 close-up) **[I from photos]**.
+- **Tip block.** It is black and split. A domed, slotted, blackened end screw sits on the axis,
+  and a bright slotted pinch screw on the side locks the slit (pp.17–18) **[I from photos]**.
+- **What we don't know.**
+  - The 1898 paper says only that the wheels "are all fastened together on the same axis and
+    form the cone D" (Michelson & Stratton, p.4). How they are fixed is not stated.
+  - Whether the brass collar is fixed to the shaft or is the end of a bush in the block can't
+    be told from the photos.
+
+### Constraints any option must meet
+
+- **Contact zone.** Each cylinder gear touches its cone gear only 2.2–5.3 mm from the cone
+  gear's big-end face, with up to ~0.7 mm penetration. This holds for T006, T012, T018 and
+  T024. It was measured by surface-sampling the cylinder gears against each cone band on
+  `dt-drive-train.glb` (saved pose) **[I, measured]**.
+- **Unused faces.** The first 2.2 mm from the big end and the last 1.6 mm at the tip side are
+  never touched. Relief grooves and solder fillets can go there.
+- **No one-piece milling.** A one-piece T006–T018 can't be cut with a rotating disc cutter.
+  - Each larger neighbour stands ≈2.6 mm above the next band's root. A cutter of radius R
+    must therefore keep its lowest point √(2·R·2.6) from that shoulder: ≥ 8.1 mm for a 1″
+    cutter, ≥ 5.8 mm even for a Ø13 fly cutter.
+  - Contact starts 2.2 mm from the shoulder, so the cutter would have to be under Ø1.9.
+  - This is the classic cluster-gear problem **[I, calculated]**.
+
+### Options
+
+All three are period-accurate (c.1898). All three delete VN-54 and the Ø0.794 wire, add the
+original's small brass collar, and keep the original split block, end screw and pinch screw.
+
+- **A · 6-leaf pinion cut on a tip arbor.**
+  - **Arbor.** Phosphor bronze, carrying the integral T006, a Ø2.0 stem and a Ø1.5 pivot. It
+    plugs into a Ø2.0 H7 × 8 hole in a shortened DT-04, soldered or pinned with a Ø0.8 pin.
+  - **Cutting T006.** The stem is 0.07 mm and the pivot 0.32 mm below the T006 root (Ø2.14),
+    so a fly cutter ground to the sheet-21 form runs off both sides. Support the work with a
+    temporary tailstock boss beyond the pivot.
+  - **T012 and T018.** Bore both Ø2.0 and soft-solder them onto the stem, setting the phase
+    with a pin jig first.
+  - **Collar.** Fit the brass collar after cutting.
+  - **Drive.** T006's torque reaches it through metal.
+- **B · One-piece T006–T018 with planed teeth.**
+  - **Method.** Plane the teeth (shaper, or the lathe used as one) with three HSS form tools.
+    Each stroke ends in a 1.5 mm relief groove inside the untouched 2.2 mm.
+  - **Indexing.** One 72-hole spindle plate indexes 6, 12, 18 and 24; a 60T bull gear can't
+    do 18.
+  - **Effort.** Slow: 36 tooth spaces.
+- **C · Gears cut separately, then sweated into a cluster.**
+  - **Cutting.** Each gear is cut alone with ordinary setups.
+  - **T006.** It becomes one small part with a Ø2.0 spigot, the 6 leaves and the Ø1.5 pivot,
+    and its leaves run off over its own spigot and pivot.
+  - **Joining.** T018, T012 and T006 are soft-soldered face to face. The joints sit at the
+    big-end faces, in the untouched zone. Phase all three with a pin jig through lined-up
+    tooth spaces; reheat to take the cluster apart.
+  - **Mounting.** The cluster stays on DT-04's existing Ø3.175 D-seat.
+  - **Trade-off.** Simplest tooling; the tip hangs on solder joints, though its torque is tiny.
+
+### Period fixing methods (c.1898)
+
+- **Riveted collet.** Standard clockwork. It fits T018 and up; there is no room inside T006 or
+  T012.
+- **Drive fit on a taper.** Removable.
+- **Soft solder (sweating).** Works at any size; options A and C use it.
+- **Taper pin.** The crank on this machine uses one. It is too coarse for a Ø2 stem.
+- **Square seat.**
+- **Nut-clamped stack with one feather key.** Plausible for the whole cone, but unproven on
+  this machine.
+- **Avoid retaining compounds (Loctite type).** They date from the 1950s; use them only where
+  period accuracy doesn't matter.
+
+### Open questions for the CAD change
+
+- Confirm the 2.2–5.3 mm contact zone against the CAD source, not only the saved GLB pose.
+- Decide whether the brass collar is a thrust collar on the shaft or a bush in the block. Set
+  the end-play scheme to match.
+- Choose A, B or C. Each touches MHA-DT-03 (T006/T012 at least), MHA-DT-04, VN-54 (deleted),
+  VN-55 and VN-56 (end and pinch screws).
 
 ## Reproducing the renders
 
@@ -381,4 +507,13 @@ $MP render-image --output pinion.png --width 1600 --height 1000
 
 The book-photo side-by-side used the same session with `--reference-image` pointing at
 `references/albert-michelsons-harmonic-analyzer/ch12_images/page002_img09.jpeg`. It is
-deliberately not committed, because the photo is licensed for non-commercial use only.
+deliberately not committed, because the photo is licensed for non-commercial use only. The
+tip comparison in §1 also uses the bundle's own overlay pair
+`harmonic_analyzer--ch12-p002-img09`, and the book's p.21 close-up
+(`ch12_images/page003_img02.jpeg`).
+
+The §7 contact zone came from loading `dt-drive-train.glb` with trimesh and fitting the cone
+and cylinder axes through the 20 gear centroids (skew 13.05°). Each cylinder gear was then
+surface-sampled at 400 000 points, keeping the points that fall inside each cone band's OD
+within that band's axial span. The committed sketch contains no book imagery; it is drawn from
+the drawings and those measurements.
