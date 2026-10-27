@@ -137,7 +137,9 @@ def admission(tmp_path, monkeypatch):
         # Execute the actual production -c program, not a duplicated protocol
         # query. The fixture protocol needs no pool dependencies or installation.
         child_kwargs = dict(kwargs)
-        child_kwargs["timeout"] = 10
+        # A hang bound, not a speed budget: interpreter start-up on a loaded
+        # Windows host under check:recipe's parallel workers exceeded 10 s.
+        child_kwargs["timeout"] = 60
         code_index = argv.index("-c")
         return _REAL_RUN([sys.executable, *argv[code_index:]], **child_kwargs)
 
