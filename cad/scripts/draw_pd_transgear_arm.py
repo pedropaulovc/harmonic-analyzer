@@ -620,6 +620,7 @@ def _dimension_input_suppressed(adapter: Any) -> Iterator[None]:
         app.SetUserPreferenceToggle(_SW_INPUT_DIM_VAL_ON_CREATE, previous)
 
 
+@_telemetry.traced("drawing.transgear_arm.projected_zone_chains", label_param="label")
 def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
     """Every projected zone drawn in ``view`` (section ``label``) at its
     feature: a heavy chain line from front face A along the zone's direction
@@ -767,6 +768,7 @@ def _add_projected_zone_chains(adapter: Any, view: Any, label: str) -> None:
             raise RuntimeError(f"{key} height text stayed at {position!r}")
 
 
+@_telemetry.traced("drawing.transgear_arm.pin_zone_section")
 def _pin_zone_section(adapter: Any, plan: Any) -> Any:
     """Section D-D on its own sheet: the arm cut across the pin bore's axis
     in that sheet's plan, cut faces only, at the sheet's 2:1, looking toward
@@ -837,6 +839,7 @@ def _section_caption(view: Any, label: str) -> tuple[Any, str]:
     return captions[0]
 
 
+@_telemetry.traced("drawing.transgear_arm.pin_section_caption_fields")
 def _match_pin_section_caption(adapter: Any, section: Any, section_a: Any) -> None:
     """Give section D-D's native caption section A-A's linked view-label
     fields, scale included, so the two sections' captions read alike (run
@@ -852,6 +855,7 @@ def _match_pin_section_caption(adapter: Any, section: Any, section_a: Any) -> No
             raise RuntimeError("section D-D caption fields did not persist")
 
 
+@_telemetry.traced("drawing.transgear_arm.pin_section_caption_settled")
 def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
     """After finalize_drawing's last sheet-scale reset and rebuild: hang
     section D-D's caption, centred, under its cut face (bounded measured
