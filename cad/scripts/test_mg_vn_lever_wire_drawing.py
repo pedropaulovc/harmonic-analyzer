@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import math
 import re
@@ -44,6 +45,51 @@ def test_package_notes_carry_no_dimension_text() -> None:
         assert not _DIMENSION_TEXT.search(text), text
 
 
+def _printed_step_sheets(module) -> dict[int, int]:
+    """Step number -> 1-based sheet, read from where the assembly drawing
+    actually places each wrapped sequence block (``_add_note_block`` calls
+    naming ``SHEET_NAMES[i]`` and a module-level block)."""
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    placed: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and getattr(node.func, "id", None) == "_add_note_block"
+            and len(node.args) >= 3
+        ):
+            continue
+        sheet, block = node.args[1], node.args[2]
+        if (
+            isinstance(sheet, ast.Subscript)
+            and getattr(sheet.value, "id", None) == "SHEET_NAMES"
+            and isinstance(sheet.slice, ast.Constant)
+            and isinstance(block, ast.Name)
+            and block.id.startswith("ASSEMBLY_STEPS")
+        ):
+            assert block.id not in placed, block.id
+            placed[block.id] = sheet.slice.value + 1
+    assert placed, module.__name__
+    printed: dict[int, int] = {}
+    for block, sheet in placed.items():
+        for line in getattr(module, block).splitlines():
+            match = re.match(r"(\d+)\. ", line)
+            if match:
+                step = int(match.group(1))
+                assert step not in printed, (module.__name__, step)
+                printed[step] = sheet
+    return printed
+
+
+def _cited_groups(line: str, number: str) -> dict[int, set[int]]:
+    """Sheet -> the step numbers the pointer prints after that SHEET."""
+    _, *parts = re.split(r"\bSHEET (\d+)\b", line.replace(number, ""))
+    assert parts and len(parts) % 2 == 0, line
+    return {
+        int(sheet): {int(value) for value in re.findall(r"\b\d+\b", text)}
+        for sheet, text in zip(parts[::2], parts[1::2], strict=True)
+    }
+
+
 def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_member():
     import draw_mg_magnifier_assembly as magnifier
     import draw_pn_pen_assembly as pen
@@ -60,46 +106,33 @@ def test_assembly_pointer_cites_the_sheets_and_steps_that_cut_and_form_each_memb
         "mg-magnifier": drawing.magnifier_steps.DRAWING_NUMBER,
         "pn-pen": drawing.PEN_DRAWING_NUMBER,
     }
-    # Each assembly prints its sequence on its ASSEMBLY STEPS sheet.
-    sheets = {
-        "mg-magnifier": magnifier.SHEET_NAMES.index("ASSEMBLY STEPS") + 1,
-        "pn-pen": pen.SHEET_NAMES.index("ASSEMBLY STEPS") + 1,
-    }
     # The lever wire's steps are the keyed sequence's hook and tie steps.
-    lever_steps = tuple(
-        drawing.magnifier_steps.step_number(key)
-        for key in (
-            drawing.magnifier_steps.WIRE_HOOKED_KEY,
-            drawing.magnifier_steps.WIRE_TIED_KEY,
-        )
+    wire_keys = (
+        drawing.magnifier_steps.WIRE_HOOKED_KEY,
+        drawing.magnifier_steps.WIRE_TIED_KEY,
     )
-    assert all(
-        "WIRE" in magnifier_sheet.STEP_TEXT[key]
-        for key in (
-            drawing.magnifier_steps.WIRE_HOOKED_KEY,
-            drawing.magnifier_steps.WIRE_TIED_KEY,
-        )
-    )
+    assert all("WIRE" in magnifier_sheet.STEP_TEXT[key] for key in wire_keys)
+    lever_steps = {drawing.magnifier_steps.step_number(key) for key in wire_keys}
     # The pen sheet has no keyed sequence: its numbered steps naming the pen
     # wire are the ones the pointer must cite.
-    pen_steps = tuple(
+    pen_steps = {
         int(text.split(".", 1)[0])
         for text in pen_sheet.ASSEMBLY_STEPS
         if text[:1].isdigit() and "PEN WIRE" in text
-    )
-    assert pen_steps == drawing.PEN_WIRE_STEPS
-    cited = {
-        "mg-magnifier": lever_steps,
-        "pn-pen": pen_steps,
     }
+    assert pen_steps == {step for _sheet, step in drawing.PEN_WIRE_CITATIONS}
+    printed = {
+        "mg-magnifier": _printed_step_sheets(magnifier),
+        "pn-pen": _printed_step_sheets(pen),
+    }
+    cited = {"mg-magnifier": lever_steps, "pn-pen": pen_steps}
     lines = drawing.ASSEMBLY_NOTE.splitlines()
     for stem, number in numbers.items():
+        expected: dict[int, set[int]] = {}
+        for step in cited[stem]:
+            expected.setdefault(printed[stem][step], set()).add(step)
         [line] = [line for line in lines if number in line]
-        tokens = {
-            int(value) for value in re.findall(r"\b\d+\b", line.replace(number, ""))
-        }
-        assert tokens == {sheets[stem], *cited[stem]}, (stem, line)
-        assert re.search(rf"\bSHEET {sheets[stem]}\b", line), line
+        assert _cited_groups(line, number) == expected, (stem, line)
 
 
 def test_end_view_and_isometric_labels_state_their_scales_inside_their_fields() -> None:

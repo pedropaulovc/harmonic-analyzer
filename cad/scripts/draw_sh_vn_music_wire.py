@@ -57,20 +57,23 @@ _TITLE_BLOCK = (0.2159, 0.0127, 0.4191, 0.0651)
 _POSITION_TOLERANCE = 1e-6
 NOTES_XY = (0.020, 0.075)
 
-# Where each member is cut and formed: the assembly drawing sheet carrying its
-# steps (test-pinned to the assembly scripts' SHEET_NAMES and step text).
-MAGNIFIER_STEPS_SHEET = 4
+# Where each member is cut and formed: the assembly drawing sheet that PRINTS
+# each step. Both packages continue their sequence on a second sheet, so the
+# citation is (sheet, step) per printed group (test-pinned to where the
+# assembly drawings place their sequence blocks).
+MAGNIFIER_WIRE_SHEET = 5
 PEN_DRAWING_NUMBER = "MHA-PN-00"
-PEN_STEPS_SHEET = 3
-PEN_WIRE_STEPS = (2, 8)
+PEN_WIRE_CITATIONS = ((3, 2), (4, 8))
 ASSEMBLY_NOTE = "\n".join(
     (
         "CUT TO LENGTH AND FORM AT ASSEMBLY:",
-        f"LEVER WIRE: {magnifier_steps.DRAWING_NUMBER} SHEET {MAGNIFIER_STEPS_SHEET}, "
+        f"LEVER WIRE: {magnifier_steps.DRAWING_NUMBER} SHEET {MAGNIFIER_WIRE_SHEET}, "
         f"STEPS {magnifier_steps.step_number(magnifier_steps.WIRE_HOOKED_KEY)}-"
         f"{magnifier_steps.step_number(magnifier_steps.WIRE_TIED_KEY)}",
-        f"PEN WIRE: {PEN_DRAWING_NUMBER} SHEET {PEN_STEPS_SHEET}, "
-        f"STEPS {PEN_WIRE_STEPS[0]} AND {PEN_WIRE_STEPS[1]}",
+        f"PEN WIRE: {PEN_DRAWING_NUMBER} "
+        + "; ".join(
+            f"SHEET {sheet}, STEP {step}" for sheet, step in PEN_WIRE_CITATIONS
+        ),
     )
 )
 ASSEMBLY_NOTE_XY = (0.020, 0.105)
