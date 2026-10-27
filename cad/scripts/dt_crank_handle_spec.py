@@ -233,15 +233,24 @@ FERRULE_SEAT_RADIAL_FLOOR = 0.5
 # keeps that whole round behind the seat face (no oak at the ferrule's mouth,
 # whatever its break).  Its maximum leaves the ferrule its 0.5 of flat
 # shoulder after the title-block break on the relief's outer edge, where the
-# cone meets the shoulder face (codjiflo on PR #1989).  Each limit is rounded
-# inward to one place; the leg prints their mid-band, which must itself print
-# at one place, as the band must.
+# cone meets the shoulder face, and after the relief and the skimmed shoulder
+# OD land off each other: the relief is turned with the tenon, true to the
+# pivot bore within BORE_ECCENTRICITY, and the shoulder is skimmed with
+# MHA-DT-34 after cure, true to it within the same again (codjiflo on PR
+# #1989).  Each limit is rounded inward to one place; the leg prints their
+# mid-band, which must itself print at one place, as the band must.
+_RELIEF_TO_SKIM_OFFSET_MAX = 2.0 * BORE_ECCENTRICITY
 TENON_ROOT_ROUND_REACH = INSIDE_CORNER_R_MAX * (1.0 + math.sqrt(2.0))
 TENON_ROOT_RELIEF_MIN = math.ceil(round(TENON_ROOT_ROUND_REACH * 10.0, 6)) / 10.0
 TENON_ROOT_RELIEF_MAX = (
     math.floor(
         round(
-            (_SEAT_RADIAL_UNRELIEVED - EDGE_BREAK_MAX_MM - FERRULE_SEAT_RADIAL_FLOOR)
+            (
+                _SEAT_RADIAL_UNRELIEVED
+                - _RELIEF_TO_SKIM_OFFSET_MAX
+                - EDGE_BREAK_MAX_MM
+                - FERRULE_SEAT_RADIAL_FLOOR
+            )
             * 10.0,
             6,
         )
@@ -262,10 +271,13 @@ if (
     raise AssertionError(
         "MHA-DT-08: the tenon-root relief band does not print at one place"
     )
-# The flat shoulder left to the ferrule outside the largest relief and the
-# break on its edge.
+# The flat shoulder left to the ferrule on the thin side, outside the largest
+# relief landed off-centre and the break on its edge.
 FERRULE_SEAT_RADIAL_MIN = (
-    _SEAT_RADIAL_UNRELIEVED - TENON_ROOT_RELIEF_MAX - EDGE_BREAK_MAX_MM
+    _SEAT_RADIAL_UNRELIEVED
+    - _RELIEF_TO_SKIM_OFFSET_MAX
+    - TENON_ROOT_RELIEF_MAX
+    - EDGE_BREAK_MAX_MM
 )
 # The shortest tenon's unbroken bonded length inside the ferrule, less the
 # title-block edge break on the tenon end and the break on the ferrule's seat

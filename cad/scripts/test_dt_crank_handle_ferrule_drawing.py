@@ -116,7 +116,7 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
         (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10)
     )
     assert spec.STOCK_DIA_MIN / 2.0 >= (12.5 + 0.8) / 2.0 + 0.10 + 0.10
-    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 1.2 - 0.25)
+    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 0.20 - 1.0 - 0.25)
     assert handle.TENON_WALL_MIN == pytest.approx(1.55)
 
 

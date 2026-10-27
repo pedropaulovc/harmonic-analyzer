@@ -218,6 +218,41 @@ def _make_driven(adapter, dimension_id: str, label: str) -> None:
         raise RuntimeError(f"{label}: dimension did not become driven")
 
 
+# The two R0.3 MAX inside corners as solved: the counterbore's floor round
+# turns 90 degrees and the tenon root 135 degrees, into the relief's corner.
+# Their 270- and 225-degree complements read 1.414 and 1.178 long.
+INSIDE_CORNER_ARC_LENGTHS = tuple(
+    sorted((INSIDE_CORNER_R_MAX * math.pi / 2.0, ROOT_ARC_LENGTH))
+)
+
+
+def _check_root_arc_sweep(adapter) -> None:
+    """Read the rebuilt HandleProfile's R0.3 arcs back and require the
+    floor round's quarter and the tenon root's 135-degree sweep."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    feature = _early_bound(part.FeatureByName("HandleProfile"), "IFeature")
+    sketch = _early_bound(feature.GetSpecificFeature2(), "ISketch")
+    lengths = []
+    for raw in sketch.GetSketchSegments() or ():
+        segment = _early_bound(raw, "ISketchSegment")
+        if int(segment.GetType()) != 1:  # swSketchSegments_e.swSketchARC
+            continue
+        arc = _early_bound(raw, "ISketchArc")
+        radius = float(arc.GetRadius()) * 1000.0
+        if math.isclose(radius, INSIDE_CORNER_R_MAX, abs_tol=1e-6):
+            lengths.append(float(segment.GetLength()) * 1000.0)
+    lengths.sort()
+    if len(lengths) != 2 or not all(
+        math.isclose(got, want, abs_tol=1e-4)
+        for got, want in zip(lengths, INSIDE_CORNER_ARC_LENGTHS, strict=True)
+    ):
+        raise RuntimeError(
+            f"HandleProfile R{INSIDE_CORNER_R_MAX:g} arcs are {lengths} long, not the "
+            f"floor round's and tenon root's {list(INSIDE_CORNER_ARC_LENGTHS)}"
+        )
+    _telemetry.success(f"inside-corner arc sweeps read back: {lengths}")
+
+
 def _inside_corner_max_limit(adapter, dimension_name: str) -> None:
     """An inside corner's radius as a MAX single limit carrying the band's
     deviations (build_pn_pen_rod._shoulder_fillet_max_limit's recipe)."""
@@ -588,17 +623,6 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_constraint(first, second, "tangent"),
         )
     await ensure_fully_defined(adapter, "handle profile")
-    # The volume gate cannot tell the root round's 135-degree sweep from its
-    # 225-degree complement (about one revolved R0.3 disk, inside 0.2 %), so
-    # read the solved arc's length back (codjiflo on PR #1989).
-    root_segment = _early_bound(adapter._sketch_entities[tenon_root], "ISketchSegment")
-    root_length = float(root_segment.GetLength()) * 1000.0
-    if not math.isclose(root_length, ROOT_ARC_LENGTH, abs_tol=1e-4):
-        raise RuntimeError(
-            f"tenon root arc is {root_length:.4f} long, not the 135-degree "
-            f"{ROOT_ARC_LENGTH:.4f} in the relief's corner"
-        )
-    _telemetry.success(f"tenon root arc sweeps 135 degrees ({root_length:.4f})")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HandleProfile")
     drive_jobs += profile.apply(adapter, "HandleProfile")
@@ -621,6 +645,11 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(
         adapter, "driven crank handle (equations neutral)", V_HANDLE, 0.002 * V_HANDLE
     )
+    # The volume gate cannot tell the root round's 135-degree sweep from its
+    # 225-degree complement (about one revolved R0.3 disk, inside 0.2 %), so
+    # read the saved profile's root arc back after the equation-driven rebuild
+    # (codjiflo on PR #1989).
+    _check_root_arc_sweep(adapter)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
