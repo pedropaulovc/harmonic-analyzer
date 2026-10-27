@@ -74,7 +74,7 @@ def test_part_authors_every_callout_on_a_marked_dimension() -> None:
     assert spec.PIN_NUMBER not in below["OverallLength"]
     assert "MHA-PD-25" in below["OverallLength"]
     assert callouts.CALLOUTS[callouts.TEXT_PREFIX] == {
-        ("RootProfile", "RootDia"): "ROOT "
+        ("RootProfile", "RootDia"): "ROOT <MOD-DIAM>"
     }
 
 
@@ -87,7 +87,6 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("FlatProfile", "FlatEnd"): "STATION_TOL",
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
         ("SleeveProfile", "FullDepth"): "FULL_DEPTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
@@ -264,8 +263,13 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     step, ahead of the wall at every printed limit."""
     import pd_transgear_disc_hub_spec as hub
 
+    # The flat cut to its printed MAX station on the longest sleeve.
     assert spec.FLAT_LENGTH_MAX == pytest.approx(
-        spec.FLAT_LENGTH + 2.0 * spec.STATION_TOL
+        spec.OVERALL_LENGTH + spec.STATION_TOL - spec.FLAT_END_STATION
+    )
+    assert spec.FLAT_END_TOL_TYPE == 6  # swTolType_e.swTolMAX
+    assert spec.FLAT_END_DEVIATIONS == (
+        pytest.approx(spec.CUTTER_RUNOUT_MAX - spec.FLAT_END_STATION), 0.0
     )
     assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_LENGTH_MAX + 0.5
     worst = (
@@ -390,7 +394,7 @@ _DEVIATION_PLACES = {
 }
 # The stations the R9-5 ±0.05 band governs; the other lengths print bare
 # under the title block's .XXX row.
-_STATIONS = {"FlatEnd", "OverallLength"}
+_STATIONS = {"OverallLength"}
 
 
 def _printed_text(name: str) -> str:
@@ -399,10 +403,12 @@ def _printed_text(name: str) -> str:
     then the root's MIN, a station's band, or a stacked band, then the
     part-authored callout below."""
     value = f"{_NOMINAL[name]:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}"
-    if name.endswith("Dia"):
-        value = f"\u00d8{value}"
     lanes = callouts.authored_by_name().get(name, {})
-    value = lanes.get(callouts.TEXT_PREFIX, "") + value
+    if callouts.TEXT_PREFIX in lanes:
+        # An authored prefix replaces SolidWorks' own diameter symbol.
+        value = lanes[callouts.TEXT_PREFIX].replace("<MOD-DIAM>", "\u00d8") + value
+    elif name.endswith("Dia"):
+        value = f"\u00d8{value}"
     if name == "ToothSpan":
         lower, upper = spec.SPAN_LIMITS
         rows = [
@@ -411,6 +417,8 @@ def _printed_text(name: str) -> str:
         ]
     elif name == "RootDia":
         rows = [f"{value} min."]
+    elif name == "FlatEnd":
+        rows = [f"{value} max."]
     elif name == "CutterRunout":
         rows = [f"{value} max."]
     elif name == "FullDepth":
@@ -449,6 +457,11 @@ def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
         line_spacing=_LINE_SPACING,
     )
     assert box is not None
+    if name == "FlatToAxis":
+        # Its text prints right of its own dimension line (run
+        # 20261027T032128736Z), the line at the anchor.
+        width = box.xmax - box.xmin
+        return Box(anchor[0], box.ymin, anchor[0] + width, box.ymax)
     if name.endswith("Dia") and name in drawing.RIGHT_KEEP and not _inline(anchor):
         width = box.xmax - box.xmin
         return Box(anchor[0] - width, box.ymin, anchor[0] + width, box.ymax)
@@ -635,7 +648,7 @@ def test_cutter_rows_stack_below_the_outside_view() -> None:
     assert lowest.ymin - 0.002 > _TITLE_BLOCK_TOP
     title_left = DRAWING_TEMPLATES[DRAWINGS_BY_NAME["pd_transgear_feed_pinion"].layout].title_block_left_m
     assert rear_x > title_left
-    assert drawing.TANGENT_EDGES_FONTED == 1  # swTangentEdgesVisibleAndFonted
+    assert drawing.TANGENT_EDGES_HIDDEN == 0  # swTangentEdgesHidden
 
 
 def test_root_reads_across_two_gap_floors_on_the_rear_view() -> None:

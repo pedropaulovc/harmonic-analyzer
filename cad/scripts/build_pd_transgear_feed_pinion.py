@@ -95,6 +95,9 @@ from pd_transgear_feed_pinion_spec import (
     FACE_WIDTH,
     FLAT_END_STATION,
     FLAT_TO_AXIS,
+    FLAT_END_DEVIATIONS,
+    FLAT_END_PLACES,
+    FLAT_END_TOL_TYPE,
     FLAT_TO_AXIS_DEVIATIONS,
     FULL_DEPTH,
     FULL_DEPTH_BAND,
@@ -746,13 +749,22 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven feed-pinion sleeve (equations neutral)", volume, 0.01 * V_BORE
     )
 
-    # Bands (pd_transgear_feed_pinion_spec): the flat's end wall and the overall
-    # length ±0.05 (R9-5), the reamed bore, the boss's h6 under the disc's
-    # and hub's H7 bores, the flat's (0, -0.015) under the hub's flat, the
-    # standard tip class, the root as a physical MIN floor; the cutter's full-depth station
-    # at its .XXX band and its run-out as a MAX limit (R9-67).  The tooth
-    # length, which only places the step, holds the title block's .XXX.
-    set_dimension_symmetric_tolerance(adapter, "FlatProfile", "FlatEnd", STATION_TOL)
+    # Bands (pd_transgear_feed_pinion_spec): the overall length ±0.05 (R9-5),
+    # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
+    # flat's (0, -0.015) under the hub's flat, the standard tip class, the
+    # root as a physical MIN floor, the flat's end wall as a MAX clear of the
+    # hub's flat; the cutter's full-depth station at its .XXX band and its
+    # run-out as a MAX limit (R9-67).  The tooth length, which only places
+    # the step, holds the title block's .XXX.
+    _single_limit(
+        adapter,
+        "FlatProfile",
+        "FlatEnd",
+        FLAT_END_STATION,
+        FLAT_END_DEVIATIONS,
+        FLAT_END_TOL_TYPE,
+        f"{FLAT_END_STATION:.{FLAT_END_PLACES}f} MAX",
+    )
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "OverallLength", STATION_TOL
     )

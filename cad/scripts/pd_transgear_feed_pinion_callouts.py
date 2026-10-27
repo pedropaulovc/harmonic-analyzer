@@ -63,7 +63,9 @@ FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"
 # outside view.
 FULL_DEPTH_CALLOUT = f"{TEETH}T FULL DEPTH"
 CUTTER_RUNOUT_CALLOUT = "CUTTER RUN-OUT"
-ROOT_PREFIX = "ROOT "
+# The prefix lane replaces SolidWorks' own diameter symbol, so it carries it
+# (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").
+ROOT_PREFIX = "ROOT <MOD-DIAM>"
 
 # lane -> (feature, dimension) -> text.
 CALLOUTS: dict[int, dict[tuple[str, str], str]] = {

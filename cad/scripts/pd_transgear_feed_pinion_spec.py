@@ -225,7 +225,7 @@ RACK_MESH_EXTENSION = (
 RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# OVERALL_LENGTH and FLAT_END_STATION print ±0.05 (R9-5; the knob chain and
+# OVERALL_LENGTH prints ±0.05 (R9-5; the knob chain and
 # the fitted bands read the overall: transgear_cluster_fit).  The tooth length
 # prints .XXX: its end is the step face the hub's spigot seats on, so it
 # places hub and disc with the spigot's own .XXX length (the bushings and the
@@ -278,13 +278,24 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
 # cut by an end mill on an axis parallel to the sleeve's, plunged from the
 # nose.  The wall stops nothing: the hub's flat starts at its flange's rear
 # face, the spigot's length ahead of the step, so the wall stands clear
-# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
-FLAT_END_STATION = 16.60
+# behind it (pd_transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).  That
+# clearance is the station's only function, so it prints as a one-sided MAX
+# at one place (2026-10-27 ENFORCE review: ±0.05 was unneeded precision).
+# swTolMAX prints the nominal then "MAX"; the deviations record "anywhere
+# ahead of the cutter's run-out limit, up to the MAX".  The hub's check keeps
+# its conservative STATION_TOL allowance on top of the MAX.
+FLAT_END_STATION = 16.6
+FLAT_END_PLACES = 1
+FLAT_END_TOL_TYPE = 6  # swTolType_e.swTolMAX
 FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
-FLAT_LENGTH_MAX = FLAT_LENGTH + 2.0 * STATION_TOL  # 10.85
+# The flat cut to its MAX station on the longest sleeve: the length the end
+# mill's flutes must cover (a longer flat is the shop's choice).
+FLAT_LENGTH_MAX = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 10.80
 FLAT_CUTTER_FLUTE_MIN = 12.0
 if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
+if round(FLAT_END_STATION, FLAT_END_PLACES) != FLAT_END_STATION:
+    raise AssertionError("the flat end's MAX does not print at its places")
 
 # G7 bore on the preserved MHA-PD-23 h6 pin: +0.016/+0.004 over 0/-0.008
 # gives 0.004..0.024 diametral clearance. The true finite root at every
@@ -349,6 +360,9 @@ FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # depth, up to the limit".
 CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
 CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
+FLAT_END_DEVIATIONS = (CUTTER_RUNOUT_MAX - FLAT_END_STATION, 0.0)
+if FLAT_END_DEVIATIONS[0] >= 0.0:
+    raise AssertionError("the flat's end wall reaches the cutter's run-out limit")
 if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
     raise AssertionError("the run-out limit does not print at its places")
 # The outside view's cutter-station witnesses run along the floor of the
@@ -557,7 +571,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "RootProfile": {"RootDia": ROOT_DIA_PLACES},
     "FlatProfile": {
         "FlatToAxis": FLAT_TO_AXIS_PLACES,
-        "FlatEnd": STATION_PLACES,
+        "FlatEnd": FLAT_END_PLACES,
     },
     "SpanProfile": {"ToothSpan": SPAN_PLACES},
 }

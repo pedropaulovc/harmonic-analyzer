@@ -189,7 +189,10 @@ _FLAT_END_TEXT_WIDTH = 0.0601
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": (_REAR_X - 0.040, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
-    "FlatToAxis": (_NOSE_X + 0.030, _SIDE_BOTTOM - 0.0079),
+    # Its dimension line stands just right of the nose; the text prints right
+    # of the line, below the flat (run 20261027T032128736Z: 30 mm out, the
+    # outside view's outline struck its last row).
+    "FlatToAxis": (_NOSE_X + 0.008, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
     "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
     "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0208),
@@ -201,12 +204,10 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # section plane's (Right plane's) dimensions.  It stands lower right, above
 # the title block and below the boss's callout; its two cutter rows hang
 # below it with their texts left of its rear face, and its caption stands
-# left of it above them.  Tangent edges print in their phantom font, so the
-# straight pass's end, where the cutter's arc meets the floor tangentially,
-# shows on the floor the full-depth row rises from.
+# left of it above them.  Its tangent edges are hidden.
 LEFT_CENTER = (0.373, 0.112)
 LEFT_CAPTION = "OUTSIDE VIEW"
-TANGENT_EDGES_FONTED = 1  # swDisplayTangentEdges_e.swTangentEdgesVisibleAndFonted
+TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
 _CUTTER_TEXT_WIDTH = 0.0418
@@ -404,17 +405,16 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
     _telemetry.info(f"rear view caption: outline {outline}, extent {extent}")
 
 
-def _show_tangent_edges_fonted(view: Any) -> None:
-    """Print the outside view's tangent edges in their phantom font, read back.
+def _hide_tangent_edges(view: Any) -> None:
+    """Hide the outside view's tangent edges, read back.
 
-    The straight pass ends where the cutter's arc meets the gap floor
-    tangentially: that edge is where the full-depth row's extension line
-    lands.
+    Run 20261027T032128736Z printed them in their phantom font along every
+    tooth space, and all three reviewers read them as hidden-line clutter.
     """
     bound = _early_bound(view, "IView")
-    bound.SetDisplayTangentEdges2(TANGENT_EDGES_FONTED)
-    if int(bound.GetDisplayTangentEdges2()) != TANGENT_EDGES_FONTED:
-        raise RuntimeError("failed to show the outside view's tangent edges")
+    bound.SetDisplayTangentEdges2(TANGENT_EDGES_HIDDEN)
+    if int(bound.GetDisplayTangentEdges2()) != TANGENT_EDGES_HIDDEN:
+        raise RuntimeError("failed to hide the outside view's tangent edges")
     bound.UpdateViewDisplayGeometry()
 
 
@@ -517,7 +517,7 @@ async def build(adapter: Any) -> dict[str, str]:
     outside = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso, rear, outside):
         set_hidden_lines_removed(adapter, view)
-    _show_tangent_edges_fonted(outside)
+    _hide_tangent_edges(outside)
     _place_rear_caption(adapter, rear)
     if add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY) is None:
         raise RuntimeError("the outside view caption was not inserted")
