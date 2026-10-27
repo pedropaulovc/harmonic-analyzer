@@ -193,7 +193,10 @@ SCREW_SECTION_LINE_MODEL = (
 # reamed-hole leader had to cross (machinist review of the r3 sheets).
 PLAN_ROWS = tuple(_SECTION_TOP + 8.0 + 4.0 * row for row in range(3))
 PLAN_KEEP: dict[str, tuple[float, float, float]] = {
-    "ScrewHoleX2": (SCREW_HOLES[1][0] / 2.0, PLAN_ROWS[0], _Z_PLAN),
+    # Text outboard of hole 2's witness line: between it and K, the bore
+    # axis's witness line struck the 4.125 (machinist review, run
+    # 20261027T165127867Z).
+    "ScrewHoleX2": (SCREW_HOLES[1][0] + 5.5, PLAN_ROWS[0], _Z_PLAN),
     "ScrewHoleX1": (SCREW_HOLES[0][0] / 2.0, 12.6, _Z_PLAN),
     "KinkY": (EDGE_MINUS_X - 5.0, KINK[1] / 2.0, _Z_PLAN),
     "TopLeftY": (EDGE_MINUS_X - 11.0, TOP_LEFT[1] / 2.0, _Z_PLAN),
@@ -205,11 +208,14 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     # Four mm higher than the drill callout: its third line (the cone
     # coaxial with the hole) would otherwise reach section D-D's letter.
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 12.0, _Z_PLAN),
-    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2], _Z_PLAN),
+    # Text right of K's witness line, which struck it between the two; the
+    # reamed-hole leader runs on the left.
+    "LocatorX1": (4.5, PLAN_ROWS[2], _Z_PLAN),
     # Under the border and high enough that its six lines clear the
     # screw-hole callout; far enough left that its leader runs down to
-    # locator 1 left of every location dimension line.
-    "LocatorDia1": (EDGE_MINUS_X - 10.8, _TOP + 31.0, _Z_PLAN),
+    # locator 1 left of every location dimension line, with air to the
+    # left border (run 20261027T165127867Z: its shelf met the border).
+    "LocatorDia1": (EDGE_MINUS_X - 9.3, _TOP + 31.0, _Z_PLAN),
 }
 # Face-A view: the notch face's corner heights and the locator heights,
 # outboard, the +X top corner's height outside them, and both side edges
@@ -217,13 +223,18 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
 # plan: there its witness line ran through section D-D's letter (run
 # 20261027T130144223Z).
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
-    "TopRightY": (EDGE_PLUS_X + 15.0, TOP_RIGHT[1] / 2.0, 0.0),
+    # Low on its line: mid-height it would sit beside the raised 18.078.
+    "TopRightY": (EDGE_PLUS_X + 15.0, 5.0, 0.0),
     "EdgeLeftX": (EDGE_MINUS_X / 2.0, _BOTTOM - 7.0, 0.0),
     "EdgeRightX": (EDGE_PLUS_X / 2.0, _BOTTOM - 7.0, 0.0),
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
     "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
-    "LocatorY2": (EDGE_PLUS_X + 8.0, LOCATOR_SITES_MM[1][1] / 2.0, 0.0),
+    # Above the notch corner's height, whose line ran along its box at mid
+    # height (machinist review, run 20261027T165127867Z).
+    "LocatorY2": (
+        EDGE_PLUS_X + 8.0, (NOTCH_RIGHT[1] + LOCATOR_SITES_MM[1][1]) / 2.0, 0.0,
+    ),
 }
 # Section A-A (x = 0): the stations along Z are a baseline from face A,
 # stacked above the plate nearest first -- the rear face, the front face, the

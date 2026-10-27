@@ -67,7 +67,10 @@ def test_the_plate_bore_and_printed_hole_stations_follow_the_reducer_geometry() 
         assert x + bore_station == pytest.approx(arm.PLATE_TAP_STATIONS[index - 1])
         assert y + bore_offset == pytest.approx(0.0)
         assert part.SCREW_HOLES[index - 1] == pytest.approx((x, y))
-        assert drawing.PLAN_KEEP[f"ScrewHoleX{index}"][0] == pytest.approx(x / 2.0)
+    # Hole 1's text sits between its witness lines; hole 2's stands outboard
+    # of its own, clear of K's witness line.
+    assert drawing.PLAN_KEEP["ScrewHoleX1"][0] == pytest.approx(geometry.SCREW_HOLES[0][0] / 2.0)
+    assert drawing.PLAN_KEEP["ScrewHoleX2"][0] > geometry.SCREW_HOLES[1][0] + 3.0
     assert part.SCREW_HOLE_Y == pytest.approx(-bore_offset)
     assert drawing.PLAN_KEEP["ScrewHoleY"][1] == pytest.approx(-bore_offset / 2.0)
     for corner, edge_x in (
