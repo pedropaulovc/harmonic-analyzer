@@ -360,6 +360,22 @@ def _sheet_keep(
     }
 
 
+def _bore_landing(
+    adapter: Any, view: Any, toward: tuple[float, float]
+) -> tuple[float, float]:
+    """The point on the bore's circle in ``view`` facing ``toward`` (sheet m).
+
+    A datum tag on a circle keeps a radial leader through its pick: the
+    tag only moves along that ray, so the pick must face the tag (run
+    20261027T124743046Z: picked by entity, B's tag stayed at its default
+    drop on the far side of the bore, 82 mm from its request).
+    """
+    centre = _sheet_xy(adapter, view, (0.0, 0.0, 0.0), "bore centre")
+    dx, dy = toward[0] - centre[0], toward[1] - centre[1]
+    scale = BORE_DIA / 2.0 * SHEET_SCALE[0] / 1000.0 / math.hypot(dx, dy)
+    return centre[0] + dx * scale, centre[1] + dy * scale
+
+
 def _activate_sheet(adapter: Any, name: str) -> None:
     drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
     if not drawing.ActivateSheet(name):
@@ -625,7 +641,9 @@ async def build(adapter: Any) -> dict[str, str]:
                 adapter, knob_section, (0.0, _SCREW_Y, 0.0), "plate mounting datum",
             ),
         ),
-        "datum:B": PmiDrawingPlacement(back, DATUM_B_XY, edge_entity=bore_edge),
+        "datum:B": PmiDrawingPlacement(
+            back, DATUM_B_XY, attachment_xy=_bore_landing(adapter, back, DATUM_B_XY),
+        ),
         "datum:C": PmiDrawingPlacement(
             back, DATUM_C_XY,
             edge_entity=back_edges.exact_line_through(
