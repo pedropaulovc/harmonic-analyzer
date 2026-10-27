@@ -333,12 +333,16 @@ WALLS: dict[str, tuple[float, float]] = {
         - _TAP_OVERSIZE_R,
     ),
     # The hole's height is dimensioned from the FRONT face, so thin stock
-    # takes its whole band off the rear ligament.
+    # takes its whole band off the rear ligament. Full budget: the drill's
+    # run-off over the deepest hole, and both title-block breaks at the mouth
+    # (the face edge's and the hole's).
     "pin hole to faces": (
         (THICKNESS - PIN_HOLE_DIA) / 2.0,
         (THICKNESS - PIN_HOLE_DIA - PIN_HOLE_DIA_BAND[0]) / 2.0
         - THICKNESS_BAND
-        - LATCH_PIN_HEIGHT_BAND,
+        - LATCH_PIN_HEIGHT_BAND
+        - (PIN_HOLE_DEPTH + PIN_HOLE_DEPTH_BAND) * math.tan(math.radians(DRILL_RUN_OFF_DEG))
+        - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,
     ),
     "pin hole to end-face edges": (
         TIP_END_R - PIN_HOLE_DIA / 2.0,
@@ -378,9 +382,15 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - LOCATOR_RUN_OFF_MM,
     )
+# The latch pin's hole-to-face ligament is 1.744 at full budget, under the
+# 2.0 target but over the 1.5 floor. #2019 tracks the owner's next stock
+# size up (owner ruling 2026-10-27, #1379); until then it is held at 1.5.
+LATCH_PIN_WALL_FLOOR = 1.5
+WALL_FLOORS = {"pin hole to faces": LATCH_PIN_WALL_FLOOR}
 for _name, (_nominal, _worst) in WALLS.items():
-    if _worst < WALL_TARGET:
-        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
+    _floor = WALL_FLOORS.get(_name, WALL_TARGET)
+    if _worst < _floor:
+        raise AssertionError(f"arm {_name} wall {_worst:.3f} < {_floor}")
 
 def polygon_area_moments(points: tuple[tuple[float, float], ...]) -> tuple[float, float, float]:
     """Exact signed-polygon area and first moments, returned with positive area."""
