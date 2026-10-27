@@ -2653,7 +2653,9 @@ def capture_readings() -> tuple[CaptureReading, ...]:
     # (-X) side and no leader crosses the section: the cap/block land at the
     # clearance hole's bottom corner, the underhead footprint on the head's
     # -X bearing ring.
-    clearance_edge = r.CAP_BOLT_X_OFFSETS[0] - (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
+    # The native cap cuts its clearance holes at the nominal diameter
+    # (pivot cap spec HOLE_DIA); its tolerance band is not modelled.
+    hole_wall = r.CAP_BOLT_X_OFFSETS[0] - spec.pivot_cap.HOLE_DIA / 2.0
     cap_origin = spec.PIVOT_CAP_PLACEMENTS[0][0]
     roof = _capture_local_point(spec.PIVOT_CAP, (
         spec.PIVOT_PIN_ORIGINS[0][0] + r.CAP_POCKET_DIAMETER / 2.0 * spec.PIN_ROWS[0][0],
@@ -2710,10 +2712,10 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         # clearance hole's bottom corner on the land. The pick acquires the
         # cap's own hole wall at mid-height below the counterbore, which no
         # block edge shares and which ends at that corner.
-        CaptureReading(3, spec.PIVOT_CAP, (clearance_edge, bolt_y, 0.0),
+        CaptureReading(3, spec.PIVOT_CAP, (hole_wall, bolt_y, 0.0),
                        callouts["cap_land"], (0.279, 0.2235),
-                       pick_local_mm=(clearance_edge, bolt_y,
-                                      (r.CAP_HEIGHT - r.CAP_COUNTERBORE_DEPTH) / 2.0)),
+                       pick_local_mm=(hole_wall, bolt_y,
+                                      (spec.pivot_cap.HEIGHT - spec.pivot_cap.COUNTERBORE_DEPTH) / 2.0)),
         # C3A's underhead arrow lands mid-annulus on the head's bearing face:
         # outside the cap's largest clearance hole, inside the smallest head
         # bearing diameter, so cap material lies beneath it.

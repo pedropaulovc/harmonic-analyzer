@@ -818,8 +818,18 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     flat_now = Segment(*_NATIVE_RIGHT_COLUMN["C5A FLAT PIN END"][2], "leader")
     cross_hole_now = Segment(0.2545473, 0.2103143, 0.308, 0.1745, "leader")
     cotter_now = Segment(0.287412, 0.2037175, 0.25535, 0.2402265, "leader")
+    # The native C5B leader was measured at its note's (0.288, 0.205) anchor:
+    # a later move must refresh this snapshot rather than silently keep it.
+    assert authored["C5B COTTER EYE / PRONGS"] == (0.288, 0.205)
     locator_caption = (0.224, 0.2154743, 0.2705646, 0.2189743)
+    # The former 1:2 A-A field is the negative control's obstacle only; the
+    # current checks use run 11's native 1:1 A-A outline (radius-30 crop),
+    # bound to the recipe that still places it so.
     section_a = (0.2924833, 0.1402120, 0.3495167, 0.1897880)
+    section_a_now = (0.271412, 0.117412, 0.354588, 0.188588)
+    assert drawing.CAPTURE_SECTION_SCALES["A"] == (1, 1)
+    assert drawing.CAPTURE_SECTION_CROP_RADII["A"] == 30.0
+    assert drawing._capture_inside(section_a_now, drawing.CAPTURE_VIEW_REGIONS[2])
     assert drawing._segment_crosses_box(cross_hole, _captured_cotter_glyph((0.280, 0.205)), inset=0.0)
     assert drawing._segment_crosses_box(flat.segments[0], _captured_cotter_glyph((0.291, 0.205)), inset=0.0)
     assert drawing._capture_overlap(_captured_cotter_glyph((0.250, 0.219)), locator_caption)
@@ -829,7 +839,7 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     for neighbor in (cross_hole_now, flat_now):
         assert not drawing._segment_crosses_box(neighbor, glyph, inset=0.0)
         assert segment_box_distance(neighbor, Box(*glyph)) > 0.0
-    for obstacle in (locator_caption, section_a):
+    for obstacle in (locator_caption, section_a_now):
         assert not drawing._capture_overlap(glyph, obstacle)
         assert not drawing._segment_crosses_box(cotter_now, obstacle, inset=0.0)
     leaders = [
@@ -3162,12 +3172,19 @@ def native_property_package(monkeypatch, native_bom_bindings):
                     endpoints = ((x, y, hole_top + 0.25 * (chamfer - hole_top)), (x, y, chamfer))
             elif reading.stem == spec.PIVOT_CAP and reading.text.startswith("C3A CAP / BLOCK LAND"):
                 # B-B cuts the cap's clearance hole as one vertical wall from
-                # the cap/block land up to the counterbore floor. Its bottom
-                # corner on the land is the C3A criterion; the mid-wall point
-                # is only where the coordinate pick acquires the cap's own edge.
-                x, y, land = reading.local_mm
-                floor = spec.retention.CAP_HEIGHT - spec.retention.CAP_COUNTERBORE_DEPTH
-                endpoints = ((x, y, land), (x, y, floor))
+                # the cap/block land up to the counterbore floor, at the
+                # NOMINAL modelled hole (the native builder cuts HOLE_DIA; its
+                # band is not geometry). Built from the cap spec alone, never
+                # from the reading, so a wrong production coordinate misses it.
+                # Its bottom corner is the C3A criterion; the mid-wall point is
+                # only where the coordinate pick acquires the cap's own edge.
+                cap = spec.pivot_cap
+                bolt_x, bolt_y = next(
+                    point for point in cap.BOLT_POINTS
+                    if point[0] < 0.0 and point[1] == reading.local_mm[1]
+                )
+                wall_x = bolt_x - cap.HOLE_DIA / 2.0
+                endpoints = ((wall_x, bolt_y, 0.0), (wall_x, bolt_y, cap.HEIGHT - cap.COUNTERBORE_DEPTH))
             else:
                 x, y, z = reading.local_mm
                 endpoints = ((x - 0.25, y, z), (x + 0.25, y, z))
@@ -4187,14 +4204,14 @@ def test_capture_c4_mouth_acquires_the_retainer_wall_inside_and_lands_on_its_top
         for reading in readings
     ]
     land = next(reading for reading in readings if reading.text.startswith("C3A CAP / BLOCK LAND"))
-    r = spec.retention
-    # Acquired on the cap's own clearance-hole wall, strictly between the
-    # cap/block interface and the counterbore floor: no block edge there.
-    assert land.pick_local_mm[0] == pytest.approx(
-        r.CAP_BOLT_X_OFFSETS[0] - (r.CAP_BOLT_CLEARANCE_DIAMETER + r.CAP_BOLT_CLEARANCE_BAND[0]) / 2.0
-    )
-    assert 0.0 < land.pick_local_mm[2] < r.CAP_HEIGHT - r.CAP_COUNTERBORE_DEPTH
-    assert land.local_mm[2] == 0.0
+    cap = spec.pivot_cap
+    # Acquired on the cap's own modelled (nominal HOLE_DIA) clearance-hole
+    # wall, strictly between the cap/block interface and the counterbore
+    # floor: no block edge there. The criterion is that wall's bottom corner.
+    wall_x = next(x for x, y in cap.BOLT_POINTS if x < 0.0 and y == land.local_mm[1]) - cap.HOLE_DIA / 2.0
+    assert land.pick_local_mm[0] == pytest.approx(wall_x, abs=1e-12)
+    assert land.local_mm == pytest.approx((wall_x, land.pick_local_mm[1], 0.0), abs=1e-12)
+    assert 0.0 < land.pick_local_mm[2] < cap.HEIGHT - cap.COUNTERBORE_DEPTH
     mouth = [(index, reading) for index, reading in enumerate(readings)
              if reading.text.startswith("C4 MOUTH")]
     bore = spec.pivot_retainer.BORE_DIA / 2.0
