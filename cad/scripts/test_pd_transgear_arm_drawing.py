@@ -748,15 +748,18 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:
+def test_the_notes_are_the_projected_zones_and_datum_a_and_carry_no_tolerance() -> None:
     """Machinist review (clarity): the notes ran to seven lines and carried
     the pair's 35.101 ±0.004 setting and its fit-up check, which are
-    MHA-PD-00's steps. Rule 7: at most four short lines."""
+    MHA-PD-00's steps. Rule 7: at most four short lines. Owner ruling
+    2026-10-27 (#1379): datum A's minimax association, on which the rear
+    face's bound rests, is stated."""
     lines = drawing.NOTES_TEXT.splitlines()
-    assert drawing.NOTES_TEXT == spec.PROJECTED_ZONE_NOTE
+    assert drawing.NOTES_TEXT == f"{spec.PROJECTED_ZONE_NOTE}\n{spec.DATUM_A_NOTE}"
     assert len(lines) <= 4
     flat = " ".join(line.strip() for line in lines)
     assert "FRONT FACE A" in flat
+    assert "DATUM A" in flat and "MINIMAX" in flat
     assert "\u00b1" not in flat
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
     assert "NO SHAKE" not in flat

@@ -209,6 +209,10 @@ PROJECTED_ZONE_NOTE = "\n".join((
     f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
     f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
 ))
+# Owner ruling 2026-10-27 (#1379): the rear face's 0.1008 bound to A
+# (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM) rests on
+# datum A's minimax association, so the sheet states it.
+DATUM_A_NOTE = "2. DATUM A: MINIMAX FIT TO FACE A."
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
