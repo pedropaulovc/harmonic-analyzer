@@ -453,20 +453,28 @@ CAPTURE_READING_REGION = (
     CLUSTER_RING_REGION[2] - BOM_SHEET_CLEARANCE,
     CLUSTER_RING_REGION[3] - BOM_SHEET_CLEARANCE,
 )
-# B-B is drawn at 1:1 (the 1:2 fragment was too small to read; machinist
-# review, 2026-10-23/26). Its native padded 1:1 extent measured 42.1 x 44.8 mm
-# (49385), so its field takes the top-right corner up to the border, and its
-# caption sits directly beneath that field, centred on it and clear of A-A's
-# right-hand callouts (C4 MOUTH tops out at 199 mm).
+# Both sections are drawn at 1:1. At 1:2 the retainer (4.16 thick) printed
+# smaller than one arrowhead, so the B-B fragment and A-A's C4/C4A/C5A/C5B
+# landings could not be told apart (machinist review, 2026-10-23/26).
+# B-B's native padded 1:1 extent measured 42.1 x 44.8 mm (49385), so its field
+# takes the top-right corner up to the border, with its caption directly
+# beneath, clear of A-A's right-hand callouts (C4 MOUTH tops out at 199 mm).
+# A-A's 1:1 crop is re-centred on its readings' span, C2 lower rim to C5A pin
+# end (23.15 to 63.0 above the pin origin), and its radius shrinks to 30 so
+# its field fits between the two callout columns; its caption sits beneath.
 CAPTURE_VIEW_REGIONS = (
     CAPTURE_EXPLODED_REGION,
     (0.224, 0.220, 0.278, 0.263),
-    (0.278, 0.119, 0.364, 0.211),
+    (0.264, 0.106, 0.362, 0.200),
     (0.352, 0.219, 0.416, 0.266),
 )
 CAPTURE_LOCATOR_SCALE = (1, 4)
-CAPTURE_SECTION_SCALES = {"A": (1, 2), "B": (1, 1)}
-CAPTURE_SECTION_CAPTIONS = ((0.302, 0.115), (0.384, 0.2175))
+CAPTURE_SECTION_SCALES = {"A": (1, 1), "B": (1, 1)}
+CAPTURE_SECTION_CAPTIONS = ((0.313, 0.104), (0.384, 0.2175))
+# Model crop of each section: (centre above the pin origin or at the first cap
+# screw, radius), in mm.
+CAPTURE_A_CROP_CENTRE_ABOVE_PIN_ORIGIN = 43.0
+CAPTURE_SECTION_CROP_RADII = {"A": 30.0, "B": 14.0}
 # Half-lengths of the cutting lines along their rows. B-B's is longer, so its
 # arrows and letters stand 3.75 mm (at the plan's 1:4) outside A-A's instead of
 # on top of them. Shorter, its right letter sat 0.48 mm in the C5B cotter
@@ -2655,8 +2663,12 @@ def capture_readings() -> tuple[CaptureReading, ...]:
                          callouts["carrier_backing_pin_end" if side > 0.0 else "carrier_backing"],
                          (x, 0.184))
           for side, x in ((-1.0, 0.224), (1.0, 0.365))),
-        CaptureReading(2, spec.PIVOT_RETAINER, (land, 0.0, 0.0),
-                       callouts["running_gap"], (0.365, 0.157)),
+        # The running gap lands on the retainer's underside 0.7 inside its
+        # rim, 2.6 mm out from C4 COMMON's carrier-face arrow at the land
+        # (they were 0.17 apart, one over the other), and its label sits
+        # low enough that the leader stays under the cotter eye.
+        CaptureReading(2, spec.PIVOT_RETAINER, (washer.OUTER_DIA / 2.0 - 0.7, 0.0, 0.0),
+                       callouts["running_gap"], (0.365, 0.1635)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
                        callouts["pin_end"], (0.305, 0.214)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
@@ -2694,6 +2706,18 @@ def capture_cut_points(section_label: str) -> tuple[tuple[float, float, float], 
         raise ValueError(f"unknown cartridge section {section_label!r}")
     half = CAPTURE_CUT_HALF_LENGTHS[section_label]
     return tuple(tuple((origin[i] + distance * rows[0][i]) / 1000.0 for i in range(3)) for distance in (-half, half))
+
+
+def capture_section_crop(section_label: str) -> tuple[tuple[float, float, float], float]:
+    """One section's model crop centre (m) and radius (m)."""
+    if section_label == "A":
+        origin = spec.PIVOT_PIN_ORIGINS[0]
+        centre = (origin[0], origin[1], origin[2] + CAPTURE_A_CROP_CENTRE_ABOVE_PIN_ORIGIN)
+    elif section_label == "B":
+        centre = spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0]
+    else:
+        raise ValueError(f"unknown cartridge section {section_label!r}")
+    return tuple(value / 1000.0 for value in centre), CAPTURE_SECTION_CROP_RADII[section_label] / 1000.0
 
 
 def _crop_capture_view(adapter: Any, view: Any, centre: tuple[float, float], radius: float, *, label: str) -> Any:
@@ -2742,12 +2766,8 @@ def _assert_capture_crop(adapter: Any, view: Any, index: int, profile: Any) -> N
     origin = tuple(value / 1000.0 for value in spec.PIVOT_PIN_ORIGINS[0])
     if index == 1:
         anchor, radius = origin, 0.055
-    elif index == 2:
-        anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
-        radius = 0.039
-    elif index == 3:
-        anchor = tuple(value / 1000.0 for value in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
-        radius = 0.014
+    elif index in (2, 3):
+        anchor, radius = capture_section_crop("A" if index == 2 else "B")
     else:
         raise ValueError(f"{label}: not an assembled crop view")
     bound = _early_bound(view, "IView")
@@ -3410,12 +3430,7 @@ def _place_capture_sheet(adapter: Any, cluster: Cluster) -> tuple[tuple[Any, ...
         section = _early_bound(view.GetSection(), "IDrSection")
         section.SetDisplayOnlySurfaceCut(False)
         _orient_capture_section(adapter, view, spec.PIN_ROWS[0] if letter == "A" else spec.PIVOT_CAP_PLACEMENTS[0][1][0])
-        if letter == "A":
-            anchor = tuple(origin[i] + (spec.pivot_pin.OVERALL_LENGTH / 2000.0 if i == 2 else 0.0) for i in range(3))
-            radius = 0.039
-        else:
-            anchor = tuple(v / 1000.0 for v in spec.PIVOT_CAP_SCREW_PLACEMENTS[0][0])
-            radius = 0.014
+        anchor, radius = capture_section_crop(letter)
         centre = model_point_in_view(adapter, view, anchor, label=f"jig capture crop {letter}")
         profile = _crop_capture_view(adapter, view, centre, radius * section_scale[0] / section_scale[1], label=f"jig capture section {letter}")
         set_hidden_lines_removed(adapter, view)

@@ -1694,7 +1694,7 @@ def test_package_settled_checks_reread_native_bom_without_mutating_layout(
         name: drawing.NOTES_REFERENCE_SCALE for name in drawing.NOTES_REFERENCE_REGIONS
     }
     capture_views = tuple(object() for _ in range(4))
-    capture_scales = ((1, 4), (1, 4), (1, 2), (1, 1))
+    capture_scales = ((1, 4), (1, 4), (1, 1), (1, 1))
     capture_profiles = tuple(object() for _ in range(3))
     seat._place_capture_sheet.return_value = (
         capture_views, capture_scales, (), capture_profiles,
@@ -3673,7 +3673,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     ]
     assert tuple(exploded.ScaleRatio) == scales[sheet.name] == (1.0, 4.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == (1, 2)
+    assert tuple(main.ScaleRatio) == (1, 1)
     assert tuple(bolt.ScaleRatio) == (1, 1)
     cluster = next(c for c in drawing.CLUSTERS if c.sheet == sheet.name)
     installed = drawing.capture_support_instances(cluster, 0) | {spec.instance_name(spec.CARRIER, 0)}
@@ -3685,7 +3685,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
     assert all(view.IsCropped() for view in (locator, main, bolt))
     assert len(package.doc.section_segments) == 2
     assert len(package.doc.crop_circles) == len(package.doc.crop_calls) == 3
-    for index, model_radius in ((1, 0.055), (2, 0.039), (3, 0.014)):
+    for index, model_radius in ((1, 0.055), (2, 0.030), (3, 0.014)):
         view = sheet.views[index]
         circle = package.doc.crop_circles[index - 1]
         assert package.doc.crop_calls[index - 1] == (view, circle)
@@ -3751,7 +3751,7 @@ def test_capture_places_four_real_views_before_bom_with_one_exploded_balloon_own
 
 
 @pytest.mark.parametrize("view_index,scale,model_radius,paper_radius,region", (
-    (2, (1, 2), 0.039, 0.0195, (0.278, 0.119, 0.364, 0.211)),
+    (2, (1, 1), 0.030, 0.030, (0.264, 0.106, 0.362, 0.200)),
     (3, (1, 1), 0.014, 0.014, (0.352, 0.219, 0.416, 0.266)),
 ))
 def test_capture_sections_native_scale_precedes_crop_without_shrinking_model_fence(
@@ -3774,10 +3774,10 @@ def test_capture_sections_native_scale_precedes_crop_without_shrinking_model_fen
 
 
 @pytest.mark.parametrize("view_index,scale,native_outline,refusal", (
-    (2, (1, 2), (
+    (2, (1, 1), (
         0.27083100196371956, 0.24606200349283217,
         0.3737219227586998, 0.3340379981999397,
-    ), "width 102[.]9 mm > 86[.]0 mm"),
+    ), "width 102[.]9 mm > 98[.]0 mm"),
     (3, (1, 1), (0.355, 0.215, 0.414, 0.265), "height 50[.]0 mm > 47[.]0 mm"),
 ))
 def test_capture_sections_still_refuse_oversized_native_extents(
@@ -3786,8 +3786,8 @@ def test_capture_sections_still_refuse_oversized_native_extents(
     package = native_property_package
     drawing._place_package(package.adapter)
     section = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views[view_index]
-    # The actual 4e7 A-A 1:1 extent remains a refusal if native returns it at
-    # 1:2, and B-B's 1:1 field never licenses a box taller than it.
+    # The actual 4e7 A-A extent at its former 39 mm crop stays a refusal in
+    # the 1:1 field, and B-B's 1:1 field never licenses a box taller than it.
     section.GetOutline = lambda: native_outline
     with pytest.raises(RuntimeError, match=refusal):
         drawing._fit_capture_view(
@@ -3861,7 +3861,7 @@ def test_capture_exploded_fit_does_not_shrink_assembled_reading_scales(native_pr
     exploded, locator, main, _bolt = package.doc.sheets[drawing.PIVOT_CAPTURE_SHEET].views
     assert tuple(exploded.ScaleRatio) == scales[drawing.PIVOT_CAPTURE_SHEET] == (1.0, 8.0)
     assert tuple(locator.ScaleRatio) == (1, 4)
-    assert tuple(main.ScaleRatio) == (1, 2)
+    assert tuple(main.ScaleRatio) == (1, 1)
     settled[-1]()
 
 
@@ -5932,7 +5932,7 @@ def test_capture_uncropped_fit_refreshes_native_geometry_at_each_candidate_scale
     (1, ((1, 4), (1, 5), (1, 6)), True, "cropped view requires one pre-authored scale"),
     (2, ((1, 1), (1, 2)), True, "cropped view requires one pre-authored scale"),
     (1, ((1, 5),), True, "cropped view scale differs from its pre-authored scale"),
-    (2, ((1, 1),), True, "cropped view scale differs from its pre-authored scale"),
+    (2, ((1, 2),), True, "cropped view scale differs from its pre-authored scale"),
     (3, ((1, 2),), True, "cropped view scale differs from its pre-authored scale"),
     (1, ((1, 4),), False, "cropped view lost its selected native profile"),
 ))

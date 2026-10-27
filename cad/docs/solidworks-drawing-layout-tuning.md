@@ -247,12 +247,15 @@ owner after moves/rebuilds: `Crop2` consumes the profile, so enumerating
 `IView.GetSketch` is not authoritative. The retained segment must remain
 accessible; do not invent a crop-feature getter or fallback if it does not.
 Set assembled views' final scales before authoring their crops (locator 1:4,
-A-A 1:2, B-B 1:1); do not walk a scale ladder after `Crop2`. Refresh native display
+A-A 1:1, B-B 1:1); do not walk a scale ladder after `Crop2`. Refresh native display
 geometry after HLR/scale changes before measuring the outline. `GetOutline` is
 a padded view extent, not an exact crop circle box. The locator's 54 x 43 mm
 field accommodates its measured 43.884 x 41.516 mm native extent; its caption
 moves down with the field's lower edge, without moving neighboring labels.
-B-B's 1:2 fragment read as an unlabelled speck (machinist review): it is 1:1
+At 1:2 the 4.16 mm retainer printed smaller than one arrowhead, so neither
+section's landings could be told apart (machinist review). A-A is 1:1 with a
+30 mm crop re-centred on its readings' span (C2 lower rim to C5A pin end);
+B-B's 1:2 fragment read as an unlabelled speck: it is 1:1
 in a 64 x 47 mm top-right field that holds its measured 42.076 x 44.776 mm
 native extent, with its caption directly beneath, its C3A labels landing on
 the bolt's near side, and a longer cutting line so its arrows stand outside
