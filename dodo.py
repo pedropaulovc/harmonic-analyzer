@@ -3314,6 +3314,8 @@ def task_verify():
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
+    "machinist_review_transport.py",
+    "machinist_review_credentials.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
 )
@@ -3346,6 +3348,10 @@ def _machinist_review_file_deps(stem: str) -> list[str]:
         str(path.resolve())
         for path in (
             spec.outputs["pdf"],
+            # SDK/runtime dependency changes invalidate verdicts, not geometry.
+            # Hash both authorities whole rather than duplicating SDK versions.
+            REPO_ROOT / "pyproject.toml",
+            REPO_ROOT / "uv.lock",
             *(
                 SCRIPTS_DIR / name
                 for name in _MACHINIST_REVIEW_MODULES

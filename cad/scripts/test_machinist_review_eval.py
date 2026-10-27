@@ -25,7 +25,9 @@ def _runtime(reviewer: str) -> dict[str, str]:
     return {
         "Pillow": "11.0.0", "pypdfium2": "4.30.0", "mcp": "1.12.0",
         "reviewer_cli": f"codex-cli {CODEX_CLI_VERSION}" if reviewer == "codex"
-        else "2.1.0 (Claude Code)",
+        else "omp v18.7.0",
+        **({"claude-agent-sdk": "0.1.76", "routing": "sdk-api-pool-then-omp-v1",
+            "omp_version_probe": "succeeded"} if reviewer == "claude" else {}),
     }
 
 
@@ -380,6 +382,18 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         if reviewer == "codex":
             events.append({"type": "thread.started", "thread_id": session_id})
         else:
+            requested_session = command[command.index("--session-id") + 1]
+            kwargs["transport_provenance"].update(
+                transport="claude_agent_sdk", session_id=requested_session,
+                requested_session_id=requested_session, credential_id="fixture",
+                credential_fingerprint="a" * 64,
+                resolved_model={"provider": "anthropic", "id": command[command.index("--model") + 1]},
+                sdk_isolation={
+                    "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+                    "permission_mode": "dontAsk", "setting_sources": [],
+                    "strict_mcp_config": True, "settings": deepcopy(mr.CLAUDE_ISOLATION_SETTINGS),
+                },
+            )
             events.append({
                 "type": "control_response",
                 "response": {
@@ -451,6 +465,16 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             path.parent.mkdir(parents=True, exist_ok=True)
             _write_rows(path, rollout)
             state["rollouts"][session_id] = path
+        if reviewer == "claude":
+            for event in events:
+                event["route_index"] = 1
+            kwargs["transport_provenance"]["routes"] = [{
+                "route_index": 1, "transport": "claude_agent_sdk",
+                "outcome": "succeeded", "event_start": 0, "event_end": len(events),
+            }]
+            _write_rows(cwd / "native-events.jsonl", [
+                {"route_index": 1, "native_event": deepcopy(event)} for event in events
+            ])
         return mr.subprocess.CompletedProcess(
             command, 1 if state["mode"] == "provider_error" else 0,
             stdout="\n".join(json.dumps(event) for event in events),
@@ -487,6 +511,9 @@ def _preserve_report(result, directory: Path, report: dict[str, Any]) -> None:
 
 
 def _preserve_events(result, directory: Path, events: list[dict[str, Any]]) -> None:
+    if result["review"]["reviewer"] == "claude":
+        for row in events:
+            row["event"].setdefault("route_index", 1)
     events_path = directory / result["events"]
     events_path.write_text("\n".join(json.dumps(row) for row in events), encoding="utf-8")
     result["events_sha256"] = mr._sha256(events_path)
@@ -496,6 +523,20 @@ def _preserve_events(result, directory: Path, events: list[dict[str, Any]]) -> N
                 json.dumps(row["event"]) for row in events
                 if row["attempt"] == invocation["attempt"]
             ), encoding="utf-8")
+        if invocation["reviewer"] == "claude":
+            native = Path(invocation["retained_dir"]) / "native-events.jsonl"
+            selected = [row["event"] for row in events if row["attempt"] == invocation["attempt"]]
+            routes = invocation["transport_provenance"].get("routes", [])
+            if len(routes) == 1:
+                routes[0]["event_end"] = len(selected)
+                _write_rows(native, [
+                    {"route_index": event["route_index"], "native_event": deepcopy(event)}
+                    for event in selected
+                ])
+                invocation["transport_provenance"]["native_events"] = {
+                    "sha256": mr._sha256(native), "records": len(selected),
+                }
+    _preserve_report(result, directory, result["review"])
     (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
 
@@ -544,10 +585,86 @@ def test_runtime_versions_are_queried_once_and_fail_closed(monkeypatch: pytest.M
         assert packages == ["Pillow", "pypdfium2", "mcp"]
         assert runs == [["C:/bin/codex.exe", "--version"]]
         outcome["returncode"] = 1
-        with pytest.raises(RuntimeError, match="--version"):
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["omp_version_probe"] == "nonzero_exit"
+        assert runtime["omp_version_probe_exit_code"] == "1"
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+def test_sdk_runtime_provenance_does_not_require_claude_or_omp_executable(monkeypatch):
+    queries = []
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", lambda name: f"{name}-fixture")
+    def unavailable(name):
+        queries.append(name)
+        return None
+    monkeypatch.setattr(evaluation.shutil, "which", unavailable)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["claude-agent-sdk"] == "claude-agent-sdk-fixture"
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["routing"] == "sdk-api-pool-then-omp-v1"
+        assert queries == ["omp"]
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+@pytest.mark.parametrize("version", ["", " ", None])
+def test_missing_sdk_version_remains_fatal(monkeypatch, version):
+    monkeypatch.setattr(
+        evaluation.importlib.metadata, "version",
+        lambda name: version if name == "claude-agent-sdk" else "fixture",
+    )
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: None)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="missing claude-agent-sdk version"):
             evaluation.runtime_versions("claude")
     finally:
         evaluation.runtime_versions.cache_clear()
+
+
+@pytest.mark.parametrize("failure,outcome", [
+    (evaluation.subprocess.TimeoutExpired(["omp", "--version"], 60, output="secret-canary"), "timeout"),
+    (OSError("secret-canary"), "OSError"),
+    (evaluation.subprocess.SubprocessError("secret-canary"), "SubprocessError"),
+    (None, "empty_output"),
+])
+def test_optional_omp_probe_failure_keeps_sdk_usable(monkeypatch, failure, outcome):
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", lambda name: f"{name}-fixture")
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: "/bin/omp")
+    def probe(*args, **kwargs):
+        if failure is not None:
+            raise failure
+        return evaluation.subprocess.CompletedProcess(args[0], 0, stdout="", stderr="secret-canary")
+    monkeypatch.setattr(evaluation.subprocess, "run", probe)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["claude-agent-sdk"] == "claude-agent-sdk-fixture"
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["omp_version_probe"] == outcome
+        assert "secret-canary" not in json.dumps(runtime)
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+def test_sdk_package_missing_remains_fatal_even_without_omp(monkeypatch):
+    def version(name):
+        if name == "claude-agent-sdk":
+            raise evaluation.importlib.metadata.PackageNotFoundError(name)
+        return "fixture"
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", version)
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: None)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="runtime versions"):
+            evaluation.runtime_versions("claude")
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
 
 
 def test_main_rejects_changed_selected_frozen_baseline_before_provider_execution(
@@ -666,10 +783,6 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
                 if argument.startswith("mcp_servers.sheets.args=")
             ))
             assert args[1:] == [str(source.resolve()) for source in sources]
-        else:
-            assert call["command"][call["command"].index("--allowedTools") + 1] == (
-                "mcp__sheets__view_sheet,mcp__sheets__crop"
-            )
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -956,11 +1069,12 @@ def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     assert result["error"] is None
     report_path = directory / result["report"]
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    command = report["extra"]["evidence"]["attempts"][0]["command"]
+    invocation = report["extra"]["evidence"]["attempts"][0]
     if reviewer == "codex":
+        command = invocation["command"]
         command[command.index("--sandbox") + 1] = "danger-full-access"
     else:
-        command[command.index("--permission-mode") + 1] = "bypassPermissions"
+        invocation["transport_provenance"]["sdk_isolation"]["permission_mode"] = "bypassPermissions"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     result["report_sha256"] = mr._sha256(report_path)
     result["review"] = report
@@ -972,6 +1086,190 @@ def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     assert fresh["error"] is None
     assert fresh["report"] != result["report"]
     assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("field,value", [
+    ("tools", None),
+    ("permission_mode", "bypassPermissions"),
+    ("allowed_tools", [*sorted(mr._claude_transport.TOOLS), "Bash"]),
+    ("setting_sources", ["user"]),
+    ("strict_mcp_config", False),
+    ("settings", {}),
+])
+def test_claude_sdk_isolation_tampering_is_rejected_despite_matching_report_hash(
+    tmp_path: Path, case, provider, field: str, value: Any,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    report = deepcopy(result["review"])
+    provenance = report["extra"]["evidence"]["attempts"][0]["transport_provenance"]
+    provenance["sdk_isolation"][field] = deepcopy(value)
+    _preserve_report(result, directory, report)
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError, match="SDK evidence lacks effective tool/permission isolation"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+def _omp_report(result: dict[str, Any]) -> dict[str, Any]:
+    """Recorded OMP runtime facts attached to otherwise valid sheet evidence."""
+    report = deepcopy(result["review"])
+    evidence = report["extra"]["evidence"]
+    invocation = evidence["attempts"][0]
+    provenance = invocation["transport_provenance"]
+    home = Path(provenance["private_home"])
+    sessions = str(home / "sessions")
+    command = [
+        "/bin/omp", "--mode", "rpc", "--no-ui", "--cwd", invocation["cwd"],
+        "--config", str(home / "config.yml"), "--no-tools", "--no-extensions",
+        "--no-skills", "--no-rules", "--no-lsp", "--no-pty", "--no-prewalk",
+        "--no-title", "--auto-approve", "--system-prompt", mr._claude_transport.OMP_SYSTEM_PROMPT,
+        "--model", "anthropic/" + report["model"], "--thinking", report["effort"],
+        "--session-dir", sessions,
+    ]
+    # Real rendered shape, independent of the validator's regex/template.
+    project = (
+        "<project-context>\n<workstation>\n- OS: linux 6.18\n- Arch: x64\n"
+        "- Model: anthropic/claude-opus-5-5\n</workstation>\n</project-context>\n\n"
+        "<critical>\n- Each response MUST advance the task; completion only stopping condition.\n"
+        "- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n"
+        "- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n"
+        "</critical>"
+    )
+    prompt = evidence["effective_prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(json.loads(evidence["schema"]))
+    provenance.update(
+        transport="omp", session_dir=sessions, session_file=str(Path(sessions) / "review.jsonl"),
+        image_blobs=["a" * 64], shutdown="graceful", omp_command=command,
+        omp_prompt=prompt, omp_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+        omp_effective_options={
+            "command": deepcopy(command), "cwd": invocation["cwd"],
+            "tools": sorted(mr._claude_transport.OMP_TOOLS),
+            "system_prompt": [mr._claude_transport.OMP_SYSTEM_PROMPT, project],
+            "config": {
+                "disabledProviders": ["native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"],
+                "mcp": {"startupTimeoutMs": 0, "enableProjectConfig": True},
+                "memory": {"backend": "off"}, "autolearn": {"enabled": False, "autoContinue": False},
+                "includeWorkspaceTree": False,
+            },
+        },
+    )
+    provenance["omp_version"] = "18.7.0"
+    provenance["routes"][0].update(transport="omp", omp_version="18.7.0")
+    return report
+
+
+def test_successful_omp_requires_recorded_runtime_evidence(tmp_path, case, provider):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    report = _omp_report(result)
+    _preserve_report(result, directory, report)
+    assert evaluation.validate_evidence(result, identity, "baseline", case[1], directory).blind is True
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing_options", "command_disagrees", "missing_flag", "extra_tool_flag",
+    "duplicate_flag", "wrong_model", "wrong_cwd", "wrong_overlay_path",
+    "context_provider", "memory", "autolearn", "workspace", "mcp", "extra_config",
+    "runtime_tools", "runtime_prompt", "runtime_context", "session_outside",
+    "session_dir_outside", "empty_blobs", "invalid_blob", "nonstring_blob",
+    "duplicate_blob", "missing_prompt", "prompt_without_schema", "bad_prompt_hash",
+    "shutdown",
+])
+def test_omp_runtime_tampering_is_rejected_despite_valid_descriptor(
+    tmp_path, case, provider, mutation,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    report = _omp_report(result)
+    evidence = report["extra"]["evidence"]
+    provenance = evidence["attempts"][0]["transport_provenance"]
+    options = provenance["omp_effective_options"]
+    command = options["command"]
+    if mutation == "missing_options":
+        del provenance["omp_effective_options"]
+    elif mutation == "command_disagrees":
+        provenance["omp_command"] = ["omp"]
+    elif mutation == "missing_flag":
+        command.remove("--no-extensions")
+    elif mutation == "extra_tool_flag":
+        command.extend(["--tools", "bash"])
+    elif mutation == "duplicate_flag":
+        command.extend(["--system-prompt", "injected"])
+    elif mutation in {"wrong_model", "wrong_overlay_path"}:
+        flag = "--model" if mutation == "wrong_model" else "--config"
+        command[command.index(flag) + 1] = "unauthorized"
+    elif mutation == "wrong_cwd":
+        options["cwd"] = "/tmp"
+    elif mutation == "context_provider":
+        options["config"]["disabledProviders"].remove("agents-md")
+    elif mutation == "memory":
+        options["config"]["memory"]["backend"] = "hindsight"
+    elif mutation == "autolearn":
+        options["config"]["autolearn"]["enabled"] = True
+    elif mutation == "workspace":
+        options["config"]["includeWorkspaceTree"] = True
+    elif mutation == "mcp":
+        options["config"]["mcp"]["enableProjectConfig"] = False
+    elif mutation == "extra_config":
+        options["config"]["systemPrompt"] = "injected"
+    elif mutation == "runtime_tools":
+        options["tools"].append("bash")
+    elif mutation == "runtime_prompt":
+        options["system_prompt"][0] += "\nRead repository files."
+    elif mutation == "runtime_context":
+        options["system_prompt"][1] += "\n<project>private instructions</project>"
+    elif mutation == "session_outside":
+        provenance["session_file"] = "/tmp/unowned.jsonl"
+    elif mutation == "session_dir_outside":
+        provenance["session_dir"] = "/tmp"
+    elif mutation in {"empty_blobs", "invalid_blob", "nonstring_blob", "duplicate_blob"}:
+        provenance["image_blobs"] = {
+            "empty_blobs": [], "invalid_blob": ["../blob"], "nonstring_blob": [None],
+            "duplicate_blob": ["a" * 64, "a" * 64],
+        }[mutation]
+    elif mutation == "missing_prompt":
+        del provenance["omp_prompt"]
+    elif mutation == "prompt_without_schema":
+        provenance["omp_prompt"] = evidence["effective_prompt"]
+        provenance["omp_prompt_sha256"] = hashlib.sha256(provenance["omp_prompt"].encode()).hexdigest()
+    elif mutation == "bad_prompt_hash":
+        provenance["omp_prompt_sha256"] = "0" * 64
+    elif mutation == "shutdown":
+        del provenance["shutdown"]
+    if mutation != "command_disagrees":
+        provenance["omp_command"] = deepcopy(command)
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="OMP"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("model", [
+    None, "claude-opus-4-6", [], {},
+    {"provider": "anthropic"},
+    {"id": "claude-opus-4-6"},
+    {"provider": "openai", "id": "claude-opus-4-6"},
+    {"provider": "anthropic", "id": None},
+    {"provider": "anthropic", "id": ""},
+    {"provider": "anthropic", "id": 1},
+    {"provider": "anthropic", "id": "claude-opus-4-6", "extra": True},
+])
+def test_claude_resolved_model_must_have_uniform_anthropic_identity(
+    tmp_path: Path, case, provider, model: Any,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    provenance = report["extra"]["evidence"]["attempts"][0]["transport_provenance"]
+    provenance["resolved_model"] = deepcopy(model)
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="Claude evidence resolved an invalid Anthropic model"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -1058,8 +1356,18 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
             if failure == "launch":
                 raise OSError("provider could not start")
             if failure == "timeout":
+                partial = {"type": "turn.started"}
+                if reviewer == "claude":
+                    partial["route_index"] = 1
+                    kwargs["transport_provenance"]["routes"] = [{
+                        "route_index": 1, "transport": "claude_agent_sdk",
+                        "outcome": "failed", "event_start": 0, "event_end": 1,
+                    }]
+                    _write_rows(Path(kwargs["cwd"]) / "native-events.jsonl", [
+                        {"route_index": 1, "native_event": deepcopy(partial)},
+                    ])
                 raise mr.subprocess.TimeoutExpired(
-                    command, kwargs["timeout"], output=b'{"type":"turn.started"}\n',
+                    command, kwargs["timeout"], output=(json.dumps(partial) + "\n").encode(),
                     stderr=b"partial diagnostics",
                 )
             if failure == "invalid_verdict":
@@ -1090,6 +1398,37 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
         assert failed["cwd"] == failed["attempt_dir"]
         assert succeeded["cwd"] == succeeded["attempt_dir"]
     assert failed["attempt_dir"] != succeeded["attempt_dir"]
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert calls == 2
+
+
+@pytest.mark.parametrize("transport", ["omp", "claude_agent_sdk", "routing"])
+def test_failed_startup_does_not_require_completion_evidence(
+    tmp_path, case, provider, monkeypatch, transport,
+):
+    identity = _identity(case, reviewer="claude")
+    identity["retries"] = 1
+    provider_run = mr._run_reviewer
+    calls = 0
+    def run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            provenance = kwargs["transport_provenance"]
+            provenance["transport"] = transport
+            if transport == "claude_agent_sdk":
+                provenance.update(credential_id="fixture", credential_fingerprint="a" * 64)
+            raise OSError("startup failed before runtime evidence was available")
+        return provider_run(command, **kwargs)
+    monkeypatch.setattr(mr, "_run_reviewer", run)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    failed = review.extra["evidence"]["attempts"][0]
+    assert failed["outcome"] == "failed"
+    assert "omp_effective_options" not in failed["transport_provenance"]
+    assert "sdk_isolation" not in failed["transport_provenance"]
     assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
     assert calls == 2
 
@@ -1201,17 +1540,26 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
     )
     expected_files = {"schema.json", "stdout.txt", "stderr.txt"}
     if reviewer == "claude":
-        expected_files.add("mcp.json")
+        expected_files.update({"mcp.json", "native-events.jsonl"})
         assert cwd == attempt_dir
         assert invocation["codex_home"] is None
         assert invocation["rollout_file"] is None
+        provenance = invocation["transport_provenance"]
+        assert provenance["sdk_isolation"] == {
+            "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+            "permission_mode": "dontAsk", "setting_sources": [],
+            "strict_mcp_config": True, "settings": mr.CLAUDE_ISOLATION_SETTINGS,
+        }
+        assert provenance["resolved_model"] == {
+            "provider": "anthropic", "id": command[command.index("--model") + 1],
+        }
         assert json.loads((retained / "mcp.json").read_text(encoding="utf-8")) == {
             "mcpServers": {"sheets": {
                 "command": sys.executable,
                 "args": [str(mr.SHEETS_SERVER), *(str(source.resolve()) for source in snapshot_sources)],
             }},
         }
-        assert invocation["artifacts"] == []
+        assert invocation["artifacts"] == [str(retained / "native-events.jsonl")]
         assert command[command.index("--mcp-config") + 1] == str(attempt_dir / "mcp.json")
     else:
         expected_files |= {"verdict.json", "codex-models.json", "rollout.jsonl"}
@@ -1252,7 +1600,7 @@ def test_surviving_original_attempt_dir_requires_warning_and_complete_retention(
     invocation = report["extra"]["evidence"]["attempts"][0]
     original = Path(invocation["attempt_dir"])
     # Windows can refuse to remove a directory a lingering MCP server still holds.
-    original.mkdir()
+    original.mkdir(parents=True)
     (original / "stdout.txt").write_text("locked", encoding="utf-8")
     try:
         if state != "unwarned":
@@ -1327,7 +1675,7 @@ def test_source_allowlist_cannot_be_redefined_by_preserved_report(
     "argv_setting", "actual_replay", "cwd_moved", "codex_home", "attempt_in_repo",
 ])
 def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
-    tmp_path: Path, case, provider, reviewer: str, damage: str,
+    tmp_path: Path, case, provider, reviewer: str, damage: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     identity = _identity(case, reviewer=reviewer)
     directory = tmp_path / "run"
@@ -1369,14 +1717,25 @@ def test_actual_and_retained_paths_cannot_be_conflated_or_redirected(
         invocation["codex_home"] = None if reviewer == "codex" else str(tmp_path / "codex-home")
     else:
         # The reviewer's cwd must stay outside every repository.
-        repo = tmp_path / "repo"
+        repo = (
+            Path(invocation["transport_provenance"]["private_home"]) / "repo"
+            if reviewer == "claude" else tmp_path / "repo"
+        )
         (repo / ".git").mkdir(parents=True)
         inside = repo / Path(invocation["attempt_dir"]).name
         invocation["attempt_dir"] = invocation["cwd"] = str(inside)
+        checked = []
+        exists = Path.exists
+        def record_exists(path):
+            if path == repo / ".git":
+                checked.append(path)
+            return exists(path)
+        monkeypatch.setattr(Path, "exists", record_exists)
     _preserve_report(result, directory, report)
-    match = "git repository" if damage == "attempt_in_repo" else None
-    with pytest.raises(ValueError, match=match):
+    with pytest.raises(ValueError):
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    if damage == "attempt_in_repo":
+        assert checked == [repo / ".git"]
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -1878,7 +2237,7 @@ def test_pre_invocation_failure_has_no_fabricated_command_or_streams(
 ) -> None:
     identity = _identity(case, reviewer=reviewer)
     identity["retries"] = 1
-    builder_name = f"build_{reviewer}_command"
+    builder_name = "build_claude_invocation" if reviewer == "claude" else "build_codex_command"
     builder = getattr(mr, builder_name)
     calls = 0
 
@@ -1995,7 +2354,9 @@ def test_retry_invocations_cannot_reuse_or_relabel_provenance(
     elif damage == "session":
         original_session = succeeded["session_id"]
         succeeded["session_id"] = failed["session_id"]
-        succeeded["resume_command"] = mr._resume_command(reviewer, failed["session_id"])
+        succeeded["resume_command"] = (
+            None if reviewer == "claude" else mr._codex_resume_command(failed["session_id"])
+        )
         if reviewer == "claude":
             for field in ("command", "retained_argv"):
                 succeeded[field] = [
@@ -2238,3 +2599,213 @@ def test_codex_argv_mcp_servers_bind_the_catalog(tmp_path: Path) -> None:
     ) == {"sheets", "files"}
     # A whole-table override names no server and can never match the catalog.
     assert evaluation._codex_mcp_servers([*command, "-c", "mcp_servers={}"]) == {"sheets", ""}
+
+
+@pytest.mark.parametrize("probe", [
+    {"reviewer_cli": "omp-unavailable", "omp_version_probe": "timeout"},
+    {"reviewer_cli": "omp-unavailable", "omp_version_probe": "nonzero_exit",
+     "omp_version_probe_exit_code": "1"},
+    {"reviewer_cli": "omp v18.11.0", "omp_version_probe": "succeeded"},
+])
+def test_sdk_only_checkpoint_resumes_despite_optional_probe_changes(
+    tmp_path, case, provider, monkeypatch, probe,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    first = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert first["error"] is None
+    changed_runtime = {**_runtime("claude"), **probe}
+    changed_identity = _identity(case, reviewer="claude", runtime=changed_runtime)
+    assert changed_identity == identity
+    monkeypatch.setattr(evaluation, "runtime_versions", lambda reviewer: changed_runtime)
+    assert evaluation.run_case(changed_identity, "baseline", case[1], "Rubric A", directory) == first
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("probe,unavailable", [
+    ({"reviewer_cli": "omp v18.7.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp/18.7.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp v18.11.0", "omp_version_probe": "succeeded"}, False),
+    ({"reviewer_cli": "omp-unavailable", "omp_version_probe": "timeout"}, True),
+    ({"reviewer_cli": "omp-unavailable", "omp_version_probe": "unavailable"}, True),
+])
+def test_cached_actual_omp_version_is_checked_without_stale_identity(
+    tmp_path, case, provider, monkeypatch, probe, unavailable,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    _preserve_report(result, directory, _omp_report(result))
+    monkeypatch.setattr(evaluation, "runtime_versions", lambda reviewer: {**_runtime("claude"), **probe})
+    if unavailable:
+        with pytest.raises(evaluation._OMPProbeUnavailable, match="no provider request submitted"):
+            evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    elif probe["reviewer_cli"] in {"omp v18.7.0", "omp/18.7.0"}:
+        assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    else:
+        with pytest.raises(ValueError, match="version differs"):
+            evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    assert len(provider["calls"]) == 1
+
+
+@pytest.mark.parametrize("damage", [
+    "empty", "truncated_boundary", "swapped_same_route", "malformed_json",
+    "nonobject", "nonobject_native", "unknown_route", "bool_route", "missing_coverage",
+    "known_secret", "escaped_secret",
+])
+def test_retained_native_content_and_route_integrity(
+    tmp_path, case, provider, monkeypatch, damage,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    invocation = report["extra"]["evidence"]["attempts"][0]
+    native = Path(invocation["retained_dir"]) / "native-events.jsonl"
+    rows = [json.loads(line) for line in native.read_text().splitlines()]
+    if damage == "empty":
+        native.write_text("")
+    elif damage == "truncated_boundary":
+        _write_rows(native, rows[:-1])
+    elif damage == "swapped_same_route":
+        rows[0]["native_event"] = {"type": "other-operation", "session_id": str(uuid.uuid4())}
+        _write_rows(native, rows)
+    else:
+        if damage == "malformed_json":
+            native.write_text("{broken\n")
+        elif damage == "nonobject":
+            _write_rows(native, [[]])
+        else:
+            if damage == "nonobject_native":
+                rows[0]["native_event"] = []
+            elif damage == "unknown_route":
+                rows[0]["route_index"] = 2
+            elif damage == "bool_route":
+                rows[0]["route_index"] = True
+            elif damage == "missing_coverage":
+                rows = []
+            else:
+                secret = 'secret-canary-"\u2603'
+                monkeypatch.setenv("ANTHROPIC_API_KEY", secret)
+                rows[0]["native_event"]["diagnostic"] = (
+                    secret if damage == "known_secret" else json.dumps(secret)[1:-1]
+                )
+            _write_rows(native, rows)
+        # Keep the outer digest valid to exercise semantic checks independently.
+        invocation["transport_provenance"]["native_events"] = {
+            "sha256": mr._sha256(native), "records": len(native.read_bytes().splitlines()),
+        }
+        _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="native"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+def test_native_routes_allow_preprovider_failure_but_reject_cross_route_records(tmp_path):
+    path = tmp_path / "native-events.jsonl"
+    events = [{"type": "system", "route_index": 2}]
+    provenance = {"routes": [
+        {"transport": "claude_agent_sdk", "route_index": 1, "outcome": "failed",
+         "event_start": 0, "event_end": 0},
+        {"transport": "omp", "route_index": 2, "outcome": "succeeded",
+         "event_start": 0, "event_end": 1},
+    ]}
+    rows = [{"route_index": 2, "native_event": {"type": "system"}}]
+    _write_rows(path, rows)
+    provenance["native_events"] = {"sha256": mr._sha256(path), "records": 1}
+    evaluation._check_native_events(path, provenance, events)
+    # A valid JSON object from the failed route cannot cover the successful route.
+    rows[0]["route_index"] = 1
+    _write_rows(path, rows)
+    provenance["native_events"]["sha256"] = mr._sha256(path)
+    with pytest.raises(ValueError, match="route coverage"):
+        evaluation._check_native_events(path, provenance, events)
+    rows[0]["route_index"] = 2
+    _write_rows(path, rows)
+    provenance["native_events"]["sha256"] = mr._sha256(path)
+    with pytest.raises(ValueError, match="cross native routes"):
+        evaluation._check_native_events(path, provenance, [{"type": "system", "route_index": 1}])
+    # No provider records at all is valid when every started route failed early.
+    provenance = {"routes": [provenance["routes"][0]]}
+    evaluation._check_native_events(None, provenance, [])
+
+
+@pytest.mark.parametrize("category", ["protocol_error", "configuration_error", "transport_error"])
+def test_attempt_failure_telemetry_preserves_transport_category(
+    tmp_path, case, provider, monkeypatch, category,
+):
+    logged = []
+    monkeypatch.setattr(mr._telemetry, "error", lambda name, **fields: logged.append((name, fields)))
+    def fail(command, **kwargs):
+        raise mr._ClaudeTransportError("safe error", category=category)
+    monkeypatch.setattr(mr, "_run_reviewer", fail)
+    result = evaluation.run_case(
+        _identity(case, reviewer="claude"), "baseline", case[1], "Rubric A", tmp_path / "run",
+    )
+    assert result["error"] is not None
+    attempt, = [fields for name, fields in logged if name == "machinist_review.attempt_failed"]
+    assert attempt["error_category"] == category
+
+
+def test_completed_attempt_telemetry_has_no_failure_category(tmp_path, case, provider, monkeypatch):
+    logged = []
+    monkeypatch.setattr(mr._telemetry, "success", lambda name, **fields: logged.append((name, fields)))
+    result = evaluation.run_case(
+        _identity(case, reviewer="claude"), "baseline", case[1], "Rubric A", tmp_path / "run",
+    )
+    assert result["error"] is None
+    attempt, = [fields for name, fields in logged if name == "machinist_review.attempt_completed"]
+    assert attempt["error_category"] is None
+
+
+def test_native_route_offsets_include_control_responses_without_provider_coverage(tmp_path):
+    status = {"type": "control_response", "route_index": 1, "response": {"subtype": "success"}}
+    response = {"type": "system", "route_index": 2}
+    provenance = {"routes": [
+        {"transport": "claude_agent_sdk", "route_index": 1, "outcome": "failed",
+         "event_start": 0, "event_end": 1},
+        {"transport": "omp", "route_index": 2, "outcome": "succeeded",
+         "event_start": 1, "event_end": 2},
+    ]}
+    native = tmp_path / "native-events.jsonl"
+    _write_rows(native, [{"route_index": 2, "native_event": {"type": "system"}}])
+    provenance["native_events"] = {"sha256": mr._sha256(native), "records": 1}
+    evaluation._check_native_events(native, provenance, [status, response])
+    # Passing the _parse_events projection loses the indexed control response.
+    with pytest.raises(ValueError):
+        evaluation._check_native_events(native, provenance, [response])
+    # A route that got only an MCP status before failing has no provider record.
+    early_failure = {"routes": [provenance["routes"][0]]}
+    evaluation._check_native_events(None, early_failure, [status])
+
+
+@pytest.mark.parametrize("damage", [None, "missing_resume", "wrong_target", "fresh_descriptor", "duplicate"])
+def test_omp_continuation_command_is_bound_to_recorded_session(
+    tmp_path, case, provider, damage,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    report = _omp_report(result)
+    evidence = report["extra"]["evidence"]
+    invocation = evidence["attempts"][0]
+    provenance = invocation["transport_provenance"]
+    if damage != "fresh_descriptor":
+        invocation["command"][invocation["command"].index("--session-id")] = "--resume"
+    command = deepcopy(provenance["omp_command"])
+    if damage != "missing_resume":
+        target = (str(Path(provenance["session_dir"]) / "other-session.jsonl")
+                  if damage == "wrong_target" else provenance["session_file"])
+        command.extend(["--resume", target])
+    if damage == "duplicate":
+        command.extend(["--resume", provenance["session_file"]])
+    provenance["omp_command"] = command
+    provenance["omp_effective_options"]["command"] = deepcopy(command)
+    if damage is None:
+        evaluation._check_omp_provenance(provenance, invocation, evidence, review)
+    else:
+        with pytest.raises(ValueError, match="OMP actual command"):
+            evaluation._check_omp_provenance(provenance, invocation, evidence, review)

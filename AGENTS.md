@@ -1028,6 +1028,10 @@ are excluded via the shared `_buildgraph.RECIPE_SKIP_MODULES` policy. The draw
 script and learn/enforce declaration are not review inputs. The complete leaf
 report directory, including individual run JSON, source snapshots and attempt
 evidence, is cached without pruning.
+For Claude this key describes the hashed SDK-first/API-pool, OMP-fallback routing
+policy, not a transport preselected from mutable quota state. The canonical
+cached report preserves each attempt's actual transport and routes; adopters
+retain that provenance rather than claiming SDK and OMP are identical harnesses.
 
 ## File-granular recipe helpers
 
