@@ -60,6 +60,12 @@ from _gtol_face_resolve import resolve_faces
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _drawing_layout_audit import annotation_display
+from _layout_audit import (
+    display_box,
+    line_segment,
+    polygon_segments,
+    polyline_segments,
+)
 from _layout_geometry import (
     Box,
     Segment,
@@ -506,18 +512,24 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
 def _datum_a_ink(
     adapter: Any, tag: Any
 ) -> tuple[list[Segment], list[tuple[float, float]], list[Box]]:
-    """Datum A's rendered ink from its own GetDisplayData (the layout audit's
-    decoder, as _drawing_gdt.assert_datum_landing reads it): its strokes, the
-    vertices of a filled triangle or arrowhead, and its letter's box."""
+    """Datum A's rendered ink from its own GetDisplayData, decoded by the
+    layout audit's own primitives (_layout_audit): its strokes (lines with
+    zero-length records dropped, polylines, polygons), the vertices of a
+    filled triangle or arrowhead, and its letter's box (display_box, which
+    estimates a run SolidWorks reports no width for)."""
     annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
     display, refused = annotation_display(adapter, annotation)
     if refused or not display:
         raise RuntimeError(f"datum A has no readable display data: {refused!r}")
     strokes = [
-        Segment(float(raw[-6]), float(raw[-5]), float(raw[-3]), float(raw[-2]))
+        segment
         for raw in display.get("lines", ())
-        if len(raw) >= 8
+        if (segment := line_segment(raw)) is not None
     ]
+    for raw in display.get("polylines", ()):
+        strokes.extend(polyline_segments(raw))
+    for raw in display.get("polygons", ()):
+        strokes.extend(polygon_segments(raw))
     vertices = [
         (float(raw[i]), float(raw[i + 1]))
         for raw in display.get("triangles", ())
@@ -528,17 +540,8 @@ def _datum_a_ink(
         for raw in display.get("arrows", ())
         if len(raw) >= 3
     ]
-    letters = [
-        Box(
-            float(text["pos"][0]),
-            float(text["pos"][1]),
-            float(text["pos"][0]) + float(text.get("w", 0.0)),
-            float(text["pos"][1]) + float(text.get("h", 0.0)),
-        )
-        for text in display.get("texts", ())
-        if len(text.get("pos", ())) >= 2
-    ]
-    return strokes, vertices, letters
+    letter = display_box({"texts": display.get("texts", ())})
+    return strokes, vertices, [] if letter is None else [letter]
 
 
 @_telemetry.traced("pivot_spacer.datum_a_clear")
