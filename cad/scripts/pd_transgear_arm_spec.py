@@ -191,19 +191,37 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
 )
-# Where each projected zone starts and which way it runs. Both start at
-# front face A (z = 0): the plate taps' run rearward through the arm into
-# the MHA-PD-19 plate to the seated screw-head contact
+# Where each projected zone starts and which way it runs, at the feature
+# (machinist review, rule 7; it was general note 1): section A-A draws each
+# zone as a heavy chain line from front face A (z = 0) and dimensions its
+# height MIN (ASME Y14.5-2018 10.5.1.4: the minimum extent and direction of
+# a projected zone, a dimensioned chain line beside the hole's axis). Model
+# +Z runs rearward. The plate taps' zones run rearward, through the arm into
+# the MHA-PD-19 plate past the seated screw-head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
 # the pin bore's runs forward to the chain plane
-# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM). It is the sheet's
-# only note: the matched-pair setting and fit-up check are MHA-PD-00's
-# steps, and the match-drill rides the locating holes' callout (rule 7).
-PROJECTED_ZONE_NOTE = "\n".join((
-    "1. PROJECTED ZONES START AT FRONT FACE A: PLATE TAPS",
-    f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
-    f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
-))
+# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM). The sheet carries no
+# general notes: the matched-pair setting and fit-up check are MHA-PD-00's
+# steps, and the match-drill rides the locating holes' callout.
+PROJECTED_ZONE_REARWARD = 1.0
+PROJECTED_ZONE_FORWARD = -1.0
+PROJECTED_ZONE_DIRECTION: dict[str, float] = {
+    **{
+        f"plate_tap_{index}_position": PROJECTED_ZONE_REARWARD
+        for index in range(1, len(PLATE_TAP_STATIONS) + 1)
+    },
+    "feed_stud_projected_axis": PROJECTED_ZONE_FORWARD,
+}
+if set(PROJECTED_ZONE_DIRECTION) != {
+    control.key for control in GEOMETRIC_CONTROLS
+    if control.projected_zone_height_mm is not None
+}:
+    raise AssertionError("every projected zone needs exactly one drawn direction")
+# The heights are sheet-derived (each measures its own chain line) and print
+# to DRAWING_REFERENCE_PRECISION, the frames' own place (Ⓟ 14.7, Ⓟ 32.6),
+# with MIN under the value: a projected height is a minimum extent, not a .X
+# band.
+PROJECTED_ZONE_HEIGHT_CALLOUT = "MIN"
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and

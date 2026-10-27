@@ -26,11 +26,12 @@ import re
 import sys
 from typing import Any
 
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
-    add_note,
     auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 import _config
@@ -44,8 +45,10 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_annotation_extent import move_annotation
 from _drawing_dimensions import (
     assert_imported_precision,
+    offset_dimension_text,
     set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_reference_dimension,
@@ -70,6 +73,7 @@ import _telemetry
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
+    PIN_BORE_DIA,
     PIN_HOLE_DEPTH,
     PIN_STATION,
     PIVOT_END_R,
@@ -92,7 +96,8 @@ from pd_transgear_arm_spec import (
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
-    PROJECTED_ZONE_NOTE,
+    PROJECTED_ZONE_DIRECTION,
+    PROJECTED_ZONE_HEIGHT_CALLOUT,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -132,15 +137,13 @@ FRONT_CENTER = (0.189, 0.205)
 # the overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.090)
 END_CENTER = (0.357, FRONT_CENTER[1])
-# Bottom left between the notes and the title block, under section A-A's
-# label: the right column holds the end view, its pin callout and section
-# B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
-ISO_CENTER = (0.184, 0.034)
-ISO_NOTE_XY = (0.080, 0.022)
-# Bottom left, clear of the section's floor-depth text above and of the
-# isometric caption below: the projected zones.
-NOTES_XY = (0.014, 0.050)
-NOTES_TEXT = PROJECTED_ZONE_NOTE
+# Bottom left, where the general notes stood (the sheet has none now), its
+# caption over it: under section A-A the plate taps' projected-zone chain
+# lines run 13.5 mm below the rear face, so A-A's own caption drops into the
+# isometric's old place, clear of them and left of the title block.
+ISO_CENTER = (0.105, 0.034)
+ISO_NOTE_XY = (0.075, 0.066)
+SECTION_CAPTION_DROP = 0.006
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -210,7 +213,9 @@ FRONT_KEEP = {
     "LocatorX1": (_front_x(LOCATOR_SITES_MM[0][0] / 2.0), _station_row(1)),
     "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
     "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),
-    "TipStation": (_front_x(TIP_STATION / 2.0), _station_row(4)),
+    # Right of the pin station, not mid-span: the pin bore's forward
+    # projected-zone chain line and its 32.6 rise through this row there.
+    "TipStation": (_front_x(0.75 * TIP_STATION), _station_row(4)),
     # The socket offsets' texts stand outside the arm: above its top edge,
     # under the tap callout's shelf, and below its bottom edge, left of
     # plate tap 1's witness line (machinist review: inside the silhouette
@@ -256,6 +261,41 @@ END_KEEP = {
     # ligament fact as a fifth line.
     "PinHoleDia": (0.384, 0.1593),
 }
+# The stock text is far wider than the 15.9 between its extension lines,
+# which ran up into the "7" and the "O" of GROUND, with the dimension line
+# along the text's foot (machinist review r3, rule 14). The text stands
+# offset 9 mm above its dimension line, under the top border, on a leader.
+STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
+
+# Each projected zone's heavy chain line in section A-A, from front face A
+# (z = 0) through its height on the side ``PROJECTED_ZONE_DIRECTION`` names
+# (the taps' rearward, down the sheet; the pin bore's forward, up it), and
+# the sheet point of its vertical height dimension's value: model X of the
+# line (mm), text point. The taps' lines run on their axes, through the
+# holes' open cut; each tap frame's leader lands on the near wall at the
+# mouth, so none crosses its line. The pin bore's runs beside its axis
+# (Y14.5's "closely adjacent"), on the wall its frames' leaders land on
+# below face A: on the axis it would run on the 68.815 station's witness
+# line. The tap heights stand between the two lines, the pin bore's left of
+# its line, between the station rows.
+_TAP_CHAIN_TEXT_Y = SECTION_CENTER[1] - 0.0125
+PROJECTED_ZONE_CHAINS: dict[str, tuple[float, tuple[float, float]]] = {
+    "plate_tap_1_position": (
+        PLATE_TAP_STATIONS[0],
+        (_front_x(PLATE_TAP_STATIONS[0]) + 0.0075, _TAP_CHAIN_TEXT_Y),
+    ),
+    "plate_tap_2_position": (
+        PLATE_TAP_STATIONS[1],
+        (_front_x(PLATE_TAP_STATIONS[1]) - 0.0075, _TAP_CHAIN_TEXT_Y),
+    ),
+    "feed_stud_projected_axis": (
+        PIN_STATION - PIN_BORE_DIA / 2.0,
+        (_front_x(PIN_STATION - PIN_BORE_DIA / 2.0) - 0.0085, SECTION_CENTER[1] + 0.067),
+    ),
+}
+_SW_LINE_CHAIN = 3  # swLineStyles_e.swLineCHAIN
+_SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK: Y14.5's heavy chain line
+_SW_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
 
 
 # The match-drill rides the locating holes' own callout, with the step that
@@ -455,13 +495,15 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
 
 
 def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
-    """Print the thickness as the stock's: "5/16 (7.94) GROUND STOCK".
+    """Print the thickness as the stock's: "5/16 ±.001 (7.94) GROUND STOCK".
 
     The arm is cut from 5/16 ground flat stock with its faces as supplied, so
     the stock's tolerance governs the thickness, not the .XX row.  Prefix and
     suffix, not a whole-text override: the value between them stays the
     model's dimension at its model-owned places, and the parentheses mark it
-    as reference (the rocker thrust washer's idiom).
+    as reference (the rocker thrust washer's idiom). The text stands off its
+    dimension line on a leader (``STOCK_TEXT_XY``), clear of both extension
+    lines.
     """
     for annotation in annotations:
         if dimension_name(adapter, annotation) != "Depth":
@@ -479,9 +521,154 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
         readback = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
         if readback != (STOCK_TEXT_PREFIX, STOCK_TEXT_SUFFIX):
             raise RuntimeError(f"arm stock text did not persist: {readback!r}")
-        rebuild_drawing(adapter, label="arm stock thickness text")
+        offset_dimension_text(adapter, [annotation], {"Depth": STOCK_TEXT_XY})
         return
     raise RuntimeError("arm end view has no Depth dimension to label")
+
+
+def _lower_section_caption(adapter: Any, section: Any) -> None:
+    """Drop section A-A's native caption below the plate taps' chain lines,
+    keeping its linked view-label fields (draw_fr_top_frame's caption)."""
+    view = _early_bound(section, "IView")
+    captions = []
+    for raw_note in view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one native section A-A caption, found {len(captions)}")
+    note, linked_text = captions[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    before = tuple(float(value) for value in annotation.GetPosition())
+    move_annotation(adapter, annotation, 0.0, -SECTION_CAPTION_DROP, label="section A-A caption")
+    after = tuple(float(value) for value in annotation.GetPosition())
+    if abs(after[1] - (before[1] - SECTION_CAPTION_DROP)) > 1e-6 or abs(after[0] - before[0]) > 1e-6:
+        raise RuntimeError(f"section A-A caption did not move: {before!r} -> {after!r}")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("section A-A caption lost its native view-label fields")
+
+
+def _line_ends(adapter: Any, line: Any) -> list[tuple[float, ...]]:
+    bound = _early_bound(line, "ISketchLine")
+    return [
+        tuple(
+            float(adapter._get_attr_or_call(point, axis)) for axis in ("X", "Y", "Z")
+        )
+        for point in (
+            _early_bound(adapter._get_attr_or_call(bound, accessor), "ISketchPoint")
+            for accessor in ("GetStartPoint2", "GetEndPoint2")
+        )
+    ]
+
+
+def _add_projected_zone_chain(
+    adapter: Any,
+    section: Any,
+    *,
+    key: str,
+    x_mm: float,
+    text_xy: tuple[float, float],
+) -> None:
+    """One projected zone at its feature in section A-A: a heavy chain line
+    from front face A along ``key``'s direction for its height, and the
+    height's vertical dimension on that line, MIN under the value.
+
+    The ends are model points projected through the section, so the line is
+    the zone's own extent at true length; it is authored in the section's
+    view sketch (draw_pn_pen_v_block's recipe: the sheet points mapped
+    through the sketch transform, straight to the database so no endpoint
+    snaps to nearby ink) and the dimension measures the line itself.
+    """
+    (control,) = (c for c in GEOMETRIC_CONTROLS if c.key == key)
+    height = control.projected_zone_height_mm
+    direction = PROJECTED_ZONE_DIRECTION[key]
+    native = _early_bound(section, "IView")
+    native.UpdateViewDisplayGeometry()
+    ends = [
+        model_point_in_view(
+            adapter, section, (x_mm / 1000.0, 0.0, z / 1000.0),
+            label=f"{key} projected zone at z {z:g}",
+        )
+        for z in (0.0, direction * height)
+    ]
+    rise = ends[1][1] - ends[0][1]
+    # Section A-A prints the front face up: forward (-Z) runs up the sheet.
+    if (
+        abs(ends[0][0] - ends[1][0]) > 1e-6
+        or abs(abs(rise) - height * _S / 1000.0) > 1e-6
+        or rise * direction >= 0.0
+    ):
+        raise RuntimeError(f"{key} projected zone projects as {ends!r}")
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, section)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate section A-A for {key}'s chain line")
+    draw.ClearSelection2(True)
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = [
+        tuple(
+            _early_bound(
+                _early_bound(
+                    utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+                ).MultiplyTransform(transform),
+                "IMathPoint",
+            ).ArrayData
+        )
+        for x, y in ends
+    ]
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        line = manager.CreateLine(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if line is None:
+        raise RuntimeError(f"failed to create {key}'s projected-zone chain line")
+    segment = _early_bound(line, "ISketchSegment")
+    # A view sketch line otherwise prints in the under-defined sketch blue.
+    segment.Color = 0  # COLORREF black
+    segment.Style = _SW_LINE_CHAIN
+    segment.Width = _SW_LW_THICK
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label=f"{key} projected-zone chain line")
+    font = (int(segment.Color), int(segment.Style), int(segment.Width))
+    if font != (0, _SW_LINE_CHAIN, _SW_LW_THICK):
+        raise RuntimeError(f"{key} chain line font did not persist: {font!r}")
+    placed = _line_ends(adapter, line)
+    drift = max(abs(a - b) for end, want in zip(placed, points) for a, b in zip(end, want))
+    if drift > 1e-9:
+        raise RuntimeError(f"{key} chain line moved from {points!r} to {placed!r}")
+
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate section A-A for {key}'s height")
+    selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    data = selection.CreateSelectData()
+    data.View = section
+    if not segment.Select4(False, data):
+        raise RuntimeError(f"failed to select {key}'s chain line")
+    display = draw.AddVerticalDimension2(text_xy[0], text_xy[1], 0.0)
+    draw.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"failed to dimension {key}'s projected height")
+    dimension = _early_bound(display, "IDisplayDimension")
+    measured = abs(float(_early_bound(dimension.GetDimension2(0), "IDimension").SystemValue))
+    if abs(measured * 1000.0 - height) > 1e-6:
+        raise RuntimeError(f"{key} height measures {measured * 1000.0:g}, not {height:g} mm")
+    dimension.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(dimension.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{key} height precision did not persist")
+    dimension.SetText(_SW_TEXT_CALLOUT_BELOW, PROJECTED_ZONE_HEIGHT_CALLOUT)
+    if str(dimension.GetText(_SW_TEXT_CALLOUT_BELOW) or "") != PROJECTED_ZONE_HEIGHT_CALLOUT:
+        raise RuntimeError(f"{key} height callout did not persist")
+    _telemetry.info(
+        f"{key} projected zone: chain {ends[0]!r} -> {ends[1]!r}, "
+        f"height {measured * 1000.0:.4f} mm at {text_xy!r}"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -627,20 +814,21 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
         ),
         # The projected-zone frames stand in section A-A on the side their
-        # zone projects to (the plate taps' rear, the stud's front), each
-        # leader entering the hole's mouth and landing on its wall 1 mm in.
+        # zone projects to (the plate taps' rear, the stud's front). Each
+        # tap frame's leader climbs to the hole's NEAR wall at the rear
+        # mouth, so it never crosses the tap's chain line on its axis.
         "plate_tap_1_position": PmiDrawingPlacement(
-            section, (0.070, SECTION_CENTER[1] - 0.0094),
+            section, (0.072, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
-                adapter, section, x_mm=PLATE_TAP_STATIONS[0] + _PLATE_DRILL_R,
-                z_mm=THICKNESS - 1.0, label="plate tap 1 wall",
+                adapter, section, x_mm=PLATE_TAP_STATIONS[0] - _PLATE_DRILL_R,
+                z_mm=THICKNESS - 0.5, label="plate tap 1 wall",
             ),
         ),
         "plate_tap_2_position": PmiDrawingPlacement(
-            section, (0.178, SECTION_CENTER[1] - 0.0094),
+            section, (0.1735, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
-                adapter, section, x_mm=PLATE_TAP_STATIONS[1] - _PLATE_DRILL_R,
-                z_mm=THICKNESS - 1.0, label="plate tap 2 wall",
+                adapter, section, x_mm=PLATE_TAP_STATIONS[1] + _PLATE_DRILL_R,
+                z_mm=THICKNESS - 0.5, label="plate tap 2 wall",
             ),
         ),
         "feed_stud_projected_axis": PmiDrawingPlacement(
@@ -669,6 +857,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, placements=placements, datums=PART_DATUMS,
         controls=GEOMETRIC_CONTROLS, label="transgear arm locating frame",
     )
+    for key, (x_mm, text_xy) in PROJECTED_ZONE_CHAINS.items():
+        _add_projected_zone_chain(adapter, section, key=key, x_mm=x_mm, text_xy=text_xy)
+    _lower_section_caption(adapter, section)
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
@@ -686,8 +877,6 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _set_tap_callout_text(callout, qualifier, label=label)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
-    if add_note(adapter, NOTES_TEXT, *NOTES_XY) is None:
-        raise RuntimeError("failed to add the arm's matched-pair notes")
 
     artefacts = await finalize_drawing(
         adapter,

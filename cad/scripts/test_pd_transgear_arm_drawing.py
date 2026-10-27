@@ -133,6 +133,12 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
     # The stock's thickness band, which the seat tilt is judged at, prints.
     assert float(band.lstrip("±")) * 25.4 == pytest.approx(geometry.THICKNESS_BAND)
     assert "Depth" in drawing.END_KEEP
+    # Machinist review r3 (rule 14): the dimension line ran along the
+    # text's foot and its extension lines struck it. The text stands offset
+    # above the line by more than a text line, under the top border.
+    line_y = drawing.END_KEEP["Depth"][1]
+    assert drawing.STOCK_TEXT_XY[1] - line_y >= 2.0 * _LINE_PITCH
+    assert drawing.STOCK_TEXT_XY[1] + _LINE_PITCH < 0.2794 - _BORDER
 
 
 # The latched arm's angular play about the pivot (IntegratorE's coupled
@@ -514,8 +520,6 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     )
     assert floor[0] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.002
-    notes_top = drawing.NOTES_XY[1]
-    assert floor[1] > notes_top + 0.002
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert drawing.SECTION_KEEP["FloorDepth"][0] < pivot_end_x
@@ -748,21 +752,75 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:
-    """Machinist review (clarity): the notes ran to seven lines and carried
-    the pair's 35.101 ±0.004 setting and its fit-up check, which are
-    MHA-PD-00's steps. Rule 7: at most four short lines."""
-    lines = drawing.NOTES_TEXT.splitlines()
-    assert drawing.NOTES_TEXT == spec.PROJECTED_ZONE_NOTE
-    assert len(lines) <= 4
-    flat = " ".join(line.strip() for line in lines)
-    assert "FRONT FACE A" in flat
-    assert "\u00b1" not in flat
-    assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
-    assert "NO SHAKE" not in flat
-    for control in spec.GEOMETRIC_CONTROLS:
-        if control.projected_zone_height_mm is not None:
-            assert f"{control.projected_zone_height_mm:.1f}" in flat
+def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side() -> None:
+    """Machinist review of f4a5f03a1 (clarity, rule 7; all three runs): the
+    frames gave each zone's height, but where it starts and which way it
+    runs (from face A: taps rearward, pin bore forward) was printed only in
+    general note 1. Section A-A draws each zone at its feature as a chain
+    line from face A on its own side, dimensioned with its height MIN, and
+    the note is gone."""
+    import paper_drive_arm_registration as registration
+
+    projected = {
+        control.key: control
+        for control in spec.GEOMETRIC_CONTROLS
+        if control.projected_zone_height_mm is not None
+    }
+    assert set(drawing.PROJECTED_ZONE_CHAINS) == set(projected)
+    assert set(spec.PROJECTED_ZONE_DIRECTION) == set(projected)
+    # Face A is z = 0 with its outward normal -Z, so +Z runs rearward.
+    face_a = spec.PART_DATUMS[0].face
+    assert (face_a.normal, face_a.offset_mm) == ((0.0, 0.0, -1.0), 0.0)
+    assert spec.PROJECTED_ZONE_REARWARD > 0.0 > spec.PROJECTED_ZONE_FORWARD
+    taps = [key for key in projected if key.startswith("plate_tap_")]
+    assert len(taps) == len(geometry.PLATE_TAP_STATIONS)
+    for key in taps:
+        # Rearward, into the MHA-PD-19 plate (seated on the rear face), past
+        # the seated screw head's contact.
+        assert spec.PROJECTED_ZONE_DIRECTION[key] == spec.PROJECTED_ZONE_REARWARD
+        height = projected[key].projected_zone_height_mm
+        assert height > geometry.THICKNESS
+        assert height >= joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM
+    # The pin bore's runs forward, to the chain plane in front of face A
+    # (machine +Z runs rearward too).
+    assert (
+        registration.CHAIN_PLANE_MACHINE_Z_LIMITS_MM[0] < registration.ARM_FRONT_MACHINE_Z_MM
+    )
+    assert spec.PROJECTED_ZONE_DIRECTION["feed_stud_projected_axis"] == spec.PROJECTED_ZONE_FORWARD
+    assert (
+        projected["feed_stud_projected_axis"].projected_zone_height_mm
+        == registration.S_PROJECTED_HEIGHT_MM
+    )
+    # Each line stands at its own hole: the taps' on their axes, the pin
+    # bore's on its wall, beside the axis its station's witness line takes.
+    stations = dict(zip(taps, geometry.PLATE_TAP_STATIONS))
+    for key, (x_mm, _text) in drawing.PROJECTED_ZONE_CHAINS.items():
+        face = projected[key].face
+        if key in stations:
+            assert x_mm == stations[key] == face.contains_x_mm
+        else:
+            assert x_mm == pytest.approx(face.contains_x_mm - face.diameter_mm / 2.0)
+    # On the sheet (front face up), each height's value stands between the
+    # line's ends, off the part, beside its line.
+    face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
+    rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
+    for key, (x_mm, (text_x, text_y)) in drawing.PROJECTED_ZONE_CHAINS.items():
+        direction = spec.PROJECTED_ZONE_DIRECTION[key]
+        end_y = face_a_y - direction * projected[key].projected_zone_height_mm * drawing._S / 1000.0
+        low, high = sorted((face_a_y, end_y))
+        assert low < text_y < high, key
+        assert not rear_y - 0.002 < text_y < face_a_y + 0.002, key
+        assert abs(text_x - drawing._front_x(x_mm)) >= 0.005, key
+    for control in projected.values():
+        assert f"{control.projected_zone_height_mm:.{spec.DRAWING_REFERENCE_PRECISION}f}" == (
+            f"{control.projected_zone_height_mm:g}"
+        )
+    assert spec.PROJECTED_ZONE_HEIGHT_CALLOUT == "MIN"
+    # No general notes remain (rule 7).
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "add_note(" not in source
+    assert not hasattr(drawing, "NOTES_TEXT")
+    assert not hasattr(spec, "PROJECTED_ZONE_NOTE")
 
 
 def test_the_rear_face_has_no_frame_and_the_stock_band_carries_its_parallelism() -> None:
