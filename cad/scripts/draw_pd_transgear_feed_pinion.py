@@ -440,6 +440,35 @@ def _assert_note_inside_border(note: Any, label: str) -> None:
         )
 
 
+_OWNER_VIEW = 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
+
+
+def _insert_view_caption(
+    adapter: Any, view: Any, text: str, xy: tuple[float, float], label: str
+) -> Any:
+    """Insert a caption owned by ``view``, read back.
+
+    A note joins the active view, so the view is activated first: after the
+    outside view's crop the gear-end caption joined the outside view
+    (codjiflo P2 on edb402b).  The owner is read back
+    (``IAnnotation.OwnerType``/``Owner``)."""
+    name = view_name(adapter, view)
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(name):
+        raise RuntimeError(f"failed to activate {name!r} for the {label} caption")
+    raw_note = add_note(adapter, text, *xy)
+    if raw_note is None:
+        raise RuntimeError(f"the {label} caption was not inserted")
+    note = _early_bound(raw_note, "INote")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    owner_type = int(annotation.OwnerType)
+    owner = view_name(adapter, annotation.Owner) if owner_type == _OWNER_VIEW else None
+    if owner != name:
+        raise RuntimeError(
+            f"the {label} caption is owned by {owner!r} (OwnerType {owner_type}), not {name!r}"
+        )
+    return note
+
+
 def _place_rear_caption(adapter: Any, view: Any) -> None:
     """Hang the rear view's caption, centred, below the view's measured outline.
 
@@ -454,10 +483,7 @@ def _place_rear_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("cannot pin the sheet scale before the rear view caption")
     outline = tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
     target = ((outline[0] + outline[2]) / 2.0, outline[1] - REAR_CAPTION_GAP_M)
-    raw_note = add_note(adapter, REAR_CAPTION, *REAR_CAPTION_XY)
-    if raw_note is None:
-        raise RuntimeError("the rear view caption was not inserted")
-    note = _early_bound(raw_note, "INote")
+    note = _insert_view_caption(adapter, view, REAR_CAPTION, REAR_CAPTION_XY, "rear view")
     for _attempt in range(4):
         extent = tuple(float(value) for value in note.GetExtent())
         error = (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
@@ -492,8 +518,10 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
 
     The fence is sketched direct to the database in the view's own sketch
     and handed to ``IView.Crop2`` (draw_dt_cone_swing_platform's section
-    crop).  The outline pads past a fence, so the proof is that it still
-    holds the fence and lost most of the boss past it.
+    crop).  The proof is the fence's own endpoints, read back in sheet
+    coordinates (codjiflo P2 on edb402b); the outline, which pads past the
+    fence (5.8-9.8 mm on run 20261027T072743812Z), is only a sanity check
+    that the view shrank to about the fence.
     """
     left, foot, right, head = OUTSIDE_CROP_FENCE
     draw = adapter.currentModel
@@ -537,33 +565,56 @@ def _crop_outside_view(adapter: Any, view: Any) -> None:
         raise RuntimeError(f"outside view crop did not take: Crop2 status {status}")
     if not bool(native.CropViewNoOutline):
         raise RuntimeError("the outside view's crop prints an outline; expected none")
+    to_sheet = _early_bound(transform.Inverse(), "IMathTransform")
+    ends = []
+    for segment in segments:
+        line = _early_bound(segment, "ISketchLine")
+        for raw in (line.GetStartPoint2(), line.GetEndPoint2()):
+            point = _early_bound(raw, "ISketchPoint")
+            sheet_point = _early_bound(
+                _early_bound(
+                    math_utility.CreatePoint(double_array([point.X, point.Y, point.Z])),
+                    "IMathPoint",
+                ).MultiplyTransform(to_sheet),
+                "IMathPoint",
+            )
+            ends.append(tuple(float(value) for value in sheet_point.ArrayData)[:2])
+    fence = (
+        min(x for x, _ in ends),
+        min(y for _, y in ends),
+        max(x for x, _ in ends),
+        max(y for _, y in ends),
+    )
     after = tuple(float(value) for value in native.GetOutline())
-    _telemetry.info(f"outside view crop: outline {before} -> {after}")
+    _telemetry.info(f"outside view crop: fence {fence}, outline {before} -> {after}")
+    if max(abs(a - b) for a, b in zip(fence, OUTSIDE_CROP_FENCE)) > 1e-6:
+        raise RuntimeError(
+            f"outside view crop fence reads back {fence}, not {OUTSIDE_CROP_FENCE}"
+        )
+    pad = 0.015
     removed = (OVERALL_LENGTH - OUTSIDE_CROP_Z) * VIEW_SCALE[0] / 1000.0
     if (
         len(after) != 4
-        or after[0] > left
-        or after[1] > foot
-        or after[2] < right
-        or after[3] < head
+        or after[0] < left - pad
+        or after[1] < foot - pad
+        or after[2] > right + pad
+        or after[3] > head + pad
         or before[2] - after[2] < 0.5 * removed
     ):
         raise RuntimeError(
-            f"outside view crop is not its fence {OUTSIDE_CROP_FENCE}: "
-            f"outline {before} -> {after}"
+            f"outside view outline {before} -> {after} is not about its fence "
+            f"{OUTSIDE_CROP_FENCE}"
         )
 
 
-def _place_outside_caption(adapter: Any) -> None:
-    """Insert the outside view's caption at LEFT_CAPTION_XY, read back.
+def _place_outside_caption(adapter: Any, view: Any) -> None:
+    """Insert the outside view's caption at LEFT_CAPTION_XY, owned by that
+    view, read back.
 
     ``add_note`` returns the note even when SetPosition fails, leaving it at
     SolidWorks' default spot (codjiflo P2 on 0772285), so its native position
     and border containment are checked here."""
-    raw_note = add_note(adapter, LEFT_CAPTION, *LEFT_CAPTION_XY)
-    if raw_note is None:
-        raise RuntimeError("the outside view caption was not inserted")
-    note = _early_bound(raw_note, "INote")
+    note = _insert_view_caption(adapter, view, LEFT_CAPTION, LEFT_CAPTION_XY, "outside view")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     position = tuple(float(value) for value in annotation.GetPosition())
     if math.dist(position[:2], LEFT_CAPTION_XY) > 1e-6:
@@ -677,7 +728,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _hide_tangent_edges(outside)
     _crop_outside_view(adapter, outside)
     _place_rear_caption(adapter, rear)
-    _place_outside_caption(adapter)
+    _place_outside_caption(adapter, outside)
 
     annotations = []
     # The section first: the outside view then imports only the cutter

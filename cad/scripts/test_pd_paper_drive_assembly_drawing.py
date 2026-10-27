@@ -344,20 +344,25 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
+    pin = _number("pd-transgear-pin")
     assert (
         "TOGETHER, THE PLATE'S KNOB BORE "
-        f"{disc.CENTRE_DISTANCE:.3f} FROM THE ARM'S PIN BORE"
+        f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {pin} PIN'S AXIS"
     ) in located
     # The step names the mesh that centre distance sets, and how it is set
-    # and checked: the package builds no jig.
+    # and checked: the package builds no jig, and the pin is already pressed
+    # into its bore, so the gauge reads over it.
+    assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     jig = located[: located.index("PER THEIR DRAWINGS")]
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in jig
     assert "MESH" in jig
     assert "JIG" not in jig
+    assert "EACH BORE" not in jig
     assert (
-        f"A SNUG GAUGE PIN IN EACH BORE, SET {disc.CENTRE_DISTANCE:.3f} PLUS HALF "
-        "EACH PIN'S DIAMETER OVER THE PINS; RE-CHECK CLAMPED."
+        f"A SNUG GAUGE PIN IN THE KNOB BORE; SET {disc.CENTRE_DISTANCE:.3f} PLUS HALF "
+        f"OF EACH PIN'S MEASURED DIAMETER OVER THE GAUGE PIN AND THE {pin} PIN; "
+        "RE-CHECK CLAMPED."
     ) in jig
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
