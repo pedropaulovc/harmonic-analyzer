@@ -300,9 +300,12 @@ def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
         raise RuntimeError(f'expected one native {label}, found {len(notes)} notes')
     note = _early_bound(notes[0], 'INote')
     annotation = _early_bound(note.GetAnnotation(), 'IAnnotation')
-    for _attempt in range(4):
+    # On the 2:1 sheet a pass closed only part of the error (C-C stood 0.26
+    # mm short after four, farm run 20261027T200059255Z), so it gets more.
+    for attempt in range(10):
         extent = [float(v) for v in note.GetExtent()]
         error = (target[0] - (extent[0] + extent[3]) / 2, target[1] - extent[4])
+        _telemetry.info(f'{label} pass {attempt}: box {extent!r}, error {error!r}')
         if max(abs(error[0]), abs(error[1])) < 2e-4:
             break
         x, y, z = (float(v) for v in annotation.GetPosition())
