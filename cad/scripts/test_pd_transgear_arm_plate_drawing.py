@@ -152,16 +152,22 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
         geometry.HUB_DIA - _band(spec.DRAWING_PRECISION_BY_NAME["HubDia"])
     ) / 2.0 - bore_r_max - 2.0 * brk
     assert hub_wall >= geometry.WALL_TARGET
-    position = spec.REDUCER_POSITION_RADIUS
+    # The P 7.0 zones run from face A into the arm: inside the plate each
+    # hole's axis is extrapolated over the deepest stock.
+    deepest = geometry.THICKNESS_OVER_ARM + geometry.THICKNESS_OVER_ARM_BAND
+    position = spec.REDUCER_POSITION_RADIUS + deepest * (
+        2.0 * spec.REDUCER_POSITION_RADIUS / geometry.CLAMP_PLATE_PROJECTED_HEIGHT_MM
+    )
     run_off = math.tan(math.radians(arm.DRILL_RUN_OFF_DEG))
+    hole_walls = []
     for x, y in geometry.SCREW_HOLES:
         centre_gap = math.hypot(x, y) - position
-        hole_wall = (
+        hole_walls.append(
             centre_gap - bore_r_max - (geometry.SCREW_HOLE_DIA + drill) / 2.0 - brk
-            - (geometry.THICKNESS_OVER_ARM + geometry.THICKNESS_OVER_ARM_BAND
-               + geometry.HUB_TO_BOSS + geometry.HUB_TO_BOSS_BAND) * run_off
+            - (deepest + geometry.HUB_TO_BOSS + geometry.HUB_TO_BOSS_BAND) * run_off
         )
-        assert hole_wall >= geometry.WALL_TARGET
+    assert min(hole_walls) == pytest.approx(geometry.WALLS["bore to screw holes"][1])
+    assert min(hole_walls) >= geometry.WALL_TARGET
     for name, (_nominal, worst) in geometry.WALLS.items():
         assert worst >= geometry.WALL_TARGET, name
     # The locator to the outline: the plate's 0.25 break and the run-off

@@ -69,7 +69,7 @@ import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
-from _drawing_sections import create_section_view
+from _drawing_sections import _assert_section_line_placed, create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _gear_drawing_entities import visible_circle_edge
@@ -597,19 +597,6 @@ def _project_to_sketch(
     return sheet, ends
 
 
-def _require_line_ends(
-    line: Any, ends: list[tuple[float, ...]], *, label: str, stage: str
-) -> None:
-    for expected, accessor in ((ends[0], "GetStartPoint2"), (ends[1], "GetEndPoint2")):
-        raw = getattr(line, accessor)()
-        if raw is None:
-            raise RuntimeError(f"{label}: {stage}, the line has no {accessor[3:-6].lower()} point")
-        point = _early_bound(raw, "ISketchPoint")
-        actual = (float(point.X), float(point.Y), float(point.Z))
-        if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
-            raise RuntimeError(f"{label}: {stage}, line end {actual} is not at {expected}")
-
-
 def _sketch_line(
     adapter: Any,
     view: Any,
@@ -637,8 +624,8 @@ def _sketch_line(
         manager.AddToDB = previous
     if segment is None:
         raise RuntimeError(f"failed to sketch the {label} line")
+    _assert_section_line_placed(adapter, segment, ends, label=f"{label} (as sketched)")
     line = _early_bound(segment, "ISketchLine")
-    _require_line_ends(line, ends, label=label, stage="as sketched")
     segment = _early_bound(segment, "ISketchSegment")
     segment.Style = style
     segment.Width = width
@@ -689,7 +676,7 @@ def _add_zone_line(
         return _project_to_sketch(adapter, view, zone, label=label, names=roles)
 
     def require_ends(line: Any, ends: list[tuple[float, ...]], stage: str) -> None:
-        _require_line_ends(line, ends, label=label, stage=stage)
+        _assert_section_line_placed(adapter, line, ends, label=f"{label} ({stage})")
 
     (start, end, text), ends = project()
     segment, line = _sketch_line(
