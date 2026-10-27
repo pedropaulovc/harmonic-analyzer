@@ -123,8 +123,10 @@ _BOX_MID_Y = (LEG_BOTTOM + ARM_Y + _TUBE_R) / 2.0
 
 # Sheet layout (metres), left to right: section A-A over the notes, the end
 # view, the elevation with its dimensions on the leg's right, the isometric.
+# The end view stands right of section A-A's braze-fit callout (farm run
+# 20261027T224212504Z: at 0.190 its leg crossed that text).
 FRONT_CENTER = (0.255, 0.150)
-END_CENTER = (0.190, FRONT_CENTER[1])
+END_CENTER = (0.205, FRONT_CENTER[1])
 ISO_CENTER = (0.375, 0.165)
 
 
@@ -145,18 +147,22 @@ SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
 
 # The elevation's dimensions: both vertical runs on the leg's right, the
 # sleeve's inside the leg's; the arm straight over the arm; the bend radius
-# outside the bend's upper right.
+# right of the bend, its line 10 degrees above the leg's tangent so it passes
+# under section line A's right arrow and label (at about 40 degrees it ran
+# through the label, farm run 20261027T224212504Z) and over the leg length's
+# upper extension line.
 FRONT_KEEP = {
     "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
     "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
     "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
-    "BendRadius": (LEG_AXIS_X + 0.016, ARM_AXIS_Y + 0.008),
+    "BendRadius": (LEG_AXIS_X + 0.019, ARM_AXIS_Y - 0.0176),
 }
 
 # The end view (*Left) looks at the end face along +X: sheet x is model +Z.
 # The tap's native callout stands up and left of it, clear of the section's
-# upper dimensions and of the elevation's arm-straight text.
-TAP_CALLOUT_XY = (0.158, 0.266)
+# upper dimensions and of the elevation's arm-straight text, its top inside
+# the border (at 0.266 it crossed it, farm run 20261027T224212504Z).
+TAP_CALLOUT_XY = (0.158, 0.252)
 
 # Section A-A: a full section on the horizontal plane through the arm axis,
 # cut faces only, cropped to the end piece and the tube over its shank.  A
@@ -192,7 +198,11 @@ def _section_x(model_x: float) -> float:
 # Section A-A's dimensions: the two lengths in one row over the part; the
 # counterbore depth's LIMIT pair above them, left of the face; the
 # counterbore Ø (with its wall) left of the end face; the head and shank Ø
-# below the part, the shank's longer fit callout lower.  The floor corner's
+# below the part, the shank's longer fit callout lower.  Each Ø's text
+# starts at its dimension line and runs right, so the head's line stands
+# near the end face and its text ends short of the shank's line (at
+# ARM_END_X + 10 the shank's line ran through it, farm run
+# 20261027T224212504Z).  The floor corner's
 # "R0.10 MAX" / "FLOOR CORNER" stands up-left of the end face, between the
 # counterbore Ø and the depth: its arc lies on the sketch's +v side, model -Z,
 # the section's top (ArmAxisPlane is offset from the Top plane), so its leader
@@ -210,10 +220,10 @@ SECTION_KEEP = {
     "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
     "CounterboreDia": (_SX0 - 0.030, _SY0),
     "CounterboreFloorCornerR": (_SX0 - 0.030, _SY0 + _SECTION_HALF + 0.010),
-    "PlugDia": (_section_x(ARM_END_X + 10.0), _SY0 - _SECTION_HALF - 0.016),
+    "PlugDia": (_section_x(ARM_END_X + 4.0), _SY0 - _SECTION_HALF - 0.016),
     "PlugShankDia": (
         _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
-        _SY0 - _SECTION_HALF - 0.040,
+        _SY0 - _SECTION_HALF - 0.044,
     ),
 }
 if set(FRONT_KEEP) | set(SECTION_KEEP) != {
@@ -222,9 +232,10 @@ if set(FRONT_KEEP) | set(SECTION_KEEP) != {
     raise AssertionError("the gooseneck sheet does not place every marked dimension")
 
 # Notes fill the lower left under section A-A; the view notes sit under
-# their views.
+# their views.  The elevation's foot stands on the title block's top, so its
+# note stands left of the foot, between the end view and the leg.
 NOTES_XY = (0.016, 0.098)
-ELEVATION_NOTE_XY = (0.228, 0.052)
+ELEVATION_NOTE_XY = (0.212, 0.075)
 ISO_NOTE_XY = (0.345, 0.085)
 TAPPED_HOLE_NOTE = "Tapped Hole"
 
