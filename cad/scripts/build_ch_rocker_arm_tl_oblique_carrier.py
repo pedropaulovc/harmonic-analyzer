@@ -13,7 +13,7 @@ Z, model Z = -carrier Y, so a Top-plane sketch reads carrier (X, Y)):
   from A1 by the spacing D1, A2 from A1 and B2 from B1 by their (dX, dY)
   chains, cut through;
 * a 45 degree chamfer on each pin hole's underside edge (``PinChamfer``)
-  clears the pivot pin's collar fillet; its printed leg lives in the hidden
+  preserves a clean entry over the purchased spacer's thrust face; its printed leg lives in the hidden
   ``SectionReference``, on ``SectionAPlane`` (section A-A's hidden cutting
   plane, coincident with the Front plane: the A1-B1 pin line), which drives
   the feature's distance and carries the finished thickness section A-A prints,
@@ -655,7 +655,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PinHoles")
     volume = await volume_check(adapter, "pin holes", volume - V_PINS, 0.01 * V_PINS)
 
-    # --- Underside chamfer on every pin hole (clears the collar fillet) ------
+    # --- Unchanged underside entry chamfer on every shoulder-screw bore ------
     # The printed leg first: the hidden reference sketch that drives the
     # feature's distance, ahead of it in the tree.
     drive_jobs += await _section_reference(adapter)

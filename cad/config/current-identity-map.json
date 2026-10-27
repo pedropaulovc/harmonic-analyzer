@@ -20,38 +20,6 @@
   },
   "parts_and_assemblies": [
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-nut-bracket",
-      "old_number": "MHA-CH-006-TL-29",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-nut-bracket",
-          "number": "MHA-CH-06-TL-29"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-pivot-cap",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-pivot-cap",
-          "number": "MHA-CH-06-TL-30"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-pivot-retainer",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-pivot-retainer",
-          "number": "MHA-CH-06-TL-31"
-        }
-      ]
-    },
-    {
       "old_stem": "ch-rocker-arm-tl-oblique-nut-screw",
       "old_number": "MHA-CH-006-TL-46",
       "new_identities": [
@@ -85,16 +53,6 @@
           "prior_number": "MHA-CH-06-TL-VN-58",
           "configuration": "HoldDownStud",
           "role": "HoldDownStud"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-hub-pin",
-      "old_number": "MHA-CH-006-TL-25",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-hub-pin",
-          "number": "MHA-CH-06-TL-25"
         }
       ]
     },
@@ -150,54 +108,6 @@
           "parent": "ch-rocker-arm-tl-oblique-jig",
           "stem": "ch-rocker-arm-tl-vn-oblique-lever-washer",
           "number": "MHA-CH-06-TL-VN-71"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
-          "number": "MHA-CH-06-TL-VN-73"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-          "number": "MHA-CH-06-TL-VN-74"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
-          "number": "MHA-CH-06-TL-VN-75"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
-      "old_number": null,
-      "introduced": "2026-10-20",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
-          "number": "MHA-CH-06-TL-VN-76"
         }
       ]
     },
@@ -329,39 +239,6 @@
         {
           "stem": "pd-transgear-rear-bushing",
           "number": "MHA-PD-24"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-bearing",
-      "old_number": "MHA-CH-006-TL-32",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-bearing",
-          "number": "MHA-CH-06-TL-VN-52"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-block-screw",
-      "old_number": "MHA-CH-006-TL-43",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-block-screw",
-          "number": "MHA-CH-06-TL-VN-63"
-        }
-      ]
-    },
-    {
-      "old_stem": "ch-rocker-arm-tl-oblique-block-washer",
-      "old_number": "MHA-CH-006-TL-50",
-      "new_identities": [
-        {
-          "parent": "ch-rocker-arm-tl-oblique-jig",
-          "stem": "ch-rocker-arm-tl-vn-oblique-block-washer",
-          "number": "MHA-CH-06-TL-VN-70"
         }
       ]
     },
@@ -2231,16 +2108,6 @@
       ]
     },
     {
-      "old_stem": "ch-rocker-arm-tl-oblique-pivot-pin",
-      "old_number": "MHA-CH-006-TL-23",
-      "new_identities": [
-        {
-          "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
-          "number": "MHA-CH-06-TL-23"
-        }
-      ]
-    },
-    {
       "old_stem": "pd-transgear-thumbnut",
       "old_number": "MHA-PD-013",
       "new_identities": [
@@ -2379,6 +2246,65 @@
         }
       ],
       "kind": "assembly"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-feed-block",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-feed-block",
+          "number": "MHA-CH-06-TL-32"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-screw",
+          "number": "MHA-CH-06-TL-VN-77"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-spacer",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-spacer",
+          "number": "MHA-CH-06-TL-VN-78"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-shim",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-shim",
+          "number": "MHA-CH-06-TL-VN-79"
+        }
+      ]
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+      "old_number": null,
+      "introduced": "2026-10-23",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-hub-pin",
+          "number": "MHA-CH-06-TL-VN-80"
+        }
+      ]
     }
   ],
   "retired_identities": [
@@ -2576,6 +2502,151 @@
         {
           "stem": "dt-cone-pivot-post-tl-soft-jaw",
           "number": "MHA-DT-05-TL-04"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-nut-bracket",
+      "old_number": "MHA-CH-006-TL-29",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-nut-bracket",
+          "number": "MHA-CH-06-TL-29"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pivot-cap",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-pivot-cap",
+          "number": "MHA-CH-06-TL-30"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pivot-retainer",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-pivot-retainer",
+          "number": "MHA-CH-06-TL-31"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-hub-pin",
+      "old_number": "MHA-CH-006-TL-25",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-hub-pin",
+          "number": "MHA-CH-06-TL-25"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-cap-screw",
+          "number": "MHA-CH-06-TL-VN-73"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+          "number": "MHA-CH-06-TL-VN-74"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-cotter",
+          "number": "MHA-CH-06-TL-VN-75"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
+      "old_number": null,
+      "introduced": "2026-10-20",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-pivot-lock-wire",
+          "number": "MHA-CH-06-TL-VN-76"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-bearing",
+      "old_number": "MHA-CH-006-TL-32",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-bearing",
+          "number": "MHA-CH-06-TL-VN-52"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-block-screw",
+      "old_number": "MHA-CH-006-TL-43",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-block-screw",
+          "number": "MHA-CH-06-TL-VN-63"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-block-washer",
+      "old_number": "MHA-CH-006-TL-50",
+      "new_identities": [
+        {
+          "parent": "ch-rocker-arm-tl-oblique-jig",
+          "stem": "ch-rocker-arm-tl-vn-oblique-block-washer",
+          "number": "MHA-CH-06-TL-VN-70"
+        }
+      ],
+      "status": "retired"
+    },
+    {
+      "old_stem": "ch-rocker-arm-tl-oblique-pivot-pin",
+      "old_number": "MHA-CH-006-TL-23",
+      "new_identities": [
+        {
+          "stem": "ch-rocker-arm-tl-oblique-pivot-pin",
+          "number": "MHA-CH-06-TL-23"
         }
       ],
       "status": "retired"

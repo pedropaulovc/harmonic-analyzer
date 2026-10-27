@@ -19,7 +19,7 @@ finished ``LENGTH`` and its ordinary printed band come from the fasteners
 spec; ``MAJOR_DIA`` comes from the base-bar stud clearance authority. The
 selected 3 in kit stock length remains UNVERIFIED against the delivered kit;
 57.2 is the fixed manufactured finished length under the title-block tolerance,
-not a vendor SKU, a kit dimension or an assembly-set length. HD1-HD3 qualify
+not a vendor SKU, a kit dimension or an assembly-set length. HD1-HD4 qualify
 the measured installed setup against that full printed length band.
 Main selected default B after the illustrated-choice timeout; this records
 that implementation ruling, not explicit user approval.
@@ -129,7 +129,7 @@ def cut_end_chamfer_callout(angle_radians: float) -> str:
 
 
 # REWORK carries the native fabrication controls and their title-block band.
-# MHA-CH-06-TL-00, steps HD1-HD3 on sheet 11, qualifies the actual installed
+# MHA-CH-06-TL-00, steps HD1-HD4 on sheet 9, qualifies the actual installed
 # setup against that band; it does not substitute a different cut-length range.
 # The drawing imports that assembly's reference for installed acceptance only;
 # no duplicate saved note properties compete with it. The conditional helper

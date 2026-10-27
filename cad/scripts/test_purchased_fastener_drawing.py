@@ -9094,7 +9094,7 @@ def test_source_property_expression_accepts_only_the_optional_font_wrapper(
     "raw",
     [
         "",
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         '$PRP:"SW-Title(Title)"',
         'NAME $PRPSHEET:"SW-Title(Title)"',
         '$PRPSHEET:"SW-Title(Title)" suffix',
@@ -9137,9 +9137,9 @@ def test_linked_value_preserves_captured_name_when_native_format_strips_font() -
     # source property and resolved Name remain intact. This is not a COM echo.
     assert_linked_value(
         '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"',
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         '$PRPSHEET:"SW-Title(Title)"',
-        "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+        "ch-rocker-arm-tl-vn-oblique-pivot-screw",
         label="Name",
     )
 
@@ -9162,42 +9162,42 @@ def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() 
     [
         pytest.param(
             '$PRPSHEET:"Title"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="different-property-even-with-identical-resolved-text",
         ),
         pytest.param(
             '$PRP:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="different-property-owner",
         ),
         pytest.param(
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="literal-replacement",
         ),
         pytest.param(
             'NAME $PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="extra-prefix",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)" suffix',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="extra-suffix",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Material"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="second-link",
         ),
         pytest.param(
             '<B>$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="unsupported-markup",
         ),
         pytest.param(
             '<FONT size=15PTS$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw",
             id="malformed-font",
         ),
         pytest.param(
@@ -9207,12 +9207,12 @@ def test_linked_value_accepts_exact_wrapped_material_without_normalizing_text() 
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"',
-            "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin ",
+            "ch-rocker-arm-tl-vn-oblique-pivot-screw ",
             id="value-whitespace-is-not-normalized",
         ),
         pytest.param(
             '$PRPSHEET:"SW-Title(Title)"',
-            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-CLEVIS-PIN",
+            "CH-ROCKER-ARM-TL-VN-OBLIQUE-PIVOT-SCREW",
             id="value-case-is-not-normalized",
         ),
     ],
@@ -9223,7 +9223,7 @@ def test_linked_value_refuses_true_identity_or_full_value_changes(
     from _purchased_title_fit import assert_linked_value
 
     expected_link = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
-    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    expected_text = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
     with pytest.raises(RuntimeError) as caught:
         assert_linked_value(
             expected_link, expected_text, actual_link, actual_text, label="Name"
@@ -9247,7 +9247,7 @@ def test_linked_value_refuses_invalid_expected_link_even_when_unchanged(
 ) -> None:
     from _purchased_title_fit import assert_linked_value
 
-    text = "ch-rocker-arm-tl-vn-oblique-pivot-clevis-pin"
+    text = "ch-rocker-arm-tl-vn-oblique-pivot-screw"
     with pytest.raises(RuntimeError) as caught:
         assert_linked_value(invalid_link, text, invalid_link, text, label="Name")
     assert repr(invalid_link) in str(caught.value)

@@ -180,7 +180,7 @@ if BEARING_FRACTION_MIN < 0.90:
     raise AssertionError(f"{SKU}: the inner pair overhangs the lever's inner end")
 if ENGAGEMENT < carrier.ENGAGEMENT_MM[carrier.LEVER_THREAD]:
     raise AssertionError(f"{SKU}: the lever screw stops short of TL-21's full thread")
-if STAND_OUT_MAX >= trammel.PIN_COLLAR_PROUD:
+if STAND_OUT_MAX >= trammel.PIVOT_SUPPORT_HEIGHT:
     raise AssertionError(f"{SKU}: the lever screw tip reaches the pivot blocks")
 
 
