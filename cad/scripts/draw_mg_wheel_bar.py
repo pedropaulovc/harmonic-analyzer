@@ -207,16 +207,22 @@ def _add_below_rows(display: Any, rows: str, *, label: str) -> None:
     below = str(display.GetText(8) or "").rstrip()
     updated = f"{below}\n{rows}" if below else rows
     display.SetText(callouts.CALLOUT_BELOW, updated)
-    wanted = callouts.callout_rows(updated)
-    applied = {
-        part: callouts.callout_rows(str(display.GetText(part) or ""))
-        for part in (callouts.CALLOUT_BELOW, 8)
-    }
-    if any(found != wanted for found in applied.values()) or any(
-        str(display.GetText(part) or "") != text for part, text in definitions.items()
+    # The definition (8) holds any native variable verbatim; the resolved
+    # text (4) holds its value, so only the appended literal rows must end it.
+    definition = callouts.callout_rows(str(display.GetText(8) or ""))
+    resolved = callouts.callout_rows(str(display.GetText(callouts.CALLOUT_BELOW) or ""))
+    appended = callouts.callout_rows(rows)
+    if (
+        definition != callouts.callout_rows(updated)
+        or resolved[-len(appended) :] != appended
+        or any(
+            str(display.GetText(part) or "") != text
+            for part, text in definitions.items()
+        )
     ):
         raise RuntimeError(
-            f"{label}: callout rows or native definitions did not persist: {applied!r}"
+            f"{label}: callout rows or native definitions did not persist: "
+            f"definition={definition!r} resolved={resolved!r}"
         )
 
 

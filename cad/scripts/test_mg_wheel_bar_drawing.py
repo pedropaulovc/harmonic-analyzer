@@ -290,14 +290,14 @@ def test_every_wall_is_an_owner_declared_minor_stated_on_the_sheet() -> None:
         "hanger hole": callouts.HANGER_HOLE_CALLOUT,
         "clamp holes": callouts.CLAMP_HOLE_CALLOUT,
     }
-    for entry, (wall, value) in zip(
-        declared, mg_wheel_bar_spec.BORE_ROW_WALLS.items(), strict=True
-    ):
+    for wall, value in mg_wheel_bar_spec.BORE_ROW_WALLS.items():
+        matches = [entry for entry in declared if f"({wall} wall" in entry.where]
+        assert len(matches) == 1, wall
+        (entry,) = matches
         bore = next(b for b in texts if wall.startswith(b))
         row = callouts.callout_rows(texts[bore])[-1]
         assert entry.kind == "minor"
         assert row in entry.where
-        assert wall in entry.where
         assert f"{math.floor(value * 100) / 100:.2f}" in entry.finding
         assert "rule 17" in entry.finding
         assert entry.reason.startswith("owner ruling 2026-10-26 (#1532)")

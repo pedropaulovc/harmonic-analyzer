@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _column_clamp_interface import BAR_DEPTH
 from _printed_tolerance import printed_band_mm
 from mg_wheel_bar_geom import (  # noqa: F401 (re-export)
@@ -77,7 +78,11 @@ CLAMP_POSITION_PLACES = 2
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
 DRILL_RUNOFF_DEG = 0.3  # the repo allowance (sh_column_clamp_fit.EAR_DRILL_WANDER_DEG)
-EDGE_BREAK = 0.25  # title block: BREAK SHARP EDGES R0.25 OR CHAMFER 0.25
+# The title block's BREAK SHARP EDGES row, its larger of radius and chamfer.
+_TITLE_EDGE_BREAK = _config.title_block("edge_break")
+EDGE_BREAK = max(
+    float(_TITLE_EDGE_BREAK["radius_mm"]), float(_TITLE_EDGE_BREAK["chamfer_max_mm"])
+)  # 0.25
 BAR_DEPTH_MAX = BAR_DEPTH + BAR_DEPTH_BAND[0]  # 9.6
 DRILL_RUNOFF = BAR_DEPTH_MAX * math.tan(math.radians(DRILL_RUNOFF_DEG))  # 0.050
 _WALL_LOSSES = DRILL_RUNOFF + 2.0 * EDGE_BREAK
