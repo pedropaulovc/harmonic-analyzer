@@ -200,11 +200,14 @@ PLATE_TAP_STATIONS = (
 )
 
 # Matched locating dowels, independent of the mounting screws' clearance.
-# 13.1 (was 13.7; coordinator ruling W1 on #1379, pending owner
-# confirmation): at 13.7 the full worst-case wall to the arm's edge, with
-# the outline's edge break and the drill's run-off, fell to 1.76 (WALLS
-# below). 13.2 met 2.0 by 0.014, too thin for the reducer centre's ±0.5
-# source-mutation control; 13.1 keeps 2.06.
+# 13.1 (was 13.7). Ruling: the coordinator chose option W1 on 2026-10-27
+# under the brief's full-budget wall rule, posted with its sketch and the
+# per-term arithmetic on #1379 (issuecomment-6443060097). Owner
+# confirmation is requested there; the alternative (W2, keep 13.7 under an
+# owner minor exception for 1.76) is the owner's only. At 13.7 the full
+# worst-case wall to the arm's edge, with the outline's edge break and the
+# drill's run-off, fell to 1.76 (WALLS below). 13.2 met 2.0 by 0.014, too
+# thin for the reducer centre's ±0.5 source-mutation control; 13.1 keeps 2.06.
 LOCATOR_PAIR_BASELINE_MM = 13.1
 LOCATOR_SITES_MM = (
     (PLATE_SCREW_MID_STATION, LOCATOR_PAIR_BASELINE_MM / 2.0),

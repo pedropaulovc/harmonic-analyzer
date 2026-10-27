@@ -383,12 +383,16 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-    assert spec.PIVOT_BORE_CALLOUT.splitlines() == [
-        "REAM TO MEASURED SHOULDER:",
-        "0.130-0.150 DIAMETRAL CLEARANCE",
-        f"ON PIVOT SCREW {screw}",
-        "MATCHED SET; NOT INTERCHANGEABLE",
-    ]
+    # The fit's facts, not its wording: reamed to the measured shoulder, the
+    # diametral clearance band, the named screw and the matched set.
+    flat = " ".join(spec.PIVOT_BORE_CALLOUT.split())
+    for fact in (
+        "MEASURED SHOULDER",
+        f"{lower:.3f}-{upper:.3f} DIAMETRAL CLEARANCE",
+        screw,
+        "MATCHED SET",
+    ):
+        assert fact in flat, fact
     assert screw == "MHA-PD-VN-57"
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
