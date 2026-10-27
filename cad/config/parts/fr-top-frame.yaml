@@ -25,7 +25,7 @@ fr-top-frame:
       kind: "accept"
       where: "sheet 3 general note 'CONVEX EDGES 1.6 X 45 DEG UNLESS NOTED' and the SHARP exceptions it names"
       finding: "general 1.6 chamfer overrides the title-block edge break without a stated function (rules 1, 2)"
-      reason: "owner rulings 2026-10-14 and 2026-10-18: the 1/16 in x 45 break on the convex casting edges is the machine's aesthetic, matching the base; hole, bore, counterbore, tap and slot mouths keep the title-block break"
+      reason: "owner rulings 2026-10-14 and 2026-10-18: the 1/16 in x 45 break on the convex casting edges is the machine's aesthetic, matching the base; hole, bore, counterbore, spot-face and tap mouths keep the title-block break"
     - id: "RV-05"
       kind: "accept"
       where: "the knife-hanger press reams' perpendicularity refinement to the faced underside (4X ⊥ Ø0.02 | A, section F-F)"

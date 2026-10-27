@@ -283,3 +283,17 @@ def test_knife_dowels_hang_pressed_end_up_from_the_crossbar_reams() -> None:
     )
     assert asm.KNIFE_DOWEL_Y == pytest.approx(1011.7)
     assert asm.KNIFE_DOWEL_END_Y == pytest.approx(992.65)
+
+
+def test_crossbar_hanger_stations_are_the_assemblys_knife_mount_stations() -> None:
+    # The crossbar's holes and its worst-case proofs read fr_top_frame_spec's
+    # stations; the assembly places the mounts and dowels at its own derived
+    # trunnion mid (87.0585).  The crossbar's 87.06 is that mid at the
+    # print's .XX resolution (the literal main's build_fr_top_frame carried),
+    # so a trunnion-station edit past that rounding must move both.
+    assert round(asm.HEX_Z_MID, 2) == top_frame.HEX_Z_MID
+    for crossbar, assembly in (
+        (top_frame.STUD_Z_FRONT, asm.SUMMING_Z - asm.HEX_Z_MID),
+        (top_frame.STUD_Z_REAR, asm.SUMMING_Z + asm.HEX_Z_MID),
+    ):
+        assert abs(crossbar - assembly) < 0.005
