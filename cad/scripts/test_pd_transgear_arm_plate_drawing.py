@@ -139,20 +139,32 @@ def test_every_printed_band_is_no_wider_than_the_arithmetic_assumed() -> None:
 
 
 def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
-    """Recompute the thinnest walls from the printed title-block rows."""
+    """Recompute the thinnest walls from the printed title-block rows, with
+    each exposed edge's 0.25 break and the drill run-off (full worst case)."""
     drill = _config.title_block("drilled_hole")["plus_mm"]
+    brk = geometry.OUTLINE_EDGE_BREAK_MAX_MM
+    assert brk == 0.25 and arm.DRILL_RUN_OFF_DEG == 0.3
     bore_r_max = (geometry.BORE_DIA + geometry.BORE_DIA_LIMITS[1]) / 2.0
     hub_wall = (
         geometry.HUB_DIA - _band(spec.DRAWING_PRECISION_BY_NAME["HubDia"])
-    ) / 2.0 - bore_r_max
+    ) / 2.0 - bore_r_max - 2.0 * brk
     assert hub_wall >= geometry.WALL_TARGET
     position = spec.REDUCER_POSITION_RADIUS
+    run_off = math.tan(math.radians(arm.DRILL_RUN_OFF_DEG))
     for x, y in geometry.SCREW_HOLES:
         centre_gap = math.hypot(x, y) - position
-        hole_wall = centre_gap - bore_r_max - (geometry.SCREW_HOLE_DIA + drill) / 2.0
+        hole_wall = (
+            centre_gap - bore_r_max - (geometry.SCREW_HOLE_DIA + drill) / 2.0 - brk
+            - (geometry.THICKNESS_OVER_ARM + geometry.HUB_TO_BOSS) * run_off
+        )
         assert hole_wall >= geometry.WALL_TARGET
     for name, (_nominal, worst) in geometry.WALLS.items():
         assert worst >= geometry.WALL_TARGET, name
+    # The locator to the outline: the plate's 0.25 break and the run-off
+    # through the plate, on top of the dowel hole's own mouth break.
+    for index in (1, 2):
+        nominal, worst = geometry.WALLS[f"locator {index} to plate edge/notch"]
+        assert worst < nominal - brk - geometry.THICKNESS_OVER_ARM * run_off
 
 
 def test_the_plate_screws_engage_the_arm_one_and_a_half_diameters() -> None:
@@ -214,7 +226,10 @@ def _screw_seat(csk_places: int, thickness_places: int) -> tuple[float, float]:
     depth = ((cone_radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
              / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
              + cone_radius * math.sin(alpha))
-    land = geometry.THICKNESS_OVER_ARM + thick_low - depth
+    land = (
+        geometry.THICKNESS_OVER_ARM + thick_low - depth
+        - geometry.OUTLINE_EDGE_BREAK_MAX_MM  # the hole's exit mouth at face A
+    )
     return proud, land
 
 
@@ -244,7 +259,10 @@ def test_floor_pays_independent_projected_cone_and_hole_axes_and_actual_rim_tilt
     radius = geometry.CSK_DIA_LIMITS_MM[1] / 2.0
     depth = ((radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
              / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha) + radius * math.sin(alpha))
-    floor = geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND - depth
+    floor = (
+        geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND - depth
+        - geometry.OUTLINE_EDGE_BREAK_MAX_MM  # the hole's exit mouth at face A
+    )
     assert geometry.WALLS["under the countersinks"][1] == pytest.approx(floor)
     assert floor > geometry.WALL_TARGET
     assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 2
