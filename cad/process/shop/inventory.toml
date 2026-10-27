@@ -3529,7 +3529,6 @@ products = ["Uline S-10085, USD 103 per roll, 2-roll minimum (https://www.uline.
 
 # Rocker route-v3 purchased jig hardware. Candidate purchases only: no possession,
 # receipt metrology, preload certificate or physical fit acceptance is asserted.
-# The bearing note records a design-level acceptance of internal C3 play only.
 [fixtures.trammel-hgr15-rails]
 kind = "linear_rail"
 make = "HIWIN"
@@ -3583,20 +3582,11 @@ kind = "ball_bearing"
 make = "generic"
 sku = "5972K41"
 source = "https://www.mcmaster.com/5972K41/"
-present = false
+present = true
 verify = true
-purchase = "4 x McMaster-Carr 5972K41, steel sealed 6200-2RS ball bearing, two per pivot block for two blocks; $7.86 each, possession unconfirmed."
-note = "Read live 2026-10-16: distributor McMaster-Carr, manufacturer not stated; 6200-2RS, Buna-N seals, steel, ABEC 1, DIN 625-1; 10 mm ID (-0.008/0), 30 mm OD (-0.009/0), 9 mm width (-0.12/0), C3 radial clearance 0.008-0.023 mm per bearing. Same nominal jig envelope; catalogue tolerances are not receipt metrology. Main sourcing ruling 2026-10-16: retain C3 rather than the fourfold-price C0 upgrade; 0.023 mm per-bearing internal play is under 5% of the 0.5 mm edge band (8.0 +0.5/-0). In-situ pin-pair setting absorbs a constant offset, not load-dependent play reversal. Combined bearing play, shaft/housing fits and axis tilt/alignment are not bounded here; this is not a complete pivot-position error budget or physical fit acceptance."
+purchase = "Owned 6200-2RS bearing stock retained; no longer required by the oblique jig after the 2026-10-23 plain-pivot simplification."
+note = "McMaster 5972K41, steel sealed 6200-2RS, 10 x 30 x 9 mm. Catalogue dimensions are not receipt metrology. Retained shop stock has no current jig CAD identity; inspect before any future use."
 cite = ["McMaster-Carr 5972K41 https://www.mcmaster.com/5972K41/ read live 2026-10-16: steel sealed 6200-2RS, 10 x 30 x 9 mm, $7.86 each", "Rejected live 2026-10-16: https://www.mcmaster.com/6661K21/", "Rejected live 2026-10-16: https://www.mcmaster.com/6661K101/", "Rejected live 2026-10-16: https://www.mcmaster.com/6153K74/"]
-# Rejected live 2026-10-16: 6661K21 adds a 34.7 mm OD x 1.12 mm retaining ring,
-# changing the external envelope. 6661K101 (ABEC 3) still has C3 0.008-0.023 mm.
-# 6153K74 is a verified normal-clearance upgrade (C0 0.002-0.013 mm, same
-# 10 x 30 x 9 envelope, 440C stainless, $31.43 each). Main rejects the upgrade:
-# $125.72 vs $31.44 for four is not justified for 0.010 mm less maximum play,
-# given the edge band and in-situ setting above. No jig design change.
-# Sources: https://www.mcmaster.com/6153K74/ and https://www.mcmaster.com/6661K101/
-# Supersedes VXB 1111-4398 solely to follow the user's McMaster sourcing
-# preference when an equivalent meets the nominal spec, not because VXB failed.
 
 [fixtures.trammel-cl-dowel]
 kind = "dowel_pin"
@@ -3661,12 +3651,9 @@ purchase = "One regular brass T8x2 flange nut is included with the HW-SC-T8x2-60
 note = "Read live page/drawings 2026-10-17 UTC: brass regular nut matching the ZYLtech T8x2 single-start right-hand screw, pitch/lead 2 mm. Flange OD 22 mm, thickness 3.5 mm; body OD 10.2 mm; four non-threaded 3.5 mm through holes on 16 mm bolt circle. Body projects 10 mm on the long side and 1.5 mm past the flange outer face as a short spigot, giving total axial length 15 mm. No angular datum is specified on the round flange. Backlash, dimensional tolerances and received fit remain unverified."
 # Lubrication and backlash acceptance remain shop checks, not catalogue proof.
 # Four plain 3.5 mm holes take #4-40 button head screws, no washers, into the
-# shop-made nut bracket; bought carriage threads remain M4.
-# C4 owner identifies TL-29 (MHA-CH-06-TL-29), defined in
-# cad/scripts/ch_rocker_arm_tl_oblique_nut_bracket_spec.py, as that bracket.
-# Interface authority: NUT_ID and NUT_* in
-# cad/scripts/ch_rocker_arm_tl_vn_oblique_leadscrew_spec.py, in-flight
-# rocker/trammel-jig-4 branch; this sourcing branch adds no CAD geometry.
+# integral TL-32 feed-block lug; bought carriage threads remain M4.
+# Drill the four #4-40 taps to print, not by transfer spotting from the nut.
+# Nut layout authority: cad/scripts/ch_rocker_arm_tl_oblique_feed_block_spec.py.
 cite = ["ZYLtech kit regular-nut geometry https://www.zyltech.com/8mm-t8x2-trapezoidal-acme-lead-screw-w-brass-nut-pre-cut-lengths-150mm-2000mm/ read live 2026-10-17 UTC; nut-only https://www.zyltech.com/zyltech-brass-nut-only-various-diameters-and-pitches-available/ T8x2 single-start option resolves to HW-SC-T8x2-NUT", "ZYLtech front drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16129/s136714152818872222_p75_i6_w500__21913__97391.1698349316.jpg?c=2 : flange 22, body 10.2, PCD 16, four 3.5 holes", "ZYLtech side drawing https://cdn11.bigcommerce.com/s-eblil3q2nd/images/stencil/1280x1280/products/197/16130/s136714152818872222_p75_i5_w1005__99935__02876.1698349316.jpg?c=2 : short spigot 1.5, flange 3.5, long projection 10"]
 # McMaster matching M8 lead-4 flanged nut 97783A270 is acetal (acceptable),
 # but its matching stocked screws are too short; material is not a rejection.
@@ -6439,16 +6426,41 @@ length_mm = 304.8
 on_hand = false
 cite = ["OnlineMetals part 20743 https://www.onlinemetals.com/en/buy/carbon-steel/0-4375-carbon-steel-round-bar-1018-cold-finish/pid/20743 read live 2026-10-16"]
 
-# Oblique-trammel stock requirements (#1619): nominal starting material only.
-# Possession is unknown: omit the optional on_hand field; no receipt measurements.
+# Oblique-trammel stock: owner-reported purchases (2026-10-23), not metrology.
 [[stock]]
-form = "rectangular_blank"
-material = "6061-T651 aluminium"
-note = "MHA-CH-06-TL-21 carrier: selected 1/2 in plate, OnlineMetals 1250 custom cut 5.5 x 21 in. Face to the drawing's 12.0 thickness and mill to 520 x 130. Purchase and receipt are not recorded."
-# Basis: issue #1619 owner-selected nominal 5.5 x 0.5 x 21 in, times 25.4 mm/in; no supplier tolerance or metrology is assumed.
-section_mm = [139.7, 12.7]
-length_mm = 533.4
-cite = ["Owner stock selection, harmonic-analyzer issue 1619 https://github.com/pedropaulovc/harmonic-analyzer/issues/1619; OnlineMetals part 1250 https://www.onlinemetals.com/en/buy/aluminum/0-5-aluminum-plate-6061-t651/pid/1250"]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Owned OnlineMetals 1173, 1/2 x 6 x 72 in: allocate TL-20 base bars x2 and TL-21 carrier; face the carrier to 12.0 mm and mill its 520 x 130 outline. Purchased nominal dimensions are not receipt measurements."
+section_mm = [152.4, 12.7]
+length_mm = 1828.8
+on_hand = true
+cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1173"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Owned OnlineMetals 1165, 1/2 x 1 x 24 in: TL-26 feed lever uses 11.811 in; cut two TL-28 end brackets 68.9 mm (2.713 in) long from the remainder, with saw kerf allowance. TL-28 is on edge: 25.4 mm high and 12.7 mm along the screw. KP08's unverified 13 mm foot width overhangs the top by nominal 0.15 mm per side; verify on receipt."
+section_mm = [25.4, 12.7]
+length_mm = 609.6
+on_hand = true
+cite = ["Owner-reported purchased stock and allocation, oblique jig simplification 2026-10-23; OnlineMetals 1165"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "Owned OnlineMetals 1164, 1/2 x 3/4 x 12 in, now unused spare. TL-28 uses the taller 1165 stock on edge."
+section_mm = [19.05, 12.7]
+length_mm = 304.8
+on_hand = true
+cite = ["Owner-reported purchased stock and reallocation, oblique jig simplification 2026-10-23; OnlineMetals 1164"]
+
+[[stock]]
+form = "flat_bar"
+material = "6061-T6511 aluminium"
+note = "New stock requirement: 1 x 3-1/2 in bar for TL-22 plain pivot block x1 and TL-32 integral feed block x1. Face to 24.3 mm high; feed-block outline spans 88 mm across the 88.9 mm stock width. Supplier, SKU and purchased length remain unselected; no purchase is claimed. Replaces the former 1 x 3 and 3/4 x 2 jig requirements."
+section_mm = [88.9, 25.4]
+on_hand = false
+cite = ["Owner-approved oblique jig plain-pivot and integral feed-block design, 2026-10-23"]
 
 [[stock]]
 form = "rectangular_blank"

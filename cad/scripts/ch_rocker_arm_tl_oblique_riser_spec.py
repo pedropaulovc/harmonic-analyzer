@@ -40,8 +40,8 @@ Holes, all THRU from the top face:
   (``ScrewDia``), with the countersink in its callout: the plan shows only the
   countersink's edges of each hole, so a native hole callout there is not the
   wizard's (farm runs jig-r3/r4).
-* HUB clearance Ø12 at ``HUB`` ⚙ = (0, 45.526): passes the HUB locator pin's
-  Ø10.20 g6 section (MHA-CH-06-TL-25).
+* HUB clearance Ø12 at ``HUB`` ⚙ = (0, 45.526): passes the purchased HUB
+  gauge pin Ø10.2000 -0.00254/0 (MHA-CH-06-TL-VN-80).
 * CL and CR clearance Ø6.60 at ``CL`` / ``CR`` ⚙ = (∓160.895, 29.350): pass
   the CL Ø6 m6 dowel (6.012 max, 0.29 radial) and the CR 1/4-20 clamp screw
   (6.35 major, 0.125 radial), and leave ``CLAMP_BAND_WALLS`` (2.52 inner, 2.02

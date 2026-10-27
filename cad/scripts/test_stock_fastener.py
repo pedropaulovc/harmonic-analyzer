@@ -12,7 +12,6 @@ from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
-import _config
 import _custom_properties
 import _stock_fastener
 from _buildgraph import module_deps_of
@@ -254,32 +253,6 @@ def test_stock_properties_are_written_before_one_save(monkeypatch, with_metadata
     assert saves == ["purchased-part"]
     if properties is not None:
         assert properties["Supplier SKUs"] == "NOT-THE-SKU"
-
-
-@pytest.mark.parametrize("suffix", ("cap_screw", "clevis_pin", "cotter", "lock_wire"))
-def test_retention_stock_builders_forward_registry_drawing_metadata(monkeypatch, suffix):
-    builder = importlib.import_module(f"build_ch_rocker_arm_tl_vn_oblique_pivot_{suffix}")
-    row = _config.parts(builder.PART_NAME)
-    captured = {}
-    adapter = object()
-    artefacts = {"part": f"{builder.PART_NAME}.SLDPRT"}
-
-    async def build_stock(actual_adapter, **kwargs):
-        assert actual_adapter is adapter
-        captured.update(kwargs)
-        return artefacts
-
-    monkeypatch.setattr(builder, "build_stock_fastener", build_stock)
-    assert asyncio.run(builder.build(adapter)) is artefacts
-    assert captured["properties"] == {
-        "Material Specification": row["material_specification"],
-        "Finish": row["finish"],
-        "Manufacturing Notes": row["purchased_note"],
-    }
-    assert all(captured["properties"].values())
-    assert captured["part_name"] == builder.PART_NAME
-    assert captured["material"] == _stock_fastener.fastener(builder.PART_NAME).material
-    assert tuple(component.sku for component in captured["components"]) == tuple(row["supplier_skus"])
 
 
 def _author(sku: str = "TEST123"):

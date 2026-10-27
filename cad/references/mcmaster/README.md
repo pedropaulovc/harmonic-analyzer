@@ -18,7 +18,7 @@ recipes:
 | 3088A429 | `ch-vn-rocker-thrust-washer` (MHA-CH-VN-56; catalogue-only, vendor model refused) | Carbon Steel Round Shim, 1/4" ID x 3/8" OD, 0.031" Thick |
 | 3606T118 | `dt-vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `dt-vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
-| 5972K41 | `ch-rocker-arm-tl-vn-oblique-bearing` (MHA-CH-06-TL-VN-52; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Steel Ball Bearing |
+| 5972K41 | — (retired TL-VN-52, 2026-10-23; owned 6200-2RS shop stock, no jig identity) | Steel Ball Bearing |
 | 6261K108 | `pd-vn-chain-connecting-link` (installed clearance stand-in; separate native supplier reference diagram) | Connecting Link for ANSI Number 25 Single Strand Roller Chain |
 | 6261K171 | `sh-vn-chain-link` (MHA-SH-VN-50; `InnerLink` and `OuterLink` installed configurations; separate family reference diagram) | Roller Chain, Single Strand, ANSI Number 25, 1/4" Pitch |
 | 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
@@ -41,13 +41,17 @@ recipes:
 | 91247A720 | — (diagnostic recipe; a former `sm-vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `dt-vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A157 | — (catalogue-only diagnostic recipe; former `sm-vn-knife-hanger-stud`) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91251A188 | `ch-rocker-arm-tl-vn-oblique-block-screw` (MHA-CH-06-TL-VN-63; shop fixture; catalogue-only, CAD login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A188 | — (retired TL-VN-63, 2026-10-23; former catalogue-only diagnostic recipe removed) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91251A196 | `ch-rocker-arm-tl-vn-oblique-bracket-screw` (MHA-CH-06-TL-VN-62; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A197 | `ch-rocker-arm-tl-vn-oblique-rail-screw` (MHA-CH-06-TL-VN-61; shop fixture; catalogue-only, vendor model read for dimensions, not replica-gated) | Socket Head Screw |
 | 91251A541 | `ch-rocker-arm-tl-vn-oblique-clamp-screw` (MHA-CH-06-TL-VN-68; shop fixture; catalogue-only, no vendor model; installed at bought 7/8 in length) | Socket Head Screw |
 | 91251A583 | `ch-rocker-arm-tl-vn-oblique-lever-screw` (MHA-CH-06-TL-VN-69; shop fixture; catalogue-only, product page login-walled, the 7/8 in sibling's vendor model read for dimensions, not replica-gated) | Socket Head Screw |
-| 91812A215 | `ch-rocker-arm-tl-vn-oblique-block-washer` (MHA-CH-06-TL-VN-70; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 91812A215 | — (retired TL-VN-70, 2026-10-23; jig-only diagnostic recipe removed) | Extreme-Vibration-Resistant Wedge Lock Washer |
 | 91812A230 | `ch-rocker-arm-tl-vn-oblique-lever-washer` (MHA-CH-06-TL-VN-71; shop fixture; catalogue-only, product page login-walled, no vendor model) | Extreme-Vibration-Resistant Wedge Lock Washer |
+| 90323A492 | `ch-rocker-arm-tl-vn-oblique-pivot-screw` (MHA-CH-06-TL-VN-77; purchased datasheet model) | 18-8 Precision Shoulder Screw, Ø10 × 35, M8 × 1.25 |
+| 92871A359 | `ch-rocker-arm-tl-vn-oblique-pivot-spacer` (MHA-CH-06-TL-VN-78; purchased datasheet model) | 18-8 Round Spacer, 10 ID × 16 OD × 15 |
+| 98055A118 | `ch-rocker-arm-tl-vn-oblique-pivot-shim` (MHA-CH-06-TL-VN-79; 98055A117/98055A121 fitting stock) | DIN 988 Spring Steel Shim, 10 × 16 × 0.2 |
+| 2281A11-6410N695 | `ch-rocker-arm-tl-vn-oblique-hub-pin` (MHA-CH-06-TL-VN-80; abrasive-cut to 20.0, factory end up) | Class Z Minus Gauge Pin, Ø10.2000, 2 in supply |
 | 91255A106 | — (diagnostic recipe; a former `pd-vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `dt-vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91251A150 | `ch-rocker-arm-tl-vn-oblique-kp08-screw` (MHA-CH-06-TL-VN-65; shop fixture; catalogue-only, product page login-walled, no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
@@ -105,11 +109,14 @@ recipes:
 The cone-lock selection follows `cad/scripts/build_dt_vn_cone_lock_knob.py`; the
 swing-stop selection rationale lives in `cad/scripts/dt_swing_stop_screw_spec.py`, and the shared 90280A108 screw it selects is built by `cad/scripts/build_sh_vn_fillister_screw_90280a108.py` (the swing-stop's placement is applied in its `dt-drive-train` occurrence).
 
-Oblique trammel jig shop-fixture hardware (MHA-CH-06-TL-VN-52/53 and
-TL-VN-61 to TL-VN-69), modelled as purchased parts so the jig assembly can run
-native interference. Their vendor models were downloaded on October 17,
-2026 (UTC) and read for dimensions only; by user ruling of that date none is
-replica-gated and no copy is kept here:
+Historical October 17, 2026 oblique-jig sourcing follows below, including
+subsequently retired parts. Vendor models were read for dimensions only;
+by the user ruling of that date none was replica-gated and no copy is kept here.
+Use the current registry table above for active purchases.
+
+Historical sourcing record: TL-VN-52 was retired on 2026-10-23. The following
+dated bearing/cartridge description is provenance, not the current jig design;
+its dimension provider and diagnostic recipe have also been removed.
 
 - [5972K41](https://www.mcmaster.com/5972K41/) (`ch-rocker-arm-tl-vn-oblique-bearing`,
   MHA-CH-06-TL-VN-52, four: a pair in each oblique-trammel jig pivot block) was
@@ -226,6 +233,9 @@ replica-gated and no copy is kept here:
   does not draw. It is NOT replica-gated (user ruling, October 17, 2026): the
   standalone run is catalogue-only (it builds the recipe, checks the solid and
   saves it under `cad/out/reference`).
+Historical sourcing record: TL-VN-63 was retired on 2026-10-23 when the nut
+lug became integral with TL-32. The following describes the former joint.
+
 - [91251A188](https://www.mcmaster.com/91251A188/)
   (`ch-rocker-arm-tl-vn-oblique-block-screw`, MHA-CH-06-TL-VN-63, 2 in the oblique
   trammel jig: the fastener table's `NUT_BRACKET_TO_BLOCK` row) was read live on
@@ -383,6 +393,9 @@ replica-gated and no copy is kept here:
   family recipe does not draw. It is NOT replica-gated (user ruling, October 17,
   2026): the standalone run is catalogue-only (it builds the recipe, checks the
   solid and saves it under `cad/out/reference`).
+Historical sourcing record: TL-VN-70 was retired on 2026-10-23 with its only
+joint. The diagnostic mentioned below was removed; this is not a live recipe.
+
 - [91812A215](https://www.mcmaster.com/91812A215/)
   (`ch-rocker-arm-tl-vn-oblique-block-washer`, MHA-CH-06-TL-VN-70, 2 pairs in
   the oblique trammel jig: the fastener table's `BLOCK_LOCK_WASHER` row, one
@@ -416,44 +429,22 @@ replica-gated and no copy is kept here:
   catalogue-only (it builds the recipe, checks the solid and saves it under
   `cad/out/reference`).
 
-### Non-McMaster captured-pivot hardware
+### Historical non-McMaster captured-pivot purchases (retired 2026-10-23)
 
-The oblique jig's new positive-capture hardware is **not** McMaster stock.
-Primary supplier pages were read on October 20, 2026; dimensions and source
-URLs are owned by
-[`ch_rocker_arm_tl_oblique_retention_hardware_spec.py`](../../scripts/ch_rocker_arm_tl_oblique_retention_hardware_spec.py).
-The native solids represent catalogue/installed envelopes, not harvested
-vendor CAD, replica-gate evidence or a load rating.
+These identities belonged to the former captured-pivot cartridge. They are
+retired, their Numbers are never reissued, and none is a current jig purchase
+or assembly instruction. Primary supplier pages were read on October 20, 2026.
 
-| Number | Quantity in jig | Supplier identity and primary source |
+| Retired Number | Former installed quantity | Supplier identity and primary source |
 |---|---:|---|
-| MHA-CH-06-TL-VN-73 | 8 | CBS Fasteners [NAS1352N5H12](https://cbsfasteners.com/nas-fastener-inventory/), listed “5/16-18 X 3/4 SHC A286 DRLD”; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
-| MHA-CH-06-TL-VN-74 | 2 | Huyett [CLPS6-0187-1250D](https://www.huyett.com/clps6-0187-1250d), headed clevis pin, 3/16 × 1-1/4 in, 316 stainless, plain finish |
-| MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter pin |
-| MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless safety wire, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
+| MHA-CH-06-TL-VN-73 | 8 | CBS Fasteners [NAS1352N5H12](https://cbsfasteners.com/nas-fastener-inventory/), “5/16-18 X 3/4 SHC A286 DRLD”; [NAS1352 dimensions](https://www.aaestore.com.au/media/specs/NAS1352.pdf) |
+| MHA-CH-06-TL-VN-74 | 2 | Huyett [CLPS6-0187-1250D](https://www.huyett.com/clps6-0187-1250d), 3/16 × 1-1/4 in headed clevis pin, 316 stainless |
+| MHA-CH-06-TL-VN-75 | 2 | Huyett [CP-062-0500](https://www.huyett.com/cp-062-0500), 1/16 × 1/2 in split cotter |
+| MHA-CH-06-TL-VN-76 | 4 formed pieces | Aircraft Spruce [05-02685](https://www.aircraftspruce.com/catalog/appages/safetywire.php), 0.032 in soft 302/304 stainless, MS20995; [catalogue](https://www.aircraftspruce.com/pdf/2027Individual/Cat270142.pdf) |
 
-Purchase TL-VN-73 as the listed **A286** NAS1352N5H12; the native AISI 304
-material-library surrogate is a rendering representation only, not a material
-substitution or purchasing authority. The retention hardware provider owns
-the catalogue limits. The native fully threaded solid and the overall
-3/4 in length do not certify complete full-form engagement: inspect actual
-screws and THRU receiving threads for ≥1.5D = 11.90625 mm physical overlap.
-For assembly, use clean, dry, free-running actual screws; seat cross-pattern
-at 0.50 ±0.05 N·m with the cap seated on all faces, cap/block base gap
-≤0.05 mm over the whole mounting footprint, and independently underhead gap
-≤0.05 mm over the whole accessible head bearing footprint. Spend these
-independent allowances separately; then pair-wire in the tightening direction.
-This engineering seating torque establishes neither minimum preload
-nor force/strength certification.
+The current plain-pivot identities and Number reservations are documented in
+[subsystem identities](../../docs/subsystem-identities.md#oblique-jig-plain-pivot-tooling).
 
-The clevis pin's native material entry is exactly
-`AISI 316 Annealed Stainless Steel Bar (SS)`; the purchased supplier's
-316 grade and condition remain authoritative, not the library entry's
-bar/annealed designation. Its actual diameter limits, not the listing's
-rounded 0.188 in nominal, control the fitted top-washer stack. The wire
-quantity counts installed formed pieces, not four spools. TL-VN-72 remains retired. See
-[captured-pivot authority and service instructions](../../docs/subsystem-identities.md#oblique-jig-captured-pivot-tooling)
-for the two-retainer pass change and destructive upward-extraction replacement.
 
 Live catalogue verification on October 12, 2026:
 
@@ -1579,14 +1570,16 @@ Catalog specifications checked on September 10, 2026:
 
 ### Tooling-only oblique-trammel source references (2026-10-21)
 
-The fourteen current `ch-rocker-arm-tl-vn-oblique-*` targets below now import
+Historical source record: the fourteen then-current `ch-rocker-arm-tl-vn-oblique-*` targets below imported
 model-owned supplier references. Live Firecrawl product fetches returned HTTP
 200 for every McMaster SKU and Olander 4C50BHCA; the exact McMaster engineering
 `X.GIF` drawings were downloaded from those pages. This supersedes the earlier
 login-wall observations above for source access, not their historical CAD or
 replica-gate provenance. No supplier models or engineering images are tracked.
+The `block-screw` and `block-washer` rows were retired on 2026-10-23; their
+rows below preserve the dated source readings, not current jig registrations.
 
-| target suffix | exact current SKU | primary size coverage |
+| target suffix at source date | exact SKU at source date | primary size coverage |
 |---|---|---|
 | `rail-screw` | [91251A197](https://www.mcmaster.com/91251A197/) | 0.750-in length; 0.270-in head diameter, 0.164-in height; 0.1640-in major; 9/64-in drive |
 | `bracket-screw` | [91251A196](https://www.mcmaster.com/91251A196/) | 0.625-in length; same published head, major and drive as the rail screw |
