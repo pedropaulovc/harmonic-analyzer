@@ -72,10 +72,12 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # Section A-A looks up the sheet (third-angle: placed below the plan, its
 # arrows point away from it, review of farm run 20261024T133158704Z), so the
 # top face prints on top: Z 0..24.3 at y 67.9..92.2, the seat floor at y
-# 84.55. The tap's dimension line rides the tap-only band near the bottom
-# face (y ~70), so its three callout rows end under the seat floor's
-# extension line; its extension lines would rise through the Ø10 seat, so
-# they are hidden and its arrows land on the bore walls (review r2/r3). The
+# 84.55. On TL-22 the tap's dimension line stands 6 mm under the bottom face
+# (its last row underlined ~8 mm under the text anchor), its extension lines
+# dropping from the tap's walls: inside the full section it crossed the
+# hatching (review of farm run 20261027T201345346Z). TL-32, whose sheet
+# shipped with it, keeps it on the tap-only band near the bottom face, its
+# extension lines (which would rise through the Ø10 seat) hidden. The
 # 7.650 seat depth keeps its line at x .120, arrows inside so the line is
 # drawn for the text leader to land on, and stands its text, with the stack
 # it sets, off to the upper left in the empty band under the plan's
@@ -85,7 +87,7 @@ ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # A-A is centred on its cut span (X -46..+24), the block's own centre, so its
 # -X face lands at x 139 under the plan's. The block height prints on B-B.
 SIDE_XY = (.170,.080)
-SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.078)}
+SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.070)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # B-B: Y up, its +Y face (Y 20) at y 142.5, Z across with the top face toward
 # the plan (x 322.85) and the carriage seat at x 347.15; the caption ends
@@ -406,7 +408,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     set_hidden_lines_removed(adapter,side)
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
-    _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
+    if is_feed:
+        _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
     _arrows_inside(adapter, side_annotations, ('TopBoreDepth',))
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
     annotations = plan_annotations + side_annotations
