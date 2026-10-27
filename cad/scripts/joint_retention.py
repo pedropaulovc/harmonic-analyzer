@@ -736,7 +736,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_knob_cup",  # MHA-PD-16: reamed through bore, cross-pinned to the journal at assembly; no thread
         "pd_transgear_knob_thrust_ring",  # MHA-PD-15 loose brass ring, drilled bore; no thread
         "pd_vn_transgear_latch_pin",  # MHA-PD-VN-58 1/8 dowel pressed into the arm's reamed end-face hole
-        "pd_vn_transgear_arm_plate_locating_pin",  # MHA-PD-VN-64 2 mm dowels pressed into the arm's blind sockets
+        "pd_vn_transgear_arm_plate_locating_pin",  # MHA-PD-VN-64 2 mm dowels pressed into the arm's through reams
         "pd_transgear_pivot_spacer",  # MHA-PD-20 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "pd_vn_transgear_pivot_spring",  # MHA-PD-VN-63 disc spring on the pivot shoulder; no thread
         "pd_vn_transgear_pivot_shim",  # MHA-PD-VN-67 DIN 988 shim on the pivot shoulder under the head; no thread

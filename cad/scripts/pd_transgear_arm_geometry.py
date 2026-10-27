@@ -208,8 +208,6 @@ LOCATOR_HOLE_DIA_MM = sum(LOCATING_PIN.PRESS_HOLE_LIMITS_MM) / 2.0
 LOCATOR_HOLE_BAND_MM = tuple(
     limit - LOCATOR_HOLE_DIA_MM for limit in reversed(LOCATING_PIN.PRESS_HOLE_LIMITS_MM)
 )
-LOCATOR_BLIND_DEPTH_MM = LOCATING_PIN.ARM_BLIND_DEPTH_MM
-LOCATOR_BLIND_DEPTH_BAND_MM = LOCATING_PIN.ARM_BLIND_DEPTH_TOLERANCE_MM
 LOCATOR_PROUD_MM = LOCATING_PIN.PROUD_MM
 LOCATOR_PROUD_BAND_MM = LOCATING_PIN.PROUD_TOLERANCE_MM
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
@@ -256,9 +254,10 @@ BAND_XXX = 0.13
 LATCH_PIN_HEIGHT_BAND = 0.065  # ordinary end-face latch-hole height, per side
 REDUCER_POSITION_DIAMETER = reducer_position_diameter_mm()
 REDUCER_POSITION_RADIUS = REDUCER_POSITION_DIAMETER / 2.0
+# The dowel's full-diameter grip runs the through ream between its two
+# mouth breaks, on the thinnest stock (as the plate's slip holes).
 LOCATOR_FULL_CYLINDER_SPAN_MIN_MM = (
-    LOCATOR_BLIND_DEPTH_MM - LOCATOR_BLIND_DEPTH_BAND_MM
-    - LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    THICKNESS - THICKNESS_BAND - 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
 )
 LOCATOR_MOUTH_POSITION_RADIUS_MM = REDUCER_POSITION_RADIUS * (
     1.0 + 2.0 * LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
@@ -355,10 +354,6 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
         - (LOCATING_PIN.PRESS_HOLE_LIMITS_MM[1] + PLATE_TAP_MOUTH_DIA_MAX_MM) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM,
     )
-WALLS["locator blind floor"] = (
-    THICKNESS - LOCATOR_BLIND_DEPTH_MM,
-    THICKNESS - THICKNESS_BAND - LOCATOR_BLIND_DEPTH_MM - LOCATOR_BLIND_DEPTH_BAND_MM,
-)
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
         raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
@@ -443,8 +438,8 @@ def material_properties(pivot_bore_mm: float, *, density_kg_m3: float = 7870.0) 
     )
     for x, y in LOCATOR_SITES_MM:
         remove(
-            math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * LOCATOR_BLIND_DEPTH_MM,
-            x, y, THICKNESS - LOCATOR_BLIND_DEPTH_MM / 2.0,
+            math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS,
+            x, y, THICKNESS / 2.0,
         )
     return {
         "volume_mm3": volume,

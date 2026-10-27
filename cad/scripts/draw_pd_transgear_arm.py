@@ -13,9 +13,9 @@ face (the pivot head's end play) and the latch-pin hole's depth print on
 solid cut edges.  The end view (``*Right``, the square end) carries the
 thickness (the ground stock's, printed as a reference to it) and the
 latch-pin hole's reamed size, its height and the press of the pin to the
-hole floor.  The matched locating sockets open in the rear face the front
-view looks at, so their stations, size and position frames print there;
-section B-B cuts them for their depth.
+hole floor.  The matched locating holes run through from the rear face the
+front view looks at, so their stations, size and position frames print there
+and in section B-B, which cuts them on their axes.
 """
 
 from __future__ import annotations
@@ -89,7 +89,6 @@ from pd_transgear_arm_spec import (
     OVERALL_LENGTH,
     PIN_BORE_CALLOUT,
     LOCATOR_CALLOUT,
-    LOCATOR_DEPTH_CALLOUT,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
@@ -248,14 +247,6 @@ SECTION_KEEP = {
 }
 # Section A-A's column right of the stud bore, where both its frames stand.
 _STUD_FRAME_X = _front_x(PIN_STATION) + 0.012
-# Each narrow depth's text stands right of its witness lines and outside
-# its view (run 20261010T001620278Z: inside them, the witness lines and the
-# view edges struck the text); the sockets' depth centres far enough right
-# that its reason line clears the mouth's witness line too (run
-# 20261027T125629744Z's audit: centred 27 mm right, the line struck it).
-LOCATOR_SECTION_KEEP = {
-    "LocatorDepth": (LOCATOR_SECTION_CENTER[0] + 0.033, 0.0935),
-}
 END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
     # Between the end view and the stock text, right of the front face.
@@ -281,7 +272,6 @@ DIMENSION_CALLOUTS = {
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT_TEXT,
-    "LocatorDepth": LOCATOR_DEPTH_CALLOUT,
 }
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
@@ -566,10 +556,6 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=FRONT_KEEP,
             view_label="front",
             dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
-        *hidden_sketches.curate_view_dimensions(
-            adapter, locator_section, keep=LOCATOR_SECTION_KEEP,
-            view_label="section B-B locating sockets", dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
         *hidden_sketches.curate_view_dimensions(
             adapter,

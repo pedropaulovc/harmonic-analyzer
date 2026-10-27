@@ -148,7 +148,7 @@ GEOMETRIC_CONTROLS += (
             f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
             CylinderFace(
                 ARM.LOCATOR_HOLE_DIA_MM, contains_x_mm=x, contains_y_mm=y,
-                contains_z_mm=THICKNESS - ARM.LOCATOR_BLIND_DEPTH_MM / 2.0,
+                contains_z_mm=THICKNESS / 2.0,
             ),
             ("A", "B", "C"), "diametral",
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
@@ -156,23 +156,28 @@ GEOMETRIC_CONTROLS += (
 )
 # The press and its proud set are assembly (MHA-PD-00 "arm-plate-located").
 # The callout names the dowel the reamed holes take and its press (rule 4),
-# and says what the small mouth break keeps: the dowel's full-diameter grip
+# and says what the small mouth breaks keep: the dowel's full-diameter grip
 # (``pd_transgear_arm_geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM``). The
 # drawing adds the match-drill with the plate and its assembly step.
 LOCATOR_PRESS_INTERFERENCE = LOCATOR_PIN.PRESS_INTERFERENCE_MM
 if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
     raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
 LOCATOR_CALLOUT = "\n".join((
-    "2X REAM, FLAT BOTTOM",
-    f"MOUTH BREAK {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX: DOWEL GRIP",
+    "2X REAM THRU",
+    f"MOUTH BREAKS {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX: DOWEL GRIP",
     f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
     f"{LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{LOCATOR_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
 ))
-# The blind depth's ±0.05 keeps the pressed dowel off the floor at its
-# proud set (``pd_vn_transgear_arm_plate_locating_pin_spec.ARM_BOTTOM_AIR_MIN_MM``).
-if LOCATOR_PIN.ARM_BOTTOM_AIR_MIN_MM <= 0.0:
-    raise AssertionError("the MHA-PD-VN-64 dowel bottoms in the MHA-PD-18 socket")
-LOCATOR_DEPTH_CALLOUT = "DOWEL OFF FLOOR"
+# Machinist review (rule 16): a pressed dowel needs a way out. The reams run
+# through, and the dowel pressed from the rear to its proud set stops short
+# of the front face's mouth break on the thinnest stock, so a punch from the
+# front drives it out.
+LOCATOR_PUNCH_AIR_MIN_MM = (
+    THICKNESS - ARM.THICKNESS_BAND - LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    - LOCATOR_PIN.INSERTION_LIMITS_MM[1]
+)
+if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
+    raise AssertionError("the MHA-PD-VN-64 dowel reaches the MHA-PD-18 front face")
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix
@@ -305,7 +310,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
     "PinHole": {"PinHoleDepth"},
     "LocatorProfile": {"LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"},
-    "LocatorHoles": {"LocatorDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ArmOutline": {
@@ -333,7 +337,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LocatorProfile": {
         "LocatorX1": 3, "LocatorY1": 3, "LocatorY2": 3, "LocatorDia1": 3,
     },
-    "LocatorHoles": {"LocatorDepth": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

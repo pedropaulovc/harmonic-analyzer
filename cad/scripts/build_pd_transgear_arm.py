@@ -85,8 +85,6 @@ from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
     LOCATOR_HOLE_BAND_MM,
-    LOCATOR_BLIND_DEPTH_MM,
-    LOCATOR_BLIND_DEPTH_BAND_MM,
     EDGE_LEAN,
     END_HALF_WIDTH,
     PIN_BORE_DIA,
@@ -292,7 +290,6 @@ async def build(adapter: Any) -> dict[str, str]:
         ("LocatorY1", abs(LOCATOR_SITES_MM[0][1])),
         ("LocatorY2", abs(LOCATOR_SITES_MM[1][1])),
         ("LocatorDia", LOCATOR_HOLE_DIA_MM),
-        ("LocatorDepth", LOCATOR_BLIND_DEPTH_MM),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -686,9 +683,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
 
-    # Matched blind press sockets from the actual rear mounting face.
+    # Matched through press holes from the actual rear mounting face: the
+    # dowel presses in from the rear and punches out from the front.
     locators = SketchDims()
-    check("create_sketch locating sockets", await adapter.create_sketch("RearFace"))
+    check("create_sketch locating holes", await adapter.create_sketch("RearFace"))
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
         await define_circle(
             adapter, x, y, LOCATOR_HOLE_DIA_MM / 2.0, f"locator {index}",
@@ -696,20 +694,19 @@ async def build(adapter: Any) -> dict[str, str]:
             names=(f"LocatorX{index}", f"LocatorY{index}", f"LocatorDia{index}"),
             drives=('"LocatorX"', f'"LocatorY{index}"', '"LocatorDia"'),
         )
-    await ensure_fully_defined(adapter, "matched locating socket sketch")
-    check("exit_sketch locating sockets", await adapter.exit_sketch())
+    await ensure_fully_defined(adapter, "matched locating hole sketch")
+    check("exit_sketch locating holes", await adapter.exit_sketch())
     name_last_feature(adapter, "LocatorProfile")
     drive_jobs += locators.apply(adapter, "LocatorProfile")
     check(
-        "cut blind locating sockets",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=LOCATOR_BLIND_DEPTH_MM)),
+        "cut through locating holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "LocatorHoles")
-    drive_jobs.append(
-        (name_dimensions(adapter, "LocatorHoles", ["LocatorDepth"])[0], '"LocatorDepth"')
-    )
-    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * LOCATOR_BLIND_DEPTH_MM
-    await volume_check(adapter, "matched blind locating sockets", expected, 0.001 * expected)
+    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS
+    await volume_check(adapter, "matched through locating holes", expected, 0.001 * expected)
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
         axis = await name_bore_axis(
             adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",
@@ -737,9 +734,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "LocatorHoles", "LocatorDepth", LOCATOR_BLIND_DEPTH_BAND_MM
     )
     # The locating ream's band is symmetric, so it prints ± on one line and
     # the six-line callout under it stays inside the sheet's upper border.

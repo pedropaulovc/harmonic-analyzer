@@ -453,16 +453,17 @@ PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -111.4625: oval heads flush
 LOCATING_PIN_XY = tuple(_on_arm(x, y) for x, y in ARM.LOCATOR_SITES_MM)
 # Dowels MHA-PD-VN-64 (Rx-90 rows: local +Y to -Z, into the arm). The origin
 # end is the PROUD end, 1.70 into the plate, so the 6.0 body runs 4.30 into
-# the arm's 4.80 blind ream. Run 9 put the origin at the buried end: the body
-# then ran out of the arm's front face (9.86 mm^3 of solid arm per dowel).
+# the arm's through ream, short of its front face (the punch-out side). Run 9
+# put the origin at the buried end: the body then ran out of the arm's front
+# face (9.86 mm^3 of solid arm per dowel).
 LOCATING_PIN_Z0 = PLATE_Z0 + LOCATING_INTERFACE.PROUD_MM
 if not (
-    PLATE_Z0 - ARM.LOCATOR_BLIND_DEPTH_MM
+    PLATE_Z0 - ARM.THICKNESS
     < LOCATING_PIN_Z0 - LOCATING_PIN.LENGTH
     < PLATE_Z0
     < LOCATING_PIN_Z0
 ):
-    raise AssertionError("the locating dowels do not sit in the arm's blind reams")
+    raise AssertionError("the locating dowels do not sit inside the arm's through reams")
 # Latch pin MHA-PD-VN-58 pressed to the floor of the arm tip's hole, along U
 # (rows Rz(theta - 90): the dowel's local +Y along U).
 LATCH_PIN_POS = (
@@ -2658,7 +2659,7 @@ def _assert_arm_plate_registered(adapter, arm: str, plate: str) -> None:
     actual_directions = {}
     for name, geometry, seat, socket_z, seat_z in (
         (arm, ARM, PlanarFace((0.0, 0.0, 1.0), ARM.THICKNESS),
-         ARM.THICKNESS - ARM.LOCATOR_BLIND_DEPTH_MM / 2.0, ARM.THICKNESS),
+         ARM.THICKNESS / 2.0, ARM.THICKNESS),
         (plate, ARM_PLATE, PlanarFace((0.0, 0.0, -1.0), 0.0),
          ARM_PLATE.THICKNESS_OVER_ARM / 2.0, 0.0),
     ):

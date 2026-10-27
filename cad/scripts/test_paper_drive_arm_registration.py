@@ -126,7 +126,7 @@ def test_locator_sites_share_real_part_frames_and_paid_mouth_walls() -> None:
                 - arm.BAND_X - arm.LOCATOR_MOUTH_POSITION_RADIUS_MM - pin.PRESS_HOLE_LIMITS_MM[1] / 2.0
                 - pin.HOLE_MOUTH_BREAK_RADIAL_MAX_MM)
     assert arm.WALLS["locator 1 to arm edge"][1] == pytest.approx(expected)
-    assert arm.WALLS["locator blind floor"][1] > 3.0
+    assert "locator blind floor" not in arm.WALLS
 
 def test_three_signed_normal_sites_pay_the_outside_gear_plane_height_lever() -> None:
     lever = (

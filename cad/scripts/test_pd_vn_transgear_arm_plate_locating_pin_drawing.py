@@ -50,11 +50,11 @@ def test_reference_model_is_nominal_not_an_unsourced_end_replica() -> None:
     assert spec.END_FORM_REFERENCE_MM == pytest.approx(0.35)
 
 
-def test_standard_press_slip_and_length_family_do_not_bottom_in_custom_arm() -> None:
+def test_standard_press_slip_and_length_family_fit_the_custom_arm_and_plate() -> None:
     assert spec.PRESS_INTERFERENCE_MM == pytest.approx((0.002, 0.018))
     assert spec.SLIP_DIAMETRAL_CLEARANCE_MM == pytest.approx((0.002, 0.018))
     assert spec.INSERTION_LIMITS_MM == pytest.approx((4.02, 4.58))
-    assert spec.ARM_BOTTOM_AIR_MIN_MM == pytest.approx(0.17)
+    assert "PUNCH OUT FROM THE FRONT" in " ".join(spec.PURCHASED_STOCK_NOTE.split())
     assert interface.HOLE_MOUTH_BREAK_AXIAL_MAX_MM == interface.HOLE_MOUTH_BREAK_RADIAL_MAX_MM == 0.05
 
 

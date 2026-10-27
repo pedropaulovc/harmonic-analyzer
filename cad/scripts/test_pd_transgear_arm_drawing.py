@@ -43,8 +43,7 @@ def test_required_drawing_paths() -> None:
 
 def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP,
-             drawing.END_KEEP)
+    views = (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP)
     assert set().union(*views) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
@@ -65,9 +64,7 @@ def test_locating_sockets_print_in_the_front_view() -> None:
     (run 7's 1:1 rear view crowded the sheet), every survivor a sheet pair."""
     for name in ("LocatorX1", "LocatorY1", "LocatorY2", "LocatorDia1"):
         assert name in drawing.FRONT_KEEP
-    for view_keep in (
-        drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.LOCATOR_SECTION_KEEP, drawing.END_KEEP,
-    ):
+    for view_keep in (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.END_KEEP):
         assert all(len(xy) == 2 for xy in view_keep.values())
 
 
@@ -280,7 +277,6 @@ def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> N
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("LocatorHoles", "LocatorDepth"): "LOCATOR_BLIND_DEPTH_BAND_MM",
         ("LocatorProfile", "f'LocatorDia{index}'"): "round(LOCATOR_HOLE_BAND_MM[0], 6)",
         ("PinHoleProfile", "PinHoleZ"): "LATCH_PIN_HEIGHT_TOLERANCE",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
@@ -598,7 +594,6 @@ def test_the_socket_offsets_and_frames_stand_outside_the_arm() -> None:
     sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
     mouth = drawing.LOCATOR_SECTION_CENTER[0] + geometry.THICKNESS * drawing._S / 2000.0
     radius = geometry.LOCATOR_HOLE_DIA_MM * drawing._S / 2000.0
-    depth_text_top = drawing.LOCATOR_SECTION_KEEP["LocatorDepth"][1] + _LINE_PITCH / 2.0
     for _x, offset in geometry.LOCATOR_SITES_MM:
         side = math.copysign(1.0, offset)
         left, top = drawing._locator_frame_xy(offset)
@@ -608,7 +603,6 @@ def test_the_socket_offsets_and_frames_stand_outside_the_arm() -> None:
         assert mouth + 0.004 < left
         assert left + _POSITION_FRAME_WIDTH < sheet_right - 0.002
         assert side * (centre_y - axis_y) > 0.0
-        assert top - _POSITION_FRAME_HEIGHT > depth_text_top + 0.002
         # The leader from the frame's near end to the inner wall 1 mm in
         # crosses the mouth inside the socket's opening.
         land = (mouth - 1.0 * drawing._S / 1000.0, axis_y - side * radius)
@@ -715,18 +709,25 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
         f"MATCH-DRILL WITH ARM PLATE {plate}",
         f"AT {step_ref('arm-plate-located')}",
     ]
-    assert lines[1] == "MOUTH BREAK 0.05 MAX: DOWEL GRIP"
+    assert lines[:2] == ["2X REAM THRU", "MOUTH BREAKS 0.05 MAX: DOWEL GRIP"]
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
-    # The depth's ±0.05 says what it keeps.
-    assert drawing.DIMENSION_CALLOUTS["LocatorDepth"] == "DOWEL OFF FLOOR"
-    # Its reason line clears the mouth's witness line and the right border.
-    caps = 0.00285  # run 20261027T125629744Z: 18 capitals set 51 mm wide
-    mouth = drawing.LOCATOR_SECTION_CENTER[0] + geometry.THICKNESS * drawing._S / 2000.0
-    centre = drawing.LOCATOR_SECTION_KEEP["LocatorDepth"][0]
-    half = len(spec.LOCATOR_DEPTH_CALLOUT) * caps / 2.0
-    assert centre - half > mouth + 0.002
-    sheet_right = DRAWING_TEMPLATES[drawing.SPEC.layout].width_m - _BORDER
-    assert centre + half < sheet_right - 0.003
+
+
+def test_the_locating_dowels_punch_out_from_the_front() -> None:
+    """Machinist review (rule 16): a dowel pressed into a blind hole had no
+    way out. The reams run through; the dowel, pressed from the rear to its
+    proud set, stops short of the front face's mouth break on the thinnest
+    stock, so a punch from the front drives it out."""
+    import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
+
+    assert "LocatorDepth" not in drawing.DIMENSION_CALLOUTS
+    assert "LocatorHoles" not in spec.DRAWING_DIMENSIONS
+    deepest = max(dowel.INSERTION_LIMITS_MM)
+    front_break = geometry.LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM
+    thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
+    assert spec.LOCATOR_PUNCH_AIR_MIN_MM == pytest.approx(thinnest - front_break - deepest)
+    assert spec.LOCATOR_PUNCH_AIR_MIN_MM > 3.0
+    assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
 def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:

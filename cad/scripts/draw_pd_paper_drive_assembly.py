@@ -1504,9 +1504,10 @@ def _step_text(*, operating_domain: RackOperatingDomain) -> dict[str, str]:
             f"({_N['pd-transgear-arm']} PRESS, {_N['pd-transgear-arm-plate']} SLIP). "
             f"PRESS {TRANSGEAR_QUANTITIES['pd-vn-transgear-arm-plate-locating-pin']} "
             f"{_N['pd-vn-transgear-arm-plate-locating-pin']} DOWELS INTO THE ARM "
+            "FROM THE REAR, "
             f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
-            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE "
-            "BLIND FLOOR; MATCH-MARK ARM AND PLATE."
+            f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD; "
+            "MATCH-MARK ARM AND PLATE."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['pd-transgear-arm-plate']} PLATE ON THE LOCATING DOWELS. "
