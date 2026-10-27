@@ -5,7 +5,8 @@ geometric-control frame (drawing-guidelines.md rule 5 (avoid excessive GD&T)): t
 prints as the part's stacked LIMIT band, its 45-degree lead as the part's
 single MAX limit, and every other size is an ordinary model dimension at its
 part-authored places under the title block's band for those places (.X for
-the tip chamfer, .XX for the rest).
+the tip chamfer, .XX for the rest).  The overall length and the crown's
+sphere radius print as references.
 
 The screw axis is model +Z, so the ``*Right`` view already lays it horizontal
 as it sits in the lathe: model +Z runs to paper-LEFT, putting the crowned head
@@ -59,6 +60,8 @@ from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
 from sm_gooseneck_spring_screw_geom import (
+    CROWN_CENTER_Z,
+    CROWN_RADIUS,
     CROWN_RISE,
     HEAD_CYL_H,
     HEAD_DIA,
@@ -83,6 +86,7 @@ from sm_gooseneck_spring_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
+    SPHERICAL_DIMENSIONS,
     THREAD_CALLOUT,
 )
 
@@ -131,6 +135,8 @@ SLOT_FLOOR_X = _sheet_x(SLOT_FLOOR_Z)
 UNDERHEAD_X = _sheet_x(0.0)
 RELIEF_END_X = _sheet_x(-RELIEF_WIDTH)
 TIP_X = _sheet_x(-LENGTH)
+# The crown's sphere centre, on the axis inside the shank.
+CROWN_CENTER_X = _sheet_x(CROWN_CENTER_Z)
 # Where the full thread meets the tip chamfer.
 THREAD_START_X = _sheet_x(-(LENGTH - TIP_CHAMFER))
 HEAD_TOP_Y = _sheet_y(HEAD_DIA / 2.0)
@@ -158,13 +164,21 @@ CROWN_RISE_TEXT_WIDTH = 0.0116
 LEAD_TEXT_WIDTH = 0.049
 # Its top line stood 10.7 mm above the anchor in that run.
 LEAD_TEXT_TOP_ABOVE_ANCHOR = 0.011
+# '(SR20.0)' at the sheet's dimension font, estimated from the ' 1.00 ' and
+# 'Ø12.50' widths of the same runs (about 2.6 mm a character).
+CROWN_RADIUS_TEXT_WIDTH = 0.018
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
     "OverallLength": ((APEX_X + TIP_X) / 2.0, _ROW_Y[1]),
     # Diameters on the side view (drawing-guidelines.md rule 11 (turned parts read like the lathe)): the head's stands clear of the
-    # crown, between the profile and the head-end view.
-    "HeadDia": (APEX_X - 0.019, SIDE_CENTER[1]),
+    # crown, between the profile and the head-end view, far enough left that
+    # the crown's radius reads between its dimension line and the apex.
+    "HeadDia": (APEX_X - 0.031, SIDE_CENTER[1]),
+    # The crown's (SR) reads left of the crown and under the slot, inside the
+    # head Ø's extension lines, so its radial leader lands on the lower arc
+    # without crossing the Ø line or either extension line.
+    "CrownRadius": (APEX_X - 0.0165, SIDE_CENTER[1] - 0.015),
     # The crown rise and the slot depth both read from the apex, stacked
     # above the head.  The rise is too narrow for its text, so the text
     # stands outside, left of the apex: centred between the two extension
@@ -232,12 +246,14 @@ NOTES_XY = (0.016, 0.070)
 # prints the model value as the part's single limit, LIMIT prints the model
 # value plus each deviation.  Each row is (nominal mm, tolerance type).
 _TOL_NONE, _TOL_LIMIT, _TOL_MAX = 0, 3, 6
+_ARROWS_OUTSIDE = 1  # swDimArrowsOutside: the (SR)'s arrow on the arc
 if RELIEF_DIA_TOL_TYPE != _TOL_LIMIT or RELIEF_LEAD_TOL_TYPE != _TOL_MAX:
     raise AssertionError("MHA-SM-04 relief limits are no longer LIMIT / MAX")
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "HeadDia": (HEAD_DIA, _TOL_NONE),
     "HeadHeight": (HEAD_H, _TOL_NONE),
     "CrownRise": (CROWN_RISE, _TOL_NONE),
+    "CrownRadius": (CROWN_RADIUS, _TOL_NONE),
     "UnderHeadLength": (LENGTH, _TOL_NONE),
     "ReliefDia": (RELIEF_DIA, _TOL_LIMIT),
     "ReliefWidth": (RELIEF_WIDTH, _TOL_NONE),
@@ -329,6 +345,15 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
         ).endswith(")")
         if parenthesized != (name in REFERENCE_DIMENSIONS):
             raise RuntimeError(f"MHA-SM-04 {name}: reference state did not persist")
+        if name in SPHERICAL_DIMENSIONS and (
+            not str(display.GetText(1) or "").startswith("(S")
+            or int(display.ArrowSide) != _ARROWS_OUTSIDE
+            or bool(display.SolidLeader)
+        ):
+            raise RuntimeError(
+                f"MHA-SM-04 {name}: spherical reference or its outside leader "
+                "did not persist"
+            )
         if int(display.GetPrimaryPrecision2()) != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"MHA-SM-04 {name}: display places did not persist")
         if (
@@ -344,6 +369,39 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             raise RuntimeError(
                 f"MHA-SM-04 {name}: callout {callout!r} is not the part's"
             )
+
+
+def _set_spherical_reference(adapter: Any, annotation: Any, *, label: str) -> None:
+    """Print the crown's model radius as the ASME spherical reference ``(SR20.0)``.
+
+    The radius is read-only: the head Ø and the controlling rise already fix
+    the dome.  Whatever radius prefix the display carries stays behind the
+    ``(S`` (draw_dt_pinion_pivot_shaft prints its crown the same way).  The
+    arrow sits outside the arc with no solid leader on to the centre, which
+    lies inside the shank, so the leader runs from the text to the crown and
+    stops there (draw_dt_pinion_arbor's SR crown).  Each write is read back.
+    """
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    existing = str(display.GetText(1) or "")  # swDimensionTextPrefix
+    prefix = "(S" + existing
+    display.SetText(1, prefix)
+    display.SetText(2, ")")  # swDimensionTextSuffix
+    applied = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+    _telemetry.info(
+        f"{label}: spherical reference prefix {existing!r} -> {applied[0]!r}, "
+        f"suffix {applied[1]!r}"
+    )
+    if applied != (prefix, ")"):
+        raise RuntimeError(
+            f"failed to mark {label} as a spherical reference: {applied}"
+        )
+    display.ArrowSide = _ARROWS_OUTSIDE
+    if int(display.ArrowSide) != _ARROWS_OUTSIDE:
+        raise RuntimeError(f"{label} did not keep its arrow outside the arc")
+    display.SolidLeader = False
+    if bool(display.SolidLeader):
+        raise RuntimeError(f"{label} still draws its solid leader to the centre")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -419,6 +477,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ]
         if len(matches) != 1:
             raise RuntimeError(f"expected one MHA-SM-04 {name} reference dimension")
+        if name in SPHERICAL_DIMENSIONS:
+            _set_spherical_reference(adapter, matches[0], label=f"MHA-SM-04 {name}")
+            continue
         set_reference_dimension(adapter, matches[0], label=f"MHA-SM-04 {name}")
 
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):

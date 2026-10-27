@@ -66,10 +66,8 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.SIDE_KEEP) | set(drawing.END_KEEP) == marked
     assert not set(drawing.SIDE_KEEP) & set(drawing.END_KEEP)
-    # The thread is defined by its callout, not a Ø3.51 dimension, and the
-    # crown by its rise and the note, not a radius.
+    # The thread is defined by its callout, not a Ø3.51 dimension.
     assert "ThreadDia" not in marked
-    assert "CrownRadius" not in marked
     # The slot width is only true-size in the head-end view.
     assert set(drawing.END_KEEP) == {"SlotWidth"}
     # The profile's lead stays unprinted; the lead prints from the lower
@@ -85,10 +83,11 @@ def test_model_owns_places_and_bands() -> None:
     one_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     }
-    # Chamfers never need extra places (rule 3); every other mark is .XX.
-    assert one_place == {"TipChamfer", "HeadLead"}
+    # Chamfers never need extra places (rule 3) and the crown's reference
+    # radius prints at one; every other mark is .XX.
+    assert one_place == {"TipChamfer", "HeadLead", "CrownRadius"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "CrownRadius"}
     # No mark carries a shared-helper band: the relief Ø is a native LIMIT
     # band and the lead a single MAX, both set by the part with the model
     # value as the upper limit; every other mark takes the title block's
@@ -169,6 +168,47 @@ def test_controlling_crown_rise_keeps_a_fillister_head_across_its_band() -> None
     assert spec.HEAD_SIDE_MIN > 0.0
     # A dome at both ends, never past a hemisphere of the Ø12.50 head.
     assert 0.0 < spec.CROWN_RISE_MIN < spec.CROWN_RISE_MAX < geom.HEAD_DIA / 2.0
+
+
+def test_crown_radius_prints_on_its_arc_as_a_spherical_reference() -> None:
+    # Machinist review of b44c591d6 (rule 7): the dome's shape is the
+    # model's own radius on the arc, read-only beside the controlling rise,
+    # not a note.
+    assert "CrownRadius" in spec.DRAWING_DIMENSIONS["HeadProfile"]
+    assert spec.SPHERICAL_DIMENSIONS == {"CrownRadius"}
+    assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
+    assert f"{geom.CROWN_RADIUS:.{spec.DRAWING_PRECISION_BY_NAME['CrownRadius']}f}" == (
+        "20.0"
+    )
+    assert drawing.PRINTED_DIMENSIONS["CrownRadius"] == (geom.CROWN_RADIUS, 0)
+    for word in ("CROWN", "SPHERICAL"):
+        assert word not in spec.DRAWING_NOTES
+    # The builder records CrownRadius on the head profile, driven by the head
+    # Ø and the rise, so the printed reference cannot drift from them.
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert 'head.record(\n        "CrownRadius",' in build
+
+
+def test_crown_radius_leader_lands_on_the_lower_arc_clear_of_the_head_dia() -> None:
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    axis_y = drawing.SIDE_CENTER[1]
+    x, y = drawing.SIDE_KEEP["CrownRadius"]
+    # The radial leader runs from the text toward the sphere centre on the
+    # axis; it meets the crown between the slot and the lower rim.
+    assert drawing.CROWN_CENTER_X == pytest.approx(
+        drawing.APEX_X + geom.CROWN_RADIUS * scale
+    )
+    angle = math.atan2(axis_y - y, drawing.CROWN_CENTER_X - x)
+    rim_angle = math.asin(geom.HEAD_DIA / 2.0 / geom.CROWN_RADIUS)
+    slot_angle = math.asin(geom.SLOT_WIDTH / 2.0 / geom.CROWN_RADIUS)
+    assert slot_angle + math.radians(3.0) < angle < rim_angle - math.radians(3.0)
+    # Its text stands between the head Ø's dimension line and the apex,
+    # inside the Ø's extension lines and well under the Ø's own text.
+    half = drawing.CROWN_RADIUS_TEXT_WIDTH / 2.0
+    assert drawing.SIDE_KEEP["HeadDia"][0] + 0.004 <= x - half
+    assert x + half <= drawing.APEX_X - 0.005
+    head_half = geom.HEAD_DIA * scale / 2.0
+    assert axis_y - head_half + 0.006 < y < axis_y - 0.010
 
 
 def test_relief_sits_below_the_die_root_with_a_flat_seat() -> None:
