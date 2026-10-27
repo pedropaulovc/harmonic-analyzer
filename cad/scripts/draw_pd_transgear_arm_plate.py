@@ -65,7 +65,7 @@ from _drawing_finish import add_surface_finish
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
-from _drawing_projection import model_point_in_view
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sections import create_section_view
 from _drawing_sheets import create_blank_drawing_sheets
@@ -452,6 +452,7 @@ def _cut(
     )
 
 
+@_telemetry.traced("drawing.plate_note", label_param="label")
 def _add_note(adapter: Any, text: str, xy: tuple[float, float], label: str) -> None:
     note = add_note(adapter, text, *xy)
     if note is None:
@@ -478,30 +479,48 @@ def _add_zone_line(
     label: str,
 ) -> Callable[[], None]:
     """A thick chain line in ``view``'s sketch along a projected zone, and its
-    height as a driven reference dimension; endpoints read back here, and
-    the returned check proves style, driven state, no tolerance, text and
-    length after the finalizer's settling rebuild (``settled_checks``).
+    height as a driven linear reference dimension; the returned check
+    re-proves, after the finalizer's settling rebuild (``settled_checks``),
+    that both ends still sit on the freshly projected zone (face A and the
+    zone's height) and the dimension's type, state, tolerance, text and length.
 
     Direct-to-DB, as the cutting lines are (_drawing_sections): an inferred
     endpoint would snap onto the hole wall or face A and change the length.
     """
-    start, end, text = (
-        _sheet_xy(adapter, view, point, f"{label} {role}")
-        for point, role in zip(zone, ("start", "end", "height text"), strict=True)
-    )
+    roles = ("start", "end", "height text")
+
+    def project() -> tuple[list[tuple[float, float]], list[tuple[float, ...]]]:
+        """The zone's sheet points, and its ends in the view sketch's space,
+        each through one transform read."""
+        sheet = model_points_in_view(
+            adapter, view, [tuple(value / 1000.0 for value in point) for point in zone],
+            label=label, names=roles,
+        )
+        sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+        transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+        ends = []
+        for x, y in sheet[:2]:
+            point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+            projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+            ends.append(tuple(float(value) for value in projected.ArrayData))
+        return sheet, ends
+
+    def require_ends(line: Any, ends: list[tuple[float, ...]], stage: str) -> None:
+        for expected, accessor in ((ends[0], "GetStartPoint2"), (ends[1], "GetEndPoint2")):
+            point = _early_bound(getattr(line, accessor)(), "ISketchPoint")
+            actual = (float(point.X), float(point.Y), float(point.Z))
+            if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
+                raise RuntimeError(
+                    f"{label}: {stage}, chain line end {actual} is off the zone at {expected}"
+                )
+
+    (start, end, text), ends = project()
     model = adapter.currentModel
     drawing = _early_bound(model, "IDrawingDoc")
     if not drawing.ActivateView(view_name(adapter, view)):
         raise RuntimeError(f"failed to activate the view for {label}")
     model.ClearSelection2(True)
-    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
-    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    ends = []
-    for x, y in (start, end):
-        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-        ends.append(tuple(float(value) for value in projected.ArrayData))
     manager = _early_bound(model.SketchManager, "ISketchManager")
     previous = bool(manager.AddToDB)
     manager.AddToDB = True
@@ -512,11 +531,7 @@ def _add_zone_line(
     if segment is None:
         raise RuntimeError(f"failed to sketch the {label} chain line")
     line = _early_bound(segment, "ISketchLine")
-    for expected, accessor in ((ends[0], "GetStartPoint2"), (ends[1], "GetEndPoint2")):
-        point = _early_bound(getattr(line, accessor)(), "ISketchPoint")
-        actual = (float(point.X), float(point.Y), float(point.Z))
-        if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
-            raise RuntimeError(f"{label}: chain line end snapped to {actual}")
+    require_ends(line, ends, "as sketched")
     segment = _early_bound(segment, "ISketchSegment")
     segment.Style = CHAIN_LINE_STYLE
     segment.Width = CHAIN_LINE_WEIGHT
@@ -527,6 +542,8 @@ def _add_zone_line(
         raise RuntimeError(f"failed to select the {label} chain line")
     across = abs(end[0] - start[0]) >= abs(end[1] - start[1])
     add = model.AddHorizontalDimension2 if across else model.AddVerticalDimension2
+    # swDimensionType_e: swLinearDimension, or its horizontal/vertical form.
+    linear_types = (2, 11) if across else (2, 12)
     display = add(text[0], text[1], 0.0)
     model.ClearSelection2(True)
     if display is None:
@@ -565,11 +582,20 @@ def _add_zone_line(
             str(display.GetText(2) or ""),
         )
 
+    def require_linear(stage: str) -> None:
+        if int(display.Type2) not in linear_types:
+            raise RuntimeError(
+                f"{label}: {stage}, native type {int(display.Type2)} is not {linear_types}"
+            )
+
+    require_linear("as dimensioned")
     placed = applied()
     if placed != wanted:
         raise RuntimeError(f"{label}: reads {placed}, not {wanted}")
 
     def settled() -> None:
+        require_ends(line, project()[1], "settled")
+        require_linear("settled")
         state = applied()
         length = float(dimension.SystemValue)
         if state != wanted or not math.isclose(
@@ -579,7 +605,10 @@ def _add_zone_line(
                 f"{label}: settled at {state} over {length * 1000.0:.4f} mm, "
                 f"not {wanted} over {height_mm:.4f} mm"
             )
-        _telemetry.info(f"{label}: settled {length * 1000.0:.4f} mm, driven, no tolerance")
+        _telemetry.info(
+            f"{label}: settled on the zone, {length * 1000.0:.4f} mm, linear, driven, "
+            "no tolerance"
+        )
 
     _telemetry.info(f"{label}: chain {start!r} -> {end!r}, height text at {text!r}")
     return settled
