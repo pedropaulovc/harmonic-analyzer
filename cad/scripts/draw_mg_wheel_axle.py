@@ -485,13 +485,22 @@ def _crop_detail_view(adapter: Any, view: Any) -> None:
         )
 
 
+ANNOTATION_DISPLAY_DIMENSION = 4  # swAnnotationType_e.swDisplayDimension
+
+
 def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
-    """The model-dimension names ``view`` holds, sorted."""
+    """The model-dimension names ``view`` holds, sorted; its notes (the
+    DETAIL A label) are skipped before any dimension binding."""
+    annotations = (
+        _early_bound(annotation, "IAnnotation")
+        for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+    )
     return sorted(
         name
         for name in (
-            dimension_name(adapter, _early_bound(annotation, "IAnnotation"))
-            for annotation in (_early_bound(view, "IView").GetAnnotations() or ())
+            dimension_name(adapter, annotation)
+            for annotation in annotations
+            if int(annotation.GetType()) == ANNOTATION_DISPLAY_DIMENSION
         )
         if name
     )

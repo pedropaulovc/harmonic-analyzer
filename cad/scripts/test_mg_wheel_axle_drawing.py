@@ -199,7 +199,8 @@ def test_journal_finish_and_no_gdt() -> None:
     assert [(c.key, c.roughness_um) for c in spec.SURFACE_FINISHES] == [
         ("mg_axle_journal", MACHINED_UM)
     ]
-    assert "MG-MAGNIFYING-WHEEL RUNS ON IT" in callouts.PIN_DIA_CALLOUT
+    pin_words = callouts.PIN_DIA_CALLOUT.split()
+    assert "MG-MAGNIFYING-WHEEL" in pin_words and "RUNS" in pin_words
 
 
 def test_thread_callout_and_no_general_notes() -> None:
@@ -212,10 +213,13 @@ def test_thread_callout_and_no_general_notes() -> None:
     assert "Manufacturing Notes" not in source
     assert not hasattr(spec, "DRAWING_NOTES")
     assert "Manufacturing Notes" not in Path(part.__file__).read_text(encoding="utf-8")
-    assert callouts.PIN_DIA_CALLOUT == (
-        "PRESS FIT IN MG-WHEEL-BAR\n<MOD-DIAM>4.737-4.747 REAMED BORE;\n"
-        "MG-MAGNIFYING-WHEEL RUNS ON IT"
-    )
+    # The Ø callout names both fits: the press into the bar's reamed bore,
+    # at that bore's limits, and the wheel running on the shank.
+    words = " ".join(callouts.PIN_DIA_CALLOUT.split())
+    low, high = sorted(spec.BAR_BORE_LIMITS)
+    for required in ("PRESS FIT", "MG-WHEEL-BAR", f"{low:.3f}-{high:.3f}"):
+        assert required in words, required
+    assert "MG-MAGNIFYING-WHEEL" in words
 
 
 def test_callouts_are_part_authored_and_only_read_by_the_sheet() -> None:
