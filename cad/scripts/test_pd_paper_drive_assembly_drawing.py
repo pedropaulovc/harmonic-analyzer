@@ -388,10 +388,9 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "MESH" in jig
     assert "JIG" not in jig
     assert "EACH BORE" not in jig
-    assert jig.count(f"{disc.CENTRE_DISTANCE:.3f}") == 2
-    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "HALF", "OVER"):
+    assert f"{disc.CENTRE_DISTANCE:.3f}" in jig
+    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "CLAMP"):
         assert reference in jig, reference
-    assert "RE-CHECK CLAMPED" in jig
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "

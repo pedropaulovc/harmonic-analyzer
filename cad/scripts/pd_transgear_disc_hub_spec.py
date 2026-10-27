@@ -238,18 +238,23 @@ SEAT_CONTACT_R = (SLEEVE.OUTSIDE_DIA + SLEEVE.OUTSIDE_DIA_BAND[1]) / 2.0
 # owner's bounded end-envelope sections, never a full-depth ideal involute.
 # Compare every printed setting/tip/step/full-depth corner on the common
 # contact annulus; smaller step-minus-depth and inward tool translation can
-# only remove more of that annulus.
+# only remove more of that annulus.  The sleeve prints only its full depth's
+# MIN and the run-out's MAX, past the step, so the deepest corner is full
+# depth at the step itself: the whole form gap, whatever cutter cut it.
 SEAT_ANNULUS_AREA = math.pi * (SEAT_CONTACT_R**2 - SEAT_INNER_R**2)
 _SEAT_AREA_BOUNDS = tuple(
     SLEEVE.step_seat_area_bounds_mm2(
         SEAT_INNER_R,
         SEAT_CONTACT_R,
         profile=profile,
-        station_mm=SLEEVE.FACE_WIDTH + face_deviation,
-        full_depth_mm=full_depth,
+        station_mm=station,
+        full_depth_mm=min(full_depth, station),
     )
     for profile in SLEEVE.manufactured_profiles()
-    for face_deviation in (-SLEEVE.FACE_WIDTH_BAND, SLEEVE.FACE_WIDTH_BAND)
+    for station in (
+        SLEEVE.FACE_WIDTH - SLEEVE.FACE_WIDTH_BAND,
+        SLEEVE.FACE_WIDTH + SLEEVE.FACE_WIDTH_BAND,
+    )
     for full_depth in (SLEEVE.FULL_DEPTH_MIN, SLEEVE.FULL_DEPTH_MAX)
 )
 SEAT_CONTACT_AREA_BOUNDS = (

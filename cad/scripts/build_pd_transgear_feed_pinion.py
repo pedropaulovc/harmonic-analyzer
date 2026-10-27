@@ -60,6 +60,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_tolerances import (
+    _set_tolerance_precision,
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -402,10 +403,9 @@ def _single_limit(
     ):
         raise RuntimeError(f"{label}: single-limit tolerance readback changed")
     if limit_places is not None:
-        display = _early_bound(display, "IDisplayDimension")
-        display.SetPrecision3(-1, -1, limit_places, -1)
-        if int(display.GetPrimaryTolPrecision2()) != limit_places:
-            raise RuntimeError(f"{label}: LIMIT precision did not persist")
+        _set_tolerance_precision(
+            display, limit_deviations, label=label, places=limit_places
+        )
     _telemetry.success(f"{label}: limit {printed}")
 
 

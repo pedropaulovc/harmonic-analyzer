@@ -180,7 +180,7 @@ def test_full_depth_covers_the_racks_worst_reach() -> None:
 
     reach = assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST
     assert spec.FULL_DEPTH_MIN >= reach
-    assert spec.FULL_DEPTH_MAX < spec.FACE_WIDTH - printed_band_mm(
+    assert spec.FULL_DEPTH_MIN < spec.FACE_WIDTH - printed_band_mm(
         spec.FACE_WIDTH_PLACES
     )
     # The platen stands between the rack's front face and the disc's rear
@@ -210,15 +210,17 @@ def test_cutter_run_out_ends_inside_its_limit_clear_of_the_disc() -> None:
     assert spec.RUNOUT_RISE_WORST == pytest.approx(
         (spec.BOSS_DIA + spec.BOSS_DIA_BAND[0]) / 2.0 - spec.ROOT_DEPTH_X_MIN
     )
+    # The largest cutter at the full-depth MIN still runs out inside the MAX.
+    rise = spec.RUNOUT_RISE_WORST
+    assert (
+        spec.FULL_DEPTH_MIN + spec.cutter_runout(spec.CUTTER_DIA_MAX, rise)
+        <= spec.CUTTER_RUNOUT_MAX
+    )
     # Negative control derives an oversized cutter from the actual station
     # limit instead of pinning a formerly acceptable catalog diameter.
-    length = spec.CUTTER_RUNOUT_MAX - spec.FULL_DEPTH_MAX
-    rise = spec.RUNOUT_RISE_WORST
+    length = spec.CUTTER_RUNOUT_MAX - spec.FULL_DEPTH_MIN
     big = 1.01 * (length * length + rise * rise) / rise
-    assert (
-        spec.FULL_DEPTH_MAX + spec.cutter_runout(big, spec.RUNOUT_RISE_WORST)
-        > spec.CUTTER_RUNOUT_MAX
-    )
+    assert spec.FULL_DEPTH_MIN + spec.cutter_runout(big, rise) > spec.CUTTER_RUNOUT_MAX
 
 
 def test_cutter_stations_are_native_banded_model_dimensions() -> None:
@@ -236,10 +238,10 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     assert spec.FULL_DEPTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
     assert spec.FULL_DEPTH_MIN == spec.FULL_DEPTH
     assert round(spec.FULL_DEPTH, spec.FULL_DEPTH_PLACES) == spec.FULL_DEPTH
-    assert spec.FULL_DEPTH_MAX == pytest.approx(
-        spec.CUTTER_RUNOUT_MAX
-        - spec.cutter_runout(spec.CUTTER_DIA_MAX, spec.RUNOUT_RISE_WORST)
-    )
+    # codjiflo P2 (0247213): a smaller cutter or shallower profile runs out
+    # sooner, so over every accepted part only the run-out MAX bounds the
+    # full depth and the cutter's end.
+    assert spec.FULL_DEPTH_MAX == spec.CUTTER_RUNOUT_MAX
     assert spec.CUTTER_RUNOUT_END_WORST == spec.CUTTER_RUNOUT_MAX
     assert spec.CUTTER_RUNOUT_TOL_TYPE == 6
     lower, upper = spec.CUTTER_RUNOUT_DEVIATIONS

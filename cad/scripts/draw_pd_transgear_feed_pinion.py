@@ -645,6 +645,7 @@ def _place_outside_caption(adapter: Any, view: Any) -> None:
     _assert_note_inside_border(note, "outside view caption")
 
 
+@_telemetry.traced("drawing.part_authored_text")
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every imported dimension prints the text lanes its part authored.
 

@@ -359,9 +359,9 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # The full depth has one function, covering the rack (the assembly's
 # RACK_FRONT_FROM_SLEEVE_REAR_WORST), so it prints as a MIN at the modelled
 # station; the run-out MAX caps how deep the cutter may go (2026-10-27
-# ENFORCE review, r1, r3: a three-place hold served nothing).  The deepest
-# full depth is the one whose largest cutter runs out at that MAX
-# (FULL_DEPTH_MAX, below).
+# ENFORCE review, r1, r3: a three-place hold served nothing).  Any cutter's
+# full depth stands behind its own run-out, so the print bounds it only by
+# that MAX (FULL_DEPTH_MAX, below).
 FULL_DEPTH = 10.15
 FULL_DEPTH_PLACES = 2
 FULL_DEPTH_TOL_TYPE = 5  # swTolType_e.swTolMIN
@@ -477,19 +477,20 @@ def step_seat_area_bounds_mm2(
 # covers the complete axial rack reach. The boss at its largest radius over the
 # deepest finite root X bounds any boss run-out at the latest full-depth
 # station. The retained limit keeps the cutting envelope behind the disc
-# and under the hub spigot; no particular boss slot is presumed.  The full
-# depth prints only its MIN, so the deepest it may go is where the largest
-# cutter runs out at the printed run-out MAX.
+# and under the hub spigot; no particular boss slot is presumed.
 RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DEPTH_X_MIN
-FULL_DEPTH_MAX = CUTTER_RUNOUT_MAX - cutter_runout(CUTTER_DIA_MAX, RUNOUT_RISE_WORST)
-# With only the MIN printed, the cutter's end may stand anywhere up to the
-# run-out MAX: the hub's round engagement and seat take it there.
+# With only the MIN printed, any cutter of the form may be used: a smaller
+# one, or a shallower accepted profile, runs out sooner and so cuts full
+# depth further forward.  Over every accepted part the full depth and the
+# cutter's end are bounded only by the run-out MAX (codjiflo P2, 0247213),
+# and the hub's round engagement and seat take them there.
+FULL_DEPTH_MAX = CUTTER_RUNOUT_MAX
 CUTTER_RUNOUT_END_WORST = CUTTER_RUNOUT_MAX
 RUNOUT_DISC_CLEARANCE = 0.05
-if FULL_DEPTH_MAX >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
-    raise AssertionError("the 12T full-depth window reaches the step")
-if FULL_DEPTH_MAX <= FULL_DEPTH_MIN:
-    raise AssertionError("the run-out MAX leaves no room for the full-depth MIN")
+if FULL_DEPTH_MIN + cutter_runout(CUTTER_DIA_MAX, RUNOUT_RISE_WORST) > CUTTER_RUNOUT_MAX:
+    raise AssertionError("the largest cutter at the full-depth MIN overruns the run-out MAX")
+if FULL_DEPTH_MIN >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
+    raise AssertionError("the 12T full-depth MIN reaches the step")
 if CUTTER_RUNOUT_MAX > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
     raise AssertionError("the run-out limit reaches the disc's rear face")
 
