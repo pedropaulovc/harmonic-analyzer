@@ -309,7 +309,7 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     )
     # The band names the seat it serves and the cone's angle (rule 4).
     relief_callout = spec.TENON_ROOT_RELIEF_CALLOUT.replace("\n", " ")
-    assert "45 DEG" in relief_callout and spec.FERRULE_NAME in relief_callout
+    assert "45 DEG" in relief_callout and spec.FERRULE_NUMBER in relief_callout
     # The profile: the tenon OD runs on behind the seat face into the root
     # round, which the relief line leaves at 45 degrees for the shoulder face.
     assert handle.RELIEF_TOP == pytest.approx((7.0, spec.TENON_R + 0.9))

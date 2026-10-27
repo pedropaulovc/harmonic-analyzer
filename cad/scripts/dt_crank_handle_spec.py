@@ -492,8 +492,9 @@ COUNTERBORE_FIT_NOTE = (
 TENON_ROOT_CALLOUT = f"{FERRULE_NAME}\nSEAT"
 COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NAME}\nSEAT"
 # The root relief's band serves the ferrule (rule 4): its leg on the shoulder
-# face, at 45 degrees, the ring seating on the shoulder outside it.  Rows of
-# 10 characters at most fit the gap left of the tenon end.
-TENON_ROOT_RELIEF_CALLOUT = f"X 45 DEG;\n{FERRULE_NAME}\nSEAT\nOUTSIDE IT"
+# face, at 45 degrees, the mate named by number (farm r3 review of
+# 8abe1a641), seating on the shoulder outside it.  Rows of 10 characters at
+# most fit the gap left of the tenon end.
+TENON_ROOT_RELIEF_CALLOUT = f"X 45 DEG;\n{FERRULE_NUMBER}\nSEATS\nOUTSIDE IT"
 PIVOT_BORE_CALLOUT = f"REAM THRU\nRUNS ON {SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

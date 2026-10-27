@@ -224,14 +224,18 @@ FRONT_KEEP = {
     #   Its leader runs down-right through the air over the tenon, right of
     #   the relief's narrower top rows, into the relief's mouth to the round.
     "TenonRootRadius": (_front_x(TENON_X0) - 0.021, 0.1905),
-    # The root relief's leg (owner ruling 2026-10-24, #1900): "1.0 ±0.2" over
-    # four callout rows of 10 characters at most, 27.5 x 27.75 mm centred on
-    # the keep, so x 0.0182..0.0457 and y 0.1522..0.1800 -- wholly above the
-    # relief's upper extension line (y 0.1492) by 3.0, so no extension line
-    # strikes it (farm r1 of 1727eecbe struck rows 1-2 with the keep between
-    # the lines), 4.3 clear of the tenon end (x 0.050), 5.8 inside the border.
-    # Its extension lines run left over the air above the tenon end.
-    "TenonRootRelief": (_front_x(TENON_X0) - 0.018, 0.1661),
+    # The root relief's leg (owner ruling 2026-10-24, #1900): a vertical
+    # linear dimension, so its dimension line sits on the keep and its
+    # "0.9 ±0.1" plus four callout rows of 10 characters at most (23 mm wide
+    # on farm r3 of 8abe1a641) stand left of it, centred on the keep's y.
+    # That r3 keep (tenon end - 0.018) put the block at x 0.009..0.032, across
+    # the inner border (x 0.0127); at tenon end - 0.010 it spans x
+    # 0.017..0.040, 4.5 inside the border and 9.8 clear of the tenon end's
+    # extension line, under the R0.3 block (x 0.018..0.040).  y 0.1522..0.1800
+    # keeps it wholly above the relief's upper extension line (y 0.1492), so
+    # no extension line strikes it (farm r1 of 1727eecbe).  The R0.3 leader
+    # runs down-right 9 mm or more clear of its right edge.
+    "TenonRootRelief": (_front_x(TENON_X0) - 0.010, 0.1661),
     #   Counterbore floor, above the section between the swell diameter's
     #   dimension line (x 0.213) and the 8.1's floor extension line (x
     #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023
