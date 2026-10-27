@@ -76,6 +76,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "tuple(limit[3] for limit in _SINGLE_LIMITS)",
         "each",
     ),
+    # set_single_limit converts each caller's single-limit band.
+    ("_single_limit_tolerance", "band"): (
+        "(__import__('pn_pen_hanger_spec').SLOT_CORNER_R_BAND,)",
+        "each",
+    ),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
     ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",
@@ -220,6 +225,11 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
+    ),
+    ("pn_pen_hanger_spec", "STRAP_T_STOCK_BAND"): (
+        "the 3 mm strap stock's supplied thickness band, indexed for the "
+        "slot-bottom gap (SLOT_BOTTOM_GAP_MIN) and the arm cover "
+        "(GUIDE_ARM_COVER_MIN); the sheet prints the thickness as a reference"
     ),
     ("dt_cylinder_end_disc_spec", "WASHER_BORE_BAND"): (
         "title-block drilled-hole deviations; upper limit indexed by "
