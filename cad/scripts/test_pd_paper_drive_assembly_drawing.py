@@ -386,7 +386,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
         assert _number(stem) in setting
     assert "MESH" in setting
-    assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
+    # One match-drilled pilot pair; each part reamed to its own drawing,
+    # the arm's press seats and the plate's slip holes (two reamers).
+    assert "MATCH-DRILL 2 PILOTS THROUGH THE PLATE, BLIND IN THE ARM" in located
+    assert (
+        f"REAM EACH PART'S HOLES TO ITS DRAWING ({_number('pd-transgear-arm')} PRESS, "
+        f"{_number('pd-transgear-arm-plate')} SLIP)"
+    ) in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
         f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
