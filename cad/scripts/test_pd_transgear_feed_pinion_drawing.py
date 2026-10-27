@@ -361,12 +361,13 @@ def test_sheet_text_names_the_right_parts() -> None:
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem
     note = drawing.OIL_HOLE_NOTE
-    drill, position = note.split("\n")
-    assert len(drill) <= 70
-    assert drill.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    hole, drill = note.split("\n")
+    assert hole.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    # The leader leaves the last row's end, so that row is the longer.
+    assert len(hole) < len(drill) <= 70
     assert f"WITH {spec.HUB_NUMBER}" in drill
     # The hub's sheet locates the match-drilled hole (CENTRED ON HUB BODY).
-    assert position == f"POSITION SET BY {spec.HUB_NUMBER}"
+    assert drill.endswith(f"POSITION SET BY {spec.HUB_NUMBER}")
     assert "CENTRED ON HUB BODY" in hub.OIL_HOLE_CALLOUT_BELOW
     assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
     assert _config.parts("pd-transgear-rear-bushing")["number"] == callouts.REAR_BUSHING_NUMBER

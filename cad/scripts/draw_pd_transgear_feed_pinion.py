@@ -278,26 +278,28 @@ REAR_KEEP: dict[str, tuple[float, float]] = {
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
 # the upper boss wall; the note's leader lands mid-wall on its front edge.
-# The note stands above the section, its first row ending just left of the
-# hole, so the leader leaves that row's right end and runs down clear of the
-# text (run 20261027T064211655Z: standing right of the hole, the leader left
-# the first row's left end and struck both rows, r1, r2).  It is match
-# drilled with the hub seated, so the hub's
-# sheet sets its position (CENTRED ON HUB BODY,
-# pd_transgear_disc_hub_spec.OIL_HOLE_CALLOUT_BELOW); the second row says so
+# The note stands above the section, its last (longer) row ending just left
+# of the hole: SolidWorks leaves the leader from the last row's end nearer
+# the tip, so it runs down clear of the text.  Run 20261027T064211655Z,
+# note right of the hole: the leader left the rows' left end and struck both
+# (r1, r2).  Run 20261027T072743812Z, the short row last: it left that row's
+# right end, crossed the step's frame leader and the note's left end met the
+# end view (layout audit).  It is match drilled with the hub seated, so the
+# hub's sheet sets its position (CENTRED ON HUB BODY,
+# pd_transgear_disc_hub_spec.OIL_HOLE_CALLOUT_BELOW); the note says so
 # (2026-10-27 ENFORCE review, r1-r3: the match drill named no locating part).
 OIL_HOLE_NOTE = "\n".join(
     (
-        f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE: DRILL AT ASSY WITH {HUB_NUMBER} THRU HUB AND BOSS",
-        # Shorter than the first row, so the leader passes right of it.
-        f"POSITION SET BY {HUB_NUMBER}",
+        f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE THRU HUB AND BOSS",
+        f"DRILL AT ASSY WITH {HUB_NUMBER}; POSITION SET BY {HUB_NUMBER}",
     )
 )
 OIL_HOLE_EDGE = (
     _side_x(OIL_HOLE_SLEEVE_Z + OIL_HOLE_DIA / 2.0),
     RIGHT_CENTER[1] + (BORE_DIA + BOSS_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
-_OIL_HOLE_NOTE_WIDTH = 0.151  # its first row, as run 20261027T064211655Z drew it
+# Its last row: run 20261027T064211655Z drew 61 characters 151 mm wide.
+_OIL_HOLE_NOTE_WIDTH = 0.151 * 55 / 61
 OIL_HOLE_CALLOUT = (OIL_HOLE_EDGE[0] - 0.008 - _OIL_HOLE_NOTE_WIDTH, _SIDE_TOP + 0.079)
 NOTE_HEIGHT = 0.0025
 
