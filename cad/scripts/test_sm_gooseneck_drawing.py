@@ -193,9 +193,16 @@ def test_sheet_places_every_marked_dimension_at_its_places() -> None:
     assert {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     } == spec.ONE_PLACE_DIMENSIONS
-    # Section A-A cuts only the end piece: past the shank, short of the bend.
-    start, end = drawing.SECTION_LINE_X_MM
+    # Section A-A keeps only the end piece: its crop runs past the shank,
+    # short of the bend; its full cut's line runs past where the plane leaves
+    # the bend's outer wall, short of the leg.
+    start, end = drawing.SECTION_CROP_X_MM
     assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
+    bend_cut_end = -geom.BEND_R + math.sqrt(
+        (geom.BEND_R + geom.TUBE_DIA / 2.0) ** 2 - geom.BEND_R**2
+    )
+    line_start, line_end = drawing.SECTION_LINE_X_MM
+    assert line_start == start and bend_cut_end < line_end < 0.0
 
 
 @pytest.fixture

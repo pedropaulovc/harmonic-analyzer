@@ -39,6 +39,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     dimension_name,
     place_view,
     remove_notes_matching,
+    view_name,
 )
 
 from _check import check
@@ -157,15 +158,25 @@ FRONT_KEEP = {
 # upper dimensions and of the elevation's arm-straight text.
 TAP_CALLOUT_XY = (0.158, 0.266)
 
-# Section A-A: the cutting line runs along the arm axis in the elevation from
-# outside the end face to just past the braze shank, short of the bend
-# tangent, and the removed section shows only that span's cut faces.  It is
-# turned until model +X runs right and model -Z up (looking down on the arm
-# axis plane, where the end piece's and counterbore's sketches lie), and set
-# so the end face's centre lands on SECTION_FACE_XY.
-SECTION_LINE_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
-if SECTION_LINE_X_MM[1] >= -BEND_R:
-    raise AssertionError("section A-A's cutting line reaches the bend")
+# Section A-A: a full section on the horizontal plane through the arm axis,
+# cut faces only, cropped to the end piece and the tube over its shank.  A
+# PARTIAL (removed) section along the same span does not import the end
+# piece's Ø or the counterbore's Ø; the full section imports all six
+# (probe farm runs 20261027T211151181Z, 20261027T213158937Z).  The plane
+# also cuts the bend's top, out to where the bend's outer wall drops below
+# it, so the cutting line runs from outside the end face to past that and the
+# crop keeps only SECTION_CROP_X_MM: to just past the braze shank, short of
+# the bend tangent.  The view is turned until model +X runs right and model
+# -Z up (looking down on the arm-axis plane, where the end piece's and
+# counterbore's sketches lie), and set so the end face's centre lands on
+# SECTION_FACE_XY.
+_BEND_CUT_END_X = -BEND_R + math.sqrt((BEND_R + _TUBE_R) ** 2 - BEND_R**2)
+SECTION_LINE_X_MM = (ARM_END_X - 2.0, _BEND_CUT_END_X + 10.0)
+SECTION_CROP_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
+if SECTION_CROP_X_MM[1] >= -BEND_R:
+    raise AssertionError("section A-A's crop reaches the bend")
+if SECTION_LINE_X_MM[1] >= 0.0:
+    raise AssertionError("section A-A's cutting line reaches the leg")
 # Created below the cutting line, so its arrows look down on the arm.
 SECTION_CREATE_XY = (0.110, 0.195)
 SECTION_FACE_XY = (0.075, 0.200)
@@ -311,14 +322,84 @@ def _place_section(adapter: Any, native: Any) -> None:
     raise RuntimeError(f"section A-A end face did not land on {SECTION_FACE_XY}")
 
 
+def _crop_section(adapter: Any, section: Any) -> None:
+    """Crop section A-A to SECTION_CROP_X_MM across the tube's Ø plus 1 mm,
+    a sheet rectangle sketched direct to the database in the view's own sketch
+    and handed to ``IView.Crop2`` with no boundary drawn
+    (draw_dt_cone_swing_platform ``_crop_section_to_fence``).  The crop is
+    proved by the outline still holding the fence and losing the bend."""
+    left, right = (_section_x(x) for x in SECTION_CROP_X_MM)
+    half = (_TUBE_R + 1.0) * _SECTION_S
+    foot, head = _SY0 - half, _SY0 + half
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    native = _early_bound(section, "IView")
+    if not ddoc.ActivateView(view_name(adapter, section)):
+        raise RuntimeError("failed to activate section A-A for its crop")
+    draw.ClearSelection2(True)
+    before = tuple(float(value) for value in native.GetOutline())
+    sketch = _early_bound(native.GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    corners = []
+    for x, y in ((left, head), (right, foot)):
+        point = _early_bound(
+            math_utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        corners.append(tuple(float(value) for value in projected.ArrayData))
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    sketch_manager.AddToDB = True
+    try:
+        segments = tuple(
+            sketch_manager.CreateCornerRectangle(*corners[0], *corners[1]) or ()
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+    if len(segments) != 4:
+        raise RuntimeError(
+            f"section A-A crop fence has {len(segments)} segments, not 4"
+        )
+    for segment in segments:
+        if not _early_bound(segment, "ISketchSegment").Select4(True, None):
+            raise RuntimeError("failed to select the section A-A crop fence")
+    # IView.Crop2 returns swCropViewErrors_e, where 1 is NoError.
+    status = int(native.Crop2(False, True, 0))
+    draw.ClearSelection2(True)
+    if status != 1:
+        raise RuntimeError(f"failed to crop section A-A: Crop2 status {status}")
+    rebuild_drawing(adapter, label="section A-A cropped")
+    native.UpdateViewDisplayGeometry()
+    if not bool(native.IsCropped()):
+        raise RuntimeError("section A-A did not retain its crop")
+    after = tuple(float(value) for value in native.GetOutline())
+    # The outline pads past the fence (draw_dt_cone_swing_platform), and the
+    # full cut runs on over the bend: 0.345 m wide before the probe's crop
+    # (farm run 20261027T213158937Z), 0.108 after.
+    if (
+        len(after) != 4
+        or after[0] > left
+        or after[1] > foot
+        or after[2] < right
+        or after[3] < head
+        or after[2] - after[0] > (right - left) + 0.03
+        or after[2] - after[0] > 0.75 * (before[2] - before[0])
+    ):
+        raise RuntimeError(
+            f"section A-A crop is not its fence {(left, foot, right, head)}: "
+            f"outline {before} -> {after}"
+        )
+
+
 def _end_piece_section(adapter: Any, front: Any) -> Any:
-    """Removed section A-A along the arm axis through the end piece only."""
+    """Section A-A along the arm axis, cropped to the end piece."""
     line = model_points_in_view(
         adapter,
         front,
         tuple((x / 1000.0, ARM_Y / 1000.0, 0.0) for x in SECTION_LINE_X_MM),
         label="section A-A cutting line",
-        names=("outside the end face", "past the braze shank"),
+        names=("outside the end face", "past the bend's cut"),
     )
     section = create_section_view(
         adapter,
@@ -328,7 +409,6 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
         view_xy=SECTION_CREATE_XY,
         section_label="A",
         scale=SECTION_SCALE,
-        partial=True,
         label="end piece section A-A",
     )
     native = _early_bound(section, "IView")
@@ -337,8 +417,8 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     # dedicated bool getter may be truth-tested.
     cut.SetDisplayOnlySurfaceCut(True)
     rebuild_drawing(adapter, label="section A-A cut faces only")
-    if not cut.GetDisplayOnlySurfaceCut() or not cut.GetPartialSection():
-        raise RuntimeError("section A-A must be a removed, cut-faces-only section")
+    if not cut.GetDisplayOnlySurfaceCut() or cut.GetPartialSection():
+        raise RuntimeError("section A-A must be a full, cut-faces-only section")
     ratio = tuple(float(value) for value in native.ScaleRatio)
     if not math.isclose(ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]):
         raise RuntimeError(f"section A-A scale did not persist: {ratio}")
@@ -346,6 +426,9 @@ def _end_piece_section(adapter: Any, front: Any) -> Any:
     # A section shows no hidden lines (drawing-guidelines.md rule 9); set
     # before placing so the display change cannot shift the placed ink.
     set_hidden_lines_removed(adapter, section)
+    _place_section(adapter, native)
+    _crop_section(adapter, section)
+    # The crop must not move the placed ink.
     _place_section(adapter, native)
     position_section_caption(
         adapter, section, SECTION_CAPTION_XY, label="gooseneck end piece"
