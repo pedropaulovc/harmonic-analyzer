@@ -900,6 +900,29 @@ the value, precision and attachments; audit the new text box and leader, then
 check the native PDF for line strikes. This is not the radial/diametric
 `OffsetText` case below.
 
+Text dragged outside the witnesses without `OffsetText` hangs off the extended
+dimension line: the shelf starts at that line and the widest row's first glyph
+sits on it. The cone gear's vertical tooth-thickness line ran 0.19 mm from the
+C of CIRCULAR on all 20 sheets of 2056e3344. No `SetPosition2` move separates
+them, because the line follows the text. `draw_dt_cone_gear` keeps the line's
+pre-offset anchor, offsets the text onto a measured shelf and checks the
+exported PDF. Every line except the callout's own shelf must keep 2 mm of
+printed air from its glyphs (`assert_tooth_thickness_text_air`, at
+`after_pdf_save`). The offset leader starts at the line's midpoint and ends at
+the shelf's near end, so it closes on the block's lower-left corner; budget
+the first glyph of the widest row against it.
+
+Once offset, a model dimension imported on one sheet per configuration printed
+the last sheet's callout text on every sheet. With per-sheet `SetText`
+applied before each sheet's offset, T006 printed T120's `ON PITCH CIRCLE
+Ø63.500` under its own T006 value and tolerance (cone gear farm runs of
+746809f62 and 5000ea76b). Without `OffsetText` the same per-sheet text had
+printed correctly. The mechanism is not established. Keep the callout text
+of such a dimension identical on every configuration's sheet, and put the
+per-configuration sizes in the per-configuration property block (GEAR DATA).
+The PDF check requires each row as one text run and names the runs that
+start alike when it refuses.
+
 Full parent-scoped Numbers can also grow a BOM without changing its column
 widths or font. On MHA-SM-00 sheet 2, the native table bottom moved from
 179.495 to 158.6533 mm after the identity cutover; its fixed caption at

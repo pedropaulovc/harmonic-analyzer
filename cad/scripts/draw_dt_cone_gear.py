@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from pathlib import Path
 from typing import Any
 
 from solidworks_mcp.adapters.com_variant import double_array
@@ -53,12 +54,21 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
+from _drawing_annotation_extent import callout_ink, move_annotation
 from _drawing_dimension_import import _INSERT_DIMS_MARKED, delete_unnamed_imports
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import visible_view_entities
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_layout_collect import check_drawing_layout
-from _drawing_leaders import ARROW_TEXT_CLEARANCE, set_near_side_diameter
+from _drawing_leaders import (
+    ARROW_TEXT_CLEARANCE,
+    dimension_segments,
+    set_near_side_diameter,
+)
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -66,8 +76,10 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _fit_deviations import deviations
 from _layout_audit import arc_segments
+from _layout_geometry import Box, Segment, segment_box_distance
 from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
+from _pdf_ink import PageInk, read_pdf_ink
 from _session import run_build
 import _telemetry
 from dt_cone_gear_notes import CUTTER_DETAIL_SHEET
@@ -487,33 +499,21 @@ DIMENSION_CALLOUTS = {
     # the bore view crops the teeth off, so the callout names the reference
     # its centre-mark line stands for.
     "BoreFlatClock": "TO TOOTH CENTERLINE",
-    # The circle the arc is measured on; the mesh it sets goes over the value
-    # (CALLOUTS_ABOVE). Per-sheet: see callouts_below.
-    "ToothThickness": "CIRCULAR TOOTH THICKNESS",
+    # The circle the arc is measured on: its witnesses are straight lines, so
+    # without the circle it read as unmeasurable (machinist review of the
+    # round-2 build). The mesh it sets goes over the value (CALLOUTS_ABOVE).
+    # The text is the same on every sheet: offset (OffsetText), the imported
+    # model dimension printed the LAST sheet's below-text on all of them (T006
+    # printed T120's "ON PITCH CIRCLE Ø63.500", farm runs of 746809f62 and
+    # 5000ea76b), so no per-configuration size can ride on it. GEAR DATA
+    # gives the teeth and diametral pitch that size the circle.
+    "ToothThickness": "CIRCULAR TOOTH THICKNESS\nON PITCH CIRCLE",
     # The origin circle is an inspection witness, not the off-centre root arc.
     "FloorDia": f"ROOT ENVELOPE\nCLEARS {CYLINDER_MATE}",
     # The cone set is a solid stack on the shaft; each gear's width sets the
     # stations (user ruling 2026-09-28, spec FACE_WIDTH).
     "FaceWidth": f"20-GEAR STACK\nON {SHAFT_MATE}",
 }
-
-
-def callouts_below(teeth: int) -> dict[str, str]:
-    """Text under the value, with the circle the tooth thickness is measured
-    on.
-
-    The thickness is the arc on the pitch circle, but its witnesses are
-    straight lines, so without the circle it read as unmeasurable (machinist
-    review of the round-2 build).
-    """
-    pitch_dia = 2.0 * stock_form_profile(teeth).pitch_radius_mm
-    return {
-        **DIMENSION_CALLOUTS,
-        "ToothThickness": (
-            f"{DIMENSION_CALLOUTS['ToothThickness']}\n"
-            f"ON PITCH CIRCLE \u00d8{pitch_dia:.3f}"
-        ),
-    }
 
 
 # Text over the value: the mates. One line each: SOLIDWORKS drops a
@@ -550,8 +550,8 @@ BLANK_DIA_LIFT = 0.0175
 # through the root envelope's block, whose left edge stands at 121 mm.
 BLANK_DIA_SHIFT_X = 0.020
 # The functional root-envelope stack stands right of the tip circle,
-# above the thickness witness: in the same lane as the thickness
-# dimension line, which runs DOWN from the +X tooth, and clear of the side
+# above the thickness witness and the thickness text's shelf
+# (``tooth_thickness_shelf``), and clear of the side
 # view (left edge >= 0.219 on every sheet). The mate's row is ~4 chars wider
 # than the label (centred block), so the gap grows ~5.5 mm over the label-only
 # 0.016 to hold the block's left edge where it cleared the teeth.
@@ -578,6 +578,31 @@ DIMENSION_ARROW_LENGTH = 0.00635
 # ENFORCE round-1 T084 render's three-row block), rounded outward; it is
 # centred on the anchor, so the same half-height bounds its top.
 FLOOR_STACK_HALF_HEIGHT = 0.0115
+# The thickness text stands on its own shelf right of the +X tooth, under the
+# root-envelope stack. Hung off its dimension line (horizontal text outside
+# the witnesses), the block started AT that line, so the line dropping from
+# the 3 o'clock tooth ran down the C of CIRCULAR, 0.19 mm of air on every
+# sheet (machinist review of 2056e3344, rule 14). The text is offset
+# (OffsetText): the line stays at the tooth, and its leader leaves the line's
+# midpoint for the shelf's near end, closing on the block's lower-left
+# corner from up-left. This gap keeps that leader 2.7 mm off the C on the
+# steepest sheet (T012), and the block's right end 3.2 mm left of the side
+# view on the tightest (T084), replayed on that run's printed ink.
+TOOTH_THICKNESS_TEXT_GAP = 0.0065
+# The shelf stands this far under the root-envelope anchor: the block's ink,
+# 24.7 mm from shelf to top row on every sheet of run 20261024T091056564Z,
+# then tops out 3.3 mm under that stack's shelf, which printed 10.1 mm under
+# its anchor.
+TOOTH_THICKNESS_SHELF_DROP = 0.038
+# Offset text is centred on its position (_drawing_annotation_extent). The
+# seed puts that centre half the 64.2 mm shelf right of, and 12.9 mm above,
+# the shelf's start (run 20261024T091056564Z); the measured shelf then
+# corrects it to within the tolerance.
+TOOTH_THICKNESS_SEED = (0.0321, 0.0129)
+TOOTH_THICKNESS_PLACE_TOL = 0.0002
+# Printed air the exported PDF must keep between the callout's glyphs and
+# every line but its own shelf: the fleet's arrow-to-text clearance.
+TOOTH_THICKNESS_TEXT_AIR = ARROW_TEXT_CLEARANCE
 
 
 def thickness_arrow_reach_y(teeth: int) -> float:
@@ -623,18 +648,24 @@ def front_keep(teeth: int) -> dict[str, tuple[float, float]]:
             FRONT_CENTER[0] - BLANK_DIA_SHIFT_X,
             FRONT_CENTER[1] + half_od + BLANK_DIA_LIFT,
         ),
-        # Vertical dimension on the +X tooth: its line stands at the text x,
-        # just right of the tip circle, and runs down to the text below the
-        # gear's lowest point (the ~65 mm callout stays left of the side view).
-        # The block is centred on its point: 22.5 mm under the tip circle
-        # with one row more than the three-row block (the mate over the
-        # value, the pitch circle under the label) keeps its bottom where
-        # that block's stood at 25 mm, ~5 mm above the title block.
+        # Vertical dimension on the +X tooth: the anchor's x places its
+        # line just right of the tip circle. Its y is where the import first
+        # hangs the text, below the gear; the text then leaves the line for
+        # its own shelf (``_shelve_tooth_thickness``).
         "ToothThickness": (
             FRONT_CENTER[0] + half_od + 0.014,
             FRONT_CENTER[1] - half_od - 0.0225,
         ),
     }
+
+
+def tooth_thickness_shelf(teeth: int) -> tuple[float, float]:
+    """Sheet point where the thickness text's shelf starts: the text gap
+    right of its dimension line, the shelf drop under the root-envelope
+    stack's anchor."""
+    line_x = front_keep(teeth)["ToothThickness"][0]
+    shelf_y = floor_dia_y(teeth) - TOOTH_THICKNESS_SHELF_DROP
+    return line_x + TOOTH_THICKNESS_TEXT_GAP, shelf_y
 
 
 def bore_view_scale(teeth: int) -> tuple[float, float]:
@@ -676,8 +707,7 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     the flat's upper half and the +X centre-mark line
     (``_sweep_clock_right_of_flat``), its text right of the circle and
     raised clear of the axis line and the arc's arrowhead on it
-    (BORE_CLOCK_TEXT_*), where the front view's thickness callout (above
-    right, x 134-164 y 78-108 mm) never reaches.
+    (BORE_CLOCK_TEXT_*).
     """
     ratio = _bore_view_ratio(teeth)
     flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
@@ -1146,6 +1176,180 @@ def _sweep_clock_right_of_flat(
     )
 
 
+def _shelve_tooth_thickness(
+    adapter: Any, annotations: list[Any], teeth: int, *, label: str
+) -> None:
+    """Offset the thickness text onto its own shelf (``tooth_thickness_shelf``)
+    and prove the shelf landed there while the line stayed at the tooth.
+
+    The line keeps the pre-offset anchor's x (the oblique jig's handoff in
+    solidworks-drawing-layout-tuning.md); the text is seeded from the last
+    print's block, then moved by what its own native shelf reads.
+    """
+    matches = [
+        _early_bound(annotation, "IAnnotation")
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "ToothThickness"
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: expected one ToothThickness, found {len(matches)}"
+        )
+    annotation = matches[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    line_x = front_keep(teeth)["ToothThickness"][0]
+    target = tooth_thickness_shelf(teeth)
+    seed = (target[0] + TOOTH_THICKNESS_SEED[0], target[1] + TOOTH_THICKNESS_SEED[1])
+    offset_dimension_text(adapter, [annotation], {"ToothThickness": seed})
+    ink = callout_ink(adapter, annotation, label=label)
+    dx, dy = target[0] - ink.text[0], target[1] - ink.text[1]
+    if max(abs(dx), abs(dy)) > TOOTH_THICKNESS_PLACE_TOL:
+        move_annotation(adapter, annotation, dx, dy, label=label)
+        ink = callout_ink(adapter, annotation, label=label)
+    error = (ink.text[0] - target[0], ink.text[1] - target[1])
+    stations = sorted(
+        round(start[0], 6)
+        for start, end in dimension_segments(annotation)
+        if abs(start[0] - end[0]) < 1e-7
+    )
+    _telemetry.info(
+        f"{label}: thickness shelf starts ({ink.text[0] * 1000:.2f}, "
+        f"{ink.text[1] * 1000:.2f}) mm for ({target[0] * 1000:.2f}, "
+        f"{target[1] * 1000:.2f}); vertical lines at "
+        f"{[round(x * 1000, 2) for x in stations]} mm, line anchor {line_x * 1000:.2f}",
+        offset_text=bool(display.OffsetText),
+    )
+    if not bool(display.OffsetText):
+        raise RuntimeError(f"{label}: the thickness text did not stay offset")
+    if max(map(abs, error)) > TOOTH_THICKNESS_PLACE_TOL:
+        raise RuntimeError(
+            f"{label}: thickness shelf starts {error[0] * 1000:.2f}, "
+            f"{error[1] * 1000:.2f} mm off its place"
+        )
+    strayed = [x for x in stations if abs(x - line_x) > TOOTH_THICKNESS_PLACE_TOL]
+    if not stations or strayed:
+        raise RuntimeError(
+            f"{label}: the thickness line left the tooth: vertical lines at "
+            f"{[round(x * 1000, 2) for x in stations]} mm, anchor {line_x * 1000:.2f}"
+        )
+
+
+# The thickness callout's printed rows other than the value, top down.
+TOOTH_THICKNESS_ROWS = (
+    CALLOUTS_ABOVE["ToothThickness"],
+    *DIMENSION_CALLOUTS["ToothThickness"].splitlines(),
+)
+
+
+# How far round the callout's text block a line is still measured; anything
+# farther is reported at this distance.
+_TEXT_AIR_WINDOW = 0.010
+
+
+def tooth_thickness_text_air(page: PageInk, teeth: int) -> tuple[float, str]:
+    """The smallest printed air between the thickness callout's glyphs and
+    any line on ``page`` other than the shelf the text stands on, with the
+    nearest line.
+
+    The callout is its printed rows (one PDF text run each) and every run
+    inside their joint box (the value and its tolerance). Its shelf is the
+    horizontal line under that box spanning it. Air is the glyph-box to
+    line distance less half the stroke width.
+    """
+    runs = []
+    for row in TOOTH_THICKNESS_ROWS:
+        key = "".join(row.split())
+        found = [span for span in page.spans if "".join(span.text.split()) == key]
+        if len(found) != 1:
+            alike = [span.text for span in page.spans if span.text[:6] == key[:6]]
+            raise ValueError(
+                f"T{teeth:03d}: thickness row {row!r} printed {len(found)} times "
+                f"(runs starting alike: {alike})"
+            )
+        runs.append(found[0])
+    block = Box(
+        min(span.xmin for span in runs),
+        min(span.ymin for span in runs),
+        max(span.xmax for span in runs),
+        max(span.ymax for span in runs),
+    )
+    hair = 0.0001
+    glyphs = [
+        Box(glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax)
+        for span in page.spans
+        if block.xmin - hair <= span.xmin
+        and span.xmax <= block.xmax + hair
+        and block.ymin - hair <= span.ymin
+        and span.ymax <= block.ymax + hair
+        for glyph in span.glyphs
+    ]
+    near = Box(
+        block.xmin - _TEXT_AIR_WINDOW,
+        block.ymin - _TEXT_AIR_WINDOW,
+        block.xmax + _TEXT_AIR_WINDOW,
+        block.ymax + _TEXT_AIR_WINDOW,
+    )
+    shelves = 0
+    air, nearest = _TEXT_AIR_WINDOW, "no line within reach"
+    for stroke in page.strokes:
+        if not (stroke.stroked or stroke.filled):
+            continue
+        segment = Segment(stroke.x0, stroke.y0, stroke.x1, stroke.y1)
+        if segment.length == 0.0 or segment_box_distance(segment, near) > 0.0:
+            continue
+        if (
+            abs(stroke.y0 - stroke.y1) < 1e-7
+            and block.ymin - 0.0025 <= stroke.y0 <= block.ymin
+            and min(stroke.x0, stroke.x1) <= block.xmin + 0.0005
+            and max(stroke.x0, stroke.x1) >= block.xmax - 0.0005
+        ):
+            shelves += 1
+            continue
+        pen = stroke.width / 2.0 if stroke.stroked else 0.0
+        for glyph in glyphs:
+            gap = segment_box_distance(segment, glyph) - pen
+            if gap < air:
+                air = gap
+                nearest = (
+                    f"{gap * 1000:.2f} mm from line {segment.format_mm()} to glyph "
+                    f"{glyph.format_mm()}"
+                )
+    if not shelves:
+        raise ValueError(
+            f"T{teeth:03d}: no shelf under the thickness text {block.format_mm()}"
+        )
+    return air, nearest
+
+
+def assert_tooth_thickness_text_air(pdf: Path) -> None:
+    """Refuse the export when any line comes nearer the thickness callout's
+    text than ``TOOTH_THICKNESS_TEXT_AIR`` on any gear sheet (the printed
+    ink, as the machinist reads it)."""
+    pages = read_pdf_ink(Path(pdf))
+    if len(pages) != len(SHEET_NAMES):
+        raise RuntimeError(
+            f"{pdf} prints {len(pages)} pages, expected {len(SHEET_NAMES)}"
+        )
+    airs = {}
+    faults = []
+    for name, teeth, page in zip(GEAR_SHEET_NAMES, CONFIGURATION_TEETH, pages):
+        air, nearest = tooth_thickness_text_air(page, teeth)
+        airs[name] = round(air * 1000, 2)
+        if air < TOOTH_THICKNESS_TEXT_AIR:
+            faults.append(f"{name}: {nearest}")
+    _telemetry.info(f"thickness text air by sheet (mm): {airs}")
+    if faults:
+        raise RuntimeError(
+            f"a line strikes the thickness text (under "
+            f"{TOOTH_THICKNESS_TEXT_AIR * 1000:.1f} mm of air):\n" + "\n".join(faults)
+        )
+
+
+def _check_exported_pdf(phase: str) -> None:
+    if phase == "after_pdf_save":
+        assert_tooth_thickness_text_air(PDF)
+
+
 def _center_mark_bore(adapter: Any, view: Any, teeth: int, *, label: str) -> None:
     """Centre-mark the D-bore on its arc.  ``IView.AutoInsertCenterMarks2``
     looks for round holes; the D is an arc and a flat, so the arc's -X point
@@ -1406,7 +1610,7 @@ async def build(adapter: Any) -> dict[str, str]:
             view_label=f"{configuration} right",
         )
         annotations = [*bore_annotations, *front_annotations, *right_annotations]
-        set_dimension_callouts(adapter, annotations, callouts_below(teeth))
+        set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
         set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
         assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
         _center_mark_bore(adapter, front, teeth, label=f"{configuration} front")
@@ -1414,6 +1618,9 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
         if not sheet.SetScale(*view_scale, False, False):
             raise RuntimeError(f"failed to pin the {configuration} sheet scale")
+        _shelve_tooth_thickness(
+            adapter, front_annotations, teeth, label=f"{configuration} thickness text"
+        )
         _label_bore_view(adapter, bore_view, teeth, label=f"{configuration} bore view")
 
         add_property_linked_note(
@@ -1459,6 +1666,7 @@ async def build(adapter: Any) -> dict[str, str]:
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
         settled_checks=(lambda: _assert_settled_clocks(adapter, clocks),),
+        checkpoint=_check_exported_pdf,
     )
 
 
