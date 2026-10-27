@@ -16,9 +16,8 @@ from _layout_audit import (
     annotation_geometry,
     calibrate_sheet_advance,
     find_lines_through_own_text,
-    find_text_clearance,
 )
-from _supplier_screw_layout import supplier_screw_lane_plan, supplier_top_text_geometry
+from _supplier_screw_layout import supplier_top_text_geometry
 
 _RECORDED = json.loads(
     (Path(__file__).parent / "testdata" / "supplier_top_r44.json").read_text(encoding="utf-8")

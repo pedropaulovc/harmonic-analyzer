@@ -14,8 +14,6 @@ import ch_rocker_arm_tl_oblique_trammel_spec as trammel
 import draw_ch_rocker_arm_tl_oblique_carrier as drawing
 import export_features
 from _drawing_contract import model_toleranced_dimensions
-from _drawing_layout_check import LeaderSegment, _proper_crossing
-from _gtol_face import FaceGeometry, SURFACE_CYLINDER, SURFACE_PLANE
 from _feature_requirements import requirements_for
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm
