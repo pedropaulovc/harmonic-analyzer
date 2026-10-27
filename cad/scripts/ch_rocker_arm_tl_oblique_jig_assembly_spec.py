@@ -1141,6 +1141,13 @@ FEED_THRUST_N = (
     * _SCREW_EFFICIENCY
     / (leadscrew_stock.LEAD / 1000.0)
 )  # 1161
+# Owner ruling 2026-10-27: TL-28 may lift its heel elastically under this
+# thrust (it opens at leadscrew.BRACKET_OPENING_THRUST, 704 N); slip governs.
+if leadscrew.BRACKET_SLIP_THRUST < leadscrew.SLIP_MARGIN_MIN * FEED_THRUST_N:
+    raise AssertionError(
+        f"TL-28 slips at {leadscrew.BRACKET_SLIP_THRUST:.0f} N, under "
+        f"{leadscrew.SLIP_MARGIN_MIN} x the {FEED_THRUST_N:.0f} N feed thrust"
+    )
 _AL_SHEAR_ULTIMATE_MPA = 207.0
 _STRIP_SAFETY = 3.0
 _NUT_FACTOR = 0.20

@@ -1279,16 +1279,16 @@ def test_bracket_bar_screws_sit_in_their_rule_17_window() -> None:
 
 def test_bracket_load_cases_hold_the_hand_abuse_thrust() -> None:
     # LOAD_CASES: 4 x #8 at 25 in-lbf on the 12.7-wide on-edge bracket, the
-    # thrust at the raised axis Z53.1. Slip holds 1.5 x the 1 kN hand-abuse
-    # thrust; opening holds the 700 N owner ruling of 2026-10-23.
+    # thrust at the raised axis Z53.1. Slip holds 1.5 x both the 1 kN
+    # hand-abuse thrust and the 70 N-pull feed thrust; the heel may lift
+    # elastically above the opening onset (owner ruling 2026-10-27).
     assert leadscrew.BAR_SCREW_TORQUE_NM == 2.8
     assert leadscrew.BAR_SCREW_PRELOAD == pytest.approx(3360.9, abs=0.1)
     assert leadscrew.BAR_SCREW_THRUST_ECCENTRICITY == pytest.approx(0.0)
     assert leadscrew.BRACKET_SLIP_THRUST == pytest.approx(2688.7, abs=0.1)
     assert leadscrew.BRACKET_OPENING_THRUST == pytest.approx(704.3, abs=0.1)
     assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * leadscrew.HAND_ABUSE_THRUST
-    assert leadscrew.NO_OPENING_THRUST == 700.0
-    assert leadscrew.BRACKET_OPENING_THRUST > leadscrew.NO_OPENING_THRUST
+    assert leadscrew.BRACKET_SLIP_THRUST >= 1.5 * spec.FEED_THRUST_N
     # TL-00 step 1 prints the one torque where the bracket screws go in.
     assert (
         "STATION, 4 #8-32 X 5/8 SHCS (ITEM "

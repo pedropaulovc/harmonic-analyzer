@@ -59,9 +59,9 @@ LOAD_CASES (ruling A′): 1 kN hand-abuse thrust along the screw at its axis
 2.8 N·m (25 in·lbf; head bearing on TL-20's counterbore floor limits it):
 preload T/(0.2 d) 3.36 kN a screw; the row's centroid is on the screw axis
 (e = 0), so the bracket slips at 2.69 kN (μ 0.2, margin 2.69). It starts to
-open (F·h = n·P·w/6, w 12.7) at 704 N. Owner ruling 2026-10-23: the
-hand-cranked Tr8 cannot reach 1 kN, so the no-opening requirement is 700 N
-(``NO_OPENING_THRUST``); the slip requirement stays 1.5 x 1 kN.
+open (F·h = n·P·w/6, w 12.7) at 704 N, below TL-00's 1161 N feed thrust at
+a 70 N hand pull. Owner ruling 2026-10-27: the heel may lift elastically;
+slip governs, held at 1.5 x both the 1 kN abuse and the feed thrust.
 
 Bought dimensions live in one block below (``# --- Bought items``). Items
 marked UNVERIFIED are assumed until verified on receipt.
@@ -490,9 +490,6 @@ BAR_SCREW_TORQUE_NM = round(BAR_SCREW_TORQUE_IN_LBF * 0.112984829, 1)  # 2.8
 NUT_FACTOR = 0.2  # dry steel SHCS, T = K * P * d
 BAR_SCREW_PRELOAD = BAR_SCREW_TORQUE_NM / (NUT_FACTOR * SHCS_8_MAJOR / 1000.0)  # N
 HAND_ABUSE_THRUST = 1000.0  # N, along the screw at its axis
-# Owner ruling 2026-10-23: the hand-cranked Tr8 cannot reach 1 kN; TL-28
-# must not open below 700 N (the slip requirement stays on 1 kN).
-NO_OPENING_THRUST = 700.0  # N
 FRICTION_MIN = 0.2  # bracket on the bar, as-machined aluminium
 SLIP_MARGIN_MIN = 1.5
 _n = len(BAR_SCREW_LATERALS)
@@ -506,6 +503,9 @@ _worst_shear = 1.0 / _n + abs(BAR_SCREW_THRUST_ECCENTRICITY) * max(_r) / sum(
 BRACKET_SLIP_THRUST = FRICTION_MIN * BAR_SCREW_PRELOAD / _worst_shear  # 2.69 kN
 # Opening onset: the thrust's moment about the bracket's heel, at the screw
 # axis above the bar top, against the row's preload over the bracket width.
+# Owner ruling 2026-10-27 (#1943 review): slip governs. A firm hand pull can
+# reach the onset (TL-00's 1161 N feed thrust), lifting the heel elastically;
+# the joint must not slip, so the onset is reported, not required.
 _thrust_height = SCREW_AXIS_Z - trammel.BASE_BAR_THICK  # 40.4
 BRACKET_OPENING_THRUST = (
     _n * BAR_SCREW_PRELOAD * BRACKET_WIDTH / (6.0 * _thrust_height)
@@ -514,9 +514,4 @@ if BRACKET_SLIP_THRUST < SLIP_MARGIN_MIN * HAND_ABUSE_THRUST:
     raise AssertionError(
         f"TL-28 slips at {BRACKET_SLIP_THRUST:.0f} N, under "
         f"{SLIP_MARGIN_MIN} x the {HAND_ABUSE_THRUST:.0f} N hand-abuse thrust"
-    )
-if not BRACKET_OPENING_THRUST > NO_OPENING_THRUST:
-    raise AssertionError(
-        f"TL-28 opens at {BRACKET_OPENING_THRUST:.0f} N, under the "
-        f"{NO_OPENING_THRUST:.0f} N no-opening requirement"
     )
