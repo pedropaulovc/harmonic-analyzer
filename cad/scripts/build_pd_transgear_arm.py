@@ -698,6 +698,9 @@ async def build(adapter: Any) -> dict[str, str]:
     check("exit_sketch locating holes", await adapter.exit_sketch())
     name_last_feature(adapter, "LocatorProfile")
     drive_jobs += locators.apply(adapter, "LocatorProfile")
+    before = await volume_check(
+        adapter, "arm before the locating holes", expected, 0.001 * expected
+    )
     check(
         "cut through locating holes",
         await adapter.create_cut_extrude(
@@ -705,8 +708,14 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "LocatorHoles")
-    expected -= len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS
-    await volume_check(adapter, "matched through locating holes", expected, 0.001 * expected)
+    # Judged on the cut's own volume: blind 4.80 sockets would remove 19.6
+    # mm^3 less than the through holes, far outside this 2% band, so the
+    # check proves the punch-out path reaches the front face.
+    v_locators = len(LOCATOR_SITES_MM) * math.pi * (LOCATOR_HOLE_DIA_MM / 2.0)**2 * THICKNESS
+    await volume_check(
+        adapter, "matched through locating holes", before - v_locators, 0.02 * v_locators
+    )
+    expected -= v_locators
     for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1):
         axis = await name_bore_axis(
             adapter, "Top Plane", y, "Right Plane", x, f"locator {index}",

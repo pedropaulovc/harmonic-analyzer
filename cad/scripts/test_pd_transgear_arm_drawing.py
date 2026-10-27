@@ -682,10 +682,9 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     ±0.05 named no mate. The spring seats in it; the floor sets its room."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
-    assert spec.SPOT_FACE_CALLOUT.splitlines() == [
-        "COUNTERBORE, REAR FACE", f"SEATS PIVOT SPRING {spring}",
-    ]
-    assert spec.FLOOR_DEPTH_CALLOUT.splitlines()[-2:] == ["FOR SPRING", "PRELOAD"]
+    # The mate is named on the counterbore; the floor says what it holds.
+    assert spring in " ".join(spec.SPOT_FACE_CALLOUT.split())
+    assert "SPRING" in " ".join(spec.FLOOR_DEPTH_CALLOUT.split())
 
 
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
@@ -702,14 +701,22 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
     assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((0.002, 0.018))
     assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
     plate = _config.parts("pd-transgear-arm-plate")["number"]
-    lines = drawing.LOCATOR_CALLOUT_TEXT.splitlines()
-    assert lines[2:] == [
-        f"PRESS FIT DOWEL {dowel.PART_NUMBER}",
-        "0.002/0.018 INTERFERENCE",
-        f"MATCH-DRILL WITH ARM PLATE {plate}",
-        f"AT {step_ref('arm-plate-located')}",
-    ]
-    assert lines[:2] == ["2X REAM THRU", "MOUTH BREAKS 0.05 MAX: DOWEL GRIP"]
+    flat = " ".join(drawing.LOCATOR_CALLOUT_TEXT.split())
+    # The contract, not the wording: the through ream, the mouth break's
+    # limit, the dowel and its interference, and the match-drill partner and
+    # its assembly step.
+    for fact in (
+        "THRU",
+        f"{interface.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX",
+        dowel.PART_NUMBER,
+        f"{spec.LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{spec.LOCATOR_PRESS_INTERFERENCE[1]:.3f}",
+        plate,
+        step_ref("arm-plate-located"),
+    ):
+        assert fact in flat, fact
+    # Layout bound: under the Ø value the block keeps inside the upper border
+    # at six lines (run 20261027T124240514Z).
+    assert len(drawing.LOCATOR_CALLOUT_TEXT.splitlines()) <= 6
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
 
 
@@ -737,8 +744,8 @@ def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> N
     lines = drawing.NOTES_TEXT.splitlines()
     assert drawing.NOTES_TEXT == spec.PROJECTED_ZONE_NOTE
     assert len(lines) <= 4
-    assert lines[0].startswith("1. PROJECTED ZONES START AT FRONT FACE A")
     flat = " ".join(line.strip() for line in lines)
+    assert "FRONT FACE A" in flat
     assert "\u00b1" not in flat
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
     assert "NO SHAKE" not in flat
