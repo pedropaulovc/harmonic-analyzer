@@ -1,4 +1,4 @@
-"""Offline native receiver, full-thread and legacy-weldment contracts."""
+"""Offline flush end piece, blind tap, counterbore and weldment-note contracts."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from _hole_spec import DRILL_POINT_H
 import build_sm_gooseneck as part
 import build_sm_gooseneck_spring_screw as screw_part
 import draw_sm_gooseneck as drawing
@@ -19,52 +20,67 @@ import sm_gooseneck_spec as spec
 import sm_gooseneck_spring_joint as joint
 
 
-def test_physical_plug_and_modelling_overlap_are_distinct() -> None:
-    tube_id = geom.TUBE_DIA - 2.0 * geom.WALL_T
+def _calls(module, *, name: str | None = None, attr: str | None = None) -> list:
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and (
+            (name is not None and getattr(node.func, "id", None) == name)
+            or (attr is not None and getattr(node.func, "attr", None) == attr)
+        )
+    ]
 
-    assert part.PLUG_DIA == tube_id == 12.0
-    assert tube_id < part.PLUG_OVERLAP_DIA < geom.TUBE_DIA
-    assert part.PLUG_OVERLAP_DIA == geom.TUBE_DIA - geom.WALL_T == 14.0
-    assert part.PLUG_LENGTH == 10.00
+
+def test_end_piece_is_flush_and_the_tube_ends_on_its_head() -> None:
+    # Owner ruling (#1951): flush with the tube OD, no step.
+    assert geom.PLUG_DIA == geom.TUBE_DIA == 12.70
+    assert part.PLUG_R == part.TUBE_R
+    assert geom.TUBE_END_X - geom.ARM_END_X == pytest.approx(geom.PLUG_HEAD_LENGTH)
+    assert geom.ARM_STRAIGHT == pytest.approx(
+        geom.TUBE_STRAIGHT + geom.PLUG_HEAD_LENGTH
+    )
+    # The braze shank sits in the tube bore at its diametral clearance and
+    # inside the straight, short of the bend tangent.
+    clearance = geom.TUBE_BORE_DIA - joint.PLUG_SHANK_DIA
+    assert joint.BRAZE_CLEARANCE_MIN <= clearance <= joint.BRAZE_CLEARANCE_MAX
+    assert part.SHANK_R < part.TUBE_IR
+    assert part.SHANK_END_X == pytest.approx(geom.TUBE_END_X + geom.PLUG_SHANK_LENGTH)
+    assert part.SHANK_END_X < -geom.BEND_R
+    assert geom.PLUG_LENGTH == geom.PLUG_HEAD_LENGTH + geom.PLUG_SHANK_LENGTH
 
 
-def test_native_receiver_is_through_tapped_before_the_tube() -> None:
-    assert joint.TAP_SPEC.kind == "tapped"
-    assert joint.TAP_SPEC.size == "#8-32"
-    assert joint.TAP_SPEC.end == "through_all"
+def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
+    assert joint.TAP_SPEC.kind.startswith("tapped")
+    assert joint.TAP_SPEC.size == "1/4-28"
+    assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.thread_class == "2B"
-    assert part.TAP_DRILL_DIA == 3.454
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    taps = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "wizard_holes"
-    ]
+    assert part.TAP_DRILL_DIA == joint.TAP_DRILL_DIA
+    assert joint.TAP_THREAD_DEPTH < joint.TAP_DRILL_DEPTH
+    # The full drill Ø stays in the head; the point stays in the end piece,
+    # so the tube's bore never sees the drill.
+    assert joint.TAP_DRILL_DEPTH_MAX <= geom.PLUG_HEAD_LENGTH
+    tip = joint.TAP_DRILL_DEPTH_MAX + DRILL_POINT_H * joint.TAP_DRILL_DIA_MAX / 2.0
+    assert tip < geom.PLUG_LENGTH
+    taps = _calls(part, name="wizard_holes")
     assert len(taps) == 1
-    # Through-all must be upstream of the curved tube: otherwise the drill
-    # exits the straight bore and perforates the bend's far wall as well.
-    sweeps = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "attr", None) == "create_sweep"
-    ]
+    # The end piece and its tap come first; the tube is swept onto them.
+    sweeps = _calls(part, attr="create_sweep")
     assert sweeps
     assert taps[0].lineno < min(node.lineno for node in sweeps)
 
 
-def test_counterbore_and_inner_break_follow_the_tap_before_the_tube() -> None:
+def test_counterbore_follows_the_tap_before_the_tube() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
+    end_piece = source.index('name_last_feature(adapter, "EndPiece")')
     tap = source.index('name="ThreadBore"')
-    cbore = source.index('name_last_feature(adapter, "Counterbore")')
-    inner = source.index('name_last_feature(adapter, "InnerTapBreak")')
+    counterbore = source.index('name_last_feature(adapter, "Counterbore")')
     sweep = source.index("create_sweep")
-    assert tap < cbore < inner < sweep
-    assert "TapEdgeBreaks" not in source and '"Mouth"' not in source
-    assert (part.COUNTERBORE_DIA, part.COUNTERBORE_DEPTH) == (
-        joint.COUNTERBORE_DIA,
-        joint.COUNTERBORE_DEPTH,
+    assert end_piece < tap < counterbore < sweep
+    assert part.COUNTERBORE_R * 2.0 == joint.COUNTERBORE_DIA
+    assert part.COUNTERBORE_FLOOR_X == pytest.approx(
+        geom.ARM_END_X + joint.COUNTERBORE_DEPTH
     )
 
 
@@ -110,82 +126,68 @@ def test_every_direct_db_block_restores_inference_in_finally(builder) -> None:
     assert on == restored == len(offs) >= 1
 
 
-def test_counterbore_and_breaks_reduce_the_printed_full_thread_length() -> None:
-    notes = " ".join(spec.DRAWING_NOTES.split())
-    cbore = re.search(
-        r"ARM END C'BORE <MOD-DIAM>([\d.]+)-([\d.]+) X ([\d.]+)-([\d.]+) DEEP"
-        r" FROM PLUG FACE, ON TAP AXIS WITHIN ([\d.]+); FLOOR CORNER R([\d.]+) MAX;",
-        notes,
-    )
-    edge = re.search(r"BREAK INNER TAP END\s+([\d.]+)\s+X\s+45\s+DEG", notes)
-    full = re.search(r"FULL THREAD\s+([\d.]+)\s+NOMINAL;\s+([\d.]+)\s+MIN", notes)
-    assert cbore is not None and edge is not None and full is not None
-    dia_min, dia_max, depth_min, depth_max, axis, corner = map(float, cbore.groups())
-    assert (dia_min, dia_max) == pytest.approx(
-        (joint.COUNTERBORE_DIA, joint.COUNTERBORE_DIA_MAX)
-    )
-    assert (dia_min, dia_max, depth_min, depth_max) == pytest.approx(
-        (4.90, 5.00, 2.59, 2.69)
-    )
-    assert axis == joint.COUNTERBORE_AXIS_OFFSET_MAX == 0.10
-    assert corner == joint.COUNTERBORE_FLOOR_CORNER_R_MAX == 0.10
-    assert "SETUP" not in notes  # a requirement, not a method
-    edge_break = float(edge.group(1))
-    nominal, minimum = map(float, full.groups())
-    assert edge_break == 0.25
-    # The title block's 0.25 break also takes the tap edge at the c'bore floor.
-    depth = (depth_min + depth_max) / 2.0
-    assert nominal == pytest.approx(part.PLUG_LENGTH - depth - 2.0 * edge_break)
-    assert minimum == pytest.approx(
-        part.PLUG_LENGTH - joint.PLUG_LENGTH_BAND - depth_max - 2.0 * edge_break
-    )
-    assert (nominal, minimum) == pytest.approx((6.86, 6.30))
-    assert minimum >= 1.5 * (0.164 * 25.4)  # #8 basic major, not its tap drill
-    assert "BREAK BOTH TAP ENDS" not in notes
+def test_counterbore_callouts_floor_the_wall_from_the_joint() -> None:
+    # A stated minimum is rounded DOWN, so the print never promises more
+    # wall than the joint's worst case leaves (drawing-guidelines rule 20).
+    floored = math.floor(joint.COUNTERBORE_WALL_MIN * 100.0) / 100.0
+    assert spec.COUNTERBORE_WALL_CALLOUT == f"C'BORE WALL {floored:.2f} MIN"
+    assert floored <= joint.COUNTERBORE_WALL_MIN
+    callouts = spec.DIMENSION_CALLOUTS_BY_NAME
+    assert spec.COUNTERBORE_WALL_CALLOUT in callouts["CounterboreDia"].splitlines()
+    assert callouts["CounterboreDepth"] == spec.COUNTERBORE_FLOOR_CALLOUT
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert set(callouts) <= marked
+    for feature, by_name in spec.DIMENSION_CALLOUTS.items():
+        assert set(by_name) <= set(spec.DRAWING_DIMENSIONS[feature])
 
 
-def test_plug_print_uses_physical_size_and_shared_loose_bands() -> None:
+def test_notes_state_stock_process_and_intent_without_sizes() -> None:
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert len([line for line in lines if re.match(r"\d+\. ", line)]) <= 4
     notes = " ".join(spec.DRAWING_NOTES.split())
-    plug = re.search(
-        r"END PLUG:.*?<MOD-DIAM>([\d.]+)\s+\+/-([\d.]+)"
-        r"\s+X\s+([\d.]+)\s+\+/-([\d.]+)",
-        notes,
-    )
-    assert plug is not None
-    assert tuple(map(float, plug.groups())) == (12.00, 0.51, 10.00, 0.51)
-    assert re.search(
-        r"THREAD AXIS TO TUBE AXIS\s+\+/-" + f"{joint.THREAD_AXIS_OFFSET_MAX:.2f}",
-        notes,
-    )
-    assert re.search(
-        r"DRILL WANDER\s+" + f"{joint.DRILL_WANDER_MAX:.2f}" + r"\s+MAX", notes
-    )
-    assert "#8-32 UNC-2B THRU PLUG" in notes
-    assert "SILVER-BRAZE" in notes
-    # drawing-guidelines.md rule 4 (tighten only for function, and name the mate): a matched fit names its mate and states the clearance.
-    fit = re.search(
-        r"FIT TO THE TUBE BORE AT\s+([\d.]+)-([\d.]+)\s+DIAMETRAL CLEARANCE", notes
-    )
-    assert fit is not None
-    assert (
-        tuple(map(float, fit.groups()))
-        == (
-            joint.BRAZE_CLEARANCE_MIN,
-            joint.BRAZE_CLEARANCE_MAX,
-        )
-        == (0.05, 0.13)
-    )
-    assert "FLUSH WITH ARM END +/-0.10" in notes
-    assert "NO OPEN GAP AT END FACE" in notes
+    for phrase in (
+        "1/2 OD X 0.065 WALL 4130-N SEAMLESS",
+        "ONLINEMETALS 7322",
+        "NOT MACHINED",
+        "1/2 X 3 CLR DIE",
+        "5/8 OD X 0.058 WALL 4130-N SEAMLESS",
+        "ONLINEMETALS 7324",
+        "SELECT-FIT FROM STOCK",
+        "NO HONE",
+        "SILVER-BRAZE BOTH ENDS",
+        "BAg-7",
+        "TAP AFTER BRAZE",
+    ):
+        assert phrase in notes, phrase
+    # Sizes and tolerances are native model dimensions, never note text.
+    assert re.search(r"\b\d+\.\d{1,2}\b", notes) is None, notes
+    assert "<MOD-DIAM>" not in notes and "Ø" not in notes
+    assert "THRU" not in notes.upper()
 
 
 def test_weldment_keeps_the_made_screw_in_the_assembly() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split()).upper()
-    assert "MHA-SM-04" in notes and "MADE SEPARATELY" in notes
+    assert spec.SCREW_NUMBER == "MHA-SM-04"
+    assert spec.SCREW_NUMBER in notes and "MADE SEPARATELY" in notes
     assert "NOT INCLUDED IN THIS WELDMENT" in notes
     assert "PURCHASED" not in notes and "INTEGRAL" not in notes
-    assert "SHANK EXPOSED" not in notes and "SLOT" not in notes
     assert "THREADLOCKER" not in notes  # spring-eye clamping belongs to the assembly
+
+
+def test_sheet_places_every_marked_dimension_at_its_places() -> None:
+    marked = {name for names in spec.DRAWING_DIMENSIONS.values() for name in names}
+    assert set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP) == marked
+    assert not set(drawing.FRONT_KEEP) & set(drawing.SECTION_KEEP)
+    assert set(spec.DRAWING_DIMENSIONS["EndPieceProfile"]) | set(
+        spec.DRAWING_DIMENSIONS["CounterboreProfile"]
+    ) == set(drawing.SECTION_KEEP)
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert {
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
+    } == spec.ONE_PLACE_DIMENSIONS
+    # Section A-A cuts only the end piece: past the shank, short of the bend.
+    start, end = drawing.SECTION_LINE_X_MM
+    assert start < geom.ARM_END_X < part.SHANK_END_X < end < -geom.BEND_R
 
 
 @pytest.fixture
@@ -193,11 +195,13 @@ def saved_tap(monkeypatch):
     """Read-only saved feature with independently specified native tap metadata."""
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _interface: value)
     definition = SimpleNamespace(
-        FastenerSize="#8-32",
+        FastenerSize="1/4-28",
         ThreadClass="2B",
-        ThreadEndCondition=1,  # through all, not blind or through next
-        EndCondition=1,
-        ThruTapDrillDiameter=0.003454,  # native model length units are metres
+        ThreadEndCondition=0,  # blind
+        EndCondition=0,
+        TapDrillDiameter=0.00541,  # native model length units are metres
+        TapDrillDepth=0.020,
+        ThreadDepth=0.0176,
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -210,25 +214,31 @@ def saved_tap(monkeypatch):
 
 
 @pytest.mark.parametrize("offset_mm", [-0.004, 0.0, 0.004])
-def test_saved_native_receiver_accepts_the_through_tap(saved_tap, offset_mm):
+@pytest.mark.parametrize("field", ["TapDrillDiameter", "TapDrillDepth", "ThreadDepth"])
+def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm):
     model, _feature, definition = saved_tap
-    definition.ThruTapDrillDiameter += offset_mm / 1000.0
+    setattr(definition, field, getattr(definition, field) + offset_mm / 1000.0)
     drawing._require_saved_tap(model)
 
 
 @pytest.mark.parametrize(
     ("field", "value", "diagnostic"),
     [
-        ("FastenerSize", "#6-32", "thread size"),
+        ("FastenerSize", "1/4-20", "thread size"),
         ("ThreadClass", "", "ThreadClass"),
         ("ThreadClass", "3B", "ThreadClass"),
-        ("ThreadEndCondition", 0, "ThreadEndCondition"),
+        ("ThreadEndCondition", 1, "ThreadEndCondition"),
         ("ThreadEndCondition", 2, "ThreadEndCondition"),
-        ("EndCondition", 0, "EndCondition"),
+        ("EndCondition", 1, "EndCondition"),
         ("EndCondition", 2, "EndCondition"),
-        ("ThruTapDrillDiameter", 0.0, "tap drill"),
-        ("ThruTapDrillDiameter", 0.003448, "tap drill"),
-        ("ThruTapDrillDiameter", 0.003460, "tap drill"),
+        ("TapDrillDiameter", 0.0, "tap drill"),
+        ("TapDrillDiameter", 0.005404, "tap drill"),
+        ("TapDrillDiameter", 0.005416, "tap drill"),
+        ("TapDrillDiameter", math.nan, "tap drill"),
+        ("TapDrillDepth", 0.0199, "tap drill depth"),
+        ("TapDrillDepth", 0.0201, "tap drill depth"),
+        ("ThreadDepth", 0.0175, "thread depth"),
+        ("ThreadDepth", 0.020, "thread depth"),
     ],
 )
 def test_saved_native_receiver_rejects_lost_thread_metadata(
@@ -263,7 +273,7 @@ def _mass_adapter(volume: float):
 
 
 @pytest.mark.parametrize("volume", [math.nan, math.inf, -math.inf])
-def test_plug_build_stops_on_a_non_finite_volume_read(volume):
+def test_build_stops_on_a_non_finite_volume_read(volume):
     # NaN passes |vol - expected| > tol, the shared volume_check's included
     # (codjiflo rounds 5 and 6 on #1997).
     adapter = _mass_adapter(volume)
@@ -271,5 +281,5 @@ def test_plug_build_stops_on_a_non_finite_volume_read(volume):
         asyncio.run(part._volume(adapter))
     # The shared check already rejects an infinite read; NaN needs the guard.
     with pytest.raises(RuntimeError, match="non-finite volume|volume -?inf"):
-        asyncio.run(part._volume_check(adapter, "plug", 100.0, 1.0))
+        asyncio.run(part._volume_check(adapter, "end piece", 100.0, 1.0))
     assert asyncio.run(part._volume(_mass_adapter(100.0))) == 100.0

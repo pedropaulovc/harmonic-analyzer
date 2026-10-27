@@ -1,18 +1,23 @@
 """Offline run-out, full-thread, wall, tip and loop contracts for the upper clamp.
 
-Owner ruling 2026-10-26 (#1951, option B): the loop sits on MHA-SM-04's plain
-Ø3.50 shoulder and its #8-32 thread runs through MHA-SM-01's plug, retapped
-#8-32 UNC-2B THRU.  The 2026-09-21 clamp rulings stand.  The plug's arm-end
-counterbore clears the screw's die run-out with the loop clamped coil-bound
-(codjiflo P1 on #1997).
+Owner rulings 2026-10-27 (#1951): MHA-SM-04's 1/4-28 UNF thread runs into
+the BLIND 1/4-28 UNF-2B tap in the solid Ø12.70 end piece of MHA-SM-01's 1/2
+in arm, and the MHA-SM-VN-51 loop is clamped on the screw's plain Ø6.35 body.
+The 2026-09-21 clamp rulings stand.  The arm-end counterbore clears the
+screw's die run-out with the loop clamped coil-bound (codjiflo P1 on #1997).
+Two owner minors stand against unchanged checks: the counterbore wall
+(sm-gooseneck RV-01) and the head's retention (sm-gooseneck-spring-screw
+RV-01).
 """
 
 from __future__ import annotations
 
 import math
+import runpy
 
 import pytest
 
+import machinist_exceptions
 import sm_gooseneck_geom as gooseneck
 import sm_gooseneck_spec as gooseneck_spec
 import sm_gooseneck_spring_joint as joint
@@ -27,7 +32,7 @@ def test_clamp_preload_binds_the_loop_coil_bound() -> None:
     rise = spring.LOOP_TURNS * spring.WIRE_DIA_MM  # one wire per turn, bound
     assert joint.CLAMPED_GAP_MAX == pytest.approx(rise + spring.WIRE_DIA_MM)
     assert joint.CLAMPED_GAP_MAX == pytest.approx(4.40, abs=0.005)
-    # Two stacked pull-side layers on the seat, inside both faces.
+    # Two stacked pull-side layers on the body, inside both faces.
     assert joint.CLAMPED_GAP_MIN == pytest.approx(2.0 * spring.WIRE_DIA_MM)
     rate = 82_700.0 * 1.6002**4 / (8.0 * 11.0998**3 * 1.75)
     assert joint.LOOP_AXIAL_RATE == pytest.approx(rate)
@@ -51,13 +56,13 @@ def test_screw_tilts_by_its_play_over_the_shortest_engagement() -> None:
     tilt = math.atan(2.0 * _screw_play() / ONE_POINT_FIVE_D)
     assert joint.SCREW_RADIAL_PLAY_MAX == pytest.approx(_screw_play())
     assert joint.SCREW_TILT_MAX == pytest.approx(tilt)
-    assert math.degrees(tilt) == pytest.approx(1.84, abs=0.005)
+    assert math.degrees(tilt) == pytest.approx(1.296, abs=5e-4)
     assert joint.ENGAGEMENT_MIN >= ONE_POINT_FIVE_D
-    # At the plug face: the deepest floor and its 0.25 break past the
+    # At the end face: the deepest floor and its 0.25 break past the
     # receiver's first full thread.
     face = _screw_play() + (joint.COUNTERBORE_DEPTH_MAX + 0.25) * math.tan(tilt)
     assert joint.SCREW_FACE_OFFSET_MAX == pytest.approx(face)
-    assert face == pytest.approx(0.194, abs=5e-4)
+    assert face == pytest.approx(0.177, abs=5e-4)
 
 
 def test_counterbore_depth_clears_the_deepest_runout_with_margin() -> None:
@@ -67,26 +72,26 @@ def test_counterbore_depth_clears_the_deepest_runout_with_margin() -> None:
     free = screw.FULL_THREAD_STATION_MAX - gooseneck.SPRING_EYE_GAP + dip
     assert joint.SCREW_RUNOUT_INTRUSION_MAX == pytest.approx(deepest)
     assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX == pytest.approx(free)
-    assert (free, deepest) == pytest.approx((0.86, 2.54), abs=0.005)
+    assert (free, deepest) == pytest.approx((0.99, 2.67), abs=0.005)
     assert joint.COUNTERBORE_DEPTH_MIN - deepest >= joint.COUNTERBORE_RUNOUT_MARGIN_MIN
     assert (
         joint.COUNTERBORE_DEPTH_MIN,
         joint.COUNTERBORE_DEPTH,
         joint.COUNTERBORE_DEPTH_MAX,
-    ) == pytest.approx((2.59, 2.64, 2.69))
+    ) == pytest.approx((2.73, 2.78, 2.83))
 
 
 def test_counterbore_clears_the_fat_runout_radially() -> None:
     clearance = (
         joint.COUNTERBORE_DIA / 2.0  # DRILLED HOLES minus is 0
         - screw.MAJOR_DIA / 2.0  # run-out crest, at or above the 2A major max
-        - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note 4, to the tap
-        - joint.SCREW_FACE_OFFSET_MAX  # the tilted screw, at the plug face
+        - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note, to the tap
+        - joint.SCREW_FACE_OFFSET_MAX  # the tilted screw, at the end face
     )
     assert joint.RUNOUT_RADIAL_CLEARANCE_MIN == pytest.approx(clearance)
-    assert clearance == pytest.approx(0.073, abs=5e-4)
-    # Ø4.70 would rub once the tilt counts: the reason the counterbore is Ø4.90.
-    assert (4.70 - screw.MAJOR_DIA) / 2.0 - joint.COUNTERBORE_AXIS_OFFSET_MAX - (
+    assert clearance == pytest.approx(0.048, abs=5e-4)
+    # Ø6.90 would rub once the tilt counts: the reason the counterbore is Ø7.00.
+    assert (6.90 - screw.MAJOR_DIA) / 2.0 - joint.COUNTERBORE_AXIS_OFFSET_MAX - (
         joint.SCREW_FACE_OFFSET_MAX
     ) < 0.0
 
@@ -102,155 +107,229 @@ def test_counterbore_floor_corner_round_clears_the_runout() -> None:
     assert 0.0 < u < rf and 0.0 < v < rf
     exact = rf - math.hypot(u - rf, v - rf)
     assert joint.RUNOUT_FLOOR_CORNER_CLEARANCE_MIN == pytest.approx(exact)
-    assert exact == pytest.approx(0.046, abs=5e-4)
+    assert exact == pytest.approx(0.033, abs=5e-4)
     # The title block's INSIDE CORNERS R1.0 MAX would stop the screw.
     assert joint._fillet_clearance(u, v, 1.0, 0.0) < 0.0
-    notes = " ".join(line.strip() for line in gooseneck_spec.DRAWING_NOTES.splitlines())
-    assert f"FLOOR CORNER R{rf:.2f} MAX" in notes
+    assert f"FLOOR CORNER R{rf:.2f} MAX" in gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT
+    assert any(
+        gooseneck_spec.COUNTERBORE_FLOOR_CALLOUT in text
+        for text in gooseneck_spec.DIMENSION_CALLOUTS_BY_NAME.values()
+    )
 
 
 def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
-    full_thread = (
-        gooseneck.PLUG_LENGTH
-        - joint.PLUG_LENGTH_BAND  # shortest plug
-        - joint.COUNTERBORE_DEPTH_MAX  # deepest counterbore
-        - 0.25  # title-block break on the tap edge at the counterbore floor
-        - 0.25  # title-block break at the inner tap end
-    )
-    assert gooseneck.PLUG_LENGTH == 10.00
-    assert joint.ENGAGEMENT_MIN == pytest.approx(full_thread)
-    assert (joint.ENGAGEMENT_NOMINAL, joint.ENGAGEMENT_MIN) == pytest.approx(
-        (6.86, 6.30)
-    )
-    assert full_thread >= ONE_POINT_FIVE_D == pytest.approx(6.25, abs=0.005)
-
-
-def test_screw_full_thread_spans_the_receiver_so_mated_equals_receiver() -> None:
-    # Full thread starts inside the counterbore at either gap ...
-    assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX < joint.COUNTERBORE_DEPTH_MIN
-    assert joint.SCREW_RUNOUT_INTRUSION_MAX < joint.COUNTERBORE_DEPTH_MIN
-    assert not hasattr(joint, "MATED_ENGAGEMENT_MIN")
-    # ... and even the shortest screw at the free gap carries it past the
-    # longest plug's inner end.
-    longest_plug = gooseneck.PLUG_LENGTH + joint.PLUG_LENGTH_BAND
-    full_tip_reach = (
+    # The shortest screw at the free gap, less its 1.5-pitch chamfered end,
+    # against the blind tap's least full thread: the screw governs.
+    screw_full = (
         screw.LENGTH + screw.LENGTH_LOWER - gooseneck.SPRING_EYE_GAP - 1.5 * screw.PITCH
     )
-    assert joint.FULL_THREAD_REACH_MIN == pytest.approx(full_tip_reach)
-    assert full_tip_reach > longest_plug
-
-
-def test_threaded_plug_wall_is_2_0_at_the_full_worst_case() -> None:
-    smallest_plug_od = joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND  # .XX lower limit
-    largest_tap_major = screw.MAJOR_DIA + 0.025  # basic major + root oversize
-    # Hole drilled after braze, plug OD turned before: different setups.
-    runoff = (gooseneck.PLUG_LENGTH + joint.PLUG_LENGTH_BAND) * math.tan(
-        math.radians(0.3)
+    tap_full = joint.TAP_THREAD_DEPTH - joint.TAP_DEPTH_BAND
+    assert joint.FULL_THREAD_REACH_MIN == pytest.approx(screw_full)
+    assert screw_full < tap_full
+    full_thread = (
+        min(screw_full, tap_full)
+        - joint.COUNTERBORE_DEPTH_MAX  # deepest counterbore
+        - 0.25  # title-block break on the tap edge at the counterbore floor
     )
+    assert joint.ENGAGEMENT_MIN == pytest.approx(full_thread)
+    assert (joint.ENGAGEMENT_NOMINAL, joint.ENGAGEMENT_MIN) == pytest.approx(
+        (10.23, 9.67), abs=0.005
+    )
+    assert joint.ENGAGEMENT_MIN >= ONE_POINT_FIVE_D == pytest.approx(9.525)
+    # Full thread starts inside the counterbore at either gap, so the mated
+    # length is the receiver's.
+    assert joint.SCREW_RUNOUT_INTRUSION_FREE_MAX < joint.COUNTERBORE_DEPTH_MIN
+    assert joint.SCREW_RUNOUT_INTRUSION_MAX < joint.COUNTERBORE_DEPTH_MIN
+
+
+def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
+    # The longest screw at the least clamped gap sits deepest.
+    deepest_tip = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP_MIN
+    shallowest_thread = joint.TAP_THREAD_DEPTH - joint.TAP_DEPTH_BAND
+    assert joint.CLAMPED_SCREW_REACH_MAX == pytest.approx(deepest_tip)
+    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(shallowest_thread - deepest_tip)
+    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.28, abs=0.005)
+    assert joint.TIP_THREAD_MARGIN_MIN > 0.0
+    assert joint.TAP_SPEC.end == "blind"
+    assert joint.TAP_SPEC.size == screw.THREAD_SIZE == "1/4-28"
+    assert joint.TAP_SPEC.thread_class == "2B"
+
+
+def test_bottoming_tap_lead_stays_inside_the_drill() -> None:
+    # A bottoming tap's 1.5-pitch lead past the deepest full thread, inside
+    # the shallowest full-Ø drill; the full-Ø drill stays in the head.
+    lead_end = joint.TAP_THREAD_DEPTH + joint.TAP_DEPTH_BAND + 1.5 * screw.PITCH
+    shallowest_drill = joint.TAP_DRILL_DEPTH - joint.TAP_DEPTH_BAND
+    assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(shallowest_drill - lead_end)
+    assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(0.019, abs=5e-4)
+    assert joint.TAP_LEAD_DRILL_MARGIN_MIN >= 0.0
+    assert joint.TAP_DRILL_DEPTH + joint.TAP_DEPTH_BAND <= gooseneck.PLUG_HEAD_LENGTH
+
+
+def _smallest_end_piece_radius() -> float:
+    return (gooseneck.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0  # .XX lower limit
+
+
+def test_tap_wall_is_2_0_at_the_full_worst_case() -> None:
+    largest_tap_major = screw.MAJOR_DIA + 0.025  # basic major + root oversize
+    # Hole drilled after braze, head OD turned before: different setups.
+    runoff = (
+        joint.TAP_THREAD_DEPTH + joint.TAP_DEPTH_BAND + 1.5 * screw.PITCH
+    ) * math.tan(math.radians(0.3))
     worst_wall = (
-        smallest_plug_od / 2.0
+        _smallest_end_piece_radius()
         - largest_tap_major / 2.0
-        - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note 4
-        - joint.DRILL_WANDER_MAX  # MHA-SM-01 note 4
+        - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note
+        - joint.DRILL_WANDER_MAX  # MHA-SM-01 note
         - runoff
-        - 2.0 * 0.25  # tap edge + plug OD edge, title block
+        - 2.0 * 0.25  # tap edge + head OD edge, title block
     )
     assert joint.EDGE_BREAK == 0.25
     assert joint.TAP_ROOT_OVERSIZE == 0.025
     assert joint.DRILL_RUNOFF_MAX == pytest.approx(runoff)
     assert joint.PLUG_WALL_MIN == pytest.approx(worst_wall)
-    assert worst_wall == pytest.approx(2.845, abs=0.0005)
+    assert worst_wall == pytest.approx(2.056, abs=5e-4)
     assert worst_wall >= joint.PLUG_WALL_TARGET == 2.0
 
 
-def test_counterbore_wall_is_2_0_at_the_full_worst_case() -> None:
-    smallest_plug_od = joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND  # .XX lower limit
-    largest_cbore = joint.COUNTERBORE_DIA + 0.10  # DRILLED HOLES +0.10
-    # Counterbore cut after braze, plug OD turned before: different setups.
-    runoff = joint.COUNTERBORE_DEPTH_MAX * math.tan(math.radians(0.3))
+def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
+    # The deepest drill's 118-degree point crosses the head's end into the
+    # shank: its cone radius there, against the shank's lower printed limit.
+    drill_r = (joint.TAP_DRILL_DIA + 0.10) / 2.0  # DRILLED HOLES +0.10
+    point_h = drill_r / math.tan(math.radians(59.0))
+    tip = joint.TAP_DRILL_DEPTH + joint.TAP_DEPTH_BAND + point_h
+    cone_r = drill_r * (tip - gooseneck.PLUG_HEAD_LENGTH) / point_h
+    assert 0.0 < cone_r < drill_r
     worst_wall = (
-        smallest_plug_od / 2.0
-        - largest_cbore / 2.0
-        - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note 4, tap to tube
-        - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note 4, to the tap
-        - runoff
-        - 2.0 * 0.25  # counterbore mouth + plug OD edge, title block
+        (joint.PLUG_SHANK_DIA - joint.PLUG_DIAMETER_BAND) / 2.0
+        - cone_r
+        - joint.THREAD_AXIS_OFFSET_MAX
+        - joint.DRILL_WANDER_MAX
+        - tip * math.tan(math.radians(0.3))
     )
-    assert joint.COUNTERBORE_DIA_MAX == pytest.approx(largest_cbore)
-    assert joint.COUNTERBORE_WALL_MIN == pytest.approx(worst_wall)
-    assert worst_wall == pytest.approx(2.481, abs=0.0005)
+    assert joint.DRILL_POINT_RADIUS_AT_SHANK == pytest.approx(cone_r, abs=1e-4)
+    assert joint.DRILL_POINT_SHANK_WALL_MIN == pytest.approx(worst_wall, abs=1e-4)
+    assert worst_wall == pytest.approx(2.049, abs=5e-4)
     assert worst_wall >= joint.PLUG_WALL_TARGET
 
 
-def test_screw_tip_exits_plug_without_reaching_tube_wall_or_bend() -> None:
-    longest_plug = gooseneck.PLUG_LENGTH + joint.PLUG_LENGTH_BAND
-    # Free gap: the screw sits shallowest.
-    shortest_reach = screw.LENGTH + screw.LENGTH_LOWER - gooseneck.SPRING_EYE_GAP
-    assert joint.TIP_PROTRUSION_MIN == pytest.approx(shortest_reach - longest_plug)
-    assert joint.TIP_PROTRUSION_MIN == pytest.approx(1.60, abs=0.005)
-    assert joint.PLUG_INNER_X < joint.SCREW_TIP_X < -gooseneck.BEND_R
-    # Least clamped gap: the screw sits deepest.
-    longest_reach = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP_MIN
-    assert joint.TIP_TO_BEND_MIN == pytest.approx(gooseneck.ARM_RUN - longest_reach)
-    assert joint.TIP_TO_BEND_MIN > 0.0
-    smallest_bore = joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND
-    radial = smallest_bore / 2.0 - (
-        screw.MAJOR_DIA / 2.0
-        + joint.THREAD_AXIS_OFFSET_MAX
-        + joint.DRILL_WANDER_MAX
-        + joint.DRILL_RUNOFF_MAX
+def test_counterbore_wall_holds_the_floor_and_declares_its_minor() -> None:
+    largest_cbore = joint.COUNTERBORE_DIA + 0.10  # DRILLED HOLES +0.10
+    # Counterbore cut after braze, head OD turned before: different setups.
+    runoff = joint.COUNTERBORE_DEPTH_MAX * math.tan(math.radians(0.3))
+    worst_wall = (
+        _smallest_end_piece_radius()
+        - largest_cbore / 2.0
+        - joint.THREAD_AXIS_OFFSET_MAX  # MHA-SM-01 note, tap to tube
+        - joint.COUNTERBORE_AXIS_OFFSET_MAX  # MHA-SM-01 note, to the tap
+        - runoff
+        - 2.0 * 0.25  # counterbore mouth + head OD edge, title block
     )
-    assert joint.TIP_BORE_RADIAL_CLEARANCE_MIN == pytest.approx(radial)
-    assert radial > 0.0
+    assert joint.COUNTERBORE_DIA_MAX == pytest.approx(largest_cbore)
+    assert joint.COUNTERBORE_WALL_MIN == pytest.approx(worst_wall)
+    assert worst_wall == pytest.approx(1.780, abs=5e-4)
+    assert joint.PLUG_WALL_FLOOR == 1.5 <= worst_wall < joint.PLUG_WALL_TARGET
+    # The sheet states it, floored, next to its feature (rule 20).
+    assert joint.COUNTERBORE_WALL_CALLOUT_MIN == 1.78 <= worst_wall
+    callout = f"C'BORE WALL {joint.COUNTERBORE_WALL_CALLOUT_MIN:.2f} MIN"
+    assert callout in gooseneck_spec.COUNTERBORE_WALL_CALLOUT
+    assert any(
+        gooseneck_spec.COUNTERBORE_WALL_CALLOUT in text
+        for text in gooseneck_spec.DIMENSION_CALLOUTS_BY_NAME.values()
+    )
 
 
-def test_clamped_eye_stays_at_existing_station_and_has_radial_capture() -> None:
+def test_head_retains_the_eye_under_its_declared_minor() -> None:
     eye_x = gooseneck.ARM_END_X - spring.END_OCCUPIED_WIDTH_MM / 2.0
     assert eye_x == pytest.approx(-105.8)
     assert gooseneck.SPRING_EYE_GAP == spring.END_OCCUPIED_WIDTH_MM
     smallest_head = screw.HEAD_DIA + screw.HEAD_DIA_LOWER
-    assert (smallest_head - spring.EYE_ID_MM) / 2.0 == pytest.approx(
-        joint.HEAD_RETENTION_MIN
-    )
-    assert joint.HEAD_RETENTION_MIN >= 1.0
-    assert screw.SEAT_DIA_MAX < screw.MAJOR_DIA < spring.EYE_ID_MM
+    retention = (smallest_head - spring.EYE_ID_MM) / 2.0
+    assert joint.HEAD_RETENTION_MIN == pytest.approx(retention)
+    assert retention == pytest.approx(0.745, abs=5e-4)
+    assert 0.0 < retention < joint.HEAD_RETENTION_TARGET == 1.0
+    assert screw.BODY_DIA_MAX < spring.EYE_ID_MM
 
 
-def test_loop_passes_bear_on_the_plain_seat_free_and_clamped() -> None:
+def _declared(package: str):
+    return {
+        entry.id: entry.kind
+        for entry in machinist_exceptions.load_exceptions(
+            joint._config.CONFIG_DIR, package, "part"
+        )
+    }
+
+
+def test_owner_minors_are_declared_and_required(monkeypatch) -> None:
+    assert _declared("sm_gooseneck")["RV-01"] == "minor"
+    assert _declared("sm_gooseneck_spring_screw")["RV-01"] == "minor"
+    joint._owner_minor("sm_gooseneck", "RV-01")
+    joint._owner_minor("sm_gooseneck_spring_screw", "RV-01")
+    real = machinist_exceptions.load_exceptions
+
+    def without(hidden: str, accept: bool = False):
+        def load(config_root, name, kind):
+            entries = real(config_root, name, kind)
+            if name != hidden:
+                return entries
+            if accept:
+                return tuple(
+                    machinist_exceptions.MachinistException(
+                        entry.id, entry.where, entry.finding, entry.reason, "accept"
+                    )
+                    for entry in entries
+                )
+            return tuple(entry for entry in entries if entry.id != "RV-01")
+
+        return load
+
+    # An undeclared shortfall, or one declared only as accept, raises.
+    for hidden in ("sm_gooseneck", "sm_gooseneck_spring_screw"):
+        for accept in (False, True):
+            monkeypatch.setattr(joint, "load_exceptions", without(hidden, accept))
+            with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
+                joint._owner_minor(hidden, "RV-01")
+    # The module's own checks call it: run it afresh with each minor hidden.
+    for hidden in ("sm_gooseneck", "sm_gooseneck_spring_screw"):
+        monkeypatch.setattr(machinist_exceptions, "load_exceptions", without(hidden))
+        with pytest.raises(AssertionError, match=f"{hidden}: no owner minor RV-01"):
+            runpy.run_path(joint.__file__)
+
+
+def test_loop_passes_bear_on_the_plain_body_free_and_clamped() -> None:
     head_pass, plug_pass = joint.LOOP_PASS_X
-    assert 0.0 < head_pass < plug_pass < screw.SHOULDER_LENGTH_MIN
+    assert 0.0 < head_pass < plug_pass < screw.PLAIN_LENGTH_MIN
     assert (head_pass, plug_pass) == pytest.approx((1.2687, 3.1433), abs=5e-4)
     clamped_head, clamped_plug = joint.CLAMPED_LOOP_PASS_X
-    assert 0.0 < clamped_head < clamped_plug < screw.SHOULDER_LENGTH_MIN
+    assert 0.0 < clamped_head < clamped_plug < screw.PLAIN_LENGTH_MIN
     assert (clamped_head, clamped_plug) == pytest.approx((1.2002, 2.8004), abs=5e-4)
-
-    def lead_gap(station: float) -> float:
-        return (screw.SHOULDER_LENGTH_MIN - station + joint.WIRE_R) / math.sqrt(
-            2.0
-        ) - joint.WIRE_R
-
-    # Plug-side pass vs the lead: worst free (the clamped loop pulls it back).
-    assert lead_gap(plug_pass) == pytest.approx(0.159, abs=5e-4)
-    assert lead_gap(clamped_plug) > lead_gap(plug_pass)
-    assert joint.LOOP_LEAD_CLEARANCE_MIN == pytest.approx(lead_gap(plug_pass))
-    assert joint.LOOP_LEAD_CLEARANCE_MIN > 0.0
+    # Plug-side pass short of the thread's earliest start: worst free.
+    margin = screw.PLAIN_LENGTH_MIN - plug_pass
+    assert joint.LOOP_PLAIN_MARGIN_MIN == pytest.approx(margin)
+    assert margin == pytest.approx(0.457, abs=5e-4)
+    assert joint.LOOP_PLAIN_MARGIN_MIN > 0.0
+    # No step: the blank lies inside the 2A major band, so the die's crests
+    # stand at the blank and the body is one diameter wherever a wire bears.
+    assert screw.THREAD_MAJOR_2A_MIN <= screw.BODY_DIA_MIN
+    assert screw.BODY_DIA_MAX <= screw.THREAD_MAJOR_2A_MAX
 
 
 def test_wire_on_the_head_face_clears_the_underhead_fillet() -> None:
     r, fillet = joint.WIRE_R, screw.UNDERHEAD_CORNER_R
     assert fillet == 0.50
-    # Wire touching head face and seat: its centre (r, r) from the corner, the
+    # Wire touching head face and body: its centre (r, r) from the corner, the
     # fillet circle centred (fillet, fillet).  With r > fillet the nearest
     # fillet material is a tangent point, (fillet, 0) or (0, fillet).
     floor = math.hypot(r - fillet, r) - r
     assert joint.LOOP_CORNER_CLEARANCE_MIN == pytest.approx(floor)
     assert floor == pytest.approx(0.054, abs=5e-4)
+    assert joint.LOOP_CORNER_CLEARANCE_MIN > 0.0
     # The floor is the least of every state: clearance grows with station.
     stations = [r + 0.01 * k for k in range(300)]
     gaps = [joint._fillet_clearance(station, r, fillet, r) for station in stations]
     assert gaps == sorted(gaps)
     # Exact on the far side of the tangent points too: the title block's
-    # R1.0 would hold the wire off the seat, and a wire whose centre lies in
+    # R1.0 would hold the wire off the body, and a wire whose centre lies in
     # a deeper fillet's material overlaps by more than its radius.
     assert joint._fillet_clearance(r, r, 1.0, r) == pytest.approx(
         1.0 - math.hypot(r - 1.0, r - 1.0) - r
@@ -259,9 +338,9 @@ def test_wire_on_the_head_face_clears_the_underhead_fillet() -> None:
     assert joint._fillet_clearance(0.1, r, 2.0, r) < -r
 
 
-def _helix_points(gap: float, rise: float, seat: float, n: int = 20_000):
+def _helix_points(gap: float, rise: float, body: float, n: int = 20_000):
     """Supplier loop wire centreline: (station from head, radius from screw)."""
-    d = (spring.EYE_ID_MM - seat) / 2.0  # inner surface on the seat, pull side
+    d = (spring.EYE_ID_MM - body) / 2.0  # inner surface on the body, pull side
     turns = spring.LOOP_TURNS
     for k in range(n + 1):
         t = k / n
@@ -287,164 +366,138 @@ def _rim_reach(radius, inner: float, outer: float):
     return reach
 
 
-def _hull_gap(head, plug) -> float:
-    """Distance between the convex hulls of two planar point sets."""
-    import numpy as np
-    from scipy.spatial import ConvexHull, QhullError
-
-    diff = (head[:, None, :] - plug[None, :, :]).reshape(-1, 2)
-
-    def segment(a, b) -> float:
-        ab = b - a
-        span = float(ab @ ab)
-        s = 0.0 if span == 0.0 else min(1.0, max(0.0, -float(a @ ab) / span))
-        return float(np.hypot(*(a + s * ab)))
-
-    try:
-        hull = ConvexHull(diff)
-    except (QhullError, ValueError):  # under three points, or collinear
-        far = diff[np.argmax(np.linalg.norm(diff - diff[0], axis=1))]
-        if np.allclose(far, diff[0]):
-            return float(np.hypot(*diff[0]))
-        along = diff @ (far - diff[0])
-        return segment(diff[np.argmin(along)], diff[np.argmax(along)])
-    if np.all(hull.equations[:, 2] <= 0.0):
-        return 0.0  # the origin is inside: the normal forces alone balance
-    corners = diff[hull.vertices]
-    return min(segment(corners[k - 1], corners[k]) for k in range(len(corners)))
-
-
-def test_friction_held_loop_keeps_the_gap_floor_and_the_free_lead_station() -> None:
-    # The coil-bound helix, rigid, rocked by a tilt vector over a grid.  Its
-    # section bears on a face wherever it meets the face's SMALLEST footprint,
-    # rims included (_rim_reach).  Head: from the R0.5 corner's tangent out to
-    # its Ø lower limit less the title-block break.  Plug face: from the
-    # counterbore mouth's reach out to the proud plug's Ø lower limit less its
-    # break, the tube's, or without limit.
+def test_rocked_loop_keeps_the_gap_floor_and_bears_on_the_body() -> None:
+    # The loop, rigid (free helix and coil-bound), rocked by a tilt vector
+    # over a grid, then pulled down the spring's line until it bears on the
+    # body (either limit).  No friction or equilibrium filter: every rocked
+    # state whose width fits the gap (the free gap, or CLAMPED_GAP_MAX bound)
+    # counts.  Its section bears on a face wherever it meets the face's
+    # footprint, rims included (_rim_reach).  Head: from the R0.5 corner's
+    # tangent out to its Ø lower limit less the title-block break.  End face:
+    # from the counterbore mouth's reach out to the flush end piece's Ø lower
+    # limit less its break, or its upper limit.
     #  * every width holds the floor CLAMPED_GAP_MIN, which is tight, and so
     #    does the gap on the screw axis with the head face tilted
-    #    SCREW_TILT_MAX against the plug face in any direction;
-    #  * friction holds the clamped loop only where its head- and plug-face
-    #    contacts, on the face plane, lie within mu x gap of each other (the
-    #    loop's moment balance; MHA-SM-00 step 8 clamps it before the spring
-    #    is hooked, so the preload is its only load).  Swept at twice the
-    #    clamp's highest friction, which also covers the head face's tilt,
-    #    with each contact set taken CONTACT_BAND deep so that every state in
-    #    a grid cell is represented, those states keep the gap within its
-    #    bounds and both pull-side passes between the head face and the free
-    #    state's plug-side station, where the lead clearance is taken.
+    #    SCREW_TILT_MAX against the end face in any direction;
+    #  * in every state that fits, the wire bears on the body at the body's
+    #    own radius (no step: test_loop_passes_bear_on_the_plain_body_free_and_clamped),
+    #    past the head face's wire radius (the R0.5 corner's floor,
+    #    LOOP_CORNER_CLEARANCE_MIN) and short of the end face: a wire on the
+    #    body spans the counterbore's mouth rim, so at most it rides that rim
+    #    and never enters the counterbore.
     import numpy as np
 
-    mu = 2.0 * max(screw_spec.CLAMP_FRICTIONS)
+    r = joint.WIRE_R
     step = 0.01
-    # Twice the most one step moves the farthest wire (8.6 from the axis)
-    # within its cell.
-    contact_band = 0.12
-    head_outer = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
-    mouth_r = joint.COUNTERBORE_MOUTH_REACH
-    footprints = {
-        "proud": (joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0 - joint.EDGE_BREAK,
-        "tube": (gooseneck.TUBE_DIA - 0.10) / 2.0 - joint.EDGE_BREAK,
-        "full": math.inf,
-    }
+    grid = np.round(np.arange(-0.31, 0.3101, step), 6)
+    tx, ty = (axis.ravel() for axis in np.meshgrid(grid, grid, indexing="ij"))
+    tilt = np.hypot(tx, ty)
+    unit = np.zeros((tx.size, 2))
+    np.divide(
+        np.stack([tx, ty], axis=1), tilt[:, None], out=unit, where=tilt[:, None] > 0.0
+    )
+    ux, uy = unit[:, 0], unit[:, 1]
+    k = np.zeros((tx.size, 3, 3))
+    k[:, 0, 2], k[:, 1, 2], k[:, 2, 0], k[:, 2, 1] = uy, -ux, -uy, ux
+    rotations = (
+        np.eye(3)
+        + np.sin(tilt)[:, None, None] * k
+        + (1.0 - np.cos(tilt))[:, None, None] * (k @ k)
+    )
     n = 240
     t = np.linspace(0.0, 1.0, n + 1)
     theta = math.pi / 2.0 + 2.0 * math.pi * spring.LOOP_TURNS * (
         t - 1.0 / (4.0 * spring.LOOP_TURNS)
     )
-    passes = [round(fraction * n) for fraction in joint._PASS_T]
-    window = n // 7
-    grid = np.round(np.arange(-0.35, 0.3501, step), 6)
+    head_outer = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
+    mouth_r = joint.COUNTERBORE_MOUTH_REACH
+    footprints = {
+        "least": _smallest_end_piece_radius() - joint.EDGE_BREAK,
+        "most": (gooseneck.PLUG_DIA + joint.PLUG_DIAMETER_BAND) / 2.0,
+    }
     face_tilts = math.tan(joint.SCREW_TILT_MAX) * np.array(
-        [[math.cos(a), math.sin(a)] for a in np.linspace(0.0, 2.0 * math.pi, 17)[:-1]]
+        [[math.cos(a), math.sin(a)] for a in np.linspace(0.0, 2.0 * math.pi, 9)[:-1]]
     )
-
-    def rotation(tx: float, ty: float):
-        angle = math.hypot(tx, ty)
-        if angle == 0.0:
-            return np.eye(3)
-        ux, uy = tx / angle, ty / angle
-        k = np.array([[0.0, 0.0, uy], [0.0, 0.0, -ux], [-uy, ux, 0.0]])
-        return np.eye(3) + math.sin(angle) * k + (1.0 - math.cos(angle)) * k @ k
-
-    rotations = [((tx, ty), rotation(tx, ty)) for tx in grid for ty in grid]
+    states = {
+        "free": (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
+        "bound": (joint.CLAMPED_GAP_MAX, joint.CLAMPED_LOOP_RISE),
+    }
     cases = []
-    for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX):
-        d = (spring.EYE_ID_MM - seat) / 2.0
-        body = np.stack(
-            [
-                spring.COIL_MEAN_RADIUS_MM * np.cos(theta),
-                -d + spring.COIL_MEAN_RADIUS_MM * np.sin(theta),
-                joint.CLAMPED_LOOP_RISE * (t - 0.5),
-            ],
-            axis=1,
-        )
-        head_inner = seat / 2.0 + screw.UNDERHEAD_CORNER_R
-        for name, plug_outer in footprints.items():
-            least_width = least_axis_gap = math.inf
-            held = []
-            for (tx, ty), matrix in rotations:
-                rocked = body @ matrix.T
-                xy, z = rocked[:, :2], rocked[:, 2]
-                radius = np.hypot(xy[:, 0], xy[:, 1])
-                head_side = z - _rim_reach(radius, head_inner, head_outer)
-                plug_side = z + _rim_reach(radius, mouth_r, plug_outer)
-                head_face, plug_face = head_side.min(), plug_side.max()
-                width = plug_face - head_face
-                least_width = min(least_width, width)
-                axis_gap = (plug_side - face_tilts @ xy.T).max(axis=1).min() - head_face
-                least_axis_gap = min(least_axis_gap, axis_gap)
-                # Contact points on the face plane: the centreline's own over
-                # a footprint, the rim's past it.
-                touch_h = head_side <= head_face + contact_band
-                touch_p = plug_side >= plug_face - contact_band
-                on_h = (
-                    np.clip(radius[touch_h], head_inner, head_outer) / radius[touch_h]
+    for state, (gap_max, rise) in states.items():
+        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX):
+            d = (spring.EYE_ID_MM - body) / 2.0
+            loop = np.stack(
+                [
+                    spring.COIL_MEAN_RADIUS_MM * np.cos(theta),
+                    -d + spring.COIL_MEAN_RADIUS_MM * np.sin(theta),
+                    rise * (t - 0.5),
+                ],
+                axis=1,
+            )
+            rocked = loop @ rotations.transpose(0, 2, 1)
+            # Pull down -y until the first wire point meets the body: each
+            # point reaches the body circle after its own drop.
+            bearing_r = body / 2.0 + r
+            x, y = rocked[..., 0], rocked[..., 1]
+            with np.errstate(invalid="ignore"):
+                drop = y - np.sqrt(bearing_r**2 - x**2)
+            drop = np.where(np.isnan(drop) | (drop < -d), np.inf, drop).min(axis=1)
+            rocked[..., 1] -= drop[:, None]
+            xy, z = rocked[..., :2], rocked[..., 2]
+            radius = np.hypot(xy[..., 0], xy[..., 1])
+            assert radius.min(axis=1) == pytest.approx(bearing_r)
+            bearing = radius <= bearing_r + 1e-9
+            head_inner = body / 2.0 + screw.UNDERHEAD_CORNER_R
+            head_side = z - _rim_reach(radius, head_inner, head_outer)
+            head_face = head_side.min(axis=1)
+            station = z - head_face[:, None]
+            for name, outer in footprints.items():
+                end_side = z + _rim_reach(radius, mouth_r, outer)
+                width = end_side.max(axis=1) - head_face
+                axis_gap = min(
+                    float(((end_side - xy @ tilted).max(axis=1) - head_face).min())
+                    for tilted in face_tilts
                 )
-                on_p = np.clip(radius[touch_p], mouth_r, plug_outer) / radius[touch_p]
-                head_pts = xy[touch_h] * on_h[:, None]
-                plug_pts = xy[touch_p] * on_p[:, None]
-                allowed = mu * width
-                axis = plug_pts.mean(axis=0) - head_pts.mean(axis=0)
-                length = float(np.hypot(*axis))
-                if (
-                    length > 0.0
-                    and ((plug_pts @ axis).min() - (head_pts @ axis).max()) / length
-                    > allowed
-                ):
-                    continue  # separated along one axis by more than allowed
-                if _hull_gap(head_pts, plug_pts) > allowed:
-                    continue
-                # Each pull-side pass: the seat-bearing (least-radius) point
-                # within a quarter turn of its untilted station.
-                head_pass, plug_pass = (
-                    z[k - window + int(np.argmin(radius[k - window : k + window + 1]))]
-                    - head_face
-                    for k in passes
+                fits = width <= gap_max
+                bearing_station = station[fits][bearing[fits]]
+                bearing_width = np.broadcast_to(
+                    width[fits][:, None], bearing[fits].shape
+                )[bearing[fits]]
+                cases.append(
+                    (
+                        state,
+                        body,
+                        name,
+                        float(width.min()),
+                        axis_gap,
+                        int(fits.sum()),
+                        float(tilt[fits].max()),
+                        float(bearing_station.min()),
+                        float((bearing_station - bearing_width).max()),
+                    )
                 )
-                held.append((width, head_pass, plug_pass, math.hypot(tx, ty)))
-            cases.append((seat, name, least_width, least_axis_gap, held))
     print(
-        "rocked loop: least width "
-        f"{min(case[2] for case in cases):.4f}, on the tilted axis "
-        f"{min(case[3] for case in cases):.4f}; friction-held (mu {mu:.2f}) "
+        "rocked loop: "
         + ", ".join(
-            f"{seat:.2f}/{name} gap {min(s[0] for s in held):.3f}-"
-            f"{max(s[0] for s in held):.3f} passes {min(s[1] for s in held):.3f}/"
-            f"{max(s[2] for s in held):.3f}"
-            for seat, name, _, _, held in cases
+            f"{state}/{body:.2f}/{name} width {least:.4f} (axis {axis:.4f}) "
+            f"{count} fit to tilt {most:.3f}, bearing {low:.3f}..width{high:+.3f}"
+            for state, body, name, least, axis, count, most, low, high in cases
         )
     )
-    assert min(case[2] for case in cases) >= joint.CLAMPED_GAP_MIN
     assert min(case[3] for case in cases) >= joint.CLAMPED_GAP_MIN
-    proud = min(case[2] for case in cases if case[1] == "proud")
-    assert proud <= joint.CLAMPED_GAP_MIN + 0.10
-    for _seat, _name, _, _, held in cases:
-        assert held  # the width minimum at least
-        for width, head_pass, plug_pass, tilt in held:
-            assert joint.CLAMPED_GAP_MIN <= width <= joint.CLAMPED_GAP_MAX
-            assert joint.WIRE_R <= head_pass < plug_pass <= joint.LOOP_PASS_X[1]
-            assert tilt < grid[-1] - step  # inside the swept grid
+    assert min(case[4] for case in cases) >= joint.CLAMPED_GAP_MIN
+    tight = min(case[3] for case in cases if case[0] == "bound" and case[2] == "least")
+    assert tight <= joint.CLAMPED_GAP_MIN + 0.10
+    # A wire bearing on the body spans the counterbore's mouth rim (its section
+    # reaches past it), so it rides that rim at most: its centre stands the
+    # rim's reach short of the end face, never inside the counterbore.
+    for state, body, _name, _, _, count, most, low, high in cases:
+        assert count  # the width minimum at least
+        assert most < grid[-1] - step  # inside the swept grid
+        assert low >= r - 1e-9  # past the head face: the corner floor holds
+        overlap = mouth_r - (body / 2.0 + r)
+        assert 0.0 < overlap < r
+        assert high <= -math.sqrt(r**2 - overlap**2) + 1e-9, (state, body)
 
 
 def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
@@ -452,7 +505,7 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
         joint.COUNTERBORE_DIA_MAX / 2.0  # largest counterbore
         + 0.25  # title-block break on its mouth
         + joint.COUNTERBORE_AXIS_OFFSET_MAX  # counterbore axis vs thread axis
-        + joint.SCREW_FACE_OFFSET_MAX  # the tilted screw's axis at the plug face
+        + joint.SCREW_FACE_OFFSET_MAX  # the tilted screw's axis at the end face
     )
     assert joint.COUNTERBORE_MOUTH_REACH == pytest.approx(reach)
     r = joint.WIRE_R
@@ -461,16 +514,16 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
         (gooseneck.SPRING_EYE_GAP, spring.LOOP_RISE_MM),
         (joint.CLAMPED_GAP_MAX, joint.CLAMPED_LOOP_RISE),
     ):
-        for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX):
-            points = list(_helix_points(gap, rise, seat))
-            # The plug-side tip is the wire that meets the plug face.
+        for body in (screw.BODY_DIA_MIN, screw.BODY_DIA_MAX):
+            points = list(_helix_points(gap, rise, body))
+            # The plug-side tip is the wire that meets the end face.
             tip_station, tip_radius = points[-1]
             assert tip_station + r == pytest.approx(gap)
             contact.append(tip_radius - r)
             inside = [s for s, rad in points if rad - r < reach]
             standoff.append(gap - (max(inside) + r))
     print(
-        f"loop wire at the plug face: {min(contact):.3f} from the screw axis "
+        f"loop wire at the end face: {min(contact):.3f} from the screw axis "
         f"vs mouth reach {reach:.3f}; wire inside the mouth stands "
         f"{min(standoff):.3f} off the face"
     )
@@ -481,35 +534,61 @@ def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
 
 
 def test_shared_interference_contract_inputs_match_their_owners() -> None:
-    # _interference_contracts keeps the plug pair's inputs narrow (shared
+    # _interference_contracts keeps the end-piece pair's inputs narrow (shared
     # thread tables and a literal threaded length) so screw or gooseneck edits
-    # do not re-key every assembly; pin them to their owners here.
+    # do not re-key every assembly; pin them to their owners here.  The model
+    # seats the screw at the free gap: its thread overlaps the blind tap drill
+    # from the counterbore floor to its tip, short of the full thread's end.
     import _interference_contracts
     from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
-    assert screw.THREAD.split()[0] == joint.TAP_SPEC.size == "#8-32"
+    size = joint.TAP_SPEC.size
+    assert screw.THREAD.split()[0] == size == "1/4-28"
+    assert joint.SCREW_REACH < joint.TAP_THREAD_DEPTH < joint.TAP_DRILL_DEPTH
+    engaged = min(joint.SCREW_REACH, joint.TAP_THREAD_DEPTH) - joint.COUNTERBORE_DEPTH
     assert _interference_contracts._GOOSENECK_THREAD_LENGTH == pytest.approx(
-        gooseneck.PLUG_LENGTH - joint.COUNTERBORE_DEPTH
+        round(engaged, 2)
     )
-    assert TAP_DRILL_MM["#8-32"] == pytest.approx(joint.TAP_DRILL_DIA) == 3.454
-    assert THREAD_MAJOR_MM["#8-32"] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)
-    assert THREAD_MAJOR_MM["#8-32"] < joint.COUNTERBORE_DIA
+    assert _interference_contracts._GOOSENECK_THREAD_LENGTH >= engaged
+    assert TAP_DRILL_MM[size] == pytest.approx(joint.TAP_DRILL_DIA) == 5.410
+    assert THREAD_MAJOR_MM[size] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)
+    assert THREAD_MAJOR_MM[size] < joint.COUNTERBORE_DIA
 
 
 def test_bending_span_reaches_the_receiver_first_full_thread() -> None:
     # Inside the counterbore the screw is unsupported: the beam runs to the
-    # plug's first full thread at its farthest (codjiflo round 3, #1997).
+    # end piece's first full thread at its farthest (codjiflo round 3, #1997).
     receiver = joint.CLAMPED_GAP_MAX + joint.COUNTERBORE_DEPTH_MAX + joint.EDGE_BREAK
     assert screw_spec.RECEIVER_FULL_THREAD_STATION_MAX == pytest.approx(receiver)
     assert screw_spec.STRENGTH_SPAN == pytest.approx(
         max(screw.FULL_THREAD_STATION_MAX, receiver)
     )
-    assert screw_spec.STRENGTH_SPAN == pytest.approx(7.34, abs=0.005)
+    assert screw_spec.STRENGTH_SPAN == pytest.approx(7.48, abs=0.005)
     assert screw_spec._SECTIONS[-1][1] == screw_spec.STRENGTH_SPAN
 
 
-def test_strength_sweeps_clamp_and_thread_friction_independently() -> None:
+def test_clamp_couple_is_bounded_by_the_smallest_head_face() -> None:
     spec = screw_spec
+    head = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
+    assert spec.CLAMP_ECCENTRICITY_MAX == pytest.approx(head)
+    assert head == pytest.approx(5.245)
+    worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
+    # The couple is what governs: on the axis both SFs are several times it.
+    assert spec.service_safety_factor(*worst, 0.0) > 2.0 * spec.service_safety_factor(
+        *worst
+    )
+    assert spec.tightening_safety_factor(
+        *worst, 0.0
+    ) > 2.0 * spec.tightening_safety_factor(*worst)
+
+
+@pytest.mark.parametrize("yield_mpa", [screw_spec.YIELD_MPA, 724.0])
+def test_strength_holds_sf_2_at_the_bar_yield_and_at_105_ksi(
+    monkeypatch, yield_mpa: float
+) -> None:
+    spec = screw_spec
+    assert spec.YIELD_MPA == pytest.approx(896.3, abs=0.05)  # 130 ksi, 6818T53
+    monkeypatch.setattr(spec, "YIELD_MPA", yield_mpa)
     pairs = {(c, t) for c in spec.CLAMP_FRICTIONS for t in spec.THREAD_FRICTIONS}
     assert set(spec.SERVICE_SF) == set(spec.TIGHTENING_SF) == pairs
     # The lowest clamp friction needs the most preload and the highest thread
@@ -517,12 +596,16 @@ def test_strength_sweeps_clamp_and_thread_friction_independently() -> None:
     worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
     assert min(spec.SERVICE_SF, key=spec.SERVICE_SF.get) == worst
     assert min(spec.TIGHTENING_SF, key=spec.TIGHTENING_SF.get) == worst
-    assert spec.service_safety_factor(*worst) >= spec.STRENGTH_SF_TARGET
-    assert spec.tightening_safety_factor(*worst) >= spec.STRENGTH_SF_TARGET
-    # 12L14 CD is the grade the function needs: 1018 CD's 370 MPa would not
-    # carry the counterbore's span at SF 2.
-    assert spec.YIELD_MPA == 415.0
-    assert spec.service_safety_factor(*worst) * 370.0 / spec.YIELD_MPA < 2.0
+    service = spec.service_safety_factor(*worst)
+    tightening = spec.tightening_safety_factor(*worst)
+    print(
+        f"yield {yield_mpa:.1f}: service SF {service:.3f}, tightening {tightening:.3f}"
+    )
+    assert service >= spec.STRENGTH_SF_TARGET == 2.0
+    assert tightening >= spec.STRENGTH_SF_TARGET
+    # 12L14 CD's 415 MPa would not carry the clamp couple at SF 2: the grade
+    # is required.
+    assert service * 415.0 / yield_mpa < 2.0
 
 
 def test_service_peak_stations_bound_a_dense_sweep() -> None:
@@ -530,8 +613,11 @@ def test_service_peak_stations_bound_a_dense_sweep() -> None:
     mu_clamp, mu_thread = min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS)
     preload = spec.clamp_preload_n(mu_clamp)
     torsion = spec.RESIDUAL_TORSION_FACTOR * spec.thread_torque_n_mm(preload, mu_thread)
+    couple = preload * spec.CLAMP_ECCENTRICITY_MAX
     dense = min(
-        spec._von_mises_sf(preload, moment(x0 + (x1 - x0) * i / 2000), torsion, dia)
+        spec._von_mises_sf(
+            preload, moment(x0 + (x1 - x0) * i / 2000) + couple, torsion, dia
+        )
         for x0, x1, dia in spec._SECTIONS
         for i in range(2001)
         for moment in spec._MOMENT_CASES
@@ -542,8 +628,9 @@ def test_service_peak_stations_bound_a_dense_sweep() -> None:
 
 
 def test_tightening_sf_is_the_overtightening_margin() -> None:
-    # Both tightening stresses are linear in the preload, so the tightening SF
-    # is the multiple of the needed preload the root takes to nominal yield.
+    # Both tightening stresses (with the clamp couple) are linear in the
+    # preload, so the tightening SF is the multiple of the needed preload the
+    # root takes to nominal yield.
     spec = screw_spec
     worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
     needed = spec.clamp_preload_n(worst[0])
@@ -551,7 +638,7 @@ def test_tightening_sf_is_the_overtightening_margin() -> None:
     at_margin = needed * margin
     sf = spec._von_mises_sf(
         at_margin,
-        0.0,
+        at_margin * spec.CLAMP_ECCENTRICITY_MAX,
         spec.thread_torque_n_mm(at_margin, worst[1]),
         spec.THREAD_MINOR_2A_MIN_EST,
     )

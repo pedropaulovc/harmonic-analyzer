@@ -226,16 +226,17 @@ _COUNTER_LOWER_OFFSET = _counter_lower_offset()
 
 
 def counter_upper_support_offset(axis: tuple[float, float]) -> float:
-    """Seat the loop's pull-side passes on MHA-SM-04's plain Ø3.50 shoulder.
+    """Seat the loop's pull-side passes on MHA-SM-04's plain Ø6.35 body.
 
-    Owner ruling 2026-10-26 (#1951, option B): the loop bears on the plain
-    turned seat under the head, never on the #8-32 thread past its 45-degree
-    lead (sm_gooseneck_spring_joint bounds the passes clear of the lead and the
-    under-head corner), so the bearing surface is the seat diameter.
+    Owner ruling 2026-10-27 (#1951): the loop bears on the screw's plain
+    turned body under the cheese head, never on the 1/4-28 thread
+    (sm_gooseneck_spring_joint bounds both passes short of PLAIN_LENGTH_MIN
+    and clear of the under-head corner), so the bearing surface is the body
+    diameter.
     """
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
-    tube = counter_stock.WIRE_RADIUS_MM + spring_screw.SEAT_DIA / 2.0
+    tube = counter_stock.WIRE_RADIUS_MM + spring_screw.BODY_DIA / 2.0
     omega = 2.0 * math.pi * counter_stock.LOOP_TURNS
     half_interval = math.asin(tube / radius) / omega
 
@@ -392,10 +393,21 @@ def solve_bank_balance(
 
 
 def counter_half_turn_clearances(
-    pose: SpringPose, screw_y: float
+    pose: SpringPose,
+    screw_y: float,
+    *,
+    clamp_gap: float = sm_gooseneck_geom.SPRING_EYE_GAP,
 ) -> tuple[float, float]:
-    """Lower bounds on raised half-turn clearance to the tube and screw head.
+    """Lower bounds on raised half-turn clearance to the arm and screw head.
 
+    The arm is the Ø12.70 tube and its end piece, turned flush with it (no
+    step), so it is one cylinder of radius TUBE_DIA/2 up to the end face; the
+    cheese head is a Ø HEAD_DIA x HEAD_H cylinder from ``head_x`` outward.
+    ``pose`` is the free-gap (native-seat) placement. Under clamp the gap is
+    ``clamp_gap``: the loop's end-face-side wire stays on the end face, so the
+    loop and its hanging coil shift toward the end face by half the gap's
+    shrink along the screw axis (a rigid-shift bound) and the head face sits
+    at GOOSENECK_END_X + clamp_gap.
     Distance to the solid cylinders is 1-Lipschitz. Subtract half the sampled
     centreline arc step, so a narrow collision between samples cannot pass.
     Native interference checks separately cover the transition and full bodies.
@@ -405,7 +417,8 @@ def counter_half_turn_clearances(
     eye_x = counter_stock.end_centers_mm(pose.length_mm)[1][0]
     start_x = counter_stock.coil_end_x_mm(pose.length_mm) + wire
     rows = pose.rotation_rows
-    head_x = GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP
+    head_x = GOOSENECK_END_X + clamp_gap
+    clamp_shift = (sm_gooseneck_geom.SPRING_EYE_GAP - clamp_gap) / 2.0
     tube_gap = head_gap = math.inf
     steps = 1024
     for index in range(steps + 1):
@@ -415,7 +428,11 @@ def counter_half_turn_clearances(
             -radius * math.sin(angle),
             -radius * math.cos(angle),
         )
-        x = pose.upper_eye_xy[0] + sum(local[k] * rows[k][0] for k in range(3))
+        x = (
+            pose.upper_eye_xy[0]
+            + sum(local[k] * rows[k][0] for k in range(3))
+            - clamp_shift
+        )
         y = pose.upper_eye_xy[1] + sum(local[k] * rows[k][1] for k in range(3))
         z = sum(local[k] * rows[k][2] for k in range(3))
         radial = math.hypot(y - screw_y, z)

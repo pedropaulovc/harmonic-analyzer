@@ -238,22 +238,26 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["component"] == "sm-gooseneck-spring-screw"
     assert support["number"] == "MHA-SM-04"
     assert "sku" not in support
-    assert support["thread"] == "#8-32 UNC"
-    assert support["major_dia_mm"] == pytest.approx(4.1656)
-    assert support["underhead_length_mm"] == 17.5
-    assert support["head_dia_mm"] == 12.5
-    assert support["head_height_mm"] == 7.0
-    assert support["crown_rise_mm"] == 1.0
+    assert support["thread"] == "1/4-28 UNF"
+    assert support["major_dia_mm"] == pytest.approx(6.35)
+    assert support["body_dia_mm"] == pytest.approx(6.35)
+    assert support["plain_length_min_mm"] == 3.60
+    assert support["full_thread_station_max_mm"] == 5.80
+    assert support["underhead_length_mm"] == 19.5
+    assert support["head_dia_mm"] == 11.5
+    assert support["head_height_mm"] == 5.5
     assert support["slot_width_mm"] == 1.6
-    assert support["slot_depth_mm"] == 3.0
-    assert support["seat_dia_mm"] == 3.5
-    assert support["shoulder_length_mm"] == 3.9
-    assert not any(key.startswith("relief_") for key in support)
-    assert support["tip_chamfer_mm"] == 0.3
+    assert support["slot_depth_mm"] == 2.0
+    assert not any(
+        key.startswith(("relief_", "crown_", "seat_", "shoulder_")) for key in support
+    )
+    assert support["tip_chamfer_mm"] == 0.5
     assert support["underhead_corner_r_mm"] == 0.50
-    assert support["plug_length_mm"] == 10.00
-    assert support["plug_counterbore_dia_mm"] == 4.90
-    assert support["plug_counterbore_depth_mm"] == 2.64
+    assert support["tube_dia_mm"] == pytest.approx(12.70)
+    assert support["plug_head_length_mm"] == 21.00
+    assert support["plug_length_mm"] == 26.00
+    assert support["plug_counterbore_dia_mm"] == 7.00
+    assert support["plug_counterbore_depth_mm"] == 2.78
     assert support["plug_edge_break_mm"] == 0.25
     counter_seat()
 
@@ -262,17 +266,21 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     "field",
     [
         "major_dia_mm",
+        "body_dia_mm",
+        "plain_length_min_mm",
+        "full_thread_station_max_mm",
         "underhead_length_mm",
         "head_dia_mm",
         "head_height_mm",
-        "crown_rise_mm",
         "slot_width_mm",
         "slot_depth_mm",
-        "seat_dia_mm",
-        "shoulder_length_mm",
         "tip_chamfer_mm",
         "underhead_corner_r_mm",
         "clamp_gap_mm",
+        "arm_end_x_mm",
+        "spring_eye_x_mm",
+        "tube_dia_mm",
+        "plug_head_length_mm",
         "plug_length_mm",
         "plug_counterbore_dia_mm",
         "plug_counterbore_depth_mm",
@@ -289,13 +297,15 @@ def test_changed_support_geometry_cannot_reuse_a_native_certificate(
         counter_seat()
 
 
-def test_counter_record_measured_on_the_six_thirty_two_screw_is_rejected(
+@pytest.mark.parametrize("thread", ["#6-32 UNC", "#8-32 UNC"])
+def test_counter_record_measured_on_an_earlier_screw_is_rejected(
     isolated_calibration,
+    thread,
 ):
     _, record = isolated_calibration
     record["upper_support"] = {
         **counter_upper_support_geometry(),
-        "thread": "#6-32 UNC",
+        "thread": thread,
     }
     with pytest.raises(ValueError, match="Stale counter native calibration"):
         counter_seat()

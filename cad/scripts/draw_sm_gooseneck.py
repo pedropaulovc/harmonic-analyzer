@@ -1,17 +1,26 @@
-r"""Create the curated machinist drawing for the gooseneck counter-spring post.
+r"""Create the curated machinist drawing for MHA-SM-01, the gooseneck weldment.
 
-The SLDPRT remains authoritative.  This recipe supplies only the post's
-elevation + isometric views, the bend-radius / arm-run dimensions, and the
-manufacturing notes;
-sheet/template and export behavior lives in ``_drawing_common``.
-Dimension import and curation live in ``_drawing_dimension_import``.
+The SLDPRT remains authoritative.  This recipe supplies the views, places the
+part's marked dimensions and the end piece's native tap callout, and links
+the notes; sheet/template and export behaviour lives in ``_drawing_common``.
 
-The post is a polished chrome Ø16 x 2-wall tube with a tall vertical leg,
-an R51 quarter bend and a horizontal arm. Its flush brazed Ø12 x 10.00 end
-plug has an axial native #8-32 UNC-2B through tap, counterbored at the arm
-end; the made MHA-SM-04 spring screw
-is NOT part of this weldment. The approximately 501 mm tall post keeps the
-elevation at 1:3 and the isometric at 1:4.
+The gooseneck is a 1/2 in 4130-N tube bent R76.2, its arm ending flush in a
+solid Ø12.70 end piece brazed on a shank inside the tube and tapped 1/4-28
+blind, with a 5/8 in sleeve brazed over the leg (owner rulings 2026-10-27,
+#1951).  The made MHA-SM-04 spring screw is NOT part of this weldment.  The
+sheet carries, at 1:3:
+
+* the ELEVATION (``*Front``): the leg length (foot to the bend tangent) and
+  the arm straight (bend tangent to the end face) on the tube's axes, from
+  the part's hidden ``StationReference``; the bend's centreline radius; the
+  sleeve length from the foot;
+* the END VIEW (``*Left``, third-angle left of the elevation): the end face,
+  carrying the native blind-tap callout with the tap's location limits;
+
+and at 3:1 SECTION A-A, a removed section cut along the arm axis through the
+end piece only (cut faces only): the head Ø (flush) and length, the braze
+shank Ø (its fit) and length, and the counterbore Ø (with the stated wall)
+and LIMIT depth (with its floor-corner limit).  The isometric is at 1:4.
 
 Run with SolidWorks open::
 
@@ -21,10 +30,16 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
+from solidworks_mcp.adapters.com_variant import double_array
+from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_name,
+    place_view,
+    remove_notes_matching,
+)
 
 from _check import check
 from _com import _early_bound
@@ -33,17 +48,50 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_dimension_import import curate_view_dimensions
+from _drawing_dimensions import assert_imported_precision
+from _drawing_hidden_sketches import curate_view_dimensions
+from _drawing_hole_callout import add_native_hole_callout, set_hole_callout_precision
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view, model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
+from _gear_drawing_entities import visible_circle_edge
+from _hole_callout_thread_class import omit_title_block_thread_class
 from _holes import DIAMETER_TOLERANCE_MM, _verify_tap_metadata
 from _paths import CAD_ROOT
+from _section_axis import position_section_caption
 from _session import run_build
 import _telemetry
-from sm_gooseneck_spring_joint import TAP_DRILL_DIA, TAP_SPEC
+from sm_gooseneck_geom import (
+    ARM_END_X,
+    ARM_Y,
+    BEND_R,
+    LEG_BOTTOM,
+    LEG_TOP,
+    PLUG_HEAD_LENGTH,
+    PLUG_SHANK_LENGTH,
+    SLEEVE_DIA,
+    SLEEVE_TOP,
+    TUBE_DIA,
+    TUBE_END_X,
+)
+from sm_gooseneck_spec import (
+    DIMENSION_CALLOUTS_BY_NAME,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    TAP_CALLOUT_BELOW,
+    TAP_CALLOUT_PRECISION,
+)
+from sm_gooseneck_spring_joint import (
+    TAP_DRILL_DEPTH,
+    TAP_DRILL_DIA,
+    TAP_SPEC,
+    TAP_THREAD_DEPTH,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["sm_gooseneck"]
@@ -58,28 +106,115 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~501 mm tall post)
+SHEET_SCALE = (1.0, 3.0)  # 1:3 whole sheet (~500 mm tall gooseneck)
+VIEW_SCALE = (1, 3)
+SECTION_SCALE = (3, 1)
+ISO_SCALE = (1, 4)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
+_SECTION_S = SECTION_SCALE[0] / SECTION_SCALE[1] / 1000.0
 
-# Sheet layout (meters).  The elevation (front) shows the goose-neck profile
-# (leg + bend + arm) right of centre so the notes clear it; the isometric (1:4)
-# sits far right; the notes fill the lower-left.
-FRONT_CENTER = (0.180, 0.150)
-ISO_CENTER = (0.350, 0.150)
-# No arm-end detail: this legacy sheet retains the model-stamped plug/tap
-# schedule in its notes. The separate made screw appears only in the assembly
-# package, so neither view needs an integral-head reference or detail fence.
+# A placed view centres its model bounding box: x from the end face to the
+# sleeve's far side, y from the leg's foot to the arm's top.
+_SLEEVE_R = SLEEVE_DIA / 2.0
+_TUBE_R = TUBE_DIA / 2.0
+_BOX_MID_X = (ARM_END_X + _SLEEVE_R) / 2.0
+_BOX_MID_Y = (LEG_BOTTOM + ARM_Y + _TUBE_R) / 2.0
 
-# Per-view survivors of the marked-dimension import: the bend radius (R51) and
-# the horizontal arm run, both on the Front-plane sweep path (so both project to
-# the elevation).  Positions are near the bend/arm at the top of the view.
+# Sheet layout (metres), left to right: section A-A over the notes, the end
+# view, the elevation with its dimensions on the leg's right, the isometric.
+FRONT_CENTER = (0.255, 0.150)
+END_CENTER = (0.190, FRONT_CENTER[1])
+ISO_CENTER = (0.375, 0.165)
+
+
+def _front_x(model_x: float) -> float:
+    return FRONT_CENTER[0] + (model_x - _BOX_MID_X) * _S
+
+
+def _front_y(model_y: float) -> float:
+    return FRONT_CENTER[1] + (model_y - _BOX_MID_Y) * _S
+
+
+LEG_AXIS_X = _front_x(0.0)
+ARM_AXIS_Y = _front_y(ARM_Y)
+END_FACE_X = _front_x(ARM_END_X)
+FOOT_Y = _front_y(LEG_BOTTOM)
+BEND_TANGENT_Y = _front_y(LEG_TOP)
+SLEEVE_TOP_Y = _front_y(SLEEVE_TOP)
+
+# The elevation's dimensions: both vertical runs on the leg's right, the
+# sleeve's inside the leg's; the arm straight over the arm; the bend radius
+# outside the bend's upper right.
 FRONT_KEEP = {
-    "BendRadius": (0.225, 0.212),
-    "ArmRun": (0.150, 0.250),
+    "SleeveLength": (LEG_AXIS_X + 0.018, (FOOT_Y + SLEEVE_TOP_Y) / 2.0),
+    "LegLength": (LEG_AXIS_X + 0.034, (SLEEVE_TOP_Y + BEND_TANGENT_Y) / 2.0),
+    "ArmStraight": ((END_FACE_X + _front_x(-BEND_R)) / 2.0, ARM_AXIS_Y + 0.014),
+    "BendRadius": (LEG_AXIS_X + 0.016, ARM_AXIS_Y + 0.008),
 }
+
+# The end view (*Left) looks at the end face along +X: sheet x is model +Z.
+# The tap's native callout stands up and left of it, clear of the section's
+# upper dimensions and of the elevation's arm-straight text.
+TAP_CALLOUT_XY = (0.158, 0.266)
+
+# Section A-A: the cutting line runs along the arm axis in the elevation from
+# outside the end face to just past the braze shank, short of the bend
+# tangent, and the removed section shows only that span's cut faces.  It is
+# turned until model +X runs right and model -Z up (looking down on the arm
+# axis plane, where the end piece's and counterbore's sketches lie), and set
+# so the end face's centre lands on SECTION_FACE_XY.
+SECTION_LINE_X_MM = (ARM_END_X - 2.0, TUBE_END_X + PLUG_SHANK_LENGTH + 0.8)
+if SECTION_LINE_X_MM[1] >= -BEND_R:
+    raise AssertionError("section A-A's cutting line reaches the bend")
+# Created below the cutting line, so its arrows look down on the arm.
+SECTION_CREATE_XY = (0.110, 0.195)
+SECTION_FACE_XY = (0.075, 0.200)
+_SX0, _SY0 = SECTION_FACE_XY
+_SECTION_HALF = _TUBE_R * _SECTION_S
+SECTION_CAPTION_XY = (_SX0 + 0.030, _SY0 - _SECTION_HALF - 0.064)
+
+
+def _section_x(model_x: float) -> float:
+    return _SX0 + (model_x - ARM_END_X) * _SECTION_S
+
+
+# Section A-A's dimensions: the two lengths in one row over the part; the
+# counterbore depth's LIMIT pair and floor callout above them, left of the
+# face; the counterbore Ø (with its wall) left of the end face; the head and
+# shank Ø below the part, the shank's longer fit callout lower.
+SECTION_KEEP = {
+    "PlugHeadLength": (
+        _section_x(ARM_END_X + PLUG_HEAD_LENGTH / 2.0),
+        _SY0 + _SECTION_HALF + 0.010,
+    ),
+    "PlugShankLength": (
+        _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
+        _SY0 + _SECTION_HALF + 0.010,
+    ),
+    "CounterboreDepth": (_SX0 - 0.012, _SY0 + _SECTION_HALF + 0.032),
+    "CounterboreDia": (_SX0 - 0.030, _SY0),
+    "PlugDia": (_section_x(ARM_END_X + 10.0), _SY0 - _SECTION_HALF - 0.016),
+    "PlugShankDia": (
+        _section_x(TUBE_END_X + PLUG_SHANK_LENGTH / 2.0),
+        _SY0 - _SECTION_HALF - 0.040,
+    ),
+}
+if set(FRONT_KEEP) | set(SECTION_KEEP) != {
+    name for names in DRAWING_DIMENSIONS.values() for name in names
+}:
+    raise AssertionError("the gooseneck sheet does not place every marked dimension")
+
+# Notes fill the lower left under section A-A; the view notes sit under
+# their views.
+NOTES_XY = (0.016, 0.098)
+ELEVATION_NOTE_XY = (0.228, 0.052)
+ISO_NOTE_XY = (0.345, 0.085)
+TAPPED_HOLE_NOTE = "Tapped Hole"
 
 
 def _require_saved_tap(model: Any) -> None:
-    """Require the saved native receiver's size, class, ends and drill diameter."""
+    """Require the saved native receiver's size, class, blind ends, drill Ø
+    and both depths."""
     feature = _early_bound(model, "IPartDoc").FeatureByName("ThreadBore")
     if feature is None:
         raise RuntimeError("saved gooseneck has no native ThreadBore")
@@ -93,10 +228,168 @@ def _require_saved_tap(model: Any) -> None:
     if str(definition.FastenerSize).strip() != TAP_SPEC.size:
         raise RuntimeError("saved gooseneck ThreadBore has the wrong thread size")
     _verify_tap_metadata(definition, TAP_SPEC, "saved gooseneck ThreadBore")
-    diameter = float(definition.ThruTapDrillDiameter) * 1000.0
-    if abs(diameter - TAP_DRILL_DIA) > DIAMETER_TOLERANCE_MM:
+    for member, expected, what in (
+        ("TapDrillDiameter", TAP_DRILL_DIA, "tap drill"),
+        ("TapDrillDepth", TAP_DRILL_DEPTH, "tap drill depth"),
+        ("ThreadDepth", TAP_THREAD_DEPTH, "thread depth"),
+    ):
+        value = float(getattr(definition, member)) * 1000.0
+        if not math.isfinite(value) or abs(value - expected) > DIAMETER_TOLERANCE_MM:
+            raise RuntimeError(
+                f"saved gooseneck {what} {value:.3f} != {expected:.3f} mm"
+            )
+
+
+def _section_axes(
+    adapter: Any, native: Any
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet directions of model +X and -Z (1 mm each) in section A-A."""
+    native.UpdateViewDisplayGeometry()
+    x0, y0 = ARM_END_X / 1000.0, ARM_Y / 1000.0
+    origin, plus_x, minus_z = model_points_in_view(
+        adapter,
+        native,
+        ((x0, y0, 0.0), (x0 + 0.001, y0, 0.0), (x0, y0, -0.001)),
+        label="section A-A axes",
+        names=("end face centre", "plus x", "minus z"),
+    )
+    return (
+        (plus_x[0] - origin[0], plus_x[1] - origin[1]),
+        (minus_z[0] - origin[0], minus_z[1] - origin[1]),
+    )
+
+
+def _orient_section(adapter: Any, native: Any, cut: Any) -> None:
+    """Look down on the arm-axis plane: model +X right, model -Z up.
+
+    Looking along -Y with -Z up puts +X on the right, a right-handed pair on
+    the sheet; a left-handed pair is the cut looking UP, so the cut direction
+    is reversed.  The view then turns until +X reads right
+    (draw_pn_pen_hanger ``_orient_section``).
+    """
+    right, up = _section_axes(adapter, native)
+    if right[0] * up[1] - right[1] * up[0] < 0.0:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section A-A reversed")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section A-A cut direction did not persist")
+        right, up = _section_axes(adapter, native)
+    native.Angle = float(native.Angle) - math.atan2(right[1], right[0])
+    rebuild_drawing(adapter, label="section A-A turned")
+    right, up = _section_axes(adapter, native)
+    tolerance = 1e-7
+    if (
+        right[0] <= 0.0
+        or abs(right[1]) > tolerance
+        or up[1] <= 0.0
+        or abs(up[0]) > tolerance
+    ):
         raise RuntimeError(
-            f"saved gooseneck tap drill {diameter:.3f} != {TAP_DRILL_DIA:.3f} mm"
+            f"section A-A is not looking down on the arm axis: {right=}, {up=}"
+        )
+
+
+def _place_section(adapter: Any, native: Any) -> None:
+    """Land the end face's centre on SECTION_FACE_XY: ``SetViewPosition``
+    moves the ink by the difference from the Position it reads."""
+    anchor = (ARM_END_X / 1000.0, ARM_Y / 1000.0, 0.0)
+    for attempt in range(4):
+        native.UpdateViewDisplayGeometry()
+        projected = model_point_in_view(
+            adapter, native, anchor, label=f"section A-A end face, pass {attempt}"
+        )
+        if math.dist(projected, SECTION_FACE_XY) <= 1e-4:
+            return
+        position = tuple(float(value) for value in native.Position)
+        moved = [
+            position[axis] + SECTION_FACE_XY[axis] - projected[axis] for axis in (0, 1)
+        ]
+        if not native.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to place section A-A")
+        rebuild_drawing(adapter, label="section A-A placed")
+    raise RuntimeError(f"section A-A end face did not land on {SECTION_FACE_XY}")
+
+
+def _end_piece_section(adapter: Any, front: Any) -> Any:
+    """Removed section A-A along the arm axis through the end piece only."""
+    line = model_points_in_view(
+        adapter,
+        front,
+        tuple((x / 1000.0, ARM_Y / 1000.0, 0.0) for x in SECTION_LINE_X_MM),
+        label="section A-A cutting line",
+        names=("outside the end face", "past the braze shank"),
+    )
+    section = create_section_view(
+        adapter,
+        front,
+        line_start=line[0],
+        line_end=line[1],
+        view_xy=SECTION_CREATE_XY,
+        section_label="A",
+        scale=SECTION_SCALE,
+        partial=True,
+        label="end piece section A-A",
+    )
+    native = _early_bound(section, "IView")
+    cut = _early_bound(native.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="section A-A cut faces only")
+    if not cut.GetDisplayOnlySurfaceCut() or not cut.GetPartialSection():
+        raise RuntimeError("section A-A must be a removed, cut-faces-only section")
+    ratio = tuple(float(value) for value in native.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], SECTION_SCALE[0] / SECTION_SCALE[1]):
+        raise RuntimeError(f"section A-A scale did not persist: {ratio}")
+    _orient_section(adapter, native, cut)
+    # A section shows no hidden lines (drawing-guidelines.md rule 9); set
+    # before placing so the display change cannot shift the placed ink.
+    set_hidden_lines_removed(adapter, section)
+    _place_section(adapter, native)
+    position_section_caption(
+        adapter, section, SECTION_CAPTION_XY, label="gooseneck end piece"
+    )
+    return section
+
+
+def _assert_part_callouts(adapter: Any, annotations: list[Any]) -> None:
+    """The part authors every callout below its dimension's value; the import
+    must carry each one unchanged (the drawing never writes them, #1942)."""
+    found: dict[str, str] = {}
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        name = dimension_name(adapter, annotation)
+        if name not in DIMENSION_CALLOUTS_BY_NAME:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        found[name] = str(display.GetText(4) or "").replace("\r\n", "\n")
+    if found != DIMENSION_CALLOUTS_BY_NAME:
+        raise RuntimeError(
+            f"gooseneck dimension callouts did not import: {found!r} != "
+            f"{DIMENSION_CALLOUTS_BY_NAME!r}"
+        )
+
+
+@_telemetry.traced("drawing.hole_callout_below")
+def _set_tap_callout_below(display: Any, text: str) -> None:
+    """Write ``text`` under the native tap callout and read it back.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the prefix, size and depth definitions
+    stay untouched, so the Hole Wizard variables stay associative
+    (draw_pd_guide_lock._set_hole_callout_below)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    # SolidWorks may store CRLF row breaks; compare both sides without CR.
+    below = definitions[8].replace("\r", "").rstrip()
+    updated = f"{below}\n{text}" if below else text
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "").replace("\r", "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "gooseneck tap callout location rows or native definitions did not "
+            f"persist: {[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
         )
 
 
@@ -139,32 +432,62 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Gooseneck Post Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "gooseneck; chrome tube; 90-deg bend; spring post",
+            3: "gooseneck; bent 4130 tube; brazed end piece; spring post",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 3))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
-    for view in (front, iso):
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    end = place_view(adapter, str(SOURCE), "*Left", *END_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, end, iso):
         set_hidden_lines_removed(adapter, view)
+    # The section derives from the elevation BEFORE the elevation shows the
+    # hidden StationReference, so the section never inherits its lines.
+    section = _end_piece_section(adapter, front)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="elevation",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    section_annotations = curate_view_dimensions(
+        adapter,
+        section,
+        keep=SECTION_KEEP,
+        view_label="end piece section A-A",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [*front_annotations, *section_annotations]
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _assert_part_callouts(adapter, section_annotations)
 
-    # 0.120 (was 0.114, before that 0.105): each time the notes grew they
-    # pushed the block over the bottom zone border. Machinist round 2 took it
-    # to 22 lines (16.1 mm over). The arm-end counterbore's two lines (codjiflo
-    # P1 on #1997; layout audit, farm run 20261027T071500743Z) took it 2.17 mm
-    # over. Nothing sits above the block until the elevation leg at x > 0.16.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.120)
-    add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
-    add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.077)
+    # The end piece's blind tap, natively called out on the end face: the
+    # title block's THREADS row owns the 2B class (drawing-guidelines.md
+    # rule 2), its depths print at two places, its location limits below.
+    tap_callout = add_native_hole_callout(
+        adapter,
+        end,
+        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
+        callout_xy=TAP_CALLOUT_XY,
+        label=f"gooseneck end piece {TAP_SPEC.size} blind tap",
+    )
+    omit_title_block_thread_class(tap_callout, label="gooseneck end piece tap")
+    set_hole_callout_precision(
+        tap_callout, TAP_CALLOUT_PRECISION, label="gooseneck end piece tap depths"
+    )
+    _set_tap_callout_below(tap_callout, TAP_CALLOUT_BELOW)
+    rebuild_drawing(adapter, label="gooseneck tap callout")
 
-    # Whether the elevation draws ThreadBore's "#8-32 Tapped Hole" label is
-    # SolidWorks' choice: none on the Ø4.70 x 9.90 plug, one (its text across
-    # the 52.36's extension line) on the Ø4.90 x 10.00 plug (layout audit, farm
-    # run 20261027T101845942Z). Note 4 states the tap, so any such label goes,
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_property_linked_note(adapter, "Elevation View Note", *ELEVATION_NOTE_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+
+    # SolidWorks pins its own "1/4-28 Tapped Hole" note beside a tap's native
+    # callout; the callout already states the thread, so any such label goes,
     # and finalize_drawing's count then proves none is left.
-    removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
+    removed_tap_labels = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
 
     return await finalize_drawing(
@@ -173,7 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Gooseneck Post Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        redundant_note_substrings=("Tapped Hole",),
+        redundant_note_substrings=(TAPPED_HOLE_NOTE,),
         expected_redundant_notes=0,
     )
 

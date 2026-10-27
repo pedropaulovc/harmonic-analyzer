@@ -29,7 +29,7 @@ allowed_free_stems:
 # regression would freeze the counter-spring anchor while the lever still
 # swings, codex #201).
 # The made MHA-SM-04 spring screw is locked to the fixed gooseneck; its
-# head clamps the upper eye to the plug and adds no operational freedom.
+# head clamps the upper eye to the end piece and adds no operational freedom.
 required_free_stems:
   - sm-summing-lever
   - sm-vn-boss-hook
@@ -42,6 +42,6 @@ free_dof: 1
 machinist_exceptions:
   - id: "SM-01"
     kind: "accept"
-    where: "sheet 3 step 7 and check 3: MHA-SM-04 clamping the upper loop of MHA-SM-VN-51 to the MHA-SM-01 plug face, tightened"
+    where: "sheet 3 step 8 and check 3: MHA-SM-04 clamping the upper loop of MHA-SM-VN-51 to the MHA-SM-01 plug face, tightened"
     finding: "threaded joint under operating load without a lock (rule 23)"
     reason: "owner ruling 2026-09-21: the upper eye is a static clamp, not a swivel. The head's preload clamps the loop to the plug face so it cannot rotate, the spring flexes in its coils below the clamp, and no operating torque reaches the screw axis, so the joint is a static clamp that needs no lock (joint_retention.py sm-summing/gooseneck-spring-screw, STATIC_CLAMP). Check 3 is the acceptance (owner-accepted)"

@@ -140,5 +140,36 @@ class MechanicsMatrixContractTests(unittest.TestCase):
             self.assertIs(exported[path], nodes[path])
 
 
+class CounterScrewDiameterTests(unittest.TestCase):
+    """screwRadiusMm follows each archived support layout's bearing surface."""
+
+    def test_integral_shank_release_never_loads_a_made_screw(self):
+        goose = types.SimpleNamespace(SCREW_SHANK_DIA=5.0)
+        loader = Mock()
+        self.assertEqual(exporter.counter_screw_diameter(goose, loader), 5.0)
+        loader.assert_not_called()
+
+    def test_made_screw_layouts_pick_their_bearing_diameter(self):
+        goose = types.SimpleNamespace()
+        cases = {
+            "six_thirty_two_thread_major": (
+                types.SimpleNamespace(MAJOR_DIA=3.5052), 3.5052
+            ),
+            "shoulder_seat": (
+                types.SimpleNamespace(MAJOR_DIA=4.1656, SEAT_DIA=3.50), 3.50
+            ),
+            # A body distinct from the major proves BODY_DIA, not MAJOR_DIA.
+            "cheese_head_plain_body": (
+                types.SimpleNamespace(MAJOR_DIA=6.35, BODY_DIA=6.30), 6.30
+            ),
+        }
+        for name, (screw, expected) in cases.items():
+            with self.subTest(name):
+                self.assertEqual(
+                    exporter.counter_screw_diameter(goose, lambda screw=screw: screw),
+                    expected,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

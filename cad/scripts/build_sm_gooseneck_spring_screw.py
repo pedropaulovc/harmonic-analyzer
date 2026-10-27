@@ -1,26 +1,27 @@
 r"""Build MHA-SM-04, the gooseneck counter-spring clamp screw.
 
-A made slotted fillister shoulder screw turned from 1/2-in 12L14 round, the
-grade its clamp strength needs (owner ruling 2026-10-26 (#1951, option B)).
-A plain turned Ø3.50 shoulder under the head is the MHA-SM-VN-51 counter
-spring's loop seat; a
-45-degree lead steps up to the #8-32 UNC thread, which runs into the
-gooseneck MHA-SM-01's tapped end plug, and the under-head face clamps the
-loop against the plug face.  Sizes and bands live in
+A made slotted cheese-head screw turned from 1/2-in 4140 hardened to HRC 32,
+the grade its clamp strength needs (owner rulings 2026-10-27, #1951).  Under
+the flat-topped Ø11.50 x 5.50 head, a plain Ø6.35 body is the MHA-SM-VN-51
+counter spring's loop seat.  It is also the 1/4-28 UNF thread's own blank,
+turned to its LIMIT band, and the die cuts the thread on it toward the tip.
+The thread runs into the blind 1/4-28 tap in the solid end piece of the
+gooseneck MHA-SM-01, and the under-head face clamps the loop against the end
+piece's flush face.  Sizes and bands live in
 ``sm_gooseneck_spring_screw_geom``; the print's marks, places and notes in
 ``sm_gooseneck_spring_screw_spec``.
 
 Layout (``sm_gooseneck_spring_screw_geom`` frame): axis Z, the under-head face
-at z=0.  ``HeadProfile`` revolves the cylindrical head and its spherical
-crown in +Z (apex at HEAD_H); ``ShankProfile`` revolves the shank in -Z:
-the seat shoulder from the R0.5 MAX under-head corner to SHOULDER_LENGTH, the
-45-degree lead up to the thread
-major, the thread, and a 45-degree tip chamfer.  The thread is modelled as
-its basic major cylinder.  The driver slot is sketched on a plane at the apex
-and cut SLOT_DEPTH down into the head along local X.  One hidden reference
-sketch, ``StationReference``, carries two printed stations only: the overall
-length on the axis, and the full-thread limit between two short witnesses
-that lie on the under-head face and on the thread's major silhouette.
+at z=0.  ``HeadProfile`` revolves the flat-topped cylinder head in +Z (top
+face at HEAD_H); ``ShankProfile`` revolves the body in -Z: one plain cylinder
+from the R0.5 MAX under-head corner to a 45-degree tip chamfer.  The body and
+the thread share the basic major cylinder; the thread callout defines the
+thread.  The driver slot is sketched on a plane at the top face and cut
+SLOT_DEPTH down into the head along local X.  One hidden reference sketch,
+``StationReference``, carries three printed stations only: the overall length
+on the axis, and the plain length's MIN and the full-thread station's MAX,
+each between a short witness on the under-head face and one on the body's
+silhouette.
 
 Run (SolidWorks already open)::
 
@@ -42,7 +43,6 @@ from _part_checks import report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
-from _drawing_prefix import set_dimension_prefix
 from _sketch import (
     SketchDims,
     add_line_chain,
@@ -70,37 +70,28 @@ from _saved_part_guard import require_saved_drawing_properties
 from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spring_screw_geom import (
-    CROWN_CENTER_Z,
-    CROWN_RADIUS,
-    CROWN_RISE,
+    BODY_DIA,
+    BODY_DIA_LOWER,
+    BODY_DIA_TOL_TYPE,
+    BODY_DIA_UPPER,
     FULL_THREAD_STATION_MAX,
     FULL_THREAD_STATION_MAX_BAND,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
-    HEAD_CYL_H,
     HEAD_DIA,
     HEAD_H,
     LENGTH,
-    MAJOR_DIA,
     OVERALL_LENGTH,
-    SEAT_DIA,
-    SEAT_DIA_LOWER,
-    SEAT_DIA_TOL_TYPE,
-    SEAT_DIA_UPPER,
-    SHOULDER_LENGTH,
-    SHOULDER_LENGTH_LOWER,
-    SHOULDER_LENGTH_TOL_TYPE,
-    SHOULDER_LENGTH_UPPER,
+    PLAIN_LENGTH_MIN,
+    PLAIN_LENGTH_MIN_BAND,
+    PLAIN_LENGTH_MIN_TOL_TYPE,
     SLOT_DEPTH,
-    SLOT_FLOOR_Z,
     SLOT_WIDTH,
-    STEP_LEAD,
     TIP_CHAMFER,
     UNDERHEAD_CORNER_R,
     UNDERHEAD_CORNER_R_BAND,
     UNDERHEAD_CORNER_R_TOL_TYPE,
 )
 from sm_gooseneck_spring_screw_spec import (
-    CROWN_RADIUS_PREFIX,
     DIMENSION_CALLOUTS,
     DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
@@ -111,7 +102,9 @@ from sm_gooseneck_spring_screw_spec import (
 )
 
 PART_NAME = "sm-gooseneck-spring-screw"
-MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+# The library stand-in for the registry's 4140 (7.80 g/cc against 7.85); the
+# printed grade is the config row's (see _appearance.apply_material).
+MATERIAL = "Plain Carbon Steel"
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
@@ -122,57 +115,63 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 HEAD_R = HEAD_DIA / 2.0
-THREAD_R = MAJOR_DIA / 2.0
-SEAT_R = SEAT_DIA / 2.0
+BODY_R = BODY_DIA / 2.0
 # The under-head corner round (Right-plane sketch u, v in mm): its centre off
-# the face and the seat by its radius, its CCW quarter from the face to the
-# seat.
-CORNER_CENTER = (UNDERHEAD_CORNER_R, SEAT_R + UNDERHEAD_CORNER_R)
-CORNER_FACE_TANGENT = (0.0, SEAT_R + UNDERHEAD_CORNER_R)
-CORNER_SEAT_TANGENT = (UNDERHEAD_CORNER_R, SEAT_R)
+# the face and the body by its radius, its CCW quarter from the face to the
+# body.
+CORNER_CENTER = (UNDERHEAD_CORNER_R, BODY_R + UNDERHEAD_CORNER_R)
+CORNER_FACE_TANGENT = (0.0, BODY_R + UNDERHEAD_CORNER_R)
+CORNER_BODY_TANGENT = (UNDERHEAD_CORNER_R, BODY_R)
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
-# StationReference's full-thread witnesses (Right-plane sketch u, v in mm):
-# each a short construction line lying ON a visible edge (the under-head face
-# from the corner round's tangent point up, then the thread's major silhouette
-# from the printed station toward the tip), so the dimension's extension
-# lines rise from the outline and no reference line floats off it.
-FULL_THREAD_WITNESS = 0.5
+# StationReference's witnesses (Right-plane sketch u, v in mm): each a short
+# construction line lying ON a visible edge (the under-head face from the
+# corner round's tangent point up, then the body's silhouette from each
+# printed station toward the tip), so the dimensions' extension lines rise
+# from the outline and no reference line floats off it.
+STATION_WITNESS = 0.5
 FACE_WITNESS_LINE = (
     CORNER_FACE_TANGENT,
-    (0.0, CORNER_FACE_TANGENT[1] + FULL_THREAD_WITNESS),
+    (0.0, CORNER_FACE_TANGENT[1] + STATION_WITNESS),
+)
+PLAIN_WITNESS_LINE = (
+    (PLAIN_LENGTH_MIN, BODY_R),
+    (PLAIN_LENGTH_MIN + STATION_WITNESS, BODY_R),
 )
 THREAD_WITNESS_LINE = (
-    (FULL_THREAD_STATION_MAX, THREAD_R),
-    (FULL_THREAD_STATION_MAX + FULL_THREAD_WITNESS, THREAD_R),
+    (FULL_THREAD_STATION_MAX, BODY_R),
+    (FULL_THREAD_STATION_MAX + STATION_WITNESS, BODY_R),
 )
-# The station sketch's drop from the face witness to the thread witness is an
-# unsigned dimension driven by "SeatDia"/2 + "UnderHeadCornerR" - "ThreadDia"/2,
-# which must stay positive.
-if CORNER_FACE_TANGENT[1] <= THREAD_R:
-    raise AssertionError("under-head corner round no longer stands over the thread")
+# The face witness stays under the head's rim, the body witnesses apart and
+# short of the tip chamfer.
+if FACE_WITNESS_LINE[1][1] >= HEAD_R:
+    raise AssertionError("under-head face witness runs off the head")
+if not (
+    CORNER_BODY_TANGENT[0]
+    < PLAIN_WITNESS_LINE[0][0]
+    < PLAIN_WITNESS_LINE[1][0]
+    < THREAD_WITNESS_LINE[0][0]
+    < THREAD_WITNESS_LINE[1][0]
+    < LENGTH - TIP_CHAMFER
+):
+    raise AssertionError("station witnesses overlap or leave the plain body")
 
-# Head: the cylinder plus the spherical cap of sagitta CROWN_RISE.
-V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
-    math.pi * CROWN_RISE**2 * (3.0 * CROWN_RADIUS - CROWN_RISE) / 3.0
-)
-# Shank: the seat cylinder, the 45-degree lead's frustum (axial length
-# STEP_LEAD, seat radius to thread radius) and the thread major cylinder,
-# less the tip chamfer's corner triangle (centroid THREAD_R - TIP_CHAMFER/3),
-# plus the under-head corner round: its spandrel, (1 - pi/4) R^2, swept about
-# the axis at its centroid, (10 - 3 pi) / (12 - 3 pi) R off both legs
-# (Pappus; build_mg_magnifying_vertical_rod's relief roots).
-V_SEAT = math.pi * SEAT_R**2 * SHOULDER_LENGTH
-V_LEAD = math.pi * STEP_LEAD / 3.0 * (SEAT_R**2 + SEAT_R * THREAD_R + THREAD_R**2)
-V_THREAD = math.pi * THREAD_R**2 * (LENGTH - SHOULDER_LENGTH - STEP_LEAD)
-V_TIP = math.pi * TIP_CHAMFER**2 * (THREAD_R - TIP_CHAMFER / 3.0)
+# Head: the flat-topped cylinder.
+V_HEAD = math.pi * HEAD_R**2 * HEAD_H
+# Shank: the body cylinder less the tip chamfer's corner triangle (centroid
+# BODY_R - TIP_CHAMFER/3), plus the under-head corner round: its spandrel,
+# (1 - pi/4) R^2, swept about the axis at its centroid, (10 - 3 pi) /
+# (12 - 3 pi) R off both legs (Pappus; build_mg_magnifying_vertical_rod's
+# relief roots).
+V_BODY_CYLINDER = math.pi * BODY_R**2 * LENGTH
+V_TIP = math.pi * TIP_CHAMFER**2 * (BODY_R - TIP_CHAMFER / 3.0)
 _CORNER_SPANDREL = (1.0 - math.pi / 4.0) * UNDERHEAD_CORNER_R**2
 _CORNER_CENTROID_R = (
-    SEAT_R + (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * UNDERHEAD_CORNER_R
+    BODY_R + (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * UNDERHEAD_CORNER_R
 )
 V_CORNER = 2.0 * math.pi * _CORNER_CENTROID_R * _CORNER_SPANDREL
-V_SHANK = V_SEAT + V_LEAD + V_THREAD - V_TIP + V_CORNER
-V_BODY = V_HEAD + V_SHANK
+V_SHANK = V_BODY_CYLINDER - V_TIP + V_CORNER
+V_TURNED = V_HEAD + V_SHANK
 
 
 def slot_strip_area(radius: float, width: float) -> float:
@@ -187,29 +186,9 @@ def slot_strip_area(radius: float, width: float) -> float:
     )
 
 
-def crown_radius_at(z: float) -> float:
-    """Head radius at height ``z`` (under-head face z=0)."""
-    if z <= HEAD_CYL_H:
-        return HEAD_R
-    return math.sqrt(max(CROWN_RADIUS**2 - (z - CROWN_CENTER_Z) ** 2, 0.0))
-
-
-def slot_volume(steps: int = 4000) -> float:
-    """Head material inside the slot strip above the slot floor.
-
-    The cylindrical part is closed-form; the crown part integrates the strip
-    area of each horizontal slice (midpoint rule)."""
-    cylinder = slot_strip_area(HEAD_R, SLOT_WIDTH) * (HEAD_CYL_H - SLOT_FLOOR_Z)
-    dz = CROWN_RISE / steps
-    crown = sum(
-        slot_strip_area(crown_radius_at(HEAD_CYL_H + (i + 0.5) * dz), SLOT_WIDTH)
-        for i in range(steps)
-    )
-    return cylinder + crown * dz
-
-
-V_SLOT = slot_volume()
-V_FINAL = V_BODY - V_SLOT
+# The slot: the strip across the flat top, SLOT_DEPTH deep.
+V_SLOT = slot_strip_area(HEAD_R, SLOT_WIDTH) * SLOT_DEPTH
+V_FINAL = V_TURNED - V_SLOT
 
 
 @_telemetry.traced("part.limit_band", label_param="name")
@@ -276,13 +255,11 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("HeadDia", HEAD_DIA),
         ("HeadHeight", HEAD_H),
-        ("CrownRise", CROWN_RISE),
         ("UnderHeadLength", LENGTH),
-        ("ThreadDia", MAJOR_DIA),
-        ("SeatDia", SEAT_DIA),
-        ("ShoulderLength", SHOULDER_LENGTH),
+        ("BodyDia", BODY_DIA),
         ("UnderHeadCornerR", UNDERHEAD_CORNER_R),
         ("TipChamfer", TIP_CHAMFER),
+        ("PlainLength", PLAIN_LENGTH_MIN),
         ("FullThread", FULL_THREAD_STATION_MAX),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
@@ -292,26 +269,20 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Head revolve on the Right plane: sketch (u, v) maps to model (-Z, Y), so
-    # the head (+Z) lies at negative u, the apex at u = -HEAD_H.  Rim-to-apex
-    # is the minor CCW arc about the crown centre on the axis.
+    # the head (+Z) lies at negative u, the flat top at u = -HEAD_H.
     head = SketchDims()
-    u_rim, u_apex, u_centre = -HEAD_CYL_H, -HEAD_H, -CROWN_CENTER_Z
+    u_top = -HEAD_H
     check("create_sketch head profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     try:
         axis = check(
             "head axis centerline",
-            await adapter.add_centerline(u_apex, 0.0, 0.0, 0.0),
+            await adapter.add_centerline(u_top, 0.0, 0.0, 0.0),
         )
-        head_seat, head_side = await add_line_chain(
-            adapter, [(0.0, 0.0), (0.0, HEAD_R), (u_rim, HEAD_R)], close=False
-        )
-        crown = check(
-            "head crown arc",
-            await adapter.add_arc(u_centre, 0.0, u_rim, HEAD_R, u_apex, 0.0),
-        )
-        head_close = check(
-            "head axis line", await adapter.add_line(u_apex, 0.0, 0.0, 0.0)
+        head_seat, head_side, head_top, head_close = await add_line_chain(
+            adapter,
+            [(0.0, 0.0), (0.0, HEAD_R), (u_top, HEAD_R), (u_top, 0.0)],
+            close=True,
         )
     finally:
         # Session state on the seat: a failed segment must not leave sketch
@@ -320,6 +291,7 @@ async def build(adapter) -> dict[str, str]:
     for line, relation in (
         (head_seat, "vertical"),
         (head_side, "horizontal"),
+        (head_top, "vertical"),
         (head_close, "horizontal"),
     ):
         check(
@@ -338,42 +310,24 @@ async def build(adapter) -> dict[str, str]:
         "head height",
     )
     head.record("HeadHeight", '"HeadHeight"')
-    await dimension_between(
-        adapter,
-        f"{head_side}.end",
-        f"{head_close}.start",
-        "horizontal_distance",
-        CROWN_RISE,
-        "crown rise",
-    )
-    head.record("CrownRise", '"CrownRise"')
     await add_diametric_linear_dimension(
-        adapter, axis, head_side, (u_rim / 2.0, HEAD_R + 4.0), "HeadDia"
+        adapter, axis, head_side, (u_top / 2.0, HEAD_R + 4.0), "HeadDia"
     )
     head.record("HeadDia", '"HeadDia"')
-    check(
-        "crown radius",
-        await adapter.add_sketch_dimension(crown, None, "radial", CROWN_RADIUS),
-    )
-    head.record(
-        "CrownRadius",
-        '("HeadDia" / 2 * "HeadDia" / 2 + "CrownRise" * "CrownRise") / (2 * "CrownRise")',
-    )
     await ensure_fully_defined(adapter, "head profile sketch")
     check("exit_sketch head profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HeadProfile")
     drive_jobs += head.apply(adapter, "HeadProfile")
     check("revolve head", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Head")
-    await volume_check(adapter, "crowned fillister head", V_HEAD, 0.005 * V_HEAD)
+    await volume_check(adapter, "flat-topped cheese head", V_HEAD, 0.005 * V_HEAD)
 
-    # Shank revolve on the Right plane, toward +u (model -Z).  The seat runs
-    # flat from the under-head corner's round to SHOULDER_LENGTH, the foot of
-    # the 45-degree lead that steps up to the thread major.  The round is the
-    # profile's own concave quarter-circle, tangent to the head face and the
-    # seat (build_pd_transgear_knob_shaft's neck corners), so its radius is a
-    # sketch dimension on the profile's side of the axis: the drawing's
-    # radius lands on the side view's upper corner.
+    # Shank revolve on the Right plane, toward +u (model -Z).  The body runs
+    # flat from the under-head corner's round to the tip chamfer.  The round
+    # is the profile's own concave quarter-circle, tangent to the head face
+    # and the body (build_pd_transgear_knob_shaft's neck corners), so its
+    # radius is a sketch dimension on the profile's side of the axis: the
+    # drawing's radius lands on the side view's upper corner.
     shank = SketchDims()
     check("create_sketch shank profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -388,15 +342,13 @@ async def build(adapter) -> dict[str, str]:
         corner = check(
             "under-head corner arc",
             await adapter.add_arc(
-                *CORNER_CENTER, *CORNER_FACE_TANGENT, *CORNER_SEAT_TANGENT
+                *CORNER_CENTER, *CORNER_FACE_TANGENT, *CORNER_BODY_TANGENT
             ),
         )
         points = [
-            CORNER_SEAT_TANGENT,
-            (SHOULDER_LENGTH, SEAT_R),
-            (SHOULDER_LENGTH + STEP_LEAD, THREAD_R),
-            (LENGTH - TIP_CHAMFER, THREAD_R),
-            (LENGTH, THREAD_R - TIP_CHAMFER),
+            CORNER_BODY_TANGENT,
+            (LENGTH - TIP_CHAMFER, BODY_R),
+            (LENGTH, BODY_R - TIP_CHAMFER),
             (LENGTH, 0.0),
             (0.0, 0.0),
         ]
@@ -407,7 +359,7 @@ async def build(adapter) -> dict[str, str]:
     for index, line in enumerate(lines):
         (u0, v0), (u1, v1) = points[index], points[index + 1]
         if u0 != u1 and v0 != v1:
-            continue  # the 45-degree lead or tip chamfer: dimensioned below
+            continue  # the tip chamfer: dimensioned below
         relation = "horizontal" if v0 == v1 else "vertical"
         check(
             f"shank profile {relation} {line}",
@@ -417,9 +369,8 @@ async def build(adapter) -> dict[str, str]:
         f"shank profile vertical {face}",
         await adapter.add_sketch_constraint(face, None, "vertical"),
     )
-    seat, step_lead, thread_outline = lines[0], lines[1], lines[2]
-    tip_chamfer = lines[3]
-    for first, second in ((face, corner), (corner, seat)):
+    body, tip_chamfer = lines[0], lines[1]
+    for first, second in ((face, corner), (corner, body)):
         check(
             f"under-head corner tangent {first} {second}",
             await adapter.add_sketch_constraint(first, second, "tangent"),
@@ -427,25 +378,13 @@ async def build(adapter) -> dict[str, str]:
     # Every axial size reads from the under-head face, the clamp face.
     for name, start, end, value in (
         ("UnderHeadLength", f"{face}.end", f"{tip_chamfer}.end", LENGTH),
-        ("ShoulderLength", f"{face}.end", f"{seat}.end", SHOULDER_LENGTH),
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
     ):
         await dimension_between(
             adapter, start, end, "horizontal_distance", value, f"shank {name}"
         )
         shank.record(name, f'"{name}"')
-    # The lead's radial leg is the two diameters' half-difference; its axial
-    # leg equals it by equation, so the lead is 45 degrees.  The tip chamfer's
-    # rise equals its axial leg the same way.
-    await dimension_between(
-        adapter,
-        f"{step_lead}.start",
-        f"{step_lead}.end",
-        "horizontal_distance",
-        STEP_LEAD,
-        "shank StepLead",
-    )
-    shank.record("StepLead", '("ThreadDia" - "SeatDia") / 2')
+    # The tip chamfer's rise equals its axial leg by equation: 45 degrees.
     await dimension_between(
         adapter,
         f"{tip_chamfer}.start",
@@ -455,19 +394,14 @@ async def build(adapter) -> dict[str, str]:
         "shank TipChamfer rise",
     )
     shank.record("TipChamferRise", '"TipChamfer"')
-    for name, line, u_mid, radius in (
-        ("SeatDia", seat, SHOULDER_LENGTH / 2.0, SEAT_R),
-        (
-            "ThreadDia",
-            thread_outline,
-            (SHOULDER_LENGTH + STEP_LEAD + LENGTH - TIP_CHAMFER) / 2.0,
-            THREAD_R,
-        ),
-    ):
-        await add_diametric_linear_dimension(
-            adapter, shank_axis, line, (u_mid, radius + 4.0), name
-        )
-        shank.record(name, f'"{name}"')
+    await add_diametric_linear_dimension(
+        adapter,
+        shank_axis,
+        body,
+        ((UNDERHEAD_CORNER_R + LENGTH - TIP_CHAMFER) / 2.0, BODY_R + 4.0),
+        "BodyDia",
+    )
+    shank.record("BodyDia", '"BodyDia"')
     check(
         "under-head corner radius",
         await adapter.add_sketch_dimension(corner, None, "radial", UNDERHEAD_CORNER_R),
@@ -484,13 +418,13 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Shank")
     await volume_check(
         adapter,
-        "turned shoulder screw with corner round, lead and tip chamfer",
-        V_BODY,
-        0.005 * V_BODY,
+        "turned cheese-head screw with corner round and tip chamfer",
+        V_TURNED,
+        0.005 * V_TURNED,
     )
 
-    # Driver slot across the crown: sketched on a plane at the apex and cut
-    # down into the head (a cut runs against the plane normal by default).
+    # Driver slot across the flat top: sketched on a plane at the top face and
+    # cut down into the head (a cut runs against the plane normal by default).
     check(
         "create_plane SlotPlane",
         await adapter.create_plane(
@@ -500,7 +434,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "SlotPlane")
-    plane_dim = name_dimensions(adapter, "SlotPlane", ["ApexStation"])
+    plane_dim = name_dimensions(adapter, "SlotPlane", ["TopStation"])
     drive_jobs.append((plane_dim[0], '"HeadHeight"'))
     slot = SketchDims()
     check("create_sketch driver slot", await adapter.create_sketch("SlotPlane"))
@@ -527,28 +461,34 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "DriverSlot", ["SlotDepth"])[0], '"SlotDepth"')
     )
     # A cut the wrong way removes nothing: the volume is the direction check.
-    await volume_check(adapter, "slotted shoulder screw", V_FINAL, 0.02 * V_SLOT)
+    await volume_check(adapter, "slotted cheese-head screw", V_FINAL, 0.02 * V_SLOT)
     blank_reference_geometry(adapter, (("SlotPlane", "PLANE"),))
 
-    # Drawing-only station reference.  The apex-to-tip overall, printed as a
+    # Drawing-only station reference.  The top-to-tip overall, printed as a
     # reference for stock cut-off: one construction line on the axis of the
     # Right plane whose single length dimension IS the printed value (policy
-    # drawing-simplicity-policy.md `How the repository implements the guidelines`), driven by the same globals so no geometry moves.
-    # The full-thread limit (machinist FIX round 1): the under-head face to
-    # the thread-silhouette point at FULL_THREAD_STATION_MAX, between the two
-    # witnesses' start points, its value the printed "5.67 MAX".
+    # drawing-simplicity-policy.md `How the repository implements the
+    # guidelines`), driven by the same globals so no geometry moves.  The
+    # plain length's MIN and the full-thread station's MAX: the under-head
+    # face to each body-silhouette witness at its printed limit, between the
+    # witnesses' start points.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     try:
         overall_line = check(
             "overall reference line",
-            await adapter.add_line(u_apex, 0.0, LENGTH, 0.0),
+            await adapter.add_line(u_top, 0.0, LENGTH, 0.0),
         )
         (fu0, fv0), (fu1, fv1) = FACE_WITNESS_LINE
         face_witness = check(
             "under-head face witness",
             await adapter.add_line(fu0, fv0, fu1, fv1),
+        )
+        (pu0, pv0), (pu1, pv1) = PLAIN_WITNESS_LINE
+        plain_witness = check(
+            "plain-length witness",
+            await adapter.add_line(pu0, pv0, pu1, pv1),
         )
         (tu0, tv0), (tu1, tv1) = THREAD_WITNESS_LINE
         thread_witness = check(
@@ -562,6 +502,7 @@ async def build(adapter) -> dict[str, str]:
     for line, relation in (
         (overall_line, "horizontal"),
         (face_witness, "vertical"),
+        (plain_witness, "horizontal"),
         (thread_witness, "horizontal"),
     ):
         segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
@@ -575,9 +516,9 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_constraint(line, None, relation),
         )
     await anchor_point_to_origin(
-        adapter, f"{overall_line}.start", u_apex, 0.0, "overall reference apex"
+        adapter, f"{overall_line}.start", u_top, 0.0, "overall reference top"
     )
-    stations.record("ApexReference", '"HeadHeight"')
+    stations.record("TopReference", '"HeadHeight"')
     await dimension_between(
         adapter,
         f"{overall_line}.start",
@@ -590,39 +531,41 @@ async def build(adapter) -> dict[str, str]:
     await anchor_point_to_origin(
         adapter, f"{face_witness}.start", fu0, fv0, "face witness at corner tangent"
     )
-    stations.record("FaceWitnessRadius", '"SeatDia" / 2 + "UnderHeadCornerR"')
+    stations.record("FaceWitnessRadius", '"BodyDia" / 2 + "UnderHeadCornerR"')
     await dimension_between(
         adapter,
         f"{face_witness}.start",
         f"{face_witness}.end",
         "vertical_distance",
-        FULL_THREAD_WITNESS,
+        STATION_WITNESS,
         "face witness length",
     )
     stations.record("FaceWitness")
-    # The printed station runs face to thread; the face witness stands the
-    # corner round's height above the thread radius.
-    await anchor_point_to_point(
-        adapter,
-        f"{face_witness}.start",
-        f"{thread_witness}.start",
-        FULL_THREAD_STATION_MAX,
-        tv0 - fv0,
-        "full-thread station",
-    )
-    stations.record("FullThread", '"FullThread"')
-    stations.record(
-        "FullThreadDrop", '"SeatDia" / 2 + "UnderHeadCornerR" - "ThreadDia" / 2'
-    )
-    await dimension_between(
-        adapter,
-        f"{thread_witness}.start",
-        f"{thread_witness}.end",
-        "horizontal_distance",
-        FULL_THREAD_WITNESS,
-        "thread witness length",
-    )
-    stations.record("ThreadWitness")
+    # Each printed station runs face to body silhouette; the face witness
+    # stands the corner round's radius above the body.
+    for name, witness, (u0, v0) in (
+        ("PlainLength", plain_witness, (pu0, pv0)),
+        ("FullThread", thread_witness, (tu0, tv0)),
+    ):
+        await anchor_point_to_point(
+            adapter,
+            f"{face_witness}.start",
+            f"{witness}.start",
+            u0 - fu0,
+            v0 - fv0,
+            f"{name} station",
+        )
+        stations.record(name, f'"{name}"')
+        stations.record(f"{name}Drop", '"UnderHeadCornerR"')
+        await dimension_between(
+            adapter,
+            f"{witness}.start",
+            f"{witness}.end",
+            "horizontal_distance",
+            STATION_WITNESS,
+            f"{name} witness length",
+        )
+        stations.record(f"{name}Witness")
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -636,7 +579,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(
         adapter,
-        "driven slotted shoulder screw (equations neutral)",
+        "driven slotted cheese-head screw (equations neutral)",
         V_FINAL,
         0.02 * V_SLOT,
     )
@@ -649,28 +592,19 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Model-owned limits (drawing-simplicity-policy.md `How the repository
-    # implements the guidelines`), owner ruling 2026-10-26 (#1951, option B):
-    # the seat diameter prints as the LIMIT band 3.60/3.40, its upper limit
-    # under the #8-32 2A major minimum so the lead always steps up into the
-    # thread blank; the shoulder length (to the lead's foot) as 4.10/3.70, so
-    # the loop clears the lead; the full-thread station as the single limit
-    # "5.67 MAX" from the under-head face, so full thread starts inside the
-    # MHA-SM-01 engagement budget (any shorter run-out only adds engagement,
-    # so it carries no deviation).  Every other mark takes the title block's
-    # band.
+    # implements the guidelines`), owner rulings 2026-10-27 (#1951): the body
+    # Ø prints as the LIMIT band 6.32/6.20, the thread blank inside the
+    # 1/4-28 UNF-2A major band; the plain length as the single "3.60 MIN"
+    # from the under-head face, so the loop always bears on the plain body;
+    # the full-thread station as the single "5.80 MAX", so the end piece's
+    # counterbore clears the run-out.  Every other mark takes the title
+    # block's band.
     _limit_band(
         adapter,
         "ShankProfile",
-        "SeatDia",
-        (SEAT_DIA_LOWER, SEAT_DIA_UPPER),
-        SEAT_DIA_TOL_TYPE,
-    )
-    _limit_band(
-        adapter,
-        "ShankProfile",
-        "ShoulderLength",
-        (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
-        SHOULDER_LENGTH_TOL_TYPE,
+        "BodyDia",
+        (BODY_DIA_LOWER, BODY_DIA_UPPER),
+        BODY_DIA_TOL_TYPE,
     )
     # The under-head corner's R0.5 MAX (codjiflo round 4 on #1997): the
     # modelled radius is the limit, the band runs from sharp up to it.
@@ -685,15 +619,19 @@ async def build(adapter) -> dict[str, str]:
     set_single_limit(
         adapter,
         "StationReference",
+        "PlainLength",
+        limit=PLAIN_LENGTH_MIN,
+        band=PLAIN_LENGTH_MIN_BAND,
+        tol_type=PLAIN_LENGTH_MIN_TOL_TYPE,
+    )
+    set_single_limit(
+        adapter,
+        "StationReference",
         "FullThread",
         limit=FULL_THREAD_STATION_MAX,
         band=FULL_THREAD_STATION_MAX_BAND,
         tol_type=FULL_THREAD_STATION_MAX_TOL_TYPE,
     )
-    # The crown's sphere prints on its arc (machinist FIX round 1): the
-    # equation-driven CrownRadius reads "SR"; the drawing parenthesizes it as
-    # a reference.
-    set_dimension_prefix(adapter, "HeadProfile", "CrownRadius", CROWN_RADIUS_PREFIX)
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

@@ -79,6 +79,7 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # set_single_limit converts each caller's single-limit band.
     ("_single_limit_tolerance", "band"): (
         "(__import__('pn_pen_hanger_spec').SLOT_CORNER_R_BAND,"
+        " __import__('sm_gooseneck_spring_screw_geom').PLAIN_LENGTH_MIN_BAND,"
         " __import__('sm_gooseneck_spring_screw_geom').FULL_THREAD_STATION_MAX_BAND,"
         " __import__('sm_gooseneck_spring_screw_geom').UNDERHEAD_CORNER_R_BAND)",
         "each",

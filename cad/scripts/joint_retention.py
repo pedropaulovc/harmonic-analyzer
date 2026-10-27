@@ -608,8 +608,8 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "ch_vn_frame_side_screw",  # #2-56 fillister (McMaster 91794A080, MHA-CH-VN-52); member, x2 into top_frame KeeperTaps (top-level row)
         "ch_fulcrum_keeper",  # #1-72 UNF crown tap through to the shaft bore (receiver of MHA-CH-VN-55); its #2 foot hole is clearance only
         "ch_vn_fulcrum_set_screw",  # #1-72 UNF x 5/32 cup-point set screw (McMaster 91375A942, MHA-CH-VN-55), member: x2, one into each fulcrum_keeper crown tap
-        "sm_gooseneck",  # receiver: #8-32 through-tapped brazed end plug; also the post gripped by the frame's set screw
-        "sm_gooseneck_spring_screw",  # made MHA-SM-04 #8-32 shoulder screw: clamps the counter-spring upper eye on its Ø3.50 seat to the plug
+        "sm_gooseneck",  # receiver: 1/4-28 blind-tapped solid end piece brazed into the 1/2 in tube arm; its sleeve is the post gripped by the frame's set screw
+        "sm_gooseneck_spring_screw",  # made MHA-SM-04 1/4-28 slotted cheese-head screw: clamps the counter-spring upper eye on its plain Ø6.35 body to the end piece
         "fr_vn_gooseneck_set_screw",  # 1/4-20 UNC x 3/4 square-head cup point (91410A540), member: into top_frame hub boss tap, grips summing gooseneck
         "pd_vn_guide_lock_screw",  # #4-40 slotted pan head (McMaster 91792A108, MHA-PD-VN-60, R9-31), member: 8 into the platen_guide rear through taps
         "pn_vn_hanger_screw",  # #8-32 UNC x 1 hex head (McMaster 93075A199), member through the pen-hanger strap's clearance hole into the hanger nut and jam nut
@@ -1563,28 +1563,32 @@ JOINTS: tuple[Joint, ...] = (
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "user ruling 2026-09-21: tighten the head to clamp the supplier upper-eye "
-            "band against the plug face. Clamp preload prevents eye rotation relative "
-            "to the screw and plug; the spring flexes below this static joint, not by "
-            "swivelling on the thread. No operating rubbing torque reaches the screw axis."
+            "band against the end piece's face. Clamp preload prevents eye rotation "
+            "relative to the screw and end piece; the spring flexes below this static "
+            "joint, not by swivelling on the thread. No operating rubbing torque reaches "
+            "the screw axis."
         ),
         axial_capture=(
-            "made MHA-SM-04 fillister head clamps the double-loop band, seated on the "
-            "screw's plain Ø3.50 shoulder, to the brazed plug end face; full thread "
-            "engagement is limited by the #8-32 through-tapped plug past its arm-end "
-            "counterbore, which keeps the screw's die run-out out of the plug's full "
-            "thread. The screw tip continues into the hollow arm, not into a blind "
-            "bottom."
+            "made MHA-SM-04 slotted cheese head clamps the double-loop band, seated on "
+            "the screw's plain Ø6.35 body, to the face of MHA-SM-01's solid Ø12.70 "
+            "end piece; full thread engagement runs in the end piece's blind 1/4-28 "
+            "UNF-2B tap past its arm-end counterbore, which keeps the screw's die "
+            "run-out out of the tap's full thread. The deepest screw tip stays inside "
+            "the tap's full thread, and the bottoming tap's lead inside its drill."
         ),
         lock=Lock.NONE,
         evidence=(
             "user, 2026-09-21, binding upper-eye clamp ruling: static nonrotating "
-            "eye, no threadlocker; owner ruling 2026-10-26 (#1951, option B): "
-            "Ø3.50 shoulder seat, #8-32 thread and retapped plug; "
-            "sm_gooseneck_spring_joint.py "
+            "eye, no threadlocker; owner rulings 2026-10-27 (#1951): 1/4-28 UNF "
+            "screw with a plain Ø6.35 body and slotted cheese head, blind 1/4-28 "
+            "tap in the solid end piece; owner minors sm-gooseneck.yaml RV-01 "
+            "(counterbore wall 1.78 MIN under the 2.0 target) and "
+            "sm-gooseneck-spring-screw.yaml RV-01 (head retention 0.745 under the "
+            "1.0 check); sm_gooseneck_spring_joint.py "
             "ENGAGEMENT_MIN/COUNTERBORE_DEPTH_MIN/SCREW_RUNOUT_INTRUSION_MAX/"
-            "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/HEAD_RETENTION_MIN/"
-            "LOOP_LEAD_CLEARANCE_MIN/LOOP_CORNER_CLEARANCE_MIN/"
-            "SCREW_REACH/TIP_PROTRUSION_MIN; "
+            "PLUG_WALL_MIN/COUNTERBORE_WALL_MIN/DRILL_POINT_SHANK_WALL_MIN/"
+            "HEAD_RETENTION_MIN/LOOP_PLAIN_MARGIN_MIN/LOOP_CORNER_CLEARANCE_MIN/"
+            "TIP_THREAD_MARGIN_MIN/TAP_LEAD_DRILL_MARGIN_MIN; "
             "build_sm_summing_assembly.py gooseneck spring screw lock_mate "
             "(CAD restraint, not mechanical locking hardware); the installation "
             "step is in the summing assembly's Manufacturing Notes property "

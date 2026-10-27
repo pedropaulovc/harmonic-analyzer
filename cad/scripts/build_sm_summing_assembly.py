@@ -30,21 +30,20 @@ boss-hook / counter-spring / gooseneck chain.
   saved model rocks on the knife edge.
 * boss-hook (keyed to the lever's anchor eye) + its MHA-SM-VN-55 jam nut on the
   boss top face + counter-spring + gooseneck -- the counter-balance hung from
-  the east column; the post is gripped by the top-frame rail hub's set screw
-  (no separate clamp part).
-* sm-gooseneck-spring-screw -- made MHA-SM-04 fillister shoulder screw, head
-  outboard: the supplier upper loop sits on its plain O3.50 seat and the head
-  clamps it to the gooseneck plug face, while the #8-32 thread past the seat's
-  45-degree lead runs through the plug's through tap (owner ruling 2026-10-26
-  (#1951, option B)); locked to the fixed gooseneck with no additional
-  operational DOF.
+  the east column; the gooseneck's brazed O15.875 sleeve is the post the
+  top-frame rail hub's set screw grips (no separate clamp part).
+* sm-gooseneck-spring-screw -- made MHA-SM-04 slotted cheese-head screw, head
+  outboard: the supplier upper loop sits on its plain O6.35 body and the head
+  clamps it to the face of the gooseneck's flush end piece, while the 1/4-28
+  thread runs into the end piece's blind tap (owner ruling 2026-10-27
+  (#1951)); locked to the fixed gooseneck with no additional operational DOF.
 
 Cross-subassembly fits (checked at the top level): the channel springs
 (ch-channel.SLDASM) thread the summing-lever plate's O4.5 holes -- gated
 analytically by build_ch_channel_assembly._assert_plate_threading; the knife-
 hanger bolts pass the top-frame crossbar's O6.045 clearance holes and clamp
 through their washers on its faced top; the knife-mount dowels slip into its
-blind round holes and slots (fr-frame.SLDASM); the gooseneck post drops
+blind round holes and slots (fr-frame.SLDASM); the gooseneck's sleeve drops
 through the casting's rail-hub bore, gripped by its 1/4-20 set screw.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact
@@ -409,6 +408,7 @@ import spring_mount_geom as spring_mounts  # noqa: E402
 import sm_summing_lever_spec  # noqa: E402
 from stock_anchor_geom import ANCHOR_9490T1  # noqa: E402
 import sm_vn_boss_hook_jam_nut_spec as jam_nut  # noqa: E402
+from fr_frame_attachment_spec import TOP_SCREW_Y as TOP_FRAME_MID_Y  # noqa: E402
 
 BOSS_HOOK_POS = (*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z)
 # MHA-SM-VN-55 on the anchor axis, its z = 0 face on the boss top face:
@@ -421,12 +421,46 @@ JAM_NUT_POS = (
 JAM_NUT_ROWS = ROT_X_NEG90
 # The counter spring and gooseneck use complete calibrated placements loaded by
 # ``counter_seat`` before assembly creation.
+# The top frame's rail band about its mid-plane: the gooseneck hub bore's rail
+# span (999.7..1036.2), where the set screw grips the gooseneck's sleeve.
+TOP_FRAME_RAIL_BOTTOM_Y = TOP_FRAME_MID_Y - top_frame.HALF_H
+TOP_FRAME_RAIL_TOP_Y = TOP_FRAME_MID_Y + top_frame.HALF_H
 
 UPPER_EYE_CLAMP_NOTES = (
-    "MHA-SM-04: CLAMP COUNTER-SPRING UPPER EYE TO PLUG.\n"
+    "MHA-SM-04: CLAMP COUNTER-SPRING UPPER EYE TO END PIECE.\n"
     "TIGHTEN UNTIL UPPER EYE IS CLAMPED AND CANNOT SWIVEL.\n"
     "NO THREADLOCKER."
 )
+
+
+def _assert_gooseneck_sleeve_covers_hub_bore(
+    gooseneck_origin_y: float, label: str
+) -> None:
+    """Require the brazed sleeve over the top-frame rail's whole bore span.
+
+    The Ø12.70 tube alone would rattle in the unchanged Ø17 rail-hub bore;
+    the 5/8 in sleeve (sm_gooseneck_geom.SLEEVE_*) is the post the hub's set
+    screw grips, so at this setting it must run from below the rail underside
+    to above its top face.
+    """
+    sleeve_bottom = gooseneck_origin_y + sm_gooseneck_geom.LEG_BOTTOM
+    sleeve_top = gooseneck_origin_y + sm_gooseneck_geom.SLEEVE_TOP
+    if not (
+        sleeve_bottom <= TOP_FRAME_RAIL_BOTTOM_Y
+        and TOP_FRAME_RAIL_TOP_Y <= sleeve_top
+    ):
+        raise RuntimeError(
+            f"gooseneck sleeve y {sleeve_bottom:.3f}..{sleeve_top:.3f} at the "
+            f"{label} setting does not cover the top-frame hub bore's rail span "
+            f"{TOP_FRAME_RAIL_BOTTOM_Y:.3f}..{TOP_FRAME_RAIL_TOP_Y:.3f}"
+        )
+    log(
+        f"gooseneck sleeve ({label}): y {sleeve_bottom:.3f}..{sleeve_top:.3f} "
+        f"covers the hub bore rail span {TOP_FRAME_RAIL_BOTTOM_Y:.3f}.."
+        f"{TOP_FRAME_RAIL_TOP_Y:.3f} "
+        f"({TOP_FRAME_RAIL_BOTTOM_Y - sleeve_bottom:.3f} "
+        f"below, {sleeve_top - TOP_FRAME_RAIL_TOP_Y:.3f} above)"
+    )
 
 
 # --- assembly settings as model dimensions (MHA-SM-00 sheet 1) --------------
@@ -564,6 +598,10 @@ async def build(adapter) -> dict[str, str]:
     counter_pose = counter_seat.pose
     _assert_counter_spring_hang(counter_pose)
     assert_counter_spring_top_hang(counter_pose, gooseneck_origin_y)
+    _assert_gooseneck_sleeve_covers_hub_bore(
+        spring_mounts.GOOSENECK_ORIGIN_Y, "reference"
+    )
+    _assert_gooseneck_sleeve_covers_hub_bore(gooseneck_origin_y, "settled")
     _assert_knife_hanger_stack()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -795,8 +833,8 @@ async def build(adapter) -> dict[str, str]:
         counter_pose.rotation_rows,
     )
     # Ry(180): the gooseneck's overhang arm reaches from the east column toward
-    # the machine centre. Its measured origin Y is inserted directly; the post
-    # is held in the top-frame rail-hub bore by its 1/4-20 set screw.
+    # the machine centre. Its measured origin Y is inserted directly; its
+    # sleeve is held in the top-frame rail-hub bore by its 1/4-20 set screw.
     gooseneck = await place_component(
         adapter,
         "sm-gooseneck",
@@ -805,7 +843,8 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_180,
     )
     # The made screw's under-head plane is local Z=0; ROT_Y_POS90 maps head +Z
-    # to machine +X, outboard of the plug, and sends the threaded shank into it.
+    # to machine +X, outboard of the end piece, and sends the threaded shank
+    # into its blind tap.
     # This mate records the static clamped pose, not a mechanical screw lock.
     # Tightening the physical eye clamp adds no operational DOF.
     screw_rows = ROT_Y_POS90
@@ -826,7 +865,7 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         named_ref(f"Front Plane@{screw}", "PLANE"),
         named_ref(f"Front Plane@{gooseneck}", "PLANE"),
-        label="gooseneck spring screw clamped to plug",
+        label="gooseneck spring screw clamped to end piece",
     )
     assert_component_placed(adapter, screw, screw_position, screw_rows)
 

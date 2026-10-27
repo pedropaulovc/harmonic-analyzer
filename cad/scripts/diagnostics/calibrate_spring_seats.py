@@ -483,7 +483,7 @@ async def _calibrate_counter(
                     f"{preset} counter {label}: landed pose is not seated ({contact!r})"
                 )
         # The fixture variant has the same made-screw receiver joint as production;
-        # allow only that exact thread/plug overlap, never spring/support masks.
+        # allow only that exact thread/end-piece overlap, never spring/support masks.
         screw_pair = frozenset((screw, gooseneck))
         production_pair = frozenset(("sm-gooseneck-spring-screw-1", "sm-gooseneck-1"))
         check_no_interference(

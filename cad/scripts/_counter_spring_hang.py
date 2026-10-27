@@ -15,6 +15,9 @@ import sm_vn_counter_spring_stock_geom as counter_stock
 import spring_mount_geom as spring_mounts
 from _check import log
 
+# Clamped gaps the half-turn clearance sweep evaluates, both ends included.
+CLAMP_GAP_SAMPLES = 9
+
 
 def assert_counter_spring_top_hang(
     pose: spring_mounts.SpringPose,
@@ -29,7 +32,11 @@ def assert_counter_spring_top_hang(
     ux, uy = pose.axis_xy
     screw_y = gooseneck_y + sm_gooseneck_geom.ARM_Y
     retention = spring_joint.HEAD_RETENTION
-    if spring_joint.HEAD_RETENTION_MIN < 1.0:
+    # The Ø11.50 cheese head keeps HEAD_RETENTION_MIN (0.745) under the 1.0
+    # retention check: owner minor sm-gooseneck-spring-screw RV-01 (2026-10-27,
+    # #1951), which sm_gooseneck_spring_joint enforces at import
+    # (_owner_minor).  The head must still overlap the eye at its smallest.
+    if spring_joint.HEAD_RETENTION_MIN <= 0.0:
         raise RuntimeError(
             f"counter eye worst head retention only "
             f"{spring_joint.HEAD_RETENTION_MIN:.3f} mm radial"
@@ -48,41 +55,42 @@ def assert_counter_spring_top_hang(
         )
         - band
     )
-    # The supplier band is CLAMPED between the plug face and the under-head
-    # plane (user, 2026-09-21), not hung on a free stand-off. Zero nominal
-    # side clearance is intentional; only floating-point round-off is tolerated.
+    # The supplier band is CLAMPED between the end piece's face and the
+    # under-head plane (user, 2026-09-21), not hung on a free stand-off. Zero
+    # nominal side clearance is intentional; only floating-point round-off is
+    # tolerated.
     if axial_gap < -1e-9:
         raise RuntimeError(
             f"double-loop band does not fit clamped gap: {axial_gap:.9f} mm"
         )
-    # Owner ruling 2026-10-26 (#1951, option B): the loop bears on MHA-SM-04's
-    # plain seat. ROT_Y_POS90 sends the shank toward -X, so a station from the
-    # under-head face is head_x - x. The band reaches the plug face, past the
-    # seat's end at the 45-degree lead's foot (SHOULDER_LENGTH_MIN at the
-    # shortest shoulder), so only the loop's two pull-side wire passes may
-    # touch the screw: sm_gooseneck_spring_joint fixes them (LOOP_PASS_X) for
-    # the plumb loop centred in the gap and bounds their clearance to the lead
-    # and to the R0.50 MAX under-head fillet. The band check above already holds
-    # the loop plumb; hold it to that centre too, so those budgets are this
-    # pose's, and require both passes on the seat.
+    # Owner ruling 2026-10-27 (#1951): the loop bears on MHA-SM-04's plain
+    # Ø6.35 body. ROT_Y_POS90 sends the shank toward -X, so a station from the
+    # under-head face is head_x - x. The band reaches the end face, past the
+    # thread's earliest start (PLAIN_LENGTH_MIN), so only the loop's two
+    # pull-side wire passes may touch the screw: sm_gooseneck_spring_joint fixes
+    # them (LOOP_PASS_X) for the plumb loop centred in the gap and bounds their
+    # margin to the thread start and their clearance to the R0.5 MAX under-head
+    # fillet. The band check above already holds the loop plumb; hold it to
+    # that centre too, so those budgets are this pose's, and require both
+    # passes on the plain body.
     head_x = spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP
     seat_shift = head_x - pose.upper_eye_xy[0] - sm_gooseneck_geom.SPRING_EYE_GAP / 2.0
     passes = tuple(station + seat_shift for station in spring_joint.LOOP_PASS_X)
     seat_overhang = (
-        head_x - (pose.upper_eye_xy[0] - band) - spring_screw.SHOULDER_LENGTH_MIN
+        head_x - (pose.upper_eye_xy[0] - band) - spring_screw.PLAIN_LENGTH_MIN
     )
-    lead_clearance = spring_joint.LOOP_LEAD_CLEARANCE_MIN
+    plain_margin = spring_joint.LOOP_PLAIN_MARGIN_MIN
     corner_clearance = spring_joint.LOOP_CORNER_CLEARANCE_MIN
     if (
         abs(seat_shift) > 1e-9
-        or not 0.0 < passes[0] < passes[1] < spring_screw.SHOULDER_LENGTH_MIN
-        or min(lead_clearance, corner_clearance) <= 0.0
+        or not 0.0 < passes[0] < passes[1] < spring_screw.PLAIN_LENGTH_MIN
+        or min(plain_margin, corner_clearance) <= 0.0
     ):
         raise RuntimeError(
-            "counter upper loop does not bear on the screw's plain seat: loop "
+            "counter upper loop does not bear on the screw's plain body: loop "
             f"{seat_shift:.9f} off the gap centre, passes at {passes[0]:.4f}/"
-            f"{passes[1]:.4f} vs seat end {spring_screw.SHOULDER_LENGTH_MIN:.2f}, "
-            f"lead/corner clearance {lead_clearance:.4f}/{corner_clearance:.4f} mm"
+            f"{passes[1]:.4f} vs plain body end {spring_screw.PLAIN_LENGTH_MIN:.2f}, "
+            f"thread/corner clearance {plain_margin:.4f}/{corner_clearance:.4f} mm"
         )
     coil_top = (
         pose.centre_xy[1]
@@ -91,18 +99,49 @@ def assert_counter_spring_top_hang(
         + counter_stock.WIRE_RADIUS_MM
     )
     main_coil_gap = screw_y - sm_gooseneck_geom.TUBE_DIA / 2.0 - coil_top
-    tube_gap, head_gap = spring_mounts.counter_half_turn_clearances(pose, screw_y)
+    # The native seat certificate is taken at the free gap, but clamping
+    # shrinks the gap to CLAMPED_GAP_MIN..CLAMPED_GAP_MAX (sm_gooseneck_spring_joint;
+    # codjiflo P1 on #1997). The independent bound of the complete clamping
+    # envelope: the half-turn against the arm and the head at the free gap and
+    # at CLAMP_GAP_SAMPLES evenly spaced clamped gaps, both ends included,
+    # each the rigid shift counter_half_turn_clearances bounds.
+    steps = CLAMP_GAP_SAMPLES - 1
+    clamp_gaps = (
+        sm_gooseneck_geom.SPRING_EYE_GAP,
+        *(
+            spring_joint.CLAMPED_GAP_MIN
+            + (spring_joint.CLAMPED_GAP_MAX - spring_joint.CLAMPED_GAP_MIN)
+            * index
+            / steps
+            for index in range(steps + 1)
+        ),
+    )
+    sweep = [
+        (
+            *spring_mounts.counter_half_turn_clearances(
+                pose, screw_y, clamp_gap=clamp_gap
+            ),
+            clamp_gap,
+        )
+        for clamp_gap in clamp_gaps
+    ]
+    tube_gap, tube_at, _ = min((tube, gap, head) for tube, head, gap in sweep)
+    head_gap, head_at, _ = min((head, gap, tube) for tube, head, gap in sweep)
     if min(main_coil_gap, tube_gap, head_gap) < spring_mounts.MIN_CLEARANCE_MM:
         raise RuntimeError(
             f"counter coil/support clearance: main {main_coil_gap:.3f}, "
-            f"half-turn/tube {tube_gap:.3f}, half-turn/head {head_gap:.3f} mm"
+            f"half-turn/tube {tube_gap:.3f} at clamp gap {tube_at:.4f}, "
+            f"half-turn/head {head_gap:.3f} at clamp gap {head_at:.4f} mm "
+            f"(free gap {sm_gooseneck_geom.SPRING_EYE_GAP:.4f}, clamped "
+            f"{spring_joint.CLAMPED_GAP_MIN:.4f}..{spring_joint.CLAMPED_GAP_MAX:.4f})"
         )
     log(
         f"counter upper support: head retention {retention:.3f}, "
-        f"eye clamp side clearance {axial_gap:.9f}, seat passes "
-        f"{passes[0]:.4f}/{passes[1]:.4f} before the O{spring_screw.SEAT_DIA:.2f} "
-        f"seat's end {spring_screw.SHOULDER_LENGTH_MIN:.2f} (band {seat_overhang:.4f} "
-        f"past it to the plug face), lead/corner clearance {lead_clearance:.4f}/"
+        f"eye clamp side clearance {axial_gap:.9f}, body passes "
+        f"{passes[0]:.4f}/{passes[1]:.4f} before the O{spring_screw.BODY_DIA:.2f} "
+        f"body's end {spring_screw.PLAIN_LENGTH_MIN:.2f} (band {seat_overhang:.4f} "
+        f"past it to the end face), thread/corner clearance {plain_margin:.4f}/"
         f"{corner_clearance:.4f}, main coil {main_coil_gap:.3f}, "
-        f"half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm"
+        f"least half-turn tube/head {tube_gap:.3f}/{head_gap:.3f} mm at clamp gaps "
+        f"{tube_at:.4f}/{head_at:.4f}"
     )
