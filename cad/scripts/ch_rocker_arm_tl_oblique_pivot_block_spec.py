@@ -47,6 +47,7 @@ CBORE_FLOOR_REFERENCE = "CboreFloorReference"
 CARRIAGE_THREAD_DEPTH = 5.0
 UNDER_HEAD = CBORE_FLOOR
 CBORE_SECTION_PLANE = "CboreSectionPlane"
+CBORE_SECTION_X = BOLT_X  # B-B cuts the +X hole column
 # Hidden construction sketch on the top face: a line on the -X edge and
 # circles on the bore and one hole per column, so the plan's X ordinates start
 # on that edge (rule 10) while staying model dimensions.

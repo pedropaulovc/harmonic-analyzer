@@ -38,35 +38,54 @@ SHEET_SCALE = (1.0,1.0)
 # callout and the 4X callouts fit left of it inside the border, with short
 # leaders. Plan geometry on the sheet: block x 139..201, y 185..225; frame
 # centre 181,205; bore 149,205; holes x 168/194, y 192/218.
-# Section A runs along y 205 (x 135..205); B along x 168 (y 181..229).
+# Both sections are removed (partial) and look away from the plan (third
+# angle, review of farm run 20261024T133158704Z), so their letters stand on
+# the plan side: A along y 205 from x 135 into the block at x 156, between
+# the seat and the hole column, its letters up at y ~217..223 (a full cut's
+# right letter sat between the row and side extension lines at y 218/225);
+# B along x 194 from y 229 down to 210, letters left at x ~176..182. The
+# REAM, 4X DRILL and 4X COUNTERBORE callouts stand under the A letter at
+# x 135, their leaders rising to the seat and hole 1 from the lower left.
 # X ordinates stand above the plan in 9 mm lanes from the -X edge (x 139):
-# the 10.00 to the seat, its text right of its 10 mm span (left of it is the
-# REAM text), then the two hole columns and the 62.00 overall, 8 mm under the
-# border. Rows are dimensioned once each from the seat axis: 3Y/4Y on the +X
-# side between the A arrow (x 206) and BlockSideY's line (x 224), arrows
+# the 10.00 to the seat, its text right of its 10 mm span, then the two hole
+# columns and the 62.00 overall, 8 mm under the border. Rows are dimensioned
+# once each from the seat axis: 3Y/4Y on the +X side at x .215, arrows
 # inside so neither's outside tail strikes the other's text (review r1-r3);
-# BlockWidth stands past BlockSideY's shouldered text (x 225..237). The 4X
-# callouts' texts end left of x 139, so the -X edge's extension lines on TL-32
-# clear them.
+# BlockSideY at x .224 and BlockWidth past its shouldered text (x 225..237).
 PLAN_XY = (.170,.205)
 PLAN_KEEP = {
     'BlockLength':(.170,.259),'PlanHole2X':(.1665,.250),'PlanHole1X':(.1535,.241),
     'PlanBoreX':(.157,.232),
     'BlockWidth':(.242,.195),'BlockSideY':(.224,.220),
     'CarriageDrills3Y':(.215,.1985),'CarriageDrills4Y':(.215,.2115),
-    'BoreDia':(.078,.226),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores1Dia':(.095,.150),
+    'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.150),'CarriageCounterbores1Dia':(.095,.132),
 }
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
-# Section A-A: Z 0..24.3 prints at y 92.2..67.9 (top face down). The tap's
-# dimension line rides the tap-only band (y 75.5..92.2); its extension lines
-# rise from the top-face sketch circle through the Ø10 seat, so they are
-# hidden and its arrows land on the bore walls (review r2/r3). The 7.650
-# seat depth keeps its line at x .120 and stands its text, with the stack it
-# sets, off to the lower left on a leader, clear of the section.
-SIDE_XY = (.170,.080)
-SIDE_KEEP = {'BlockHeight':(.212,.080),'TopBoreDepth':(.120,.072),'TapDrillDia':(.084,.091)}
-SEAT_DEPTH_TEXT_XY = (.098,.058)
-FLOOR_KEEP = {'CboreFloor':(.360,.155)}
+# Section A-A looks up the sheet (third-angle: placed below the plan, its
+# arrows point away from it, review of farm run 20261024T133158704Z), so the
+# top face prints on top: Z 0..24.3 at y 67.9..92.2, the seat floor at y
+# 84.55. The tap's dimension line rides the tap-only band near the bottom
+# face (y ~70), so its three callout rows end under the seat floor's
+# extension line; its extension lines would rise through the Ø10 seat, so
+# they are hidden and its arrows land on the bore walls (review r2/r3). The
+# 7.650 seat depth keeps its line at x .120, arrows inside so the line is
+# drawn for the text leader to land on, and stands its text, with the stack
+# it sets, off to the upper left in the empty band under the plan's
+# callouts. The ~72 mm two-row text is centred on the point and must end
+# left of x .120, or the leader to its right end crosses its last letters
+# (farm run 20261024T133158704Z).
+# The removed A-A is centred on its cut span (X -46..-25), so its -X face
+# lands at x 139 under the plan's when the view stands at x .1455. The block
+# height prints on B-B instead (A-A has no right face).
+SIDE_XY = (.1455,.080)
+SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.078)}
+SEAT_DEPTH_TEXT_XY = (.078,.104)
+# Removed B-B at .335,.125: Y +5..+20 prints 15 mm tall (y ~117.5..132.5), Z
+# across with the top face toward the plan (x 322.85) and the carriage seat
+# at x 347.15. The floor and its note stand above; the block height under,
+# clear of the SECTION B-B caption ~17 mm below the view.
+FLOOR_XY = (.335,.125)
+FLOOR_KEEP = {'CboreFloor':(.360,.143),'BlockHeight':(.335,.111)}
 ISO_XY, ISO_SCALE = (.355,.235), SHEET_SCALE
 # TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
 # (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
@@ -77,9 +96,9 @@ FEED_PLAN_XY = (.170,.181)
 FEED_PLAN_KEEP = PLAN_KEEP | {
     'LugWidth':(.2045,.1305),'PlanLugX':(.1554,.1225),'PlanOverallY':(.256,.181),
 }
-FEED_SIDE_XY = (.170,.060)
-FEED_SIDE_KEEP = {'BlockHeight':(.209,.060),'TopBoreDepth':(.120,.052),'TapDrillDia':(.084,.071)}
-FEED_SEAT_DEPTH_TEXT_XY = (.098,.038)
+FEED_SIDE_XY = (.1455,.060)
+FEED_SIDE_KEEP = {'TopBoreDepth':(.120,.068),'TapDrillDia':(.084,.058)}
+FEED_SEAT_DEPTH_TEXT_XY = (.078,.084)
 FEED_ISO_XY, FEED_ISO_SCALE = (.360,.225), (1,2)
 # VIEW D looks at the lug's -X (nut) face: its letter's leader is the viewing
 # arrow, level with the lug's mid-length, 15 mm left of that face.
@@ -202,10 +221,14 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
         (FEED_PLAN_XY, FEED_PLAN_KEEP, FEED_SIDE_XY, FEED_SIDE_KEEP, FEED_SEAT_DEPTH_TEXT_XY, FEED_ISO_XY, FEED_ISO_SCALE)
         if is_feed else (PLAN_XY, PLAN_KEEP, SIDE_XY, SIDE_KEEP, SEAT_DEPTH_TEXT_XY, ISO_XY, ISO_SCALE))
     plan = place_view(adapter,str(source),'*Front',*plan_xy,scale=SHEET_SCALE)
+    # Each cutting line runs so its arrows point away from the section it
+    # names (third-angle): A-A below the plan looks up, B-B right of it looks
+    # left, and the plan's top face prints toward the plan in both. Both are
+    # removed sections whose lines stop inside the block (layout notes above).
     side = create_section_view(adapter,plan,
-        line_start=_project(adapter,plan,(-46,0,contract.BLOCK_HEIGHT),'pivot cut start'),
-        line_end=_project(adapter,plan,(24,0,contract.BLOCK_HEIGHT),'pivot cut end'),
-        view_xy=side_xy,section_label='A',scale=(1,1),label='pivot shoulder seat')
+        line_start=_project(adapter,plan,(-25,0,contract.BLOCK_HEIGHT),'pivot cut start'),
+        line_end=_project(adapter,plan,(-46,0,contract.BLOCK_HEIGHT),'pivot cut end'),
+        view_xy=side_xy,section_label='A',scale=(1,1),partial=True,label='pivot shoulder seat')
     iso = place_view(adapter,str(source),'*Isometric',*iso_xy,scale=iso_scale)
     set_hidden_lines_removed(adapter,plan)
     plan_annotations = curate_view_dimensions(adapter,plan,keep=plan_keep,view_label='plan',
@@ -215,14 +238,14 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     side_annotations = curate_view_dimensions(adapter,side,keep=side_keep,view_label='pivot section direction',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     _hide_witness_lines(adapter, side_annotations, 'TapDrillDia')
+    _arrows_inside(adapter, side_annotations, ('TopBoreDepth',))
     offset_dimension_text(adapter, side_annotations, {'TopBoreDepth': seat_text_xy})
     annotations = plan_annotations + side_annotations
-    start = _project(adapter,plan,(-13,-24,contract.BLOCK_HEIGHT),'floor cut start')
-    end = _project(adapter,plan,(-13,24,contract.BLOCK_HEIGHT),'floor cut end')
-    # TL-32's full cut would carry the whole lug beyond the plane; the removed
-    # section keeps B-B to the block, as on TL-22.
-    floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=(.335,.125),
-                                section_label='B',scale=(1,1),partial=is_feed,
+    x = part.CBORE_SECTION_X
+    start = _project(adapter,plan,(x,24,contract.BLOCK_HEIGHT),'floor cut start')
+    end = _project(adapter,plan,(x,5,contract.BLOCK_HEIGHT),'floor cut end')
+    floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
+                                section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)

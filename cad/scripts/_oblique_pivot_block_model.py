@@ -24,7 +24,7 @@ from _sketch_chains import define_rectilinear_chain
 from _sketch_circle import define_circle
 from _visibility import blank_reference_geometry
 import ch_rocker_arm_tl_oblique_pivot_block_spec as spec
-from ch_rocker_arm_tl_oblique_pivot_block_spec import BOLT_X, BOLT_Y, HOLE_DIA, CBORE_FLOOR, CBORE_FLOOR_REFERENCE, CBORE_SECTION_PLANE
+from ch_rocker_arm_tl_oblique_pivot_block_spec import BOLT_Y, HOLE_DIA, CBORE_FLOOR, CBORE_FLOOR_REFERENCE, CBORE_SECTION_PLANE
 
 MATERIAL = "6061 Alloy"
 
@@ -108,16 +108,18 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
 async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     """The hidden sketch carrying the printed counterbore floor height.
 
-    Section B-B cuts along Y through the (-13, +13) counterbore (along X its
-    arrows and letters would sit on the bore: review r5), so its cutting
-    plane is the Right plane (model YZ) carried to X = -BoltX; a derived view
-    imports a reference sketch that lies in its cut (build_pd_platen
-    ``CboreFloorReference``). One construction line on the Ã˜4.5 hole's +Y
-    wall, a visible section edge, from the carriage seat (Z = 0) up to the
-    counterbore floor: its foot's Y from the origin (unprinted; the Z = 0
-    end sits on the sketch axis), and its rise, the printed floor. The
-    off-sketch check in ``_sketch_mapper`` proves the plane stands at
-    X = -13 and that the sketch opened on it, not on a fallback plane.
+    Section B-B cuts along Y through the (+13, +13) counterbore (along X its
+    arrows and letters would sit on the bore: review r5; through the -13
+    column its left-pointing letters met the seat's 10.00 extension line), so
+    its cutting plane is the Right plane (model YZ) carried to X = +BoltX; a
+    derived view imports a reference sketch that lies in its cut
+    (build_pd_platen ``CboreFloorReference``). One construction line on the
+    Ø4.5 hole's +Y wall, a visible section edge, from the carriage seat
+    (Z = 0) up to the counterbore floor: its foot's Y from the origin
+    (unprinted; the Z = 0 end sits on the sketch axis), and its rise, the
+    printed floor. The off-sketch check in ``_sketch_mapper`` proves the
+    plane stands at X = +13 and that the sketch opened on it, not on a
+    fallback plane.
     """
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
@@ -125,7 +127,7 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
         f"create_plane {CBORE_SECTION_PLANE}",
         await adapter.create_plane(
             CreatePlaneParameters(
-                mode="offset", base_plane="Right Plane", offset=-BOLT_X
+                mode="offset", base_plane="Right Plane", offset=spec.CBORE_SECTION_X
             )
         ),
     )
@@ -144,11 +146,11 @@ async def _cbore_floor_reference(adapter) -> list[tuple[str, str]]:
     check(f"create_sketch {feature}", await adapter.create_sketch(CBORE_SECTION_PLANE))
     # A Right-plane sketch reads (u, v) = model (-Z, Y) (build_pd_platen).
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
-    origin = to_sketch((-BOLT_X, 0.0, 0.0))
+    origin = to_sketch((spec.CBORE_SECTION_X, 0.0, 0.0))
     if origin != (0.0, 0.0):
         raise RuntimeError(f"{feature}: sketch origin maps to {origin}")
-    foot = to_sketch((-BOLT_X, y_wall, 0.0))
-    floor = to_sketch((-BOLT_X, y_wall, CBORE_FLOOR))
+    foot = to_sketch((spec.CBORE_SECTION_X, y_wall, 0.0))
+    floor = to_sketch((spec.CBORE_SECTION_X, y_wall, CBORE_FLOOR))
     set_sketch_direct_db(adapter, True)
     line = check(feature, await adapter.add_line(*foot, *floor))
     set_sketch_direct_db(adapter, False)
