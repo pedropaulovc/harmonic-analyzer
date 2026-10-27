@@ -81,20 +81,26 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
     assert math.degrees(math.atan((wide - rod_min) / span)) < 0.25
     # The plate is cut as its own blank before brazing: the sheet prints its
     # reach and slot depth both .X from its free end, its root seating on the
-    # strap front face a sheet-stock (reference) thickness off the bar seat
-    # that sets the rod line.  The slot bottom carries both bands and still
-    # stands behind the largest rod's back face, and the corner fillets' wall
-    # tangency behind it too with the radius at its printed MAX
-    # (drawing-guidelines.md rule 16, no tight band).
+    # strap front face a stock (reference) thickness off the bar seat that
+    # sets the rod line.  With both .X bands and the thickest strap stock the
+    # slot bottom still stands behind the largest rod's back face, and the
+    # corner fillets' wall tangency behind it too with the radius at its
+    # printed MAX (drawing-guidelines.md rule 16, no tight band).
     back_face = spec.ROD_AXIS_Z + rod_max / 2.0
     assert spec.SLOT_DEPTH == pytest.approx(
         spec.PLATE_REACH + spec.STRAP_T - spec.SLOT_BOTTOM
     )
-    slot_bottom_near = spec.SLOT_BOTTOM_Z - 2.0 * printed_band_mm(1)
+    # 11 gauge sheet, 0.1130-0.1256 in, about the 3.0 nominal; it covers the
+    # 1018 metric bar's +0/-0.075 too.
+    assert spec.STRAP_T_STOCK_BAND == pytest.approx((0.19024, -0.12980))
+    thickest = spec.STRAP_T + spec.STRAP_T_STOCK_BAND[0]
+    root_z = -thickest
+    free_end_z = root_z - (spec.PLATE_REACH + printed_band_mm(1))
+    slot_bottom_near = free_end_z + (spec.SLOT_DEPTH - printed_band_mm(1))
     assert slot_bottom_near - back_face == pytest.approx(spec.SLOT_BOTTOM_GAP_MIN)
-    assert spec.SLOT_BOTTOM_GAP_MIN == pytest.approx(2.4)
+    assert spec.SLOT_BOTTOM_GAP_MIN == pytest.approx(2.20976)
     fillet_tangent = slot_bottom_near - spec.SLOT_CORNER_R_MAX
-    assert fillet_tangent - back_face == pytest.approx(0.4)
+    assert fillet_tangent - back_face == pytest.approx(0.20976)
     assert spec.SLOT_CORNER_R_MAX == spec.SLOT_CORNER_R == 2.0
     assert spec.SLOT_CORNER_R_BAND == (0.0, -spec.SLOT_CORNER_R)
     assert spec.SLOT_CORNER_R_TOL_TYPE == 6  # swTolMAX
@@ -105,8 +111,13 @@ def test_slots_centre_on_the_rod_line_with_a_running_fit() -> None:
         assert ("UpperGuideProfile", name) not in spec.DRAWING_BANDS
         assert spec.DRAWING_PRECISION["UpperGuideProfile"][name] == 1
     assert "StrapThick" in spec.REFERENCE_DIMENSIONS
-    # The arms reach past the rod's front face.
+    # The arms reach past the rod's front face, and still cover it with the
+    # reach short and the strap at its thinnest stock.
     assert spec.ROD_AXIS_Z - rod_max / 2.0 - spec.PLATE_FRONT_Z == pytest.approx(1.5)
+    thinnest = spec.STRAP_T + spec.STRAP_T_STOCK_BAND[1]
+    front_z = -thinnest - (spec.PLATE_REACH - printed_band_mm(1))
+    cover = spec.ROD_AXIS_Z - rod_max / 2.0 - front_z
+    assert cover == pytest.approx(spec.GUIDE_ARM_COVER_MIN) == pytest.approx(0.5702)
 
 
 def test_both_slot_walls_keep_the_floor_at_the_printed_worst_case() -> None:
@@ -292,13 +303,26 @@ def test_slot_width_text_is_parked_clear_of_every_extension_line() -> None:
     assert '"StrapThick": STRAP_THICK_TEXT_XY' in source
 
 
-def test_slot_corner_radius_prints_its_single_max_limit() -> None:
-    import build_pn_pen_hanger as part
+def test_slot_corner_radius_prints_its_single_max_limit(monkeypatch) -> None:
+    import _single_limit_tolerance as single
 
-    source = inspect.getsource(part)
-    assert "tolerance.Type = SLOT_CORNER_R_TOL_TYPE" in source
-    assert source.index("_slot_corner_max_limit(adapter)\n") < source.index(
-        "clear_dimensions_for_drawing(adapter)"
+    from test_single_limit_tolerance import FakeDimension
+
+    # The spec's limit, band and type drive the shared helper to "R2.0 MAX":
+    # the modelled radius is the limit, the band runs from sharp up to it.
+    dimension = FakeDimension(spec.SLOT_CORNER_R / 1000.0)
+    monkeypatch.setattr(single, "_named_dimension", lambda *_: (None, dimension))
+    single.set_single_limit(
+        None,
+        "UpperSlotCorner",
+        "SlotCornerR",
+        limit=spec.SLOT_CORNER_R,
+        band=spec.SLOT_CORNER_R_BAND,
+        tol_type=spec.SLOT_CORNER_R_TOL_TYPE,
+    )
+    assert dimension.Tolerance.Type == single.SW_TOL_MAX
+    assert (dimension.Tolerance.min, dimension.Tolerance.max) == pytest.approx(
+        (-0.002, 0.0)
     )
     assert spec.DIMENSION_PREFIXES == {("UpperSlotCorner", "SlotCornerR"): "2X R"}
 

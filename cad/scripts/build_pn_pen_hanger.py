@@ -34,7 +34,6 @@ import sys
 from _appearance import BAR_STEEL, apply_color, apply_material
 from _bore_axis import name_bore_axis
 from _check import check
-from _com import _early_bound
 from _dimensions import drive_dimension, name_dimensions, set_global
 from _extrude import extrude_at_offset
 from _feature_tree import name_last_feature
@@ -54,11 +53,12 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _drawing_precision import _named_dimension, apply_drawing_precision
+from _drawing_precision import apply_drawing_precision
 from _drawing_prefix import set_dimension_prefix
 from _drawing_tolerances import set_dimension_bilateral_tolerance
 from _fit_deviations import deviations
 from _holes import wizard_holes
+from _single_limit_tolerance import set_single_limit
 from pn_pen_hanger_spec import (
     DIMENSION_PREFIXES,
     DRAWING_BANDS,
@@ -100,36 +100,6 @@ MATERIAL = "Plain Carbon Steel"  # black hardware
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
-
-
-def _slot_corner_max_limit(adapter) -> None:
-    """SlotCornerR as the single limit "R2.0 MAX" carrying its band's
-    deviations (build_pn_pen_v_block._single_limits' recipe): the native type
-    prints the nominal, so the nominal is the limit."""
-    feature_name, dimension_name = "UpperSlotCorner", "SlotCornerR"
-    label = f"{dimension_name}@{feature_name}"
-    lower, upper = deviations(SLOT_CORNER_R_BAND)
-    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, SLOT_CORNER_R / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the max {SLOT_CORNER_R}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = SLOT_CORNER_R_TOL_TYPE
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != SLOT_CORNER_R_TOL_TYPE
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {SLOT_CORNER_R:g} MAX")
 
 
 async def _guide_plate(adapter, prefix: str, drop: float) -> list[tuple[str, str]]:
@@ -346,7 +316,15 @@ async def build(adapter) -> dict[str, str]:
             adapter, feature_name, dimension_name, *deviations(band)
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    _slot_corner_max_limit(adapter)
+    # "2X R2.0 MAX": the modelled radius is the printed limit (rule 16).
+    set_single_limit(
+        adapter,
+        "UpperSlotCorner",
+        "SlotCornerR",
+        limit=SLOT_CORNER_R,
+        band=SLOT_CORNER_R_BAND,
+        tol_type=SLOT_CORNER_R_TOL_TYPE,
+    )
     for (feature_name, dimension_name), prefix in DIMENSION_PREFIXES.items():
         set_dimension_prefix(adapter, feature_name, dimension_name, prefix)
     clear_dimensions_for_drawing(adapter)

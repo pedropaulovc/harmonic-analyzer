@@ -44,6 +44,20 @@ ROD_AXIS_Z = round(PEN_Z_MID - BAR_FRONT_Z, 6)  # local z of the rod line
 # sits flush with both foot corners (note 1) and needs no lateral dimension.
 STRAP_T = 3.0
 STRAP_Z = (-STRAP_T, 0.0)
+# The strap is 3 mm stock as supplied: the sheet prints its thickness as a
+# reference over SHEET STOCK, so the stacks below carry the stock's commercial
+# band instead of a .X one.  The envelope of the bands for 3 mm low-carbon
+# stock (Online Metals, Cold Roll Steel Tolerances,
+# https://www.onlinemetals.com/en/cold-roll-steel-tolerances, read 2026-10-26):
+# 1018 metric cold-finish rectangle bar +0/-0.075 (its 3-6 mm row), and
+# A366/1008 sheet at 11 gauge, the gauge nearest 3 mm, 0.1130-0.1256 in.
+STRAP_T_STOCK_RANGE = (round(0.1130 * 25.4, 6), round(0.1256 * 25.4, 6))
+STRAP_T_STOCK_BAND = (
+    round(STRAP_T_STOCK_RANGE[1] - STRAP_T, 6),
+    round(STRAP_T_STOCK_RANGE[0] - STRAP_T, 6),
+)  # (upper, lower) about the 3.0 nominal: +0.190/-0.130
+if not (STRAP_T_STOCK_BAND[1] <= -0.075 and STRAP_T_STOCK_BAND[0] >= 0.0):
+    raise AssertionError("the strap stock band no longer covers the 1018 bar row")
 STRAP_TOP_X = (-16.0, 0.0)  # 16 wide at the bar (low)
 STRAP_BOT_X = (-6.0, 6.0)  # 12 wide at the foot, centred on the rod (low)
 # 170 below the bar top: the strap stays flat on the bar plane, which the
@@ -96,9 +110,9 @@ SLOT_WIDTH = 5.05
 # slots allow (GUIDE_TILT_MAX).
 SLOT_WIDTH_BAND = (0.05, 0.0)
 # Nominal, largest rod's back face to slot bottom.  Open enough that the
-# plate's printed .X reach and slot depth, with the corner radius at its printed
-# MAX below, still keep the rod's back corners off the slot-corner fillets
-# (guarded below), so neither needs a tight band.
+# plate's printed .X reach and slot depth and the strap's stock band, with the
+# corner radius at its printed MAX below, still keep the rod's back corners off
+# the slot-corner fillets (guarded below), so neither needs a tight band.
 SLOT_BOTTOM_GAP = 4.0
 SLOT_BOTTOM_Z = round(ROD_AXIS_Z + ROD_SECTION / 2.0 + SLOT_BOTTOM_GAP, 6)
 # The slot bottom from the strap back face (the bar seat): the sketch's anchor.
@@ -131,13 +145,14 @@ if SLOT_CLEARANCE[0] <= 0.0:
 GUIDE_TILT_MAX = math.atan(SLOT_CLEARANCE[1] / (GUIDE_PITCH + GUIDE_PLATE_T))
 if math.degrees(GUIDE_TILT_MAX) > 0.25:
     raise AssertionError("guide slots let the pen rod lean over 0.25 deg")
-# The slot bottom stays behind the rod's back face at the printed worst case.
-# The rod line is set from the strap back face (the bar seat); the plate's root
-# seats on the strap front face, the strap's sheet-stock thickness away (a
-# reference on the sheet, not a machined size), and the sheet prints the
-# plate's reach and its slot depth both .X from the plate's free end, so the
-# slot bottom carries both bands.
-SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP - 2.0 * printed_band_mm(1)
+# The slot bottom stays behind the rod's back face at the worst case.  The
+# rod line is set from the strap back face (the bar seat); the plate's root
+# seats on the strap front face, the strap's stock thickness away (a
+# reference on the sheet, at its commercial band: the thickest strap pushes
+# the plate forward), and the sheet prints the plate's reach and its slot
+# depth both .X from the plate's free end, so the slot bottom carries both
+# .X bands as well.
+SLOT_BOTTOM_GAP_MIN = SLOT_BOTTOM_GAP - 2.0 * printed_band_mm(1) - STRAP_T_STOCK_BAND[0]
 if SLOT_BOTTOM_GAP_MIN <= 0.0:
     raise AssertionError("guide slot bottom can bear on the pen rod")
 # The corner fillets are tangent to the walls SLOT_CORNER_R ahead of the slot
@@ -151,9 +166,11 @@ if SLOT_BOTTOM_GAP_MIN < SLOT_CORNER_R_MAX:
 # The two fillets leave a flat slot bottom between them, inside the slot depth.
 if 2.0 * SLOT_CORNER_R >= SLOT_WIDTH or SLOT_CORNER_R >= SLOT_DEPTH:
     raise AssertionError("guide slot corner radius does not fit the slot")
-# The arms still cover the rod's front face with the reach at its .X limit (the
-# strap's sheet-stock thickness unbanded, as above).
-GUIDE_ARM_COVER_MIN = GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1)
+# The arms still cover the rod's front face with the reach at its .X limit and
+# the thinnest strap stock holding the plate back.
+GUIDE_ARM_COVER_MIN = (
+    GUIDE_NOSE - _ROD_MAX / 2.0 - printed_band_mm(1) + STRAP_T_STOCK_BAND[1]
+)
 if GUIDE_ARM_COVER_MIN <= 0.0:
     raise AssertionError("guide plate arms can stop short of the rod's front face")
 
