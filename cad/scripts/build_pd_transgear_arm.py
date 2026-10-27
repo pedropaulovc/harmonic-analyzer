@@ -741,9 +741,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "LocatorHoles", "LocatorDepth", LOCATOR_BLIND_DEPTH_BAND_MM
     )
+    # The locating ream's band is symmetric, so it prints ± on one line and
+    # the six-line callout under it stays inside the sheet's upper border.
+    if abs(sum(LOCATOR_HOLE_BAND_MM)) > 1e-9:
+        raise AssertionError("the locating ream's band is no longer symmetric")
     for index in (1, 2):
-        set_dimension_bilateral_tolerance(
-            adapter, "LocatorProfile", f"LocatorDia{index}", *deviations(LOCATOR_HOLE_BAND_MM)
+        set_dimension_symmetric_tolerance(
+            adapter, "LocatorProfile", f"LocatorDia{index}", round(LOCATOR_HOLE_BAND_MM[0], 6)
         )
     for feature_name, dimension_name in BASIC_REDUCER_DIMENSIONS:
         set_dimension_basic_tolerance(adapter, feature_name, dimension_name)

@@ -213,7 +213,7 @@ FRONT_KEEP = {
     "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
     # Six callout lines under the value: the block centres low enough that
     # its top stays inside the upper border, right of the tap callout.
-    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0177),
+    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0157),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper

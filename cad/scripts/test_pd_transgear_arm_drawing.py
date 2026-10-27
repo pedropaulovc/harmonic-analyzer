@@ -281,7 +281,7 @@ def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> N
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
         ("LocatorHoles", "LocatorDepth"): "LOCATOR_BLIND_DEPTH_BAND_MM",
-        ("LocatorProfile", "f'LocatorDia{index}'"): "*deviations(LOCATOR_HOLE_BAND_MM)",
+        ("LocatorProfile", "f'LocatorDia{index}'"): "round(LOCATOR_HOLE_BAND_MM[0], 6)",
         ("PinHoleProfile", "PinHoleZ"): "LATCH_PIN_HEIGHT_TOLERANCE",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
         ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
