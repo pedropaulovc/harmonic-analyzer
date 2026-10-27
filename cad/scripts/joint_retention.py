@@ -1587,7 +1587,7 @@ JOINTS: tuple[Joint, ...] = (
             "step is in the summing assembly's Manufacturing Notes property "
             "(UPPER_EYE_CLAMP_NOTES) and printed as MHA-SM-00 step 8 "
             "(sm_summing_assembly_sheet.ASSEMBLY_STEPS 8, ASSEMBLY_CHECKS 3); "
-            "_assert_counter_spring_top_hang"
+            "_counter_spring_hang.assert_counter_spring_top_hang"
         ),
     ),
     Joint(

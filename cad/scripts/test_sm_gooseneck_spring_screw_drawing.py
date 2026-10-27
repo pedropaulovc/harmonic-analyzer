@@ -266,10 +266,15 @@ def test_full_thread_limit_prints_on_the_part_not_in_a_note() -> None:
     assert geom.FULL_THREAD_STATION_MAX >= die_room
     with pytest.raises(AssertionError, match="no room behind the lead"):
         geom.require_shoulder_form(full_thread_station_max=die_room - 0.01)
-    # Its callout carries the purpose the shoulder length's no longer does.
-    assert spec.DIMENSION_CALLOUTS["StationReference"] == {
-        "FullThread": "FULL THREAD IN\nMHA-SM-01"
+    # Its callout parallels the shoulder length's "TO 45 DEG LEAD"; note 1
+    # names the mate, so the callout names none (farm run 20261027T053051351Z:
+    # "FULL THREAD IN MHA-SM-01" read as a plug-engagement statement).  It
+    # stands ABOVE the value, which alone takes the dimension line.
+    assert spec.DIMENSION_CALLOUTS_ABOVE == {
+        "StationReference": {"FullThread": "TO FULL THREAD"}
     }
+    assert "StationReference" not in spec.DIMENSION_CALLOUTS
+    assert "MHA-SM-01" in spec.DRAWING_NOTES
     # The station sketch's witnesses lie on the outline: the under-head face
     # (from the thread radius up, under the head's rim) and the thread's
     # major silhouette from the printed station toward the tip.
@@ -476,7 +481,6 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.block_height(2, 3) == pytest.approx(0.2388337 - 0.2131399, abs=2e-4)
     assert drawing.SEAT_DIA_TEXT_HEIGHT == drawing.block_height(2, 3)
     assert drawing.SHOULDER_LENGTH_TEXT_HEIGHT == drawing.block_height(2, 2)
-    assert drawing.FULL_THREAD_TEXT_HEIGHT == drawing.block_height(1, 2)
     # The seat Ø stands on the seat, its line clear of the under-head
     # extension line, and its text hangs right of its own dimension line (its
     # leader meets the text's left end, so the leader runs beside the text,
@@ -508,16 +512,21 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert sl_line >= drawing.THREAD_NOTE_XY[1] + 0.008
     assert sl_line >= drawing.THREAD_TOP_Y + 0.004
     assert ft_line - sl_line >= 0.008
-    # The full-thread block centres over its own span (a 0.4 mm nudge keeps
-    # its extension lines' tips off the last line's glyphs), above its line.
+    # The full-thread block centres over its own span, above its line.  The
+    # extension lines overshoot the line by 1.0 mm, to the ink of the line on
+    # it, so that line is the value alone and fits between them with 0.5 mm
+    # a side; its one-line callout stands a line above, over the overshoot.
     ft_x, ft_y = drawing.SIDE_KEEP["FullThread"]
     span_mid = (drawing.UNDERHEAD_X + drawing.FULL_THREAD_X) / 2.0
-    assert abs(ft_x - span_mid) <= 0.0005
+    assert ft_x == pytest.approx(span_mid)
     assert ft_y == pytest.approx(ft_line + drawing.FULL_THREAD_TEXT_HEIGHT / 2.0)
+    assert drawing.FULL_THREAD_TEXT_HEIGHT == drawing.block_height(1, 1)
+    span = drawing.FULL_THREAD_X - drawing.UNDERHEAD_X
+    assert (span - drawing.FULL_THREAD_VALUE_WIDTH) / 2.0 >= 0.0005
     ft_left = ft_x - drawing.FULL_THREAD_TEXT_WIDTH / 2.0
     ft_right = ft_x + drawing.FULL_THREAD_TEXT_WIDTH / 2.0
     ft_top = ft_line + drawing.FULL_THREAD_TEXT_HEIGHT
-    assert drawing.FULL_THREAD_LAST_LINE_WIDTH < drawing.FULL_THREAD_TEXT_WIDTH
+    assert drawing.FULL_THREAD_VALUE_WIDTH < span < drawing.FULL_THREAD_TEXT_WIDTH
     # Clear of the head's slot-depth stack (its right extension line at the
     # slot floor) and inside the border.
     assert ft_left >= drawing.SLOT_FLOOR_X + 0.008
@@ -599,6 +608,46 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.ISO_CENTER[0] - drawing.THREAD_NOTE_XY[0] > 0.040
 
 
+def test_every_direct_db_block_restores_inference_in_finally() -> None:
+    # Sketch inference is session state on the persistent seat: each block
+    # that turns it off must restore it even when a native segment is
+    # rejected, so every True is followed at once by a try whose finally
+    # restores it, and nothing restores it outside a finally.
+    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+
+    def toggle(node: ast.AST) -> str | None:
+        if (
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "id", "") == "set_sketch_direct_db"
+        ):
+            return ast.unparse(node.value.args[1])
+        return None
+
+    on = restored = 0
+    finally_offs: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Try):
+            finally_offs |= {
+                id(stmt) for stmt in node.finalbody if toggle(stmt) == "False"
+            }
+    for node in ast.walk(tree):
+        body = getattr(node, "body", None)
+        if not isinstance(body, list):
+            continue
+        for index, stmt in enumerate(body):
+            if toggle(stmt) == "True":
+                on += 1
+                following = body[index + 1]
+                assert isinstance(following, ast.Try), ast.unparse(stmt)
+                assert [toggle(s) for s in following.finalbody] == ["False"]
+                restored += 1
+    offs = [node for node in ast.walk(tree) if toggle(node) == "False"]
+    assert {id(node) for node in offs} == finally_offs
+    # The head profile, the shank profile and the station reference.
+    assert on == restored == len(offs) == 3
+
+
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     build = Path(part.__file__).read_text(encoding="utf-8")
     blank = 'blank_sketch(adapter, "StationReference")'
@@ -651,13 +700,20 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "ThreadDia@ShankProfile": (geom.MAJOR_DIA, 0),
     }
     # The part authors every callout on the dimension it marks; the drawing
-    # writes none.
+    # writes none.  The full-thread callout alone stands above its value.
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    assert set(callouts) == {"SeatDia", "ShoulderLength", "TipChamfer", "FullThread"}
+    assert set(callouts) == {"SeatDia", "ShoulderLength", "TipChamfer"}
+    assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {"FullThread": "TO FULL THREAD"}
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
-    for feature, names in spec.DIMENSION_CALLOUTS.items():
-        assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
+    for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
+        for feature, names in by_feature.items():
+            assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
     assert part.DIMENSION_CALLOUTS is spec.DIMENSION_CALLOUTS
+    assert part.DIMENSION_CALLOUTS_ABOVE is spec.DIMENSION_CALLOUTS_ABOVE
+    build = Path(part.__file__).read_text(encoding="utf-8")
+    assert "((4, DIMENSION_CALLOUTS), (3, DIMENSION_CALLOUTS_ABOVE))" in build
+    readback = inspect.getsource(drawing._verify_printed_dimensions)
+    assert "(3, DIMENSION_CALLOUTS_ABOVE_BY_NAME)" in readback
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "set_dimension_callouts" not in source
 

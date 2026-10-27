@@ -1,31 +1,13 @@
 """Measured spring seats reject unsafe transforms and uncalibrated stations."""
 
-import ast
-from pathlib import Path
-
 import pytest
 
 import _config
-import settled_spring_seats
 from settled_spring_seats import (
     channel_seat,
     counter_seat,
     counter_upper_support_geometry,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = Path(__file__).resolve().parent
-_ACCEPT_STALE = "accept_stale_counter_record_for_recalibration"
-
-
-@pytest.fixture(autouse=True)
-def strict_stale_counter(monkeypatch):
-    # Importing diagnostics/calibrate_spring_seats.py anywhere in this process
-    # (test_seat_search does) sets the recalibration bypass; every test here
-    # starts from, and restores, the module's own default.
-    monkeypatch.setattr(
-        settled_spring_seats, "_ACCEPT_STALE_COUNTER_FOR_RECALIBRATION", False
-    )
 
 
 @pytest.fixture
@@ -299,83 +281,13 @@ def test_changed_support_geometry_cannot_reuse_a_native_certificate(
         counter_seat()
 
 
-def _stale(record: dict) -> None:
+def test_counter_record_measured_on_the_six_thirty_two_screw_is_rejected(
+    isolated_calibration,
+):
+    _, record = isolated_calibration
     record["upper_support"] = {
         **counter_upper_support_geometry(),
         "thread": "#6-32 UNC",
     }
-
-
-def test_stale_counter_record_still_raises_by_default(isolated_calibration):
-    _, record = isolated_calibration
-    _stale(record)
     with pytest.raises(ValueError, match="Stale counter native calibration"):
         counter_seat()
-
-
-def test_recalibration_bypass_returns_the_stored_stale_record(isolated_calibration):
-    _, record = isolated_calibration
-    _stale(record)
-    settled_spring_seats.accept_stale_counter_record_for_recalibration()
-
-    seat, gooseneck_y = counter_seat()
-
-    assert seat.pose.upper_eye_xy == (-6.0, 5.0)
-    assert seat.pose.clocking == "half_turn"
-    assert gooseneck_y == 15.0
-
-
-def _references_bypass(path: Path) -> bool:
-    """True when ``path`` names the bypass as an identifier, attribute, import,
-    definition or bare string (``getattr``); docstrings and comments do not."""
-    source = path.read_bytes()
-    if _ACCEPT_STALE.encode() not in source:
-        return False
-    return any(
-        _ACCEPT_STALE
-        in (
-            getattr(node, "id", None),
-            getattr(node, "attr", None),
-            node.name if isinstance(node, (ast.alias, ast.FunctionDef)) else None,
-            node.value if isinstance(node, ast.Constant) else None,
-        )
-        for node in ast.walk(ast.parse(source))
-    )
-
-
-def _python_sources():
-    pruned = {"node_modules", "__pycache__", "SolidworksMCP-python", "out"}
-    for root, dirs, files in REPO_ROOT.walk():
-        dirs[:] = [d for d in dirs if d not in pruned and not d.startswith(".")]
-        yield from (root / name for name in files if name.endswith(".py"))
-
-
-def test_only_the_calibrator_may_accept_a_stale_counter_record():
-    owner = SCRIPTS / "settled_spring_seats.py"
-    calibrator = SCRIPTS / "diagnostics" / "calibrate_spring_seats.py"
-    this_test = Path(__file__).resolve()
-    referencing = {
-        path.resolve()
-        for path in _python_sources()
-        if path.resolve() != this_test and _references_bypass(path)
-    }
-    # Anchors: each allowed source must still be found, or the scan proves nothing.
-    assert referencing == {owner, calibrator}
-
-    # The calibrator calls it as a module-level statement, before it imports
-    # the summing builder (whose spec reads counter_seat() at import).
-    body = ast.parse(calibrator.read_text(encoding="utf-8")).body
-    call = next(
-        index
-        for index, node in enumerate(body)
-        if isinstance(node, ast.Expr)
-        and isinstance(node.value, ast.Call)
-        and getattr(node.value.func, "attr", None) == _ACCEPT_STALE
-    )
-    summing = next(
-        index
-        for index, node in enumerate(body)
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "build_sm_summing_assembly"
-    )
-    assert call < summing

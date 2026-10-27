@@ -30,8 +30,8 @@ Every size takes the title block's band for its places except three limits,
 each named on the sheet for what it serves (drawing-guidelines.md rule 4):
 the seat Ø's LIMIT band (the loop seat, under the thread major), the shoulder
 length's LIMIT band (to the lead's foot: the loop clears the lead) and the
-full-thread station's single "5.67 MAX" from the under-head face (full
-thread inside the MHA-SM-01 engagement budget).  The crown's sphere prints
+full-thread station's single "5.67 MAX" from the under-head face, "TO FULL
+THREAD" over its value (note 1 names the mate).  The crown's sphere prints
 on its arc as the reference "(SR20.03)": the head Ø and the crown rise
 drive it (machinist FIX round 1: no note carries a feature's geometry).
 
@@ -69,10 +69,10 @@ from sm_gooseneck_spring_screw_geom import (
 
 THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
-# Below-value callouts the PART authors on its dimensions (the drawing only
-# reads them back; a drawing-side SetText can write through to the part,
-# #1942).  The three limits are tighter than the title block, so each names
-# what it serves (drawing-guidelines.md rule 4).
+# Callouts the PART authors on its dimensions (the drawing only reads them
+# back; a drawing-side SetText can write through to the part, #1942).  The
+# three limits are tighter than the title block, so each names what it serves
+# (drawing-guidelines.md rule 4).  Below the value:
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
@@ -81,13 +81,29 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "ShoulderLength": "TO 45 DEG LEAD; LOOP\nCLEARS LEAD",
         "TipChamfer": CHAMFER_CALLOUT,
     },
-    "StationReference": {"FullThread": f"FULL THREAD IN\n{PLUG_NUMBER}"},
+}
+# Above the value: the full-thread limit's span (22.7 mm on the sheet) is
+# wider than its "5.67 max." but narrower than any callout, and the line on
+# the dimension line meets both extension lines' overshoot (farm run
+# 20261027T053051351Z: under-head line into the 'M' of a below callout), so
+# the value takes that line and the callout stands over it.
+DIMENSION_CALLOUTS_ABOVE: dict[str, dict[str, str]] = {
+    "StationReference": {"FullThread": "TO FULL THREAD"},
 }
 DIMENSION_CALLOUTS_BY_NAME: dict[str, str] = {
     name: text
     for callouts in DIMENSION_CALLOUTS.values()
     for name, text in callouts.items()
 }
+DIMENSION_CALLOUTS_ABOVE_BY_NAME: dict[str, str] = {
+    name: text
+    for callouts in DIMENSION_CALLOUTS_ABOVE.values()
+    for name, text in callouts.items()
+}
+if any("\n" in text for text in DIMENSION_CALLOUTS_ABOVE_BY_NAME.values()):
+    raise AssertionError("an above-callout line break would not print")
+if set(DIMENSION_CALLOUTS_BY_NAME) & set(DIMENSION_CALLOUTS_ABOVE_BY_NAME):
+    raise AssertionError("a dimension carries callouts both above and below")
 
 # drawing-guidelines.md rule 17 (walls and webs): the head left under the slot floor, at the shortest head,
 # the deepest slot and a full under-head edge break, stays above the 2.0
@@ -113,14 +129,26 @@ HEAD_SIDE_MIN = round(HEAD_H + HEAD_H_LOWER - CROWN_RISE_MAX - EDGE_BREAK_MAX, 6
 if CROWN_RISE_MIN <= 0.0 or SLOT_RIM_CUT_MIN <= 0.0 or HEAD_SIDE_MIN <= 0.0:
     raise AssertionError("spring-screw crown band does not leave a fillister head")
 
-# --- Strength case (#1941 / #1951 load model, unchanged) --------------------
+# --- Strength case (#1941 / #1951 load model) ---------------------------------
 # Inputs: the catalogue maximum pull of MHA-SM-VN-51 (config), yield of AISI
 # 1018 cold-drawn, the weaker listed stock (370 MPa, azom.com ArticleID 6115;
-# 12L14 CD's 415 MPa adds 12 %), and the oiled black-oxide friction floor.
+# 12L14 CD's 415 MPa adds 12 %), and the oiled black-oxide friction range.
 SPRING_PULL_MAX_N = float(_config.parts("sm-vn-counter-spring")["maximum_load_n"])
 YIELD_MPA = 370.0
-FRICTIONS = (0.05, 0.10, 0.15)
+# The clamp faces (the head and the plug face on the loop wire) and the thread
+# are different contact pairs, so each sweeps the range on its own: the lowest
+# clamp friction demands the most preload, and the highest thread friction
+# turns the most of it into torsion.
+CLAMP_FRICTIONS = (0.05, 0.10, 0.15)
+THREAD_FRICTIONS = (0.05, 0.10, 0.15)
+FRICTION_PAIRS = tuple((c, t) for c in CLAMP_FRICTIONS for t in THREAD_FRICTIONS)
 STRENGTH_SF_TARGET = 2.0
+# Two load states, in the MHA-SM-00 sequence.  Tightening: the fitter clamps
+# the upper loop at step 8 while the spring's lower loop is still free (it is
+# hooked at step 9), so the full thread torsion meets the preload alone.
+# Service: the pull adds its bending while the torsion has relaxed to the
+# working-state share of VDI 2230 Part 1:2015 (R8: k_tau = 0.5).
+RESIDUAL_TORSION_FACTOR = 0.5
 # Clamp: friction alone holds the pull on both clamp faces, so the preload is
 # F/(2 mu).  The thread carries the thread share of the tightening torque,
 # Fp d2/2 (tan lambda + mu sec 30)/(1 - mu tan lambda sec 30), on the basic
@@ -130,17 +158,17 @@ _TAN_LEAD = PITCH / (math.pi * _PITCH_DIA)
 _SEC_FLANK = 1.0 / math.cos(math.radians(30.0))
 
 
-def clamp_preload_n(mu: float) -> float:
-    return SPRING_PULL_MAX_N / (2.0 * mu)
+def clamp_preload_n(mu_clamp: float) -> float:
+    return SPRING_PULL_MAX_N / (2.0 * mu_clamp)
 
 
-def thread_torque_n_mm(preload_n: float, mu: float) -> float:
+def thread_torque_n_mm(preload_n: float, mu_thread: float) -> float:
     return (
         preload_n
         * _PITCH_DIA
         / 2.0
-        * (_TAN_LEAD + mu * _SEC_FLANK)
-        / (1.0 - mu * _TAN_LEAD * _SEC_FLANK)
+        * (_TAN_LEAD + mu_thread * _SEC_FLANK)
+        / (1.0 - mu_thread * _TAN_LEAD * _SEC_FLANK)
     )
 
 
@@ -184,42 +212,59 @@ def _path2_moment(x: float, span: float, loads, fixed: bool) -> float:
     return abs(moment)
 
 
-def combined_safety_factor(mu: float, samples: int = 400) -> float:
-    """Worst nominal von Mises SF against yield over sections, brackets and splits."""
-    preload = clamp_preload_n(mu)
-    torque = thread_torque_n_mm(preload, mu)
-    cases = [lambda x, g=g: _path1_moment(x, STRENGTH_SPAN, g) for g in (True, False)]
-    cases += [
+_MOMENT_CASES = (
+    *(lambda x, g=g: _path1_moment(x, STRENGTH_SPAN, g) for g in (True, False)),
+    *(
         lambda x, ld=ld, f=f: _path2_moment(x, STRENGTH_SPAN, ld, f)
         for ld in _PASS_LOADS
         for f in (True, False)
-    ]
-    worst = math.inf
-    for x0, x1, dia in _SECTIONS:
-        area = math.pi / 4.0 * dia * dia
-        tau = 16.0 * torque / (math.pi * dia**3)
-        for index in range(samples + 1):
-            x = x0 + (x1 - x0) * index / samples
-            for moment in cases:
-                sigma = preload / area + 32.0 * moment(x) / (math.pi * dia**3)
-                worst = min(worst, YIELD_MPA / math.hypot(sigma, math.sqrt(3.0) * tau))
-    return worst
+    ),
+)
 
 
-def twist_off_safety_factor(mu: float) -> float:
-    """Preload plus thread torsion alone, on the estimated deepest root."""
-    dia = THREAD_MINOR_2A_MIN_EST
-    preload = clamp_preload_n(mu)
-    sigma = preload / (math.pi / 4.0 * dia * dia)
-    tau = 16.0 * thread_torque_n_mm(preload, mu) / (math.pi * dia**3)
+def _peak_stations(x0: float, x1: float) -> tuple[float, ...]:
+    """Every moment case is piecewise linear with kinks only at the load
+    stations (path 1's |M| kink is its zero, a minimum), and a section's
+    diameter is constant, so its worst stress sits at its ends or a load
+    station inside it."""
+    inner = {a for loads in _PASS_LOADS for _load, a in loads if x0 < a < x1}
+    return tuple(sorted({x0, x1, *inner}))
+
+
+def _von_mises_sf(preload: float, moment: float, torsion: float, dia: float) -> float:
+    sigma = preload / (math.pi / 4.0 * dia * dia) + 32.0 * moment / (math.pi * dia**3)
+    tau = 16.0 * torsion / (math.pi * dia**3)
     return YIELD_MPA / math.hypot(sigma, math.sqrt(3.0) * tau)
 
 
-COMBINED_SF = {mu: round(combined_safety_factor(mu), 3) for mu in FRICTIONS}
-TWIST_OFF_SF = {mu: round(twist_off_safety_factor(mu), 3) for mu in FRICTIONS}
-if min(COMBINED_SF.values()) < STRENGTH_SF_TARGET:
+def service_safety_factor(mu_clamp: float, mu_thread: float) -> float:
+    """Preload, the pull's bending and the residual torsion: worst nominal von
+    Mises SF against yield over sections, brackets and splits."""
+    preload = clamp_preload_n(mu_clamp)
+    torsion = RESIDUAL_TORSION_FACTOR * thread_torque_n_mm(preload, mu_thread)
+    return min(
+        _von_mises_sf(preload, moment(x), torsion, dia)
+        for x0, x1, dia in _SECTIONS
+        for x in _peak_stations(x0, x1)
+        for moment in _MOMENT_CASES
+    )
+
+
+def tightening_safety_factor(mu_clamp: float, mu_thread: float) -> float:
+    """Preload plus the full thread torsion, on the estimated deepest root."""
+    preload = clamp_preload_n(mu_clamp)
+    torsion = thread_torque_n_mm(preload, mu_thread)
+    return _von_mises_sf(preload, 0.0, torsion, THREAD_MINOR_2A_MIN_EST)
+
+
+SERVICE_SF = {pair: round(service_safety_factor(*pair), 3) for pair in FRICTION_PAIRS}
+TIGHTENING_SF = {
+    pair: round(tightening_safety_factor(*pair), 3) for pair in FRICTION_PAIRS
+}
+if min((*SERVICE_SF.values(), *TIGHTENING_SF.values())) < STRENGTH_SF_TARGET:
     raise AssertionError(
-        f"MHA-SM-04 clamp strength SF {COMBINED_SF} under {STRENGTH_SF_TARGET}"
+        f"MHA-SM-04 clamp strength SF service {SERVICE_SF}, tightening "
+        f"{TIGHTENING_SF} under {STRENGTH_SF_TARGET}"
     )
 # Fatigue does not govern: the summing lever is quasi-static and the pull
 # swings about +/-1.2 N about a 46.9-47.1 N service load (#1951 sketch), so

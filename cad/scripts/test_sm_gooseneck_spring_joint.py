@@ -140,3 +140,34 @@ def test_shared_interference_contract_inputs_match_their_owners() -> None:
     assert _interference_contracts._GOOSENECK_PLUG_LENGTH == gooseneck.PLUG_LENGTH
     assert TAP_DRILL_MM["#8-32"] == pytest.approx(joint.TAP_DRILL_DIA) == 3.454
     assert THREAD_MAJOR_MM["#8-32"] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)
+
+
+def test_strength_sweeps_clamp_and_thread_friction_independently() -> None:
+    import sm_gooseneck_spring_screw_spec as spec
+
+    pairs = {(c, t) for c in spec.CLAMP_FRICTIONS for t in spec.THREAD_FRICTIONS}
+    assert set(spec.SERVICE_SF) == set(spec.TIGHTENING_SF) == pairs
+    # The lowest clamp friction needs the most preload and the highest thread
+    # friction converts the most of it to torsion: that pair governs both.
+    worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
+    assert min(spec.SERVICE_SF, key=spec.SERVICE_SF.get) == worst
+    assert min(spec.TIGHTENING_SF, key=spec.TIGHTENING_SF.get) == worst
+    assert spec.SERVICE_SF[worst] >= spec.STRENGTH_SF_TARGET
+    assert spec.TIGHTENING_SF[worst] >= spec.STRENGTH_SF_TARGET
+
+
+def test_service_peak_stations_bound_a_dense_sweep() -> None:
+    import sm_gooseneck_spring_screw_spec as spec
+
+    mu_clamp, mu_thread = min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS)
+    preload = spec.clamp_preload_n(mu_clamp)
+    torsion = spec.RESIDUAL_TORSION_FACTOR * spec.thread_torque_n_mm(preload, mu_thread)
+    dense = min(
+        spec._von_mises_sf(preload, moment(x0 + (x1 - x0) * i / 2000), torsion, dia)
+        for x0, x1, dia in spec._SECTIONS
+        for i in range(2001)
+        for moment in spec._MOMENT_CASES
+    )
+    exact = spec.service_safety_factor(mu_clamp, mu_thread)
+    assert exact <= dense + 1e-12
+    assert dense - exact < 1e-3

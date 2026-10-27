@@ -53,6 +53,7 @@ import os
 import sys
 import traceback
 from dataclasses import asdict, replace
+from enum import Enum
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -66,14 +67,8 @@ import ch_vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 import settled_spring_seats  # noqa: E402
-
-# This driver exists to replace a stale counter record, and the summing spec
-# reads counter_seat() at import: accept that record (with a warning) BEFORE
-# importing build_sm_summing_assembly. Nothing here consumes it -- every seed
-# is analytic (spring_mount_geom) and every written number is measured.
-settled_spring_seats.accept_stale_counter_record_for_recalibration()
+from _counter_spring_hang import assert_counter_spring_top_hang  # noqa: E402
 from _interference_contracts import allowed_interference_pairs  # noqa: E402
-from build_sm_summing_assembly import _assert_counter_spring_top_hang  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
     check_no_interference,
@@ -507,7 +502,7 @@ async def _calibrate_counter(
         lower_eye_xy=(seed.lower_eye_xy[0] + dx, seed.lower_eye_xy[1] + dy),
         upper_eye_xy=(seed.upper_eye_xy[0] + dx, seed.upper_eye_xy[1] + dy),
     )
-    _assert_counter_spring_top_hang(pose, actual_gooseneck_y)
+    assert_counter_spring_top_hang(pose, actual_gooseneck_y)
     report["counter"].append(
         {
             "preset": preset,
@@ -536,6 +531,43 @@ async def _calibrate_counter(
 
 
 # ---------------------------------------------------------------- driver
+
+
+class CalibrationMode(Enum):
+    """What one run re-measures."""
+
+    ALL = "all"  # every channel seat, then the listed presets' counters
+    COUNTER = "counter"  # the listed presets' counters only; channel seats kept
+
+
+def _refuse_unsafe_run(presets: list[str], output: Path, write: Path | None) -> None:
+    """Refuse, before any native work, a run whose write would leave a stale
+    seat or whose report would overwrite the table it writes."""
+    table = _config.machine("springs", "presets")
+    unknown = [name for name in presets if name not in table]
+    if unknown:
+        raise ValueError(f"unknown presets {unknown}; have {sorted(table)}")
+    if write is None:
+        return
+    # A written table keeps the counter of any preset this run did not measure,
+    # and counter_seat() would reject that stale record at build. In ALL mode
+    # the same coverage also holds every channel amplitude _merge_yaml's
+    # replaced channel_seats must carry (channel_seat() matches exactly).
+    omitted = sorted(set(table) - set(presets))
+    if omitted:
+        raise ValueError(
+            "--write must re-measure every configured preset's counter, so none "
+            f"keeps a stale seat; missing {omitted}. Calibrate {sorted(table)} "
+            "together, or drop --write."
+        )
+    output, write = output.resolve(), write.resolve()
+    if output == write or (
+        output.exists() and write.exists() and os.path.samefile(output, write)
+    ):
+        raise ValueError(
+            f"--output {output} is the --write table {write}; the report would "
+            "overwrite it"
+        )
 
 
 def _merge_yaml(
@@ -571,12 +603,10 @@ async def calibrate(
     write: Path | None,
     source: str,
     *,
-    counter_only: bool = False,
+    mode: CalibrationMode = CalibrationMode.ALL,
 ) -> dict[str, str]:
+    _refuse_unsafe_run(presets, output, write)
     table = _config.machine("springs", "presets")
-    unknown = [name for name in presets if name not in table]
-    if unknown:
-        raise ValueError(f"unknown presets {unknown}; have {sorted(table)}")
     amplitudes = list(
         dict.fromkeys(
             float(a) for name in presets for a in table[name]["amplitudes_mm"]
@@ -586,44 +616,17 @@ async def calibrate(
         raise ValueError(
             f"preset amplitudes must be finite and nonnegative: {amplitudes}"
         )
-    if write is not None and counter_only:
-        # A counter-only write keeps every channel row, so the only way it can
-        # leave the table stale is a preset whose counter it did not re-measure.
-        omitted = sorted(set(table) - set(presets))
-        if omitted:
-            raise ValueError(
-                "--counter-only --write must recalibrate every configured preset's "
-                f"counter, so none keeps a stale seat; missing {omitted}. Calibrate "
-                f"{sorted(table)} together, or drop --write."
-            )
-    elif write is not None:
-        # _merge_yaml REPLACES springs.channel_seats, and channel_seat() matches an
-        # amplitude exactly (no fit, no interpolation), so a write that calibrated
-        # only some presets would delete the rows the omitted ones need. Refuse it
-        # here, before the COM run, rather than leave a table that fails at build.
-        missing = [
-            (name, a)
-            for name in sorted(table)
-            for a in (float(x) for x in table[name]["amplitudes_mm"])
-            if a not in amplitudes
-        ]
-        if missing:
-            raise ValueError(
-                "--write rewrites every channel seat, so the calibrated presets must "
-                f"cover all configured amplitudes; missing {missing}. Calibrate "
-                f"{sorted(table)} together, or drop --write."
-            )
     report: dict = {
         "status": "started",
         "presets": presets,
-        "counter_only": counter_only,
+        "mode": mode.value,
         "channel": [],
         "counter": [],
     }
     channel_rows: list[dict] = []
     counters: dict[str, dict] = {}
     try:
-        if not counter_only:
+        if mode is CalibrationMode.ALL:
             for index, amplitude in enumerate(amplitudes):
                 channel_rows.append(
                     await _calibrate_channel(adapter, amplitude, index, report)
@@ -636,7 +639,12 @@ async def calibrate(
         report["counters"] = counters
         report["status"] = "completed"
         if write is not None:
-            _merge_yaml(None if counter_only else channel_rows, counters, source, write)
+            _merge_yaml(
+                channel_rows if mode is CalibrationMode.ALL else None,
+                counters,
+                source,
+                write,
+            )
             report["written"] = str(write)
         return {"report": str(output)}
     except BaseException:
@@ -686,17 +694,16 @@ def main() -> int:
         "full saved-assembly acceptance is required by the build gates.",
     )
     args = parser.parse_args()
+    output = args.output.resolve()
     write = None if args.write is None else args.write.resolve()
+    mode = CalibrationMode.COUNTER if args.counter_only else CalibrationMode.ALL
+    # Refuse here too, before the COM seat and run_build's connect.
+    _refuse_unsafe_run(args.presets, output, write)
 
     def run() -> int:
         return run_build(
             lambda adapter: calibrate(
-                adapter,
-                args.presets,
-                args.output.resolve(),
-                write,
-                args.source,
-                counter_only=args.counter_only,
+                adapter, args.presets, output, write, args.source, mode=mode
             )
         )
 

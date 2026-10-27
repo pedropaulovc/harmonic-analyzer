@@ -1934,10 +1934,11 @@ def verify_spring_base(report: Report) -> None:
     def _counter_mount() -> None:
         import build_sm_summing_assembly as summing
         import spring_mount_geom as mounts
+        from _counter_spring_hang import assert_counter_spring_top_hang
 
         pose = mounts.COUNTER_REFERENCE_POSE
         summing._assert_counter_spring_hang(pose)
-        summing._assert_counter_spring_top_hang(pose, mounts.GOOSENECK_ORIGIN_Y)
+        assert_counter_spring_top_hang(pose, mounts.GOOSENECK_ORIGIN_Y)
 
     report.gate("spring:stock-channel-mounts", _channel_mounts)
     report.gate("spring:stock-counter-mount", _counter_mount)

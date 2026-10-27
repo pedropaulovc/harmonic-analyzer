@@ -78,6 +78,7 @@ def test_counter_upper_loop_bears_on_the_plain_seat_and_clears_the_tube() -> Non
     """The MHA-SM-04 shank supports the plumb loop on its plain Ø3.50 seat."""
     import build_sm_summing_assembly as summing
     import sm_gooseneck_spring_screw_geom as spring_screw
+    from _counter_spring_hang import assert_counter_spring_top_hang
 
     pose = spring_mount_geom.COUNTER_REFERENCE_POSE
     assert pose.axis_xy[1] == pytest.approx(1.0, abs=1e-6)
@@ -94,7 +95,7 @@ def test_counter_upper_loop_bears_on_the_plain_seat_and_clears_the_tube() -> Non
         spring_screw.LENGTH
         > sm_gooseneck_geom.SPRING_EYE_GAP + sm_gooseneck_geom.PLUG_LENGTH
     )
-    summing._assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
+    assert_counter_spring_top_hang(pose, spring_mount_geom.GOOSENECK_ORIGIN_Y)
     # The screw frame's head (+Z) points outboard (machine +X), so its shank
     # runs into the plug.
     assert summing.ROT_Y_POS90[2] == [1.0, 0.0, 0.0]

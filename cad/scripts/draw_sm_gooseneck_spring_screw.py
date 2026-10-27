@@ -92,6 +92,7 @@ from sm_gooseneck_spring_screw_geom import (
 )
 from sm_gooseneck_spring_screw_spec import (
     CROWN_RADIUS_PREFIX,
+    DIMENSION_CALLOUTS_ABOVE_BY_NAME,
     DIMENSION_CALLOUTS_BY_NAME,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -159,13 +160,15 @@ CROWN_CENTER_X = _sheet_x(CROWN_CENTER_Z)
 
 # Text blocks as rendered at this text height (layout audit of farm run
 # 20261027T034356887Z): a dimension's block centres on its anchor,
-# both ways; its last line sits on the dimension line (the underline); lines
-# above it step 5.56 mm (a callout line, or the value over its callout) and
-# 4.53 mm (a stacked LIMIT's upper over its lower); the first line's ink
-# tops out 4.50 mm above its baseline.  Widths are the widest line's: the
-# measured ones where that line rendered, else its Century Gothic advance at
-# the scale the measured lines fix (4.667 um per font unit at 1000 units,
-# ten rendered strings agreeing within 0.3 %).
+# both ways; its last line sits on the dimension line (the underline), its
+# ink ~1.0 mm over the line however the anchor is set (0.96 mm under
+# 'CLEARS LEAD', 1.04 mm under 'MHA-SM-01', farm run 20261027T053051351Z);
+# lines above it step 5.56 mm (a callout line, or the value over its
+# callout) and 4.53 mm (a stacked LIMIT's upper over its lower); the first
+# line's ink tops out 4.50 mm above its baseline.  Widths are the widest
+# line's: the measured ones where that line rendered, else its Century
+# Gothic advance at the scale the measured lines fix (4.667 um per font unit
+# at 1000 units, ten rendered strings agreeing within 0.3 %).
 _CALLOUT_PITCH = 0.00556
 _LIMIT_PITCH = 0.00453
 _FIRST_LINE_INK = 0.0045
@@ -181,7 +184,10 @@ def block_height(value_lines: int, callout_lines: int) -> float:
 
 
 def _callout_lines(name: str) -> int:
-    return len(DIMENSION_CALLOUTS_BY_NAME[name].splitlines())
+    text = (
+        DIMENSION_CALLOUTS_BY_NAME.get(name) or DIMENSION_CALLOUTS_ABOVE_BY_NAME[name]
+    )
+    return len(text.splitlines())
 
 
 # 'MHA-SM-VN-51 LOOP', 48.41 mm as rendered.
@@ -190,10 +196,10 @@ SEAT_DIA_TEXT_HEIGHT = block_height(2, _callout_lines("SeatDia"))
 # 'TO 45 DEG LEAD; LOOP', 52.33 mm as rendered.
 SHOULDER_LENGTH_TEXT_WIDTH = 0.0524
 SHOULDER_LENGTH_TEXT_HEIGHT = block_height(2, _callout_lines("ShoulderLength"))
-# 'FULL THREAD IN' 34.18 mm and its last line 'MHA-SM-01' 25.82 mm (font
-# advance); '5.67 max.' prints on one line (the old '0.3 max.' did).
-FULL_THREAD_TEXT_WIDTH = 0.0342
-FULL_THREAD_LAST_LINE_WIDTH = 0.0258
+# 'TO FULL THREAD' 35.69 mm (font advance) over '5.67 max.', 21.44 mm as
+# rendered, on one line.
+FULL_THREAD_TEXT_WIDTH = 0.0357
+FULL_THREAD_VALUE_WIDTH = 0.0214
 FULL_THREAD_TEXT_HEIGHT = block_height(1, _callout_lines("FullThread"))
 # ' (SR20.03) ' 22.83 mm (font advance).
 CROWN_RADIUS_TEXT_WIDTH = 0.0228
@@ -221,14 +227,14 @@ THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.035)
 SHOULDER_LENGTH_LINE_Y = THREAD_NOTE_XY[1] + 0.013
 FULL_THREAD_LINE_Y = SHOULDER_LENGTH_LINE_Y + 0.010
 # The full-thread block centres over its own 22.7-mm span, above its line.
-# Its extension lines rise 1.0 mm past the line, to the last line's
-# baseline, and 'MHA-SM-01' is wider than the span: centred, the 5.67
-# station's line would end 0.17 mm from the '1''s stem, so the block sits
-# 0.4 mm toward the tip, where both lines end >= 0.5 mm from glyph ink
-# (Century Gothic outlines at the measured scale).
-FULL_THREAD_TEXT_NUDGE = 0.0004
+# Its extension lines rise 1.0 mm past the line, to the ink of the line on
+# it, so that line must fit between them: the value '5.67 max.' (21.44 mm)
+# does, its ink 0.86 / 0.92 mm inside the two lines (Century Gothic
+# outlines), and its callout stands above it (a below callout put 'MHA-SM-01'
+# on the line and the under-head line into its 'M', farm run
+# 20261027T053051351Z).
 FULL_THREAD_TEXT_XY = (
-    (UNDERHEAD_X + FULL_THREAD_X) / 2.0 + FULL_THREAD_TEXT_NUDGE,
+    (UNDERHEAD_X + FULL_THREAD_X) / 2.0,
     FULL_THREAD_LINE_Y + FULL_THREAD_TEXT_HEIGHT / 2.0,
 )
 # The shoulder length's span (3.9 mm) is far narrower than its block, so the
@@ -483,13 +489,18 @@ def _verify_printed_dimensions(adapter: Any, views: Sequence[Any]) -> None:
             != DRAWING_PRECISION_BY_NAME[name]
         ):
             raise RuntimeError(f"MHA-SM-04 {name}: limit places did not persist")
-        # The part authors every callout (swDimensionTextCalloutBelow); the
-        # drawing only reads it back.  SOLIDWORKS may hand lines back as CRLF.
-        callout = str(display.GetText(4) or "").replace("\r\n", "\n")
-        if callout != DIMENSION_CALLOUTS_BY_NAME.get(name, ""):
-            raise RuntimeError(
-                f"MHA-SM-04 {name}: callout {callout!r} is not the part's"
-            )
+        # The part authors every callout (swDimensionTextCalloutBelow = 4,
+        # swDimensionTextCalloutAbove = 3); the drawing only reads them back.
+        # SOLIDWORKS may hand lines back as CRLF.
+        for slot, expected_by_name in (
+            (4, DIMENSION_CALLOUTS_BY_NAME),
+            (3, DIMENSION_CALLOUTS_ABOVE_BY_NAME),
+        ):
+            callout = str(display.GetText(slot) or "").replace("\r\n", "\n")
+            if callout != expected_by_name.get(name, ""):
+                raise RuntimeError(
+                    f"MHA-SM-04 {name}: callout {callout!r} is not the part's"
+                )
 
 
 async def build(adapter: Any) -> dict[str, str]:

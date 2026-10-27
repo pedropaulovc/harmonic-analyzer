@@ -95,6 +95,7 @@ from sm_gooseneck_spring_screw_geom import (
 from sm_gooseneck_spring_screw_spec import (
     CROWN_RADIUS_PREFIX,
     DIMENSION_CALLOUTS,
+    DIMENSION_CALLOUTS_ABOVE,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -256,17 +257,19 @@ def _limit_band(
 
 @_telemetry.traced("part.dimension_callouts")
 def _author_dimension_callouts(adapter) -> None:
-    """Persist each printed callout on its source dimension, below the value
-    (build_mg_magnifying_bracket._author_dimension_callouts): the drawing
-    imports and reads them back, never writing them itself."""
-    for feature, callouts in DIMENSION_CALLOUTS.items():
-        # One walk of the feature's dimension tree for all its callouts.
-        resolved = _named_dimensions(adapter, feature, set(callouts))
-        for name, text in callouts.items():
-            display, _dimension = resolved[name]
-            display.SetText(4, text)  # swDimensionTextCalloutBelow
-            if str(display.GetText(4) or "").replace("\r\n", "\n") != text:
-                raise RuntimeError(f"{name}@{feature}: callout did not persist")
+    """Persist each printed callout on its source dimension, below or above
+    the value (build_mg_magnifying_bracket._author_dimension_callouts): the
+    drawing imports and reads them back, never writing them itself."""
+    # swDimensionTextCalloutBelow = 4, swDimensionTextCalloutAbove = 3.
+    for slot, by_feature in ((4, DIMENSION_CALLOUTS), (3, DIMENSION_CALLOUTS_ABOVE)):
+        for feature, callouts in by_feature.items():
+            # One walk of the feature's dimension tree for all its callouts.
+            resolved = _named_dimensions(adapter, feature, set(callouts))
+            for name, text in callouts.items():
+                display, _dimension = resolved[name]
+                display.SetText(slot, text)
+                if str(display.GetText(slot) or "").replace("\r\n", "\n") != text:
+                    raise RuntimeError(f"{name}@{feature}: callout did not persist")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -303,18 +306,25 @@ async def build(adapter) -> dict[str, str]:
     u_rim, u_apex, u_centre = -HEAD_CYL_H, -HEAD_H, -CROWN_CENTER_Z
     check("create_sketch head profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    axis = check(
-        "head axis centerline", await adapter.add_centerline(u_apex, 0.0, 0.0, 0.0)
-    )
-    head_seat, head_side = await add_line_chain(
-        adapter, [(0.0, 0.0), (0.0, HEAD_R), (u_rim, HEAD_R)], close=False
-    )
-    crown = check(
-        "head crown arc",
-        await adapter.add_arc(u_centre, 0.0, u_rim, HEAD_R, u_apex, 0.0),
-    )
-    head_close = check("head axis line", await adapter.add_line(u_apex, 0.0, 0.0, 0.0))
-    set_sketch_direct_db(adapter, False)
+    try:
+        axis = check(
+            "head axis centerline",
+            await adapter.add_centerline(u_apex, 0.0, 0.0, 0.0),
+        )
+        head_seat, head_side = await add_line_chain(
+            adapter, [(0.0, 0.0), (0.0, HEAD_R), (u_rim, HEAD_R)], close=False
+        )
+        crown = check(
+            "head crown arc",
+            await adapter.add_arc(u_centre, 0.0, u_rim, HEAD_R, u_apex, 0.0),
+        )
+        head_close = check(
+            "head axis line", await adapter.add_line(u_apex, 0.0, 0.0, 0.0)
+        )
+    finally:
+        # Session state on the seat: a failed segment must not leave sketch
+        # inference off for the next leaf.
+        set_sketch_direct_db(adapter, False)
     for line, relation in (
         (head_seat, "vertical"),
         (head_side, "horizontal"),
@@ -371,20 +381,24 @@ async def build(adapter) -> dict[str, str]:
     shank = SketchDims()
     check("create_sketch shank profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
-    shank_axis = check(
-        "shank axis centerline", await adapter.add_centerline(0.0, 0.0, LENGTH, 0.0)
-    )
-    points = [
-        (0.0, 0.0),
-        (0.0, SEAT_R),
-        (SHOULDER_LENGTH, SEAT_R),
-        (SHOULDER_LENGTH + STEP_LEAD, THREAD_R),
-        (LENGTH - TIP_CHAMFER, THREAD_R),
-        (LENGTH, THREAD_R - TIP_CHAMFER),
-        (LENGTH, 0.0),
-    ]
-    lines = await add_line_chain(adapter, points)
-    set_sketch_direct_db(adapter, False)
+    try:
+        shank_axis = check(
+            "shank axis centerline",
+            await adapter.add_centerline(0.0, 0.0, LENGTH, 0.0),
+        )
+        points = [
+            (0.0, 0.0),
+            (0.0, SEAT_R),
+            (SHOULDER_LENGTH, SEAT_R),
+            (SHOULDER_LENGTH + STEP_LEAD, THREAD_R),
+            (LENGTH - TIP_CHAMFER, THREAD_R),
+            (LENGTH, THREAD_R - TIP_CHAMFER),
+            (LENGTH, 0.0),
+        ]
+        lines = await add_line_chain(adapter, points)
+    finally:
+        # Session state on the seat (as the head profile above).
+        set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
         (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(lines)]
         if u0 != u1 and v0 != v1:
