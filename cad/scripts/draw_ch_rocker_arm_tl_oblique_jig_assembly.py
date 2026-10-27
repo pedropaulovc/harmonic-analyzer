@@ -2655,22 +2655,26 @@ def capture_readings() -> tuple[CaptureReading, ...]:
         # C5B HEAD and C4 COMMON at least one row pitch apart. Each leader
         # leaves its bottom row's right end, so the mouth leader passes 2.7 mm
         # above C5B's longer first row (struck by 0.78 mm at 2056e3344).
+        # The right column, top to bottom under the B-B caption: C5A, C4
+        # MOUTH, C4 COMMON, C4A running gap, each leader leaving its first row
+        # above the next one's so none cross. C5A sits here because from the
+        # top centre its leader ran through the C5B cotter label (5d622b853).
+        # The common and running-gap leaders start above the carrier top
+        # (their targets lie on and just over it) and the running gap's
+        # passes under the cotter eye.
         *(CaptureReading(2, spec.PIVOT_RETAINER, (side * mouth, 0.0, top),
                          callouts["mouth"], xy,
                          pick_local_mm=(side * mouth, 0.0, top / 2.0))
-          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.199)))),
-        *(CaptureReading(2, spec.CARRIER, carrier_face(side),
-                         callouts["carrier_backing_pin_end" if side > 0.0 else "carrier_backing"],
-                         (x, 0.184))
-          for side, x in ((-1.0, 0.224), (1.0, 0.365))),
+          for side, xy in ((-1.0, (0.224, 0.2058)), (1.0, (0.365, 0.1895)))),
+        *(CaptureReading(2, spec.CARRIER, carrier_face(side), callouts["carrier_backing"], xy)
+          for side, xy in ((-1.0, (0.224, 0.184)), (1.0, (0.365, 0.179)))),
         # The running gap lands on the retainer's underside 0.7 inside its
         # rim, 2.6 mm out from C4 COMMON's carrier-face arrow at the land
-        # (they were 0.17 apart, one over the other), and its label sits
-        # low enough that the leader stays under the cotter eye.
+        # (they were 0.17 apart, one over the other).
         CaptureReading(2, spec.PIVOT_RETAINER, (washer.OUTER_DIA / 2.0 - 0.7, 0.0, 0.0),
-                       callouts["running_gap"], (0.365, 0.1635)),
+                       callouts["running_gap"], (0.365, 0.1683)),
         CaptureReading(2, spec.PIVOT_PIN, (0.0, 0.0, pin.OVERALL_LENGTH),
-                       callouts["pin_end"], (0.305, 0.214)),
+                       callouts["pin_end"], (0.365, 0.200)),
         CaptureReading(2, spec.PIVOT_PIN, (-pin.FIT_DIA / 2.0, 0.0, hole_top),
                        callouts["cross_hole"], (0.224, 0.2145),
                        pick_local_mm=(-pin.FIT_DIA / 2.0, 0.0, (hole_top + pin.OVERALL_LENGTH - pin.LEAD_CHAMFER) / 2.0)),
