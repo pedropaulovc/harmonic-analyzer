@@ -65,12 +65,14 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _saved_part_guard import require_saved_drawing_properties
+from _single_limit_tolerance import set_single_limit
 from _visibility import blank_reference_geometry
 from sm_gooseneck_spring_screw_geom import (
     CROWN_CENTER_Z,
     CROWN_RADIUS,
     CROWN_RISE,
     FULL_THREAD_STATION_MAX,
+    FULL_THREAD_STATION_MAX_BAND,
     FULL_THREAD_STATION_MAX_TOL_TYPE,
     HEAD_CYL_H,
     HEAD_DIA,
@@ -181,44 +183,6 @@ def slot_volume(steps: int = 4000) -> float:
 
 V_SLOT = slot_volume()
 V_FINAL = V_BODY - V_SLOT
-
-
-@_telemetry.traced("part.single_limit", label_param="name")
-def _single_limit(
-    adapter,
-    feature: str,
-    name: str,
-    limit: float,
-    tol_type: int,
-    lower: float,
-    upper: float,
-) -> None:
-    """``name@feature`` as a single limit: its nominal IS the printed limit
-    (swTolMAX / swTolMIN print the nominal plus MAX / MIN), carrying the
-    deviations ``lower`` / ``upper`` mm (build_ch_fulcrum_keeper._single_limit's
-    recipe)."""
-    _, dimension = _named_dimension(adapter, feature, name)
-    label = f"{name}@{feature}"
-    value = float(dimension.SystemValue)
-    if not math.isclose(value, limit / 1000.0, abs_tol=1e-9):
-        raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the limit {limit}"
-        )
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = tol_type
-    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
-        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
-    if (
-        int(tolerance.Type) != tol_type
-        or not math.isclose(
-            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
-        )
-        or not math.isclose(
-            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
-        )
-    ):
-        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {limit:g} (type {tol_type})")
 
 
 @_telemetry.traced("part.limit_band", label_param="name")
@@ -648,14 +612,13 @@ async def build(adapter) -> dict[str, str]:
         (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
         SHOULDER_LENGTH_TOL_TYPE,
     )
-    _single_limit(
+    set_single_limit(
         adapter,
         "StationReference",
         "FullThread",
-        FULL_THREAD_STATION_MAX,
-        FULL_THREAD_STATION_MAX_TOL_TYPE,
-        0.0,
-        0.0,
+        limit=FULL_THREAD_STATION_MAX,
+        band=FULL_THREAD_STATION_MAX_BAND,
+        tol_type=FULL_THREAD_STATION_MAX_TOL_TYPE,
     )
     # The crown's sphere prints on its arc (machinist FIX round 1): the
     # equation-driven CrownRadius reads "SR"; the drawing parenthesizes it as

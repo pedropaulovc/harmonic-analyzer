@@ -144,17 +144,31 @@ def test_model_owns_places_and_bands() -> None:
             "SHOULDER_LENGTH_TOL_TYPE",
         ),
     }
-    # "5.67 MAX": the model value IS the printed limit, with no deviation.
-    assert calls("_single_limit") == {
-        (
-            "'StationReference'",
-            "'FullThread'",
-            "FULL_THREAD_STATION_MAX",
-            "FULL_THREAD_STATION_MAX_TOL_TYPE",
-            "0.0",
-            "0.0",
-        ),
+    # "5.67 MAX": the model value IS the printed limit (the shared
+    # _single_limit_tolerance setter), its band running down to the lead's top.
+    (single,) = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "set_single_limit"
+    ]
+    assert [ast.unparse(arg) for arg in single.args[1:]] == [
+        "'StationReference'",
+        "'FullThread'",
+    ]
+    assert {kw.arg: ast.unparse(kw.value) for kw in single.keywords} == {
+        "limit": "FULL_THREAD_STATION_MAX",
+        "band": "FULL_THREAD_STATION_MAX_BAND",
+        "tol_type": "FULL_THREAD_STATION_MAX_TOL_TYPE",
     }
+    assert calls("_single_limit") == set()
+    assert geom.FULL_THREAD_STATION_MAX_BAND == (
+        0.0,
+        -round(geom.FULL_THREAD_STATION_MAX - geom.FULL_THREAD_STATION_MIN, 6),
+    )
+    assert geom.FULL_THREAD_STATION_MIN == pytest.approx(
+        geom.SHOULDER_LENGTH_MIN + (geom.MAJOR_DIA - geom.SEAT_DIA_MAX) / 2.0
+    )
     assert geom.SEAT_DIA_TOL_TYPE == 3  # swTolLIMIT
     assert geom.SHOULDER_LENGTH_TOL_TYPE == 3  # swTolLIMIT
     assert geom.FULL_THREAD_STATION_MAX_TOL_TYPE == 6  # swTolMAX

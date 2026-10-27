@@ -100,6 +100,14 @@ FULL_THREAD_STATION_MAX = (
     math.floor((SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + DIE_RUNOUT) * 100.0) / 100.0
 )
 FULL_THREAD_STATION_MAX_TOL_TYPE = 6  # swTolType_e.swTolMAX
+# The full thread cannot start before the lead's top on the shortest shoulder
+# and largest seat (zero run-out), so the MAX's native band runs from there up
+# to the limit: (upper, lower) about the modelled limit.
+FULL_THREAD_STATION_MIN = SHOULDER_LENGTH_MIN + (MAJOR_DIA - SEAT_DIA_MAX) / 2.0
+FULL_THREAD_STATION_MAX_BAND = (
+    0.0,
+    -round(FULL_THREAD_STATION_MAX - FULL_THREAD_STATION_MIN, 6),
+)
 # The longest shoulder must still leave a die one pitch of blank behind the
 # lead before the printed limit: anything tighter is not die-cuttable.
 FULL_THREAD_DIE_ROOM_MIN = SHOULDER_LENGTH_MAX + STEP_LEAD_MAX + 1.0 * PITCH
