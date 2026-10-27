@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 from pathlib import Path
 import re
 from types import SimpleNamespace
@@ -573,6 +574,31 @@ def test_bore_callout_clears_the_end_view() -> None:
         drawing.END_CENTER[1] + end_r,
     )
     assert _bore_text_box().gap(circle) >= _AIR
+
+
+# Datum tag box as run 20261027T131303762Z-7567dd7c printed it: 3.2 x 3.4 of
+# text in a ~7 mm square frame.
+_DATUM_TAG = 0.007
+
+
+def test_datum_a_tag_stands_off_the_od_and_the_bore_callout() -> None:
+    """The native drop put datum A's tag on the Ø11.0 outline (text-on-line).
+    The placed tag stands outside the O.D. circle with air, whichever corner
+    of the tag SolidWorks anchors at the requested point, and clear of the
+    bore callout and the vertical centreline."""
+    cx, cy = drawing.END_CENTER
+    od_r = spec.OD / 2.0 * _S
+    x, y = drawing.DATUM_A_SYMBOL
+    for dx in (-_DATUM_TAG, 0.0):
+        for dy in (-_DATUM_TAG, 0.0):
+            tag = Box(x + dx, y + dy, x + dx + _DATUM_TAG, y + dy + _DATUM_TAG)
+            nearest = (
+                min(max(cx, tag.xmin), tag.xmax),
+                min(max(cy, tag.ymin), tag.ymax),
+            )
+            assert math.dist(nearest, (cx, cy)) >= od_r + _AIR
+            assert tag.gap(_bore_text_box()) >= _AIR
+            assert tag.xmax <= cx - _AIR
 
 
 def test_registry_row_is_the_turned_brass_mha_167() -> None:

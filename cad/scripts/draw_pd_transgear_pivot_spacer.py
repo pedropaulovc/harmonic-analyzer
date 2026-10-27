@@ -54,7 +54,7 @@ from _drawing_dimensions import (
 )
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_gdt import add_feature_control_frame
+from _drawing_gdt import add_datum_feature, add_feature_control_frame
 from _drawing_notes import add_property_linked_note
 from _drawing_projection import model_points_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -64,7 +64,6 @@ from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
-from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -172,6 +171,17 @@ FACE_FINISHES = {
     ),
 }
 ISO_NOTE_XY = (0.315, 0.140)
+# Datum A's tag stands outside the O.D. on the end view's lower-left ray,
+# its leader crossing the annulus to the bore circle.  SolidWorks' native
+# drop landed it on the Ø11.0 outline (farm run 20261027T131303762Z-7567dd7c,
+# layout audit text-on-line), so the tag is placed: its centre this far off
+# the end view's centre.
+DATUM_A_ANGLE = math.radians(225.0)
+DATUM_A_REACH = OD / 2.0 * _S + 0.0125
+DATUM_A_SYMBOL = (
+    END_CENTER[0] + DATUM_A_REACH * math.cos(DATUM_A_ANGLE),
+    END_CENTER[1] + DATUM_A_REACH * math.sin(DATUM_A_ANGLE),
+)
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -557,18 +567,15 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             char_height=0.0025,
         )
-    # Datum A, the bore, on the end view where it shows round; the view has
-    # no datum tag yet, as the native placement requires.
-    add_native_axis_datum(
+    # Datum A, the bore, on the end view where it shows round.
+    add_datum_feature(
         adapter,
         end,
         entity=visible_circle_edge(adapter, end, BORE_DIA),
-        source_path=SOURCE,
-        radius_m=BORE_DIA / 2000.0,
+        symbol_xy=DATUM_A_SYMBOL,
         datum=BORE_DATUM,
         label="spacer bore axis",
         shoulder=True,
-        stability_tolerance_m=0.0001,
     )
     # Both end faces square to A.
     profile_edges = scan_view_edges(profile, label="spacer profile rims")
