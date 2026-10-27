@@ -79,7 +79,7 @@ def test_the_installation_note_names_both_holes_and_fits_the_sheet() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
     assert "MHA-SM-02" in flat and "MHA-FR-02" in flat
-    assert "CHAMFER END IN THE SEAT" in flat
+    assert "CHAMFER END FIRST INTO THE REAM" in flat
     assert "DIAMETRAL CLEARANCE" in flat
     # Owner ruling 2026-10-24 (T+H3): the crossbar holds the press, the knife
     # mount the slip.
