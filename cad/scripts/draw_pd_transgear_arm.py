@@ -45,7 +45,6 @@ from _drawing_common import (
     rebuild_drawing,
     stamp_drawing_summary,
 )
-from _drawing_annotation_extent import move_annotation
 from _drawing_dimensions import (
     assert_imported_precision,
     offset_dimension_text,
@@ -97,7 +96,7 @@ from pd_transgear_arm_spec import (
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
     PROJECTED_ZONE_DIRECTION,
-    PROJECTED_ZONE_HEIGHT_CALLOUT,
+    PROJECTED_ZONE_HEIGHT_SUFFIX,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
@@ -139,11 +138,10 @@ SECTION_CENTER = (FRONT_CENTER[0], 0.090)
 END_CENTER = (0.357, FRONT_CENTER[1])
 # Bottom left, where the general notes stood (the sheet has none now), its
 # caption over it: under section A-A the plate taps' projected-zone chain
-# lines run 13.5 mm below the rear face, so A-A's own caption drops into the
-# isometric's old place, clear of them and left of the title block.
+# lines run 13.5 mm below the rear face, and A-A's own caption, which hangs
+# below the view's extent, follows them down into the isometric's old place.
 ISO_CENTER = (0.105, 0.034)
 ISO_NOTE_XY = (0.075, 0.066)
-SECTION_CAPTION_DROP = 0.006
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -243,7 +241,10 @@ OVERALL_PICKS = (
 # above-the-value callout prints one line only), clear of the overall
 # reference above it.
 SECTION_KEEP = {
-    "SpotFaceDia": (0.1295, SECTION_CENTER[1] + 0.019),
+    # Half a millimetre higher than 0.019: the plate taps' 14.7 height
+    # arrow ends on face A under its last line (run
+    # 20261027T180656347Z: 1.9 mm, under the 2.0 arrow clearance).
+    "SpotFaceDia": (0.1295, SECTION_CENTER[1] + 0.0196),
     "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.022),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
@@ -273,29 +274,52 @@ STOCK_TEXT_XY = (END_CENTER[0], END_KEEP["Depth"][1] + 0.009)
 # the sheet point of its vertical height dimension's value: model X of the
 # line (mm), text point. The taps' lines run on their axes, through the
 # holes' open cut; each tap frame's leader lands on the near wall at the
-# mouth, so none crosses its line. The pin bore's runs beside its axis
-# (Y14.5's "closely adjacent"), on the wall its frames' leaders land on
-# below face A: on the axis it would run on the 68.815 station's witness
-# line. The tap heights stand between the two lines, the pin bore's left of
-# its line, between the station rows.
-_TAP_CHAIN_TEXT_Y = SECTION_CENTER[1] - 0.0125
-PROJECTED_ZONE_CHAINS: dict[str, tuple[float, tuple[float, float]]] = {
+# mouth, so none crosses its line. The two tap zones are the same height
+# the same way, so one dimension between their lines carries both ("2X";
+# run 20261027T180656347Z: two values crowded the 30 mm between the lines
+# and stood on the rear face); the other's text point is None. The pin
+# bore's runs beside its axis (Y14.5's "closely adjacent"), 1 mm out from
+# the wall its frames' leaders land on below face A: on the axis it ran on
+# the 68.815 station's witness line, and on the wall into its arrowhead.
+# Its height stands left of it, midway between the 68.815 row and its top.
+_PIN_CHAIN_X_MM = PIN_STATION - PIN_BORE_DIA / 2.0 - 1.0
+PROJECTED_ZONE_CHAINS: dict[str, tuple[float, tuple[float, float] | None]] = {
     "plate_tap_1_position": (
         PLATE_TAP_STATIONS[0],
-        (_front_x(PLATE_TAP_STATIONS[0]) + 0.0075, _TAP_CHAIN_TEXT_Y),
+        (
+            (_front_x(PLATE_TAP_STATIONS[0]) + _front_x(PLATE_TAP_STATIONS[1])) / 2.0,
+            SECTION_CENTER[1] - 0.0145,
+        ),
     ),
-    "plate_tap_2_position": (
-        PLATE_TAP_STATIONS[1],
-        (_front_x(PLATE_TAP_STATIONS[1]) - 0.0075, _TAP_CHAIN_TEXT_Y),
-    ),
+    "plate_tap_2_position": (PLATE_TAP_STATIONS[1], None),
     "feed_stud_projected_axis": (
-        PIN_STATION - PIN_BORE_DIA / 2.0,
-        (_front_x(PIN_STATION - PIN_BORE_DIA / 2.0) - 0.0085, SECTION_CENTER[1] + 0.067),
+        _PIN_CHAIN_X_MM,
+        (_front_x(_PIN_CHAIN_X_MM) - 0.012, SECTION_CENTER[1] + 0.0617),
     ),
 }
+
+
+def projected_zone_count(key: str) -> int:
+    """How many drawn zones ``key``'s height dimension carries: its own and
+    every undimensioned zone of the same height run the same way."""
+    height = {c.key: c.projected_zone_height_mm for c in GEOMETRIC_CONTROLS}
+
+    def same(other: str) -> bool:
+        return (
+            height[other] == height[key]
+            and PROJECTED_ZONE_DIRECTION[other] == PROJECTED_ZONE_DIRECTION[key]
+        )
+
+    return 1 + sum(
+        1 for other, (_x, text) in PROJECTED_ZONE_CHAINS.items()
+        if text is None and same(other)
+    )
+
+
 _SW_LINE_CHAIN = 3  # swLineStyles_e.swLineCHAIN
 _SW_LW_THICK = 2  # swLineWeights_e.swLW_THICK: Y14.5's heavy chain line
-_SW_TEXT_CALLOUT_BELOW = 4  # swDimensionTextCalloutBelow
+_SW_TEXT_PREFIX = 1  # swDimensionTextPrefix
+_SW_TEXT_SUFFIX = 2  # swDimensionTextSuffix
 
 
 # The match-drill rides the locating holes' own callout, with the step that
@@ -526,29 +550,6 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     raise RuntimeError("arm end view has no Depth dimension to label")
 
 
-def _lower_section_caption(adapter: Any, section: Any) -> None:
-    """Drop section A-A's native caption below the plate taps' chain lines,
-    keeping its linked view-label fields (draw_fr_top_frame's caption)."""
-    view = _early_bound(section, "IView")
-    captions = []
-    for raw_note in view.GetNotes() or ():
-        note = _early_bound(raw_note, "INote")
-        linked_text = str(note.PropertyLinkedText or "")
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>")):
-            captions.append((note, linked_text))
-    if len(captions) != 1:
-        raise RuntimeError(f"expected one native section A-A caption, found {len(captions)}")
-    note, linked_text = captions[0]
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    before = tuple(float(value) for value in annotation.GetPosition())
-    move_annotation(adapter, annotation, 0.0, -SECTION_CAPTION_DROP, label="section A-A caption")
-    after = tuple(float(value) for value in annotation.GetPosition())
-    if abs(after[1] - (before[1] - SECTION_CAPTION_DROP)) > 1e-6 or abs(after[0] - before[0]) > 1e-6:
-        raise RuntimeError(f"section A-A caption did not move: {before!r} -> {after!r}")
-    if str(note.PropertyLinkedText or "") != linked_text:
-        raise RuntimeError("section A-A caption lost its native view-label fields")
-
-
 def _line_ends(adapter: Any, line: Any) -> list[tuple[float, ...]]:
     bound = _early_bound(line, "ISketchLine")
     return [
@@ -568,11 +569,12 @@ def _add_projected_zone_chain(
     *,
     key: str,
     x_mm: float,
-    text_xy: tuple[float, float],
+    text_xy: tuple[float, float] | None,
 ) -> None:
     """One projected zone at its feature in section A-A: a heavy chain line
-    from front face A along ``key``'s direction for its height, and the
-    height's vertical dimension on that line, MIN under the value.
+    from front face A along ``key``'s direction for its height, and, when
+    ``text_xy`` is given, the height's vertical dimension on that line, "MIN"
+    after the value and the count of zones it carries before it.
 
     The ends are model points projected through the section, so the line is
     the zone's own extent at true length; it is authored in the section's
@@ -643,7 +645,9 @@ def _add_projected_zone_chain(
     drift = max(abs(a - b) for end, want in zip(placed, points) for a, b in zip(end, want))
     if drift > 1e-9:
         raise RuntimeError(f"{key} chain line moved from {points!r} to {placed!r}")
-
+    if text_xy is None:
+        _telemetry.info(f"{key} projected zone: chain {ends[0]!r} -> {ends[1]!r}")
+        return
     if not drawing.ActivateView(name):
         raise RuntimeError(f"failed to activate section A-A for {key}'s height")
     selection = _early_bound(draw.SelectionManager, "ISelectionMgr")
@@ -662,12 +666,19 @@ def _add_projected_zone_chain(
     dimension.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(dimension.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError(f"{key} height precision did not persist")
-    dimension.SetText(_SW_TEXT_CALLOUT_BELOW, PROJECTED_ZONE_HEIGHT_CALLOUT)
-    if str(dimension.GetText(_SW_TEXT_CALLOUT_BELOW) or "") != PROJECTED_ZONE_HEIGHT_CALLOUT:
-        raise RuntimeError(f"{key} height callout did not persist")
+    count = projected_zone_count(key)
+    prefix = f"{count}X " if count > 1 else ""
+    dimension.SetText(_SW_TEXT_PREFIX, prefix)
+    dimension.SetText(_SW_TEXT_SUFFIX, PROJECTED_ZONE_HEIGHT_SUFFIX)
+    readback = (
+        str(dimension.GetText(_SW_TEXT_PREFIX) or ""),
+        str(dimension.GetText(_SW_TEXT_SUFFIX) or ""),
+    )
+    if readback != (prefix, PROJECTED_ZONE_HEIGHT_SUFFIX):
+        raise RuntimeError(f"{key} height text did not persist: {readback!r}")
     _telemetry.info(
         f"{key} projected zone: chain {ends[0]!r} -> {ends[1]!r}, "
-        f"height {measured * 1000.0:.4f} mm at {text_xy!r}"
+        f"height {prefix}{measured * 1000.0:.4f}{PROJECTED_ZONE_HEIGHT_SUFFIX} at {text_xy!r}"
     )
 
 
@@ -816,16 +827,19 @@ async def build(adapter: Any) -> dict[str, str]:
         # The projected-zone frames stand in section A-A on the side their
         # zone projects to (the plate taps' rear, the stud's front). Each
         # tap frame's leader climbs to the hole's NEAR wall at the rear
-        # mouth, so it never crosses the tap's chain line on its axis.
+        # mouth, so it never crosses the tap's chain line on its axis; each
+        # frame stands far enough out that its 6 mm shoulder ends short of
+        # the hole (run 20261027T180656347Z: the shoulders ran across the
+        # chain lines).
         "plate_tap_1_position": PmiDrawingPlacement(
-            section, (0.072, SECTION_CENTER[1] - 0.0094),
+            section, (0.0665, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[0] - _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 1 wall",
             ),
         ),
         "plate_tap_2_position": PmiDrawingPlacement(
-            section, (0.1735, SECTION_CENTER[1] - 0.0094),
+            section, (0.1795, SECTION_CENTER[1] - 0.0094),
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PLATE_TAP_STATIONS[1] + _PLATE_DRILL_R,
                 z_mm=THICKNESS - 0.5, label="plate tap 2 wall",
@@ -859,7 +873,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     for key, (x_mm, text_xy) in PROJECTED_ZONE_CHAINS.items():
         _add_projected_zone_chain(adapter, section, key=key, x_mm=x_mm, text_xy=text_xy)
-    _lower_section_caption(adapter, section)
     _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):

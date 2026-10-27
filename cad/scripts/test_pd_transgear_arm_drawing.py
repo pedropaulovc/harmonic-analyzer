@@ -792,30 +792,47 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
         == registration.S_PROJECTED_HEIGHT_MM
     )
     # Each line stands at its own hole: the taps' on their axes, the pin
-    # bore's on its wall, beside the axis its station's witness line takes.
+    # bore's beside its axis (which its station's witness line takes), just
+    # outside its wall.
     stations = dict(zip(taps, geometry.PLATE_TAP_STATIONS))
     for key, (x_mm, _text) in drawing.PROJECTED_ZONE_CHAINS.items():
         face = projected[key].face
         if key in stations:
             assert x_mm == stations[key] == face.contains_x_mm
         else:
-            assert x_mm == pytest.approx(face.contains_x_mm - face.diameter_mm / 2.0)
+            outside = face.contains_x_mm - face.diameter_mm / 2.0 - x_mm
+            assert 0.0 < outside <= 1.0
+    # Every zone's height is printed: by its own dimension, or by one that
+    # counts it ("2X") because it has the same height the same way.
+    counts = {
+        key: drawing.projected_zone_count(key)
+        for key, (_x, text) in drawing.PROJECTED_ZONE_CHAINS.items() if text is not None
+    }
+    assert sum(counts.values()) == len(projected)
+    assert counts == {"plate_tap_1_position": 2, "feed_stud_projected_axis": 1}
     # On the sheet (front face up), each height's value stands between the
     # line's ends, off the part, beside its line.
     face_a_y = drawing.SECTION_CENTER[1] + geometry.THICKNESS * drawing._S / 2000.0
     rear_y = drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
-    for key, (x_mm, (text_x, text_y)) in drawing.PROJECTED_ZONE_CHAINS.items():
+    for key, (x_mm, text) in drawing.PROJECTED_ZONE_CHAINS.items():
+        if text is None:
+            continue
+        text_x, text_y = text
         direction = spec.PROJECTED_ZONE_DIRECTION[key]
         end_y = face_a_y - direction * projected[key].projected_zone_height_mm * drawing._S / 1000.0
         low, high = sorted((face_a_y, end_y))
         assert low < text_y < high, key
         assert not rear_y - 0.002 < text_y < face_a_y + 0.002, key
-        assert abs(text_x - drawing._front_x(x_mm)) >= 0.005, key
+        assert abs(text_x - drawing._front_x(x_mm)) >= 0.010, key
+    # The shared tap value stands midway between the two tap lines.
+    tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
+    text = drawing.PROJECTED_ZONE_CHAINS["plate_tap_1_position"][1]
+    assert text is not None and text[0] == pytest.approx(sum(tap_x) / 2.0)
     for control in projected.values():
         assert f"{control.projected_zone_height_mm:.{spec.DRAWING_REFERENCE_PRECISION}f}" == (
             f"{control.projected_zone_height_mm:g}"
         )
-    assert spec.PROJECTED_ZONE_HEIGHT_CALLOUT == "MIN"
+    assert spec.PROJECTED_ZONE_HEIGHT_SUFFIX == " MIN"
     # No general notes remain (rule 7).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_note(" not in source

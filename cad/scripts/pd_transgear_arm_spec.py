@@ -219,9 +219,8 @@ if set(PROJECTED_ZONE_DIRECTION) != {
     raise AssertionError("every projected zone needs exactly one drawn direction")
 # The heights are sheet-derived (each measures its own chain line) and print
 # to DRAWING_REFERENCE_PRECISION, the frames' own place (Ⓟ 14.7, Ⓟ 32.6),
-# with MIN under the value: a projected height is a minimum extent, not a .X
-# band.
-PROJECTED_ZONE_HEIGHT_CALLOUT = "MIN"
+# followed by MIN: a projected height is a minimum extent, not a .X band.
+PROJECTED_ZONE_HEIGHT_SUFFIX = " MIN"
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
