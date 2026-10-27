@@ -167,6 +167,8 @@ NUT_CAPTION_XY = (.166,.078)
 # D caption, its own caption ~15..26 mm under it, above the border.
 NUT_SECTION_XY = (.085,.062)
 NUT_CUT_OVERRUN = 2
+# TL-32's cut-face sections hang their captions 6 mm under the face.
+SECTION_CAPTION_GAP = .006
 NUT_CALLOUT_XY = (.265,.084)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
@@ -241,7 +243,8 @@ def _section_letter_tops(dr_section) -> list[float]:
 
 
 def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float],
-                   target: tuple[float, float]) -> None:
+                   target: tuple[float, float], caption_top: tuple[float, float],
+                   sheet_scale: tuple[float, float]) -> None:
     """Print only the cut face (rule 9): on TL-32 a line run past the part
     also printed the lug or the block beyond the plane, 88 mm tall (farm run
     20261027T190843112Z). R2026x declares the setter void; only its bool
@@ -279,6 +282,36 @@ def _cut_face_only(adapter, view, letter: str, anchor: tuple[float, float, float
                     f'target {target!r}')
     if math.dist(landed, target) > 5e-5:
         raise RuntimeError(f'section {letter}: anchor landed at {landed!r}, not {target!r}')
+    _place_caption(adapter, view, caption_top, letter, sheet_scale)
+
+
+def _place_caption(adapter, view, target, letter: str, sheet_scale) -> None:
+    """Move the section's native caption so its box's top centre lands on
+    ``target``: it kept its place under the larger outline, on the title
+    block (farm run 20261027T195248081Z). The sheet scale is pinned first so
+    finalization cannot move it after (draw_ch_rocker_arm_tl_vn_oblique_leadscrew
+    ``_place_view_caption``)."""
+    label = f'section {letter} caption'
+    sheet = _early_bound(_early_bound(adapter.currentModel, 'IDrawingDoc').GetCurrentSheet(), 'ISheet')
+    if not sheet.SetScale(*sheet_scale, False, False):
+        raise RuntimeError(f'cannot pin the sheet scale before the {label}')
+    notes = tuple(_early_bound(view, 'IView').GetNotes() or ())
+    if len(notes) != 1:
+        raise RuntimeError(f'expected one native {label}, found {len(notes)} notes')
+    note = _early_bound(notes[0], 'INote')
+    annotation = _early_bound(note.GetAnnotation(), 'IAnnotation')
+    for _attempt in range(4):
+        extent = [float(v) for v in note.GetExtent()]
+        error = (target[0] - (extent[0] + extent[3]) / 2, target[1] - extent[4])
+        if max(abs(error[0]), abs(error[1])) < 2e-4:
+            break
+        x, y, z = (float(v) for v in annotation.GetPosition())
+        if not annotation.SetPosition2(x + error[0], y + error[1], z):
+            raise RuntimeError(f'failed to move the {label}')
+        rebuild_drawing(adapter, label=f'place {label}')
+    else:
+        raise RuntimeError(f'{label} stayed at {extent!r}, its top centre wanted at {target!r}')
+    _telemetry.info(f'{label}: box {extent!r}')
 
 
 def _set_section_arrows(adapter) -> None:
@@ -383,7 +416,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     if is_feed:
         # The top face's +Y corner lands where TL-22's full B-B puts it.
         _cut_face_only(adapter, floor, 'B', (x, part.BLOCK_WIDTH/2, contract.BLOCK_HEIGHT),
-                       (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000))
+                       (FLOOR_XY[0]-contract.BLOCK_HEIGHT/2000, FLOOR_XY[1]+part.BLOCK_WIDTH/2000),
+                       (FLOOR_XY[0], FLOOR_XY[1]-part.BLOCK_WIDTH/2000-SECTION_CAPTION_GAP), SHEET_SCALE)
     row_4y = _project(adapter,plan,(part.BLOCK_X1,part.BOLT_Y,contract.BLOCK_HEIGHT),'row 4Y')
     _fit_section_letters(adapter, side, (floor,), below_y=row_4y[1])
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
@@ -416,7 +450,10 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
                                         contract.NUT_AXIS_Z),'+Y nut tap row')
         _cut_face_only(adapter, section_c, 'C',
                        ((contract.LUG_X0+contract.LUG_X1)/2, contract.NUT_AXIS_Y, contract.BLOCK_HEIGHT/2),
-                       NUT_SECTION_XY)
+                       NUT_SECTION_XY,
+                       (NUT_SECTION_XY[0],
+                        NUT_SECTION_XY[1]-(contract.LUG_X1-contract.LUG_X0)*NUT_SCALE[0]/NUT_SCALE[1]/2000
+                        -SECTION_CAPTION_GAP), NUT_SCALE)
         _fit_section_letters(adapter, section_c, (), below_y=tap_row[1])
         # The callout picks the +Z column's lower tap, under section line C
         # at the nut axis, so its short leader from the lower right crosses
