@@ -62,7 +62,7 @@ def assert_counter_spring_top_hang(
     # shortest shoulder), so only the loop's two pull-side wire passes may
     # touch the screw: sm_gooseneck_spring_joint fixes them (LOOP_PASS_X) for
     # the plumb loop centred in the gap and bounds their clearance to the lead
-    # and to the largest under-head corner. The band check above already holds
+    # and to the R0.50 MAX under-head fillet. The band check above already holds
     # the loop plumb; hold it to that centre too, so those budgets are this
     # pose's, and require both passes on the seat.
     head_x = spring_mounts.GOOSENECK_END_X + sm_gooseneck_geom.SPRING_EYE_GAP

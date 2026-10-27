@@ -198,12 +198,14 @@ def counter_upper_support_geometry() -> dict[str, str | float]:
         "seat_dia_mm": spring_screw.SEAT_DIA,
         "shoulder_length_mm": spring_screw.SHOULDER_LENGTH,
         "tip_chamfer_mm": spring_screw.TIP_CHAMFER,
+        "underhead_corner_r_mm": spring_screw.UNDERHEAD_CORNER_R,
         "clamp_gap_mm": sm_gooseneck_geom.SPRING_EYE_GAP,
         "arm_end_x_mm": sm_gooseneck_geom.ARM_END_X,
         "spring_eye_x_mm": sm_gooseneck_geom.SPRING_EYE_X,
         "plug_length_mm": sm_gooseneck_geom.PLUG_LENGTH,
         "plug_counterbore_dia_mm": spring_joint.COUNTERBORE_DIA,
         "plug_counterbore_depth_mm": spring_joint.COUNTERBORE_DEPTH,
+        "plug_edge_break_mm": spring_joint.EDGE_BREAK,
     }
 
 

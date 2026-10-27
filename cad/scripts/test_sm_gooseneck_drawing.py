@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 import build_sm_gooseneck as part
+import build_sm_gooseneck_spring_screw as screw_part
 import draw_sm_gooseneck as drawing
 import sm_gooseneck_geom as geom
 import sm_gooseneck_spec as spec
@@ -65,12 +66,14 @@ def test_counterbore_and_inner_break_follow_the_tap_before_the_tube() -> None:
     )
 
 
-def test_every_direct_db_block_restores_inference_in_finally() -> None:
+@pytest.mark.parametrize("builder", [part, screw_part], ids=lambda m: m.__name__)
+def test_every_direct_db_block_restores_inference_in_finally(builder) -> None:
     # Sketch inference is session state on the persistent seat: each block
     # that turns it off must restore it even when a native segment is
     # rejected, so every True is followed at once by a try whose finally
-    # restores it, and nothing restores it outside a finally.
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+    # restores it, and nothing restores it outside a finally.  Shared by the
+    # MHA-SM-01 post and the MHA-SM-04 screw builders.
+    tree = ast.parse(Path(builder.__file__).read_text(encoding="utf-8"))
 
     def toggle(node: ast.AST) -> str | None:
         if (
@@ -108,8 +111,8 @@ def test_every_direct_db_block_restores_inference_in_finally() -> None:
 def test_counterbore_and_breaks_reduce_the_printed_full_thread_length() -> None:
     notes = " ".join(spec.DRAWING_NOTES.split())
     cbore = re.search(
-        r"ARM END C'BORE <MOD-DIAM>([\d.]+)-([\d.]+) X ([\d.]+)-([\d.]+) DEEP,"
-        r" ON TAP AXIS WITHIN ([\d.]+)\.",
+        r"ARM END C'BORE <MOD-DIAM>([\d.]+)-([\d.]+) X ([\d.]+)-([\d.]+) DEEP"
+        r" FROM PLUG FACE, ON TAP AXIS WITHIN ([\d.]+)\.",
         notes,
     )
     edge = re.search(r"BREAK INNER TAP END\s+([\d.]+)\s+X\s+45\s+DEG", notes)

@@ -26,14 +26,17 @@ stops clamping the loop needs far less preload, but makes the loop a pivot
 (rule 23) and needs a stated seating torque, so it would reverse 2026-09-21.
 The #8-32 root carries the same clamp at the SF below.
 
-Every size takes the title block's band for its places except three limits,
+Every size takes the title block's band for its places except four limits,
 each named on the sheet for what it serves (drawing-guidelines.md rule 4):
 the seat Ø's LIMIT band (the loop seat, under the thread major), the shoulder
-length's LIMIT band (to the lead's foot: the loop clears the lead) and the
+length's LIMIT band (to the lead's foot: the loop clears the lead), the
 full-thread station's single "5.67 MAX" from the under-head face, "TO FULL
-THREAD" over its value (note 1 names the mate).  The crown's sphere prints
-on its arc as the reference "(SR20.03)": the head Ø and the crown rise
-drive it (machinist FIX round 1: no note carries a feature's geometry).
+THREAD" over its value (note 1 names the mate), and the under-head corner's
+single "R0.5 MAX", "MHA-SM-VN-51 / LOOP CLEARS" under it, under the title
+block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997).  The crown's
+sphere prints on its arc as the reference "(SR20.03)": the head Ø and the
+crown rise drive it (machinist FIX round 1: no note carries a feature's
+geometry).
 
 The counter seats in ``cad/config/machine/springs.yaml`` were re-measured
 natively on this 17.50 screw and the counterbored 9.90 plug by the one-off
@@ -72,8 +75,11 @@ THREAD_CALLOUT = THREAD
 CHAMFER_CALLOUT = "X 45 DEG"
 # Callouts the PART authors on its dimensions (the drawing only reads them
 # back; a drawing-side SetText can write through to the part, #1942).  The
-# three limits are tighter than the title block, so each names what it serves
-# (drawing-guidelines.md rule 4).  Below the value:
+# four limits are tighter than the title block, so each names what it serves
+# (drawing-guidelines.md rule 4).  Below the value (the corner radius's
+# two rows too: SolidWorks prints no line break in the above compartment,
+# pn_pen_v_block_spec; its value stands over them on the leader's shoulder,
+# draw_pn_pen_rod's "R0.2 MAX / SEATS ON PEN V-BLOCK / MHA-PN-05"):
 COUNTER_SPRING_NUMBER = str(_config.parts("sm-vn-counter-spring")["number"])
 PLUG_NUMBER = str(_config.parts("sm-gooseneck")["number"])
 DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
@@ -81,6 +87,7 @@ DIMENSION_CALLOUTS: dict[str, dict[str, str]] = {
         "SeatDia": f"{COUNTER_SPRING_NUMBER} LOOP\nSEAT, UNDER\nTHREAD MAJOR",
         "ShoulderLength": f"TO 45 DEG LEAD;\n{COUNTER_SPRING_NUMBER} LOOP\nCLEARS LEAD",
         "TipChamfer": CHAMFER_CALLOUT,
+        "UnderHeadCornerR": f"{COUNTER_SPRING_NUMBER}\nLOOP CLEARS",
     },
 }
 # Above the value: the full-thread limit's span (22.7 mm on the sheet) is
@@ -153,9 +160,16 @@ STRENGTH_SF_TARGET = 2.0
 # working-state share of VDI 2230 Part 1:2015 (R8: k_tau = 0.5).
 RESIDUAL_TORSION_FACTOR = 0.5
 # Clamp: friction alone holds the pull on both clamp faces, so the preload is
-# F/(2 mu).  The thread carries the thread share of the tightening torque,
-# Fp d2/2 (tan lambda + mu sec 30)/(1 - mu tan lambda sec 30), on the basic
-# pitch diameter; the under-head share reacts at the head, above the shank.
+# at least F/(2 mu).  The thread carries the thread share of the tightening
+# torque, Fp d2/2 (tan lambda + mu sec 30)/(1 - mu tan lambda sec 30), on the
+# basic pitch diameter; the under-head share reacts at the head, above the
+# shank.  F/(2 mu) is the preload the clamp NEEDS, not a ceiling: under the
+# 2026-09-21 rulings MHA-SM-00 step 8 gives no torque value (the fitter stops
+# once the loop is clamped and cannot swivel), so no installation bound
+# exists above it.  Both tightening stresses are linear in the preload, so
+# TIGHTENING_SF is that envelope stated as a ratio: the multiple of the
+# needed preload (and of its torque) the root takes before nominal yield,
+# OVERTIGHTEN_MARGIN (codjiflo round 4, #1997).
 _PITCH_DIA = MAJOR_DIA - 0.649519 * PITCH
 _TAN_LEAD = PITCH / (math.pi * _PITCH_DIA)
 _SEC_FLANK = 1.0 / math.cos(math.radians(30.0))
@@ -284,6 +298,15 @@ _SERVICE_SF_EXACT = {pair: service_safety_factor(*pair) for pair in FRICTION_PAI
 _TIGHTENING_SF_EXACT = {
     pair: tightening_safety_factor(*pair) for pair in FRICTION_PAIRS
 }
+# The criterion is NOMINAL von Mises stress against yield, on smooth sections
+# at the deepest estimated root and the smallest seat.  The die-cut root and
+# the under-head and lead corners raise local stress above it, and local
+# first yield there is accepted: the screw is a statically loaded clamp of
+# ductile steel (12L14 CD, 10 % elongation), so a notch root yields locally
+# and redistributes, and the #1951 options sketch reported its SFs as nominal
+# on that basis.  Fatigue does not govern: the summing lever is quasi-static
+# and the pull swings about +/-1.2 N about a 46.9-47.1 N service load (#1951
+# sketch), so first-load yield at the low-friction preload sets the margin.
 # Acceptance reads the unrounded factors; the rounded tables are for print.
 if min((*_SERVICE_SF_EXACT.values(), *_TIGHTENING_SF_EXACT.values())) < (
     STRENGTH_SF_TARGET
@@ -294,20 +317,25 @@ if min((*_SERVICE_SF_EXACT.values(), *_TIGHTENING_SF_EXACT.values())) < (
     )
 SERVICE_SF = {pair: round(sf, 3) for pair, sf in _SERVICE_SF_EXACT.items()}
 TIGHTENING_SF = {pair: round(sf, 3) for pair, sf in _TIGHTENING_SF_EXACT.items()}
-# Fatigue does not govern: the summing lever is quasi-static and the pull
-# swings about +/-1.2 N about a 46.9-47.1 N service load (#1951 sketch), so
-# first-load yield at the low-friction preload sets the margin.
+OVERTIGHTEN_MARGIN = min(_TIGHTENING_SF_EXACT.values())
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia", "HeadHeight", "CrownRise", "CrownRadius"},
-    "ShankProfile": {"UnderHeadLength", "SeatDia", "ShoulderLength", "TipChamfer"},
+    "ShankProfile": {
+        "UnderHeadLength",
+        "SeatDia",
+        "ShoulderLength",
+        "TipChamfer",
+        "UnderHeadCornerR",
+    },
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
     "StationReference": {"OverallLength", "FullThread"},
 }
 # Chamfers never need extra places (drawing-guidelines.md rule 3): the tip
-# chamfer rides the title block's .X band.  Every other mark prints at two.
-ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer"})
+# chamfer rides the title block's .X band, and the under-head corner's
+# single "R0.5 MAX" its one place.  Every other mark prints at two.
+ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer", "UnderHeadCornerR"})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()

@@ -39,8 +39,9 @@ def test_part_registry_row_is_the_made_screw() -> None:
     assert row["title"] == "Gooseneck Spring Screw"
     assert row["description"] == "GOOSENECK SPRING SCREW"
     # A critical grade (rule 2): the clamp's service SF needs 12L14's yield
-    # (sm_gooseneck_spring_screw_spec.YIELD_MPA); 1018 is not accepted.
-    for grade in ("12L14", "1/2 in"):
+    # (sm_gooseneck_spring_screw_spec.YIELD_MPA); 1018 is not accepted.  The
+    # print states the strength the SF assumes (codjiflo P2 round 4 on #1997).
+    for grade in ("12L14", "1/2 in", f"{spec.YIELD_MPA:g} MPa min"):
         assert grade in row["material"]
         assert grade in row["material_specification"]
     assert "1018" not in row["material"] + row["material_specification"]
@@ -59,7 +60,8 @@ def test_part_registry_row_is_the_made_screw() -> None:
 def test_printed_material_fits_one_title_block_line() -> None:
     row = _config.parts("sm-gooseneck-spring-screw")
     assert len(str(row["material"])) <= 36
-    assert "cold-finished" in str(row["material_specification"])
+    assert "cold-drawn" in str(row["material_specification"])
+    assert "CD" in str(row["material"])
 
 
 def test_stock_turns_the_head() -> None:
@@ -104,6 +106,7 @@ def test_spec_is_the_single_source_of_marked_dimensions() -> None:
         "SeatDia",
         "ShoulderLength",
         "TipChamfer",
+        "UnderHeadCornerR",
     }
 
 
@@ -114,8 +117,9 @@ def test_model_owns_places_and_bands() -> None:
     one_place = {
         name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 1
     }
-    # Chamfers never need extra places (rule 3); every other mark is .XX.
-    assert one_place == {"TipChamfer"}
+    # Chamfers never need extra places (rule 3) and the corner's single
+    # "R0.5 MAX" prints at one; every other mark is .XX.
+    assert one_place == {"TipChamfer", "UnderHeadCornerR"}
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1, 2}
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "CrownRadius"}
     # No mark carries a shared-helper band: the seat Ø and the shoulder
@@ -147,24 +151,32 @@ def test_model_owns_places_and_bands() -> None:
             "SHOULDER_LENGTH_TOL_TYPE",
         ),
     }
-    # "5.67 MAX": the model value IS the printed limit (the shared
-    # _single_limit_tolerance setter), its band running down to the lead's top.
-    (single,) = [
-        node
+    # "5.67 MAX" and "R0.5 MAX": the model value IS the printed limit (the
+    # shared _single_limit_tolerance setter), each band running down from it.
+    singles = {
+        tuple(ast.unparse(arg) for arg in node.args[1:]): {
+            kw.arg: ast.unparse(kw.value) for kw in node.keywords
+        }
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", "") == "set_single_limit"
-    ]
-    assert [ast.unparse(arg) for arg in single.args[1:]] == [
-        "'StationReference'",
-        "'FullThread'",
-    ]
-    assert {kw.arg: ast.unparse(kw.value) for kw in single.keywords} == {
-        "limit": "FULL_THREAD_STATION_MAX",
-        "band": "FULL_THREAD_STATION_MAX_BAND",
-        "tol_type": "FULL_THREAD_STATION_MAX_TOL_TYPE",
+    }
+    assert singles == {
+        ("'StationReference'", "'FullThread'"): {
+            "limit": "FULL_THREAD_STATION_MAX",
+            "band": "FULL_THREAD_STATION_MAX_BAND",
+            "tol_type": "FULL_THREAD_STATION_MAX_TOL_TYPE",
+        },
+        ("'ShankProfile'", "'UnderHeadCornerR'"): {
+            "limit": "UNDERHEAD_CORNER_R",
+            "band": "UNDERHEAD_CORNER_R_BAND",
+            "tol_type": "UNDERHEAD_CORNER_R_TOL_TYPE",
+        },
     }
     assert calls("_single_limit") == set()
+    assert geom.UNDERHEAD_CORNER_R == 0.50
+    assert geom.UNDERHEAD_CORNER_R_BAND == (0.0, -geom.UNDERHEAD_CORNER_R)
+    assert geom.UNDERHEAD_CORNER_R_TOL_TYPE == 6  # swTolMAX
     assert geom.FULL_THREAD_STATION_MAX_BAND == (
         0.0,
         -round(geom.FULL_THREAD_STATION_MAX - geom.FULL_THREAD_STATION_MIN, 6),
@@ -291,26 +303,29 @@ def test_full_thread_limit_prints_on_the_part_not_in_a_note() -> None:
     # names the mate, so the callout names none (farm run 20261027T053051351Z:
     # "FULL THREAD IN MHA-SM-01" read as a plug-engagement statement).  It
     # stands ABOVE the value, which alone takes the dimension line.
-    assert spec.DIMENSION_CALLOUTS_ABOVE == {
-        "StationReference": {"FullThread": "TO FULL THREAD"}
+    assert spec.DIMENSION_CALLOUTS_ABOVE["StationReference"] == {
+        "FullThread": "TO FULL THREAD"
     }
     assert "StationReference" not in spec.DIMENSION_CALLOUTS
     assert "MHA-SM-01" in spec.DRAWING_NOTES
     # The station sketch's witnesses lie on the outline: the under-head face
-    # (from the thread radius up, under the head's rim) and the thread's
-    # major silhouette from the printed station toward the tip.
+    # (from the corner round's tangent point up, under the head's rim) and
+    # the thread's major silhouette from the printed station toward the tip.
     thread_r = geom.MAJOR_DIA / 2.0
+    tangent_r = geom.SEAT_DIA / 2.0 + geom.UNDERHEAD_CORNER_R
     (f0, f1), (t0, t1) = part.FACE_WITNESS_LINE, part.THREAD_WITNESS_LINE
-    assert f0 == pytest.approx((0.0, thread_r))
-    assert f1[0] == 0.0 and thread_r < f1[1] < geom.HEAD_DIA / 2.0
+    assert f0 == pytest.approx((0.0, tangent_r))
+    assert f1[0] == 0.0 and tangent_r < f1[1] < geom.HEAD_DIA / 2.0
+    assert thread_r < tangent_r
     assert t0 == pytest.approx((geom.FULL_THREAD_STATION_MAX, thread_r))
     lead_top = geom.SHOULDER_LENGTH_MAX + geom.STEP_LEAD_MAX
     assert lead_top < t0[0] < t1[0] < geom.LENGTH - geom.TIP_CHAMFER
     assert t1[1] == t0[1]
     build = Path(part.__file__).read_text(encoding="utf-8")
     for record in (
-        """stations.record("FullThreadRadius", '"ThreadDia" / 2')""",
+        """stations.record("FaceWitnessRadius", '"SeatDia" / 2 + "UnderHeadCornerR"')""",
         """stations.record("FullThread", '"FullThread"')""",
+        """"FullThreadDrop", '"SeatDia" / 2 + "UnderHeadCornerR" - "ThreadDia" / 2'""",
         '("FullThread", FULL_THREAD_STATION_MAX)',
     ):
         assert record in build
@@ -330,16 +345,22 @@ def _shank_profile_points() -> list[tuple[float, float]]:
     return eval(compile(ast.Expression(node.value), "<points>", "eval"), vars(part))
 
 
-def test_shank_profile_is_seat_lead_thread_and_tip() -> None:
+def test_shank_profile_is_corner_seat_lead_thread_and_tip() -> None:
     seat_r, thread_r = geom.SEAT_DIA / 2.0, geom.MAJOR_DIA / 2.0
+    corner_r = geom.UNDERHEAD_CORNER_R
+    # The face rises from the axis to the corner round, whose CCW quarter
+    # (centre off the face and the seat by its radius) turns onto the seat.
+    assert part.CORNER_FACE_TANGENT == pytest.approx((0.0, seat_r + corner_r))
+    assert part.CORNER_CENTER == pytest.approx((corner_r, seat_r + corner_r))
+    assert part.CORNER_SEAT_TANGENT == pytest.approx((corner_r, seat_r))
     expected = [
-        (0.0, 0.0),
-        (0.0, seat_r),
+        (corner_r, seat_r),
         (geom.SHOULDER_LENGTH, seat_r),
         (geom.SHOULDER_LENGTH + geom.STEP_LEAD, thread_r),
         (geom.LENGTH - geom.TIP_CHAMFER, thread_r),
         (geom.LENGTH, thread_r - geom.TIP_CHAMFER),
         (geom.LENGTH, 0.0),
+        (0.0, 0.0),
     ]
     points = _shank_profile_points()
     assert len(points) == len(expected)
@@ -347,7 +368,7 @@ def test_shank_profile_is_seat_lead_thread_and_tip() -> None:
         assert got == pytest.approx(want)
     # The lead is 45 degrees: its axial leg equals its radial leg, the two
     # diameters' half-difference.
-    (u0, v0), (u1, v1) = points[2], points[3]
+    (u0, v0), (u1, v1) = points[1], points[2]
     assert u1 - u0 == pytest.approx(v1 - v0) == pytest.approx(geom.STEP_LEAD)
     assert geom.STEP_LEAD == pytest.approx((geom.MAJOR_DIA - geom.SEAT_DIA) / 2.0)
     # The model holds it by equation from the two diameter globals, so the
@@ -362,6 +383,14 @@ def test_shank_profile_is_seat_lead_thread_and_tip() -> None:
         )
     ]
     assert shank.count('"vertical_distance"') == 1
+    # The round is tangent to both legs and its radius, a sketch dimension,
+    # runs from the global; the axial sizes read from the face, not the seat.
+    assert shank.count('"tangent"') == 1
+    assert "for first, second in ((face, corner), (corner, seat)):" in shank
+    assert """shank.record("UnderHeadCornerR", '"UnderHeadCornerR"')""" in shank
+    assert '("ShoulderLength", f"{face}.end", f"{seat}.end", SHOULDER_LENGTH)' in shank
+    assert '("UnderHeadLength", f"{face}.end", f"{tip_chamfer}.end", LENGTH)' in shank
+    assert '("UnderHeadCornerR", UNDERHEAD_CORNER_R)' in build
     # No hidden reference sketch restates the lead: only StationReference.
     assert build.count("blank_sketch(adapter, ") == 1
 
@@ -411,12 +440,25 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     assert part.V_HEAD == pytest.approx(math.pi * r_head**2 * 6.0 + cap)
     # The major cylinder less the annulus over the seat and, by Pappus, the
     # lead's corner triangle (legs `lead`, centroid r_seat + 2 lead/3) and
-    # the tip chamfer's (legs 0.3, centroid r_thread - 0.1).
+    # the tip chamfer's (legs 0.3, centroid r_thread - 0.1), plus the
+    # under-head corner round's spandrel ring, integrated on a midpoint grid
+    # over (axial u, radius r): material where u, r - r_seat in [0, R] and
+    # the point stands outside the round's circle.
     over_seat = math.pi * (r_thread**2 - r_seat**2) * shoulder
     over_lead = 2.0 * math.pi * (r_seat + 2.0 * lead / 3.0) * lead**2 / 2.0
     tip = 2.0 * math.pi * (r_thread - 0.1) * 0.045
+    corner_r, steps = 0.5, 400
+    cell = corner_r / steps
+    corner = 0.0
+    for i in range(steps):
+        u = (i + 0.5) * cell
+        for j in range(steps):
+            r = r_seat + (j + 0.5) * cell
+            if math.hypot(u - corner_r, r - (r_seat + corner_r)) >= corner_r:
+                corner += 2.0 * math.pi * r * cell * cell
+    assert part.V_CORNER == pytest.approx(corner, rel=2e-3)
     assert part.V_SHANK == pytest.approx(
-        math.pi * r_thread**2 * 17.5 - over_seat - over_lead - tip
+        math.pi * r_thread**2 * 17.5 - over_seat - over_lead - tip + part.V_CORNER
     )
     assert part.V_BODY == pytest.approx(part.V_HEAD + part.V_SHANK)
     # Independent slot volume: a 3-D midpoint grid over the strip.
@@ -509,9 +551,13 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # tip-chamfer extension lines (layout audit, farm run 20261010T190631112Z).
     assert drawing.SIDE_KEEP["SeatDia"][0] == drawing.SEAT_DIA_X
     assert drawing.UNDERHEAD_X + 0.003 <= drawing.SEAT_DIA_X < drawing.LEAD_FOOT_X
+    # It stands on the straight seat, 2 mm past the corner round's tangent.
+    corner_end = drawing.UNDERHEAD_X + drawing.UNDERHEAD_CORNER_R_SHEET
+    assert drawing.SEAT_DIA_X >= corner_end + 0.002
     text_x, text_y = drawing.SEAT_DIA_TEXT_XY
-    # Unchanged from the reviewed render (anchor 0.2273, 0.142).
-    assert (text_x, text_y) == pytest.approx((0.2273, 0.142))
+    # The reviewed render's block (anchor 0.2273, 0.142), moved with its line
+    # 6 mm toward the tip (codjiflo round 4 on #1997).
+    assert (text_x, text_y) == pytest.approx((0.2333, 0.142))
     left = text_x - drawing.SEAT_DIA_TEXT_WIDTH / 2.0
     right = text_x + drawing.SEAT_DIA_TEXT_WIDTH / 2.0
     assert left > drawing.SEAT_DIA_X + 0.002
@@ -629,44 +675,74 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert drawing.ISO_CENTER[0] - drawing.THREAD_NOTE_XY[0] > 0.040
 
 
-def test_every_direct_db_block_restores_inference_in_finally() -> None:
-    # Sketch inference is session state on the persistent seat: each block
-    # that turns it off must restore it even when a native segment is
-    # rejected, so every True is followed at once by a try whose finally
-    # restores it, and nothing restores it outside a finally.
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
+def test_underhead_corner_radius_reads_in_free_space() -> None:
+    """The R0.5 MAX over MHA-SM-VN-51 / LOOP CLEARS stands up-right of the
+    upper corner round: its radial leader crosses only extension lines, its
+    text no line."""
+    scale = drawing._S / 1000.0
+    radius = drawing.UNDERHEAD_CORNER_R_SHEET
+    assert radius == pytest.approx(geom.UNDERHEAD_CORNER_R * scale)
+    cx, cy = drawing.UNDERHEAD_CORNER_CENTER_XY
+    # The round's circle touches the face and the seat's upper silhouette.
+    assert cx - radius == pytest.approx(drawing.UNDERHEAD_X)
+    seat_top = drawing.SIDE_CENTER[1] + geom.SEAT_DIA / 2.0 * scale
+    assert cy - radius == pytest.approx(seat_top)
+    # The text stands opposite the arc's down-left quarter, so the arrow
+    # lands on the circle at the leader's angle (the vertical rod's recipe),
+    # and the tip, the bend and the centre are one radial line.
+    angle = drawing.UNDERHEAD_CORNER_LEADER_DEG
+    assert 0.0 < angle < 90.0
+    tip_x, tip_y = drawing.UNDERHEAD_CORNER_TIP_XY
+    assert math.hypot(tip_x - cx, tip_y - cy) == pytest.approx(radius)
+    bend_x, bend_y = drawing.UNDERHEAD_CORNER_BEND_X, drawing.UNDERHEAD_CORNER_BEND_Y
+    tan = math.tan(math.radians(angle))
+    assert bend_y - cy == pytest.approx((bend_x - cx) * tan)
+    assert tip_y - cy == pytest.approx((tip_x - cx) * tan)
 
-    def toggle(node: ast.AST) -> str | None:
-        if (
-            isinstance(node, ast.Expr)
-            and isinstance(node.value, ast.Call)
-            and getattr(node.value.func, "id", "") == "set_sketch_direct_db"
-        ):
-            return ast.unparse(node.value.args[1])
-        return None
+    def leader_y(x: float) -> float:
+        return cy + (x - cx) * tan
 
-    on = restored = 0
-    finally_offs: set[int] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Try):
-            finally_offs |= {
-                id(stmt) for stmt in node.finalbody if toggle(stmt) == "False"
-            }
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if not isinstance(body, list):
-            continue
-        for index, stmt in enumerate(body):
-            if toggle(stmt) == "True":
-                on += 1
-                following = body[index + 1]
-                assert isinstance(following, ast.Try), ast.unparse(stmt)
-                assert [toggle(s) for s in following.finalbody] == ["False"]
-                restored += 1
-    offs = [node for node in ast.walk(tree) if toggle(node) == "False"]
-    assert {id(node) for node in offs} == finally_offs
-    # The property, not the inventory: at least one block, each restored.
-    assert on == restored == len(offs) >= 1
+    # The leader passes over the seat Ø's upper arrow stub (6.35 mm over the
+    # seat as rendered, farm run 20261027T053051351Z) with 1.5 mm to spare,
+    # and over the shank, the lead foot's and the 5.67 station's extension
+    # lines being the only lines it crosses.
+    assert leader_y(drawing.SEAT_DIA_X) >= seat_top + 0.00635 + 0.0015
+    assert leader_y(drawing.LEAD_FOOT_X) >= drawing.THREAD_TOP_Y + 0.008
+    assert tip_x < drawing.SEAT_DIA_X < drawing.LEAD_FOOT_X < drawing.FULL_THREAD_X
+    # It bends 2 mm or more past the 5.67 station's extension line, under the
+    # shoulder length's dimension line.
+    assert bend_x - drawing.FULL_THREAD_X >= 0.002
+    assert bend_y <= drawing.SHOULDER_LENGTH_LINE_Y - 0.010
+    # "R0.5 max." over "MHA-SM-VN-51" over "LOOP CLEARS" (rule 4: a band
+    # tighter than the title block's names the mate it serves), below the
+    # value since an above-callout line break would not print; the block
+    # centres on the anchor, its shoulder under the last row 8.36 mm down and
+    # leaving 1.6 mm left of the widest row (draw_pn_pen_rod's three-row
+    # "R0.2 MAX" block: 8.35 mm, x keep-0.0281..keep+0.0265).
+    assert spec.DIMENSION_CALLOUTS["ShankProfile"]["UnderHeadCornerR"] == (
+        f"{spec.COUNTER_SPRING_NUMBER}\nLOOP CLEARS"
+    )
+    assert "ShankProfile" not in spec.DIMENSION_CALLOUTS_ABOVE
+    assert spec.COUNTER_SPRING_NUMBER == "MHA-SM-VN-51"
+    text_x, text_y = drawing.SIDE_KEEP["UnderHeadCornerR"]
+    assert (text_x, text_y) == drawing.UNDERHEAD_CORNER_TEXT_XY
+    assert text_y - bend_y == pytest.approx(0.0028 + 2.0 * 0.00556 / 2.0)
+    left = text_x - drawing.UNDERHEAD_CORNER_TEXT_WIDTH / 2.0
+    right = text_x + drawing.UNDERHEAD_CORNER_TEXT_WIDTH / 2.0
+    assert bend_x == pytest.approx(left - drawing.RADIAL_BEND_GAP)
+    ink_bottom = bend_y + 0.0009
+    ink_top = bend_y + drawing.UNDERHEAD_CORNER_TEXT_HEIGHT
+    assert drawing.UNDERHEAD_CORNER_TEXT_HEIGHT == pytest.approx(2 * 0.00556 + 0.0045)
+    # Clear of the 5.67 station's extension line (it rises past the
+    # full-thread row) and of the lead foot's, under the shoulder length's
+    # dimension line, over the thread, and short of the thread note and its
+    # leader (whose lowest end is the pick); the leader ends at the
+    # shoulder's left end, under and left of every row.
+    assert left >= drawing.FULL_THREAD_X + 0.003
+    assert ink_top <= drawing.SHOULDER_LENGTH_LINE_Y - 0.004
+    assert ink_bottom >= drawing.THREAD_TOP_Y + 0.015
+    assert right <= drawing.THREAD_PICK[0] - 0.007
+    assert right <= drawing.THREAD_NOTE_XY[0] - 0.015
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
@@ -684,13 +760,27 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
     assert set(drawing.PRINTED_DIMENSIONS) == printed
     limits = {name: row for name, row in drawing.PRINTED_DIMENSIONS.items() if row[1]}
     # The builder's limits: the seat Ø's and the shoulder length's LIMIT
-    # bands (owner ruling 2026-10-26 (#1951, option B)) and the full-thread
-    # station's single MAX (machinist FIX round 1).
+    # bands (owner ruling 2026-10-26 (#1951, option B)), the full-thread
+    # station's single MAX (machinist FIX round 1) and the under-head
+    # corner's (codjiflo round 4 on #1997).
     assert limits == {
         "SeatDia": (geom.SEAT_DIA, 3),
         "ShoulderLength": (geom.SHOULDER_LENGTH, 3),
         "FullThread": (5.67, 6),
+        "UnderHeadCornerR": (0.5, 6),
     }
+    # The corner's radius lands on the side view's upper round, checked on
+    # the rebuilt arrow tip.
+    assert "_dress_underhead_corner(adapter, side, side_annotations)" in (
+        Path(drawing.__file__).read_text(encoding="utf-8")
+    )
+    corner = inspect.getsource(drawing._dress_underhead_corner)
+    for step in (
+        "display.ArcExtensionLineOrOppositeSide = True",
+        'rebuild_drawing(adapter, label="under-head corner radius leader")',
+        "model_point_in_view(",
+    ):
+        assert step in corner
     assert drawing.PRINTED_DIMENSIONS["CrownRadius"] == (
         pytest.approx(20.03125),
         0,
@@ -721,10 +811,17 @@ def test_readback_contract_mirrors_every_printed_and_callout_control() -> None:
         "ThreadDia@ShankProfile": (geom.MAJOR_DIA, 0),
     }
     # The part authors every callout on the dimension it marks; the drawing
-    # writes none.  The full-thread callout alone stands above its value.
+    # writes none.  The full-thread limit alone carries its callout above
+    # the value.
     callouts = spec.DIMENSION_CALLOUTS_BY_NAME
-    assert set(callouts) == {"SeatDia", "ShoulderLength", "TipChamfer"}
+    assert set(callouts) == {
+        "SeatDia",
+        "ShoulderLength",
+        "TipChamfer",
+        "UnderHeadCornerR",
+    }
     assert spec.DIMENSION_CALLOUTS_ABOVE_BY_NAME == {"FullThread": "TO FULL THREAD"}
+    assert callouts["UnderHeadCornerR"] == "MHA-SM-VN-51\nLOOP CLEARS"
     assert callouts["TipChamfer"] == spec.CHAMFER_CALLOUT
     for by_feature in (spec.DIMENSION_CALLOUTS, spec.DIMENSION_CALLOUTS_ABOVE):
         for feature, names in by_feature.items():

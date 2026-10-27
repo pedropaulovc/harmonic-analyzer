@@ -186,7 +186,19 @@ HEAD_RETENTION_MIN = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER - spring.EYE_ID_MM) 
 # counter_pose, build_sm_summing_assembly).  Both passes must bear on the
 # plain seat alone, so the wire's section clears every other surface.
 # LOOP_PASS_X is the free (CAD, native-seat) state; the coil-bound loop rises
-# CLAMPED_LOOP_RISE in CLAMPED_GAP_MAX, and each clearance takes the worse state.
+# CLAMPED_LOOP_RISE in CLAMPED_GAP_MAX.
+#
+# Rocked states.  Over every tilt whose width fits CLAMPED_GAP_MAX the passes
+# can reach the whole stacking envelope (head-side down to the head face,
+# plug-side out to ~3.64), but a rigid loop squeezed between two parallel
+# faces comes to rest only at a local MINIMUM of its width over tilt.  Each
+# seat limit and plug footprint has exactly one, near the untilted state (gap
+# 3.27-3.47, head-side pass 0.84-1.05, plug-side pass 2.44-2.65), so the
+# plug-side pass never stands farther out than the free state's: the lead
+# clearance below holds at the free and coil-bound untilted states
+# (test_sm_gooseneck_spring_joint finds the minima).  The head-side pass has
+# no such bound worth relying on, so the corner clearance holds for a wire
+# touching the head face itself, station WIRE_R, the floor in every state.
 _PASS_T = (1.0 / (4.0 * spring.LOOP_TURNS), 5.0 / (4.0 * spring.LOOP_TURNS))
 
 
@@ -202,40 +214,60 @@ CLAMPED_LOOP_PASS_X = tuple(
     _loop_station(CLAMPED_GAP_MAX, CLAMPED_LOOP_RISE, t) for t in _PASS_T
 )
 WIRE_R = spring.WIRE_RADIUS_MM
+
+
 # Plug-side pass vs the 45-degree lead at the SHORTEST shoulder.  The wire
 # rests on the seat, so the clearance depends on the stations only.
-INSIDE_CORNER_R_MAX = float(_config.title_block("inside_corner")["radius_mm"])
-
-
 def _lead_clearance(plug_pass: float) -> float:
     return (screw.SHOULDER_LENGTH_MIN - plug_pass + WIRE_R) / math.sqrt(2.0) - WIRE_R
 
 
-# Head-side pass vs the largest inside corner the title block allows under the
-# head ("INSIDE CORNERS R1.0 MAX"): past the fillet's tangent point the wire
-# meets the fillet's end, not its arc.
-def _corner_clearance(head_pass: float) -> float:
-    return math.hypot(head_pass - INSIDE_CORNER_R_MAX, WIRE_R) - WIRE_R
+def _corner_clearance(station: float, fillet_r: float) -> float:
+    """Clearance from a seat-bearing wire to the under-head fillet's material.
+
+    In the axial section, from the corner: the wire's centre stands
+    ``station`` from the head face and WIRE_R above the seat; the fillet's
+    material is the corner square ``[0, fillet_r]^2`` outside the fillet
+    circle centred ``(fillet_r, fillet_r)``.  The head face and the seat are
+    the wire's own bearing faces, so only the quarter arc counts.  Valid on
+    either side of the fillet's tangent points; negative is overlap.
+    """
+    u, v = station, WIRE_R
+    to_centre = math.hypot(u - fillet_r, v - fillet_r)
+    if 0.0 <= u <= fillet_r and 0.0 <= v <= fillet_r and to_centre >= fillet_r:
+        return -WIRE_R  # the wire's centre lies in the fillet's material
+    nearest = min(math.hypot(u - fillet_r, v), math.hypot(u, v - fillet_r))
+    if to_centre > 0.0:
+        # The arc point on the ray from the fillet centre, if on the quarter.
+        arc_u = fillet_r + fillet_r * (u - fillet_r) / to_centre
+        arc_v = fillet_r + fillet_r * (v - fillet_r) / to_centre
+        if arc_u <= fillet_r and arc_v <= fillet_r:
+            nearest = min(nearest, abs(to_centre - fillet_r))
+    return nearest - WIRE_R
 
 
 LOOP_LEAD_CLEARANCE_MIN = min(
     _lead_clearance(LOOP_PASS_X[1]), _lead_clearance(CLAMPED_LOOP_PASS_X[1])
 )
-LOOP_CORNER_CLEARANCE_MIN = min(
-    _corner_clearance(LOOP_PASS_X[0]), _corner_clearance(CLAMPED_LOOP_PASS_X[0])
-)
+# The under-head fillet MHA-SM-04 prints "R0.50 MAX"; the clearance grows with
+# the station past WIRE_R, so the head-face floor is the least of every state.
+LOOP_CORNER_CLEARANCE_MIN = _corner_clearance(WIRE_R, screw.UNDERHEAD_CORNER_R)
 
 # The loop against the counterbore mouth.  The eye's inner surface bears on
 # the seat on the pull side, so its axis stands EYE_ID/2 - SEAT/2 from the
 # screw axis.  The mouth's reach from the screw axis is the counterbore's
 # largest radius, its 0.25 edge break, and both axis offsets
 # (COUNTERBORE_AXIS_OFFSET_MAX and SCREW_RADIAL_PLAY_MAX, as for the run-out).
-# Two facts, each at the worse seat limit and the worse gap:
+# Two facts, each at the worse seat limit and the worse untilted gap:
 #  * LOOP_FACE_CONTACT_RADIUS_MIN: the wire that meets the plug face is the
 #    loop's plug-side tip (end of the helix), half a turn past the plug-side
 #    pull pass, on the far side of the eye: its distance from the screw axis;
 #  * LOOP_MOUTH_STANDOFF_MIN: every wire inside the mouth's reach is the
 #    seat-bearing pull pass, this far short of the plug face.
+# Rocked to its rest (a width minimum, above) the loop instead bears on the
+# plug face at the mouth's reach, so that standoff falls to zero there (within
+# the rest sweep's resolution in test_sm_gooseneck_spring_joint): the wire
+# reaches the face plane at the mouth and does not pass into the counterbore.
 COUNTERBORE_MOUTH_REACH = (
     COUNTERBORE_DIA_MAX / 2.0
     + EDGE_BREAK

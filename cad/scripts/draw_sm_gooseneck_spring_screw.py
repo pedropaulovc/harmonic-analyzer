@@ -6,10 +6,12 @@ under the head, a 45-degree lead, an #8-32 UNC thread.  A screw carries no
 datum and no geometric-control frame (drawing-guidelines.md rule 5 (avoid
 excessive GD&T)): the seat diameter and the shoulder length (to the lead's
 foot) print as the part's stacked LIMIT bands, the full-thread station as
-the part's single "5.67 MAX" from the under-head face, the crown's sphere as
-the reference "(SR20.03)" on its arc, and every other size is an ordinary
-model dimension at its part-authored places under the title block's band for
-those places (.X for the tip chamfer, .XX for the rest).  The lead itself is
+the part's single "5.67 MAX" from the under-head face, the under-head
+corner as its single "R0.5 MAX" (codjiflo round 4 on #1997), the crown's
+sphere as the reference "(SR20.03)" on its arc, and every other size is an
+ordinary model dimension at its part-authored places under the title block's
+band for those places (.X for the tip chamfer and the corner, .XX for the
+rest).  The lead itself is
 unprinted: the two diameters fix it and the shoulder length's callout names
 it.
 
@@ -48,6 +50,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     stamp_drawing_summary,
 )
 from _drawing_dimensions import (
@@ -58,6 +61,7 @@ from _drawing_dimensions import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_leader_notes import add_attached_note
 from _drawing_notes import add_property_linked_note
+from _drawing_projection import model_point_in_view
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_view_display import set_hidden_lines_removed
 from _machinist_review_mode import MachinistReviewMode
@@ -89,6 +93,8 @@ from sm_gooseneck_spring_screw_geom import (
     SLOT_WIDTH,
     STEP_LEAD,
     TIP_CHAMFER,
+    UNDERHEAD_CORNER_R,
+    UNDERHEAD_CORNER_R_TOL_TYPE,
 )
 from sm_gooseneck_spring_screw_spec import (
     CROWN_RADIUS_PREFIX,
@@ -162,6 +168,13 @@ LEAD_TOP_X = _sheet_x(-(SHOULDER_LENGTH + STEP_LEAD))
 FULL_THREAD_X = _sheet_x(-FULL_THREAD_STATION_MAX)
 # The crown sphere's centre on the axis, right of the apex by its radius.
 CROWN_CENTER_X = _sheet_x(CROWN_CENTER_Z)
+# The under-head corner round's centre (its arc the quarter down-left of it,
+# tangent to the head face and the seat) and its radius on the sheet.
+UNDERHEAD_CORNER_R_SHEET = UNDERHEAD_CORNER_R * _S / 1000.0
+UNDERHEAD_CORNER_CENTER_XY = (
+    UNDERHEAD_X + UNDERHEAD_CORNER_R_SHEET,
+    _sheet_y(SEAT_DIA / 2.0 + UNDERHEAD_CORNER_R),
+)
 
 # Text blocks as rendered at this text height (layout audit of farm run
 # 20261027T034356887Z): a dimension's block centres on its anchor,
@@ -208,6 +221,11 @@ FULL_THREAD_VALUE_WIDTH = 0.0214
 FULL_THREAD_TEXT_HEIGHT = block_height(1, _callout_lines("FullThread"))
 # ' (SR20.03) ' 22.83 mm (font advance).
 CROWN_RADIUS_TEXT_WIDTH = 0.0228
+# 'R0.5 max.' 21.69 mm (the vertical rod's 'R0.2 max.' rendered 21.69, farm
+# run 20261027T054106110Z) over 'MHA-SM-VN-51' 34.09 mm (font advance;
+# 'MHA-SM-VN-51 LOOP' rendered 48.41 against its 48.42) over 'LOOP CLEARS'
+# 31.38 mm.
+UNDERHEAD_CORNER_TEXT_WIDTH = 0.0341
 
 # Rows below the profile, 15 mm apart, the first 38 mm under the head
 # (text sits ~3 mm above its requested point, the dimension line ~5 mm
@@ -217,9 +235,12 @@ CROWN_RADIUS_TEXT_WIDTH = 0.0228
 _ROW_Y = (HEAD_TOP_Y - 0.093, HEAD_TOP_Y - 0.108)
 # ' 1.00 ' as rendered (farm run 20261010T190631112Z).
 CROWN_RISE_TEXT_WIDTH = 0.0116
-# The seat Ø's dimension line stands on the seat near the under-head face,
-# leaving the seat's run toward the lead to its text.
-SEAT_DIA_X = UNDERHEAD_X + 0.004
+# The seat Ø's dimension line stands on the seat 2.5 mm from the under-head
+# face (1.0 until codjiflo round 4 on #1997), clear of the corner round and
+# of the round's radius leader, which passes over its upper arrow stub (6.35
+# mm, farm run 20261027T053051351Z); the seat's run toward the lead stays
+# its text's.
+SEAT_DIA_X = UNDERHEAD_X + 0.010
 # The thread callout's leader lands on the edge where the full thread meets
 # the tip chamfer, never on the lead.  The note stands up and right so the
 # leader slants down-left onto that edge.
@@ -272,6 +293,44 @@ CROWN_RADIUS_ARC_XY = (
     SIDE_CENTER[1]
     - CROWN_RADIUS * _S / 1000.0 * math.sin(math.radians(CROWN_RADIUS_LEADER_DEG)),
 )
+# The under-head corner's "R0.5 MAX" reads up-right of the upper corner,
+# under the shoulder length's row and right of the 5.67 station's extension
+# line, "MHA-SM-VN-51" / "LOOP CLEARS" under it.  Its arc is the quarter
+# down-left of its centre; the text stands opposite, so SolidWorks lands the
+# radial arrow on the circle's point facing the text and the arc's extension
+# carries the arc out to it (draw_mg_magnifying_vertical_rod's relief roots).
+# The three-row block centres on its anchor with its shoulder under the last
+# row, half a callout row lower per row under the value, and the leader
+# leaves the shoulder's left end 1.6 mm short of the widest row
+# (draw_pn_pen_rod's three-row "R0.2 MAX" block: shoulder 8.35 mm under the
+# anchor, x keep-0.0281..keep+0.0265, farm audit 20261014T053239477Z).  The
+# leader leaves the circle 38 degrees above the axis direction, low enough
+# that the block's top ink stays 5.3 mm under the shoulder length's dimension
+# line, passing 1.9 mm over the seat Ø's upper arrow stub and crossing only
+# the lead-foot and full-thread extension lines.
+UNDERHEAD_CORNER_LEADER_DEG = 38.0
+UNDERHEAD_CORNER_TEXT_LEFT = FULL_THREAD_X + 0.004
+UNDERHEAD_CORNER_TEXT_X = UNDERHEAD_CORNER_TEXT_LEFT + UNDERHEAD_CORNER_TEXT_WIDTH / 2.0
+UNDERHEAD_CORNER_BEND_X = UNDERHEAD_CORNER_TEXT_LEFT - RADIAL_BEND_GAP
+UNDERHEAD_CORNER_BEND_Y = UNDERHEAD_CORNER_CENTER_XY[1] + (
+    UNDERHEAD_CORNER_BEND_X - UNDERHEAD_CORNER_CENTER_XY[0]
+) * math.tan(math.radians(UNDERHEAD_CORNER_LEADER_DEG))
+UNDERHEAD_CORNER_SHOULDER_DROP = (
+    RADIAL_SHOULDER_DROP + _callout_lines("UnderHeadCornerR") * _CALLOUT_PITCH / 2.0
+)
+UNDERHEAD_CORNER_TEXT_HEIGHT = block_height(1, _callout_lines("UnderHeadCornerR"))
+UNDERHEAD_CORNER_TEXT_XY = (
+    UNDERHEAD_CORNER_TEXT_X,
+    UNDERHEAD_CORNER_BEND_Y + UNDERHEAD_CORNER_SHOULDER_DROP,
+)
+# Where the radial line from the bend meets the round's circle.
+UNDERHEAD_CORNER_TIP_XY = (
+    UNDERHEAD_CORNER_CENTER_XY[0]
+    + UNDERHEAD_CORNER_R_SHEET * math.cos(math.radians(UNDERHEAD_CORNER_LEADER_DEG)),
+    UNDERHEAD_CORNER_CENTER_XY[1]
+    + UNDERHEAD_CORNER_R_SHEET * math.sin(math.radians(UNDERHEAD_CORNER_LEADER_DEG)),
+)
+UNDERHEAD_CORNER_TIP_TOL_M = 0.0002
 SIDE_KEEP = {
     "HeadHeight": ((APEX_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[0]),
@@ -294,6 +353,7 @@ SIDE_KEEP = {
         CROWN_RADIUS_BEND_Y + RADIAL_SHOULDER_DROP,
     ),
     "FullThread": FULL_THREAD_TEXT_XY,
+    "UnderHeadCornerR": UNDERHEAD_CORNER_TEXT_XY,
     "ShoulderLength": (
         SHOULDER_LENGTH_TEXT_LEFT + SHOULDER_LENGTH_TEXT_WIDTH / 2.0,
         SHOULDER_LENGTH_LINE_Y + SHOULDER_LENGTH_TEXT_HEIGHT / 2.0,
@@ -339,9 +399,11 @@ if (
     SEAT_DIA_TOL_TYPE != _TOL_LIMIT
     or SHOULDER_LENGTH_TOL_TYPE != _TOL_LIMIT
     or FULL_THREAD_STATION_MAX_TOL_TYPE != _TOL_MAX
+    or UNDERHEAD_CORNER_R_TOL_TYPE != _TOL_MAX
 ):
     raise AssertionError(
-        "MHA-SM-04 seat/shoulder bands are no longer LIMIT or full thread MAX"
+        "MHA-SM-04 seat/shoulder bands are no longer LIMIT or full thread and "
+        "under-head corner MAX"
     )
 PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "HeadDia": (HEAD_DIA, _TOL_NONE),
@@ -352,6 +414,7 @@ PRINTED_DIMENSIONS: dict[str, tuple[float, int]] = {
     "SeatDia": (SEAT_DIA, _TOL_LIMIT),
     "ShoulderLength": (SHOULDER_LENGTH, _TOL_LIMIT),
     "FullThread": (FULL_THREAD_STATION_MAX, _TOL_MAX),
+    "UnderHeadCornerR": (UNDERHEAD_CORNER_R, _TOL_MAX),
     "TipChamfer": (TIP_CHAMFER, _TOL_NONE),
     "SlotWidth": (SLOT_WIDTH, _TOL_NONE),
     "SlotDepth": (SLOT_DEPTH, _TOL_NONE),
@@ -450,6 +513,81 @@ def _dress_crown_radius(adapter: Any, annotations: Sequence[Any]) -> None:
         or bool(display.SolidLeader)
     ):
         raise RuntimeError("MHA-SM-04 crown radius kept its leader to the centre")
+
+
+@_telemetry.traced("drawing.sm_gooseneck_spring_screw.underhead_corner")
+def _dress_underhead_corner(
+    adapter: Any, side: Any, annotations: Sequence[Any]
+) -> None:
+    """Prove the imported UnderHeadCornerR prints the round's R MAX over its
+    "MHA-SM-VN-51 / LOOP CLEARS", and land its leader on the side view's
+    upper corner (draw_mg_magnifying_vertical_rod._dress_relief_roots).
+
+    Read back: radial, measuring UNDERHEAD_CORNER_R, the part's native
+    swTolMAX and the callout below the value.  The text stands up-right of
+    the round, opposite its down-left quarter: SolidWorks ends the radial
+    leader at the circle point facing the text, so the arc's extension line
+    carries the arc out to it.  The rebuilt arrow tip must sit on the upper
+    round's circle, on the text's side of its centre.
+    """
+    (annotation,) = [
+        item
+        for item in annotations
+        if dimension_name(adapter, item) == "UnderHeadCornerR"
+    ]
+    annotation = _early_bound(annotation, "IAnnotation")
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    if bool(display.Diametric):
+        raise RuntimeError("MHA-SM-04 UnderHeadCornerR imported diametric, not radial")
+    _check_dimension_state(
+        "UnderHeadCornerR",
+        display.GetDimension2(0),
+        PRINTED_DIMENSIONS["UnderHeadCornerR"],
+    )
+    display.ArcExtensionLineOrOppositeSide = True
+    if display.ArcExtensionLineOrOppositeSide is not True:
+        raise RuntimeError("MHA-SM-04 UnderHeadCornerR refused its arc extension")
+    rebuild_drawing(adapter, label="under-head corner radius leader")
+    raw = display.GetDisplayData()
+    if raw is None:
+        raise RuntimeError("MHA-SM-04 UnderHeadCornerR has no rebuilt display data")
+    data = _early_bound(raw, "IDisplayData")
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError("MHA-SM-04 UnderHeadCornerR must draw one radial arrow")
+    arrow = tuple(float(v) for v in data.GetArrowHeadAtIndex2(0))
+    if len(arrow) != 12 or not all(math.isfinite(v) for v in arrow):
+        raise RuntimeError("MHA-SM-04 UnderHeadCornerR arrow coordinates incomplete")
+    tip = (arrow[0], arrow[1])
+    # The upper round's centre: Right-plane sketch (u, v) is model (-Z, Y).
+    centre = model_point_in_view(
+        adapter,
+        side,
+        (
+            0.0,
+            (SEAT_DIA / 2.0 + UNDERHEAD_CORNER_R) / 1000.0,
+            -UNDERHEAD_CORNER_R / 1000.0,
+        ),
+        label="under-head corner round centre",
+    )
+    off = (tip[0] - centre[0], tip[1] - centre[1])
+    toward_text = (
+        UNDERHEAD_CORNER_TEXT_XY[0] - centre[0],
+        UNDERHEAD_CORNER_TEXT_XY[1] - centre[1],
+    )
+    if (
+        abs(math.hypot(*off) - UNDERHEAD_CORNER_R_SHEET) > UNDERHEAD_CORNER_TIP_TOL_M
+        or off[0] * toward_text[0] + off[1] * toward_text[1] <= 0.0
+    ):
+        raise RuntimeError(
+            f"MHA-SM-04 UnderHeadCornerR arrow tip {tip} is not on the upper "
+            f"round's circle facing its text (centre {centre}, "
+            f"R {UNDERHEAD_CORNER_R_SHEET})"
+        )
+    _telemetry.info(
+        f"under-head corner radius: MAX type, callout "
+        f"{DIMENSION_CALLOUTS_BY_NAME['UnderHeadCornerR']!r}, arrow tip "
+        f"{tip} on the upper round"
+    )
 
 
 def _verify_source_dimensions(model: Any) -> None:
@@ -582,6 +720,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # The crown radius keeps its part-authored "SR" inside the parentheses;
     # the plain references then rebuild the sheet.
     _dress_crown_radius(adapter, side_annotations)
+    _dress_underhead_corner(adapter, side, side_annotations)
     for name in sorted(REFERENCE_DIMENSIONS - {"CrownRadius"}):
         matches = [
             annotation

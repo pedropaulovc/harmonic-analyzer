@@ -13,7 +13,8 @@ loop against the plug face.  Sizes and bands live in
 Layout (``sm_gooseneck_spring_screw_geom`` frame): axis Z, the under-head face
 at z=0.  ``HeadProfile`` revolves the cylindrical head and its spherical
 crown in +Z (apex at HEAD_H); ``ShankProfile`` revolves the shank in -Z:
-the seat shoulder to SHOULDER_LENGTH, the 45-degree lead up to the thread
+the seat shoulder from the R0.5 MAX under-head corner to SHOULDER_LENGTH, the
+45-degree lead up to the thread
 major, the thread, and a 45-degree tip chamfer.  The thread is modelled as
 its basic major cylinder.  The driver slot is sketched on a plane at the apex
 and cut SLOT_DEPTH down into the head along local X.  One hidden reference
@@ -94,6 +95,9 @@ from sm_gooseneck_spring_screw_geom import (
     SLOT_WIDTH,
     STEP_LEAD,
     TIP_CHAMFER,
+    UNDERHEAD_CORNER_R,
+    UNDERHEAD_CORNER_R_BAND,
+    UNDERHEAD_CORNER_R_TOL_TYPE,
 )
 from sm_gooseneck_spring_screw_spec import (
     CROWN_RADIUS_PREFIX,
@@ -120,19 +124,33 @@ _SAVED_DRAWING_PROPERTIES = (
 HEAD_R = HEAD_DIA / 2.0
 THREAD_R = MAJOR_DIA / 2.0
 SEAT_R = SEAT_DIA / 2.0
+# The under-head corner round (Right-plane sketch u, v in mm): its centre off
+# the face and the seat by its radius, its CCW quarter from the face to the
+# seat.
+CORNER_CENTER = (UNDERHEAD_CORNER_R, SEAT_R + UNDERHEAD_CORNER_R)
+CORNER_FACE_TANGENT = (0.0, SEAT_R + UNDERHEAD_CORNER_R)
+CORNER_SEAT_TANGENT = (UNDERHEAD_CORNER_R, SEAT_R)
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
 # StationReference's full-thread witnesses (Right-plane sketch u, v in mm):
-# each a short construction line lying ON a visible edge (the under-head face,
-# then the thread's major silhouette from the printed station toward the
-# tip), so the dimension's extension lines rise from the outline and no
-# reference line floats off it.
+# each a short construction line lying ON a visible edge (the under-head face
+# from the corner round's tangent point up, then the thread's major silhouette
+# from the printed station toward the tip), so the dimension's extension
+# lines rise from the outline and no reference line floats off it.
 FULL_THREAD_WITNESS = 0.5
-FACE_WITNESS_LINE = ((0.0, THREAD_R), (0.0, THREAD_R + FULL_THREAD_WITNESS))
+FACE_WITNESS_LINE = (
+    CORNER_FACE_TANGENT,
+    (0.0, CORNER_FACE_TANGENT[1] + FULL_THREAD_WITNESS),
+)
 THREAD_WITNESS_LINE = (
     (FULL_THREAD_STATION_MAX, THREAD_R),
     (FULL_THREAD_STATION_MAX + FULL_THREAD_WITNESS, THREAD_R),
 )
+# The station sketch's drop from the face witness to the thread witness is an
+# unsigned dimension driven by "SeatDia"/2 + "UnderHeadCornerR" - "ThreadDia"/2,
+# which must stay positive.
+if CORNER_FACE_TANGENT[1] <= THREAD_R:
+    raise AssertionError("under-head corner round no longer stands over the thread")
 
 # Head: the cylinder plus the spherical cap of sagitta CROWN_RISE.
 V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
@@ -140,12 +158,20 @@ V_HEAD = math.pi * HEAD_R**2 * HEAD_CYL_H + (
 )
 # Shank: the seat cylinder, the 45-degree lead's frustum (axial length
 # STEP_LEAD, seat radius to thread radius) and the thread major cylinder,
-# less the tip chamfer's corner triangle (centroid THREAD_R - TIP_CHAMFER/3).
+# less the tip chamfer's corner triangle (centroid THREAD_R - TIP_CHAMFER/3),
+# plus the under-head corner round: its spandrel, (1 - pi/4) R^2, swept about
+# the axis at its centroid, (10 - 3 pi) / (12 - 3 pi) R off both legs
+# (Pappus; build_mg_magnifying_vertical_rod's relief roots).
 V_SEAT = math.pi * SEAT_R**2 * SHOULDER_LENGTH
 V_LEAD = math.pi * STEP_LEAD / 3.0 * (SEAT_R**2 + SEAT_R * THREAD_R + THREAD_R**2)
 V_THREAD = math.pi * THREAD_R**2 * (LENGTH - SHOULDER_LENGTH - STEP_LEAD)
 V_TIP = math.pi * TIP_CHAMFER**2 * (THREAD_R - TIP_CHAMFER / 3.0)
-V_SHANK = V_SEAT + V_LEAD + V_THREAD - V_TIP
+_CORNER_SPANDREL = (1.0 - math.pi / 4.0) * UNDERHEAD_CORNER_R**2
+_CORNER_CENTROID_R = (
+    SEAT_R + (10.0 - 3.0 * math.pi) / (12.0 - 3.0 * math.pi) * UNDERHEAD_CORNER_R
+)
+V_CORNER = 2.0 * math.pi * _CORNER_CENTROID_R * _CORNER_SPANDREL
+V_SHANK = V_SEAT + V_LEAD + V_THREAD - V_TIP + V_CORNER
 V_BODY = V_HEAD + V_SHANK
 
 
@@ -255,6 +281,7 @@ async def build(adapter) -> dict[str, str]:
         ("ThreadDia", MAJOR_DIA),
         ("SeatDia", SEAT_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
+        ("UnderHeadCornerR", UNDERHEAD_CORNER_R),
         ("TipChamfer", TIP_CHAMFER),
         ("FullThread", FULL_THREAD_STATION_MAX),
         ("SlotWidth", SLOT_WIDTH),
@@ -341,8 +368,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "crowned fillister head", V_HEAD, 0.005 * V_HEAD)
 
     # Shank revolve on the Right plane, toward +u (model -Z).  The seat runs
-    # flat from the under-head face to SHOULDER_LENGTH, the foot of the
-    # 45-degree lead that steps up to the thread major.
+    # flat from the under-head corner's round to SHOULDER_LENGTH, the foot of
+    # the 45-degree lead that steps up to the thread major.  The round is the
+    # profile's own concave quarter-circle, tangent to the head face and the
+    # seat (build_pd_transgear_knob_shaft's neck corners), so its radius is a
+    # sketch dimension on the profile's side of the axis: the drawing's
+    # radius lands on the side view's upper corner.
     shank = SketchDims()
     check("create_sketch shank profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
@@ -351,21 +382,30 @@ async def build(adapter) -> dict[str, str]:
             "shank axis centerline",
             await adapter.add_centerline(0.0, 0.0, LENGTH, 0.0),
         )
+        (face,) = await add_line_chain(
+            adapter, [(0.0, 0.0), CORNER_FACE_TANGENT], close=False
+        )
+        corner = check(
+            "under-head corner arc",
+            await adapter.add_arc(
+                *CORNER_CENTER, *CORNER_FACE_TANGENT, *CORNER_SEAT_TANGENT
+            ),
+        )
         points = [
-            (0.0, 0.0),
-            (0.0, SEAT_R),
+            CORNER_SEAT_TANGENT,
             (SHOULDER_LENGTH, SEAT_R),
             (SHOULDER_LENGTH + STEP_LEAD, THREAD_R),
             (LENGTH - TIP_CHAMFER, THREAD_R),
             (LENGTH, THREAD_R - TIP_CHAMFER),
             (LENGTH, 0.0),
+            (0.0, 0.0),
         ]
-        lines = await add_line_chain(adapter, points)
+        lines = await add_line_chain(adapter, points, close=False)
     finally:
         # Session state on the seat (as the head profile above).
         set_sketch_direct_db(adapter, False)
     for index, line in enumerate(lines):
-        (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(lines)]
+        (u0, v0), (u1, v1) = points[index], points[index + 1]
         if u0 != u1 and v0 != v1:
             continue  # the 45-degree lead or tip chamfer: dimensioned below
         relation = "horizontal" if v0 == v1 else "vertical"
@@ -373,12 +413,21 @@ async def build(adapter) -> dict[str, str]:
             f"shank profile {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    seat, step_lead, thread_outline = lines[1], lines[2], lines[3]
-    tip_chamfer = lines[4]
+    check(
+        f"shank profile vertical {face}",
+        await adapter.add_sketch_constraint(face, None, "vertical"),
+    )
+    seat, step_lead, thread_outline = lines[0], lines[1], lines[2]
+    tip_chamfer = lines[3]
+    for first, second in ((face, corner), (corner, seat)):
+        check(
+            f"under-head corner tangent {first} {second}",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     # Every axial size reads from the under-head face, the clamp face.
     for name, start, end, value in (
-        ("UnderHeadLength", f"{seat}.start", f"{tip_chamfer}.end", LENGTH),
-        ("ShoulderLength", f"{seat}.start", f"{seat}.end", SHOULDER_LENGTH),
+        ("UnderHeadLength", f"{face}.end", f"{tip_chamfer}.end", LENGTH),
+        ("ShoulderLength", f"{face}.end", f"{seat}.end", SHOULDER_LENGTH),
         ("TipChamfer", f"{tip_chamfer}.start", f"{tip_chamfer}.end", TIP_CHAMFER),
     ):
         await dimension_between(
@@ -419,8 +468,13 @@ async def build(adapter) -> dict[str, str]:
             adapter, shank_axis, line, (u_mid, radius + 4.0), name
         )
         shank.record(name, f'"{name}"')
+    check(
+        "under-head corner radius",
+        await adapter.add_sketch_dimension(corner, None, "radial", UNDERHEAD_CORNER_R),
+    )
+    shank.record("UnderHeadCornerR", '"UnderHeadCornerR"')
     await anchor_point_to_origin(
-        adapter, f"{lines[0]}.start", 0.0, 0.0, "shank under-head centre"
+        adapter, f"{face}.start", 0.0, 0.0, "shank under-head centre"
     )
     await ensure_fully_defined(adapter, "shank profile sketch")
     check("exit_sketch shank profile", await adapter.exit_sketch())
@@ -430,7 +484,7 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Shank")
     await volume_check(
         adapter,
-        "turned shoulder screw with lead and tip chamfer",
+        "turned shoulder screw with corner round, lead and tip chamfer",
         V_BODY,
         0.005 * V_BODY,
     )
@@ -534,9 +588,9 @@ async def build(adapter) -> dict[str, str]:
     )
     stations.record("OverallLength", '"HeadHeight" + "UnderHeadLength"')
     await anchor_point_to_origin(
-        adapter, f"{face_witness}.start", fu0, fv0, "face witness on thread radius"
+        adapter, f"{face_witness}.start", fu0, fv0, "face witness at corner tangent"
     )
-    stations.record("FullThreadRadius", '"ThreadDia" / 2')
+    stations.record("FaceWitnessRadius", '"SeatDia" / 2 + "UnderHeadCornerR"')
     await dimension_between(
         adapter,
         f"{face_witness}.start",
@@ -546,15 +600,20 @@ async def build(adapter) -> dict[str, str]:
         "face witness length",
     )
     stations.record("FaceWitness")
+    # The printed station runs face to thread; the face witness stands the
+    # corner round's height above the thread radius.
     await anchor_point_to_point(
         adapter,
         f"{face_witness}.start",
         f"{thread_witness}.start",
         FULL_THREAD_STATION_MAX,
-        0.0,
+        tv0 - fv0,
         "full-thread station",
     )
     stations.record("FullThread", '"FullThread"')
+    stations.record(
+        "FullThreadDrop", '"SeatDia" / 2 + "UnderHeadCornerR" - "ThreadDia" / 2'
+    )
     await dimension_between(
         adapter,
         f"{thread_witness}.start",
@@ -612,6 +671,16 @@ async def build(adapter) -> dict[str, str]:
         "ShoulderLength",
         (SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER),
         SHOULDER_LENGTH_TOL_TYPE,
+    )
+    # The under-head corner's R0.5 MAX (codjiflo round 4 on #1997): the
+    # modelled radius is the limit, the band runs from sharp up to it.
+    set_single_limit(
+        adapter,
+        "ShankProfile",
+        "UnderHeadCornerR",
+        limit=UNDERHEAD_CORNER_R,
+        band=UNDERHEAD_CORNER_R_BAND,
+        tol_type=UNDERHEAD_CORNER_R_TOL_TYPE,
     )
     set_single_limit(
         adapter,

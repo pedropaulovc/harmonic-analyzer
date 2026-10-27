@@ -186,21 +186,34 @@ def test_loop_passes_bear_on_the_plain_seat_free_and_clamped() -> None:
             2.0
         ) - joint.WIRE_R
 
-    def corner_gap(station: float) -> float:
-        return (
-            math.hypot(station - joint.INSIDE_CORNER_R_MAX, joint.WIRE_R) - joint.WIRE_R
-        )
-
-    assert joint.INSIDE_CORNER_R_MAX == 1.0
     # Plug-side pass vs the lead: worst free (the clamped loop pulls it back).
     assert lead_gap(plug_pass) == pytest.approx(0.159, abs=5e-4)
     assert lead_gap(clamped_plug) > lead_gap(plug_pass)
     assert joint.LOOP_LEAD_CLEARANCE_MIN == pytest.approx(lead_gap(plug_pass))
-    # Head-side pass vs the R1.0 MAX corner: worst clamped, still clear.
-    assert corner_gap(head_pass) == pytest.approx(0.044, abs=5e-4)
-    assert corner_gap(clamped_head) == pytest.approx(0.025, abs=5e-4)
-    assert joint.LOOP_CORNER_CLEARANCE_MIN == pytest.approx(corner_gap(clamped_head))
-    assert min(joint.LOOP_LEAD_CLEARANCE_MIN, joint.LOOP_CORNER_CLEARANCE_MIN) > 0.0
+    assert joint.LOOP_LEAD_CLEARANCE_MIN > 0.0
+
+
+def test_wire_on_the_head_face_clears_the_underhead_fillet() -> None:
+    r, fillet = joint.WIRE_R, screw.UNDERHEAD_CORNER_R
+    assert fillet == 0.50
+    # Wire touching head face and seat: its centre (r, r) from the corner, the
+    # fillet circle centred (fillet, fillet).  With r > fillet the nearest
+    # fillet material is a tangent point, (fillet, 0) or (0, fillet).
+    floor = math.hypot(r - fillet, r) - r
+    assert joint.LOOP_CORNER_CLEARANCE_MIN == pytest.approx(floor)
+    assert floor == pytest.approx(0.054, abs=5e-4)
+    # The floor is the least of every state: clearance grows with station.
+    stations = [r + 0.01 * k for k in range(300)]
+    gaps = [joint._corner_clearance(station, fillet) for station in stations]
+    assert gaps == sorted(gaps)
+    # Exact on the far side of the tangent points too: the title block's
+    # R1.0 would hold the wire off the seat, and a wire whose centre lies in
+    # a deeper fillet's material overlaps by at least its radius.
+    assert joint._corner_clearance(r, 1.0) == pytest.approx(
+        1.0 - math.hypot(r - 1.0, r - 1.0) - r
+    )
+    assert joint._corner_clearance(r, 1.0) < 0.0
+    assert joint._corner_clearance(0.1, 2.0) == -r
 
 
 def _helix_points(gap: float, rise: float, seat: float, n: int = 20_000):
@@ -215,56 +228,108 @@ def _helix_points(gap: float, rise: float, seat: float, n: int = 20_000):
         yield gap / 2.0 - rise / 2.0 + rise * t, math.hypot(x, y)
 
 
-def test_footprint_limited_rocked_loop_never_closes_below_the_gap_floor() -> None:
-    # The coil-bound helix, rigid, rocked about any horizontal axis: only wire
-    # whose contact point lands on a face's SMALLEST footprint can hold the
-    # faces apart.  Head: its Ø lower limit less the title-block break.  Plug
-    # face: from the counterbore mouth reach to the proud plug's Ø lower
-    # limit less its break.  Coarse grid; the floor must hold and be tight.
+def test_rocked_loop_rests_inside_the_gap_floor_and_the_free_lead_station() -> None:
+    # The coil-bound helix, rigid, rocked by a tilt vector over a coarse grid:
+    # only wire whose contact point lands on a face's SMALLEST footprint can
+    # hold the faces apart.  Head: its Ø lower limit less the title-block
+    # break.  Plug face: from the counterbore mouth reach out to the proud
+    # plug's Ø lower limit less its break, the tube's, or without limit.
+    #  * every width holds the floor CLAMPED_GAP_MIN, which is tight;
+    #  * the loop rests only at a local width minimum: each case has one,
+    #    and its plug-side pass stands no farther out than the free state's.
+    import numpy as np
+
     head_r = (screw.HEAD_DIA + screw.HEAD_DIA_LOWER) / 2.0 - joint.EDGE_BREAK
     mouth_r = joint.COUNTERBORE_MOUTH_REACH
-    plug_r = (joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0 - joint.EDGE_BREAK
-    tilts = [math.radians(step / 4.0) for step in range(33)]  # 0-8 degrees
-    axes = [math.radians(step) for step in range(0, 360, 10)]
-    widths = []
+    footprints = {
+        "proud": (joint.PLUG_DIA - joint.PLUG_DIAMETER_BAND) / 2.0 - joint.EDGE_BREAK,
+        "tube": (gooseneck.TUBE_DIA - 0.10) / 2.0 - joint.EDGE_BREAK,
+        "full": math.inf,
+    }
+    n = 240
+    t = np.linspace(0.0, 1.0, n + 1)
+    theta = math.pi / 2.0 + 2.0 * math.pi * spring.LOOP_TURNS * (
+        t - 1.0 / (4.0 * spring.LOOP_TURNS)
+    )
+    passes = [round(fraction * n) for fraction in joint._PASS_T]
+    grid = np.round(np.arange(-0.35, 0.3501, 0.01), 6)
+
+    def rotation(tx: float, ty: float):
+        angle = math.hypot(tx, ty)
+        if angle == 0.0:
+            return np.eye(3)
+        ux, uy = tx / angle, ty / angle
+        k = np.array([[0.0, 0.0, uy], [0.0, 0.0, -ux], [-uy, ux, 0.0]])
+        return np.eye(3) + math.sin(angle) * k + (1.0 - math.cos(angle)) * k @ k
+
+    rotations = {
+        (i, j): rotation(tx, ty)
+        for i, tx in enumerate(grid)
+        for j, ty in enumerate(grid)
+    }
+    least_widths, rests = [], []
     for seat in (screw.SEAT_DIA_MIN, screw.SEAT_DIA_MAX):
         d = (spring.EYE_ID_MM - seat) / 2.0
-        points = []
-        for k in range(241):
-            t = k / 240.0
-            theta = math.pi / 2.0 + 2.0 * math.pi * spring.LOOP_TURNS * (
-                t - 1.0 / (4.0 * spring.LOOP_TURNS)
-            )
-            points.append(
-                (
-                    spring.COIL_MEAN_RADIUS_MM * math.cos(theta),
-                    -d + spring.COIL_MEAN_RADIUS_MM * math.sin(theta),
-                    joint.CLAMPED_LOOP_RISE * (t - 0.5),
-                )
-            )
-        least = math.inf
-        for tilt in tilts:
-            c, s = math.cos(tilt), math.sin(tilt)
-            for axis in axes:
-                ux, uy = math.cos(axis), math.sin(axis)
-                head_z, plug_z = [], []
-                for x, y, z in points:
-                    dot = (x * ux + y * uy) * (1.0 - c)
-                    xr = x * c + uy * z * s + ux * dot
-                    yr = y * c - ux * z * s + uy * dot
-                    zr = z * c + (ux * y - uy * x) * s
-                    radius = math.hypot(xr, yr)
-                    if radius < head_r:
-                        head_z.append(zr)
-                    if mouth_r < radius < plug_r:
-                        plug_z.append(zr)
-                if head_z and plug_z:
-                    gap = max(plug_z) - min(head_z) + 2.0 * joint.WIRE_R
-                    least = min(least, gap)
-        widths.append(least)
-    print(f"rocked footprint-limited loop width: {min(widths):.3f}")
-    assert all(width >= joint.CLAMPED_GAP_MIN for width in widths)
-    assert min(widths) <= joint.CLAMPED_GAP_MIN + 0.10
+        body = np.stack(
+            [
+                spring.COIL_MEAN_RADIUS_MM * np.cos(theta),
+                -d + spring.COIL_MEAN_RADIUS_MM * np.sin(theta),
+                joint.CLAMPED_LOOP_RISE * (t - 0.5),
+            ],
+            axis=1,
+        )
+        for name, outer_r in footprints.items():
+            width = np.full((grid.size, grid.size), math.inf)
+            stations = {}
+            for (i, j), matrix in rotations.items():
+                rocked = body @ matrix.T
+                radius = np.hypot(rocked[:, 0], rocked[:, 1])
+                z = rocked[:, 2]
+                head_z = z[radius < head_r]
+                plug_z = z[(radius > mouth_r) & (radius < outer_r)]
+                if head_z.size == 0 or plug_z.size == 0:
+                    continue
+                head_face = head_z.min() - joint.WIRE_R
+                plug_face = plug_z.max() + joint.WIRE_R
+                width[i, j] = plug_face - head_face
+                # Each pull-side pass: the seat-bearing (least-radius) point
+                # within a quarter turn of its untilted station.
+                window = n // 7
+                stations[i, j] = [
+                    z[k - window + int(np.argmin(radius[k - window : k + window + 1]))]
+                    - head_face
+                    for k in passes
+                ]
+                # Wire reaching inside the counterbore mouth's reach stays on
+                # the head side of the plug-face plane: it never enters the bore.
+                inside = z[radius < mouth_r + joint.WIRE_R]
+                stations[i, j].append(plug_face - (inside.max() + joint.WIRE_R))
+            least_widths.append((name, float(width.min())))
+            minima = [
+                (float(width[i, j]), stations[i, j])
+                for i in range(1, grid.size - 1)
+                for j in range(1, grid.size - 1)
+                if width[i, j] <= joint.CLAMPED_GAP_MAX
+                and width[i, j] <= width[i - 1 : i + 2, j - 1 : j + 2].min()
+            ]
+            assert len(minima) == 1, (seat, name, minima)
+            rests.append(minima[0])
+    print(
+        "rocked loop: least width "
+        f"{min(width for _, width in least_widths):.3f}; rests "
+        + ", ".join(
+            f"{gap:.3f} ({head:.3f}/{plug:.3f}, mouth {mouth:.3f})"
+            for gap, (head, plug, mouth) in rests
+        )
+    )
+    assert all(width >= joint.CLAMPED_GAP_MIN for _, width in least_widths)
+    proud = min(width for name, width in least_widths if name == "proud")
+    assert proud <= joint.CLAMPED_GAP_MIN + 0.10
+    for gap, (head_pass, plug_pass, mouth_standoff) in rests:
+        assert joint.CLAMPED_GAP_MIN <= gap <= joint.CLAMPED_GAP_MAX
+        assert joint.WIRE_R <= head_pass < plug_pass <= joint.LOOP_PASS_X[1]
+        # Zero within the sweep's resolution (0.01-rad tilt steps).
+        assert mouth_standoff >= -0.01
 
 
 def test_loop_wire_clears_the_counterbore_mouth_at_full_worst_case() -> None:
@@ -314,3 +379,67 @@ def test_shared_interference_contract_inputs_match_their_owners() -> None:
     assert TAP_DRILL_MM["#8-32"] == pytest.approx(joint.TAP_DRILL_DIA) == 3.454
     assert THREAD_MAJOR_MM["#8-32"] == pytest.approx(screw.MAJOR_DIA, abs=1e-3)
     assert THREAD_MAJOR_MM["#8-32"] < joint.COUNTERBORE_DIA
+
+
+def test_bending_span_reaches_the_receiver_first_full_thread() -> None:
+    # Inside the counterbore the screw is unsupported: the beam runs to the
+    # plug's first full thread at its farthest (codjiflo round 3, #1997).
+    receiver = joint.CLAMPED_GAP_MAX + joint.COUNTERBORE_DEPTH_MAX + joint.EDGE_BREAK
+    assert screw_spec.RECEIVER_FULL_THREAD_STATION_MAX == pytest.approx(receiver)
+    assert screw_spec.STRENGTH_SPAN == pytest.approx(
+        max(screw.FULL_THREAD_STATION_MAX, receiver)
+    )
+    assert screw_spec.STRENGTH_SPAN == pytest.approx(7.27, abs=0.005)
+    assert screw_spec._SECTIONS[-1][1] == screw_spec.STRENGTH_SPAN
+
+
+def test_strength_sweeps_clamp_and_thread_friction_independently() -> None:
+    spec = screw_spec
+    pairs = {(c, t) for c in spec.CLAMP_FRICTIONS for t in spec.THREAD_FRICTIONS}
+    assert set(spec.SERVICE_SF) == set(spec.TIGHTENING_SF) == pairs
+    # The lowest clamp friction needs the most preload and the highest thread
+    # friction converts the most of it to torsion: that pair governs both.
+    worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
+    assert min(spec.SERVICE_SF, key=spec.SERVICE_SF.get) == worst
+    assert min(spec.TIGHTENING_SF, key=spec.TIGHTENING_SF.get) == worst
+    assert spec.service_safety_factor(*worst) >= spec.STRENGTH_SF_TARGET
+    assert spec.tightening_safety_factor(*worst) >= spec.STRENGTH_SF_TARGET
+    # 12L14 CD is the grade the function needs: 1018 CD's 370 MPa would not
+    # carry the counterbore's span at SF 2.
+    assert spec.YIELD_MPA == 415.0
+    assert spec.service_safety_factor(*worst) * 370.0 / spec.YIELD_MPA < 2.0
+
+
+def test_service_peak_stations_bound_a_dense_sweep() -> None:
+    spec = screw_spec
+    mu_clamp, mu_thread = min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS)
+    preload = spec.clamp_preload_n(mu_clamp)
+    torsion = spec.RESIDUAL_TORSION_FACTOR * spec.thread_torque_n_mm(preload, mu_thread)
+    dense = min(
+        spec._von_mises_sf(preload, moment(x0 + (x1 - x0) * i / 2000), torsion, dia)
+        for x0, x1, dia in spec._SECTIONS
+        for i in range(2001)
+        for moment in spec._MOMENT_CASES
+    )
+    exact = spec.service_safety_factor(mu_clamp, mu_thread)
+    assert exact <= dense + 1e-12
+    assert dense - exact < 1e-3
+
+
+def test_tightening_sf_is_the_overtightening_margin() -> None:
+    # Both tightening stresses are linear in the preload, so the tightening SF
+    # is the multiple of the needed preload the root takes to nominal yield.
+    spec = screw_spec
+    worst = (min(spec.CLAMP_FRICTIONS), max(spec.THREAD_FRICTIONS))
+    needed = spec.clamp_preload_n(worst[0])
+    margin = spec.tightening_safety_factor(*worst)
+    at_margin = needed * margin
+    sf = spec._von_mises_sf(
+        at_margin,
+        0.0,
+        spec.thread_torque_n_mm(at_margin, worst[1]),
+        spec.THREAD_MINOR_2A_MIN_EST,
+    )
+    assert sf == pytest.approx(1.0)
+    assert spec.OVERTIGHTEN_MARGIN == pytest.approx(margin)
+    assert spec.OVERTIGHTEN_MARGIN >= spec.STRENGTH_SF_TARGET

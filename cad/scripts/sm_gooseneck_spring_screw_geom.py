@@ -82,6 +82,16 @@ SHOULDER_LENGTH_LOWER, SHOULDER_LENGTH_UPPER = -0.20, 0.20
 SHOULDER_LENGTH_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
 SHOULDER_LENGTH_MIN = round(SHOULDER_LENGTH + SHOULDER_LENGTH_LOWER, 6)
 SHOULDER_LENGTH_MAX = round(SHOULDER_LENGTH + SHOULDER_LENGTH_UPPER, 6)
+# The under-head inside corner (head face to seat) is turned R0.5 MAX, not the
+# title block's INSIDE CORNERS R1.0 MAX (codjiflo round 4 on #1997): the
+# clamped loop rests rocked to its width minimum with its head-side pull pass
+# 0.84 from the head face, and a wire touching both the face and the seat
+# clears a concave round only up to R0.8 (sm_gooseneck_spring_joint owns the
+# check).  swTolMAX prints the nominal and "MAX", so the modelled radius IS
+# the limit; the band runs from sharp up to it.
+UNDERHEAD_CORNER_R = 0.50
+UNDERHEAD_CORNER_R_BAND = (0.0, -UNDERHEAD_CORNER_R)  # (upper, lower)
+UNDERHEAD_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.5 MAX"
 # The lead rises at 45 degrees from the seat to the thread major: its legs are
 # set by the two diameters, not printed separately (the model holds the 45 by
 # equation; the shoulder length's callout names the lead's foot and angle).
