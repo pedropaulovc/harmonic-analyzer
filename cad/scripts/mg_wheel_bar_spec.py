@@ -77,7 +77,11 @@ CLAMP_POSITION_PLACES = 2
 # No tap on this bar, so no tap-major term.
 WALL_TARGET = 2.0
 WALL_FLOOR = 1.5
-DRILL_RUNOFF_DEG = 0.3  # the repo allowance (sh_column_clamp_fit.EAR_DRILL_WANDER_DEG)
+# The run-off term is the repo's 0.3 deg drilling process allowance
+# (sh_column_clamp_fit.EAR_DRILL_WANDER_DEG). The title block's general
+# ANGULAR +/-1 deg does not govern the drilled-axis squareness of a plain hole
+# (owner ruling 2026-10-27, #2000), so it is not charged here.
+DRILL_RUNOFF_DEG = 0.3
 # The title block's BREAK SHARP EDGES row, its larger of radius and chamfer.
 _TITLE_EDGE_BREAK = _config.title_block("edge_break")
 EDGE_BREAK = max(
