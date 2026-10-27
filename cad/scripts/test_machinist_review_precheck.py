@@ -68,7 +68,7 @@ class _Reviewer:
     def __call__(self, command: list[str], **kwargs: Any) -> Any:
         reviewer = kwargs["reviewer"]
         schema = (
-            json.loads(_flag(command, "--json-schema")) if reviewer == "claude"
+            json.loads(Path(_flag(command, "--schema")).read_text(encoding="utf-8")) if reviewer == "claude"
             else json.loads(Path(_flag(command, "--output-schema")).read_text(encoding="utf-8"))
         )
         properties = schema["properties"]
@@ -78,6 +78,11 @@ class _Reviewer:
             sheet_args = config["mcpServers"]["sheets"]["args"][1:]
             resumed = _flag(command, "--resume") if "--resume" in command else None
             session_id = resumed or _flag(command, "--session-id")
+            kwargs["transport_provenance"].update(
+                transport="claude_agent_sdk", session_id=session_id,
+                requested_session_id=session_id, credential_id="fixture",
+                credential_fingerprint="a" * 64,
+            )
         else:
             sheet_args = _codex_overrides(command)["mcp_servers.sheets.args"][1:]
             resumed = _flag(command, "resume") if "resume" in command else None
@@ -150,11 +155,9 @@ class _Reviewer:
 
 
 def _aggregate(package: mr.ReviewPackage, tmp_path: Path, reviewer: str = "claude", **kwargs: Any) -> dict[str, Any]:
-    return mr.aggregate_package(
-        package, reviewer=reviewer, judge_reviewer=reviewer,
-        report_dir=tmp_path / "reports", claude="claude-test", codex="codex-test",
-        retries=kwargs.pop("retries", 0), **kwargs,
-    )
+    return mr.aggregate_package(package, reviewer=reviewer, judge_reviewer=reviewer,
+    report_dir=tmp_path / "reports", codex="codex-test",
+    retries=kwargs.pop("retries", 0), **kwargs,)
 
 
 @pytest.fixture
@@ -211,7 +214,7 @@ def test_precheck_and_aggregate_results_reach_sdk_exporter(
     def reviewer(command: list[str], **kwargs: Any) -> Any:
         # This callback is the only CLI boundary; no actual reviewer is invoked.
         # A full reviewer must see a completed precheck even while aggregate is live.
-        schema = json.loads(_flag(command, "--json-schema"))
+        schema = json.loads(Path(_flag(command, "--schema")).read_text(encoding="utf-8"))
         if "decision" not in schema["properties"]:
             finished = precheck_spans.get_finished_spans()
             prechecks = [span for span in finished if span.name == "machinist_review.precheck"]

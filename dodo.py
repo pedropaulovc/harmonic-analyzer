@@ -3314,6 +3314,8 @@ def task_verify():
 _MACHINIST_REVIEW_MODULES = (
     "machinist_review.py",
     "machinist_review_config.py",
+    "machinist_review_transport.py",
+    "machinist_review_credentials.py",
     "machinist_review_sheets_mcp.py",
     "machinist_exceptions.py",
 )

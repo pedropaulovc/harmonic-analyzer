@@ -67,7 +67,7 @@ INVOCATION_FIELDS = frozenset({
     "attempt", "reviewer", "cwd", "attempt_dir", "codex_home", "sources", "command",
     "outcome", "error", "exit_code", "session_id", "resume_command", "stdout_file",
     "stderr_file", "artifacts", "retained_dir", "retained_argv", "rollout_file",
-    "retention_warning",
+    "retention_warning", "transport_provenance",
 })
 
 
@@ -151,15 +151,22 @@ def load_cases(manifest: Path) -> tuple[dict[str, Any], list[mr.ReviewPackage]]:
 
 @functools.cache
 def runtime_versions(reviewer: str) -> dict[str, str]:
-    """Installed renderer/MCP and reviewer CLI versions; queried once per process.
+    """Installed renderer/MCP and transport versions, queried once per process.
 
-    review_package resolves the reviewer the same way, through PATH.
+    Claude records the pinned SDK and optional OMP fallback, never Claude CLI.
+    Missing OMP does not prevent an API-pool SDK run; a selected fallback still
+    fails at execution if OMP is unavailable.
     """
     try:
         versions = {name: importlib.metadata.version(name) for name in RUNTIME_PACKAGES}
-        executable = shutil.which(reviewer)
+        transport = "omp" if reviewer == "claude" else reviewer
+        if reviewer == "claude":
+            versions["claude-agent-sdk"] = importlib.metadata.version("claude-agent-sdk")
+        executable = shutil.which(transport)
         if not executable:
-            raise RuntimeError(f"{reviewer} CLI not found on PATH")
+            if reviewer == "claude":
+                return {**versions, "reviewer_cli": "omp-unavailable", "routing": "sdk-api-pool-then-omp-v1"}
+            raise RuntimeError(f"{transport} CLI not found on PATH")
         process = subprocess.run(
             [executable, "--version"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=60, check=False,
@@ -169,7 +176,7 @@ def runtime_versions(reviewer: str) -> dict[str, str]:
     cli = process.stdout.strip()
     if process.returncode != 0 or not cli:
         raise RuntimeError(f"{reviewer} --version failed: {process.stderr.strip()[-400:]}")
-    return {**versions, "reviewer_cli": cli}
+    return {**versions, "reviewer_cli": cli, **({"routing": "sdk-api-pool-then-omp-v1"} if reviewer == "claude" else {})}
 
 
 
@@ -185,6 +192,11 @@ def make_identity(
         "engine_sha256": mr._sha256(Path(mr.__file__)),
         "evaluator_sha256": mr._sha256(Path(__file__)),
         "sheets_server_sha256": mr._sha256(mr.SHEETS_SERVER),
+        "transport_sources_sha256": {
+            name: mr._sha256(mr.SCRIPTS_DIR / name) for name in (
+                "machinist_review_transport.py", "machinist_review_credentials.py",
+            )
+        },
         "schema_sha256": mr._sha256(mr.SCHEMA_FILE),
         "reviewer": reviewer, "model": model, "effort": effort,
         "retries": retries, "timeout_s": timeout_s, "runtime": dict(runtime),
@@ -393,10 +405,29 @@ def validate_evidence(
         ):
             raise ValueError("invalid invocation record")
         session_id = invocation["session_id"]
+        provenance = invocation["transport_provenance"]
+        if not isinstance(provenance, dict):
+            raise ValueError("missing transport provenance")
+        if review.reviewer == "claude" and invocation["command"] is not None:
+            if provenance.get("transport") not in {"claude_agent_sdk", "omp", "routing"} or (
+                invocation["outcome"] == "succeeded" and provenance.get("transport") == "routing"
+            ):
+                raise ValueError("unknown Claude execution transport")
+            if invocation["outcome"] == "succeeded" and provenance.get("session_id") != session_id:
+                raise ValueError("transport session differs from invocation")
+            if provenance.get("transport") == "claude_agent_sdk" and (
+                not isinstance(provenance.get("credential_id"), str)
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}", provenance["credential_id"])
+                or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
+            ):
+                raise ValueError("invalid SDK credential provenance")
         if (
             invocation["reviewer"] != review.reviewer
             or (session_id is not None and (not isinstance(session_id, str) or not session_id))
-            or invocation["resume_command"] != mr._resume_command(review.reviewer, session_id)
+            or invocation["resume_command"] != (
+                mr._transport_resume(invocation["transport_provenance"], session_id)
+                if review.reviewer == "claude" else mr._codex_resume_command(session_id)
+            )
             or (session_id is not None and session_id in sessions)
         ):
             raise ValueError("invalid session provenance")
@@ -520,7 +551,8 @@ def validate_evidence(
         if len(set(artifact_paths)) != len(artifact_paths) or any(
             not path.is_absolute() or path.parent != retained
             or path.resolve().parent != retained.resolve() or not path.is_file()
-            or review.reviewer != "codex" or path.name not in ("codex-models.json", "verdict.json")
+            or (review.reviewer == "codex" and path.name not in ("codex-models.json", "verdict.json"))
+            or (review.reviewer == "claude" and path.name != "native-events.jsonl")
             for path in artifact_paths
         ):
             raise ValueError("missing or misplaced retained artifact")
@@ -544,14 +576,13 @@ def validate_evidence(
             continue
         if not isinstance(command, list) or not command or any(not isinstance(arg, str) for arg in command):
             raise ValueError("invalid invocation command")
-        if review.reviewer == "claude" and session_id is None:
+        if review.reviewer == "claude" and outcome == "succeeded" and session_id is None:
             raise ValueError("missing Claude invocation session")
         expected_command = (
-            mr.build_claude_command(
+            mr.build_claude_invocation(
                 workdir=attempt_dir, mcp_config=attempt_dir / "mcp.json",
                 schema=attempt_dir / "schema.json", model=review.model, effort=review.effort,
-                session_id=session_id or "", claude=command[0],
-                schema_content=evidence["schema"],
+                session_id=invocation["transport_provenance"].get("requested_session_id", session_id) or "",
             )
             if review.reviewer == "claude"
             else mr.build_codex_command(
@@ -578,6 +609,8 @@ def validate_evidence(
     if review.extra.get("context_errors") != []:
         raise ValueError("recorded reviewer context was not proven clean")
     successful = [row["event"] for row in events if row["attempt"] == review.attempts]
+    final_route = max((event.get("route_index", 0) for event in successful), default=0)
+    successful = [event for event in successful if event.get("route_index", 0) == final_route]
     if review.reviewer == "codex":
         # The --json stream is a projection that can omit calls (e.g. code-mode
         # cells); it may still never show one, but only the rollout proves views.
@@ -594,7 +627,8 @@ def validate_evidence(
         neutral_resources=neutral_resources,
     )
     final_inspection = mr.evaluate_sheet_evidence(
-        [row for row in authoritative if row["attempt"] == review.attempts],
+        [row for row in authoritative if row["attempt"] == review.attempts
+         and row["event"].get("route_index", 0) == final_route],
         reviewer=review.reviewer, sheet_count=review.sheet_count,
         neutral_resources=neutral_resources,
     )

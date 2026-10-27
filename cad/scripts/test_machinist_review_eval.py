@@ -25,7 +25,8 @@ def _runtime(reviewer: str) -> dict[str, str]:
     return {
         "Pillow": "11.0.0", "pypdfium2": "4.30.0", "mcp": "1.12.0",
         "reviewer_cli": f"codex-cli {CODEX_CLI_VERSION}" if reviewer == "codex"
-        else "2.1.0 (Claude Code)",
+        else "omp v18.7.0",
+        **({"claude-agent-sdk": "0.1.76", "routing": "sdk-api-pool-then-omp-v1"} if reviewer == "claude" else {}),
     }
 
 
@@ -380,6 +381,12 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         if reviewer == "codex":
             events.append({"type": "thread.started", "thread_id": session_id})
         else:
+            requested_session = command[command.index("--session-id") + 1]
+            kwargs["transport_provenance"].update(
+                transport="claude_agent_sdk", session_id=requested_session,
+                requested_session_id=requested_session, credential_id="fixture",
+                credential_fingerprint="a" * 64,
+            )
             events.append({
                 "type": "control_response",
                 "response": {
@@ -550,6 +557,25 @@ def test_runtime_versions_are_queried_once_and_fail_closed(monkeypatch: pytest.M
         evaluation.runtime_versions.cache_clear()
 
 
+def test_sdk_runtime_provenance_does_not_require_claude_or_omp_executable(monkeypatch):
+    queries = []
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", lambda name: f"{name}-fixture")
+    def unavailable(name):
+        queries.append(name)
+        return None
+    monkeypatch.setattr(evaluation.shutil, "which", unavailable)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["claude-agent-sdk"] == "claude-agent-sdk-fixture"
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["routing"] == "sdk-api-pool-then-omp-v1"
+        assert queries == ["omp"]
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+
 def test_main_rejects_changed_selected_frozen_baseline_before_provider_execution(
     tmp_path: Path, frozen_baseline: Path, provider, monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -666,10 +692,6 @@ def test_override_reaches_model_and_hash_without_losing_package_context(
                 if argument.startswith("mcp_servers.sheets.args=")
             ))
             assert args[1:] == [str(source.resolve()) for source in sources]
-        else:
-            assert call["command"][call["command"].index("--allowedTools") + 1] == (
-                "mcp__sheets__view_sheet,mcp__sheets__crop"
-            )
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -946,7 +968,7 @@ def test_foreign_sheet_cannot_redefine_recorded_allowlist(
     assert len(provider["calls"]) == 2
 
 
-@pytest.mark.parametrize("reviewer", ["codex", "claude"])
+@pytest.mark.parametrize("reviewer", ["codex"])
 def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     tmp_path: Path, case, provider, reviewer: str,
 ) -> None:
@@ -959,8 +981,6 @@ def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     command = report["extra"]["evidence"]["attempts"][0]["command"]
     if reviewer == "codex":
         command[command.index("--sandbox") + 1] = "danger-full-access"
-    else:
-        command[command.index("--permission-mode") + 1] = "bypassPermissions"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     result["report_sha256"] = mr._sha256(report_path)
     result["review"] = report
@@ -1995,7 +2015,10 @@ def test_retry_invocations_cannot_reuse_or_relabel_provenance(
     elif damage == "session":
         original_session = succeeded["session_id"]
         succeeded["session_id"] = failed["session_id"]
-        succeeded["resume_command"] = mr._resume_command(reviewer, failed["session_id"])
+        succeeded["resume_command"] = (
+            mr._transport_resume(succeeded["transport_provenance"], failed["session_id"])
+            if reviewer == "claude" else mr._codex_resume_command(failed["session_id"])
+        )
         if reviewer == "claude":
             for field in ("command", "retained_argv"):
                 succeeded[field] = [

@@ -658,581 +658,362 @@ def test_schema_is_strict_structured_output() -> None:
     )
 
 
-def test_claude_command_owns_only_attempt_dir_configuration(tmp_path: Path) -> None:
-    attempt_dir = tmp_path / "attempt"
-    attempt_dir.mkdir()
-    schema = attempt_dir / "schema.json"
-    schema.write_text(json.dumps(mr.load_schema()), encoding="utf-8")
-    mcp_config = attempt_dir / "mcp.json"
-    mcp_config.write_text("{}", encoding="utf-8")
-    session_id = "2f4a6c8e-1111-4222-8333-444455556666"
-
-    def build(**overrides: Any) -> list[str]:
-        arguments = {
-            "workdir": attempt_dir,
-            "mcp_config": mcp_config,
-            "schema": schema,
-            "model": "fable",
-            "effort": "high",
-            "session_id": session_id,
-        }
-        return mr.build_claude_command(**{**arguments, **overrides})
-
-    command = build()
-    # The schema travels inline; the only file the CLI reads is the retained config.
-    assert _flag(command, "--input-format") == "stream-json"
-    assert json.loads(_flag(command, "--json-schema")) == mr.load_schema()
-    assert (attempt_dir / _flag(command, "--mcp-config")).resolve() == mcp_config.resolve()
-    assert _flag(command, "--session-id") == session_id
-    start = command.index("--allowedTools") + 1
-    end = next(
-        (i for i in range(start, len(command)) if command[i].startswith("--")),
-        len(command),
-    )
-    allowed = {name for value in command[start:end] for name in value.split(",") if name}
-    assert allowed == SHEET_TOOLS
-    # Sources reach only the sheet server's config, never the reviewer's argv.
-    assert not any(".png" in value or ".pdf" in value for value in command)
-    assert mr.CAD_ROOT.parent.as_posix() not in " ".join(command).replace("\\", "/")
-
-    stray = tmp_path / "stray.json"
-    stray.write_text("{}", encoding="utf-8")
-    for misplaced in ({"mcp_config": stray}, {"schema": stray}):
-        with pytest.raises(ValueError):
-            build(**misplaced)
-
-
 @pytest.fixture
-def claude_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    """A real subprocess speaking the CLI control protocol, never a model API."""
-    script = tmp_path / "claude_protocol.py"
-    script.write_text(
-        r'''
-import json
-import sys
-import time
-from pathlib import Path
+def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Exercise actual SDK option/event types with a deterministic client."""
+    import claude_agent_sdk as sdk
+    import machinist_review_credentials as credentials
+    import machinist_review_transport as transport
+    keys = tmp_path / "keys.json"
+    keys.write_text(json.dumps({"keys": [
+        {"id": f"account-{n}", "apiKey": f"secret-canary-{n}"} for n in range(3)
+    ]}))
+    keys.chmod(0o600)
+    credentials._windows_acl(keys, secure=True)
+    monkeypatch.setenv("CODJIFLO_ANTHROPIC_KEYS_FILE", str(keys))
+    monkeypatch.setenv("CODJIFLO_CLAUDE_STATE_FILE", str(tmp_path / "private" / "state.json"))
+    state = SimpleNamespace(status="connected", queries=[], clients=[], quota=False, fail=False, delay=0)
+    state.controlled = False
+    state.leader_timeout = False
+    state.before_response = threading.Event()
+    state.release_response = threading.Event()
+    state.release_finish = threading.Event()
+    state.followers_started = threading.Event()
 
-mode, reply_path, delay, pending_polls = sys.argv[1:]
-pending_polls = int(pending_polls)
-started = time.monotonic()
-last_status = None
-status_started = None
-status_count = 0
+    class Client:
+        def __init__(self, *, options):
+            self.options = options
+            self.disconnected = False
+            self.index = len(state.clients)
+            if state.leader_timeout and self.index:
+                assert state.clients[0].disconnected
+            state.clients.append(self)
+            if self.index == 2:
+                state.followers_started.set()
 
-def record(event):
-    event = {**event, "at": time.monotonic() - started}
-    with Path("protocol.jsonl").open("a", encoding="utf-8") as log:
-        log.write(json.dumps(event) + "\n")
+        async def connect(self):
+            if state.leader_timeout and self.index == 0:
+                await asyncio.sleep(10)
+            if state.delay:
+                await asyncio.sleep(state.delay)
 
-def respond(request, value, subtype="success"):
-    print(json.dumps({
-        "type": "control_response",
-        "response": {
-            "subtype": subtype, "request_id": request["request_id"],
-            "response": value, "error": "synthetic control failure",
-        },
-    }), flush=True)
+        async def get_mcp_status(self):
+            return {"mcpServers": [{"name": "sheets", "status": state.status,
+                                    "tools": [{"name": "view_sheet"}, {"name": "crop"}]}]}
 
-print("synthetic CLI startup diagnostic", flush=True)
+        async def query(self, prompt):
+            state.queries.append(prompt)
+            if state.fail:
+                # Chunk boundaries must not expose secrets in retained stderr.
+                self.options.stderr("secret-can")
+                self.options.stderr("ary-0")
+                raise RuntimeError("failure secret-canary-0")
 
-def emit(text):
-    data = text.encode("utf-8")
-    # Deliberately split JSON, multibyte text and CRLF across pipe writes.
-    for offset in range(0, len(data), 4093):
-        sys.stdout.buffer.write(data[offset:offset + 4093])
-        sys.stdout.buffer.flush()
-
-def wait_for(path):
-    if path is None:
-        return
-    deadline = time.monotonic() + 10
-    while not Path(path).exists():
-        if time.monotonic() >= deadline:
-            sys.exit("test stream gate timed out")
-        time.sleep(0.01)
-
-print("startup stderr " + "x" * 131072, file=sys.stderr, flush=True)
-if mode == "eof":
-    sys.exit(9)
-if mode == "silent":
-    Path("silent-ready").touch()
-    time.sleep(60)
-for line in sys.stdin:
-    event = json.loads(line)
-    record(event)
-    if event["type"] == "control_request":
-        request = event["request"]["subtype"]
-        if request == "initialize":
-            respond(event, {}, "error" if mode == "control_error" else "success")
-        elif request == "mcp_status":
-            status_count += 1
-            if status_started is None:
-                status_started = time.monotonic()
-            waiting = (
-                status_count <= pending_polls if pending_polls >= 0
-                else time.monotonic() - status_started < float(delay)
+        async def receive_response(self):
+            if state.controlled and self.index == 0:
+                state.before_response.set()
+                while not state.release_response.is_set():
+                    await asyncio.sleep(0.005)
+            if state.quota:
+                yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Credit balance is too low")],
+                                           model="test", error="billing_error")
+                yield sdk.ResultMessage(subtype="error_during_execution", duration_ms=1,
+                                        duration_api_ms=1, is_error=True, num_turns=0,
+                                        session_id=self.options.session_id or self.options.resume)
+                return
+            yield sdk.AssistantMessage(
+                content=[sdk.ToolUseBlock(id="view", name="mcp__sheets__view_sheet", input={"sheet": 1})],
+                model="test", usage={"input_tokens": 10, "output_tokens": 2},
             )
-            if mode == "pending" or waiting:
-                state = "pending"
-            else:
-                state = "failed" if mode == "failed" else "connected"
-            tools = [{"name": "view_sheet"}, {"name": "crop"}]
-            if mode == "missing_tools":
-                tools.pop()
-            server = {
-                "name": "sheets", "status": state, "tools": tools,
-                "config": {
-                    "type": "stdio", "command": sys.executable,
-                    "args": ["sheets_mcp.py", "sheet.png"],
-                },
-                "error": "synthetic sheets startup failure",
-            }
-            record({"type": "status", "value": state, "tools": tools})
-            respond(event, {"mcpServers": [] if mode == "missing_server" else [server]})
-            last_status = state
-    elif event["type"] == "user":
-        if last_status != "connected":
-            sys.exit("review submitted before connection")
-        if mode == "review_timeout":
-            time.sleep(60)
-        if mode == "stream":
-            stream = json.loads(Path(reply_path).read_text(encoding="utf-8"))
-            emit(stream.get("before", ""))
-            Path("before-response").touch()
-            wait_for(stream.get("response_gate"))
-            emit(stream.get("response", ""))
-            wait_for(stream.get("finish_gate"))
-            emit(stream.get("after", ""))
-            sys.exit(stream.get("exit_code", 0))
-        # Include a line larger than asyncio's default readline limit.
-        print(json.dumps({"type": "diagnostic", "payload": "x" * 131072}), flush=True)
-        print(Path(reply_path).read_text(encoding="utf-8"), flush=True)
-        break
-''',
-        encoding="utf-8",
-    )
-    state = SimpleNamespace(processes=[], commands=[], environments=[])
-    real_spawn = mr.asyncio.create_subprocess_exec
+            if state.controlled and self.index == 0:
+                while not state.release_finish.is_set():
+                    await asyncio.sleep(0.005)
+            yield sdk.UserMessage(content=[sdk.ToolResultBlock(
+                tool_use_id="view", content=[{"type": "image", "source": {
+                    "type": "base64", "media_type": "image/png", "data": "aW1hZ2U=",
+                }}],
+            )])
+            yield sdk.ResultMessage(
+                subtype="success", duration_ms=1, duration_api_ms=1, is_error=False,
+                num_turns=1, session_id=self.options.session_id or self.options.resume,
+                total_cost_usd=0.01, usage={"input_tokens": 10, "output_tokens": 2},
+                structured_output=_clean_verdict(),
+            )
 
-    async def spawn(*args: Any, **kwargs: Any):
-        state.environments.append(kwargs["env"])
-        process = await real_spawn(*args, **kwargs)
-        state.processes.append(process)
-        return process
+        async def disconnect(self):
+            self.disconnected = True
 
-    def command(
-        mode: str, reply: str, delay_s: float = 0.0, *, pending_polls: int = -1,
-    ) -> list[str]:
-        reply_path = tmp_path / f"reply-{uuid.uuid4().hex}.jsonl"
-        reply_path.write_text(reply, encoding="utf-8")
-        argv = [
-            sys.executable, str(script), mode, str(reply_path), str(delay_s),
-            str(pending_polls),
-        ]
-        state.commands.append(argv)
-        return argv
-
-    state.command = command
-    monkeypatch.setattr(mr.asyncio, "create_subprocess_exec", spawn)
-    monkeypatch.setattr(mr, "_CLAUDE_MCP_POLL_INTERVAL_S", 0.02)
+    monkeypatch.setattr(sdk, "ClaudeSDKClient", Client)
+    state.transport = transport
     return state
 
 
-@pytest.mark.parametrize("timeout,expected_ms", [(300, "120000"), (17.25, "17250")])
-@pytest.mark.parametrize("inherited_timeout", [None, "1", "999999"])
-@pytest.mark.parametrize("caller_env", [False, True])
-def test_claude_spawn_sets_independent_mcp_timeout_without_mutating_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, timeout: float, expected_ms: str,
-    inherited_timeout: str | None, caller_env: bool,
+def test_sdk_isolated_options_real_image_evidence_and_first_response(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    if inherited_timeout is None:
-        monkeypatch.delenv("MCP_TIMEOUT", raising=False)
-    else:
-        monkeypatch.setenv("MCP_TIMEOUT", inherited_timeout)
-    monkeypatch.setenv("CLAUDE_TEST_INHERITED_ONLY", "not a caller setting")
-    source_env = dict(os.environ) if caller_env else None
-    if source_env is not None:
-        source_env.pop("CLAUDE_TEST_INHERITED_ONLY")
-        source_env["CLAUDE_TEST_CALLER_SETTING"] = "preserved"
-    inherited_before = dict(os.environ)
-    source_before = dict(source_env) if source_env is not None else inherited_before
-    command = claude_transport.command("stream", json.dumps({
-        "response": _claude_stdout(1, _clean_verdict()),
-    }))
-
-    completed = mr._run_reviewer(
-        command, reviewer="claude", input="synthetic prompt", timeout=timeout,
-        cwd=str(tmp_path), env=source_env,
-    )
-
-    assert completed.returncode == 0
-    (spawn_env,) = claude_transport.environments
-    assert spawn_env == {**source_before, "MCP_TIMEOUT": expected_ms}
-    assert spawn_env is not source_env and spawn_env is not os.environ
-    assert dict(os.environ) == inherited_before
-    if source_env is not None:
-        assert source_env == source_before
-
-
-def _wait_for_file(path: Path) -> None:
-    deadline = mr.time.monotonic() + 10
-    while not path.exists():
-        if mr.time.monotonic() >= deadline:
-            pytest.fail(f"subprocess did not reach {path.name}")
-        mr.time.sleep(0.01)
-
-
-def test_claude_first_response_stream_is_chunked_unlimited_once_only_and_not_completion(
-    tmp_path: Path, claude_transport: SimpleNamespace,
-) -> None:
-    response_gate = tmp_path / "allow-response"
-    finish_gate = tmp_path / "allow-finish"
-    # Large diagnostics and image-like assistant content exercise framing above
-    # asyncio's readline limit, with malformed JSON and CRLF mixed into the stream.
-    before = (
-        "not JSON\r\n{broken\r\n"
-        + "\r\n".join(json.dumps(event) for event in _claude_nonresponses())
-        + "\r\n" + json.dumps({"type": "diagnostic", "payload": "x" * 2097152})
-        + "\r\n"
-    )
-    response = _claude_provider_event()
-    response["message"]["content"][0]["text"] = "画像" * 350000
-    response_text = json.dumps(response, ensure_ascii=False) + "\r\n"
-    after = (
-        json.dumps(_claude_provider_event()) + "\r\n"
-        + _claude_stdout(1, _clean_verdict()) + "\r\n"
-    )
-    command = claude_transport.command("stream", json.dumps({
-        "before": before, "response": response_text, "after": after,
-        "response_gate": str(response_gate), "finish_gate": str(finish_gate),
-    }))
-    notified = threading.Event()
-    calls = []
-
-    def first_response() -> None:
-        calls.append("response")
-        notified.set()
-
-    with mr.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(
-            mr._run_reviewer, command, reviewer="claude", input="synthetic prompt",
-            timeout=15, cwd=str(tmp_path), env=None, on_first_response=first_response,
-        )
-        try:
-            _wait_for_file(tmp_path / "before-response")
-            assert not notified.wait(0.1)
-            response_gate.touch()
-            assert notified.wait(10)
-            assert not future.done()  # Partial output usage is not review completion.
-        finally:
-            response_gate.touch()
-            finish_gate.touch()
-        completed = future.result()
-    assert calls == ["response"] and completed.returncode == 0
-    assert completed.stdout.endswith(before + response_text + after)
-    assert claude_transport.processes[0].returncode == 0
-
-
-@pytest.mark.parametrize("real_response", [False, True])
-def test_claude_first_response_handles_unterminated_eof_without_false_readiness(
-    tmp_path: Path, claude_transport: SimpleNamespace, real_response: bool,
-) -> None:
-    events = _claude_nonresponses()
-    if real_response:
-        events.append(_claude_provider_event())
-    payload = "\r\n".join(json.dumps(event) for event in events)
-    command = claude_transport.command("stream", json.dumps({"response": payload}))
-    calls = []
-    completed = mr._run_reviewer(
-        command, reviewer="claude", input="synthetic prompt", timeout=10,
-        cwd=str(tmp_path), env=None, on_first_response=lambda: calls.append("response"),
-    )
-    assert completed.returncode == 0
-    assert completed.stdout.endswith(payload)
-    assert calls == (["response"] if real_response else [])
-
-
-@pytest.mark.parametrize("respond_before_failure", [False, True])
-def test_claude_first_response_retries_without_duplicate_notifications(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, respond_before_failure: bool,
-) -> None:
-    first_events = [_claude_provider_event()] if respond_before_failure else _claude_nonresponses()
-    commands = [
-        claude_transport.command("stream", json.dumps({
-            "response": "\n".join(json.dumps(event) for event in first_events) + "\n",
-            "exit_code": 1,
-        })),
-        claude_transport.command("stream", json.dumps({
-            "response": json.dumps(_claude_provider_event()) + "\n",
-            "after": _claude_stdout(1, _clean_verdict()),
-        })),
-    ]
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
     calls = []
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=1, timeout_s=10, on_first_response=lambda: calls.append("response"),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+        on_first_response=lambda: calls.append("response"),
     )
-    assert review.passed and review.attempts == 2 and calls == ["response"]
-    assert [attempt["outcome"] for attempt in review.extra["evidence"]["attempts"]] == [
-        "failed", "succeeded",
-    ]
-    assert all(process.returncode is not None for process in claude_transport.processes)
-
-
-@pytest.fixture
-def claude_startup_clock(monkeypatch: pytest.MonkeyPatch) -> list[SimpleNamespace]:
-    """Advance startup deadlines by protocol progress, not process scheduling."""
-    real_run = mr._run_claude
-    transport_asyncio = mr.asyncio
-    clocks = []
-
-    async def run(*args: Any, **kwargs: Any):
-        clock = SimpleNamespace(elapsed=0.0, outer=None, startup=None, budget=None)
-        clocks.append(clock)
-
-        class ProtocolAsyncio:
-            def __getattr__(self, name: str):
-                return getattr(transport_asyncio, name)
-
-            def timeout(self, delay: float):
-                if clock.outer is None:
-                    # The overall wall-time timeout remains unmodified.
-                    clock.outer = asyncio.timeout(delay)
-                    return clock.outer
-                assert clock.startup is None
-                clock.budget = delay
-                clock.startup = asyncio.timeout(None)
-                return clock.startup
-
-            async def sleep(self, delay: float) -> None:
-                clock.elapsed += delay
-                if clock.elapsed >= clock.budget:
-                    # Deliver real Timeout cancellation at the synthetic startup
-                    # deadline, including the production kill/drain/reap path.
-                    clock.startup.reschedule(asyncio.get_running_loop().time())
-                await asyncio.sleep(0)
-
-        async def expire_silent_startup() -> None:
-            # A silent CLI never answers initialize, so there are no status
-            # polls to advance the clock. Wait until its diagnostics are written
-            # before cancelling; CPU load must not select the failure outcome.
-            ready = Path(kwargs["cwd"]) / "silent-ready"
-            while not ready.exists():
-                await asyncio.sleep(0.01)
-            clock.elapsed = clock.budget
-            clock.startup.reschedule(asyncio.get_running_loop().time())
-
-        with monkeypatch.context() as scoped:
-            # Only this module binding is replaced; asyncio and loop.time stay
-            # untouched for subprocess machinery and the real outer timeout.
-            scoped.setattr(mr, "asyncio", ProtocolAsyncio())
-            silent = (
-                asyncio.create_task(expire_silent_startup())
-                if args[0][2] == "silent" else None
-            )
-            try:
-                return await real_run(*args, **kwargs)
-            finally:
-                if silent is not None:
-                    silent.cancel()
-                    await asyncio.gather(silent, return_exceptions=True)
-
-    monkeypatch.setattr(mr, "_run_claude", run)
-    return clocks
-
-
-@pytest.mark.parametrize("judge", [False, True])
-def test_claude_slow_start_waits_for_actual_connection_before_review_or_judge(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, judge: bool,
-) -> None:
-    value = {"clusters": []} if judge else _clean_verdict()
-    command = claude_transport.command("slow", _claude_stdout(1, value), delay_s=0.15)
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
-    report_dir = tmp_path / "reports"
-    review = mr._review_session(
-        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=report_dir, retries=0,
-        timeout_s=10, judge_findings=[] if judge else None,
-    )
-    assert review.passed and review.blind and review.attempts == 1
-    assert review.verdict == value
-    assert review.tool_events == 0
-    assert review.extra["inspection_proven"] is True
+    assert review.passed and review.blind and calls == ["response"]
+    assert review.extra["usage"]["input_tokens"] == 10
     assert review.extra["sheets_viewed"] == [1]
-    (attempt,) = review.extra["evidence"]["attempts"]
-    records = [
-        json.loads(line) for line in
-        (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
-    ]
-    statuses = [row for row in records if row["type"] == "status"]
-    assert statuses[0]["value"] == "pending" and statuses[-1]["value"] == "connected"
-    (prompt,) = [row for row in records if row["type"] == "user"]
-    assert prompt["at"] >= statuses[-1]["at"] >= 0.15
-    assert prompt["message"]["content"] == review.extra["evidence"]["effective_prompt"]
-    assert ("FINDINGS TO ADJUDICATE" in prompt["message"]["content"]) is judge
-    assert len(claude_transport.processes) == 1
-    assert claude_transport.processes[0].returncode == 0
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    stdout = Path(attempt["stdout_file"]).read_text()
-    assert "synthetic CLI startup diagnostic" in stdout
-    statuses = [
-        row["response"]["response"]["mcpServers"][0]
-        for row in (json.loads(line) for line in stdout.splitlines() if line.startswith("{"))
-        if row.get("type") == "control_response"
-        and row["response"]["response"].get("mcpServers")
-    ]
-    assert statuses[-1]["config"] == {
-        "type": "stdio", "command": sys.executable,
-        "args": ["sheets_mcp.py", "sheet.png"],
-    }
-    assert all(event.get("type") != "control_response" for event in mr._parse_events(stdout))
+    client, = sdk_transport.clients
+    options = client.options
+    assert options.tools == [] and set(options.allowed_tools) == SHEET_TOOLS
+    assert options.setting_sources == [] and options.strict_mcp_config
+    assert options.thinking == {"type": "adaptive"}
+    assert json.loads(options.settings)["disableAllHooks"]
+    assert set(options.mcp_servers) == {"sheets"}
+    assert client.disconnected
+    record, = review.extra["evidence"]["attempts"]
+    assert record["transport_provenance"]["transport"] == "claude_agent_sdk"
+    assert record["command"][0] == "claude_agent_sdk"
+    assert "secret-canary" not in json.dumps(review.extra)
 
 
-@pytest.mark.parametrize(
-    ("mode", "error"),
-    [
-        ("failed", "synthetic sheets startup failure"),
-        ("missing_tools", "without its sheet tools"),
-        ("missing_server", "sole private sheets server"),
-        ("control_error", "initialize failed"),
-        ("eof", "exited before sheets MCP was ready"),
-        ("pending", "TimeoutExpired"),
-        ("silent", "TimeoutExpired"),
-    ],
-)
-def test_claude_failed_start_never_receives_prompt_and_retains_cleanup_evidence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
-    mode: str, error: str,
+@pytest.mark.parametrize("status", ["failed", "pending"])
+def test_sdk_startup_failure_never_submits_review_and_cleans_up(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, status: str,
 ) -> None:
-    command = claude_transport.command(mode, _claude_stdout(1, _clean_verdict()))
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
+    sdk_transport.status = status
+    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.02)
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=0, timeout_s=30,
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0, timeout_s=1,
     )
-    assert not review.passed and review.verdict is None and error in review.error
-    (clock,) = claude_startup_clock
-    assert not clock.outer.expired()
-    assert clock.startup.expired() is (mode in ("pending", "silent"))
-    (attempt,) = review.extra["evidence"]["attempts"]
-    assert attempt["outcome"] == ("timed_out" if mode in ("pending", "silent") else "failed")
-    log = Path(attempt["retained_dir"]) / "protocol.jsonl"
-    records = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-    assert not any(row["type"] == "user" for row in records)
-    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    assert claude_transport.processes[0].returncode is not None
-    assert not Path(attempt["attempt_dir"]).exists()
-
-
-@pytest.mark.parametrize("judge", [False, True])
-@pytest.mark.parametrize("failure", ["failed", "pending", "missing_tools"])
-def test_claude_startup_infrastructure_failure_retries_without_reviewing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-    claude_transport: SimpleNamespace, claude_startup_clock: list[SimpleNamespace],
-    judge: bool, failure: str,
-) -> None:
-    value = {"clusters": []} if judge else _clean_verdict()
-    reply = _claude_stdout(1, value)
-    commands = [
-        claude_transport.command(failure, reply),
-        claude_transport.command("slow", reply, pending_polls=2),
-    ]
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: commands.pop(0))
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 0.75)
-    review = mr._review_session(
-        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports", retries=1,
-        timeout_s=10, judge_findings=[] if judge else None,
+    assert not review.passed and sdk_transport.queries == []
+    assert all(client.disconnected for client in sdk_transport.clients)
+    assert review.extra["evidence"]["attempts"][0]["outcome"] == (
+        "timed_out" if status == "pending" else "failed"
     )
-    attempts = review.extra["evidence"]["attempts"]
-    diagnostics = {
-        "error": (review.error or "")[-800:],
-        "attempts": [
-            {
-                "attempt": attempt["attempt"], "outcome": attempt["outcome"],
-                "error": (attempt["error"] or "")[-800:],
-                "retained_dir": attempt["retained_dir"],
-            }
-            for attempt in attempts
-        ],
-    }
-    assert review.passed and review.attempts == 2 and review.error is None, diagnostics
-    first, second = attempts
-    assert first["outcome"] == ("timed_out" if failure == "pending" else "failed"), diagnostics
-    expected_error = {
-        "failed": "synthetic sheets startup failure",
-        "pending": "TimeoutExpired",
-        "missing_tools": "without its sheet tools",
-    }[failure]
-    assert expected_error in first["error"], diagnostics
-    assert second["outcome"] == "succeeded", diagnostics
-    assert len(claude_startup_clock) == 2
-    assert all(clock.budget == 0.75 and not clock.outer.expired() for clock in claude_startup_clock)
-    assert claude_startup_clock[0].startup.expired() is (failure == "pending")
-    assert not claude_startup_clock[1].startup.expired()
-    if failure == "pending":
-        assert 0.75 <= claude_startup_clock[0].elapsed < 0.8
-    assert claude_startup_clock[1].elapsed == pytest.approx(0.04)
-    assert first["cwd"] != second["cwd"]
-    for index, attempt in enumerate((first, second)):
-        records = [
-            json.loads(line) for line in
-            (Path(attempt["retained_dir"]) / "protocol.jsonl").read_text().splitlines()
-        ]
-        assert sum(row["type"] == "user" for row in records) == index
-        statuses = [row["value"] for row in records if row["type"] == "status"]
-        if index == 1:
-            assert statuses == ["pending", "pending", "connected"]
-    assert all(process.returncode is not None for process in claude_transport.processes)
-    assert "synthetic CLI startup diagnostic" in Path(first["stdout_file"]).read_text()
 
 
-def test_claude_startup_and_review_share_one_overall_timeout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+def test_sdk_generic_error_is_redacted_and_never_falls_back(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    command = claude_transport.command("review_timeout", "", delay_s=1.0)
-    monkeypatch.setattr(mr, "MCP_STARTUP_TIMEOUT_S", 10.0)
-    started = mr.time.monotonic()
-    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
-        mr._run_reviewer(
-            command, reviewer="claude", input="synthetic prompt", timeout=2.0,
-            cwd=str(tmp_path), env=None,
-        )
-    elapsed = mr.time.monotonic() - started
-    assert caught.value.timeout == 2.0
-    assert elapsed < 2.75  # Not startup time plus another full review timeout.
-    records = [json.loads(line) for line in (tmp_path / "protocol.jsonl").read_text().splitlines()]
-    assert sum(row["type"] == "user" for row in records) == 1
-    assert any(row["type"] == "status" and row["value"] == "connected" for row in records)
-    assert "startup stderr " in caught.value.stderr
-    assert claude_transport.processes[0].returncode is not None
-
-
-def test_claude_connected_review_findings_are_not_retried(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
-) -> None:
-    verdict = _clean_verdict("FIX")
-    verdict["clarity"] = [{"where": "sheet 1", "issue": "synthetic finding", "fix": "clarify"}]
-    command = claude_transport.command("slow", _claude_stdout(1, verdict), delay_s=0.1)
-    monkeypatch.setattr(mr, "build_claude_command", lambda **_kwargs: command)
+    sdk_transport.fail = True
+    async def forbidden(**kwargs):
+        pytest.fail("generic SDK failure must not authorize OMP")
+    monkeypatch.setattr(sdk_transport.transport, "_omp", forbidden)
     review = mr.review_package(
         mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        reviewer="claude", claude="fake", report_dir=tmp_path / "reports",
-        retries=2, timeout_s=10,
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
     )
-    assert not review.passed and review.verdict == verdict and review.error is None
-    assert review.blind and review.attempts == 1
-    assert len(claude_transport.processes) == 1
+    assert not review.passed and "[REDACTED]" in review.error
+    for path in (tmp_path / "reports").rglob("*"):
+        if path.is_file() and path.suffix in {".json", ".jsonl", ".txt"}:
+            assert b"secret-canary" not in path.read_bytes()
+
+
+def test_sdk_typed_quota_rotates_then_omp_only_when_pool_unavailable(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk_transport.quota = True
+    routes = []
+    async def fallback(**kwargs):
+        routes.append("omp")
+        kwargs["provenance"]["session_id"] = "omp-session"
+        kwargs["provenance"]["session_file"] = str(tmp_path / "omp-session.jsonl")
+        kwargs["emit"]({"type": "result", "result": json.dumps(_clean_verdict())}, None)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert len(sdk_transport.clients) == 3 and routes == ["omp"]
+    assert len({client.options.session_id for client in sdk_transport.clients}) == 3
+    assert not review.passed  # A verdict without images is not inspection.
+
+
+def test_quota_classifier_rejects_assistant_prose_and_structured_output_failures():
+    import machinist_review_transport as transport
+    assert transport.quota_event({"type": "assistant", "message": {
+        "content": [{"type": "text", "text": "Insufficient API credits"}],
+    }}) is None
+    assert transport.quota_event({"type": "result", "subtype": "error_max_structured_output_retries",
+                                  "errors": ["Insufficient API credits"]}) is None
+    assert transport.quota_event({"type": "system", "subtype": "api_retry",
+                                  "error": "rate_limit", "error_status": 429})["status"] == "cooldown"
+
+
+def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
+    import machinist_review_transport as transport
+    events = [
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "assistant", "model": "test", "usage": {"input": 12, "cacheRead": 4},
+            "content": [{"type": "toolCall", "id": "a", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}],
+        }}),
+        transport.omp_event({"type": "message_end", "message": {
+            "role": "toolResult", "toolCallId": "a", "content": [{"type": "image", "data": "image", "mimeType": "image/png"}],
+        }}),
+    ]
+    assert mr.evaluate_sheet_evidence(events, reviewer="claude", sheet_count=1)["inspection_proven"]
+    assert mr._claude_provider_response(events[0])
+    assert transport.omp_event({"type": "agent_end", "messages": []}) is None
+    events[0]["message"]["content"][0]["name"] = "bash"
+    assert mr.evaluate_sheet_evidence(events, reviewer="claude", sheet_count=1)["tool_events"] == 1
+    for native_name in ("StructuredOutput", "mcp__sheets__view_sheet", "bash"):
+        event = transport.omp_event({"type": "message_end", "message": {
+            "role": "assistant", "content": [{"type": "toolCall", "id": "a", "name": native_name, "arguments": {"sheet": 1}}],
+        }})
+        assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
+
+
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent"])
+def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
+) -> None:
+    import machinist_review_transport as transport
+    script = tmp_path / "rpc_fixture.py"
+    script.write_text(r'''
+import json, sys, time
+from pathlib import Path
+mode = sys.argv[1]
+def emit(value):
+    print(json.dumps(value), flush=True)
+for line in sys.stdin:
+    request = json.loads(line)
+    with Path("protocol.jsonl").open("a") as log:
+        log.write(json.dumps(request) + "\n")
+    kind = request["type"]
+    if kind == "get_state":
+        if mode == "silent":
+            time.sleep(20)
+        names = ["mcp__sheets_view_sheet", "mcp__sheets_crop"]
+        if mode == "missing": names.pop()
+        if mode == "extra": names.append("bash")
+        data = {"sessionId": "omp-fixture", "sessionFile": "fixture.jsonl",
+                "model": {"provider": "anthropic", "id": "test"},
+                "dumpTools": [{"name": name} for name in names]}
+    elif kind == "prompt":
+        emit({"type": "message_end", "message": {"role": "assistant", "model": "test",
+              "usage": {"input": 10, "output": 2},
+              "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
+        emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
+              "content": [{"type": "image", "mimeType": "image/png", "data": "aW1hZ2U="}]}})
+        emit({"type": "prompt_result", "id": request["id"], "status": "completed", "sessionSettled": True})
+        continue
+    elif kind == "get_last_assistant_text":
+        data = {"text": "{}"}
+    else:
+        data = {}
+    emit({"type": "response", "id": request["id"], "command": kind, "success": True, "data": data})
+''', encoding="utf-8")
+    work = tmp_path / "work"
+    work.mkdir()
+    processes, environments, normalized = [], [], []
+    original = asyncio.create_subprocess_exec
+    async def spawn(executable, *arguments, **kwargs):
+        environments.append(kwargs["env"])
+        process = await original(sys.executable, str(script), catalog, *arguments, **kwargs)
+        processes.append(process)
+        return process
+    monkeypatch.setattr(transport.asyncio, "create_subprocess_exec", spawn)
+    monkeypatch.setenv("PI_CONFIG_FILES", "must-not-load.yml")
+    monkeypatch.setenv("OMP_PROFILE", "must-not-load")
+    before = dict(os.environ)
+    def emit(event, raw):
+        if event is not None:
+            normalized.append(event)
+    async def invoke():
+        async with asyncio.timeout(5):
+            await transport._omp_session(
+                executable=sys.executable, broker_env={"OMP_AUTH_BROKER_URL": "http://127.0.0.1:1", "OMP_AUTH_BROKER_TOKEN": "fixture-token"},
+                config={"mcpServers": {"sheets": {"command": sys.executable, "args": []}}, "prompt": "inspect"},
+                schema={}, model="test", effort="medium", cwd=str(work),
+                remaining=lambda: 5, startup=1, emit=emit, diagnostics=[],
+                provenance={}, resume=False,
+            )
+    if catalog == "valid":
+        asyncio.run(invoke())
+        assert mr.evaluate_sheet_evidence(normalized, reviewer="claude", sheet_count=1)["inspection_proven"]
+    else:
+        with pytest.raises(TimeoutError if catalog == "silent" else RuntimeError):
+            asyncio.run(invoke())
+    requests = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines()]
+    assert requests[0]["type"] == "get_state"
+    assert any(row["type"] == "prompt" for row in requests) is (catalog == "valid")
+    assert all(process.returncode is not None for process in processes)
+    env, = environments
+    assert env["HOME"] != before.get("HOME")
+    assert "PI_CONFIG_FILES" not in env and "OMP_PROFILE" not in env
+    assert dict(os.environ) == before
+
+
+
+def test_private_pool_rotation_groups_and_replaced_key_cannot_restore_old_block(
+    tmp_path: Path,
+) -> None:
+    import machinist_review_credentials as credentials
+    keys, state = tmp_path / "keys.json", tmp_path / "state.json"
+    value = {"keys": [
+        {"id": "a", "apiKey": "private-key-a", "quotaGroup": "shared"},
+        {"id": "b", "apiKey": "private-key-b", "quotaGroup": "shared"},
+        {"id": "c", "apiKey": "private-key-c"},
+    ]}
+    def save():
+        keys.write_text(json.dumps(value))
+        keys.chmod(0o600)
+        credentials._windows_acl(keys, secure=True)
+    save()
+    env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
+    pool = credentials.CredentialPool(env)
+    first = pool.claim()
+    assert first.id == "a"
+    assert pool.claim().id == "b"
+    pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
+    assert pool.claim().id == "c"
+    assert pool.claim(["c"]) is None
+    value["keys"][0]["apiKey"] = "replacement-key-a"
+    save()
+    pool.unavailable(first, {"status": "exhausted", "retryAt": None, "reason": "credit-balance"})
+    assert pool.claim(["c"]).id == "a"
+    with pytest.raises(ValueError, match="rotated"):
+        pool.claim(required_id=first.id, required_fingerprint=first.fingerprint)
+    assert "private-key" not in state.read_text()
+
+
+@pytest.mark.parametrize("damage", ["bad_json", "wrong_shape", "duplicate", "state"])
+def test_private_pool_invalid_configuration_fails_closed_without_secret_echo(
+    tmp_path: Path, damage: str,
+) -> None:
+    import machinist_review_credentials as credentials
+    keys, state = tmp_path / "keys.json", tmp_path / "state.json"
+    value = {"keys": [{"id": f"key-{n}", "apiKey": f"canary-secret-{n}"} for n in range(3)]}
+    if damage == "wrong_shape":
+        value["keys"].pop()
+    if damage == "duplicate":
+        value["keys"][1]["apiKey"] = value["keys"][0]["apiKey"]
+    keys.write_text("canary-secret-broken{" if damage == "bad_json" else json.dumps(value))
+    keys.chmod(0o600)
+    credentials._windows_acl(keys, secure=True)
+    if damage == "state":
+        state.write_text('{"keys":"canary-secret-state"}')
+        state.chmod(0o600)
+        credentials._windows_acl(state, secure=True)
+    env = {"CODJIFLO_ANTHROPIC_KEYS_FILE": str(keys), "CODJIFLO_CLAUDE_STATE_FILE": str(state)}
+    with pytest.raises(ValueError) as caught:
+        credentials.CredentialPool(env).claim()
+    assert "canary-secret" not in str(caught.value)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode contract; Windows DACL is tested by native smoke")
+def test_private_pool_rejects_public_file_and_symlink(tmp_path: Path):
+    import machinist_review_credentials as credentials
+    keys = tmp_path / "keys.json"
+    keys.write_text('{"keys":[]}')
+    keys.chmod(0o644)
+    with pytest.raises(ValueError, match="0600"):
+        credentials._private_json(keys)
+    keys.chmod(0o600)
+    link = tmp_path / "link.json"
+    link.symlink_to(keys)
+    with pytest.raises(ValueError):
+        credentials._private_json(link)
+
 
 
 def test_codex_command_keeps_cwd_and_attempt_files_independent(
@@ -2680,10 +2461,7 @@ def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
-    review = mr.review_package(
-        package, reviewer=reviewer, report_dir=report_dir, retries=0,
-        claude="claude-test", codex="codex-test",
-    )
+    review = mr.review_package(package, reviewer=reviewer, report_dir=report_dir, retries=0, codex="codex-test",)
 
     assert review.passed and review.blind
     assert review.sheet_count == 3
@@ -2794,13 +2572,10 @@ def test_attempt_records_carry_session_id_and_resume_command(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "part", (source,))
-    mr.review_package(
-        package,
-        reviewer="claude",
-        report_dir=tmp_path / "claude",
-        retries=1,
-        claude="claude-test",
-    )
+    mr.review_package(package,
+    reviewer="claude",
+    report_dir=tmp_path / "claude",
+    retries=1, )
     mr.review_package(
         package,
         reviewer="codex",
@@ -2821,7 +2596,7 @@ def test_attempt_records_carry_session_id_and_resume_command(
         assert uuid.UUID(session_id).version == 4
         command = record["command"]
         assert command[command.index("--session-id") + 1] == session_id
-        assert record["resume_command"] == f"claude --resume {session_id}"
+        assert record["resume_command"] == mr._transport_resume(record["transport_provenance"], session_id)
 
     codex_attempt = attempts(tmp_path / "codex")[0]
     assert codex_attempt["reviewer"] == "codex"
@@ -2901,13 +2676,10 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
-    review = mr.review_package(
-        mr.ReviewPackage("part", "part", (png,)),
-        reviewer="claude",
-        report_dir=report_dir,
-        retries=1,
-        claude="claude",
-    )
+    review = mr.review_package(mr.ReviewPackage("part", "part", (png,)),
+    reviewer="claude",
+    report_dir=report_dir,
+    retries=1, )
     assert review.attempts == 2
     assert review.tool_events == 1
     # The successful attempt inspected every sheet; only the hidden tool fails it.
@@ -3072,13 +2844,10 @@ def test_retry_requires_sheet_views_from_the_successful_attempt(
         )
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
-    review = mr.review_package(
-        mr.ReviewPackage("part", "part", (png,)),
-        reviewer="claude",
-        report_dir=tmp_path / "reports",
-        retries=1,
-        claude="claude",
-    )
+    review = mr.review_package(mr.ReviewPackage("part", "part", (png,)),
+    reviewer="claude",
+    report_dir=tmp_path / "reports",
+    retries=1, )
 
     assert review.attempts == 2
     assert review.tool_events == 0
@@ -3411,13 +3180,10 @@ def test_both_reviewers_receive_one_complete_package_invocation(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
-    claude_review = mr.review_package(
-        package,
-        reviewer="claude",
-        report_dir=tmp_path / "claude",
-        retries=0,
-        claude="claude-test",
-    )
+    claude_review = mr.review_package(package,
+    reviewer="claude",
+    report_dir=tmp_path / "claude",
+    retries=0, )
     codex_review = mr.review_package(
         package,
         reviewer="codex",
@@ -3652,14 +3418,10 @@ def test_provider_failures_stay_blind_but_never_pass(
         return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="quota exhausted")
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
-    review = mr.review_package(
-        mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-        reviewer=reviewer,
-        report_dir=tmp_path / "reports",
-        retries=1,
-        claude="claude-test",
-        codex="codex-test",
-    )
+    review = mr.review_package(mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+    reviewer=reviewer,
+    report_dir=tmp_path / "reports",
+    retries=1, codex="codex-test",)
 
     assert review.attempts == 2
     assert "quota exhausted" in review.error
@@ -3703,13 +3465,10 @@ def test_retention_falls_back_to_copy_when_windows_holds_the_attempt_dir(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
     try:
-        review = mr.review_package(
-            mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-            reviewer="claude",
-            report_dir=report_dir,
-            retries=1,
-            claude="claude-test",
-        )
+        review = mr.review_package(mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+        reviewer="claude",
+        report_dir=report_dir,
+        retries=1, )
     finally:
         for attempt in held:
             real_rmtree(attempt, ignore_errors=True)
@@ -4277,11 +4036,8 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True,
-        claude="claude-test", codex="codex-test",
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+    judge_reviewer=reviewer, report_dir=directory, retries=0, force=True, codex="codex-test",)
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert aggregate["source_sha256"] == [source_hash]
     assert len({cwd for cwd, _ in seen}) == 3
@@ -4365,12 +4121,10 @@ def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuat
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     with mr.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(
-            contextvars.copy_context().run, mr.aggregate_package,
-            mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-            judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-            retries=0, force=True, claude="claude-test", codex="codex-test",
-        )
+        future = pool.submit(contextvars.copy_context().run, mr.aggregate_package,
+        mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        retries=0, force=True, codex="codex-test",)
         try:
             assert leader_started.wait(15)
             if reviewer == "claude":
@@ -4412,11 +4166,9 @@ def test_aggregate_single_review_does_not_require_response_notification(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-        runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-        retries=0, force=True, claude="claude-test", codex="codex-test",
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+    runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+    retries=0, force=True, codex="codex-test",)
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert len(calls) == 2 and calls[0] is None and calls[1] is not None
 
@@ -4466,10 +4218,8 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
 
     monkeypatch.setattr(mr, "review_package", review)
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=1, force=True, claude="claude-test",
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+    retries=1, force=True, )
     assert followers.is_set() and aggregate["verdict"] == "FIX"
     assert aggregate["gating_count"] == 1 and aggregate["error"] is None
     assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
@@ -4482,96 +4232,47 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
     )
 
 
-def test_aggregate_claude_real_stream_releases_only_on_response_before_leader_exit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+def test_aggregate_sdk_releases_followers_on_response_before_leader_completion(
+    tmp_path: Path, sdk_transport,
 ) -> None:
-    source = _pdf_source(tmp_path / "sheet.pdf", [(144, 72)])
-    response_gate = tmp_path / "allow-response"
-    finish_gate = tmp_path / "allow-finish"
-    leader_started = threading.Event()
-    leader_cwd = []
-    followers = []
-    before = "\r\n".join(json.dumps(event) for event in _claude_nonresponses()) + "\r\n"
-
-    def command(**kwargs: Any) -> list[str]:
-        config = json.loads(kwargs["mcp_config"].read_text())
-        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
-        run_id = snapshot.parents[1].name
-        if run_id == "r1":
-            leader_cwd.append(kwargs["workdir"])
-            leader_started.set()
-            return claude_transport.command("stream", json.dumps({
-                "before": before, "response": json.dumps(_claude_provider_event()) + "\r\n",
-                "after": _claude_stdout(1, _clean_verdict()),
-                "response_gate": str(response_gate), "finish_gate": str(finish_gate),
-            }))
-        assert response_gate.exists()
-        assert claude_transport.processes[0].returncode is None
-        followers.append(run_id)
-        if len(followers) == 2:
-            finish_gate.touch()
-        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
-
-    monkeypatch.setattr(mr, "build_claude_command", command)
+    sdk_transport.controlled = True
+    source = _png_source(tmp_path / "sheet.png")
     with mr.ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(
             mr.aggregate_package, mr.ReviewPackage("sample", "part", (source,)),
-            report_dir=tmp_path / "reports", retries=0, timeout_s=15,
-            force=True, claude="fake",
+            report_dir=tmp_path / "reports", retries=0, timeout_s=15, force=True,
         )
         try:
-            assert leader_started.wait(10)
-            _wait_for_file(leader_cwd[0] / "before-response")
-            mr.time.sleep(0.1)
-            assert followers == []
-            response_gate.touch()
+            assert sdk_transport.before_response.wait(10)
+            assert len(sdk_transport.clients) == 1
+            sdk_transport.release_response.set()
+            assert sdk_transport.followers_started.wait(10)
+            assert not sdk_transport.clients[0].disconnected
+            sdk_transport.release_finish.set()
             aggregate = future.result(timeout=20)
         finally:
-            response_gate.touch()
-            finish_gate.touch()
+            sdk_transport.release_response.set()
+            sdk_transport.release_finish.set()
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
-    assert set(followers) == {"r2", "r3"}
-    assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
-    assert all(not run["error"] for run in aggregate["runs"])
-    assert len(claude_transport.processes) == 3
-    assert all(process.returncode == 0 for process in claude_transport.processes)
+    assert len(sdk_transport.clients) == 3
+    assert all(client.disconnected for client in sdk_transport.clients)
 
 
-def test_aggregate_claude_leader_real_timeout_reaps_then_releases_followers(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, claude_transport: SimpleNamespace,
+def test_aggregate_sdk_leader_timeout_closes_before_releasing_followers(
+    tmp_path: Path, sdk_transport,
 ) -> None:
-    source = _png_source(tmp_path / "sheet.png")
-    leader_process = None
-
-    def command(**kwargs: Any) -> list[str]:
-        nonlocal leader_process
-        config = json.loads(kwargs["mcp_config"].read_text())
-        snapshot = Path(config["mcpServers"]["sheets"]["args"][-1])
-        run_id = snapshot.parents[1].name
-        if run_id == "r1":
-            argv = claude_transport.command("review_timeout", "")
-            leader_process = argv
-            return argv
-        assert leader_process is not None
-        # The timeout path must kill/drain/reap before terminal release.
-        assert claude_transport.processes[0].returncode is not None
-        return claude_transport.command("slow", _claude_stdout(1, _clean_verdict()))
-
-    monkeypatch.setattr(mr, "build_claude_command", command)
+    sdk_transport.leader_timeout = True
     aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, timeout_s=2, force=True, claude="fake",
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        report_dir=tmp_path / "reports", retries=0, timeout_s=0.2, force=True,
     )
     assert aggregate["verdict"] == "SHIP" and aggregate["judge"]["skipped"]
     assert "TimeoutExpired" in aggregate["runs"][0]["error"]
     assert all(not run["error"] for run in aggregate["runs"][1:])
-    assert len(claude_transport.processes) == 3
-    assert all(process.returncode is not None for process in claude_transport.processes)
-    leader = json.loads(Path(aggregate["runs"][0]["report"]).read_text())
-    (attempt,) = leader["extra"]["evidence"]["attempts"]
-    assert attempt["outcome"] == "timed_out"
-    assert "startup stderr " in Path(attempt["stderr_file"]).read_text()
-    assert "synthetic CLI startup diagnostic" in Path(attempt["stdout_file"]).read_text()
+    assert len(sdk_transport.clients) == 3
+    assert all(client.disconnected for client in sdk_transport.clients)
+
+
 
 
 @pytest.mark.parametrize(
@@ -4616,11 +4317,9 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
-        retries=1, claude="claude-test", codex="codex-test",
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
+    judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
+    retries=1, codex="codex-test",)
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
     assert len(judge_cwds) == len(set(judge_cwds)) == 2
     judge = json.loads(Path(aggregate["judge"]["report"]).read_text(encoding="utf-8"))
@@ -4646,10 +4345,8 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=2,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=2,
+    report_dir=tmp_path / "reports", retries=0, force=True,)
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
     assert [item["decision"] for item in aggregate["rejected"]] == ["misread", "not_gating"]
@@ -4676,10 +4373,8 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=3,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=3,
+    report_dir=tmp_path / "reports", retries=0, force=True,)
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
     assert [item["gating"] for item in aggregate["confirmed"]] == [verdict == "FIX"]
@@ -4705,10 +4400,8 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
+    report_dir=tmp_path / "reports", retries=0, force=True,)
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
     assert not aggregate["judge"]["skipped"]
@@ -4732,10 +4425,8 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
         return _session_reply(command, kwargs, _clean_verdict())
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-        retries=0, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+    retries=0, force=True,)
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
     assert aggregate["judge"]["skipped"] and aggregate["judge"]["error"] is None
@@ -4761,10 +4452,8 @@ def test_aggregate_error_is_retained_and_never_passes(
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=directory, retries=1, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
+    report_dir=directory, retries=1, force=True,)
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
     assert bool(aggregate["judge"]["error"]) == (failure != "all_runs")
@@ -4794,10 +4483,8 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(
-        mr.ReviewPackage("sample", "part", (source,)), runs=1,
-        report_dir=tmp_path / "reports", retries=0, claude="claude-test", force=True,
-    )
+    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
+    report_dir=tmp_path / "reports", retries=0, force=True,)
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
     assert "SHEET TEXT LAYER" in prompts[0] and "FRONT 5:1" in prompts[0]

@@ -273,15 +273,43 @@ both verdicts and the finding diff.
   (`--judge-reviewer`, `--judge-model`, `--judge-effort` select alternatives).
   PDF text coordinates use PDFium's page-to-device mapping with `ctypes.c_int`
   outputs, matching its `int*` binding contract on Linux and Windows.
-- Before either Claude session receives its review/judge prompt, the runner uses
-  that same CLI process's SDK control channel to await the private `sheets`
-  connection and its `view_sheet`/`crop` tool catalogue. A separately probed
-  server or a generic initialization event is not readiness evidence. Startup
-  is bounded to 120 seconds within the existing per-attempt timeout; failed or
-  incomplete connections retry as infrastructure errors in fresh isolated
-  sessions, without submitting a drawing review. Startup diagnostics remain in
-  retained raw stdout; SDK control responses are excluded from reviewer tool
-  evidence. Valid drawing findings are not retried.
+- Claude execution first selects an eligible API credential from the private
+  codjiflo pool and uses the pinned Python Claude Agent SDK. The shared pool is
+  `CODJIFLO_ANTHROPIC_KEYS_FILE` (default
+  `~/.config/codjiflo/anthropic-keys.json`), containing exactly three unique
+  `{"id": "label", "apiKey": "secret", "quotaGroup": "optional-group"}` entries
+  under `keys`. Files must be regular, non-symlink, current-user-owned and mode
+  `0600` on POSIX; Windows requires a private current-user DACL (SYSTEM and
+  Administrators may also be allowed). Ambient Anthropic/OAuth keys are not a
+  second credential source. Routing state uses
+  `CODJIFLO_CLAUDE_STATE_FILE`, default
+  `~/.local/state/codjiflo/claude-routing.json`, with locked round-robin claims,
+  fingerprint-aware rotation and quota-group cooldown/exhaustion. Invalid or
+  insecure configuration fails closed. Only typed API quota errors authorize
+  rotation, not ordinary prose, schema errors, startup failures or SDK exceptions.
+- When no configured API credential is eligible, execution uses **OMP**, never
+  Claude CLI OAuth. OMP runs in RPC mode with a private HOME/config/cache,
+  disabled built-in tools, extensions, rules, skills, LSP, memory and autolearn,
+  and only the sheets MCP server. Existing OMP credentials remain in the original
+  vault, accessed through the supported auth broker: an explicitly configured
+  `OMP_AUTH_BROKER_URL`/`OMP_AUTH_BROKER_TOKEN` pair is reused, otherwise a scoped
+  loopback broker opens the existing store and is reaped after the invocation.
+  No privileged Windows links or credential copies are required. Broker tokens
+  are passed only in environment, with snapshot disk caching disabled.
+- Before submitting review content, SDK `get_mcp_status` must prove that the
+  actual session has the sole connected sheets server and both tools; OMP waits
+  for synchronous MCP startup and validates the actual RPC `get_state.dumpTools`
+  catalog. Startup is bounded to 120 seconds within the total attempt deadline.
+  Failed or incomplete startup submits no review. Native redacted records and
+  normalized image/tool evidence are retained separately. Valid findings are
+  never retried. A successful precheck pins its actual transport and session for
+  judging; SDK continuation also pins credential ID/fingerprint. Unavailable or
+  rotated continuation credentials fail rather than silently replacing history.
+- Structured operation logs record credential decisions (safe IDs/counts),
+  SDK attempts, OMP fallback reasons, broker readiness and terminal outcome or
+  failure category. Keys/tokens, environment maps and unredacted exceptions are
+  never logged or retained. Eval identities record SDK/OMP runtime versions and
+  each attempt's actual transport provenance; SDK descriptors are not CLI argv.
 - Claude multi-run reviews use **initial-request staggering, then concurrent
   continuation**: `r1` starts alone; the other isolated runs start after its
   first real positive-usage provider assistant response, while `r1` continues.

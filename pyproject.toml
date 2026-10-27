@@ -31,6 +31,8 @@ dependencies = [
     #            the single SolidWorks STA seat at runtime (replaces the old task_dep
     #            spine). Was only transitive; declared direct so a dep bump can't drop it.
     "filelock>=3.13",
+    # Blind machinist review uses the SDK transport with explicit API credentials.
+    "claude-agent-sdk==0.1.76",
     "pyyaml>=6.0",
     "pillow>=10.0",
     "numpy>=1.26",
