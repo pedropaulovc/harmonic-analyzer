@@ -116,7 +116,7 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
         (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10)
     )
     assert spec.STOCK_DIA_MIN / 2.0 >= (12.5 + 0.8) / 2.0 + 0.10 + 0.10
-    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 1.4)
+    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 1.2 - 0.25)
     assert handle.TENON_WALL_MIN == pytest.approx(1.55)
 
 
@@ -148,17 +148,13 @@ def test_callouts_name_the_mating_tenon_and_no_general_note_remains() -> None:
         "TURNED TO SUIT, 0.05-0.15",
         "DIAMETRAL CLEARANCE",
     ]
-    assert notes.OUTER_DIA_CALLOUT.splitlines() == [
-        "STOCK;",
-        "SKIM TO <MOD-DIAM>12.5",
-        "WITH MHA-DT-08",
-        "AFTER CURE;",
-        "WALL 1.50 MIN",
-    ]
+    # The OD's skim names its mate and states the walls it leaves (rule 20).
+    od_rows = notes.OUTER_DIA_CALLOUT.splitlines()
+    assert od_rows[:3] == ["STOCK;", "SKIM TO <MOD-DIAM>12.5", "WITH MHA-DT-08"]
     for callout in (notes.BORE_FIT_CALLOUT, notes.OUTER_DIA_CALLOUT):
         assert "EPOXY" not in callout and "LATHE" not in callout
     # The prose lives in the notes module, which the mating parts never import.
-    for name in ("DRAWING_NOTES", "HANDLE_NUMBER", "MOUTH_WALL_MIN"):
+    for name in ("DRAWING_NOTES", "HANDLE_NUMBER", "SEAT_FACE_WALL_MIN"):
         assert not hasattr(spec, name), name
     for module in (part, drawing):
         source = Path(module.__file__).read_text(encoding="utf-8")
@@ -196,27 +192,37 @@ def test_seat_mouth_takes_only_the_edge_break() -> None:
     assert handle.TENON_GLUE_LENGTH_MIN >= spec.TENON_GLUE_LENGTH_FLOOR
 
 
-def test_skimmed_wall_at_the_seat_mouth_is_stated_and_declared() -> None:
+def test_skimmed_walls_at_both_faces_are_stated_and_declared() -> None:
     import dt_crank_handle_spec as handle
 
-    # #1900: the plain-bore wall missed the mouth.  At the seat face, the .X
-    # skim small, 0.10 of skim wander, the 0.10 mandrel offset, the largest
-    # bore and the 0.25 break leave 1.50: the rule-17 floor, under the 2.0
-    # target, accepted by the owner (2026-10-24) and stated on the sheet.
-    assert handle.FERRULE_MOUTH_WALL_MIN == pytest.approx(
-        (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10) - 0.25
-    )
-    assert handle.FERRULE_MOUTH_WALL_MIN == pytest.approx(1.50)
+    # #1900: the plain-bore wall missed the faces.  The .X skim small, 0.10 of
+    # skim wander, the 0.10 mandrel offset and the largest bore leave 1.75 on
+    # the thin side.  At the seat face only the bore mouth is broken (the OD
+    # edge is the skim line shared with the oak): 1.50, on the rule-17 floor
+    # (owner ruling 2026-10-24).  At the arm face both edges are broken: 1.25
+    # at the face plane (owner ruling 2026-10-26).  Both print, floored.
+    thin_side = (12.5 - 0.8) / 2.0 - 0.10 - (7.8 / 2.0 + 0.10)
+    assert handle.FERRULE_MOUTH_WALL_MIN == pytest.approx(thin_side - 0.25) == 1.50
+    assert handle.FERRULE_ARM_FACE_WALL_MIN == pytest.approx(thin_side - 0.5) == 1.25
     assert handle.FERRULE_MOUTH_WALL_MIN >= handle.TENON_WALL_FLOOR_MM
     assert handle.FERRULE_MOUTH_WALL_MIN < handle.WALL_TARGET_MM
-    assert notes.MOUTH_WALL_MIN == pytest.approx(handle.FERRULE_MOUTH_WALL_MIN)
-    assert f"WALL {notes.MOUTH_WALL_MIN:.2f} MIN" in notes.OUTER_DIA_CALLOUT
-    (declared,) = load_exceptions(
-        CAD_ROOT / "config", "dt-crank-handle-ferrule", "part"
-    )
-    assert (declared.id, declared.kind) == ("RV-01", "minor")
-    assert "WALL 1.50 MIN" in declared.where
-    assert "2026-10-24" in declared.reason and "#1900" in declared.reason
+    assert handle.FERRULE_ARM_FACE_WALL_MIN >= handle.FERRULE_ARM_FACE_WALL_ACCEPTED_MM
+    assert notes.SEAT_FACE_WALL_MIN <= handle.FERRULE_MOUTH_WALL_MIN
+    assert notes.ARM_FACE_WALL_MIN <= handle.FERRULE_ARM_FACE_WALL_MIN
+    assert "WALL 1.50 MIN AT SEAT FACE" in notes.OUTER_DIA_CALLOUT
+    assert "WALL 1.25 MIN AT ARM FACE" in notes.OUTER_DIA_CALLOUT
+    declared = {
+        entry.id: entry
+        for entry in load_exceptions(
+            CAD_ROOT / "config", "dt-crank-handle-ferrule", "part"
+        )
+    }
+    assert set(declared) == {"RV-01", "RV-02"}
+    assert {entry.kind for entry in declared.values()} == {"minor"}
+    assert "WALL 1.50 MIN AT SEAT FACE" in declared["RV-01"].where
+    assert "2026-10-24 (#1900" in declared["RV-01"].reason
+    assert "WALL 1.25 MIN AT ARM FACE" in declared["RV-02"].where
+    assert "2026-10-26 (#1900, arm face)" in declared["RV-02"].reason
 
 
 def test_skimmed_mouth_wall_assert_fails_below_the_floor(

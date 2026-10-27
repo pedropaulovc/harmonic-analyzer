@@ -90,7 +90,6 @@ from dt_crank_handle_spec import (
     SHOULDER_X,
     TANGENT_POINT_DIAMETERS,
     TENON_FIT_NOTE,
-    TENON_R,
     TENON_ROOT_CALLOUT,
     TENON_ROOT_RELIEF_CALLOUT,
     TENON_X0,
@@ -219,19 +218,20 @@ FRONT_KEEP = {
     # the rows to hang from the keep instead, each box drops ~7 mm and stays
     # clear):
     #   Tenon root, left of the tenon end above the root relief's block: box x
-    #   0.024..0.046, y 0.1689..0.1835 -- 4.0 mm clear of the tenon end's
-    #   extension line (x 0.050), 11.3 inside the border, 8.7 under the 5.0's
-    #   outside tail (y 0.1922) and 10.6 over the relief's block.  Its leader
-    #   runs down-right through the air over the tenon into the relief's mouth
-    #   to the root round.
-    "TenonRootRadius": (_front_x(TENON_X0) - 0.015, _front_y(TENON_R) + 0.031),
-    # The root relief's leg (owner ruling 2026-10-24, #1900): "1.1 ±0.3" over
-    # three callout rows of 11 characters at most, 30.3 x 22.2 mm centred on
-    # the keep, so x 0.0177..0.0480 and y 0.1361..0.1583 -- 2.0 clear of the
-    # tenon end (x 0.050), 5.3 inside the border.  The vertical dimension line
-    # stands there, its extension lines running right over the air above the
-    # tenon to the relief's edge and the tenon OD.
-    "TenonRootRelief": (_front_x(TENON_X0) - 0.0172, _front_y(TENON_R) + 0.0020),
+    #   0.018..0.040, y 0.1832..0.1978 -- 3.6 mm left of the 5.0's outside
+    #   tail (x 0.0436 at y 0.1922), 10.4 clear of the tenon end's extension
+    #   line (x 0.050), 5.6 inside the border and 3.2 over the relief's block.
+    #   Its leader runs down-right through the air over the tenon, right of
+    #   the relief's narrower top rows, into the relief's mouth to the round.
+    "TenonRootRadius": (_front_x(TENON_X0) - 0.021, 0.1905),
+    # The root relief's leg (owner ruling 2026-10-24, #1900): "1.0 ±0.2" over
+    # four callout rows of 10 characters at most, 27.5 x 27.75 mm centred on
+    # the keep, so x 0.0182..0.0457 and y 0.1522..0.1800 -- wholly above the
+    # relief's upper extension line (y 0.1492) by 3.0, so no extension line
+    # strikes it (farm r1 of 1727eecbe struck rows 1-2 with the keep between
+    # the lines), 4.3 clear of the tenon end (x 0.050), 5.8 inside the border.
+    # Its extension lines run left over the air above the tenon end.
+    "TenonRootRelief": (_front_x(TENON_X0) - 0.018, 0.1661),
     #   Counterbore floor, above the section between the swell diameter's
     #   dimension line (x 0.213) and the 8.1's floor extension line (x
     #   0.2416): box x 0.2163..0.2383 (3.3 mm clear of each), y 0.1877..0.2023

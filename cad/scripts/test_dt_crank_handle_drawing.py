@@ -182,10 +182,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2), the
     # contour at the title block's .X band; the root relief (owner ruling
-    # 2026-10-24, #1900) takes up to 1.4 of the seat.
+    # 2026-10-24, #1900) and the break on its edge take up to 1.45 of the seat.
     assert spec.SHOULDER_R == pytest.approx(ferrule.INSTALLED_OUTER_DIA / 2.0)
     assert spec.BORE_ECCENTRICITY == pytest.approx(0.10)
-    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 1.4)
+    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 1.2 - 0.25)
     assert spec.FERRULE_SEAT_RADIAL_MIN >= spec.FERRULE_SEAT_RADIAL_FLOOR == 0.5
     assert spec.TENON_WALL_MIN == pytest.approx(1.55)
     assert spec.WAIST_WALL_MIN == pytest.approx(2.175)
@@ -286,39 +286,42 @@ def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None
     # the shoulder at the tenon root, so MHA-DT-34's seat mouth needs only the
     # 0.25 edge break.  Its minimum keeps the R0.3 MAX root round -- tangent
     # R (1 + sqrt 2) back from the root -- behind the seat face; its maximum
-    # leaves the ferrule 0.5 of shoulder; each rounds inward to one place.
+    # leaves the ferrule 0.5 of flat shoulder after the 0.25 break on the
+    # relief's edge; each rounds inward to one place.
     # The tenon is not cut, so its wall over the pivot bore and its bonded
     # length stand.
     spec = dt_crank_handle_spec
     assert spec.TENON_ROOT_ROUND_REACH == pytest.approx(0.3 * (1.0 + math.sqrt(2.0)))
-    assert (spec.TENON_ROOT_RELIEF_MIN, spec.TENON_ROOT_RELIEF_MAX) == (0.8, 1.4)
-    assert (spec.TENON_ROOT_RELIEF, spec.TENON_ROOT_RELIEF_TOL) == (1.1, 0.3)
+    assert (spec.TENON_ROOT_RELIEF_MIN, spec.TENON_ROOT_RELIEF_MAX) == (0.8, 1.2)
+    assert (spec.TENON_ROOT_RELIEF, spec.TENON_ROOT_RELIEF_TOL) == (1.0, 0.2)
     assert spec.TENON_ROOT_RELIEF_MIN - 0.1 < spec.TENON_ROOT_ROUND_REACH
-    assert spec.TENON_ROOT_RELIEF_MAX + 0.1 > 1.975 - spec.FERRULE_SEAT_RADIAL_FLOOR
+    assert (
+        spec.TENON_ROOT_RELIEF_MAX + 0.1 > 1.975 - 0.25 - spec.FERRULE_SEAT_RADIAL_FLOOR
+    )
     assert spec.TENON_WALL_MIN >= spec.TENON_WALL_FLOOR_MM
     assert "TenonRootRelief" in spec.DRAWING_DIMENSIONS["HandleProfile"]
     assert spec.DRAWING_PRECISION_BY_NAME["TenonRootRelief"] == 1
     assert (
         drawing.DIMENSION_CALLOUTS["TenonRootRelief"] == spec.TENON_ROOT_RELIEF_CALLOUT
     )
-    assert spec.TENON_ROOT_RELIEF_CALLOUT.splitlines() == [
-        "X 45 DEG;",
-        "FERRULE SEAT",
-        "OUTSIDE IT",
-    ]
+    # The band names the seat it serves and the cone's angle (rule 4).
+    relief_callout = spec.TENON_ROOT_RELIEF_CALLOUT.replace("\n", " ")
+    assert "45 DEG" in relief_callout and spec.FERRULE_NAME in relief_callout
     # The profile: the tenon OD runs on behind the seat face into the root
     # round, which the relief line leaves at 45 degrees for the shoulder face.
-    assert handle.RELIEF_TOP == pytest.approx((7.0, spec.TENON_R + 1.1))
+    assert handle.RELIEF_TOP == pytest.approx((7.0, spec.TENON_R + 1.0))
     assert handle.ROOT_ON_TENON[0] > spec.SHOULDER_X
     assert handle.ROOT_ON_RELIEF[0] - handle.RELIEF_TOP[0] == pytest.approx(
         handle.RELIEF_TOP[1] - handle.ROOT_ON_RELIEF[1]
     )
     assert math.dist(handle.ROOT_CENTER, handle.ROOT_ON_RELIEF) == pytest.approx(0.3)
-    assert handle.RELIEF_RUN == pytest.approx(1.1 - 0.3 * (1.0 + 1.0 / math.sqrt(2.0)))
+    assert handle.RELIEF_RUN == pytest.approx(1.0 - 0.3 * (1.0 + 1.0 / math.sqrt(2.0)))
+    assert handle.ROOT_ARC_LENGTH == pytest.approx(0.3 * 3.0 * math.pi / 4.0)
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     assert '("TenonRootRelief", TENON_ROOT_RELIEF)' in build_source
     assert """profile.record("TenonRootRelief", '"TenonRootRelief"')""" in build_source
     assert '(tenon_root, relief, "tenon root on the relief")' in build_source
+    assert "GetLength()" in build_source
 
 
 def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:

@@ -130,6 +130,8 @@ ROOT_ON_RELIEF = (
 # from the leg and the round so the cone stays at 45 degrees.
 RELIEF_RUN = ROOT_ON_RELIEF[0] - SHOULDER_X
 _RELIEF_RUN_EXPR = '"TenonRootRelief" - "InsideCornerR" * 1.7071067812'
+# The root round turns 135 degrees, from the tenon OD to the 45-degree relief.
+ROOT_ARC_LENGTH = INSIDE_CORNER_R_MAX * 3.0 * math.pi / 4.0
 
 
 def _spandrel(
@@ -586,6 +588,17 @@ async def build(adapter) -> dict[str, str]:
             await adapter.add_sketch_constraint(first, second, "tangent"),
         )
     await ensure_fully_defined(adapter, "handle profile")
+    # The volume gate cannot tell the root round's 135-degree sweep from its
+    # 225-degree complement (about one revolved R0.3 disk, inside 0.2 %), so
+    # read the solved arc's length back (codjiflo on PR #1989).
+    root_segment = _early_bound(adapter._sketch_entities[tenon_root], "ISketchSegment")
+    root_length = float(root_segment.GetLength()) * 1000.0
+    if not math.isclose(root_length, ROOT_ARC_LENGTH, abs_tol=1e-4):
+        raise RuntimeError(
+            f"tenon root arc is {root_length:.4f} long, not the 135-degree "
+            f"{ROOT_ARC_LENGTH:.4f} in the relief's corner"
+        )
+    _telemetry.success(f"tenon root arc sweeps 135 degrees ({root_length:.4f})")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HandleProfile")
     drive_jobs += profile.apply(adapter, "HandleProfile")

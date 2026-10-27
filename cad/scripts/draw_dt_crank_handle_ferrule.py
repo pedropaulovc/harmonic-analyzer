@@ -87,7 +87,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (2, 1)
-END_CENTER = (0.085, 0.165)
+# 20 left of iteration 1, so the OD's seven-row block (both stated walls)
+# clears the end view's centre-mark tails (~10 past its edge).
+END_CENTER = (0.065, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.205)
 CAPTION_XY = (0.195, 0.113)
@@ -107,11 +109,11 @@ BORE_TOP_Y = SECTION_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0  # 0.1804
 # Each block is its value plus callout rows at 5.55 pitch, ~2.75 per
 # character, centred on its keep point.
 SECTION_KEEP = {
-    # "(Ø14.29)" over six rows, the widest 14 chars: 38.5 x 33.3, so x
-    # 0.1558-0.1943 and y 0.1484-0.1817.  It clears the section's left edge
-    # (x 0.201) by 6.7, the OD's extension lines (y 0.136, 0.194) by 12, and
-    # the end view (right edge x 0.115) by 40.
-    "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.026, SECTION_CENTER[1]),
+    # "(Ø14.29)" over seven rows, the widest 27 chars: 74.3 x 38.9, so x
+    # 0.1209-0.1951 and y 0.1456-0.1844.  It clears the section's left edge
+    # (x 0.201) by 5.9, the OD's extension lines (y 0.136, 0.194) by 9, and
+    # the end view's centre-mark tail (~x 0.104) by 17.
+    "OuterDia": (0.158, SECTION_CENTER[1]),
     # "Ø7.70 ±0.1" over three rows, the widest 25 chars: 68.8 x 22.2, so x
     # 0.2626-0.3314 and y 0.1539-0.1761, between the bore's extension lines
     # (y 0.1496, 0.1804); the isometric note (x 0.345) stands 13.6 clear.
