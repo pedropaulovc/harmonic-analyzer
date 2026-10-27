@@ -70,6 +70,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _drawing_precision import _named_dimension, _named_dimensions, apply_drawing_precision
+from _named_views import name_octant_views, octant_key
 from _drawing_tolerances import set_dimension_symmetric_tolerance
 from ms_stick_geom import (
     DIVISION_COUNT,
@@ -912,6 +913,11 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
             "Numeral Placement Note": NUMERAL_PLACEMENT_NOTE,
         },
+    )
+    name_octant_views(
+        adapter,
+        octants={octant_key(*callouts.RULED_FACE_ISOMETRIC_OCTANT): callouts.RULED_FACE_ISOMETRIC_OCTANT},
+        label=PART_NAME,
     )
     _hide_manufacturing_chords(adapter)
     outputs = await save_part_and_images(adapter, PART_NAME)

@@ -43,6 +43,13 @@ import _telemetry
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"
+# Top-plane foot chain (sketch y = -model Z). The first vertical segment is
+# the free -X end, so the drawing's FlangeDepth witnesses start on the real
+# foot top and bottom corners, not on the +X face shared with the upright.
+# Same anchor vertex and FlangeWidth segment as before; geometry is unchanged.
+FOOT_PROFILE = ((FLANGE_X[0], -FLANGE_Z[0]), (FLANGE_X[0], -FLANGE_Z[1]), (FLANGE_X[1], -FLANGE_Z[1]), (FLANGE_X[1], -FLANGE_Z[0]))
+FOOT_PROFILE_ANCHOR = 1
+FOOT_PROFILE_DIMENSIONS = ("FlangeDepth", "FlangeWidth", "FlangeCornerX", "FlangeCornerZ")
 
 
 def _construction(adapter, entity: str) -> None:
@@ -276,9 +283,9 @@ async def build(adapter) -> dict[str, str]:
 
     dims = SketchDims()
     check("foot profile", await adapter.create_sketch("Top"))
-    points = [(FLANGE_X[0], -FLANGE_Z[1]), (FLANGE_X[1], -FLANGE_Z[1]), (FLANGE_X[1], -FLANGE_Z[0]), (FLANGE_X[0], -FLANGE_Z[0])]
+    points = list(FOOT_PROFILE)
     lines = await add_line_chain(adapter, points)
-    await define_rectilinear_chain(adapter, lines, points, label="foot", dims=dims, names=["FlangeWidth", "FlangeDepth", "FlangeCornerX", "FlangeCornerZ"])
+    await define_rectilinear_chain(adapter, lines, points, anchor=FOOT_PROFILE_ANCHOR, label="foot", dims=dims, names=list(FOOT_PROFILE_DIMENSIONS))
     await ensure_fully_defined(adapter, "foot profile")
     check("exit foot profile", await adapter.exit_sketch())
     name_last_feature(adapter, "FlangeProfile")

@@ -204,20 +204,28 @@ PLAN_CENTER_MARKS = 2  # the hold-down hole and the apex set-screw tap
 # Every plan length along the foot runs from the ear's INBOARD face (the plan's
 # top edge): the face fit-up sets and the fixtures hold Z0 on. Only the hole
 # station stands on the left; the tap station, the ear thickness and the foot
-# length step out on the right, each text in its own column (the foot length's
-# extension lines leave the EAST corners, so on the left they would run the
-# whole top edge the tap's leader must cross). The tap station's text sits
-# above its short span, high enough that the ear thickness's outside arrow
-# (which runs up past the plan's top edge) stops below it (r1 render: the
-# arrow struck "SHAFT"), its text starting at its own dimension line, east
-# of the tap callout. Both laterals start on the west side face, below the
+# length step out on the right, nested shortest first, each in its own column
+# (the foot length's extension lines leave the EAST corners, so on the left
+# they would run the whole top edge the tap's leader must cross). Each banded
+# station's text hangs off its own dimension line, at its own arrows, the two
+# staggered (5bca52e machinist review FIX: the 4.00 block stood over the 8.00
+# column's top arrow and the 8.00 text sat inside the 4.00 span, beside its
+# lower arrow, so neither value read as its own pair's). The tap station's
+# text stands ABOVE its short span: the shelf starts on its column 10 mm off
+# the plan and the ~55 mm block runs east from it, east of the tap callout.
+# The ear thickness's column stands clear east of that block, and its text
+# hangs BELOW its span, under the ear's outboard-face line and over the foot
+# length's lower extension line, the ~76 mm block running east from its own
+# column, east of the hold-down hole's callout. The foot length's column
+# stands past that block, its text in the upper half of its span, level with
+# neither banded block. Both laterals start on the west side face, below the
 # plan, where the foot width nests outside them. Above the plan's left half
 # only the apex tap callout stands.
 TOP_KEEP = {
     "HoleStation": (_WEST_X - 0.010, _top_y(FOOT_Z0 + HOLE_STATION / 2.0)),
-    "SetScrewLocation": (_EAST_X + 0.030, _top_y(FOOT_Z0) + 0.017),
-    "EarThick": (_EAST_X + 0.075, _top_y(0.0)),
-    "FootLen": (_EAST_X + 0.119, _top_y(FOOT_Z1) + 0.012),
+    "SetScrewLocation": (_EAST_X + 0.010, _top_y(FOOT_Z0) + 0.017),
+    "EarThick": (_EAST_X + 0.077, _top_y(FOOT_Z0 + EAR_T) - 0.010),
+    "FootLen": (_EAST_X + 0.160, TOP_CENTER[1] + 0.008),
     "HoleDia": (FRONT_CENTER[0] + 0.045, _top_y(HOLE_Z) - 0.001),
     "HoleLateral": (FRONT_CENTER[0] - FOOT_W / 4.0 * _S, _top_y(FOOT_Z1) - 0.008),
     "FootW": (FRONT_CENTER[0], _top_y(FOOT_Z1) - 0.019),
