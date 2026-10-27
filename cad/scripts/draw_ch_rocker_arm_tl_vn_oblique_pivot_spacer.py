@@ -14,6 +14,9 @@ from _session import run_build
 from _supplier_limits import LIMIT
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_pivot_spacer"]
 ITEM = '18-8 STAINLESS STEEL ROUND SPACER, 10 MM ID X 16 MM OD X 15 MM'

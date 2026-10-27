@@ -63,6 +63,9 @@ from ch_rocker_arm_tl_oblique_jig_assembly_spec import HOLD_DOWN_REFERENCE
 from _layout_audit import display_box, estimated_text_runs
 from _drawing_layout_audit import annotation_display
 from _layout_geometry import Box, Segment, segment_box_distance
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 
 SPEC = DRAWINGS_BY_NAME["sh_vn_clamping_kit_hardware"]

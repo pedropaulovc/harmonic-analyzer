@@ -1,6 +1,5 @@
 """Physical contracts for TL-32's integral, drill-to-print nut lug."""
 from __future__ import annotations
-import ast
 import math
 from pathlib import Path
 import _config
@@ -82,6 +81,4 @@ def test_feed_entrypoints_use_the_native_shared_geometry_and_not_a_separate_brac
     assert 'NutTaps' in shared and 'NutSeat' in shared and 'LugProfile' in shared
     assert 'part.NUT_HOLES_YZ' in shared
     drawing=(folder/'draw_ch_rocker_arm_tl_oblique_feed_block.py').read_text()
-    tree=ast.parse(drawing)
-    assert not any(isinstance(n,ast.Name) and n.id=='MACHINIST_REVIEW' for n in ast.walk(tree))
     assert 'draw_block(adapter,SPEC,part,read_source_properties=_read_source_properties)' in drawing

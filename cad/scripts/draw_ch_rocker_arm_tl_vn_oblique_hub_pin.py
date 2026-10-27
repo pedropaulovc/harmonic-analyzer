@@ -15,6 +15,9 @@ from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_draw
 from _session import run_build
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
 from _supplier_text_shelf import assert_supplier_shelves, shelve_supplier_text
+from _machinist_review_mode import MachinistReviewMode
+
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_vn_oblique_hub_pin"]
 ITEM = "CLASS Z MINUS GAUGE PIN, Ø10.2 X 2 IN SUPPLY"
