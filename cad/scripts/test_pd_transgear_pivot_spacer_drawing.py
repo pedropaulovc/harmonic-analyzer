@@ -108,7 +108,7 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
     """The wall charges whichever permitted break sets back further: an R0.4
     break with the 0.25 chamfer kept leaves 2.0325 - 2 x 0.15 < 2.0, so the
     spec refuses rather than missing the radius."""
-    import importlib
+    import importlib.util
 
     real = _config.title_block
 
@@ -117,12 +117,14 @@ def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
         return {**row, "radius_mm": 0.4} if key == "edge_break" else row
 
     monkeypatch.setattr(_config, "title_block", title_block)
-    try:
-        with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.732 < the 2\.0"):
-            importlib.reload(spec)
-    finally:
-        monkeypatch.undo()
-        importlib.reload(spec)
+    # Execute a private copy: reloading the shared module would rebind its
+    # band tuples, and test_fit_bands matches consumers to bands by id().
+    probe_spec = importlib.util.spec_from_file_location(
+        "_pivot_spacer_spec_probe", spec.__file__
+    )
+    probe = importlib.util.module_from_spec(probe_spec)
+    with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.732 < the 2\.0"):
+        probe_spec.loader.exec_module(probe)
     assert spec.EDGE_BREAK == pytest.approx(0.25)
 
 
