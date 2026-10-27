@@ -1077,11 +1077,14 @@ def _web_diameter_under_section(
         raise RuntimeError("section A-A needs exactly one native ShoulderHoleDia")
     annotation = _early_bound(matches[0], "IAnnotation")
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    # ShoulderHoleProfile's define_circle DIAMETER imports diametric; the sheet
+    # only reads it (never re-solves a model dimension through Diametric).
+    if not bool(display.Diametric):
+        raise RuntimeError("Ø25 web hole imported without its diameter dimension")
     if place:
-        display.Diametric = True
         display.ArrowSide = _ARROWS_INSIDE
-    if not bool(display.Diametric) or int(display.ArrowSide) != _ARROWS_INSIDE:
-        raise RuntimeError("Ø25 web hole lost its two-arrow diametric style")
+    if int(display.ArrowSide) != _ARROWS_INSIDE:
+        raise RuntimeError("Ø25 web hole lost its two-arrow style")
     if place:
         return
     outline = tuple(
