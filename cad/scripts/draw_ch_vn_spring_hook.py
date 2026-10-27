@@ -34,23 +34,9 @@ from _drawing_common import (
 from _drawing_dimension_import import curate_view_dimensions
 from _drawing_dimensions import set_dimension_callouts, set_dimension_precision
 from _drawing_hidden_sketches import curate_view_dimensions as curate_stock_dimensions
-from _drawing_layout_audit import _Reader, _dump_annotation
 from _drawing_notes import add_property_linked_note
 from _drawing_registry import DRAWINGS_BY_NAME
 from _drawing_sheet_region import sheet_drawable_region
-from _layout_audit import (
-    annotation_geometry,
-    calibrate_sheet_advance,
-    find_arrows_near_text,
-    find_lines_through_own_text,
-)
-from _layout_geometry import (
-    ARROW_TEXT_CLEARANCE_M,
-    DEFAULT_ADVANCE_RATIO,
-    SheetGeometry,
-    segment_box_distance,
-)
-from _native_text_runs import lower_left_texts, measured_run_ink
 from _purchased_fastener_drawing import assert_supplier_view_fits
 from _rebuild import active_configuration_name
 from _supplier_dimensions import (
@@ -102,16 +88,18 @@ ISO_CENTER = (0.310, 0.209)
 # 80ff6d1a read y 0.1587..0.2673 at centre 0.213, 0.6 mm past the border);
 # centred at 0.209 its top is 0.2633 and its bottom 0.1547.
 # Deburr texts. The 45 deg angle's vertex is where the chamfer meets the cut
-# end, (106.5, 103.2) mm on the b344192 render; SolidWorks runs the angle's
-# arc through its text. Parked at radius 22.3 next to the 45 deg ray it sat on
-# its own chamfer extension line and arc arrowhead (machinist b344192, rule
-# 14), so the text is centred on the bisector (22.5 deg) at radius 26: its
-# ~6.8 x 3.5 box stands >= 6 mm off both rays and >= 4 mm off both
-# arrowheads, the arc broken around it as on every dimension here. The width
-# block drops 2 mm: its MIN row stood 1.5 mm under the arc's lower arrowhead
-# (the audit's arrow-to-text clearance is 2.0) and now stands 3.5 mm under it,
-# still right of the shank, clear of its own extension lines (review r8:
-# centred under the 2.3 mm leg they were struck) and ~6 mm above the notes.
+# end, (106.5, 103.2) mm; SolidWorks runs the angle's arc through its text and
+# breaks it at the text box. Parked at radius 22.3 next to the 45 deg ray it
+# sat on its own chamfer extension line and arc arrowhead (machinist b344192,
+# rule 14), so the text is centred on the bisector (22.5 deg) at radius 26.
+# Settled native ink (runs fa43a1a5, ae121732; run boxes at SolidWorks'
+# widths): the 45 deg's arrowheads stand 3.6 and 4.8 mm off its text, its
+# extension lines 6.0 and 7.2 mm, its lower arrowhead 4.5 mm off the width
+# block, and no own line runs inside any control's text. The width block
+# drops 2 mm (its MIN row stood 1.5 mm under that arrowhead) and still stands
+# right of the shank, clear of its own extension lines (review r8: centred
+# under the 2.3 mm leg they were struck) and ~6 mm above the notes. The
+# shared layout audit, not a sheet check, guards the settled ink.
 FRONT_KEEP = {
     "FinishedOverall": (0.042, FRONT_CENTER[1]),
     "ChamferWidth": (0.168, 0.098),
@@ -153,65 +141,6 @@ def _verify_controls(annotations: list[Any]) -> None:
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
         precision=DIMENSION_PRECISION,
     )
-
-
-@_telemetry.traced("drawing.spring_hook.control_ink")
-def _verify_control_ink(adapter: Any, annotations: list[Any]) -> None:
-    """Settled cutting-control ink: no dimension's own line or arrowhead
-    strikes its own text, and no arrowhead crowds another control's text.
-
-    The audit's own-line finders, plus the fleet's arrow-to-text clearance on
-    each control's OWN arrowheads, which ``find_arrows_near_text`` exempts
-    (machinist b344192: the 45 deg sat on its own arc arrowhead). Text is
-    read as it prints: each run moved from its native anchor to its
-    lower-left, and boxed at the width SolidWorks reports. Only a run with no
-    reported width is estimated, at the calibrated advance floored at the
-    audit's default so the estimate never narrows the box (as the cylinder
-    spring's ``size_text_box``): a single-run dimension has no calibration
-    sample.
-    """
-    reader = _Reader(adapter)
-    records = [_dump_annotation(reader, annotation) for annotation in annotations]
-    errors = reader.take_errors()
-    if errors or any(
-        record is None or not (record.get("display") or {}).get("texts")
-        for record in records
-    ):
-        raise RuntimeError(f"unreadable settled cutting-control text/ink: {errors}")
-    records = [
-        lower_left_texts(record, label=str(record.get("name") or "cutting control"))
-        for record in records
-    ]
-    advance = max(calibrate_sheet_advance(records), DEFAULT_ADVANCE_RATIO)
-    geometries = tuple(
-        annotation_geometry(
-            record, owner="front", advance=advance, ink=measured_run_ink(record)
-        )
-        for record in records
-    )
-    if any(geometry is None or not geometry.text_boxes for geometry in geometries):
-        raise RuntimeError("a settled cutting control prints no readable text")
-    sheet = SheetGeometry("FINISHED", 0.0, 0.0, None, annotations=geometries)
-    struck = [
-        finding.format()
-        for finding in (
-            *find_lines_through_own_text(sheet),
-            *find_arrows_near_text(sheet),
-        )
-    ]
-    struck += [
-        f"{geometry.label}: own arrowhead {arrow.format_mm()} within "
-        f"{ARROW_TEXT_CLEARANCE_M * 1000:g} mm of its text {box.format_mm()}"
-        for geometry in geometries
-        for arrow in geometry.segments
-        if arrow.role == "arrow"
-        for box in geometry.text_boxes
-        if segment_box_distance(arrow, box) < ARROW_TEXT_CLEARANCE_M
-    ]
-    if struck:
-        raise RuntimeError(
-            "cutting-control text is struck by line ink:\n" + "\n".join(struck)
-        )
 
 
 def _supplier_references(adapter: Any, front: Any) -> list[tuple[str, dict[str, Any]]]:
@@ -381,7 +310,6 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         settled_checks=(
             lambda: _verify_controls(annotations),
-            lambda: _verify_control_ink(adapter, annotations),
             lambda: _verify_supplier_references(
                 adapter, refs, view_names, finished_configuration
             ),

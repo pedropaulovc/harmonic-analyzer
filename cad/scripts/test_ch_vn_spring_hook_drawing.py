@@ -299,119 +299,6 @@ def test_settled_sheet_keeps_only_the_thread_as_supplier_reference(monkeypatch, 
         check()
 
 
-def _mm_box(x0, y0, x1, y1):
-    from _layout_geometry import Box
-
-    return Box(x0 / 1000, y0 / 1000, x1 / 1000, y1 / 1000)
-
-
-def _mm_run(x0, y0, x1, y1, role):
-    from _layout_geometry import Segment
-
-    return Segment(x0 / 1000, y0 / 1000, x1 / 1000, y1 / 1000, role)
-
-
-def _deburr_ink(placement):
-    """The deburr controls' settled ink in sheet mm. ``b344192`` is the
-    machinist-reviewed render's layout audit: the 45 deg parked beside its
-    45 deg ray at radius 22.3. ``moved`` is FRONT_KEEP's: the text on the
-    bisector at radius 26 about the (106.5, 103.2) vertex, the arc broken
-    round it, and the width block 2 mm lower."""
-    from _layout_geometry import AnnotationGeometry
-
-    if placement == "b344192":
-        text, width_row = (120.6, 115.2, 127.4, 118.7), (123.5, 98.2, 212.5, 101.7)
-        runs = (
-            (109.5, 106.2, 122.9, 119.7, "ext-line"),
-            (112.0, 103.2, 129.8, 103.2, "ext-line"),
-            (128.8, 103.2, 124.0, 117.0, "dim-line"),
-            (124.0, 117.0, 123.1, 118.0, "dim-line"),
-            (128.8, 103.2, 128.1, 106.7, "arrow"),
-            (122.3, 119.0, 124.5, 116.3, "arrow"),
-        )
-    else:
-        text, width_row = (127.1, 111.4, 133.9, 114.9), (123.5, 96.2, 212.5, 99.7)
-        runs = (
-            (109.5, 106.2, 125.6, 122.3, "ext-line"),
-            (112.0, 103.2, 133.5, 103.2, "ext-line"),
-            (132.5, 103.2, 131.6, 109.9, "dim-line"),
-            (129.0, 116.2, 124.9, 121.6, "dim-line"),
-            (132.5, 103.2, 132.3, 106.7, "arrow"),
-            (124.9, 121.6, 127.2, 119.0, "arrow"),
-        )
-    angle = AnnotationGeometry(
-        "ChamferAngle",
-        "dim",
-        "front",
-        (_mm_box(*text),),
-        tuple(_mm_run(*run) for run in runs),
-    )
-    width = AnnotationGeometry("ChamferWidth", "dim", "front", (_mm_box(*width_row),))
-    return {"ChamferAngle": angle, "ChamferWidth": width}
-
-
-@pytest.mark.parametrize("placement", ["moved", "b344192", "own_arrow"])
-def test_settled_deburr_texts_clear_their_own_line_ink(monkeypatch, placement):
-    """Machinist b344192 (rule 14): the 45 deg sat on its own chamfer
-    extension line and arc arrowhead. The reviewed layout must fail the
-    settled check and the moved one pass; an own arrowhead within the
-    arrow-to-text clearance fails even with every line clear. The check is
-    one operation span, closed on success and on refusal alike."""
-    import contextlib
-
-    import _telemetry
-
-    spans = []
-
-    @contextlib.contextmanager
-    def span(name, **_attributes):
-        spans.append(name)
-        try:
-            yield None
-        finally:
-            spans.append(f"/{name}")
-
-    monkeypatch.setattr(_telemetry, "span", span)
-    from dataclasses import replace
-
-    ink = _deburr_ink("b344192" if placement == "b344192" else "moved")
-    if placement == "own_arrow":
-        angle = ink["ChamferAngle"]
-        ink["ChamferAngle"] = replace(
-            angle,
-            segments=(*angle.segments, _mm_run(129.0, 116.2, 128.0, 115.5, "arrow")),
-        )
-    reader = SimpleNamespace(take_errors=lambda: [])
-    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
-    monkeypatch.setattr(
-        drawing,
-        "_dump_annotation",
-        lambda _reader, name: {
-            "name": name,
-            "display": {
-                "texts": [{"t": name, "pos": [0.1, 0.1, 0.0], "h": 0.0035, "ref": 1}]
-            },
-        },
-    )
-    monkeypatch.setattr(drawing, "calibrate_sheet_advance", lambda _records: 0.6)
-    monkeypatch.setattr(
-        drawing, "annotation_geometry", lambda record, **_kwargs: ink[record["name"]]
-    )
-
-    def check():
-        drawing._verify_control_ink(None, list(ink))
-
-    if placement == "moved":
-        check()
-    else:
-        with pytest.raises(RuntimeError, match="struck by line ink"):
-            check()
-    assert spans == [
-        "drawing.spring_hook.control_ink",
-        "/drawing.spring_hook.control_ink",
-    ]
-
-
 def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
     """An angle's text outside its 0..45 deg wedge measures another angle; on
     the bisector at radius 26 it stands off both rays by more than its box."""
@@ -423,212 +310,61 @@ def test_angle_text_sits_inside_the_deburr_wedge_on_its_bisector():
     assert drawing.FRONT_KEEP["ChamferWidth"][1] < 0.100
 
 
-# The settled 45 deg as SolidWorks dumped it (layout audit of run fa43a1a5,
-# FRONT_KEEP's bisector placement): one lower-left run, native width 9.625.
-NATIVE_CHAMFER_ANGLE = {
-    "type": 4,
-    "name": "ChamferAngle",
-    "visible": 1,
-    "owner_type": 0,
-    "pos": [0.1305, 0.1132, 0.0005],
-    "display": {
-        "lines": [
-            [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.1120414,
-                0.1032311,
-                0.0005,
-                0.1334869,
-                0.1032311,
-                0.0005,
-            ],
-            [
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                0.1094701,
-                0.1062166,
-                0.0005,
-                0.1255781,
-                0.1223246,
-                0.0005,
-            ],
-        ],
-        "arcs": [
-            [
-                0.0,
-                0.0,
-                -1.0,
-                -1.0,
-                0.1324869,
-                0.1032311,
-                0.0005,
-                0.1314728,
-                0.1104219,
-                0.0005,
-                0.1064846,
-                0.1032311,
-                0.0005,
-                0.0,
-                0.0,
-                1.0,
-                1.0,
-            ],
-            [
-                0.0,
-                0.0,
-                -1.0,
-                -1.0,
-                0.129148,
-                0.1159781,
-                0.0005,
-                0.124871,
-                0.1216174,
-                0.0005,
-                0.1064846,
-                0.1032311,
-                0.0005,
-                0.0,
-                0.0,
-                1.0,
-                1.0,
-            ],
-        ],
-        "arrows": [
-            [
+def test_fixed_deburr_angle_text_clears_its_own_ink_by_two_millimetres():
+    """Arithmetic on the settled native 45 deg (layout audits of runs fa43a1a5
+    and ae121732, FRONT_KEEP's bisector placement), sheet metres: its run box
+    at SolidWorks' 9.625 width, both arrowheads (GetArrowHeadAtIndex2 rows)
+    and both extension lines stand at least the fleet's 2 mm arrow-to-text
+    clearance off its text, and its lower arrowhead off the width block's MIN
+    row (machinist b344192: the text sat on its own ray and arrowhead)."""
+    from _layout_audit import arrowhead_segments
+    from _layout_geometry import (
+        ARROW_TEXT_CLEARANCE_M,
+        Box,
+        Segment,
+        segment_box_distance,
+    )
+
+    assert drawing.FRONT_KEEP["ChamferAngle"] == pytest.approx((0.1305, 0.1132))
+    text = Box(0.1256875, 0.1104219, 0.1256875 + 0.009625, 0.1104219 + 0.0035)
+    min_row = Box(0.1232316, 0.0952219, 0.1232316 + 0.0895368, 0.0952219 + 0.0035)
+    arrowheads = [
+        arrowhead_segments(row)
+        for row in (
+            (
                 0.1324869,
                 0.1032311,
                 0.0005,
                 -0.0679048,
                 0.9976918,
-                -0.0,
+                0.0,
                 0.003556,
                 0.000762,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-            ],
-            [
+            ),
+            (
                 0.124871,
                 0.1216174,
                 0.0005,
                 0.6574587,
                 -0.7534906,
-                -0.0,
+                0.0,
                 0.003556,
                 0.000762,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-            ],
-        ],
-        "texts": [
-            {
-                "t": " 45\u00b0 ",
-                "pos": [0.1256875, 0.1104219, 0.0005],
-                "h": 0.0035,
-                "ref": 1,
-                "ang": 0.0,
-                "w": 0.009625,
-            },
-        ],
-    },
-    "dim": {"hole_callout": False},
-}
-
-
-def _run_native_ink_check(monkeypatch, records):
-    """``_verify_control_ink`` on dump-shaped records, through the real
-    normalization, advance calibration and ``annotation_geometry``."""
-    reader = SimpleNamespace(take_errors=lambda: [])
-    monkeypatch.setattr(drawing, "_Reader", lambda _adapter: reader)
-    monkeypatch.setattr(
-        drawing, "_dump_annotation", lambda _reader, index: records[index]
+            ),
+        )
+    ]
+    rays = (
+        Segment(0.1120414, 0.1032311, 0.1334869, 0.1032311, "ext-line"),
+        Segment(0.1094701, 0.1062166, 0.1255781, 0.1223246, "ext-line"),
     )
-    drawing._verify_control_ink(None, list(range(len(records))))
 
+    def gap(segments, box):
+        return min(segment_box_distance(segment, box) for segment in segments)
 
-def _probe(width_mm, line_x_mm):
-    """A one-run, arrowless dimension "1111" at (100, 100) mm, 3.5 tall, with
-    a vertical line of its own across the row at ``line_x_mm``. Its single run
-    gives no advance sample, so an estimate uses the 0.62 default: 8.68 mm."""
-    run = {"t": "1111", "pos": [0.100, 0.100, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0}
-    if width_mm is not None:
-        run["w"] = width_mm / 1000
-    x = line_x_mm / 1000
-    return {
-        "type": 4,
-        "name": "Probe",
-        "visible": 1,
-        "display": {
-            "texts": [run],
-            "lines": [[0.0, 0.0, 0.0, 0.0, x, 0.0980, 0.0, x, 0.1055, 0.0]],
-        },
-    }
-
-
-@pytest.mark.parametrize(
-    ("width_mm", "line_x_mm", "refused"),
-    [
-        (5.0, 107.0, False),  # native 5.0 wide: the line stands 2 mm clear
-        (None, 107.0, True),  # no native width: the 0.62 estimate is struck
-        (12.0, 110.0, True),  # native 12.0 wide: the estimate would hide it
-        (5.0, 103.0, True),  # a real strike through the measured run
-    ],
-)
-def test_native_run_widths_decide_the_ink_check(
-    monkeypatch, width_mm, line_x_mm, refused
-):
-    """Review 4385690681: a single-run dimension boxed at the 0.62 estimate is
-    falsely refused when its native run is narrower, and an under-estimate
-    hides a real strike. Measured widths decide; only a run SolidWorks gave
-    no width keeps the estimate."""
-    record = _probe(width_mm, line_x_mm)
-    if not refused:
-        _run_native_ink_check(monkeypatch, [record])
-        return
-    with pytest.raises(RuntimeError, match="struck by line ink"):
-        _run_native_ink_check(monkeypatch, [record])
-
-
-def test_the_settled_native_deburr_angle_passes(monkeypatch):
-    """The real fa43a1a5 record clears its own lines and arrowheads when read
-    at its native width."""
-    _run_native_ink_check(monkeypatch, [NATIVE_CHAMFER_ANGLE])
-
-
-@pytest.mark.parametrize(
-    ("reference", "line_x_mm", "refused"),
-    [
-        (2, 107.0, False),  # centred: read raw, the box shifts onto the line
-        (4, 107.0, False),  # lower-right: likewise
-        (4, 103.0, True),  # lower-right: read raw, the strike is hidden
-    ],
-)
-def test_anchored_text_runs_normalize_to_their_lower_left(
-    monkeypatch, reference, line_x_mm, refused
-):
-    """Review 4385690674: SolidWorks may report a run at a centred or right
-    anchor, but the audit's boxes read every position as lower-left. The
-    probe's 5 mm run truly spans x 100..105; it is reported at its anchor."""
-    from _layout_audit import _TEXT_ANCHORS
-    from _native_text_runs import lower_left_texts
-
-    record = _probe(5.0, line_x_mm)
-    (run,) = record["display"]["texts"]
-    fx, fy = _TEXT_ANCHORS[reference]
-    run["pos"] = [0.100 + fx * run["w"], 0.100 + fy * run["h"], 0.0]
-    run["ref"] = reference
-    (normal,) = lower_left_texts(record, label="Probe")["display"]["texts"]
-    assert (normal["ref"], normal["pos"]) == (1, pytest.approx([0.100, 0.100, 0.0]))
-    if not refused:
-        _run_native_ink_check(monkeypatch, [record])
-        return
-    with pytest.raises(RuntimeError, match="struck by line ink"):
-        _run_native_ink_check(monkeypatch, [record])
+    clearances = [gap(head, text) for head in arrowheads] + [
+        gap([ray], text) for ray in rays
+    ]
+    assert clearances == pytest.approx([0.00362, 0.00477, 0.00719, 0.00602], abs=5e-5)
+    assert min(clearances) >= ARROW_TEXT_CLEARANCE_M
+    assert gap(arrowheads[0], min_row) == pytest.approx(0.00451, abs=5e-5)
+    assert gap(arrowheads[0], min_row) >= ARROW_TEXT_CLEARANCE_M
