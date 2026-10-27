@@ -810,9 +810,14 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     from _layout_geometry import Box, Segment, segment_box_distance
 
     authored = {reading.text.splitlines()[0]: reading.text_xy for reading in drawing.capture_readings()}
-    cotter = _captured_capture_callout("C5B COTTER EYE / PRONGS", authored["C5B COTTER EYE / PRONGS"])
+    # Retired routes (old C5A at (0.305, 0.216), old C4A junction) are only the
+    # negative controls; the current-layout checks use run 11's native leaders
+    # (layout-audit JSON DetailItem374 C5A, DetailItem375 C4A, DetailItem377 C5B).
     flat = _captured_capture_callout("C5A FLAT PIN END")
     cross_hole = Segment(0.2545473, 0.2122206, 0.3184239, 0.17925, "leader")
+    flat_now = Segment(*_NATIVE_RIGHT_COLUMN["C5A FLAT PIN END"][2], "leader")
+    cross_hole_now = Segment(0.2545473, 0.2103143, 0.308, 0.1745, "leader")
+    cotter_now = Segment(0.287412, 0.2037175, 0.25535, 0.2402265, "leader")
     locator_caption = (0.224, 0.2154743, 0.2705646, 0.2189743)
     section_a = (0.2924833, 0.1402120, 0.3495167, 0.1897880)
     assert drawing._segment_crosses_box(cross_hole, _captured_cotter_glyph((0.280, 0.205)), inset=0.0)
@@ -821,17 +826,17 @@ def test_capture_measured_cotter_air_rejects_neighboring_leaders_caption_and_mod
     assert drawing._capture_overlap(_captured_cotter_glyph((0.288, 0.198)), section_a)
     glyph = _captured_cotter_glyph(authored["C5B COTTER EYE / PRONGS"])
     assert drawing._capture_inside(glyph, drawing.CAPTURE_READING_REGION)
-    for neighbor in (cross_hole, flat.segments[0]):
+    for neighbor in (cross_hole_now, flat_now):
         assert not drawing._segment_crosses_box(neighbor, glyph, inset=0.0)
         assert segment_box_distance(neighbor, Box(*glyph)) > 0.0
     for obstacle in (locator_caption, section_a):
         assert not drawing._capture_overlap(glyph, obstacle)
-        assert not drawing._segment_crosses_box(cotter.segments[0], obstacle, inset=0.0)
+        assert not drawing._segment_crosses_box(cotter_now, obstacle, inset=0.0)
     leaders = [
         LeaderSegment(label=label, kind="note", x0=segment.x0, y0=segment.y0,
                       x1=segment.x1, y1=segment.y1)
         for label, segment in (
-            ("cotter", cotter.segments[0]), ("flat pin", flat.segments[0]), ("cross-hole", cross_hole),
+            ("cotter", cotter_now), ("flat pin", flat_now), ("cross-hole", cross_hole_now),
         )
     ]
     assert find_leader_leader_crossings(leaders) == []
