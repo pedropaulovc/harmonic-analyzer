@@ -1918,18 +1918,25 @@ clients for matching token requests. Refresh is singleflight per request identit
 and starts five minutes before expiry (or at the token's earlier `refresh_on`
 time). Backoff does not hold a lock or delay unrelated identities. Speculative
 prewarm uses a private client and one acquisition attempt, without retry backoff.
-Only a successfully warmed client can be published; failed or losing speculative
-clients and their credentials are closed. The first real probe can proceed
-independently after its bounded prewarm wait.
+An authenticated client can be published even if the warm HEAD reports a
+storage-side error, avoiding a redundant token traversal; authentication failures
+remain private. Failed or losing speculative clients and their credentials are
+closed. The first real probe can proceed independently after its bounded wait.
 
 Only transient credential unavailability is retried: at most three acquisition
 attempts, with one- then two-second backoffs. Typed observations distinguish
 unavailability caused by subprocess/network timeouts or transport failures from
-missing configuration. A chain with no usable credential source costs one
-traversal and no backoff; genuine authentication failures also fail immediately.
+missing configuration. Managed-identity endpoint discovery that has never
+successfully supplied a token is unavailable, not a retryable transport outage:
+an absent IMDS endpoint on a non-Azure host costs one traversal and no backoff.
+After that managed-identity link has succeeded, transient outages can use the
+bounded retry policy. First-fetch CLI invocation timeouts remain retryable.
+Genuine authentication failures fail immediately.
 
 Exhausted transient unavailability suppresses **additional retries** for that
-request identity for 30 seconds, but never caches or replays an exception.
+request identity for 30 seconds, but never caches or replays an exception across
+acquisitions. Concurrent callers joining the same in-flight acquisition share
+its result or original exception through the singleflight future.
 Every later acquisition still makes one fresh attempt, so a recovered credential
 can immediately restore published artifacts, including after farm success.
 Successful acquisition clears retry suppression; after the deadline, the full
@@ -1937,9 +1944,11 @@ bounded retry budget is available again.
 Unhashable request options bypass token reuse without preventing acquisition.
 Every retry emits a `cache.credential.retry` span event and warning when telemetry
 is already loaded; a bare pool probe never imports/configures telemetry for this.
-Structured observations identify each chain link, its outcome, exception and
-cause types; the acquisition span records the attempt count. No token, claims or
-raw exception message is recorded by retry telemetry. Exhausted credential
+Structured observations identify each chain link, its outcome, exception,
+immediate cause and matched transient cause types. The acquisition span records
+the attempt count and whether retries were suppressed, with the remaining
+suppression duration. No token, claims or raw exception message is recorded by
+retry telemetry. Exhausted credential
 failures retain their original exception and follow the existing restore/store
 error path. In particular, a farm success still requires a successful restore of
 the exact key: credential failure cannot make `cache_missing` pass.

@@ -1323,23 +1323,33 @@ def _transient_credential_cause(exc):
         seen.add(id(cause))
         if isinstance(cause, (subprocess.TimeoutExpired, TimeoutError,
                               ServiceRequestError, ServiceResponseError)):
-            return True
+            return cause
         pending.extend((cause.__cause__, cause.__context__))
-    return False
+    return None
 
 
-def _credential_observation(inner, exc=None):
-    from azure.identity import CredentialUnavailableError
+def _credential_observation(inner, exc=None, *, established=False):
+    from azure.identity import CredentialUnavailableError, ManagedIdentityCredential
+    from azure.identity._credentials.imds import ImdsCredential
 
-    cause = (exc.__cause__ or exc.__context__) if exc is not None else None
+    cause = _transient_credential_cause(exc) if exc is not None else None
+    if exc is None:
+        outcome = _CredentialOutcome.SUCCESS
+    elif not isinstance(exc, CredentialUnavailableError):
+        outcome = _CredentialOutcome.FAILURE
+    elif cause is None or (
+        isinstance(inner, (ManagedIdentityCredential, ImdsCredential)) and not established
+    ):
+        # An unproven IMDS transport failure is endpoint discovery, not an outage
+        # of an identity we know works. Other sources (notably CLI) need no probe.
+        outcome = _CredentialOutcome.UNAVAILABLE
+    else:
+        outcome = _CredentialOutcome.TRANSIENT
     return _CredentialObservation(
         type(inner).__name__,
         type(exc).__name__ if exc is not None else "",
         type(cause).__name__ if cause is not None else "",
-        (_CredentialOutcome.SUCCESS if exc is None else
-         (_CredentialOutcome.TRANSIENT if _transient_credential_cause(exc) else
-          _CredentialOutcome.UNAVAILABLE) if isinstance(exc, CredentialUnavailableError) else
-         _CredentialOutcome.FAILURE),
+        outcome,
     )
 
 
@@ -1353,6 +1363,7 @@ class _ObservedCredentialLink:
     def __init__(self, inner, observation):
         self._inner = inner
         self._observation = observation
+        self._established = False
 
     @property
     def __class__(self):
@@ -1370,8 +1381,11 @@ class _ObservedCredentialLink:
                 token = member(*args, **kwargs)
             except Exception as exc:
                 if observations is not None:
-                    observations.append(_credential_observation(self._inner, exc))
+                    observations.append(_credential_observation(
+                        self._inner, exc, established=self._established,
+                    ))
                 raise
+            self._established = True
             if observations is not None:
                 observations.append(_credential_observation(self._inner))
             return token
@@ -1386,8 +1400,10 @@ class _SharedTokenCredential:
     coordinates concurrent acquisitions and preserves complete token identity.
     Refresh five minutes before expiry, or at ``refresh_on`` if earlier. Only
     typed transient causes of credential unavailability get up to three attempts
-    with 1 s / 2 s backoff. Authentication failures and unconfigured sources fail
-    fast. Exhaustion suppresses retries for 30 s, never fresh acquisition.
+    with 1 s / 2 s backoff; managed identity additionally requires prior success.
+    Authentication failures and unconfigured sources fail fast. Exhaustion
+    suppresses retries for 30 s, never fresh acquisition. Concurrent waiters share
+    their singleflight Future's exception; subsequent acquisitions never replay it.
     """
 
     def __init__(self, inner, *, attempts=_CREDENTIAL_ATTEMPTS):
@@ -1398,6 +1414,7 @@ class _SharedTokenCredential:
         self._retry_after = {}
         self._attempts = attempts
         self._observation = threading.local()
+        self._authenticated = False
         from azure.identity import ChainedTokenCredential
 
         self._chain_size = 0
@@ -1459,32 +1476,39 @@ class _SharedTokenCredential:
         from azure.identity import CredentialUnavailableError
 
         with self._token_lock:
-            attempts = (
-                1 if identity is not None
-                and time.monotonic() < self._retry_after.get(identity, 0)
-                else self._attempts
-            )
+            remaining = max(
+                0.0, self._retry_after.get(identity, 0) - time.monotonic(),
+            ) if identity is not None else 0.0
+            attempts = 1 if remaining else self._attempts
 
         with _phase("cache.credential", credential=type(self._inner).__name__) as span:
+            span.set_attribute("retry_suppressed", remaining > 0)
+            span.set_attribute("retry_suppression_remaining_s", remaining)
             for attempt in range(1, attempts + 1):
                 span.set_attribute("attempts", attempt)
                 self._observation.links = []
                 try:
-                    return getattr(self._inner, method)(*scopes, **kwargs)
+                    token = getattr(self._inner, method)(*scopes, **kwargs)
+                    self._authenticated = True
+                    return token
                 except ClientAuthenticationError as exc:
-                    observations = self._observation.links
-                    if isinstance(exc, CredentialUnavailableError):
-                        transient = _transient_credential_cause(exc)
-                    else:
-                        transient = (
-                            self._chain_size > 0
-                            and len(observations) == self._chain_size
-                            and all(link.outcome in (
-                                _CredentialOutcome.UNAVAILABLE, _CredentialOutcome.TRANSIENT,
-                            ) for link in observations)
-                            and any(link.outcome is _CredentialOutcome.TRANSIENT
-                                    for link in observations)
-                        )
+                    observations = self._observation.links or [
+                        _credential_observation(
+                            self._inner, exc, established=self._authenticated,
+                        ),
+                    ]
+                    unavailable = isinstance(exc, CredentialUnavailableError)
+                    complete_chain = (
+                        self._chain_size > 0 and len(observations) == self._chain_size
+                    )
+                    transient = (
+                        (unavailable or complete_chain)
+                        and all(link.outcome in (
+                            _CredentialOutcome.UNAVAILABLE, _CredentialOutcome.TRANSIENT,
+                        ) for link in observations)
+                        and any(link.outcome is _CredentialOutcome.TRANSIENT
+                                for link in observations)
+                    )
                     if not transient:
                         raise
                     if attempt == attempts:
@@ -1494,18 +1518,17 @@ class _SharedTokenCredential:
                                     time.monotonic() + _CREDENTIAL_COOLDOWN_S
                                 )
                         raise
-                    self._retry_notice(exc, attempt, observations)
+                    self._retry_notice(attempt, observations)
                 finally:
                     self._observation.links = None
                 # The singleflight future, not a held lock, owns this request.
                 time.sleep(attempt)
 
-    def _retry_notice(self, exc, attempt, observations):
+    def _retry_notice(self, attempt, links):
         # A bare pool probe must not configure OTel just to report a retry.
         telemetry = sys.modules.get("_telemetry")
         if telemetry is None:
             return
-        links = observations or [_credential_observation(self._inner, exc)]
         with contextlib.suppress(Exception):
             summary = ", ".join(
                 f"{link.credential}:{link.error_type}/{link.cause_type or 'none'}"
@@ -1622,8 +1645,8 @@ def _warm() -> None:
     exists so the token is fetched and the pooled TLS connection is open.
 
     Speculative, so it never decides anything: a client that cannot be built
-    (SDK absent, constructor error) leaves ``_BACKEND`` unset for the real call
-    to build -- and report -- itself; only a working client is published."""
+    (SDK absent, constructor error) leaves ``_BACKEND`` unset for the real call.
+    A storage HEAD error can still leave a token-authenticated client reusable."""
     global _BACKEND
     warming = _PREWARMED
     backend = None
@@ -1641,7 +1664,17 @@ def _warm() -> None:
                 return
             # Keep the speculative credential private while acquiring its token.
             # A real probe past the wait bound must never queue behind this HEAD.
-            backend.exists("prewarm")
+            from azure.core.exceptions import ClientAuthenticationError, HttpResponseError
+
+            try:
+                backend.exists("prewarm")
+            except HttpResponseError as exc:
+                if (
+                    isinstance(exc, ClientAuthenticationError)
+                    or backend._credential is None
+                    or not backend._credential._authenticated
+                ):
+                    raise
             with _BACKEND_LOCK:
                 if isinstance(_BACKEND, _Unset):
                     # Once public, future real refreshes get the normal retry policy.
