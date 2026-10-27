@@ -27,12 +27,15 @@ LENGTH_BAND = (0.13, -0.13)
 SUPPLIER_REFERENCE_DIMENSIONS = (('SupplierBoreDiameter', 10.0, 'horizontal'), ('SupplierOuterDiameter', 16.0, 'horizontal'), ('SupplierLength', 15.0, 'vertical'))
 SUPPLIER_REFERENCE_STARTS = {'SupplierBoreDiameter': (-5.0, 0.0), 'SupplierOuterDiameter': (-8.0, 0.0), 'SupplierLength': (0.0, -15.0)}
 SUPPLIER_REFERENCE_PLANES = {'SupplierBoreDiameter': 'Front', 'SupplierOuterDiameter': 'Front', 'SupplierLength': 'Top'}
-SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'NOMINAL BORE DIAMETER'), 'SupplierOuterDiameter': (2, 'diameter', None, 'NOMINAL OUTER DIAMETER'), 'SupplierLength': (2, 'length', None, 'NOMINAL LENGTH')}
-SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'bottom', 'SupplierOuterDiameter': 'bottom', 'SupplierLength': 'left'}
+# Bands print as stacked limits (max over min) inside one parenthesis.
+SUPPLIER_REFERENCE_FORMATS = {'SupplierBoreDiameter': (2, 'diameter', None, 'BORE'), 'SupplierOuterDiameter': (2, 'diameter', None, 'OUTSIDE'), 'SupplierLength': (2, 'length', None, 'LENGTH')}
+# The bore takes the top lane, the OD the bottom: each shelved text stays clear
+# of the other's witnesses. The length sits right of the Top view.
+SUPPLIER_REFERENCE_SIDES = {'SupplierBoreDiameter': 'top', 'SupplierOuterDiameter': 'bottom', 'SupplierLength': 'right'}
 SUPPLIER_REFERENCE_UNITS = {'SupplierBoreDiameter': 'mm', 'SupplierOuterDiameter': 'mm', 'SupplierLength': 'mm'}
 SUPPLIER_REFERENCE_TOLERANCES_MM = {
     'SupplierBoreDiameter': deviations(ID_BAND),
     'SupplierOuterDiameter': deviations(OD_BAND),
     'SupplierLength': deviations(LENGTH_BAND),
 }
-SUPPLIER_DATA = ('SUPPLIED SPACER; NO SHOP MACHINING.', 'LOOSE BORE IS NOT A LOCATING BUSHING.')
+SUPPLIER_DATA = ('LOOSE BORE IS NOT A LOCATING BUSHING.',)
