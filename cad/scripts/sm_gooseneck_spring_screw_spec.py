@@ -36,10 +36,11 @@ on its arc as the reference "(SR20.03)": the head Ø and the crown rise
 drive it (machinist FIX round 1: no note carries a feature's geometry).
 
 The counter seats in ``cad/config/machine/springs.yaml`` were re-measured
-natively on this seat by the one-off ``verify:spring_seats`` leaf, farm run
-20261027T034638856Z-1b1dff54e70d478cbab26d49c9bce78d; the committed file is
+natively on this seat and the counterbored 8.80 plug by the one-off
+``verify:spring_seats`` leaf, farm run
+20261027T065717640Z-ab9171bae60b4714a33d72a6d5e5a2a5; the committed file is
 that leaf's output byte for byte (sha256
-f32e260c67c6d7e2687eb6c37b10ee742d8e53dd0ccbe5b7c3d90ede2ee17d4a).
+a92a13546d94fe9257aa6d3ea693ab8a9844323cef1825c0cbdbd2dc803c798e).
 """
 
 from __future__ import annotations
