@@ -436,6 +436,7 @@ async def _root_profile(adapter, drive_jobs: list[tuple[str, str]]) -> None:
     blank_reference_sketches(adapter, ("RootProfile",))
 
 
+@_telemetry.traced("part.dimension_text")
 def _author_dimension_text(adapter) -> None:
     """Write every authored text lane on its source dimension, read it back.
 
