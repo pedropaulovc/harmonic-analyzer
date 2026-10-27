@@ -112,7 +112,10 @@ def test_sheet_uses_imported_part_precision_and_no_gdt() -> None:
     )
     assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1}
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
-    assert model_toleranced_dimensions(arm) == {}
+    # Only the punch witness's two ordinates carry their own band.
+    assert model_toleranced_dimensions(arm) == {
+        ("FiducialProfile", "name"): "FIDUCIAL_ORDINATE_TOL"
+    }
     assert spec.SURFACE_FINISHES == ()
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
 
@@ -358,21 +361,30 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
 
 def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:
     # Machinist review 2026-10-27: the callout said where only in words.  The
-    # mark now prints two .X ordinates from the hub-seat axis; the callout
-    # names its function and mate.
+    # mark now prints two toleranced ordinates from the hub-seat axis; the
+    # callout names its function and mate.
     assert "BY EYE" not in notes.FIDUCIAL_CALLOUT
     assert "MHA-DT-11" in notes.FIDUCIAL_CALLOUT
     assert spec.DRAWING_PRECISION["FiducialProfile"] == {"FiducialX": 1, "FiducialY": 1}
-    # The model ordinates are the printed one-place values, at 135 degrees.
-    assert spec.FIDUCIAL_Y == -spec.FIDUCIAL_X == pytest.approx(7.9)
+    # codjiflo P2 on #2005: the flat face is judged at the printed worst case,
+    # the seat bore at its .X upper limit and the boss end at its .X lower
+    # limit, each less its edge break.
+    general, break_ = geometry.GENERAL_1PL_TOL_MM, geometry.EDGE_BREAK_MAX_MM
+    face = ((spec.HUB_SEAT_DIA + general) / 2.0 + break_, spec.HALF_WIDTH - general - break_)
+    assert spec.FIDUCIAL_FACE_RADII == pytest.approx(face)
+    assert face == pytest.approx((10.35, 11.65))
+    # The model ordinates are the printed one-place values, at 135 degrees on
+    # that annulus's mid-radius.
+    assert spec.FIDUCIAL_Y == -spec.FIDUCIAL_X == pytest.approx(7.8)
     assert round(spec.FIDUCIAL_Y, 1) == spec.FIDUCIAL_Y
-    # Anywhere in the .X square the punch centre stays on the flat face
-    # between the seat bore's and boss end's edge breaks.
+    # Anywhere in the ordinates' square band the centre stays on that face;
+    # the title block's .X band would not.
+    assert spec.FIDUCIAL_ORDINATE_TOL == 0.4
     inner, outer = spec.FIDUCIAL_RADIAL_LIMITS
-    break_ = geometry.EDGE_BREAK_MAX_MM
-    assert inner == pytest.approx(math.sqrt(2.0) * (7.9 - geometry.GENERAL_1PL_TOL_MM))
-    assert spec.HUB_SEAT_DIA / 2.0 + break_ < inner
-    assert outer < spec.HALF_WIDTH - break_
+    assert inner == pytest.approx(math.sqrt(2.0) * (7.8 - 0.4))
+    assert outer == pytest.approx(math.sqrt(2.0) * (7.8 + 0.4))
+    assert face[0] < inner < outer < face[1]
+    assert math.sqrt(2.0) * (7.8 - general) < face[0]
     # Both ordinate texts stand off the part, the Y left of the boss end.
     import _drawing_leaders as leaders
 

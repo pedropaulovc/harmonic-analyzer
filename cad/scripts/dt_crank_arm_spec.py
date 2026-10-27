@@ -31,7 +31,6 @@ from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
 from dt_crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from dt_crank_hub_geometry import (
-    ARM_FIDUCIAL_RADIUS,
     ARM_STOCK_THICKNESS,
     ARM_STOCK_THICKNESS_IN,
     ARM_THICKNESS,
@@ -44,6 +43,7 @@ from dt_crank_hub_geometry import (
     FIDUCIAL_MODEL_DIA,
     GENERAL_1PL_TOL_MM,
     HUB_SEAT_DIA,
+    HUB_SEAT_DIA_MAX_GENERAL,
     MM_PER_IN,
     WALL_TARGET_MM,
 )
@@ -82,30 +82,41 @@ AXIAL_PIN_Y = 0.0
 
 # The arm owns one shallow punched alignment witness; the matching mark is on
 # the crankshaft (MHA-DT-11) dome, and the drive-train assembly lines the two up
-# before the taper ream.  It stands at 135 degrees on the boss ring's
-# mid-radius, its ordinates from the hub-seat axis rounded to their printed .X
-# place.  Its diameter and depth are a visual representation, never printed.
-_FIDUCIAL_AXIS = round(ARM_FIDUCIAL_RADIUS / math.sqrt(2.0), 1)
+# before the taper ream.  Its diameter and depth are a visual representation,
+# never printed; its centre prints as two ordinates from the hub-seat axis.
+#
+# The centre must land on the flat outboard face at every accepted part
+# (codjiflo P2 on #2005: the first band was checked against the nominal bore).
+# That face's worst-case annulus runs from the seat bore's .X upper limit plus
+# its edge break out to the boss end's .X lower limit less its break.
+FIDUCIAL_FACE_RADII = (
+    HUB_SEAT_DIA_MAX_GENERAL / 2.0 + EDGE_BREAK_MAX_MM,
+    ARM_WIDTH / 2.0 - GENERAL_1PL_TOL_MM - EDGE_BREAK_MAX_MM,
+)
+# The mark stands at 135 degrees on that annulus's mid-radius, each ordinate
+# rounded to its printed .X place.
+_FIDUCIAL_AXIS = round(sum(FIDUCIAL_FACE_RADII) / 2.0 / math.sqrt(2.0), 1)
 FIDUCIAL_X = -_FIDUCIAL_AXIS
 FIDUCIAL_Y = _FIDUCIAL_AXIS
-# Machinist review 2026-10-27 (no location in words): the ordinates print from
-# the hub-seat axis at the title block's loose .X band, enough for a scribed,
-# hand-punched mark.  Anywhere in that square the punch centre stays on the flat
-# outboard face, outside the edge breaks of the nominal seat bore and boss end;
-# a .X band any looser would let it reach the boss end's break.
+# A square ordinate band +/-t reaches sqrt(2)(a -/+ t) from the axis at its
+# near and far corners.  The title block's .X +/-0.8 would let the centre into
+# the bore (9.9 against 10.35), so the ordinates carry their own +/-0.4: as
+# loose as the 1.3-mm annulus allows at one place, still enough to scribe and
+# hand-punch.
+FIDUCIAL_ORDINATE_TOL = 0.4
 FIDUCIAL_RADIAL_LIMITS = (
-    math.sqrt(2.0) * (_FIDUCIAL_AXIS - GENERAL_1PL_TOL_MM),
-    math.sqrt(2.0) * (_FIDUCIAL_AXIS + GENERAL_1PL_TOL_MM),
+    math.sqrt(2.0) * (_FIDUCIAL_AXIS - FIDUCIAL_ORDINATE_TOL),
+    math.sqrt(2.0) * (_FIDUCIAL_AXIS + FIDUCIAL_ORDINATE_TOL),
 )
 if not (
-    HUB_SEAT_DIA / 2.0 + EDGE_BREAK_MAX_MM
+    FIDUCIAL_FACE_RADII[0]
     < FIDUCIAL_RADIAL_LIMITS[0]
     < FIDUCIAL_RADIAL_LIMITS[1]
-    < ARM_WIDTH / 2.0 - EDGE_BREAK_MAX_MM
+    < FIDUCIAL_FACE_RADII[1]
 ):
     raise AssertionError(
         f"punch witness band reaches {FIDUCIAL_RADIAL_LIMITS} from the hub-seat axis, "
-        "off the flat face between the seat bore and boss end breaks"
+        f"off the worst-case flat face {FIDUCIAL_FACE_RADII}"
     )
 
 # Keeper-ring anchor (ch11 p.14): a small slotted screw in the arm's outboard
