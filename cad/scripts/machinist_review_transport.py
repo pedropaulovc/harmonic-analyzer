@@ -9,6 +9,8 @@ import asyncio
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict
+from copy import deepcopy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -96,6 +98,10 @@ class StartupTimeout(TimeoutError):
         self.phase, self.budget = phase, budget
 
 
+class AttemptTimeout(TimeoutError):
+    """The overall attempt expired, not an inner startup phase."""
+
+
 class CredentialLockTimeout(TimeoutError):
     def __init__(self, budget, state_file):
         super().__init__(
@@ -108,10 +114,13 @@ class CredentialLockTimeout(TimeoutError):
 
 @asynccontextmanager
 async def startup_timeout(phase, budget):
+    timer = asyncio.timeout(budget)
     try:
-        async with asyncio.timeout(budget):
+        async with timer:
             yield
     except TimeoutError as exc:
+        if not timer.expired() or isinstance(exc, AttemptTimeout):
+            raise
         raise StartupTimeout(phase, budget) from exc
 
 
@@ -122,7 +131,7 @@ async def credential_operation(pool, operation, remaining, *args, **kwargs):
     while True:
         remaining()
         try:
-            return operation(*args, timeout=0, **kwargs)
+            return operation(*args, **kwargs)
         except (LockTimeout, BlockingIOError):
             budget = min(deadline - time.monotonic(), remaining())
             if budget <= 0:
@@ -130,14 +139,16 @@ async def credential_operation(pool, operation, remaining, *args, **kwargs):
             await asyncio.sleep(min(0.05, budget))
 
 
-def environment(key=None, *, overlay=True):
-    env = dict(os.environ)
-    for name in tuple(env):
+def environment(key=None, *, inherited=False):
+    # SDK merges the parent environment itself and owns entrypoint/tracing
+    # hygiene. Only credential removals and our explicit overrides belong there.
+    env = dict(os.environ) if inherited else {}
+    for name in os.environ:
         if name.startswith("ANTHROPIC_") or re.match(r"CLAUDE_CODE_(OAUTH|USE_|API_KEY|SUBAGENT_MODEL|AWS|VERTEX|FOUNDRY)", name):
-            if overlay:
-                env[name] = ""
+            if inherited:
+                env.pop(name, None)
             else:
-                env.pop(name)
+                env[name] = ""
     if key:
         env["ANTHROPIC_API_KEY"] = key
         # API proxies receive only explicitly selected API credentials, never
@@ -145,6 +156,19 @@ def environment(key=None, *, overlay=True):
         if os.environ.get("ANTHROPIC_BASE_URL"):
             env["ANTHROPIC_BASE_URL"] = os.environ["ANTHROPIC_BASE_URL"]
     return env
+
+
+def resume_inputs(previous):
+    """Copy only conversation inputs, never prior turn's completion evidence."""
+    return {
+        name: deepcopy(previous[name])
+        for name in (
+            "transport", "private_home", "session_id", "credential_id",
+            "credential_fingerprint", "sdk_session_dir", "sdk_redacted_files",
+            "sdk_redacted_fingerprint", "session_file",
+        )
+        if name in previous
+    }
 
 
 def sdk_event(message):
@@ -208,7 +232,7 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
     # Skip only files successfully sanitized by an earlier pass. New or changed
     # native files (including metadata) always receive the complete secret scan.
     previous_files = (
-        provenance.get("sdk_redacted_files", {})
+        deepcopy(provenance.get("sdk_redacted_files", {}))
         if provenance.get("sdk_redacted_fingerprint") == key.fingerprint else {}
     )
     env.update(HOME=str(home), USERPROFILE=str(home))
@@ -428,7 +452,7 @@ async def _omp(*, register_secret, remaining, startup, **kwargs):
     async with _broker(executable, register_secret, remaining, startup) as broker_env:
         startup_remaining = min(startup_deadline - time.monotonic(), remaining())
         if startup_remaining <= 0:
-            raise TimeoutError
+            raise StartupTimeout("OMP sheets MCP connection", startup)
         await _omp_session(executable=executable, broker_env=broker_env,
                            remaining=remaining, startup=startup_remaining, **kwargs)
 
@@ -457,7 +481,6 @@ def _omp_blobs(provenance):
         for line in transcript:
             if line.strip():
                 images(json.loads(line))
-    import hashlib
     for digest in hashes:
         path = home / "agent" / "blobs" / digest
         try:
@@ -500,18 +523,19 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
     agent = home / "agent"
     agent.mkdir(mode=0o700, exist_ok=True)
     overlay = home / "config.yml"
-    overlay.write_text(json.dumps({
+    effective_config = {
         "disabledProviders": ["native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"],
         "mcp": {"startupTimeoutMs": 0, "enableProjectConfig": True},
         "memory": {"backend": "off"}, "autolearn": {"enabled": False, "autoContinue": False},
         "includeWorkspaceTree": False,
-    }), encoding="utf-8")
+    }
+    overlay.write_text(json.dumps(effective_config), encoding="utf-8")
     sessions = home / "sessions"
     sessions.mkdir(mode=0o700, exist_ok=True)
     provenance["session_dir"] = str(sessions)
     if resume:
         _omp_blobs(provenance)
-    env = environment(overlay=False)
+    env = environment(inherited=True)
     for name in tuple(env):
         if name.startswith(("PI_", "OMP_", "XDG_")):
             env.pop(name)
@@ -544,7 +568,11 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
         line = await proc.stdout.readline()
         if not line:
             raise RuntimeError("OMP exited before terminal response")
-        event = json.loads(line)
+        try:
+            event = json.loads(line)
+        except (ValueError, UnicodeDecodeError):
+            emit(None, {"type": "rpc_parse_error", "text": line.decode("utf-8", errors="replace")})
+            raise RuntimeError("OMP RPC stdout is not valid JSON") from None
         emit(omp_event(event), omp_native_event(event))
         return event
     async def control(kind, **fields):
@@ -581,9 +609,16 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                 raise RuntimeError("OMP resolved a non-Anthropic provider")
             provenance.update(session_id=actual, session_file=state["sessionFile"],
                               resolved_model={name: resolved.get(name) for name in ("provider", "id")})
+            provenance["omp_effective_options"] = {
+                "command": list(command), "config": effective_config,
+                "system_prompt": parts, "tools": sorted(tools), "cwd": cwd,
+            }
         await control("set_auto_compaction", enabled=False)
         prompt_id = str(uuid.uuid4())
-        await send({"id": prompt_id, "type": "prompt", "message": config["prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(schema)})
+        omp_prompt = config["prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(schema)
+        provenance["omp_prompt"] = omp_prompt
+        provenance["omp_prompt_sha256"] = hashlib.sha256(omp_prompt.encode("utf-8")).hexdigest()
+        await send({"id": prompt_id, "type": "prompt", "message": omp_prompt})
         while True:
             event = await receive()
             if event.get("type") == "prompt_result" and event.get("id") == prompt_id:
@@ -654,7 +689,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     def remaining():
         value = deadline - time.monotonic()
         if value <= 0:
-            raise TimeoutError
+            raise AttemptTimeout
         return value
     def scope_tool_ids(node):
         if isinstance(node, list):
@@ -719,6 +754,16 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     model = command[command.index("--model") + 1]
     effort = command[command.index("--effort") + 1]
     prior_transport = provenance.get("transport") if resume else None
+    def clear_route_evidence():
+        # These describe the current execution, not resumable conversation
+        # inputs. A quota predecessor must not certify a failed next route.
+        for name in (
+            "resolved_model", "sdk_isolation", "omp_command",
+            "omp_effective_options", "omp_prompt", "omp_prompt_sha256",
+            "shutdown", "image_blobs", "session_dir",
+        ):
+            provenance.pop(name, None)
+
     async def execute():
         nonlocal session_id, route_index
         attempted = []
@@ -740,6 +785,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                 break
             attempted.append(credential.id)
             route_index += 1
+            clear_route_evidence()
             provenance.update(transport="claude_agent_sdk", credential_id=credential.id, credential_fingerprint=credential.fingerprint,
                               session_id=session_id if resume else None)
             route = {"transport": "claude_agent_sdk", "credential_id": credential.id, "outcome": "started",
@@ -754,7 +800,16 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                 route["outcome"] = "succeeded"
                 return
             route.update(outcome="quota", reason=quota["reason"])
-            await credential_operation(pool, pool.unavailable, remaining, credential, quota)
+            route["quota_state_write"] = "pending"
+            try:
+                await credential_operation(pool, pool.unavailable, remaining, credential, quota)
+            except (Exception, asyncio.CancelledError) as exc:
+                route.update(quota_state_write="failed", quota_state_write_error=type(exc).__name__)
+                _telemetry.error("machinist_review.quota_state_write", outcome="failed",
+                                 error_category=type(exc).__name__, credential_id=credential.id,
+                                 reason=quota["reason"], **common)
+                raise
+            route["quota_state_write"] = "persisted"
             _telemetry.warn("machinist_review.credential_unavailable", credential_id=credential.id,
                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
             if resume:
@@ -764,6 +819,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             session_id = str(uuid.uuid4())
         if resume and prior_transport != "omp":
             raise RuntimeError("SDK continuation cannot switch transport")
+        clear_route_evidence()
         provenance.update(transport="omp", credential_id=None, credential_fingerprint=None,
                           session_id=provenance.get("session_id") if resume else None)
         route_index += 1
@@ -799,6 +855,9 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
             if isinstance(exc, (StartupTimeout, CredentialLockTimeout)):
                 provenance["timeout_phase"] = exc.phase
                 provenance["timeout_budget_s"] = exc.budget
+            else:
+                provenance["timeout_phase"] = "attempt"
+                provenance["timeout_budget_s"] = timeout
             raise expired from None
         detail = pool.redact(f"{category}: {exc}")
         if errors.strip():

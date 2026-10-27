@@ -159,24 +159,41 @@ def runtime_versions(reviewer: str) -> dict[str, str]:
     """
     try:
         versions = {name: importlib.metadata.version(name) for name in RUNTIME_PACKAGES}
-        transport = "omp" if reviewer == "claude" else reviewer
         if reviewer == "claude":
             versions["claude-agent-sdk"] = importlib.metadata.version("claude-agent-sdk")
-        executable = shutil.which(transport)
-        if not executable:
-            if reviewer == "claude":
-                return {**versions, "reviewer_cli": "omp-unavailable", "routing": "sdk-api-pool-then-omp-v1"}
-            raise RuntimeError(f"{transport} CLI not found on PATH")
+            if not isinstance(versions["claude-agent-sdk"], str) or not versions["claude-agent-sdk"].strip():
+                raise RuntimeError("cannot determine review runtime versions: missing claude-agent-sdk version")
+    except importlib.metadata.PackageNotFoundError as exc:
+        raise RuntimeError(f"cannot determine review runtime versions: {exc}") from exc
+    transport = "omp" if reviewer == "claude" else reviewer
+    if reviewer == "claude":
+        versions["routing"] = "sdk-api-pool-then-omp-v1"
+    executable = shutil.which(transport)
+    if not executable:
+        if reviewer == "claude":
+            return {**versions, "reviewer_cli": "omp-unavailable", "omp_version_probe": "unavailable"}
+        raise RuntimeError(f"{transport} CLI not found on PATH")
+    try:
         process = subprocess.run(
             [executable, "--version"], capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=60, check=False,
         )
-    except (OSError, subprocess.SubprocessError, importlib.metadata.PackageNotFoundError) as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
+        if reviewer == "claude":
+            # Exceptions/output may contain credentials; retain only a safe category.
+            outcome = "timeout" if isinstance(exc, subprocess.TimeoutExpired) else type(exc).__name__
+            return {**versions, "reviewer_cli": "omp-unavailable", "omp_version_probe": outcome}
         raise RuntimeError(f"cannot determine review runtime versions: {exc}") from exc
     cli = process.stdout.strip()
     if process.returncode != 0 or not cli:
+        if reviewer == "claude":
+            return {
+                **versions, "reviewer_cli": "omp-unavailable",
+                "omp_version_probe": "nonzero_exit" if process.returncode else "empty_output",
+                "omp_version_probe_exit_code": str(process.returncode),
+            }
         raise RuntimeError(f"{reviewer} --version failed: {process.stderr.strip()[-400:]}")
-    return {**versions, "reviewer_cli": cli, **({"routing": "sdk-api-pool-then-omp-v1"} if reviewer == "claude" else {})}
+    return {**versions, "reviewer_cli": cli, **({"omp_version_probe": "succeeded"} if reviewer == "claude" else {})}
 
 
 
@@ -311,6 +328,103 @@ def _check_retained_argv(
         raise ValueError("retained argv must relocate exactly the attempt-dir file arguments")
 
 
+def _check_omp_provenance(
+    provenance: dict[str, Any], invocation: dict[str, Any], evidence: dict[str, Any],
+    review: mr.Review,
+) -> None:
+    """Check recorded runtime facts, not the SDK-shaped invocation descriptor."""
+    options = provenance.get("omp_effective_options")
+    if not isinstance(options, dict) or set(options) != {"command", "config", "system_prompt", "tools", "cwd"}:
+        raise ValueError("OMP lacks recorded effective options")
+    home = Path(provenance["private_home"]).resolve()
+    cwd = invocation["cwd"]
+    sessions = provenance.get("session_dir")
+    session = provenance.get("session_file")
+    if (
+        options["cwd"] != cwd or not Path(cwd).is_absolute()
+        or not Path(cwd).resolve().is_relative_to(home)
+        or not isinstance(sessions, str) or not Path(sessions).is_absolute()
+        or Path(sessions).resolve() != home / "sessions"
+        or not isinstance(session, str) or not Path(session).is_absolute()
+        or not Path(session).resolve().is_relative_to(Path(sessions).resolve())
+        or Path(session).resolve() == Path(sessions).resolve()
+    ):
+        raise ValueError("OMP session/cwd escapes its private HOME")
+    command = options["command"]
+    if (
+        not isinstance(command, list) or not command
+        or any(not isinstance(arg, str) or not arg for arg in command)
+        or command != provenance.get("omp_command")
+    ):
+        raise ValueError("OMP actual command provenance mismatch")
+    flags = {
+        "--no-ui", "--no-tools", "--no-extensions", "--no-skills", "--no-rules",
+        "--no-lsp", "--no-pty", "--no-prewalk", "--no-title", "--auto-approve",
+    }
+    values = {
+        "--mode": "rpc", "--cwd": cwd, "--config": str(home / "config.yml"),
+        "--system-prompt": mr._claude_transport.OMP_SYSTEM_PROMPT,
+        "--model": "anthropic/" + review.model.removeprefix("anthropic/"),
+        "--thinking": review.effort, "--session-dir": sessions,
+    }
+    seen: set[str] = set()
+    index = 1
+    while index < len(command):
+        flag = command[index]
+        if flag in seen:
+            raise ValueError("OMP actual command repeats an option")
+        seen.add(flag)
+        if flag in flags:
+            index += 1
+        elif flag in values and index + 1 < len(command) and command[index + 1] == values[flag]:
+            index += 2
+        else:
+            raise ValueError("OMP actual command violates sheets-only isolation")
+    if seen != flags | values.keys():
+        raise ValueError("OMP actual command lacks isolation options")
+    config = options["config"]
+    disabled = config.get("disabledProviders") if isinstance(config, dict) else None
+    if (
+        not isinstance(disabled, list) or any(not isinstance(item, str) for item in disabled)
+        or not {"native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"} <= set(disabled)
+        or set(config) != {"disabledProviders", "mcp", "memory", "autolearn", "includeWorkspaceTree"}
+        or config["mcp"] != {"startupTimeoutMs": 0, "enableProjectConfig": True}
+        or config["memory"] != {"backend": "off"}
+        or config["autolearn"] != {"enabled": False, "autoContinue": False}
+        or config["includeWorkspaceTree"] is not False
+    ):
+        raise ValueError("OMP overlay lacks context/memory isolation")
+    parts = options["system_prompt"]
+    if (
+        options["tools"] != sorted(mr._claude_transport.OMP_TOOLS)
+        or not isinstance(parts, list) or len(parts) != 2
+        or any(not isinstance(part, str) for part in parts)
+    ):
+        raise ValueError("OMP runtime lacks sheets-only tools/system prompt")
+    first = re.sub(r"<redacted-content>.*?</redacted-content>", "", parts[0], flags=re.S).strip()
+    forbidden = ("<project>", "<repo-rules>", "<file path=", "<dir-context>", "<skills>", "<rules>", "<workspace-tree>", "<workspace-roots>")
+    if (
+        first != mr._claude_transport.OMP_SYSTEM_PROMPT
+        or any(marker in part for part in parts for marker in forbidden)
+        or mr._claude_transport.OMP_PROJECT_CONTEXT_RE.fullmatch(parts[1].replace("\r\n", "\n").strip()) is None
+    ):
+        raise ValueError("OMP runtime system prompt contains unauthorized context")
+    blobs = provenance.get("image_blobs")
+    if not isinstance(blobs, list) or not blobs or any(
+        not isinstance(digest, str) or re.fullmatch(r"[a-f0-9]{64}", digest) is None
+        for digest in blobs
+    ) or len(blobs) != len(set(blobs)):
+        raise ValueError("OMP lacks valid persisted image digests")
+    prompt = evidence["effective_prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(json.loads(evidence["schema"]))
+    if (
+        provenance.get("omp_prompt") != prompt
+        or provenance.get("omp_prompt_sha256") != hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+    ):
+        raise ValueError("OMP exact prompt/schema provenance mismatch")
+    if provenance.get("shutdown") not in {"graceful", "forced_after_completion"}:
+        raise ValueError("OMP lacks completed process shutdown evidence")
+
+
 def validate_evidence(
     result: dict[str, Any], identity: dict[str, Any], version: str,
     package: mr.ReviewPackage, directory: Path,
@@ -421,7 +535,7 @@ def validate_evidence(
                 or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
             ):
                 raise ValueError("invalid SDK credential provenance")
-            if provenance.get("transport") == "claude_agent_sdk":
+            if provenance.get("transport") == "claude_agent_sdk" and invocation["outcome"] == "succeeded":
                 expected_isolation = {
                     "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
                     "permission_mode": "dontAsk", "setting_sources": [],
@@ -440,6 +554,8 @@ def validate_evidence(
                         or resolved.get("provider") != "anthropic"
                         or not isinstance(resolved.get("id"), str) or not resolved["id"]):
                     raise ValueError("Claude evidence resolved an invalid Anthropic model")
+                if provenance.get("transport") == "omp":
+                    _check_omp_provenance(provenance, invocation, evidence, review)
         if (
             invocation["reviewer"] != review.reviewer
             or (session_id is not None and (not isinstance(session_id, str) or not session_id))

@@ -281,6 +281,12 @@ both verdicts and the finding diff.
   `--permission-prompts` flags. Isolation instead uses supported `--bare`,
   explicit skill disabling, `tools=[]`, `permission_mode="dontAsk"`, empty
   setting sources and strict sheets-only MCP configuration.
+  The SDK receives only explicit environment overrides (including empty values
+  to remove ambient authentication); its launcher owns parent-environment
+  merging and entrypoint/tracing hygiene. OMP instead receives a sanitized full
+  environment, with inherited PI/OMP/XDG state removed before private-HOME and
+  broker overrides are applied. Do not send a copied full parent environment
+  through the SDK override map.
   The shared pool is
   `CODJIFLO_ANTHROPIC_KEYS_FILE` (default
   `~/.config/codjiflo/anthropic-keys.json`), containing exactly three unique
@@ -292,11 +298,18 @@ both verdicts and the finding diff.
   `CODJIFLO_CLAUDE_STATE_FILE`, default
   `~/.local/state/codjiflo/claude-routing.json`, with locked round-robin claims,
   fingerprint-aware rotation and quota-group cooldown/exhaustion. Invalid or
-  insecure configuration fails closed. Only terminal typed API quota errors
-  authorize rotation, not ordinary prose, schema errors, startup failures or SDK
-  exceptions. Transient SDK `system/api_retry` notices are retained as evidence
-  while the in-flight turn continues, including a resumed judge; they do not
-  trigger credential cooldown, rotation or transport switching.
+  insecure configuration fails closed. Invalid API keys are configuration errors,
+  not quota exhaustion: they never authorize cooldown or transport switching.
+  Only terminal typed API quota errors authorize rotation, not ordinary prose,
+  schema errors, startup failures or SDK exceptions. Transient SDK
+  `system/api_retry` notices are retained as evidence while the in-flight turn
+  continues, including a resumed judge; they do not trigger credential cooldown,
+  rotation or transport switching. A terminal quota route records
+  `quota_state_write` as pending, then persisted or failed; failure also records
+  the safe exception type in `quota_state_write_error` and emits
+  `machinist_review.quota_state_write` with outcome `failed`. State-write lock
+  waits remain inside the original attempt deadline. A failed write does not
+  erase the quota evidence or silently authorize fallback.
 - Shared routing recovery is operator-controlled; there is no automatic lock
   reclamation or re-probe of indefinite exhaustion. From the sibling
   `codjiflo-reviewer` checkout, using the same `CODJIFLO_ANTHROPIC_KEYS_FILE` and
@@ -334,6 +347,8 @@ both verdicts and the finding diff.
   system-prompt isolation and resolved provider. Startup is bounded to 120
   seconds within the total attempt deadline; timeout diagnostics retain the
   startup phase and its budget rather than reporting a full-attempt timeout.
+  An exhausted overall deadline remains an attempt timeout even when it expires
+  inside a startup phase; the startup budget must not relabel that failure.
   Credential-lock contention has its own phase and budget (at most 30 seconds,
   also bounded by the attempt deadline), distinct from MCP startup and full
   attempt timeouts. A contended or stale lock fails closed, without bypassing
@@ -344,11 +359,25 @@ both verdicts and the finding diff.
   message snapshots. Terminal messages, including real tool images and usage,
   remain intact. Verdict extraction and successful inspection use only the final
   route; billed usage sums every route, including quota-rotated API attempts.
+  RPC stdout is a strict machine channel: every nonempty line, including the
+  shutdown drain, must be a JSON object. Malformed lines are retained as native
+  `rpc_parse_error` evidence and fail closed, never discarded as diagnostic noise.
   Valid findings are never retried. A successful precheck pins its actual transport and session for
   judging. SDK continuation prefers the original credential, but may select
   another eligible key **before** submitting its single resumed turn: the local
   conversation and cwd remain unchanged. Once submitted, a failed resumed turn
   is never retried or switched to another transport.
+  Resume inputs are explicitly allowlisted: `transport`, `private_home`,
+  `session_id`, `credential_id`, `credential_fingerprint`, `sdk_session_dir`,
+  `sdk_redacted_files`, `sdk_redacted_fingerprint`, and `session_file`. Mutable
+  allowlisted values are deep-copied. Completion evidence (resolved model,
+  effective options, exact prompt/hash, image digests and shutdown outcome) must
+  be newly observed for the resumed turn, never inherited from the precheck.
+  Judge provenance is a separate object; judging must not mutate the retained
+  precheck report.
+  The same boundary applies when quota rotation starts a new SDK route or
+  falls back to OMP: current-execution evidence is cleared at route entry,
+  while conversation inputs, redaction state and prior route outcomes remain.
   Private SDK transcripts and OMP agent/blob state survive the precheck so
   persisted images hydrate correctly in the judge's history. Independent runs,
   failed attempts and completed judges delete native state after retaining
@@ -364,6 +393,22 @@ both verdicts and the finding diff.
   (tools, permission mode, setting sources and strict MCP configuration).
   Both transports record `resolved_model` as a provider/id object; the SDK
   provider is `anthropic`.
+  Successful OMP evidence records `omp_effective_options`: actual argv, parsed
+  overlay JSON, actual `get_state` system-prompt parts and sorted tools, and
+  actual cwd. Evaluation independently checks the isolation flags and overlay,
+  runtime context/tools, private-HOME cwd and session containment, nonempty valid
+  persisted image digests, and completed shutdown. `omp_prompt` and
+  `omp_prompt_sha256` bind the exact submitted message, including its appended
+  JSON schema, rather than just the rubric. These completion requirements apply
+  to successful invocations; failed startup/attempt history remains usable
+  without pretending completion evidence exists.
+  The pinned SDK package/version is mandatory. OMP is an optional fallback for
+  SDK runs: a missing executable or failed, empty, timed-out or OS-error
+  `omp --version` probe does not prevent SDK execution. Runtime identity records
+  the explicit probe outcome (and exit code when available), not raw failed-probe
+  output or exception text that could leak secrets. An executed fallback still
+  fails normally if OMP is unavailable. This transport policy does not regroup
+  project dependencies or change dependency-group installation semantics.
   The cache key identifies the SDK-first/OMP-fallback **routing policy**, not a
   quota-dependent route selected in advance. The canonical cached result records
   the route actually used and its per-attempt provenance, which adopters retain;

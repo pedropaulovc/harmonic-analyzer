@@ -1023,7 +1023,7 @@ def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "inherited-canary")
     monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "inherited-oauth-canary")
     api = transport.environment("selected-canary")
-    oauth = transport.environment(overlay=False)
+    oauth = transport.environment(inherited=True)
     assert api["ANTHROPIC_BASE_URL"] == "https://api-only-proxy.invalid"
     assert api["ANTHROPIC_API_KEY"] == "selected-canary"
     assert all(name not in oauth for name in (
@@ -1075,8 +1075,8 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
     def forbidden(*args, **kwargs):
         pytest.fail("credential contention must not allocate executor threads")
 
-    def operation(value, *, timeout, required_id):
-        calls.append((value, timeout, required_id))
+    def operation(value, *, required_id):
+        calls.append((value, required_id))
         if release and len(calls) == 3:
             return "claimed"
         if lock_error == "advisory":
@@ -1105,7 +1105,7 @@ def test_credential_contention_polls_without_threads_and_respects_deadline(
     monkeypatch.setattr(transport.asyncio, "to_thread", forbidden)
     asyncio.run(invoke())
     assert callbacks == ["responsive"]
-    assert all(call == ("argument", 0, "account-0") for call in calls)
+    assert all(call == ("argument", "account-0") for call in calls)
     assert sleeps and all(0 < delay <= 0.05 for delay in sleeps)
     assert clock[0] == pytest.approx(0.1 if release else min(30, budget))
 
@@ -1140,22 +1140,17 @@ def test_credential_shared_lock_uses_binary_pid_protocol(tmp_path, sdk_transport
     assert not shared.exists()
 
 
-@pytest.mark.parametrize("budget", [0, 60])
-def test_credential_shared_lock_contention_keeps_owner_file(sdk_transport, monkeypatch, budget):
+def test_credential_shared_lock_contention_keeps_owner_file(sdk_transport):
     import machinist_review_credentials as credentials
     pool = credentials.CredentialPool()
     credentials._directory(pool.state_file.parent)
     shared = Path(str(pool.state_file) + ".lock")
     owner = b"pid=12345\n"
     shared.write_bytes(owner)
-    clock = [0.0]
-    monkeypatch.setattr(credentials.time, "monotonic", lambda: clock[0])
-    monkeypatch.setattr(credentials.time, "sleep", lambda delay: clock.__setitem__(0, clock[0] + delay))
-    with pytest.raises(BlockingIOError if budget == 0 else TimeoutError):
-        with pool._state(timeout=budget):
+    with pytest.raises(BlockingIOError):
+        with pool._state():
             pytest.fail("contended lock must not enter state")
     assert shared.read_bytes() == owner
-    assert clock[0] == pytest.approx(0 if budget == 0 else 30)
 
 
 def test_credential_lock_timeout_preserves_distinct_phase_and_budget(
@@ -1320,7 +1315,7 @@ def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
         assert mr.evaluate_sheet_evidence([event, events[1]], reviewer="claude", sheet_count=1)["tool_events"] == 1
 
 
-@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "context", "provider", "slow_shutdown", "footer_context", "footer_instruction"])
+@pytest.mark.parametrize("catalog", ["valid", "missing", "extra", "silent", "malformed", "context", "provider", "slow_shutdown", "footer_context", "footer_instruction"])
 def test_omp_rpc_actual_session_readiness_precedes_prompt_and_reaps_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, catalog: str,
 ) -> None:
@@ -1341,6 +1336,9 @@ for line in sys.stdin:
         log.write(json.dumps(request) + "\n")
     kind = request["type"]
     if kind == "get_state":
+        if mode == "malformed":
+            print("not-json-protocol-canary", flush=True)
+            continue
         if mode == "silent":
             time.sleep(20)
         names = ["mcp__sheets_view_sheet", "mcp__sheets_crop"]
@@ -1378,7 +1376,7 @@ for line in sys.stdin:
               "content": [{"type": "toolCall", "id": "view", "name": "mcp__sheets_view_sheet", "arguments": {"sheet": 1}}]}})
         emit({"type": "message_end", "message": {"role": "toolResult", "toolCallId": "view",
               "content": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(payload).decode()}]}})
-        emit({"type": "prompt_result", "id": request["id"], "status": "completed", "sessionSettled": True})
+        emit({"type": "prompt_result", "id": request["id"], "status": "failed" if mode == "turn_failure" else "completed", "sessionSettled": True})
         continue
     elif kind == "get_last_assistant_text":
         data = {"text": "{}"}
@@ -1392,7 +1390,7 @@ if mode == "slow_shutdown": time.sleep(60)
     home.mkdir()
     work = home / "work"
     work.mkdir()
-    processes, environments, normalized = [], [], []
+    processes, environments, normalized, native = [], [], [], []
     provenance = {"private_home": str(home)}
     original = asyncio.create_subprocess_exec
     async def spawn(executable, *arguments, **kwargs):
@@ -1405,6 +1403,8 @@ if mode == "slow_shutdown": time.sleep(60)
     monkeypatch.setenv("OMP_PROFILE", "must-not-load")
     before = dict(os.environ)
     def emit(event, raw):
+        if raw is not None:
+            native.append(raw)
         if event is not None:
             normalized.append(event)
     async def invoke(resume=False):
@@ -1427,10 +1427,33 @@ if mode == "slow_shutdown": time.sleep(60)
         assert Path(environments[0]["PI_CODING_AGENT_DIR"]).is_dir()
         assert mr.evaluate_sheet_evidence(normalized, reviewer="claude", sheet_count=1)["inspection_proven"]
         assert provenance["image_blobs"]
+        import hashlib
+        expected_prompt = "inspect\nReturn JSON matching this schema:\n{}"
+        assert provenance["omp_prompt"] == expected_prompt
+        assert provenance["omp_prompt_sha256"] == hashlib.sha256(expected_prompt.encode()).hexdigest()
+        effective = provenance["omp_effective_options"]
+        assert effective["command"] == provenance["omp_command"]
+        assert effective["config"] == json.loads((home / "config.yml").read_text())
+        assert effective["tools"] == sorted(transport.OMP_TOOLS)
         assert (home / "agent" / "blobs").is_dir()
         before_blobs = set(provenance["image_blobs"])
         asyncio.run(invoke(resume=True))
         assert before_blobs < set(provenance["image_blobs"])
+        completed = provenance
+        completed["resolved_model"] = {"provider": "anthropic", "id": "stale-precheck-model"}
+        completed_bytes = json.dumps(completed, sort_keys=True).encode()
+        for failed_mode in ("extra", "turn_failure"):
+            provenance = transport.resume_inputs(completed)
+            catalog = failed_mode
+            with pytest.raises(RuntimeError):
+                asyncio.run(invoke(resume=True))
+            assert "shutdown" not in provenance and "image_blobs" not in provenance
+            assert provenance.get("resolved_model", {}).get("id") != "stale-precheck-model"
+            if failed_mode == "extra":
+                assert "resolved_model" not in provenance
+            assert json.dumps(completed, sort_keys=True).encode() == completed_bytes
+        catalog = "valid"
+        provenance = completed
         (home / "agent" / "blobs" / next(iter(before_blobs))).unlink()
         started = len(processes)
         with pytest.raises(RuntimeError, match="image blob is unavailable"):
@@ -1442,6 +1465,13 @@ if mode == "slow_shutdown": time.sleep(60)
     requests = [json.loads(line) for line in (work / "protocol.jsonl").read_text().splitlines()]
     assert requests[0]["type"] == "get_state"
     assert any(row["type"] == "prompt" for row in requests) is (catalog in {"valid", "slow_shutdown"})
+    if catalog == "malformed":
+        assert any(
+            row.get("type") == "rpc_parse_error"
+            and row.get("text", "").splitlines() == ["not-json-protocol-canary"]
+            for row in native
+        )
+        assert "shutdown" not in provenance and "image_blobs" not in provenance
     assert all(process.returncode is not None for process in processes)
     assert environments and all(env["HOME"] == str(home) for env in environments)
     assert all("PI_CONFIG_FILES" not in env and "OMP_PROFILE" not in env for env in environments)
@@ -5118,3 +5148,192 @@ def test_missing_source_still_writes_an_error_aggregate(
     assert "source snapshot failed" in aggregate["error"]
     assert (directory / "missing.aggregate.json").is_file()
     assert Path(aggregate["runs"][0]["report"]).is_file()
+
+
+@pytest.mark.parametrize("failure", ["startup", "turn"])
+def test_failed_resumed_judge_does_not_reuse_completion_evidence_or_mutate_precheck(
+    tmp_path, sdk_transport, failure,
+):
+    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
+    sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Inspect sheet."}
+    first = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+        precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                 "new_size_points": [10, 10], "text_changed": False}]},
+    )
+    assert first.passed
+    initial, = first.extra["evidence"]["attempts"]
+    old = initial["transport_provenance"]
+    # Completion fields from either adapter must never survive as judge inputs.
+    old.update(shutdown="graceful", image_blobs=["a" * 64], omp_command=["old"],
+               session_dir="old", omp_effective_options={"old": []})
+    session_dir = Path(old["sdk_session_dir"])
+    native = session_dir / "precheck.jsonl"
+    native.write_text("precheck")
+    old["sdk_redacted_files"] = {"sentinel": [1, 2, 3, 4]}
+    before = json.dumps(first.extra, sort_keys=True).encode()
+    if failure == "startup":
+        sdk_transport.status = "failed"
+    else:
+        sdk_transport.fail = True
+    judgment = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "judge", retries=0,
+        judge_findings=[], resume_review=first,
+    )
+    assert judgment.error
+    record, = judgment.extra["evidence"]["attempts"]
+    current = record["transport_provenance"]
+    assert record["outcome"] == "failed"
+    assert all(name not in current for name in (
+        "resolved_model", "shutdown", "image_blobs", "omp_command", "session_dir",
+        "omp_effective_options", "omp_prompt", "omp_prompt_sha256",
+    ))
+    assert current["state_cleanup"] == "removed"
+    assert json.dumps(first.extra, sort_keys=True).encode() == before
+    assert str(native) in current["sdk_redacted_files"]
+    assert str(native) not in old["sdk_redacted_files"]
+
+
+def test_sdk_environment_preserves_sdk_owned_entrypoint_and_tracing(
+    tmp_path, sdk_transport, monkeypatch,
+):
+    inherited = {
+        "TRACEPARENT": "parent-span", "CLAUDE_CODE_ENTRYPOINT": "parent-entrypoint",
+        "CLAUDECODE": "1", "PATH": os.environ.get("PATH", ""), "SDK_ENV_CANARY": "inherited",
+    }
+    for name, value in inherited.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("ANTHROPIC_OAUTH_TOKEN", "must-not-use")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert review.passed
+    overrides = sdk_transport.clients[0].options.env
+    assert set(overrides).isdisjoint(inherited)
+    assert overrides["ANTHROPIC_OAUTH_TOKEN"] == ""
+    assert overrides["CLAUDE_CODE_USE_BEDROCK"] == ""
+    assert all(os.environ[name] == value for name, value in inherited.items())
+    omp = sdk_transport.transport.environment(inherited=True)
+    assert all(omp[name] == value for name, value in inherited.items())
+    assert "ANTHROPIC_OAUTH_TOKEN" not in omp and "CLAUDE_CODE_USE_BEDROCK" not in omp
+
+
+def test_startup_timeout_does_not_relabel_attempt_or_inner_timeouts():
+    import machinist_review_transport as transport
+    async def invoke():
+        for error in (transport.AttemptTimeout(), TimeoutError("inner failure")):
+            with pytest.raises(type(error)) as caught:
+                async with transport.startup_timeout("broker", 1):
+                    raise error
+            assert caught.value is error
+        with pytest.raises(transport.StartupTimeout) as caught:
+            async with transport.startup_timeout("broker", 0.001):
+                await asyncio.sleep(1)
+        assert caught.value.phase == "broker" and caught.value.budget == 0.001
+    asyncio.run(invoke())
+
+
+def test_omp_broker_exhausted_startup_budget_is_typed_startup_timeout(monkeypatch):
+    from contextlib import asynccontextmanager
+    import machinist_review_transport as transport
+    clock = [0]
+    monkeypatch.setattr(transport.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(transport.shutil, "which", lambda name: "/fixture/omp")
+    @asynccontextmanager
+    async def broker(*args):
+        clock[0] = 2
+        yield {}
+    monkeypatch.setattr(transport, "_broker", broker)
+    with pytest.raises(transport.StartupTimeout) as caught:
+        asyncio.run(transport._omp(register_secret=lambda value: None, remaining=lambda: 20, startup=1))
+    assert caught.value.phase == "OMP sheets MCP connection"
+    assert caught.value.budget == 1
+
+
+@pytest.mark.parametrize("failure", ["write_error", "attempt_deadline"])
+def test_quota_state_write_failure_is_retained_without_extending_attempt(
+    tmp_path, sdk_transport, monkeypatch, failure,
+):
+    from machinist_review_credentials import CredentialPool
+    transport = sdk_transport.transport
+    sdk_transport.quota = True
+    logs = []
+    monkeypatch.setattr(transport._telemetry, "error", lambda event, **fields: logs.append((event, fields)))
+    def failed_write(self, *args):
+        if failure == "write_error":
+            raise OSError("state storage failed")
+        raise BlockingIOError("state busy")
+    monkeypatch.setattr(CredentialPool, "unavailable", failed_write)
+    started = mr.time.monotonic()
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+        timeout_s=0.1 if failure == "attempt_deadline" else 10,
+    )
+    assert review.error
+    record, = review.extra["evidence"]["attempts"]
+    route, = record["transport_provenance"]["routes"]
+    assert route["outcome"] == "quota" and route["quota_state_write"] == "failed"
+    assert route["quota_state_write_error"] in {"OSError", "AttemptTimeout", "CancelledError"}
+    assert any(event == "machinist_review.quota_state_write" and fields["outcome"] == "failed"
+               for event, fields in logs)
+    if failure == "attempt_deadline":
+        assert mr.time.monotonic() - started < 2
+        assert record["transport_provenance"]["timeout_phase"] == "attempt"
+
+
+def test_invalid_api_key_is_configuration_failure_not_quota():
+    import machinist_review_transport as transport
+    assert transport.quota_event({"type": "assistant", "error": "authentication_failed",
+                                  "api_error_status": 401, "message": {"content": [
+                                      {"type": "text", "text": "Invalid API key"}]}}) is None
+
+
+@pytest.mark.parametrize("failed_transport", ["claude_agent_sdk", "omp"])
+def test_failed_routed_successor_does_not_inherit_predecessor_execution_evidence(
+    tmp_path, sdk_transport, monkeypatch, failed_transport,
+):
+    transport = sdk_transport.transport
+    stale = {
+        "resolved_model": {"provider": "anthropic", "id": "predecessor-model"},
+        "sdk_isolation": {"predecessor": True}, "omp_command": ["predecessor"],
+        "omp_effective_options": {"predecessor": True}, "omp_prompt": "predecessor",
+        "omp_prompt_sha256": "a" * 64, "shutdown": "graceful",
+        "image_blobs": ["b" * 64], "session_dir": "predecessor",
+    }
+    calls = []
+    def assert_clean(provenance):
+        assert set(stale).isdisjoint(provenance)
+        assert provenance["private_home"]
+    async def sdk(**kwargs):
+        provenance = kwargs["provenance"]
+        assert_clean(provenance)
+        calls.append("claude_agent_sdk")
+        if failed_transport == "claude_agent_sdk" and len(calls) == 2:
+            raise RuntimeError("successor startup failed")
+        provenance.update(stale)
+        return {"status": "exhausted", "retryAt": None, "reason": "credit-balance"}
+    async def omp(**kwargs):
+        assert_clean(kwargs["provenance"])
+        calls.append("omp")
+        raise RuntimeError("successor startup failed")
+    monkeypatch.setattr(transport, "_sdk", sdk)
+    monkeypatch.setattr(transport, "_omp", omp)
+    review = mr.review_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=0,
+    )
+    assert review.error and "successor startup failed" in review.error
+    record, = review.extra["evidence"]["attempts"]
+    provenance = record["transport_provenance"]
+    assert_clean(provenance)
+    assert provenance["transport"] == failed_transport
+    expected_quota_routes = 1 if failed_transport == "claude_agent_sdk" else 3
+    assert calls == ["claude_agent_sdk"] * expected_quota_routes + [failed_transport]
+    assert [route["outcome"] for route in provenance["routes"]] == (
+        ["quota"] * expected_quota_routes + ["failed"]
+    )
+    assert all(route["quota_state_write"] == "persisted"
+               for route in provenance["routes"][:-1])

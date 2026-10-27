@@ -166,30 +166,19 @@ class CredentialPool:
         return {"fingerprint": key.fingerprint, "quotaGroup": key.quota_group, "status": "ready", "retryAt": None, "reason": None}
 
     @contextmanager
-    def _state(self, timeout=30):
+    def _state(self):
         _directory(self.state_file.parent)
-        deadline = time.monotonic() + min(30, timeout)
         # Use our own advisory-lock inode: codjiflo's O_EXCL lock is not an
         # advisory lock. Its pathname remains reserved for its own lock protocol.
         lock = self.state_file.with_suffix(self.state_file.suffix + ".machinist.lock")
-        with FileLock(str(lock), timeout=min(30, timeout), mode=0o600):
-            # Cooperate with codjiflo's atomic-create lock as well.
+        with FileLock(str(lock), timeout=0, mode=0o600):
+            # Cooperate with codjiflo's atomic-create lock as well. Async
+            # credential_operation owns all waiting and its attempt deadline.
             shared = Path(str(self.state_file) + ".lock")
-            while True:
-                try:
-                    fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
-                    break
-                except FileExistsError:
-                    if timeout == 0:
-                        raise BlockingIOError("Claude credential routing lock is busy") from None
-                    if time.monotonic() >= deadline:
-                        detail = (
-                            f"Claude credential routing lock unavailable: {shared}. "
-                            "Locks are never stolen; confirm every holder has stopped "
-                            "before removing a leftover shared lock."
-                        )
-                        raise TimeoutError(detail) from None
-                    time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+            try:
+                fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+            except FileExistsError:
+                raise BlockingIOError("Claude credential routing lock is busy") from None
             try:
                 os.write(fd, f"pid={os.getpid()}\n".encode())
                 self.credentials = _credentials(_private_json(self.keys_file))
@@ -242,10 +231,10 @@ class CredentialPool:
                     or entry["status"] == "cooldown" and entry["retryAt"] is None):
                 raise ValueError("Claude credentials: corrupt routing state")
 
-    def claim(self, excluded=(), *, required_id=None, required_fingerprint=None, timeout=30):
+    def claim(self, excluded=(), *, required_id=None, required_fingerprint=None):
         if not self.credentials and required_id is None:
             return None
-        with self._state(timeout=timeout) as state:
+        with self._state() as state:
             now = int(time.time() * 1000)
             for offset in range(len(self.credentials)):
                 index = (state["cursor"] + offset) % len(self.credentials)
@@ -262,13 +251,13 @@ class CredentialPool:
             raise CredentialUnavailable("Claude continuation credential is unavailable or rotated")
         return None
 
-    def unavailable(self, key: Credential, quota: dict, *, timeout=30):
+    def unavailable(self, key: Credential, quota: dict):
         # Reject malformed provider updates before acquiring or changing shared
         # state, and validate again at the write boundary for every mutation.
         self._validate_state({"version": 1, "cursor": 0, "keys": {
             key.id: {**self._fresh(key), **quota},
         }})
-        with self._state(timeout=timeout) as state:
+        with self._state() as state:
             if not any(current == key for current in self.credentials):
                 return
             for current in self.credentials:

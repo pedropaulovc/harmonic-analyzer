@@ -1844,7 +1844,7 @@ def _review_session(
             "stderr_file": None,
             "artifacts": [],
             "transport_provenance": (
-                dict(previous.get("transport_provenance", {}))
+                _claude_transport.resume_inputs(previous.get("transport_provenance", {}))
                 if resume_review is not None else {}
             ),
         }
@@ -2029,7 +2029,6 @@ def _review_session(
                 transport=attempt_record["transport_provenance"].get("transport", reviewer),
                 session_id=session_id, outcome=attempt_record["outcome"],
                 duration_s=time.monotonic() - attempt_started,
-                verdict_validated=attempt_record["outcome"] == "succeeded",
                 error_category=error.split(":", 1)[0] if error else None,
             )
             events.extend(_tag_events(attempts, attempt_events))

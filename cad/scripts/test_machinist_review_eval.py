@@ -557,8 +557,10 @@ def test_runtime_versions_are_queried_once_and_fail_closed(monkeypatch: pytest.M
         assert packages == ["Pillow", "pypdfium2", "mcp"]
         assert runs == [["C:/bin/codex.exe", "--version"]]
         outcome["returncode"] = 1
-        with pytest.raises(RuntimeError, match="--version"):
-            evaluation.runtime_versions("claude")
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["omp_version_probe"] == "nonzero_exit"
+        assert runtime["omp_version_probe_exit_code"] == "1"
     finally:
         evaluation.runtime_versions.cache_clear()
 
@@ -577,6 +579,61 @@ def test_sdk_runtime_provenance_does_not_require_claude_or_omp_executable(monkey
         assert runtime["reviewer_cli"] == "omp-unavailable"
         assert runtime["routing"] == "sdk-api-pool-then-omp-v1"
         assert queries == ["omp"]
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+@pytest.mark.parametrize("version", ["", " ", None])
+def test_missing_sdk_version_remains_fatal(monkeypatch, version):
+    monkeypatch.setattr(
+        evaluation.importlib.metadata, "version",
+        lambda name: version if name == "claude-agent-sdk" else "fixture",
+    )
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: None)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="missing claude-agent-sdk version"):
+            evaluation.runtime_versions("claude")
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+@pytest.mark.parametrize("failure,outcome", [
+    (evaluation.subprocess.TimeoutExpired(["omp", "--version"], 60, output="secret-canary"), "timeout"),
+    (OSError("secret-canary"), "OSError"),
+    (evaluation.subprocess.SubprocessError("secret-canary"), "SubprocessError"),
+    (None, "empty_output"),
+])
+def test_optional_omp_probe_failure_keeps_sdk_usable(monkeypatch, failure, outcome):
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", lambda name: f"{name}-fixture")
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: "/bin/omp")
+    def probe(*args, **kwargs):
+        if failure is not None:
+            raise failure
+        return evaluation.subprocess.CompletedProcess(args[0], 0, stdout="", stderr="secret-canary")
+    monkeypatch.setattr(evaluation.subprocess, "run", probe)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        runtime = evaluation.runtime_versions("claude")
+        assert runtime["claude-agent-sdk"] == "claude-agent-sdk-fixture"
+        assert runtime["reviewer_cli"] == "omp-unavailable"
+        assert runtime["omp_version_probe"] == outcome
+        assert "secret-canary" not in json.dumps(runtime)
+    finally:
+        evaluation.runtime_versions.cache_clear()
+
+
+def test_sdk_package_missing_remains_fatal_even_without_omp(monkeypatch):
+    def version(name):
+        if name == "claude-agent-sdk":
+            raise evaluation.importlib.metadata.PackageNotFoundError(name)
+        return "fixture"
+    monkeypatch.setattr(evaluation.importlib.metadata, "version", version)
+    monkeypatch.setattr(evaluation.shutil, "which", lambda name: None)
+    evaluation.runtime_versions.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="runtime versions"):
+            evaluation.runtime_versions("claude")
     finally:
         evaluation.runtime_versions.cache_clear()
 
@@ -1028,6 +1085,138 @@ def test_claude_sdk_isolation_tampering_is_rejected_despite_matching_report_hash
         evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
+def _omp_report(result: dict[str, Any]) -> dict[str, Any]:
+    """Recorded OMP runtime facts attached to otherwise valid sheet evidence."""
+    report = deepcopy(result["review"])
+    evidence = report["extra"]["evidence"]
+    invocation = evidence["attempts"][0]
+    provenance = invocation["transport_provenance"]
+    home = Path(provenance["private_home"])
+    sessions = str(home / "sessions")
+    command = [
+        "/bin/omp", "--mode", "rpc", "--no-ui", "--cwd", invocation["cwd"],
+        "--config", str(home / "config.yml"), "--no-tools", "--no-extensions",
+        "--no-skills", "--no-rules", "--no-lsp", "--no-pty", "--no-prewalk",
+        "--no-title", "--auto-approve", "--system-prompt", mr._claude_transport.OMP_SYSTEM_PROMPT,
+        "--model", "anthropic/" + report["model"], "--thinking", report["effort"],
+        "--session-dir", sessions,
+    ]
+    # Real rendered shape, independent of the validator's regex/template.
+    project = (
+        "<project-context>\n<workstation>\n- OS: linux 6.18\n- Arch: x64\n"
+        "- Model: anthropic/claude-opus-5-5\n</workstation>\n</project-context>\n\n"
+        "<critical>\n- Each response MUST advance the task; completion only stopping condition.\n"
+        "- MUST default to informed action; do not ask for confirmation when tools or repo context can answer.\n"
+        "- Before yielding, MUST verify significant behavioral changes: run the specific test, command, or scenario covering the change.\n"
+        "</critical>"
+    )
+    prompt = evidence["effective_prompt"] + "\nReturn JSON matching this schema:\n" + json.dumps(json.loads(evidence["schema"]))
+    provenance.update(
+        transport="omp", session_dir=sessions, session_file=str(Path(sessions) / "review.jsonl"),
+        image_blobs=["a" * 64], shutdown="graceful", omp_command=command,
+        omp_prompt=prompt, omp_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+        omp_effective_options={
+            "command": deepcopy(command), "cwd": invocation["cwd"],
+            "tools": sorted(mr._claude_transport.OMP_TOOLS),
+            "system_prompt": [mr._claude_transport.OMP_SYSTEM_PROMPT, project],
+            "config": {
+                "disabledProviders": ["native", "agents", "agents-md", "claude", "claude-md", "codex", "gemini", "github", "opencode"],
+                "mcp": {"startupTimeoutMs": 0, "enableProjectConfig": True},
+                "memory": {"backend": "off"}, "autolearn": {"enabled": False, "autoContinue": False},
+                "includeWorkspaceTree": False,
+            },
+        },
+    )
+    return report
+
+
+def test_successful_omp_requires_recorded_runtime_evidence(tmp_path, case, provider):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    report = _omp_report(result)
+    _preserve_report(result, directory, report)
+    assert evaluation.validate_evidence(result, identity, "baseline", case[1], directory).blind is True
+
+
+@pytest.mark.parametrize("mutation", [
+    "missing_options", "command_disagrees", "missing_flag", "extra_tool_flag",
+    "duplicate_flag", "wrong_model", "wrong_cwd", "wrong_overlay_path",
+    "context_provider", "memory", "autolearn", "workspace", "mcp", "extra_config",
+    "runtime_tools", "runtime_prompt", "runtime_context", "session_outside",
+    "session_dir_outside", "empty_blobs", "invalid_blob", "nonstring_blob",
+    "duplicate_blob", "missing_prompt", "prompt_without_schema", "bad_prompt_hash",
+    "shutdown",
+])
+def test_omp_runtime_tampering_is_rejected_despite_valid_descriptor(
+    tmp_path, case, provider, mutation,
+):
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    report = _omp_report(result)
+    evidence = report["extra"]["evidence"]
+    provenance = evidence["attempts"][0]["transport_provenance"]
+    options = provenance["omp_effective_options"]
+    command = options["command"]
+    if mutation == "missing_options":
+        del provenance["omp_effective_options"]
+    elif mutation == "command_disagrees":
+        provenance["omp_command"] = ["omp"]
+    elif mutation == "missing_flag":
+        command.remove("--no-extensions")
+    elif mutation == "extra_tool_flag":
+        command.extend(["--tools", "bash"])
+    elif mutation == "duplicate_flag":
+        command.extend(["--system-prompt", "injected"])
+    elif mutation in {"wrong_model", "wrong_overlay_path"}:
+        flag = "--model" if mutation == "wrong_model" else "--config"
+        command[command.index(flag) + 1] = "unauthorized"
+    elif mutation == "wrong_cwd":
+        options["cwd"] = "/tmp"
+    elif mutation == "context_provider":
+        options["config"]["disabledProviders"].remove("agents-md")
+    elif mutation == "memory":
+        options["config"]["memory"]["backend"] = "hindsight"
+    elif mutation == "autolearn":
+        options["config"]["autolearn"]["enabled"] = True
+    elif mutation == "workspace":
+        options["config"]["includeWorkspaceTree"] = True
+    elif mutation == "mcp":
+        options["config"]["mcp"]["enableProjectConfig"] = False
+    elif mutation == "extra_config":
+        options["config"]["systemPrompt"] = "injected"
+    elif mutation == "runtime_tools":
+        options["tools"].append("bash")
+    elif mutation == "runtime_prompt":
+        options["system_prompt"][0] += "\nRead repository files."
+    elif mutation == "runtime_context":
+        options["system_prompt"][1] += "\n<project>private instructions</project>"
+    elif mutation == "session_outside":
+        provenance["session_file"] = "/tmp/unowned.jsonl"
+    elif mutation == "session_dir_outside":
+        provenance["session_dir"] = "/tmp"
+    elif mutation in {"empty_blobs", "invalid_blob", "nonstring_blob", "duplicate_blob"}:
+        provenance["image_blobs"] = {
+            "empty_blobs": [], "invalid_blob": ["../blob"], "nonstring_blob": [None],
+            "duplicate_blob": ["a" * 64, "a" * 64],
+        }[mutation]
+    elif mutation == "missing_prompt":
+        del provenance["omp_prompt"]
+    elif mutation == "prompt_without_schema":
+        provenance["omp_prompt"] = evidence["effective_prompt"]
+        provenance["omp_prompt_sha256"] = hashlib.sha256(provenance["omp_prompt"].encode()).hexdigest()
+    elif mutation == "bad_prompt_hash":
+        provenance["omp_prompt_sha256"] = "0" * 64
+    elif mutation == "shutdown":
+        del provenance["shutdown"]
+    if mutation != "command_disagrees":
+        provenance["omp_command"] = deepcopy(command)
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="OMP"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
 @pytest.mark.parametrize("model", [
     None, "claude-opus-4-6", [], {},
     {"provider": "anthropic"},
@@ -1169,6 +1358,37 @@ def test_complete_retry_evidence_resumes_after_provider_failure(
         assert failed["cwd"] == failed["attempt_dir"]
         assert succeeded["cwd"] == succeeded["attempt_dir"]
     assert failed["attempt_dir"] != succeeded["attempt_dir"]
+    assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
+    assert calls == 2
+
+
+@pytest.mark.parametrize("transport", ["omp", "claude_agent_sdk", "routing"])
+def test_failed_startup_does_not_require_completion_evidence(
+    tmp_path, case, provider, monkeypatch, transport,
+):
+    identity = _identity(case, reviewer="claude")
+    identity["retries"] = 1
+    provider_run = mr._run_reviewer
+    calls = 0
+    def run(command, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            provenance = kwargs["transport_provenance"]
+            provenance["transport"] = transport
+            if transport == "claude_agent_sdk":
+                provenance.update(credential_id="fixture", credential_fingerprint="a" * 64)
+            raise OSError("startup failed before runtime evidence was available")
+        return provider_run(command, **kwargs)
+    monkeypatch.setattr(mr, "_run_reviewer", run)
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    review = evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    failed = review.extra["evidence"]["attempts"][0]
+    assert failed["outcome"] == "failed"
+    assert "omp_effective_options" not in failed["transport_provenance"]
+    assert "sdk_isolation" not in failed["transport_provenance"]
     assert evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory) == result
     assert calls == 2
 
