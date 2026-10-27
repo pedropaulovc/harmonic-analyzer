@@ -82,6 +82,13 @@ class _Reviewer:
                 transport="claude_agent_sdk", session_id=session_id,
                 requested_session_id=session_id, credential_id="fixture",
                 credential_fingerprint="a" * 64,
+                resolved_model={"provider": "anthropic", "id": _flag(command, "--model")},
+                sdk_isolation={
+                    "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+                    "permission_mode": "dontAsk", "setting_sources": [],
+                    "strict_mcp_config": True,
+                    "settings": json.loads(json.dumps(mr.CLAUDE_ISOLATION_SETTINGS)),
+                },
             )
         else:
             sheet_args = _codex_overrides(command)["mcp_servers.sheets.args"][1:]

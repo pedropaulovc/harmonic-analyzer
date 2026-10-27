@@ -288,8 +288,25 @@ both verdicts and the finding diff.
   `CODJIFLO_CLAUDE_STATE_FILE`, default
   `~/.local/state/codjiflo/claude-routing.json`, with locked round-robin claims,
   fingerprint-aware rotation and quota-group cooldown/exhaustion. Invalid or
-  insecure configuration fails closed. Only typed API quota errors authorize
-  rotation, not ordinary prose, schema errors, startup failures or SDK exceptions.
+  insecure configuration fails closed. Only terminal typed API quota errors
+  authorize rotation, not ordinary prose, schema errors, startup failures or SDK
+  exceptions. Transient SDK `system/api_retry` notices are retained as evidence
+  while the in-flight turn continues, including a resumed judge; they do not
+  trigger credential cooldown, rotation or transport switching.
+- Shared routing recovery is operator-controlled; there is no automatic lock
+  reclamation or re-probe of indefinite exhaustion. From the sibling
+  `codjiflo-reviewer` checkout, using the same `CODJIFLO_ANTHROPIC_KEYS_FILE` and
+  `CODJIFLO_CLAUDE_STATE_FILE` overrides as the review, run
+  `node scripts/claude-keys.mjs status` to inspect safe IDs, quota groups and
+  blocks. After topping up an account, run
+  `node scripts/claude-keys.mjs reset ID [ID ...]` for every blocked key ID in
+  its quota group. `node scripts/claude-keys.mjs reset` clears all blocks and
+  recovers corrupt routing state. These commands use the same shared lock.
+  If `<state-file>.lock` is stale, first confirm its owner has stopped and no
+  review or codjiflo process can still be updating that state; only then manually
+  remove that lock file and retry. Never remove a live or unverified owner's
+  lock, or replace the shared lock with a process-local advisory lock: both
+  projects must retain mutual exclusion.
 - When no configured API credential is eligible, execution uses **OMP**, never
   Claude CLI OAuth. OMP runs in RPC mode with cwd beneath a private HOME, an inert
   local `.omp` discovery boundary, and disabled ancestor context-file providers,
@@ -311,7 +328,8 @@ both verdicts and the finding diff.
   actual session has the sole connected sheets server and both tools; OMP waits
   for synchronous MCP startup and validates actual RPC `get_state.dumpTools`,
   system-prompt isolation and resolved provider. Startup is bounded to 120
-  seconds within the total attempt deadline.
+  seconds within the total attempt deadline; timeout diagnostics retain the
+  startup phase and its budget rather than reporting a full-attempt timeout.
   Failed or incomplete startup submits no review. Native redacted records and
   normalized image/tool evidence are retained separately. Valid findings are
   never retried. A successful precheck pins its actual transport and session for
@@ -330,6 +348,10 @@ both verdicts and the finding diff.
   failure category. Keys/tokens, environment maps and unredacted exceptions are
   never logged or retained. Eval identities record SDK/OMP runtime versions and
   each attempt's actual transport provenance; SDK descriptors are not CLI argv.
+  SDK provenance records the effective isolation options in `sdk_isolation`
+  (tools, permission mode, setting sources and strict MCP configuration).
+  Both transports record `resolved_model` as a provider/id object; the SDK
+  provider is `anthropic`.
 - Claude multi-run reviews use **initial-request staggering, then concurrent
   continuation**: `r1` starts alone; the other isolated runs start after its
   first real positive-usage provider assistant response, while `r1` continues.

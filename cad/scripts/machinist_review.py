@@ -419,8 +419,6 @@ def build_claude_invocation(
     ]
 
 
-
-
 def _claude_provider_response(event: Any) -> bool:
     """Recognize a real provider response, not CLI startup or synthetic errors."""
     if (
@@ -450,8 +448,6 @@ def _claude_provider_response(event: Any) -> bool:
         all(type(count) is int and count >= 0 for count in counts)
         and any(count > 0 for count in counts)
     )
-
-
 
 
 def _run_reviewer(
@@ -1624,11 +1620,6 @@ def _codex_resume_command(session_id: str | None) -> str | None:
     return f"codex resume {session_id}" if session_id is not None else None
 
 
-
-
-
-
-
 def _retain_attempt_dir(source: Path, destination: Path) -> str | None:
     """Preserve evidence even while a Windows child still holds its cwd."""
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2164,9 +2155,11 @@ def review_package(
     on_first_response: Callable[[], None] | None = None,
 ) -> Review:
     """Run one blind review, retaining the original single-session contract."""
-    return _review_session(package, reviewer=reviewer, model=model, effort=effort,
-    report_dir=report_dir, retries=retries, timeout_s=timeout_s, codex=codex, prompt_text=prompt_text,
-    on_first_response=on_first_response,)
+    return _review_session(
+        package, reviewer=reviewer, model=model, effort=effort,
+        report_dir=report_dir, retries=retries, timeout_s=timeout_s,
+        codex=codex, prompt_text=prompt_text, on_first_response=on_first_response,
+    )
 
 
 def _failed_review(
@@ -2290,9 +2283,11 @@ def aggregate_package(
                     judge_package = ReviewPackage(
                         package.name, package.kind, (*snapshot.sources, *overlay_sources)
                     )
-                    precheck = _review_session(judge_package, reviewer=judge_reviewer, model=judge_model,
-                    effort=judge_effort, report_dir=directory, retries=retries,
-                    timeout_s=timeout_s, codex=codex, precheck_diff=diff,)
+                    precheck = _review_session(
+                        judge_package, reviewer=judge_reviewer, model=judge_model,
+                        effort=judge_effort, report_dir=directory, retries=retries,
+                        timeout_s=timeout_s, codex=codex, precheck_diff=diff,
+                    )
                     precheck_info["report"] = str(directory / f"{package.name}.json")
                     if not precheck.passed or not precheck.extra.get("session_id"):
                         raise RuntimeError(precheck.error or "precheck failed blind sheet/session evidence checks")
@@ -2331,9 +2326,12 @@ def aggregate_package(
                 try:
                     if snapshot_error:
                         raise RuntimeError(snapshot_error)
-                    review = review_package(snapshot, reviewer=reviewer, model=model, effort=effort,
-                    report_dir=directory, retries=retries, timeout_s=timeout_s, codex=codex, prompt_text=prompt_text,
-                    on_first_response=on_first_response,)
+                    review = review_package(
+                        snapshot, reviewer=reviewer, model=model, effort=effort,
+                        report_dir=directory, retries=retries, timeout_s=timeout_s,
+                        codex=codex, prompt_text=prompt_text,
+                        on_first_response=on_first_response,
+                    )
                 except Exception as exc:
                     review = _failed_review(
                         snapshot, reviewer, model, effort, source_sha,
@@ -2439,10 +2437,12 @@ def aggregate_package(
                 "machinist_review.judge", name=package.name, finding_count=len(findings)
             ) as judge_span:
                 try:
-                    judgment = _review_session(judge_package, reviewer=judge_reviewer,
-                    model=judge_model, effort=judge_effort, report_dir=directory,
-                    retries=retries, timeout_s=timeout_s, codex=codex,
-                    judge_findings=findings, resume_review=precheck,)
+                    judgment = _review_session(
+                        judge_package, reviewer=judge_reviewer,
+                        model=judge_model, effort=judge_effort, report_dir=directory,
+                        retries=retries, timeout_s=timeout_s, codex=codex,
+                        judge_findings=findings, resume_review=precheck,
+                    )
                 except Exception as exc:
                     judgment = _failed_review(
                         snapshot, judge_reviewer, judge_model, judge_effort, source_sha,

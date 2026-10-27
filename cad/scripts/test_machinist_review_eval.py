@@ -386,6 +386,12 @@ def provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
                 transport="claude_agent_sdk", session_id=requested_session,
                 requested_session_id=requested_session, credential_id="fixture",
                 credential_fingerprint="a" * 64,
+                resolved_model={"provider": "anthropic", "id": command[command.index("--model") + 1]},
+                sdk_isolation={
+                    "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+                    "permission_mode": "dontAsk", "setting_sources": [],
+                    "strict_mcp_config": True, "settings": deepcopy(mr.CLAUDE_ISOLATION_SETTINGS),
+                },
             )
             events.append({
                 "type": "control_response",
@@ -968,7 +974,7 @@ def test_foreign_sheet_cannot_redefine_recorded_allowlist(
     assert len(provider["calls"]) == 2
 
 
-@pytest.mark.parametrize("reviewer", ["codex"])
+@pytest.mark.parametrize("reviewer", ["codex", "claude"])
 def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     tmp_path: Path, case, provider, reviewer: str,
 ) -> None:
@@ -978,9 +984,12 @@ def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     assert result["error"] is None
     report_path = directory / result["report"]
     report = json.loads(report_path.read_text(encoding="utf-8"))
-    command = report["extra"]["evidence"]["attempts"][0]["command"]
+    invocation = report["extra"]["evidence"]["attempts"][0]
     if reviewer == "codex":
+        command = invocation["command"]
         command[command.index("--sandbox") + 1] = "danger-full-access"
+    else:
+        invocation["transport_provenance"]["sdk_isolation"]["permission_mode"] = "bypassPermissions"
     report_path.write_text(json.dumps(report), encoding="utf-8")
     result["report_sha256"] = mr._sha256(report_path)
     result["review"] = report
@@ -992,6 +1001,56 @@ def test_recorded_permission_bypass_is_rejected_despite_matching_report_hash(
     assert fresh["error"] is None
     assert fresh["report"] != result["report"]
     assert len(provider["calls"]) == 2
+
+
+@pytest.mark.parametrize("field,value", [
+    ("tools", None),
+    ("permission_mode", "bypassPermissions"),
+    ("allowed_tools", [*sorted(mr._claude_transport.TOOLS), "Bash"]),
+    ("setting_sources", ["user"]),
+    ("strict_mcp_config", False),
+    ("settings", {}),
+])
+def test_claude_sdk_isolation_tampering_is_rejected_despite_matching_report_hash(
+    tmp_path: Path, case, provider, field: str, value: Any,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+    report = deepcopy(result["review"])
+    provenance = report["extra"]["evidence"]["attempts"][0]["transport_provenance"]
+    provenance["sdk_isolation"][field] = deepcopy(value)
+    _preserve_report(result, directory, report)
+    assert result["review"]["blind"] is True
+    with pytest.raises(ValueError, match="SDK evidence lacks effective tool/permission isolation"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
+
+
+@pytest.mark.parametrize("model", [
+    None, "claude-opus-4-6", [], {},
+    {"provider": "anthropic"},
+    {"id": "claude-opus-4-6"},
+    {"provider": "openai", "id": "claude-opus-4-6"},
+    {"provider": "anthropic", "id": None},
+    {"provider": "anthropic", "id": ""},
+    {"provider": "anthropic", "id": 1},
+    {"provider": "anthropic", "id": "claude-opus-4-6", "extra": True},
+])
+def test_claude_resolved_model_must_have_uniform_anthropic_identity(
+    tmp_path: Path, case, provider, model: Any,
+) -> None:
+    identity = _identity(case, reviewer="claude")
+    directory = tmp_path / "run"
+    result = evaluation.run_case(identity, "baseline", case[1], "Rubric A", directory)
+    assert result["error"] is None
+    report = deepcopy(result["review"])
+    provenance = report["extra"]["evidence"]["attempts"][0]["transport_provenance"]
+    provenance["resolved_model"] = deepcopy(model)
+    _preserve_report(result, directory, report)
+    with pytest.raises(ValueError, match="Claude evidence resolved an invalid Anthropic model"):
+        evaluation.validate_evidence(result, identity, "baseline", case[1], directory)
 
 
 @pytest.mark.parametrize("reviewer", ["codex", "claude"])
@@ -1225,6 +1284,15 @@ def test_mcp_provenance_preserves_sources_actual_argv_and_path_adapted_argv(
         assert cwd == attempt_dir
         assert invocation["codex_home"] is None
         assert invocation["rollout_file"] is None
+        provenance = invocation["transport_provenance"]
+        assert provenance["sdk_isolation"] == {
+            "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+            "permission_mode": "dontAsk", "setting_sources": [],
+            "strict_mcp_config": True, "settings": mr.CLAUDE_ISOLATION_SETTINGS,
+        }
+        assert provenance["resolved_model"] == {
+            "provider": "anthropic", "id": command[command.index("--model") + 1],
+        }
         assert json.loads((retained / "mcp.json").read_text(encoding="utf-8")) == {
             "mcpServers": {"sheets": {
                 "command": sys.executable,

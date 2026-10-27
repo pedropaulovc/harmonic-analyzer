@@ -169,10 +169,17 @@ class CredentialPool:
                     fd = os.open(shared, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                     break
                 except FileExistsError:
+                    if timeout == 0:
+                        raise BlockingIOError("Claude credential routing lock is busy") from None
                     if time.monotonic() >= deadline:
+                        detail = (
+                            f"Claude credential routing lock unavailable: {shared}. "
+                            "Locks are never stolen; confirm every holder has stopped "
+                            "before removing a leftover shared lock."
+                        )
                         if timeout <= 30:
-                            raise TimeoutError("Claude credential claim exceeded review deadline") from None
-                        raise ValueError("Claude credentials: routing lock unavailable") from None
+                            raise TimeoutError(detail) from None
+                        raise ValueError(detail) from None
                     time.sleep(min(0.05, max(0, deadline - time.monotonic())))
             try:
                 os.write(fd, f"pid={os.getpid()}\n".encode())
@@ -187,6 +194,7 @@ class CredentialPool:
                                  and state["keys"].get(key.id, {}).get("quotaGroup") == key.quota_group
                                  else self._fresh(key) for key in self.credentials}
                 yield state
+                self._validate_state(state)
                 with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.state_file.parent, delete=False) as output:
                     temporary = Path(output.name)
                     try:
@@ -246,6 +254,11 @@ class CredentialPool:
         return None
 
     def unavailable(self, key: Credential, quota: dict, *, timeout=30):
+        # Reject malformed provider updates before acquiring or changing shared
+        # state, and validate again at the write boundary for every mutation.
+        self._validate_state({"version": 1, "cursor": 0, "keys": {
+            key.id: {**self._fresh(key), **quota},
+        }})
         with self._state(timeout=timeout) as state:
             if not any(current == key for current in self.credentials):
                 return

@@ -90,6 +90,39 @@ class TransportError(RuntimeError):
         self.stdout, self.stderr, self.returncode = stdout, stderr, returncode
 
 
+class StartupTimeout(TimeoutError):
+    def __init__(self, phase, budget):
+        super().__init__(f"Timed out waiting for {phase} ({budget:g}s startup budget)")
+        self.phase, self.budget = phase, budget
+
+
+@asynccontextmanager
+async def startup_timeout(phase, budget):
+    try:
+        async with asyncio.timeout(budget):
+            yield
+    except TimeoutError as exc:
+        raise StartupTimeout(phase, budget) from exc
+
+
+async def credential_operation(pool, operation, remaining, *args, **kwargs):
+    """Poll contended locks without blocking the loop or creating worker threads."""
+    deadline = time.monotonic() + min(30, remaining())
+    while True:
+        remaining()
+        try:
+            return operation(*args, timeout=0, **kwargs)
+        except (LockTimeout, BlockingIOError):
+            budget = min(deadline - time.monotonic(), remaining())
+            if budget <= 0:
+                raise TimeoutError(
+                    f"Claude credential routing lock deadline exceeded: {pool.state_file}.lock "
+                    "(or its .machinist.lock advisory lock). Locks are never stolen; "
+                    "confirm every holder has stopped before removing a leftover shared .lock."
+                ) from None
+            await asyncio.sleep(min(0.05, budget))
+
+
 def environment(key=None):
     env = dict(os.environ)
     for name in tuple(env):
@@ -129,8 +162,8 @@ def sdk_event(message):
 def quota_event(event):
     """Only typed API failures authorize rotation, never ordinary model prose."""
     now = int(time.time() * 1000)
-    if event.get("type") == "system" and event.get("subtype") == "api_retry" and event.get("error") == "rate_limit" and event.get("error_status") == 429:
-        return {"status": "cooldown", "retryAt": now + max(1, event.get("retry_delay_ms") or 60000), "reason": "rate-limit"}
+    # api_retry is a nonterminal CLI backoff notice, not an exhausted key.
+    # In particular its fractional jitter must never enter shared state.
     if event.get("type") != "assistant" or not event.get("error"):
         return None
     error = event["error"]
@@ -162,6 +195,12 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
     home = Path(provenance["private_home"])
     session_dir = Path(provenance.get("sdk_session_dir") or home / "sdk")
     session_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    # Skip only files successfully sanitized by an earlier pass. New or changed
+    # native files (including metadata) always receive the complete secret scan.
+    previous_files = (
+        provenance.get("sdk_redacted_files", {})
+        if provenance.get("sdk_redacted_fingerprint") == key.fingerprint else {}
+    )
     env.update(HOME=str(home), USERPROFILE=str(home))
     provenance["sdk_session_dir"] = str(session_dir)
     env["CLAUDE_CONFIG_DIR"] = str(session_dir)
@@ -176,9 +215,16 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
         extra_args={"bare": None, "disable-slash-commands": None, "no-chrome": None},
         stderr=diagnostics.append,
     )
+    provenance["sdk_isolation"] = {
+        "tools": options.tools, "allowed_tools": options.allowed_tools,
+        "permission_mode": options.permission_mode,
+        "setting_sources": options.setting_sources,
+        "strict_mcp_config": options.strict_mcp_config,
+        "settings": json.loads(options.settings),
+    }
     client = ClaudeSDKClient(options=options)
     try:
-        async with asyncio.timeout(min(startup, remaining())):
+        async with startup_timeout("Claude sheets MCP connection", min(startup, remaining())):
             await client.connect()
             while True:
                 status = await client.get_mcp_status()
@@ -204,12 +250,10 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
                     raise RuntimeError("SDK session differs from requested conversation")
                 provenance["session_id"] = actual_session
             if event.get("type") == "assistant" and event.get("message", {}).get("model"):
-                provenance["resolved_model"] = event["message"]["model"]
+                provenance["resolved_model"] = {"provider": "anthropic", "id": event["message"]["model"]}
             current = quota_event(event)
             if event.get("type") == "assistant":
                 quota = current
-            if current and event.get("subtype") == "api_retry":
-                return current
             if event.get("type") == "result":
                 if not event.get("is_error") and event.get("subtype") == "success":
                     if not provenance.get("session_id"):
@@ -227,12 +271,20 @@ async def _sdk(*, key, config, schema, model, effort, session_id, resume, cwd, r
             # around the retained-stream redactor.
             for path in session_dir.rglob("*"):
                 if path.is_file() and path.suffix in {".json", ".jsonl", ".txt", ".log"}:
+                    stat = path.stat()
+                    signature = (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+                    if previous_files.get(str(path)) == list(signature):
+                        continue
                     text = path.read_text(encoding="utf-8", errors="replace")
                     sanitized = text.replace(key.api_key, "[REDACTED]").replace(
                         json.dumps(key.api_key, ensure_ascii=True)[1:-1], "[REDACTED]",
                     )
                     if sanitized != text:
                         path.write_text(sanitized, encoding="utf-8")
+                    stat = path.stat()
+                    previous_files[str(path)] = [stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns]
+            provenance["sdk_redacted_files"] = previous_files
+            provenance["sdk_redacted_fingerprint"] = key.fingerprint
 
 
 def omp_event(event):
@@ -285,7 +337,7 @@ async def _broker(executable, register_secret, remaining, startup):
     broker = None
     drain = None
     try:
-        async with asyncio.timeout(min(startup, remaining())):
+        async with startup_timeout("OMP credential broker", min(startup, remaining())):
             # OMP's first token creation is not exclusive. Coordinate our
             # parallel workers before starting brokers against the same vault.
             lock_dir = Path.home() / ".local/state/harmonic-analyzer"
@@ -479,7 +531,7 @@ async def _omp_session(*, executable, broker_env, config, schema, model, effort,
                 return event.get("data", {})
     completed = False
     try:
-        async with asyncio.timeout(min(startup, remaining())):
+        async with startup_timeout("OMP sheets MCP connection", min(startup, remaining())):
             state = await control("get_state")
             tools = {tool["name"] for tool in state.get("dumpTools", [])}
             if tools != OMP_TOOLS:
@@ -557,10 +609,11 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     provenance["operation_id"] = str(uuid.uuid4())
     provenance["routes"] = []
     common = {name: provenance.get(name) for name in ("operation_id", "package", "phase", "attempt")}
-    pinned_omp = "--resume" in command and provenance.get("transport") == "omp"
-    resume_flag = "--resume" if "--resume" in command else "--session-id"
-    provenance["requested_session_id"] = command[command.index(resume_flag) + 1]
-    if resume_flag != "--resume":
+    resume = "--resume" in command
+    pinned_omp = resume and provenance.get("transport") == "omp"
+    session_id = command[command.index("--resume" if resume else "--session-id") + 1]
+    provenance["requested_session_id"] = session_id
+    if not resume:
         provenance.update(transport="routing", session_id=None)
     try:
         pool = CredentialPool(load=not pinned_omp)
@@ -636,9 +689,6 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
     config = json.loads((Path(cwd) / "mcp.json").read_text())
     config["prompt"] = prompt
     schema = json.loads((Path(cwd) / "schema.json").read_text())
-    resume = "--resume" in command
-    session_id = command[command.index("--resume" if resume else "--session-id") + 1]
-    provenance["requested_session_id"] = session_id
     model = command[command.index("--model") + 1]
     effort = command[command.index("--effort") + 1]
     prior_transport = provenance.get("transport") if resume else None
@@ -647,16 +697,16 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         attempted = []
         while prior_transport != "omp":
             try:
-                credential = pool.claim(
-                    attempted, required_id=provenance.get("credential_id") if resume else None,
+                credential = await credential_operation(
+                    pool, pool.claim, remaining, attempted,
+                    required_id=provenance.get("credential_id") if resume else None,
                     required_fingerprint=provenance.get("credential_fingerprint") if resume else None,
-                    timeout=remaining(),
                 )
             except CredentialUnavailable:
                 # Conversation history is local, not owned by the API key.
                 # Rebind before submitting this one resumed turn, never replay
                 # a turn already submitted with an exhausted credential.
-                credential = pool.claim(attempted, timeout=remaining())
+                credential = await credential_operation(pool, pool.claim, remaining, attempted)
             remaining()
             _telemetry.info("machinist_review.credentials", configured_count=len(pool.credentials), selected_id=credential.id if credential else None, reason="selected" if credential else "no_eligible_keys", **common)
             if credential is None:
@@ -677,7 +727,7 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
                 route["outcome"] = "succeeded"
                 return
             route.update(outcome="quota", reason=quota["reason"])
-            pool.unavailable(credential, quota, timeout=remaining())
+            await credential_operation(pool, pool.unavailable, remaining, credential, quota)
             _telemetry.warn("machinist_review.credential_unavailable", credential_id=credential.id,
                             reason=quota["reason"], status=quota["status"], retry_at=quota["retryAt"], **common)
             if resume:
@@ -715,7 +765,14 @@ def run(*, command, prompt, timeout, cwd, startup, settings, provenance, on_firs
         output = "\n".join(json.dumps(event) for event in events)
         errors = pool.redact("".join(diagnostics))
         if isinstance(exc, TimeoutError):
-            raise subprocess.TimeoutExpired(command, timeout, output=output, stderr=errors) from None
+            budget = exc.budget if isinstance(exc, StartupTimeout) else timeout
+            expired = subprocess.TimeoutExpired(command, budget, output=output, stderr=errors)
+            if str(exc):
+                expired.add_note(pool.redact(str(exc)))
+            if isinstance(exc, StartupTimeout):
+                provenance["timeout_phase"] = exc.phase
+                provenance["timeout_budget_s"] = exc.budget
+            raise expired from None
         detail = pool.redact(f"{category}: {exc}")
         if errors.strip():
             detail += "\nSanitized transport stderr:\n" + errors.strip()[-1600:]

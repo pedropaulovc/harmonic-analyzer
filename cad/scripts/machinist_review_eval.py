@@ -421,15 +421,25 @@ def validate_evidence(
                 or not re.fullmatch(r"[a-f0-9]{64}", provenance.get("credential_fingerprint", ""))
             ):
                 raise ValueError("invalid SDK credential provenance")
+            if provenance.get("transport") == "claude_agent_sdk":
+                expected_isolation = {
+                    "tools": [], "allowed_tools": sorted(mr._claude_transport.TOOLS),
+                    "permission_mode": "dontAsk", "setting_sources": [],
+                    "strict_mcp_config": True, "settings": mr.CLAUDE_ISOLATION_SETTINGS,
+                }
+                if provenance.get("sdk_isolation") != expected_isolation:
+                    raise ValueError("SDK evidence lacks effective tool/permission isolation")
             home = provenance.get("private_home")
             if (not isinstance(home, str) or not Path(home).is_absolute()
                     or not Path(home).name.startswith("machrev-home-")
                     or not Path(invocation["cwd"]).resolve().is_relative_to(Path(home).resolve())):
                 raise ValueError("Claude invocation cwd is outside its private HOME")
-            if provenance.get("transport") == "omp" and invocation["outcome"] == "succeeded":
+            if invocation["outcome"] == "succeeded":
                 resolved = provenance.get("resolved_model")
-                if not isinstance(resolved, dict) or resolved.get("provider") != "anthropic":
-                    raise ValueError("OMP evidence resolved a non-Anthropic provider")
+                if (not isinstance(resolved, dict) or set(resolved) != {"provider", "id"}
+                        or resolved.get("provider") != "anthropic"
+                        or not isinstance(resolved.get("id"), str) or not resolved["id"]):
+                    raise ValueError("Claude evidence resolved an invalid Anthropic model")
         if (
             invocation["reviewer"] != review.reviewer
             or (session_id is not None and (not isinstance(session_id, str) or not session_id))

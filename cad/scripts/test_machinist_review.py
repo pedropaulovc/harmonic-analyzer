@@ -675,6 +675,7 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     state = SimpleNamespace(status="connected", queries=[], clients=[], quota=False, fail=False, delay=0)
     state.verdict = _clean_verdict()
     state.transient_failure = False
+    state.api_retry = False
     state.controlled = False
     state.leader_timeout = False
     state.before_response = threading.Event()
@@ -723,6 +724,11 @@ def sdk_transport(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                                         duration_api_ms=1, is_error=True, num_turns=1,
                                         usage={"input_tokens": 10}, session_id=self.options.session_id or self.options.resume)
                 return
+            if state.api_retry:
+                yield sdk.SystemMessage(subtype="api_retry", data={
+                    "subtype": "api_retry", "error": "rate_limit", "error_status": 429,
+                    "attempt": 1, "max_retries": 10, "retry_delay_ms": 1234.5,
+                })
             if state.quota:
                 yield sdk.AssistantMessage(content=[sdk.TextBlock(text="Credit balance is too low")],
                                            model="test", error="billing_error")
@@ -794,6 +800,53 @@ def test_sdk_clears_stale_quota_after_a_clean_assistant_response(tmp_path, sdk_t
     assert not review.passed and len(sdk_transport.clients) == 1
     state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
     assert all(entry["status"] == "ready" for entry in state["keys"].values())
+
+
+@pytest.mark.parametrize("resumed_judge", [False, True])
+def test_sdk_api_retry_succeeds_without_rotation(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch, resumed_judge: bool,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    def unavailable(*args, **kwargs):
+        pytest.fail("a transient API retry must not change credential availability")
+
+    async def fallback(**kwargs):
+        pytest.fail("a transient API retry must not switch to OMP")
+
+    monkeypatch.setattr(CredentialPool, "unavailable", unavailable)
+    monkeypatch.setattr(sdk_transport.transport, "_omp", fallback)
+    package = mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),))
+    first = None
+    if resumed_judge:
+        sdk_transport.verdict = {"decision": "review", "skip_kind": "none", "reason": "Review required."}
+        first = mr._review_session(
+            package, reviewer="claude", report_dir=tmp_path / "precheck", retries=0,
+            precheck_diff={"pages": [{"status": "unchanged", "old_size_points": [10, 10],
+                                     "new_size_points": [10, 10], "text_changed": False}]},
+        )
+        assert first.passed
+        sdk_transport.verdict = {"clusters": []}
+    sdk_transport.api_retry = True
+    review = mr._review_session(
+        package, reviewer="claude", report_dir=tmp_path / "review", retries=0,
+        **({"judge_findings": [], "resume_review": first} if resumed_judge else {}),
+    )
+    assert review.passed
+    assert len(sdk_transport.clients) == (2 if resumed_judge else 1)
+    record, = review.extra["evidence"]["attempts"]
+    routes = record["transport_provenance"]["routes"]
+    assert len(routes) == 1 and routes[0]["outcome"] == "succeeded"
+    events = mr._parse_events(Path(record["stdout_file"]).read_text())
+    assert any(event.get("subtype") == "api_retry" for event in events)
+    if resumed_judge:
+        before, after = sdk_transport.clients
+        assert after.options.resume == before.options.session_id
+        assert after.options.env["ANTHROPIC_API_KEY"] == before.options.env["ANTHROPIC_API_KEY"]
+        assert review.extra["session_id"] == first.extra["session_id"]
+    state = json.loads(Path(os.environ["CODJIFLO_CLAUDE_STATE_FILE"]).read_text())
+    assert all(entry["status"] == "ready" and entry["retryAt"] is None
+               for entry in state["keys"].values())
 
 
 def test_sdk_independent_native_state_is_removed_after_retaining_evidence(tmp_path, sdk_transport):
@@ -872,6 +925,12 @@ def test_sdk_startup_failure_never_submits_review_and_cleans_up(
     assert review.extra["evidence"]["attempts"][0]["outcome"] == (
         "timed_out" if status == "pending" else "failed"
     )
+    if status == "pending":
+        record, = review.extra["evidence"]["attempts"]
+        provenance = record["transport_provenance"]
+        assert provenance["timeout_phase"] == "Claude sheets MCP connection"
+        assert provenance["timeout_budget_s"] == 0.02
+        assert "0.02" in review.error
 
 
 def test_sdk_generic_error_is_redacted_and_never_falls_back(
@@ -933,6 +992,170 @@ def test_omp_oauth_environment_never_inherits_the_api_proxy(monkeypatch):
     assert not oauth.get("ANTHROPIC_OAUTH_TOKEN")
 
 
+@pytest.mark.parametrize("existing_state", [False, True])
+def test_private_pool_fractional_quota_rejected_without_state_write(
+    tmp_path: Path, sdk_transport, existing_state: bool,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    pool = CredentialPool()
+    key = pool.claim() if existing_state else pool.credentials[0]
+    before = pool.state_file.read_bytes() if existing_state else None
+    quota = {"status": "cooldown", "retryAt": 1900000000123.5, "reason": "rate-limit"}
+
+    with pytest.raises(ValueError, match="corrupt routing state"):
+        pool.unavailable(key, quota)
+    assert (pool.state_file.read_bytes() if pool.state_file.exists() else None) == before
+    with pytest.raises(ValueError, match="corrupt routing state"):
+        with pool._state() as state:
+            state["keys"][key.id].update(quota)
+    assert (pool.state_file.read_bytes() if pool.state_file.exists() else None) == before
+    assert not Path(str(pool.state_file) + ".lock").exists()
+    assert pool.claim() is not None
+
+
+@pytest.mark.parametrize("lock_error", ["advisory", "shared"])
+@pytest.mark.parametrize("budget", [0.12, 60.0])
+@pytest.mark.parametrize("release", [False, True])
+def test_credential_contention_polls_without_threads_and_respects_deadline(
+    monkeypatch: pytest.MonkeyPatch, lock_error: str, budget: float, release: bool,
+) -> None:
+    import machinist_review_transport as transport
+
+    clock = [0.0]
+    calls, sleeps, callbacks = [], [], []
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(transport.time, "monotonic", lambda: clock[0])
+
+    async def sleep(delay):
+        sleeps.append(delay)
+        clock[0] += delay
+        await real_sleep(0)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("credential contention must not allocate executor threads")
+
+    def operation(value, *, timeout, required_id):
+        calls.append((value, timeout, required_id))
+        if release and len(calls) == 3:
+            return "claimed"
+        if lock_error == "advisory":
+            raise transport.LockTimeout("routing.lock")
+        raise BlockingIOError("routing lock busy")
+
+    async def invoke():
+        loop = asyncio.get_running_loop()
+        monkeypatch.setattr(loop, "run_in_executor", forbidden)
+        loop.call_soon(callbacks.append, "responsive")
+        remaining = lambda: budget - clock[0]
+        pool = SimpleNamespace(state_file=Path("routing.json"))
+        if release:
+            assert await transport.credential_operation(
+                pool, operation, remaining, "argument", required_id="account-0",
+            ) == "claimed"
+        else:
+            with pytest.raises(TimeoutError, match="lock deadline"):
+                await transport.credential_operation(
+                    pool, operation, remaining, "argument", required_id="account-0",
+                )
+
+    monkeypatch.setattr(transport.asyncio, "sleep", sleep)
+    monkeypatch.setattr(transport.asyncio, "to_thread", forbidden)
+    asyncio.run(invoke())
+    assert callbacks == ["responsive"]
+    assert all(call == ("argument", 0, "account-0") for call in calls)
+    assert sleeps and all(0 < delay <= 0.05 for delay in sleeps)
+    assert clock[0] == pytest.approx(0.1 if release else min(30, budget))
+
+
+def test_sdk_startup_timeout_preserves_phase_budget_and_exception_note(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport = sdk_transport.transport
+    (tmp_path / "mcp.json").write_text(json.dumps({"mcpServers": {}}))
+    (tmp_path / "schema.json").write_text(json.dumps(mr.load_schema()))
+    provenance = {"private_home": str(tmp_path / "native")}
+    phase, budget = "Claude sheets MCP connection", 0.125
+
+    async def timeout(**kwargs):
+        raise transport.StartupTimeout(phase, budget)
+
+    monkeypatch.setattr(transport, "_sdk", timeout)
+    with pytest.raises(mr.subprocess.TimeoutExpired) as caught:
+        transport.run(
+            command=["claude", "--model", "test", "--effort", "high",
+                     "--session-id", "00000000-0000-4000-8000-000000000001"],
+            prompt="Review", timeout=90, cwd=str(tmp_path), startup=budget,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, provenance=provenance,
+        )
+    assert caught.value.timeout == budget
+    assert caught.value.__notes__ == [f"Timed out waiting for {phase} (0.125s startup budget)"]
+    assert provenance["timeout_phase"] == phase
+    assert provenance["timeout_budget_s"] == budget
+
+
+def test_sdk_redaction_skips_unchanged_files_but_scans_changed_and_new_files(
+    tmp_path: Path, sdk_transport, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from machinist_review_credentials import CredentialPool
+
+    transport = sdk_transport.transport
+    key = CredentialPool().credentials[0]
+    session_dir = tmp_path / "native" / "sdk"
+    session_dir.mkdir(parents=True)
+    unchanged = session_dir / "unchanged.jsonl"
+    changed = session_dir / "changed.jsonl"
+    metadata = session_dir / "metadata.json"
+    for path in (unchanged, changed, metadata):
+        path.write_text(key.api_key)
+    provenance = {"private_home": str(session_dir.parent)}
+    reads = []
+    read_text = Path.read_text
+
+    def tracked_read(path, *args, **kwargs):
+        if path.parent == session_dir:
+            reads.append(path)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", tracked_read)
+
+    async def invoke(resume):
+        await transport._sdk(
+            key=key, config={"mcpServers": {}, "prompt": "Review"}, schema=mr.load_schema(),
+            model="test", effort="high", session_id="00000000-0000-4000-8000-000000000001",
+            resume=resume, cwd=str(tmp_path), remaining=lambda: 5, startup=1,
+            settings=mr.CLAUDE_ISOLATION_SETTINGS, emit=lambda *args: None,
+            diagnostics=[], provenance=provenance,
+        )
+
+    asyncio.run(invoke(False))
+    assert set(reads) == {unchanged, changed, metadata}
+    assert all(read_text(path) == "[REDACTED]" for path in reads)
+    reads.clear()
+    changed.write_text("changed " + key.api_key)
+    next_key = CredentialPool().credentials[1]
+    metadata.write_text(json.dumps({"secret": key.api_key, "next_secret": next_key.api_key}))
+    new = session_dir / "new.log"
+    new.write_text(key.api_key)
+    asyncio.run(invoke(True))
+    assert set(reads) == {changed, metadata, new}
+    assert all(key.api_key not in read_text(path) for path in (unchanged, changed, metadata, new))
+    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
+    assert set(provenance["sdk_redacted_files"]) == {
+        str(path) for path in (unchanged, changed, metadata, new)
+    }
+    reads.clear()
+    asyncio.run(invoke(True))
+    assert reads == []
+    # Even unchanged files need a fresh scan after rebinding to another key.
+    assert next_key.api_key in read_text(metadata)
+    key = next_key
+    asyncio.run(invoke(True))
+    assert set(reads) == {unchanged, changed, metadata, new}
+    assert key.api_key not in read_text(metadata)
+    assert provenance["sdk_redacted_fingerprint"] == key.fingerprint
+
+
 def test_quota_classifier_rejects_assistant_prose_and_structured_output_failures():
     import machinist_review_transport as transport
     assert transport.quota_event({"type": "assistant", "message": {
@@ -941,7 +1164,8 @@ def test_quota_classifier_rejects_assistant_prose_and_structured_output_failures
     assert transport.quota_event({"type": "result", "subtype": "error_max_structured_output_retries",
                                   "errors": ["Insufficient API credits"]}) is None
     assert transport.quota_event({"type": "system", "subtype": "api_retry",
-                                  "error": "rate_limit", "error_status": 429})["status"] == "cooldown"
+                                  "error": "rate_limit", "error_status": 429,
+                                  "retry_delay_ms": 1234.5}) is None
 
 
 def test_omp_normalization_preserves_images_and_rejects_unknown_tools():
@@ -2653,7 +2877,9 @@ def test_attempt_dir_is_the_cwd_then_retained_without_sheet_images(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
-    review = mr.review_package(package, reviewer=reviewer, report_dir=report_dir, retries=0, codex="codex-test",)
+    review = mr.review_package(
+        package, reviewer=reviewer, report_dir=report_dir, retries=0, codex="codex-test",
+    )
 
     assert review.passed and review.blind
     assert review.sheet_count == 3
@@ -2766,10 +2992,9 @@ def test_attempt_records_carry_session_id_and_resume_command(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "part", (source,))
-    mr.review_package(package,
-    reviewer="claude",
-    report_dir=tmp_path / "claude",
-    retries=1, )
+    mr.review_package(
+        package, reviewer="claude", report_dir=tmp_path / "claude", retries=1,
+    )
     mr.review_package(
         package,
         reviewer="codex",
@@ -2872,10 +3097,10 @@ def test_retry_persists_all_attempts_and_cannot_hide_tool_use(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
-    review = mr.review_package(mr.ReviewPackage("part", "part", (png,)),
-    reviewer="claude",
-    report_dir=report_dir,
-    retries=1, )
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
+        reviewer="claude", report_dir=report_dir, retries=1,
+    )
     assert review.attempts == 2
     assert review.tool_events == 1
     # The successful attempt inspected every sheet; only the hidden tool fails it.
@@ -3040,10 +3265,10 @@ def test_retry_requires_sheet_views_from_the_successful_attempt(
         )
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
-    review = mr.review_package(mr.ReviewPackage("part", "part", (png,)),
-    reviewer="claude",
-    report_dir=tmp_path / "reports",
-    retries=1, )
+    review = mr.review_package(
+        mr.ReviewPackage("part", "part", (png,)),
+        reviewer="claude", report_dir=tmp_path / "reports", retries=1,
+    )
 
     assert review.attempts == 2
     assert review.tool_events == 0
@@ -3376,10 +3601,9 @@ def test_both_reviewers_receive_one_complete_package_invocation(
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     package = mr.ReviewPackage("package", "assembly", sources)
-    claude_review = mr.review_package(package,
-    reviewer="claude",
-    report_dir=tmp_path / "claude",
-    retries=0, )
+    claude_review = mr.review_package(
+        package, reviewer="claude", report_dir=tmp_path / "claude", retries=0,
+    )
     codex_review = mr.review_package(
         package,
         reviewer="codex",
@@ -3614,10 +3838,10 @@ def test_provider_failures_stay_blind_but_never_pass(
         return mr.subprocess.CompletedProcess(command, 1, stdout="", stderr="quota exhausted")
 
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
-    review = mr.review_package(mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-    reviewer=reviewer,
-    report_dir=tmp_path / "reports",
-    retries=1, codex="codex-test",)
+    review = mr.review_package(
+        mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+        reviewer=reviewer, report_dir=tmp_path / "reports", retries=1, codex="codex-test",
+    )
 
     assert review.attempts == 2
     assert "quota exhausted" in review.error
@@ -3661,10 +3885,10 @@ def test_retention_falls_back_to_copy_when_windows_holds_the_attempt_dir(
     monkeypatch.setattr(mr, "_run_reviewer", fake_run)
     report_dir = tmp_path / "reports"
     try:
-        review = mr.review_package(mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
-        reviewer="claude",
-        report_dir=report_dir,
-        retries=1, )
+        review = mr.review_package(
+            mr.ReviewPackage("package", "part", (_png_source(tmp_path / "page.png"),)),
+            reviewer="claude", report_dir=report_dir, retries=1,
+        )
     finally:
         for attempt in held:
             real_rmtree(attempt, ignore_errors=True)
@@ -4232,8 +4456,10 @@ def test_aggregate_runs_are_parallel_isolated_and_share_frozen_sources(
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-    judge_reviewer=reviewer, report_dir=directory, retries=0, force=True, codex="codex-test",)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+        judge_reviewer=reviewer, report_dir=directory, retries=0, force=True, codex="codex-test",
+    )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert aggregate["source_sha256"] == [source_hash]
     assert len({cwd for cwd, _ in seen}) == 3
@@ -4317,10 +4543,12 @@ def test_aggregate_initial_request_gate_is_claude_only_with_concurrent_continuat
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     with mr.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(contextvars.copy_context().run, mr.aggregate_package,
-        mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
-        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-        retries=0, force=True, codex="codex-test",)
+        future = pool.submit(
+            contextvars.copy_context().run, mr.aggregate_package,
+            mr.ReviewPackage("sample", "part", (source,)), reviewer=reviewer,
+            judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+            retries=0, force=True, codex="codex-test",
+        )
         try:
             assert leader_started.wait(15)
             if reviewer == "claude":
@@ -4362,9 +4590,11 @@ def test_aggregate_single_review_does_not_require_response_notification(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
-    runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
-    retries=0, force=True, codex="codex-test",)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (_png_source(tmp_path / "sheet.png"),)),
+        runs=1, judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports",
+        retries=0, force=True, codex="codex-test",
+    )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert len(calls) == 2 and calls[0] is None and calls[1] is not None
 
@@ -4414,8 +4644,10 @@ def test_aggregate_claude_leader_retries_or_terminal_failure_release_followers(
 
     monkeypatch.setattr(mr, "review_package", review)
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-    retries=1, force=True, )
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+        retries=1, force=True,
+    )
     assert followers.is_set() and aggregate["verdict"] == "FIX"
     assert aggregate["gating_count"] == 1 and aggregate["error"] is None
     assert [run["run_id"] for run in aggregate["runs"]] == ["r1", "r2", "r3"]
@@ -4513,9 +4745,11 @@ def test_judge_coverage_errors_retry_in_fresh_isolated_sessions(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
-    judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
-    retries=1, codex="codex-test",)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        judge_reviewer=judge_reviewer, report_dir=tmp_path / "reports", force=True,
+        retries=1, codex="codex-test",
+    )
     assert aggregate["verdict"] == "FIX" and aggregate["error"] is None
     assert len(judge_cwds) == len(set(judge_cwds)) == 2
     judge = json.loads(Path(aggregate["judge"]["report"]).read_text(encoding="utf-8"))
@@ -4541,8 +4775,10 @@ def test_aggregate_counts_unique_runs_and_only_confirmed_gating_clusters(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=2,
-    report_dir=tmp_path / "reports", retries=0, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=2,
+        report_dir=tmp_path / "reports", retries=0, force=True,
+    )
     assert aggregate["verdict"] == "FIX" and aggregate["gating_count"] == 1
     assert [item["run_count"] for item in aggregate["confirmed"]] == [2, 1]
     assert [item["decision"] for item in aggregate["rejected"]] == ["misread", "not_gating"]
@@ -4569,8 +4805,10 @@ def test_aggregate_gates_only_findings_raised_by_two_runs(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=3,
-    report_dir=tmp_path / "reports", retries=0, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=3,
+        report_dir=tmp_path / "reports", retries=0, force=True,
+    )
     assert aggregate["verdict"] == verdict
     assert aggregate["gating_count"] == (verdict == "FIX")
     assert [item["gating"] for item in aggregate["confirmed"]] == [verdict == "FIX"]
@@ -4596,8 +4834,10 @@ def test_aggregate_ship_uses_judged_category_not_raw_verdict(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
-    report_dir=tmp_path / "reports", retries=0, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=tmp_path / "reports", retries=0, force=True,
+    )
     assert aggregate["verdict"] == "SHIP" and aggregate["gating_count"] == 0
     assert aggregate["runs"][0]["verdict"] == "FIX"
     assert not aggregate["judge"]["skipped"]
@@ -4621,8 +4861,10 @@ def test_aggregate_zero_findings_skips_judge_and_records_partial_run_errors(
         return _session_reply(command, kwargs, _clean_verdict())
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
-    retries=0, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), report_dir=tmp_path / "reports",
+        retries=0, force=True,
+    )
     assert calls == 3
     assert aggregate["verdict"] == "SHIP" and aggregate["error"] is None
     assert aggregate["judge"]["skipped"] and aggregate["judge"]["error"] is None
@@ -4648,8 +4890,10 @@ def test_aggregate_error_is_retained_and_never_passes(
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
     directory = tmp_path / "reports"
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
-    report_dir=directory, retries=1, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=directory, retries=1, force=True,
+    )
     assert aggregate["verdict"] == "ERROR" and aggregate["error"]
     assert aggregate["gating_count"] == 0
     assert bool(aggregate["judge"]["error"]) == (failure != "all_runs")
@@ -4679,8 +4923,10 @@ def test_judge_prompt_includes_sheet_text_and_owner_exceptions(
         return _session_reply(command, kwargs, value)
 
     monkeypatch.setattr(mr, "_run_reviewer", reply)
-    aggregate = mr.aggregate_package(mr.ReviewPackage("sample", "part", (source,)), runs=1,
-    report_dir=tmp_path / "reports", retries=0, force=True,)
+    aggregate = mr.aggregate_package(
+        mr.ReviewPackage("sample", "part", (source,)), runs=1,
+        report_dir=tmp_path / "reports", retries=0, force=True,
+    )
     assert aggregate["verdict"] == "SHIP"
     assert len(prompts) == 1
     assert "SHEET TEXT LAYER" in prompts[0] and "FRONT 5:1" in prompts[0]
