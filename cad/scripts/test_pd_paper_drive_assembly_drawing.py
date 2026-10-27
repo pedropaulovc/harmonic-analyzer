@@ -35,7 +35,6 @@ import pd_transgear_front_bushing_spec as front_bushing
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
-import pd_transgear_arm_plate_geometry as plate_geometry
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
@@ -376,15 +375,13 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    # The setting's values and identities, in operation order: the ZZ pin and
-    # the MHA-PD-23 pin, the gear-plane station and the reading window (with
-    # the mesh it sets) before the pilots are drilled, then each part reamed
-    # to its own drawing, then the dowels.
+    # The setting's values and identities, in operation order: S (the
+    # MHA-PD-23 pin), K's two coordinates from S with the mesh they set,
+    # then each part reamed to its own drawing, then the dowels.
     order = [
-        f"{steps.KNOB_BORE_GAUGE_PIN_IN:.3f}",
         _number("pd-transgear-pin"),
-        steps.GEAR_PLANE_FROM_HUB_FACE_TEXT,
-        steps.CENTRE_READING_TEXT,
+        f"{steps.K_FROM_S_ALONG_MM:.3f}",
+        f"{steps.K_FROM_S_ACROSS_MM:.3f}",
         _number("pd-transgear-knob-shaft"),
         _number("pd-rack-pinion"),
         _number("pd-transgear-arm"),
@@ -398,25 +395,37 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "JIG" not in located
 
 
-def test_the_s_k_reading_window_pays_the_gauge_pin_float_inside_the_band() -> None:
-    inch = 25.4
-    bore = [plate_geometry.BORE_DIA + limit for limit in plate_geometry.BORE_DIA_LIMITS]
-    pin = steps.KNOB_BORE_GAUGE_PIN_IN
-    # The largest set pin that enters the least bore; the next never enters.
-    assert pin * inch <= min(bore) < (pin + steps.ZZ_STEP_IN - steps.ZZ_CLASS_IN) * inch
-    assert (pin + steps.ZZ_STEP_IN - steps.ZZ_CLASS_IN) * inch > max(bore)
-    float_mm = (max(bore) - (pin - steps.ZZ_CLASS_IN) * inch) / 2.0
-    assert steps.KNOB_BORE_GAUGE_PIN_FLOAT_MM == pytest.approx(float_mm)
-    low, high = steps.CENTRE_READING_WINDOW
-    assert low == disc.CENTRE_DISTANCE_WINDOW[0]
-    assert high + float_mm <= disc.CENTRE_DISTANCE_WINDOW[1]
-    assert high + float_mm + 0.001 > disc.CENTRE_DISTANCE_WINDOW[1]
-    import paper_drive_arm_registration as registration
+def test_the_jig_bored_k_lands_in_the_set_band_and_the_position_circle() -> None:
+    import tomllib
 
-    assert steps.GEAR_PLANE_FROM_HUB_FACE_MM == pytest.approx(
-        registration.KNOB_JOURNAL_CONTACT_FRONT_MACHINE_Z_MM
-        - registration.gear_plane_machine_z_mm()
+    import paper_drive_arm_registration as registration
+    from _process_plans import PROCESS_ROOT
+
+    # The printed coordinates are K at the middle of the set band, from S.
+    along, across = steps.K_FROM_S_ALONG_MM, steps.K_FROM_S_ACROSS_MM
+    low, high = disc.CENTRE_DISTANCE_WINDOW
+    assert math.hypot(along, across) == pytest.approx((low + high) / 2.0)
+    ux, uy = registration.S_TO_K_UNIT
+    assert (-along, -across) == pytest.approx(
+        (ux * (low + high) / 2.0, uy * (low + high) / 2.0)
     )
+    # Setting error per axis from the shop's own instruments: each located
+    # centre (S, K, and the pivot that trams the arm) is off by half a DRO
+    # step plus half an indicator division of runout; independent points add
+    # root-sum-square. The tram error turns K about S by its lever.
+    inventory = tomllib.loads(
+        (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
+    )
+    dro = inventory["machines"]["PM-30MV"]["resolution_mm"]["value"]
+    dti = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
+    point = dro / 2.0 + dti / 4.0
+    lever = math.hypot(along, across) / steps.arm_geometry.PIN_STATION
+    along_err = math.sqrt(2.0) * point
+    across_err = math.hypot(along_err, math.sqrt(2.0) * point * lever)
+    band_half = (high - low) / 2.0
+    assert along_err < band_half
+    radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
+    assert math.hypot(band_half + along_err, across_err) < radius
 
 
 def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
@@ -432,9 +441,8 @@ def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
     # One ordinary hand check; no gauge budget or load qualification text.
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
-    # The refit re-reads the same window, citing the setting step.
-    assert str(steps.step_number("arm-plate-located")) in fitted
-    assert steps.CENTRE_READING_TEXT in fitted
+    # The setting step's own coordinates fix K; the refit only checks shake.
+    assert f"{steps.K_FROM_S_ALONG_MM:.3f}" not in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted
