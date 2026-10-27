@@ -93,6 +93,13 @@ TEXT_SIDES = {
 # imported them, before their style and text move.
 HEIGHT_STATION_M = 0.010
 DIAMETER_IMPORT_M = 0.018
+# Ruling (release manager, 2026-10-27, applying the owner's rule that a vn
+# sheet carries only replacement-critical sizes and that simplifying beats
+# adding native machinery; PR #1896): the size texts take these fixed,
+# spec-derived places, and the sheet has no runtime own-ink, own-arrowhead or
+# settled-clearance check. The shared finaliser and layout audit stay the
+# guards. Natively measured own-arrowhead-to-text clearance at these places:
+# 2.73-3.23 mm (run 20261027T155633803Z-efb1e66b, 380ee131).
 # Native geometry of this sheet's size dimensions, identical on runs
 # fa43a1a5 (ec339f3d) and ae121732 (d179e35b):
 # the witnesses run 1 mm past the station, away from the diagram;
