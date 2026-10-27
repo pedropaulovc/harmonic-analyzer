@@ -62,7 +62,6 @@ from _drawing_attachment import _assert_attached_to
 from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
 from _drawing_edges import scan_view_edges
 from _drawing_finish import add_surface_finish
-from _drawing_centerline import add_view_centerline
 from _drawing_gdt import PmiDrawingPlacement, project_part_pmi
 import _drawing_hidden_sketches as hidden_sketches
 from _drawing_notes import add_property_linked_note
@@ -350,6 +349,12 @@ FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
 CHAIN_LINE_OFFSET_MM = 1.2
 CHAIN_LINE_STYLE = 3  # swLineStyles_e.swLineCHAIN
 CHAIN_LINE_WEIGHT = 2  # swLineWeights_e.swLW_THICK
+CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
+CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
+# Each screw hole's axis in section D-D, past face A and past its zone.
+SCREW_AXES = tuple(
+    ((x, _SCREW_Y, -1.5), (x, _SCREW_Y, SCREW_ZONE_HEIGHT + 1.5)) for x, _y in SCREW_HOLES
+)
 KNOB_ZONE = (
     (0.0, CHAIN_LINE_OFFSET_MM, 0.0),
     (0.0, CHAIN_LINE_OFFSET_MM, -KNOB_ZONE_HEIGHT),
@@ -509,6 +514,98 @@ def _add_linked_note(
     )
 
 
+def _project_to_sketch(
+    adapter: Any,
+    view: Any,
+    points_mm: tuple[_ModelPoint, ...],
+    *,
+    label: str,
+    names: tuple[str, ...],
+) -> tuple[list[tuple[float, float]], list[tuple[float, ...]]]:
+    """Model points (mm) on the sheet, and the first two in the view
+    sketch's space, each through one transform read."""
+    sheet = model_points_in_view(
+        adapter, view, [tuple(value / 1000.0 for value in point) for point in points_mm],
+        label=label, names=names,
+    )
+    sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    ends = []
+    for x, y in sheet[:2]:
+        point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        ends.append(tuple(float(value) for value in projected.ArrayData))
+    return sheet, ends
+
+
+def _require_line_ends(
+    line: Any, ends: list[tuple[float, ...]], *, label: str, stage: str
+) -> None:
+    for expected, accessor in ((ends[0], "GetStartPoint2"), (ends[1], "GetEndPoint2")):
+        raw = getattr(line, accessor)()
+        if raw is None:
+            raise RuntimeError(f"{label}: {stage}, the line has no {accessor[3:-6].lower()} point")
+        point = _early_bound(raw, "ISketchPoint")
+        actual = (float(point.X), float(point.Y), float(point.Z))
+        if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
+            raise RuntimeError(f"{label}: {stage}, line end {actual} is not at {expected}")
+
+
+def _sketch_line(
+    adapter: Any,
+    view: Any,
+    ends: list[tuple[float, ...]],
+    *,
+    style: int,
+    width: int,
+    label: str,
+) -> tuple[Any, Any]:
+    """A black line of ``style``/``width`` in ``view``'s sketch, straight to
+    the database (as the cutting lines are, _drawing_sections): an inferred
+    endpoint would snap onto a hole wall or a face.  Returns the segment
+    and the line, its ends read back."""
+    model = adapter.currentModel
+    drawing = _early_bound(model, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the view for {label}")
+    model.ClearSelection2(True)
+    manager = _early_bound(model.SketchManager, "ISketchManager")
+    previous = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        segment = manager.CreateLine(*ends[0], *ends[1])
+    finally:
+        manager.AddToDB = previous
+    if segment is None:
+        raise RuntimeError(f"failed to sketch the {label} line")
+    line = _early_bound(segment, "ISketchLine")
+    _require_line_ends(line, ends, label=label, stage="as sketched")
+    segment = _early_bound(segment, "ISketchSegment")
+    segment.Style = style
+    segment.Width = width
+    # COLORREF black: the default sketch colour prints grey, which read as
+    # a hidden line (machinist review, run 20261027T152452686Z).
+    segment.Color = 0
+    if (int(segment.Style), int(segment.Width), int(segment.Color)) != (style, width, 0):
+        raise RuntimeError(f"{label}: line style did not apply")
+    return segment, line
+
+
+@_telemetry.traced("drawing.axis_line", label_param="label")
+def _add_axis_line(
+    adapter: Any, view: Any, axis: tuple[_ModelPoint, _ModelPoint], *, label: str
+) -> None:
+    """A hole's axis as a thin black centre line in ``view``'s sketch."""
+    _sheet, ends = _project_to_sketch(
+        adapter, view, axis, label=label, names=("start", "end")
+    )
+    _sketch_line(
+        adapter, view, ends, style=CENTER_LINE_STYLE, width=CENTER_LINE_WEIGHT,
+        label=label,
+    )
+
+
 @_telemetry.traced("drawing.projected_zone_line", label_param="label")
 def _add_zone_line(
     adapter: Any,
@@ -531,54 +628,17 @@ def _add_zone_line(
     roles = ("start", "end", "height text")
 
     def project() -> tuple[list[tuple[float, float]], list[tuple[float, ...]]]:
-        """The zone's sheet points, and its ends in the view sketch's space,
-        each through one transform read."""
-        sheet = model_points_in_view(
-            adapter, view, [tuple(value / 1000.0 for value in point) for point in zone],
-            label=label, names=roles,
-        )
-        sketch = _early_bound(_early_bound(view, "IView").GetSketch(), "ISketch")
-        transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
-        utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-        ends = []
-        for x, y in sheet[:2]:
-            point = _early_bound(utility.CreatePoint(double_array([x, y, 0.0])), "IMathPoint")
-            projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
-            ends.append(tuple(float(value) for value in projected.ArrayData))
-        return sheet, ends
+        return _project_to_sketch(adapter, view, zone, label=label, names=roles)
 
     def require_ends(line: Any, ends: list[tuple[float, ...]], stage: str) -> None:
-        for expected, accessor in ((ends[0], "GetStartPoint2"), (ends[1], "GetEndPoint2")):
-            point = _early_bound(getattr(line, accessor)(), "ISketchPoint")
-            actual = (float(point.X), float(point.Y), float(point.Z))
-            if max(abs(a - b) for a, b in zip(actual, expected)) > 1e-9:
-                raise RuntimeError(
-                    f"{label}: {stage}, chain line end {actual} is off the zone at {expected}"
-                )
+        _require_line_ends(line, ends, label=label, stage=stage)
 
     (start, end, text), ends = project()
+    segment, line = _sketch_line(
+        adapter, view, ends, style=CHAIN_LINE_STYLE, width=CHAIN_LINE_WEIGHT,
+        label=label,
+    )
     model = adapter.currentModel
-    drawing = _early_bound(model, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate the view for {label}")
-    model.ClearSelection2(True)
-    manager = _early_bound(model.SketchManager, "ISketchManager")
-    previous = bool(manager.AddToDB)
-    manager.AddToDB = True
-    try:
-        segment = manager.CreateLine(*ends[0], *ends[1])
-    finally:
-        manager.AddToDB = previous
-    if segment is None:
-        raise RuntimeError(f"failed to sketch the {label} chain line")
-    line = _early_bound(segment, "ISketchLine")
-    require_ends(line, ends, "as sketched")
-    segment = _early_bound(segment, "ISketchSegment")
-    segment.Style = CHAIN_LINE_STYLE
-    segment.Width = CHAIN_LINE_WEIGHT
-    # COLORREF black: the default sketch colour prints grey, which read as
-    # a hidden line (machinist review, run 20261027T152452686Z).
-    segment.Color = 0
     selection_manager = _early_bound(model.SelectionManager, "ISelectionMgr")
     selection = selection_manager.CreateSelectData()
     selection.View = view
@@ -740,13 +800,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Each hole's axis in section D-D, so its zone's chain line reads as
     # drawn beside the axis (ASME Y14.5-2018 6.4.7), not as a hidden line.
-    for index, (x, _y) in enumerate(SCREW_HOLES, 1):
-        add_view_centerline(
-            adapter, screw_section,
-            face_xy=_sheet_xy(
-                adapter, screw_section, (x - 0.8, _SCREW_Y, 1.5), f"screw hole {index} wall"
-            ),
-            label=f"screw hole {index} axis in section D-D",
+    # Sketched: InsertCenterLine2 found no cylinder at a pick inside the
+    # cut hole (run 20261027T155333783Z).
+    for index, axis in enumerate(SCREW_AXES, 1):
+        _add_axis_line(
+            adapter, screw_section, axis, label=f"screw hole {index} axis in section D-D"
         )
     zone_checks = [
         _add_zone_line(
