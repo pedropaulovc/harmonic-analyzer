@@ -64,15 +64,22 @@ if not 0.0 < PRESS_INTERFERENCE[0] <= PRESS_INTERFERENCE[1]:
         f"MHA-PD-20 bore leaves the shoulder press: {PRESS_INTERFERENCE}"
     )
 
-# Rule 17 at the full worst case: the smallest O.D. over the largest ream, less
-# the title block's edge break on both rims of an end face (the bore's and the
-# O.D.'s; REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX).  No
-# run-off term: the bore is drilled and reamed and the O.D. turned in one
-# chucking.
+# Rule 17 at the full worst case: the smallest O.D. over the largest ream,
+# offset by the bore's eccentricity to the O.D., less the title block's edge
+# break on both rims of an end face (the bore's and the O.D.'s; REMOVE BURRS
+# AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX, whichever sets back
+# further).  No drill run-off: the bore is drilled and reamed in the chucking
+# that holds the O.D.  That chucking's coaxiality is charged instead, since
+# the sheet prints no runout: the bar may stand as supplied in a 3-jaw chuck,
+# so the allowance is 0.20 TIR (0.10 offset), four times the repo's 0.05 TIR
+# per-setup convention (tolerances/crank_mesh.yaml,
+# tooth_cutting_runout_tir_mm).
 WALL_TARGET = 2.0
-EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
+_BREAK = _config.title_block("edge_break")
+EDGE_BREAK = max(float(_BREAK["radius_mm"]), float(_BREAK["chamfer_max_mm"]))
+BORE_ECCENTRICITY = 0.10
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
-WALL_WORST = (OD - OD_BAND - BORE_DIA_MAX) / 2.0 - 2.0 * EDGE_BREAK
+WALL_WORST = (OD - OD_BAND - BORE_DIA_MAX) / 2.0 - BORE_ECCENTRICITY - 2.0 * EDGE_BREAK
 if WALL_WORST < WALL_TARGET:
     raise AssertionError(
         f"MHA-PD-20 wall {WALL_WORST:.3f} < the {WALL_TARGET} target at the worst case"
@@ -82,7 +89,7 @@ if WALL_WORST < WALL_TARGET:
 # Pressed on the shoulder, the ring's bore is the screw's axis (datum A).  The
 # front face seats on the bar and the arm seats on the rear face, so the arm
 # tilts off the axis by the sum of both faces' perpendicularity to A over the
-# smallest face the arm seats on (the O.D. at its lower limit); the
+# smallest flat the arm seats on (FACE_PERPENDICULARITY_ZONE_DIA); the
 # assembly's hanger-tilt stack reads all three.
 BORE_DATUM = "A"
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {

@@ -330,8 +330,10 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
 
 def test_spacer_wall_holds_the_target_with_both_rim_breaks() -> None:
     worst = (
-        spacer.OD - spacer.OD_BAND - spacer.BORE_DIA_MAX
-    ) / 2.0 - 2.0 * spacer.EDGE_BREAK
+        (spacer.OD - spacer.OD_BAND - spacer.BORE_DIA_MAX) / 2.0
+        - spacer.BORE_ECCENTRICITY
+        - 2.0 * spacer.EDGE_BREAK
+    )
     assert math.isclose(spacer.WALL_WORST, worst)
     assert worst >= spacer.WALL_TARGET
     assert not hasattr(spacer, "WALL_NOTE")

@@ -35,7 +35,7 @@ from _rebuild import force_rebuild
 from _session import run_build
 from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
-from _drawing_precision import apply_drawing_precision
+from _drawing_precision import _named_dimensions, apply_drawing_precision
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -49,6 +49,7 @@ from _fit_deviations import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
+import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
     BORE_DIA,
     BORE_DIA_BAND,
@@ -72,6 +73,27 @@ _SAVED_DRAWING_PROPERTIES = (
 )
 
 V_RING = math.pi * ((OD / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * LENGTH
+
+
+def author_dimension_callouts(adapter) -> None:
+    """Write every authored text lane on its source dimension, read it back
+    (build_pd_transgear_pin.author_dimension_callouts).
+
+    The drawing only reads these lanes: set from the sheet they would write
+    through to this part outside its recipe (#1942).
+    """
+    for feature, by_name in callouts.authored_text().items():
+        displays = _named_dimensions(adapter, feature, set(by_name))
+        for name, lanes in by_name.items():
+            display, _dimension = displays[name]
+            for lane, text in lanes.items():
+                display.SetText(lane, text)
+                printed = str(display.GetText(lane) or "")
+                if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                    raise RuntimeError(
+                        f"{name}@{feature}: text lane {lane} did not persist: "
+                        f"{printed!r}"
+                    )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -169,6 +191,7 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    author_dimension_callouts(adapter)
     # Both end faces, resolved by outward normal and offset: a ring extruded
     # -Z would have no +Z face at z = LENGTH and refuse here.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)

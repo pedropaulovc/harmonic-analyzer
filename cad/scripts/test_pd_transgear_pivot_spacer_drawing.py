@@ -83,14 +83,46 @@ def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
 
 def test_wall_holds_the_target_at_the_full_worst_case() -> None:
     """Rule 17 with every allowance the shop sees: the O.D. at its .X row's
-    low limit, the bore at its largest ream, and the title block's 0.25 break
-    on both rims of an end face.  One lathe chucking, so no run-off."""
+    low limit, the bore at its largest ream offset by the chucking's
+    eccentricity, and the title block's larger permitted break (radius or
+    chamfer) on both rims of an end face.  One chucking, so no run-off."""
     row = _config.title_block("linear_1pl")["display"].lstrip("±")
-    brk = _config.title_block("edge_break")["chamfer_max_mm"]
+    brk = _config.title_block("edge_break")
+    setback = max(float(brk["radius_mm"]), float(brk["chamfer_max_mm"]))
     assert spec.OD_BAND == pytest.approx(float(row))
-    worst = (spec.OD - float(row) - spec.BORE_DIA_MAX) / 2.0 - 2.0 * brk
+    assert spec.EDGE_BREAK == pytest.approx(setback)
+    # Four times the repo's per-setup 0.05 TIR, as a radial offset.
+    tir = float(_config.fit("crank_mesh", "tooth_cutting_runout_tir_mm"))
+    assert spec.BORE_ECCENTRICITY == pytest.approx(4.0 * tir / 2.0)
+    worst = (
+        (spec.OD - float(row) - spec.BORE_DIA_MAX) / 2.0
+        - spec.BORE_ECCENTRICITY
+        - 2.0 * setback
+    )
     assert spec.WALL_WORST == pytest.approx(worst)
     assert spec.WALL_WORST >= spec.WALL_TARGET == 2.0
+
+
+def test_a_larger_permitted_radius_break_charges_the_wall(monkeypatch) -> None:
+    """The wall charges whichever permitted break sets back further: an R0.4
+    break with the 0.25 chamfer kept leaves 2.132 - 2 x 0.15 < 2.0, so the
+    spec refuses rather than missing the radius."""
+    import importlib
+
+    real = _config.title_block
+
+    def title_block(key):
+        row = real(key)
+        return {**row, "radius_mm": 0.4} if key == "edge_break" else row
+
+    monkeypatch.setattr(_config, "title_block", title_block)
+    try:
+        with pytest.raises(AssertionError, match=r"MHA-PD-20 wall 1\.832 < the 2\.0"):
+            importlib.reload(spec)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(spec)
+    assert spec.EDGE_BREAK == pytest.approx(0.25)
 
 
 def test_the_sheet_states_no_shortfall_and_no_facing_step() -> None:

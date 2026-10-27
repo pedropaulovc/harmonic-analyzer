@@ -36,7 +36,6 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 from _check import check
 from _com import _early_bound
-import _config
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -47,11 +46,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import (
-    assert_imported_precision,
-    offset_dimension_text,
-    set_dimension_callouts,
-)
+from _drawing_dimensions import assert_imported_precision, offset_dimension_text
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_datum_feature, add_feature_control_frame
@@ -71,8 +66,8 @@ from _session import run_build
 from _surface_finish import surface_finish_by_key
 import _telemetry
 from diagnostics.drawing_layout_audit import collect_document
+import pd_transgear_pivot_spacer_callouts as callouts
 from pd_transgear_pivot_spacer_spec import (
-    BORE_CALLOUT,
     BORE_DATUM,
     BORE_DIA,
     DRAWING_DIMENSIONS,
@@ -81,7 +76,6 @@ from pd_transgear_pivot_spacer_spec import (
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
     OD,
-    PRESS_INTERFERENCE,
     SURFACE_FINISHES,
 )
 
@@ -127,22 +121,12 @@ END_KEEP = {
     "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-# Rule 4: every tight band names its mate.  The ream's band holds a light
-# press on the MHA-PD-VN-57 shoulder: the interference both limits produce,
-# printed outward to three places, on the screw named by its number.  The
-# length's ±0.05 sets the MHA-PD-VN-63 spring's room between the arm's spot
-# face floor and the shim under the screw head (transgear_hanger_joints).
-_SCREW_NUMBER = _config.parts("pd-vn-transgear-pivot-screw")["number"]
-_SPRING_NUMBER = _config.parts("pd-vn-transgear-pivot-spring")["number"]
-PRESS_CALLOUT = (
-    f"{math.floor(PRESS_INTERFERENCE[0] * 1000.0 + 1e-9) / 1000.0:.3f}-"
-    f"{math.ceil(PRESS_INTERFERENCE[1] * 1000.0 - 1e-9) / 1000.0:.3f} DIAMETRAL\n"
-    f"INTERFERENCE ON\n{_SCREW_NUMBER} SHOULDER"
-)
-LENGTH_CALLOUT = f"SETS {_SPRING_NUMBER}\nSPRING ROOM"
+# Rule 4: every tight band names its mate (pd_transgear_pivot_spacer_callouts).
+# The part authors both below-callouts on its source dimensions; the sheet
+# imports them and only reads them back (#1942).
 DIMENSION_CALLOUTS = {
-    "BoreDia": f"{BORE_CALLOUT}\n{PRESS_CALLOUT}",
-    "RingLength": LENGTH_CALLOUT,
+    name: lanes[callouts.CALLOUT_BELOW]
+    for name, lanes in callouts.authored_by_name().items()
 }
 # The length under the profile; the O.D. right of the part, its dimension line
 # far enough out that the front face's finish symbol sits between them.
@@ -438,6 +422,33 @@ def _move_dimension(
     return matches[0]
 
 
+def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
+    """Every authored dimension prints the text lanes its part wrote
+    (draw_mg_wheel_axle).  Read-only: text set from the sheet would write
+    through to the source part (#1942)."""
+    wanted = callouts.authored_by_name()
+    displays = {
+        dimension_name(adapter, annotation): annotation for annotation in annotations
+    }
+    missing = sorted(set(wanted) - set(displays))
+    if missing:
+        raise RuntimeError(f"authored dimensions not printed: {missing!r}")
+    wrong = {}
+    for name, lanes in wanted.items():
+        display = _early_bound(
+            _early_bound(displays[name], "IAnnotation").GetSpecificAnnotation(),
+            "IDisplayDimension",
+        )
+        for lane, text in lanes.items():
+            printed = str(display.GetText(lane) or "")
+            if callouts.callout_rows(printed) != callouts.callout_rows(text):
+                wrong[(name, lane)] = printed
+    if wrong:
+        raise RuntimeError(
+            f"imported dimension text differs from the part's: {wrong!r}"
+        )
+
+
 def _datum_a_live(
     adapter: Any, view: Any, tag: Any, bore_edge: Any
 ) -> tuple[float, float]:
@@ -596,7 +607,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the length's and bore's bands are authored on the part; the sheet
     # only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _assert_part_authored_text(adapter, annotations)
     offset_dimension_text(adapter, profile_annotations, {"RingLength": LENGTH_TEXT_XY})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the spacer end view")
