@@ -180,15 +180,16 @@ def _left_of(edge_x: float, width: float) -> float:
     return edge_x - _LEFT_OF_REAR_AIR - width / 2.0
 
 
-# Widths and heights of the stacked texts, as the drawing test estimates them
-# (3.5 mm caps, test_pd_transgear_feed_pinion_drawing): the rows are placed by
-# their text centres, each a 3 mm gap under the row above.
-_FACE_WIDTH_TEXT_WIDTH = 0.0575
-_FLAT_END_TEXT_WIDTH = 0.0549
+# Widths of the texts that stand left of a rear face, as the drawing test
+# estimates them (3.5 mm caps, 2.61 mm advance, a space padding either side;
+# test_pd_transgear_feed_pinion_drawing): the rows are placed by their text
+# centres, each a 3 mm gap under the row above.
+_FACE_WIDTH_TEXT_WIDTH = 0.0627
+_FLAT_END_TEXT_WIDTH = 0.0601
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": (_REAR_X - 0.040, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
-    "FlatToAxis": (_NOSE_X + 0.026, _SIDE_BOTTOM - 0.0079),
+    "FlatToAxis": (_NOSE_X + 0.030, _SIDE_BOTTOM - 0.0079),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
     "FaceWidth": (_left_of(_REAR_X, _FACE_WIDTH_TEXT_WIDTH), _SIDE_BOTTOM - 0.0069),
     "FlatEnd": (_left_of(_REAR_X, _FLAT_END_TEXT_WIDTH), _SIDE_BOTTOM - 0.0208),
@@ -203,14 +204,14 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # left of it above them.  Tangent edges print in their phantom font, so the
 # straight pass's end, where the cutter's arc meets the floor tangentially,
 # shows on the floor the full-depth row rises from.
-LEFT_CENTER = (0.369, 0.112)
+LEFT_CENTER = (0.373, 0.112)
 LEFT_CAPTION = "OUTSIDE VIEW"
 TANGENT_EDGES_FONTED = 1  # swDisplayTangentEdges_e.swTangentEdgesVisibleAndFonted
 _LEFT_REAR_X = LEFT_CENTER[0] - OVERALL_LENGTH / 2.0 * VIEW_SCALE[0] / 1000.0
 _LEFT_BOTTOM = LEFT_CENTER[1] - HALF_OD
-_CUTTER_TEXT_WIDTH = 0.0366
+_CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
-    "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0067),
+    "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0068),
     "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0206),
 }
 LEFT_CAPTION_XY = (_LEFT_REAR_X - _LEFT_OF_REAR_AIR - 0.032, LEFT_CENTER[1] + 0.001)
@@ -220,7 +221,7 @@ LEFT_CAPTION_XY = (_LEFT_REAR_X - _LEFT_OF_REAR_AIR - 0.032, LEFT_CENTER[1] + 0.
 # its arrows land on two gap floors; the text stands lower left, clear of the
 # view, under the notes and over its caption.
 _ROOT_TEXT_ANGLE = math.radians(195.0)
-_ROOT_TEXT_RADIUS = 0.040
+_ROOT_TEXT_RADIUS = 0.050
 REAR_KEEP: dict[str, tuple[float, float]] = {
     "RootDia": (
         REAR_CENTER[0] + _ROOT_TEXT_RADIUS * math.cos(_ROOT_TEXT_ANGLE),
