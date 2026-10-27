@@ -101,7 +101,6 @@ from pd_transgear_feed_pinion_spec import (
     FLAT_END_TOL_TYPE,
     FLAT_TO_AXIS_DEVIATIONS,
     FULL_DEPTH,
-    FULL_DEPTH_BAND,
     GAP_FLOOR_WITNESS_Y,
     GEAR_DATA,
     OUTSIDE_DIA,
@@ -762,9 +761,10 @@ async def build(adapter) -> dict[str, str]:
     # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
     # flat's (0, -0.015) under the hub's flat, the standard tip class, the
     # root as a physical MIN floor, the flat's end wall as LIMITS between the
-    # step and the hub's flat; the cutter's full-depth station at its .XXX
-    # band and its run-out as a MAX limit (R9-67).  The tooth length, which
-    # only places the step, holds the title block's .XXX.
+    # step and the hub's flat; the cutter's run-out as a MAX limit (R9-67).
+    # The tooth length, which only places the step, and the cutter's
+    # full-depth station hold the title block's .XXX: an explicit ±0.13
+    # restated that row (2026-10-27 ENFORCE review, r2, r3).
     _single_limit(
         adapter,
         "FlatProfile",
@@ -777,9 +777,6 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "OverallLength", STATION_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "SleeveProfile", "FullDepth", FULL_DEPTH_BAND
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS

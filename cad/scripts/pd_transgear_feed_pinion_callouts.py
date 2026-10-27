@@ -62,8 +62,10 @@ OVERALL_CALLOUT = "\n".join(
 FLAT_END_CALLOUT = f"CLEARS {HUB_NUMBER} FLAT"
 # The cutter stations name themselves under their values: neither ends at an
 # edge of the section, which cuts through teeth, so they print on the
-# outside view.
-FULL_DEPTH_CALLOUT = f"{TEETH}T FULL DEPTH"
+# outside view.  The full depth's teeth cover the rack's whole reach
+# (build_pd_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST), so it
+# names the rack (2026-10-27 ENFORCE review, r2, r3: no stated function).
+FULL_DEPTH_CALLOUT = "\n".join((f"{TEETH}T FULL DEPTH", f"COVERS {RACK_NUMBER} RACK"))
 CUTTER_RUNOUT_CALLOUT = "CUTTER RUN-OUT"
 # The prefix lane replaces SolidWorks' own diameter symbol, so it carries it
 # (run 20261027T032128736Z printed a bare "ROOT 7.93 min.").  The translated

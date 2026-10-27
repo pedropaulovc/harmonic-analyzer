@@ -230,7 +230,9 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
 # left of it above them.  Its tangent edges are hidden.  It is not projected
 # from any view, so its caption names its direction (codjiflo P2 on
 # 65a022125): it shows the side section B-B shows, uncut.
-LEFT_CENTER = (0.373, 0.112)
+# It stands 4 mm higher than the uncropped view did, so the full depth's
+# extra row (the rack it covers) stays above the title block.
+LEFT_CENTER = (0.373, 0.116)
 LEFT_CAPTION = "OUTSIDE VIEW\nSAME SIDE AS B-B"
 _LEFT_CAPTION_WIDTH = 0.047  # its longer row, as the drawing test estimates
 TANGENT_EDGES_HIDDEN = 0  # swDisplayTangentEdges_e.swTangentEdgesHidden
@@ -249,10 +251,11 @@ OUTSIDE_CROP_FENCE = (
     _LEFT_REAR_X + OUTSIDE_CROP_Z * VIEW_SCALE[0] / 1000.0,
     LEFT_CENTER[1] + HALF_OD + 0.004,
 )
+_FULL_DEPTH_TEXT_WIDTH = 0.0601
 _CUTTER_TEXT_WIDTH = 0.0418
 LEFT_KEEP: dict[str, tuple[float, float]] = {
-    "FullDepth": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0068),
-    "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0206),
+    "FullDepth": (_left_of(_LEFT_REAR_X, _FULL_DEPTH_TEXT_WIDTH), _LEFT_BOTTOM - 0.0100),
+    "CutterRunout": (_left_of(_LEFT_REAR_X, _CUTTER_TEXT_WIDTH), _LEFT_BOTTOM - 0.0250),
 }
 LEFT_CAPTION_XY = (
     _LEFT_REAR_X - _LEFT_OF_REAR_AIR - _LEFT_CAPTION_WIDTH, LEFT_CENTER[1] + 0.001

@@ -88,7 +88,6 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
-        ("SleeveProfile", "FullDepth"): "FULL_DEPTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
         ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
@@ -244,10 +243,15 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     # A shop note states requirements only: the cutter is method.
     assert lines == [spec.TOOTH_EDGE_NOTE, spec.FLAT_WALL_NOTE]
     assert max(len(line) for line in lines) <= 70
-    # One-line names, printed under the value, so the narrow text stands left
-    # of the outside view's rear face.
-    for name in (callouts.FULL_DEPTH_CALLOUT, callouts.CUTTER_RUNOUT_CALLOUT):
-        assert "\n" not in name
+    # Short names, printed under the value, so the narrow text stands left
+    # of the outside view's rear face.  The full depth holds the title
+    # block's .XXX (an explicit ±0.13 restated it: 2026-10-27 review, r2,
+    # r3), so it names its function: its teeth cover the rack's reach.
+    assert callouts.FULL_DEPTH_CALLOUT.split("\n") == [
+        f"{spec.TEETH}T FULL DEPTH",
+        f"COVERS {callouts.RACK_NUMBER} RACK",
+    ]
+    assert "\n" not in callouts.CUTTER_RUNOUT_CALLOUT
     # Their witnesses run along the floor of the gap facing the outside
     # view: model 195°, a gap centre (gap centres at 15° + k·30°).
     assert spec.GAP_FLOOR_WITNESS_Y == pytest.approx(
@@ -439,8 +443,6 @@ def _printed_text(name: str) -> str:
         rows = [value, f"{spec.FLAT_END_MIN:.{spec.FLAT_END_PLACES}f}"]
     elif name == "CutterRunout":
         rows = [f"{value} max."]
-    elif name == "FullDepth":
-        rows = [f"{value} \u00b1{spec.FULL_DEPTH_BAND:.2f}"]
     elif name in _DEVIATIONS:
         lower, upper = _DEVIATIONS[name]
         places = _DEVIATION_PLACES[name]
