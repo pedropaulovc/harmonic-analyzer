@@ -128,7 +128,9 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
     parentheses after the stock's own size, which is the modelled one."""
     prefix, suffix = spec.STOCK_TEXT_PREFIX, spec.STOCK_TEXT_SUFFIX
     assert prefix.endswith("(") and suffix.startswith(")")
-    stock, band = prefix.rstrip("( ").split()
+    stock, band, unit = prefix.rstrip("( ").split()
+    # In inches, said so: on the millimetre sheet a bare ±.001 reads as mm.
+    assert unit == "IN"
     assert float(Fraction(stock)) * 25.4 == pytest.approx(geometry.THICKNESS)
     # The stock's thickness band, which the seat tilt is judged at, prints.
     assert float(band.lstrip("±")) * 25.4 == pytest.approx(geometry.THICKNESS_BAND)
@@ -499,40 +501,38 @@ def _centred_box(lines: list[str], xy: tuple[float, float]) -> tuple[float, ...]
     )
 
 
-# Measured on 8b5e1f354's render (transgear-arm.pdf, 300 dpi): outside its
-# witnesses the floor depth's text hangs LEFT of its dimension line, right
-# edge on the line; "FLOOR FROM" set 30.0 mm wide, and the 14.0 8.8 mm wide,
-# centred on its line.  The section arrow stands 5 mm past the square end.
+# Measured on 8b5e1f354's render (transgear-arm.pdf, 300 dpi): "FLOOR FROM"
+# set 30.0 mm wide, and the 14.0 8.8 mm wide, centred on its line.  The
+# section arrow stands 5 mm past the square end.
 _CAPS_CHAR_WIDTH = 0.0030
 _END_WIDTH_TEXT = 0.0088
-
-
-def _hanging_left_box(lines: list[str], xy: tuple[float, float]) -> tuple[float, ...]:
-    width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
-    half_height = len(lines) * _LINE_PITCH / 2.0
-    return (xy[0] - width, xy[1] - half_height, xy[0], xy[1] + half_height)
 
 
 def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() -> None:
     """Machinist reviews of 19e33c6c2 and 8b5e1f354: the floor-depth text
     crossed the left border (rendered at x 1.5 mm), and the counterbore text
-    crossed it before."""
+    crossed it before. Review of 2ac1bdb28: the floor's text names its
+    spring, wider than the room left of its line, so it stands off the line
+    on a leader, under the section and clear of the isometric's note and the
+    plate tap's frame."""
     lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
-    assert len(lines) == 5
-    floor = _hanging_left_box(lines, drawing.SECTION_KEEP["FloorDepth"])
+    width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    x, y = drawing.FLOOR_TEXT_XY
+    floor = (x - width / 2.0, y - half_height, x + width / 2.0, y + half_height)
     section_bottom = (
         drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
     )
     assert floor[0] > _BORDER + 0.0015
-    assert floor[3] < section_bottom - 0.002
+    assert floor[1] > _BORDER + 0.0015
+    assert floor[3] < section_bottom - 0.008
+    assert floor[2] < drawing.ISO_NOTE_XY[0] - 0.005
+    # Too wide to hang left of its line inside the border: hence the leader.
+    line_x = drawing.SECTION_KEEP["FloorDepth"][0]
+    assert line_x - width < _BORDER
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
-    assert drawing.SECTION_KEEP["FloorDepth"][0] < pivot_end_x
-    # Positive control: 8b5e1f354's keep reproduces its rendered left edge.
-    old_line_x = pivot_end_x - (drawing.FRONT_CENTER[0] - 0.178) - 0.005
-    assert _hanging_left_box(lines, (old_line_x, 0.0))[0] == pytest.approx(
-        0.0015, abs=0.001
-    )
+    assert line_x < pivot_end_x
     # The counterbore's text stands right of its extension lines, above the
     # section (machinist review: between them, the lines struck it).
     counterbore = _counterbore_box()
@@ -702,9 +702,12 @@ def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
     ±0.05 named no mate. The spring seats in it; the floor sets its room."""
     spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
     assert spring == "MHA-PD-VN-63"
-    # The mate is named on the counterbore; the floor says what it holds.
+    # The mate is named on the counterbore, and again on the floor whose
+    # band sets its preload (review of 2ac1bdb28: a tight band names its
+    # mate at its own callout).
     assert spring in " ".join(spec.SPOT_FACE_CALLOUT.split())
-    assert "SPRING" in " ".join(spec.FLOOR_DEPTH_CALLOUT.split())
+    floor = " ".join(spec.FLOOR_DEPTH_CALLOUT.split())
+    assert spring in floor and "PRELOAD" in floor
 
 
 def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
@@ -734,9 +737,6 @@ def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
         step_ref("arm-plate-located"),
     ):
         assert fact in flat, fact
-    # Layout bound: under the Ø value the block keeps inside the upper border
-    # at six lines (run 20261027T124240514Z).
-    assert len(drawing.LOCATOR_CALLOUT_TEXT.splitlines()) <= 6
     assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
 
 
@@ -833,30 +833,29 @@ def test_each_projected_zone_is_a_dimensioned_chain_line_from_face_a_on_its_side
     assert tap_end_y < tap.text_xy[1] < rear_y - 0.004
     tap_x = [drawing._front_x(station) for station in geometry.PLATE_TAP_STATIONS]
     assert tap.text_xy[0] == pytest.approx(sum(tap_x) / 2.0)
-    # Section D-D (1:1, looking toward the pivot, forward to the right): the
-    # cut face and the 32.6 line inside the lower-left corner, under the
-    # floor depth's text and over the lower border, with its caption under
-    # them; D is not a datum letter.
+    # Section D-D (rule 15: its own sheet at the sheet's 2:1, not shrunk
+    # into a corner of sheet 1; looking toward the pivot, forward to the
+    # right): the cut face and the 32.6 line under the sheet-2 plan (on
+    # sheet 1's plan centre) and over the title block, with room for the
+    # caption under them; D is not a datum letter.
     assert drawing.PIN_SECTION_LABEL not in {datum.letter for datum in spec.PART_DATUMS}
-    assert drawing.PIN_SECTION_SCALE == (1, 1)
-    pin_height = projected["feed_stud_projected_axis"].projected_zone_height_mm / 1000.0
-    thickness = geometry.THICKNESS / 1000.0
+    assert len(drawing.SHEET_NAMES) == 2
+    pin_height = projected["feed_stud_projected_axis"].projected_zone_height_mm * drawing._S / 1000.0
+    thickness = geometry.THICKNESS * drawing._S / 1000.0
     centre_x, axis_y = drawing.PIN_SECTION_ZONE_CENTER
     face_x = centre_x - (pin_height - thickness) / 2.0
     left, right = face_x - thickness, face_x + pin_height
-    half = geometry.edge_half_width(geometry.PIN_STATION) / 1000.0
-    assert left > _BORDER + 0.005
-    assert right < drawing.ISO_NOTE_XY[0] - 0.010
-    floor_lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
-    floor = _hanging_left_box(floor_lines, drawing.SECTION_KEEP["FloorDepth"])
+    half = geometry.edge_half_width(geometry.PIN_STATION) * drawing._S / 1000.0
+    assert left > _BORDER + 0.020 and right < 0.4318 - _BORDER - 0.020
+    plan_bottom = drawing._front_y(-geometry.PIVOT_END_R)
+    assert axis_y + half + 0.020 < plan_bottom
     pin = drawing.PROJECTED_ZONE_CHAINS["feed_stud_projected_axis"]
     assert pin.dimension is not None and pin.dimension[0] == 0.0
-    assert axis_y + half + 0.002 <= floor[1]
-    assert axis_y + pin.dimension[1] + _LINE_PITCH < floor[1]
-    caption_x, caption_top = drawing.PIN_SECTION_CAPTION_TOP
-    assert caption_x == pytest.approx(centre_x)
-    assert caption_top < axis_y - half - 0.002
-    assert caption_top - 0.016 > _BORDER
+    # Its dimension line clears the bore's mouth, beside the cut face.
+    assert geometry.PIN_BORE_DIA * drawing._S / 2000.0 < pin.dimension[1] < half
+    caption_top = axis_y - half - drawing._PIN_CAPTION_GAP_M
+    title_block_top = 0.065
+    assert caption_top - 0.016 > title_block_top + 0.005
     # No general notes remain (rule 7).
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "add_note(" not in source

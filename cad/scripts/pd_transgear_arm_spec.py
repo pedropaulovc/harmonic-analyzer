@@ -180,13 +180,15 @@ if LOCATOR_PUNCH_AIR_MIN_MM <= 0.0:
     raise AssertionError("the MHA-PD-VN-64 dowel reaches the MHA-PD-18 front face")
 
 # --- Printed text -------------------------------------------------------------
-# The thickness is the stock's: it prints "5/16 ±.001 (7.94) GROUND STOCK",
-# prefix and suffix around the imported model value, which the parentheses
-# mark as reference, so the title block's .XX band never applies to it. The
-# stock's own band is printed because the seat tilt and the plate screw's
-# engagement are judged at it (codjiflo review of #2015).
+# The thickness is the stock's: it prints "5/16 ±.001 IN (7.94) GROUND
+# STOCK", prefix and suffix around the imported model value, which the
+# parentheses mark as reference, so the title block's .XX band never applies
+# to it. The stock's own band is printed because the seat tilt and the plate
+# screw's engagement are judged at it (codjiflo review of #2015), and its
+# inch unit with it: on the millimetre sheet a bare ±.001 reads as 0.001 mm
+# (codjiflo review of 2ac1bdb28).
 STOCK_THICKNESS_BAND_IN_TEXT = f"±{ARM.THICKNESS_BAND / 25.4:.3f}".replace("±0.", "±.")
-STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} ("
+STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} {STOCK_THICKNESS_BAND_IN_TEXT} IN ("
 STOCK_TEXT_SUFFIX = ") GROUND STOCK"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
@@ -229,9 +231,15 @@ SPOT_FACE_CALLOUT = "\n".join((
     "COUNTERBORE, REAR FACE",
     f"SEATS PIVOT SPRING {_SPRING['number']}",
 ))
-# Four short lines: the text stands under the section's pivot end, inside
-# the left border.
-FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE\nFOR SPRING\nPRELOAD"
+# The floor's band names the mate it serves at its own callout (review of
+# 2ac1bdb28, rule 4): it sets the pivot spring's preload.
+FLOOR_DEPTH_CALLOUT = "\n".join((
+    "FLOOR FROM",
+    "FRONT FACE:",
+    "SETS PRELOAD OF",
+    "PIVOT SPRING",
+    _SPRING["number"],
+))
 # Conditional measured-shoulder clearance on the named pivot screw, with
 # ordinary squareness paid; not an absolute H7/g6 bore zone. The bore's 90°
 # to the front face is implied and takes the title block's angular row.
