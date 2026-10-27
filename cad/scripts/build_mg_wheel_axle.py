@@ -125,6 +125,7 @@ ROOTS_VOLUME_TOL = 0.25 * V_RELIEF_ROOTS
 NEUTRAL_VOLUME_TOL = 0.01
 
 
+@_telemetry.traced("wheel_axle.single_limits")
 def _single_limits(adapter) -> None:
     """Each SINGLE_LIMITS dimension printed as a single MAX limit
     (build_mg_magnifying_vertical_rod._single_limits): SOLIDWORKS prints the
@@ -144,6 +145,7 @@ def _single_limits(adapter) -> None:
         _telemetry.success(f"{label}: single limit (swTolType {tol_type})")
 
 
+@_telemetry.traced("wheel_axle.limit_pairs")
 def _limit_pairs(adapter) -> None:
     """Each LIMIT_PAIRS dimension printed as its MIN/MAX pair, the model at
     the MAX (build_mg_output_fixture's LIMIT form), at its own places, read
@@ -173,6 +175,7 @@ def _limit_pairs(adapter) -> None:
         _telemetry.success(f"{label}: LIMIT {high:.{places}f}/{low:.{places}f}")
 
 
+@_telemetry.traced("wheel_axle.author_callouts")
 def author_dimension_callouts(adapter) -> None:
     """Write every authored text lane on its source dimension, read it back
     (build_pd_transgear_pin.author_dimension_callouts).

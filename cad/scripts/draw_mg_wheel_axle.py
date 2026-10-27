@@ -356,6 +356,7 @@ def _activate_view(adapter: Any, view: Any, *, label: str) -> str:
     return name
 
 
+@_telemetry.traced("wheel_axle.exact_circle", label_param="label")
 def _exact_circle(
     adapter: Any,
     view: Any,
@@ -402,6 +403,7 @@ def _exact_circle(
     return circle
 
 
+@_telemetry.traced("wheel_axle.detail_place")
 def _placed_detail_view(adapter: Any) -> Any:
     """Detail A, uncropped: a 10:1 *Front model view turned like the side
     view and moved so the fence's focus lands on DETAIL_CENTER; a root centre
@@ -442,6 +444,7 @@ def _placed_detail_view(adapter: Any) -> Any:
     return view
 
 
+@_telemetry.traced("wheel_axle.detail_crop")
 def _crop_detail_view(adapter: Any, view: Any) -> None:
     """Crop detail A to its exact fence circle round DETAIL_CENTER; status,
     IsCropped, the outline and its style are read back and raise."""
@@ -512,6 +515,7 @@ def _view_dimension_names(adapter: Any, view: Any) -> list[str]:
     )
 
 
+@_telemetry.traced("wheel_axle.detail_dimensions")
 def _dimension_then_crop_detail(adapter: Any, detail: Any) -> list[Any]:
     """Import and curate detail A's dimensions uncropped, then crop it; any
     kept dimension the crop drops raises."""
@@ -539,6 +543,7 @@ def _dimension_then_crop_detail(adapter: Any, detail: Any) -> list[Any]:
     return annotations
 
 
+@_telemetry.traced("wheel_axle.detail_mark")
 def _mark_detail_on_side(adapter: Any, side: Any) -> None:
     """Circle detail A's fence on the side view in the outline's black."""
     _activate_view(adapter, side, label="side view")
@@ -592,6 +597,7 @@ def _add_view_note(
         raise RuntimeError(f"{label} note did not land in its view: {texts!r}")
 
 
+@_telemetry.traced("wheel_axle.detail_label")
 def _label_detail(
     adapter: Any, detail: Any, side: Any, letter_xy: tuple[float, float]
 ) -> None:
@@ -631,6 +637,7 @@ def _display(annotation: Any) -> Any:
     )
 
 
+@_telemetry.traced("wheel_axle.break_line", label_param="name")
 def _break_line_at_text(named: dict[str, Any], name: str) -> None:
     """Put ``name``'s value in a break of its dimension line, read back
     (draw_ch_channel_assembly._break_line_at_text)."""
@@ -699,6 +706,7 @@ def _assert_relief_limits(named: dict[str, Any]) -> None:
             )
 
 
+@_telemetry.traced("wheel_axle.relief_roots_leader")
 def _dress_relief_roots(adapter: Any, named: dict[str, Any]) -> None:
     """Draw detail A's ReliefRootR leader out along its arc's extension
     (draw_mg_magnifying_vertical_rod._dress_relief_roots): SolidWorks ends a
@@ -714,6 +722,7 @@ def _dress_relief_roots(adapter: Any, named: dict[str, Any]) -> None:
     rebuild_drawing(adapter, label="relief roots radius leader")
 
 
+@_telemetry.traced("wheel_axle.relief_roots_landing")
 def _assert_relief_root_landing(
     adapter: Any, detail: Any, named: dict[str, Any]
 ) -> None:
@@ -754,6 +763,7 @@ def _assert_relief_root_landing(
     )
 
 
+@_telemetry.traced("wheel_axle.detail_settled")
 def _assert_detail_settled(adapter: Any, detail: Any, named: dict[str, Any]) -> None:
     """After finalize's last rebuild: detail A still holds its three
     dimensions; every imported dimension is visible and attached
