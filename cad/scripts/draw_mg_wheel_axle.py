@@ -214,18 +214,24 @@ DETAIL_KEEP = {
     # right of the flank's extension line (run 20261027T030250671Z: centred
     # between the extension lines, both struck every line of it).
     "ReliefWidth": (0.1295, _DETAIL_BOTTOM - 0.010),
-    # Over the crop: its line runs between the two floors 0.3 (3 mm) from the
-    # step, inside the flat floor (the step's root ends 0.4 from it) and left
-    # of the radius's arrow, then rises through the groove's open mouth.
+    # Over the crop: its line runs between the two floors 0.7 (7 mm) from the
+    # step, inside the flat floor (the flank's root starts 0.9 from it) and
+    # right of the radius's leader, then rises through the groove's open
+    # mouth; its text stands over the radius's block, so the radius's leader
+    # meets neither the line nor the text on either side of the line (run
+    # 20261027T064924192Z: at 0.3 the leader crossed this line, rule 14).
     "ReliefDia": (
-        _detail_xy(0.0, STEP_Y + 0.3)[0],
+        _detail_xy(0.0, STEP_Y + 0.7)[0],
+        _DETAIL_TOP + 0.015,
+    ),
+    # "2X / R0.2 MAX" up-left over the crop, under the Ø's text: the ~21 mm
+    # block ends just left of the step-side root's centre, so its leader drops
+    # near-vertically through the groove's mouth, 2 mm right of the step face
+    # and left of the Ø's line, onto the root on its text's side.
+    "ReliefRootR": (
+        _detail_xy(0.0, STEP_Y + RELIEF_ROOT_R)[0] - 0.0115,
         _DETAIL_TOP + 0.005,
     ),
-    # "2X / R0.2 MAX" up-right of the crop, opposite the step-side root's own
-    # (down-left) quarter on the -x side: its leader leaves that root's
-    # up-right point through the groove's mouth at about 32 deg, 3 mm over the
-    # thread's crest at the flank, and right of the Ø's text.
-    "ReliefRootR": (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] + 0.022),
 }
 # Left of the crop, so the label reads with its view.
 DETAIL_LABEL_XY = (0.015, DETAIL_CENTER[1] + 0.005)
