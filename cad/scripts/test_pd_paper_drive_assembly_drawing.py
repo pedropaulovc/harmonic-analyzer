@@ -409,23 +409,41 @@ def test_the_jig_bored_k_lands_in_the_set_band_and_the_position_circle() -> None
     assert (-along, -across) == pytest.approx(
         (ux * (low + high) / 2.0, uy * (low + high) / 2.0)
     )
-    # Setting error per axis from the shop's own instruments: each located
-    # centre (S, K, and the pivot that trams the arm) is off by half a DRO
-    # step plus half an indicator division of runout; independent points add
-    # root-sum-square. The tram error turns K about S by its lever.
+    # The nominal K, the centre of the drawn position circle, is the band bottom.
+    assert math.hypot(*registration._S_TO_K) == pytest.approx(low)
     inventory = tomllib.loads(
         (PROCESS_ROOT / "shop" / "inventory.toml").read_text(encoding="utf-8")
     )
-    dro = inventory["machines"]["PM-30MV"]["resolution_mm"]["value"]
-    dti = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4
-    point = dro / 2.0 + dti / 4.0
-    lever = math.hypot(along, across) / steps.arm_geometry.PIN_STATION
-    along_err = math.sqrt(2.0) * point
-    across_err = math.hypot(along_err, math.sqrt(2.0) * point * lever)
-    band_half = (high - low) / 2.0
-    assert along_err < band_half
+    mill = inventory["machines"]["PM-30MV"]
+    # The installed DRO's vendor-stated accuracy, per axis (inventory cite).
+    (stated,) = [
+        float(match.group(1))
+        for cite in mill["cite"]
+        if cite.startswith("DRO accuracy")
+        for match in [re.search(r"(\.\d+)” Accuracy", cite)]
+        if match
+    ]
+    accuracy = stated * 25.4
+    # The indicator's model is unknown: half a division of runout, centred.
+    centring = inventory["gauges"]["dti"]["resolution_in"]["value"] * 25.4 / 4.0
+    # The DRO is zeroed on S, so its error enters once, on the S-to-K move:
+    # worst case both axes' errors add along any direction. The indicator
+    # centres S and K, and the pivot-and-pin tram turns K about S by its lever.
+    ux, uy = registration.S_TO_K_UNIT
+    dro = accuracy * (abs(ux) + abs(uy))
+    lever = (low + high) / 2.0 / steps.arm_geometry.PIN_STATION
+    radial_err = math.hypot(dro, math.sqrt(2.0) * centring)
+    tangential_err = math.hypot(
+        dro, math.sqrt(2.0) * centring, math.sqrt(2.0) * centring * lever
+    )
+    # The operator dials the display's nearest count to each printed coordinate.
+    count = mill["resolution_mm"]["value"]
+    x, y = (round(value / count) * count for value in (along, across))
+    radial = math.hypot(x, y) - low
+    tangential = abs(x * uy - y * ux)
+    assert 0.0 <= radial - radial_err and radial + radial_err <= high - low
     radius = registration.REDUCER_AXIS_SETUP_RADIUS_MM
-    assert math.hypot(band_half + along_err, across_err) < radius
+    assert math.hypot(radial + radial_err, tangential + tangential_err) < radius
 
 
 def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
