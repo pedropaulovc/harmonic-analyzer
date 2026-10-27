@@ -347,6 +347,13 @@ def test_fiducial_callout_attaches_on_the_punched_mark_rim() -> None:
     char_w = 0.0027  # measured on the 5bca52e13 render
     width = max(map(len, notes.FIDUCIAL_CALLOUT.splitlines())) * char_w
     assert drawing.FIDUCIAL_CALLOUT_XY[0] + width + 0.005 < cx
+    # Both ordinates draw their arrows inside their witnesses, so neither 7.9
+    # line runs out under the punch-mark or hub-seat leader (farm iter 2).
+    assert drawing.ARROWS_INSIDE == ("FiducialX", "FiducialY")
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.index("_arrows_inside(adapter, front_annotations)") < source.index(
+        "_hub_seat_leader_clear(adapter, front_annotations)"
+    )
 
 
 def test_fiducial_is_located_from_the_seat_axis_not_by_eye() -> None:

@@ -290,6 +290,13 @@ ANCHOR_CALLOUT_XY = (0.195, 0.205)
 PIVOT_CALLOUT_XY = (0.270, 0.190)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
+# swDimensionArrowsSide_e.swDimArrowsInside, set rather than left to the
+# document's smart arrows (draw_dt_pinion_arbor's form): left smart, the two
+# 7.9 ordinates drew their arrows outside, and the X's tails ran under the
+# punch-mark and hub-seat leaders (machinist review of the 2026-10-27 fix's
+# farm iter 2, rule 14).
+ARROWS_INSIDE = ("FiducialX", "FiducialY")
+_DIM_ARROWS_INSIDE = 0
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -297,6 +304,16 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     if len(matches) != 1:
         raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
     return matches[0]
+
+
+def _arrows_inside(adapter: Any, annotations: list[Any]) -> None:
+    """Draw each ``ARROWS_INSIDE`` dimension's arrows inside its witnesses."""
+    for name in ARROWS_INSIDE:
+        annotation = _early_bound(_named(adapter, annotations, name), "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.ArrowSide = _DIM_ARROWS_INSIDE
+        if int(display.ArrowSide) != _DIM_ARROWS_INSIDE:
+            raise RuntimeError(f"{name} did not keep its arrows inside its witnesses")
 
 
 def _hub_seat_leader_clear(adapter: Any, annotations: list[Any]) -> None:
@@ -408,6 +425,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, _named(adapter, right_annotations, name), label="arm stock thickness"
         )
+    _arrows_inside(adapter, front_annotations)
     _hub_seat_leader_clear(adapter, front_annotations)
     _texts_off_the_part(adapter, front_annotations)
 
