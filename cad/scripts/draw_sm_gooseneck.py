@@ -87,10 +87,10 @@ from sm_gooseneck_spec import (
     TAP_CALLOUT_PRECISION,
 )
 from sm_gooseneck_spring_joint import (
-    TAP_DRILL_DEPTH,
+    TAP_DRILL_DEPTH_FROM_FLOOR,
     TAP_DRILL_DIA,
     TAP_SPEC,
-    TAP_THREAD_DEPTH,
+    TAP_THREAD_DEPTH_FROM_FLOOR,
 )
 
 
@@ -230,8 +230,8 @@ def _require_saved_tap(model: Any) -> None:
     _verify_tap_metadata(definition, TAP_SPEC, "saved gooseneck ThreadBore")
     for member, expected, what in (
         ("TapDrillDiameter", TAP_DRILL_DIA, "tap drill"),
-        ("TapDrillDepth", TAP_DRILL_DEPTH, "tap drill depth"),
-        ("ThreadDepth", TAP_THREAD_DEPTH, "thread depth"),
+        ("TapDrillDepth", TAP_DRILL_DEPTH_FROM_FLOOR, "tap drill depth"),
+        ("ThreadDepth", TAP_THREAD_DEPTH_FROM_FLOOR, "thread depth"),
     ):
         value = float(getattr(definition, member)) * 1000.0
         if not math.isfinite(value) or abs(value - expected) > DIAMETER_TOLERANCE_MM:

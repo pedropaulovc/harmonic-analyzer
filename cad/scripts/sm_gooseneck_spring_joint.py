@@ -166,27 +166,45 @@ FULL_THREAD_REACH_MIN = SCREW_REACH_MIN - SCREW_END_INCOMPLETE_MAX
 # runs past the deepest screw tip at the printed band; a bottoming tap's
 # 1.5-pitch lead (TAP_LEAD) past the deepest full thread stays inside the
 # shallowest full-Ø drill; the drill's 118-degree point may cross into the
-# shank, where DRILL_POINT_SHANK_WALL_MIN is its wall (below).
-TAP_THREAD_DEPTH = 17.60
-TAP_DRILL_DEPTH = 20.00
+# shank, where DRILL_POINT_SHANK_WALL_MIN is its wall (below).  The tap
+# starts on the counterbore's floor, its start face: the counterbore is cut
+# first, and both printed depths run from that floor (a tap started on the
+# end face and counterbored after read back a shortened native thread depth,
+# 17.22 for 17.60, farm run 20261027T181248453Z).  From the end face, each
+# depth stacks on the counterbore's LIMIT depth.
+TAP_THREAD_DEPTH_FROM_FLOOR = 14.77
+TAP_DRILL_DEPTH_FROM_FLOOR = 17.17
 TAP_DEPTH_BAND = printed_band_mm(2)
 TAP_LEAD = 1.5 * screw.PITCH
 TAP_SPEC = HoleSpec(
     "tapped_bottoming",
     screw.THREAD_SIZE,
     end="blind",
-    depth_mm=TAP_DRILL_DEPTH,
+    depth_mm=TAP_DRILL_DEPTH_FROM_FLOOR,
     thread_class="2B",
-    overrides_mm={"ThreadDepth": TAP_THREAD_DEPTH},
+    overrides_mm={"ThreadDepth": TAP_THREAD_DEPTH_FROM_FLOOR},
 )
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 TAP_DRILL_DIA_MAX = TAP_DRILL_DIA + drilled_oversize_mm()
-TAP_THREAD_DEPTH_MIN = TAP_THREAD_DEPTH - TAP_DEPTH_BAND
-TAP_THREAD_DEPTH_MAX = TAP_THREAD_DEPTH + TAP_DEPTH_BAND
-TAP_DRILL_DEPTH_MIN = TAP_DRILL_DEPTH - TAP_DEPTH_BAND
-TAP_DRILL_DEPTH_MAX = TAP_DRILL_DEPTH + TAP_DEPTH_BAND
+TAP_THREAD_DEPTH = COUNTERBORE_DEPTH + TAP_THREAD_DEPTH_FROM_FLOOR
+TAP_DRILL_DEPTH = COUNTERBORE_DEPTH + TAP_DRILL_DEPTH_FROM_FLOOR
+TAP_THREAD_DEPTH_MIN = (
+    COUNTERBORE_DEPTH_MIN + TAP_THREAD_DEPTH_FROM_FLOOR - TAP_DEPTH_BAND
+)
+TAP_THREAD_DEPTH_MAX = (
+    COUNTERBORE_DEPTH_MAX + TAP_THREAD_DEPTH_FROM_FLOOR + TAP_DEPTH_BAND
+)
+TAP_DRILL_DEPTH_MIN = (
+    COUNTERBORE_DEPTH_MIN + TAP_DRILL_DEPTH_FROM_FLOOR - TAP_DEPTH_BAND
+)
+TAP_DRILL_DEPTH_MAX = (
+    COUNTERBORE_DEPTH_MAX + TAP_DRILL_DEPTH_FROM_FLOOR + TAP_DEPTH_BAND
+)
 TIP_THREAD_MARGIN_MIN = TAP_THREAD_DEPTH_MIN - CLAMPED_SCREW_REACH_MAX
-TAP_LEAD_DRILL_MARGIN_MIN = TAP_DRILL_DEPTH_MIN - (TAP_THREAD_DEPTH_MAX + TAP_LEAD)
+# Both depths run from the same floor, so its band cancels here.
+TAP_LEAD_DRILL_MARGIN_MIN = (TAP_DRILL_DEPTH_FROM_FLOOR - TAP_DEPTH_BAND) - (
+    TAP_THREAD_DEPTH_FROM_FLOOR + TAP_DEPTH_BAND + TAP_LEAD
+)
 
 # The RECEIVER's full thread, mated: from the counterbore floor (and its 0.25
 # break) to the shallower of the screw's last full thread at the free gap and

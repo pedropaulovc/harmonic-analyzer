@@ -145,10 +145,15 @@ def test_receiver_full_thread_past_the_counterbore_is_1_5d() -> None:
 def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
     # The longest screw at the least clamped gap sits deepest.
     deepest_tip = screw.LENGTH + screw.LENGTH_UPPER - joint.CLAMPED_GAP_MIN
-    shallowest_thread = joint.TAP_THREAD_DEPTH - joint.TAP_DEPTH_BAND
+    # The tap's depths run from the counterbore floor, its start face.
+    shallowest_thread = (
+        joint.COUNTERBORE_DEPTH_MIN
+        + joint.TAP_THREAD_DEPTH_FROM_FLOOR
+        - joint.TAP_DEPTH_BAND
+    )
     assert joint.CLAMPED_SCREW_REACH_MAX == pytest.approx(deepest_tip)
     assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(shallowest_thread - deepest_tip)
-    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.28, abs=0.005)
+    assert joint.TIP_THREAD_MARGIN_MIN == pytest.approx(0.18, abs=0.005)
     assert joint.TIP_THREAD_MARGIN_MIN > 0.0
     assert joint.TAP_SPEC.end == "blind"
     assert joint.TAP_SPEC.size == screw.THREAD_SIZE == "1/4-28"
@@ -158,12 +163,20 @@ def test_deepest_tip_stays_inside_the_blind_full_thread() -> None:
 def test_bottoming_tap_lead_stays_inside_the_drill() -> None:
     # A bottoming tap's 1.5-pitch lead past the deepest full thread, inside
     # the shallowest full-Ø drill; the full-Ø drill stays in the head.
-    lead_end = joint.TAP_THREAD_DEPTH + joint.TAP_DEPTH_BAND + 1.5 * screw.PITCH
-    shallowest_drill = joint.TAP_DRILL_DEPTH - joint.TAP_DEPTH_BAND
+    # Both depths run from the counterbore floor, so its band cancels.
+    lead_end = (
+        joint.TAP_THREAD_DEPTH_FROM_FLOOR + joint.TAP_DEPTH_BAND + 1.5 * screw.PITCH
+    )
+    shallowest_drill = joint.TAP_DRILL_DEPTH_FROM_FLOOR - joint.TAP_DEPTH_BAND
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(shallowest_drill - lead_end)
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN == pytest.approx(0.019, abs=5e-4)
     assert joint.TAP_LEAD_DRILL_MARGIN_MIN >= 0.0
-    assert joint.TAP_DRILL_DEPTH + joint.TAP_DEPTH_BAND <= gooseneck.PLUG_HEAD_LENGTH
+    assert (
+        joint.COUNTERBORE_DEPTH_MAX
+        + joint.TAP_DRILL_DEPTH_FROM_FLOOR
+        + joint.TAP_DEPTH_BAND
+        <= gooseneck.PLUG_HEAD_LENGTH
+    )
 
 
 def _smallest_end_piece_radius() -> float:
@@ -174,7 +187,10 @@ def test_tap_wall_is_2_0_at_the_full_worst_case() -> None:
     largest_tap_major = screw.MAJOR_DIA + 0.025  # basic major + root oversize
     # Hole drilled after braze, head OD turned before: different setups.
     runoff = (
-        joint.TAP_THREAD_DEPTH + joint.TAP_DEPTH_BAND + 1.5 * screw.PITCH
+        joint.COUNTERBORE_DEPTH_MAX
+        + joint.TAP_THREAD_DEPTH_FROM_FLOOR
+        + joint.TAP_DEPTH_BAND
+        + 1.5 * screw.PITCH
     ) * math.tan(math.radians(0.3))
     worst_wall = (
         _smallest_end_piece_radius()
@@ -197,7 +213,12 @@ def test_drill_point_shank_wall_is_2_0_at_the_full_worst_case() -> None:
     # shank: its cone radius there, against the shank's lower printed limit.
     drill_r = (joint.TAP_DRILL_DIA + 0.10) / 2.0  # DRILLED HOLES +0.10
     point_h = drill_r / math.tan(math.radians(59.0))
-    tip = joint.TAP_DRILL_DEPTH + joint.TAP_DEPTH_BAND + point_h
+    tip = (
+        joint.COUNTERBORE_DEPTH_MAX
+        + joint.TAP_DRILL_DEPTH_FROM_FLOOR
+        + joint.TAP_DEPTH_BAND
+        + point_h
+    )
     cone_r = drill_r * (tip - gooseneck.PLUG_HEAD_LENGTH) / point_h
     assert 0.0 < cone_r < drill_r
     worst_wall = (

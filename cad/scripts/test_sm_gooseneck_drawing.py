@@ -71,13 +71,21 @@ def test_blind_tap_stays_inside_the_solid_end_piece() -> None:
     assert taps[0].lineno < min(node.lineno for node in sweeps)
 
 
-def test_counterbore_follows_the_tap_before_the_tube() -> None:
+def test_tap_starts_on_the_counterbore_floor_before_the_tube() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     end_piece = source.index('name_last_feature(adapter, "EndPiece")')
-    tap = source.index('name="ThreadBore"')
     counterbore = source.index('name_last_feature(adapter, "Counterbore")')
+    tap = source.index('name="ThreadBore"')
     sweep = source.index("create_sweep")
-    assert end_piece < tap < counterbore < sweep
+    assert end_piece < counterbore < tap < sweep
+    assert "[[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]]" in source
+    assert joint.TAP_SPEC.depth_mm == joint.TAP_DRILL_DEPTH_FROM_FLOOR
+    assert joint.TAP_SPEC.overrides_mm == {
+        "ThreadDepth": joint.TAP_THREAD_DEPTH_FROM_FLOOR
+    }
+    assert joint.TAP_DRILL_DEPTH == pytest.approx(
+        joint.COUNTERBORE_DEPTH + joint.TAP_DRILL_DEPTH_FROM_FLOOR
+    )
     assert part.COUNTERBORE_R * 2.0 == joint.COUNTERBORE_DIA
     assert part.COUNTERBORE_FLOOR_X == pytest.approx(
         geom.ARM_END_X + joint.COUNTERBORE_DEPTH
@@ -200,8 +208,8 @@ def saved_tap(monkeypatch):
         ThreadEndCondition=0,  # blind
         EndCondition=0,
         TapDrillDiameter=0.00541,  # native model length units are metres
-        TapDrillDepth=0.020,
-        ThreadDepth=0.0176,
+        TapDrillDepth=0.01717,
+        ThreadDepth=0.01477,
     )
     feature = SimpleNamespace(
         GetTypeName2=lambda: "HoleWzd",
@@ -235,10 +243,10 @@ def test_saved_native_receiver_accepts_the_blind_tap(saved_tap, field, offset_mm
         ("TapDrillDiameter", 0.005404, "tap drill"),
         ("TapDrillDiameter", 0.005416, "tap drill"),
         ("TapDrillDiameter", math.nan, "tap drill"),
-        ("TapDrillDepth", 0.0199, "tap drill depth"),
-        ("TapDrillDepth", 0.0201, "tap drill depth"),
-        ("ThreadDepth", 0.0175, "thread depth"),
-        ("ThreadDepth", 0.020, "thread depth"),
+        ("TapDrillDepth", 0.0171, "tap drill depth"),
+        ("TapDrillDepth", 0.0200, "tap drill depth"),
+        ("ThreadDepth", 0.0147, "thread depth"),
+        ("ThreadDepth", 0.0122, "thread depth"),
     ],
 )
 def test_saved_native_receiver_rejects_lost_thread_metadata(

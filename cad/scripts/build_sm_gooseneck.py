@@ -17,11 +17,12 @@ One weldment part, one body, built in this order:
    PLUG_SHANK_LENGTH into the tube bore -- one revolve on ``ArmAxisPlane``
    (the horizontal plane through the arm axis, so section A-A on the print
    carries its dimensions).
-2. ``ThreadBore``: the native blind bottoming tap from ``TAP_SPEC`` on the
-   end face, then ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x
-   COUNTERBORE_DEPTH from the end face, its floor corner sharp (printed
-   R0.10 MAX); its depth carries the native LIMIT band.  ``SpringScrewAxis``
-   is their hidden, equation-driven assembly reference.
+2. ``Counterbore``: a revolved cut Ø COUNTERBORE_DIA x COUNTERBORE_DEPTH
+   from the end face, its floor corner sharp (printed R0.10 MAX); its depth
+   carries the native LIMIT band.  Then ``ThreadBore``: the native blind
+   bottoming tap from ``TAP_SPEC``, started on the counterbore floor, both
+   depths from it.  ``SpringScrewAxis`` is their hidden, equation-driven
+   assembly reference.
 3. ``Leg``: the tube from its foot LEG_BOTTOM up to the bend tangent LEG_TOP.
 4. ``BendArmSweep``: the 90-degree bend R BEND_R and the TUBE_STRAIGHT arm to
    TUBE_END_X along ``BendPath``, hollow, ending on the end piece's head
@@ -119,7 +120,7 @@ from sm_gooseneck_spring_joint import (
     COUNTERBORE_DEPTH_MIN,
     COUNTERBORE_DIA,
     PLUG_SHANK_DIA,
-    TAP_DRILL_DEPTH,
+    TAP_DRILL_DEPTH_FROM_FLOOR,
     TAP_DRILL_DIA,
     TAP_SPEC,
 )
@@ -155,8 +156,8 @@ if not math.isclose(TUBE_END_X - ARM_END_X, PLUG_HEAD_LENGTH, abs_tol=1e-9):
 
 # Analytic volumes, mm^3.
 V_END_PIECE = math.pi * (PLUG_R**2 * PLUG_HEAD_LENGTH + SHANK_R**2 * PLUG_SHANK_LENGTH)
-V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH)
-V_COUNTERBORE = math.pi * (COUNTERBORE_R**2 - TAP_DRILL_R**2) * COUNTERBORE_DEPTH
+V_COUNTERBORE = math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
+V_TAP = blind_hole_volume_mm3(TAP_DRILL_DIA, TAP_DRILL_DEPTH_FROM_FLOOR)
 V_LEG = RING_AREA * (LEG_TOP - LEG_BOTTOM)
 # Quarter torus with an annular cross-section (Pappus): (pi/2) * BendR * ring.
 V_BEND = math.pi / 2.0 * BEND_R * RING_AREA
@@ -369,31 +370,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "solid end piece", V_END_PIECE, 0.005 * V_END_PIECE
     )
 
-    # 2. The native blind bottoming tap on the west-facing end face.  If the
-    # wizard's table drill differs from TAP_DRILL_DIA, wizard_holes fails loud
-    # (the joint's walls are budgeted on that drill).
-    tap = wizard_holes(
-        adapter,
-        TAP_SPEC,
-        [[ARM_END_X, ARM_Y, 0.0]],
-        (-1.0, 0.0, 0.0),
-        f"gooseneck end piece ({TAP_SPEC.size} blind)",
-        name="ThreadBore",
-        expect_dia_mm=TAP_DRILL_DIA,
-        placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
-    )
-    if abs(tap.depth_mm - TAP_DRILL_DEPTH) > 0.005:
-        raise RuntimeError(
-            f"gooseneck tap drill depth {tap.depth_mm:.3f} != {TAP_DRILL_DEPTH:.3f} mm"
-        )
-    drive_jobs += tap.placement_drive_jobs
-    vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
-
-    # 2b. The arm-end counterbore, coaxial with ThreadBore: its flat floor sits
-    # past the screw's clamped run-out, so the fat incomplete threads never
-    # reach the end piece's full 2B thread.  The cutter's mouth lies on the
-    # end face, so its depth dimension runs face to floor; the floor corner
-    # is sharp (the print's R0.10 MAX).
+    # 2. The arm-end counterbore: its flat floor sits past the screw's clamped
+    # run-out, so the fat incomplete threads never reach the end piece's full
+    # 2B thread.  The cutter's mouth lies on the end face, so its depth
+    # dimension runs face to floor; the floor corner is sharp (the print's
+    # R0.10 MAX).  It is cut FIRST: its floor is the tap's start face.
     counterbore = SketchDims()
     counterbore_points = [
         (COUNTERBORE_FLOOR_X, 0.0),
@@ -456,6 +437,28 @@ async def build(adapter) -> dict[str, str]:
     vol = await _volume_check(
         adapter, "arm-end counterbore", vol - V_COUNTERBORE, 0.02 * V_COUNTERBORE
     )
+
+    # 2b. The native blind bottoming tap, started on the counterbore floor
+    # (west-facing), both depths from that floor (sm_gooseneck_spring_joint).
+    # If the wizard's table drill differs from TAP_DRILL_DIA, wizard_holes
+    # fails loud (the joint's walls are budgeted on that drill).
+    tap = wizard_holes(
+        adapter,
+        TAP_SPEC,
+        [[COUNTERBORE_FLOOR_X, ARM_Y, 0.0]],
+        (-1.0, 0.0, 0.0),
+        f"gooseneck end piece ({TAP_SPEC.size} blind)",
+        name="ThreadBore",
+        expect_dia_mm=TAP_DRILL_DIA,
+        placement_dims=[((None, None), ("TapAxisY", '"ArmY"'))],
+    )
+    if abs(tap.depth_mm - TAP_DRILL_DEPTH_FROM_FLOOR) > 0.005:
+        raise RuntimeError(
+            f"gooseneck tap drill depth {tap.depth_mm:.3f} != "
+            f"{TAP_DRILL_DEPTH_FROM_FLOOR:.3f} mm"
+        )
+    drive_jobs += tap.placement_drive_jobs
+    vol = await _volume_check(adapter, "end piece blind tap", vol - V_TAP, 0.02 * V_TAP)
     blank_reference_geometry(adapter, (("ArmAxisPlane", "PLANE"),))
 
     await name_bore_axis(
