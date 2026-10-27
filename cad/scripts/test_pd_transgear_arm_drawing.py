@@ -375,6 +375,11 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
     assert lines[1] == f"PRESS FIT PIN {spec.LATCH_PIN_NUMBER}"
     assert lines[2] == f"{low:.4f}/{high:.4f} INTERFERENCE"
     assert lines[2] == "0.0025/0.0177 INTERFERENCE"
+    # The owner-accepted ligament shortfall prints as a plain fact, rounded
+    # down so the sheet never promises more wall than the budget holds.
+    worst = geometry.WALLS["pin hole to faces"][1]
+    assert spec.LATCH_PIN_WALL_PRINTED <= worst < spec.LATCH_PIN_WALL_PRINTED + 0.01
+    assert f"PIN HOLE TO FACES {spec.LATCH_PIN_WALL_PRINTED:.2f} MIN" in lines
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:

@@ -116,12 +116,14 @@ HUB_FACE_TO_MOUNTING = NOTCH_DEPTH + HUB_LENGTH  # 20.5375
 HUB_STATION_PLACES = 3
 HUB_FACE_TO_MOUNTING_BAND = printed_band_mm(HUB_STATION_PLACES)
 BOSS_DIA = 20.0  # .X
-BOSS_HEIGHT = 3.1  # its face stays at z 8.5 over the 5.4 section
-HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + THICKNESS_OVER_ARM + BOSS_HEIGHT  # 29.0375
+# The boss face's station is authoritative: the knob stack (HUB_TO_BOSS) runs
+# to it, so the boss takes whatever the over-arm section leaves (3.1 at 5.4).
+BOSS_FACE_Z = 8.5
+REAR_FACE_Z = THICKNESS_OVER_ARM
+BOSS_HEIGHT = BOSS_FACE_Z - REAR_FACE_Z
+HUB_TO_BOSS = HUB_FACE_TO_MOUNTING + BOSS_FACE_Z  # 29.0375
 HUB_TO_BOSS_BAND = 0.05  # knob float
 HUB_FACE_Z = -HUB_FACE_TO_MOUNTING
-REAR_FACE_Z = THICKNESS_OVER_ARM
-BOSS_FACE_Z = REAR_FACE_Z + BOSS_HEIGHT
 
 # Shared matched-pair sites, expressed in this part's actual K-datum frame.
 LOCATOR_SITES_MM = tuple(

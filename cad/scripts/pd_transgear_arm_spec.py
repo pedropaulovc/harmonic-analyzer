@@ -289,15 +289,20 @@ LATCH_PIN_PRESS_PRINTED = (
     math.floor(LATCH_PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
     math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
 )  # 0.0025, 0.0177
-# Three lines as the pin bore's: the operation, the mating pin, the press.
-# Pressing it to the floor is MHA-PD-00's latch-pin-pressed step (policy
-# option (c)); the callout stands below the end view, inside the border.
+# The pin bore's three lines (the operation, the mating pin, the press), plus
+# the ligament to the faces as a plain fact: 1.74 MIN at full budget is the
+# owner-accepted shortfall (machinist_exceptions RV-04; #2019 tracks the next
+# stock size up). Pressing it to the floor is MHA-PD-00's latch-pin-pressed
+# step (policy option (c)); the callout stands below the end view, inside the
+# border.
+LATCH_PIN_WALL_PRINTED = math.floor(ARM.WALLS["pin hole to faces"][1] * 100.0 + 1e-6) / 100.0
 PIN_HOLE_CALLOUT = "\n".join(
     (
         "BLIND FLAT-BOTTOM REAM",
         f"PRESS FIT PIN {LATCH_PIN_NUMBER}",
         f"{LATCH_PIN_PRESS_PRINTED[0]:.4f}/{LATCH_PIN_PRESS_PRINTED[1]:.4f}"
         " INTERFERENCE",
+        f"PIN HOLE TO FACES {LATCH_PIN_WALL_PRINTED:.2f} MIN",
     )
 )
 

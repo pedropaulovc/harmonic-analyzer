@@ -251,8 +251,10 @@ END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.017),
     # Between the end view and the stock text, right of the front face.
     "PinHoleZ": (_end_x(0.0) + 0.017, _end_y(PIVOT_END_R) + 0.006),
-    # Below the end view, above section B-B, right edge inside the border.
-    "PinHoleDia": (0.384, 0.162),
+    # Below the end view, above section B-B, right edge inside the border;
+    # half a line lower than the 4-line block so its top stays put with the
+    # ligament fact as a fifth line.
+    "PinHoleDia": (0.384, 0.1593),
 }
 
 
