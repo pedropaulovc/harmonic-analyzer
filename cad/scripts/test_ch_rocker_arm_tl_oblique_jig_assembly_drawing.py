@@ -37,6 +37,8 @@ import ch_rocker_arm_tl_oblique_jig_assembly_spec as spec
 import ch_rocker_arm_tl_oblique_retention_hardware_spec as hardware
 import draw_ch_rocker_arm_tl_oblique_jig_assembly as drawing
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
+from _paths import CAD_ROOT
+from machinist_exceptions import load_exceptions
 
 
 # Default-format note text: about 2.8 mm a character and 4.5 mm a line on the
@@ -1564,6 +1566,29 @@ def test_cap_seating_steps_cite_the_sourced_cap_screw_sku() -> None:
         (drawing.TOP_CAPTURE_LAYOUT.steps, drawing.TOP_CAPTURE_LAYOUT.continued)
     )
     assert hardware.SCREW_SKU in steps
+
+
+def test_c3b_states_the_owner_accepted_engagement_shortfall() -> None:
+    # Owner ruling 2026-10-27: the 3/4 screw stays; its worst-case complete
+    # thread engagement is a minor exception (RV-04), C3B a plain statement.
+    engagement = spec.retention.cap_screw_complete_engagement_min()
+    minimum = spec.retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT
+    assert 0.0 < engagement < minimum
+    c3b = next(step for step in spec.CAP_SEATING_STEPS if step.startswith("C3B."))
+    assert f"{engagement:.2f}" in c3b and f"{minimum:.2f}" in c3b
+    assert "MIN(" not in c3b and "MAX(" not in c3b
+    exceptions = {
+        e.id: e
+        for e in load_exceptions(
+            CAD_ROOT / "config", "ch_rocker_arm_tl_oblique_jig_assembly", "assembly"
+        )
+    }
+    shortfall = exceptions["RV-04"]
+    assert shortfall.kind == "minor"
+    assert f"{engagement:.2f}" in shortfall.finding
+    assert f"{minimum:.2f}" in shortfall.finding
+    assert "owner ruling 2026-10-27" in shortfall.reason
+    assert hardware.SCREW_SKU in shortfall.where
 
 
 class _Table:

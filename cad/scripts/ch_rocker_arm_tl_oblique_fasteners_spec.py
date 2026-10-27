@@ -244,8 +244,10 @@ CAP_TO_BLOCK = Fastener(
     pivot_block.BLOCK_HEIGHT,
     note=(
         f"{retention_hardware.SCREW_SUPPLIER} {retention_hardware.SCREW_SKU}; "
-        "inspect actual complete full-form overlap >=1.5D (11.90625 mm) in THRU "
-        "block threads; overall length and nominal overlap alone are not proof. "
+        "worst-case complete full-form overlap in the THRU block threads is "
+        f"{retention.cap_screw_complete_engagement_min():.2f} mm, under 1.5D "
+        f"({retention.CAP_MIN_COMPLETE_THREAD_ENGAGEMENT:.2f} mm): owner minor "
+        "exception RV-04 (owner ruling 2026-10-27), not measured at assembly. "
         "Seat clean, dry, free-running actual screws cross-pattern at "
         "0.50 +/-0.05 Nm; cap must seat on all faces with cap/block base gap "
         "<=0.05 mm over the whole mounting footprint; independently, underhead "

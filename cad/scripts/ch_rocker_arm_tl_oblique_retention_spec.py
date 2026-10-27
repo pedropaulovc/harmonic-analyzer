@@ -128,6 +128,35 @@ CAP_SEATING_TORQUE_NM = 0.50
 CAP_SEATING_TORQUE_BAND_NM = 0.05
 CAP_HEAD_SEATING_GAP_MAX = 0.05
 CAP_BASE_SEATING_GAP_MAX = 0.05
+# The block's THRU tap mouth carries only the title-block edge break MAX.
+BLOCK_TAP_MOUTH_BREAK_MAX = float(_config.title_block("edge_break")["chamfer_max_mm"])
+
+
+def cap_screw_complete_engagement_min() -> float:
+    """Worst-case complete-thread overlap of a cap screw in its block tap, mm.
+
+    Along the actual tap axis from the block top: the screw's complete
+    threads run from SCREW_COMPLETE_THREAD_FROM_HEAD_MAX under its head to
+    SCREW_POINT_INCOMPLETE_MAX short of its point (hardware spec, ASME B18.3);
+    the block's start below the tap mouth's title-block break plus one
+    partial thread. The shortest screw pairs with the highest seated head for
+    the deep end and the lowest seat for the shallow end. The 3/4 screw falls
+    short of CAP_MIN_COMPLETE_THREAD_ENGAGEMENT: owner minor exception RV-04
+    (owner ruling 2026-10-27) accepts it without assembly measurement.
+    """
+    gamma = math.radians(GENERAL_ANGULAR_BAND_DEGREES)
+    fitted = fitted_counterbore_bounds()
+    deep = (
+        CAP_BOLT_LENGTH_MIN - hardware.SCREW_POINT_INCOMPLETE_MAX
+        - fitted.head_seat_max / math.cos(gamma)
+    )
+    shallow = max(
+        BLOCK_TAP_MOUTH_BREAK_MAX / math.cos(gamma) + CAP_BOLT_PITCH,
+        hardware.SCREW_COMPLETE_THREAD_FROM_HEAD_MAX - fitted.head_seat_min,
+    )
+    return deep - shallow
+
+
 # Analytic enclosures, NOT tighter machining tolerances. The computed motion
 # must remain strictly inside both to close the connected-branch argument.
 CAP_VERTICAL_MOTION_ENCLOSURE = 0.35
@@ -186,8 +215,8 @@ def fitted_counterbore_bounds(*, height: float | None = None) -> FittedCounterbo
     NAS H is axis-parallel. Its inclined bearing-plane reference need not
     be guessed: moving any reference within the head envelope to the axis
     costs at most radius*tan(bearing angle). This is a datum conversion,
-    not an additional manufactured tolerance. C3B must still measure the
-    actual complete-thread intervals; no bound here proves full threads.
+    not an additional manufactured tolerance. cap_screw_complete_engagement_min
+    bounds the complete-thread overlap from these seat heights.
     """
     body_height = CAP_HEIGHT if height is None else height
     inputs = (
@@ -707,9 +736,9 @@ def capture_bounds(
         chamber_excess + projection_change + fit_z
         + seat_radius_max * math.tan(bore_axis_angle + gamma + carrier_fit_angle)
     )
-    # This is only available AXIAL penetration. The actual engaged complete
-    # thread interval still requires C3B; a world-Z head height is not an
-    # axial distance when the tap axis is inclined.
+    # This is only available AXIAL penetration (a world-Z head height is not
+    # an axial distance when the tap axis is inclined). Complete-thread
+    # overlap is shorter: cap_screw_complete_engagement_min.
     available_penetration = (
         CAP_BOLT_LENGTH_MIN - fitted_counterbore_bounds().head_seat_max / math.cos(gamma)
     )

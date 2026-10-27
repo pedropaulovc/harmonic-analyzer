@@ -56,9 +56,13 @@ SCREW_WIRE_FROM_TOP = (SCREW_WIRE_FROM_TOP_MIN + SCREW_WIRE_FROM_TOP_MAX) / 2
 SCREW_WIRE_HEIGHT = SCREW_HEAD_HEIGHT - SCREW_WIRE_FROM_TOP
 SCREW_WIRE_HEIGHT_MIN = SCREW_HEAD_HEIGHT_MIN - SCREW_WIRE_FROM_TOP_MAX
 SCREW_WIRE_HEIGHT_MAX = SCREW_HEAD_HEIGHT_MAX - SCREW_WIRE_FROM_TOP_MIN
-# A short screw is threaded as close to the head as practicable (NAS note c).
-# The existing fully-threaded native representation supplies no crest-distance
-# or complete-engagement guarantee; those require receiving/joint inspection.
+# A short screw is threaded as close to the head as practicable (NAS note c);
+# ASME B18.3-2012 Table 4 note (c), which NAS cites for body and grip, bounds
+# that for sizes through 5/8: complete threads to within two pitches of the
+# head. B18.3 Table 1 note (8)'s ~90-degree point, chamfered just below the
+# root, plus one partial thread leaves under two incomplete pitches there.
+SCREW_COMPLETE_THREAD_FROM_HEAD_MAX = 2.0 * INCH / 18
+SCREW_POINT_INCOMPLETE_MAX = 2.0 * INCH / 18
 SCREW_WIRE_HOLE_ANGLES = (0.0, 60.0, 120.0, 180.0, 240.0, 300.0)
 SCREW_DIMS = SocketHeadScrew(
     part_no=SCREW_SKU,
