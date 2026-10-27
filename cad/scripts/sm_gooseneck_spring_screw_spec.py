@@ -79,7 +79,7 @@ if CROWN_RISE_MIN <= 0.0 or SLOT_RIM_CUT_MIN <= 0.0 or HEAD_SIDE_MIN <= 0.0:
     raise AssertionError("spring-screw crown band does not leave a fillister head")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "HeadProfile": {"HeadDia", "HeadHeight", "CrownRise"},
+    "HeadProfile": {"HeadDia", "HeadHeight", "CrownRise", "CrownRadius"},
     "ShankProfile": {"UnderHeadLength", "ReliefDia", "ReliefWidth", "TipChamfer"},
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
@@ -88,8 +88,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 }
 # Chamfers never need extra places (drawing-guidelines.md rule 3): the tip
 # chamfer rides the title block's .X band and the lead's single MAX limit
-# prints at one place too.  Every other mark prints at two.
-ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer", "HeadLead"})
+# prints at one place too, as does the crown's reference radius.  Every other
+# mark prints at two.
+ONE_PLACE_DIMENSIONS = frozenset({"TipChamfer", "HeadLead", "CrownRadius"})
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: {name: 1 if name in ONE_PLACE_DIMENSIONS else 2 for name in sorted(names)}
     for feature, names in DRAWING_DIMENSIONS.items()
@@ -100,17 +101,17 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for name, places in dimensions.items()
 }
 # The overall length is the stock cut-off, a restatement of the head height
-# and under-head length; the crown rise is NOT a reference (see above).
-REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+# and under-head length; the crown rise is NOT a reference (see above).  The
+# crown's sphere radius prints on its arc as the spherical reference (SR20.0):
+# the Ø12.50 head and the controlling rise already fix it, so it is read-only,
+# and it states the spherical shape the views otherwise left to a note
+# (machinist review of b44c591d6, rule 7).
+SPHERICAL_DIMENSIONS = frozenset({"CrownRadius"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength"}) | SPHERICAL_DIMENSIONS
 
 # The fitter's clamp step (user ruling 2026-09-21: no torque value, no
 # threadlocker) prints on the summing assembly sheet as MHA-SM-00 step 8,
 # not here: a part sheet carries no assembly instruction (machinist review
 # 2026-10-23).
-DRAWING_NOTES = "\n".join(
-    (
-        "1. CROWN SPHERICAL THROUGH RIM AND APEX.",
-        "2. THREAD MATES THE TAPPED END PLUG OF MHA-SM-01.",
-    )
-)
+DRAWING_NOTES = "THREAD MATES THE TAPPED END PLUG OF MHA-SM-01."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
