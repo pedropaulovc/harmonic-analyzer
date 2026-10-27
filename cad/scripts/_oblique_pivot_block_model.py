@@ -207,10 +207,11 @@ async def _circles(adapter, plane, z, profile, circles, *, side=False):
 
 async def _construction(adapter, create, label: str) -> str:
     """One construction entity, drawn without inference (no snap to the
-    model edges it lies on), so only the dimensions below define it."""
+    model edges it lies on), so only the dimensions below define it.
+    ``create`` is the un-awaited adapter call; it runs inside the mode."""
     set_sketch_direct_db(adapter, True)
     try:
-        entity = check(label, await create())
+        entity = check(label, await create)
     finally:
         set_sketch_direct_db(adapter, False)
     _as_construction(adapter, entity)
@@ -229,7 +230,7 @@ async def _offset_point(adapter, dims, base, point, du, dv, names, label) -> Non
 async def _construction_circle(adapter, dims, base, base_uv, uv, dia, names, label) -> str:
     """A construction circle on a real hole, centred by offsets from
     ``base`` (a sketch point at ``base_uv``), then sized."""
-    circle = await _construction(adapter, lambda: adapter.add_circle(*uv, dia / 2), label)
+    circle = await _construction(adapter, adapter.add_circle(uv[0], uv[1], dia / 2), label)
     await _offset_point(adapter, dims, base, f"{circle}.center",
                         abs(uv[0] - base_uv[0]), abs(uv[1] - base_uv[1]), names[:2], label)
     check(f"{label} diameter", await adapter.add_sketch_dimension(circle, None, "diameter", dia))
@@ -249,7 +250,8 @@ async def _plan_datum_reference(adapter, part) -> None:
     at = _xy_mapper(adapter, z, feature)
     dims = SketchDims()
     edge_start, edge_end = at(part.BLOCK_X0, -part.BLOCK_WIDTH / 2), at(part.BLOCK_X0, part.BLOCK_WIDTH / 2)
-    edge = await _construction(adapter, lambda: adapter.add_line(*edge_start, *edge_end), f"{feature} -X edge")
+    edge = await _construction(adapter, adapter.add_line(edge_start[0], edge_start[1], edge_end[0], edge_end[1]),
+                               f"{feature} -X edge")
     check(f"{feature} -X edge vertical", await adapter.add_sketch_constraint(edge, None, "vertical"))
     await anchor_point_to_origin(adapter, f"{edge}.start", *edge_start, f"{feature} -X edge foot")
     dims.record("PlanEdgeX")
@@ -266,7 +268,8 @@ async def _plan_datum_reference(adapter, part) -> None:
                                    f"{feature} carriage hole column {i}")
     if hasattr(part, "LUG_WIDTH"):
         lug_top, lug_end = at(part.LUG_X0, part.LUG_Y1), at(part.LUG_X0, part.LUG_Y0)
-        lug = await _construction(adapter, lambda: adapter.add_line(*lug_top, *lug_end), f"{feature} lug -X face")
+        lug = await _construction(adapter, adapter.add_line(lug_top[0], lug_top[1], lug_end[0], lug_end[1]),
+                                  f"{feature} lug -X face")
         check(f"{feature} lug face vertical", await adapter.add_sketch_constraint(lug, None, "vertical"))
         await _offset_point(adapter, dims, f"{edge}.start", f"{lug}.start",
                             abs(lug_top[0] - edge_start[0]), abs(lug_top[1] - edge_start[1]),
@@ -289,10 +292,14 @@ async def _nut_pattern_reference(adapter, part) -> None:
     feature = "NutPatternReference"
     check(f"create_sketch {feature}", await adapter.create_sketch("NutFace"))
     to_sketch = _sketch_mapper(adapter, u_axis=2, v_axis=1, label=feature)
-    at = lambda y, z: to_sketch((part.NUT_FACE_X, y, z))  # noqa: E731
+
+    def at(y: float, z: float) -> tuple[float, float]:
+        return to_sketch((part.NUT_FACE_X, y, z))
+
     dims = SketchDims()
     end_start, end_end = at(part.LUG_Y0, 0.0), at(part.LUG_Y0, part.BLOCK_HEIGHT)
-    end = await _construction(adapter, lambda: adapter.add_line(*end_start, *end_end), f"{feature} lug end")
+    end = await _construction(adapter, adapter.add_line(end_start[0], end_start[1], end_end[0], end_end[1]),
+                              f"{feature} lug end")
     check(f"{feature} lug end horizontal", await adapter.add_sketch_constraint(end, None, "horizontal"))
     await anchor_point_to_origin(adapter, f"{end}.start", *end_start, f"{feature} lug end corner")
     dims.record("NutEndY")

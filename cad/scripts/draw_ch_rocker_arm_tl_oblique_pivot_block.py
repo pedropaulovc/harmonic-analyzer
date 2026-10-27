@@ -108,7 +108,10 @@ NUT_CAPTION_XY = (.166,.078)
 # through the nut axis, hatched, showing the Ø8.50 across the lug and the
 # Ø10.50 recess floor that its callout gives the depth of.
 NUT_SECTION_XY = (.335,.160)
-NUT_CALLOUT_XY = (.245,.084)
+# The tap callout's shoulder starts right of the C line's lower letter
+# (x 204.6..210.5, y 81.6..88.0): from x 208 (farm run 20261024T133158704Z)
+# the leader ran 6.6 mm through it; from ~x 228 it passes above the letter.
+NUT_CALLOUT_XY = (.265,.084)
 NUT_ISO_XY = (.380,.215)
 _ARROWS_INSIDE = 0  # swDimArrowsInside
 _WITNESS_NONE = 3  # swWitnessLineVisibility_e.swWitnessLineNone
