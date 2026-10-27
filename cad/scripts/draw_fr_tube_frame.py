@@ -120,10 +120,16 @@ LENGTH_KEEP = {
 # The top-end break is a native chamfer dimension (``AddChamferDim``) whose
 # leader lands on the chamfer itself. The part's ``TopChamfer`` is a linear
 # distance: imported, it drew opposed arrows on the top face's extension well
-# right of the tube and named no edge (machinist review 5bca52e r2/r3). The
-# text stands right of the tube top, clear of the end view above and left of
-# the isometric's top.
-CHAMFER_TEXT_XY = (LENGTH_CENTER[0] + 0.090, LENGTH_CENTER[1] + 0.118)
+# right of the tube and named no edge (machinist review 5bca52e r2/r3).
+# ``AddChamferDim`` ignores its text point (run 20261027T080236834Z: asked
+# for x 200 mm, it centred the 103.6 mm block at x 141.6 over the end view,
+# four text-on-view/line audit findings), so the text is set after insertion
+# by ``SetPosition2``, which places the block's centre at x and the cap line
+# at y with the value line's shoulder 5.6 mm under it. Centred at x 198 mm
+# the block (146..250 mm) clears the end view's outline (x <= 141 mm); the
+# shoulder at 333 mm stays 4.8 mm over the isometric's outline (328.2 mm).
+CHAMFER_TEXT_XY = (0.198, 0.3386)
+_CHAMFER_POSITION_TOLERANCE_M = 0.001
 # The chamfer dimension prints the part-authored break places (one, .X) and
 # a whole-degree angle: "0.5 X 45°".
 CHAMFER_PLACES = DRAWING_PRECISION_BY_NAME["TopChamfer"]
@@ -332,6 +338,8 @@ def _add_top_chamfer_dimension(
     annotation = _early_bound(display.GetAnnotation(), "IAnnotation")
     if annotation is None:
         raise RuntimeError("tube top chamfer dimension has no annotation")
+    if not annotation.SetPosition2(text_xy[0], text_xy[1], 0.0):
+        raise RuntimeError("failed to position the tube top chamfer text")
 
     def settled() -> None:
         if bool(annotation.IsDangling()):
@@ -360,6 +368,14 @@ def _add_top_chamfer_dimension(
                 f"type={display.Type2}, style={display.ChamferTextStyle}, "
                 f"places=({display.ChamferPrecision(_CHAMFER_LENGTH)}, "
                 f"{display.ChamferPrecision(_CHAMFER_ANGLE)}), lanes={lanes!r}"
+            )
+        placed = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        if (
+            len(placed) < 2
+            or math.dist(placed[:2], text_xy) > _CHAMFER_POSITION_TOLERANCE_M
+        ):
+            raise RuntimeError(
+                f"tube top chamfer text moved: {placed!r}, requested {text_xy!r}"
             )
 
     settled()
