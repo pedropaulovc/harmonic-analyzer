@@ -8,9 +8,9 @@ positions from the bore (the countersink Ø from the blanked
 ``CountersinkReference`` sketch round the +X hole, shown in this view only:
 the drill callout leads to the -X hole from the upper left, the countersink
 callout to the +X hole from the upper right).  Section D-D cuts the plan
-through both screw holes; a chain line in each hole draws its projected
-tolerance zone from face A with the zone's height.  The isometric stands
-above it.
+through both screw holes, face A up; a chain line on each hole's axis draws
+its projected tolerance zone from face A outward, into the arm's side, with
+the zone's height.  The isometric stands above it.
 
 Sheet 2 (FACE A): the back view (``*Back``), labelled FRONT VIEW (FACE A),
 looks at the mounting face A.  It carries the notch face's two corner
@@ -166,15 +166,17 @@ _SCREW_Y = SCREW_HOLES[0][1]
 # The cutting lines, past both ends of the plate.  A-A runs down the face-A
 # view on the bore axis (its arrows point at the view's +X side, the hub
 # then stands left in the section); D-D runs across the plan through both
-# screw-hole axes, right to left (its arrows point up the plan).
+# screw-hole axes, left to right (its arrows point down the plan, so face A
+# stands up in the section and the screw holes' zones rise from it, away
+# from the view's caption).
 SECTION_LINE_OVERRUN_MM = 3.0
 KNOB_SECTION_LINE_MODEL = (
     (0.0, _SECTION_TOP + SECTION_LINE_OVERRUN_MM, 0.0),
     (0.0, _BOTTOM - SECTION_LINE_OVERRUN_MM, 0.0),
 )
 SCREW_SECTION_LINE_MODEL = (
-    (EDGE_PLUS_X + SECTION_LINE_OVERRUN_MM, _SCREW_Y, _Z_PLAN),
     (EDGE_MINUS_X - SECTION_LINE_OVERRUN_MM, _SCREW_Y, _Z_PLAN),
+    (EDGE_PLUS_X + SECTION_LINE_OVERRUN_MM, _SCREW_Y, _Z_PLAN),
 )
 
 # Per-view survivors of the marked-dimension import, each at the MODEL point
@@ -205,8 +207,8 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "EndR": (0.7071 * END_R + 6.0, -0.7071 * END_R - 6.0, _Z_PLAN),
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 6.0, _TOP + 8.0, _Z_PLAN),
-    # Four mm higher than the drill callout: its third line (the cone
-    # coaxial with the hole) would otherwise reach section D-D's letter.
+    # Four mm higher than the drill callout: its three lines under the
+    # value end clear of the plate's +X top corner.
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 12.0, _Z_PLAN),
     # Text right of K's witness line, which struck it between the two; the
     # reamed-hole leader runs on the left.
@@ -350,21 +352,22 @@ FACE_FINISHES: dict[str, tuple[_ModelPoint, _ModelPoint, _ModelPoint]] = {
     ),
 }
 # Each projected zone: a chain line from face A along its feature's axis,
-# just off it, for the zone's height, dimensioned as a reference (the frame
-# states the height).  (start, end, dimension text) model points, mm.  The
-# knob bore's runs out of A toward the hub in section A-A, its height above
-# it beyond the hub face (the hub face's finish symbol stands below it);
-# each screw hole's runs through the plate in section D-D past the rear
-# face, its height beside the hole beyond the zone's end (beyond A it met
-# the view's caption: run 20261027T130144223Z).
+# for the zone's height, dimensioned as a reference (the frame states the
+# height).  (start, end, dimension text) model points, mm.  The knob bore's
+# runs out of A toward the hub in section A-A, just off the axis, its height
+# above it beyond the hub face (the hub face's finish symbol stands below
+# it).  Each screw hole's runs on its axis out of A into the arm's side (the
+# mating part: ASME Y14.5 projected tolerance zone), clear of the hatching,
+# its height beside it beyond the zone's end.
 CHAIN_LINE_OFFSET_MM = 1.2
 CHAIN_LINE_STYLE = 3  # swLineStyles_e.swLineCHAIN
 CHAIN_LINE_WEIGHT = 2  # swLineWeights_e.swLW_THICK
 CENTER_LINE_STYLE = 4  # swLineStyles_e.swLineCENTER
 CENTER_LINE_WEIGHT = 0  # swLineWeights_e.swLW_THIN
-# Each screw hole's axis in section D-D, past face A and past its zone.
+# Each screw hole's axis in section D-D, from face A (where its zone's chain
+# line continues it) past the rear face.
 SCREW_AXES = tuple(
-    ((x, _SCREW_Y, -1.5), (x, _SCREW_Y, SCREW_ZONE_HEIGHT + 1.5)) for x, _y in SCREW_HOLES
+    ((x, _SCREW_Y, 0.0), (x, _SCREW_Y, REAR_FACE_Z + 1.5)) for x, _y in SCREW_HOLES
 )
 KNOB_ZONE = (
     (0.0, CHAIN_LINE_OFFSET_MM, 0.0),
@@ -373,9 +376,9 @@ KNOB_ZONE = (
 )
 SCREW_ZONES = tuple(
     (
-        (x + CHAIN_LINE_OFFSET_MM, _SCREW_Y, 0.0),
-        (x + CHAIN_LINE_OFFSET_MM, _SCREW_Y, SCREW_ZONE_HEIGHT),
-        (x - 1.5, _SCREW_Y, SCREW_ZONE_HEIGHT + 3.5),
+        (x, _SCREW_Y, 0.0),
+        (x, _SCREW_Y, -SCREW_ZONE_HEIGHT),
+        (x - 2.0, _SCREW_Y, -SCREW_ZONE_HEIGHT - 3.0),
     )
     for x, _y in SCREW_HOLES
 )
@@ -809,8 +812,8 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=FINISH_CHAR_HEIGHT,
         leader_attach_xy=_bore_landing(adapter, plan, bore_finish_xy),
     )
-    # Each hole's axis in section D-D, so its zone's chain line reads as
-    # drawn beside the axis (ASME Y14.5-2018 6.4.7), not as a hidden line.
+    # Each hole's axis in section D-D, continued out of face A by its zone's
+    # chain line (ASME Y14.5-2018 6.4.7).
     # Sketched: InsertCenterLine2 found no cylinder at a pick inside the
     # cut hole (run 20261027T155333783Z).
     for index, axis in enumerate(SCREW_AXES, 1):

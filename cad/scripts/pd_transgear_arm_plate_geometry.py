@@ -143,7 +143,10 @@ CSK_HALF_ANGLE_LIMITS_RAD = tuple(
     math.radians((CSK_ANGLE_DEG + sign * CSK_ANGLE_BAND_DEG) / 2.0)
     for sign in (-1.0, 1.0)
 )
-CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0  # seated bearing-contact cap; SOURCE mm, not whole crown/native unit proof
+# Each screw hole's projected zone (P 7.0) starts at face A and runs into the
+# arm MHA-PD-18, the mate's side (ASME Y14.5 projected tolerance zone;
+# coordinator ruling 2026-10-27, #2017). SOURCE mm.
+CLAMP_PLATE_PROJECTED_HEIGHT_MM = 7.0
 CSK_DIA_DEVIATIONS_MM = printed_deviations(CSK_DIA, CSK_DIA_PLACES)
 CSK_DIA_LIMITS_MM = tuple(CSK_DIA + deviation for deviation in CSK_DIA_DEVIATIONS_MM)
 CSK_DEPTH = (
@@ -179,13 +182,29 @@ CSK_DIA_BAND = printed_band_mm(CSK_DIA_PLACES)
 # The notch face's corner heights print .X: the face only clears the arm's
 # lower edge (transgear_hanger_joints.NOTCH_REFERENCE_AIR_WORST_MM).
 NOTCH_BAND = BAND_X
-# Each cone is coaxial with its hole (the plan's 2X CSK callout), so its axis lies in the
-# hole's projected zone. The floor still pays two independent zone radii at
-# EVERY height, which bounds that with no coaxial credit.
+# Each cone is coaxial with its hole (the plan's 2X CSK callout). The zone
+# lies outside the plate, so inside it each axis is the zone's straight
+# extension: tilted at most D/H, and off true position by at most the zone
+# radius plus that tilt over the height above face A. The floor pays two
+# independent such radii (cone and hole) at the deepest stock's rear face,
+# with no coaxial credit.
 # Pay the cone rim's vertical lever and its shallowest global generatrix.
 _CSK_AXIS_TILT_MAX_RAD = math.atan(REDUCER_POSITION_DIAMETER / CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+
+
+def screw_axis_radius_mm(height_mm: float) -> float:
+    """Bound on a screw hole's (or its cone's) axis offset from true position
+    at ``height_mm`` above face A, inside the plate."""
+    if height_mm < 0.0:
+        raise ValueError("inside the plate is above face A")
+    return REDUCER_POSITION_RADIUS + height_mm * math.tan(_CSK_AXIS_TILT_MAX_RAD)
+
+
+SCREW_AXIS_RADIUS_IN_PLATE_MM = screw_axis_radius_mm(
+    THICKNESS_OVER_ARM + THICKNESS_OVER_ARM_BAND
+)
 _CSK_DEPTH_MAX = (
-    ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + REDUCER_POSITION_DIAMETER)
+    ((CSK_DIA_LIMITS_MM[1] - SCREW_HOLE_DIA) / 2.0 + 2.0 * SCREW_AXIS_RADIUS_IN_PLATE_MM)
     / math.tan(CSK_HALF_ANGLE_LIMITS_RAD[0] - _CSK_AXIS_TILT_MAX_RAD)
     + CSK_DIA_LIMITS_MM[1] / 2.0 * math.sin(_CSK_AXIS_TILT_MAX_RAD)
 )
@@ -242,7 +261,7 @@ WALLS: dict[str, tuple[float, float]] = {
     "bore to screw holes": (
         math.hypot(*_NEAR_HOLE) - BORE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0,
         math.hypot(*_NEAR_HOLE)
-        - REDUCER_POSITION_RADIUS
+        - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - _BORE_R_MAX
         - (SCREW_HOLE_DIA + DRILL_GROWTH) / 2.0
         - OUTLINE_EDGE_BREAK_MAX_MM - HOLE_RUN_OFF_MM - BORE_RUN_OFF_MM,
@@ -257,7 +276,7 @@ WALLS: dict[str, tuple[float, float]] = {
         _HOLE_TO_EDGE
         - CSK_DIA_LIMITS_MM[1] / 2.0
         - BAND_X
-        - REDUCER_POSITION_RADIUS
+        - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,  # the side edge and the cone's rim
     ),
 }
@@ -276,7 +295,7 @@ for _index, (_x, _y) in enumerate(LOCATOR_SITES_MM, 1):
     _csk_air = min(math.hypot(_x - x, _y - y) for x, y in SCREW_HOLES)
     WALLS[f"locator {_index} to countersink"] = (
         _csk_air - (LOCATOR_HOLE_DIA_MM + CSK_DIA) / 2.0,
-        _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - REDUCER_POSITION_RADIUS
+        _csk_air - LOCATOR_MOUTH_POSITION_RADIUS_MM - SCREW_AXIS_RADIUS_IN_PLATE_MM
         - (LOCATING_PIN.SLIP_HOLE_LIMITS_MM[1] + CSK_DIA_LIMITS_MM[1]) / 2.0
         - LOCATING_PIN.HOLE_MOUTH_BREAK_RADIAL_MAX_MM - OUTLINE_EDGE_BREAK_MAX_MM
         - 2.0 * HOLE_RUN_OFF_MM,

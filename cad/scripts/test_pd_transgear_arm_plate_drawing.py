@@ -229,7 +229,9 @@ def _screw_seat(csk_places: int, thickness_places: int) -> tuple[float, float]:
     )
     cone_radius = (geometry.CSK_DIA + csk_high) / 2.0
     alpha = math.atan(geometry.REDUCER_POSITION_DIAMETER / geometry.CLAMP_PLATE_PROJECTED_HEIGHT_MM)
-    depth = ((cone_radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+    # The zone runs into the arm: each axis is extrapolated to the rear face.
+    axis = geometry.REDUCER_POSITION_RADIUS + (geometry.THICKNESS_OVER_ARM + thick_high) * math.tan(alpha)
+    depth = ((cone_radius - geometry.SCREW_HOLE_DIA / 2.0 + 2.0 * axis)
              / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
              + cone_radius * math.sin(alpha))
     land = (
@@ -260,10 +262,19 @@ def test_the_countersink_and_the_thickness_print_the_loosest_seat_rows() -> None
     assert _seat_holds(csk, thickness)
 
 
-def test_floor_pays_independent_projected_cone_and_hole_axes_and_actual_rim_tilt() -> None:
+def test_floor_pays_independent_extrapolated_cone_and_hole_axes_and_actual_rim_tilt() -> None:
+    """The P 7.0 zone runs from face A into the arm, so inside the plate each
+    axis (cone and hole, no coaxial credit) is the zone's straight extension:
+    the zone radius plus its full tilt over the deepest stock."""
     alpha = math.atan(geometry.REDUCER_POSITION_DIAMETER / geometry.CLAMP_PLATE_PROJECTED_HEIGHT_MM)
+    rear_face_max = geometry.THICKNESS_OVER_ARM + geometry.THICKNESS_OVER_ARM_BAND
+    axis = geometry.REDUCER_POSITION_RADIUS + rear_face_max * math.tan(alpha)
+    assert geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM == pytest.approx(axis)
+    assert geometry.screw_axis_radius_mm(0.0) == geometry.REDUCER_POSITION_RADIUS
+    with pytest.raises(ValueError):
+        geometry.screw_axis_radius_mm(-1.0)
     radius = geometry.CSK_DIA_LIMITS_MM[1] / 2.0
-    depth = ((radius - geometry.SCREW_HOLE_DIA / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+    depth = ((radius - geometry.SCREW_HOLE_DIA / 2.0 + 2.0 * axis)
              / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha) + radius * math.sin(alpha))
     floor = (
         geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND - depth
@@ -628,10 +639,11 @@ def test_the_callouts_name_each_fit_and_the_matched_pair() -> None:
 
 
 def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
-    """ASME Y14.5-2018 §6.4.7: each zone drawn from face A, along its
-    feature's axis and just off it, for its frame's height, away from the
-    feature's own body (the knob bore's toward the hub, -Z; the holes'
-    through the plate past the rear face, +Z)."""
+    """ASME Y14.5-2018 §6.4.7: each zone drawn from face A along its
+    feature's axis for its frame's height: the knob bore's toward the hub
+    (-Z), just off the axis; each screw hole's on its axis, out of face A
+    into the mating arm (-Z), outside the plate and clear of its hatching,
+    the axis's centre line continuing it through the plate."""
     heights = {
         control.key: control.projected_zone_height_mm
         for control in spec.GEOMETRIC_CONTROLS
@@ -648,12 +660,17 @@ def test_each_projected_zone_is_a_chain_line_from_face_a() -> None:
     assert end[2] < text[2] < geometry.HUB_FACE_Z
     assert drawing.CHAIN_LINE_OFFSET_MM < text[1] < geometry.HUB_DIA / 2.0 - 1.5
     assert drawing.CHAIN_LINE_OFFSET_MM < geometry.BORE_DIA / 2.0
-    for (start, end, text), (x, y) in zip(drawing.SCREW_ZONES, geometry.SCREW_HOLES, strict=True):
-        assert start == (x + drawing.CHAIN_LINE_OFFSET_MM, y, 0.0)
-        assert end[:2] == start[:2] and end[2] == spec.SCREW_ZONE_HEIGHT
-        assert spec.SCREW_ZONE_HEIGHT > geometry.REAR_FACE_Z
-        assert text[2] > end[2] and abs(text[0] - x) < geometry.SCREW_HOLE_DIA / 2.0
-    assert drawing.CHAIN_LINE_OFFSET_MM < geometry.SCREW_HOLE_DIA / 2.0
+    for (start, end, text), axis, (x, y) in zip(
+        drawing.SCREW_ZONES, drawing.SCREW_AXES, geometry.SCREW_HOLES, strict=True
+    ):
+        assert start == (x, y, 0.0)
+        assert end == (x, y, -spec.SCREW_ZONE_HEIGHT)
+        assert text[2] < end[2] and abs(text[0] - x) < geometry.SCREW_HOLE_DIA / 2.0
+        assert axis == ((x, y, 0.0), (x, y, geometry.REAR_FACE_Z + 1.5))
+    # D-D's arrows point down the plan: face A stands up in the section, so
+    # the zones rise away from the view's caption.
+    first, last = drawing.SCREW_SECTION_LINE_MODEL
+    assert first[0] < geometry.EDGE_MINUS_X < geometry.EDGE_PLUS_X < last[0]
     assert spec.DRAWING_REFERENCE_PRECISION == {"KnobZone": 1, "ScrewZone": 1}
     assert f"{spec.KNOB_ZONE_HEIGHT:.1f}" == "40.6"
     assert f"{spec.SCREW_ZONE_HEIGHT:.1f}" == "7.0"

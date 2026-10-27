@@ -203,8 +203,9 @@ FINISH_CAPTIONS = {
 # (hole and slot callouts say what to do)), and the H7 band names the knob
 # shaft's g6 journal it runs on.  The screw holes are clearance, drilled;
 # both countersinks take the oval heads, each coaxial with its drilled hole:
-# the seat and wall budgets bound the cone's axis by the hole's projected
-# zone (pd_transgear_arm_plate_geometry._CSK_AXIS_TILT_MAX_RAD).
+# the seat and wall budgets bound both axes inside the plate by the hole's
+# projected zone, extrapolated from face A
+# (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).
 BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT\n{KNOB_SHAFT_NUMBER}"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
 CSK_CALLOUT = (
@@ -224,9 +225,8 @@ HUB_TO_BOSS_CALLOUT = f"SETS CUP {KNOB_CUP_NUMBER}\nON SHAFT {KNOB_SHAFT_NUMBER}
 # view with every frame and datum and section A-A on the knob bore. The face
 # views say which face they show; each projected zone is a chain line from
 # face A with its height (ASME Y14.5-2018 §6.4.7), the knob bore's toward the
-# hub and each screw hole's through the plate toward the rear face, to the
-# seated head contact
-# (transgear_hanger_joints.PLATE_SCREW_CONTACT_PLATE_LOCAL_Z_MAX_MM).
+# hub and each screw hole's out of face A into the mating arm MHA-PD-18
+# (coordinator ruling 2026-10-27, #2017).
 SHEET_NAMES = ("REAR FACE", "FACE A")
 REAR_VIEW_LABEL = "REAR VIEW"
 FRONT_VIEW_LABEL = "FRONT VIEW (FACE A)"
