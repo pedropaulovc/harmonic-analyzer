@@ -44,10 +44,19 @@ guidelines, the policy or the machinist-review prompts. Check at least:
 
 - **Model owns tolerance and precision (rules 3, 4).** Bands are native model
   tolerances on the dimension. Precision is authored by the part build
-  (`DRAWING_PRECISION`) and read back by the drawing. Flag a drawing script that
-  rewrites precision (`SetPrecision3`, `set_dimension_precision`), types a spec
-  constant into note text (`f"{DEPTH:.1f} DEEP"`), prints a value no model
-  dimension carries, or calls `SetText` on an imported dimension.
+  (`DRAWING_PRECISION`) and read back by the drawing. Flag a drawing change
+  that newly introduces a render-time precision rewrite (`SetPrecision3`,
+  `set_dimension_precision`) on a banded or controlling dimension, types a
+  spec constant into note text (`f"{DEPTH:.1f} DEEP"`), or prints a value no
+  model dimension carries. A pure reference dimension with no band and no
+  model dimension to import may take its places from
+  `DRAWING_REFERENCE_PRECISION`. The fleet migrates incrementally (migrated
+  packages are gated by `test_drawing_specification_purity.py`): do not flag
+  pre-existing unmigrated usage the diff only carries along. Callout text set
+  through the shared `set_dimension_callouts` helper is established practice,
+  not a violation by itself; flag it only where the policy names a
+  builder-authored callout (for example the cylinder-bank settings) or when
+  source-clean guards are removed.
 - **No dimensions or methods in notes (rule 7).** Notes are few, flagged and
   never prescribe a machining method; dimensions, tolerances and assembly
   settings are associative native dimensions (hidden reference sketches when no
