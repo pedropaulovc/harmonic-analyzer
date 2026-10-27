@@ -67,7 +67,8 @@ DRAWING_VALUES = {
     "TapDrillDia": PIVOT_TAP_DRILL,
     "CboreFloor": CBORE_FLOOR,
     "CarriageDrills1Dia": HOLE_DIA,
-    "CarriageCounterbores1Dia": CBORE_DIA,
+    # The counterbore prints on hole 3, the drill on hole 1: one leader each.
+    "CarriageCounterbores3Dia": CBORE_DIA,
     "CarriageDrills3Y": BOLT_Y, "CarriageDrills4Y": BOLT_Y,
     "PlanBoreX": BORE_X - BLOCK_X0,
     **{f"PlanHole{i}X": x - BLOCK_X0 for i, (x, _y) in enumerate(PLAN_DATUM_HOLES, 1)},
@@ -79,7 +80,7 @@ DRAWING_DIMENSIONS = {
     "PivotTapProfile": ("TapDrillDia",),
     CBORE_FLOOR_REFERENCE: ("CboreFloor", "SectionBlockHeight"),
     "CarriageDrillProfile": ("CarriageDrills3Y", "CarriageDrills4Y", "CarriageDrills1Dia"),
-    "CarriageCboreProfile": ("CarriageCounterbores1Dia",),
+    "CarriageCboreProfile": ("CarriageCounterbores3Dia",),
     PLAN_DATUM_REFERENCE: ("PlanBoreX", "PlanHole1X", "PlanHole2X"),
 }
 THREE_PLACE_DIMENSIONS = frozenset({
@@ -95,19 +96,20 @@ CALLOUTS_SUFFIX: dict[str, str] = {}
 CALLOUTS_ABOVE = {
     "BoreDia": "REAM H7", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
-    "CarriageCounterbores1Dia": "4X COUNTERBORE FROM TOP",
-    # Above the value, two rows: the floor's extension lines rise to the
-    # dimension line and B-B's block height passes left of the note.
-    "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
+    "CarriageCounterbores3Dia": "4X COUNTERBORE FROM TOP",
 }
 CALLOUTS_BELOW = {
     "BoreDia": "LOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER",
     "TapDrillDia": "M8x1.25 TAP THRU BELOW SHOULDER SEAT",
     "TopBoreDepth": "SETS TL-VN-77 SHOULDER HEIGHT",
     "CarriageDrills1Dia": "MATCHES HGH15CA CARRIAGE M4 PATTERN",
+    "CarriageCounterbores3Dia": "FLOOR: SECTION B-B",
+    # Under the value, two rows, right of B-B (an above-text newline dropped
+    # the note, farm run 20261027T175531766Z): the block height's extension
+    # lines pass left of it.
+    "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
 }
 REFERENCE_SKETCHES = (CBORE_FLOOR_REFERENCE, PLAN_DATUM_REFERENCE)
-ISOMETRIC_VIEW_NOTE = "RAIL 2 / QTY 1"
 WALLS_MM = {
     "pivot seat to spindle end": BORE_X - BORE_DIA / 2 - BLOCK_X0,
     "carriage counterbore to side": BLOCK_WIDTH / 2 - BOLT_Y - CBORE_DIA / 2,

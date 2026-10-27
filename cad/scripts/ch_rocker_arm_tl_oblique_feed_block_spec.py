@@ -100,7 +100,6 @@ CALLOUTS_BELOW = dict(pivot.CALLOUTS_BELOW) | {
 }
 NUT_FLANGE_MATE_TEXT = "MATCHES TL-VN-55 NUT FLANGE"
 REFERENCE_SKETCHES = pivot.REFERENCE_SKETCHES + ("NutPatternReference",)
-ISOMETRIC_VIEW_NOTE = "RAIL 1 / QTY 1 / INTEGRAL NUT LUG"
 # The flange rim remains within the full-height lug.
 assert NUT_AXIS_Z - lead.NUT_FLANGE_DIA / 2 >= 0
 assert NUT_AXIS_Z + lead.NUT_FLANGE_DIA / 2 <= BLOCK_HEIGHT

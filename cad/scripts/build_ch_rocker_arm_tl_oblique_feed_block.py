@@ -13,7 +13,7 @@ MATERIAL = "6061 Alloy"
 
 async def build(adapter):
     await build_block_model(adapter, spec)
-    apply_drawing_properties(adapter, PART_NAME, {"Isometric View Note": spec.ISOMETRIC_VIEW_NOTE})
+    apply_drawing_properties(adapter, PART_NAME)
     result = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, ("Number", "Material Specification", "Finish", "Quantity"))
     return result
