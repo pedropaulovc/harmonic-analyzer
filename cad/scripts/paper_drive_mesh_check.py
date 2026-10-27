@@ -46,7 +46,7 @@ involute, so the relieved disc tip carries little load at handover.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 
 import pd_platen_rack_spec as rack
@@ -102,6 +102,8 @@ class MeshCheck:
             "root clearance": self.root_clearance_min_mm,
             "root clearance floor": self.root_clearance_floor_mm,
             "interference margin": self.interference_margin_min_mm,
+            "contact ratio floor": self.contact_ratio_floor,
+            "runout contact ratio floor": self.runout_contact_ratio_floor,
         }
         if self.runout_contact_ratio_min is not None:
             values["runout contact ratio"] = self.runout_contact_ratio_min
@@ -335,9 +337,7 @@ def reducer_band_meshes() -> tuple[MeshCheck, MeshCheck]:
     low, high = disc.CENTRE_DISTANCE_WINDOW
     nominal_floor, runout_floor = BAND_TOP_CONTACT_RATIO_FLOORS
     top = reducer_mesh(high)
-    return reducer_mesh(low), MeshCheck(
-        f"{top.label} at +{high - low:.3f}", top.contact_ratio_min, top.backlash_mm,
-        top.root_clearance_min_mm, top.root_clearance_floor_mm,
-        top.interference_margin_min_mm, top.runout_contact_ratio_min,
-        nominal_floor, runout_floor,
+    return reducer_mesh(low), replace(
+        top, label=f"{top.label} at +{high - low:.3f}",
+        contact_ratio_floor=nominal_floor, runout_contact_ratio_floor=runout_floor,
     )

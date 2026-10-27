@@ -35,6 +35,7 @@ import pd_transgear_front_bushing_spec as front_bushing
 import pd_transgear_feed_pinion_spec as feed_pinion
 import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
+import pd_transgear_arm_plate_geometry as plate_geometry
 import pd_vn_transgear_arm_plate_locating_pin_spec as plate_locating_pin
 import _transgear_arm_plate_locating_interface as plate_locating_interface
 import pd_vn_transgear_arm_plate_screw_spec as plate_screw
@@ -375,24 +376,51 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"PRESS {plate_locating_pin.ASSEMBLY_QUANTITY} "
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
-    # Set with the shop's micrometer over a ZZ gauge pin and the pressed pin:
-    # no jig, the catalogue +x/-0 band read directly.
+    # The setting's values and identities, in operation order: the ZZ pin and
+    # the MHA-PD-23 pin, the gear-plane station and the reading window (with
+    # the mesh it sets) before the pilots are drilled, then each part reamed
+    # to its own drawing, then the dowels.
+    order = [
+        f"{steps.KNOB_BORE_GAUGE_PIN_IN:.3f}",
+        _number("pd-transgear-pin"),
+        steps.GEAR_PLANE_FROM_HUB_FACE_TEXT,
+        steps.CENTRE_READING_TEXT,
+        _number("pd-transgear-knob-shaft"),
+        _number("pd-rack-pinion"),
+        _number("pd-transgear-arm"),
+        _number("pd-transgear-arm-plate"),
+        _number("pd-vn-transgear-arm-plate-locating-pin"),
+    ]
+    # The parts named in the opening clamp are skipped by searching after it.
+    cursor = located.index(_number("pd-transgear-arm")) + 1
+    for token in order:
+        cursor = located.index(token, cursor)
     assert "JIG" not in located
-    assert "ZZ GAUGE PIN THAT ENTERS IN THE PLATE'S KNOB BORE" in located
-    assert f"{_number('pd-transgear-pin')} PIN, THEN MIKE OVER BOTH" in located
-    assert f"THE CENTRES MUST READ {disc.CENTRE_DISTANCE_SET_TEXT}" in located
-    # The step names the mesh that centre distance sets.
-    setting = located[: located.index("TAP THE PLATE")]
-    for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
-        assert _number(stem) in setting
-    assert "MESH" in setting
-    # One match-drilled pilot pair; each part reamed to its own drawing,
-    # the arm's press seats and the plate's slip holes (two reamers).
-    assert "MATCH-DRILL 2 PILOTS THROUGH THE PLATE, BLIND IN THE ARM" in located
-    assert (
-        f"REAM EACH PART'S HOLES TO ITS DRAWING ({_number('pd-transgear-arm')} PRESS, "
-        f"{_number('pd-transgear-arm-plate')} SLIP)"
-    ) in located
+
+
+def test_the_s_k_reading_window_pays_the_gauge_pin_float_inside_the_band() -> None:
+    inch = 25.4
+    bore = [plate_geometry.BORE_DIA + limit for limit in plate_geometry.BORE_DIA_LIMITS]
+    pin = steps.KNOB_BORE_GAUGE_PIN_IN
+    # The largest set pin that enters the least bore; the next never enters.
+    assert pin * inch <= min(bore) < (pin + steps.ZZ_STEP_IN - steps.ZZ_CLASS_IN) * inch
+    assert (pin + steps.ZZ_STEP_IN - steps.ZZ_CLASS_IN) * inch > max(bore)
+    float_mm = (max(bore) - (pin - steps.ZZ_CLASS_IN) * inch) / 2.0
+    assert steps.KNOB_BORE_GAUGE_PIN_FLOAT_MM == pytest.approx(float_mm)
+    low, high = steps.CENTRE_READING_WINDOW
+    assert low == disc.CENTRE_DISTANCE_WINDOW[0]
+    assert high + float_mm <= disc.CENTRE_DISTANCE_WINDOW[1]
+    assert high + float_mm + 0.001 > disc.CENTRE_DISTANCE_WINDOW[1]
+    import paper_drive_arm_registration as registration
+
+    assert steps.GEAR_PLANE_FROM_HUB_FACE_MM == pytest.approx(
+        registration.KNOB_JOURNAL_CONTACT_FRONT_MACHINE_Z_MM
+        - registration.gear_plane_machine_z_mm()
+    )
+
+
+def test_the_matched_plate_is_refitted_on_its_dowels_and_re_read() -> None:
+    located = _step_body("arm-plate-located")
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "
         f"{plate_locating_interface.PROUD_LIMITS_MM[1]:.2f} PROUD, NOT TO THE BLIND FLOOR"
@@ -403,8 +431,10 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "DOWELS LOCATE; SCREWS CLAMP ONLY" in fitted
     # One ordinary hand check; no gauge budget or load qualification text.
     assert "PUSH AND ROCK THE PLATE BY HAND: NO SHAKE ON THE DOWELS" in fitted
-    assert f"CENTRES STILL {disc.CENTRE_DISTANCE_SET_TEXT}" in fitted
     assert "RE-CHECK AFTER EVERY REMOVAL" in fitted
+    # The refit re-reads the same window, citing the setting step.
+    assert str(steps.step_number("arm-plate-located")) in fitted
+    assert steps.CENTRE_READING_TEXT in fitted
     for method in ("RFS", "UNCERTAINTY", "QUALIFIED", "ACTUAL"):
         assert method not in fitted
     assert "COUNTERSINK" not in fitted

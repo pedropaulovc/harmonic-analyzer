@@ -102,6 +102,7 @@ def test_runout_tier_fails_on_its_own() -> None:
 @pytest.mark.parametrize("field", [
     "contact_ratio_min", "runout_contact_ratio_min", "backlash_low", "backlash_high",
     "root_clearance_min_mm", "root_clearance_floor_mm", "interference_margin_min_mm",
+    "contact_ratio_floor", "runout_contact_ratio_floor",
 ])
 def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
     good = mesh.reducer_mesh()
@@ -113,6 +114,8 @@ def test_an_undefined_mesh_number_fails_closed(field: str) -> None:
         "root_clearance_floor_mm": good.root_clearance_floor_mm,
         "interference_margin_min_mm": good.interference_margin_min_mm,
         "runout_contact_ratio_min": good.runout_contact_ratio_min,
+        "contact_ratio_floor": good.contact_ratio_floor,
+        "runout_contact_ratio_floor": good.runout_contact_ratio_floor,
     }
     if field.startswith("backlash"):
         low, high = good.backlash_mm

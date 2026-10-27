@@ -140,8 +140,10 @@ with that centre set to the ordinary fine-pitch band, nominal +0.025/-0
 is the radius of the drawn reducer position zone). At the band's far end
 the stock pair gives CR 1.162 and 1.073 at the runout extreme, gated at
 `BAND_TOP_CONTACT_RATIO_FLOORS` (1.1, 1.0): standard gears in a standard
-band (owner ruling 2026-10-27, option A). MHA-PD-00 step 10 sets it with a micrometer
-over a ZZ gauge pin in the knob bore and the pressed MHA-PD-23 pin.
+band (owner ruling 2026-10-27, option A). MHA-PD-00 step 10 sets it at the
+gear plane with a micrometer over a ZZ gauge pin in the knob bore and the
+pressed MHA-PD-23 pin; the reading window pays that pin's worst float inside
+the band (`pd_paper_drive_assembly_steps.CENTRE_READING_WINDOW`).
 
 ### Setting the cone mesh
 

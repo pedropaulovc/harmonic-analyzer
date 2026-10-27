@@ -19,11 +19,16 @@ live proof.
 
 from __future__ import annotations
 
+import math
+from pathlib import Path
 import textwrap
+import tomllib
 
 import dt_drive_train_steps
 import pd_transgear_drive_collar_spec as collar
 import pd_transgear_arm_geometry as arm_geometry
+import pd_transgear_arm_plate_geometry as plate_geometry
+import paper_drive_arm_registration as registration
 import paper_drive_mesh_check as mesh_check
 import paper_drive_rack_setup as rack_setup
 import pd_transgear_removable_spec as removable
@@ -32,6 +37,44 @@ import paper_drive_geom as paper_geometry
 import _paper_drive_placement as paper_placement
 
 DRAWING_NUMBER = "MHA-PD-00"
+
+# --- The reducer's S-K setting over pins (step "arm-plate-located") ---------
+# A micrometer over the pressed MHA-PD-23 pin and a ZZ gauge pin in the
+# plate's knob bore, at the gear plane (the disc's mid-face). The pin is the
+# largest of the shop's Class ZZ minus set (gauges.pin-gauges; ASME B89.1.5
+# Class ZZ is 0.0002 in at this size) that enters the bore at its least size;
+# the micrometer pushes it toward S, so the true centre is the reading plus
+# up to its radial float at the bore's largest size. The reading window pays
+# that float inside the set band (pd_rack_pinion_spec.CENTRE_DISTANCE_WINDOW).
+INCH = 25.4
+_PIN_GAUGES = tomllib.loads(
+    (Path(__file__).resolve().parents[1] / "process" / "shop" / "inventory.toml")
+    .read_text(encoding="utf-8")
+)["gauges"]["pin-gauges"]
+ZZ_STEP_IN = _PIN_GAUGES["resolution_in"]["value"]  # 0.001
+ZZ_CLASS_IN = 0.0002
+_KNOB_BORE_MIN = plate_geometry.BORE_DIA + min(plate_geometry.BORE_DIA_LIMITS)
+_KNOB_BORE_MAX = plate_geometry.BORE_DIA + max(plate_geometry.BORE_DIA_LIMITS)
+KNOB_BORE_GAUGE_PIN_IN = round(
+    math.floor(round(_KNOB_BORE_MIN / INCH / ZZ_STEP_IN, 9)) * ZZ_STEP_IN, 4
+)  # 0.236
+if (KNOB_BORE_GAUGE_PIN_IN + ZZ_STEP_IN) * INCH - ZZ_CLASS_IN * INCH <= _KNOB_BORE_MAX:
+    raise AssertionError("the next ZZ pin may enter the knob bore: the pin is not fixed")
+KNOB_BORE_GAUGE_PIN_FLOAT_MM = (
+    _KNOB_BORE_MAX - (KNOB_BORE_GAUGE_PIN_IN - ZZ_CLASS_IN) * INCH
+) / 2.0  # 0.0113 radial
+_SET_LOW, _SET_HIGH = arm_geometry.DISC.CENTRE_DISTANCE_WINDOW
+CENTRE_READING_WINDOW = (
+    _SET_LOW,
+    math.floor(round((_SET_HIGH - KNOB_BORE_GAUGE_PIN_FLOAT_MM) * 1000.0, 6)) / 1000.0,
+)  # 35.101..35.114
+CENTRE_READING_TEXT = f"{CENTRE_READING_WINDOW[0]:.3f} TO {CENTRE_READING_WINDOW[1]:.3f}"
+# The gear plane ahead of the plate's front hub face (the thrust ring's seat).
+GEAR_PLANE_FROM_HUB_FACE_MM = (
+    registration.KNOB_JOURNAL_CONTACT_FRONT_MACHINE_Z_MM
+    - registration.gear_plane_machine_z_mm()
+)  # 9.15
+GEAR_PLANE_FROM_HUB_FACE_TEXT = f"{GEAR_PLANE_FROM_HUB_FACE_MM:.1f}"
 
 # The chain fit-up starts from the crank side complete per its own fit-up
 # (CONTRACT-paper-drive.md §13.2 procedure (1)): the 16T set on its feeler and
