@@ -208,9 +208,10 @@ FINISH_CAPTIONS = {
 # (pd_transgear_arm_plate_geometry.SCREW_AXIS_RADIUS_IN_PLATE_MM).
 BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT\n{KNOB_SHAFT_NUMBER}"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
-CSK_CALLOUT = (
-    f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH\n\u00d8{SCREW_HOLE_DIA:.1f} HOLE"
-)
+# Size-independent: the callout is fixed text on the native countersink
+# dimension, so a printed hole size here would not follow a unit change of
+# the drill callout's own native value (codjiflo review of fad938fc9).
+CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH\nDRILLED HOLE"
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # The hub face's station from mounting face A sets the knob shaft's 12T plane
 # through the thrust ring (the chain plane and the disc-to-platen air,

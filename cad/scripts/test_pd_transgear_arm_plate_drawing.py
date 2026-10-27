@@ -177,6 +177,29 @@ def test_the_worst_case_walls_hold_at_the_printed_bands() -> None:
     for index in (1, 2):
         nominal, worst = geometry.WALLS[f"locator {index} to plate edge/notch"]
         assert worst < nominal - brk - deepest * run_off
+    # Each countersink to its side edge: the .X edge band, the cone's upper
+    # Ø, the extrapolated axis, the hole's run-off to its rear exit (the cone
+    # follows it; the edge was milled first) and both edge breaks.
+    to_edge = min(
+        geometry.SCREW_HOLES[0][0] - geometry.EDGE_MINUS_X,
+        geometry.EDGE_PLUS_X - geometry.SCREW_HOLES[-1][0],
+    )
+    # The budget charges the arm's 0.8 for the .X side edge, no less than
+    # the title block's printed .X row.
+    assert geometry.BAND_X >= _band(1)
+    side_wall = (
+        to_edge - geometry.CSK_DIA_LIMITS_MM[1] / 2.0 - geometry.BAND_X - position
+        - deepest * run_off - 2.0 * brk
+    )
+    assert geometry.WALLS["countersinks to the side edges"][1] == pytest.approx(side_wall)
+    assert side_wall >= geometry.WALL_TARGET
+
+
+def test_the_countersink_callout_names_no_hole_size() -> None:
+    """The callout is fixed text on the countersink's native dimension: a
+    hole size typed into it would not follow the drill's native value."""
+    assert spec.CSK_CALLOUT.splitlines() == ["82\u00b0 CSK", "COAXIAL WITH", "DRILLED HOLE"]
+    assert not any(character.isdigit() for character in spec.CSK_CALLOUT.splitlines()[-1])
 
 
 def test_the_plate_screws_engage_the_arm_one_and_a_half_diameters() -> None:

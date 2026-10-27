@@ -277,6 +277,10 @@ WALLS: dict[str, tuple[float, float]] = {
         - CSK_DIA_LIMITS_MM[1] / 2.0
         - BAND_X
         - SCREW_AXIS_RADIUS_IN_PLATE_MM
+        # The countersink follows the drilled hole's exit at the rear face,
+        # which has run off over the plate since entry at face A; the side
+        # edge was milled in an earlier setup.
+        - HOLE_RUN_OFF_MM
         - 2.0 * OUTLINE_EDGE_BREAK_MAX_MM,  # the side edge and the cone's rim
     ),
 }
