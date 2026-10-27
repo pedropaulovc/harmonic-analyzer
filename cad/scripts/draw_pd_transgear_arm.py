@@ -189,12 +189,15 @@ def _station_row(index: int) -> float:
 
 
 _LOCATOR_X = _front_x(LOCATOR_SITES_MM[0][0])
-# The socket offsets' shared dimension line, 2 mm short of the sockets'
-# station witness line: each 6.850 hangs LEFT of it, so the text stands
-# between plate tap 1's witness line and the sockets' (run
-# 20261027T124240514Z's audit: midway, plate tap 1's witness line struck
-# the lower 6.850).
-_LOCATOR_OFFSET_X = _LOCATOR_X - 0.002
+# Midway between plate tap 1's and the sockets' station witness lines.
+_LOCATOR_OFFSET_X = (_front_x(PLATE_TAP_STATIONS[0]) + _LOCATOR_X) / 2.0
+# Below the arm, every station witness line runs down through the text's
+# height, and each 6.850 (with its shoulder, 14.5 mm) hangs LEFT of its
+# dimension line: the lower one's line stands left of plate tap 1's hole,
+# so its text stands clear of every witness line (runs 20261027T124240514Z
+# and 20261027T124924064Z: between tap 1's and the sockets' witness lines
+# the text or its shoulder was struck).
+_LOWER_OFFSET_X = _front_x(PLATE_TAP_STATIONS[0]) - 0.005
 FRONT_KEEP = {
     # Lower left of the pivot round, clear of datum B's tag above it.
     "PivotEndR": (0.025, FRONT_CENTER[1] + 0.010),
@@ -209,13 +212,12 @@ FRONT_KEEP = {
     "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _station_row(2)),
     "PinStation": (_front_x(PIN_STATION / 2.0), _station_row(3)),
     "TipStation": (_front_x(TIP_STATION / 2.0), _station_row(4)),
-    # The socket offsets share one dimension line left of section line B,
-    # their texts outside the arm: above its top edge, under the tap
-    # callout's shelf, and below its bottom edge, between the plate tap's and
-    # the socket's station witness lines (machinist review: inside the
-    # silhouette they crowded the sockets and line B).
+    # The socket offsets' texts stand outside the arm: above its top edge,
+    # under the tap callout's shelf, and below its bottom edge, left of
+    # plate tap 1's witness line (machinist review: inside the silhouette
+    # they crowded the sockets and line B).
     "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
-    "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
+    "LocatorY2": (_LOWER_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
     # Six callout lines under the value: the block centres low enough that
     # its top stays inside the upper border, right of the tap callout.
     "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0157),

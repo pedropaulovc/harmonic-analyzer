@@ -559,8 +559,9 @@ def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
 # "\u2316 \u00d80.050 A B C" as rendered on the stack sheet (1c103499e).
 _POSITION_FRAME_WIDTH = 0.0446
 _POSITION_FRAME_HEIGHT = 0.0069
-# The boxed "6.850" basic as rendered (run 20261027T124240514Z's audit).
-_BOXED_BASIC_WIDTH = 0.0112
+# The boxed "6.850" basic with its leader shoulder, as rendered (run
+# 20261027T124924064Z's audit: shoulder 137.0..151.5 mm, line at 151.5).
+_BOXED_BASIC_WIDTH = 0.0145
 
 
 def _front_station(sheet_x: float) -> float:
@@ -573,14 +574,19 @@ def test_the_socket_offsets_and_frames_stand_outside_the_arm() -> None:
     the sockets and section line B."""
     for name, (_x, offset) in zip(("LocatorY1", "LocatorY2"), geometry.LOCATOR_SITES_MM):
         side = math.copysign(1.0, offset)
-        # The boxed 6.850 hangs LEFT of its dimension line, right edge on it
-        # (run 20261027T124240514Z's audit: [133.2, 144.4] mm with the line
-        # at 144.4); it stands between plate tap 1's and the sockets'
-        # station witness lines, clear of both.
+        # The boxed 6.850 and its shoulder hang LEFT of the dimension line.
+        # Above the arm no witness line runs; below it, every station
+        # witness line does, so the lower one stands left of plate tap 1's.
         line_x, text_y = drawing.FRONT_KEEP[name]
         box = (line_x - _BOXED_BASIC_WIDTH, text_y - 0.00175, line_x, text_y + 0.00175)
-        assert drawing._front_x(geometry.PLATE_TAP_STATIONS[0]) + 0.001 < box[0], name
-        assert box[2] + 0.001 < drawing._LOCATOR_X, name
+        tap_1 = drawing._front_x(geometry.PLATE_TAP_STATIONS[0])
+        if side > 0:
+            assert tap_1 < line_x < drawing._LOCATOR_X, name
+        else:
+            tap_hole_r = drawing.blind_cut_dia_mm(geometry.PLATE_TAP_SPEC) * drawing._S / 2000.0
+            assert box[2] + 0.001 < tap_1 - tap_hole_r, name
+            # Clear of plate tap 1's 32.929 on the first station row.
+            assert box[0] > drawing.FRONT_KEEP["PlateTapStation1"][0] + 0.010, name
         edges = [
             drawing._front_y(side * geometry.edge_half_width(_front_station(x)))
             for x in (box[0], box[2])
