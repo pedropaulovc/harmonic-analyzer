@@ -1,6 +1,6 @@
 r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
-A turned brass ring: Ø8.600 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
+A turned brass ring: Ø11.0 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
 press on the MHA-PD-VN-57 shoulder), 5.000 long under its explicit band.  The
 profile lies as it sits in the lathe (axis horizontal): the ``*Top`` view
 turned a quarter turn, so model +Z runs LEFT and the bar-side front face
@@ -100,7 +100,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø8.6 x 5.0 ring: 5:1 keeps the three sizes and both face finishes legible
+# A Ø11.0 x 5.0 ring: 5:1 keeps the three sizes and both face finishes legible
 # on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
@@ -171,7 +171,6 @@ FACE_FINISHES = {
         (_PROFILE_FRONT_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
-NOTES_XY = (0.020, 0.075)
 ISO_NOTE_XY = (0.315, 0.140)
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
@@ -456,7 +455,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
         required=(
@@ -464,7 +462,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
-            "Manufacturing Notes",
             "Isometric View Note",
         ),
     )
@@ -598,7 +595,6 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (end, profile):
         set_hidden_lines_removed(adapter, view)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     rebuild_drawing(adapter, label="pivot spacer layout audit")
     _assert_layout_clean(

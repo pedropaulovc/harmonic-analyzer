@@ -45,15 +45,15 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
         for feature, names in spec.DRAWING_DIMENSIONS.items()
         for name in names
     }
-    # Every size is a "hold it" size: O.D. and bore under the .XXX row, the
-    # length under its explicit band.
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {3}
+    # The length and bore hold their own bands at .XXX; the O.D., an outside
+    # profile no stack reads, takes the loosest row (.X, rule 4).
+    assert spec.DRAWING_PRECISION_BY_NAME == {"RingOd": 1, "BoreDia": 3, "RingLength": 3}
 
 
 def test_the_length_and_the_bore_carry_their_bands_on_the_model() -> None:
     """The MHA-PD-VN-63 spring's room rides the length and the shoulder press the
     bore, so each band is a native model tolerance from the spec (policy
-    drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .XXX and the title block's row governs it;
+    drawing-simplicity-policy.md `How the repository implements the guidelines`).  The O.D. prints at .X and the title block's row governs it;
     restating that row on the dimension is what drawing-guidelines.md rule 2 (the title block is the general specification) forbids."""
     assert model_toleranced_dimensions(part) == {
         ("Ring", "RingLength"): "LENGTH_BAND",
@@ -80,25 +80,24 @@ def test_the_bore_holds_a_light_press_on_the_shoulder_at_every_limit() -> None:
     assert 0.0 < loosest < tightest
 
 
-def test_wall_bands_cover_the_printed_xxx_row() -> None:
-    """The wall stack charges the O.D. at least the .XXX row it prints under
-    and the bore its largest ream, and the MIN the sheet states never rounds
-    the worst case up (drawing-guidelines.md rule 17 (walls and webs))."""
-    row = _config.title_block("linear_3pl")["value_in"] * 25.4
-    assert spec.OD_BAND >= row
-    worst_at_row = (spec.OD - row - spec.BORE_DIA_MAX) / 2.0
-    assert spec.WALL_WORST_PRINTED <= spec.WALL_WORST + 1e-9 <= worst_at_row + 1e-9
-    assert 1.5 <= spec.WALL_WORST_PRINTED < 2.0
+def test_wall_holds_the_target_at_the_full_worst_case() -> None:
+    """Rule 17 with every allowance the shop sees: the O.D. at its .X row's
+    low limit, the bore at its largest ream, and the title block's 0.25 break
+    on both rims of an end face.  One lathe chucking, so no run-off."""
+    row = _config.title_block("linear_1pl")["display"].lstrip("±")
+    brk = _config.title_block("edge_break")["chamfer_max_mm"]
+    assert spec.OD_BAND == pytest.approx(float(row))
+    worst = (spec.OD - float(row) - spec.BORE_DIA_MAX) / 2.0 - 2.0 * brk
+    assert spec.WALL_WORST == pytest.approx(worst)
+    assert spec.WALL_WORST >= spec.WALL_TARGET == 2.0
 
 
-def test_sheet_notes_carry_the_wall_and_no_facing_step() -> None:
-    """R9-6: the spacer is fitted as made, never faced."""
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert f"WALL {spec.WALL_WORST_PRINTED:.2f} MIN." in lines
-    assert not any("FACE" in line for line in lines)
-    # The length and its band ride the dimension, never the note text.
-    assert "±" not in spec.DRAWING_NOTES
-    assert f"{spec.LENGTH:.3f}" not in spec.DRAWING_NOTES
+def test_the_sheet_states_no_shortfall_and_no_facing_step() -> None:
+    """The wall holds the target, so no WALL MIN line; R9-6: fitted as made,
+    never faced.  The sheet carries no general notes at all."""
+    assert not hasattr(spec, "DRAWING_NOTES")
+    assert not hasattr(spec, "WALL_NOTE")
+    assert "Manufacturing Notes" not in part._SAVED_DRAWING_PROPERTIES
 
 
 def test_the_arm_runs_on_the_rear_face_and_the_front_face_seats_on_the_bar() -> None:
@@ -297,9 +296,10 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
         ),
         "length text": _length_text_box(),
         "length dimension line": Box(rear_x, length_y, drawing.LENGTH_TEXT_XY[0], length_y),
-        "O.D. text": _text_box(f"\u00d8{spec.OD:.3f}", drawing.OD_ON_PROFILE, 2),
+        "O.D. text": _text_box(
+            f"\u00d8{spec.OD:.{spec.OD_PLACES}f}", drawing.OD_ON_PROFILE, 2
+        ),
         "bore text": _bore_text_box(),
-        "notes": _text_box(spec.DRAWING_NOTES, drawing.NOTES_XY, 0),
         "isometric note": _text_box(spec.ISOMETRIC_VIEW_NOTE, drawing.ISO_NOTE_XY, 0),
         # Lines: the axis centreline, the length's extension lines down from
         # the part's lower corners, the O.D.'s out from its two corners.
@@ -378,7 +378,7 @@ def test_each_frame_finds_the_od_rim_of_its_own_face() -> None:
         edges = _drawing_edges.ViewEdges(label="profile", edges=(*neighbours, rim))
         assert drawing.face_rim(edges, mark) is rim
         lone = _drawing_edges.ViewEdges(label="profile", edges=neighbours)
-        with pytest.raises(RuntimeError, match=r"matched 0 of 3 circles: r 4\.3000"):
+        with pytest.raises(RuntimeError, match=rf"matched 0 of 3 circles: r {od_r:.4f}"):
             drawing.face_rim(lone, mark)
         split = _drawing_edges.ViewEdges(
             label="profile", edges=(rim, _circle(od_r, z))
@@ -624,6 +624,5 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME, extra)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
-    assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
     assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
     assert set(part._SAVED_DRAWING_PROPERTIES) <= set(required)

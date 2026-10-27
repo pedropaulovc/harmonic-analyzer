@@ -160,9 +160,11 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 # (LATCH_PIN_HEIGHT_BAND) it barely clears in a 6.10 hole; 0.05 deeper it
 # stops short of the face. Ruling B's 9.5 bar shortened the hook's ear
 # 16.0 -> 15.5, so the bend lever and its loss shrank 0.5.
-_PINNED_FAR_FACE_MARGIN = 0.818
-_PINNED_OLD_PIN_MARGIN = 0.043
-_PINNED_DEEPER_OLD_PIN_MARGIN = -0.007
+# The Ø11.0 .X pivot spacer (MHA-PD-20) widens the face squareness zone to
+# 10.2, so the hanger leans less: each margin grows ~0.0013.
+_PINNED_FAR_FACE_MARGIN = 0.819
+_PINNED_OLD_PIN_MARGIN = 0.044
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.006
 
 
 def _worst_far_face_margin(
@@ -380,12 +382,12 @@ def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """A model reference cannot masquerade as a universal ±.130 bore zone."""
     lower, upper = geometry.PIVOT_BORE_DIAMETRAL_CLEARANCE
-    assert (lower, upper) == pytest.approx((0.132, 0.152))
+    assert (lower, upper) == pytest.approx((0.130, 0.150))
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
     assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
-    assert "SHOULDER +0.132/+0.152 DIA" in spec.PIVOT_BORE_CALLOUT
+    assert "SHOULDER +0.130/+0.150 DIA" in spec.PIVOT_BORE_CALLOUT
     assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")

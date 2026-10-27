@@ -20,14 +20,23 @@ mating planes, Axis1 the bore axis.
 
 from __future__ import annotations
 
-import math
-
+import _config
 import _mcmaster_90325a174 as SCREW
 from _gtol_planar import PlanarFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
-OD = 8.6
-OD_BAND = 0.13  # ±0.13: 0.142 worst to the lock stations, floating (R9-61)
+# Ø11.0 at .X (coordinator's provisional option D, 2026-10-27, pending owner
+# confirmation on #1380): no stack reads the O.D.'s band (the R9-61 0.142 lock
+# gap belonged to the retired 15.65 lock plates; the 9.8 plates leave 3.99 at
+# the largest O.D.), so the outside profile takes the loosest title-block row
+# (rule 4) and the wall reaches the 2.0 target at the full worst case below.
+# 7/16 in 360 brass rod lies inside the band as supplied: McMaster 8953K162
+# series, Ø7/16 in -0.003/+0.003 in (11.036..11.189), H02, ASTM B16 (read
+# live 2026-10-27), against Ø10.2..11.8.
+OD = 11.0
+OD_PLACES = 1
+OD_BAND = printed_band_mm(OD_PLACES)
 # The bore is a light press on the Ø4.7625 -0.0254/0 shoulder, so it is a
 # reamed fit bore (drawing-guidelines.md rule 12 (hole and slot callouts say what to do): the callout states the process) under an
 # explicit band on the model dimension.  A standard hole, it is fully
@@ -55,13 +64,18 @@ if not 0.0 < PRESS_INTERFERENCE[0] <= PRESS_INTERFERENCE[1]:
         f"MHA-PD-20 bore leaves the shoulder press: {PRESS_INTERFERENCE}"
     )
 
+# Rule 17 at the full worst case: the smallest O.D. over the largest ream, less
+# the title block's edge break on both rims of an end face (the bore's and the
+# O.D.'s; REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX).  No
+# run-off term: the bore is drilled and reamed and the O.D. turned in one
+# chucking.
+WALL_TARGET = 2.0
+EDGE_BREAK = float(_config.title_block("edge_break")["chamfer_max_mm"])
 WALL_NOMINAL = (OD - BORE_DIA) / 2.0
-WALL_WORST = (OD - OD_BAND - BORE_DIA_MAX) / 2.0
-# A MIN never rounds up: floored to two places.
-WALL_WORST_PRINTED = math.floor(WALL_WORST * 100.0 + 1e-9) / 100.0
-if not 1.5 <= WALL_WORST_PRINTED < 2.0:
+WALL_WORST = (OD - OD_BAND - BORE_DIA_MAX) / 2.0 - 2.0 * EDGE_BREAK
+if WALL_WORST < WALL_TARGET:
     raise AssertionError(
-        f"MHA-PD-20 wall {WALL_WORST:.3f} left the approved 1.5..2.0 shortfall"
+        f"MHA-PD-20 wall {WALL_WORST:.3f} < the {WALL_TARGET} target at the worst case"
     )
 
 # --- geometric control --------------------------------------------------------
@@ -83,26 +97,21 @@ FRONT_FACE_PERPENDICULARITY = float(
 )
 FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND
 
-# Sheet text (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-# Pending exception ruling: MHA-PD-20 wall (#1380).
-WALL_NOTE = f"WALL {WALL_WORST_PRINTED:.2f} MIN."
-
-# The sheet's general notes: the worst-case wall, a fact the views cannot
-# carry.  The length and bore bands are not here: they ride their dimensions
-# as model tolerances (drawing-simplicity-policy.md `How the repository implements the guidelines`).
-DRAWING_NOTES = WALL_NOTE
+# The wall holds the target, so the sheet states no shortfall and carries no
+# notes: the length and bore bands ride their dimensions as model tolerances
+# (drawing-simplicity-policy.md `How the repository implements the guidelines`).
 
 # Marked model dimensions and the places the part authors on them (policy
-# drawing-simplicity-policy.md `How the repository implements the guidelines`): every size prints at .XXX.  The title block's .XXX row governs the
-# O.D. (OD_BAND restates it for the wall above only); the length carries
-# LENGTH_BAND and the bore BORE_DIA_BAND on their model dimensions.
+# drawing-simplicity-policy.md `How the repository implements the guidelines`).
+# The O.D. prints at .X under the title block's row; the length (LENGTH_BAND)
+# and the bore (BORE_DIA_BAND) print at .XXX under their own model bands.
 _XXX = 3
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"RingOd", "BoreDia"},
     "Ring": {"RingLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "RingProfile": {"RingOd": _XXX, "BoreDia": _XXX},
+    "RingProfile": {"RingOd": OD_PLACES, "BoreDia": _XXX},
     "Ring": {"RingLength": _XXX},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
