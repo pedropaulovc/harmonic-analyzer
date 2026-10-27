@@ -218,6 +218,52 @@ def test_wrong_hint_still_ends_in_a_native_bracket(fake, gain, hint) -> None:
     assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
 
 
+class _PrecisionBand(_FakeContact):
+    """The counter upper loop on MHA-SM-04's plain Ø6.35 body (farm run
+    20261027T205137862Z): a 2e-6 mm sweep read the native verdict CLEAR again
+    10-12e-6 mm inside its outer boundary, inside the modeller's ~1e-5 mm
+    precision, and ClosestDistance over-reported by ~2.8e-5 mm."""
+
+    contact = -6e-6
+    island = (-12e-6, -10e-6)
+    over_report = 2.8e-5
+
+    def evaluate(self, offset_mm: float):
+        self.trials += 1
+        self.offsets.append(offset_mm)
+        depth = offset_mm - self.contact
+        if depth >= 0.0:
+            return "clear", depth + self.over_report
+        if self.island[0] <= depth <= self.island[1]:
+            return "clear", self.over_report
+        return "interfering", None
+
+
+def test_landed_re_measure_hinted_at_its_allowance_closes_on_the_outer_boundary(
+    monkeypatch,
+) -> None:
+    """A pose landed boolean_stability_mm past the boundary re-measures with
+    the hint at -allowance (calibrate_spring_seats' counter verify); the
+    bracket must close on the OUTER boundary, not an island inside it."""
+    monkeypatch.setattr(search, "_ActualContact", _PrecisionBand)
+    allowance = float(_config.machine("springs", "boolean_stability_mm"))
+    solution = search.solve_component_contact(
+        object(),
+        "screw",
+        "counter",
+        (0.0, -1.0, 0.0),
+        0.125,
+        label="fake",
+        locate_only=True,
+        hint_offset_mm=-allowance,
+    )
+
+    assert solution.interfering_offset_mm < _PrecisionBand.contact
+    assert _PrecisionBand.contact <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
+    assert abs(solution.clear_offset_mm + allowance) <= allowance / 2.0
+
+
 @pytest.mark.parametrize("mode", ["ALL", "COUNTER"])
 def test_write_refuses_presets_that_leave_any_counter_unmeasured(
     tmp_path, mode

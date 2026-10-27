@@ -459,6 +459,15 @@ async def _calibrate_counter(
         upper_correction = _correction_mm(upper, allowance)
         _land(adapter, screw, upper_direction, upper_correction)
         _land(adapter, gooseneck, upper_direction, upper_correction)
+        # Landing put each boundary at -allowance, so the re-measure straddles
+        # that, as a channel refit's does.  Unhinted, ClosestDistance (which
+        # over-reports the Boolean's boundary by ~2.8e-5 mm) steers the first
+        # trial past it, and inside the modeller's ~1e-5 mm precision the
+        # native verdict need not be monotonic: the loop on the plain Ø6.35
+        # body read CLEAR 10-12e-6 mm inside its outer boundary in a 2e-6 mm
+        # sweep, identically before and after landing (farm run
+        # 20261027T205137862Z), and the unhinted bisection closed on that
+        # island, 1.08e-5 mm deep.
         lower_check = solve_component_contact(
             adapter,
             counter,
@@ -467,6 +476,7 @@ async def _calibrate_counter(
             bracket,
             label=f"{preset} counter lower verify",
             locate_only=True,
+            hint_offset_mm=-allowance,
         )
         upper_check = solve_component_contact(
             adapter,
@@ -476,6 +486,7 @@ async def _calibrate_counter(
             bracket,
             label=f"{preset} counter upper verify",
             locate_only=True,
+            hint_offset_mm=-allowance,
         )
         for label, contact in (("lower", lower_check), ("upper", upper_check)):
             if not _seated(f"{preset} counter {label}", contact, allowance):
