@@ -3896,12 +3896,15 @@ def test_washer_support_on_the_faced_top_charges_all_printed_limits() -> None:
     # 0.13 stations at opposite limits over their spacing (codjiflo round 4).
     import sm_knife_mount_spec as knife_mount
 
-    assert (knife_mount.STUD_TAP_POSITION_TOL, knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL) == (
-        0.14, 0.015
-    )
+    assert (
+        knife_mount.STUD_TAP_POSITION_TOL,
+        knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL,
+        knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL,
+    ) == (0.14, 0.015, 0.015)
     slip = 0.09246
-    perp = 0.015
-    pair_shift = slip / 2.0 + slip / 2.0 + 0.025 + perp
+    perp = 0.015  # B's round hole
+    slot_perp = 0.015  # C's slot
+    pair_shift = slip / 2.0 + slip / 2.0 + 0.025 + perp / 2.0 + slot_perp / 2.0
     yaw_shift = 7.632 * 2.0 * 0.13 / (spec.STUD_Z_REAR - spec.STUD_Z_FRONT)
     assert spec.HANGER_DATUM_LINE_YAW_SHIFT == pytest.approx(yaw_shift)
     assert yaw_shift == pytest.approx(0.0114, abs=5e-5)

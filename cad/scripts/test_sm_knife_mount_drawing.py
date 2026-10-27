@@ -750,7 +750,7 @@ def test_the_sheet_carries_no_notes_block() -> None:
     # (rule 4), and the depth states one floor for both.
     assert not hasattr(drawing, "CALLOUTS_ABOVE")
     assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": sm_knife_mount_spec.BORE_CALLOUT,
+        "BoreDia": drawing.BORE_CALLOUT,
         "PinHoleDia": sm_knife_mount_spec.PIN_HOLE_CALLOUT,
         "SlotWidth": sm_knife_mount_spec.SLOT_WIDTH_CALLOUT,
         "PinHoleDepth": sm_knife_mount_spec.PIN_DEPTH_CALLOUT,
@@ -893,7 +893,7 @@ def test_native_gdt_and_bore_geometry() -> None:
         '        datums=("A", "B"),\n'
         "        lower_frame=(\n"
         '            "perpendicularity",\n'
-        '            GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"],\n'
+        '            GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"],\n'
         '            ("A",),\n'
         "        ),\n"
     ) in slot
@@ -992,7 +992,7 @@ def test_native_gdt_and_bore_geometry() -> None:
     # composite segment shares its upper's characteristic (one symbol cell).
     assert lower_frames == {
         "dowel slot position": (
-            ("perpendicularity", "dowel hole perpendicularity", ("A",)),
+            ("perpendicularity", "dowel slot perpendicularity", ("A",)),
             False,
         ),
         "knife-bore position": (
@@ -1034,10 +1034,12 @@ def test_native_gdt_and_bore_geometry() -> None:
         "knife-hanger tap position": "0.14",
         "dowel slot position": "0.05",
         "dowel hole perpendicularity": "0.015",
+        "dowel slot perpendicularity": "0.015",
     }
     # Owner ruling 2026-10-27 (#2016): the name a sibling's assembly check
     # imports.
     assert sm_knife_mount_spec.DOWEL_HOLE_PERPENDICULARITY_TOL == 0.015
+    assert sm_knife_mount_spec.DOWEL_SLOT_PERPENDICULARITY_TOL == 0.015
     assert sm_knife_mount_spec.KNIFE_BORE_POSITION_TOL == 0.20
     assert sm_knife_mount_spec.KNIFE_BORE_ORIENTATION_TOL == 0.05
     assert (
@@ -1536,8 +1538,15 @@ def test_the_bore_states_its_ream_band_and_mate() -> None:
     # on under the stacked band (farm run 20261024T114146582Z).
     rows = drawing.DIMENSION_CALLOUTS["BoreDia"].splitlines()
     assert "REAM" in rows[0].split()
+    # The mate's number is drawing text: the spec, in MHA-FR-02's and the
+    # frame assembly's import closure, must not read the lever's registry row.
     lever_number = _config.parts("sm-summing-lever")["number"]
-    assert sm_knife_mount_spec.LEVER_NUMBER == lever_number
+    assert drawing.LEVER_NUMBER == lever_number
+    assert not hasattr(sm_knife_mount_spec, "LEVER_NUMBER")
+    assert not hasattr(sm_knife_mount_spec, "BORE_CALLOUT")
+    assert "sm-summing-lever" not in Path(sm_knife_mount_spec.__file__).read_text(
+        encoding="utf-8"
+    )
     assert drawing.DIMENSION_CALLOUTS["BoreDia"].count(lever_number) == 1
     assert len(rows) <= 3
     widest = max(len(row) for row in rows)

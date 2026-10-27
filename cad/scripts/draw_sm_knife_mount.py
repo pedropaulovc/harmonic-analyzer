@@ -50,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     view_name,
 )
 
+import _config
 from _check import check
 from _com import _early_bound
 from _drawing_common import (
@@ -93,7 +94,6 @@ from sm_knife_mount_spec import (
     BLK_BOT,
     BLK_HALF_X,
     BLK_TOP,
-    BORE_CALLOUT,
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -189,8 +189,8 @@ def _sheet_x(model_x_mm: float) -> float:
 # The 29.6 height's dimension line stands at sheet x 0.024, 65.6 mm off the
 # block's -X face (its text 6 mm inside the border), and the bore's Ø, its
 # ream band and its three callout
-# rows (REAM THRU, then the knife seat's mate, sm_knife_mount_spec.
-# BORE_CALLOUT) sit in the band between them: the 5ff8fba5d render ran the
+# rows (REAM THRU, then the knife seat's mate, BORE_CALLOUT below) sit in
+# the band between them: the 5ff8fba5d render ran the
 # height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3 mm).
 # BORE_DIA_TEXT_HALF_WIDTH is half the widest row, "MHA-SM-03 TRUNNION": 18
 # capitals at the ~2.52 mm a character the tap callout's 31-character reason
@@ -338,9 +338,15 @@ TOP_KEEP = {
 }
 # The knife bore is reamed (Ra 1.6, +0.03/0 band): the process is stated
 # (blind machinist review, 2026-10-09: a bare THRU left drill or ream open),
-# and the band's mate under it (ENFORCE review, 2026-10-24, rule 4).  Datum
+# and the band's mate under it (ENFORCE review, 2026-10-24, rule 4): the
+# summing lever's hex trunnion, whose top ridge rocks on the bore's crown,
+# the knife seat.  The mate's number is drawing text only, read here, not in
+# sm_knife_mount_spec: the spec is in MHA-FR-02's and the frame assembly's
+# import closure, which must not key on the lever's registry row.  Datum
 # B's slip band and the slot's name their mate (owner ruling 2026-10-24,
 # T+H3); the floor depth states it holds for both.
+LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
+BORE_CALLOUT = "\n".join(("REAM THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
@@ -1374,7 +1380,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A", "B"),
         lower_frame=(
             "perpendicularity",
-            GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"],
+            GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"],
             ("A",),
         ),
         label="dowel slot position",

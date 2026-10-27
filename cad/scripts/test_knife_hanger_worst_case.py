@@ -275,6 +275,7 @@ def test_the_slip_band_and_the_screw_float_absorb_the_dowel_stations() -> None:
     # from B along the pair, moves across by that turn.
     assert knife_mount.STUD_TAP_POSITION_TOL == 0.14
     assert knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL == 0.015
+    assert knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL == 0.015
     assert top_frame.HANGER_PIN_X_TOL == 0.13
     assert top_frame.HANGER_PRESS_HOLE_POSITION_TOL == 0.05
     station_spacing = top_frame.STUD_Z_REAR - top_frame.STUD_Z_FRONT
@@ -355,6 +356,7 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
     # included) short of its rounded free end, 8.113 - 0.406.
     assert top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL == 0.02
     assert knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL == 0.015
+    assert knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL == 0.015
     assert dowel.PRESS_FLOOR_CORNER_R_MAX == knife_mount.DOWEL_HOLE_FLOOR_CORNER_R_MAX
     assert dowel.PRESS_FLOOR_CORNER_R_MAX == pytest.approx(0.1)
     assert asm.KNIFE_REAM_LEAD_ALLOWANCE == 0.5
@@ -396,10 +398,14 @@ def test_the_slip_fit_takes_the_perpendicularity_tilt() -> None:
     allowed = math.degrees(math.atan(dowel.SLIP_CLEARANCE_MIN / entry))
     assert asm.KNIFE_DOWEL_TILT_ALLOWED_DEG == pytest.approx(allowed)
     assert asm.KNIFE_DOWEL_TILT_ALLOWED_DEG == pytest.approx(0.3522479, abs=5e-7)
+    # The pin leans in whichever block seat is looser: B's hole or C's slot.
     assert asm.KNIFE_DOWEL_TILT_CHARGED_DEG == pytest.approx(
         tilt(
             top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL,
-            knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL,
+            max(
+                knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL,
+                knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL,
+            ),
         )
     )
     assert asm.KNIFE_DOWEL_TILT_CHARGED_DEG == pytest.approx(0.2576142, abs=5e-7)
@@ -597,6 +603,7 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
         "knife-hanger tap position": "0.14",
         "dowel slot position": "0.05",
         "dowel hole perpendicularity": "0.015",
+        "dowel slot perpendicularity": "0.015",
     }
     assert knife_mount.KNIFE_BORE_POSITION_TOL == 0.20
     assert knife_mount.KNIFE_BORE_ORIENTATION_TOL == 0.05
@@ -610,7 +617,8 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
     # and the Z leg the datum line's yaw.  Ø0.05 closes with spare; the
     # stack closes near Ø0.0548, and Ø0.055, Ø0.06, Ø0.07 or Ø0.10 overruns
     # the screw float.
-    perp = knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL
+    hole_perp = knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL
+    slot_perp = knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL
 
     def spare_at_ream(zone: float) -> float:
         x = (
@@ -618,13 +626,19 @@ def test_the_datum_frame_is_the_zone_the_stacks_were_derived_on() -> None:
             + zone / 2.0
             + knife_mount.STUD_TAP_POSITION_TOL / 2.0
             + dowel.SLIP_CLEARANCE_MAX / 2.0
-            + perp / 2.0
+            + hole_perp / 2.0
         )
         z = (
             top_frame.HANGER_PIN_X_TOL
             + zone / 2.0
             + knife_mount.STUD_TAP_POSITION_TOL / 2.0
-            + (dowel.SLIP_CLEARANCE_MAX + zone / 2.0 + perp) / 2.0
+            + (
+                dowel.SLIP_CLEARANCE_MAX
+                + zone / 2.0
+                + hole_perp / 2.0
+                + slot_perp / 2.0
+            )
+            / 2.0
             + top_frame.HANGER_DATUM_LINE_YAW_SHIFT
         )
         return top_frame.HANGER_SCREW_FLOAT - math.hypot(x, z) - asm.HANGER_SCREW_DRIFT
@@ -729,7 +743,8 @@ def test_the_knife_edge_keeps_five_degrees_of_rock_at_the_worst_case() -> None:
                 (
                     dowel.SLIP_CLEARANCE_MAX
                     + top_frame.HANGER_PRESS_HOLE_POSITION_TOL / 2.0
-                    + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL
+                    + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
+                    + knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL / 2.0
                 )
                 / asm.KNIFE_DOWEL_SPAN_MIN
             )

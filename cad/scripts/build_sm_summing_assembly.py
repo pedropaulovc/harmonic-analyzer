@@ -210,7 +210,8 @@ _KNIFE_DOWEL_PAIR_SHIFT = (
     _KNIFE_DOWEL_SLIP_MAX / 2.0
     + _KNIFE_DOWEL_SLIP_MAX / 2.0
     + top_frame.HANGER_PRESS_HOLE_POSITION_TOL / 2.0
-    + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL
+    + knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / 2.0
+    + knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL / 2.0
 )  # 0.132: the slot centre's worst offset across the dowel line from B's
 # The last term is the datum simulators' (codjiflo round 5, wyUmn): within
 # ⊥0.015 to A, B's largest perpendicular inscribed cylinder and C's largest
@@ -353,8 +354,14 @@ _KNIFE_HOLE_TILT_WALL = (
 KNIFE_DOWEL_TILT_REAM_DEG = math.degrees(
     math.atan(top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL / _KNIFE_REAM_TILT_WALL)
 )
+# The pin in whichever seat leans most: B's round hole (⊥Ø to A) or C's
+# slot (⊥ to A), both over the block's straight wall.
+_KNIFE_BLOCK_SEAT_PERP = max(
+    knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL,
+    knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL,
+)
 KNIFE_DOWEL_TILT_HOLE_DEG = math.degrees(
-    math.atan(knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL / _KNIFE_HOLE_TILT_WALL)
+    math.atan(_KNIFE_BLOCK_SEAT_PERP / _KNIFE_HOLE_TILT_WALL)
 )
 KNIFE_DOWEL_TILT_SEAT_DEG = math.degrees(
     math.atan(KNIFE_SEAT_CONFORMITY / _KNIFE_SEAT_DEPTH_MIN)
@@ -487,7 +494,8 @@ def _assert_knife_hanger_stack() -> None:
             f"crossbar ream ⊥Ø{top_frame.HANGER_PRESS_HOLE_PERPENDICULARITY_TOL} "
             f"over its {_KNIFE_REAM_TILT_WALL:.1f} wall "
             f"{KNIFE_DOWEL_TILT_REAM_DEG:.4f} deg + block hole "
-            f"⊥Ø{knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL} over its "
+            f"⊥Ø{knife_mount.DOWEL_HOLE_PERPENDICULARITY_TOL} / slot "
+            f"⊥{knife_mount.DOWEL_SLOT_PERPENDICULARITY_TOL}, the larger over its "
             f"{_KNIFE_HOLE_TILT_WALL:.1f} wall {KNIFE_DOWEL_TILT_HOLE_DEG:.4f} deg "
             f"+ seat conformity {KNIFE_SEAT_CONFORMITY} over "
             f"{_KNIFE_SEAT_DEPTH_MIN:.1f} {KNIFE_DOWEL_TILT_SEAT_DEG:.4f} deg "

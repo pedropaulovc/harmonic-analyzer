@@ -75,11 +75,6 @@ BORE_DIA_BAND = (0.03, 0.0)
 BORE_DIA_PLACES = 2
 BORE_R_MIN = R_BORE + min(BORE_DIA_BAND) / 2.0  # 6.000
 BORE_R_MAX = R_BORE + max(BORE_DIA_BAND) / 2.0  # 6.015
-# The band's mate, named on the bore's callout (drawing-guidelines.md rule
-# 4): the summing lever's hex trunnion, whose top ridge rocks on the bore's
-# crown, the knife seat.
-LEVER_NUMBER = str(_config.parts("sm-summing-lever")["number"])
-BORE_CALLOUT = "\n".join(("REAM THRU", "KNIFE SEAT FOR", f"{LEVER_NUMBER} TRUNNION"))
 # The block's overall sizes print one place (.X, drawing-guidelines.md rule 17 (walls and webs): every web below
 # holds at that band); the stacks judge the block at those limits.
 BLOCK_SIZE_PLACES = 1
@@ -95,6 +90,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-hanger tap position": "0.14",
     "dowel slot position": "0.05",
     "dowel hole perpendicularity": "0.015",
+    "dowel slot perpendicularity": "0.015",
 }
 # The bore (drawing-guidelines.md rule 5 (avoid excessive GD&T), knife-edge
 # system), owner ruling 2026-10-27 (#2016): a composite ⌖ to A|B|C, Ø0.20
@@ -136,9 +132,13 @@ STUD_TAP_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["knife-hanger tap position
 # datum C's slot stand square to the datum-A top seat, so the MHA-SM-VN-53
 # dowels, pressed square into the crossbar, enter them without binding.  The
 # hole takes ⊥Ø0.015|A (a cylindrical zone round its axis); the slot, a
-# width feature, takes ⊥0.015|A (a planar zone, no Ø) on its centre plane.
+# width feature, takes ⊥0.015|A (a planar zone, no Ø) on its centre plane:
+# two controls, each its own key, both set to 0.015 by the ruling.
 DOWEL_HOLE_PERPENDICULARITY_TOL = float(
     GEOMETRIC_TOLERANCES_MM["dowel hole perpendicularity"]
+)
+DOWEL_SLOT_PERPENDICULARITY_TOL = float(
+    GEOMETRIC_TOLERANCES_MM["dowel slot perpendicularity"]
 )
 
 
