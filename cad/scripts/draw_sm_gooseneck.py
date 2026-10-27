@@ -24,7 +24,7 @@ import argparse
 import sys
 from typing import Any
 
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view, remove_notes_matching
 
 from _check import check
 from _com import _early_bound
@@ -159,12 +159,22 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Elevation View Note", 0.160, 0.022)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.077)
 
+    # Whether the elevation draws ThreadBore's "#8-32 Tapped Hole" label is
+    # SolidWorks' choice: none on the Ø4.70 x 9.90 plug, one (its text across
+    # the 52.36's extension line) on the Ø4.90 x 10.00 plug (layout audit, farm
+    # run 20261027T101845942Z). Note 4 states the tap, so any such label goes,
+    # and finalize_drawing's count then proves none is left.
+    removed_tap_labels = remove_notes_matching(adapter, "Tapped Hole")
+    _telemetry.info(f"removed {removed_tap_labels} automatic tapped-hole label(s)")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Gooseneck Post Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=0,
     )
 
 
