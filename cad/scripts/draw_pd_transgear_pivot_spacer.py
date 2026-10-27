@@ -64,6 +64,7 @@ from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _native_axis_datum import _readback as read_native_datum
 from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
 from _paths import CAD_ROOT
 from _session import run_build
@@ -437,14 +438,53 @@ def _move_dimension(
     return matches[0]
 
 
-def _datum_position(tag: Any) -> tuple[float, float]:
-    """The tag's native sheet position (IAnnotation::GetPosition)."""
-    position = tuple(
-        _early_bound(tag.GetAnnotation(), "IAnnotation").GetPosition() or ()
+def _datum_a_live(
+    adapter: Any, view: Any, tag: Any, bore_edge: Any
+) -> tuple[float, float]:
+    """Datum A as the view holds it (the native helper's readback): the
+    view's one live datum tag is ``tag``, labelled A, shouldered, attached to
+    the bore edge alone and not dangling.  Returns its native position."""
+    xy, shoulder, _equality = read_native_datum(
+        adapter.swApp,
+        _early_bound(view, "IView"),
+        tag,
+        bore_edge,
+        datum=BORE_DATUM,
+        label="spacer bore axis",
     )
-    if len(position) != 3 or not all(math.isfinite(float(v)) for v in position):
-        raise RuntimeError(f"datum A has no valid position: {position!r}")
-    return float(position[0]), float(position[1])
+    if shoulder != "shouldered":
+        raise RuntimeError("datum A lost its shoulder")
+    return xy
+
+
+def _place_datum_a(
+    adapter: Any, view: Any, bore_edge: Any
+) -> tuple[Any, tuple[float, float]]:
+    """Place datum A on the validated bore edge and prove the placement
+    survives a rebuild within the native helper's 0.1 mm.
+
+    ``add_datum_feature`` rebuilds before it returns, so the requested
+    position is applied again and read before a second rebuild: a tag that
+    re-solves on rebuild moves here and is refused."""
+    tag = add_datum_feature(
+        adapter,
+        view,
+        entity=bore_edge,
+        symbol_xy=DATUM_A_SYMBOL,
+        datum=BORE_DATUM,
+        label="spacer bore axis",
+        shoulder=True,
+    )
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(DATUM_A_SYMBOL[0], DATUM_A_SYMBOL[1], 0.0):
+        raise RuntimeError("failed to re-apply datum A's position")
+    placed = _datum_a_live(adapter, view, tag, bore_edge)
+    rebuild_drawing(adapter, label="datum A stability")
+    rebuilt = _datum_a_live(adapter, view, tag, bore_edge)
+    drift = math.dist(placed, rebuilt)
+    if drift > DATUM_A_STABILITY_M:
+        raise RuntimeError(f"datum A moved {drift * 1000.0:.3f} mm on rebuild")
+    return tag, rebuilt
 
 
 def _assert_layout_clean(findings: list[Any]) -> None:
@@ -593,16 +633,7 @@ async def build(adapter: Any) -> dict[str, str]:
         radius_m=BORE_DIA / 2000.0,
         label="spacer bore axis",
     )
-    datum_a = add_datum_feature(
-        adapter,
-        end,
-        entity=bore_edge,
-        symbol_xy=DATUM_A_SYMBOL,
-        datum=BORE_DATUM,
-        label="spacer bore axis",
-        shoulder=True,
-    )
-    datum_a_xy = _datum_position(datum_a)
+    datum_a, datum_a_xy = _place_datum_a(adapter, end, bore_edge)
     # Both end faces square to A.
     profile_edges = scan_view_edges(profile, label="spacer profile rims")
     for mark, key in (
@@ -639,9 +670,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     def datum_a_settled() -> None:
-        """After the export's last rebuild the tag still stands where it was
-        placed (the native helper's 0.1 mm stability limit)."""
-        drift = math.dist(_datum_position(datum_a), datum_a_xy)
+        """After the export's last rebuild datum A is still the view's live,
+        attached tag and stands where it was placed (0.1 mm)."""
+        drift = math.dist(_datum_a_live(adapter, end, datum_a, bore_edge), datum_a_xy)
         if drift > DATUM_A_STABILITY_M:
             raise RuntimeError(
                 f"datum A moved {drift * 1000.0:.3f} mm after the final rebuild"
