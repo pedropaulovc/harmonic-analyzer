@@ -1,15 +1,16 @@
 r"""Create the curated machinist drawing for MHA-DT-34, the crank handle ferrule.
 
-A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore, length
-and the 45-degree chamfer at the bore's seat-end mouth.  The end view carries
-only its centre mark and the cutting plane; the longitudinal section A-A is
-the ring's length view (drawing-guidelines.md rule 9 (show internal shape in solid lines)) and takes
-every dimension, so the bore reads on cut edges rather than hidden lines (the
-MHA-DT-34 machinist review).  Every size but the bore and the chamfer is
-routine (.X): the oak tenon is turned to suit this bore.  There is no general
-note (MHA-DT-34 machinist ENFORCE, r1-r3): the bore's matched fit, the OD's
-skim with MHA-DT-08 and both of the chamfer's limits are callouts on their
-own dimensions (rule 7: flag it where it applies).
+A plain brass ring (user ruling 2026-09-29, ch11 p.14/p.15): OD, bore and
+length, both bore mouths at the title block's edge break (owner ruling
+2026-10-24, #1900, supersedes ruling A's seat-mouth chamfer).  The end view
+carries only its centre mark and the cutting plane; the longitudinal section
+A-A is the ring's length view (drawing-guidelines.md rule 9 (show internal
+shape in solid lines)) and takes every dimension, so the bore reads on cut
+edges rather than hidden lines (the MHA-DT-34 machinist review).  Every size
+but the bore is routine (.X): the oak tenon is turned to suit this bore.
+There is no general note (MHA-DT-34 machinist ENFORCE, r1-r3): the bore's
+matched fit and the OD's skim with MHA-DT-08, with the wall it leaves, are
+callouts on their own dimensions (rule 7: flag it where it applies).
 
 Run with SolidWorks open::
 
@@ -56,7 +57,6 @@ import _telemetry
 from dt_crank_handle_ferrule_notes import (
     BORE_FIT_CALLOUT,
     OUTER_DIA_CALLOUT,
-    SEAT_MOUTH_CHAMFER_CALLOUT,
 )
 from dt_crank_handle_ferrule_spec import (
     BORE_DIA,
@@ -87,7 +87,9 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (2, 1)
-END_CENTER = (0.085, 0.165)
+# 20 left of iteration 1, so the OD's seven-row block (both stated walls)
+# clears the end view's centre-mark tails (~10 past its edge).
+END_CENTER = (0.065, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.365, 0.205)
 CAPTION_XY = (0.195, 0.113)
@@ -107,30 +109,16 @@ BORE_TOP_Y = SECTION_CENTER[1] + BORE_DIA * VIEW_SCALE[0] / 2000.0  # 0.1804
 # Each block is its value plus callout rows at 5.55 pitch, ~2.75 per
 # character, centred on its keep point.
 SECTION_KEEP = {
-    # "(Ø14.29)" over four rows, the widest 14 chars: 38.5 x 27.8, so x
-    # 0.1558-0.1943 and y 0.151-0.179.  It clears the section's left edge
-    # (x 0.201) by 6.7, the OD's extension lines (y 0.135, 0.195) by 16, and
-    # the end view (right edge x 0.115) by 40.
-    "OuterDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.026, SECTION_CENTER[1]),
+    # "(Ø14.29)" over seven rows, the widest 27 chars: 74.3 x 38.9, so x
+    # 0.1209-0.1951 and y 0.1456-0.1844.  It clears the section's left edge
+    # (x 0.201) by 5.9, the OD's extension lines (y 0.136, 0.194) by 9, and
+    # the end view's centre-mark tail (~x 0.104) by 17.
+    "OuterDia": (0.158, SECTION_CENTER[1]),
     # "Ø7.70 ±0.1" over three rows, the widest 25 chars: 68.8 x 22.2, so x
     # 0.2626-0.3314 and y 0.1539-0.1761, between the bore's extension lines
-    # (y 0.1496, 0.1804).  Its dimension line (x 0.297) stands right of the
-    # chamfer's block and the dimension line under it (to x ~0.291), so the
-    # two never cross and the Ø7.70's upper arrow strikes no chamfer text
-    # (ENFORCE iteration 1); the isometric note (x 0.345) stands 13.6 clear.
+    # (y 0.1496, 0.1804); the isometric note (x 0.345) stands 13.6 clear.
     "BoreDia": (SEAT_FACE_X + 0.068, SECTION_CENTER[1]),
     "Length": (SECTION_CENTER[0], SECTION_CENTER[1] + OUTER_R + 0.012),
-    # The seat mouth's axial leg (1.4 at 4:1, at the upper bore corner by
-    # the seat face) reads up and right of it, outside the ring.  Value plus
-    # six callout rows: 7 x 5.55 = 38.85 tall, the widest row 20 chars x
-    # 2.75 = 55 wide, so the box spans x 0.2345-0.2895, y 0.1838-0.2227.
-    # It clears the seat face and Length's right extension line (x 0.229,
-    # from 0.1946 up) by 5.5; the Ø7.70's upper extension line (y 0.1804) by
-    # 3.4 and its callout block (top y 0.1761) by 7.7; the "7.0" (right edge
-    # 0.2181) by 16.  The dimension line runs under the last row back to the
-    # chamfer's extension lines and crosses no other dimension or extension
-    # line.
-    "SeatMouthChamfer": (SEAT_FACE_X + 0.033, BORE_TOP_Y + 0.0228),
 }
 CUT_START = (END_CENTER[0], END_CENTER[1] - OUTER_R - 0.006)
 CUT_END = (END_CENTER[0], END_CENTER[1] + OUTER_R + 0.006)
@@ -200,14 +188,13 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # Each band and the stock OD carry their mate and reason at the callout.
+    # The band and the stock OD carry their mate and reason at the callout.
     set_dimension_callouts(
         adapter,
         annotations,
         {
             "BoreDia": BORE_FIT_CALLOUT,
             "OuterDia": OUTER_DIA_CALLOUT,
-            "SeatMouthChamfer": SEAT_MOUTH_CHAMFER_CALLOUT,
         },
         location="below",
     )

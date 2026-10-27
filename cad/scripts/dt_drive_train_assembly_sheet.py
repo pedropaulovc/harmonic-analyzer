@@ -5,10 +5,20 @@ prints their bench checks and remedies, without design-clearance narration.
 Kept separate from the explode contract so text changes do not rebuild CAD.
 """
 
+import dt_crank_handle_spec as _handle
 import dt_crank_pinion_spec as pinion
 import dt_pinion_lever_geometry as _lever
 import dt_pinion_lever_pin_spec as _lever_pin
 from _inch_fraction import inch_fraction
+
+# Owner ruling 2026-10-24 (#1900): MHA-DT-34 cures on a mandrel through the
+# MHA-DT-08 pivot bore.  Step 7 prints the requirement, the bore's offset off
+# that axis that MHA-DT-34's skimmed wall is budgeted on, not the mandrel;
+# MHA-DT-32 passes through the larger MHA-DT-34 bore and does not locate it.
+HANDLE_FERRULE_CURE = (
+    "THE MHA-DT-34 BORE CENTRED ON THE MHA-DT-08 PIVOT BORE WITHIN "
+    f"{_handle.FERRULE_OFFSET_MAX:.2f}"
+)
 
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
     (

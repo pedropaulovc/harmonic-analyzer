@@ -181,10 +181,13 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "FLUSH" in spec.COUNTERBORE_FIT_NOTE
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2), the
-    # contour at the title block's .X band.
+    # contour at the title block's .X band; the root relief (owner ruling
+    # 2026-10-24, #1900), landed off the skimmed shoulder, and the break on its
+    # edge take up to 1.45 of the seat.
     assert spec.SHOULDER_R == pytest.approx(ferrule.INSTALLED_OUTER_DIA / 2.0)
     assert spec.BORE_ECCENTRICITY == pytest.approx(0.10)
-    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975)
+    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(1.975 - 0.20 - 1.0 - 0.25)
+    assert spec.FERRULE_SEAT_RADIAL_MIN >= spec.FERRULE_SEAT_RADIAL_FLOOR == 0.5
     assert spec.TENON_WALL_MIN == pytest.approx(1.55)
     assert spec.WAIST_WALL_MIN == pytest.approx(2.175)
     # The ring is skimmed with the shoulder, so its stock OD carries no band
@@ -192,14 +195,18 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert not hasattr(ferrule, "OUTER_DIA_TOL")
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
-    assert "set_dimension_symmetric_tolerance" not in source
+    # ...and the root relief's band, the one symmetric one.
+    assert source.count("set_dimension_symmetric_tolerance(") == 1
+    assert (
+        'adapter, "HandleProfile", "TenonRootRelief", TENON_ROOT_RELIEF_TOL' in source
+    )
     assert not hasattr(spec, "TENON_LENGTH_TOL")
     assert spec.TENON_END_GAP_MIN == pytest.approx((7.0 - 0.8) - (5.0 + 0.8))
     # The shortest tenon's bonded length after the tenon end's edge break and
-    # the ferrule's seat-mouth chamfer at its largest (owner ruling A on
-    # #1661; the tenon root's R0.3 MAX sits inside that chamfer).
-    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(5.0 - 0.8 - 0.25 - 0.4)
-    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(3.55)
+    # the ferrule's seat-mouth break (owner ruling 2026-10-24, #1900: the root
+    # relief stands behind the seat face, so it costs none).
+    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(5.0 - 0.8 - 0.25 - 0.25)
+    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(3.70)
     assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
     # The reamed bore prints 4.10 +0.05/0, its two-place nominal the limit
     # itself (local review of fbf82ad96: 4.125 printed 4.13 +/-0.025).
@@ -235,11 +242,13 @@ def test_s_curve_tangent_point_prints_a_driven_reference_diameter() -> None:
     )
 
 
-def test_inside_corners_print_a_max_radius_their_mates_chamfers_clear() -> None:
+def test_inside_corners_print_a_max_radius_their_mates_clear() -> None:
     # Owner ruling A on #1661: the tenon root and the counterbore's floor
     # corner are modelled at R0.3 and print the single limit "R0.3 MAX"
     # (swTolMAX, build_pn_pen_rod's ShoulderRadius), each naming the part that
-    # seats on it; the ferrule's and the cup's 45-degree chamfers clear them.
+    # seats on it; the tenon root stands in its relief behind the ferrule's
+    # seat face (owner ruling 2026-10-24, #1900) and the cup's 45-degree
+    # chamfer clears the floor corner.
     spec = dt_crank_handle_spec
     corners = {"TenonRootRadius", "CounterboreFloorRadius"}
     assert spec.INSIDE_CORNER_R_MAX == 0.3
@@ -248,7 +257,7 @@ def test_inside_corners_print_a_max_radius_their_mates_chamfers_clear() -> None:
     assert corners <= spec.DRAWING_DIMENSIONS["HandleProfile"]
     assert not corners & (spec.REFERENCE_RADII | spec.REFERENCE_DIMENSIONS)
     assert all(spec.DRAWING_PRECISION_BY_NAME[name] == 1 for name in corners)
-    assert ferrule.SEAT_MOUTH_CHAMFER_MIN >= spec.INSIDE_CORNER_R_MAX
+    assert spec.TENON_ROOT_RELIEF_MIN >= spec.TENON_ROOT_ROUND_REACH
     assert cup.BODY_CHAMFER_MIN >= spec.INSIDE_CORNER_R_MAX
     assert drawing.DIMENSION_CALLOUTS["TenonRootRadius"] == spec.TENON_ROOT_CALLOUT
     assert (
@@ -271,6 +280,56 @@ def test_inside_corners_print_a_max_radius_their_mates_chamfers_clear() -> None:
         "_dress_inside_corner(adapter, front_by_name[name], name=name)"
         in drawing_source
     )
+
+
+def test_tenon_root_relief_clears_the_ferrule_seat_and_keeps_the_tenon() -> None:
+    # Owner ruling 2026-10-24 (#1900, option 4): a 45-degree relief cut into
+    # the shoulder at the tenon root, so MHA-DT-34's seat mouth needs only the
+    # 0.25 edge break.  Its minimum keeps the R0.3 MAX root round -- tangent
+    # R (1 + sqrt 2) back from the root -- behind the seat face; its maximum
+    # leaves the ferrule 0.5 of flat shoulder after the 0.25 break on the
+    # relief's edge and the relief landing off the skimmed shoulder (0.10 of
+    # bore wander each); each rounds inward to one place.
+    # The tenon is not cut, so its wall over the pivot bore and its bonded
+    # length stand.
+    spec = dt_crank_handle_spec
+    assert spec.TENON_ROOT_ROUND_REACH == pytest.approx(0.3 * (1.0 + math.sqrt(2.0)))
+    assert (spec.TENON_ROOT_RELIEF_MIN, spec.TENON_ROOT_RELIEF_MAX) == (0.8, 1.0)
+    assert (spec.TENON_ROOT_RELIEF, spec.TENON_ROOT_RELIEF_TOL) == (0.9, 0.1)
+    assert spec.TENON_ROOT_RELIEF_MIN - 0.1 < spec.TENON_ROOT_ROUND_REACH
+    assert (
+        spec.TENON_ROOT_RELIEF_MAX + 0.1
+        > 1.975 - 2.0 * spec.BORE_ECCENTRICITY - 0.25 - spec.FERRULE_SEAT_RADIAL_FLOOR
+    )
+    assert spec.TENON_WALL_MIN >= spec.TENON_WALL_FLOOR_MM
+    assert "TenonRootRelief" in spec.DRAWING_DIMENSIONS["HandleProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["TenonRootRelief"] == 1
+    assert (
+        drawing.DIMENSION_CALLOUTS["TenonRootRelief"] == spec.TENON_ROOT_RELIEF_CALLOUT
+    )
+    # The band names the seat it serves and the cone's angle (rule 4).
+    relief_callout = spec.TENON_ROOT_RELIEF_CALLOUT.replace("\n", " ")
+    assert "45 DEG" in relief_callout and spec.FERRULE_NUMBER in relief_callout
+    # The profile: the tenon OD runs on behind the seat face into the root
+    # round, which the relief line leaves at 45 degrees for the shoulder face.
+    assert handle.RELIEF_TOP == pytest.approx((7.0, spec.TENON_R + 0.9))
+    assert handle.ROOT_ON_TENON[0] > spec.SHOULDER_X
+    assert handle.ROOT_ON_RELIEF[0] - handle.RELIEF_TOP[0] == pytest.approx(
+        handle.RELIEF_TOP[1] - handle.ROOT_ON_RELIEF[1]
+    )
+    assert math.dist(handle.ROOT_CENTER, handle.ROOT_ON_RELIEF) == pytest.approx(0.3)
+    assert handle.RELIEF_RUN == pytest.approx(0.9 - 0.3 * (1.0 + 1.0 / math.sqrt(2.0)))
+    assert handle.INSIDE_CORNER_ARC_LENGTHS == pytest.approx(
+        (0.3 * math.pi / 2.0, 0.3 * 3.0 * math.pi / 4.0)
+    )
+    build_source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert '("TenonRootRelief", TENON_ROOT_RELIEF)' in build_source
+    assert """profile.record("TenonRootRelief", '"TenonRootRelief"')""" in build_source
+    assert '(tenon_root, relief, "tenon root on the relief")' in build_source
+    # The sweeps are read back from the saved profile after the final,
+    # equation-driven rebuild (codjiflo on PR #1989).
+    rebuilt = build_source.index("equations neutral")
+    assert build_source.index("_check_root_arc_sweep(adapter)", rebuilt) > rebuilt
 
 
 def test_grip_contour_is_tangent_arcs_dimensioned_on_the_section() -> None:

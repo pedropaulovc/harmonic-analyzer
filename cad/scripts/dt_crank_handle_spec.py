@@ -53,8 +53,7 @@ from dt_crank_handle_ferrule_spec import (
     LENGTH as FERRULE_LENGTH,
     INSTALLED_OUTER_DIA as FERRULE_OUTER_DIA,
     STOCK_DIA_MIN as FERRULE_STOCK_DIA_MIN,
-    SEAT_MOUTH_CHAMFER_MAX as FERRULE_SEAT_MOUTH_CHAMFER_MAX,
-    SEAT_MOUTH_CHAMFER_MIN as FERRULE_SEAT_MOUTH_CHAMFER_MIN,
+    SEAT_MOUTH_BREAK_MAX as FERRULE_SEAT_MOUTH_BREAK_MAX,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
     TENON_GLUE_LENGTH_FLOOR,
     TENON_LENGTH,
@@ -89,8 +88,9 @@ TENON_R = TENON_DIA / 2.0
 # cutter: say the largest acceptable inside radius): the tenon root and the
 # counterbore's floor corner are each modelled AT this limit and print the
 # single limit "R0.3 MAX" (swTolMAX prints the nominal, so nominal = limit;
-# the band runs from sharp up to it).  The ferrule's seat-mouth chamfer and
-# the cup's body chamfer each clear it (asserted below).
+# the band runs from sharp up to it).  The tenon root sits in the shoulder
+# relief below, behind the ferrule's seat face, and the cup's body chamfer
+# clears the counterbore's floor corner (both asserted below).
 INSIDE_CORNER_R_MAX = 0.3
 INSIDE_CORNER_R_BAND = (0.0, -INSIDE_CORNER_R_MAX)  # (upper, lower)
 INSIDE_CORNER_R_TOL_TYPE = 6  # swTolType_e.swTolMAX: prints "R0.3 MAX"
@@ -216,22 +216,82 @@ BUTT_WALL_MIN = round(
 # and the smallest bore with the widest line the smallest.
 TENON_DIA_MAX = FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[0]
 TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[1]
-# The shoulder the ferrule seats on, radially, at its worst: the oak turned
-# its .X band small at the shoulder over the largest tenon.
-FERRULE_SEAT_RADIAL_MIN = ((2.0 * SHOULDER_R - _GENERAL_1PL) - TENON_DIA_MAX) / 2.0
-# The shortest tenon's unbroken bonded length inside the ferrule, less the
-# title-block edge break on the tenon end and the ferrule's seat-mouth chamfer
-# at its largest (owner ruling A on #1661; the 0.4 upper limit is what keeps
-# this at 3.55, half the ferrule's length and more).  The tenon root's R0.3
-# MAX sits inside that chamfer, so it costs no further length.
-TENON_GLUE_LENGTH_MIN = round(
-    TENON_LENGTH - _GENERAL_1PL - EDGE_BREAK_MAX_MM - FERRULE_SEAT_MOUTH_CHAMFER_MAX, 6
+# The shoulder the ferrule seats on, radially, before the root relief: the oak
+# turned its .X band small at the shoulder over the largest tenon.
+_SEAT_RADIAL_UNRELIEVED = ((2.0 * SHOULDER_R - _GENERAL_1PL) - TENON_DIA_MAX) / 2.0
+FERRULE_SEAT_RADIAL_FLOOR = 0.5
+# Owner ruling 2026-10-24 (#1900, option 4): the tenon root is relieved so the
+# MHA-DT-34 seat mouth needs only the title block's edge break, not ruling A's
+# chamfer, and keeps that brass in its wall.  The relief is a 45-degree cone
+# cut into the SHOULDER at the root, its leg the same along the shoulder face
+# from the tenon OD and along the tenon behind the face.  A groove in the
+# tenon cannot do it: the smallest fitted tenon keeps only 0.05 of oak over
+# its rule-17 floor round the pivot bore (TENON_WALL_MIN), far less than the
+# depth that would swallow an R0.3 root, while a shoulder relief leaves the
+# tenon whole.  The R0.3 MAX root round sits in the relief's 45-degree corner,
+# tangent R (1 + sqrt 2) back from it along the tenon, so the leg's minimum
+# keeps that whole round behind the seat face (no oak at the ferrule's mouth,
+# whatever its break).  Its maximum leaves the ferrule its 0.5 of flat
+# shoulder after the title-block break on the relief's outer edge, where the
+# cone meets the shoulder face, and after the relief and the skimmed shoulder
+# OD land off each other: the relief is turned with the tenon, true to the
+# pivot bore within BORE_ECCENTRICITY, and the shoulder is skimmed with
+# MHA-DT-34 after cure, true to it within the same again (codjiflo on PR
+# #1989).  Each limit is rounded inward to one place; the leg prints their
+# mid-band, which must itself print at one place, as the band must.
+_RELIEF_TO_SKIM_OFFSET_MAX = 2.0 * BORE_ECCENTRICITY
+TENON_ROOT_ROUND_REACH = INSIDE_CORNER_R_MAX * (1.0 + math.sqrt(2.0))
+TENON_ROOT_RELIEF_MIN = math.ceil(round(TENON_ROOT_ROUND_REACH * 10.0, 6)) / 10.0
+TENON_ROOT_RELIEF_MAX = (
+    math.floor(
+        round(
+            (
+                _SEAT_RADIAL_UNRELIEVED
+                - _RELIEF_TO_SKIM_OFFSET_MAX
+                - EDGE_BREAK_MAX_MM
+                - FERRULE_SEAT_RADIAL_FLOOR
+            )
+            * 10.0,
+            6,
+        )
+    )
+    / 10.0
 )
-# The ferrule rides the tenon (true to the bore within the eccentricity) on
-# its glue line, so it can sit this far off the bore; the skim, true to the
-# bore, takes it down to the contour (local review of 47cb8a46b, user ruling
-# 2026-10-01).
-FERRULE_OFFSET_MAX = BORE_ECCENTRICITY + TENON_GLUE_LINE[1] / 2.0
+if not TENON_ROOT_RELIEF_MIN < TENON_ROOT_RELIEF_MAX:
+    raise AssertionError(
+        "MHA-DT-08: no tenon-root relief keeps the root round behind the ferrule "
+        "seat face and leaves the ferrule its shoulder"
+    )
+TENON_ROOT_RELIEF = round((TENON_ROOT_RELIEF_MIN + TENON_ROOT_RELIEF_MAX) / 2.0, 6)
+TENON_ROOT_RELIEF_TOL = round((TENON_ROOT_RELIEF_MAX - TENON_ROOT_RELIEF_MIN) / 2.0, 6)
+if (
+    round(TENON_ROOT_RELIEF, 1) != TENON_ROOT_RELIEF
+    or round(TENON_ROOT_RELIEF_TOL, 1) != TENON_ROOT_RELIEF_TOL
+):
+    raise AssertionError(
+        "MHA-DT-08: the tenon-root relief band does not print at one place"
+    )
+# The flat shoulder left to the ferrule on the thin side, outside the largest
+# relief landed off-centre and the break on its edge.
+FERRULE_SEAT_RADIAL_MIN = (
+    _SEAT_RADIAL_UNRELIEVED
+    - _RELIEF_TO_SKIM_OFFSET_MAX
+    - TENON_ROOT_RELIEF_MAX
+    - EDGE_BREAK_MAX_MM
+)
+# The shortest tenon's unbroken bonded length inside the ferrule, less the
+# title-block edge break on the tenon end and the break on the ferrule's seat
+# mouth (owner ruling 2026-10-24, #1900).  The relief and the root round in it
+# stand behind the seat face, so they cost no bonded length.
+TENON_GLUE_LENGTH_MIN = round(
+    TENON_LENGTH - _GENERAL_1PL - EDGE_BREAK_MAX_MM - FERRULE_SEAT_MOUTH_BREAK_MAX, 6
+)
+# Owner ruling 2026-10-24 (#1900): the ferrule cures on a mandrel through the
+# pivot bore, so its bore sits on that axis within the same 0.10 the walls
+# budget for anything turned true to the reamed bore, not riding the tenon on
+# its glue line (0.10 + 0.15/2 = 0.175, user ruling 2026-10-01).  MHA-DT-00
+# step 7 states it; the skim, true to the bore, takes the ring to the contour.
+FERRULE_OFFSET_MAX = BORE_ECCENTRICITY
 # Brass left at the thin side: the smallest skimmed OD, off the bore by the
 # skim's own wander, over the largest bore on the ferrule's offset.
 FERRULE_SKIMMED_WALL_MIN = (
@@ -241,6 +301,23 @@ FERRULE_SKIMMED_WALL_MIN = (
 )
 # drawing-guidelines.md rule 17's wall floor.
 TENON_WALL_FLOOR_MM = 1.5
+# The same brass at the seat face, where the bore mouth's break comes off it
+# (#1900: the plain-bore figure above missed the mouth); the OD's seat-end edge
+# is the skim line it shares with the oak shoulder, so it takes no break.
+# 1.50 sits on the floor and under the 2.0 target: owner ruling 2026-10-24
+# (#1900) accepts it as minor exception RV-01 in dt-crank-handle-ferrule.yaml,
+# and MHA-DT-34 prints it as WALL 1.50 MIN AT SEAT FACE.
+FERRULE_MOUTH_WALL_MIN = round(
+    FERRULE_SKIMMED_WALL_MIN - FERRULE_SEAT_MOUTH_BREAK_MAX, 6
+)
+# At the arm face both edges are exposed and each takes the title block's
+# break, the bore mouth's and the skimmed OD's (codjiflo on PR #1989), so the
+# face plane keeps 1.25, under the floor: owner ruling 2026-10-26 (#1900, arm
+# face) accepts it as minor exception RV-02, printed WALL 1.25 MIN AT ARM FACE.
+FERRULE_ARM_FACE_WALL_MIN = round(
+    FERRULE_SKIMMED_WALL_MIN - FERRULE_SEAT_MOUTH_BREAK_MAX - EDGE_BREAK_MAX_MM, 6
+)
+FERRULE_ARM_FACE_WALL_ACCEPTED_MM = 1.25
 # Arm face to the shortest tenon's end: the shortest .X ferrule less the
 # longest .X tenon, so the oak never bears on the arm.
 TENON_END_GAP_MIN = round(
@@ -265,8 +342,9 @@ for _ok, _what in (
         f"the shortest tenon leaves under {TENON_GLUE_LENGTH_FLOOR:g} of unbroken glue length",
     ),
     (
-        FERRULE_SEAT_RADIAL_MIN >= 0.5,
-        "the largest fitted tenon leaves under 0.5 of shoulder for the ferrule",
+        FERRULE_SEAT_RADIAL_MIN >= FERRULE_SEAT_RADIAL_FLOOR,
+        "the largest fitted tenon and root relief leave under "
+        f"{FERRULE_SEAT_RADIAL_FLOOR:g} of shoulder for the ferrule",
     ),
     (
         TENON_WALL_MIN >= TENON_WALL_FLOOR_MM,
@@ -280,6 +358,17 @@ for _ok, _what in (
     (
         FERRULE_SKIMMED_WALL_MIN >= 1.5,
         "the skimmed ferrule, off-centre, leaves under 1.5 of brass",
+    ),
+    (
+        FERRULE_MOUTH_WALL_MIN >= TENON_WALL_FLOOR_MM,
+        "the skimmed ferrule, off-centre, leaves under 1.5 of brass at its broken "
+        "seat mouth (#1900)",
+    ),
+    (
+        FERRULE_ARM_FACE_WALL_MIN >= FERRULE_ARM_FACE_WALL_ACCEPTED_MM,
+        "the skimmed ferrule, off-centre, leaves under the owner-accepted "
+        f"{FERRULE_ARM_FACE_WALL_ACCEPTED_MM:g} of brass at its arm face, both edges "
+        "broken (#1900)",
     ),
     (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
@@ -296,11 +385,12 @@ for _ok, _what in (
         DOME_END[0] > PEAK_X and DOME_END[1] > END_ROUND_CY,
         "the dome does not run from the swell down to the end round",
     ),
-    # A 45-degree chamfer of leg c clears an inside fillet of radius R when
-    # c >= R: the fillet ends R along each face.
+    # A fillet of radius R in the relief's 45-degree root is tangent to the
+    # tenon R (1 + sqrt 2) back from the root, so the smallest relief keeps it
+    # behind the seat face and the ferrule's mouth meets no oak.
     (
-        FERRULE_SEAT_MOUTH_CHAMFER_MIN >= INSIDE_CORNER_R_MAX,
-        "the smallest ferrule seat-mouth chamfer fouls the tenon root radius",
+        TENON_ROOT_RELIEF_MIN >= TENON_ROOT_ROUND_REACH,
+        "the smallest tenon-root relief lets the root round reach the ferrule seat face",
     ),
     (
         CUP_BODY_CHAMFER_MIN >= INSIDE_CORNER_R_MAX,
@@ -313,8 +403,9 @@ for _ok, _what in (
 
 # Marked dimensions, all on the one revolve profile: the tenon, the reamed bore,
 # the stations from the tenon end face, the grip diameters and the end round,
-# the counterbore, the two inside corners' single limits, and the
-# tangency-fixed radii and the S-curve's tangent-point diameter as references.
+# the counterbore, the tenon-root relief, the two inside corners' single
+# limits, and the tangency-fixed radii and the S-curve's tangent-point diameter
+# as references.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HandleProfile": {
         "PivotBoreDia",
@@ -336,6 +427,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "SConcaveR",
         "SConvexR",
         "DomeR",
+        "TenonRootRelief",
         "TenonRootRadius",
         "CounterboreFloorRadius",
     },
@@ -343,8 +435,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places are the tolerance (drawing-guidelines.md rule 3 (decimal places
 # carry the tolerance)): the reamed bore prints its band at two places; every
 # other size is routine (.X), the fitted tenon and counterbore as references
-# under their to-suit notes, and the inside corners' R0.3 MAX limits print at
-# one place.
+# under their to-suit notes, the root relief with its own band naming the
+# ferrule it serves (rule 4), and the inside corners' R0.3 MAX limits at one
+# place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HandleProfile": {
         name: 2 if name == "PivotBoreDia" else 1
@@ -398,5 +491,10 @@ COUNTERBORE_FIT_NOTE = (
 # gap beside the section.
 TENON_ROOT_CALLOUT = f"{FERRULE_NAME}\nSEAT"
 COUNTERBORE_FLOOR_CALLOUT = f"{CUP_NAME}\nSEAT"
+# The root relief's band serves the ferrule (rule 4): its leg on the shoulder
+# face, at 45 degrees, the mate named by number (farm r3 review of
+# 8abe1a641), seating on the shoulder outside it.  Rows of 10 characters at
+# most fit the gap left of the tenon end.
+TENON_ROOT_RELIEF_CALLOUT = f"X 45 DEG;\n{FERRULE_NUMBER}\nSEATS\nOUTSIDE IT"
 PIVOT_BORE_CALLOUT = f"REAM THRU\nRUNS ON {SCREW_NAME}\n{SCREW_NUMBER} SHOULDER"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
