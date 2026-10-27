@@ -6,7 +6,7 @@ pd-transgear-arm:
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
-  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; for inspection, datum A is associated to front face A by the minimax (Chebyshev) fit (owner ruling 2026-10-27, #1379); mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill, countersink both sides and tap the plate clamp holes through; hold arm and MHA-PD-19 on independent retained datum-A fixture carriers at the specified critical S-K gear-plane setting and projected-axis limits; drill the two common 1.80 locating pilots through the plate and through the arm; retain each carrier while finishing plate holes 2.010–2.020 through and arm holes 1.990–2.000 through, separately, with mouth breaks 0.05 MAX; reassemble the original matched pair and inspect the actual hole positions, S-K gear-plane setup and complete loaded free-motion envelope; drill and ream the blind latch-pin hole flat-bottomed into the square end"
+  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-PD-23 press; drill, countersink both sides and tap the plate clamp holes through; hold arm and MHA-PD-19 on independent retained datum-A fixture carriers at the specified critical S-K gear-plane setting and projected-axis limits; drill the two common 1.80 locating pilots through the plate and through the arm; retain each carrier while finishing plate holes 2.010–2.020 through and arm holes 1.990–2.000 through, separately, with mouth breaks 0.05 MAX; reassemble the original matched pair and inspect the actual hole positions, S-K gear-plane setup and complete loaded free-motion envelope; drill and ream the blind latch-pin hole flat-bottomed into the square end"
   installation_notes: |-
     INSTALLATION - MATCHED ARM / ARM PLATE
     SET THE SPECIFIED CRITICAL S-K POSE BEFORE MATCH-REAMING.
@@ -18,11 +18,6 @@ pd-transgear-arm:
       where: "the locating-pattern and running-axis position controls"
       finding: "position controls over-specified (rule 5)"
       reason: "required by the whole-stack stock-form gate including the rigid two-hole registration yaw; stock dowels in reamed holes locate, the screws clamp (owner-accepted)"
-    - id: "RV-02"
-      kind: "accept"
-      where: "the 0.050 flatness frame on front face A"
-      finding: "flatness on ground-stock face over-specified (rule 5)"
-      reason: "owner ruling 2026-10-27 (#1379): datum A is established by the minimax fit, so face A's flatness plus the stock's ±0.001 in thickness band bounds the rear plate seat's tilt to A (0.1008); that tilt sets the MHA-PD-VN-56 worst engagement and the reducer-axis tilt (owner-accepted)"
     - id: "RV-03"
       kind: "accept"
       where: "the MHA-PD-VN-58 latch pin's blind flat-bottom press hole"

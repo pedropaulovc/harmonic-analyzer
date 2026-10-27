@@ -748,18 +748,15 @@ def test_the_locating_dowels_punch_out_from_the_front() -> None:
     assert geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM == pytest.approx(thinnest - 2.0 * front_break)
 
 
-def test_the_notes_are_the_projected_zones_and_datum_a_and_carry_no_tolerance() -> None:
+def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:
     """Machinist review (clarity): the notes ran to seven lines and carried
     the pair's 35.101 ±0.004 setting and its fit-up check, which are
-    MHA-PD-00's steps. Rule 7: at most four short lines. Owner ruling
-    2026-10-27 (#1379): datum A's minimax association, on which the rear
-    face's bound rests, is stated."""
+    MHA-PD-00's steps. Rule 7: at most four short lines."""
     lines = drawing.NOTES_TEXT.splitlines()
-    assert drawing.NOTES_TEXT == f"{spec.PROJECTED_ZONE_NOTE}\n{spec.DATUM_A_NOTE}"
+    assert drawing.NOTES_TEXT == spec.PROJECTED_ZONE_NOTE
     assert len(lines) <= 4
     flat = " ".join(line.strip() for line in lines)
     assert "FRONT FACE A" in flat
-    assert "DATUM A" in flat and "MINIMAX" in flat
     assert "\u00b1" not in flat
     assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
     assert "NO SHAKE" not in flat
@@ -768,22 +765,20 @@ def test_the_notes_are_the_projected_zones_and_datum_a_and_carry_no_tolerance() 
             assert f"{control.projected_zone_height_mm:.1f}" in flat
 
 
-def test_the_rear_face_parallelism_is_face_a_flatness_plus_the_stock_band() -> None:
+def test_the_rear_face_has_no_frame_and_the_stock_band_carries_its_parallelism() -> None:
     """Machinist review (over-specification): a // 0.050 A frame sat on the
-    rear face of 5/16 ground stock. Codjiflo (#2015): the thickness band
-    alone does not bound the rear face against datum A on bowed stock. Face
-    A's flatness frame bounds the bow; the rear face lies within that zone
-    plus the thickness spread, and the plate screw's worst engagement still
-    meets 1.5D at that tilt."""
+    rear face of 5/16 ground stock. Owner ruling 2026-10-27 (#1379): no
+    face carries a frame. The stock's thickness band bounds the plate seat's
+    tilt to the arm's own surface under it (bow bends both faces together),
+    and the plate screw's worst engagement still meets 1.5D at that tilt."""
     import paper_drive_arm_registration as registration
 
-    assert all(control.characteristic != "parallelism" for control in spec.GEOMETRIC_CONTROLS)
-    flatness = [c for c in spec.GEOMETRIC_CONTROLS if c.characteristic == "flatness"]
-    assert [c.face for c in flatness] == [spec.PART_DATUMS[0].face]
-    assert flatness[0].datums == ()
-    assert float(flatness[0].tolerance) == pytest.approx(registration.ARM_FRONT_FACE_FLATNESS_MM)
+    assert all(
+        control.characteristic not in ("parallelism", "flatness")
+        for control in spec.GEOMETRIC_CONTROLS
+    )
     assert registration.ARM_OPPOSITE_FACE_PARALLELISM_MM == pytest.approx(
-        registration.ARM_FRONT_FACE_FLATNESS_MM + 2.0 * geometry.THICKNESS_BAND
+        2.0 * geometry.THICKNESS_BAND
     )
     assert joints.PLATE_SCREW_ENGAGEMENT_WORST_D >= joints.ENGAGEMENT_TARGET_D
 

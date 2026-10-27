@@ -7,7 +7,7 @@ widened to 1-1/2 in so the outline can stand symmetric about K (the 1-1/4 in
 bar centred on K leaves the -X countersink under the wall target).  It
 carries the knob shaft's running bore on axis K, a front hub (the thrust
 ring's seat) and a rear boss (the cup runs behind it).  Its rear portion is
-5.4 thick where it lies over the arm; below the arm's lower edge it drops the
+5 thick where it lies over the arm; below the arm's lower edge it drops the
 arm's thickness (7.9375) more to the arm's front face, so the step (the
 "notch") wraps that edge, NOTCH_RELIEF clear of it. Two matched stock
 dowels locate; screws clamp.
@@ -19,9 +19,9 @@ rotation about Z):
   that seats on the arm's rear face (machine z -116.4625);
 * +X and +Y are the arm's +X (toward its square end) and +Y (toward its upper
   tangent edge); the plate's long axis runs along -Y;
-* +Z toward the rear (machine +Z): the over-arm section spans z 0..5.4, the
-  section below the arm z -7.9375..5.4, the front hub z -20.5375..-7.9375 and
-  the rear boss z 5.4..8.5.
+* +Z toward the rear (machine +Z): the over-arm section spans z 0..5, the
+  section below the arm z -7.9375..5, the front hub z -20.5375..-7.9375 and
+  the rear boss z 5..8.5.
 
 Keep drawing-only notes out of this module.
 """
@@ -44,16 +44,11 @@ BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 # --- Section ----------------------------------------------------------------
 END_R = 12.5  # full round about K; both tapers are tangent to it
 WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
-# 5.4 (was 5.0; owner ruling 2026-10-27, #1379): the arm's front face A
-# carries a 0.05 flatness frame, so the plate seat may tilt 0.1008 over the
-# seat span; at 5.0 the MHA-PD-VN-56 worst thread engagement fell to 1.468D.
-# 5.4 restores 1.566D. The boss gives the 0.4 back, so its face, the knob
-# stack and the hub-to-boss length are unchanged. .XX bounds the dowel span.
-THICKNESS_OVER_ARM = 5.4
+THICKNESS_OVER_ARM = 5.0  # unchanged nominal; .XX bounds the locator dowel span
 THICKNESS_OVER_ARM_PLACES = 2
 THICKNESS_OVER_ARM_BAND = printed_band_mm(THICKNESS_OVER_ARM_PLACES)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
-THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 13.3375
+THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375
 
 # Edges along the plate's long axis, in the plate frame (x from K): the
 # outline is symmetric about the long axis through K, so the screws' midpoint
@@ -117,7 +112,7 @@ HUB_STATION_PLACES = 3
 HUB_FACE_TO_MOUNTING_BAND = printed_band_mm(HUB_STATION_PLACES)
 BOSS_DIA = 20.0  # .X
 # The boss face's station is authoritative: the knob stack (HUB_TO_BOSS) runs
-# to it, so the boss takes whatever the over-arm section leaves (3.1 at 5.4).
+# to it, so the boss takes whatever the over-arm section leaves.
 BOSS_FACE_Z = 8.5
 REAR_FACE_Z = THICKNESS_OVER_ARM
 BOSS_HEIGHT = BOSS_FACE_Z - REAR_FACE_Z

@@ -246,6 +246,13 @@ def test_floor_pays_independent_projected_cone_and_hole_axes_and_actual_rim_tilt
     assert floor > geometry.WALL_TARGET
     assert spec.DRAWING_PRECISION_BY_NAME["ThicknessOverArm"] == 2
     assert spec.DRAWING_PRECISION_BY_NAME["CskDia"] == 1
+    # With the source fillet-clearance drill, the ordinary CSK row now
+    # retains the true floor. The old smaller hole required needless precision.
+    old_hole_floor = (geometry.THICKNESS_OVER_ARM - geometry.THICKNESS_OVER_ARM_BAND
+                      - ((2.0 * radius - 4.5) / 2.0 + geometry.REDUCER_POSITION_DIAMETER)
+                      / math.tan(geometry.CSK_HALF_ANGLE_LIMITS_RAD[0] - alpha)
+                      - radius * math.sin(alpha))
+    assert old_hole_floor < geometry.WALL_TARGET
 
 
 def _notch_air(places: int) -> float:

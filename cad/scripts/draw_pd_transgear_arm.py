@@ -92,7 +92,6 @@ from pd_transgear_arm_spec import (
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
-    DATUM_A_NOTE,
     PROJECTED_ZONE_NOTE,
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
@@ -139,9 +138,9 @@ END_CENTER = (0.357, FRONT_CENTER[1])
 ISO_CENTER = (0.184, 0.034)
 ISO_NOTE_XY = (0.080, 0.022)
 # Bottom left, clear of the section's floor-depth text above and of the
-# isometric caption below: the projected zones and datum A's association.
+# isometric caption below: the projected zones.
 NOTES_XY = (0.014, 0.050)
-NOTES_TEXT = f"{PROJECTED_ZONE_NOTE}\n{DATUM_A_NOTE}"
+NOTES_TEXT = PROJECTED_ZONE_NOTE
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -594,14 +593,6 @@ async def build(adapter: Any) -> dict[str, str]:
             section, (_front_x(56.0), SECTION_CENTER[1] + 0.018),
             attachment_xy=model_point_in_view(
                 adapter, section, (0.056, 0.0, 0.0), label="arm front datum",
-            ),
-        ),
-        # Right of the stud's frames, under the overall (141.4), with a short
-        # leader down to face A.
-        "arm_front_flatness": PmiDrawingPlacement(
-            section, (0.285, SECTION_CENTER[1] + 0.0205),
-            attachment_xy=model_point_in_view(
-                adapter, section, (0.112, 0.0, 0.0), label="arm front face flatness",
             ),
         ),
         # Datum tags on a bore are picked by a SHEET POINT on the rim

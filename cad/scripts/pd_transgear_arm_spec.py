@@ -140,14 +140,9 @@ GEOMETRIC_CONTROLS += (
         ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.S_PROJECTED_HEIGHT_MM,
     ),
-    # No frame on the rear face (machinist review, rule 5): the front face A's
-    # flatness plus the 9517K466 stock's thickness band carry its parallelism
-    # to A (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
-    GeometricControl(
-        "arm_front_flatness", "flatness",
-        f"{REGISTRATION.ARM_FRONT_FACE_FLATNESS_MM:.3f}",
-        PlanarFace((0.0, 0.0, -1.0), 0.0),
-    ),
+    # No frame on the rear face (machinist review, rule 5): the 9517K466
+    # ground stock's thickness band carries its parallelism to A
+    # (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
     *(
         GeometricControl(
             f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
@@ -209,10 +204,6 @@ PROJECTED_ZONE_NOTE = "\n".join((
     f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
     f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
 ))
-# Owner ruling 2026-10-27 (#1379): the rear face's 0.1008 bound to A
-# (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM) rests on
-# datum A's minimax association, so the sheet states it.
-DATUM_A_NOTE = "2. DATUM A: MINIMAX FIT TO FACE A."
 # The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
 # head, and its floor from the FRONT face sets the spring's room there
 # (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
