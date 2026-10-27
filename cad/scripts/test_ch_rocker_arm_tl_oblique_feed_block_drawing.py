@@ -44,7 +44,27 @@ def test_nut_taps_are_drilled_to_print_on_sixteen_pcd_at_forty_five_degrees():
     assert spec.NUT_TAP_SPEC.overrides_mm['ThreadDepth']==spec.SCREW_TAP_DEPTH==10
     assert spec.NUT_TAP_DRILL_DEPTH==12
     assert spec.NUT_TAP_DRILL_DEPTH+spec.NUT_TAP_DRILL/2*.60086<spec.LUG_WIDTH
-    assert len(spec.DRAWING_DIMENSIONS['NutPatternReference'])==8
+    # Printed from the nut axis: one Z per column on the +Y row, one Y per row
+    # on the -Z column, plus the axis from the lug end and the bottom face.
+    assert spec.DRAWING_DIMENSIONS['NutPatternReference']==(
+        'NutCentreZ','NutCentreY','NutTap3Z','NutTap4Z','NutTap1Y','NutTap3Y')
+    assert spec.DRAWING_VALUES['NutCentreY']==spec.NUT_AXIS_Y-spec.LUG_Y0==13
+
+
+def test_tap_to_recess_wall_shortfall_is_stated_at_its_worst_case():
+    assert math.isclose(spec.NUT_SEAT_WALL_NOMINAL,1.3275)
+    assert math.isclose(spec.NUT_SEAT_WALL_MIN,8-math.hypot(.13,.13)-(10.5+.51)/2-2.845/2)
+    assert spec.NUT_SEAT_WALL_TEXT=='WALL 0.88 MIN TO 4-40 TAPS'
+    assert spec.NUT_SEAT_WALL_TEXT in spec.CALLOUTS_BELOW['NutSeatDia']
+    # No recess that still clears the bought spigot reaches the 1.5 floor.
+    assert spec.NUT_PCD/2-lead.NUT_BODY_DIA/2-spec.NUT_TAP_MAJOR/2<1.5
+
+
+def test_plan_ordinates_start_on_the_left_edge():
+    values=spec.DRAWING_VALUES
+    assert (values['PlanBoreX'],values['PlanHole1X'],values['PlanHole2X'])==(10,29,55)
+    assert (values['PlanLugX'],values['LugWidth'],values['PlanOverallY'])==(32.75,18.5,88)
+    assert not {'BlockEndX','BoreX','LugEndX','LugEndY','LugLength'}&set(spec.DRAWING_PRECISION_BY_NAME)
 
 
 def test_nut_and_lug_clear_both_end_blocks_at_both_travel_limits():
