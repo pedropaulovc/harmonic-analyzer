@@ -356,16 +356,22 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # remaining face has partial-depth gaps, not full-depth analytic teeth.
 # CUTTER_RUNOUT_MAX is the retained native maximum station; the geometric
 # endpoint over the boss uses the deepest template X, never a root norm.
+# The full depth has one function, covering the rack (the assembly's
+# RACK_FRONT_FROM_SLEEVE_REAR_WORST), so it prints as a MIN at the modelled
+# station; the run-out MAX caps how deep the cutter may go (2026-10-27
+# ENFORCE review, r1, r3: a three-place hold served nothing).  The deepest
+# full depth is the one whose largest cutter runs out at that MAX
+# (FULL_DEPTH_MAX, below).
 FULL_DEPTH = 10.15
-FULL_DEPTH_PLACES = 3
+FULL_DEPTH_PLACES = 2
+FULL_DEPTH_TOL_TYPE = 5  # swTolType_e.swTolMIN
+FULL_DEPTH_DEVIATIONS = (0.0, 0.0)
+FULL_DEPTH_MIN = FULL_DEPTH
 CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 2.25
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN
 CUTTER_SKU = "10-289-328"
-FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
@@ -471,24 +477,19 @@ def step_seat_area_bounds_mm2(
 # covers the complete axial rack reach. The boss at its largest radius over the
 # deepest finite root X bounds any boss run-out at the latest full-depth
 # station. The retained limit keeps the cutting envelope behind the disc
-# and under the hub spigot; no particular boss slot is presumed.
+# and under the hub spigot; no particular boss slot is presumed.  The full
+# depth prints only its MIN, so the deepest it may go is where the largest
+# cutter runs out at the printed run-out MAX.
 RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DEPTH_X_MIN
-CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
-    CUTTER_DIA_MAX, RUNOUT_RISE_WORST
-)
+FULL_DEPTH_MAX = CUTTER_RUNOUT_MAX - cutter_runout(CUTTER_DIA_MAX, RUNOUT_RISE_WORST)
+# With only the MIN printed, the cutter's end may stand anywhere up to the
+# run-out MAX: the hub's round engagement and seat take it there.
+CUTTER_RUNOUT_END_WORST = CUTTER_RUNOUT_MAX
 RUNOUT_DISC_CLEARANCE = 0.05
 if FULL_DEPTH_MAX >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
     raise AssertionError("the 12T full-depth window reaches the step")
-if CUTTER_RUNOUT_END_WORST > CUTTER_RUNOUT_MAX + 1e-9:
-    raise AssertionError(
-        f"a Ø{CUTTER_DIA_MAX_IN:.2f} in cutter runs out to "
-        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the {CUTTER_RUNOUT_MAX} limit"
-    )
-if CUTTER_RUNOUT_END_WORST > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
-    raise AssertionError(
-        f"the cutter runs out to {CUTTER_RUNOUT_END_WORST:.3f}, within "
-        f"{RUNOUT_DISC_CLEARANCE} of the disc's rear face {DISC_REAR_MIN:.3f}"
-    )
+if FULL_DEPTH_MAX <= FULL_DEPTH_MIN:
+    raise AssertionError("the run-out MAX leaves no room for the full-depth MIN")
 if CUTTER_RUNOUT_MAX > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
     raise AssertionError("the run-out limit reaches the disc's rear face")
 
@@ -635,10 +636,12 @@ GEAR_DATA = gear_data_note(
 )
 
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
-# and the tooth ends seat the hub's spigot.
+# and the tooth ends seat the hub's spigot.  The drawing flags it at the
+# teeth with a leader (rule 7; 2026-10-27 ENFORCE review, r2, r3: loose in
+# the notes block it reached no feature), so the notes block omits it.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
 # Pending exception ruling: MHA-PD-10 flat wall (#1378).
 # A shop note states the requirement, not the measuring method or the cutter
 # choice (Main ruling 2026-10-10): the run-out length is dimensioned.
 FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FLAT_WALL_NOTE))
+DRAWING_NOTES = FLAT_WALL_NOTE

@@ -227,26 +227,36 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
     frozen into note text (drawing-simplicity-policy.md `How the repository implements the guidelines` and drawing-guidelines.md rule 12 (hole and slot callouts say what to do))."""
     assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["SleeveProfile"]
     places = spec.DRAWING_PRECISION_BY_NAME
-    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3
+    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 2
     assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 2
-    # The window is the .XXX row's band; the run-out a MAX limit
-    # (swTolType_e.swTolMAX) whose nominal is the limit it prints.
-    assert spec.FULL_DEPTH_BAND == printed_band_mm(spec.FULL_DEPTH_PLACES)
+    # The full depth covers the rack, a one-sided need, so it prints as a
+    # MIN at the modelled station (2026-10-27 review, r1, r3); the run-out
+    # MAX (swTolType_e.swTolMAX) caps it.  Each nominal is the limit it
+    # prints.
+    assert spec.FULL_DEPTH_TOL_TYPE == 5  # swTolType_e.swTolMIN
+    assert spec.FULL_DEPTH_MIN == spec.FULL_DEPTH
+    assert round(spec.FULL_DEPTH, spec.FULL_DEPTH_PLACES) == spec.FULL_DEPTH
+    assert spec.FULL_DEPTH_MAX == pytest.approx(
+        spec.CUTTER_RUNOUT_MAX
+        - spec.cutter_runout(spec.CUTTER_DIA_MAX, spec.RUNOUT_RISE_WORST)
+    )
+    assert spec.CUTTER_RUNOUT_END_WORST == spec.CUTTER_RUNOUT_MAX
     assert spec.CUTTER_RUNOUT_TOL_TYPE == 6
     lower, upper = spec.CUTTER_RUNOUT_DEVIATIONS
     assert upper == 0.0
     assert spec.CUTTER_RUNOUT_MAX + lower == pytest.approx(spec.FULL_DEPTH_MIN)
     # No number the model owns is retyped into the notes.
     lines = spec.DRAWING_NOTES.splitlines()
-    for value in (f"{spec.FULL_DEPTH:.3f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
+    for value in (f"{spec.FULL_DEPTH:.2f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
         assert value not in spec.DRAWING_NOTES, value
-    # A shop note states requirements only: the cutter is method.
-    assert lines == [spec.TOOTH_EDGE_NOTE, spec.FLAT_WALL_NOTE]
+    # A shop note states requirements only: the cutter is method.  The
+    # tooth-edge exception is flagged at the teeth by a leader (rule 7), so
+    # the loose block keeps only the wall.
+    assert lines == [spec.FLAT_WALL_NOTE]
     assert max(len(line) for line in lines) <= 70
     # Short names, printed under the value, so the narrow text stands left
-    # of the outside view's rear face.  The full depth holds the title
-    # block's .XXX (an explicit ±0.13 restated it: 2026-10-27 review, r2,
-    # r3), so it names its function: its teeth cover the rack's reach.
+    # of the outside view's rear face.  The full depth names its function:
+    # its teeth cover the rack's reach.
     assert callouts.FULL_DEPTH_CALLOUT.split("\n") == [
         f"{spec.TEETH}T FULL DEPTH",
         f"COVERS {callouts.RACK_NUMBER} RACK",
@@ -446,7 +456,7 @@ def _printed_text(name: str) -> str:
             f"{spec.SPAN_PREFIX}{upper:.{spec.SPAN_PLACES}f}",
             f"{lower:.{spec.SPAN_PLACES}f}",
         ]
-    elif name == "RootDia":
+    elif name in ("RootDia", "FullDepth"):
         rows = [f"{value} min."]
     elif name == "FlatEnd":
         rows = [value, f"{spec.FLAT_END_MIN:.{spec.FLAT_END_PLACES}f}"]
@@ -575,6 +585,12 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         height=drawing.TOOTH_SPACE_CALLOUT_CHAR_HEIGHT,
     )
     boxes["outside caption"] = _note_box(drawing.LEFT_CAPTION, drawing.LEFT_CAPTION_XY)
+    boxes["tooth edge note"] = _note_box(
+        drawing.TOOTH_EDGE_LEADER_NOTE, drawing.TOOTH_EDGE_NOTE_XY, height=0.0025
+    )
+    boxes["manufacturing notes"] = _note_box(
+        spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025
+    )
     data_box = estimate_text_box(
         spec.GEAR_DATA,
         anchor=drawing.GEAR_DATA_XY,
@@ -999,3 +1015,29 @@ def test_outside_view_crops_past_the_run_out_limit() -> None:
     assert right < rear + (spec.FACE_WIDTH + 0.5) * s
     assert foot < drawing.LEFT_CENTER[1] - drawing.HALF_OD
     assert head > drawing.LEFT_CENTER[1] + drawing.HALF_OD
+
+
+def test_tooth_edge_exception_is_flagged_at_the_teeth() -> None:
+    """2026-10-27 ENFORCE review (r2, r3), rule 7: the 'do not break' exception
+    to the title block's edge break reaches the teeth on a leader, not as a
+    loose note.  The leader leaves its longer last row and lands on the tip
+    land of the gear-end view's upper-left tooth, a tooth in the mirrored
+    *Back view (model 30°), outside the root's dimension."""
+    rows = drawing.TOOTH_EDGE_LEADER_NOTE.split("\n")
+    assert " ".join(rows) == spec.TOOTH_EDGE_NOTE
+    assert len(rows) == 2 and len(rows[0]) < len(rows[1])
+    assert spec.TOOTH_EDGE_NOTE not in spec.DRAWING_NOTES
+    scale = drawing.VIEW_SCALE[0] / 1000.0
+    dx = drawing.TOOTH_EDGE_ATTACH[0] - drawing.REAR_CENTER[0]
+    dy = drawing.TOOTH_EDGE_ATTACH[1] - drawing.REAR_CENTER[1]
+    radius = math.hypot(dx, dy) / scale
+    assert spec.ROOT_DIA_MIN / 2.0 < spec.OUTSIDE_DIA / 2.0 - 0.1 < radius
+    assert radius < spec.OUTSIDE_DIA / 2.0
+    model_angle = (180.0 - math.degrees(math.atan2(dy, dx))) % 360.0
+    assert model_angle % (360.0 / spec.TEETH) == pytest.approx(0.0, abs=1e-9)
+    # The notes block hangs below the leader's note; the leader runs right,
+    # to a tip beyond the note's end.
+    note = _note_box(drawing.TOOTH_EDGE_LEADER_NOTE, drawing.TOOTH_EDGE_NOTE_XY, height=0.0025)
+    assert note.xmax < drawing.TOOTH_EDGE_ATTACH[0]
+    notes = _note_box(spec.DRAWING_NOTES, drawing.NOTES_XY, height=0.0025)
+    assert notes.ymax < note.ymin

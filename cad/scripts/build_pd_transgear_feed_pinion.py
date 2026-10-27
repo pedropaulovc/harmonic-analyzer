@@ -101,6 +101,9 @@ from pd_transgear_feed_pinion_spec import (
     FLAT_END_TOL_TYPE,
     FLAT_TO_AXIS_DEVIATIONS,
     FULL_DEPTH,
+    FULL_DEPTH_DEVIATIONS,
+    FULL_DEPTH_PLACES,
+    FULL_DEPTH_TOL_TYPE,
     GAP_FLOOR_WITNESS_Y,
     GEAR_DATA,
     OUTSIDE_DIA,
@@ -762,10 +765,9 @@ async def build(adapter) -> dict[str, str]:
     # the reamed bore, the boss's h6 under the disc's and hub's H7 bores, the
     # flat's (0, -0.015) under the hub's flat, the standard tip class, the
     # root as a physical MIN floor, the flat's end wall as LIMITS between the
-    # step and the hub's flat; the cutter's run-out as a MAX limit (R9-67).
-    # The tooth length, which only places the step, and the cutter's
-    # full-depth station hold the title block's .XXX: an explicit ±0.13
-    # restated that row (2026-10-27 ENFORCE review, r2, r3).
+    # step and the hub's flat; the cutter's full depth as a MIN (it covers
+    # the rack) and its run-out as a MAX limit (R9-67).  The tooth length,
+    # which only places the step, holds the title block's .XXX.
     _single_limit(
         adapter,
         "FlatProfile",
@@ -808,6 +810,15 @@ async def build(adapter) -> dict[str, str]:
         CUTTER_RUNOUT_DEVIATIONS,
         CUTTER_RUNOUT_TOL_TYPE,
         f"{CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX",
+    )
+    _single_limit(
+        adapter,
+        "SleeveProfile",
+        "FullDepth",
+        FULL_DEPTH,
+        FULL_DEPTH_DEVIATIONS,
+        FULL_DEPTH_TOL_TYPE,
+        f"{FULL_DEPTH:.{FULL_DEPTH_PLACES}f} MIN",
     )
     apply_span_limits(
         adapter, nominal_mm=SPAN_NOMINAL, deviations=SPAN_DEVIATIONS,

@@ -788,6 +788,24 @@ CHAIN_QUANTITIES = {
     "sh-vn-chain-link--OuterLink": chain.LINK_COUNT // 2 - 1,
     "pd-vn-chain-connecting-link": 1,
 }
+# The inner and outer link rows print one purchase Number, one supplier
+# chain's two link kinds, so the BOM sheet says what that Number is and what
+# to order (2026-10-27 ENFORCE review, r1-r3: one Number with two
+# descriptions and quantities left the order unknown).  It joins the BOM
+# reference's caption, in the air right of that view.
+_CHAIN_CUT_PITCHES = (
+    CHAIN_QUANTITIES["sh-vn-chain-link--InnerLink"]
+    + CHAIN_QUANTITIES["sh-vn-chain-link--OuterLink"]
+)
+BOM_CHAIN_ORDER_NOTE = (
+    f"{BOM_PART_NUMBERS['sh-vn-chain-link--InnerLink']} IS ONE CHAIN,\n"
+    f"MCMASTER {_config.parts('sh-vn-chain-link')['supplier_skus'][0]}: "
+    f"CUT {_CHAIN_CUT_PITCHES} PITCHES,\n"
+    f"{CHAIN_QUANTITIES['sh-vn-chain-link--InnerLink']} INNER AND "
+    f"{CHAIN_QUANTITIES['sh-vn-chain-link--OuterLink']} OUTER LINKS;\n"
+    f"{BOM_PART_NUMBERS['pd-vn-chain-connecting-link']} CLOSES THE LOOP."
+)
+BOM_SHEET_CAPTION = f"{BOM_REFERENCE_CAPTION}\n{BOM_CHAIN_ORDER_NOTE}"
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
 TRANSGEAR_INSTANCES = frozenset(
@@ -2552,7 +2570,7 @@ def _place_bom_sheet(
     ):
         raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
     _place_sheet_note(
-        adapter, SHEET_NAMES[7], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        adapter, SHEET_NAMES[7], BOM_SHEET_CAPTION, BOM_REFERENCE_CAPTION_XY,
         label="BOM reference caption",
     )
     # Insert the complete model's BOM on its own sheet; view-only isolation

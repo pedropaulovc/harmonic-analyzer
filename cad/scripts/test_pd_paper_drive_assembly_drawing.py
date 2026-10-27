@@ -323,6 +323,37 @@ def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
     assert drawing.BOM_COMPONENT_IDENTITIES[inner] != drawing.BOM_COMPONENT_IDENTITIES[outer]
 
 
+def test_bom_sheet_says_what_the_shared_chain_number_orders() -> None:
+    """2026-10-27 ENFORCE review (r1-r3): the inner and outer link rows share
+    one Number, so the BOM sheet states that Number is one supplier chain,
+    the length to cut and how it splits, and what closes the loop."""
+    inner, outer = "sh-vn-chain-link--InnerLink", "sh-vn-chain-link--OuterLink"
+    note = drawing.BOM_CHAIN_ORDER_NOTE
+    sku = _config.parts("sh-vn-chain-link")["supplier_skus"][0]
+    pitches = drawing.CHAIN_QUANTITIES[inner] + drawing.CHAIN_QUANTITIES[outer]
+    assert pitches + drawing.CHAIN_QUANTITIES["pd-vn-chain-connecting-link"] == (
+        drawing.chain.LINK_COUNT
+    )
+    for text in (
+        f"{drawing.BOM_PART_NUMBERS[inner]} IS ONE CHAIN",
+        f"MCMASTER {sku}",
+        f"CUT {pitches} PITCHES",
+        f"{drawing.CHAIN_QUANTITIES[inner]} INNER",
+        f"{drawing.CHAIN_QUANTITIES[outer]} OUTER",
+        drawing.BOM_PART_NUMBERS["pd-vn-chain-connecting-link"],
+    ):
+        assert text in note.replace("\n", " "), text
+    assert drawing.BOM_SHEET_CAPTION.endswith(note)
+    assert drawing.BOM_SHEET_CAPTION.startswith(drawing.BOM_REFERENCE_CAPTION)
+    # The caption hangs right of the reference view, above the border and
+    # left of the title block (rows of at most 36 characters).
+    rows = drawing.BOM_SHEET_CAPTION.split("\n")
+    assert max(len(row) for row in rows) <= 36
+    x, y = drawing.BOM_REFERENCE_CAPTION_XY
+    assert x > drawing.BOM_REFERENCE_LIMITS[2]
+    assert y - len(rows) * NOTE_LINE_PITCH > drawing.SHEET_INNER_BORDER_BOTTOM
+
+
 def test_the_two_locating_dowels_are_not_the_two_knob_wheel_drive_dowels() -> None:
     locating = "pd-vn-transgear-arm-plate-locating-pin"
     driving = "pd-vn-transgear-knob-drive-pin"

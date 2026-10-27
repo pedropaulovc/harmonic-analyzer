@@ -91,6 +91,7 @@ from pd_transgear_feed_pinion_spec import (
     TOOTH_SPACE_INSPECTION_END_MM,
     TOOTH_SPACE_INSPECTION_PHASE_RAD,
     TOOTH_SPACE_CALLOUT_PROPERTY,
+    TOOTH_EDGE_NOTE,
 )
 
 MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
@@ -319,9 +320,22 @@ BORE_FIT_CHAR_HEIGHT = 0.0022
 # the rear-view contact, inside the flank's open quarter (run 12: at 16 mm
 # the shorter callout's leader arrived from behind the flank).
 TOOTH_SPACE_CALLOUT_XY = (0.050, 0.102)
-# The manufacturing notes stand below the callout's leader (run 12: at
-# y 70 mm they overlapped the leader's extent down to the 60 mm landing).
-NOTES_XY = (0.016, 0.056)
+# The tooth-edge exception stands below the callout's leader (run 12: at
+# y 70 mm the notes overlapped the leader's extent down to the 60 mm
+# landing), flagged at the teeth: its leader runs from its longer last row's
+# right end to the tip land of the gear-end view's upper-left tooth (sheet
+# 150°; model 30°, a tooth, as *Back mirrors x), clear above the root's
+# 165° arrow (2026-10-27 ENFORCE review, r2, r3: a loose "do not cut" note
+# reached no feature, rule 7).  The remaining notes hang below it.
+TOOTH_EDGE_LEADER_NOTE = TOOTH_EDGE_NOTE.replace(" ON TOOTH", "\nON TOOTH")
+TOOTH_EDGE_NOTE_XY = (0.016, 0.056)
+TOOTH_EDGE_ATTACH = (
+    REAR_CENTER[0]
+    + (OUTSIDE_DIA / 2.0 - 0.05) * VIEW_SCALE[0] / 1000.0 * math.cos(math.radians(150.0)),
+    REAR_CENTER[1]
+    + (OUTSIDE_DIA / 2.0 - 0.05) * VIEW_SCALE[0] / 1000.0 * math.sin(math.radians(150.0)),
+)
+NOTES_XY = (0.016, TOOTH_EDGE_NOTE_XY[1] - 0.0100)
 TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
 BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
@@ -824,6 +838,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
+    )
+    add_leader_note(
+        adapter,
+        TOOTH_EDGE_LEADER_NOTE,
+        text_xy=TOOTH_EDGE_NOTE_XY,
+        attach_xy=TOOTH_EDGE_ATTACH,
+        label="tooth edge note",
+        view=rear,
+        height=0.0025,
     )
     toothspace_callout = add_toothspace_callout(
         adapter, rear, profile=STOCK_PROFILE,

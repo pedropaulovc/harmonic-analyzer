@@ -246,11 +246,11 @@ _SEAT_AREA_BOUNDS = tuple(
         SEAT_CONTACT_R,
         profile=profile,
         station_mm=SLEEVE.FACE_WIDTH + face_deviation,
-        full_depth_mm=SLEEVE.FULL_DEPTH + depth_deviation,
+        full_depth_mm=full_depth,
     )
     for profile in SLEEVE.manufactured_profiles()
     for face_deviation in (-SLEEVE.FACE_WIDTH_BAND, SLEEVE.FACE_WIDTH_BAND)
-    for depth_deviation in (-SLEEVE.FULL_DEPTH_BAND, SLEEVE.FULL_DEPTH_BAND)
+    for full_depth in (SLEEVE.FULL_DEPTH_MIN, SLEEVE.FULL_DEPTH_MAX)
 )
 SEAT_CONTACT_AREA_BOUNDS = (
     min(lower for lower, _upper in _SEAT_AREA_BOUNDS),
