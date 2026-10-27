@@ -1913,21 +1913,28 @@ drive. Auth is **keyless** via `DefaultAzureCredential`:
 - **builder (`vm-solidworks`)** → its system-assigned managed identity
   (granted *Storage Blob Data Contributor*); nothing to log in.
 
-Each process shares its cache credential and reuses tokens across blob clients
-for matching token requests. Refresh is singleflight per request identity and
-starts five minutes before expiry (or at the token's earlier `refresh_on` time).
-Backoff does not hold a lock or delay unrelated identities. Speculative prewarm
-keeps a private client until it succeeds, so the first real probe can proceed
+The published cache backend shares its credential and reuses tokens across blob
+clients for matching token requests. Refresh is singleflight per request identity
+and starts five minutes before expiry (or at the token's earlier `refresh_on`
+time). Backoff does not hold a lock or delay unrelated identities. Speculative
+prewarm uses a private client and one acquisition attempt, without retry backoff.
+Only a successfully warmed client can be published; failed or losing speculative
+clients and their credentials are closed. The first real probe can proceed
 independently after its bounded prewarm wait.
 
 Only credential unavailability is retried: at most three acquisition attempts,
 with one- then two-second backoffs. This includes a chained credential's
 `ClientAuthenticationError` only when typed observations of its attempted links
 show they were all unavailable; genuine authentication failures fail immediately.
+Exhausted unavailability is remembered per request identity for 30 seconds, so
+later cache operations fail fast with the original exception rather than repeat
+the full chain and backoff. Acquisition can recover after that cooldown.
 Unhashable request options bypass token reuse without preventing acquisition.
 Every retry emits a `cache.credential.retry` span event and warning when telemetry
 is already loaded; a bare pool probe never imports/configures telemetry for this.
-Exception/cause types are recorded, but no token or claims. Exhausted credential
+Structured observations identify each chain link, its outcome, exception and
+cause types; the acquisition span records the attempt count. No token, claims or
+raw exception message is recorded by retry telemetry. Exhausted credential
 failures retain their original exception and follow the existing restore/store
 error path. In particular, a farm success still requires a successful restore of
 the exact key: credential failure cannot make `cache_missing` pass.
