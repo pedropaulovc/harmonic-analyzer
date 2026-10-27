@@ -44,7 +44,7 @@ BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 # --- Section ----------------------------------------------------------------
 END_R = 12.5  # full round about K; both tapers are tangent to it
 WIDTH = 38.1  # 1-1/2 in bar, symmetric about K
-# 5.4 (was 5.0; pending owner confirmation, #1379): the arm's front face A
+# 5.4 (was 5.0; owner ruling 2026-10-27, #1379): the arm's front face A
 # carries a 0.05 flatness frame, so the plate seat may tilt 0.1008 over the
 # seat span; at 5.0 the MHA-PD-VN-56 worst thread engagement fell to 1.468D.
 # 5.4 restores 1.566D. The boss gives the 0.4 back, so its face, the knob

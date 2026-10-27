@@ -69,13 +69,15 @@ if ARM_SEAT_WITNESS_MIN_WIDTH_MM < ARM_SEAT_SPAN_MIN_MM:
 # The arm's rear face carries no parallelism frame (machinist review, rule 5):
 # it is the 9517K466 ground stock's as-supplied face, thickness 5/16 ±0.001"
 # (the only face tolerance McMaster lists, page read 2026-10-27). The front
-# face A carries a flatness frame instead (codjiflo review of #2015,
-# coordinator ruling, pending owner confirmation): the A-referenced taps and
-# running axes see the rear face anywhere inside the front face's flatness
-# zone plus the full thickness spread, so the rear face lies within that sum
-# parallel to A. The governing gate is the MHA-PD-VN-56 plate screw's worst
-# full-thread engagement, >= 1.5D, which the plate's 5.4 over-arm section
-# restores.
+# face A carries a flatness frame instead (codjiflo review of #2015; owner
+# ruling 2026-10-27, #1379): the A-referenced taps and running axes see the
+# rear face anywhere inside the front face's flatness zone plus the full
+# thickness spread, so the rear face lies within that sum parallel to A.
+# Owner ruling 2026-10-27 (#1379): datum A is taken as established by the
+# minimax (Chebyshev) fit, whose plane bounds the minimum flatness zone, so
+# the flatness zone is parallel to A. The governing gate is the
+# MHA-PD-VN-56 plate screw's worst full-thread engagement, >= 1.5D, which
+# the plate's 5.4 over-arm section restores.
 ARM_FRONT_FACE_FLATNESS_MM = 0.05
 ARM_OPPOSITE_FACE_PARALLELISM_MM = ARM_FRONT_FACE_FLATNESS_MM + 2.0 * ARM.THICKNESS_BAND
 AXIS_PROJECTED_ZONE_DIAMETER_MM = reducer_axis_projected_zone_diameter_mm()
