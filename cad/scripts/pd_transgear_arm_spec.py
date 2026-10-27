@@ -168,6 +168,11 @@ LOCATOR_CALLOUT = "\n".join((
     f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
     f"{LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{LOCATOR_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
 ))
+# The blind depth's ±0.05 keeps the pressed dowel off the floor at its
+# proud set (``pd_vn_transgear_arm_plate_locating_pin_spec.ARM_BOTTOM_AIR_MIN_MM``).
+if LOCATOR_PIN.ARM_BOTTOM_AIR_MIN_MM <= 0.0:
+    raise AssertionError("the MHA-PD-VN-64 dowel bottoms in the MHA-PD-18 socket")
+LOCATOR_DEPTH_CALLOUT = "DOWEL CLEARS FLOOR"
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix

@@ -89,6 +89,7 @@ from pd_transgear_arm_spec import (
     OVERALL_LENGTH,
     PIN_BORE_CALLOUT,
     LOCATOR_CALLOUT,
+    LOCATOR_DEPTH_CALLOUT,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_EDGE_BREAK_CALLOUT,
@@ -188,8 +189,12 @@ def _station_row(index: int) -> float:
 
 
 _LOCATOR_X = _front_x(LOCATOR_SITES_MM[0][0])
-# Midway between plate tap 1's and the sockets' station witness lines.
-_LOCATOR_OFFSET_X = (_front_x(PLATE_TAP_STATIONS[0]) + _LOCATOR_X) / 2.0
+# The socket offsets' shared dimension line, 2 mm short of the sockets'
+# station witness line: each 6.850 hangs LEFT of it, so the text stands
+# between plate tap 1's witness line and the sockets' (run
+# 20261027T124240514Z's audit: midway, plate tap 1's witness line struck
+# the lower 6.850).
+_LOCATOR_OFFSET_X = _LOCATOR_X - 0.002
 FRONT_KEEP = {
     # Lower left of the pivot round, clear of datum B's tag above it.
     "PivotEndR": (0.025, FRONT_CENTER[1] + 0.010),
@@ -272,6 +277,7 @@ DIMENSION_CALLOUTS = {
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "LocatorDia1": LOCATOR_CALLOUT_TEXT,
+    "LocatorDepth": LOCATOR_DEPTH_CALLOUT,
 }
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
