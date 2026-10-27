@@ -255,7 +255,7 @@ def test_isolated_counter_provenance_identifies_the_whole_made_support(
     assert support["tip_chamfer_mm"] == 0.5
     assert support["underhead_corner_r_mm"] == 0.50
     assert support["tube_dia_mm"] == pytest.approx(12.70)
-    assert support["plug_head_length_mm"] == 21.00
+    assert support["plug_head_length_mm"] == 21.50
     assert support["plug_length_mm"] == 26.00
     assert support["plug_counterbore_dia_mm"] == 7.00
     assert support["plug_counterbore_depth_mm"] == 2.78

@@ -279,7 +279,7 @@ springs:
           major_dia_mm: 6.35
           body_dia_mm: 6.35
           plain_length_min_mm: 3.6
-          full_thread_station_max_mm: 5.8
+          full_thread_station_max_mm: 5.71
           head_dia_mm: 11.5
           head_height_mm: 6.6
           head_relief_chamfer_mm: 1.45
@@ -291,7 +291,7 @@ springs:
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
-          plug_head_length_mm: 21.0
+          plug_head_length_mm: 21.5
           plug_length_mm: 26.0
           plug_counterbore_dia_mm: 7.0
           plug_counterbore_depth_mm: 2.78
@@ -326,16 +326,16 @@ springs:
           length_mm: 350.26533131534217
           lower_eye_xy:
           - -91.19999999999999
-          - 1010.3428723439941
+          - 1010.3428723439944
           upper_eye_xy:
           - -91.2
-          - 1351.1086036593363
+          - 1351.1086036593365
           axis_xy:
           - -4.068867282667633e-17
           - 1.0
           centre_xy:
           - -91.19999999999999
-          - 1180.7257380016651
+          - 1180.7257380016654
           clocking: half_turn
         gooseneck_origin_y_mm: 1189.3784303519294
         upper_support:
@@ -347,7 +347,7 @@ springs:
           major_dia_mm: 6.35
           body_dia_mm: 6.35
           plain_length_min_mm: 3.6
-          full_thread_station_max_mm: 5.8
+          full_thread_station_max_mm: 5.71
           head_dia_mm: 11.5
           head_height_mm: 6.6
           head_relief_chamfer_mm: 1.45
@@ -359,11 +359,11 @@ springs:
           arm_end_x_mm: -103.359695
           spring_eye_x_mm: -105.8
           tube_dia_mm: 12.7
-          plug_head_length_mm: 21.0
+          plug_head_length_mm: 21.5
           plug_length_mm: 26.0
           plug_counterbore_dia_mm: 7.0
           plug_counterbore_depth_mm: 2.78
           plug_edge_break_mm: 0.25
         final_distance_mm:
           lower: 3.7864959429115734e-06
-          upper: 3.417007566413843e-05
+          upper: 3.4170074775922006e-05
