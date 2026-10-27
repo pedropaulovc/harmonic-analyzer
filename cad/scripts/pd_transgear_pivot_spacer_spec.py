@@ -24,7 +24,7 @@ import math
 
 import _mcmaster_90325a174 as SCREW
 from _gtol_planar import PlanarFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 OD = 8.6
 OD_BAND = 0.13  # ±0.13: 0.142 worst to the lock stations, floating (R9-61)
@@ -118,10 +118,18 @@ ISOMETRIC_VIEW_NOTE = (
     f"ISOMETRIC VIEW SCALE {ISOMETRIC_VIEW_SCALE[0]}:{ISOMETRIC_VIEW_SCALE[1]}"
 )
 
-# Both end faces are MACHINED (drawing-guidelines.md rule 6 (roughness symbols only where a surface runs, slides or locates)): the arm runs on the rear face
-# and the front face bears on the bar.  Resolved on the exact native faces by
-# outward normal and offset in the part frame.  The bore carries no symbol.
+# drawing-guidelines.md rule 6 (roughness symbols only where a surface runs,
+# slides or locates): the arm swings on the shoulder against the rear face, so
+# the rear face runs (MACHINED, labelled as the arm's bearing face on the
+# sheet); the front face is the one static seat that locates the ring on the
+# bar (SEAT).  Resolved on the exact native faces by outward normal and offset
+# in the part frame.  The pressed bore carries no symbol.
 SURFACE_FINISHES = (
-    SurfaceFinishControl("front_face", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
-    SurfaceFinishControl("rear_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), LENGTH)),
+    SurfaceFinishControl("front_face", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
+    SurfaceFinishControl(
+        "rear_face",
+        MACHINED_UM,
+        PlanarFace((0.0, 0.0, 1.0), LENGTH),
+        production_method="BEARING FACE",
+    ),
 )

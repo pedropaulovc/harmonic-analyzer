@@ -1,15 +1,18 @@
 r"""Create the manufacturing drawing for the transgear pivot spacer (MHA-PD-20).
 
 A turned brass ring: Ø8.600 O.D. over a reamed Ø4.727 +0.008/0 bore (a light
-press on the MHA-PD-VN-57 shoulder), 5.500 long under its explicit band.  The
+press on the MHA-PD-VN-57 shoulder), 5.000 long under its explicit band.  The
 profile lies as it sits in the lathe (axis horizontal): the ``*Top`` view
 turned a quarter turn, so model +Z runs LEFT and the bar-side front face
 (z 0) is the profile's right end, the rear face (on the arm) its left end.
-Each end face carries its running finish and its perpendicularity to the
-bore, the length sits under the profile and the O.D. moves onto the profile
+Each end face carries its finish (the arm's bearing face and the bar seat)
+and its perpendicularity to the bore, the length sits under the profile and
+the O.D. moves onto the profile
 (drawing-guidelines.md rule 11 (turned parts read like the lathe): diameters on the side view).  The end view to its left (third
 angle, looking along -Z from the +Z end) keeps the bore, a solid circle only
-end-on, and its axis is datum A.
+end-on, and its axis is datum A.  Each banded size names what it serves
+(rule 4): the bore its press on the screw's shoulder, the length the spring
+room it sets.
 
 Run with SolidWorks open::
 
@@ -31,9 +34,9 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
     view_name,
 )
-
 from _check import check
 from _com import _early_bound
+import _config
 from _drawing_centerline import add_view_centerline
 from _drawing_common import (
     DrawingOutputs,
@@ -44,7 +47,11 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_dimension_import import curate_view_dimensions
-from _drawing_dimensions import assert_imported_precision, set_dimension_callouts
+from _drawing_dimensions import (
+    assert_imported_precision,
+    offset_dimension_text,
+    set_dimension_callouts,
+)
 from _drawing_edges import ViewEdge, ViewEdges, scan_view_edges
 from _drawing_finish import add_surface_finish
 from _drawing_gdt import add_feature_control_frame
@@ -56,6 +63,7 @@ from _gear_drawing_entities import visible_circle_edge
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import audit_sheet, format_findings
+from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import add_native_axis_datum
 from _paths import CAD_ROOT
 from _session import run_build
@@ -72,9 +80,13 @@ from pd_transgear_pivot_spacer_spec import (
     ISOMETRIC_VIEW_SCALE,
     LENGTH,
     OD,
+    PRESS_INTERFERENCE,
     SURFACE_FINISHES,
 )
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_pivot_spacer"]
 PART_STEM = SPEC.artifact_stem
@@ -111,15 +123,36 @@ _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 # profile is hidden-lines-removed (a dimension never lands on a hidden line).
 # The O.D. arrives there too and is moved onto the profile below.
 END_KEEP = {
-    "BoreDia": (0.045, 0.205),
+    "BoreDia": (0.050, 0.222),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# Rule 4: every tight band names its mate.  The ream's band holds a light
+# press on the MHA-PD-VN-57 shoulder: the interference both limits produce,
+# printed outward to three places, on the screw named by its number.  The
+# length's ±0.05 sets the MHA-PD-VN-63 spring's room between the arm's spot
+# face floor and the shim under the screw head (transgear_hanger_joints).
+_SCREW_NUMBER = _config.parts("pd-vn-transgear-pivot-screw")["number"]
+_SPRING_NUMBER = _config.parts("pd-vn-transgear-pivot-spring")["number"]
+PRESS_CALLOUT = (
+    f"{math.floor(PRESS_INTERFERENCE[0] * 1000.0 + 1e-9) / 1000.0:.3f}-"
+    f"{math.ceil(PRESS_INTERFERENCE[1] * 1000.0 - 1e-9) / 1000.0:.3f} DIAMETRAL\n"
+    f"INTERFERENCE ON\n{_SCREW_NUMBER} SHOULDER"
+)
+LENGTH_CALLOUT = f"SETS {_SPRING_NUMBER}\nSPRING ROOM"
+DIMENSION_CALLOUTS = {
+    "BoreDia": f"{BORE_CALLOUT}\n{PRESS_CALLOUT}",
+    "RingLength": LENGTH_CALLOUT,
+}
 # The length under the profile; the O.D. right of the part, its dimension line
 # far enough out that the front face's finish symbol sits between them.
 PROFILE_KEEP = {
     "RingLength": (PROFILE_CENTER[0], _PROFILE_BOTTOM - 0.022),
 }
+# The length's text and its callout are wider than the 25 between its
+# extension lines, so they stand offset right of the front face's extension
+# line, level with the dimension line and under the O.D.'s lower extension
+# line (clarity, review 2026-10-23: text struck by both extension lines).
+LENGTH_TEXT_XY = (_PROFILE_FRONT_X + 0.032, PROFILE_KEEP["RingLength"][1])
 OD_ON_PROFILE = (_PROFILE_FRONT_X + 0.040, PROFILE_CENTER[1])
 
 # Each face's pick lies on its edge line between the bore and O.D. radii.  The
@@ -502,7 +535,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the length's and bore's bands are authored on the part; the sheet
     # only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    offset_dimension_text(adapter, profile_annotations, {"RingLength": LENGTH_TEXT_XY})
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the spacer end view")
     # The turning axis, picked on the O.D. face above it.
