@@ -658,7 +658,7 @@ def _assert_single_limits(adapter: Any, annotations: list[Any]) -> None:
                 f"{name} lost its native MAX type: {int(tolerance.Type)}"
             )
         if not math.isclose(float(dimension.SystemValue), limit / 1000.0, abs_tol=1e-9):
-            raise RuntimeError(f"{name} does not measure its {limit} MAX")
+            raise RuntimeError(f"{name} does not measure its part's limit {limit}")
 
 
 def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> None:
