@@ -159,18 +159,22 @@ DETAIL_LETTER = "A"
 DETAIL_LABEL_TEXT = (
     f"DETAIL {DETAIL_LETTER}\nSCALE {DETAIL_SCALE[0]} : {DETAIL_SCALE[1]}"
 )
-# The fence, model mm (x = radius, y = axial): mid-relief, 0.6 off the axis.
-# Radius 2.0 holds the axis, the relief floor and both roots, the step face
-# out to the shank's corner (1.86 off) and the flank: every reference the
-# three dimensions take, since a crop drops a dimension whose reference it
+# The fence, model mm (x = radius, y = axial): mid-relief, 0.6 off the axis
+# on the -x side (up the sheet). Farm run 20261024T140241347Z attached the
+# imported ReliefRootR to the root on that side of the axis (the revolve's
+# mirror silhouette, not the sketch's +x half), so the fence frames that
+# side: its step face out to the shank's corner (1.86 off), the floor, both
+# roots and the flank to the thread major. Radius 2.0 also holds the axis
+# and the +x floor (1.62 off), so whichever floor silhouette a linear
+# dimension takes stays inside: a crop drops a dimension whose reference it
 # cuts away.
-DETAIL_FOCUS_MM = (0.6, STEP_Y + RELIEF_WIDTH / 2.0)
+DETAIL_FOCUS_MM = (-0.6, STEP_Y + RELIEF_WIDTH / 2.0)
 _DETAIL_FOCUS_M = (DETAIL_FOCUS_MM[0] / 1000.0, DETAIL_FOCUS_MM[1] / 1000.0, 0.0)
 DETAIL_RADIUS_MM = 2.0
 DETAIL_CROP_RADIUS = DETAIL_RADIUS_MM * _DS / 1000.0
 # Lower left, under the side view's rows and left of the title block:
-# x 0.055-0.095, y 0.035-0.075.
-DETAIL_CENTER = (0.075, 0.055)
+# x 0.060-0.100, y 0.038-0.078.
+DETAIL_CENTER = (0.080, 0.058)
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 DETAIL_POSITION_TOL_M = 1e-4
 CIRCLE_TOL_M = 1e-7
@@ -189,29 +193,34 @@ _DETAIL_TOP = DETAIL_CENTER[1] + DETAIL_CROP_RADIUS
 _DETAIL_BOTTOM = DETAIL_CENTER[1] - DETAIL_CROP_RADIUS
 _DETAIL_RIGHT = DETAIL_CENTER[0] + DETAIL_CROP_RADIUS
 # The roots' centres (model mm): each R0.2 sits in its corner of the floor,
-# the step's and the flank's.
-RELIEF_ROOT_CENTRES_MM = (
-    (RELIEF_DIA / 2.0 + RELIEF_ROOT_R, STEP_Y + RELIEF_ROOT_R),
-    (RELIEF_DIA / 2.0 + RELIEF_ROOT_R, STEP_Y + RELIEF_WIDTH - RELIEF_ROOT_R),
+# the step's and the flank's, on both sides of the axis (a radius may attach
+# to either silhouette of the turned fillet).
+RELIEF_ROOT_CENTRES_MM = tuple(
+    (side * (RELIEF_DIA / 2.0 + RELIEF_ROOT_R), axial)
+    for side in (-1.0, 1.0)
+    for axial in (STEP_Y + RELIEF_ROOT_R, STEP_Y + RELIEF_WIDTH - RELIEF_ROOT_R)
 )
 ROOT_TIP_TOL_M = 0.0002
 DETAIL_KEEP = {
-    # Over the crop, its extension lines rising from the floor's two ends;
-    # its text right of the flank's extension line, its two-line mate callout
-    # under the value, right of the crop.
-    "ReliefWidth": (_DETAIL_RIGHT + 0.027, _DETAIL_TOP + 0.006),
-    # Under the crop, its line falling through the groove's air from the
-    # floor.
+    # Under the crop, nearest the part: its extension lines fall from the
+    # floor's two ends through the groove's air, its two-line mate callout
+    # under the value.
+    "ReliefWidth": (DETAIL_CENTER[0], _DETAIL_BOTTOM - 0.005),
+    # Over the crop: its line runs between the two floors 0.3 (3 mm) from the
+    # step, inside the flat floor (the step's root ends 0.4 from it) and left
+    # of the radius's arrow, then rises through the groove's open mouth.
     "ReliefDia": (
-        _detail_xy(0.0, STEP_Y + RELIEF_WIDTH / 2.0)[0],
-        _DETAIL_BOTTOM - 0.008,
+        _detail_xy(0.0, STEP_Y + 0.3)[0],
+        _DETAIL_TOP + 0.005,
     ),
-    # "2X / R0.2 MAX" down-right of the crop, opposite the roots' arcs: its
-    # leader rises up-left through the groove's air to a root.
-    "ReliefRootR": (_DETAIL_RIGHT + 0.013, _DETAIL_BOTTOM + 0.005),
+    # "2X / R0.2 MAX" up-right of the crop, opposite the step-side root's own
+    # (down-left) quarter on the -x side: its leader leaves that root's
+    # up-right point through the groove's mouth at about 32 deg, 3 mm over the
+    # thread's crest at the flank, and right of the Ø's text.
+    "ReliefRootR": (DETAIL_CENTER[0] + 0.022, DETAIL_CENTER[1] + 0.022),
 }
 # Left of the crop, so the label reads with its view.
-DETAIL_LABEL_XY = (0.015, DETAIL_CENTER[1] - 0.010)
+DETAIL_LABEL_XY = (0.015, DETAIL_CENTER[1] + 0.005)
 # The mark's letter, under the mark circle round the side view's step,
 # between the step's and the thread end's extension lines.
 PARENT_LETTER_XY = (STEP_X + 0.008, SIDE_CENTER[1] - 0.009)
@@ -635,12 +644,11 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
     """Land detail A's ReliefRootR leader on a root's circle, on its text's
     side (draw_mg_magnifying_vertical_rod._dress_relief_roots).
 
-    Read back: radial. The text stands down-right of the roots, opposite the
-    arcs' own (up-left, up-right) quarters. SolidWorks ends a radial leader
-    at the circle point facing its text and does not carry it through the
-    centre, so ``ArcExtensionLineOrOppositeSide`` True draws the arc's
-    extension out to that point. The rebuilt arrow tip must sit on one
-    root's circle, below its centre.
+    Read back: radial. SolidWorks ends a radial leader at the circle point
+    facing its text and does not carry it through the centre, so
+    ``ArcExtensionLineOrOppositeSide`` True draws the arc's extension out to
+    that point. The rebuilt arrow tip must sit on one root's circle (either
+    root, either side of the axis), on its text's side of that root's centre.
     """
     annotation = _early_bound(
         _named(adapter, annotations, "ReliefRootR"), "IAnnotation"
@@ -663,6 +671,7 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
         raise RuntimeError("ReliefRootR has incomplete arrow-head coordinates")
     tip = (arrow[0], arrow[1])
     radius = RELIEF_ROOT_R * _DS / 1000.0
+    text = DETAIL_KEEP["ReliefRootR"]
     for index, centre_mm in enumerate(RELIEF_ROOT_CENTRES_MM):
         centre = model_point_in_view(
             adapter,
@@ -671,18 +680,16 @@ def _dress_relief_roots(adapter: Any, detail: Any, annotations: list[Any]) -> No
             label=f"relief root {index} centre",
         )
         off = (tip[0] - centre[0], tip[1] - centre[1])
-        if (
-            abs(math.hypot(*off) - radius) <= ROOT_TIP_TOL_M
-            and off[1] <= ROOT_TIP_TOL_M
-        ):
+        toward_text = (text[0] - centre[0]) * off[0] + (text[1] - centre[1]) * off[1]
+        if abs(math.hypot(*off) - radius) <= ROOT_TIP_TOL_M and toward_text > 0.0:
             _telemetry.info(
                 f"relief roots radius: text {display.GetText(1)!r}, arrow tip {tip} "
-                f"on root {index}'s circle"
+                f"on root {index}'s circle ({centre_mm} mm)"
             )
             return
     raise RuntimeError(
-        f"ReliefRootR's arrow tip {tip} is on neither relief root's circle "
-        f"under its centre (R {radius})"
+        f"ReliefRootR's arrow tip {tip} is on no relief root's circle on its "
+        f"text's side (R {radius})"
     )
 
 
