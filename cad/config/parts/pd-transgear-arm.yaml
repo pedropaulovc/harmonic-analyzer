@@ -2,7 +2,7 @@ pd-transgear-arm:
   title: Transgear Arm
   number: MHA-PD-18
   material: AISI 1018 cold-finished steel
-  material_specification: "AISI 1018 cold-finished steel bar, ASTM A108; 5/16 x 1 precision-ground flat, thickness ±0.001 in (McMaster-Carr 9517K466)"
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
   finish: bright machined; protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
