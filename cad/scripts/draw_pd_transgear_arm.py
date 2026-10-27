@@ -331,7 +331,9 @@ PIN_SECTION_LABEL = "D"
 PIN_SECTION_ZONE_CENTER = (FRONT_CENTER[0], 0.125)
 # The caption's top stands this far under the cut face.
 _PIN_CAPTION_GAP_M = 0.006
-_CAPTION_SETTLE_M = 2e-4
+# Half a millimetre: run 20261027T212717523Z's four moves left it 0.26 mm
+# off at 0.2 (a native caption's extent does not follow a move exactly).
+_CAPTION_SETTLE_M = 5e-4
 _CAPTION_MOVES = 4
 _SW_INPUT_DIM_VAL_ON_CREATE = 10  # swUserPreferenceToggle_e.swInputDimValOnCreate
 
@@ -866,8 +868,9 @@ def _pin_section_caption_settled(adapter: Any, section: Any) -> None:
         extent = tuple(float(value) for value in note.GetExtent())
         return extent, (target[0] - (extent[0] + extent[3]) / 2.0, target[1] - extent[4])
 
-    for _move in range(_CAPTION_MOVES):
+    for move in range(_CAPTION_MOVES):
         extent, error = miss()
+        _telemetry.info(f"section D-D caption move {move}: extent {extent}, off {error}")
         if max(map(abs, error)) < _CAPTION_SETTLE_M:
             break
         move_annotation(adapter, note.GetAnnotation(), *error, label="section D-D caption")
