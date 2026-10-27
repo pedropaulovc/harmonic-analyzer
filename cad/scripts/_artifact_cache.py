@@ -116,6 +116,7 @@ import re
 import secrets
 import shutil
 import stat
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -828,6 +829,11 @@ class _BlobBackend:
         self._cc = container_client
         self._credential = credential
 
+    def enable_credential_retries(self):
+        """Promote a successfully warmed private credential to the normal policy."""
+        if self._credential is not None:
+            self._credential.enable_retries()
+
     def close(self):
         """Close a private backend; Azure's client closes sockets, not credentials."""
         try:
@@ -1293,6 +1299,7 @@ def _token_request_identity(value):
 class _CredentialOutcome(Enum):
     SUCCESS = "success"
     UNAVAILABLE = "unavailable"
+    TRANSIENT = "transient"
     FAILURE = "failure"
 
 
@@ -1304,6 +1311,23 @@ class _CredentialObservation:
     outcome: _CredentialOutcome
 
 
+def _transient_credential_cause(exc):
+    from azure.core.exceptions import ServiceRequestError, ServiceResponseError
+
+    pending = [exc]
+    seen = set()
+    while pending:
+        cause = pending.pop()
+        if cause is None or id(cause) in seen:
+            continue
+        seen.add(id(cause))
+        if isinstance(cause, (subprocess.TimeoutExpired, TimeoutError,
+                              ServiceRequestError, ServiceResponseError)):
+            return True
+        pending.extend((cause.__cause__, cause.__context__))
+    return False
+
+
 def _credential_observation(inner, exc=None):
     from azure.identity import CredentialUnavailableError
 
@@ -1313,12 +1337,14 @@ def _credential_observation(inner, exc=None):
         type(exc).__name__ if exc is not None else "",
         type(cause).__name__ if cause is not None else "",
         (_CredentialOutcome.SUCCESS if exc is None else
-         _CredentialOutcome.UNAVAILABLE if isinstance(exc, CredentialUnavailableError) else
+         (_CredentialOutcome.TRANSIENT if _transient_credential_cause(exc) else
+          _CredentialOutcome.UNAVAILABLE) if isinstance(exc, CredentialUnavailableError) else
          _CredentialOutcome.FAILURE),
     )
 
 
 _CREDENTIAL_COOLDOWN_S = 30.0
+_CREDENTIAL_ATTEMPTS = 3
 
 
 class _ObservedCredentialLink:
@@ -1354,23 +1380,22 @@ class _ObservedCredentialLink:
 
 
 class _SharedTokenCredential:
-    """Share expiring tokens across the process's memoized blob client's pipelines.
+    """Singleflight token acquisition by interface, scopes and complete options.
 
-    Azure's individual bearer policies cache tokens, but separate blob pipelines
-    can still fetch independently, and AzureCliCredential does not cache at all.
-    Serialize refreshes here and span the actual acquisition (``cache.credential``),
-    reusing only the same interface, scopes and complete request options. Refresh
-    five minutes before expiry, or at ``refresh_on`` if earlier. Only credential
-    unavailability is retried, at most three attempts with 1 s / 2 s backoff;
-    authentication failures fail fast; exhausted unavailability cools down for 30 s.
+    Azure blob clients already share a bearer policy; this proxy additionally
+    coordinates concurrent acquisitions and preserves complete token identity.
+    Refresh five minutes before expiry, or at ``refresh_on`` if earlier. Only
+    typed transient causes of credential unavailability get up to three attempts
+    with 1 s / 2 s backoff. Authentication failures and unconfigured sources fail
+    fast. Exhaustion suppresses retries for 30 s, never fresh acquisition.
     """
 
-    def __init__(self, inner, *, attempts=3):
+    def __init__(self, inner, *, attempts=_CREDENTIAL_ATTEMPTS):
         self._inner = inner
         self._tokens = {}
         self._token_lock = threading.Lock()
         self._inflight = {}
-        self._failures = {}
+        self._retry_after = {}
         self._attempts = attempts
         self._observation = threading.local()
         from azure.identity import ChainedTokenCredential
@@ -1385,6 +1410,9 @@ class _SharedTokenCredential:
                 for link in inner.credentials
             )
             self._chain_size = len(inner.credentials)
+
+    def enable_retries(self):
+        self._attempts = _CREDENTIAL_ATTEMPTS
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
@@ -1405,12 +1433,6 @@ class _SharedTokenCredential:
                     refresh_at = min(refresh_at, refresh_on)
                 if time.time() < refresh_at:
                     return saved
-            failure = self._failures.get(identity)
-            if failure is not None:
-                deadline, exc = failure
-                if time.monotonic() < deadline:
-                    raise exc.with_traceback(None)
-                del self._failures[identity]
             pending = self._inflight.get(identity)
             owner = pending is None
             if owner:
@@ -1422,6 +1444,7 @@ class _SharedTokenCredential:
             token = self._acquire(method, scopes, kwargs, identity)
             with self._token_lock:
                 self._tokens[identity] = token
+                self._retry_after.pop(identity, None)
             pending.set_result(token)
             return token
         except BaseException as exc:
@@ -1431,33 +1454,44 @@ class _SharedTokenCredential:
             with self._token_lock:
                 del self._inflight[identity]
 
-    def _unavailable(self, exc, observations):
-        from azure.identity import CredentialUnavailableError
-
-        return isinstance(exc, CredentialUnavailableError) or (
-            self._chain_size > 0
-            and len(observations) == self._chain_size
-            and all(link.outcome is _CredentialOutcome.UNAVAILABLE for link in observations)
-        )
-
     def _acquire(self, method, scopes, kwargs, identity=None):
         from azure.core.exceptions import ClientAuthenticationError
+        from azure.identity import CredentialUnavailableError
+
+        with self._token_lock:
+            attempts = (
+                1 if identity is not None
+                and time.monotonic() < self._retry_after.get(identity, 0)
+                else self._attempts
+            )
 
         with _phase("cache.credential", credential=type(self._inner).__name__) as span:
-            for attempt in range(1, self._attempts + 1):
+            for attempt in range(1, attempts + 1):
                 span.set_attribute("attempts", attempt)
                 self._observation.links = []
                 try:
                     return getattr(self._inner, method)(*scopes, **kwargs)
                 except ClientAuthenticationError as exc:
                     observations = self._observation.links
-                    if not self._unavailable(exc, observations):
+                    if isinstance(exc, CredentialUnavailableError):
+                        transient = _transient_credential_cause(exc)
+                    else:
+                        transient = (
+                            self._chain_size > 0
+                            and len(observations) == self._chain_size
+                            and all(link.outcome in (
+                                _CredentialOutcome.UNAVAILABLE, _CredentialOutcome.TRANSIENT,
+                            ) for link in observations)
+                            and any(link.outcome is _CredentialOutcome.TRANSIENT
+                                    for link in observations)
+                        )
+                    if not transient:
                         raise
-                    if attempt == self._attempts:
-                        if identity is not None:
+                    if attempt == attempts:
+                        if identity is not None and attempts > 1:
                             with self._token_lock:
-                                self._failures[identity] = (
-                                    time.monotonic() + _CREDENTIAL_COOLDOWN_S, exc,
+                                self._retry_after[identity] = (
+                                    time.monotonic() + _CREDENTIAL_COOLDOWN_S
                                 )
                         raise
                     self._retry_notice(exc, attempt, observations)
@@ -1502,7 +1536,7 @@ class _SharedTokenInfoCredential(_SharedTokenCredential):
         return self._get_token("get_token_info", scopes, kwargs)
 
 
-def _make_backend(*, attempts=3) -> _BlobBackend | None:
+def _make_backend(*, attempts=_CREDENTIAL_ATTEMPTS) -> _BlobBackend | None:
     try:
         from azure.storage.blob import ContainerClient
     except ImportError:
@@ -1528,7 +1562,8 @@ def _make_backend(*, attempts=3) -> _BlobBackend | None:
             account_url, container, credential=proxy, max_single_get_size=_ARCHIVE_CACHE_MIN,
         )
     except BaseException:
-        proxy.close()
+        with contextlib.suppress(Exception):
+            proxy.close()
         raise
     return _BlobBackend(client, proxy)
 
@@ -1610,8 +1645,7 @@ def _warm() -> None:
             with _BACKEND_LOCK:
                 if isinstance(_BACKEND, _Unset):
                     # Once public, future real refreshes get the normal retry policy.
-                    if isinstance(backend, _BlobBackend) and backend._credential is not None:
-                        backend._credential._attempts = 3
+                    backend.enable_credential_retries()
                     _BACKEND = backend
                     published = True
     finally:

@@ -1922,13 +1922,18 @@ Only a successfully warmed client can be published; failed or losing speculative
 clients and their credentials are closed. The first real probe can proceed
 independently after its bounded prewarm wait.
 
-Only credential unavailability is retried: at most three acquisition attempts,
-with one- then two-second backoffs. This includes a chained credential's
-`ClientAuthenticationError` only when typed observations of its attempted links
-show they were all unavailable; genuine authentication failures fail immediately.
-Exhausted unavailability is remembered per request identity for 30 seconds, so
-later cache operations fail fast with the original exception rather than repeat
-the full chain and backoff. Acquisition can recover after that cooldown.
+Only transient credential unavailability is retried: at most three acquisition
+attempts, with one- then two-second backoffs. Typed observations distinguish
+unavailability caused by subprocess/network timeouts or transport failures from
+missing configuration. A chain with no usable credential source costs one
+traversal and no backoff; genuine authentication failures also fail immediately.
+
+Exhausted transient unavailability suppresses **additional retries** for that
+request identity for 30 seconds, but never caches or replays an exception.
+Every later acquisition still makes one fresh attempt, so a recovered credential
+can immediately restore published artifacts, including after farm success.
+Successful acquisition clears retry suppression; after the deadline, the full
+bounded retry budget is available again.
 Unhashable request options bypass token reuse without preventing acquisition.
 Every retry emits a `cache.credential.retry` span event and warning when telemetry
 is already loaded; a bare pool probe never imports/configures telemetry for this.
