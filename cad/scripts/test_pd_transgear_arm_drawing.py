@@ -386,13 +386,20 @@ def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     assert geometry.PIVOT_BORE_DIA == pytest.approx(pivot_screw.SHOULDER_DIA + (lower + upper) / 2.0)
     assert joints.SHOULDER_RADIAL_CLEARANCE == pytest.approx(lower / 2.0)
     assert joints.PIVOT_RADIAL_FLOAT_MAX == pytest.approx(upper / 2.0)
-    assert spec.PIVOT_BORE_CALLOUT.splitlines()[0] == "REAM TO MEASURED VN041"
-    assert "SHOULDER +0.130/+0.150 DIA" in spec.PIVOT_BORE_CALLOUT
-    assert "MATCHED SET; NOT INTERCHANGEABLE" in spec.PIVOT_BORE_CALLOUT
+    screw = _config.parts("pd-vn-transgear-pivot-screw")["number"]
+    assert spec.PIVOT_BORE_CALLOUT.splitlines() == [
+        "REAM TO MEASURED SHOULDER:",
+        "0.130-0.150 DIAMETRAL CLEARANCE",
+        f"ON PIVOT SCREW {screw}",
+        "MATCHED SET; NOT INTERCHANGEABLE",
+    ]
+    assert screw == "MHA-PD-VN-57"
     # drawing-guidelines.md rule 7 (notes: few, flagged, never a method): the matched fit rides the callout; no inspection-method note.
     assert not hasattr(spec, "PIVOT_FIT_INSPECTION_NOTE")
     assert "Pivot Fit Inspection" not in part._SAVED_DRAWING_PROPERTIES
-    assert "BORE AXIS 90° TO FRONT FACE" in spec.PIVOT_BORE_CALLOUT
+    # Machinist review: the implied 90° to the front face is the title
+    # block's angular row; a line restating it adds nothing.
+    assert "90°" not in spec.PIVOT_BORE_CALLOUT
     assert geometry.PIVOT_AXIS_BINDING_SWEEP_MAX < lower
     assert lower - geometry.PIVOT_AXIS_BINDING_SWEEP_MAX >= 0.004
 
@@ -493,12 +500,15 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     crossed the left border (rendered at x 1.5 mm), and the counterbore text
     crossed it before."""
     lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    assert len(lines) == 5
     floor = _hanging_left_box(lines, drawing.SECTION_KEEP["FloorDepth"])
     section_bottom = (
         drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
     )
     assert floor[0] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.002
+    notes_top = drawing.NOTES_XY[1]
+    assert floor[1] > notes_top + 0.002
     # The line stands off the pivot end it dimensions.
     pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
     assert drawing.SECTION_KEEP["FloorDepth"][0] < pivot_end_x
@@ -507,6 +517,10 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     assert _hanging_left_box(lines, (old_line_x, 0.0))[0] == pytest.approx(
         0.0015, abs=0.001
     )
+    # The counterbore's lines stand above its value (machinist review: below
+    # it, the extension lines struck them).
+    assert drawing.DIMENSION_CALLOUTS_ABOVE == {"SpotFaceDia": spec.SPOT_FACE_CALLOUT}
+    assert "SpotFaceDia" not in drawing.DIMENSION_CALLOUTS
     counterbore = _centred_box(
         ["\u00d811.500 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
@@ -602,7 +616,8 @@ def test_the_overall_reference_spans_the_pivot_round_to_the_square_end() -> None
     assert abs(end_pick[1] - drawing.FRONT_CENTER[1]) < end_half
     lowest_station = min(xy[1] for xy in drawing.FRONT_KEEP.values())
     assert drawing.OVERALL_TEXT_XY[1] <= lowest_station - drawing.STATION_PITCH + 1e-9
-    counterbore_top = drawing.SECTION_KEEP["SpotFaceDia"][1] + 0.006
+    above = len(spec.SPOT_FACE_CALLOUT.splitlines())
+    counterbore_top = drawing.SECTION_KEEP["SpotFaceDia"][1] + 0.003 + above * _LINE_PITCH
     assert drawing.OVERALL_TEXT_XY[1] - _LINE_PITCH > counterbore_top
 
 
@@ -648,3 +663,75 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
     assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)
+
+
+def test_the_counterbore_and_its_floor_name_the_pivot_spring() -> None:
+    """Machinist review (blocker): the counterbore's +0.1/0 and its floor's
+    ±0.05 named no mate. The spring seats in it; the floor sets its room."""
+    spring = _config.parts("pd-vn-transgear-pivot-spring")["number"]
+    assert spring == "MHA-PD-VN-63"
+    assert spec.SPOT_FACE_CALLOUT.splitlines() == [
+        "COUNTERBORE, REAR FACE", f"SEATS PIVOT SPRING {spring}",
+    ]
+    assert spec.FLOOR_DEPTH_CALLOUT.splitlines()[-2:] == ["FOR SPRING", "PRELOAD"]
+
+
+def test_the_locating_holes_name_their_dowel_press_and_match_drill() -> None:
+    """Machinist review (blocker and clarity): the reamed sockets named no
+    dowel or fit, the mouth break no reason, and the match-drill sat in a
+    general note with the pair's setting."""
+    import pd_vn_transgear_arm_plate_locating_pin_spec as dowel
+    import _transgear_arm_plate_locating_interface as interface
+    from pd_paper_drive_assembly_steps import step_ref
+
+    loosest = min(dowel.DIA_LIMITS) - max(interface.PRESS_HOLE_LIMITS_MM)
+    tightest = max(dowel.DIA_LIMITS) - min(interface.PRESS_HOLE_LIMITS_MM)
+    assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
+    assert spec.LOCATOR_PRESS_INTERFERENCE == pytest.approx((0.002, 0.018))
+    assert _config.parts("pd-vn-transgear-arm-plate-locating-pin")["number"] == dowel.PART_NUMBER
+    plate = _config.parts("pd-transgear-arm-plate")["number"]
+    lines = drawing.LOCATOR_CALLOUT_TEXT.splitlines()
+    assert lines[2:] == [
+        f"PRESS FIT DOWEL {dowel.PART_NUMBER}",
+        "0.002/0.018 INTERFERENCE",
+        f"MATCH-DRILL WITH ARM PLATE {plate}",
+        f"AT {step_ref('arm-plate-located')}",
+    ]
+    assert lines[1] == "MOUTH BREAK 0.05 MAX: DOWEL GRIP"
+    assert drawing.DIMENSION_CALLOUTS["LocatorDia1"] == drawing.LOCATOR_CALLOUT_TEXT
+
+
+def test_the_only_note_is_the_projected_zones_and_it_carries_no_tolerance() -> None:
+    """Machinist review (clarity): the notes ran to seven lines and carried
+    the pair's 35.101 ±0.004 setting and its fit-up check, which are
+    MHA-PD-00's steps. Rule 7: at most four short lines."""
+    lines = drawing.NOTES_TEXT.splitlines()
+    assert drawing.NOTES_TEXT == spec.PROJECTED_ZONE_NOTE
+    assert len(lines) <= 4
+    assert lines[0].startswith("1. PROJECTED ZONES START AT FRONT FACE A")
+    flat = " ".join(line.strip() for line in lines)
+    assert "\u00b1" not in flat
+    assert f"{disc.CENTRE_DISTANCE:.3f}" not in flat
+    assert "NO SHAKE" not in flat
+    for control in spec.GEOMETRIC_CONTROLS:
+        if control.projected_zone_height_mm is not None:
+            assert f"{control.projected_zone_height_mm:.1f}" in flat
+
+
+def test_the_rear_face_has_no_frame_and_the_stock_carries_its_parallelism() -> None:
+    """Machinist review (over-specification): a // 0.050 A frame sat on the
+    rear face of 5/16 ground stock. The stock's thickness band carries it,
+    and the plate screw's worst engagement still meets 1.5D."""
+    import paper_drive_arm_registration as registration
+
+    assert all(control.characteristic != "parallelism" for control in spec.GEOMETRIC_CONTROLS)
+    assert registration.ARM_OPPOSITE_FACE_PARALLELISM_MM == pytest.approx(
+        2.0 * geometry.THICKNESS_BAND
+    )
+    assert joints.PLATE_SCREW_ENGAGEMENT_WORST_D >= joints.ENGAGEMENT_TARGET_D
+
+
+def test_the_drawing_enforces_machinist_review() -> None:
+    from _machinist_review_mode import MachinistReviewMode
+
+    assert drawing.MACHINIST_REVIEW is MachinistReviewMode.ENFORCE

@@ -14,6 +14,8 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 from __future__ import annotations
 
 import math
+
+import _config
 from _gtol_controls import GeometricControl, PartDatum
 from _gtol_cylinder import CylinderFace
 from _gtol_planar import PlanarFace
@@ -21,6 +23,7 @@ from _hole_spec import blind_cut_dia_mm
 
 import pd_vn_transgear_latch_pin_spec as LATCH_PIN
 import pd_transgear_arm_geometry as ARM
+import pd_vn_transgear_arm_plate_locating_pin_spec as LOCATOR_PIN
 import _transgear_arm_plate_locating_interface as LOCATING_PIN
 import paper_drive_arm_registration as REGISTRATION
 import pd_transgear_pin_spec as PIN
@@ -40,7 +43,6 @@ from pd_transgear_arm_geometry import (
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIVOT_BORE_DIAMETRAL_CLEARANCE,
-    PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG,
     PIVOT_FIT_CLEARANCE_PLACES,
     PIVOT_END_R,
     SPOT_FACE_DIA_GROWTH,
@@ -138,11 +140,9 @@ GEOMETRIC_CONTROLS += (
         ("A",), "diametral",
         projected_zone_height_mm=REGISTRATION.S_PROJECTED_HEIGHT_MM,
     ),
-    GeometricControl(
-        "arm_rear_parallel", "parallelism",
-        f"{REGISTRATION.ARM_OPPOSITE_FACE_PARALLELISM_MM:.3f}",
-        PlanarFace((0.0, 0.0, 1.0), THICKNESS), ("A",),
-    ),
+    # No frame on the rear face (machinist review, rule 5): the 9517K466
+    # ground stock's thickness band carries its parallelism to A
+    # (paper_drive_arm_registration.ARM_OPPOSITE_FACE_PARALLELISM_MM).
     *(
         GeometricControl(
             f"arm_locator_{index}_position", "position", f"{REDUCER_POSITION_DIAMETER:.3f}",
@@ -154,12 +154,20 @@ GEOMETRIC_CONTROLS += (
         ) for index, (x, y) in enumerate(ARM.LOCATOR_SITES_MM, 1)
     ),
 )
-# The press and its proud set are assembly (MHA-PD-00 "arm-plate-located");
-# the callout keeps the hole's own requirements only (drawing-guidelines.md rule 7 (notes: few, flagged, never a method)).
-LOCATOR_CALLOUT = (
-    "2X REAM, FLAT BOTTOM\n"
-    f"BREAK EDGE {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX"
-)
+# The press and its proud set are assembly (MHA-PD-00 "arm-plate-located").
+# The callout names the dowel the reamed holes take and its press (rule 4),
+# and says what the small mouth break keeps: the dowel's full-diameter grip
+# (``pd_transgear_arm_geometry.LOCATOR_FULL_CYLINDER_SPAN_MIN_MM``). The
+# drawing adds the match-drill with the plate and its assembly step.
+LOCATOR_PRESS_INTERFERENCE = LOCATOR_PIN.PRESS_INTERFERENCE_MM
+if LOCATOR_PRESS_INTERFERENCE[0] <= 0.0:
+    raise AssertionError("the MHA-PD-18 locating ream loses MHA-PD-VN-64's press")
+LOCATOR_CALLOUT = "\n".join((
+    "2X REAM, FLAT BOTTOM",
+    f"MOUTH BREAK {LOCATING_PIN.HOLE_MOUTH_BREAK_AXIAL_MAX_MM:.2f} MAX: DOWEL GRIP",
+    f"PRESS FIT DOWEL {LOCATOR_PIN.PART_NUMBER}",
+    f"{LOCATOR_PRESS_INTERFERENCE[0]:.3f}/{LOCATOR_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
+))
 
 # --- Printed text -------------------------------------------------------------
 # The thickness is the stock's: it prints "5/16 (7.94) GROUND STOCK", prefix
@@ -170,29 +178,44 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK"
 PLATE_TAP_EDGE_BREAK_CALLOUT = (
     f"ENTRY / EXIT EDGE BREAK {ARM.PLATE_TAP_ENTRY_BREAK_MAX_MM:g} MAX BOTH SIDES"
 )
-SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
 # Where each projected zone starts and which way it runs. Both start at
 # front face A (z = 0): the plate taps' run rearward through the arm into
 # the MHA-PD-19 plate to the seated screw-head contact
 # (transgear_hanger_joints.PLATE_SCREW_CONTACT_ARM_LOCAL_Z_MAX_MM, from A);
 # the pin bore's runs forward to the chain plane
-# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM).
+# (paper_drive_arm_registration.S_PROJECTED_HEIGHT_MM). It is the sheet's
+# only note: the matched-pair setting and fit-up check are MHA-PD-00's
+# steps, and the match-drill rides the locating holes' callout (rule 7).
 PROJECTED_ZONE_NOTE = "\n".join((
-    "3. PROJECTED ZONES START AT FRONT FACE A: PLATE TAPS",
+    "1. PROJECTED ZONES START AT FRONT FACE A: PLATE TAPS",
     f"   {ARM.CLAMP_TAP_PROJECTED_HEIGHT_MM:.1f} REARWARD; PIN BORE "
     f"{REGISTRATION.S_PROJECTED_HEIGHT_MM:.1f} FORWARD.",
 ))
-# Two short lines: the text stands under the section's pivot end, inside the
-# left border.
-FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
-# Conditional measured-shaft clearance with ordinary squareness paid; not an
-# absolute H7/g6 bore zone. The stated 90-degree angle takes the angular row.
+# The counterbore seats the MHA-PD-VN-63 spring's rim under the MHA-PD-VN-57
+# head, and its floor from the FRONT face sets the spring's room there
+# (transgear_hanger_joints.SPRING_ROOM_*): the callout names the spring, and
+# the floor's text says what its band sets (rule 4 (name the mate)). The
+# lines stand ABOVE the value, clear of the counterbore's extension lines
+# (machinist review: below it, the lines struck the text).
+_SPRING = _config.parts("pd-vn-transgear-pivot-spring")
+_PIVOT_SCREW = _config.parts("pd-vn-transgear-pivot-screw")
+SPOT_FACE_CALLOUT = "\n".join((
+    "COUNTERBORE, REAR FACE",
+    f"SEATS PIVOT SPRING {_SPRING['number']}",
+))
+# Four short lines: the text stands under the section's pivot end, inside
+# the left border.
+FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE\nFOR SPRING\nPRELOAD"
+# Conditional measured-shoulder clearance on the named pivot screw, with
+# ordinary squareness paid; not an absolute H7/g6 bore zone. The bore's 90°
+# to the front face is implied and takes the title block's angular row.
 PIVOT_BORE_CALLOUT = "\n".join((
-    "REAM TO MEASURED VN041",
-    f"SHOULDER +{PIVOT_BORE_DIAMETRAL_CLEARANCE[0]:.{PIVOT_FIT_CLEARANCE_PLACES}f}"
-    f"/+{PIVOT_BORE_DIAMETRAL_CLEARANCE[1]:.{PIVOT_FIT_CLEARANCE_PLACES}f} DIA",
+    "REAM TO MEASURED SHOULDER:",
+    f"{PIVOT_BORE_DIAMETRAL_CLEARANCE[0]:.{PIVOT_FIT_CLEARANCE_PLACES}f}-"
+    f"{PIVOT_BORE_DIAMETRAL_CLEARANCE[1]:.{PIVOT_FIT_CLEARANCE_PLACES}f}"
+    " DIAMETRAL CLEARANCE",
+    f"ON PIVOT SCREW {_PIVOT_SCREW['number']}",
     "MATCHED SET; NOT INTERCHANGEABLE",
-    f"BORE AXIS {PIVOT_BORE_TO_FRONT_FACE_ANGLE_DEG:.0f}° TO FRONT FACE",
 ))
 
 # --- The MHA-PD-23 pin's press in the reamed bore at S (R9-68) -----------------

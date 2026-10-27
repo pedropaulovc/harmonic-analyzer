@@ -531,8 +531,7 @@ def test_section_stations_are_a_baseline_from_the_mounting_face() -> None:
 
 
 def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
-    """Both sheets state the setting and acceptance, and every zone's origin."""
-    import draw_pd_transgear_arm as arm_drawing
+    """The plate sheet states the setting and acceptance, and every zone's origin."""
     import pd_rack_pinion_spec as disc
 
     numbers = {
@@ -540,7 +539,6 @@ def test_matched_pair_and_projected_zone_notes_state_their_values() -> None:
         for key in ("pd-transgear-arm", "pd-transgear-arm-plate")
     }
     for text, mate in (
-        (arm_drawing.NOTES_TEXT, numbers["pd-transgear-arm-plate"]),
         (drawing.NOTES_TEXT, numbers["pd-transgear-arm"]),
     ):
         flat = " ".join(line.strip() for line in text.splitlines())

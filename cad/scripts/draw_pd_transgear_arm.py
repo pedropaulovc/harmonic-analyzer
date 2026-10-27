@@ -63,10 +63,10 @@ from _drawing_sections import create_section_view
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_spec import blind_cut_dia_mm
 from _native_projected_zone import require_saved_projected_gtols
+from _machinist_review_mode import MachinistReviewMode
 from _paths import CAD_ROOT
 from _session import run_build
 import _telemetry
-from pd_paper_drive_assembly_steps import matched_locator_notes
 from pd_transgear_arm_geometry import (
     LOCATOR_SITES_MM,
     LOCATOR_HOLE_DIA_MM,
@@ -99,7 +99,11 @@ from pd_transgear_arm_spec import (
     engagement_line,
 )
 import transgear_hanger_joints as joints
+from pd_paper_drive_assembly_steps import step_ref
 
+
+# Cached machinist review leaf: a FIX or ERROR verdict fails the build.
+MACHINIST_REVIEW = MachinistReviewMode.ENFORCE
 
 SPEC = DRAWINGS_BY_NAME["pd_transgear_arm"]
 PART_STEM = SPEC.artifact_stem
@@ -124,29 +128,19 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
 FRONT_CENTER = (0.189, 0.205)
-# Low enough that the counterbore callout above the section clears the
-# overall-length reference under the station stack.
-SECTION_CENTER = (FRONT_CENTER[0], 0.094)
+# Low enough that the counterbore callout's two lines above its value clear
+# the overall-length reference under the station stack.
+SECTION_CENTER = (FRONT_CENTER[0], 0.090)
 END_CENTER = (0.357, FRONT_CENTER[1])
 # Bottom left between the notes and the title block, under section A-A's
 # label: the right column holds the end view, its pin callout and section
 # B-B (run 20261010T001620278Z: B-B's label printed on the isometric).
-ISO_CENTER = (0.184, 0.037)
+ISO_CENTER = (0.184, 0.034)
 ISO_NOTE_XY = (0.080, 0.022)
 # Bottom left, clear of the section's floor-depth text above and of the
-# isometric caption below.
-NOTES_XY = (0.014, 0.060)
-# Characters per line that keep the block left of the isometric view.
-NOTES_WIDTH = 52
-NOTES_TEXT = "\n".join((
-    matched_locator_notes(
-        _config.parts("pd-transgear-arm")["number"],
-        _config.parts("pd-transgear-arm-plate")["number"],
-        on_arm=True,
-        width=NOTES_WIDTH,
-    ),
-    PROJECTED_ZONE_NOTE,
-))
+# isometric caption below.  The projected-zone note is the only note.
+NOTES_XY = (0.014, 0.050)
+NOTES_TEXT = PROJECTED_ZONE_NOTE
 # Under the end view's pin callout and on its axis; its label clears the
 # title block and section A-A's 8.50.  The socket mouths face right, and the
 # column right of them holds the sockets' position frames inside the border.
@@ -217,7 +211,9 @@ FRONT_KEEP = {
     # silhouette they crowded the sockets and line B).
     "LocatorY1": (_LOCATOR_OFFSET_X, _front_y(PIVOT_END_R) + 0.0045),
     "LocatorY2": (_LOCATOR_OFFSET_X, _front_y(-PIVOT_END_R) - 0.0045),
-    "LocatorDia1": (0.245, _front_y(PIVOT_END_R) + 0.021),
+    # Six callout lines under the value: the block centres low enough that
+    # its top stays inside the upper border, right of the tap callout.
+    "LocatorDia1": (0.262, _front_y(PIVOT_END_R) + 0.0155),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
 # as one), a reference under the stations: picked on the pivot round's upper
@@ -231,11 +227,11 @@ OVERALL_PICKS = (
 # The floor depth's text stands BELOW the section's pivot end, outside its
 # witness lines, where it hangs LEFT of the dimension line (away from the
 # part, right edge on the line): the line runs 2 mm off the pivot end.
-# The spot face's callout stands low enough to clear the overall reference,
-# which moved down a row when the locator station joined the stack.
+# The spot face's callout stands low enough that its two lines above the
+# value clear the overall reference; its value sits off the section's top.
 SECTION_KEEP = {
-    "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.020),
-    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.020),
+    "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.016),
+    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.022),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
         SECTION_CENTER[1] - 0.020,
@@ -256,14 +252,25 @@ END_KEEP = {
 }
 
 
+# The match-drill rides the locating holes' own callout, with the step that
+# sets the pair's centres and checks its fit (machinist review, rule 7).
+_PLATE = _config.parts("pd-transgear-arm-plate")
+LOCATOR_CALLOUT_TEXT = "\n".join((
+    LOCATOR_CALLOUT,
+    f"MATCH-DRILL WITH ARM PLATE {_PLATE['number']}",
+    f"AT {step_ref('arm-plate-located')}",
+))
+
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
     "PinBoreDia": PIN_BORE_CALLOUT,
-    "SpotFaceDia": SPOT_FACE_CALLOUT,
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "LocatorDia1": LOCATOR_CALLOUT,
+    "LocatorDia1": LOCATOR_CALLOUT_TEXT,
 }
+# Above the value: below it, the counterbore's extension lines struck the
+# callout (machinist review).
+DIMENSION_CALLOUTS_ABOVE = {"SpotFaceDia": SPOT_FACE_CALLOUT}
 
 # Native tap callout: arrow on the rear entry break's own edge, text above
 # the view with its top inside the upper border. It carries the ordinary
@@ -571,6 +578,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above")
     set_reference_dimensions(adapter, annotations, ("PivotBoreDia",))
     _set_stock_text(adapter, annotations)
     # Model-owned circular zones and actual feature datums. BASIC stations
@@ -581,10 +589,12 @@ async def build(adapter: Any) -> dict[str, str]:
     }
     pin_r = bore_dia["C"] / 2.0
     placements = {
+        # Right of the counterbore callout's lines, left of the stud's
+        # perpendicularity frame.
         "datum:A": PmiDrawingPlacement(
-            section, (_front_x(22.0), SECTION_CENTER[1] + 0.018),
+            section, (_front_x(30.0), SECTION_CENTER[1] + 0.018),
             attachment_xy=model_point_in_view(
-                adapter, section, (0.022, 0.0, 0.0), label="arm front datum",
+                adapter, section, (0.030, 0.0, 0.0), label="arm front datum",
             ),
         ),
         # Datum tags on a bore are picked by a SHEET POINT on the rim
@@ -606,10 +616,11 @@ async def build(adapter: Any) -> dict[str, str]:
                 bearing_deg=-27.0, label="datum C pin bore rim",
             ),
         ),
-        # Above the arm, landing on the pin bore's upper right rim, clear of
-        # datum C's leader below it and of the locator frame left of it.
+        # Above the arm's upper edge near the square end, landing on the pin
+        # bore's upper right rim: the locating holes' six-line callout
+        # fills the band above the arm left of it.
         "feed_stud_position": PmiDrawingPlacement(
-            front, (_front_x(PIN_STATION) + 0.018, FRONT_CENTER[1] + 0.0285),
+            front, (0.300, FRONT_CENTER[1] + 0.025),
             attachment_xy=_rim_point(
                 adapter, front, station_mm=PIN_STATION, radius_mm=pin_r,
                 bearing_deg=50.0, label="feed stud position pin bore rim",
@@ -637,13 +648,6 @@ async def build(adapter: Any) -> dict[str, str]:
             attachment_xy=_wall_point(
                 adapter, section, x_mm=PIN_STATION + pin_r, z_mm=1.0,
                 label="feed stud projected axis pin bore wall",
-            ),
-        ),
-        "arm_rear_parallel": PmiDrawingPlacement(
-            section, (0.279, SECTION_CENTER[1] - 0.014),
-            attachment_xy=model_point_in_view(
-                adapter, section, (0.098, 0.0, THICKNESS / 1000.0),
-                label="actual rear mounting face parallelism",
             ),
         ),
         **{
