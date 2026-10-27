@@ -345,13 +345,11 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
         f"{_number('pd-vn-transgear-arm-plate-locating-pin')} DOWELS"
     ) in located
     pin = _number("pd-transgear-pin")
-    assert (
-        "TOGETHER, THE PLATE'S KNOB BORE "
-        f"{disc.CENTRE_DISTANCE:.3f} FROM THE PRESSED {pin} PIN'S AXIS"
-    ) in located
     # The step names the mesh that centre distance sets, and how it is set
     # and checked: the package builds no jig, and the pin is already pressed
-    # into its bore, so the gauge reads over it.
+    # into its bore, so the gauge reads over it and a gauge pin in the knob
+    # bore.  References and relationship only, not the sentence (codjiflo P3
+    # on 482fbdc).
     assert steps.step_number("pin-pressed") < steps.step_number("arm-plate-located")
     jig = located[: located.index("PER THEIR DRAWINGS")]
     for stem in ("pd-transgear-knob-shaft", "pd-rack-pinion"):
@@ -359,11 +357,10 @@ def test_the_critical_matched_dowels_locate_and_the_plate_screws_only_clamp() ->
     assert "MESH" in jig
     assert "JIG" not in jig
     assert "EACH BORE" not in jig
-    assert (
-        f"A SNUG GAUGE PIN IN THE KNOB BORE; SET {disc.CENTRE_DISTANCE:.3f} PLUS HALF "
-        f"OF EACH PIN'S MEASURED DIAMETER OVER THE GAUGE PIN AND THE {pin} PIN; "
-        "RE-CHECK CLAMPED."
-    ) in jig
+    assert jig.count(f"{disc.CENTRE_DISTANCE:.3f}") == 2
+    for reference in ("KNOB BORE", f"PRESSED {pin} PIN", "GAUGE PIN", "HALF", "OVER"):
+        assert reference in jig, reference
+    assert "RE-CHECK CLAMPED" in jig
     assert "MATCH-DRILL AND REAM THE LOCATING HOLES" in located
     assert (
         f"{plate_locating_interface.PROUD_LIMITS_MM[0]:.2f} TO "

@@ -298,6 +298,14 @@ def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
     )
     assert hub.FLAT_END_CLEARANCE_WORST == pytest.approx(worst)
     assert hub.FLAT_END_CLEARANCE_WORST > 0.0
+    # codjiflo P2 on edb402b/482fbdc (#2006): the title block lets the
+    # flat's floor meet the wall in an inside corner up to its ceiling.  Where
+    # the hub's flat starts, that corner's blend must stay under the flats'
+    # minimum clearance, or the hub cannot seat.
+    corner = float(_config.title_block("inside_corner")["radius_mm"])
+    gap = hub.FLAT_END_CLEARANCE_WORST
+    rise = corner - math.sqrt(corner**2 - (corner - gap) ** 2) if gap < corner else 0.0
+    assert rise < hub.FLAT_CLEARANCE[0], (gap, rise)
 
 
 def test_flat_volume_is_the_boss_segment() -> None:

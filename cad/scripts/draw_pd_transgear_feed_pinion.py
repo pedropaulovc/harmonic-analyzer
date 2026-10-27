@@ -512,6 +512,7 @@ def _hide_tangent_edges(view: Any) -> None:
     bound.UpdateViewDisplayGeometry()
 
 
+@_telemetry.traced("drawing.outside_view_crop")
 def _crop_outside_view(adapter: Any, view: Any) -> None:
     """Crop the outside view to OUTSIDE_CROP_FENCE (sheet left, foot, right,
     head) with no outline, read back.

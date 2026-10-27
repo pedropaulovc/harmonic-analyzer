@@ -188,7 +188,7 @@ FLAT_END_CLEARANCE_WORST = (
     - SLEEVE.FACE_WIDTH_BAND
     + SPIGOT_LENGTH_MIN
     - (SLEEVE.FLAT_END_STATION + SLEEVE.STATION_TOL)
-)  # 0.34
+)  # 0.94
 if FLAT_END_CLEARANCE_WORST <= 0.0:
     raise AssertionError(
         f"the sleeve's flat end wall reaches the hub's flat: {FLAT_END_CLEARANCE_WORST:.3f}"

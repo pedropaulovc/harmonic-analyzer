@@ -286,16 +286,21 @@ FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
 # alone left the step unguarded).  The MAX is the modelled station.  The MIN
 # stands behind the longest tooth length plus the title block's 0.25 edge
 # break, and behind the cutter's run-out (asserted below).  The hub's check
-# keeps its conservative STATION_TOL allowance on top of the MAX.
-FLAT_END_STATION = 16.6
+# keeps its conservative STATION_TOL allowance on top of the MAX.  The MAX
+# stands far enough behind the hub's flat that the title block's R1.0 inside
+# corner, where the flat's floor meets the wall, stays under the flats'
+# 0.020 minimum clearance where the hub's flat starts (codjiflo P2 on
+# edb402b/482fbdc: at 16.6 an R1.0 corner rose 0.21 there; #2006).  The
+# drawing test holds that envelope.
+FLAT_END_STATION = 16.0
 FLAT_END_MIN = 14.0
 FLAT_END_PLACES = 1
 FLAT_END_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
-FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
+FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 11.35
 # The reach the end mill's flutes must cover: the flat cut to its MAX
 # station on the longest sleeve.  Stopping there is always accepted; a
 # longer flat, toward the MIN, is the shop's choice of a longer cutter.
-FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 10.80
+FLAT_REACH = OVERALL_LENGTH + STATION_TOL - FLAT_END_STATION  # 11.40
 FLAT_CUTTER_FLUTE_MIN = 12.0
 if FLAT_CUTTER_FLUTE_MIN < FLAT_REACH + 0.5:
     raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
