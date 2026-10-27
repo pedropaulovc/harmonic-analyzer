@@ -151,7 +151,10 @@ def test_both_end_faces_hold_square_to_the_bore_datum() -> None:
     }
     assert spec.REAR_FACE_PERPENDICULARITY == pytest.approx(0.01)
     assert spec.FRONT_FACE_PERPENDICULARITY == pytest.approx(0.01)
-    assert spec.FACE_PERPENDICULARITY_ZONE_DIA == pytest.approx(spec.OD - spec.OD_BAND)
+    # The arm seats on the face's flat inside the O.D. rim's break.
+    assert spec.FACE_PERPENDICULARITY_ZONE_DIA == pytest.approx(
+        spec.OD - spec.OD_BAND - 2.0 * spec.EDGE_BREAK
+    )
     # Each frame sits on the exact plane its finish row names: the rear face
     # at z LENGTH, the front at z 0.
     faces = {control.key: control.face for control in spec.SURFACE_FINISHES}
@@ -379,7 +382,7 @@ def test_each_frame_finds_the_od_rim_of_its_own_face() -> None:
         edges = _drawing_edges.ViewEdges(label="profile", edges=(*neighbours, rim))
         assert drawing.face_rim(edges, mark) is rim
         lone = _drawing_edges.ViewEdges(label="profile", edges=neighbours)
-        with pytest.raises(RuntimeError, match=rf"matched 0 of 3 circles: r {od_r:.4f}"):
+        with pytest.raises(RuntimeError, match=rf"matched 0 of 3 circles: r {re.escape(f'{od_r:.4f}')}"):
             drawing.face_rim(lone, mark)
         split = _drawing_edges.ViewEdges(
             label="profile", edges=(rim, _circle(od_r, z))

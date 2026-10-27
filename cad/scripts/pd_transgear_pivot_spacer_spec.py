@@ -95,7 +95,9 @@ REAR_FACE_PERPENDICULARITY = float(
 FRONT_FACE_PERPENDICULARITY = float(
     GEOMETRIC_TOLERANCES_MM["front face perpendicularity to bore"]
 )
-FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND
+# The arm seats on the face's flat: the smallest O.D. less the title block's
+# break on its rim (the same break the wall charges above).
+FACE_PERPENDICULARITY_ZONE_DIA = OD - OD_BAND - 2.0 * EDGE_BREAK
 
 # The wall holds the target, so the sheet states no shortfall and carries no
 # notes: the length and bore bands ride their dimensions as model tolerances

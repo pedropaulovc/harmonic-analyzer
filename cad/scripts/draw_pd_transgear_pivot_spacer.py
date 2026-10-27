@@ -64,6 +64,7 @@ from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
 from _layout_geometry import audit_sheet, format_findings
 from _machinist_review_mode import MachinistReviewMode
+from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
 from _paths import CAD_ROOT
 from _session import run_build
 from _surface_finish import surface_finish_by_key
@@ -182,6 +183,9 @@ DATUM_A_SYMBOL = (
     END_CENTER[0] + DATUM_A_REACH * math.cos(DATUM_A_ANGLE),
     END_CENTER[1] + DATUM_A_REACH * math.sin(DATUM_A_ANGLE),
 )
+# The placed tag may not drift through the export's final rebuild by more
+# than the native helper's limit.
+DATUM_A_STABILITY_M = 0.0001
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -433,6 +437,16 @@ def _move_dimension(
     return matches[0]
 
 
+def _datum_position(tag: Any) -> tuple[float, float]:
+    """The tag's native sheet position (IAnnotation::GetPosition)."""
+    position = tuple(
+        _early_bound(tag.GetAnnotation(), "IAnnotation").GetPosition() or ()
+    )
+    if len(position) != 3 or not all(math.isfinite(float(v)) for v in position):
+        raise RuntimeError(f"datum A has no valid position: {position!r}")
+    return float(position[0]), float(position[1])
+
+
 def _assert_layout_clean(findings: list[Any]) -> None:
     """Fail the sheet on text over ink; log every other audit finding."""
     blocking = [f for f in findings if f.kind in BLOCKING_LAYOUT_FINDINGS]
@@ -567,16 +581,28 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             char_height=0.0025,
         )
-    # Datum A, the bore, on the end view where it shows round.
-    add_datum_feature(
+    # Datum A, the bore, on the end view where it shows round.  The edge is
+    # first proved to be the source part's one bore cylinder at the spec's
+    # radius (the native helper's validation), then the tag is placed.
+    bore_edge = visible_circle_edge(adapter, end, BORE_DIA)
+    validate_source_axis_edge(
+        adapter.swApp,
+        _early_bound(end, "IView"),
+        bore_edge,
+        SOURCE.resolve(strict=True),
+        radius_m=BORE_DIA / 2000.0,
+        label="spacer bore axis",
+    )
+    datum_a = add_datum_feature(
         adapter,
         end,
-        entity=visible_circle_edge(adapter, end, BORE_DIA),
+        entity=bore_edge,
         symbol_xy=DATUM_A_SYMBOL,
         datum=BORE_DATUM,
         label="spacer bore axis",
         shoulder=True,
     )
+    datum_a_xy = _datum_position(datum_a)
     # Both end faces square to A.
     profile_edges = scan_view_edges(profile, label="spacer profile rims")
     for mark, key in (
@@ -612,12 +638,22 @@ async def build(adapter: Any) -> dict[str, str]:
         ]
     )
 
+    def datum_a_settled() -> None:
+        """After the export's last rebuild the tag still stands where it was
+        placed (the native helper's 0.1 mm stability limit)."""
+        drift = math.dist(_datum_position(datum_a), datum_a_xy)
+        if drift > DATUM_A_STABILITY_M:
+            raise RuntimeError(
+                f"datum A moved {drift * 1000.0:.3f} mm after the final rebuild"
+            )
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Pivot Spacer Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(datum_a_settled,),
     )
 
 
