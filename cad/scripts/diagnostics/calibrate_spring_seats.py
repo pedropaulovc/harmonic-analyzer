@@ -612,16 +612,30 @@ def _merge_yaml(
 ) -> None:
     """Merge the measurements into springs.yaml's document and write it to ``path``.
 
-    ``channel_rows=None`` keeps the existing ``springs.channel_seats``.
+    ``channel_rows=None`` keeps the existing ``springs.channel_seats`` and their
+    ``source``: the refreshed counters then carry this run's attribution as
+    ``counter_source`` (absent when it equals ``source``), so a retained
+    channel table is never credited to a run that did not measure it.
     """
     import yaml
 
     original = SPRINGS_YAML.read_text(encoding="utf-8")
     document = yaml.safe_load(original)
     springs = document["springs"]
-    springs["source"] = source
-    if channel_rows is not None:
+    if channel_rows is None:
+        counter_source = source if source != springs["source"] else None
+    else:
+        springs["source"] = source
         springs["channel_seats"] = channel_rows
+        counter_source = None
+    attributed: dict = {}
+    for key, value in springs.items():
+        if key == "counter_source":
+            continue
+        attributed[key] = value
+        if key == "source" and counter_source is not None:
+            attributed["counter_source"] = counter_source
+    document["springs"] = springs = attributed
     for preset, counter in counters.items():
         springs["presets"][preset]["counter"] = counter
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=False, width=88)

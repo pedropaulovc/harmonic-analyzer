@@ -559,7 +559,11 @@ def test_counter_only_merge_keeps_channel_seats_and_writes_the_given_path(
     assert channel_block(after) == channel_block(before)
     merged = yaml.safe_load(after)["springs"]
     assert merged["channel_seats"] == original["channel_seats"]
-    assert merged["source"] == "test source"
+    # The retained channel seats keep their own attribution; only the refreshed
+    # counters are credited to this run.
+    assert merged["source"] == original["source"] != "test source"
+    assert merged["counter_source"] == "test source"
+    assert list(merged).index("counter_source") == list(merged).index("source") + 1
     for name, counter in counters.items():
         assert merged["presets"][name]["counter"] == counter
         assert (
@@ -592,6 +596,28 @@ def test_unchanged_merge_reproduces_the_committed_table_byte_for_byte(
 
     assert b"\r" not in target.read_bytes()
     assert target.read_bytes() == text.encode("utf-8")
+
+
+def test_full_merge_credits_both_tables_to_the_run(tmp_path, monkeypatch) -> None:
+    import yaml
+
+    from diagnostics import calibrate_spring_seats as driver
+
+    springs = tmp_path / "springs.yaml"
+    document = yaml.safe_load(driver.SPRINGS_YAML.read_text(encoding="utf-8"))
+    document["springs"]["counter_source"] = "an earlier counter-only run"
+    springs.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    monkeypatch.setattr(driver, "SPRINGS_YAML", springs)
+    original = document["springs"]
+    counters = {name: {"marker": name} for name in original["presets"]}
+    target = tmp_path / "out" / "springs.yaml"
+
+    driver._merge_yaml([{"row": 0}], counters, "run B", target)
+
+    merged = yaml.safe_load(target.read_text(encoding="utf-8"))["springs"]
+    assert merged["source"] == "run B"
+    assert "counter_source" not in merged
+    assert merged["channel_seats"] == [{"row": 0}]
 
 
 def _tear_writes(monkeypatch) -> None:
