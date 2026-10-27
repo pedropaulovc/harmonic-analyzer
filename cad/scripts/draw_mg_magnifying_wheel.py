@@ -432,6 +432,11 @@ GROOVE_R_CALLOUT = f"PEN-WIRE SEAT {PEN_WIRE_NUMBER}"
 # Capitals print wider than _TEXT_CHAR (run 13: "2X RIM BORE EDGES" measured
 # 2.6 mm a character), so a callout's span is estimated two characters wide.
 _CALLOUT_MARGIN_CHARS = 2
+# The drum callout is the one long all-capitals line: run 3 (9603d23e0)
+# printed its 32 characters 96.6 mm wide (3.02 mm a character), crossing the
+# spigot face's shared extension line, so its span is estimated at that
+# pitch.
+_DRUM_CALLOUT_CHAR = 0.00302
 ARROWS_INSIDE = ("SpigotLength", "HubFrontZ")
 _DIM_ARROWS_INSIDE = 0  # swDimensionArrowsSide_e.swDimArrowsInside
 SECTION_KEEP = {
@@ -451,7 +456,8 @@ SECTION_KEEP = {
     "SpigotLength": _beside(
         _section_x(HUB_FRONT_Z),
         1,
-        len(SPIGOT_LENGTH_CALLOUT) + _CALLOUT_MARGIN_CHARS,
+        math.ceil(len(SPIGOT_LENGTH_CALLOUT) * _DRUM_CALLOUT_CHAR / _TEXT_CHAR)
+        + _CALLOUT_MARGIN_CHARS,
         _HUB_ROWS[0] + _STACK_UP + _ABOVE_UP,
     ),
     "HubFrontZ": _beside(
@@ -472,8 +478,10 @@ SECTION_KEEP = {
     # the top of the rim-bore round's R block (ROUND_TEXT_XY), moved up and
     # right along that bearing.  Run 17's 5.8 mm left its stacked +0.1 2.93
     # mm over the "R0.8 MAX" (text separation needs 3.57 mm): 1.5 mm more,
-    # 2.1 mm right on the bearing.
-    "GrooveR": (SECTION_CENTER[0] + 0.0335, SECTION_CENTER[1] + 0.0695),
+    # 2.1 mm right on the bearing.  The one-line callout (run 3, 9603d23e0)
+    # left its R0.60 1.65 mm over the R0.8 MAX (text clearance needs 1.78):
+    # 0.6 mm more, 0.9 mm right.
+    "GrooveR": (SECTION_CENTER[0] + 0.0344, SECTION_CENTER[1] + 0.0701),
 }
 # The rim-bore round's R is a sheet radial on its cut arc: A-A cannot import
 # a fillet radius whose arc IS the cut (round-12 farm leaves: neither the
