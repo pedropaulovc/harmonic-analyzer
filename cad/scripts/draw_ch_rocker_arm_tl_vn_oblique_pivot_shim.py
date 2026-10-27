@@ -9,7 +9,7 @@ import _telemetry
 import ch_rocker_arm_tl_vn_oblique_pivot_shim_spec as part
 from _com import _early_bound
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_fastener_drawing
+from _purchased_fastener_drawing import NumberFit, build_purchased_fastener_drawing
 from _session import run_build
 from _supplier_limits import LIMIT
 from _supplier_screw_dimensions import annotate_supplier_screw, assert_supplier_screw
@@ -87,7 +87,7 @@ async def build(adapter) -> dict[str, str]:
         proofs[0]()
 
     return await build_purchased_fastener_drawing(
-        adapter, SPEC, item=ITEM, cut_to_suit=False,
+        adapter, SPEC, item=ITEM, cut_to_suit=False, number_fit=NumberFit.SHRINK_TO_CELL,
         supplier_dimensions=supplier_dimensions,
         supplier_margins=SUPPLIER_MARGINS,
         settled_checks=(assert_supplier_dimensions,), supplier_data=part.SUPPLIER_DATA,
