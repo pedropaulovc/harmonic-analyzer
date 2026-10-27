@@ -1546,9 +1546,10 @@ def _assert_lock_station_sweep() -> None:
     # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
     # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
     # model by that band in y. The spacer is pressed on the shoulder, so its
-    # largest O.D. stands on the screw axis.
+    # bore is on the screw axis; its largest O.D. stands off that axis by the
+    # offset its printed runout to A allows (SPACER.BORE_ECCENTRICITY).
     pivot_tap = BAR.HOLE_POSITION_BAND
-    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
+    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + SPACER.BORE_ECCENTRICITY
     # The arm's front face on the shortest spacer; its plate's lower section
     # stands proud of it by the deepest notch on the thinnest arm stock.
     arm_forward = -_SPACER_LENGTH_DEV[0]

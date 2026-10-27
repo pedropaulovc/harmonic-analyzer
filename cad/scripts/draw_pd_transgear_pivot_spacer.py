@@ -59,7 +59,14 @@ from _gtol_cylinder import CylinderFace
 from _gtol_face_resolve import resolve_faces
 from _gtol_face_read import face_geometry
 from _gtol_planar import PlanarFace
-from _layout_geometry import audit_sheet, format_findings
+from _drawing_layout_audit import annotation_display
+from _layout_geometry import (
+    Box,
+    Segment,
+    audit_sheet,
+    format_findings,
+    point_segment_distance,
+)
 from _machinist_review_mode import MachinistReviewMode
 from _native_axis_datum import _readback as read_native_datum
 from _native_axis_datum import _validate_source_edge as validate_source_axis_edge
@@ -177,6 +184,8 @@ DATUM_A_STABILITY_M = 0.0001
 # O.D., and the leader ends on the bore within this.
 DATUM_A_AIR = 0.002
 DATUM_A_LEADER_TOL = 0.0005
+# The datum triangle (as lines or filled) lies within this of its tip.
+DATUM_A_TRIANGLE_SPAN = 0.005
 # Text on a line and text on text are defects; leader crossings stay logged.
 BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 
@@ -391,6 +400,7 @@ def _face_attachment(
     return face, landing
 
 
+@_telemetry.traced("pivot_spacer.od_runout_landing")
 def _od_runout_landing(adapter: Any, view: Any) -> tuple[float, float]:
     """The O.D.'s upper line on the profile at OD_RUNOUT_LANDING_Z_MM: of the
     O.D.'s two silhouette points at that station (model -X and +X), the one
@@ -461,6 +471,7 @@ def _move_dimension(
     return matches[0]
 
 
+@_telemetry.traced("pivot_spacer.assert_part_authored_text")
 def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
     """Every authored dimension prints exactly once, with the text lanes its
     part wrote (draw_pd_transgear_pin).  Read-only: text set from the sheet
@@ -492,53 +503,82 @@ def _assert_part_authored_text(adapter: Any, annotations: list[Any]) -> None:
         )
 
 
-def _centre_distance(segment: Any) -> float:
-    """Closest approach of one ink segment to the end view's centre."""
-    (cx, cy), (x0, y0), (x1, y1) = (
-        END_CENTER,
-        (segment.x0, segment.y0),
-        (segment.x1, segment.y1),
-    )
-    dx, dy = x1 - x0, y1 - y0
-    span = dx * dx + dy * dy
-    t = (
-        0.0
-        if span == 0.0
-        else min(1.0, max(0.0, ((cx - x0) * dx + (cy - y0) * dy) / span))
-    )
-    return math.dist((cx, cy), (x0 + t * dx, y0 + t * dy))
-
-
-def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
-    """Datum A's settled ink, as the layout audit collects it: one stroke,
-    its leader, enters the O.D. circle (plus air) and ends on the bore;
-    the frame, its letter and the shoulder all stand outside the O.D. with
-    DATUM_A_AIR (the clearance test_datum_a_tag_stands_off_the_od_... sets
-    on the requested point)."""
-    label = str(_early_bound(tag.GetAnnotation(), "IAnnotation").GetName())
-    inks = [
-        ink
-        for sheet in collect_document(adapter)
-        for ink in sheet.annotations
-        if ink.kind == "datum" and ink.label == label
+def _datum_a_ink(
+    adapter: Any, tag: Any
+) -> tuple[list[Segment], list[tuple[float, float]], list[Box]]:
+    """Datum A's rendered ink from its own GetDisplayData (the layout audit's
+    decoder, as _drawing_gdt.assert_datum_landing reads it): its strokes, the
+    vertices of a filled triangle or arrowhead, and its letter's box."""
+    annotation = _early_bound(tag.GetAnnotation(), "IAnnotation")
+    display, refused = annotation_display(adapter, annotation)
+    if refused or not display:
+        raise RuntimeError(f"datum A has no readable display data: {refused!r}")
+    strokes = [
+        Segment(float(raw[-6]), float(raw[-5]), float(raw[-3]), float(raw[-2]))
+        for raw in display.get("lines", ())
+        if len(raw) >= 8
     ]
-    if len(inks) != 1:
-        raise RuntimeError(f"datum A {label!r}: {len(inks)} collected inks, expected 1")
+    vertices = [
+        (float(raw[i]), float(raw[i + 1]))
+        for raw in display.get("triangles", ())
+        if len(raw) >= 9
+        for i in (0, 3, 6)
+    ] + [
+        (float(raw[0]), float(raw[1]))
+        for raw in display.get("arrows", ())
+        if len(raw) >= 3
+    ]
+    letters = [
+        Box(
+            float(text["pos"][0]),
+            float(text["pos"][1]),
+            float(text["pos"][0]) + float(text.get("w", 0.0)),
+            float(text["pos"][1]) + float(text.get("h", 0.0)),
+        )
+        for text in display.get("texts", ())
+        if len(text.get("pos", ())) >= 2
+    ]
+    return strokes, vertices, letters
+
+
+@_telemetry.traced("pivot_spacer.datum_a_clear")
+def _assert_datum_a_clear(adapter: Any, tag: Any) -> None:
+    """Datum A's settled ink: its tip (the triangle's or leader's point
+    nearest the axis, in whichever primitives SolidWorks draws it) lies on
+    the bore; every stroke within DATUM_A_AIR of the O.D. reaches that tip
+    (the leader, or the triangle drawn as lines), and one of them, the
+    leader, leaves the O.D.; the frame, its letter and the shoulder all
+    stand DATUM_A_AIR outside the O.D. (the clearance
+    test_datum_a_tag_stands_off_the_od_... sets on the requested point)."""
+    strokes, vertices, letters = _datum_a_ink(adapter, tag)
     od_r = OD / 2.0 * _S
     bore_r = BORE_DIA / 2.0 * _S
-    near = [s for s in inks[0].segments if _centre_distance(s) < od_r + DATUM_A_AIR]
-    if len(near) != 1:
-        raise RuntimeError(
-            f"datum A: {len(near)} strokes within {DATUM_A_AIR * 1000.0:.1f} mm of the "
-            "O.D.; only its leader may cross it"
-        )
-    tip = min(
-        ((near[0].x0, near[0].y0), (near[0].x1, near[0].y1)),
-        key=lambda point: math.dist(point, END_CENTER),
-    )
+    points = [p for s in strokes for p in ((s.x0, s.y0), (s.x1, s.y1))] + vertices
+    if not points:
+        raise RuntimeError("datum A drew no ink")
+    tip = min(points, key=lambda point: math.dist(point, END_CENTER))
     if abs(math.dist(tip, END_CENTER) - bore_r) > DATUM_A_LEADER_TOL:
-        raise RuntimeError(f"datum A's leader ends at {tip!r}, not on the bore")
-    for box in inks[0].text_boxes:
+        raise RuntimeError(f"datum A's tip is at {tip!r}, not on the bore")
+    near = [
+        s for s in strokes if point_segment_distance(END_CENTER, s) < od_r + DATUM_A_AIR
+    ]
+    stray = [
+        s
+        for s in near
+        if min(math.dist((s.x0, s.y0), tip), math.dist((s.x1, s.y1), tip))
+        > DATUM_A_TRIANGLE_SPAN
+    ]
+    if stray:
+        raise RuntimeError(
+            f"datum A's ink stands on the O.D. away from its tip: {stray!r}"
+        )
+    if not any(
+        max(math.dist((s.x0, s.y0), END_CENTER), math.dist((s.x1, s.y1), END_CENTER))
+        >= od_r + DATUM_A_AIR
+        for s in near
+    ):
+        raise RuntimeError("datum A has no leader from outside the O.D. to the bore")
+    for box in letters:
         nearest = (
             min(max(END_CENTER[0], box.xmin), box.xmax),
             min(max(END_CENTER[1], box.ymin), box.ymax),
@@ -566,6 +606,7 @@ def _datum_a_live(
     return xy
 
 
+@_telemetry.traced("pivot_spacer.place_datum_a")
 def _place_datum_a(
     adapter: Any, view: Any, bore_edge: Any
 ) -> tuple[Any, tuple[float, float]]:

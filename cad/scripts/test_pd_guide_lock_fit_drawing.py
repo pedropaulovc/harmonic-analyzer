@@ -239,12 +239,12 @@ def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
     9.8 plate (user ruling 2026-10-11, at .X per Codex P1 on #1353) keeps
     the spacer far off; the 15.65 plate it replaced needed a +0/-0.50 band
     to pass it, and at the general bands runs into it. R9-71: the spacer is
-    pressed on the shoulder, so its O.D. no longer
-    floats off the screw axis."""
+    pressed on the shoulder, so its O.D. stands off the screw axis only by
+    the bore offset its printed runout to A allows."""
     import build_pd_paper_drive_assembly as assembly
 
     assert spacer.BORE_DIA_MAX < (0.1875 - 0.001) * IN
-    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0 + 0.065
+    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0 + spacer.BORE_ECCENTRICITY + 0.065
     far_reach = (_WIDTH + 0.8 - _HOLE_X[1] + 0.035) * (
         _SET_MAX - _SET_MIN
     ) / 13.93 - _SET_MIN
@@ -260,7 +260,7 @@ def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
         )
 
     gap = gap_at(_HEIGHT)
-    assert gap == pytest.approx(3.988, abs=1e-3)  # the Ø11.0 .X spacer
+    assert gap == pytest.approx(3.788, abs=1e-3)  # the Ø11.0 .X spacer, runout 0.4
     assert _sweep_gap(monkeypatch, assembly, "pivot spacer") == pytest.approx(
         gap, abs=1e-3
     )
@@ -294,12 +294,13 @@ def test_the_bar_pivot_tap_band_moves_the_spacer_in_the_sweep(monkeypatch) -> No
 def test_sweep_refuses_a_lock_set_toward_the_latch_hook(monkeypatch) -> None:
     """With the spacer far off, the latch hook's base is the nearest part a
     bottom plate's far edge moves toward.  The Ø11.0 spacer now stands nearer
-    than the hook (3.99 against 5.38), so the spacer is held at its old
-    Ø8.6 here to isolate the hook's refusal."""
+    than the hook (3.79 against 5.38), so the spacer is held at its old
+    Ø8.6, with no runout offset, here to isolate the hook's refusal."""
     import build_pd_paper_drive_assembly as assembly
 
     monkeypatch.setattr(spacer, "OD", 8.6)
     monkeypatch.setattr(spacer, "OD_BAND", 0.13)
+    monkeypatch.setattr(spacer, "BORE_ECCENTRICITY", 0.0)
 
     far, guide_side = assembly.LOCK_SET_EDGE_REACH
     # A far edge reaching 0.01 past the hook gap's margin over the sweep

@@ -33,6 +33,7 @@ from _part_checks import bbox_extent_check, report_mass_properties, volume_check
 from _part_save import save_part_and_images
 from _rebuild import force_rebuild
 from _session import run_build
+import _telemetry
 from _sketch import SketchDims, ensure_fully_defined
 from _sketch_circle import define_circle
 from _drawing_precision import _named_dimensions, apply_drawing_precision
@@ -75,6 +76,7 @@ _SAVED_DRAWING_PROPERTIES = (
 V_RING = math.pi * ((OD / 2.0) ** 2 - (BORE_DIA / 2.0) ** 2) * LENGTH
 
 
+@_telemetry.traced("pivot_spacer.author_callouts")
 def author_dimension_callouts(adapter) -> None:
     """Write every authored text lane on its source dimension, read it back
     (build_pd_transgear_pin.author_dimension_callouts).
