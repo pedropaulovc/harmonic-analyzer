@@ -202,10 +202,14 @@ FINISH_CAPTIONS = {
 # The bore is a fit: REAM is the requirement (drawing-guidelines.md rule 12
 # (hole and slot callouts say what to do)), and the H7 band names the knob
 # shaft's g6 journal it runs on.  The screw holes are clearance, drilled;
-# both countersinks take the oval heads.
+# both countersinks take the oval heads, each coaxial with its drilled hole:
+# the seat and wall budgets bound the cone's axis by the hole's projected
+# zone (pd_transgear_arm_plate_geometry._CSK_AXIS_TILT_MAX_RAD).
 BORE_CALLOUT = f"REAM THRU\nRUNNING FIT ON\nKNOB SHAFT\n{KNOB_SHAFT_NUMBER}"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
-CSK_CALLOUT = f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK"
+CSK_CALLOUT = (
+    f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK\nCOAXIAL WITH\n\u00d8{SCREW_HOLE_DIA:.1f} HOLE"
+)
 HOLE_COUNT_CALLOUT = f"{len(SCREW_HOLES)}X"
 # The hub face's station from mounting face A sets the knob shaft's 12T plane
 # through the thrust ring (the chain plane and the disc-to-platen air,
