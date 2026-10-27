@@ -96,8 +96,9 @@ CALLOUTS_ABOVE = {
     "BoreDia": "REAM H7", "TapDrillDia": "DRILL THRU",
     "CarriageDrills1Dia": "4X DRILL THRU",
     "CarriageCounterbores1Dia": "4X COUNTERBORE FROM TOP",
-    # Above the value: the floor's extension lines rise to the dimension line.
-    "CboreFloor": "M4x20 IN HGH15CA: 3.85 MIN ENGAGEMENT",
+    # Above the value, two rows: the floor's extension lines rise to the
+    # dimension line and B-B's block height passes left of the note.
+    "CboreFloor": "M4x20 IN HGH15CA:\n3.85 MIN ENGAGEMENT",
 }
 CALLOUTS_BELOW = {
     "BoreDia": "LOCATING FIT ON MHA-CH-06-TL-VN-77 SHOULDER",

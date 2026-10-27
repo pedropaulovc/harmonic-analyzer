@@ -25,6 +25,7 @@ from _drawing_sheets import create_blank_drawing_sheets
 from _drawing_view_display import set_hidden_lines_removed
 from _hole_callout_thread_class import omit_title_block_thread_class
 from _paths import CAD_ROOT
+import _telemetry
 from _session import run_build
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 import ch_rocker_arm_tl_oblique_pivot_block_spec as part
@@ -58,7 +59,7 @@ PLAN_KEEP = {
     'PlanBoreX':(.157,.232),
     'BlockWidth':(.242,.195),'BlockSideY':(.224,.220),
     'CarriageDrills3Y':(.215,.1985),'CarriageDrills4Y':(.215,.2115),
-    'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.150),'CarriageCounterbores1Dia':(.095,.132),
+    'BoreDia':(.078,.196),'CarriageDrills1Dia':(.085,.168),'CarriageCounterbores1Dia':(.095,.150),
 }
 ROW_DIMENSIONS = ('CarriageDrills3Y','CarriageDrills4Y')
 # Section A-A looks up the sheet (third-angle: placed below the plan, its
@@ -82,10 +83,17 @@ SIDE_KEEP = {'TopBoreDepth':(.120,.088),'TapDrillDia':(.084,.078)}
 SEAT_DEPTH_TEXT_XY = (.078,.104)
 # Removed B-B at .335,.125: Y +5..+20 prints 15 mm tall (y ~117.5..132.5), Z
 # across with the top face toward the plan (x 322.85) and the carriage seat
-# at x 347.15. The floor and its note stand above; the block height under,
-# clear of the SECTION B-B caption ~17 mm below the view.
+# at x 347.15. Both dimensions stand above the view (under it, the 24.30 met
+# the SECTION B-B caption on TL-32, farm run 20261027T171931429Z): the floor
+# inside, its two-row note above its value right of x 357, so the block
+# height's extension lines (x 322.85, 347.15) outside it pass clear of it.
 FLOOR_XY = (.335,.125)
-FLOOR_KEEP = {'CboreFloor':(.360,.143),'SectionBlockHeight':(.335,.111)}
+FLOOR_KEEP = {'CboreFloor':(.380,.141),'SectionBlockHeight':(.335,.162)}
+# The section letters print smaller than the document default so A's right
+# letter, raised inside the block, ends under the block's +Y edge (y 225; at
+# the default it crossed it, farm run 20261027T171931429Z).
+SECTION_LETTER_HEIGHTS = (.005, .0045, .004, .0035)
+SECTION_LETTER_CLEARANCE = .001
 ISO_XY, ISO_SCALE = (.355,.235), SHEET_SCALE
 # TL-32: the plan drops 24 mm so its block lands where TL-22's does; the lug
 # (x 171.75..190.25, y 137..185) takes the space below. Under it: LugWidth,
@@ -118,15 +126,18 @@ VIEW_ARROW_RUN = .015
 NUT_XY, NUT_SCALE = (.190,.175), (2,1)
 NUT_KEEP = {
     'NutCentreY':(.133,.100),'NutTap1Y':(.157,.1073),'NutTap3Y':(.145,.1187),
-    'NutCentreZ':(.178,.175),'NutTap3Z':(.1725,.160),'NutTap4Z':(.2225,.160),
+    'NutCentreZ':(.140,.175),'NutTap3Z':(.1725,.160),'NutTap4Z':(.2225,.160),
     'NutClearanceDia':(.250,.101),'NutSeatDia':(.258,.128),
 }
 NUT_CAPTION = 'VIEW D'
 NUT_CAPTION_XY = (.166,.078)
 # C-C: the removed (partial) section of the lug alone at the sheet's 2:1, cut
 # through the nut axis, hatched, showing the Ø8.50 across the lug and the
-# Ø10.50 recess floor that its callout gives the depth of.
-NUT_SECTION_XY = (.335,.160)
+# Ø10.50 recess floor that its callout gives the depth of. Its arrows point
+# right, so it stands LEFT of VIEW D (third angle; right of it, it read
+# first-angle) in the sheet's empty left half. The 12.40's two-row text stands
+# left of the bottom-face edge (x 165.7), which struck it at x .178.
+NUT_SECTION_XY = (.075,.160)
 # The tap callout's shoulder starts right of the C line's lower letter
 # (x 204.6..210.5, y 81.6..88.0): from x 208 (farm run 20261024T133158704Z)
 # the leader ran 6.6 mm through it; from ~x 228 it passes above the letter.
@@ -193,6 +204,44 @@ def _size_note(adapter, note, height: float, *, label: str) -> None:
     rebuild_drawing(adapter, label=label)
 
 
+def _section_letter_tops(dr_section) -> list[float]:
+    """Sheet y of each cutting-line letter's top (GetTextInfo: x, y, z per
+    letter at its top-left, draw_fr_harmonic_base.section_line_boxes)."""
+    info = [float(v) for v in (dr_section.GetTextInfo() or ())]
+    if len(info) < 6:
+        raise RuntimeError(f'section {dr_section.GetLabel()!r}: unreadable letter positions {info!r}')
+    return [info[1], info[4]]
+
+
+def _set_section_letter_height(adapter, dr, height: float) -> None:
+    text_format = _early_bound(dr.GetTextFormat(), 'ITextFormat')
+    text_format.CharHeight = height
+    if not dr.SetTextFormat(False, text_format):
+        raise RuntimeError(f'section {dr.GetLabel()!r}: letter height {height} refused')
+    rebuild_drawing(adapter, label='section letter height')
+
+
+def _fit_section_letters(adapter, fitted, matched, *, below_y: float) -> None:
+    """Shrink ``fitted``'s cutting-line letters until both tops stand
+    ``SECTION_LETTER_CLEARANCE`` under ``below_y``, and print ``matched``'s at
+    the same height. Every height tried is logged with the letter tops, so a
+    seat that moves the letters differently reads off the leaf log."""
+    fit = _early_bound(_early_bound(fitted, 'IView').GetSection(), 'IDrSection')
+    tops: list[float] = []
+    for height in SECTION_LETTER_HEIGHTS:
+        _set_section_letter_height(adapter, fit, height)
+        tops = _section_letter_tops(fit)
+        _telemetry.info(f'section letters at {height * 1000:g} mm: tops {tops!r}, limit {below_y!r}')
+        if max(tops) <= below_y - SECTION_LETTER_CLEARANCE:
+            break
+    else:
+        _telemetry.warn(f'section letters still reach y {max(tops)!r} against {below_y!r} at '
+                        f'{SECTION_LETTER_HEIGHTS[-1] * 1000:g} mm')
+    for view in matched:
+        _set_section_letter_height(adapter, _early_bound(_early_bound(view, 'IView').GetSection(), 'IDrSection'),
+                                   height)
+
+
 def _view_arrow(adapter, plan, contract) -> None:
     """The lettered viewing arrow onto the lug's -X face (draw_dt_cone_tip_block)."""
     tip = _project(adapter, plan, (contract.LUG_X0, (contract.LUG_Y0 + contract.LUG_Y1) / 2,
@@ -247,6 +296,8 @@ async def draw_block(adapter, spec, contract, *, read_source_properties=None):
     floor = create_section_view(adapter,plan,line_start=start,line_end=end,view_xy=FLOOR_XY,
                                 section_label='B',scale=(1,1),partial=True,
                                 label='carriage counterbore floor')
+    block_top = _project(adapter,plan,(part.BORE_X,part.BLOCK_WIDTH/2,contract.BLOCK_HEIGHT),'block +Y edge')
+    _fit_section_letters(adapter, side, (floor,), below_y=block_top[1])
     annotations += curate_view_dimensions(adapter,floor,keep=FLOOR_KEEP,view_label='B-B floor',
                      dimensions_by_feature=contract.DRAWING_DIMENSIONS)
     set_hidden_lines_removed(adapter,iso)
